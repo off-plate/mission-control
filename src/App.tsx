@@ -1,9 +1,11 @@
-import { useState } from 'react'
-import { SpaceGrid } from './Grid'
-import { MOCK_EXCEPTIONS, SPACE_LABELS } from './mock'
-import { AddWidgetSheet, CoachSheet, DecomposeSheet, LedgerSheet } from './modals'
+import { useEffect, useRef, useState } from 'react'
+import { MOCK_EXCEPTIONS_FOR } from './exceptions'
+import { SPACE_LABELS } from './mock'
+import { DecomposeSheet } from './modals'
+import { GoalsPage, HabitsPage, PlanPage, TasksPage, TodayPage } from './pages1'
+import { CoachPage, MoneyPage, ReviewPage, SettingsPage, StatsPage } from './pages2'
 import { useStore } from './store'
-import type { SpaceId } from './types'
+import type { PageId, SpaceId } from './types'
 
 function Logo() {
   return (
@@ -15,19 +17,57 @@ function Logo() {
   )
 }
 
-type Modal = 'decompose' | 'coach' | 'ledger' | 'add' | null
+const NAV: { id: PageId; label: string; personalOnly?: boolean }[] = [
+  { id: 'today', label: 'Today' },
+  { id: 'plan', label: 'Plan' },
+  { id: 'tasks', label: 'Tasks' },
+  { id: 'habits', label: 'Habits' },
+  { id: 'goals', label: 'Goals' },
+  { id: 'money', label: 'Money', personalOnly: true },
+  { id: 'review', label: 'Review' },
+  { id: 'coach', label: 'Coach' },
+  { id: 'stats', label: 'Stats' },
+  { id: 'settings', label: 'Settings' },
+]
+
+function PageNav({
+  tabs, page, setPage, attention,
+}: {
+  tabs: { id: PageId; label: string }[]
+  page: PageId
+  setPage: (p: PageId) => void
+  attention: boolean
+}) {
+  const activeRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({ inline: 'center', block: 'nearest' })
+  }, [page])
+  return (
+    <nav className="nav" aria-label="Pages">
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          ref={page === t.id ? activeRef : undefined}
+          className={`nav-tab${t.id === 'today' && attention ? ' attention' : ''}`}
+          aria-current={page === t.id ? 'page' : undefined}
+          onClick={() => setPage(t.id)}
+        >
+          {t.label}
+        </button>
+      ))}
+    </nav>
+  )
+}
 
 export default function App() {
-  const { space, setSpace, theme, toggleTheme, editing, setEditing, savedMin, resetDemo } = useStore()
-  const [modal, setModal] = useState<Modal>(null)
+  const { space, setSpace, page, setPage, theme, toggleTheme } = useStore()
+  const [decomposeOpen, setDecomposeOpen] = useState(false)
+  const exceptions = MOCK_EXCEPTIONS_FOR(space)
 
-  const now = new Date()
-  const dateLine = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
-  const exceptions = space === 'personal' ? MOCK_EXCEPTIONS : []
+  const tabs = NAV.filter((t) => !t.personalOnly || space === 'personal')
 
   return (
     <div className="shell">
-      <a className="sr-only" href="#main" style={{ position: 'absolute', left: -9999 }}>Skip to content</a>
       <header className="topbar">
         <div className="brand">
           <Logo />
@@ -39,31 +79,16 @@ export default function App() {
               key={s}
               className="space-btn"
               aria-pressed={space === s}
-              onClick={() => setSpace(s)}
+              onClick={() => { setSpace(s); if (s !== 'personal' && page === 'money') setPage('today') }}
             >
               {SPACE_LABELS[s]}
             </button>
           ))}
         </nav>
         <div className="topbar-right">
-          <button className="chip" onClick={() => setModal('ledger')} aria-label="Time saved this week">
-            <span className="chip-label">saved</span>
-            <span className="mono">{Math.floor(savedMin / 60)}h {savedMin % 60}m</span>
-          </button>
-          <button className="btn btn-quiet" onClick={() => setModal('coach')}>Coach</button>
+          <button className="btn btn-primary" onClick={() => setDecomposeOpen(true)}>Break it down</button>
           <button
-            className="btn btn-quiet"
-            aria-pressed={editing}
-            onClick={() => setEditing(!editing)}
-          >
-            {editing ? 'Done' : 'Edit'}
-          </button>
-          {editing && (
-            <button className="btn btn-quiet" onClick={() => setModal('add')}>Add widget</button>
-          )}
-          <button className="btn btn-primary" onClick={() => setModal('decompose')}>Break it down</button>
-          <button
-            className="btn btn-quiet"
+            className="btn btn-ghost"
             onClick={toggleTheme}
             aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
           >
@@ -81,47 +106,27 @@ export default function App() {
         </div>
       </header>
 
+      <PageNav tabs={tabs} page={page} setPage={setPage} attention={exceptions.length > 0} />
+
       <main id="main">
-        <div className="dayline">
-          <h1>{SPACE_LABELS[space]}</h1>
-          <span className="mono">{dateLine} · Prague</span>
-        </div>
-
-        {exceptions.length > 0 ? (
-          <div className="exceptions" role="alert" aria-label="Needs attention">
-            {exceptions.map((x) => (
-              <div className="exception-row" key={x.id}>
-                <span className="dot" aria-hidden="true" />
-                <span>{x.text}</span>
-                {x.action === 'coach' && (
-                  <button onClick={() => setModal('coach')}>Walk me through it</button>
-                )}
-                <span className="when">{x.when}</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="allclear">
-            <span className="dot" aria-hidden="true" />
-            Nothing is on fire in this space. The grid below is the detail.
-          </div>
-        )}
-
-        <SpaceGrid onOpenLedger={() => setModal('ledger')} />
+        {page === 'today' && <TodayPage />}
+        {page === 'plan' && <PlanPage />}
+        {page === 'tasks' && <TasksPage onDecompose={() => setDecomposeOpen(true)} />}
+        {page === 'habits' && <HabitsPage />}
+        {page === 'goals' && <GoalsPage />}
+        {page === 'money' && <MoneyPage />}
+        {page === 'review' && <ReviewPage />}
+        {page === 'coach' && <CoachPage />}
+        {page === 'stats' && <StatsPage />}
+        {page === 'settings' && <SettingsPage />}
       </main>
 
       <footer className="foot">
-        <span className="mono">DEMO BUILD</span>
-        <span>All data on this page is invented. The real build syncs TickTick, Trello, Jira, two Gmail accounts, Calendar, Compass, Hevy and more into Supabase.</span>
-        <button className="btn-quiet" style={{ marginLeft: 'auto', fontSize: 'inherit', color: 'var(--muted)' }} onClick={resetDemo}>
-          Reset demo
-        </button>
+        <span className="mono">V1 DEMO</span>
+        <span>All data is invented and lives only in this browser. The real build syncs TickTick, Trello, Jira, two Gmail accounts, Calendar, Compass and Hevy into Supabase.</span>
       </footer>
 
-      {modal === 'decompose' && <DecomposeSheet onClose={() => setModal(null)} />}
-      {modal === 'coach' && <CoachSheet onClose={() => setModal(null)} />}
-      {modal === 'ledger' && <LedgerSheet onClose={() => setModal(null)} />}
-      {modal === 'add' && <AddWidgetSheet onClose={() => setModal(null)} />}
+      {decomposeOpen && <DecomposeSheet onClose={() => setDecomposeOpen(false)} />}
     </div>
   )
 }

@@ -23,14 +23,8 @@ class WidgetBoundary extends Component<{ children: ReactNode }, { failed: boolea
   }
 }
 
-function WidgetFrame({
-  inst, space, onOpenLedger,
-}: {
-  inst: WidgetInstance
-  space: SpaceId
-  onOpenLedger: () => void
-}) {
-  const { editing, resizeWidget, removeWidget } = useStore()
+function WidgetFrame({ inst, space }: { inst: WidgetInstance; space: SpaceId }) {
+  const { editing, resizeWidget, removeWidget, setPage } = useStore()
   const [menuOpen, setMenuOpen] = useState(false)
   const def = WIDGET_DEFS[inst.type]
   const stale = def.freshMinutes !== null && def.freshMinutes > def.staleAfter
@@ -38,7 +32,13 @@ function WidgetFrame({
   return (
     <section className={`widget${stale ? ' is-stale' : ''}`} aria-label={def.title}>
       <header className="widget-head">
-        <h2 className="widget-title">{def.title}</h2>
+        <button
+          className="widget-title-btn"
+          onClick={() => { if (!editing) setPage(def.page) }}
+          aria-label={`Open ${def.title}`}
+        >
+          <h2 className="widget-title">{def.title}</h2>
+        </button>
         <span className={`widget-fresh${stale ? ' stale' : ''}`}>
           {stale ? `stale, ${formatFresh(def.freshMinutes)}` : formatFresh(def.freshMinutes)}
         </span>
@@ -76,14 +76,50 @@ function WidgetFrame({
       )}
       <div className={`widget-body${inst.type === 'tasks' ? ' scroll' : ''}`}>
         <WidgetBoundary>
-          <WidgetBody type={inst.type} space={space} size={inst.size} onOpenLedger={onOpenLedger} />
+          <WidgetBody type={inst.type} space={space} size={inst.size} />
         </WidgetBoundary>
       </div>
     </section>
   )
 }
 
-export function SpaceGrid({ onOpenLedger }: { onOpenLedger: () => void }) {
+function PhoneStack({
+  instances, space, editing, moveWidget,
+}: {
+  instances: WidgetInstance[]
+  space: SpaceId
+  editing: boolean
+  moveWidget: (space: SpaceId, id: string, dir: -1 | 1) => void
+}) {
+  const [showAll, setShowAll] = useState(false)
+  const VISIBLE = 4
+  const shown = showAll || editing ? instances : instances.slice(0, VISIBLE)
+  const hidden = instances.slice(VISIBLE)
+  return (
+    <div className="stack">
+      {shown.map((inst, i) => (
+        <div key={inst.id} style={{ position: 'relative' }}>
+          {editing && (
+            <div className="stack-reorder" style={{ position: 'absolute', top: 8, right: 8, zIndex: 5 }}>
+              <button aria-label="Move up" onClick={() => moveWidget(space, inst.id, -1)} disabled={i === 0}>↑</button>
+              <button aria-label="Move down" onClick={() => moveWidget(space, inst.id, 1)} disabled={i === instances.length - 1}>↓</button>
+            </div>
+          )}
+          <WidgetFrame inst={inst} space={space} />
+        </div>
+      ))}
+      {!editing && hidden.length > 0 && (
+        <button className="btn btn-quiet" onClick={() => setShowAll((v) => !v)}>
+          {showAll
+            ? 'Show less'
+            : `More: ${hidden.map((h) => WIDGET_DEFS[h.type].title.toLowerCase()).join(', ')}`}
+        </button>
+      )}
+    </div>
+  )
+}
+
+export function SpaceGrid() {
   const { spaces, space, editing, reorderSpace, moveWidget } = useStore()
   const instances = spaces[space]
   const { width, containerRef, mounted } = useContainerWidth()
@@ -92,26 +128,14 @@ export function SpaceGrid({ onOpenLedger }: { onOpenLedger: () => void }) {
   const cols = colsForWidth(width || 1280)
   const margin = 14
   const cellW = (width - margin * (cols - 1)) / cols
-  const rowHeight = Math.max(150, Math.min(230, cellW * 0.88))
+  const rowHeight = Math.max(150, Math.min(250, cellW * 0.85))
 
   const layout = useMemo(() => packLayout(instances, cols), [instances, cols])
 
   return (
     <div ref={containerRef as React.RefObject<HTMLDivElement>} className={`grid-wrap${editing ? ' editing' : ''}`}>
       {mounted && phone && (
-        <div className="stack">
-          {instances.map((inst, i) => (
-            <div key={inst.id} style={{ position: 'relative' }}>
-              {editing && (
-                <div className="stack-reorder" style={{ position: 'absolute', top: 8, right: 8, zIndex: 5 }}>
-                  <button aria-label="Move up" onClick={() => moveWidget(space, inst.id, -1)} disabled={i === 0}>↑</button>
-                  <button aria-label="Move down" onClick={() => moveWidget(space, inst.id, 1)} disabled={i === instances.length - 1}>↓</button>
-                </div>
-              )}
-              <WidgetFrame inst={inst} space={space} onOpenLedger={onOpenLedger} />
-            </div>
-          ))}
-        </div>
+        <PhoneStack instances={instances} space={space} editing={editing} moveWidget={moveWidget} />
       )}
       {mounted && !phone && (
         <ReactGridLayout
@@ -124,7 +148,7 @@ export function SpaceGrid({ onOpenLedger }: { onOpenLedger: () => void }) {
         >
           {instances.map((inst) => (
             <div key={inst.id}>
-              <WidgetFrame inst={inst} space={space} onOpenLedger={onOpenLedger} />
+              <WidgetFrame inst={inst} space={space} />
             </div>
           ))}
         </ReactGridLayout>

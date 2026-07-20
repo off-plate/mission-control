@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { COACH_DEMO, WIDGET_DEFS, fakeDecompose, type DecomposedStep } from './mock'
+import { fakeDecompose, type DecomposedStep } from './mock'
 import { useStore } from './store'
-import type { WidgetType } from './types'
 
-function Sheet({ title, onClose, children, note }: {
+export function Sheet({ title, onClose, children, note }: {
   title: string
   onClose: () => void
   children: ReactNode
@@ -28,12 +27,11 @@ function Sheet({ title, onClose, children, note }: {
   )
 }
 
-/* ---------------- decompose ---------------- */
-
 export function DecomposeSheet({ onClose }: { onClose: () => void }) {
   const { addTasks, space } = useStore()
   const [goal, setGoal] = useState('')
   const [busy, setBusy] = useState(false)
+  const [dest, setDest] = useState<'today' | 'backlog'>('today')
   const [steps, setSteps] = useState<DecomposedStep[] | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -54,13 +52,13 @@ export function DecomposeSheet({ onClose }: { onClose: () => void }) {
 
   const accept = () => {
     if (!steps) return
-    addTasks(steps.map((s, i) => ({
-      id: `d-${Date.now()}-${i}`,
+    addTasks(steps.map((s) => ({
       title: s.title,
       source: 'mc' as const,
       estimateMin: s.estimateMin,
-      done: false,
       space,
+      list: dest,
+      category: s.category ?? 'quick',
     })))
     onClose()
   }
@@ -77,7 +75,7 @@ export function DecomposeSheet({ onClose }: { onClose: () => void }) {
           id="goal"
           ref={inputRef}
           className="textinput"
-          placeholder="Plan next week"
+          placeholder="Set up the bank payment plan"
           value={goal}
           onChange={(e) => setGoal(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') run() }}
@@ -108,126 +106,20 @@ export function DecomposeSheet({ onClose }: { onClose: () => void }) {
           <div className="total-line">
             <span>Raw estimate <span className="mono">{total}m</span></span>
             <span style={{ color: 'var(--muted)' }}>
-              Plan for <span className="mono">{calibrated}m</span>, your history runs about 1.3x
+              Plan for <span className="mono">{calibrated}m</span> with the 1.3x buffer. The real app computes the buffer from your logged history.
             </span>
           </div>
-          <div style={{ display: 'flex', marginTop: 16 }}>
+          <div style={{ display: 'flex', marginTop: 16, gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div className="seg" role="group" aria-label="Where to add">
+              <button aria-pressed={dest === 'today'} onClick={() => setDest('today')}>today</button>
+              <button aria-pressed={dest === 'backlog'} onClick={() => setDest('backlog')}>backlog</button>
+            </div>
             <button className="btn btn-primary" onClick={accept} style={{ marginLeft: 'auto' }}>
-              Add {steps.length} steps to {space === 'personal' ? 'Personal' : space === 'work' ? 'Work' : 'Off-Plate'}
+              Add {steps.length} steps
             </button>
           </div>
         </div>
       )}
-    </Sheet>
-  )
-}
-
-/* ---------------- coach ---------------- */
-
-export function CoachSheet({ onClose }: { onClose: () => void }) {
-  const { addTasks, space } = useStore()
-  const [i, setI] = useState(0)
-  const step = COACH_DEMO[i]
-  const last = i === COACH_DEMO.length - 1
-
-  const finish = () => {
-    addTasks([{
-      id: `c-${Date.now()}`,
-      title: 'Call: confirm the payment plan, script ready',
-      source: 'mc',
-      estimateMin: 15,
-      done: false,
-      space,
-    }])
-    onClose()
-  }
-
-  return (
-    <Sheet
-      title="Coach"
-      onClose={onClose}
-      note="Demo: one canned scenario. The real app walks any uncomfortable situation in five steps, plays the counterpart in rehearsal, and never invents institutional facts."
-    >
-      <div className="coach-progress" aria-hidden="true">
-        {COACH_DEMO.map((_, k) => <i key={k} className={k <= i ? 'on' : ''} />)}
-      </div>
-      <span className="coach-step-label">Step {i + 1} of {COACH_DEMO.length}: {step.label}</span>
-      <h3 className="coach-q">{step.question}</h3>
-      {step.body && <p style={{ fontSize: 'var(--text-sm)', color: 'var(--muted)', marginBottom: 12 }}>{step.body}</p>}
-      {step.scripts?.map((s, k) => (
-        <div className="script-line" key={k}>
-          <span className="say">{s.say}</span>
-          {s.text}
-        </div>
-      ))}
-      <div className="coach-nav">
-        {i > 0 && <button className="btn btn-quiet" onClick={() => setI(i - 1)}>Back</button>}
-        {!last && <button className="btn btn-primary" onClick={() => setI(i + 1)}>Next</button>}
-        {last && <button className="btn btn-primary" onClick={finish}>Save the call as a task</button>}
-      </div>
-    </Sheet>
-  )
-}
-
-/* ---------------- time saved ledger ---------------- */
-
-export function LedgerSheet({ onClose }: { onClose: () => void }) {
-  const { ledger, savedMin, accuracyPct } = useStore()
-  return (
-    <Sheet
-      title="Time saved"
-      onClose={onClose}
-      note="Every number here traces to a logged estimate and a logged actual. Nothing is projected, nothing is invented."
-    >
-      <div className="kpi">
-        {Math.floor(savedMin / 60) > 0 ? `${Math.floor(savedMin / 60)}h ${savedMin % 60}` : savedMin}
-        <span className="unit"> min</span>
-      </div>
-      <div className="kpi-sub" style={{ marginBottom: 16 }}>
-        saved this week. Estimate accuracy {accuracyPct}% within a quarter of the estimate.
-      </div>
-      {ledger.map((e) => {
-        const d = e.estimateMin - e.actualMin
-        return (
-          <div className="ledger-row" key={e.id}>
-            <span className="mono" style={{ color: 'var(--faint)', fontSize: 'var(--text-xs)', minWidth: '3ch' }}>{e.when}</span>
-            <span style={{ flex: 1, minWidth: 0 }}>{e.title}</span>
-            <span className="mono" style={{ color: 'var(--muted)', fontSize: 'var(--text-xs)' }}>
-              ~{e.estimateMin} → {e.actualMin}m
-            </span>
-            <span className={`delta ${d >= 0 ? 'saved' : 'over'}`}>{d >= 0 ? `+${d}m` : `${d}m`}</span>
-          </div>
-        )
-      })}
-    </Sheet>
-  )
-}
-
-/* ---------------- add widget ---------------- */
-
-export function AddWidgetSheet({ onClose }: { onClose: () => void }) {
-  const { spaces, space, addWidget } = useStore()
-  const present = new Set(spaces[space].map((w) => w.type))
-  const types = Object.values(WIDGET_DEFS)
-  return (
-    <Sheet
-      title="Add a widget"
-      onClose={onClose}
-      note="The real app also gets a generic source widget: point it at any API or MCP connection and template the result."
-    >
-      <div className="addw-grid">
-        {types.map((d) => (
-          <button
-            key={d.type}
-            className="addw-item"
-            disabled={present.has(d.type as WidgetType)}
-            onClick={() => { addWidget(space, d.type as WidgetType); onClose() }}
-          >
-            {d.title}
-            <span className="d">{d.description}</span>
-          </button>
-        ))}
-      </div>
     </Sheet>
   )
 }

@@ -7,6 +7,10 @@
 **DONE:** Phase 0 demo (mock data) live at off-plate.github.io/mission-control.
 **ASK:** Before adding widgets or features beyond the plan; before any deploy beyond Pages.
 
+## Release gate (non-negotiable)
+
+Nothing gets deployed or shown to Michael as "ready" until the release team returns GO. Run the saved workflow `mission-control-release-gate` (Jarvis `.claude/workflows/`); it builds, runs `scripts/qa.mjs` (functional flows + full screenshot matrix into `.qa-shots/`), then a panel of `mc-release-critic` and `persona-michael` (Jarvis `.claude/agents/`) judges the build. Fix every high-severity finding and re-run until GO. This exists because the first demo shipped on self-QA alone and was rejected.
+
 ## Rules
 
 - The founding plan and research live in `notes/` (gitignored, personal). Read `notes/PLAN.md` before structural changes.

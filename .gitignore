@@ -2,3 +2,4 @@ node_modules/
 notes/
 .DS_Store
 *.local
+.qa-shots/

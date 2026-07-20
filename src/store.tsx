@@ -1,30 +1,59 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   DEFAULT_SPACES,
+  MOCK_GOALS,
   MOCK_HABITS,
   MOCK_LEDGER,
+  MOCK_SOCIAL,
+  MOCK_SOURCES,
   MOCK_TASKS,
   WIDGET_DEFS,
 } from './mock'
-import type { Habit, LedgerEntry, SizeKey, SpaceId, Task, WidgetInstance, WidgetType } from './types'
+import type {
+  Goal,
+  HabitDef,
+  LedgerEntry,
+  PageId,
+  PlanState,
+  ReviewState,
+  SizeKey,
+  SocialEntry,
+  SourceState,
+  SpaceId,
+  Task,
+  TaskCategory,
+  WidgetInstance,
+  WidgetType,
+} from './types'
 
-const STORAGE_KEY = 'mission-control-demo-v1'
+const STORAGE_KEY = 'mission-control-demo-v3'
 
 interface PersistedState {
-  version: 1
+  version: 2
   spaces: Record<SpaceId, WidgetInstance[]>
   tasks: Task[]
-  habits: Habit[]
+  habits: HabitDef[]
+  goals: Goal[]
   ledger: LedgerEntry[]
+  social: SocialEntry[]
+  sources: SourceState[]
+  plan: PlanState
+  review: ReviewState
 }
 
 interface Store extends PersistedState {
   space: SpaceId
   setSpace: (s: SpaceId) => void
+  page: PageId
+  setPage: (p: PageId) => void
   theme: 'light' | 'dark'
   toggleTheme: () => void
   editing: boolean
   setEditing: (v: boolean) => void
+  focusTaskId: string | null
+  setFocusTaskId: (id: string | null) => void
+  coachOpen: string | null
+  setCoachOpen: (id: string | null) => void
 
   reorderSpace: (space: SpaceId, order: string[]) => void
   resizeWidget: (space: SpaceId, id: string, size: SizeKey) => void
@@ -34,9 +63,27 @@ interface Store extends PersistedState {
 
   toggleTask: (id: string) => void
   logActual: (id: string, actualMin: number) => void
-  toggleHabit: (id: string) => void
-  addTasks: (tasks: Task[]) => void
+  addTask: (t: Omit<Task, 'id' | 'done'>) => void
+  addTasks: (tasks: Omit<Task, 'id' | 'done'>[]) => void
+  moveTaskList: (id: string, list: 'today' | 'backlog') => void
+  deleteTask: (id: string) => void
 
+  toggleHabitDay: (id: string, day: number) => void
+  addHabit: (name: string) => void
+  togglePauseHabit: (id: string) => void
+  deleteHabit: (id: string) => void
+
+  addGoal: (g: Omit<Goal, 'id'>) => void
+  bumpGoal: (id: string, delta: number) => void
+  deleteGoal: (id: string) => void
+
+  setSocial: (entries: SocialEntry[]) => void
+  toggleSource: (id: string) => void
+
+  commitPlan: (taskIds: string[], firstMoveId: string | null) => void
+  finishReview: (wins: string[], outcomes: string[]) => void
+
+  todayIndex: number
   savedMin: number
   accuracyPct: number
   resetDemo: () => void
@@ -49,7 +96,7 @@ function loadPersisted(): PersistedState | null {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const p = JSON.parse(raw) as PersistedState
-    return p.version === 1 ? p : null
+    return p.version === 2 ? p : null
   } catch {
     return null
   }
@@ -59,16 +106,40 @@ function systemTheme(): 'light' | 'dark' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
+function pageFromHash(): PageId {
+  const h = location.hash.replace('#/', '')
+  const pages: PageId[] = ['today', 'plan', 'tasks', 'habits', 'goals', 'money', 'review', 'coach', 'stats', 'settings']
+  return (pages as string[]).includes(h) ? (h as PageId) : 'today'
+}
+
 let uid = 100
+const todayKey = () => new Date().toISOString().slice(0, 10)
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const persisted = useMemo(loadPersisted, [])
+  const seedTodayIdx = (new Date().getDay() + 6) % 7
+  const seededHabits = useMemo(
+    () => MOCK_HABITS.map((h) => ({ ...h, days: h.days.map((d, i) => (i <= seedTodayIdx ? d : false)) })),
+    [seedTodayIdx],
+  )
+  const seededGoals = useMemo(() => {
+    const sleepNights = seededHabits[0].days.filter(Boolean).length
+    return MOCK_GOALS.map((g) => (g.id === 'g2' ? { ...g, current: sleepNights } : g))
+  }, [seededHabits])
   const [spaces, setSpaces] = useState(persisted?.spaces ?? DEFAULT_SPACES)
   const [tasks, setTasks] = useState(persisted?.tasks ?? MOCK_TASKS)
-  const [habits, setHabits] = useState(persisted?.habits ?? MOCK_HABITS)
+  const [habits, setHabits] = useState(persisted?.habits ?? seededHabits)
+  const [goals, setGoals] = useState(persisted?.goals ?? seededGoals)
   const [ledger, setLedger] = useState(persisted?.ledger ?? MOCK_LEDGER)
+  const [social, setSocialState] = useState(persisted?.social ?? MOCK_SOCIAL)
+  const [sources, setSources] = useState(persisted?.sources ?? MOCK_SOURCES)
+  const [plan, setPlan] = useState<PlanState>(persisted?.plan ?? { committedDate: null, firstMoveId: null })
+  const [review, setReview] = useState<ReviewState>(persisted?.review ?? { lastDoneDate: null, wins: [], outcomes: [] })
   const [space, setSpace] = useState<SpaceId>('personal')
+  const [page, setPageState] = useState<PageId>(pageFromHash)
   const [editing, setEditing] = useState(false)
+  const [focusTaskId, setFocusTaskId] = useState<string | null>(null)
+  const [coachOpen, setCoachOpen] = useState<string | null>(null)
   const [theme, setTheme] = useState<'light' | 'dark'>(systemTheme)
 
   useEffect(() => {
@@ -76,27 +147,49 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [theme])
 
   useEffect(() => {
-    const state: PersistedState = { version: 1, spaces, tasks, habits, ledger }
+    const onHash = () => setPageState(pageFromHash())
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [])
+
+  const setPage = (p: PageId) => {
+    location.hash = `/${p}`
+    setPageState(p)
+    window.scrollTo({ top: 0 })
+  }
+
+  useEffect(() => {
+    const state: PersistedState = {
+      version: 2, spaces, tasks, habits, goals, ledger, social, sources, plan, review,
+    }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
     } catch {
       /* demo only; the real app persists to Supabase */
     }
-  }, [spaces, tasks, habits, ledger])
+  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review])
 
-  const savedMin = ledger.reduce((acc, e) => acc + Math.max(0, e.estimateMin - e.actualMin), 0)
+  /* Demo pretends today is Sunday when the real weekday is irrelevant;
+     habits use the real weekday so checking off feels true. */
+  const todayIndex = (new Date().getDay() + 6) % 7
+
+  /* Net, including overruns; the headline must equal the sum of the visible ledger rows. */
+  const savedMin = ledger.reduce((acc, e) => acc + (e.estimateMin - e.actualMin), 0)
   const accuracyPct = Math.round(
     (ledger.filter((e) => Math.abs(e.actualMin - e.estimateMin) <= e.estimateMin * 0.25).length /
       Math.max(1, ledger.length)) * 100,
   )
 
   const value: Store = {
-    version: 1,
-    spaces, tasks, habits, ledger,
+    version: 2,
+    spaces, tasks, habits, goals, ledger, social, sources, plan, review,
     space, setSpace,
+    page, setPage,
     theme,
     toggleTheme: () => setTheme((t) => (t === 'dark' ? 'light' : 'dark')),
     editing, setEditing,
+    focusTaskId, setFocusTaskId,
+    coachOpen, setCoachOpen,
 
     reorderSpace: (sp, order) =>
       setSpaces((prev) => {
@@ -107,10 +200,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }),
 
     resizeWidget: (sp, id, size) =>
-      setSpaces((prev) => ({
-        ...prev,
-        [sp]: prev[sp].map((w) => (w.id === id ? { ...w, size } : w)),
-      })),
+      setSpaces((prev) => ({ ...prev, [sp]: prev[sp].map((w) => (w.id === id ? { ...w, size } : w)) })),
 
     removeWidget: (sp, id) =>
       setSpaces((prev) => ({ ...prev, [sp]: prev[sp].filter((w) => w.id !== id) })),
@@ -135,25 +225,86 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t))),
 
     logActual: (id, actualMin) => {
-      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: true, actualMin } : t)))
       const t = tasks.find((x) => x.id === id)
+      setTasks((prev) => prev.map((x) => (x.id === id ? { ...x, done: true, actualMin } : x)))
       if (t && t.actualMin === undefined) {
         setLedger((prev) => [
-          { id: `l-${++uid}`, title: t.title, estimateMin: t.estimateMin, actualMin, when: 'now' },
+          { id: `l-${++uid}`, title: t.title, category: t.category, estimateMin: t.estimateMin, actualMin, when: 'now' },
           ...prev,
         ])
       }
     },
 
-    toggleHabit: (id) =>
-      setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, done: !h.done } : h))),
+    addTask: (t) => setTasks((prev) => [{ ...t, id: `t-${++uid}`, done: false }, ...prev]),
+    addTasks: (ts) =>
+      setTasks((prev) => [...ts.map((t) => ({ ...t, id: `t-${++uid}`, done: false })), ...prev]),
+    moveTaskList: (id, list) =>
+      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, list } : t))),
+    deleteTask: (id) => setTasks((prev) => prev.filter((t) => t.id !== id)),
 
-    addTasks: (ts) => setTasks((prev) => [...ts, ...prev]),
+    toggleHabitDay: (id, day) =>
+      setHabits((prev) =>
+        prev.map((h) =>
+          h.id === id ? { ...h, days: h.days.map((d, i) => (i === day ? !d : d)) } : h,
+        ),
+      ),
+    addHabit: (name) =>
+      setHabits((prev) => [...prev, { id: `h-${++uid}`, name, days: [false, false, false, false, false, false, false], paused: false }]),
+    togglePauseHabit: (id) =>
+      setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, paused: !h.paused } : h))),
+    deleteHabit: (id) => setHabits((prev) => prev.filter((h) => h.id !== id)),
 
+    addGoal: (g) => setGoals((prev) => [...prev, { ...g, id: `g-${++uid}` }]),
+    bumpGoal: (id, delta) =>
+      setGoals((prev) =>
+        prev.map((g) =>
+          g.id === id ? { ...g, current: Math.max(0, Math.min(g.target, g.current + delta)) } : g,
+        ),
+      ),
+    deleteGoal: (id) => setGoals((prev) => prev.filter((g) => g.id !== id)),
+
+    setSocial: (entries) => setSocialState(entries),
+    toggleSource: (id) =>
+      setSources((prev) =>
+        prev.map((s) =>
+          s.id === id && s.status !== 'manual'
+            ? { ...s, status: s.status === 'connected' ? 'off' : 'connected' }
+            : s,
+        ),
+      ),
+
+    commitPlan: (taskIds, firstMoveId) => {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.space !== space ? t : { ...t, list: taskIds.includes(t.id) ? 'today' : t.done ? t.list : 'backlog' },
+        ),
+      )
+      setPlan({ committedDate: todayKey(), firstMoveId })
+    },
+
+    finishReview: (wins, outcomes) => {
+      setReview({ lastDoneDate: todayKey(), wins, outcomes })
+      setTasks((prev) => [
+        ...outcomes.filter(Boolean).map((o) => ({
+          id: `t-${++uid}`,
+          title: o,
+          source: 'mc' as const,
+          estimateMin: 30,
+          done: false,
+          space,
+          list: 'backlog' as const,
+          category: 'deep' as TaskCategory,
+        })),
+        ...prev,
+      ])
+    },
+
+    todayIndex,
     savedMin,
     accuracyPct,
     resetDemo: () => {
       try { localStorage.removeItem(STORAGE_KEY) } catch { /* noop */ }
+      location.hash = ''
       location.reload()
     },
   }

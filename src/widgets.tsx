@@ -99,6 +99,7 @@ const TasksBody = memo(function TasksBody({ space, size }: { space: SpaceId; siz
                 <path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
             </button>
+            <span className={`cat-dot ${t.category}`} title={t.category} aria-hidden="true" />
             <span className="grow wrap2">{t.title}</span>
             {!t.done && t.actualMin === undefined && (
               <span className={`actual-chips${logOpen === t.id ? ' open' : ''}`} title="Done in...">
@@ -148,7 +149,7 @@ const FinanceBody = memo(function FinanceBody({ size }: { size: SizeKey }) {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-        <span className="kpi" style={{ fontSize: '1.6rem' }}>{f.safeToSpend}</span>
+        <span className="kpi val-pos" style={{ fontSize: '1.6rem' }}>{f.safeToSpend}</span>
         <span className="kpi-sub" style={{ marginTop: 0 }}>safe to spend {f.safeUntil}</span>
       </div>
       <div className="kpi-sub">{f.safeMath}</div>
@@ -216,13 +217,14 @@ const TrainingBody = memo(function TrainingBody({ size }: { size: SizeKey }) {
 })
 
 const GoalsBody = memo(function GoalsBody({ space }: { space: SpaceId }) {
-  const { goals } = useStore()
+  const { goals, todayIndex } = useStore()
   const list = goals.filter((g) => g.space === space)
   return (
     <div>
       {list.map((g) => {
         const pct = Math.round((g.current / g.target) * 100)
-        const off = pct < 50
+        const weekly = /this week/.test(g.unit)
+        const off = pct < 50 && !(weekly && todayIndex < 3)
         return (
           <div className="goal-row" key={g.id}>
             <div className="goal-line">
@@ -247,7 +249,7 @@ const TimeSavedBody = memo(function TimeSavedBody() {
   const m = savedMin % 60
   return (
     <button onClick={() => setPage('stats')} style={{ textAlign: 'left', display: 'block', width: '100%' }} aria-label="Open the time saved log">
-      <div className="kpi">{h > 0 ? `${h}h ${m}` : m}<span className="unit">min</span></div>
+      <div className={`kpi${savedMin >= 0 ? ' val-pos' : ' val-urgent'}`}>{h > 0 ? `${h}h ${m}` : m}<span className="unit">min</span></div>
       <div className="kpi-sub">net minutes under your own estimates this week</div>
       <div className="kpi-sub">estimate accuracy {accuracyPct}%</div>
     </button>

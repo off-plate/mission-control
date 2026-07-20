@@ -404,7 +404,7 @@ export const COACH_SCENARIOS: CoachScenario[] = [
         ],
       },
       { label: 'Rehearse', question: 'They push: "Zabere to jen hodinu."', scripts: [{ say: 'You answer', text: 'Právě proto to nabízím na středu. Když to vezmu teď, bude to odbyté a stejně to budeme dělat znovu.' }] },
-      { label: 'Fallback', question: 'If guilt kicks in', scripts: [{ say: 'Remember', text: 'Every yes this week is a no to the payment plan calls. That is the real trade.' }] },
+      { label: 'Fallback', question: 'If guilt kicks in', scripts: [{ say: 'Připomeň si', text: 'Každé „ano“ tenhle týden je „ne“ hovorům o splátkách. To je ta skutečná cena.' }] },
       { label: 'Commit', question: 'Lock it in', body: 'Send the message now, 10 minutes. Done is better than dreaded.' },
     ],
   },

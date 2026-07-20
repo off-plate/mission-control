@@ -11,7 +11,7 @@ export function Band({
 }: {
   title: string
   sub?: string
-  metrics?: { v: string; k: string }[]
+  metrics?: { v: string; k: string; tone?: 'pos' | 'urgent' | 'info' }[]
   actions?: React.ReactNode
 }) {
   return (
@@ -23,7 +23,7 @@ export function Band({
       <div className="band-status">
         {metrics?.map((m) => (
           <div className="band-metric" key={m.k}>
-            <span className="v">{m.v}</span>
+            <span className={`v${m.tone ? ' val-' + m.tone : ''}`}>{m.v}</span>
             <span className="k">{m.k}</span>
           </div>
         ))}
@@ -77,9 +77,9 @@ export function TodayPage() {
         title={SPACE_LABELS[space]}
         sub={`${dateLine()} · Prague`}
         metrics={[
-          { v: nextEvent.v, k: nextEvent.k },
+          { v: nextEvent.v, k: nextEvent.k, tone: 'info' as const },
           { v: String(open.length), k: 'tasks open' },
-          ...(space === 'personal' ? [{ v: '2 400 Kč Fri', k: 'next payment' }] : [{ v: `${Math.floor(savedMin / 60)}h ${savedMin % 60}m`, k: 'under estimate' }]),
+          ...(space === 'personal' ? [{ v: '2 400 Kč Fri', k: 'next payment', tone: 'urgent' as const }] : [{ v: `${Math.floor(savedMin / 60)}h ${savedMin % 60}m`, k: 'under estimate', tone: 'pos' as const }]),
         ]}
         actions={
           <>
@@ -151,20 +151,10 @@ export function TodayPage() {
 
       <div className="status-strip" aria-label="Background numbers">
         {space === 'personal' && (
-          <>
-            <button onClick={() => setPage('stats')}><span className="k">under estimate</span> {Math.floor(savedMin / 60)}h {savedMin % 60}m</button>
-            <button onClick={() => setPage('stats')}><span className="k">claude</span> 6 sessions today</button>
-            <button onClick={() => setPage('settings')}><span className="k">sync</span> {sources.filter((x) => x.status === 'connected').length} of {sources.filter((x) => x.status !== 'manual').length} live{sources.some((x) => x.status === 'off') ? `, ${sources.filter((x) => x.status === 'off').map((x) => x.name).join(', ')} paused` : ''}</button>
-          </>
-        )}
-        {space === 'work' && (
-          <button onClick={() => setPage('stats')}><span className="k">under estimate</span> {Math.floor(savedMin / 60)}h {savedMin % 60}m</button>
+          <button onClick={() => setPage('settings')}><span className="k">sync</span> {sources.filter((x) => x.status === 'connected').length} of {sources.filter((x) => x.status !== 'manual').length} live{sources.some((x) => x.status === 'off') ? `, ${sources.filter((x) => x.status === 'off').map((x) => x.name).join(', ')} paused` : ''}</button>
         )}
         {space === 'offplate' && (
-          <>
-            <button onClick={() => setPage('stats')}><span className="k">under estimate</span> {Math.floor(savedMin / 60)}h {savedMin % 60}m</button>
-            <button onClick={() => setPage('review')}><span className="k">follower stats</span> entered 9 d ago, stale</button>
-          </>
+          <button onClick={() => setPage('review')}><span className="k">follower stats</span> entered 9 d ago, stale</button>
         )}
       </div>
       {addOpen && <AddWidgetInline onClose={() => setAddOpen(false)} />}
@@ -391,6 +381,7 @@ export function TasksPage({ onDecompose: _onDecompose }: { onDecompose?: () => v
           <path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         </svg>
       </button>
+      <span className={`cat-dot ${t.category}`} title={t.category} aria-hidden="true" />
       <span className="grow">{t.title}</span>
       {!t.done && t.actualMin === undefined && (
         <span className={`actual-chips${logOpen === t.id ? ' open' : ''}`} title="Done in...">
@@ -531,7 +522,7 @@ export function HabitsPage() {
   )
 
   return (
-    <div className="page">
+    <div className="page narrow">
       <Band
         title="Habits"
         sub="this week"
@@ -624,7 +615,7 @@ export function HabitsPage() {
 /* ---------------- GOALS ---------------- */
 
 export function GoalsPage() {
-  const { space, goals, addGoal, bumpGoal, deleteGoal } = useStore()
+  const { space, goals, addGoal, bumpGoal, deleteGoal, todayIndex } = useStore()
   const list = goals.filter((g) => g.space === space)
   const [name, setName] = useState('')
   const [target, setTarget] = useState(10)
@@ -637,7 +628,7 @@ export function GoalsPage() {
   }
 
   return (
-    <div className="page">
+    <div className="page narrow">
       <Band
         title="Quarter goals"
         sub={`${SPACE_LABELS[space]} · Q3 2026`}
@@ -652,7 +643,8 @@ export function GoalsPage() {
         </div>
         {list.map((g) => {
           const pct = Math.round((g.current / g.target) * 100)
-          const off = pct < 50
+          const weekly = /this week/.test(g.unit)
+          const off = pct < 50 && !(weekly && todayIndex < 3)
           return (
             <div className="goal-row" key={g.id}>
               <div className="goal-line">

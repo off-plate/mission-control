@@ -25,6 +25,24 @@
   --progress: #23624a;
   --progress-wash: rgba(35, 98, 74, 0.12);
 
+  /* Semantic layer. Meaning, not decoration:
+     accent  = interactive (you can act; also the active space's identity)
+     alert   = important, out of band (needs your attention)
+     progress= positive, yours, done, money you have
+     info    = plain data (a calm cool tint so information reads as information,
+               distinct from both action-accent and warm page chrome) */
+  --info: #55606e;
+  --info-wash: rgba(85, 96, 110, 0.10);
+  --warn: #b06612;
+  --warn-wash: rgba(176, 102, 18, 0.12);
+
+  /* Categorical layer: muted identity hues, dots only, never fills.
+     Deliberately below the accent's saturation and never green. */
+  --cat-call: #b5654a;
+  --cat-admin: #5b6e8c;
+  --cat-deep: #8a6a4f;
+  --cat-quick: #4e8a88;
+
   --shadow-pop: 0 18px 50px rgba(22, 21, 15, 0.18);
 
   --font-display: 'Cabinet Grotesk', 'Avenir Next', sans-serif;
@@ -73,7 +91,32 @@ html { font-size: 16px; }
   --alert-wash: rgba(240, 133, 96, 0.13);
   --progress: #8dc3a5;
   --progress-wash: rgba(141, 195, 165, 0.14);
+  --info: #9aa6b8;
+  --info-wash: rgba(154, 166, 184, 0.14);
+  --warn: #d99a3c;
+  --warn-wash: rgba(217, 154, 60, 0.14);
+  --cat-call: #d08a6e;
+  --cat-admin: #8ea3c2;
+  --cat-deep: #b39476;
+  --cat-quick: #7bb3b0;
   --shadow-pop: 0 18px 50px rgba(0, 0, 0, 0.55);
+}
+
+/* ---------- per-space identity accent ----------
+   Interactive elements adopt the active space's accent, so Personal, Work
+   and Off-Plate each feel like a different room. Theme-qualified so dark
+   mode keeps its lighter cuts. Personal keeps the base flight blue. */
+[data-theme="light"][data-space="work"] {
+  --accent: #0f5f5a; --accent-hover: #0b4a46; --accent-wash: rgba(15, 95, 90, 0.10);
+}
+[data-theme="dark"][data-space="work"] {
+  --accent: #63c3ba; --accent-hover: #7fd0c8; --accent-ink: #101009; --accent-wash: rgba(99, 195, 186, 0.14);
+}
+[data-theme="light"][data-space="offplate"] {
+  --accent: #8a6410; --accent-hover: #6f5009; --accent-wash: rgba(138, 100, 16, 0.11);
+}
+[data-theme="dark"][data-space="offplate"] {
+  --accent: #e0a94a; --accent-hover: #ecbb68; --accent-ink: #101009; --accent-wash: rgba(224, 169, 74, 0.14);
 }
 
 /* ---------- base ---------- */
@@ -161,7 +204,18 @@ a, button, input, select, textarea {
   min-height: 34px;
 }
 .space-btn:hover { color: var(--ink); }
-.space-btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); font-weight: 600; }
+.space-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
+/* semantic value colors, applied to numbers/labels that carry meaning */
+.val-pos { color: var(--progress); }
+.val-urgent { color: var(--alert); }
+.val-info { color: var(--info); }
+
+.cat-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.cat-dot.call { background: var(--cat-call); }
+.cat-dot.admin { background: var(--cat-admin); }
+.cat-dot.deep { background: var(--cat-deep); }
+.cat-dot.quick { background: var(--cat-quick); }
 
 .topbar-right { margin-left: auto; display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
 
@@ -390,7 +444,7 @@ a, button, input, select, textarea {
   margin-left: auto;
   font-family: var(--font-mono);
   font-size: 0.75rem;
-  color: var(--faint);
+  color: var(--info);
   white-space: nowrap;
 }
 .widget-fresh.stale { color: var(--alert); font-weight: 600; }
@@ -452,7 +506,7 @@ a, button, input, select, textarea {
 }
 .rowitem:last-child { border-bottom: none; }
 .rowitem .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rowitem .meta { color: var(--muted); font-size: var(--text-xs); white-space: nowrap; }
+.rowitem .meta { color: var(--info); font-size: var(--text-xs); white-space: nowrap; }
 .rowitem .mono { white-space: nowrap; }
 .rowitem.done .grow { text-decoration: line-through; color: var(--faint); }
 
@@ -460,24 +514,26 @@ a, button, input, select, textarea {
   font-family: var(--font-mono);
   font-size: 0.6875rem;
   letter-spacing: 0.04em;
-  color: var(--muted);
-  border: 1px solid var(--hairline);
+  color: var(--info);
+  background: var(--info-wash);
   border-radius: 3px;
   padding: 1px 6px;
   white-space: nowrap;
 }
 
-/* Estimates are passive metadata: neutral, so accent stays for actions. */
+/* Estimates are informative data: cool info tint, never the action accent. */
 .est-chip {
   font-family: var(--font-mono);
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--muted);
-  border: 1px solid var(--hairline);
+  color: var(--info);
+  background: var(--info-wash);
+  border: none;
   border-radius: 3px;
-  padding: 1px 6px;
+  padding: 2px 6px;
   white-space: nowrap;
 }
+button.est-chip:hover { color: var(--accent); background: var(--accent-wash); }
 
 .checkbox {
   width: 22px; height: 22px;
@@ -497,8 +553,11 @@ a, button, input, select, textarea {
 
 .bar { height: 7px; border-radius: 4px; background: var(--surface-2); border: 1px solid var(--hairline-strong); overflow: hidden; }
 .bar > i { display: block; height: 100%; border-radius: 4px; background: var(--accent); transition: width 400ms var(--ease); }
-.bar.warn > i { background: var(--alert); }
 .bar.prog > i { background: var(--progress); }
+/* debt paydown is never green (money owed): neutral info fill */
+.bar.debt > i { background: var(--info); }
+/* drifting (warn) must win over prog: green only when truly on track */
+.bar.warn > i, .bar.prog.warn > i { background: var(--warn); }
 
 .spark { color: var(--accent); }
 .spark-base { color: var(--hairline-strong); }
@@ -534,7 +593,7 @@ a, button, input, select, textarea {
 .goal-line .grow { flex: 1; min-width: 0; }
 .goal-line .drift { font-family: var(--font-mono); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
 .drift.ok { color: var(--progress); }
-.drift.off { color: var(--alert); }
+.drift.off { color: var(--warn); }
 .goal-row .bar { margin-top: var(--s2); }
 .goal-row .kpi-sub { margin-top: var(--s1); }
 
@@ -547,6 +606,9 @@ a, button, input, select, textarea {
 
 /* ---------- pages ---------- */
 .page { animation: pagein 200ms var(--ease); }
+/* Content-light pages sit in one centered column so the band metric tracks
+   the content, never floats to the far screen edge on ultrawide. */
+.page.narrow { max-width: 1180px; margin-inline: auto; }
 /* One shell strategy: every page runs full-bleed like Today.
    Standalone flow cards center themselves; grids span the width. */
 .grid-2 { display: grid; gap: var(--s5); grid-template-columns: 1fr; }
@@ -559,6 +621,7 @@ a, button, input, select, textarea {
 
 .page-grid { display: grid; gap: var(--s5); grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); align-items: start; }
 .page-grid > * { min-width: 0; }
+.grid-2, .grid-3 { align-items: start; }
 
 /* tasks board: one column filtered on small screens, three side by side on wide */
 .tasks-board { display: grid; gap: var(--s5); grid-template-columns: 1fr; }
@@ -649,7 +712,8 @@ select.textinput { flex: 0 0 auto; min-width: 110px; }
   white-space: nowrap;
 }
 .state-tag.agreed { color: var(--progress); background: var(--progress-wash); }
-.state-tag.waiting { color: var(--muted); background: var(--surface-2); }
+.state-tag.waiting, .state-tag.pending { color: var(--warn); background: var(--warn-wash); }
+.state-tag.scheduled { color: var(--info); background: var(--info-wash); }
 .state-tag.action { color: var(--alert); background: var(--alert-wash); }
 .oblig .bar { margin-top: var(--s3); }
 .oblig .next { margin-top: var(--s2); font-size: var(--text-xs); color: var(--muted); }

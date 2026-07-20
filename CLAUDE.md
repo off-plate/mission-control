@@ -14,7 +14,7 @@ Nothing gets deployed or shown to Michael as "ready" until the release team retu
 ## Rules
 
 - The founding plan and research live in `notes/` (gitignored, personal). Read `notes/PLAN.md` before structural changes.
-- Design direction: "flight console on warm paper." Cabinet Grotesk + General Sans + JetBrains Mono (data only). Accent `#0B3D91` (flight blue), coral `#BD3A1C` strictly for exceptions, green strictly for progress you own, never for money owed. Light and dark both first-class. Jarvis DESIGN.md anti-slop canon applies in full.
+- Design direction: "flight console on warm paper." Cabinet Grotesk + General Sans + JetBrains Mono (data only). Light and dark both first-class. Jarvis DESIGN.md anti-slop canon applies, EXCEPT the color system is a deliberate documented expansion: see `COLOR.md`. Semantic roles: accent = interactive (per-space: Personal blue / Work teal / Off-Plate gold), coral = urgent/debt, amber = at-risk, green = yours/progress (never debt), info-slate = plain data, plus muted category dots. Read COLOR.md before touching any color; keep its discipline or it becomes slop.
 - Layout truth is ORDER + size presets, never per-breakpoint coordinates. Phone (<640px) is a stacked reorder-only list by design; do not enable grid drag on touch.
 - `npm run build` outputs to `docs/` for GitHub Pages with base `/mission-control/`. Keep the demo build free of network calls and secrets; the real backend (Netlify + Supabase) is a separate build profile, never this one.
 - Mock data must stay obviously invented. No real creditor names, balances, or personal identifiers.

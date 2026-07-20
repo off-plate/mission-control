@@ -18,6 +18,7 @@ function daysToFriday(): number {
 }
 
 const PERSONAL: ExceptionItem[] = [
+  { id: 'x0', text: 'Tax settlement 12 500 Kč set aside, transfer not sent.', when: 'pay by Fri 31 Jul', action: 'add-task', actionLabel: 'Add the tax transfer', task: { title: 'Arrange the 12 500 Kč tax transfer', estimateMin: 15 } },
   { id: 'x1', text: 'Installment 2 400 Kč due Friday. Not sent yet.', when: `in ${daysToFriday()} days`, action: 'add-task', actionLabel: 'Add the transfer to today', task: { title: 'Send the 2 400 Kč installment', estimateMin: 5 } },
   { id: 'x2', text: 'Datová schránka unchecked for 8 days. Sunday rule slipped.', when: '8 days', action: 'coach', coachId: 'datova-schranka' },
 ]

@@ -147,6 +147,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [theme])
 
   useEffect(() => {
+    document.documentElement.setAttribute('data-space', space)
+  }, [space])
+
+  useEffect(() => {
     const onHash = () => setPageState(pageFromHash())
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)

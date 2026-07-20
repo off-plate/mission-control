@@ -31,15 +31,15 @@ export function MoneyPage() {
         title="Money"
         sub="pay cycle and obligations"
         metrics={[
-          { v: f.safeToSpend, k: 'safe to spend' },
-          { v: f.totalRemaining, k: 'total debt remaining' },
+          { v: f.safeToSpend, k: 'safe to spend', tone: 'pos' as const },
+          { v: f.totalRemaining, k: 'total debt remaining', tone: 'urgent' as const },
           { v: `${f.obligations.filter((o) => o.state === 'agreed').length}/${f.obligations.length}`, k: 'plans agreed' },
         ]}
       />
       <div className="grid-3">
         <div className="panel">
           <span className="microcap">Pay cycle</span>
-          <div className="kpi">{f.safeToSpend}</div>
+          <div className="kpi val-pos">{f.safeToSpend}</div>
           <div className="kpi-sub">safe to spend {f.safeUntil}</div>
           <div className="kpi-sub">{f.safeMath}</div>
           <div className="bar" style={{ marginTop: 12 }}>
@@ -56,7 +56,7 @@ export function MoneyPage() {
                 <span className="monthly">{o.monthly}</span>
                 <span className={`state-tag ${o.state === 'action needed' ? 'action' : o.state}`}>{o.state}</span>
               </div>
-              <div className="bar prog"><i style={{ width: `${o.progressPct}%` }} /></div>
+              <div className="bar debt"><i style={{ width: `${o.progressPct}%` }} /></div>
               <div className="next">{o.remaining} · {o.next}</div>
             </div>
           ))}
@@ -73,7 +73,7 @@ export function MoneyPage() {
                   <span className="mono meta" style={{ minWidth: '9ch' }}>{sch.date}</span>
                   <span className="grow">{sch.name}</span>
                   <span className="mono" style={{ fontWeight: 600 }}>{sch.amount}</span>
-                  <span className={`state-tag ${urgent ? 'action' : 'waiting'}`}>{sch.state}</span>
+                  <span className={`state-tag ${urgent ? 'action' : sch.state === 'pending' ? 'pending' : sch.state === 'scheduled' ? 'scheduled' : 'waiting'}`}>{sch.state}</span>
                   {urgent && (
                     queued ? (
                       <span className="microcap" style={{ color: 'var(--progress)' }}>{queued.done ? 'done' : 'on today'}</span>
@@ -112,9 +112,9 @@ export function ReviewPage() {
 
   if (doneToday && step === 0) {
     return (
-      <div className="page">
+      <div className="page narrow">
         <Band title="Weekly review" sub="Sunday ritual, about 15 minutes" />
-        <div className="panel" style={{ maxWidth: 640, marginInline: "auto" }}>
+        <div className="panel">
           <span className="done-mark">Done for this week.</span>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--muted)', marginTop: 8 }}>
             Your outcomes for next week are in the backlog. See you next Sunday.
@@ -131,7 +131,7 @@ export function ReviewPage() {
   const idx = doneToday ? step - 1 : step
 
   return (
-    <div className="page">
+    <div className="page narrow">
       <Band title="Weekly review" sub="Sunday ritual, about 15 minutes" />
       <div className="panel" style={{ maxWidth: 1100, marginInline: "auto" }}>
         <div className="coach-progress" aria-hidden="true">
@@ -257,7 +257,7 @@ export function CoachPage() {
 
   if (!scenario) {
     return (
-      <div className="page">
+      <div className="page narrow">
         <Band title="Coach" sub="for the things you keep putting off" />
         {finished && (
           <div className="allclear" style={{ borderColor: 'var(--progress)' }}>
@@ -287,7 +287,7 @@ export function CoachPage() {
   const last = i === scenario.steps.length - 1
 
   return (
-    <div className="page">
+    <div className="page narrow">
       <Band title={scenario.title} sub={scenario.tag} />
       <div className="panel" style={{ maxWidth: 1100, marginInline: "auto" }}>
         <div className="coach-progress" aria-hidden="true">
@@ -335,7 +335,7 @@ export function StatsPage() {
         title="Stats"
         sub="everything traces to a log entry"
         metrics={[
-          { v: `${Math.floor(savedMin / 60)}h ${savedMin % 60}m`, k: 'under estimate, net' },
+          { v: `${Math.floor(savedMin / 60)}h ${savedMin % 60}m`, k: 'under estimate, net', tone: 'pos' as const },
           { v: `${accuracyPct}%`, k: 'estimate accuracy' },
         ]}
       />

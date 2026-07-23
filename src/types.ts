@@ -58,6 +58,22 @@ export interface WidgetDef {
 
 export type TaskCategory = 'call' | 'admin' | 'deep' | 'quick'
 
+export type TimeSlot = 'morning' | 'noon' | 'afternoon' | 'evening'
+
+export const SLOTS: { id: TimeSlot; label: string; hint: string }[] = [
+  { id: 'morning', label: 'Morning', hint: 'before noon' },
+  { id: 'noon', label: 'Noon', hint: '12 to 2 PM' },
+  { id: 'afternoon', label: 'Afternoon', hint: '2 to 6 PM' },
+  { id: 'evening', label: 'Evening', hint: 'after 6 PM' },
+]
+
+export interface SubTask {
+  id: string
+  title: string
+  estimateMin: number
+  done: boolean
+}
+
 export interface Task {
   id: string
   title: string
@@ -68,6 +84,12 @@ export interface Task {
   space: SpaceId
   list: 'today' | 'backlog'
   category: TaskCategory
+  /** Which time-of-day bucket on the Today plan; undefined = not yet placed. */
+  slot?: TimeSlot
+  /** Optional breakdown; the task's real estimate is the sum of these when present. */
+  subtasks?: SubTask[]
+  /** 'HH:MM' if the user pinned it to a clock time (feeds the Calendar link). */
+  at?: string
 }
 
 export interface HabitDef {

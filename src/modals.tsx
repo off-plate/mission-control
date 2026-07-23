@@ -28,7 +28,7 @@ export function Sheet({ title, onClose, children, note }: {
 }
 
 export function DecomposeSheet({ onClose }: { onClose: () => void }) {
-  const { addTasks, space } = useStore()
+  const { addTaskWithSubtasks, space } = useStore()
   const [goal, setGoal] = useState('')
   const [busy, setBusy] = useState(false)
   const [dest, setDest] = useState<'today' | 'backlog'>('today')
@@ -52,14 +52,10 @@ export function DecomposeSheet({ onClose }: { onClose: () => void }) {
 
   const accept = () => {
     if (!steps) return
-    addTasks(steps.map((s) => ({
-      title: s.title,
-      source: 'mc' as const,
-      estimateMin: s.estimateMin,
-      space,
-      list: dest,
-      category: s.category ?? 'quick',
-    })))
+    addTaskWithSubtasks(
+      { title: goal.trim(), source: 'mc', estimateMin: 0, space, list: dest, category: 'deep' },
+      steps.map((s) => ({ title: s.title, estimateMin: s.estimateMin })),
+    )
     onClose()
   }
 
@@ -115,7 +111,7 @@ export function DecomposeSheet({ onClose }: { onClose: () => void }) {
               <button aria-pressed={dest === 'backlog'} onClick={() => setDest('backlog')}>backlog</button>
             </div>
             <button className="btn btn-primary" onClick={accept} style={{ marginLeft: 'auto' }}>
-              Add {steps.length} steps
+              Add as a task with {steps.length} subtasks
             </button>
           </div>
         </div>

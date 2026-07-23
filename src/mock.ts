@@ -109,18 +109,34 @@ export const SPACE_LABELS: Record<SpaceId, string> = {
 }
 
 export const MOCK_TASKS: Task[] = [
-  { id: 't1', title: 'Reply to the accountant about missing documents', source: 'ticktick', estimateMin: 15, done: false, space: 'personal', list: 'today', category: 'admin' },
-  { id: 't2', title: 'Book car service before the Italy trip', source: 'ticktick', estimateMin: 10, done: false, space: 'personal', list: 'today', category: 'quick' },
-  { id: 't3', title: 'Check Datová schránka', source: 'mc', estimateMin: 5, done: false, space: 'personal', list: 'today', category: 'admin' },
-  { id: 't4', title: 'Move washing machine repair card to Done', source: 'trello', estimateMin: 5, done: true, actualMin: 3, space: 'personal', list: 'today', category: 'quick' },
-  { id: 't10', title: 'Sort the insurance letters into one folder', source: 'mc', estimateMin: 20, done: false, space: 'personal', list: 'backlog', category: 'admin' },
+  { id: 't1', title: 'Reply to the accountant about missing documents', source: 'ticktick', estimateMin: 15, done: false, space: 'personal', list: 'today', category: 'admin', slot: 'morning', at: '09:30' },
+  { id: 't2', title: 'Book car service before the Italy trip', source: 'ticktick', estimateMin: 10, done: false, space: 'personal', list: 'today', category: 'quick', slot: 'noon' },
+  { id: 't3', title: 'Check Datová schránka', source: 'mc', estimateMin: 5, done: false, space: 'personal', list: 'today', category: 'admin', slot: 'morning' },
+  { id: 't4', title: 'Move washing machine repair card to Done', source: 'trello', estimateMin: 5, done: true, actualMin: 3, space: 'personal', list: 'today', category: 'quick', slot: 'morning' },
+  { id: 't10', title: 'Sort the insurance letters into one folder', source: 'mc', estimateMin: 20, done: false, space: 'personal', list: 'backlog', category: 'admin',
+    subtasks: [
+      { id: 't10a', title: 'Open the pile and split by sender', estimateMin: 4, done: false },
+      { id: 't10b', title: 'Scan each into the Insurance folder', estimateMin: 10, done: false },
+      { id: 't10c', title: 'Write down any deadline you spot', estimateMin: 6, done: false },
+    ] },
   { id: 't11', title: 'Cancel the streaming service you never open', source: 'ticktick', estimateMin: 10, done: false, space: 'personal', list: 'backlog', category: 'quick' },
-  { id: 't12', title: 'Plan the August budget with the trip included', source: 'mc', estimateMin: 40, done: false, space: 'personal', list: 'backlog', category: 'deep' },
-  { id: 't5', title: 'Prep talking points for Tuesday sync', source: 'ticktick', estimateMin: 25, done: false, space: 'work', list: 'today', category: 'deep' },
-  { id: 't6', title: 'Review the two open pull requests', source: 'jira', estimateMin: 40, done: false, space: 'work', list: 'today', category: 'deep' },
+  { id: 't12', title: 'Plan the August budget with the trip included', source: 'mc', estimateMin: 40, done: false, space: 'personal', list: 'backlog', category: 'deep',
+    subtasks: [
+      { id: 't12a', title: 'List every fixed cost for August', estimateMin: 10, done: false },
+      { id: 't12b', title: 'Add the trip line, about 20 000 Kč', estimateMin: 8, done: false },
+      { id: 't12c', title: 'Subtract from expected income', estimateMin: 7, done: false },
+      { id: 't12d', title: 'Set the safe-to-spend number', estimateMin: 5, done: false },
+    ] },
+  { id: 't5', title: 'Prep talking points for Tuesday sync', source: 'ticktick', estimateMin: 25, done: false, space: 'work', list: 'today', category: 'deep', slot: 'morning' },
+  { id: 't6', title: 'Review the two open pull requests', source: 'jira', estimateMin: 40, done: false, space: 'work', list: 'today', category: 'deep', slot: 'afternoon' },
   { id: 't7', title: 'Close DASH-214: onboarding empty state', source: 'jira', estimateMin: 30, done: false, space: 'work', list: 'backlog', category: 'deep' },
-  { id: 't8', title: 'Send follow-up to Thursday’s workshop lead', source: 'ticktick', estimateMin: 15, done: false, space: 'offplate', list: 'today', category: 'call' },
-  { id: 't9', title: 'Draft next LinkedIn post from the outline', source: 'trello', estimateMin: 30, done: false, space: 'offplate', list: 'backlog', category: 'deep' },
+  { id: 't8', title: 'Send follow-up to Thursday’s workshop lead', source: 'ticktick', estimateMin: 15, done: false, space: 'offplate', list: 'today', category: 'call', slot: 'morning' },
+  { id: 't9', title: 'Draft next LinkedIn post from the outline', source: 'trello', estimateMin: 30, done: false, space: 'offplate', list: 'backlog', category: 'deep',
+    subtasks: [
+      { id: 't9a', title: 'Pick one concrete story from this week', estimateMin: 5, done: false },
+      { id: 't9b', title: 'Draft 8 to 10 lines, no editing', estimateMin: 15, done: false },
+      { id: 't9c', title: 'Cut a third and add one number', estimateMin: 10, done: false },
+    ] },
 ]
 
 /* Mon..Sun; the demo pretends today is index 6 (Sunday). */

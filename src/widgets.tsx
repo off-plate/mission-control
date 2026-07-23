@@ -9,6 +9,7 @@ import {
 } from './mock'
 import { useStore } from './store'
 import type { SizeKey, SpaceId, WidgetType } from './types'
+import { fmtTimeShort } from './util'
 
 export function Spark({ data, width = 120, height = 32 }: { data: number[]; width?: number; height?: number }) {
   const max = Math.max(...data)
@@ -60,7 +61,7 @@ const AgendaBody = memo(function AgendaBody({ space, size }: { space: SpaceId; s
         const past = toMin(e.end) <= nowMin
         return (
           <div className="rowitem" key={e.id}>
-            <span className="mono meta" style={i === nextIdx ? { color: 'var(--accent)', fontWeight: 600 } : undefined}>{e.start}</span>
+            <span className="mono meta" style={i === nextIdx ? { color: 'var(--accent)', fontWeight: 600 } : undefined}>{fmtTimeShort(e.start)}</span>
             <span className="grow wrap2" style={past ? { color: 'var(--muted)', textDecoration: 'line-through', textDecorationColor: 'var(--hairline-strong)' } : undefined} title={e.where ? `${e.title}, ${e.where}` : e.title}>{e.title}</span>
             {past ? <span className="meta mono">done</span> : e.where && !narrow ? <span className="meta">{e.where}</span> : null}
           </div>

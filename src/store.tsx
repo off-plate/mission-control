@@ -26,7 +26,7 @@ import type {
   WidgetType,
 } from './types'
 
-const STORAGE_KEY = 'mission-control-demo-v3'
+const STORAGE_KEY = 'mission-control-demo-v4'
 
 interface PersistedState {
   version: 2
@@ -65,7 +65,11 @@ interface Store extends PersistedState {
   logActual: (id: string, actualMin: number) => void
   addTask: (t: Omit<Task, 'id' | 'done'>) => void
   addTasks: (tasks: Omit<Task, 'id' | 'done'>[]) => void
+  addTaskWithSubtasks: (parent: Omit<Task, 'id' | 'done' | 'subtasks'>, subs: { title: string; estimateMin: number }[]) => void
   moveTaskList: (id: string, list: 'today' | 'backlog') => void
+  moveTasksToToday: (ids: string[]) => void
+  assignSlot: (id: string, slot: import('./types').TimeSlot | undefined) => void
+  toggleSubtask: (taskId: string, subId: string) => void
   deleteTask: (id: string) => void
 
   toggleHabitDay: (id: string, day: number) => void
@@ -242,8 +246,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     addTask: (t) => setTasks((prev) => [{ ...t, id: `t-${++uid}`, done: false }, ...prev]),
     addTasks: (ts) =>
       setTasks((prev) => [...ts.map((t) => ({ ...t, id: `t-${++uid}`, done: false })), ...prev]),
+    addTaskWithSubtasks: (parent, subs) =>
+      setTasks((prev) => {
+        const pid = `t-${++uid}`
+        const subtasks = subs.map((sub, i) => ({ id: `${pid}s${i}`, title: sub.title, estimateMin: sub.estimateMin, done: false }))
+        const est = subtasks.reduce((a, s) => a + s.estimateMin, 0)
+        return [{ ...parent, id: pid, done: false, estimateMin: est, subtasks }, ...prev]
+      }),
     moveTaskList: (id, list) =>
       setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, list } : t))),
+    moveTasksToToday: (ids) =>
+      setTasks((prev) => prev.map((t) => (ids.includes(t.id) ? { ...t, list: 'today', slot: undefined } : t))),
+    assignSlot: (id, slot) =>
+      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, slot } : t))),
+    toggleSubtask: (taskId, subId) =>
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId && t.subtasks
+            ? { ...t, subtasks: t.subtasks.map((s) => (s.id === subId ? { ...s, done: !s.done } : s)) }
+            : t,
+        ),
+      ),
     deleteTask: (id) => setTasks((prev) => prev.filter((t) => t.id !== id)),
 
     toggleHabitDay: (id, day) =>

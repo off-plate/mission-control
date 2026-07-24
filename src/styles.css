@@ -252,6 +252,55 @@ a, button, input, select, textarea {
 .habit-card.is-routine { outline: 1px solid var(--accent-wash); }
 .savings-months { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.625rem; color: var(--faint); margin-top: 2px; }
 
+/* ---------- Pomodoro (global) ---------- */
+.pomo-ambient {
+  position: fixed; inset: 0; pointer-events: none; z-index: 45;
+  background:
+    radial-gradient(circle at 0 0, var(--glow), transparent 20%),
+    radial-gradient(circle at 100% 0, var(--glow), transparent 20%),
+    radial-gradient(circle at 0 100%, var(--glow), transparent 20%),
+    radial-gradient(circle at 100% 100%, var(--glow), transparent 20%);
+  animation: pomo-pulse 4.5s ease-in-out infinite;
+}
+.pomo-ambient.focus { --glow: color-mix(in oklab, var(--accent) 34%, transparent); }
+.pomo-ambient.break { --glow: color-mix(in oklab, var(--progress) 40%, transparent); }
+.pomo-ambient.paused { --glow: color-mix(in oklab, var(--warn) 34%, transparent); animation: none; }
+@keyframes pomo-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.85; } }
+@media (prefers-reduced-motion: reduce) { .pomo-ambient { animation: none; } }
+
+.pomo-badge {
+  position: fixed; right: 20px; bottom: 20px; z-index: 60;
+  display: flex; align-items: center; gap: var(--s1);
+  background: var(--surface); border: 1px solid var(--hairline-strong);
+  border-radius: 999px; padding: 5px 7px 5px 12px; box-shadow: var(--shadow-pop);
+}
+.pomo-badge.active.focus { border-color: var(--accent); }
+.pomo-badge.active.break { border-color: var(--progress); }
+.pomo-badge.active.paused { border-color: var(--warn); }
+.pomo-phase {
+  font-family: var(--font-body); font-weight: 600; font-size: 0.6875rem;
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-right: 2px;
+}
+.pomo-badge.active.focus .pomo-phase { color: var(--accent); }
+.pomo-badge.active.break .pomo-phase { color: var(--progress); }
+.pomo-badge.active.paused .pomo-phase { color: var(--warn); }
+.pomo-clock { font-family: var(--font-display); font-weight: 800; font-size: 1.3rem; letter-spacing: -0.01em; min-width: 4.2ch; text-align: center; }
+.pomo-icon { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); font-size: 0.8rem; }
+.pomo-icon:hover { color: var(--ink); background: var(--surface-2); }
+.pomo-start { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: var(--text-sm); color: var(--accent); padding: 4px 6px; }
+.pomo-start:hover { color: var(--accent-hover); }
+.pomo-setup {
+  position: absolute; bottom: calc(100% + 10px); right: 0;
+  background: var(--surface); border: 1px solid var(--hairline-strong); border-radius: var(--r-md);
+  box-shadow: var(--shadow-pop); padding: var(--s3); display: flex; flex-direction: column; gap: var(--s2);
+}
+.pomo-step { display: flex; align-items: center; gap: var(--s2); }
+.pomo-step-label { font-size: var(--text-xs); color: var(--muted); min-width: 4ch; }
+.pomo-step button { width: 26px; height: 26px; border: 1px solid var(--hairline-strong); border-radius: 6px; color: var(--ink); }
+.pomo-step button:hover { border-color: var(--accent); color: var(--accent); }
+.pomo-step-val { min-width: 3.5ch; text-align: center; font-weight: 600; }
+@media (max-width: 639px) { .pomo-badge { bottom: 80px; right: 12px; } }
+
 .topbar-right { margin-left: auto; display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
 
 /* nav tabs */

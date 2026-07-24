@@ -24,7 +24,7 @@ export const WIDGET_DEFS: Record<WidgetType, WidgetDef> = {
   },
   tasks: {
     type: 'tasks', title: 'Due today', description: 'TickTick and Trello, one list',
-    supportedSizes: ['M', 'L', 'XL'], defaultSize: 'L', freshMinutes: 2, staleAfter: 60, page: 'tasks',
+    supportedSizes: ['M', 'L', 'XL'], defaultSize: 'L', freshMinutes: 2, staleAfter: 60, page: 'plan',
   },
   mail: {
     type: 'mail', title: 'Mail', description: 'Unread counts across accounts',
@@ -43,7 +43,7 @@ export const WIDGET_DEFS: Record<WidgetType, WidgetDef> = {
     supportedSizes: ['S', 'M', 'L'], defaultSize: 'M', freshMinutes: 95, staleAfter: 60 * 26, page: 'today',
   },
   goals: {
-    type: 'goals', title: 'Quarter goals', description: 'Q3 targets and drift',
+    type: 'goals', title: 'Goals', description: 'Targets across timeframes and drift',
     supportedSizes: ['T', 'L'], defaultSize: 'L', freshMinutes: null, staleAfter: Infinity, page: 'goals',
   },
   timesaved: {
@@ -159,12 +159,22 @@ export const MOCK_HABITS: HabitDef[] = [
 ]
 
 export const MOCK_GOALS: Goal[] = [
-  { id: 'g1', space: 'personal', name: 'Every obligation on a payment plan', current: 1, target: 3, unit: 'plans agreed', note: 'Bank plan waiting on written confirmation, tax transfer not sent' },
-  { id: 'g2', space: 'personal', name: 'Sleep before 1:00, five nights a week', current: 4, target: 5, unit: 'nights this week', note: 'Counted from the habit log' },
-  { id: 'g3', space: 'personal', name: 'Weekly reset every Sunday', current: 9, target: 12, unit: 'weeks kept', note: 'The ritual is the structure' },
-  { id: 'g4', space: 'work', name: 'Ship onboarding revamp', current: 11, target: 20, unit: 'tickets closed', note: 'On track for August' },
-  { id: 'g5', space: 'offplate', name: 'Discovery calls this quarter', current: 3, target: 10, unit: 'calls booked', note: 'Cold emails feed this' },
-  { id: 'g6', space: 'offplate', name: 'Publish weekly on LinkedIn', current: 7, target: 12, unit: 'weeks kept', note: 'Batch drafts on Sunday' },
+  // personal
+  { id: 'g-w1', space: 'personal', name: 'Send the tax transfer', current: 0, target: 1, unit: 'done', note: 'Hard deadline Fri 31 Jul', timeframe: 'weekly', category: 'money' },
+  { id: 'g-w2', space: 'personal', name: 'One honest money talk with GF', current: 0, target: 1, unit: 'done', note: 'No softening', timeframe: 'weekly', category: 'life' },
+  { id: 'g-m1', space: 'personal', name: 'No new overdue debt', current: 1, target: 1, unit: 'held', note: 'Nothing slipped this month', timeframe: 'monthly', category: 'money' },
+  { id: 'g-m2', space: 'personal', name: 'Gym 12 sessions', current: 7, target: 12, unit: 'sessions', note: 'Proving Ground block', timeframe: 'monthly', category: 'health' },
+  { id: 'g1', space: 'personal', name: 'Every obligation on a payment plan', current: 1, target: 3, unit: 'plans agreed', note: 'Bank plan waiting, tax not sent', timeframe: 'quarter', category: 'money' },
+  { id: 'g3', space: 'personal', name: 'Weekly reset every Sunday', current: 9, target: 12, unit: 'weeks kept', note: 'The ritual is the structure', timeframe: 'quarter', category: 'life' },
+  { id: 'g-h1', space: 'personal', name: 'Debt down by 60 000 Kč', current: 22000, target: 60000, unit: 'Kč paid', note: 'Steady on the plans', timeframe: 'half', category: 'money' },
+  { id: 'g-h2', space: 'personal', name: 'Restart Off-Plate from stable ground', current: 1, target: 3, unit: 'milestones', note: 'Only once debt is on rails', timeframe: 'half', category: 'life' },
+  // work
+  { id: 'g4', space: 'work', name: 'Ship onboarding revamp', current: 11, target: 20, unit: 'tickets closed', note: 'On track for August', timeframe: 'quarter', category: 'work' },
+  { id: 'g-w-w', space: 'work', name: 'Clear the review backlog', current: 2, target: 5, unit: 'PRs', note: 'this week', timeframe: 'weekly', category: 'work' },
+  // offplate
+  { id: 'g-o-w', space: 'offplate', name: 'Send 10 cold emails', current: 0, target: 10, unit: 'sent', note: 'this week', timeframe: 'weekly', category: 'offplate' },
+  { id: 'g5', space: 'offplate', name: 'Discovery calls this quarter', current: 3, target: 10, unit: 'calls booked', note: 'Cold emails feed this', timeframe: 'quarter', category: 'offplate' },
+  { id: 'g6', space: 'offplate', name: 'Publish weekly on LinkedIn', current: 7, target: 12, unit: 'weeks kept', note: 'Batch drafts on Sunday', timeframe: 'quarter', category: 'offplate' },
 ]
 
 export const MOCK_LEDGER: LedgerEntry[] = [
@@ -226,6 +236,13 @@ export const MOCK_CLAUDE = {
 /* One consistent invented model: every schedule row derives from an obligation,
    percentages match remaining/total, and dates respect their own deadlines. */
 export const MOCK_MONEY = {
+  debt: {
+    original: '218 500 Kč',
+    remaining: '162 900 Kč',
+    paid: '55 600 Kč',
+    pct: 25,
+    monthly: '5 500 Kč',
+  },
   cycleLabel: 'Pay cycle',
   spentPct: 46,
   budgetLine: 'After rent and fixed costs, spending is on pace for day 12 of 30',

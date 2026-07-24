@@ -4,7 +4,7 @@ import { MOCK_AGENDA, MOCK_EXCEPTIONS_FOR, SPACE_LABELS } from './exceptions'
 import { fakeDecompose } from './mock'
 import { useStore } from './store'
 import { RoutineRunner } from './modals'
-import { SLOTS, type AgendaEvent, type HabitDef, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, SLOTS, type AgendaEvent, type GoalCategory, type GoalTimeframe, type HabitDef, type Task, type TaskCategory, type TimeSlot } from './types'
 import { fmtDuration, fmtTime, fmtTimeShort, gcalUrl, taskMinutes, toMin } from './util'
 
 /* ---------------- shared bits ---------------- */
@@ -137,7 +137,7 @@ export function TodayPage() {
               <span className="microcap fm-label">{evening ? 'First move tomorrow' : 'First move'}</span>
               <span className="fm-title">{firstMove.title}</span>
               <span className="est-chip">~{firstMove.estimateMin}m</span>
-              <button className="btn btn-primary" onClick={() => { setFocusTaskId(firstMove.id); setPage('tasks') }}>Start</button>
+              <button className="btn btn-primary" onClick={() => { setFocusTaskId(firstMove.id); setPage('plan') }}>Start</button>
             </div>
           )}
           {reviewDue && space === 'personal' && (
@@ -251,22 +251,49 @@ const BUCKETS: { id: TimeSlot | 'unsorted'; label: string; hint?: string }[] = [
   ...SLOTS.map((s) => ({ id: s.id, label: s.label, hint: s.hint })),
 ]
 
+/** Inline "how long did it take?" logger shown when you finish a task or subtask. */
+function ActualLog({ est, onLog, onSkip }: { est: number; onLog: (m: number) => void; onSkip: () => void }) {
+  const [custom, setCustom] = useState('')
+  const chips = Array.from(new Set([Math.max(1, Math.round(est / 2)), est, est * 2]))
+  return (
+    <div className="actual-log" role="group" aria-label="How long did it take?">
+      <span className="actual-log-q">How long?</span>
+      {chips.map((m) => <button key={m} className="actual-chip" onClick={() => onLog(m)}>{m}m</button>)}
+      <input
+        className="actual-input" type="number" min={1} placeholder="min" value={custom}
+        onChange={(e) => setCustom(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && Number(custom) > 0) onLog(Number(custom)) }}
+        aria-label="Custom minutes"
+      />
+      <button className="actual-skip" onClick={onSkip}>skip</button>
+    </div>
+  )
+}
+
 export function PlanPage() {
-  const { space, tasks, toggleTask, assignSlot, toggleSubtask, moveTasksToToday, addTaskWithSubtasks } = useStore()
+  const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, addTaskWithSubtasks } = useStore()
   const evening = new Date().getHours() >= 21
   const events = MOCK_AGENDA[space]
 
   const spaceTasks = tasks.filter((t) => t.space === space)
-  const open = spaceTasks.filter((t) => !t.done)                 // everything you added, any day
+  const backlogOpen = spaceTasks.filter((t) => !t.done && t.list === 'backlog') // the to-do pool
   const todayAll = spaceTasks.filter((t) => t.list === 'today')  // today incl. finished (they stay, struck)
   const todayTasks = todayAll.filter((t) => !t.done)             // still to do
   const plannedMin = todayTasks.reduce((a, t) => a + taskMinutes(t), 0)
 
-  // to-do progress: done vs the time still left across everything
-  const totalMin = spaceTasks.reduce((a, t) => a + taskMinutes(t), 0)
-  const doneMin = spaceTasks.filter((t) => t.done).reduce((a, t) => a + taskMinutes(t), 0)
-  const doneCount = spaceTasks.filter((t) => t.done).length
+  // to-do progress: done vs the time still left across the backlog + today
+  const pool = spaceTasks
+  const totalMin = pool.reduce((a, t) => a + taskMinutes(t), 0)
+  const doneMin = pool.filter((t) => t.done).reduce((a, t) => a + taskMinutes(t), 0)
+  const doneCount = pool.filter((t) => t.done).length
   const donePct = totalMin ? Math.round((doneMin / totalMin) * 100) : 0
+
+  // time saved today: estimate minus actual, only for what you finished in Today
+  const loggedAny = todayAll.some((t) => t.actualMin != null || t.subtasks?.some((s) => s.actualMin != null))
+  const savedToday = todayAll.reduce((acc, t) => {
+    if (t.subtasks?.length) return acc + t.subtasks.reduce((a, s) => a + (s.done && s.actualMin != null ? s.estimateMin - s.actualMin : 0), 0)
+    return acc + (t.done && t.actualMin != null ? t.estimateMin - t.actualMin : 0)
+  }, 0)
 
   const [selected, setSelected] = useState<string[]>([])
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -274,6 +301,7 @@ export function PlanPage() {
   const [busy, setBusy] = useState(false)
   const [dropKey, setDropKey] = useState<string | null>(null)
   const [menuFor, setMenuFor] = useState<string | null>(null)
+  const [logging, setLogging] = useState<string | null>(null)
 
   const toggleSel = (id: string) =>
     setSelected((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]))
@@ -293,7 +321,7 @@ export function PlanPage() {
     }, 750)
   }
 
-  const selMin = open.filter((t) => selected.includes(t.id)).reduce((a, t) => a + taskMinutes(t), 0)
+  const selMin = backlogOpen.filter((t) => selected.includes(t.id)).reduce((a, t) => a + taskMinutes(t), 0)
   const dropTo = (key: TimeSlot | 'unsorted', id: string) => assignSlot(id, key === 'unsorted' ? undefined : key)
 
   return (
@@ -320,9 +348,9 @@ export function PlanPage() {
             <span className="microcap">To-do list</span>
             <span className="col-tot mono">{fmtDuration(totalMin - doneMin)} left</span>
           </div>
-          <div className="todo-progress" aria-label={`${doneCount} of ${spaceTasks.length} tasks done`}>
+          <div className="todo-progress" aria-label={`${doneCount} of ${pool.length} tasks done`}>
             <div className="bar prog"><i style={{ width: `${donePct}%` }} /></div>
-            <span className="todo-progress-label">{doneCount} of {spaceTasks.length} done · {fmtDuration(totalMin - doneMin)} left</span>
+            <span className="todo-progress-label">{doneCount} of {pool.length} done · {fmtDuration(totalMin - doneMin)} left</span>
           </div>
           <div className="formrow" style={{ marginBottom: 'var(--s3)' }}>
             <input
@@ -335,7 +363,7 @@ export function PlanPage() {
             />
             <button className="btn btn-primary" onClick={generate} disabled={busy || !goal.trim()}>{busy ? 'Thinking' : 'Generate'}</button>
           </div>
-          {open.map((t) => {
+          {backlogOpen.map((t) => {
             const isExp = expanded.has(t.id)
             const hasSubs = !!t.subtasks?.length
             const doneSubs = t.subtasks?.filter((s) => s.done).length ?? 0
@@ -351,7 +379,6 @@ export function PlanPage() {
                   </button>
                   <span className={`cat-dot ${t.category}`} aria-hidden="true" />
                   <span className="grow">{t.title}</span>
-                  {t.list === 'today' && <span className="on-today-tag">today</span>}
                   <span className="est-chip">~{taskMinutes(t)}m</span>
                   {hasSubs && (
                     <button className="expand-btn" aria-expanded={isExp} aria-label={isExp ? 'Collapse subtasks' : 'Expand subtasks'} onClick={() => toggleExp(t.id)}>
@@ -362,24 +389,25 @@ export function PlanPage() {
                 {hasSubs && isExp && (
                   <div className="subtask-list">
                     {t.subtasks!.map((s) => (
-                      <button className={`subtask${s.done ? ' done' : ''}`} key={s.id} onClick={() => toggleSubtask(t.id, s.id)}>
+                      <div className="subtask-row" key={s.id}>
                         <span className="sub-tick" aria-hidden="true" />
-                        <span className="grow">{s.title}</span>
+                        <span className="grow" style={{ fontSize: 'var(--text-sm)' }}>{s.title}</span>
                         <span className="est-chip">~{s.estimateMin}m</span>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 )}
               </div>
             )
           })}
-          {open.length === 0 && <div className="empty">Nothing on the list. Generate a task above when something lands.</div>}
+          {backlogOpen.length === 0 && <div className="empty">Nothing on the list. Generate a task above when something lands.</div>}
         </div>
 
         {/* 3 — Today: drag tasks from Unsorted into a time of day */}
         <div className="panel">
           <div className="col-head">
             <span className="microcap">Today</span>
+            {loggedAny && <span className={`col-tot mono ${savedToday >= 0 ? 'val-pos' : 'val-urgent'}`}>{savedToday >= 0 ? '+' : ''}{savedToday}m saved</span>}
             <span className="col-tot mono">{fmtDuration(plannedMin)} planned</span>
           </div>
           {BUCKETS.map((b) => {
@@ -415,11 +443,20 @@ export function PlanPage() {
                           onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move' }}
                         >
                           <span className="drag-grip" aria-hidden="true">⠿</span>
-                          <button className="checkbox" role="checkbox" aria-checked={t.done} aria-label={t.done ? `Reopen: ${t.title}` : `Complete: ${t.title}`} onClick={() => toggleTask(t.id)}>
+                          <button
+                            className="checkbox" role="checkbox" aria-checked={t.done}
+                            aria-label={t.done ? `Reopen: ${t.title}` : `Complete: ${t.title}`}
+                            onClick={() => {
+                              if (t.done) { toggleTask(t.id); return }        // reopen
+                              if (t.subtasks?.length) { toggleTask(t.id); return } // subtasked: time comes from subtasks
+                              setLogging(t.id)                                 // flat: ask how long it took
+                            }}
+                          >
                             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
                           </button>
                           <span className={`cat-dot ${t.category}`} aria-hidden="true" />
                           <TaskName title={t.title} start={t.at} className="grow" />
+                          {t.done && t.actualMin != null && <span className="mono meta">{t.actualMin}m</span>}
                           <span className="est-chip">~{taskMinutes(t)}m</span>
                           {hasSubs && (
                             <button className="expand-btn" aria-expanded={isExp} aria-label={isExp ? 'Collapse subtasks' : 'Expand subtasks'} onClick={() => toggleExp(t.id)}>
@@ -441,14 +478,26 @@ export function PlanPage() {
                             </span>
                           )}
                         </div>
+                        {logging === t.id && (
+                          <ActualLog est={taskMinutes(t)} onLog={(m) => { logActual(t.id, m); setLogging(null) }} onSkip={() => { toggleTask(t.id); setLogging(null) }} />
+                        )}
                         {hasSubs && isExp && (
                           <div className="subtask-list">
                             {t.subtasks!.map((s) => (
-                              <button className={`subtask${s.done ? ' done' : ''}`} key={s.id} onClick={() => toggleSubtask(t.id, s.id)}>
-                                <span className="sub-tick" aria-hidden="true" />
-                                <span className="grow">{s.title}</span>
-                                <span className="est-chip">~{s.estimateMin}m</span>
-                              </button>
+                              <div key={s.id}>
+                                <button
+                                  className={`subtask${s.done ? ' done' : ''}`}
+                                  onClick={() => { if (s.done) toggleSubtask(t.id, s.id); else setLogging(`sub|${t.id}|${s.id}`) }}
+                                >
+                                  <span className="sub-tick" aria-hidden="true" />
+                                  <span className="grow">{s.title}</span>
+                                  {s.done && s.actualMin != null && <span className="mono meta">{s.actualMin}m</span>}
+                                  <span className="est-chip">~{s.estimateMin}m</span>
+                                </button>
+                                {logging === `sub|${t.id}|${s.id}` && (
+                                  <ActualLog est={s.estimateMin} onLog={(m) => { logSubtaskActual(t.id, s.id, m); setLogging(null) }} onSkip={() => { toggleSubtask(t.id, s.id); setLogging(null) }} />
+                                )}
+                              </div>
                             ))}
                           </div>
                         )}
@@ -701,10 +750,10 @@ export function HabitsPage() {
   }
 
   return (
-    <div className="page narrow">
-      <Band title="Habits" sub="this week, the way the day runs" metrics={[{ v: String(kept), k: 'checkoffs this week' }]} />
-      <div className="panel panel-wide">
-        <div className="formrow">
+    <div className="page">
+      <Band title="Habits" sub="the way the day runs" metrics={[{ v: String(kept), k: 'checkoffs this week' }]} />
+      <div className="panel" style={{ marginBottom: 'var(--s5)', maxWidth: 720 }}>
+        <div className="formrow" style={{ marginBottom: 0 }}>
           <input
             className="textinput"
             placeholder="New habit"
@@ -719,22 +768,29 @@ export function HabitsPage() {
           </select>
           <button className="btn btn-primary" disabled={!name.trim()} onClick={add}>Add habit</button>
         </div>
+      </div>
 
+      <div className="grid-4 habit-cols">
         {groups.map((g) => {
           const inGroup = habits.filter((h) => (h.daypart ?? 'anytime') === g.id)
+          const done = inGroup.filter((h) => !h.paused && h.days[todayIndex]).length
+          const active = inGroup.filter((h) => !h.paused).length
           if (inGroup.length === 0) return null
           return (
-            <div className="habit-group" key={g.id}>
-              <div className="habit-group-head"><span className="bucket-name">{g.label}</span></div>
+            <div className="panel habit-col" key={g.id}>
+              <div className="col-head">
+                <span className="microcap">{g.label}</span>
+                {active > 0 && <span className="col-tot mono">{done}/{active} today</span>}
+              </div>
               {inGroup.map((h) => <HabitRow key={h.id} h={h} todayIndex={todayIndex} onStart={setRunning} />)}
             </div>
           )
         })}
-
-        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginTop: 16 }}>
-          Missed days stay quiet on purpose. No broken streaks, no wall of missed-day marks. Pausing a habit is fine, it just stops counting until you resume it.
-        </p>
       </div>
+
+      <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginTop: 16 }}>
+        Missed days stay quiet on purpose. No broken streaks, no wall of missed-day marks. Pausing a habit just stops it counting until you resume.
+      </p>
       {running && <RoutineRunner habit={running} onClose={() => setRunning(null)} />}
     </div>
   )
@@ -743,55 +799,100 @@ export function HabitsPage() {
 /* ---------------- GOALS ---------------- */
 
 export function GoalsPage() {
-  const { space, goals, addGoal, bumpGoal, deleteGoal, todayIndex } = useStore()
-  const list = goals.filter((g) => g.space === space)
+  const { space, goals, habits, addGoal, bumpGoal, deleteGoal, todayIndex } = useStore()
   const [name, setName] = useState('')
   const [target, setTarget] = useState(10)
-  const [unit, setUnit] = useState('')
+  const [tf, setTf] = useState<GoalTimeframe>('weekly')
+  const [cat, setCat] = useState<GoalCategory>('life')
+
+  const spaceGoals = goals.filter((g) => g.space === space)
+  // Habits category is computed live from the habit log (personal only)
+  const habitGoals = space === 'personal'
+    ? habits.filter((h) => !h.paused).map((h) => ({
+        id: `hg-${h.id}`, space, name: h.name, current: h.days.filter(Boolean).length, target: 7,
+        unit: 'days', note: 'from the habit log', timeframe: 'weekly' as GoalTimeframe, category: 'habits' as GoalCategory, auto: true,
+      }))
+    : []
 
   const submit = () => {
     if (!name.trim() || target < 1) return
-    addGoal({ space, name: name.trim(), current: 0, target, unit: unit.trim() || 'steps done', note: '' })
-    setName(''); setUnit('')
+    addGoal({ space, name: name.trim(), current: 0, target, unit: 'done', note: '', timeframe: tf, category: cat })
+    setName('')
   }
 
+  const onTrack = spaceGoals.filter((g) => g.current / g.target >= 0.5).length
+
   return (
-    <div className="page narrow">
+    <div className="page">
       <Band
-        title="Quarter goals"
-        sub={`${SPACE_LABELS[space]} · Q3 2026`}
-        metrics={[{ v: `${list.filter((g) => g.current / g.target >= 0.5).length}/${list.length}`, k: 'on track' }]}
+        title="Goals"
+        sub={SPACE_LABELS[space]}
+        metrics={[{ v: `${onTrack}/${spaceGoals.length}`, k: 'on track', tone: 'pos' as const }]}
       />
-      <div className="panel panel-wide">
-        <div className="formrow">
-          <input className="textinput" placeholder="Goal, e.g. Ten discovery calls" value={name} onChange={(e) => setName(e.target.value)} aria-label="Goal name" />
-          <input className="numinput" type="number" min={1} value={target} onChange={(e) => setTarget(Math.max(1, Number(e.target.value)))} aria-label="Target number" />
-          <input className="textinput" style={{ maxWidth: 180 }} placeholder="unit, e.g. calls" value={unit} onChange={(e) => setUnit(e.target.value)} aria-label="Unit" />
+      <div className="panel" style={{ marginBottom: 'var(--s5)', maxWidth: 880 }}>
+        <div className="formrow" style={{ marginBottom: 0 }}>
+          <input className="textinput" placeholder="New goal" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} aria-label="Goal name" />
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <input className="numinput" type="number" min={1} value={target} onChange={(e) => setTarget(Math.max(1, Number(e.target.value)))} aria-label="Target number" />
+            <span className="microcap">target</span>
+          </span>
+          <select className="textinput" style={{ flex: '0 0 auto' }} value={tf} onChange={(e) => setTf(e.target.value as GoalTimeframe)} aria-label="Timeframe">
+            {GOAL_TIMEFRAMES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+          </select>
+          <select className="textinput" style={{ flex: '0 0 auto' }} value={cat} onChange={(e) => setCat(e.target.value as GoalCategory)} aria-label="Category">
+            {GOAL_CATEGORIES.filter((c) => c.id !== 'habits').map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+          </select>
           <button className="btn btn-primary" onClick={submit} disabled={!name.trim()}>Add goal</button>
         </div>
-        {list.map((g) => {
-          const pct = Math.round((g.current / g.target) * 100)
-          const weekly = /this week/.test(g.unit)
-          const off = pct < 50 && !(weekly && todayIndex < 3)
+      </div>
+
+      <div className="grid-4 goal-cols">
+        {GOAL_TIMEFRAMES.map((tfr) => {
+          const inTf = [
+            ...spaceGoals.filter((g) => (g.timeframe ?? 'quarter') === tfr.id),
+            ...(tfr.id === 'weekly' ? habitGoals : []),
+          ]
           return (
-            <div className="goal-row" key={g.id}>
-              <div className="goal-line">
-                <span className="grow">{g.name}</span>
-                <span className={`drift ${off ? 'off' : 'ok'}`}>{off ? 'drifting' : 'on track'}</span>
+            <div className="panel goal-col" key={tfr.id}>
+              <div className="col-head">
+                <span className="microcap">{tfr.label}</span>
+                <span className="col-tot mono">{tfr.sub}</span>
               </div>
-              <div className={`bar prog${off ? ' warn' : ''}`}><i style={{ width: `${pct}%` }} /></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-                <span className="kpi-sub" style={{ marginTop: 0, flex: 1 }}>
-                  {g.current} of {g.target} {g.unit}{g.note ? ` · ${g.note}` : ''}
-                </span>
-                <button className="btn btn-quiet" style={{ minHeight: 30 }} onClick={() => bumpGoal(g.id, 1)} aria-label={`Progress ${g.name}`}>+1</button>
-                <button className="btn btn-ghost" style={{ minHeight: 30 }} onClick={() => bumpGoal(g.id, -1)} aria-label={`Undo progress ${g.name}`}>-1</button>
-                <button className="btn btn-danger" style={{ minHeight: 30, fontSize: 'var(--text-xs)' }} onClick={() => deleteGoal(g.id)} aria-label={`Delete ${g.name}`}>×</button>
-              </div>
+              {inTf.map((g) => {
+                const pct = Math.min(100, Math.round((g.current / g.target) * 100))
+                const weekly = tfr.id === 'weekly'
+                const off = pct < 50 && !(weekly && todayIndex < 3)
+                const auto = 'auto' in g && g.auto
+                return (
+                  <div className="goal-card" key={g.id}>
+                    <div className="goal-line">
+                      <span className={`cat-dot goalcat-${g.category ?? 'life'}`} aria-hidden="true" />
+                      <span className="grow">{g.name}</span>
+                      <span className={`drift ${off ? 'off' : 'ok'}`}>{off ? 'behind' : 'on track'}</span>
+                    </div>
+                    <div className={`bar prog${off ? ' warn' : ''}`}><i style={{ width: `${pct}%` }} /></div>
+                    <div className="goal-foot">
+                      <span className="kpi-sub" style={{ marginTop: 0, flex: 1 }}>
+                        {g.current.toLocaleString('en')} of {g.target.toLocaleString('en')} {g.unit}
+                      </span>
+                      {auto ? (
+                        <span className="microcap" title="Updated from the habit log">auto</span>
+                      ) : (
+                        <>
+                          <button className="btn btn-quiet" style={{ minHeight: 28, padding: '0 8px' }} onClick={() => bumpGoal(g.id, 1)} aria-label={`Progress ${g.name}`}>+</button>
+                          <button className="btn btn-ghost" style={{ minHeight: 28, padding: '0 8px' }} onClick={() => bumpGoal(g.id, -1)} aria-label={`Undo ${g.name}`}>−</button>
+                          <button className="btn btn-danger" style={{ minHeight: 28, padding: '0 6px', fontSize: 'var(--text-xs)' }} onClick={() => deleteGoal(g.id)} aria-label={`Delete ${g.name}`}>×</button>
+                        </>
+                      )}
+                    </div>
+                    {g.note && <div className="goal-note">{g.note}</div>}
+                  </div>
+                )
+              })}
+              {inTf.length === 0 && <p className="bucket-empty">No goals here yet.</p>}
             </div>
           )
         })}
-        {list.length === 0 && <div className="empty">No goals in this space yet. Add the first one above.</div>}
       </div>
     </div>
   )

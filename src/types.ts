@@ -3,7 +3,6 @@ export type SpaceId = 'personal' | 'work' | 'offplate'
 export type PageId =
   | 'today'
   | 'plan'
-  | 'tasks'
   | 'habits'
   | 'goals'
   | 'money'
@@ -72,6 +71,8 @@ export interface SubTask {
   title: string
   estimateMin: number
   done: boolean
+  /** Minutes it actually took, logged on completion. */
+  actualMin?: number
 }
 
 export interface Task {
@@ -120,6 +121,25 @@ export interface HabitDef {
   steps?: RoutineStep[]
 }
 
+export type GoalTimeframe = 'weekly' | 'monthly' | 'quarter' | 'half'
+export type GoalCategory = 'money' | 'health' | 'life' | 'work' | 'offplate' | 'habits'
+
+export const GOAL_TIMEFRAMES: { id: GoalTimeframe; label: string; sub: string }[] = [
+  { id: 'weekly', label: 'This week', sub: '7 days' },
+  { id: 'monthly', label: 'This month', sub: '30 days' },
+  { id: 'quarter', label: 'This quarter', sub: 'Q3 2026' },
+  { id: 'half', label: 'Half year', sub: 'by year end' },
+]
+
+export const GOAL_CATEGORIES: { id: GoalCategory; label: string }[] = [
+  { id: 'money', label: 'Money' },
+  { id: 'health', label: 'Health' },
+  { id: 'life', label: 'Life' },
+  { id: 'work', label: 'Work' },
+  { id: 'offplate', label: 'Off-Plate' },
+  { id: 'habits', label: 'Habits' },
+]
+
 export interface Goal {
   id: string
   space: SpaceId
@@ -128,6 +148,8 @@ export interface Goal {
   target: number
   unit: string
   note: string
+  timeframe?: GoalTimeframe
+  category?: GoalCategory
 }
 
 export interface LedgerEntry {

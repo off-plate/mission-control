@@ -3,12 +3,13 @@ import { COACH_SCENARIOS, MOCK_CLAUDE, MOCK_MONEY, MOCK_STATS } from './mock'
 import { Band } from './pages1'
 import { useStore } from './store'
 import { Spark, SparkBox } from './widgets'
-import type { CoachScenario, SocialEntry } from './types'
+import { fmtDuration, taskMinutes } from './util'
+import type { CoachScenario } from './types'
 
 /* ---------------- MONEY ---------------- */
 
 export function MoneyPage() {
-  const { space, setSpace: setSpage, tasks, addTask } = useStore()
+  const { space, setSpace: setSpage, tasks, addTask, goals } = useStore()
   const f = MOCK_MONEY
   if (space !== 'personal') {
     return (
@@ -25,20 +26,39 @@ export function MoneyPage() {
       </div>
     )
   }
+  const moneyGoals = goals.filter((g) => g.space === 'personal' && g.category === 'money')
   return (
     <div className="page">
       <Band
         title="Money"
-        sub="pay cycle and obligations"
+        sub="where the debt is going"
         metrics={[
-          { v: f.safeToSpend, k: 'safe to spend', tone: 'pos' as const },
-          { v: f.totalRemaining, k: 'total debt remaining', tone: 'urgent' as const },
-          { v: `${f.obligations.filter((o) => o.state === 'agreed').length}/${f.obligations.length}`, k: 'plans agreed' },
+          { v: f.debt.remaining, k: 'debt remaining', tone: 'urgent' as const },
+          { v: f.debt.paid, k: 'paid off', tone: 'pos' as const },
+          { v: `${f.debt.monthly}/mo`, k: 'across plans' },
         ]}
       />
       <div className="grid-3">
+        {/* Debt payoff */}
         <div className="panel">
-          <span className="microcap">Pay cycle</span>
+          <span className="microcap">Debt payoff</span>
+          <div className="kpi">{f.debt.remaining}<span className="unit">left</span></div>
+          <div className="bar debt" style={{ marginTop: 12 }}><i style={{ width: `${f.debt.pct}%` }} /></div>
+          <div className="kpi-sub"><span className="val-pos">{f.debt.paid} paid</span> of {f.debt.original} · {f.debt.pct}% cleared</div>
+          <div className="rowlist" style={{ marginTop: 10 }}>
+            {f.obligations.map((o) => (
+              <div className="rowitem" key={o.id} style={{ minHeight: 34 }}>
+                <span className="grow" style={{ color: 'var(--muted)' }}>{o.name}</span>
+                <span className="mono meta">{o.monthly}</span>
+                <span className={`state-tag ${o.state === 'action needed' ? 'action' : o.state}`}>{o.state}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* This cycle */}
+        <div className="panel">
+          <span className="microcap">This cycle</span>
           <div className="kpi val-pos">{f.safeToSpend}</div>
           <div className="kpi-sub">safe to spend {f.safeUntil}</div>
           <div className="kpi-sub">{f.safeMath}</div>
@@ -47,20 +67,8 @@ export function MoneyPage() {
           </div>
           <div className="kpi-sub">{f.spentPct}% of the cycle budget spent. {f.budgetLine}.</div>
         </div>
-        <div className="panel">
-          <span className="microcap">Obligations</span>
-          {f.obligations.map((o) => (
-            <div className="oblig" key={o.id}>
-              <div className="oblig-line">
-                <span className="name">{o.name}</span>
-                <span className="monthly">{o.monthly}</span>
-                <span className={`state-tag ${o.state === 'action needed' ? 'action' : o.state}`}>{o.state}</span>
-              </div>
-              <div className="bar debt"><i style={{ width: `${o.progressPct}%` }} /></div>
-              <div className="next">{o.remaining} · {o.next}</div>
-            </div>
-          ))}
-        </div>
+
+        {/* Next payments */}
         <div className="panel">
           <span className="microcap">Next payments</span>
           <div className="rowlist">
@@ -90,6 +98,30 @@ export function MoneyPage() {
           </div>
         </div>
       </div>
+
+      {/* Money goals + Compass */}
+      <div className="panel" style={{ marginTop: 'var(--s5)' }}>
+        <div className="col-head">
+          <span className="microcap">Money goals</span>
+          <a className="cal-link" style={{ marginLeft: 'auto' }} href="https://compass-money.netlify.app" target="_blank" rel="noreferrer">Open Compass ↗</a>
+        </div>
+        <div className="grid-3" style={{ marginTop: 'var(--s3)' }}>
+          {moneyGoals.map((g) => {
+            const pct = Math.min(100, Math.round((g.current / g.target) * 100))
+            return (
+              <div className="goal-card" key={g.id}>
+                <div className="goal-line"><span className="grow">{g.name}</span></div>
+                <div className="bar prog"><i style={{ width: `${pct}%` }} /></div>
+                <div className="kpi-sub">{g.current.toLocaleString('en')} of {g.target.toLocaleString('en')} {g.unit}</div>
+              </div>
+            )
+          })}
+          {moneyGoals.length === 0 && <p className="bucket-empty">No money goals yet. Add them on the Goals page.</p>}
+        </div>
+        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--faint)', marginTop: 'var(--s4)' }}>
+          Figures are demo placeholders. The real app reads your Compass ledger server-side; nothing financial ships in this public bundle.
+        </p>
+      </div>
     </div>
   )
 }
@@ -97,143 +129,94 @@ export function MoneyPage() {
 /* ---------------- REVIEW (weekly reset) ---------------- */
 
 export function ReviewPage() {
-  const { tasks, space, savedMin, accuracyPct, habits, social, setSocial, finishReview, review } = useStore()
-  const [step, setStep] = useState(0)
-  const doneTasks = tasks.filter((t) => t.done && t.space === space)
+  const { tasks, space, savedMin, accuracyPct, habits, goals, finishReview, review } = useStore()
   const [wins, setWins] = useState<string[]>(['', '', ''])
-  const [socialDraft, setSocialDraft] = useState<SocialEntry[]>(social)
+  const [changed, setChanged] = useState('')
   const [outcomes, setOutcomes] = useState<string[]>(['', '', ''])
   const todayKey = new Date().toISOString().slice(0, 10)
   const doneToday = review.lastDoneDate === todayKey
 
-  const habitsKept = habits.filter((h) => !h.paused).reduce((a, h) => a + h.days.filter(Boolean).length, 0)
+  const doneTasks = tasks.filter((t) => t.done && t.space === space)
+  const doneMin = doneTasks.reduce((a, t) => a + taskMinutes(t), 0)
+  const activeHabits = habits.filter((h) => !h.paused)
+  const habitsKept = activeHabits.reduce((a, h) => a + h.days.filter(Boolean).length, 0)
+  const spaceGoals = goals.filter((g) => g.space === space)
+  const goalsOnTrack = spaceGoals.filter((g) => g.current / g.target >= 0.5).length
 
-  const STEPS = ['Wins', 'Numbers', 'Audience', 'Next week']
-
-  if (doneToday && step === 0) {
-    return (
-      <div className="page narrow">
-        <Band title="Weekly review" sub="Sunday ritual, about 15 minutes" />
-        <div className="panel">
-          <span className="done-mark">Done for this week.</span>
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--muted)', marginTop: 8 }}>
-            Your outcomes for next week are in the backlog. See you next Sunday.
-          </p>
-          {review.outcomes.filter(Boolean).map((o, i) => (
-            <div className="rowitem" key={i}><span className="mono meta">{i + 1}</span><span className="grow">{o}</span></div>
-          ))}
-          <button className="btn btn-ghost" style={{ marginTop: 12 }} onClick={() => setStep(1)}>Run it again anyway</button>
-        </div>
-      </div>
-    )
-  }
-
-  const idx = doneToday ? step - 1 : step
+  const setW = (i: number, v: string) => setWins((p) => p.map((x, j) => (j === i ? v : x)))
+  const setO = (i: number, v: string) => setOutcomes((p) => p.map((x, j) => (j === i ? v : x)))
 
   return (
-    <div className="page narrow">
-      <Band title="Weekly review" sub="Sunday ritual, about 15 minutes" />
-      <div className="panel" style={{ maxWidth: 1100, marginInline: "auto" }}>
-        <div className="coach-progress" aria-hidden="true">
-          {STEPS.map((_, k) => <i key={k} className={k <= idx ? 'on' : ''} />)}
+    <div className="page">
+      <Band
+        title="Weekly review"
+        sub="the week in numbers, then a quick checkup"
+        metrics={[{ v: `${Math.floor(savedMin / 60)}h ${savedMin % 60}m`, k: 'time saved', tone: 'pos' as const }]}
+      />
+      {doneToday && (
+        <div className="allclear" style={{ borderColor: 'var(--progress)' }}>
+          <span className="dot" aria-hidden="true" />
+          Closed for this week. Your outcomes are in the backlog. The numbers below keep updating live.
         </div>
-        <span className="microcap coach-step-label">Step {idx + 1} of {STEPS.length} · {STEPS[idx]}</span>
-
-        {idx === 0 && (
-          <div>
-            <h3 className="coach-q">What actually went well?</h3>
-            {doneTasks.length > 0 && (
-              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginBottom: 8 }}>
-                Finished this week: {doneTasks.map((t) => t.title).slice(0, 3).join(' · ')}
-              </p>
-            )}
-            {wins.map((w, i) => (
-              <input
-                key={i}
-                className="textinput"
-                style={{ marginBottom: 8, width: '100%' }}
-                placeholder={`Win ${i + 1}`}
-                value={w}
-                onChange={(e) => setWins((prev) => prev.map((x, j) => (j === i ? e.target.value : x)))}
-                aria-label={`Win ${i + 1}`}
-              />
-            ))}
-          </div>
-        )}
-
-        {idx === 1 && (
-          <div>
-            <h3 className="coach-q">The numbers, no commentary</h3>
-            <div className="rowlist">
-              <div className="rowitem"><span className="grow">Time saved vs your estimates</span><span className="mono" style={{ fontWeight: 600 }}>{Math.floor(savedMin / 60)}h {savedMin % 60}m</span></div>
-              <div className="rowitem"><span className="grow">Estimate accuracy</span><span className="mono" style={{ fontWeight: 600 }}>{accuracyPct}%</span></div>
-              <div className="rowitem"><span className="grow">Habit checkoffs</span><span className="mono" style={{ fontWeight: 600 }}>{habitsKept}</span></div>
-            </div>
-            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginTop: 12 }}>
-              Every one of these traces to something you logged. Nothing is projected.
-            </p>
-          </div>
-        )}
-
-        {idx === 2 && (
-          <div>
-            <h3 className="coach-q">Audience numbers, 60 seconds</h3>
-            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginBottom: 12 }}>
-              From each platform’s own analytics screen. This is the manual entry that keeps the Audience widget honest.
-            </p>
-            {socialDraft.map((s, i) => (
-              <div className="formrow" key={s.platform}>
-                <span style={{ minWidth: 90, fontSize: 'var(--text-sm)', fontWeight: 600, alignSelf: 'center' }}>{s.platform}</span>
-                <input
-                  className="numinput"
-                  type="number"
-                  value={s.followers}
-                  onChange={(e) => setSocialDraft((prev) => prev.map((x, j) => (j === i ? { ...x, change: Number(e.target.value) - x.followers + x.change, followers: Number(e.target.value) } : x)))}
-                  aria-label={`${s.platform} followers`}
-                />
-                <input
-                  className="textinput"
-                  style={{ maxWidth: 200 }}
-                  value={s.lastPost}
-                  onChange={(e) => setSocialDraft((prev) => prev.map((x, j) => (j === i ? { ...x, lastPost: e.target.value } : x)))}
-                  aria-label={`${s.platform} last post`}
-                />
+      )}
+      <div className="grid-4">
+        <div className="panel">
+          <span className="microcap">Tasks done</span>
+          <div className="kpi">{doneTasks.length}</div>
+          <div className="kpi-sub">{fmtDuration(doneMin)} of work · {accuracyPct}% within estimate</div>
+        </div>
+        <div className="panel">
+          <span className="microcap">Habits kept</span>
+          <div className="kpi val-pos">{habitsKept}</div>
+          <div className="kpi-sub">checkoffs across {activeHabits.length} habits</div>
+          <div className="rowlist" style={{ marginTop: 8 }}>
+            {activeHabits.map((h) => (
+              <div className="rowitem" key={h.id} style={{ minHeight: 30 }}>
+                <span className="grow">{h.name}</span>
+                <span className="mono meta">{h.days.filter(Boolean).length}/7</span>
               </div>
             ))}
           </div>
-        )}
-
-        {idx === 3 && (
-          <div>
-            <h3 className="coach-q">Three outcomes for next week</h3>
-            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginBottom: 8 }}>
-              Outcomes, not activities. They land in the backlog and Monday’s plan pulls from there.
-            </p>
-            {outcomes.map((o, i) => (
-              <input
-                key={i}
-                className="textinput"
-                style={{ marginBottom: 8, width: '100%' }}
-                placeholder={`Outcome ${i + 1}`}
-                value={o}
-                onChange={(e) => setOutcomes((prev) => prev.map((x, j) => (j === i ? e.target.value : x)))}
-                aria-label={`Outcome ${i + 1}`}
-              />
-            ))}
+        </div>
+        <div className="panel">
+          <span className="microcap">Goals on track</span>
+          <div className="kpi">{goalsOnTrack}<span className="unit">of {spaceGoals.length}</span></div>
+          <div className="rowlist" style={{ marginTop: 8 }}>
+            {spaceGoals.slice(0, 5).map((g) => {
+              const pct = Math.min(100, Math.round((g.current / g.target) * 100))
+              return (
+                <div className="rowitem" key={g.id} style={{ minHeight: 30 }}>
+                  <span className="grow">{g.name}</span>
+                  <span className={`drift ${pct < 50 ? 'off' : 'ok'}`}>{pct}%</span>
+                </div>
+              )
+            })}
           </div>
-        )}
+        </div>
+        <div className="panel">
+          <span className="microcap">Time saved</span>
+          <div className={`kpi ${savedMin >= 0 ? 'val-pos' : 'val-urgent'}`}>{Math.floor(savedMin / 60)}h {savedMin % 60}m</div>
+          <div className="kpi-sub">vs your own estimates · {accuracyPct}% accuracy. Everything here traces to something you logged.</div>
+        </div>
+      </div>
 
+      <div className="panel" style={{ marginTop: 'var(--s5)', maxWidth: 820 }}>
+        <span className="microcap">Manual checkup</span>
+        <h4 className="checkup-q">What actually went well?</h4>
+        {wins.map((w, i) => (
+          <input key={i} className="textinput" style={{ marginBottom: 8, width: '100%' }} placeholder={`Win ${i + 1}`} value={w} onChange={(e) => setW(i, e.target.value)} aria-label={`Win ${i + 1}`} />
+        ))}
+        <h4 className="checkup-q">What drifted, and one change for next week?</h4>
+        <input className="textinput" style={{ width: '100%' }} placeholder="One honest note" value={changed} onChange={(e) => setChanged(e.target.value)} aria-label="What to change" />
+        <h4 className="checkup-q">Three outcomes for next week</h4>
+        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginBottom: 8 }}>Results you can check off. They land in the backlog and Monday’s plan pulls from there.</p>
+        {outcomes.map((o, i) => (
+          <input key={i} className="textinput" style={{ marginBottom: 8, width: '100%' }} placeholder={`Outcome ${i + 1}`} value={o} onChange={(e) => setO(i, e.target.value)} aria-label={`Outcome ${i + 1}`} />
+        ))}
         <div className="coach-nav">
-          {idx > 0 && <button className="btn btn-quiet" onClick={() => setStep(step - 1)}>Back</button>}
-          {idx < 3 && <button className="btn btn-primary" onClick={() => setStep(step + 1)}>Next</button>}
-          {idx === 3 && (
-            <button
-              className="btn btn-primary"
-              onClick={() => { setSocial(socialDraft); finishReview(wins.filter(Boolean), outcomes.filter(Boolean)); setStep(0) }}
-            >
-              Close the week
-            </button>
-          )}
+          <button className="btn btn-primary" onClick={() => { finishReview([...wins, changed].filter(Boolean), outcomes.filter(Boolean)); setWins(['', '', '']); setChanged(''); setOutcomes(['', '', '']) }}>
+            {doneToday ? 'Update the week' : 'Close the week'}
+          </button>
         </div>
       </div>
     </div>
@@ -263,7 +246,7 @@ export function CoachPage() {
           <div className="allclear" style={{ borderColor: 'var(--progress)' }}>
             <span className="dot" aria-hidden="true" />
             Saved as a task: {finished}. It is on your list now.
-            <button className="btn btn-ghost" style={{ marginLeft: 'auto' }} onClick={() => setPage('tasks')}>Open tasks</button>
+            <button className="btn btn-ghost" style={{ marginLeft: 'auto' }} onClick={() => setPage('plan')}>Open plan</button>
           </div>
         )}
         <div className="scenario-grid">

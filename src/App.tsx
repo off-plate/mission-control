@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { MOCK_EXCEPTIONS_FOR } from './exceptions'
 import { SPACE_LABELS } from './mock'
 import { DecomposeSheet } from './modals'
-import { GoalsPage, HabitsPage, PlanPage, TasksPage, TodayPage } from './pages1'
+import { GoalsPage, HabitsPage, PlanPage, TodayPage } from './pages1'
 import { CoachPage, MoneyPage, ReviewPage, SettingsPage, StatsPage } from './pages2'
 import { useStore } from './store'
 import type { PageId, SpaceId } from './types'
@@ -20,7 +20,6 @@ function Logo() {
 const NAV: { id: PageId; label: string; personalOnly?: boolean }[] = [
   { id: 'today', label: 'Today' },
   { id: 'plan', label: 'Plan' },
-  { id: 'tasks', label: 'Tasks' },
   { id: 'habits', label: 'Habits' },
   { id: 'goals', label: 'Goals' },
   { id: 'money', label: 'Money', personalOnly: true },
@@ -111,7 +110,6 @@ export default function App() {
       <main id="main">
         {page === 'today' && <TodayPage />}
         {page === 'plan' && <PlanPage />}
-        {page === 'tasks' && <TasksPage onDecompose={() => setDecomposeOpen(true)} />}
         {page === 'habits' && <HabitsPage />}
         {page === 'goals' && <GoalsPage />}
         {page === 'money' && <MoneyPage />}

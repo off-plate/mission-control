@@ -70,6 +70,7 @@ interface Store extends PersistedState {
   moveTasksToToday: (ids: string[]) => void
   assignSlot: (id: string, slot: import('./types').TimeSlot | undefined) => void
   toggleSubtask: (taskId: string, subId: string) => void
+  logSubtaskActual: (taskId: string, subId: string, actualMin: number) => void
   deleteTask: (id: string) => void
 
   toggleHabitDay: (id: string, day: number) => void
@@ -113,7 +114,7 @@ function systemTheme(): 'light' | 'dark' {
 
 function pageFromHash(): PageId {
   const h = location.hash.replace('#/', '')
-  const pages: PageId[] = ['today', 'plan', 'tasks', 'habits', 'goals', 'money', 'review', 'coach', 'stats', 'settings']
+  const pages: PageId[] = ['today', 'plan', 'habits', 'goals', 'money', 'review', 'coach', 'stats', 'settings']
   return (pages as string[]).includes(h) ? (h as PageId) : 'today'
 }
 
@@ -265,7 +266,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setTasks((prev) =>
         prev.map((t) =>
           t.id === taskId && t.subtasks
-            ? { ...t, subtasks: t.subtasks.map((s) => (s.id === subId ? { ...s, done: !s.done } : s)) }
+            ? { ...t, subtasks: t.subtasks.map((s) => (s.id === subId ? { ...s, done: !s.done, actualMin: s.done ? undefined : s.actualMin } : s)) }
+            : t,
+        ),
+      ),
+    logSubtaskActual: (taskId, subId, actualMin) =>
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId && t.subtasks
+            ? { ...t, subtasks: t.subtasks.map((s) => (s.id === subId ? { ...s, done: true, actualMin } : s)) }
             : t,
         ),
       ),

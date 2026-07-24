@@ -232,6 +232,8 @@ a, button, input, select, textarea {
 .goal-foot { display: flex; align-items: center; gap: 4px; margin-top: var(--s2); }
 .goal-note { font-size: var(--text-xs); color: var(--faint); margin-top: 4px; }
 .checkup-q { font-family: var(--font-display); font-weight: 700; font-size: var(--text-base); margin: var(--s5) 0 var(--s2); }
+.est-vs-actual { font-size: 0.75rem; color: var(--info); white-space: nowrap; }
+.est-vs-actual b { font-weight: 600; }
 
 .topbar-right { margin-left: auto; display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
 

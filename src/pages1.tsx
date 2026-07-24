@@ -456,8 +456,11 @@ export function PlanPage() {
                           </button>
                           <span className={`cat-dot ${t.category}`} aria-hidden="true" />
                           <TaskName title={t.title} start={t.at} className="grow" />
-                          {t.done && t.actualMin != null && <span className="mono meta">{t.actualMin}m</span>}
-                          <span className="est-chip">~{taskMinutes(t)}m</span>
+                          {t.done && t.actualMin != null ? (
+                            <span className="est-vs-actual mono">~{taskMinutes(t)} → {t.actualMin}m <b className={taskMinutes(t) - t.actualMin >= 0 ? 'val-pos' : 'val-urgent'}>{taskMinutes(t) - t.actualMin >= 0 ? '+' : ''}{taskMinutes(t) - t.actualMin}m</b></span>
+                          ) : (
+                            <span className="est-chip">~{taskMinutes(t)}m</span>
+                          )}
                           {hasSubs && (
                             <button className="expand-btn" aria-expanded={isExp} aria-label={isExp ? 'Collapse subtasks' : 'Expand subtasks'} onClick={() => toggleExp(t.id)}>
                               {isExp ? '▾' : '▸'} {doneSubs}/{t.subtasks!.length}
@@ -491,8 +494,11 @@ export function PlanPage() {
                                 >
                                   <span className="sub-tick" aria-hidden="true" />
                                   <span className="grow">{s.title}</span>
-                                  {s.done && s.actualMin != null && <span className="mono meta">{s.actualMin}m</span>}
-                                  <span className="est-chip">~{s.estimateMin}m</span>
+                                  {s.done && s.actualMin != null ? (
+                                    <span className="est-vs-actual mono">~{s.estimateMin} → {s.actualMin}m <b className={s.estimateMin - s.actualMin >= 0 ? 'val-pos' : 'val-urgent'}>{s.estimateMin - s.actualMin >= 0 ? '+' : ''}{s.estimateMin - s.actualMin}m</b></span>
+                                  ) : (
+                                    <span className="est-chip">~{s.estimateMin}m</span>
+                                  )}
                                 </button>
                                 {logging === `sub|${t.id}|${s.id}` && (
                                   <ActualLog est={s.estimateMin} onLog={(m) => { logSubtaskActual(t.id, s.id, m); setLogging(null) }} onSkip={() => { toggleSubtask(t.id, s.id); setLogging(null) }} />

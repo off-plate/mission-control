@@ -92,6 +92,20 @@ export interface Task {
   at?: string
 }
 
+export interface RoutineStep {
+  id: string
+  title: string
+  /** 'timer' shows a countdown; 'do' is a guided step you mark done. */
+  kind: 'timer' | 'do'
+  seconds?: number
+  note?: string
+  /** e.g. a tongue-twister to read aloud. */
+  example?: string
+  /** optional external tool to open (typing test, etc.). */
+  link?: string
+  linkLabel?: string
+}
+
 export interface HabitDef {
   id: string
   name: string
@@ -100,6 +114,10 @@ export interface HabitDef {
   paused: boolean
   /** Checkoffs per week for the last 12 weeks, oldest first (0-7). */
   history?: number[]
+  /** Part of day this habit belongs to; undefined = anytime. */
+  daypart?: TimeSlot
+  /** Present => this habit is a launchable routine you press Start on. */
+  steps?: RoutineStep[]
 }
 
 export interface Goal {

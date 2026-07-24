@@ -73,7 +73,8 @@ interface Store extends PersistedState {
   deleteTask: (id: string) => void
 
   toggleHabitDay: (id: string, day: number) => void
-  addHabit: (name: string) => void
+  markHabitDay: (id: string, day: number, value: boolean) => void
+  addHabit: (name: string, daypart?: import('./types').TimeSlot) => void
   togglePauseHabit: (id: string) => void
   deleteHabit: (id: string) => void
 
@@ -127,7 +128,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [seedTodayIdx],
   )
   const seededGoals = useMemo(() => {
-    const sleepNights = seededHabits[0].days.filter(Boolean).length
+    const sleep = seededHabits.find((h) => h.id === 'h1')
+    const sleepNights = sleep ? sleep.days.filter(Boolean).length : 0
     return MOCK_GOALS.map((g) => (g.id === 'g2' ? { ...g, current: sleepNights } : g))
   }, [seededHabits])
   const [spaces, setSpaces] = useState(persisted?.spaces ?? DEFAULT_SPACES)
@@ -275,8 +277,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           h.id === id ? { ...h, days: h.days.map((d, i) => (i === day ? !d : d)) } : h,
         ),
       ),
-    addHabit: (name) =>
-      setHabits((prev) => [...prev, { id: `h-${++uid}`, name, days: [false, false, false, false, false, false, false], paused: false }]),
+    markHabitDay: (id, day, value) =>
+      setHabits((prev) =>
+        prev.map((h) =>
+          h.id === id ? { ...h, days: h.days.map((d, i) => (i === day ? value : d)) } : h,
+        ),
+      ),
+    addHabit: (name, daypart) =>
+      setHabits((prev) => [...prev, { id: `h-${++uid}`, name, daypart, days: [false, false, false, false, false, false, false], paused: false }]),
     togglePauseHabit: (id) =>
       setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, paused: !h.paused } : h))),
     deleteHabit: (id) => setHabits((prev) => prev.filter((h) => h.id !== id)),

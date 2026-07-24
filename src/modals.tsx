@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { fakeDecompose, type DecomposedStep } from './mock'
 import { useStore } from './store'
+import type { HabitDef } from './types'
 
 export function Sheet({ title, onClose, children, note }: {
   title: string
@@ -116,6 +117,90 @@ export function DecomposeSheet({ onClose }: { onClose: () => void }) {
           </div>
         </div>
       )}
+    </Sheet>
+  )
+}
+
+/* ---------------- Morning routine runner ---------------- */
+
+function mmss(sec: number): string {
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+export function RoutineRunner({ habit, onClose }: { habit: HabitDef; onClose: () => void }) {
+  const { markHabitDay, todayIndex } = useStore()
+  const steps = habit.steps ?? []
+  const [i, setI] = useState(0)
+  const [done, setDone] = useState(false)
+  const step = steps[i]
+  const last = i === steps.length - 1
+
+  // countdown for timer steps
+  const [left, setLeft] = useState(step?.seconds ?? 0)
+  const [running, setRunning] = useState(false)
+  useEffect(() => { setLeft(step?.seconds ?? 0); setRunning(false) }, [i, step?.seconds])
+  useEffect(() => {
+    if (!running || left <= 0) return
+    const id = window.setInterval(() => setLeft((l) => Math.max(0, l - 1)), 1000)
+    return () => window.clearInterval(id)
+  }, [running, left])
+
+  const finish = () => {
+    markHabitDay(habit.id, todayIndex, true)
+    setDone(true)
+  }
+
+  if (done) {
+    return (
+      <Sheet title={habit.name} onClose={onClose}>
+        <div style={{ textAlign: 'center', padding: 'var(--s6) 0' }}>
+          <div className="done-mark">Routine done.</div>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--muted)', marginTop: 8 }}>
+            Checked off for today. Good start.
+          </p>
+          <button className="btn btn-primary" style={{ marginTop: 'var(--s5)' }} onClick={onClose}>Close</button>
+        </div>
+      </Sheet>
+    )
+  }
+
+  return (
+    <Sheet title={habit.name} onClose={onClose}>
+      <div className="coach-progress" aria-hidden="true">
+        {steps.map((_, k) => <i key={k} className={k <= i ? 'on' : ''} />)}
+      </div>
+      <span className="microcap coach-step-label">Step {i + 1} of {steps.length}</span>
+      <h3 className="coach-q">{step.title}</h3>
+      {step.note && <p style={{ fontSize: 'var(--text-sm)', color: 'var(--muted)', marginBottom: 'var(--s4)' }}>{step.note}</p>}
+
+      {step.kind === 'timer' && (
+        <div className="routine-timer">
+          <div className={`timer-clock${left === 0 ? ' done' : ''}`}>{mmss(left)}</div>
+          <div className="timer-controls">
+            {left > 0 ? (
+              <button className="btn btn-primary" onClick={() => setRunning((r) => !r)}>{running ? 'Pause' : left === (step.seconds ?? 0) ? 'Start' : 'Resume'}</button>
+            ) : (
+              <span className="microcap" style={{ color: 'var(--progress)' }}>Time is up</span>
+            )}
+            <button className="btn btn-ghost" onClick={() => { setLeft(step.seconds ?? 0); setRunning(false) }}>Reset</button>
+          </div>
+        </div>
+      )}
+
+      {step.example && <div className="script-line"><span className="say">Say it</span>{step.example}</div>}
+      {step.link && (
+        <a className="btn btn-quiet" href={step.link} target="_blank" rel="noreferrer" style={{ marginTop: 'var(--s2)' }}>
+          {step.linkLabel ?? 'Open tool'} ↗
+        </a>
+      )}
+
+      <div className="coach-nav">
+        {i > 0 && <button className="btn btn-quiet" onClick={() => setI(i - 1)}>Back</button>}
+        {!last && <button className="btn btn-primary" onClick={() => setI(i + 1)}>Next</button>}
+        {last && <button className="btn btn-primary" onClick={finish}>Finish routine</button>}
+      </div>
     </Sheet>
   )
 }

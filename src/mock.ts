@@ -139,12 +139,23 @@ export const MOCK_TASKS: Task[] = [
     ] },
 ]
 
-/* Mon..Sun; the demo pretends today is index 6 (Sunday). */
+/* Mon..Sun. Habits carry a part-of-day so the page groups the way the day runs. */
 export const MOCK_HABITS: HabitDef[] = [
-  { id: 'h1', name: 'In bed before 1:00', days: [true, true, false, true, false, true, false], paused: false, history: [1, 2, 2, 3, 2, 4, 3, 3, 4, 5, 4, 4] },
-  { id: 'h2', name: 'Morning check-in', days: [true, true, true, false, true, true, true], paused: false, history: [3, 4, 4, 5, 5, 4, 6, 5, 6, 6, 5, 6] },
-  { id: 'h3', name: '20 min movement', days: [false, true, false, true, true, false, false], paused: false, history: [0, 1, 2, 1, 3, 2, 3, 4, 3, 3, 4, 3] },
-  { id: 'h4', name: 'No screens at dinner', days: [false, false, true, true, false, false, false], paused: false, history: [0, 0, 1, 1, 2, 1, 2, 2, 3, 2, 2, 2] },
+  {
+    id: 'h-morning', name: 'Morning routine', daypart: 'morning', paused: false,
+    days: [true, true, true, false, true, false, false],
+    history: [2, 3, 3, 4, 4, 3, 5, 4, 5, 5, 4, 5],
+    steps: [
+      { id: 'mr1', title: 'Meditation', kind: 'timer', seconds: 600, note: 'Sit, eyes closed, follow the breath. Ten minutes, no phone.' },
+      { id: 'mr2', title: 'Pronunciation test', kind: 'do', note: 'Read a short passage out loud, record it, listen back once.' },
+      { id: 'mr3', title: 'Jazykolam mouth stretch', kind: 'do', note: 'Loosen the jaw and lips, then a tongue-twister three times, fast and clean.', example: 'Strč prst skrz krk.' },
+      { id: 'mr4', title: 'Typing test', kind: 'do', note: 'One quick round to wake the hands up.', link: 'https://monkeytype.com', linkLabel: 'Open typing test' },
+    ],
+  },
+  { id: 'h2', name: 'Morning check-in', daypart: 'morning', days: [true, true, true, false, true, true, true], paused: false, history: [3, 4, 4, 5, 5, 4, 6, 5, 6, 6, 5, 6] },
+  { id: 'h3', name: '20 min movement', daypart: 'afternoon', days: [false, true, false, true, true, false, false], paused: false, history: [0, 1, 2, 1, 3, 2, 3, 4, 3, 3, 4, 3] },
+  { id: 'h4', name: 'No screens at dinner', daypart: 'evening', days: [false, false, true, true, false, false, false], paused: false, history: [0, 0, 1, 1, 2, 1, 2, 2, 3, 2, 2, 2] },
+  { id: 'h1', name: 'In bed before 1:00', daypart: 'evening', days: [true, true, false, true, false, true, false], paused: false, history: [1, 2, 2, 3, 2, 4, 3, 3, 4, 5, 4, 4] },
 ]
 
 export const MOCK_GOALS: Goal[] = [

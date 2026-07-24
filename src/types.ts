@@ -3,6 +3,7 @@ export type SpaceId = 'personal' | 'work' | 'offplate'
 export type PageId =
   | 'today'
   | 'plan'
+  | 'assistant'
   | 'habits'
   | 'goals'
   | 'money'
@@ -213,6 +214,20 @@ export interface CoachStep {
 export interface PlanState {
   committedDate: string | null
   firstMoveId: string | null
+}
+
+/** Where the assistant put a dictated item, so you can see and undo it. */
+export interface AssistantItem {
+  id: string
+  kind: 'task' | 'goal' | 'done'
+  label: string
+  tab: PageId
+}
+export interface AssistantEntry {
+  id: string
+  text: string
+  when: string
+  items: AssistantItem[]
 }
 
 export interface ReviewState {

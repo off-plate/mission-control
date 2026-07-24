@@ -4,6 +4,7 @@ import { SPACE_LABELS } from './mock'
 import { DecomposeSheet } from './modals'
 import { GoalsPage, HabitsPage, PlanPage, TodayPage } from './pages1'
 import { CoachPage, MoneyPage, ReviewPage, SettingsPage, StatsPage } from './pages2'
+import { AssistantPage } from './pages3'
 import { useStore } from './store'
 import type { PageId, SpaceId } from './types'
 
@@ -85,6 +86,16 @@ export default function App() {
           ))}
         </nav>
         <div className="topbar-right">
+          <button
+            className={`btn btn-quiet${page === 'assistant' ? ' is-on' : ''}`}
+            onClick={() => setPage('assistant')}
+            aria-pressed={page === 'assistant'}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3z" strokeLinejoin="round" />
+            </svg>
+            Assistant
+          </button>
           <button className="btn btn-primary" onClick={() => setDecomposeOpen(true)}>Break it down</button>
           <button
             className="btn btn-ghost"
@@ -122,6 +133,7 @@ export default function App() {
       <main id="main">
         {page === 'today' && <TodayPage />}
         {page === 'plan' && <PlanPage />}
+        {page === 'assistant' && <AssistantPage />}
         {page === 'habits' && <HabitsPage />}
         {page === 'goals' && <GoalsPage />}
         {page === 'money' && <MoneyPage />}

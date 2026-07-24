@@ -10,6 +10,7 @@ import {
   WIDGET_DEFS,
 } from './mock'
 import type {
+  AssistantEntry,
   Goal,
   HabitDef,
   LedgerEntry,
@@ -26,7 +27,7 @@ import type {
   WidgetType,
 } from './types'
 
-const STORAGE_KEY = 'mission-control-demo-v5'
+const STORAGE_KEY = 'mission-control-demo-v6'
 
 interface PersistedState {
   version: 2
@@ -39,6 +40,7 @@ interface PersistedState {
   sources: SourceState[]
   plan: PlanState
   review: ReviewState
+  assistantLog: AssistantEntry[]
 }
 
 interface Store extends PersistedState {
@@ -89,6 +91,10 @@ interface Store extends PersistedState {
   commitPlan: (taskIds: string[], firstMoveId: string | null) => void
   finishReview: (wins: string[], outcomes: string[]) => void
 
+  assistantLog: AssistantEntry[]
+  applyDictation: (text: string, items: { kind: 'task' | 'goal' | 'done'; text: string; estimateMin?: number }[]) => void
+  revertAssistantItem: (entryId: string, itemId: string) => void
+
   todayIndex: number
   savedMin: number
   accuracyPct: number
@@ -114,7 +120,7 @@ function systemTheme(): 'light' | 'dark' {
 
 function pageFromHash(): PageId {
   const h = location.hash.replace('#/', '')
-  const pages: PageId[] = ['today', 'plan', 'habits', 'goals', 'money', 'review', 'coach', 'stats', 'settings']
+  const pages: PageId[] = ['today', 'plan', 'assistant', 'habits', 'goals', 'money', 'review', 'coach', 'stats', 'settings']
   return (pages as string[]).includes(h) ? (h as PageId) : 'today'
 }
 
@@ -142,6 +148,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [sources, setSources] = useState(persisted?.sources ?? MOCK_SOURCES)
   const [plan, setPlan] = useState<PlanState>(persisted?.plan ?? { committedDate: null, firstMoveId: null })
   const [review, setReview] = useState<ReviewState>(persisted?.review ?? { lastDoneDate: null, wins: [], outcomes: [] })
+  const [assistantLog, setAssistantLog] = useState<AssistantEntry[]>(persisted?.assistantLog ?? [])
   const [space, setSpace] = useState<SpaceId>('personal')
   const [page, setPageState] = useState<PageId>(pageFromHash)
   const [editing, setEditing] = useState(false)
@@ -171,14 +178,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const state: PersistedState = {
-      version: 2, spaces, tasks, habits, goals, ledger, social, sources, plan, review,
+      version: 2, spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog,
     }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
     } catch {
       /* demo only; the real app persists to Supabase */
     }
-  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review])
+  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog])
 
   /* Demo pretends today is Sunday when the real weekday is irrelevant;
      habits use the real weekday so checking off feels true. */
@@ -341,6 +348,36 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         })),
         ...prev,
       ])
+    },
+
+    assistantLog,
+    applyDictation: (text, items) => {
+      const created: AssistantEntry['items'] = []
+      const newTasks: Task[] = []
+      const newGoals: Goal[] = []
+      items.forEach((it) => {
+        const id = `a-${++uid}`
+        if (it.kind === 'goal') {
+          newGoals.push({ id, space, name: it.text, current: 0, target: 1, unit: 'done', note: 'added by assistant', timeframe: 'weekly', category: 'life' })
+          created.push({ id, kind: 'goal', label: it.text, tab: 'goals' })
+        } else {
+          const done = it.kind === 'done'
+          newTasks.push({ id, title: it.text, source: 'mc', estimateMin: it.estimateMin ?? 15, done, actualMin: done ? (it.estimateMin ?? 15) : undefined, space, list: 'today', category: 'quick' })
+          created.push({ id, kind: it.kind, label: it.text, tab: done ? 'today' : 'plan' })
+        }
+      })
+      if (newTasks.length) setTasks((prev) => [...newTasks, ...prev])
+      if (newGoals.length) setGoals((prev) => [...prev, ...newGoals])
+      setAssistantLog((prev) => [{ id: `log-${++uid}`, text, when: 'just now', items: created }, ...prev])
+    },
+    revertAssistantItem: (entryId, itemId) => {
+      const entry = assistantLog.find((e) => e.id === entryId)
+      const item = entry?.items.find((i) => i.id === itemId)
+      if (item) {
+        if (item.kind === 'goal') setGoals((p) => p.filter((g) => g.id !== item.id))
+        else setTasks((p) => p.filter((t) => t.id !== item.id))
+      }
+      setAssistantLog((prev) => prev.map((e) => (e.id === entryId ? { ...e, items: e.items.filter((i) => i.id !== itemId) } : e)).filter((e) => e.items.length))
     },
 
     todayIndex,

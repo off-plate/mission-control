@@ -176,6 +176,15 @@ a, button, input, select, textarea {
   padding: 0 clamp(var(--s4), 2.2vw, var(--s12)) var(--s12);
 }
 
+/* header + nav stick to the top so core buttons are always reachable */
+.topstick {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--bg);
+  box-shadow: 0 6px 16px -12px rgba(0, 0, 0, 0.5);
+}
+
 .topbar {
   display: flex;
   align-items: center;
@@ -183,6 +192,7 @@ a, button, input, select, textarea {
   padding-block: var(--s3);
   flex-wrap: wrap;
 }
+.btn-ghost.is-on { color: var(--accent); border-color: var(--accent); }
 
 .brand { display: flex; align-items: center; gap: var(--s3); color: var(--ink); }
 .brand svg { color: var(--accent); }
@@ -234,6 +244,13 @@ a, button, input, select, textarea {
 .checkup-q { font-family: var(--font-display); font-weight: 700; font-size: var(--text-base); margin: var(--s5) 0 var(--s2); }
 .est-vs-actual { font-size: 0.75rem; color: var(--info); white-space: nowrap; }
 .est-vs-actual b { font-weight: 600; }
+
+/* each habit is its own separate card */
+.habit-card-tag { display: flex; align-items: baseline; gap: var(--s2); margin-bottom: var(--s2); }
+.habit-card-tag .col-tot { margin-left: auto; }
+.habit-card .habit-row { border-bottom: none; padding: 0; }
+.habit-card.is-routine { outline: 1px solid var(--accent-wash); }
+.savings-months { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.625rem; color: var(--faint); margin-top: 2px; }
 
 .topbar-right { margin-left: auto; display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
 

@@ -243,6 +243,13 @@ export const MOCK_MONEY = {
     pct: 25,
     monthly: '5 500 Kč',
   },
+  savings: {
+    thisMonth: '4 200 Kč',
+    total: '38 400 Kč',
+    months: [1800, 2400, 2100, 3600, 4200],
+    monthLabels: ['Mar', 'Apr', 'May', 'Jun', 'Jul'],
+    note: 'after debt and fixed costs',
+  },
   cycleLabel: 'Pay cycle',
   spentPct: 46,
   budgetLine: 'After rent and fixed costs, spending is on pace for day 12 of 30',

@@ -56,22 +56,12 @@ export function MoneyPage() {
           </div>
         </div>
 
-        {/* This cycle */}
+        {/* Monthly payments */}
         <div className="panel">
-          <span className="microcap">This cycle</span>
-          <div className="kpi val-pos">{f.safeToSpend}</div>
-          <div className="kpi-sub">safe to spend {f.safeUntil}</div>
-          <div className="kpi-sub">{f.safeMath}</div>
-          <div className="bar" style={{ marginTop: 12 }}>
-            <i style={{ width: `${f.spentPct}%` }} />
-          </div>
-          <div className="kpi-sub">{f.spentPct}% of the cycle budget spent. {f.budgetLine}.</div>
-        </div>
-
-        {/* Next payments */}
-        <div className="panel">
-          <span className="microcap">Next payments</span>
-          <div className="rowlist">
+          <span className="microcap">Monthly payments</span>
+          <div className="kpi">{f.debt.monthly}<span className="unit">/ month</span></div>
+          <div className="kpi-sub">across your payment plans</div>
+          <div className="rowlist" style={{ marginTop: 12 }}>
             {f.schedule.map((sch) => {
               const taskTitle = `Send: ${sch.name.split(',')[0]} (${sch.amount})`
               const queued = tasks.find((t) => t.title === taskTitle)
@@ -96,6 +86,20 @@ export function MoneyPage() {
               )
             })}
           </div>
+        </div>
+
+        {/* Monthly savings over time */}
+        <div className="panel">
+          <span className="microcap">Monthly savings</span>
+          <div className="kpi val-pos">{f.savings.thisMonth}</div>
+          <div className="kpi-sub">set aside this month, {f.savings.note}</div>
+          <div style={{ marginTop: 12 }}>
+            <Spark data={f.savings.months} width={260} height={54} />
+            <div className="savings-months">
+              {f.savings.monthLabels.map((m) => <span key={m}>{m}</span>)}
+            </div>
+          </div>
+          <div className="kpi-sub" style={{ marginTop: 10 }}><span className="val-pos">{f.savings.total}</span> saved so far</div>
         </div>
       </div>
 
@@ -240,7 +244,7 @@ export function CoachPage() {
 
   if (!scenario) {
     return (
-      <div className="page narrow">
+      <div className="page">
         <Band title="Coach" sub="for the things you keep putting off" />
         {finished && (
           <div className="allclear" style={{ borderColor: 'var(--progress)' }}>
@@ -270,7 +274,7 @@ export function CoachPage() {
   const last = i === scenario.steps.length - 1
 
   return (
-    <div className="page narrow">
+    <div className="page">
       <Band title={scenario.title} sub={scenario.tag} />
       <div className="panel" style={{ maxWidth: 1100, marginInline: "auto" }}>
         <div className="coach-progress" aria-hidden="true">

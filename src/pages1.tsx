@@ -702,7 +702,7 @@ function HabitRow({ h, todayIndex, onStart }: { h: HabitDef; todayIndex: number;
         )}
         <span className="habit-count mono">{kept}/7</span>
         <button className="btn btn-ghost" style={{ minHeight: 30, fontSize: 'var(--text-xs)' }} onClick={() => togglePauseHabit(h.id)}>{h.paused ? 'resume' : 'pause'}</button>
-        <button className="btn btn-danger" style={{ minHeight: 30, fontSize: 'var(--text-xs)' }} onClick={() => deleteHabit(h.id)} aria-label={`Delete ${h.name}`}>×</button>
+        <button className="btn btn-danger" style={{ minHeight: 30, fontSize: 'var(--text-xs)' }} onClick={() => { if (window.confirm(`Delete habit "${h.name}"? This can't be undone.`)) deleteHabit(h.id) }} aria-label={`Delete ${h.name}`}>×</button>
       </div>
       {isRoutine && (
         <div className="routine-preview">
@@ -737,6 +737,9 @@ function HabitRow({ h, todayIndex, onStart }: { h: HabitDef; todayIndex: number;
   )
 }
 
+const DP_ORDER: (TimeSlot | 'anytime')[] = ['morning', 'noon', 'afternoon', 'evening', 'anytime']
+const dpLabel = (dp?: TimeSlot) => (dp ? (SLOTS.find((s) => s.id === dp)?.label ?? 'Anytime') : 'Anytime')
+
 export function HabitsPage() {
   const { habits, addHabit, todayIndex } = useStore()
   const [name, setName] = useState('')
@@ -744,10 +747,7 @@ export function HabitsPage() {
   const [running, setRunning] = useState<HabitDef | null>(null)
   const kept = habits.filter((h) => !h.paused).reduce((a, h) => a + h.days.filter(Boolean).length, 0)
 
-  const groups: { id: TimeSlot | 'anytime'; label: string }[] = [
-    ...SLOTS.map((s) => ({ id: s.id, label: s.label })),
-    { id: 'anytime', label: 'Anytime' },
-  ]
+  const sorted = [...habits].sort((a, b) => DP_ORDER.indexOf(a.daypart ?? 'anytime') - DP_ORDER.indexOf(b.daypart ?? 'anytime'))
 
   const add = () => {
     if (!name.trim()) return
@@ -776,22 +776,17 @@ export function HabitsPage() {
         </div>
       </div>
 
-      <div className="grid-4 habit-cols">
-        {groups.map((g) => {
-          const inGroup = habits.filter((h) => (h.daypart ?? 'anytime') === g.id)
-          const done = inGroup.filter((h) => !h.paused && h.days[todayIndex]).length
-          const active = inGroup.filter((h) => !h.paused).length
-          if (inGroup.length === 0) return null
-          return (
-            <div className="panel habit-col" key={g.id}>
-              <div className="col-head">
-                <span className="microcap">{g.label}</span>
-                {active > 0 && <span className="col-tot mono">{done}/{active} today</span>}
-              </div>
-              {inGroup.map((h) => <HabitRow key={h.id} h={h} todayIndex={todayIndex} onStart={setRunning} />)}
+      <div className="grid-4 habit-cards">
+        {sorted.map((h) => (
+          <div className={`panel habit-card${h.steps?.length ? ' is-routine' : ''}`} key={h.id}>
+            <div className="habit-card-tag">
+              <span className="microcap">{dpLabel(h.daypart)}</span>
+              {!h.paused && h.days[todayIndex] && <span className="col-tot mono val-pos">done today</span>}
             </div>
-          )
-        })}
+            <HabitRow h={h} todayIndex={todayIndex} onStart={setRunning} />
+          </div>
+        ))}
+        {habits.length === 0 && <div className="empty">No habits yet. Add one above.</div>}
       </div>
 
       <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginTop: 16 }}>
@@ -852,7 +847,7 @@ export function GoalsPage() {
         </div>
       </div>
 
-      <div className="grid-4 goal-cols">
+      <div className="grid-2 goal-cols">
         {GOAL_TIMEFRAMES.map((tfr) => {
           const inTf = [
             ...spaceGoals.filter((g) => (g.timeframe ?? 'quarter') === tfr.id),
@@ -887,7 +882,7 @@ export function GoalsPage() {
                         <>
                           <button className="btn btn-quiet" style={{ minHeight: 28, padding: '0 8px' }} onClick={() => bumpGoal(g.id, 1)} aria-label={`Progress ${g.name}`}>+</button>
                           <button className="btn btn-ghost" style={{ minHeight: 28, padding: '0 8px' }} onClick={() => bumpGoal(g.id, -1)} aria-label={`Undo ${g.name}`}>−</button>
-                          <button className="btn btn-danger" style={{ minHeight: 28, padding: '0 6px', fontSize: 'var(--text-xs)' }} onClick={() => deleteGoal(g.id)} aria-label={`Delete ${g.name}`}>×</button>
+                          <button className="btn btn-danger" style={{ minHeight: 28, padding: '0 6px', fontSize: 'var(--text-xs)' }} onClick={() => { if (window.confirm(`Delete goal "${g.name}"?`)) deleteGoal(g.id) }} aria-label={`Delete ${g.name}`}>×</button>
                         </>
                       )}
                     </div>

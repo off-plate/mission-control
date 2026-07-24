@@ -32,11 +32,6 @@ export function MoneyPage() {
       <Band
         title="Money"
         sub="where the debt is going"
-        metrics={[
-          { v: f.debt.remaining, k: 'debt remaining', tone: 'urgent' as const },
-          { v: f.debt.paid, k: 'paid off', tone: 'pos' as const },
-          { v: `${f.debt.monthly}/mo`, k: 'across plans' },
-        ]}
       />
       <div className="grid-3">
         {/* Debt payoff */}
@@ -293,6 +288,15 @@ export function ReviewPage() {
 
 /* ---------------- COACH ---------------- */
 
+/* The method Coach runs every avoided task through. Keep in step order. */
+const METHOD_HINT: Record<string, string> = {
+  Frame: 'name the fear, set the win',
+  Script: 'the exact opening lines',
+  Rehearse: 'play their pushback',
+  Fallback: 'a line for when it turns',
+  Commit: 'drop it onto Today',
+}
+
 export function CoachPage() {
   const { addTask, space, setPage, coachOpen, setCoachOpen } = useStore()
   const [scenario, setScenario] = useState<CoachScenario | null>(null)
@@ -317,6 +321,14 @@ export function CoachPage() {
             <button className="btn btn-ghost" style={{ marginLeft: 'auto' }} onClick={() => setPage('plan')}>Open plan</button>
           </div>
         )}
+        <div className="coach-method" aria-label="How Coach works">
+          <p className="coach-method-lead">Pick a task you have been avoiding. Coach walks it through five beats, then drops the real thing onto Today.</p>
+          <ol className="coach-method-strip">
+            {(['Frame', 'Script', 'Rehearse', 'Fallback', 'Commit'] as const).map((m, k) => (
+              <li key={m}><span className="n">{k + 1}</span><span className="l">{m}</span><span className="h">{METHOD_HINT[m]}</span></li>
+            ))}
+          </ol>
+        </div>
         <div className="scenario-grid">
           {COACH_SCENARIOS.map((s) => (
             <button key={s.id} className="scenario" onClick={() => { setScenario(s); setI(0) }}>
@@ -340,35 +352,51 @@ export function CoachPage() {
   return (
     <div className="page">
       <Band title={scenario.title} sub={scenario.tag} />
-      <div className="panel" style={{ maxWidth: 1100, marginInline: "auto" }}>
-        <div className="coach-progress" aria-hidden="true">
-          {scenario.steps.map((_, k) => <i key={k} className={k <= i ? 'on' : ''} />)}
-        </div>
-        <span className="microcap coach-step-label">Step {i + 1} of {scenario.steps.length} · {step.label}</span>
-        <h3 className="coach-q">{step.question}</h3>
-        {step.body && <p style={{ fontSize: 'var(--text-sm)', color: 'var(--muted)', marginBottom: 12 }}>{step.body}</p>}
-        {step.scripts?.map((s, k) => (
-          <div className="script-line" key={k}>
-            <span className="say">{s.say}</span>
-            {s.text}
+      <div className="coach-runner">
+        <aside className="coach-spine">
+          <span className="microcap">The five beats</span>
+          <ol className="coach-steps">
+            {scenario.steps.map((st, k) => (
+              <li key={k} className={`coach-step${k === i ? ' current' : ''}${k < i ? ' done' : ''}`}>
+                <button onClick={() => k <= i && setI(k)} disabled={k > i} aria-current={k === i ? 'step' : undefined}>
+                  <span className="coach-step-num">{k < i ? '✓' : k + 1}</span>
+                  <span className="coach-step-name">
+                    <span className="l">{st.label}</span>
+                    <span className="h">{METHOD_HINT[st.label] ?? ''}</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ol>
+          <button className="btn btn-ghost coach-exit" onClick={() => setScenario(null)}>All scenarios</button>
+        </aside>
+
+        <div className="panel coach-active">
+          <span className="microcap coach-step-label">Step {i + 1} of {scenario.steps.length} · {step.label}</span>
+          <h3 className="coach-q">{step.question}</h3>
+          {step.body && <p className="coach-body">{step.body}</p>}
+          {step.scripts?.map((s, k) => (
+            <div className="script-line" key={k}>
+              <span className="say">{s.say}</span>
+              {s.text}
+            </div>
+          ))}
+          <div className="coach-nav">
+            {i > 0 && <button className="btn btn-quiet" onClick={() => setI(i - 1)}>Back</button>}
+            {!last && <button className="btn btn-primary" onClick={() => setI(i + 1)}>Next</button>}
+            {last && (
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  addTask({ title: scenario.resultTask.title, source: 'mc', estimateMin: scenario.resultTask.estimateMin, space, list: 'today', category: scenario.resultTask.category })
+                  setFinished(scenario.resultTask.title)
+                  setScenario(null)
+                }}
+              >
+                Save it to Today
+              </button>
+            )}
           </div>
-        ))}
-        <div className="coach-nav">
-          <button className="btn btn-ghost" onClick={() => setScenario(null)}>All scenarios</button>
-          {i > 0 && <button className="btn btn-quiet" onClick={() => setI(i - 1)}>Back</button>}
-          {!last && <button className="btn btn-primary" onClick={() => setI(i + 1)}>Next</button>}
-          {last && (
-            <button
-              className="btn btn-primary"
-              onClick={() => {
-                addTask({ title: scenario.resultTask.title, source: 'mc', estimateMin: scenario.resultTask.estimateMin, space, list: 'today', category: scenario.resultTask.category })
-                setFinished(scenario.resultTask.title)
-                setScenario(null)
-              }}
-            >
-              Save the task
-            </button>
-          )}
         </div>
       </div>
     </div>

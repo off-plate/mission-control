@@ -3,7 +3,7 @@ import { MOCK_EXCEPTIONS_FOR } from './exceptions'
 import { SPACE_LABELS } from './mock'
 import { DecomposeSheet } from './modals'
 import { GoalsPage, HabitsPage, PlanPage, TodayPage } from './pages1'
-import { CoachPage, MoneyPage, ReviewPage, SettingsPage, StatsPage } from './pages2'
+import { CoachPage, MoneyPage, ReviewPage, SettingsPage } from './pages2'
 import { AssistantPage } from './pages3'
 import { useStore } from './store'
 import type { PageId, SpaceId } from './types'
@@ -26,7 +26,6 @@ const NAV: { id: PageId; label: string; personalOnly?: boolean }[] = [
   { id: 'money', label: 'Money', personalOnly: true },
   { id: 'review', label: 'Review' },
   { id: 'coach', label: 'Coach' },
-  { id: 'stats', label: 'Stats' },
 ]
 
 function PageNav({
@@ -96,7 +95,12 @@ export default function App() {
             </svg>
             Assistant
           </button>
-          <button className="btn btn-primary" onClick={() => setDecomposeOpen(true)}>Break it down</button>
+          <button className="btn btn-primary btn-breakdown" onClick={() => setDecomposeOpen(true)}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M12 3v6M12 9L6.5 14M12 9l5.5 5M6.5 14v0M6.5 14a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM17.5 14a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM12 3a2.5 2.5 0 1 0 0-.01" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Break it down
+          </button>
           <button
             className="btn btn-ghost"
             onClick={toggleTheme}
@@ -137,9 +141,8 @@ export default function App() {
         {page === 'habits' && <HabitsPage />}
         {page === 'goals' && <GoalsPage />}
         {page === 'money' && <MoneyPage />}
-        {page === 'review' && <ReviewPage />}
+        {(page === 'review' || page === 'stats') && <ReviewPage />}
         {page === 'coach' && <CoachPage />}
-        {page === 'stats' && <StatsPage />}
         {page === 'settings' && <SettingsPage />}
       </main>
 

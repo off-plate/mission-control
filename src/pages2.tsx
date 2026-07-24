@@ -130,15 +130,25 @@ export function MoneyPage() {
   )
 }
 
-/* ---------------- REVIEW (weekly reset) ---------------- */
+/* ---------------- REVIEW (weekly reset + stats, merged) ---------------- */
+
+function SecHead({ label, note }: { label: string; note?: string }) {
+  return (
+    <div className="review-sec">
+      <span className="microcap">{label}</span>
+      {note && <span className="review-sec-note">{note}</span>}
+    </div>
+  )
+}
 
 export function ReviewPage() {
-  const { tasks, space, savedMin, accuracyPct, habits, goals, finishReview, review } = useStore()
+  const { tasks, space, savedMin, accuracyPct, habits, goals, finishReview, review, ledger } = useStore()
   const [wins, setWins] = useState<string[]>(['', '', ''])
   const [changed, setChanged] = useState('')
   const [outcomes, setOutcomes] = useState<string[]>(['', '', ''])
   const todayKey = new Date().toISOString().slice(0, 10)
   const doneToday = review.lastDoneDate === todayKey
+  const s = MOCK_STATS
 
   const doneTasks = tasks.filter((t) => t.done && t.space === space)
   const doneMin = doneTasks.reduce((a, t) => a + taskMinutes(t), 0)
@@ -155,7 +165,10 @@ export function ReviewPage() {
       <Band
         title="Weekly review"
         sub="the week in numbers, then a quick checkup"
-        metrics={[{ v: `${Math.floor(savedMin / 60)}h ${savedMin % 60}m`, k: 'time saved', tone: 'pos' as const }]}
+        metrics={[
+          { v: `${Math.floor(savedMin / 60)}h ${savedMin % 60}m`, k: 'time saved', tone: 'pos' as const },
+          { v: `${accuracyPct}%`, k: 'estimate accuracy' },
+        ]}
       />
       {doneToday && (
         <div className="allclear" style={{ borderColor: 'var(--progress)' }}>
@@ -163,6 +176,8 @@ export function ReviewPage() {
           Closed for this week. Your outcomes are in the backlog. The numbers below keep updating live.
         </div>
       )}
+
+      <SecHead label="This week" note="live, straight off what you logged" />
       <div className="grid-4">
         <div className="panel">
           <span className="microcap">Tasks done</span>
@@ -204,7 +219,56 @@ export function ReviewPage() {
         </div>
       </div>
 
-      <div className="panel" style={{ marginTop: 'var(--s5)', maxWidth: 820 }}>
+      <SecHead label="Trends & calibration" note="six weeks back, this week live" />
+      <div className="grid-3">
+        <div className="panel">
+          <span className="microcap">Time saved, six weeks</span>
+          <SparkBox data={[...s.weeklySavedMin, savedMin]} unit="m" caption="minutes per week saved vs your estimates, this week live" />
+          <span className="microcap" style={{ marginTop: 24, display: 'block' }}>Accuracy trend</span>
+          <SparkBox data={[...s.weeklyAccuracy, accuracyPct]} unit="%" caption="share of tasks finished within a quarter of the estimate" />
+        </div>
+        <div className="panel">
+          <span className="microcap">Your calibration factors</span>
+          <table className="caltable">
+            <tbody>
+              {s.calibration.map((c) => (
+                <tr key={c.category}>
+                  <td style={{ fontWeight: 600 }}>{c.label}</td>
+                  <td className="f">x{c.factor.toFixed(1)}</td>
+                  <td className="n">{c.note}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="panel">
+          <span className="microcap">Claude usage</span>
+          <div className="kpi">{MOCK_CLAUDE.sessionsToday}<span className="unit">sessions today</span></div>
+          <div style={{ marginTop: 12 }}>
+            <SparkBox data={MOCK_CLAUDE.tokensWeek} unit="k" caption={`tokens per day, ${MOCK_CLAUDE.note}`} />
+          </div>
+        </div>
+        <div className="panel panel-wide">
+          <span className="microcap">The ledger, estimate vs actual</span>
+          <div className="ledger-list">
+            {ledger.map((e) => {
+              const d = e.estimateMin - e.actualMin
+              return (
+                <div className="ledger-row" key={e.id}>
+                  <span className="mono" style={{ color: 'var(--faint)', fontSize: 'var(--text-xs)', minWidth: '3ch' }}>{e.when}</span>
+                  <span className="ledger-title">{e.title}</span>
+                  <span className="src-tag">{e.category}</span>
+                  <span className="mono" style={{ color: 'var(--muted)', fontSize: 'var(--text-xs)' }}>~{e.estimateMin}m → {e.actualMin}m</span>
+                  <span className={`delta ${d >= 0 ? 'saved' : 'over'}`}>{d >= 0 ? `+${d}m` : `${d}m`}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
+      <SecHead label="Checkup" note="two minutes, honest" />
+      <div className="panel" style={{ maxWidth: 820 }}>
         <span className="microcap">Manual checkup</span>
         <h4 className="checkup-q">What actually went well?</h4>
         {wins.map((w, i) => (
@@ -305,75 +369,6 @@ export function CoachPage() {
               Save the task
             </button>
           )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/* ---------------- STATS ---------------- */
-
-export function StatsPage() {
-  const { ledger, savedMin, accuracyPct } = useStore()
-  const s = MOCK_STATS
-  return (
-    <div className="page">
-      <Band
-        title="Stats"
-        sub="everything traces to a log entry"
-        metrics={[
-          { v: `${Math.floor(savedMin / 60)}h ${savedMin % 60}m`, k: 'under estimate, net', tone: 'pos' as const },
-          { v: `${accuracyPct}%`, k: 'estimate accuracy' },
-        ]}
-      />
-      <div className="grid-3">
-        <div className="panel">
-          <span className="microcap">Time saved, six weeks</span>
-          <SparkBox data={[...s.weeklySavedMin, savedMin]} unit="m" caption="minutes per week saved vs your estimates, this week live" />
-          <span className="microcap" style={{ marginTop: 24, display: 'block' }}>Accuracy trend</span>
-          <SparkBox data={[...s.weeklyAccuracy, accuracyPct]} unit="%" caption="share of tasks finished within a quarter of the estimate" />
-        </div>
-
-        <div className="panel">
-          <span className="microcap">Your calibration factors</span>
-          <table className="caltable">
-            <tbody>
-              {s.calibration.map((c) => (
-                <tr key={c.category}>
-                  <td style={{ fontWeight: 600 }}>{c.label}</td>
-                  <td className="f">x{c.factor.toFixed(1)}</td>
-                  <td className="n">{c.note}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-        </div>
-
-        <div className="panel">
-          <span className="microcap">Claude usage</span>
-          <div className="kpi">{MOCK_CLAUDE.sessionsToday}<span className="unit">sessions today</span></div>
-          <div style={{ marginTop: 12 }}>
-            <SparkBox data={MOCK_CLAUDE.tokensWeek} unit="k" caption={`tokens per day, ${MOCK_CLAUDE.note}`} />
-          </div>
-        </div>
-
-        <div className="panel panel-wide">
-          <span className="microcap">The ledger, estimate vs actual</span>
-          <div className="ledger-list">
-          {ledger.map((e) => {
-            const d = e.estimateMin - e.actualMin
-            return (
-              <div className="ledger-row" key={e.id}>
-                <span className="mono" style={{ color: 'var(--faint)', fontSize: 'var(--text-xs)', minWidth: '3ch' }}>{e.when}</span>
-                <span className="ledger-title">{e.title}</span>
-                <span className="src-tag">{e.category}</span>
-                <span className="mono" style={{ color: 'var(--muted)', fontSize: 'var(--text-xs)' }}>~{e.estimateMin}m → {e.actualMin}m</span>
-                <span className={`delta ${d >= 0 ? 'saved' : 'over'}`}>{d >= 0 ? `+${d}m` : `${d}m`}</span>
-              </div>
-            )
-          })}
-          </div>
         </div>
       </div>
     </div>

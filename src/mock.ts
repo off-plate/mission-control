@@ -48,11 +48,11 @@ export const WIDGET_DEFS: Record<WidgetType, WidgetDef> = {
   },
   timesaved: {
     type: 'timesaved', title: 'Time saved', description: 'Estimate minus actual, from your own log',
-    supportedSizes: ['S', 'M'], defaultSize: 'S', freshMinutes: 0, staleAfter: Infinity, page: 'stats',
+    supportedSizes: ['S', 'M'], defaultSize: 'S', freshMinutes: 0, staleAfter: Infinity, page: 'review',
   },
   claude: {
     type: 'claude', title: 'Claude', description: 'Sessions and tokens this week',
-    supportedSizes: ['S', 'M'], defaultSize: 'S', freshMinutes: 32, staleAfter: 60 * 26, page: 'stats',
+    supportedSizes: ['S', 'M'], defaultSize: 'S', freshMinutes: 32, staleAfter: 60 * 26, page: 'review',
   },
   social: {
     type: 'social', title: 'Audience', description: 'Followers and last post, entered weekly',

@@ -249,7 +249,7 @@ const TimeSavedBody = memo(function TimeSavedBody() {
   const h = Math.floor(savedMin / 60)
   const m = savedMin % 60
   return (
-    <button onClick={() => setPage('stats')} style={{ textAlign: 'left', display: 'block', width: '100%' }} aria-label="Open the time saved log">
+    <button onClick={() => setPage('review')} style={{ textAlign: 'left', display: 'block', width: '100%' }} aria-label="Open the time saved log">
       <div className={`kpi${savedMin >= 0 ? ' val-pos' : ' val-urgent'}`}>{h > 0 ? `${h}h ${m}` : m}<span className="unit">min</span></div>
       <div className="kpi-sub">net minutes under your own estimates this week</div>
       <div className="kpi-sub">estimate accuracy {accuracyPct}%</div>

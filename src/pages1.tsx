@@ -203,9 +203,9 @@ const WIDGET_DEFS_LIST = WIDGET_DEFS
 
 /* ---------------- PLAN ---------------- */
 
-const DAY_START = 7 * 60   // 7 AM
-const DAY_END = 23 * 60    // 11 PM
-const HOUR_PX = 46
+const DAY_START = 0            // full day, midnight to midnight, shrunk to fit
+const DAY_END = 24 * 60
+const HOUR_PX = 30
 
 /** The task/event name IS the link; clicking opens (or schedules) it in Google Calendar. */
 function TaskName({ title, start, end, className }: { title: string; start?: string; end?: string; className?: string }) {
@@ -224,14 +224,11 @@ function Schedule({ events, tasks }: { events: AgendaEvent[]; tasks: Task[] }) {
   return (
     <div className="vsched">
       <div className="vsched-inner" style={{ height }}>
-        {Array.from({ length: (DAY_END - DAY_START) / 60 + 1 }, (_, i) => {
-          const h = DAY_START / 60 + i
-          return (
-            <div key={h} className="hline" style={{ top: i * HOUR_PX }}>
-              <span className="hlabel">{fmtTimeShort(`${h}:00`)}</span>
-            </div>
-          )
-        })}
+        {Array.from({ length: 25 }, (_, h) => (
+          <div key={h} className="hline" style={{ top: h * HOUR_PX }}>
+            {h % 2 === 0 && h < 24 && <span className="hlabel">{fmtTimeShort(`${h}:00`)}</span>}
+          </div>
+        ))}
         {events.map((e) => (
           <div className="vev vev-cal" key={e.id} style={{ top: y(e.start) + 1, height: Math.max(((toMin(e.end) - toMin(e.start)) / 60) * HOUR_PX - 2, 30) }}>
             <TaskName title={e.title} start={e.start} end={e.end} className="t" />
@@ -261,7 +258,8 @@ export function PlanPage() {
 
   const spaceTasks = tasks.filter((t) => t.space === space)
   const open = spaceTasks.filter((t) => !t.done)                 // everything you added, any day
-  const todayTasks = open.filter((t) => t.list === 'today')      // pulled into today
+  const todayAll = spaceTasks.filter((t) => t.list === 'today')  // today incl. finished (they stay, struck)
+  const todayTasks = todayAll.filter((t) => !t.done)             // still to do
   const plannedMin = todayTasks.reduce((a, t) => a + taskMinutes(t), 0)
 
   // to-do progress: done vs the time still left across everything
@@ -385,8 +383,10 @@ export function PlanPage() {
             <span className="col-tot mono">{fmtDuration(plannedMin)} planned</span>
           </div>
           {BUCKETS.map((b) => {
-            const inBucket = todayTasks.filter((t) => (t.slot ?? 'unsorted') === b.id)
-            const tot = inBucket.reduce((a, t) => a + taskMinutes(t), 0)
+            const inBucket = todayAll.filter((t) => (t.slot ?? 'unsorted') === b.id)
+            // Unsorted only appears when something is actually unsorted
+            if (b.id === 'unsorted' && inBucket.length === 0) return null
+            const tot = inBucket.filter((t) => !t.done).reduce((a, t) => a + taskMinutes(t), 0)
             return (
               <div
                 className={`bucket drop-zone${dropKey === b.id ? ' drop-over' : ''}`}
@@ -398,44 +398,68 @@ export function PlanPage() {
                 <div className="bucket-head">
                   <span className="bucket-name">{b.label}</span>
                   {b.hint && <span className="bucket-hint">{b.hint}</span>}
-                  {inBucket.length > 0 && <span className="tot mono">{fmtDuration(tot)}</span>}
+                  {tot > 0 && <span className="tot mono">{fmtDuration(tot)}</span>}
                 </div>
                 {inBucket.length === 0 ? (
-                  <p className="bucket-empty">{b.id === 'unsorted' ? 'Moved tasks land here.' : 'Drop a task here.'}</p>
+                  <p className="bucket-empty">Drop a task here.</p>
                 ) : (
-                  inBucket.map((t) => (
-                    <div
-                      className="today-task"
-                      key={t.id}
-                      draggable
-                      onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move' }}
-                    >
-                      <span className="drag-grip" aria-hidden="true">⠿</span>
-                      <button className="checkbox" role="checkbox" aria-checked={t.done} aria-label={`Complete: ${t.title}`} onClick={() => toggleTask(t.id)}>
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
-                      </button>
-                      <span className={`cat-dot ${t.category}`} aria-hidden="true" />
-                      <TaskName title={t.title} start={t.at} className="grow" />
-                      <span className="est-chip">~{taskMinutes(t)}m</span>
-                      <span className="kebab-wrap">
-                        <button className="kebab" aria-label="Move to a time of day" aria-expanded={menuFor === t.id} onClick={() => setMenuFor((m) => (m === t.id ? null : t.id))}>⋯</button>
-                        {menuFor === t.id && (
-                          <div className="kebab-menu" role="menu">
-                            {BUCKETS.map((mb) => (
-                              <button key={mb.id} role="menuitemradio" aria-checked={(t.slot ?? 'unsorted') === mb.id} onClick={() => { dropTo(mb.id, t.id); setMenuFor(null) }}>
-                                {mb.label}
+                  inBucket.map((t) => {
+                    const isExp = expanded.has(t.id)
+                    const hasSubs = !!t.subtasks?.length
+                    const doneSubs = t.subtasks?.filter((s) => s.done).length ?? 0
+                    return (
+                      <div className="today-item" key={t.id}>
+                        <div
+                          className={`today-task${t.done ? ' done' : ''}`}
+                          draggable={!t.done}
+                          onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move' }}
+                        >
+                          <span className="drag-grip" aria-hidden="true">⠿</span>
+                          <button className="checkbox" role="checkbox" aria-checked={t.done} aria-label={t.done ? `Reopen: ${t.title}` : `Complete: ${t.title}`} onClick={() => toggleTask(t.id)}>
+                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+                          </button>
+                          <span className={`cat-dot ${t.category}`} aria-hidden="true" />
+                          <TaskName title={t.title} start={t.at} className="grow" />
+                          <span className="est-chip">~{taskMinutes(t)}m</span>
+                          {hasSubs && (
+                            <button className="expand-btn" aria-expanded={isExp} aria-label={isExp ? 'Collapse subtasks' : 'Expand subtasks'} onClick={() => toggleExp(t.id)}>
+                              {isExp ? '▾' : '▸'} {doneSubs}/{t.subtasks!.length}
+                            </button>
+                          )}
+                          {!t.done && (
+                            <span className="kebab-wrap">
+                              <button className="kebab" aria-label="Move to a time of day" aria-expanded={menuFor === t.id} onClick={() => setMenuFor((m) => (m === t.id ? null : t.id))}>⋯</button>
+                              {menuFor === t.id && (
+                                <div className="kebab-menu" role="menu">
+                                  {BUCKETS.map((mb) => (
+                                    <button key={mb.id} role="menuitemradio" aria-checked={(t.slot ?? 'unsorted') === mb.id} onClick={() => { dropTo(mb.id, t.id); setMenuFor(null) }}>
+                                      {mb.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </span>
+                          )}
+                        </div>
+                        {hasSubs && isExp && (
+                          <div className="subtask-list">
+                            {t.subtasks!.map((s) => (
+                              <button className={`subtask${s.done ? ' done' : ''}`} key={s.id} onClick={() => toggleSubtask(t.id, s.id)}>
+                                <span className="sub-tick" aria-hidden="true" />
+                                <span className="grow">{s.title}</span>
+                                <span className="est-chip">~{s.estimateMin}m</span>
                               </button>
                             ))}
                           </div>
                         )}
-                      </span>
-                    </div>
-                  ))
+                      </div>
+                    )
+                  })
                 )}
               </div>
             )
           })}
-          {todayTasks.length === 0 && (
+          {todayAll.length === 0 && (
             <p className="col-note">Select tasks in the to-do list and move them over, then drag them into a time of day.</p>
           )}
         </div>

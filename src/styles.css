@@ -871,70 +871,65 @@ select.textinput { flex: 0 0 auto; min-width: 110px; }
 .oblig .next { margin-top: var(--s2); font-size: var(--text-xs); color: var(--muted); }
 
 /* coach */
-.scenario-grid { display: grid; gap: var(--s4); grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); }
+/* ---------- Coach: face an avoided thing, ease in, check how it felt ---------- */
+.coach-intake { margin-bottom: var(--s5); }
+.coach-intake-row { display: flex; align-items: center; gap: var(--s3); margin-top: var(--s3); flex-wrap: wrap; }
+.coach-quick { margin-top: var(--s5); padding-top: var(--s4); border-top: 1px solid var(--hairline); }
+.coach-chips { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s3); }
+.coach-chip { display: flex; flex-direction: column; gap: 1px; text-align: left; padding: var(--s2) var(--s3); border: 1px solid var(--hairline-strong); border-radius: var(--r-md); background: var(--surface); }
+.coach-chip:hover { border-color: var(--accent); }
+.coach-chip .l { font-weight: 600; font-size: var(--text-sm); }
+.coach-chip .h { font-family: var(--font-mono); font-size: 0.625rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--faint); }
 
-/* Coach landing: surface the method so the page explains itself */
-.coach-method { margin-bottom: var(--s5); }
-.coach-method-lead { font-size: var(--text-base); color: var(--ink); max-width: 62ch; margin-bottom: var(--s4); }
-.coach-method-strip { list-style: none; display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--s2); }
-.coach-method-strip li { display: flex; flex-direction: column; gap: 2px; padding: var(--s3); border: 1px solid var(--hairline); border-radius: var(--r-md); background: var(--surface); }
-.coach-method-strip .n { font-family: var(--font-mono); font-size: 0.6875rem; color: var(--accent); }
-.coach-method-strip .l { font-weight: 700; font-size: var(--text-sm); }
-.coach-method-strip .h { font-size: 0.6875rem; color: var(--faint); line-height: 1.3; }
-@media (max-width: 719px) { .coach-method-strip { grid-template-columns: 1fr 1fr; } }
+/* the guided flow: a slim rail + one panel */
+.coach-flow { display: grid; grid-template-columns: 200px 1fr; gap: var(--s5); align-items: start; }
+.coach-flow-rail { list-style: none; position: sticky; top: 104px; display: flex; flex-direction: column; gap: 2px; }
+.coach-flow-rail li { display: flex; align-items: center; gap: var(--s3); padding: var(--s2) var(--s3); border-radius: var(--r-md); color: var(--faint); font-size: var(--text-sm); }
+.coach-flow-rail li.current { color: var(--ink); background: var(--accent-wash); font-weight: 600; }
+.coach-flow-rail li.done { color: var(--muted); }
+.coach-flow-rail .d { width: 22px; height: 22px; flex: none; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--hairline-strong); font-family: var(--font-mono); font-size: 0.6875rem; }
+.coach-flow-rail li.current .d { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.coach-flow-rail li.done .d { border-color: var(--progress); color: var(--progress); }
 
-/* Coach runner: five-beat spine on the left, active step on the right */
-.coach-runner { display: grid; grid-template-columns: 264px 1fr; gap: var(--s5); align-items: start; }
-.coach-spine { position: sticky; top: 104px; display: flex; flex-direction: column; gap: var(--s2); }
-.coach-steps { list-style: none; display: flex; flex-direction: column; gap: 2px; margin-top: var(--s2); }
-.coach-step button { display: flex; align-items: center; gap: var(--s3); width: 100%; text-align: left; padding: var(--s2) var(--s3); border-radius: var(--r-md); color: var(--muted); }
-.coach-step button:not(:disabled):hover { background: var(--surface-2); }
-.coach-step button:disabled { opacity: 0.45; cursor: default; }
-.coach-step.current button { background: var(--accent-wash); color: var(--ink); }
-.coach-step-num { width: 24px; height: 24px; flex: none; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--hairline-strong); font-family: var(--font-mono); font-size: 0.75rem; }
-.coach-step.current .coach-step-num { background: var(--accent); border-color: var(--accent); color: var(--bg); }
-.coach-step.done .coach-step-num { border-color: var(--progress); color: var(--progress); }
-.coach-step-name { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
-.coach-step-name .l { font-weight: 600; font-size: var(--text-sm); }
-.coach-step-name .h { font-size: 0.6875rem; color: var(--faint); }
-.coach-exit { align-self: flex-start; margin-top: var(--s3); }
-.coach-active { display: flex; flex-direction: column; min-height: 340px; }
-.coach-active .coach-nav { margin-top: auto; }
+.coach-facts { display: flex; flex-direction: column; max-width: 760px; }
+.coach-ta { width: 100%; line-height: 1.5; resize: vertical; }
+.coach-field { display: block; margin-bottom: var(--s4); }
+.coach-field-q { display: block; font-weight: 600; font-size: var(--text-base); margin-bottom: var(--s2); }
+.coach-field-hint { display: block; font-size: var(--text-xs); color: var(--muted); margin: -4px 0 var(--s2); }
+.coach-field-inline { display: flex; align-items: center; gap: var(--s2); font-size: var(--text-sm); color: var(--muted); margin-bottom: var(--s4); flex-wrap: wrap; }
 .coach-body { font-size: var(--text-sm); color: var(--muted); margin-bottom: var(--s4); max-width: 62ch; }
-@media (max-width: 719px) {
-  .coach-runner { grid-template-columns: 1fr; }
-  .coach-spine { position: static; min-width: 0; }
-}
-.scenario {
-  text-align: left;
-  background: var(--surface);
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--r-md);
-  padding: var(--s5);
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--s2);
-}
-.scenario:hover { border-color: var(--accent); }
-.scenario .t { font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); display: block; }
-.scenario .desc { font-size: var(--text-sm); color: var(--muted); }
-.scenario .foot-line { margin-top: auto; padding-top: var(--s2); font-size: 0.6875rem; color: var(--faint); }
-.coach-progress { display: flex; gap: var(--s1); margin-bottom: var(--s5); }
-.coach-progress i { height: 4px; flex: 1; border-radius: 2px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--hairline-strong); }
-.coach-progress i.on { background: var(--accent); }
-.coach-step-label { color: var(--accent); }
-.coach-q { font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); margin: var(--s2) 0 var(--s4); }
-.script-line {
-  padding: var(--s3) var(--s4);
-  margin-bottom: var(--s3);
-  font-size: var(--text-sm);
-  background: var(--accent-wash);
-  border-radius: var(--r-md);
-}
-.script-line .say { font-family: var(--font-body); font-size: 0.6875rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); display: block; margin-bottom: 3px; font-weight: 600; }
-.coach-nav { display: flex; gap: var(--s3); margin-top: var(--s6); }
+.coach-nav { display: flex; gap: var(--s3); margin-top: var(--s4); align-items: center; }
 .coach-nav .btn-primary { margin-left: auto; }
+
+/* open loops awaiting a check-back */
+.coach-loops { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); gap: var(--s4); }
+.coach-loop-head { display: flex; align-items: baseline; gap: var(--s3); }
+.coach-loop-head .grow { flex: 1; min-width: 0; font-weight: 600; }
+.coach-loop-step { font-size: var(--text-sm); color: var(--muted); margin: var(--s2) 0 var(--s3); }
+.coach-loop-actions { display: flex; gap: var(--s2); }
+
+.coach-reflect { border-top: 1px solid var(--hairline); padding-top: var(--s3); margin-top: var(--s1); }
+.coach-choice { display: flex; gap: var(--s2); margin: var(--s2) 0 var(--s3); }
+.coach-choice.wrap { flex-wrap: wrap; }
+.coach-choice button { padding: 6px var(--s3); border: 1px solid var(--hairline-strong); border-radius: var(--r-md); font-size: var(--text-sm); color: var(--muted); }
+.coach-choice button.on { border-color: var(--accent); background: var(--accent-wash); color: var(--ink); font-weight: 600; }
+
+/* what you faced: closed loops with how it felt */
+.coach-history { display: flex; flex-direction: column; }
+.coach-closed { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) 0; border-bottom: 1px solid var(--hairline); font-size: var(--text-sm); }
+.coach-closed:last-child { border-bottom: none; }
+.coach-closed .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.coach-closed-note { color: var(--muted); font-style: italic; }
+.coach-felt-tag { flex: none; font-family: var(--font-mono); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; border-radius: 3px; padding: 2px 7px; }
+.coach-felt-tag.felt-easier { color: var(--progress); background: var(--progress-wash); }
+.coach-felt-tag.felt-as-feared { color: var(--info); background: var(--info-wash); }
+.coach-felt-tag.felt-harder { color: var(--warn); background: var(--warn-wash); }
+.coach-felt-tag.felt-open { color: var(--muted); background: var(--surface-2); }
+
+@media (max-width: 719px) {
+  .coach-flow { grid-template-columns: 1fr; }
+  .coach-flow-rail { position: static; flex-direction: row; overflow-x: auto; }
+}
 
 /* stats */
 .ledger-row { display: flex; gap: var(--s3); align-items: baseline; padding: var(--s2) 0; border-bottom: 1px solid var(--hairline); font-size: var(--text-sm); }

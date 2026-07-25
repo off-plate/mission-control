@@ -4,7 +4,7 @@ import { Band } from './pages1'
 import { useStore } from './store'
 import { Spark, SparkBox } from './widgets'
 import { fmtDuration, taskMinutes } from './util'
-import type { CoachScenario } from './types'
+import type { CoachFacts, CoachScenario, CoachSession, TaskCategory } from './types'
 
 /* ---------------- MONEY ---------------- */
 
@@ -286,119 +286,235 @@ export function ReviewPage() {
   )
 }
 
-/* ---------------- COACH ---------------- */
+/* ---------------- COACH ----------------
+   Coach is for a thing you are avoiding. It walks you through the facts
+   (what it is, what it takes, what ignoring it costs), eases you into the
+   smallest first step, then, once you have done it, asks how it actually
+   felt. That last part is the point: it trains the fear back down. */
 
-/* The method Coach runs every avoided task through. Keep in step order. */
-const METHOD_HINT: Record<string, string> = {
-  Frame: 'name the fear, set the win',
-  Script: 'the exact opening lines',
-  Rehearse: 'play their pushback',
-  Fallback: 'a line for when it turns',
-  Commit: 'drop it onto Today',
+type CoachStage = 'home' | 'facts' | 'ease' | 'saved'
+const EMPTY_FACTS: CoachFacts = { avoiding: '', steps: '', cost: '' }
+
+const FELT_OPTS: { key: NonNullable<CoachSession['felt']>; label: string }[] = [
+  { key: 'easier', label: 'Easier than I feared' },
+  { key: 'as-feared', label: 'About what I expected' },
+  { key: 'harder', label: 'Harder than I feared' },
+]
+const FELT_TAG: Record<NonNullable<CoachSession['felt']>, string> = {
+  easier: 'easier than feared', 'as-feared': 'about as expected', harder: 'harder than feared',
+}
+
+function ReflectForm({ onSubmit, onCancel }: { onSubmit: (didIt: boolean, felt: CoachSession['felt'], text: string) => void; onCancel: () => void }) {
+  const [didIt, setDidIt] = useState(true)
+  const [felt, setFelt] = useState<NonNullable<CoachSession['felt']>>('easier')
+  const [text, setText] = useState('')
+  return (
+    <div className="coach-reflect">
+      <span className="coach-field-q">Did you do it?</span>
+      <div className="coach-choice">
+        <button className={didIt ? 'on' : ''} onClick={() => setDidIt(true)}>Yes</button>
+        <button className={!didIt ? 'on' : ''} onClick={() => setDidIt(false)}>Not yet</button>
+      </div>
+      <span className="coach-field-q">How did it actually feel?</span>
+      <div className="coach-choice wrap">
+        {FELT_OPTS.map((o) => (
+          <button key={o.key} className={felt === o.key ? 'on' : ''} onClick={() => setFelt(o.key)}>{o.label}</button>
+        ))}
+      </div>
+      <textarea className="textinput" rows={2} style={{ width: '100%', marginTop: 'var(--s2)' }} placeholder="What did it feel like? One honest line." value={text} onChange={(e) => setText(e.target.value)} aria-label="How it felt" />
+      <div className="coach-nav">
+        <button className="btn btn-quiet" onClick={onCancel}>Cancel</button>
+        <button className="btn btn-primary" onClick={() => onSubmit(didIt, felt, text.trim())}>Close the loop</button>
+      </div>
+    </div>
+  )
 }
 
 export function CoachPage() {
-  const { addTask, space, setPage, coachOpen, setCoachOpen } = useStore()
-  const [scenario, setScenario] = useState<CoachScenario | null>(null)
-  const [i, setI] = useState(0)
-  const [finished, setFinished] = useState<string | null>(null)
+  const { space, setPage, coachOpen, setCoachOpen, coachSessions, startCoachSession, reflectCoachSession, deleteCoachSession } = useStore()
+  const [stage, setStage] = useState<CoachStage>('home')
+  const [title, setTitle] = useState('')
+  const [facts, setFacts] = useState<CoachFacts>(EMPTY_FACTS)
+  const [firstStep, setFirstStep] = useState('')
+  const [meta, setMeta] = useState<{ firstStepMin: number; category: TaskCategory }>({ firstStepMin: 10, category: 'admin' })
+  const [reflectId, setReflectId] = useState<string | null>(null)
 
+  const beginFromScenario = (s: CoachScenario) => {
+    setTitle(s.title); setFacts(s.facts); setFirstStep(s.firstStep)
+    setMeta({ firstStepMin: s.firstStepMin, category: s.category }); setStage('facts')
+  }
   useEffect(() => {
     if (!coachOpen) return
-    const hit = COACH_SCENARIOS.find((x) => x.id === coachOpen)
-    if (hit) { setScenario(hit); setI(0) }
+    const s = COACH_SCENARIOS.find((x) => x.id === coachOpen)
+    if (s) beginFromScenario(s)
     setCoachOpen(null)
   }, [coachOpen])
 
-  if (!scenario) {
+  const beginBlank = () => {
+    if (!title.trim()) return
+    setFacts(EMPTY_FACTS); setFirstStep(''); setMeta({ firstStepMin: 10, category: 'admin' }); setStage('facts')
+  }
+  const reset = () => { setStage('home'); setTitle(''); setFacts(EMPTY_FACTS); setFirstStep('') }
+  const setFact = (k: keyof CoachFacts, v: string) => setFacts((f) => ({ ...f, [k]: v }))
+  const save = () => {
+    startCoachSession({ title: title.trim(), facts, firstStep: firstStep.trim(), firstStepMin: meta.firstStepMin, category: meta.category })
+    setStage('saved')
+  }
+
+  const open = coachSessions.filter((s) => s.status === 'open')
+  const closed = coachSessions.filter((s) => s.status === 'closed')
+  const easedCount = closed.filter((s) => s.felt === 'easier').length
+
+  /* ---- the guided flow (facts -> ease -> saved) ---- */
+  if (stage !== 'home') {
+    const n = stage === 'facts' ? 1 : stage === 'ease' ? 2 : 3
     return (
       <div className="page">
-        <Band title="Coach" sub="for the things you keep putting off" />
-        {finished && (
-          <div className="allclear" style={{ borderColor: 'var(--progress)' }}>
-            <span className="dot" aria-hidden="true" />
-            Saved as a task: {finished}. It is on your list now.
-            <button className="btn btn-ghost" style={{ marginLeft: 'auto' }} onClick={() => setPage('plan')}>Open plan</button>
-          </div>
-        )}
-        <div className="coach-method" aria-label="How Coach works">
-          <p className="coach-method-lead">Pick a task you have been avoiding. Coach walks it through five beats, then drops the real thing onto Today.</p>
-          <ol className="coach-method-strip">
-            {(['Frame', 'Script', 'Rehearse', 'Fallback', 'Commit'] as const).map((m, k) => (
-              <li key={m}><span className="n">{k + 1}</span><span className="l">{m}</span><span className="h">{METHOD_HINT[m]}</span></li>
+        <Band title={title || 'Coach'} sub={stage === 'facts' ? 'look at it straight' : stage === 'ease' ? 'ease into it' : 'on your list'} />
+        <div className="coach-flow">
+          <ol className="coach-flow-rail" aria-hidden="true">
+            {['Face the facts', 'Ease in', 'Check back'].map((l, k) => (
+              <li key={l} className={k + 1 === n ? 'current' : k + 1 < n ? 'done' : ''}><span className="d">{k + 1}</span>{l}</li>
             ))}
           </ol>
+
+          {stage === 'facts' && (
+            <div className="panel coach-facts">
+              <label className="coach-field">
+                <span className="coach-field-q">What exactly are you avoiding?</span>
+                <textarea className="textinput coach-ta" rows={3} value={facts.avoiding} onChange={(e) => setFact('avoiding', e.target.value)} placeholder="Name the thing plainly. No softening." aria-label="What you are avoiding" />
+              </label>
+              <label className="coach-field">
+                <span className="coach-field-q">What are the steps, and what do you need?</span>
+                <textarea className="textinput coach-ta" rows={4} value={facts.steps} onChange={(e) => setFact('steps', e.target.value)} placeholder="Break it into the actual moves. What information or thing do you need to start?" aria-label="Steps and needs" />
+              </label>
+              <label className="coach-field">
+                <span className="coach-field-q">What happens if you keep putting it off?</span>
+                <span className="coach-field-hint">The honest cost. This is the part avoidance hides from you.</span>
+                <textarea className="textinput coach-ta" rows={3} value={facts.cost} onChange={(e) => setFact('cost', e.target.value)} placeholder="What does waiting actually cost, and to whom?" aria-label="Cost of not doing it" />
+              </label>
+              <div className="coach-nav">
+                <button className="btn btn-quiet" onClick={reset}>Back</button>
+                <button className="btn btn-primary" onClick={() => setStage('ease')}>Next, ease in</button>
+              </div>
+            </div>
+          )}
+
+          {stage === 'ease' && (
+            <div className="panel coach-facts">
+              <p className="coach-body">You do not have to finish it. Pick the smallest first move, the one almost too easy to skip. That is what gets you in.</p>
+              <label className="coach-field">
+                <span className="coach-field-q">Your first step, right now</span>
+                <input className="textinput" style={{ width: '100%' }} value={firstStep} onChange={(e) => setFirstStep(e.target.value)} placeholder="e.g. Log in and read the subject lines only" aria-label="First step" />
+              </label>
+              <div className="coach-field-inline">
+                <span>Give it</span>
+                <input className="textinput" type="number" min={1} max={120} style={{ width: 72 }} value={meta.firstStepMin} onChange={(e) => setMeta((m) => ({ ...m, firstStepMin: Math.max(1, Number(e.target.value) || 1) }))} aria-label="Minutes" />
+                <span>min ·</span>
+                <select className="textinput" value={meta.category} onChange={(e) => setMeta((m) => ({ ...m, category: e.target.value as TaskCategory }))} aria-label="Category">
+                  <option value="call">call</option><option value="admin">admin</option><option value="deep">deep</option><option value="quick">quick</option>
+                </select>
+              </div>
+              <div className="coach-nav">
+                <button className="btn btn-quiet" onClick={() => setStage('facts')}>Back</button>
+                <button className="btn btn-primary" disabled={!firstStep.trim()} onClick={save}>Put it on Today</button>
+              </div>
+            </div>
+          )}
+
+          {stage === 'saved' && (
+            <div className="panel coach-facts">
+              <div className="allclear" style={{ borderColor: 'var(--progress)', marginTop: 0 }}>
+                <span className="dot" aria-hidden="true" />
+                First step is on Today: {firstStep}
+              </div>
+              <p className="coach-body">This is an open loop now. Once you have done it, come back and tell Coach how it actually felt. That reflection is what trains the dread down over time.</p>
+              <div className="coach-nav">
+                <button className="btn btn-ghost" onClick={() => setPage('today')}>Open Today</button>
+                <button className="btn btn-primary" onClick={reset}>Done</button>
+              </div>
+            </div>
+          )}
         </div>
-        <div className="scenario-grid">
-          {COACH_SCENARIOS.map((s) => (
-            <button key={s.id} className="scenario" onClick={() => { setScenario(s); setI(0) }}>
-              <span className="microcap">{s.tag}</span>
-              <span className="t">{s.title}</span>
-              <span className="desc">{s.blurb}</span>
-              <span className="mono foot-line">~10 min · ends as a scheduled task</span>
-            </button>
-          ))}
-        </div>
-        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginTop: 20, maxWidth: '72ch' }}>
-          Demo: {COACH_SCENARIOS.length} canned scenarios. In the real app you describe your own situation and the model plays the counterpart in rehearsal, without ever inventing institutional facts.
-        </p>
       </div>
     )
   }
 
-  const step = scenario.steps[i]
-  const last = i === scenario.steps.length - 1
-
+  /* ---- home: intake + open loops + what you have faced ---- */
   return (
     <div className="page">
-      <Band title={scenario.title} sub={scenario.tag} />
-      <div className="coach-runner">
-        <aside className="coach-spine">
-          <span className="microcap">The five beats</span>
-          <ol className="coach-steps">
-            {scenario.steps.map((st, k) => (
-              <li key={k} className={`coach-step${k === i ? ' current' : ''}${k < i ? ' done' : ''}`}>
-                <button onClick={() => k <= i && setI(k)} disabled={k > i} aria-current={k === i ? 'step' : undefined}>
-                  <span className="coach-step-num">{k < i ? '✓' : k + 1}</span>
-                  <span className="coach-step-name">
-                    <span className="l">{st.label}</span>
-                    <span className="h">{METHOD_HINT[st.label] ?? ''}</span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ol>
-          <button className="btn btn-ghost coach-exit" onClick={() => setScenario(null)}>All scenarios</button>
-        </aside>
+      <Band title="Coach" sub="for the thing you keep circling" />
 
-        <div className="panel coach-active">
-          <span className="microcap coach-step-label">Step {i + 1} of {scenario.steps.length} · {step.label}</span>
-          <h3 className="coach-q">{step.question}</h3>
-          {step.body && <p className="coach-body">{step.body}</p>}
-          {step.scripts?.map((s, k) => (
-            <div className="script-line" key={k}>
-              <span className="say">{s.say}</span>
-              {s.text}
-            </div>
-          ))}
-          <div className="coach-nav">
-            {i > 0 && <button className="btn btn-quiet" onClick={() => setI(i - 1)}>Back</button>}
-            {!last && <button className="btn btn-primary" onClick={() => setI(i + 1)}>Next</button>}
-            {last && (
-              <button
-                className="btn btn-primary"
-                onClick={() => {
-                  addTask({ title: scenario.resultTask.title, source: 'mc', estimateMin: scenario.resultTask.estimateMin, space, list: 'today', category: scenario.resultTask.category })
-                  setFinished(scenario.resultTask.title)
-                  setScenario(null)
-                }}
-              >
-                Save it to Today
+      <div className="panel coach-intake">
+        <span className="microcap">Something you are avoiding</span>
+        <textarea className="textinput" rows={2} style={{ width: '100%', marginTop: 'var(--s2)' }} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Call VZP to confirm the payment plan" aria-label="What you are avoiding" />
+        <div className="coach-intake-row">
+          <button className="btn btn-primary" disabled={!title.trim()} onClick={beginBlank}>Face it</button>
+          <span className="assist-note">Look at it factually, ease into the first step, then check how it actually felt.</span>
+        </div>
+        <div className="coach-quick">
+          <span className="microcap">Or start from a common one</span>
+          <div className="coach-chips">
+            {COACH_SCENARIOS.map((s) => (
+              <button key={s.id} className="coach-chip" onClick={() => beginFromScenario(s)}>
+                <span className="l">{s.title}</span>
+                <span className="h">{s.tag}</span>
               </button>
-            )}
+            ))}
           </div>
         </div>
       </div>
+
+      {open.length > 0 && (
+        <>
+          <SecHead label="Open loops" note="you started these, close them when they are done" />
+          <div className="coach-loops">
+            {open.map((s) => (
+              <div className="panel coach-loop" key={s.id}>
+                <div className="coach-loop-head">
+                  <span className="grow">{s.title}</span>
+                  <span className="mono meta">{s.when}</span>
+                </div>
+                <div className="coach-loop-step">First step: {s.firstStep}</div>
+                {reflectId === s.id ? (
+                  <ReflectForm
+                    onCancel={() => setReflectId(null)}
+                    onSubmit={(didIt, felt, text) => { reflectCoachSession(s.id, didIt, felt, text); setReflectId(null) }}
+                  />
+                ) : (
+                  <div className="coach-loop-actions">
+                    <button className="btn btn-primary" onClick={() => setReflectId(s.id)}>Check in</button>
+                    <button className="btn btn-ghost" onClick={() => deleteCoachSession(s.id)}>Drop</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {closed.length > 0 && (
+        <>
+          <SecHead label="What you faced" note={easedCount ? `${easedCount} of ${closed.length} felt easier than you feared` : undefined} />
+          <div className="coach-history">
+            {closed.map((s) => (
+              <div className="coach-closed" key={s.id}>
+                {s.felt && <span className={`coach-felt-tag felt-${s.felt}`}>{FELT_TAG[s.felt]}</span>}
+                {!s.didIt && <span className="coach-felt-tag felt-open">not done</span>}
+                <span className="grow">
+                  <strong>{s.title}</strong>
+                  {s.reflection && <span className="coach-closed-note">{s.reflection}</span>}
+                </span>
+                <button className="assist-goto" onClick={() => deleteCoachSession(s.id)} aria-label="Remove">remove</button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginTop: 'var(--s5)', maxWidth: '72ch' }}>
+        Demo: everything you enter stays in this browser. In the real app Coach drafts the factual breakdown for you and remembers the pattern, so the fifth avoided call is easier to face than the first.
+      </p>
     </div>
   )
 }

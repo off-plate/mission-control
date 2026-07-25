@@ -11,6 +11,8 @@ import {
 } from './mock'
 import type {
   AssistantEntry,
+  CoachFacts,
+  CoachSession,
   Goal,
   HabitDef,
   LedgerEntry,
@@ -27,7 +29,7 @@ import type {
   WidgetType,
 } from './types'
 
-const STORAGE_KEY = 'mission-control-demo-v6'
+const STORAGE_KEY = 'mission-control-demo-v7'
 
 interface PersistedState {
   version: 2
@@ -41,6 +43,7 @@ interface PersistedState {
   plan: PlanState
   review: ReviewState
   assistantLog: AssistantEntry[]
+  coachSessions: CoachSession[]
 }
 
 interface Store extends PersistedState {
@@ -94,6 +97,11 @@ interface Store extends PersistedState {
   assistantLog: AssistantEntry[]
   applyDictation: (text: string, items: { kind: 'task' | 'goal' | 'done'; text: string; estimateMin?: number }[]) => void
   revertAssistantItem: (entryId: string, itemId: string) => void
+
+  coachSessions: CoachSession[]
+  startCoachSession: (input: { title: string; facts: CoachFacts; firstStep: string; firstStepMin: number; category: TaskCategory }) => void
+  reflectCoachSession: (id: string, didIt: boolean, felt: CoachSession['felt'], reflection: string) => void
+  deleteCoachSession: (id: string) => void
 
   todayIndex: number
   savedMin: number
@@ -149,6 +157,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [plan, setPlan] = useState<PlanState>(persisted?.plan ?? { committedDate: null, firstMoveId: null })
   const [review, setReview] = useState<ReviewState>(persisted?.review ?? { lastDoneDate: null, wins: [], outcomes: [] })
   const [assistantLog, setAssistantLog] = useState<AssistantEntry[]>(persisted?.assistantLog ?? [])
+  const [coachSessions, setCoachSessions] = useState<CoachSession[]>(persisted?.coachSessions ?? [])
   const [space, setSpace] = useState<SpaceId>('personal')
   const [page, setPageState] = useState<PageId>(pageFromHash)
   const [editing, setEditing] = useState(false)
@@ -178,14 +187,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const state: PersistedState = {
-      version: 2, spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog,
+      version: 2, spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions,
     }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
     } catch {
       /* demo only; the real app persists to Supabase */
     }
-  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog])
+  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions])
 
   /* Demo pretends today is Sunday when the real weekday is irrelevant;
      habits use the real weekday so checking off feels true. */
@@ -378,6 +387,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         else setTasks((p) => p.filter((t) => t.id !== item.id))
       }
       setAssistantLog((prev) => prev.map((e) => (e.id === entryId ? { ...e, items: e.items.filter((i) => i.id !== itemId) } : e)).filter((e) => e.items.length))
+    },
+
+    coachSessions,
+    startCoachSession: (input) => {
+      const taskId = `t-${++uid}`
+      setTasks((prev) => [
+        { id: taskId, title: input.firstStep, source: 'mc', estimateMin: input.firstStepMin, done: false, space, list: 'today', category: input.category },
+        ...prev,
+      ])
+      setCoachSessions((prev) => [
+        { id: `cs-${++uid}`, title: input.title, facts: input.facts, firstStep: input.firstStep, taskId, when: 'just now', status: 'open' },
+        ...prev,
+      ])
+    },
+    reflectCoachSession: (id, didIt, felt, reflection) => {
+      setCoachSessions((prev) => prev.map((s) => (s.id === id ? { ...s, status: 'closed', didIt, felt, reflection } : s)))
+    },
+    deleteCoachSession: (id) => {
+      const s = coachSessions.find((x) => x.id === id)
+      if (s?.taskId) setTasks((prev) => prev.filter((t) => t.id !== s.taskId))
+      setCoachSessions((prev) => prev.filter((x) => x.id !== id))
     },
 
     todayIndex,

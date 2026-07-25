@@ -4,7 +4,8 @@ import { Band } from './pages1'
 import { useStore } from './store'
 import { Spark, SparkBox } from './widgets'
 import { fmtDuration, taskMinutes } from './util'
-import type { CoachFacts, CoachScenario, CoachSession, TaskCategory } from './types'
+import { analyzeAvoidance } from './coach'
+import type { CoachFacts, CoachSession, TaskCategory } from './types'
 
 /* ---------------- MONEY ---------------- */
 
@@ -287,12 +288,13 @@ export function ReviewPage() {
 }
 
 /* ---------------- COACH ----------------
-   Coach is for a thing you are avoiding. It walks you through the facts
-   (what it is, what it takes, what ignoring it costs), eases you into the
-   smallest first step, then, once you have done it, asks how it actually
-   felt. That last part is the point: it trains the fear back down. */
+   Coach is for a thing you are avoiding. You give it the thing in plain
+   words; it breaks the thing down factually (what it is, the steps, the
+   cost of stalling) and hands you an easy first step. You do the step, then
+   tell it how it actually felt. That last part is the point: it trains the
+   fear back down. You never fill in the analysis, Coach does. */
 
-type CoachStage = 'home' | 'facts' | 'ease' | 'saved'
+type CoachStage = 'home' | 'review' | 'saved'
 const EMPTY_FACTS: CoachFacts = { avoiding: '', steps: '', cost: '' }
 
 const FELT_OPTS: { key: NonNullable<CoachSession['felt']>; label: string }[] = [
@@ -333,31 +335,34 @@ function ReflectForm({ onSubmit, onCancel }: { onSubmit: (didIt: boolean, felt: 
 export function CoachPage() {
   const { space, setPage, coachOpen, setCoachOpen, coachSessions, startCoachSession, reflectCoachSession, deleteCoachSession } = useStore()
   const [stage, setStage] = useState<CoachStage>('home')
+  const [thing, setThing] = useState('')
   const [title, setTitle] = useState('')
   const [facts, setFacts] = useState<CoachFacts>(EMPTY_FACTS)
   const [firstStep, setFirstStep] = useState('')
-  const [meta, setMeta] = useState<{ firstStepMin: number; category: TaskCategory }>({ firstStepMin: 10, category: 'admin' })
+  const [meta, setMeta] = useState<{ firstStepMin: number; category: TaskCategory }>({ firstStepMin: 5, category: 'admin' })
   const [reflectId, setReflectId] = useState<string | null>(null)
 
-  const beginFromScenario = (s: CoachScenario) => {
-    setTitle(s.title); setFacts(s.facts); setFirstStep(s.firstStep)
-    setMeta({ firstStepMin: s.firstStepMin, category: s.category }); setStage('facts')
+  const analyze = (input: string) => {
+    const a = analyzeAvoidance(input)
+    setTitle(input.trim())
+    setFacts({ avoiding: a.avoiding, steps: a.steps, cost: a.cost })
+    setFirstStep(a.firstStep)
+    setMeta({ firstStepMin: a.firstStepMin, category: a.category })
+    setStage('review')
   }
+
+  // Today's avoided-admin alerts deep-link here; seed the analyzer from the alert.
   useEffect(() => {
     if (!coachOpen) return
     const s = COACH_SCENARIOS.find((x) => x.id === coachOpen)
-    if (s) beginFromScenario(s)
+    if (s) { setThing(s.title); analyze(s.title) }
     setCoachOpen(null)
   }, [coachOpen])
 
-  const beginBlank = () => {
-    if (!title.trim()) return
-    setFacts(EMPTY_FACTS); setFirstStep(''); setMeta({ firstStepMin: 10, category: 'admin' }); setStage('facts')
-  }
-  const reset = () => { setStage('home'); setTitle(''); setFacts(EMPTY_FACTS); setFirstStep('') }
+  const reset = () => { setStage('home'); setThing(''); setTitle(''); setFacts(EMPTY_FACTS); setFirstStep('') }
   const setFact = (k: keyof CoachFacts, v: string) => setFacts((f) => ({ ...f, [k]: v }))
   const save = () => {
-    startCoachSession({ title: title.trim(), facts, firstStep: firstStep.trim(), firstStepMin: meta.firstStepMin, category: meta.category })
+    startCoachSession({ title: title.trim() || thing.trim(), facts, firstStep: firstStep.trim(), firstStepMin: meta.firstStepMin, category: meta.category })
     setStage('saved')
   }
 
@@ -365,103 +370,86 @@ export function CoachPage() {
   const closed = coachSessions.filter((s) => s.status === 'closed')
   const easedCount = closed.filter((s) => s.felt === 'easier').length
 
-  /* ---- the guided flow (facts -> ease -> saved) ---- */
-  if (stage !== 'home') {
-    const n = stage === 'facts' ? 1 : stage === 'ease' ? 2 : 3
+  /* ---- review the breakdown Coach drafted, then commit ---- */
+  if (stage === 'review') {
     return (
       <div className="page">
-        <Band title={title || 'Coach'} sub={stage === 'facts' ? 'look at it straight' : stage === 'ease' ? 'ease into it' : 'on your list'} />
-        <div className="coach-flow">
-          <ol className="coach-flow-rail" aria-hidden="true">
-            {['Face the facts', 'Ease in', 'Check back'].map((l, k) => (
-              <li key={l} className={k + 1 === n ? 'current' : k + 1 < n ? 'done' : ''}><span className="d">{k + 1}</span>{l}</li>
-            ))}
-          </ol>
-
-          {stage === 'facts' && (
-            <div className="panel coach-facts">
-              <label className="coach-field">
-                <span className="coach-field-q">What exactly are you avoiding?</span>
-                <textarea className="textinput coach-ta" rows={3} value={facts.avoiding} onChange={(e) => setFact('avoiding', e.target.value)} placeholder="Name the thing plainly. No softening." aria-label="What you are avoiding" />
-              </label>
-              <label className="coach-field">
-                <span className="coach-field-q">What are the steps, and what do you need?</span>
-                <textarea className="textinput coach-ta" rows={4} value={facts.steps} onChange={(e) => setFact('steps', e.target.value)} placeholder="Break it into the actual moves. What information or thing do you need to start?" aria-label="Steps and needs" />
-              </label>
-              <label className="coach-field">
-                <span className="coach-field-q">What happens if you keep putting it off?</span>
-                <span className="coach-field-hint">The honest cost. This is the part avoidance hides from you.</span>
-                <textarea className="textinput coach-ta" rows={3} value={facts.cost} onChange={(e) => setFact('cost', e.target.value)} placeholder="What does waiting actually cost, and to whom?" aria-label="Cost of not doing it" />
-              </label>
-              <div className="coach-nav">
-                <button className="btn btn-quiet" onClick={reset}>Back</button>
-                <button className="btn btn-primary" onClick={() => setStage('ease')}>Next, ease in</button>
-              </div>
-            </div>
-          )}
-
-          {stage === 'ease' && (
-            <div className="panel coach-facts">
-              <p className="coach-body">You do not have to finish it. Pick the smallest first move, the one almost too easy to skip. That is what gets you in.</p>
-              <label className="coach-field">
-                <span className="coach-field-q">Your first step, right now</span>
-                <input className="textinput" style={{ width: '100%' }} value={firstStep} onChange={(e) => setFirstStep(e.target.value)} placeholder="e.g. Log in and read the subject lines only" aria-label="First step" />
-              </label>
-              <div className="coach-field-inline">
-                <span>Give it</span>
-                <input className="textinput" type="number" min={1} max={120} style={{ width: 72 }} value={meta.firstStepMin} onChange={(e) => setMeta((m) => ({ ...m, firstStepMin: Math.max(1, Number(e.target.value) || 1) }))} aria-label="Minutes" />
-                <span>min ·</span>
-                <select className="textinput" value={meta.category} onChange={(e) => setMeta((m) => ({ ...m, category: e.target.value as TaskCategory }))} aria-label="Category">
-                  <option value="call">call</option><option value="admin">admin</option><option value="deep">deep</option><option value="quick">quick</option>
-                </select>
-              </div>
-              <div className="coach-nav">
-                <button className="btn btn-quiet" onClick={() => setStage('facts')}>Back</button>
-                <button className="btn btn-primary" disabled={!firstStep.trim()} onClick={save}>Put it on Today</button>
-              </div>
-            </div>
-          )}
-
-          {stage === 'saved' && (
-            <div className="panel coach-facts">
-              <div className="allclear" style={{ borderColor: 'var(--progress)', marginTop: 0 }}>
-                <span className="dot" aria-hidden="true" />
-                First step is on Today: {firstStep}
-              </div>
-              <p className="coach-body">This is an open loop now. Once you have done it, come back and tell Coach how it actually felt. That reflection is what trains the dread down over time.</p>
-              <div className="coach-nav">
-                <button className="btn btn-ghost" onClick={() => setPage('today')}>Open Today</button>
-                <button className="btn btn-primary" onClick={reset}>Done</button>
-              </div>
-            </div>
-          )}
+        <Band title={title || 'Coach'} sub="what it actually is" />
+        <div className="panel coach-facts">
+          <div className="coach-drafted">
+            <span className="microcap">Coach broke this down</span>
+            <span className="assist-note">Drafted from what you wrote. Fix anything that is off, then send the first step to Today.</span>
+          </div>
+          <div className="coach-field">
+            <span className="coach-field-q">What you are avoiding</span>
+            <textarea className="textinput coach-ta" rows={3} value={facts.avoiding} onChange={(e) => setFact('avoiding', e.target.value)} aria-label="What you are avoiding" />
+          </div>
+          <div className="coach-field">
+            <span className="coach-field-q">The steps it takes</span>
+            <textarea className="textinput coach-ta" rows={4} value={facts.steps} onChange={(e) => setFact('steps', e.target.value)} aria-label="The steps" />
+          </div>
+          <div className="coach-field">
+            <span className="coach-field-q">If you keep putting it off</span>
+            <textarea className="textinput coach-ta" rows={3} value={facts.cost} onChange={(e) => setFact('cost', e.target.value)} aria-label="The cost" />
+          </div>
+          <div className="coach-field coach-firststep">
+            <span className="coach-field-q">Your easy first step</span>
+            <span className="coach-field-hint">Not the whole thing. The smallest move that gets you in.</span>
+            <input className="textinput" style={{ width: '100%' }} value={firstStep} onChange={(e) => setFirstStep(e.target.value)} aria-label="First step" />
+          </div>
+          <div className="coach-field-inline">
+            <span>Give it</span>
+            <input className="textinput" type="number" min={1} max={120} style={{ width: 72 }} value={meta.firstStepMin} onChange={(e) => setMeta((m) => ({ ...m, firstStepMin: Math.max(1, Number(e.target.value) || 1) }))} aria-label="Minutes" />
+            <span>min ·</span>
+            <select className="textinput" value={meta.category} onChange={(e) => setMeta((m) => ({ ...m, category: e.target.value as TaskCategory }))} aria-label="Category">
+              <option value="call">call</option><option value="admin">admin</option><option value="deep">deep</option><option value="quick">quick</option>
+            </select>
+          </div>
+          <div className="coach-nav">
+            <button className="btn btn-quiet" onClick={reset}>Back</button>
+            <button className="btn btn-primary" disabled={!firstStep.trim()} onClick={save}>Put first step on Today</button>
+          </div>
         </div>
       </div>
     )
   }
 
-  /* ---- home: intake + open loops + what you have faced ---- */
+  if (stage === 'saved') {
+    return (
+      <div className="page">
+        <Band title={title || 'Coach'} sub="on your list" />
+        <div className="panel coach-facts">
+          <div className="allclear" style={{ borderColor: 'var(--progress)', marginTop: 0 }}>
+            <span className="dot" aria-hidden="true" />
+            First step is on Today: {firstStep}
+          </div>
+          <p className="coach-body">This is an open loop now. Once you have done it, come back and tell Coach how it actually felt. That reflection is what trains the dread down over time.</p>
+          <div className="coach-nav">
+            <button className="btn btn-ghost" onClick={() => setPage('today')}>Open Today</button>
+            <button className="btn btn-primary" onClick={reset}>Done</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  /* ---- home: name the thing, Coach breaks it down ---- */
   return (
     <div className="page">
       <Band title="Coach" sub="for the thing you keep circling" />
 
       <div className="panel coach-intake">
-        <span className="microcap">Something you are avoiding</span>
-        <textarea className="textinput" rows={2} style={{ width: '100%', marginTop: 'var(--s2)' }} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Call VZP to confirm the payment plan" aria-label="What you are avoiding" />
+        <span className="microcap">What are you avoiding?</span>
+        <textarea
+          className="textinput" rows={2} style={{ width: '100%', marginTop: 'var(--s2)' }}
+          value={thing} onChange={(e) => setThing(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && thing.trim()) analyze(thing) }}
+          placeholder="Say it plainly. e.g. Call VZP to confirm the payment plan, or Reply to the tax office letter"
+          aria-label="What you are avoiding"
+        />
         <div className="coach-intake-row">
-          <button className="btn btn-primary" disabled={!title.trim()} onClick={beginBlank}>Face it</button>
-          <span className="assist-note">Look at it factually, ease into the first step, then check how it actually felt.</span>
-        </div>
-        <div className="coach-quick">
-          <span className="microcap">Or start from a common one</span>
-          <div className="coach-chips">
-            {COACH_SCENARIOS.map((s) => (
-              <button key={s.id} className="coach-chip" onClick={() => beginFromScenario(s)}>
-                <span className="l">{s.title}</span>
-                <span className="h">{s.tag}</span>
-              </button>
-            ))}
-          </div>
+          <button className="btn btn-primary" disabled={!thing.trim()} onClick={() => analyze(thing)}>Face it</button>
+          <span className="assist-note">Coach looks at it factually and hands you an easy first step. You do not fill in the analysis, it does.</span>
         </div>
       </div>
 
@@ -513,7 +501,7 @@ export function CoachPage() {
       )}
 
       <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginTop: 'var(--s5)', maxWidth: '72ch' }}>
-        Demo: everything you enter stays in this browser. In the real app Coach drafts the factual breakdown for you and remembers the pattern, so the fifth avoided call is easier to face than the first.
+        Demo: Coach drafts the breakdown here in your browser. The real build sends what you wrote to a model that reads the actual thing, and remembers your pattern so the fifth avoided call is easier than the first.
       </p>
     </div>
   )

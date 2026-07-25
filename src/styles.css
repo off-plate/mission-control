@@ -892,11 +892,15 @@ select.textinput { flex: 0 0 auto; min-width: 110px; }
 .coach-flow-rail li.done .d { border-color: var(--progress); color: var(--progress); }
 
 .coach-facts { display: flex; flex-direction: column; max-width: 760px; }
+.coach-drafted { display: flex; flex-direction: column; gap: 2px; margin-bottom: var(--s4); padding-bottom: var(--s3); border-bottom: 1px solid var(--hairline); }
+.coach-firststep { padding: var(--s3); background: var(--accent-wash); border-radius: var(--r-md); }
 .coach-ta { width: 100%; line-height: 1.5; resize: vertical; }
 .coach-field { display: block; margin-bottom: var(--s4); }
 .coach-field-q { display: block; font-weight: 600; font-size: var(--text-base); margin-bottom: var(--s2); }
 .coach-field-hint { display: block; font-size: var(--text-xs); color: var(--muted); margin: -4px 0 var(--s2); }
 .coach-field-inline { display: flex; align-items: center; gap: var(--s2); font-size: var(--text-sm); color: var(--muted); margin-bottom: var(--s4); flex-wrap: wrap; }
+.coach-field-inline input[type="number"] { flex: 0 0 76px; width: 76px; }
+.coach-field-inline select { flex: 0 0 auto; width: auto; }
 .coach-body { font-size: var(--text-sm); color: var(--muted); margin-bottom: var(--s4); max-width: 62ch; }
 .coach-nav { display: flex; gap: var(--s3); margin-top: var(--s4); align-items: center; }
 .coach-nav .btn-primary { margin-left: auto; }

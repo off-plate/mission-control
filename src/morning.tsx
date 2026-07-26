@@ -154,11 +154,9 @@ function Typing({ url, label }: { url?: string; label?: string }) {
 
 /* ---- Goals reminder (content to be defined together) ---- */
 function GoalsReminder({ note }: { note?: string }) {
-  const { setPage } = useStore()
   return (
     <div className="mr-typing">
       <p className="mr-lead">{note ?? 'Look at what you are working toward before the day pulls you elsewhere.'}</p>
-      <button className="btn btn-quiet" onClick={() => setPage('goals')}>Open Goals ↗</button>
     </div>
   )
 }

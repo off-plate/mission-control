@@ -128,8 +128,8 @@ export function BrandPage() {
       <div className="top">
         <div>
           <div className="ey">Mission Control · Brand &amp; guidelines</div>
-          <h1>Warm console.<br /><em>One accent, real paper.</em></h1>
-          <p className="lede">The proposed direction for the production site: a warm, editorial personal OS. Confident display type, one burnt-orange accent, and colour used only where it carries meaning. Review this, we fix what's off, then I recolour the app to match it.</p>
+          <h1>Warm console.<br /><em>Real paper, warm ink.</em></h1>
+          <p className="lede">The production direction: a warm, editorial personal OS. Confident display type, a burnt-orange lead accent that others can join when a screen earns it, colour with intent, hairlines with the odd soft shadow. This system is now live across the whole app.</p>
         </div>
         <button className="back" onClick={() => setPage('settings')}>Back to settings</button>
       </div>
@@ -219,27 +219,26 @@ export function BrandPage() {
           <div className="col">
             <div className="rl" style={{ color: 'var(--green)' }}>Do</div>
             <ul>
-              <li>One accent per screen. Warm neutrals do the rest.</li>
-              <li>Colour only when it means something: act, yours, data, risk.</li>
+              <li>Accents can stack on one screen when it earns them. Keep them purposeful.</li>
+              <li>Colour usually carries meaning, but a plain, near-monochrome page is fine too.</li>
+              <li>Hairlines are the default separator; a soft shadow to lift a surface is allowed.</li>
               <li>Display font for headings and numbers, mono for data, sans for words.</li>
-              <li>Big type, protected whitespace, one idea per screen.</li>
-              <li>Full-bleed header; content on a comfortable measure.</li>
+              <li>Big type, protected whitespace, full-bleed header, content on a comfortable measure.</li>
             </ul>
           </div>
           <div className="col">
             <div className="rl" style={{ color: 'var(--alert)' }}>Never</div>
             <ul>
-              <li>Gradients or glow as decoration (the focus band's warmth is the one exception).</li>
               <li>Green for money owed or spent. Green is only what you have.</li>
-              <li>A second accent, or a second display font.</li>
-              <li>Drop shadows where a hairline works.</li>
+              <li>A second display font.</li>
+              <li>Colour with no reason behind it, or a rainbow of it for its own sake.</li>
               <li>Stranded cards or capped widths that leave dead space on wide screens.</li>
             </ul>
           </div>
         </div>
       </section>
 
-      <p className="note">This is a proposal rendered in the new direction, it does not change the rest of the app yet. Tell me what to adjust (the accent, the fonts, the meanings, the density) and I'll fix this page first, then recolour Today, Plan, Routines, Habits, Goals, Money, Review and Coach to match it.</p>
+      <p className="note">This system is now live across the app, Today, Plan, Routines, Habits, Goals, Money, Review, Coach and the rest all run on these tokens. Tell me anything to adjust (the accent, the fonts, a colour meaning, the density) and it changes everywhere at once.</p>
     </div>
   )
 }

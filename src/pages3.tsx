@@ -156,24 +156,6 @@ export function BrainDumpPage() {
     <div className="page">
       <Band title="Brain dump" sub="sticky notes for whatever is in your head" />
 
-      <div className="panel note-composer" style={{ maxWidth: 720, marginBottom: 'var(--s5)' }}>
-        <textarea
-          className="textinput" rows={2} style={{ width: '100%' }}
-          value={text} onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit() }}
-          placeholder="Whatever is on your mind. Add a #category to group it."
-          aria-label="New note"
-        />
-        <div className="note-composer-row">
-          <div className="note-swatches" role="radiogroup" aria-label="Note colour">
-            {NOTE_COLORS.map((c) => (
-              <button key={c.id} className={`note-swatch${color === c.id ? ' on' : ''}`} style={{ background: c.bg }} aria-label={c.id} aria-pressed={color === c.id} onClick={() => setColor(c.id)} />
-            ))}
-          </div>
-          <button className="btn btn-primary" style={{ marginLeft: 'auto' }} disabled={!text.trim()} onClick={submit}>Add note</button>
-        </div>
-      </div>
-
       {allTags.length > 0 && (
         <div className="note-filter">
           <button className={`note-chip${!activeTag ? ' on' : ''}`} onClick={() => setActiveTag(null)}>all</button>
@@ -183,7 +165,25 @@ export function BrainDumpPage() {
         </div>
       )}
 
-      <div className="sticky-board">
+      <div className="bd-grid">
+        <div className="bd-composer">
+          <textarea
+            className="textinput" rows={4} style={{ width: '100%' }}
+            value={text} onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit() }}
+            placeholder="Whatever is on your mind. Add a #category to group it."
+            aria-label="New note"
+          />
+          <div className="note-composer-row">
+            <div className="note-swatches" role="radiogroup" aria-label="Note colour">
+              {NOTE_COLORS.map((c) => (
+                <button key={c.id} className={`note-swatch${color === c.id ? ' on' : ''}`} style={{ background: c.bg }} aria-label={c.id} aria-pressed={color === c.id} onClick={() => setColor(c.id)} />
+              ))}
+            </div>
+            <button className="btn btn-primary" style={{ marginLeft: 'auto' }} disabled={!text.trim()} onClick={submit}>Add note</button>
+          </div>
+        </div>
+
         {shown.map((i) => (
           <div className="sticky" key={i.id} style={{ background: colorBg(i.color) }}>
             <p className="note-text">{renderNote(i.text)}</p>
@@ -197,7 +197,6 @@ export function BrainDumpPage() {
             </div>
           </div>
         ))}
-        {shown.length === 0 && <p className="bucket-empty">No notes tagged {activeTag}. Clear the filter or add one.</p>}
       </div>
     </div>
   )

@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { SUPABASE_ENABLED, deleteRemoteState, saveRemoteState } from './supabase'
 import {
   DEFAULT_SPACES,
   MOCK_GOALS,
@@ -31,7 +32,7 @@ import type {
   WidgetType,
 } from './types'
 
-const STORAGE_KEY = 'mission-control-demo-v9'
+export const STORAGE_KEY = 'mission-control-demo-v9'
 
 interface PersistedState {
   version: 2
@@ -160,6 +161,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [assistantLog, setAssistantLog] = useState<AssistantEntry[]>(persisted?.assistantLog ?? [])
   const [coachSessions, setCoachSessions] = useState<CoachSession[]>(persisted?.coachSessions ?? [])
   const [routines, setRoutines] = useState<Routine[]>(persisted?.routines ?? MOCK_ROUTINES)
+  const remoteSaveTimer = useRef<number | undefined>(undefined)
   const [space, setSpace] = useState<SpaceId>('personal')
   const [page, setPageState] = useState<PageId>(pageFromHash)
   const [editing, setEditing] = useState(false)
@@ -186,10 +188,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const state: PersistedState = {
       version: 2, spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines,
     }
+    const json = JSON.stringify(state)
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+      localStorage.setItem(STORAGE_KEY, json)
     } catch {
-      /* demo only; the real app persists to Supabase */
+      /* localStorage full or unavailable; Supabase (if configured) is the source of truth */
+    }
+    // Mirror to Supabase when configured, debounced so rapid edits collapse into one write.
+    if (SUPABASE_ENABLED) {
+      window.clearTimeout(remoteSaveTimer.current)
+      remoteSaveTimer.current = window.setTimeout(() => { void saveRemoteState(json) }, 800)
     }
   }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines])
 
@@ -438,8 +446,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     accuracyPct,
     resetDemo: () => {
       try { localStorage.removeItem(STORAGE_KEY) } catch { /* noop */ }
-      location.hash = ''
-      location.reload()
+      const finish = () => { location.hash = ''; location.reload() }
+      if (SUPABASE_ENABLED) { void deleteRemoteState().finally(finish) } else finish()
     },
   }
 

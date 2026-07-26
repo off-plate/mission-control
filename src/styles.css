@@ -59,6 +59,9 @@
   --s1: 0.25rem; --s2: 0.5rem; --s3: 0.75rem; --s4: 1rem;
   --s5: 1.25rem; --s6: 1.5rem; --s8: 2rem; --s10: 2.5rem; --s12: 3rem;
 
+  /* side gutter for content; the header bar itself is full-bleed */
+  --gutter: clamp(var(--s4), 2.2vw, var(--s12));
+
   --r-sm: 4px;
   --r-md: 8px;
 
@@ -139,8 +142,10 @@ a, button, input, select, textarea {
 
 /* ---------- shell: full width, breathing gutters ---------- */
 .shell {
-  padding: 0 clamp(var(--s4), 2.2vw, var(--s12)) var(--s12);
+  padding: 0 0 var(--s12);
 }
+/* Header bar spans full width; content (header inner, page, footer) keeps the gutter. */
+main { padding-inline: var(--gutter); }
 
 /* header + nav stick to the top so core buttons are always reachable */
 .topstick {
@@ -156,6 +161,7 @@ a, button, input, select, textarea {
   align-items: center;
   gap: var(--s4);
   padding-block: var(--s3);
+  padding-inline: var(--gutter);
   flex-wrap: wrap;
 }
 .btn-ghost.is-on { color: var(--accent); border-color: var(--accent); }
@@ -318,6 +324,7 @@ a, button, input, select, textarea {
 .nav {
   display: flex;
   gap: var(--s1);
+  padding-inline: var(--gutter);
   border-block: 1px solid var(--hairline);
   overflow-x: auto;
   scrollbar-width: none;
@@ -1069,6 +1076,7 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 .foot {
   margin-top: var(--s12);
   padding-top: var(--s4);
+  padding-inline: var(--gutter);
   border-top: 1px solid var(--hairline);
   display: flex;
   gap: var(--s4);
@@ -1236,7 +1244,6 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 .done-mark { color: var(--progress); font-family: var(--font-display); font-weight: 800; font-size: var(--text-xl); }
 
 @media (max-width: 639px) {
-  .shell { padding-inline: var(--s4); }
   .hide-phone { display: none; }
   .brand-name { display: none; }
   .topbar { gap: var(--s2); row-gap: var(--s2); }

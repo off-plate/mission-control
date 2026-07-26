@@ -5,8 +5,8 @@
    The anon key is meant to live in a web app, so it is safe to ship here.
    While these are empty the app persists to this browser only (localStorage). */
 
-export const SUPABASE_URL = ''
-export const SUPABASE_ANON_KEY = ''
+export const SUPABASE_URL = 'https://fhfempisopwsdkmvywbt.supabase.co'
+export const SUPABASE_ANON_KEY = 'sb_publishable_MDxQPm0SzLHFTnDqg-eyyQ_0yposnES'
 
 export const SUPABASE_ENABLED = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY)
 

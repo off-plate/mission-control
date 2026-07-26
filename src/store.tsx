@@ -31,7 +31,7 @@ import type {
   WidgetType,
 } from './types'
 
-const STORAGE_KEY = 'mission-control-demo-v8'
+const STORAGE_KEY = 'mission-control-demo-v9'
 
 interface PersistedState {
   version: 2

@@ -151,6 +151,9 @@ export const MOCK_HABITS: HabitDef[] = [
   { id: 'h3', name: '20 min movement', daypart: 'afternoon', days: [false, true, false, true, true, false, false], paused: false, history: [0, 1, 2, 1, 3, 2, 3, 4, 3, 3, 4, 3] },
   { id: 'h4', name: 'No screens at dinner', daypart: 'evening', days: [false, false, true, true, false, false, false], paused: false, history: [0, 0, 1, 1, 2, 1, 2, 2, 3, 2, 2, 2] },
   { id: 'h1', name: 'In bed before 1:00', daypart: 'evening', days: [true, true, false, true, false, true, false], paused: false, history: [1, 2, 2, 3, 2, 4, 3, 3, 4, 5, 4, 4] },
+  { id: 'h-prework', name: 'Before work', paused: false, days: [true, true, false, true, false, false, false], history: [1, 2, 2, 3, 2, 3, 3, 2, 3, 4, 3, 3] },
+  { id: 'h-weekly', name: 'Weekly reset', paused: false, days: [false, false, false, false, false, false, false], history: [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1] },
+  { id: 'h-monthly', name: 'Monthly review', paused: false, days: [false, false, false, false, false, false, false], history: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1] },
 ]
 
 export const MOCK_ROUTINES: Routine[] = [
@@ -166,7 +169,7 @@ export const MOCK_ROUTINES: Routine[] = [
     ],
   },
   {
-    id: 'r-prework', title: 'Before work', cadence: 'prework',
+    id: 'r-prework', title: 'Before work', cadence: 'prework', habitId: 'h-prework',
     blurb: 'Run this before you start any focused work, so you begin clear instead of scattered.',
     doneStepIds: [],
     steps: [
@@ -177,7 +180,7 @@ export const MOCK_ROUTINES: Routine[] = [
     ],
   },
   {
-    id: 'r-weekly', title: 'Weekly reset', cadence: 'weekly',
+    id: 'r-weekly', title: 'Weekly reset', cadence: 'weekly', habitId: 'h-weekly',
     blurb: 'Sunday, fifteen minutes. Close the week and set up the next one.',
     doneStepIds: [],
     steps: [
@@ -188,7 +191,7 @@ export const MOCK_ROUTINES: Routine[] = [
     ],
   },
   {
-    id: 'r-monthly', title: 'Monthly review', cadence: 'monthly',
+    id: 'r-monthly', title: 'Monthly review', cadence: 'monthly', habitId: 'h-monthly',
     blurb: 'Once a month, the wider look. Where the money and the goals actually stand.',
     doneStepIds: [],
     steps: [

@@ -10,8 +10,8 @@
   --surface: #fbf8f1;
   --surface-2: #ece6d8;
   --ink: #1a1712;
-  --muted: #6d6656;
-  --faint: #938b7b;
+  --muted: #565040;
+  --faint: #78705f;
   --hairline: rgba(26, 23, 18, 0.12);
   --hairline-strong: rgba(26, 23, 18, 0.44);
 
@@ -47,7 +47,7 @@
 
   --font-display: 'Bricolage Grotesque', 'Avenir Next', sans-serif;
   --font-body: 'Instrument Sans', 'Helvetica Neue', sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+  --font-mono: 'Instrument Sans', 'Helvetica Neue', sans-serif;
 
   --text-xs: 0.8125rem;
   --text-sm: 0.9375rem;
@@ -129,7 +129,7 @@ a, button, input, select, textarea {
               border-color var(--t-fast), opacity var(--t-fast);
 }
 
-.mono { font-family: var(--font-mono); font-feature-settings: 'zero'; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 /* Labels are body-font small caps; mono is reserved for data. */
 .microcap {
   font-family: var(--font-body);
@@ -1434,3 +1434,25 @@ a.pron-src:hover { color: var(--accent); text-decoration: underline; }
 .sticky:hover .note-colors { opacity: 1; }
 .note-dot { width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(26,23,18,.2); cursor: pointer; }
 .note-dot.on { box-shadow: 0 0 0 1.5px #fff, 0 0 0 3px rgba(26,23,18,.55); }
+
+/* ===== Warm brand: contrast, depth, and state that actually reads ===== */
+/* Lift surfaces off the paper so cards, not colour alone, create hierarchy. */
+.panel, .card, .routine-card, .mr-card, .goal-col, .habit-card, .coach-loop, .scenario, .bucket, .checkup-panel {
+  box-shadow: 0 1px 2px rgba(26, 23, 18, 0.05), 0 12px 34px -22px rgba(26, 23, 18, 0.34);
+}
+/* Cadence label pops in the accent so each routine reads as a titled thing. */
+.routine-tag .microcap { color: var(--accent); }
+.routine-progress { color: var(--muted); font-weight: 600; }
+/* "done today" and positive counts go green. */
+.col-tot.val-pos { color: var(--progress); font-weight: 600; }
+/* Checkboxes read as tappable: heavier border, accent on hover. */
+.routine-check, .mr-check { border-width: 2px; }
+.routine-check:hover, .mr-check:hover { background: var(--accent-wash); border-color: var(--accent); }
+/* Status labels legible, not faint mono. */
+.mr-status { font-family: var(--font-body); font-weight: 600; color: var(--muted); letter-spacing: 0.03em; }
+.mr-step.open .mr-status { color: var(--accent); }
+/* The active routine step is unmistakable: accent number, accent left edge. */
+.mr-step.open { box-shadow: inset 3px 0 0 var(--accent); }
+.mr-step.open .mr-num { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
+/* Goal status chips carry more weight. */
+.goal-status { font-weight: 700; }

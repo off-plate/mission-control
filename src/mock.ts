@@ -3,6 +3,7 @@ import type {
   CoachScenario,
   Goal,
   HabitDef,
+  Idea,
   LedgerEntry,
   Obligation,
   Routine,
@@ -154,6 +155,10 @@ export const MOCK_HABITS: HabitDef[] = [
   { id: 'h-prework', name: 'Before work', paused: false, days: [true, true, false, true, false, false, false], history: [1, 2, 2, 3, 2, 3, 3, 2, 3, 4, 3, 3] },
   { id: 'h-weekly', name: 'Weekly reset', paused: false, days: [false, false, false, false, false, false, false], history: [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1] },
   { id: 'h-monthly', name: 'Monthly review', paused: false, days: [false, false, false, false, false, false, false], history: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1] },
+]
+
+export const MOCK_IDEAS: Idea[] = [
+  { id: 'idea-rubberband', text: 'Rubber band on my wrist — snap it whenever I catch myself doing something I do not want to do (doomscroll, avoidance, overstimulation). A pattern interrupt, not punishment. Later: track the catches so they trend down over time.', when: 'idea' },
 ]
 
 export const MOCK_ROUTINES: Routine[] = [

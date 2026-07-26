@@ -1312,7 +1312,6 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 .routine-reset { min-height: 30px; font-size: var(--text-xs); margin-left: auto; }
 
 /* ---------- Morning routine: guided foldable accordion ---------- */
-.mr-card { max-width: 880px; }
 .mr-accordion { margin-top: var(--s4); border-top: 1px solid var(--hairline); }
 .mr-step { border-bottom: 1px solid var(--hairline); }
 .mr-head {

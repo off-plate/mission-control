@@ -790,14 +790,12 @@ const CADENCE_LABEL: Record<RoutineCadence, string> = { daily: 'Daily', prework:
 export function RoutinesPage() {
   const { routines, toggleRoutineStep, resetRoutine, habits } = useStore()
   const sorted = [...routines].sort((a, b) => CADENCE_ORDER.indexOf(a.cadence) - CADENCE_ORDER.indexOf(b.cadence))
-  const morning = sorted.find((r) => r.id === 'r-morning')
-  const others = sorted.filter((r) => r.id !== 'r-morning')
   return (
     <div className="page">
       <Band title="Routines" sub="what you run on repeat" />
-      {morning && <MorningRoutine routine={morning} />}
-      <div className="routine-cards" style={{ marginTop: morning ? 'var(--s5)' : 0 }}>
-        {others.map((r) => {
+      <div className="routine-cards">
+        {sorted.map((r) => {
+          if (r.id === 'r-morning') return <MorningRoutine routine={r} key={r.id} />
           const total = r.steps.length
           const done = r.doneStepIds.length
           const complete = total > 0 && done === total

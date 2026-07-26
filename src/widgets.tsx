@@ -172,9 +172,9 @@ const FinanceBody = memo(function FinanceBody({ size }: { size: SizeKey }) {
   )
 })
 
-const HabitsBody = memo(function HabitsBody() {
+const HabitsBody = memo(function HabitsBody({ space }: { space: SpaceId }) {
   const { habits, toggleHabitDay, todayIndex } = useStore()
-  const active = habits.filter((h) => !h.paused)
+  const active = habits.filter((h) => h.space === space && !h.paused)
   return (
     <div className="habit-grid">
       {active.map((h) => (
@@ -328,7 +328,7 @@ export function WidgetBody({ type, space, size }: { type: WidgetType; space: Spa
     case 'tasks': return <TasksBody space={space} size={size} />
     case 'mail': return <MailBody space={space} size={size} />
     case 'finance': return <FinanceBody size={size} />
-    case 'habits': return <HabitsBody />
+    case 'habits': return <HabitsBody space={space} />
     case 'training': return <TrainingBody size={size} />
     case 'goals': return <GoalsBody space={space} />
     case 'timesaved': return <TimeSavedBody />

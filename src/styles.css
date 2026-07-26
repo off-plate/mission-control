@@ -1310,3 +1310,60 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 .routine-card-foot { display: flex; align-items: center; gap: var(--s3); margin-top: auto; padding-top: var(--s3); }
 .routine-card-foot .assist-note { flex: 1; min-width: 0; }
 .routine-reset { min-height: 30px; font-size: var(--text-xs); margin-left: auto; }
+
+/* ---------- Morning routine: guided foldable accordion ---------- */
+.mr-card { max-width: 880px; }
+.mr-accordion { margin-top: var(--s4); border-top: 1px solid var(--hairline); }
+.mr-step { border-bottom: 1px solid var(--hairline); }
+.mr-head {
+  display: flex; align-items: center; gap: var(--s3); width: 100%; text-align: left;
+  padding: var(--s4) var(--s1); color: var(--ink);
+}
+.mr-head:hover { color: var(--accent); }
+.mr-num {
+  flex: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%;
+  border: 1px solid var(--hairline-strong); font-family: var(--font-mono); font-size: 0.8125rem; color: var(--muted);
+}
+.mr-step.done .mr-num { background: var(--progress); border-color: var(--progress); color: var(--bg); }
+.mr-step.open .mr-num { border-color: var(--accent); color: var(--accent); }
+.mr-title { flex: 1; min-width: 0; font-family: var(--font-display); font-weight: 700; font-size: var(--text-base); }
+.mr-step.done .mr-title { color: var(--muted); }
+.mr-status { font-family: var(--font-mono); font-size: 0.6875rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
+.mr-step.open .mr-status { color: var(--accent); }
+.mr-chev { color: var(--faint); transition: transform 180ms var(--ease); }
+.mr-step.open .mr-chev { transform: rotate(180deg); }
+.mr-body { padding: 0 var(--s1) var(--s5); }
+.mr-lead { font-size: var(--text-sm); color: var(--muted); margin-bottom: var(--s3); }
+.mr-done { margin-top: var(--s4); }
+
+/* meditation */
+.mr-med { display: flex; flex-direction: column; }
+.med-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: var(--r-md); overflow: hidden; background: var(--surface-2); border: 1px solid var(--hairline); }
+.med-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.med-stage { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--s2); padding: var(--s5) var(--s4); margin-top: var(--s4); border-radius: var(--r-md); background: var(--surface-2); transition: background 300ms var(--ease); }
+.med-stage.phase-run { background: var(--accent-wash); }
+.med-stage.phase-ended { background: var(--progress-wash); }
+.med-phase { font-family: var(--font-mono); font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.med-stage.phase-run .med-phase { color: var(--accent); }
+.med-stage.phase-ended .med-phase { color: var(--progress); }
+.med-clock { font-family: var(--font-display); font-weight: 700; font-size: clamp(2.75rem, 2rem + 3vw, 4rem); line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
+.med-hint { font-size: var(--text-sm); color: var(--muted); max-width: 46ch; min-height: 2.6em; }
+.med-controls { margin-top: var(--s2); }
+
+/* pronunciation */
+.pron-para { border-left: 2px solid var(--hairline-strong); padding-left: var(--s4); margin-bottom: var(--s4); }
+.pron-lang { font-family: var(--font-mono); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.08em; color: var(--accent); display: block; margin-bottom: var(--s1); }
+.pron-para p { font-size: var(--text-base); line-height: 1.65; max-width: 62ch; }
+.pron-src { display: inline-block; margin-top: var(--s2); font-family: var(--font-mono); font-size: 0.6875rem; color: var(--info); }
+a.pron-src:hover { color: var(--accent); text-decoration: underline; }
+
+/* mouth stretch */
+.stretch-list { list-style: none; display: flex; flex-direction: column; gap: var(--s3); }
+.stretch-item { display: flex; gap: var(--s3); align-items: baseline; }
+.stretch-tag { flex: none; font-family: var(--font-mono); font-size: 0.625rem; font-weight: 600; border-radius: 3px; padding: 2px 6px; }
+.stretch-tag.lang-cs { color: var(--accent); background: var(--accent-wash); }
+.stretch-tag.lang-en { color: var(--info); background: var(--info-wash); }
+.stretch-text { font-size: var(--text-base); line-height: 1.55; }
+
+/* typing */
+.mr-typing { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s2); }

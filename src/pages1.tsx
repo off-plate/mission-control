@@ -3,6 +3,7 @@ import { SpaceGrid } from './Grid'
 import { MOCK_AGENDA, MOCK_EXCEPTIONS_FOR, SPACE_LABELS } from './exceptions'
 import { fakeDecompose } from './mock'
 import { useStore } from './store'
+import { MorningRoutine } from './morning'
 import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, SLOTS, type AgendaEvent, type GoalCategory, type GoalTimeframe, type HabitDef, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
 import { fmtDuration, fmtTime, fmtTimeShort, gcalUrl, taskMinutes, toMin } from './util'
 
@@ -789,11 +790,14 @@ const CADENCE_LABEL: Record<RoutineCadence, string> = { daily: 'Daily', prework:
 export function RoutinesPage() {
   const { routines, toggleRoutineStep, resetRoutine, habits } = useStore()
   const sorted = [...routines].sort((a, b) => CADENCE_ORDER.indexOf(a.cadence) - CADENCE_ORDER.indexOf(b.cadence))
+  const morning = sorted.find((r) => r.id === 'r-morning')
+  const others = sorted.filter((r) => r.id !== 'r-morning')
   return (
     <div className="page">
       <Band title="Routines" sub="what you run on repeat" />
-      <div className="routine-cards">
-        {sorted.map((r) => {
+      {morning && <MorningRoutine routine={morning} />}
+      <div className="routine-cards" style={{ marginTop: morning ? 'var(--s5)' : 0 }}>
+        {others.map((r) => {
           const total = r.steps.length
           const done = r.doneStepIds.length
           const complete = total > 0 && done === total

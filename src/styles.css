@@ -1305,3 +1305,34 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 }
 .rowitem .btn-danger { position: relative; }
 .rowitem .btn-danger::after { content: ''; position: absolute; inset: -9px; }
+
+/* ---------- Routines: named checklists you run on repeat ---------- */
+.routine-group { margin-bottom: var(--s4); }
+.routine-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr)); gap: var(--s4); }
+.routine-card { display: flex; flex-direction: column; }
+.routine-card.is-complete { border-color: var(--progress); }
+.routine-card-head { display: flex; align-items: baseline; gap: var(--s3); }
+.routine-card-title { font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); flex: 1; min-width: 0; }
+.routine-progress { color: var(--faint); font-size: var(--text-sm); }
+.routine-blurb { font-size: var(--text-sm); color: var(--muted); margin: var(--s2) 0 var(--s3); max-width: 54ch; }
+.routine-steplist { display: flex; flex-direction: column; }
+.routine-step { display: flex; gap: var(--s3); padding: var(--s3) 0; border-top: 1px solid var(--hairline); }
+.routine-step:first-child { border-top: none; }
+.routine-check {
+  flex: none; width: 24px; height: 24px; margin-top: 1px; border-radius: 6px;
+  border: 1.5px solid var(--hairline-strong); color: transparent; display: grid; place-items: center;
+  transition: background 140ms ease-out, border-color 140ms ease-out, color 140ms ease-out;
+}
+.routine-check:hover { border-color: var(--accent); }
+.routine-step.checked .routine-check { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.routine-step-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.routine-step-body .l { font-weight: 600; font-size: var(--text-base); display: flex; align-items: center; gap: var(--s2); }
+.routine-step.checked .routine-step-body .l { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
+.routine-step-body .h { font-size: var(--text-sm); color: var(--muted); line-height: 1.4; }
+.routine-step-body .ex { font-size: var(--text-sm); color: var(--info); }
+.routine-dur { font-size: 0.6875rem; color: var(--faint); font-weight: 400; }
+.routine-link { font-size: var(--text-sm); color: var(--accent); align-self: flex-start; }
+.routine-link:hover { text-decoration: underline; }
+.routine-card-foot { display: flex; align-items: center; gap: var(--s3); margin-top: auto; padding-top: var(--s3); }
+.routine-card-foot .assist-note { flex: 1; min-width: 0; }
+.routine-reset { min-height: 30px; font-size: var(--text-xs); margin-left: auto; }

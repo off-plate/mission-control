@@ -4,6 +4,7 @@ import {
   MOCK_GOALS,
   MOCK_HABITS,
   MOCK_LEDGER,
+  MOCK_ROUTINES,
   MOCK_SOCIAL,
   MOCK_SOURCES,
   MOCK_TASKS,
@@ -14,6 +15,7 @@ import type {
   CoachFacts,
   CoachSession,
   Goal,
+  Routine,
   HabitDef,
   LedgerEntry,
   PageId,
@@ -29,7 +31,7 @@ import type {
   WidgetType,
 } from './types'
 
-const STORAGE_KEY = 'mission-control-demo-v7'
+const STORAGE_KEY = 'mission-control-demo-v8'
 
 interface PersistedState {
   version: 2
@@ -44,6 +46,7 @@ interface PersistedState {
   review: ReviewState
   assistantLog: AssistantEntry[]
   coachSessions: CoachSession[]
+  routines: Routine[]
 }
 
 interface Store extends PersistedState {
@@ -103,6 +106,10 @@ interface Store extends PersistedState {
   reflectCoachSession: (id: string, didIt: boolean, felt: CoachSession['felt'], reflection: string) => void
   deleteCoachSession: (id: string) => void
 
+  routines: Routine[]
+  toggleRoutineStep: (routineId: string, stepId: string) => void
+  resetRoutine: (routineId: string) => void
+
   todayIndex: number
   savedMin: number
   accuracyPct: number
@@ -128,7 +135,7 @@ function systemTheme(): 'light' | 'dark' {
 
 function pageFromHash(): PageId {
   const h = location.hash.replace('#/', '')
-  const pages: PageId[] = ['today', 'plan', 'assistant', 'habits', 'goals', 'money', 'review', 'coach', 'stats', 'settings']
+  const pages: PageId[] = ['today', 'plan', 'assistant', 'habits', 'routines', 'goals', 'money', 'review', 'coach', 'stats', 'settings']
   return (pages as string[]).includes(h) ? (h as PageId) : 'today'
 }
 
@@ -158,6 +165,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [review, setReview] = useState<ReviewState>(persisted?.review ?? { lastDoneDate: null, wins: [], outcomes: [] })
   const [assistantLog, setAssistantLog] = useState<AssistantEntry[]>(persisted?.assistantLog ?? [])
   const [coachSessions, setCoachSessions] = useState<CoachSession[]>(persisted?.coachSessions ?? [])
+  const [routines, setRoutines] = useState<Routine[]>(persisted?.routines ?? MOCK_ROUTINES)
   const [space, setSpace] = useState<SpaceId>('personal')
   const [page, setPageState] = useState<PageId>(pageFromHash)
   const [editing, setEditing] = useState(false)
@@ -187,14 +195,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const state: PersistedState = {
-      version: 2, spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions,
+      version: 2, spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines,
     }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
     } catch {
       /* demo only; the real app persists to Supabase */
     }
-  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions])
+  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines])
 
   /* Demo pretends today is Sunday when the real weekday is irrelevant;
      habits use the real weekday so checking off feels true. */
@@ -209,7 +217,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value: Store = {
     version: 2,
-    spaces, tasks, habits, goals, ledger, social, sources, plan, review,
+    spaces, tasks, habits, goals, ledger, social, sources, plan, review, routines,
     space, setSpace,
     page, setPage,
     theme,
@@ -408,6 +416,34 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const s = coachSessions.find((x) => x.id === id)
       if (s?.taskId) setTasks((prev) => prev.filter((t) => t.id !== s.taskId))
       setCoachSessions((prev) => prev.filter((x) => x.id !== id))
+    },
+
+    toggleRoutineStep: (routineId, stepId) => {
+      setRoutines((prev) =>
+        prev.map((r) => {
+          if (r.id !== routineId) return r
+          const has = r.doneStepIds.includes(stepId)
+          const doneStepIds = has ? r.doneStepIds.filter((x) => x !== stepId) : [...r.doneStepIds, stepId]
+          const allDone = r.steps.length > 0 && r.steps.every((s) => doneStepIds.includes(s.id))
+          if (r.habitId) {
+            const hid = r.habitId
+            setHabits((hs) => hs.map((h) => (h.id === hid ? { ...h, days: h.days.map((d, i) => (i === todayIndex ? allDone : d)) } : h)))
+          }
+          return { ...r, doneStepIds }
+        }),
+      )
+    },
+    resetRoutine: (routineId) => {
+      setRoutines((prev) =>
+        prev.map((r) => {
+          if (r.id !== routineId) return r
+          if (r.habitId) {
+            const hid = r.habitId
+            setHabits((hs) => hs.map((h) => (h.id === hid ? { ...h, days: h.days.map((d, i) => (i === todayIndex ? false : d)) } : h)))
+          }
+          return { ...r, doneStepIds: [] }
+        }),
+      )
     },
 
     todayIndex,

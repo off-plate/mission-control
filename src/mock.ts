@@ -5,6 +5,7 @@ import type {
   HabitDef,
   LedgerEntry,
   Obligation,
+  Routine,
   SocialEntry,
   SourceState,
   SpaceId,
@@ -145,6 +146,18 @@ export const MOCK_HABITS: HabitDef[] = [
     id: 'h-morning', name: 'Morning routine', daypart: 'morning', paused: false,
     days: [true, true, true, false, true, false, false],
     history: [2, 3, 3, 4, 4, 3, 5, 4, 5, 5, 4, 5],
+  },
+  { id: 'h2', name: 'Morning check-in', daypart: 'morning', days: [true, true, true, false, true, true, true], paused: false, history: [3, 4, 4, 5, 5, 4, 6, 5, 6, 6, 5, 6] },
+  { id: 'h3', name: '20 min movement', daypart: 'afternoon', days: [false, true, false, true, true, false, false], paused: false, history: [0, 1, 2, 1, 3, 2, 3, 4, 3, 3, 4, 3] },
+  { id: 'h4', name: 'No screens at dinner', daypart: 'evening', days: [false, false, true, true, false, false, false], paused: false, history: [0, 0, 1, 1, 2, 1, 2, 2, 3, 2, 2, 2] },
+  { id: 'h1', name: 'In bed before 1:00', daypart: 'evening', days: [true, true, false, true, false, true, false], paused: false, history: [1, 2, 2, 3, 2, 4, 3, 3, 4, 5, 4, 4] },
+]
+
+export const MOCK_ROUTINES: Routine[] = [
+  {
+    id: 'r-morning', title: 'Morning routine', cadence: 'daily', habitId: 'h-morning',
+    blurb: 'The four things that start the day right. Check them off as you go; finishing all four ticks the Morning routine habit for today.',
+    doneStepIds: [],
     steps: [
       { id: 'mr1', title: 'Meditation', kind: 'timer', seconds: 600, note: 'Sit, eyes closed, follow the breath. Ten minutes, no phone.' },
       { id: 'mr2', title: 'Pronunciation test', kind: 'do', note: 'Read a short passage out loud, record it, listen back once.' },
@@ -152,10 +165,39 @@ export const MOCK_HABITS: HabitDef[] = [
       { id: 'mr4', title: 'Typing test', kind: 'do', note: 'One quick round to wake the hands up.', link: 'https://monkeytype.com', linkLabel: 'Open typing test' },
     ],
   },
-  { id: 'h2', name: 'Morning check-in', daypart: 'morning', days: [true, true, true, false, true, true, true], paused: false, history: [3, 4, 4, 5, 5, 4, 6, 5, 6, 6, 5, 6] },
-  { id: 'h3', name: '20 min movement', daypart: 'afternoon', days: [false, true, false, true, true, false, false], paused: false, history: [0, 1, 2, 1, 3, 2, 3, 4, 3, 3, 4, 3] },
-  { id: 'h4', name: 'No screens at dinner', daypart: 'evening', days: [false, false, true, true, false, false, false], paused: false, history: [0, 0, 1, 1, 2, 1, 2, 2, 3, 2, 2, 2] },
-  { id: 'h1', name: 'In bed before 1:00', daypart: 'evening', days: [true, true, false, true, false, true, false], paused: false, history: [1, 2, 2, 3, 2, 4, 3, 3, 4, 5, 4, 4] },
+  {
+    id: 'r-prework', title: 'Before work', cadence: 'prework',
+    blurb: 'Run this before you start any focused work, so you begin clear instead of scattered.',
+    doneStepIds: [],
+    steps: [
+      { id: 'pw1', title: 'Clear the desk', kind: 'do', note: 'Phone away, tabs you do not need closed, water within reach.' },
+      { id: 'pw2', title: 'Pick the one task', kind: 'do', note: 'Name the single outcome for this block. Not a list, one thing.' },
+      { id: 'pw3', title: 'Kill the distractions', kind: 'do', note: 'Notifications off, messaging closed. Decide when you will check them next.' },
+      { id: 'pw4', title: 'Start a focus timer', kind: 'do', note: 'Open the Pomodoro and start the block before the resistance talks you out of it.' },
+    ],
+  },
+  {
+    id: 'r-weekly', title: 'Weekly reset', cadence: 'weekly',
+    blurb: 'Sunday, fifteen minutes. Close the week and set up the next one.',
+    doneStepIds: [],
+    steps: [
+      { id: 'wk1', title: 'Check Datová schránka', kind: 'do', note: 'Open it, read everything, write down any deadlines. Non-negotiable.' },
+      { id: 'wk2', title: 'Look at the money', kind: 'do', note: 'Payments due this week, anything that needs sending.' },
+      { id: 'wk3', title: 'Empty the inboxes', kind: 'do', note: 'Both Gmail accounts to zero or near it. Reply, file, or bin.' },
+      { id: 'wk4', title: 'Plan the week', kind: 'do', note: 'Pull the three outcomes that matter onto the plan.' },
+    ],
+  },
+  {
+    id: 'r-monthly', title: 'Monthly review', cadence: 'monthly',
+    blurb: 'Once a month, the wider look. Where the money and the goals actually stand.',
+    doneStepIds: [],
+    steps: [
+      { id: 'mo1', title: 'Reconcile the budget', kind: 'do', note: 'What came in, what went out, what the debt looks like now.' },
+      { id: 'mo2', title: 'Review the goals', kind: 'do', note: 'Which are on track, which drifted, which to drop.' },
+      { id: 'mo3', title: 'Cancel what you do not use', kind: 'do', note: 'Subscriptions and services quietly draining money.' },
+      { id: 'mo4', title: 'Set the month ahead', kind: 'do', note: 'One theme, three outcomes. Keep it small enough to actually hit.' },
+    ],
+  },
 ]
 
 export const MOCK_GOALS: Goal[] = [

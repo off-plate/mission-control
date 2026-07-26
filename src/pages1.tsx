@@ -3,8 +3,7 @@ import { SpaceGrid } from './Grid'
 import { MOCK_AGENDA, MOCK_EXCEPTIONS_FOR, SPACE_LABELS } from './exceptions'
 import { fakeDecompose } from './mock'
 import { useStore } from './store'
-import { RoutineRunner } from './modals'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, SLOTS, type AgendaEvent, type GoalCategory, type GoalTimeframe, type HabitDef, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, SLOTS, type AgendaEvent, type GoalCategory, type GoalTimeframe, type HabitDef, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
 import { fmtDuration, fmtTime, fmtTimeShort, gcalUrl, taskMinutes, toMin } from './util'
 
 /* ---------------- shared bits ---------------- */
@@ -689,28 +688,15 @@ export function TasksPage({ onDecompose: _onDecompose }: { onDecompose?: () => v
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-function HabitRow({ h, todayIndex, onStart }: { h: HabitDef; todayIndex: number; onStart: (h: HabitDef) => void }) {
-  const { toggleHabitDay, togglePauseHabit, deleteHabit } = useStore()
+function HabitRow({ h, todayIndex }: { h: HabitDef; todayIndex: number }) {
+  const { toggleHabitDay } = useStore()
   const kept = h.days.filter(Boolean).length
-  const isRoutine = !!h.steps?.length
   return (
-    <div className={`habit-row${h.paused ? ' habit-paused' : ''}`}>
+    <div className="habit-row">
       <div className="habit-row-top">
         <span className="habit-name">{h.name}</span>
-        {isRoutine && !h.paused && (
-          <button className="btn btn-primary habit-start" onClick={() => onStart(h)}>▸ Start</button>
-        )}
         <span className="habit-count mono">{kept}/7</span>
-        <button className="btn btn-ghost" style={{ minHeight: 30, fontSize: 'var(--text-xs)' }} onClick={() => togglePauseHabit(h.id)}>{h.paused ? 'resume' : 'pause'}</button>
-        <button className="btn btn-danger" style={{ minHeight: 30, fontSize: 'var(--text-xs)' }} onClick={() => { if (window.confirm(`Delete habit "${h.name}"? This can't be undone.`)) deleteHabit(h.id) }} aria-label={`Delete ${h.name}`}>×</button>
       </div>
-      {isRoutine && (
-        <div className="routine-preview">
-          {h.steps!.map((s) => (
-            <span className="routine-chip" key={s.id}>{s.title}{s.kind === 'timer' && s.seconds ? ` · ${Math.round(s.seconds / 60)}m` : ''}</span>
-          ))}
-        </div>
-      )}
       <div className="habit-days">
         {DAY_LABELS.map((d, i) => (
           <span className="day-cell" key={i}>
@@ -718,7 +704,7 @@ function HabitRow({ h, todayIndex, onStart }: { h: HabitDef; todayIndex: number;
               className="daydot"
               role="checkbox"
               aria-checked={h.days[i]}
-              disabled={h.paused || i > todayIndex}
+              disabled={i > todayIndex}
               aria-label={`${h.name}, ${d}`}
               onClick={() => toggleHabitDay(h.id, i)}
             >
@@ -744,7 +730,6 @@ export function HabitsPage() {
   const { habits, addHabit, todayIndex } = useStore()
   const [name, setName] = useState('')
   const [daypart, setDaypart] = useState<TimeSlot | ''>('morning')
-  const [running, setRunning] = useState<HabitDef | null>(null)
   const kept = habits.filter((h) => !h.paused).reduce((a, h) => a + h.days.filter(Boolean).length, 0)
 
   const sorted = [...habits].sort((a, b) => DP_ORDER.indexOf(a.daypart ?? 'anytime') - DP_ORDER.indexOf(b.daypart ?? 'anytime'))
@@ -778,21 +763,89 @@ export function HabitsPage() {
 
       <div className="grid-4 habit-cards">
         {sorted.map((h) => (
-          <div className={`panel habit-card${h.steps?.length ? ' is-routine' : ''}`} key={h.id}>
+          <div className="panel habit-card" key={h.id}>
             <div className="habit-card-tag">
               <span className="microcap">{dpLabel(h.daypart)}</span>
-              {!h.paused && h.days[todayIndex] && <span className="col-tot mono val-pos">done today</span>}
+              {h.days[todayIndex] && <span className="col-tot mono val-pos">done today</span>}
             </div>
-            <HabitRow h={h} todayIndex={todayIndex} onStart={setRunning} />
+            <HabitRow h={h} todayIndex={todayIndex} />
           </div>
         ))}
         {habits.length === 0 && <div className="empty">No habits yet. Add one above.</div>}
       </div>
 
       <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginTop: 16 }}>
-        Missed days stay quiet on purpose. No broken streaks, no wall of missed-day marks. Pausing a habit just stops it counting until you resume.
+        Missed days stay quiet on purpose. No broken streaks, no wall of missed-day marks. Multi-step routines live on the Routines tab; finishing one there checks its habit off here.
       </p>
-      {running && <RoutineRunner habit={running} onClose={() => setRunning(null)} />}
+    </div>
+  )
+}
+
+/* ---------------- ROUTINES ---------------- */
+
+const CADENCE_ORDER: RoutineCadence[] = ['daily', 'prework', 'weekly', 'monthly']
+const CADENCE_LABEL: Record<RoutineCadence, string> = { daily: 'Daily', prework: 'Before work', weekly: 'Weekly', monthly: 'Monthly' }
+
+export function RoutinesPage() {
+  const { routines, toggleRoutineStep, resetRoutine, habits } = useStore()
+  return (
+    <div className="page">
+      <Band title="Routines" sub="what you run on repeat" />
+      {CADENCE_ORDER.map((cad) => {
+        const list = routines.filter((r) => r.cadence === cad)
+        if (!list.length) return null
+        return (
+          <section className="routine-group" key={cad}>
+            <div className="review-sec"><span className="microcap">{CADENCE_LABEL[cad]}</span></div>
+            <div className="routine-cards">
+              {list.map((r) => {
+                const total = r.steps.length
+                const done = r.doneStepIds.length
+                const complete = total > 0 && done === total
+                const linked = r.habitId ? habits.find((h) => h.id === r.habitId) : null
+                return (
+                  <div className={`panel routine-card${complete ? ' is-complete' : ''}`} key={r.id}>
+                    <div className="routine-card-head">
+                      <span className="routine-card-title">{r.title}</span>
+                      {complete
+                        ? <span className="col-tot mono val-pos">done today</span>
+                        : <span className="routine-progress mono">{done}/{total}</span>}
+                    </div>
+                    {r.blurb && <p className="routine-blurb">{r.blurb}</p>}
+                    <div className="routine-steplist">
+                      {r.steps.map((s) => {
+                        const checked = r.doneStepIds.includes(s.id)
+                        return (
+                          <div className={`routine-step${checked ? ' checked' : ''}`} key={s.id}>
+                            <button className="routine-check" role="checkbox" aria-checked={checked} aria-label={s.title} onClick={() => toggleRoutineStep(r.id, s.id)}>
+                              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                            </button>
+                            <span className="routine-step-body">
+                              <span className="l">
+                                {s.title}
+                                {s.kind === 'timer' && s.seconds ? <span className="routine-dur mono">{Math.round(s.seconds / 60)}m</span> : null}
+                              </span>
+                              {s.note && <span className="h">{s.note}</span>}
+                              {s.example && <span className="ex mono">{s.example}</span>}
+                              {s.link && <a className="routine-link" href={s.link} target="_blank" rel="noreferrer">{s.linkLabel ?? 'Open'} ↗</a>}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div className="routine-card-foot">
+                      {linked
+                        ? <span className="assist-note">Finishing all {total} checks off “{linked.name}” in Habits.</span>
+                        : <span />}
+                      {done > 0 && <button className="btn btn-ghost routine-reset" onClick={() => resetRoutine(r.id)}>Reset</button>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )
+      })}
     </div>
   )
 }

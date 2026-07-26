@@ -5,6 +5,7 @@ export type PageId =
   | 'plan'
   | 'assistant'
   | 'habits'
+  | 'routines'
   | 'goals'
   | 'money'
   | 'review'
@@ -118,8 +119,23 @@ export interface HabitDef {
   history?: number[]
   /** Part of day this habit belongs to; undefined = anytime. */
   daypart?: TimeSlot
-  /** Present => this habit is a launchable routine you press Start on. */
-  steps?: RoutineStep[]
+}
+
+/** How often a routine runs. Drives the sections on the Routines page. */
+export type RoutineCadence = 'daily' | 'prework' | 'weekly' | 'monthly'
+
+/** A named checklist you run on repeat. Checking every step marks it done for
+ *  the period; if it mirrors a habit, that habit checks off automatically. */
+export interface Routine {
+  id: string
+  title: string
+  cadence: RoutineCadence
+  blurb?: string
+  steps: RoutineStep[]
+  /** If set, completing this routine checks that habit off for today. */
+  habitId?: string
+  /** Step ids checked so far this period. */
+  doneStepIds: string[]
 }
 
 export type GoalTimeframe = 'weekly' | 'monthly' | 'quarter' | 'half'

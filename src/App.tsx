@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { MOCK_EXCEPTIONS_FOR } from './exceptions'
 import { SPACE_LABELS } from './mock'
 import { DecomposeSheet } from './modals'
-import { GoalsPage, HabitsPage, PlanPage, TodayPage } from './pages1'
+import { GoalsPage, HabitsPage, PlanPage, RoutinesPage, TodayPage } from './pages1'
 import { CoachPage, MoneyPage, ReviewPage, SettingsPage } from './pages2'
 import { AssistantPage } from './pages3'
 import { useStore } from './store'
@@ -22,6 +22,7 @@ const NAV: { id: PageId; label: string; personalOnly?: boolean }[] = [
   { id: 'today', label: 'Today' },
   { id: 'plan', label: 'Plan' },
   { id: 'habits', label: 'Habits' },
+  { id: 'routines', label: 'Routines' },
   { id: 'goals', label: 'Goals' },
   { id: 'money', label: 'Money', personalOnly: true },
   { id: 'review', label: 'Review' },
@@ -139,6 +140,7 @@ export default function App() {
         {page === 'plan' && <PlanPage />}
         {page === 'assistant' && <AssistantPage />}
         {page === 'habits' && <HabitsPage />}
+        {page === 'routines' && <RoutinesPage />}
         {page === 'goals' && <GoalsPage />}
         {page === 'money' && <MoneyPage />}
         {(page === 'review' || page === 'stats') && <ReviewPage />}

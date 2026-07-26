@@ -4,7 +4,7 @@ import { SPACE_LABELS } from './mock'
 import { DecomposeSheet } from './modals'
 import { GoalsPage, HabitsPage, PlanPage, RoutinesPage, TodayPage } from './pages1'
 import { CoachPage, MoneyPage, ReviewPage, SettingsPage } from './pages2'
-import { AssistantPage } from './pages3'
+import { AssistantPage, BrainDumpPage } from './pages3'
 import { BrandPage } from './brand'
 import { useStore } from './store'
 import type { PageId, SpaceId } from './types'
@@ -28,6 +28,7 @@ const NAV: { id: PageId; label: string; personalOnly?: boolean }[] = [
   { id: 'money', label: 'Money', personalOnly: true },
   { id: 'review', label: 'Review' },
   { id: 'coach', label: 'Coach' },
+  { id: 'braindump', label: 'Brain Dump' },
 ]
 
 function PageNav({
@@ -130,6 +131,7 @@ export default function App() {
         {page === 'money' && <MoneyPage />}
         {(page === 'review' || page === 'stats') && <ReviewPage />}
         {page === 'coach' && <CoachPage />}
+        {page === 'braindump' && <BrainDumpPage />}
         {page === 'settings' && <SettingsPage />}
         {page === 'brand' && <BrandPage />}
       </main>

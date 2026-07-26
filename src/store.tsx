@@ -4,6 +4,7 @@ import {
   DEFAULT_SPACES,
   MOCK_GOALS,
   MOCK_HABITS,
+  MOCK_IDEAS,
   MOCK_LEDGER,
   MOCK_ROUTINES,
   MOCK_SOCIAL,
@@ -16,6 +17,7 @@ import type {
   CoachFacts,
   CoachSession,
   Goal,
+  Idea,
   Routine,
   HabitDef,
   LedgerEntry,
@@ -48,6 +50,7 @@ interface PersistedState {
   assistantLog: AssistantEntry[]
   coachSessions: CoachSession[]
   routines: Routine[]
+  ideas: Idea[]
 }
 
 interface Store extends PersistedState {
@@ -109,6 +112,10 @@ interface Store extends PersistedState {
   toggleRoutineStep: (routineId: string, stepId: string) => void
   resetRoutine: (routineId: string) => void
 
+  ideas: Idea[]
+  addIdea: (text: string) => void
+  deleteIdea: (id: string) => void
+
   todayIndex: number
   savedMin: number
   accuracyPct: number
@@ -130,7 +137,7 @@ function loadPersisted(): PersistedState | null {
 
 function pageFromHash(): PageId {
   const h = location.hash.replace('#/', '')
-  const pages: PageId[] = ['today', 'plan', 'assistant', 'habits', 'routines', 'goals', 'money', 'review', 'coach', 'stats', 'settings', 'brand']
+  const pages: PageId[] = ['today', 'plan', 'assistant', 'habits', 'routines', 'goals', 'money', 'review', 'coach', 'stats', 'settings', 'brand', 'braindump']
   return (pages as string[]).includes(h) ? (h as PageId) : 'today'
 }
 
@@ -161,6 +168,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [assistantLog, setAssistantLog] = useState<AssistantEntry[]>(persisted?.assistantLog ?? [])
   const [coachSessions, setCoachSessions] = useState<CoachSession[]>(persisted?.coachSessions ?? [])
   const [routines, setRoutines] = useState<Routine[]>(persisted?.routines ?? MOCK_ROUTINES)
+  const [ideas, setIdeas] = useState<Idea[]>(persisted?.ideas ?? MOCK_IDEAS)
   const remoteSaveTimer = useRef<number | undefined>(undefined)
   const [space, setSpace] = useState<SpaceId>('personal')
   const [page, setPageState] = useState<PageId>(pageFromHash)
@@ -186,7 +194,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const state: PersistedState = {
-      version: 2, spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines,
+      version: 2, spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
     }
     const json = JSON.stringify(state)
     try {
@@ -199,7 +207,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { void saveRemoteState(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines])
+  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas])
 
   /* Demo pretends today is Sunday when the real weekday is irrelevant;
      habits use the real weekday so checking off feels true. */
@@ -214,7 +222,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value: Store = {
     version: 2,
-    spaces, tasks, habits, goals, ledger, social, sources, plan, review, routines,
+    spaces, tasks, habits, goals, ledger, social, sources, plan, review, routines, ideas,
     space, setSpace,
     page, setPage,
     editing, setEditing,
@@ -440,6 +448,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }),
       )
     },
+
+    addIdea: (text) => {
+      const t = text.trim()
+      if (!t) return
+      setIdeas((prev) => [{ id: `idea-${++uid}`, text: t, when: 'just now' }, ...prev])
+    },
+    deleteIdea: (id) => setIdeas((prev) => prev.filter((i) => i.id !== id)),
 
     todayIndex,
     savedMin,

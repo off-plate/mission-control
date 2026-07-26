@@ -13,6 +13,7 @@ export type PageId =
   | 'stats'
   | 'settings'
   | 'brand'
+  | 'braindump'
 
 export type WidgetType =
   | 'agenda'
@@ -157,6 +158,13 @@ export const GOAL_CATEGORIES: { id: GoalCategory; label: string }[] = [
   { id: 'offplate', label: 'Off-Plate' },
   { id: 'habits', label: 'Habits' },
 ]
+
+/** A raw captured thought on the Brain Dump page. */
+export interface Idea {
+  id: string
+  text: string
+  when: string
+}
 
 export interface GoalMilestone {
   id: string

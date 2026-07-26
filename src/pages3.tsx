@@ -123,3 +123,47 @@ export function AssistantPage() {
     </div>
   )
 }
+
+/* ---------------- BRAIN DUMP ---------------- */
+
+export function BrainDumpPage() {
+  const { ideas, addIdea, deleteIdea } = useStore()
+  const [text, setText] = useState('')
+  const submit = () => { if (!text.trim()) return; addIdea(text); setText('') }
+  return (
+    <div className="page">
+      <Band title="Brain dump" sub="get it out of your head, sort it later" />
+
+      <div className="panel" style={{ maxWidth: 820, marginBottom: 'var(--s5)' }}>
+        <span className="microcap">New idea</span>
+        <textarea
+          className="textinput" rows={2} style={{ width: '100%', marginTop: 'var(--s2)' }}
+          value={text} onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit() }}
+          placeholder="Whatever is in your head. One line or a paragraph."
+          aria-label="New idea"
+        />
+        <div style={{ display: 'flex', gap: 'var(--s2)', marginTop: 'var(--s3)', alignItems: 'center' }}>
+          <button className="btn btn-primary" disabled={!text.trim()} onClick={submit}>Add</button>
+          <span className="assist-note">Capture now, no fields, no sorting. Cmd/Ctrl+Enter adds it.</span>
+        </div>
+      </div>
+
+      <div className="panel" style={{ maxWidth: 820 }}>
+        <span className="microcap">{ideas.length} {ideas.length === 1 ? 'idea' : 'ideas'}</span>
+        {ideas.length === 0 && <p className="bucket-empty">Nothing here yet. Dump the first thing on your mind.</p>}
+        <div className="idea-list">
+          {ideas.map((i) => (
+            <div className="idea" key={i.id}>
+              <p className="idea-text">{i.text}</p>
+              <div className="idea-foot">
+                <span className="mono meta">{i.when}</span>
+                <button className="assist-goto" onClick={() => deleteIdea(i.id)} aria-label="Delete idea">remove</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}

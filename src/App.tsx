@@ -59,7 +59,7 @@ function PageNav({
 }
 
 export default function App() {
-  const { space, setSpace, page, setPage, theme, toggleTheme } = useStore()
+  const { space, setSpace, page, setPage } = useStore()
   const [decomposeOpen, setDecomposeOpen] = useState(false)
   const exceptions = MOCK_EXCEPTIONS_FOR(space)
 
@@ -101,22 +101,6 @@ export default function App() {
               <path d="M12 3v6M12 9L6.5 14M12 9l5.5 5M6.5 14v0M6.5 14a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM17.5 14a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM12 3a2.5 2.5 0 1 0 0-.01" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             Break it down
-          </button>
-          <button
-            className="btn btn-ghost"
-            onClick={toggleTheme}
-            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-          >
-            {theme === 'dark' ? (
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <circle cx="12" cy="12" r="5" />
-                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-              </svg>
-            ) : (
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-              </svg>
-            )}
           </button>
           <button
             className={`btn btn-ghost${page === 'settings' ? ' is-on' : ''}`}

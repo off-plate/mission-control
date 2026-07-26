@@ -5,7 +5,7 @@
    for progress you own. Cabinet Grotesk carries the numbers.
    ============================================================ */
 
-:root, [data-theme="light"] {
+:root {
   --bg: #f4f1e9;
   --surface: #fdfcf8;
   --surface-2: #ece8dc;
@@ -74,49 +74,15 @@ html { font-size: 16px; }
 @media (min-width: 2560px) { html { font-size: 20px; } }
 @media (min-width: 3200px) { html { font-size: 22px; } }
 
-[data-theme="dark"] {
-  --bg: #101009;
-  --surface: #1b1a12;
-  --surface-2: #3f3b2c;
-  --ink: #f0ebd8;
-  --muted: #b1ac97;
-  --faint: #8f8a79;
-  --hairline: rgba(240, 235, 216, 0.18);
-  --hairline-strong: rgba(240, 235, 216, 0.46);
-  --accent: #9db9f0;
-  --accent-hover: #b6cbf5;
-  --accent-ink: #101009;
-  --accent-wash: rgba(157, 185, 240, 0.12);
-  --alert: #f08560;
-  --alert-wash: rgba(240, 133, 96, 0.13);
-  --progress: #8dc3a5;
-  --progress-wash: rgba(141, 195, 165, 0.14);
-  --info: #9aa6b8;
-  --info-wash: rgba(154, 166, 184, 0.14);
-  --warn: #d99a3c;
-  --warn-wash: rgba(217, 154, 60, 0.14);
-  --cat-call: #d08a6e;
-  --cat-admin: #8ea3c2;
-  --cat-deep: #b39476;
-  --cat-quick: #7bb3b0;
-  --shadow-pop: 0 18px 50px rgba(0, 0, 0, 0.55);
-}
-
 /* ---------- per-space identity accent ----------
    Interactive elements adopt the active space's accent, so Personal, Work
-   and Off-Plate each feel like a different room. Theme-qualified so dark
-   mode keeps its lighter cuts. Personal keeps the base flight blue. */
-[data-theme="light"][data-space="work"] {
+   and Off-Plate each feel like a different room. Personal keeps the base
+   flight blue. */
+[data-space="work"] {
   --accent: #0f5f5a; --accent-hover: #0b4a46; --accent-wash: rgba(15, 95, 90, 0.10);
 }
-[data-theme="dark"][data-space="work"] {
-  --accent: #63c3ba; --accent-hover: #7fd0c8; --accent-ink: #101009; --accent-wash: rgba(99, 195, 186, 0.14);
-}
-[data-theme="light"][data-space="offplate"] {
+[data-space="offplate"] {
   --accent: #8a6410; --accent-hover: #6f5009; --accent-wash: rgba(138, 100, 16, 0.11);
-}
-[data-theme="dark"][data-space="offplate"] {
-  --accent: #e0a94a; --accent-hover: #ecbb68; --accent-ink: #101009; --accent-wash: rgba(224, 169, 74, 0.14);
 }
 
 /* ---------- base ---------- */
@@ -330,6 +296,13 @@ a, button, input, select, textarea {
 .assist-tag.k-done { color: var(--progress); background: var(--progress-wash); }
 .assist-goto { font-family: var(--font-mono); font-size: 0.6875rem; color: var(--info); white-space: nowrap; }
 .assist-goto:hover { color: var(--accent); text-decoration: underline; }
+
+/* ---------- Review checkup: two-column form so it fills the width ---------- */
+.checkup-panel { max-width: 1100px; }
+.checkup-cols { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s5) var(--s8); margin-top: var(--s3); }
+.checkup-col { display: flex; flex-direction: column; }
+.checkup-col .coach-nav { margin-top: auto; }
+@media (max-width: 719px) { .checkup-cols { grid-template-columns: 1fr; } }
 
 /* ---------- Review section headers ---------- */
 .review-sec { display: flex; align-items: baseline; gap: var(--s3); margin: var(--s6) 0 var(--s3); padding-bottom: var(--s2); border-bottom: 1px solid var(--hairline); }
@@ -1308,15 +1281,16 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ---------- Routines: named checklists you run on repeat ---------- */
 .routine-group { margin-bottom: var(--s4); }
-.routine-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr)); gap: var(--s4); }
+.routine-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: var(--s4); align-items: start; }
 .routine-card { display: flex; flex-direction: column; }
 .routine-card.is-complete { border-color: var(--progress); }
-.routine-card-head { display: flex; align-items: baseline; gap: var(--s3); }
-.routine-card-title { font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); flex: 1; min-width: 0; }
+.routine-tag { display: flex; align-items: baseline; gap: var(--s3); margin-bottom: var(--s2); }
+.routine-tag .routine-progress, .routine-tag .col-tot { margin-left: auto; }
+.routine-card-title { font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); }
 .routine-progress { color: var(--faint); font-size: var(--text-sm); }
 .routine-blurb { font-size: var(--text-sm); color: var(--muted); margin: var(--s2) 0 var(--s3); max-width: 54ch; }
-.routine-steplist { display: flex; flex-direction: column; }
-.routine-step { display: flex; gap: var(--s3); padding: var(--s3) 0; border-top: 1px solid var(--hairline); }
+.routine-steplist { display: flex; flex-direction: column; margin-top: var(--s3); }
+.routine-step { display: flex; gap: var(--s3); align-items: flex-start; padding: var(--s3) 0; border-top: 1px solid var(--hairline); }
 .routine-step:first-child { border-top: none; }
 .routine-check {
   flex: none; width: 24px; height: 24px; margin-top: 1px; border-radius: 6px;

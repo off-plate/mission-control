@@ -264,23 +264,29 @@ export function ReviewPage() {
       </div>
 
       <SecHead label="Checkup" note="two minutes, honest" />
-      <div className="panel" style={{ maxWidth: 820 }}>
+      <div className="panel checkup-panel">
         <span className="microcap">Manual checkup</span>
-        <h4 className="checkup-q">What actually went well?</h4>
-        {wins.map((w, i) => (
-          <input key={i} className="textinput" style={{ marginBottom: 8, width: '100%' }} placeholder={`Win ${i + 1}`} value={w} onChange={(e) => setW(i, e.target.value)} aria-label={`Win ${i + 1}`} />
-        ))}
-        <h4 className="checkup-q">What drifted, and one change for next week?</h4>
-        <input className="textinput" style={{ width: '100%' }} placeholder="One honest note" value={changed} onChange={(e) => setChanged(e.target.value)} aria-label="What to change" />
-        <h4 className="checkup-q">Three outcomes for next week</h4>
-        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginBottom: 8 }}>Results you can check off. They land in the backlog and Monday’s plan pulls from there.</p>
-        {outcomes.map((o, i) => (
-          <input key={i} className="textinput" style={{ marginBottom: 8, width: '100%' }} placeholder={`Outcome ${i + 1}`} value={o} onChange={(e) => setO(i, e.target.value)} aria-label={`Outcome ${i + 1}`} />
-        ))}
-        <div className="coach-nav">
-          <button className="btn btn-primary" onClick={() => { finishReview([...wins, changed].filter(Boolean), outcomes.filter(Boolean)); setWins(['', '', '']); setChanged(''); setOutcomes(['', '', '']) }}>
-            {doneToday ? 'Update the week' : 'Close the week'}
-          </button>
+        <div className="checkup-cols">
+          <div className="checkup-col">
+            <h4 className="checkup-q">What actually went well?</h4>
+            {wins.map((w, i) => (
+              <input key={i} className="textinput" style={{ marginBottom: 8, width: '100%' }} placeholder={`Win ${i + 1}`} value={w} onChange={(e) => setW(i, e.target.value)} aria-label={`Win ${i + 1}`} />
+            ))}
+            <h4 className="checkup-q">What drifted, and one change for next week?</h4>
+            <input className="textinput" style={{ width: '100%' }} placeholder="One honest note" value={changed} onChange={(e) => setChanged(e.target.value)} aria-label="What to change" />
+          </div>
+          <div className="checkup-col">
+            <h4 className="checkup-q">Three outcomes for next week</h4>
+            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginBottom: 8 }}>Results you can check off. They land in the backlog and Monday’s plan pulls from there.</p>
+            {outcomes.map((o, i) => (
+              <input key={i} className="textinput" style={{ marginBottom: 8, width: '100%' }} placeholder={`Outcome ${i + 1}`} value={o} onChange={(e) => setO(i, e.target.value)} aria-label={`Outcome ${i + 1}`} />
+            ))}
+            <div className="coach-nav">
+              <button className="btn btn-primary" onClick={() => { finishReview([...wins, changed].filter(Boolean), outcomes.filter(Boolean)); setWins(['', '', '']); setChanged(''); setOutcomes(['', '', '']) }}>
+                {doneToday ? 'Update the week' : 'Close the week'}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -441,7 +447,7 @@ export function CoachPage() {
       <div className="panel coach-intake">
         <span className="microcap">What are you avoiding?</span>
         <textarea
-          className="textinput" rows={2} style={{ width: '100%', marginTop: 'var(--s2)' }}
+          className="textinput" rows={3} style={{ width: '100%', marginTop: 'var(--s2)' }}
           value={thing} onChange={(e) => setThing(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && thing.trim()) analyze(thing) }}
           placeholder="Say it plainly. e.g. Call VZP to confirm the payment plan, or Reply to the tax office letter"
@@ -510,7 +516,7 @@ export function CoachPage() {
 /* ---------------- SETTINGS ---------------- */
 
 export function SettingsPage() {
-  const { sources, toggleSource, theme, toggleTheme, resetDemo } = useStore()
+  const { sources, toggleSource, resetDemo } = useStore()
   return (
     <div className="page">
       <Band title="Settings" sub="connections and controls" />
@@ -542,12 +548,7 @@ export function SettingsPage() {
 
         </div>
         <div className="panel">
-          <span className="microcap">Appearance</span>
-          <div className="source-row">
-            <span className="info"><span className="name">Theme</span><span className="detail" style={{ display: 'block' }}>Follows your system until you flip it</span></span>
-            <button className="btn btn-quiet" onClick={toggleTheme}>{theme === 'dark' ? 'Switch to light' : 'Switch to dark'}</button>
-          </div>
-          <span className="microcap" style={{ marginTop: 24, display: 'block' }}>Demo</span>
+          <span className="microcap">Demo</span>
           <div className="source-row">
             <span className="info"><span className="name">Reset the demo</span><span className="detail" style={{ display: 'block' }}>Clears local changes, restores the sample data</span></span>
             <button className="btn btn-danger" style={{ border: '1px solid var(--alert)' }} onClick={resetDemo}>Reset</button>

@@ -788,64 +788,57 @@ const CADENCE_LABEL: Record<RoutineCadence, string> = { daily: 'Daily', prework:
 
 export function RoutinesPage() {
   const { routines, toggleRoutineStep, resetRoutine, habits } = useStore()
+  const sorted = [...routines].sort((a, b) => CADENCE_ORDER.indexOf(a.cadence) - CADENCE_ORDER.indexOf(b.cadence))
   return (
     <div className="page">
       <Band title="Routines" sub="what you run on repeat" />
-      {CADENCE_ORDER.map((cad) => {
-        const list = routines.filter((r) => r.cadence === cad)
-        if (!list.length) return null
-        return (
-          <section className="routine-group" key={cad}>
-            <div className="review-sec"><span className="microcap">{CADENCE_LABEL[cad]}</span></div>
-            <div className="routine-cards">
-              {list.map((r) => {
-                const total = r.steps.length
-                const done = r.doneStepIds.length
-                const complete = total > 0 && done === total
-                const linked = r.habitId ? habits.find((h) => h.id === r.habitId) : null
-                return (
-                  <div className={`panel routine-card${complete ? ' is-complete' : ''}`} key={r.id}>
-                    <div className="routine-card-head">
-                      <span className="routine-card-title">{r.title}</span>
-                      {complete
-                        ? <span className="col-tot mono val-pos">done today</span>
-                        : <span className="routine-progress mono">{done}/{total}</span>}
+      <div className="routine-cards">
+        {sorted.map((r) => {
+          const total = r.steps.length
+          const done = r.doneStepIds.length
+          const complete = total > 0 && done === total
+          const linked = r.habitId ? habits.find((h) => h.id === r.habitId) : null
+          return (
+            <div className={`panel routine-card${complete ? ' is-complete' : ''}`} key={r.id}>
+              <div className="routine-tag">
+                <span className="microcap">{CADENCE_LABEL[r.cadence]}</span>
+                {complete
+                  ? <span className="col-tot mono val-pos">done today</span>
+                  : <span className="routine-progress mono">{done}/{total}</span>}
+              </div>
+              <span className="routine-card-title">{r.title}</span>
+              {r.blurb && <p className="routine-blurb">{r.blurb}</p>}
+              <div className="routine-steplist">
+                {r.steps.map((s) => {
+                  const checked = r.doneStepIds.includes(s.id)
+                  return (
+                    <div className={`routine-step${checked ? ' checked' : ''}`} key={s.id}>
+                      <button className="routine-check" role="checkbox" aria-checked={checked} aria-label={s.title} onClick={() => toggleRoutineStep(r.id, s.id)}>
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      </button>
+                      <span className="routine-step-body">
+                        <span className="l">
+                          {s.title}
+                          {s.kind === 'timer' && s.seconds ? <span className="routine-dur mono">{Math.round(s.seconds / 60)}m</span> : null}
+                        </span>
+                        {s.note && <span className="h">{s.note}</span>}
+                        {s.example && <span className="ex mono">{s.example}</span>}
+                        {s.link && <a className="routine-link" href={s.link} target="_blank" rel="noreferrer">{s.linkLabel ?? 'Open'} ↗</a>}
+                      </span>
                     </div>
-                    {r.blurb && <p className="routine-blurb">{r.blurb}</p>}
-                    <div className="routine-steplist">
-                      {r.steps.map((s) => {
-                        const checked = r.doneStepIds.includes(s.id)
-                        return (
-                          <div className={`routine-step${checked ? ' checked' : ''}`} key={s.id}>
-                            <button className="routine-check" role="checkbox" aria-checked={checked} aria-label={s.title} onClick={() => toggleRoutineStep(r.id, s.id)}>
-                              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                            </button>
-                            <span className="routine-step-body">
-                              <span className="l">
-                                {s.title}
-                                {s.kind === 'timer' && s.seconds ? <span className="routine-dur mono">{Math.round(s.seconds / 60)}m</span> : null}
-                              </span>
-                              {s.note && <span className="h">{s.note}</span>}
-                              {s.example && <span className="ex mono">{s.example}</span>}
-                              {s.link && <a className="routine-link" href={s.link} target="_blank" rel="noreferrer">{s.linkLabel ?? 'Open'} ↗</a>}
-                            </span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                    <div className="routine-card-foot">
-                      {linked
-                        ? <span className="assist-note">Finishing all {total} checks off “{linked.name}” in Habits.</span>
-                        : <span />}
-                      {done > 0 && <button className="btn btn-ghost routine-reset" onClick={() => resetRoutine(r.id)}>Reset</button>}
-                    </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
+              </div>
+              <div className="routine-card-foot">
+                {linked
+                  ? <span className="assist-note">Finishing all {total} checks off “{linked.name}” in Habits.</span>
+                  : <span />}
+                {done > 0 && <button className="btn btn-ghost routine-reset" onClick={() => resetRoutine(r.id)}>Reset</button>}
+              </div>
             </div>
-          </section>
-        )
-      })}
+          )
+        })}
+      </div>
     </div>
   )
 }

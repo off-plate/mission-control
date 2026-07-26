@@ -54,8 +54,6 @@ interface Store extends PersistedState {
   setSpace: (s: SpaceId) => void
   page: PageId
   setPage: (p: PageId) => void
-  theme: 'light' | 'dark'
-  toggleTheme: () => void
   editing: boolean
   setEditing: (v: boolean) => void
   focusTaskId: string | null
@@ -129,10 +127,6 @@ function loadPersisted(): PersistedState | null {
   }
 }
 
-function systemTheme(): 'light' | 'dark' {
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-}
-
 function pageFromHash(): PageId {
   const h = location.hash.replace('#/', '')
   const pages: PageId[] = ['today', 'plan', 'assistant', 'habits', 'routines', 'goals', 'money', 'review', 'coach', 'stats', 'settings']
@@ -171,11 +165,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [editing, setEditing] = useState(false)
   const [focusTaskId, setFocusTaskId] = useState<string | null>(null)
   const [coachOpen, setCoachOpen] = useState<string | null>(null)
-  const [theme, setTheme] = useState<'light' | 'dark'>(systemTheme)
-
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-  }, [theme])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-space', space)
@@ -220,8 +209,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     spaces, tasks, habits, goals, ledger, social, sources, plan, review, routines,
     space, setSpace,
     page, setPage,
-    theme,
-    toggleTheme: () => setTheme((t) => (t === 'dark' ? 'light' : 'dark')),
     editing, setEditing,
     focusTaskId, setFocusTaskId,
     coachOpen, setCoachOpen,

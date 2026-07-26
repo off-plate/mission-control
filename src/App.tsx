@@ -5,6 +5,7 @@ import { DecomposeSheet } from './modals'
 import { GoalsPage, HabitsPage, PlanPage, RoutinesPage, TodayPage } from './pages1'
 import { CoachPage, MoneyPage, ReviewPage, SettingsPage } from './pages2'
 import { AssistantPage } from './pages3'
+import { BrandPage } from './brand'
 import { useStore } from './store'
 import type { PageId, SpaceId } from './types'
 
@@ -130,11 +131,12 @@ export default function App() {
         {(page === 'review' || page === 'stats') && <ReviewPage />}
         {page === 'coach' && <CoachPage />}
         {page === 'settings' && <SettingsPage />}
+        {page === 'brand' && <BrandPage />}
       </main>
 
       <footer className="foot">
         <span className="mono">V1 DEMO</span>
-        <span>All data is invented and lives only in this browser. The real build syncs TickTick, Trello, Jira, two Gmail accounts, Calendar, Compass and Hevy into Supabase.</span>
+        <span>All data is invented and lives only in this browser. The real build syncs two Gmail accounts, Calendar, Compass and Hevy into Supabase.</span>
       </footer>
 
       {decomposeOpen && <DecomposeSheet onClose={() => setDecomposeOpen(false)} />}

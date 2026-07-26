@@ -12,6 +12,7 @@ export type PageId =
   | 'coach'
   | 'stats'
   | 'settings'
+  | 'brand'
 
 export type WidgetType =
   | 'agenda'
@@ -157,9 +158,16 @@ export const GOAL_CATEGORIES: { id: GoalCategory; label: string }[] = [
   { id: 'habits', label: 'Habits' },
 ]
 
+export interface GoalMilestone {
+  id: string
+  label: string
+  done: boolean
+}
+
 export interface Goal {
   id: string
   space: SpaceId
+  /** The objective: a specific outcome, not an activity. */
   name: string
   current: number
   target: number
@@ -167,6 +175,12 @@ export interface Goal {
   note: string
   timeframe?: GoalTimeframe
   category?: GoalCategory
+  /** Why it matters, the motivation that keeps it alive. */
+  why?: string
+  /** Target date within the timeframe. */
+  deadline?: string
+  /** The concrete steps that ladder up to the objective. */
+  milestones?: GoalMilestone[]
 }
 
 export interface LedgerEntry {

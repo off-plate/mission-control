@@ -4,7 +4,7 @@ import { MOCK_AGENDA, MOCK_EXCEPTIONS_FOR, SPACE_LABELS } from './exceptions'
 import { fakeDecompose } from './mock'
 import { useStore } from './store'
 import { MorningRoutine } from './morning'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, SLOTS, type AgendaEvent, type GoalCategory, type GoalTimeframe, type HabitDef, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_TIMEFRAMES, SLOTS, type AgendaEvent, type HabitDef, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
 import { fmtDuration, fmtTime, fmtTimeShort, gcalUrl, taskMinutes, toMin } from './util'
 
 /* ---------------- shared bits ---------------- */
@@ -848,59 +848,21 @@ export function RoutinesPage() {
 /* ---------------- GOALS ---------------- */
 
 export function GoalsPage() {
-  const { space, goals, habits, addGoal, bumpGoal, deleteGoal, todayIndex } = useStore()
-  const [name, setName] = useState('')
-  const [target, setTarget] = useState(10)
-  const [tf, setTf] = useState<GoalTimeframe>('weekly')
-  const [cat, setCat] = useState<GoalCategory>('life')
-
+  const { space, goals } = useStore()
   const spaceGoals = goals.filter((g) => g.space === space)
-  // Habits category is computed live from the habit log (personal only)
-  const habitGoals = space === 'personal'
-    ? habits.filter((h) => !h.paused).map((h) => ({
-        id: `hg-${h.id}`, space, name: h.name, current: h.days.filter(Boolean).length, target: 7,
-        unit: 'days', note: 'from the habit log', timeframe: 'weekly' as GoalTimeframe, category: 'habits' as GoalCategory, auto: true,
-      }))
-    : []
-
-  const submit = () => {
-    if (!name.trim() || target < 1) return
-    addGoal({ space, name: name.trim(), current: 0, target, unit: 'done', note: '', timeframe: tf, category: cat })
-    setName('')
-  }
-
-  const onTrack = spaceGoals.filter((g) => g.current / g.target >= 0.5).length
+  const done = spaceGoals.filter((g) => g.current >= g.target).length
 
   return (
     <div className="page">
       <Band
         title="Goals"
         sub={SPACE_LABELS[space]}
-        metrics={[{ v: `${onTrack}/${spaceGoals.length}`, k: 'on track', tone: 'pos' as const }]}
+        metrics={[{ v: `${done}/${spaceGoals.length}`, k: 'reached', tone: 'pos' as const }]}
       />
-      <div className="panel" style={{ marginBottom: 'var(--s5)', maxWidth: 880 }}>
-        <div className="formrow" style={{ marginBottom: 0 }}>
-          <input className="textinput" placeholder="New goal" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} aria-label="Goal name" />
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <input className="numinput" type="number" min={1} value={target} onChange={(e) => setTarget(Math.max(1, Number(e.target.value)))} aria-label="Target number" />
-            <span className="microcap">target</span>
-          </span>
-          <select className="textinput" style={{ flex: '0 0 auto' }} value={tf} onChange={(e) => setTf(e.target.value as GoalTimeframe)} aria-label="Timeframe">
-            {GOAL_TIMEFRAMES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
-          </select>
-          <select className="textinput" style={{ flex: '0 0 auto' }} value={cat} onChange={(e) => setCat(e.target.value as GoalCategory)} aria-label="Category">
-            {GOAL_CATEGORIES.filter((c) => c.id !== 'habits').map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-          </select>
-          <button className="btn btn-primary" onClick={submit} disabled={!name.trim()}>Add goal</button>
-        </div>
-      </div>
 
       <div className="grid-2 goal-cols">
         {GOAL_TIMEFRAMES.map((tfr) => {
-          const inTf = [
-            ...spaceGoals.filter((g) => (g.timeframe ?? 'quarter') === tfr.id),
-            ...(tfr.id === 'weekly' ? habitGoals : []),
-          ]
+          const inTf = spaceGoals.filter((g) => (g.timeframe ?? 'quarter') === tfr.id)
           return (
             <div className="panel goal-col" key={tfr.id}>
               <div className="col-head">
@@ -909,32 +871,34 @@ export function GoalsPage() {
               </div>
               {inTf.map((g) => {
                 const pct = Math.min(100, Math.round((g.current / g.target) * 100))
-                const weekly = tfr.id === 'weekly'
-                const off = pct < 50 && !(weekly && todayIndex < 3)
-                const auto = 'auto' in g && g.auto
+                const status = g.current >= g.target ? 'done' : pct < 40 ? 'behind' : 'ontrack'
+                const statusLabel = status === 'done' ? 'reached' : status === 'behind' ? 'behind' : 'on track'
                 return (
-                  <div className="goal-card" key={g.id}>
+                  <div className="goal-card v2" key={g.id}>
                     <div className="goal-line">
                       <span className={`cat-dot goalcat-${g.category ?? 'life'}`} aria-hidden="true" />
-                      <span className="grow">{g.name}</span>
-                      <span className={`drift ${off ? 'off' : 'ok'}`}>{off ? 'behind' : 'on track'}</span>
+                      <span className="grow goal-obj">{g.name}</span>
+                      <span className={`goal-status s-${status}`}>{statusLabel}</span>
                     </div>
-                    <div className={`bar prog${off ? ' warn' : ''}`}><i style={{ width: `${pct}%` }} /></div>
-                    <div className="goal-foot">
-                      <span className="kpi-sub" style={{ marginTop: 0, flex: 1 }}>
-                        {g.current.toLocaleString('en')} of {g.target.toLocaleString('en')} {g.unit}
-                      </span>
-                      {auto ? (
-                        <span className="microcap" title="Updated from the habit log">auto</span>
-                      ) : (
-                        <>
-                          <button className="btn btn-quiet" style={{ minHeight: 28, padding: '0 8px' }} onClick={() => bumpGoal(g.id, 1)} aria-label={`Progress ${g.name}`}>+</button>
-                          <button className="btn btn-ghost" style={{ minHeight: 28, padding: '0 8px' }} onClick={() => bumpGoal(g.id, -1)} aria-label={`Undo ${g.name}`}>−</button>
-                          <button className="btn btn-danger" style={{ minHeight: 28, padding: '0 6px', fontSize: 'var(--text-xs)' }} onClick={() => { if (window.confirm(`Delete goal "${g.name}"?`)) deleteGoal(g.id) }} aria-label={`Delete ${g.name}`}>×</button>
-                        </>
-                      )}
+                    {g.why && <p className="goal-why">{g.why}</p>}
+                    <div className={`bar prog${status === 'behind' ? ' warn' : ''}`}><i style={{ width: `${pct}%` }} /></div>
+                    <div className="goal-measure">
+                      <span className="mono meas">{g.current.toLocaleString('en')} / {g.target.toLocaleString('en')} {g.unit}</span>
+                      <span className="mono pct">{pct}%</span>
+                      {g.deadline && <span className="goal-deadline">by {g.deadline}</span>}
                     </div>
-                    {g.note && <div className="goal-note">{g.note}</div>}
+                    {g.milestones && g.milestones.length > 0 && (
+                      <ul className="goal-ms">
+                        {g.milestones.map((m) => (
+                          <li className={`goal-ms-item${m.done ? ' done' : ''}`} key={m.id}>
+                            <span className="goal-ms-check" aria-hidden="true">
+                              {m.done && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                            </span>
+                            <span>{m.label}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 )
               })}

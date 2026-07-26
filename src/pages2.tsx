@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { COACH_SCENARIOS, MOCK_CLAUDE, MOCK_MONEY, MOCK_STATS } from './mock'
+import { COACH_SCENARIOS, MOCK_MONEY, MOCK_STATS } from './mock'
 import { Band } from './pages1'
 import { useStore } from './store'
 import { Spark, SparkBox } from './widgets'
@@ -10,7 +10,7 @@ import type { CoachFacts, CoachSession, TaskCategory } from './types'
 /* ---------------- MONEY ---------------- */
 
 export function MoneyPage() {
-  const { space, setSpace: setSpage, tasks, addTask, goals } = useStore()
+  const { space, setSpace: setSpage, tasks, addTask } = useStore()
   const f = MOCK_MONEY
   if (space !== 'personal') {
     return (
@@ -27,7 +27,6 @@ export function MoneyPage() {
       </div>
     )
   }
-  const moneyGoals = goals.filter((g) => g.space === 'personal' && g.category === 'money')
   return (
     <div className="page">
       <Band
@@ -99,28 +98,16 @@ export function MoneyPage() {
         </div>
       </div>
 
-      {/* Money goals + Compass */}
-      <div className="panel" style={{ marginTop: 'var(--s5)' }}>
-        <div className="col-head">
-          <span className="microcap">Money goals</span>
-          <a className="cal-link" style={{ marginLeft: 'auto' }} href="https://compass-money.netlify.app" target="_blank" rel="noreferrer">Open Compass ↗</a>
+      {/* Compass handoff */}
+      <div className="panel money-compass" style={{ marginTop: 'var(--s5)' }}>
+        <div className="money-compass-copy">
+          <span className="microcap">The full picture lives in Compass</span>
+          <p>Debts, budget, goals and the five-year plan are managed in Compass. This page is just the at-a-glance readout.</p>
         </div>
-        <div className="grid-3" style={{ marginTop: 'var(--s3)' }}>
-          {moneyGoals.map((g) => {
-            const pct = Math.min(100, Math.round((g.current / g.target) * 100))
-            return (
-              <div className="goal-card" key={g.id}>
-                <div className="goal-line"><span className="grow">{g.name}</span></div>
-                <div className="bar prog"><i style={{ width: `${pct}%` }} /></div>
-                <div className="kpi-sub">{g.current.toLocaleString('en')} of {g.target.toLocaleString('en')} {g.unit}</div>
-              </div>
-            )
-          })}
-          {moneyGoals.length === 0 && <p className="bucket-empty">No money goals yet. Add them on the Goals page.</p>}
-        </div>
-        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--faint)', marginTop: 'var(--s4)' }}>
-          Figures are demo placeholders. The real app reads your Compass ledger server-side; nothing financial ships in this public bundle.
-        </p>
+        <a className="btn btn-primary money-compass-btn" href="https://compass-money.netlify.app" target="_blank" rel="noreferrer">
+          Open Compass
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M7 17L17 7M17 7H8M17 7v9" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </a>
       </div>
     </div>
   )
@@ -216,7 +203,7 @@ export function ReviewPage() {
       </div>
 
       <SecHead label="Trends & calibration" note="six weeks back, this week live" />
-      <div className="grid-3">
+      <div className="grid-2">
         <div className="panel">
           <span className="microcap">Time saved, six weeks</span>
           <SparkBox data={[...s.weeklySavedMin, savedMin]} unit="m" caption="minutes per week saved vs your estimates, this week live" />
@@ -237,29 +224,22 @@ export function ReviewPage() {
             </tbody>
           </table>
         </div>
-        <div className="panel">
-          <span className="microcap">Claude usage</span>
-          <div className="kpi">{MOCK_CLAUDE.sessionsToday}<span className="unit">sessions today</span></div>
-          <div style={{ marginTop: 12 }}>
-            <SparkBox data={MOCK_CLAUDE.tokensWeek} unit="k" caption={`tokens per day, ${MOCK_CLAUDE.note}`} />
-          </div>
-        </div>
-        <div className="panel panel-wide">
-          <span className="microcap">The ledger, estimate vs actual</span>
-          <div className="ledger-list">
-            {ledger.map((e) => {
-              const d = e.estimateMin - e.actualMin
-              return (
-                <div className="ledger-row" key={e.id}>
-                  <span className="mono" style={{ color: 'var(--faint)', fontSize: 'var(--text-xs)', minWidth: '3ch' }}>{e.when}</span>
-                  <span className="ledger-title">{e.title}</span>
-                  <span className="src-tag">{e.category}</span>
-                  <span className="mono" style={{ color: 'var(--muted)', fontSize: 'var(--text-xs)' }}>~{e.estimateMin}m → {e.actualMin}m</span>
-                  <span className={`delta ${d >= 0 ? 'saved' : 'over'}`}>{d >= 0 ? `+${d}m` : `${d}m`}</span>
-                </div>
-              )
-            })}
-          </div>
+      </div>
+      <div className="panel" style={{ marginTop: 'var(--s4)' }}>
+        <span className="microcap">The ledger, estimate vs actual</span>
+        <div className="ledger-list">
+          {ledger.map((e) => {
+            const d = e.estimateMin - e.actualMin
+            return (
+              <div className="ledger-row" key={e.id}>
+                <span className="mono" style={{ color: 'var(--faint)', fontSize: 'var(--text-xs)', minWidth: '3ch' }}>{e.when}</span>
+                <span className="ledger-title">{e.title}</span>
+                <span className="src-tag">{e.category}</span>
+                <span className="mono" style={{ color: 'var(--muted)', fontSize: 'var(--text-xs)' }}>~{e.estimateMin}m → {e.actualMin}m</span>
+                <span className={`delta ${d >= 0 ? 'saved' : 'over'}`}>{d >= 0 ? `+${d}m` : `${d}m`}</span>
+              </div>
+            )
+          })}
         </div>
       </div>
 
@@ -516,7 +496,7 @@ export function CoachPage() {
 /* ---------------- SETTINGS ---------------- */
 
 export function SettingsPage() {
-  const { sources, toggleSource, resetDemo } = useStore()
+  const { sources, toggleSource, resetDemo, setPage } = useStore()
   return (
     <div className="page">
       <Band title="Settings" sub="connections and controls" />
@@ -548,7 +528,12 @@ export function SettingsPage() {
 
         </div>
         <div className="panel">
-          <span className="microcap">Demo</span>
+          <span className="microcap">Design</span>
+          <div className="source-row">
+            <span className="info"><span className="name">Brand &amp; guidelines</span><span className="detail" style={{ display: 'block' }}>The colours, type and rules this app is built on</span></span>
+            <button className="btn btn-quiet" onClick={() => setPage('brand')}>Open</button>
+          </div>
+          <span className="microcap" style={{ marginTop: 24, display: 'block' }}>Demo</span>
           <div className="source-row">
             <span className="info"><span className="name">Reset the demo</span><span className="detail" style={{ display: 'block' }}>Clears local changes, restores the sample data</span></span>
             <button className="btn btn-danger" style={{ border: '1px solid var(--alert)' }} onClick={resetDemo}>Reset</button>

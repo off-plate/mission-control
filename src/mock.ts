@@ -205,14 +205,75 @@ export const MOCK_ROUTINES: Routine[] = [
 
 export const MOCK_GOALS: Goal[] = [
   // personal
-  { id: 'g-w1', space: 'personal', name: 'Send the tax transfer', current: 0, target: 1, unit: 'done', note: 'Hard deadline Fri 31 Jul', timeframe: 'weekly', category: 'money' },
-  { id: 'g-w2', space: 'personal', name: 'One honest money talk with GF', current: 0, target: 1, unit: 'done', note: 'No softening', timeframe: 'weekly', category: 'life' },
-  { id: 'g-m1', space: 'personal', name: 'No new overdue debt', current: 1, target: 1, unit: 'held', note: 'Nothing slipped this month', timeframe: 'monthly', category: 'money' },
-  { id: 'g-m2', space: 'personal', name: 'Gym 12 sessions', current: 7, target: 12, unit: 'sessions', note: 'Proving Ground block', timeframe: 'monthly', category: 'health' },
-  { id: 'g1', space: 'personal', name: 'Every obligation on a payment plan', current: 1, target: 3, unit: 'plans agreed', note: 'Bank plan waiting, tax not sent', timeframe: 'quarter', category: 'money' },
-  { id: 'g3', space: 'personal', name: 'Weekly reset every Sunday', current: 9, target: 12, unit: 'weeks kept', note: 'The ritual is the structure', timeframe: 'quarter', category: 'life' },
-  { id: 'g-h1', space: 'personal', name: 'Debt down by 60 000 Kč', current: 22000, target: 60000, unit: 'Kč paid', note: 'Steady on the plans', timeframe: 'half', category: 'money' },
-  { id: 'g-h2', space: 'personal', name: 'Restart Off-Plate from stable ground', current: 1, target: 3, unit: 'milestones', note: 'Only once debt is on rails', timeframe: 'half', category: 'life' },
+  {
+    id: 'g-w1', space: 'personal', name: 'Send the tax transfer', current: 1, target: 3, unit: 'steps', note: '', timeframe: 'weekly', category: 'money',
+    why: 'The 41K is the one deadline that turns into penalties the moment it slips.', deadline: 'Fri 31 Jul',
+    milestones: [
+      { id: 'g-w1-a', label: 'Confirm the amount with ARSTAS', done: true },
+      { id: 'g-w1-b', label: 'Prepare the transfer', done: false },
+      { id: 'g-w1-c', label: 'Send it and save the confirmation', done: false },
+    ],
+  },
+  {
+    id: 'g-w2', space: 'personal', name: 'One honest money talk with GF', current: 0, target: 3, unit: 'steps', note: '', timeframe: 'weekly', category: 'life',
+    why: 'Being a role model starts with her seeing the real numbers, not a softened version.', deadline: 'This week',
+    milestones: [
+      { id: 'g-w2-a', label: 'Pick the evening', done: false },
+      { id: 'g-w2-b', label: 'Show the two agreed plans', done: false },
+      { id: 'g-w2-c', label: 'Agree a monthly check-in', done: false },
+    ],
+  },
+  {
+    id: 'g-m1', space: 'personal', name: 'No new overdue debt this month', current: 2, target: 2, unit: 'kept', note: '', timeframe: 'monthly', category: 'money',
+    why: 'One new overdue undoes a month of progress. This is the floor to hold.', deadline: 'End of July',
+    milestones: [
+      { id: 'g-m1-a', label: 'Every payment sent on time', done: true },
+      { id: 'g-m1-b', label: 'Nothing new put on a card', done: true },
+    ],
+  },
+  {
+    id: 'g-m2', space: 'personal', name: 'Twelve gym sessions', current: 7, target: 12, unit: 'sessions', note: '', timeframe: 'monthly', category: 'health',
+    why: 'Proving Ground block. Consistency is the point, not intensity.', deadline: 'End of July',
+    milestones: [
+      { id: 'g-m2-a', label: 'Weeks 1 and 2 done', done: true },
+      { id: 'g-m2-b', label: 'Week 3 done', done: false },
+      { id: 'g-m2-c', label: 'Week 4 done', done: false },
+    ],
+  },
+  {
+    id: 'g1', space: 'personal', name: 'Every obligation on a payment plan', current: 1, target: 3, unit: 'plans agreed', note: '', timeframe: 'quarter', category: 'money',
+    why: 'Nothing avoided. Everything on rails with an agreed plan is what ends the spiral.', deadline: 'End of Q3',
+    milestones: [
+      { id: 'g1-a', label: 'VZP plan confirmed in writing', done: false },
+      { id: 'g1-b', label: 'Moneta plan agreed', done: false },
+      { id: 'g1-c', label: 'Tax filed and settled', done: true },
+    ],
+  },
+  {
+    id: 'g3', space: 'personal', name: 'Weekly reset every Sunday', current: 9, target: 12, unit: 'weeks kept', note: '', timeframe: 'quarter', category: 'life',
+    why: 'The ritual is the structure that holds everything else together.', deadline: 'End of Q3',
+    milestones: [
+      { id: 'g3-a', label: 'Keep the streak to 12 weeks', done: false },
+    ],
+  },
+  {
+    id: 'g-h1', space: 'personal', name: 'Debt down by 60 000 Kč', current: 22000, target: 60000, unit: 'Kč paid', note: '', timeframe: 'half', category: 'money',
+    why: 'The number that proves the spiral is actually reversing, not just holding.', deadline: 'End of year',
+    milestones: [
+      { id: 'g-h1-a', label: 'First 20 000 paid', done: true },
+      { id: 'g-h1-b', label: '40 000 paid', done: false },
+      { id: 'g-h1-c', label: '60 000 paid', done: false },
+    ],
+  },
+  {
+    id: 'g-h2', space: 'personal', name: 'Restart Off-Plate from stable ground', current: 1, target: 3, unit: 'milestones', note: '', timeframe: 'half', category: 'offplate',
+    why: 'Only once debt is on rails, never before. Stable foundation first.', deadline: 'End of year',
+    milestones: [
+      { id: 'g-h2-a', label: 'All debt plans agreed', done: false },
+      { id: 'g-h2-b', label: 'Three months with no new debt', done: false },
+      { id: 'g-h2-c', label: 'First real client conversation', done: true },
+    ],
+  },
   // work
   { id: 'g4', space: 'work', name: 'Ship onboarding revamp', current: 11, target: 20, unit: 'tickets closed', note: 'On track for August', timeframe: 'quarter', category: 'work' },
   { id: 'g-w-w', space: 'work', name: 'Clear the review backlog', current: 2, target: 5, unit: 'PRs', note: 'this week', timeframe: 'weekly', category: 'work' },
@@ -318,16 +379,11 @@ export const MOCK_MONEY = {
 
 export const MOCK_SOURCES: SourceState[] = [
   { id: 's1', name: 'Google Calendar', kind: 'calendar', status: 'connected', detail: 'Two accounts, sync every 15 min' },
-  { id: 's2', name: 'TickTick', kind: 'tasks', status: 'connected', detail: 'Tasks and habits, sync every 5 min' },
-  { id: 's3', name: 'Trello', kind: 'tasks', status: 'connected', detail: 'Cards assigned to you' },
-  { id: 's4', name: 'Jira', kind: 'tasks', status: 'off', detail: 'Work space only, via server proxy' },
+  { id: 's2', name: 'TickTick', kind: 'tasks', status: 'off', detail: 'Tasks and habits, sync every 5 min' },
   { id: 's5', name: 'Gmail personal', kind: 'mail', status: 'connected', detail: 'Unread counts and top subject' },
   { id: 's6', name: 'Gmail Off-Plate', kind: 'mail', status: 'connected', detail: 'Unread counts and top subject' },
   { id: 's7', name: 'Compass', kind: 'money', status: 'connected', detail: 'Server-side ledger read, daily' },
   { id: 's8', name: 'Hevy', kind: 'training', status: 'connected', detail: 'Workouts, hourly' },
-  { id: 's9', name: 'Claude usage', kind: 'stats', status: 'connected', detail: 'Local session logs, pushed by your Mac' },
-  { id: 's10', name: 'Audience numbers', kind: 'social', status: 'manual', detail: 'Entered in the weekly review' },
-  { id: 's11', name: 'Datová schránka', kind: 'admin', status: 'manual', detail: 'Checked by you, Sunday rule' },
 ]
 
 export const MOCK_STATS = {

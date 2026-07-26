@@ -32,7 +32,7 @@ import type {
   WidgetType,
 } from './types'
 
-export const STORAGE_KEY = 'mission-control-demo-v9'
+export const STORAGE_KEY = 'mission-control-demo-v10'
 
 interface PersistedState {
   version: 2
@@ -130,7 +130,7 @@ function loadPersisted(): PersistedState | null {
 
 function pageFromHash(): PageId {
   const h = location.hash.replace('#/', '')
-  const pages: PageId[] = ['today', 'plan', 'assistant', 'habits', 'routines', 'goals', 'money', 'review', 'coach', 'stats', 'settings']
+  const pages: PageId[] = ['today', 'plan', 'assistant', 'habits', 'routines', 'goals', 'money', 'review', 'coach', 'stats', 'settings', 'brand']
   return (pages as string[]).includes(h) ? (h as PageId) : 'today'
 }
 

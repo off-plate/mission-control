@@ -1367,3 +1367,41 @@ a.pron-src:hover { color: var(--accent); text-decoration: underline; }
 
 /* typing */
 .mr-typing { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s2); }
+
+/* ---------- Money: Compass handoff ---------- */
+.money-compass { display: flex; align-items: center; gap: var(--s5); flex-wrap: wrap; }
+.money-compass-copy { flex: 1; min-width: 260px; }
+.money-compass-copy p { font-size: var(--text-sm); color: var(--muted); margin-top: var(--s2); max-width: 60ch; }
+.money-compass-btn { font-size: var(--text-base); padding: var(--s3) var(--s5); gap: var(--s2); white-space: nowrap; }
+
+/* ---------- Brand & guidelines page ---------- */
+.brand-block { margin-bottom: var(--s6); }
+.brand-swatches { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: var(--s3); }
+.brand-swatch { display: flex; gap: var(--s3); align-items: stretch; border: 1px solid var(--hairline); border-radius: var(--r-md); background: var(--surface); overflow: hidden; }
+.brand-chip { flex: 0 0 96px; display: grid; place-items: center; font-family: var(--font-mono); font-size: 0.6875rem; letter-spacing: 0.02em; }
+.brand-swatch-body { display: flex; flex-direction: column; gap: 2px; padding: var(--s3); min-width: 0; }
+.brand-swatch-name { font-weight: 700; font-size: var(--text-sm); }
+.brand-swatch-use { font-size: var(--text-xs); color: var(--muted); line-height: 1.4; }
+.brand-rules { list-style: none; display: flex; flex-direction: column; gap: var(--s2); margin-top: var(--s3); }
+.brand-rules li { font-size: var(--text-sm); color: var(--ink); padding-left: var(--s4); position: relative; }
+.brand-rules li::before { content: ''; position: absolute; left: 0; top: 0.6em; width: 6px; height: 6px; border-radius: 50%; background: var(--hairline-strong); }
+
+/* ---------- Goals v2: real goal anatomy ---------- */
+.goal-card.v2 { padding: var(--s4) 0; border-top: 1px solid var(--hairline); }
+.goal-card.v2:first-of-type { border-top: none; }
+.goal-obj { font-family: var(--font-display); font-weight: 700; font-size: var(--text-base); }
+.goal-status { flex: none; font-family: var(--font-mono); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; border-radius: 3px; padding: 2px 7px; }
+.goal-status.s-done { color: var(--progress); background: var(--progress-wash); }
+.goal-status.s-ontrack { color: var(--info); background: var(--info-wash); }
+.goal-status.s-behind { color: var(--warn); background: var(--warn-wash); }
+.goal-why { font-size: var(--text-sm); color: var(--muted); line-height: 1.45; margin: var(--s2) 0 var(--s3); max-width: 60ch; }
+.goal-measure { display: flex; align-items: baseline; gap: var(--s3); margin-top: var(--s2); font-size: var(--text-xs); }
+.goal-measure .meas { color: var(--ink); }
+.goal-measure .pct { color: var(--faint); }
+.goal-measure .goal-deadline { margin-left: auto; color: var(--info); font-family: var(--font-mono); }
+.goal-ms { list-style: none; display: flex; flex-direction: column; gap: 5px; margin-top: var(--s3); }
+.goal-ms-item { display: flex; align-items: center; gap: var(--s2); font-size: var(--text-sm); color: var(--muted); }
+.goal-ms-check { flex: none; width: 16px; height: 16px; display: grid; place-items: center; border: 1.5px solid var(--hairline-strong); border-radius: 4px; color: transparent; }
+.goal-ms-item.done .goal-ms-check { background: var(--progress); border-color: var(--progress); color: var(--bg); }
+.goal-ms-item.done { color: var(--ink); }
+.goal-ms-item.done span:last-child { text-decoration: line-through; text-decoration-color: var(--hairline-strong); }

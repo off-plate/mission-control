@@ -113,6 +113,8 @@ export interface RoutineStep {
 
 export interface HabitDef {
   id: string
+  /** Which space this habit belongs to. */
+  space: SpaceId
   name: string
   /** Mon..Sun of the current week. */
   days: boolean[]
@@ -130,6 +132,8 @@ export type RoutineCadence = 'daily' | 'prework' | 'weekly' | 'monthly'
  *  the period; if it mirrors a habit, that habit checks off automatically. */
 export interface Routine {
   id: string
+  /** Which space this routine belongs to. */
+  space: SpaceId
   title: string
   cadence: RoutineCadence
   blurb?: string
@@ -162,6 +166,8 @@ export const GOAL_CATEGORIES: { id: GoalCategory; label: string }[] = [
 /** A sticky note on the Brain Dump board. Categories are #hashtags inside the text. */
 export interface Idea {
   id: string
+  /** Which space this note belongs to. */
+  space: SpaceId
   text: string
   when: string
   color: string

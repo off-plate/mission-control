@@ -21,7 +21,6 @@ export function Band({
     <div className="band">
       <div className="band-day">
         <h1>{title}</h1>
-        {sub && <span className="sub">{sub}</span>}
       </div>
       <div className="band-status">
         {metrics?.map((m) => (
@@ -728,12 +727,13 @@ const DP_ORDER: (TimeSlot | 'anytime')[] = ['morning', 'noon', 'afternoon', 'eve
 const dpLabel = (dp?: TimeSlot) => (dp ? (SLOTS.find((s) => s.id === dp)?.label ?? 'Anytime') : 'Anytime')
 
 export function HabitsPage() {
-  const { habits, addHabit, todayIndex } = useStore()
+  const { habits, space, addHabit, todayIndex } = useStore()
   const [name, setName] = useState('')
   const [daypart, setDaypart] = useState<TimeSlot | ''>('morning')
-  const kept = habits.filter((h) => !h.paused).reduce((a, h) => a + h.days.filter(Boolean).length, 0)
+  const spaceHabits = habits.filter((h) => h.space === space)
+  const kept = spaceHabits.filter((h) => !h.paused).reduce((a, h) => a + h.days.filter(Boolean).length, 0)
 
-  const sorted = [...habits].sort((a, b) => DP_ORDER.indexOf(a.daypart ?? 'anytime') - DP_ORDER.indexOf(b.daypart ?? 'anytime'))
+  const sorted = [...spaceHabits].sort((a, b) => DP_ORDER.indexOf(a.daypart ?? 'anytime') - DP_ORDER.indexOf(b.daypart ?? 'anytime'))
 
   const add = () => {
     if (!name.trim()) return
@@ -743,7 +743,7 @@ export function HabitsPage() {
 
   return (
     <div className="page">
-      <Band title="Habits" sub="the way the day runs" metrics={[{ v: String(kept), k: 'checkoffs this week' }]} />
+      <Band title="Habits" sub={SPACE_LABELS[space]} metrics={[{ v: String(kept), k: 'checkoffs this week' }]} />
       <div className="panel" style={{ marginBottom: 'var(--s5)', maxWidth: 720 }}>
         <div className="formrow" style={{ marginBottom: 0 }}>
           <input
@@ -772,7 +772,7 @@ export function HabitsPage() {
             <HabitRow h={h} todayIndex={todayIndex} />
           </div>
         ))}
-        {habits.length === 0 && <div className="empty">No habits yet. Add one above.</div>}
+        {sorted.length === 0 && <div className="empty">No habits in this space yet. Add one above.</div>}
       </div>
 
       <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginTop: 16 }}>
@@ -785,15 +785,16 @@ export function HabitsPage() {
 /* ---------------- ROUTINES ---------------- */
 
 const CADENCE_ORDER: RoutineCadence[] = ['daily', 'prework', 'weekly', 'monthly']
-const CADENCE_LABEL: Record<RoutineCadence, string> = { daily: 'Daily', prework: 'Before work', weekly: 'Weekly', monthly: 'Monthly' }
 
 export function RoutinesPage() {
-  const { routines, toggleRoutineStep, resetRoutine, habits } = useStore()
-  const sorted = [...routines].sort((a, b) => CADENCE_ORDER.indexOf(a.cadence) - CADENCE_ORDER.indexOf(b.cadence))
+  const { routines, space, toggleRoutineStep, resetRoutine, habits } = useStore()
+  const spaceRoutines = routines.filter((r) => r.space === space)
+  const sorted = [...spaceRoutines].sort((a, b) => CADENCE_ORDER.indexOf(a.cadence) - CADENCE_ORDER.indexOf(b.cadence))
   return (
     <div className="page">
-      <Band title="Routines" sub="what you run on repeat" />
+      <Band title="Routines" sub={SPACE_LABELS[space]} />
       <div className="routine-cards">
+        {sorted.length === 0 && <div className="empty">No routines in this space yet.</div>}
         {sorted.map((r) => {
           if (r.id === 'r-morning') return <MorningRoutine routine={r} key={r.id} />
           const total = r.steps.length
@@ -803,7 +804,6 @@ export function RoutinesPage() {
           return (
             <div className={`panel routine-card${complete ? ' is-complete' : ''}`} key={r.id}>
               <div className="routine-tag">
-                <span className="microcap">{CADENCE_LABEL[r.cadence]}</span>
                 {complete
                   ? <span className="col-tot mono val-pos">done today</span>
                   : <span className="routine-progress mono">{done}/{total}</span>}

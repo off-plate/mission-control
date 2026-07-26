@@ -141,29 +141,45 @@ export const MOCK_TASKS: Task[] = [
     ] },
 ]
 
-/* Mon..Sun. Habits carry a part-of-day so the page groups the way the day runs. */
+/* Mon..Sun. Habits carry a part-of-day so the page groups the way the day runs.
+   Every habit belongs to one space, so each profile shows its own list. */
 export const MOCK_HABITS: HabitDef[] = [
+  // personal
   {
-    id: 'h-morning', name: 'Morning routine', daypart: 'morning', paused: false,
+    id: 'h-morning', space: 'personal', name: 'Morning routine', daypart: 'morning', paused: false,
     days: [true, true, true, false, true, false, false],
     history: [2, 3, 3, 4, 4, 3, 5, 4, 5, 5, 4, 5],
   },
-  { id: 'h2', name: 'Morning check-in', daypart: 'morning', days: [true, true, true, false, true, true, true], paused: false, history: [3, 4, 4, 5, 5, 4, 6, 5, 6, 6, 5, 6] },
-  { id: 'h3', name: '20 min movement', daypart: 'afternoon', days: [false, true, false, true, true, false, false], paused: false, history: [0, 1, 2, 1, 3, 2, 3, 4, 3, 3, 4, 3] },
-  { id: 'h4', name: 'No screens at dinner', daypart: 'evening', days: [false, false, true, true, false, false, false], paused: false, history: [0, 0, 1, 1, 2, 1, 2, 2, 3, 2, 2, 2] },
-  { id: 'h1', name: 'In bed before 1:00', daypart: 'evening', days: [true, true, false, true, false, true, false], paused: false, history: [1, 2, 2, 3, 2, 4, 3, 3, 4, 5, 4, 4] },
-  { id: 'h-prework', name: 'Before work', paused: false, days: [true, true, false, true, false, false, false], history: [1, 2, 2, 3, 2, 3, 3, 2, 3, 4, 3, 3] },
-  { id: 'h-weekly', name: 'Weekly reset', paused: false, days: [false, false, false, false, false, false, false], history: [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1] },
-  { id: 'h-monthly', name: 'Monthly review', paused: false, days: [false, false, false, false, false, false, false], history: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1] },
+  { id: 'h2', space: 'personal', name: 'Morning check-in', daypart: 'morning', days: [true, true, true, false, true, true, true], paused: false, history: [3, 4, 4, 5, 5, 4, 6, 5, 6, 6, 5, 6] },
+  { id: 'h3', space: 'personal', name: '20 min movement', daypart: 'afternoon', days: [false, true, false, true, true, false, false], paused: false, history: [0, 1, 2, 1, 3, 2, 3, 4, 3, 3, 4, 3] },
+  { id: 'h4', space: 'personal', name: 'No screens at dinner', daypart: 'evening', days: [false, false, true, true, false, false, false], paused: false, history: [0, 0, 1, 1, 2, 1, 2, 2, 3, 2, 2, 2] },
+  { id: 'h1', space: 'personal', name: 'In bed before 1:00', daypart: 'evening', days: [true, true, false, true, false, true, false], paused: false, history: [1, 2, 2, 3, 2, 4, 3, 3, 4, 5, 4, 4] },
+  { id: 'h-prework', space: 'personal', name: 'Before work', paused: false, days: [true, true, false, true, false, false, false], history: [1, 2, 2, 3, 2, 3, 3, 2, 3, 4, 3, 3] },
+  { id: 'h-weekly', space: 'personal', name: 'Weekly reset', paused: false, days: [false, false, false, false, false, false, false], history: [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1] },
+  { id: 'h-monthly', space: 'personal', name: 'Monthly review', paused: false, days: [false, false, false, false, false, false, false], history: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1] },
+  // work
+  { id: 'w-h-startup', space: 'work', name: 'Work startup', paused: false, days: [true, true, false, true, false, false, false], history: [3, 3, 4, 3, 4, 4, 3, 4, 4, 3, 4, 4] },
+  { id: 'w-h1', space: 'work', name: 'Deep work block', daypart: 'morning', paused: false, days: [true, false, true, true, false, false, false], history: [2, 3, 2, 3, 3, 2, 4, 3, 3, 4, 3, 3] },
+  { id: 'w-h2', space: 'work', name: 'Inbox to zero', daypart: 'afternoon', paused: false, days: [true, true, true, false, false, false, false], history: [3, 4, 3, 4, 4, 3, 4, 4, 3, 4, 4, 3] },
+  { id: 'w-h-shutdown', space: 'work', name: 'Shutdown ritual', daypart: 'evening', paused: false, days: [true, true, false, false, false, false, false], history: [2, 2, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3] },
+  { id: 'w-h-weekly', space: 'work', name: 'Weekly work review', paused: false, days: [false, false, false, false, false, false, false], history: [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0] },
+  // offplate
+  { id: 'o-h-outreach', space: 'offplate', name: 'Daily outreach', daypart: 'morning', paused: false, days: [true, false, true, false, false, false, false], history: [1, 2, 1, 2, 2, 1, 2, 3, 2, 2, 3, 2] },
+  { id: 'o-h1', space: 'offplate', name: 'Capture one content idea', paused: false, days: [true, true, false, true, false, false, false], history: [2, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2] },
+  { id: 'o-h2', space: 'offplate', name: 'Read 20 min in the field', daypart: 'evening', paused: false, days: [false, true, false, true, false, false, false], history: [1, 1, 2, 1, 2, 2, 1, 2, 2, 1, 2, 2] },
+  { id: 'o-h-weekly', space: 'offplate', name: 'Weekly pipeline review', paused: false, days: [false, false, false, false, false, false, false], history: [1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1] },
 ]
 
 export const MOCK_IDEAS: Idea[] = [
-  { id: 'idea-rubberband', text: 'Rubber band on my wrist — snap it whenever I catch myself doing something I do not want to do (doomscroll, avoidance, overstimulation). A pattern interrupt, not punishment. Later: track the catches so they trend down over time. #tools', when: 'idea', color: 'amber' },
+  { id: 'idea-rubberband', space: 'personal', text: 'Rubber band on my wrist — snap it whenever I catch myself doing something I do not want to do (doomscroll, avoidance, overstimulation). A pattern interrupt, not punishment. Later: track the catches so they trend down over time. #tools', when: 'idea', color: 'amber' },
+  { id: 'idea-work-1', space: 'work', text: 'A starter repo I can clone for every new project so I stop re-scaffolding the same setup each time. #tools', when: 'idea', color: 'blue' },
+  { id: 'idea-offplate-1', space: 'offplate', text: 'Offer a free 20-minute automation teardown as the lead magnet. Show one process, name where the hours go, no pitch. #offers', when: 'idea', color: 'green' },
 ]
 
 export const MOCK_ROUTINES: Routine[] = [
+  // personal
   {
-    id: 'r-morning', title: 'Morning routine', cadence: 'daily', habitId: 'h-morning',
+    id: 'r-morning', space: 'personal', title: 'Morning routine', cadence: 'daily', habitId: 'h-morning',
     blurb: 'The four things that start the day right. Check them off as you go; finishing all four ticks the Morning routine habit for today.',
     doneStepIds: [],
     steps: [
@@ -175,7 +191,7 @@ export const MOCK_ROUTINES: Routine[] = [
     ],
   },
   {
-    id: 'r-prework', title: 'Before work', cadence: 'prework', habitId: 'h-prework',
+    id: 'r-prework', space: 'personal', title: 'Before work', cadence: 'prework', habitId: 'h-prework',
     blurb: 'Run this before you start any focused work, so you begin clear instead of scattered.',
     doneStepIds: [],
     steps: [
@@ -186,7 +202,7 @@ export const MOCK_ROUTINES: Routine[] = [
     ],
   },
   {
-    id: 'r-weekly', title: 'Weekly reset', cadence: 'weekly', habitId: 'h-weekly',
+    id: 'r-weekly', space: 'personal', title: 'Weekly reset', cadence: 'weekly', habitId: 'h-weekly',
     blurb: 'Sunday, fifteen minutes. Close the week and set up the next one.',
     doneStepIds: [],
     steps: [
@@ -197,7 +213,7 @@ export const MOCK_ROUTINES: Routine[] = [
     ],
   },
   {
-    id: 'r-monthly', title: 'Monthly review', cadence: 'monthly', habitId: 'h-monthly',
+    id: 'r-monthly', space: 'personal', title: 'Monthly review', cadence: 'monthly', habitId: 'h-monthly',
     blurb: 'Once a month, the wider look. Where the money and the goals actually stand.',
     doneStepIds: [],
     steps: [
@@ -205,6 +221,63 @@ export const MOCK_ROUTINES: Routine[] = [
       { id: 'mo2', title: 'Review the goals', kind: 'do', note: 'Which are on track, which drifted, which to drop.' },
       { id: 'mo3', title: 'Cancel what you do not use', kind: 'do', note: 'Subscriptions and services quietly draining money.' },
       { id: 'mo4', title: 'Set the month ahead', kind: 'do', note: 'One theme, three outcomes. Keep it small enough to actually hit.' },
+    ],
+  },
+  // work
+  {
+    id: 'w-r-startup', space: 'work', title: 'Work startup', cadence: 'prework', habitId: 'w-h-startup',
+    blurb: 'Run this before the first focused block so you start clear, not reactive.',
+    doneStepIds: [],
+    steps: [
+      { id: 'wsr1', title: 'Read the board, not the inbox', kind: 'do', note: 'Open the tickets first. The inbox can wait until the deep block is done.' },
+      { id: 'wsr2', title: 'Pick the one ticket that matters', kind: 'do', note: 'The single outcome for the morning. Move it to In Progress.' },
+      { id: 'wsr3', title: 'Silence notifications', kind: 'do', note: 'Slack and mail closed. Decide the time you will check them next.' },
+      { id: 'wsr4', title: 'Start the block', kind: 'do', note: 'Open the Pomodoro and begin before standup pulls you sideways.' },
+    ],
+  },
+  {
+    id: 'w-r-shutdown', space: 'work', title: 'Work shutdown', cadence: 'daily', habitId: 'w-h-shutdown',
+    blurb: 'Close the workday cleanly so it does not leak into the evening.',
+    doneStepIds: [],
+    steps: [
+      { id: 'wsd1', title: 'Update the board', kind: 'do', note: 'Move every ticket to where it actually is. No optimistic columns.' },
+      { id: 'wsd2', title: 'Note tomorrow’s first move', kind: 'do', note: 'One line, so the morning starts without deciding.' },
+      { id: 'wsd3', title: 'Inbox to a stopping point', kind: 'do', note: 'Reply to anything blocking someone, file the rest, close the tab.' },
+      { id: 'wsd4', title: 'Say you are done', kind: 'do', note: 'Actually stop. The laptop closes, the work stays at work.' },
+    ],
+  },
+  {
+    id: 'w-r-weekly', space: 'work', title: 'Weekly work review', cadence: 'weekly', habitId: 'w-h-weekly',
+    blurb: 'Friday, fifteen minutes. Close the week and line up the next one.',
+    doneStepIds: [],
+    steps: [
+      { id: 'wwr1', title: 'What shipped', kind: 'do', note: 'List what actually went out. Facts, not effort.' },
+      { id: 'wwr2', title: 'What is stuck and why', kind: 'do', note: 'Name the blockers out loud so Monday you can clear them.' },
+      { id: 'wwr3', title: 'Prep next week’s priorities', kind: 'do', note: 'The three outcomes that matter, onto the board.' },
+      { id: 'wwr4', title: 'Clear the review backlog', kind: 'do', note: 'Open PRs reviewed or handed off before the weekend.' },
+    ],
+  },
+  // offplate
+  {
+    id: 'o-r-outreach', space: 'offplate', title: 'Daily outreach', cadence: 'daily', habitId: 'o-h-outreach',
+    blurb: 'One deliberate outreach action a day. Small and consistent beats a burst then silence.',
+    doneStepIds: [],
+    steps: [
+      { id: 'oor1', title: 'Pick one person', kind: 'do', note: 'A real business, a real name. Not a list, one contact.' },
+      { id: 'oor2', title: 'Find the specific hook', kind: 'do', note: 'One concrete thing about them you can point to. No generic opener.' },
+      { id: 'oor3', title: 'Write two sentences', kind: 'do', note: 'What you noticed, what you can do. Short enough to read on a phone.' },
+      { id: 'oor4', title: 'Send it and log it', kind: 'do', note: 'One sent. Note it against the weekly target.' },
+    ],
+  },
+  {
+    id: 'o-r-weekly', space: 'offplate', title: 'Weekly pipeline review', cadence: 'weekly', habitId: 'o-h-weekly',
+    blurb: 'Sunday, look at the pipeline honestly. What moved, what stalled, what to chase.',
+    doneStepIds: [],
+    steps: [
+      { id: 'owr1', title: 'Count the week’s outreach', kind: 'do', note: 'Emails sent, replies in. The real numbers, not the intended ones.' },
+      { id: 'owr2', title: 'Move each lead one step or drop it', kind: 'do', note: 'Every conversation goes forward or comes off the board. No limbo.' },
+      { id: 'owr3', title: 'Draft next week’s content', kind: 'do', note: 'One post outline from something that actually happened this week.' },
+      { id: 'owr4', title: 'Set the outreach target', kind: 'do', note: 'The number of contacts for next week. Small enough to hit every day.' },
     ],
   },
 ]

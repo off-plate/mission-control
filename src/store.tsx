@@ -34,10 +34,10 @@ import type {
   WidgetType,
 } from './types'
 
-export const STORAGE_KEY = 'mission-control-demo-v10'
+export const STORAGE_KEY = 'mission-control-demo-v11'
 
 interface PersistedState {
-  version: 2
+  version: 3
   spaces: Record<SpaceId, WidgetInstance[]>
   tasks: Task[]
   habits: HabitDef[]
@@ -130,7 +130,7 @@ function loadPersisted(): PersistedState | null {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const p = JSON.parse(raw) as PersistedState
-    return p.version === 2 ? p : null
+    return p.version === 3 ? p : null
   } catch {
     return null
   }
@@ -205,7 +205,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const state: PersistedState = {
-      version: 2, spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
+      version: 3, spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
     }
     const json = JSON.stringify(state)
     try {
@@ -232,7 +232,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   )
 
   const value: Store = {
-    version: 2,
+    version: 3,
     spaces, tasks, habits, goals, ledger, social, sources, plan, review, routines, ideas,
     space, setSpace,
     page, setPage,
@@ -331,7 +331,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ),
       ),
     addHabit: (name, daypart) =>
-      setHabits((prev) => [...prev, { id: `h-${++uid}`, name, daypart, days: [false, false, false, false, false, false, false], paused: false }]),
+      setHabits((prev) => [...prev, { id: `h-${++uid}`, space, name, daypart, days: [false, false, false, false, false, false, false], paused: false }]),
     togglePauseHabit: (id) =>
       setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, paused: !h.paused } : h))),
     deleteHabit: (id) => setHabits((prev) => prev.filter((h) => h.id !== id)),
@@ -463,7 +463,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     addIdea: (text, color) => {
       const t = text.trim()
       if (!t) return
-      setIdeas((prev) => [{ id: `idea-${++uid}`, text: t, when: 'just now', color }, ...prev])
+      setIdeas((prev) => [{ id: `idea-${++uid}`, space, text: t, when: 'just now', color }, ...prev])
     },
     setIdeaColor: (id, color) => setIdeas((prev) => prev.map((i) => (i.id === id ? { ...i, color } : i))),
     deleteIdea: (id) => setIdeas((prev) => prev.filter((i) => i.id !== id)),

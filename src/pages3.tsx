@@ -143,13 +143,15 @@ function renderNote(t: string) {
 }
 
 export function BrainDumpPage() {
-  const { ideas, addIdea, setIdeaColor } = useStore()
+  const { ideas, space, addIdea, setIdeaColor } = useStore()
   const [text, setText] = useState('')
   const [color, setColor] = useState('amber')
   const [activeTag, setActiveTag] = useState<string | null>(null)
 
-  const allTags = Array.from(new Set(ideas.flatMap((i) => tagsOf(i.text).map((t) => t.toLowerCase()))))
-  const shown = activeTag ? ideas.filter((i) => tagsOf(i.text).some((t) => t.toLowerCase() === activeTag)) : ideas
+  const spaceIdeas = ideas.filter((i) => i.space === space)
+  const allTags = Array.from(new Set(spaceIdeas.flatMap((i) => tagsOf(i.text).map((t) => t.toLowerCase()))))
+  const tag = activeTag && allTags.includes(activeTag) ? activeTag : null
+  const shown = tag ? spaceIdeas.filter((i) => tagsOf(i.text).some((t) => t.toLowerCase() === tag)) : spaceIdeas
   const submit = () => { if (!text.trim()) return; addIdea(text, color); setText('') }
 
   return (
@@ -158,9 +160,9 @@ export function BrainDumpPage() {
 
       {allTags.length > 0 && (
         <div className="note-filter">
-          <button className={`note-chip${!activeTag ? ' on' : ''}`} onClick={() => setActiveTag(null)}>all</button>
+          <button className={`note-chip${!tag ? ' on' : ''}`} onClick={() => setActiveTag(null)}>all</button>
           {allTags.map((t) => (
-            <button key={t} className={`note-chip${activeTag === t ? ' on' : ''}`} onClick={() => setActiveTag(activeTag === t ? null : t)}>{t}</button>
+            <button key={t} className={`note-chip${tag === t ? ' on' : ''}`} onClick={() => setActiveTag(tag === t ? null : t)}>{t}</button>
           ))}
         </div>
       )}

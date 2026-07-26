@@ -1456,3 +1456,7 @@ a.pron-src:hover { color: var(--accent); text-decoration: underline; }
 .mr-step.open .mr-num { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
 /* Goal status chips carry more weight. */
 .goal-status { font-weight: 700; }
+
+/* Titles carry the colour; redundant eyebrow subtitles removed. */
+.band h1 { color: var(--accent); }
+.routine-card-title { color: var(--accent); }

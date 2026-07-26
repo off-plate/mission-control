@@ -19,13 +19,15 @@ function Logo() {
   )
 }
 
-const NAV: { id: PageId; label: string; personalOnly?: boolean }[] = [
+/* Every space shows the same menu. What changes between spaces is the content of
+   each page, never which pages exist. */
+const NAV: { id: PageId; label: string }[] = [
   { id: 'today', label: 'Today' },
   { id: 'plan', label: 'Plan' },
   { id: 'habits', label: 'Habits' },
   { id: 'routines', label: 'Routines' },
   { id: 'goals', label: 'Goals' },
-  { id: 'money', label: 'Money', personalOnly: true },
+  { id: 'money', label: 'Money' },
   { id: 'review', label: 'Review' },
   { id: 'braindump', label: 'Brain Dump' },
   { id: 'coach', label: 'Coach' },
@@ -65,7 +67,7 @@ export default function App() {
   const [decomposeOpen, setDecomposeOpen] = useState(false)
   const exceptions = MOCK_EXCEPTIONS_FOR(space)
 
-  const tabs = NAV.filter((t) => !t.personalOnly || space === 'personal')
+  const tabs = NAV
 
   return (
     <div className="shell">
@@ -81,7 +83,7 @@ export default function App() {
               key={s}
               className="space-btn"
               aria-pressed={space === s}
-              onClick={() => { setSpace(s); if (s !== 'personal' && page === 'money') setPage('today') }}
+              onClick={() => setSpace(s)}
             >
               {SPACE_LABELS[s]}
             </button>

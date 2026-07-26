@@ -192,7 +192,6 @@ export function MorningRoutine({ routine }: { routine: Routine }) {
   return (
     <div className="panel routine-card mr-card">
       <div className="routine-tag">
-        <span className="microcap">Daily</span>
         {doneCount === total
           ? <span className="col-tot mono val-pos">done today</span>
           : <span className="routine-progress mono">{doneCount}/{total}</span>}

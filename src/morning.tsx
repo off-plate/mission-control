@@ -3,11 +3,12 @@ import { useStore } from './store'
 import { FALLBACK_NEWS, loadMorningNews, twistersForDay, type MorningNews } from './morning-data'
 import type { Routine } from './types'
 
-/* The Morning routine as a guided, foldable accordion. Finishing a step collapses
-   it with a check and opens the next. Meditation runs a 10s settle countdown then
-   a 10-minute timer with a chime at the start and end; pronunciation reads today's
-   real AI-news paragraphs; mouth stretch shows three rotating full-sentence tongue
-   twisters. Completing every step checks the Morning routine habit for the day. */
+/* The Morning routine as a guided, foldable accordion. Every step starts collapsed;
+   you open one to work through it and check it off yourself with the checkbox, same
+   as every other routine. Checking a step collapses it and opens the next. Meditation
+   runs a 10s settle countdown then a 10-minute timer with a chime at the start and
+   end; pronunciation reads today's real AI-news paragraphs; mouth stretch shows three
+   rotating full-sentence tongue twisters. Completing all four checks the habit. */
 
 const PREP_SECONDS = 10
 const MED_SECONDS = 600
@@ -45,16 +46,8 @@ function chime(times = 1) {
   } catch { /* audio not available; the timer still works */ }
 }
 
-function DoneButton({ done, onClick }: { done: boolean; onClick: () => void }) {
-  return (
-    <button className={`btn ${done ? 'btn-ghost' : 'btn-primary'} mr-done`} onClick={onClick}>
-      {done ? 'Done ✓  ·  redo' : 'Mark done'}
-    </button>
-  )
-}
-
 /* ---- Meditation ---- */
-function Meditation({ url, done, onComplete }: { url?: string; done: boolean; onComplete: () => void }) {
+function Meditation({ url, onEnd }: { url?: string; onEnd: () => void }) {
   const id = ytId(url)
   const [phase, setPhase] = useState<'idle' | 'prep' | 'run' | 'ended'>('idle')
   const [left, setLeft] = useState(PREP_SECONDS)
@@ -68,7 +61,7 @@ function Meditation({ url, done, onComplete }: { url?: string; done: boolean; on
 
   useEffect(() => {
     if (phase === 'prep' && left <= 0) { chime(1); setPhase('run'); setLeft(MED_SECONDS) }
-    else if (phase === 'run' && left <= 0) { chime(2); setPhase('ended'); if (!done) onComplete() }
+    else if (phase === 'run' && left <= 0) { chime(2); setPhase('ended'); onEnd() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [left, phase])
 
@@ -97,7 +90,7 @@ function Meditation({ url, done, onComplete }: { url?: string; done: boolean; on
           {phase === 'idle' && 'Press play above, then Start. A chime marks the real beginning and the end.'}
           {phase === 'prep' && 'Get comfortable. The 10 minutes begin on the chime.'}
           {phase === 'run' && 'Follow the breath. A double chime will tell you when time is up.'}
-          {phase === 'ended' && 'That is ten minutes. Checked off for today.'}
+          {phase === 'ended' && 'That is ten minutes. Check it off above when you are ready.'}
         </span>
         <div className="med-controls">
           {phase === 'idle' && <button className="btn btn-primary" onClick={start}>Start</button>}
@@ -105,13 +98,12 @@ function Meditation({ url, done, onComplete }: { url?: string; done: boolean; on
           {phase === 'ended' && <button className="btn btn-ghost" onClick={reset}>Again</button>}
         </div>
       </div>
-      <DoneButton done={done} onClick={onComplete} />
     </div>
   )
 }
 
 /* ---- Pronunciation: read today's real AI-news paragraphs aloud ---- */
-function Pronunciation({ done, onComplete }: { done: boolean; onComplete: () => void }) {
+function Pronunciation() {
   const [news, setNews] = useState<MorningNews | null>(null)
   useEffect(() => { loadMorningNews().then(setNews) }, [])
   const n = news ?? FALLBACK_NEWS
@@ -128,13 +120,12 @@ function Pronunciation({ done, onComplete }: { done: boolean; onComplete: () => 
         <p>{n.cs.text}</p>
         {n.cs.url ? <a className="pron-src" href={n.cs.url} target="_blank" rel="noreferrer">{n.cs.source} ↗</a> : <span className="pron-src">{n.cs.source}</span>}
       </div>
-      <DoneButton done={done} onClick={onComplete} />
     </div>
   )
 }
 
 /* ---- Mouth stretch: three rotating full-sentence tongue twisters ---- */
-function MouthStretch({ done, onComplete }: { done: boolean; onComplete: () => void }) {
+function MouthStretch() {
   const { group, items } = twistersForDay()
   return (
     <div className="mr-stretch">
@@ -147,18 +138,16 @@ function MouthStretch({ done, onComplete }: { done: boolean; onComplete: () => v
           </li>
         ))}
       </ol>
-      <DoneButton done={done} onClick={onComplete} />
     </div>
   )
 }
 
 /* ---- Typing ---- */
-function Typing({ url, label, done, onComplete }: { url?: string; label?: string; done: boolean; onComplete: () => void }) {
+function Typing({ url, label }: { url?: string; label?: string }) {
   return (
     <div className="mr-typing">
       <p className="mr-lead">One quick round to wake the hands up.</p>
       {url && <a className="btn btn-quiet" href={url} target="_blank" rel="noreferrer">{label ?? 'Open typing test'} ↗</a>}
-      <DoneButton done={done} onClick={onComplete} />
     </div>
   )
 }
@@ -167,8 +156,7 @@ export function MorningRoutine({ routine }: { routine: Routine }) {
   const { toggleRoutineStep } = useStore()
   const steps = routine.steps
   const done = routine.doneStepIds
-  const firstUndone = steps.findIndex((s) => !done.includes(s.id))
-  const [open, setOpen] = useState<string>(steps[firstUndone === -1 ? 0 : firstUndone]?.id ?? '')
+  const [open, setOpen] = useState<string>('') // everything collapsed until you open a step
 
   const onComplete = (id: string) => {
     const wasDone = done.includes(id)
@@ -182,12 +170,10 @@ export function MorningRoutine({ routine }: { routine: Routine }) {
 
   const body = (stepId: string) => {
     const s = steps.find((x) => x.id === stepId)!
-    const isDone = done.includes(stepId)
-    const complete = () => onComplete(stepId)
-    if (stepId === 'mr1') return <Meditation url={s.link} done={isDone} onComplete={complete} />
-    if (stepId === 'mr2') return <Pronunciation done={isDone} onComplete={complete} />
-    if (stepId === 'mr3') return <MouthStretch done={isDone} onComplete={complete} />
-    return <Typing url={s.link} label={s.linkLabel} done={isDone} onComplete={complete} />
+    if (stepId === 'mr1') return <Meditation url={s.link} onEnd={() => { if (!done.includes('mr1')) onComplete('mr1') }} />
+    if (stepId === 'mr2') return <Pronunciation />
+    if (stepId === 'mr3') return <MouthStretch />
+    return <Typing url={s.link} label={s.linkLabel} />
   }
 
   const total = steps.length
@@ -205,17 +191,27 @@ export function MorningRoutine({ routine }: { routine: Routine }) {
       {routine.blurb && <p className="routine-blurb">{routine.blurb}</p>}
 
       <div className="mr-accordion">
-        {steps.map((s, i) => {
+        {steps.map((s) => {
           const isDone = done.includes(s.id)
           const isOpen = open === s.id
           return (
             <div className={`mr-step${isOpen ? ' open' : ''}${isDone ? ' done' : ''}`} key={s.id}>
-              <button className="mr-head" onClick={() => setOpen(isOpen ? '' : s.id)} aria-expanded={isOpen}>
-                <span className="mr-num" aria-hidden="true">{isDone ? '✓' : i + 1}</span>
-                <span className="mr-title">{s.title}</span>
-                <span className="mr-status">{isDone ? 'done' : isOpen ? 'now' : 'to do'}</span>
-                <svg className="mr-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              </button>
+              <div className="mr-head">
+                <button
+                  className="routine-check mr-check"
+                  role="checkbox"
+                  aria-checked={isDone}
+                  aria-label={`Mark ${s.title} ${isDone ? 'not done' : 'done'}`}
+                  onClick={() => onComplete(s.id)}
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </button>
+                <button className="mr-head-main" onClick={() => setOpen(isOpen ? '' : s.id)} aria-expanded={isOpen}>
+                  <span className="mr-title">{s.title}</span>
+                  <span className="mr-status">{isDone ? 'done' : isOpen ? 'now' : 'to do'}</span>
+                  <svg className="mr-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </button>
+              </div>
               {isOpen && <div className="mr-body">{body(s.id)}</div>}
             </div>
           )

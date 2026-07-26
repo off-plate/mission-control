@@ -1314,17 +1314,11 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 /* ---------- Morning routine: guided foldable accordion ---------- */
 .mr-accordion { margin-top: var(--s4); border-top: 1px solid var(--hairline); }
 .mr-step { border-bottom: 1px solid var(--hairline); }
-.mr-head {
-  display: flex; align-items: center; gap: var(--s3); width: 100%; text-align: left;
-  padding: var(--s4) var(--s1); color: var(--ink);
-}
-.mr-head:hover { color: var(--accent); }
-.mr-num {
-  flex: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%;
-  border: 1px solid var(--hairline-strong); font-family: var(--font-mono); font-size: 0.8125rem; color: var(--muted);
-}
-.mr-step.done .mr-num { background: var(--progress); border-color: var(--progress); color: var(--bg); }
-.mr-step.open .mr-num { border-color: var(--accent); color: var(--accent); }
+.mr-head { display: flex; align-items: center; gap: var(--s3); padding: var(--s4) var(--s1); }
+.mr-check { flex: none; }
+.mr-step.done .mr-check { background: var(--progress); border-color: var(--progress); color: var(--bg); }
+.mr-head-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--s3); text-align: left; color: var(--ink); }
+.mr-head-main:hover { color: var(--accent); }
 .mr-title { flex: 1; min-width: 0; font-family: var(--font-display); font-weight: 700; font-size: var(--text-base); }
 .mr-step.done .mr-title { color: var(--muted); }
 .mr-status { font-family: var(--font-mono); font-size: 0.6875rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }

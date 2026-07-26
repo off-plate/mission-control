@@ -27,8 +27,8 @@ const NAV: { id: PageId; label: string; personalOnly?: boolean }[] = [
   { id: 'goals', label: 'Goals' },
   { id: 'money', label: 'Money', personalOnly: true },
   { id: 'review', label: 'Review' },
-  { id: 'coach', label: 'Coach' },
   { id: 'braindump', label: 'Brain Dump' },
+  { id: 'coach', label: 'Coach' },
 ]
 
 function PageNav({

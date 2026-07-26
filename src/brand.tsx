@@ -1,56 +1,120 @@
-import { Band } from './pages1'
 import { useStore } from './store'
 
-/* The design system, documented on a page reachable only from Settings. This is the
-   current state, gathered from the app's own tokens, so we can review it together and
-   then adjust. It eats its own dog food: built with the same tokens it describes. */
+/* Brand & guidelines for the production site, in the WARM direction explored in
+   Claude Design. This page is rendered in that direction (its own scoped tokens and
+   fonts) so it is both the spec and a live preview. Review it, we fix what's wrong,
+   then apply it to the rest of the app. Nothing here changes the other pages yet. */
 
-type Swatch = { name: string; hex: string; use: string; ink?: string }
+const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap');
+.bg-guide{
+  --bg:#f4efe4;--card:#fbf8f1;--surf2:#ece6d8;--ink:#1a1712;--muted:#6d6656;--faint:#9a9282;
+  --line:rgba(26,23,18,.10);--line2:rgba(26,23,18,.16);
+  --accent:#d1502a;--accent-soft:rgba(209,80,42,.10);
+  --alert:#9e2b12;--green:#3f6b46;--green-soft:rgba(63,107,70,.12);--amber:#b06612;--amber-soft:rgba(176,102,18,.12);--info:#55606e;--info-soft:rgba(85,96,110,.10);
+  --disp:'Bricolage Grotesque',system-ui,sans-serif;--sans:'Instrument Sans',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace;
+  background:var(--bg);color:var(--ink);font-family:var(--sans);border:1px solid var(--line);border-radius:22px;padding:clamp(28px,4vw,64px);margin-top:12px;
+  background-image:radial-gradient(circle at 1px 1px,rgba(26,23,18,.035) 1px,transparent 0);background-size:22px 22px;
+}
+.bg-guide *{box-sizing:border-box}
+.bg-guide .top{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:26px}
+.bg-guide .ey{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+.bg-guide h1{font-family:var(--disp);font-weight:800;font-size:clamp(34px,4.4vw,56px);line-height:.98;letter-spacing:-.025em;margin-top:8px}
+.bg-guide h1 em{font-style:normal;color:var(--accent)}
+.bg-guide .lede{color:var(--muted);font-size:16px;max-width:56ch;line-height:1.55;margin-top:16px}
+.bg-guide .back{font-family:var(--sans);font-weight:600;font-size:13.5px;color:var(--ink);background:var(--card);border:1px solid var(--line2);border-radius:11px;padding:10px 15px;cursor:pointer;white-space:nowrap}
+.bg-guide section{margin-top:52px}
+.bg-guide .sh{display:flex;align-items:baseline;gap:14px;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:22px}
+.bg-guide .sh h2{font-family:var(--disp);font-weight:700;font-size:22px;letter-spacing:-.01em}
+.bg-guide .sh span{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
 
-const SURFACES: Swatch[] = [
-  { name: 'Page', hex: '#f4f1e9', use: 'The warm paper background behind everything' },
-  { name: 'Surface', hex: '#fdfcf8', use: 'Cards and panels, one step lighter than the page' },
-  { name: 'Surface 2', hex: '#ece8dc', use: 'Insets, wells, the meditation stage' },
+/* swatches */
+.bg-guide .sw{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.bg-guide .chip{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card)}
+.bg-guide .chip .col{height:78px;display:flex;align-items:flex-end;padding:10px 12px}
+.bg-guide .chip .hex{font-family:var(--mono);font-size:11px;background:rgba(255,255,255,.82);color:#1a1712;padding:3px 7px;border-radius:5px}
+.bg-guide .chip .cb{padding:12px 14px}
+.bg-guide .chip .nm{font-weight:700;font-size:14px}
+.bg-guide .chip .us{font-size:12.5px;color:var(--muted);line-height:1.4;margin-top:3px}
+
+/* type */
+.bg-guide .spec{border:1px solid var(--line);border-radius:16px;background:var(--card);padding:26px;margin-bottom:14px}
+.bg-guide .spec .role{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.bg-guide .spec .big{margin:6px 0 10px;letter-spacing:-.02em}
+.bg-guide .spec .use{font-size:13.5px;color:var(--muted)}
+.bg-guide .scale{display:flex;flex-wrap:wrap;gap:6px 20px;margin-top:14px;font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+
+/* components preview */
+.bg-guide .cprev{display:grid;grid-template-columns:1.3fr 1fr;gap:16px}
+.bg-guide .demo{border:1px solid var(--line);border-radius:16px;background:var(--card);padding:22px}
+.bg-guide .demo .lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:14px}
+.bg-guide .btn{border:none;font-family:var(--sans);font-weight:600;font-size:14px;padding:12px 18px;border-radius:12px;cursor:pointer;display:inline-flex;gap:8px;align-items:center}
+.bg-guide .btn.acc{background:var(--accent);color:#fff}
+.bg-guide .btn.ink{background:var(--ink);color:var(--bg)}
+.bg-guide .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line2)}
+.bg-guide .pills{display:flex;gap:8px;flex-wrap:wrap}
+.bg-guide .pill{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;padding:5px 10px;border-radius:7px}
+.bg-guide .pill.now{background:var(--accent-soft);color:var(--accent)}
+.bg-guide .pill.done{background:var(--green-soft);color:var(--green)}
+.bg-guide .pill.warn{background:var(--amber-soft);color:var(--amber)}
+.bg-guide .pill.data{background:var(--info-soft);color:var(--info)}
+.bg-guide .focus{background:var(--ink);color:var(--bg);border-radius:16px;padding:22px 24px;position:relative;overflow:hidden}
+.bg-guide .focus::after{content:'';position:absolute;right:-40px;top:-40px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(209,80,42,.5),transparent 65%)}
+.bg-guide .focus .t{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:rgba(244,239,228,.6)}
+.bg-guide .focus .h{font-family:var(--disp);font-weight:700;font-size:20px;line-height:1.15;margin-top:8px;max-width:22ch}
+.bg-guide .barwrap{height:6px;border-radius:99px;background:rgba(26,23,18,.08);overflow:hidden;margin-top:16px}
+.bg-guide .barwrap i{display:block;height:100%;border-radius:99px;background:var(--accent)}
+.bg-guide .barwrap.g i{background:var(--green)}
+.bg-guide .card-demo{border:1px solid var(--line);border-radius:16px;background:var(--card);padding:18px 20px}
+.bg-guide .card-demo h4{font-family:var(--disp);font-weight:700;font-size:14px;display:flex;align-items:center}
+.bg-guide .card-demo h4 .k{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--faint)}
+.bg-guide .card-demo .kpi{font-family:var(--disp);font-weight:800;font-size:32px;margin:8px 0 2px}
+
+/* rules */
+.bg-guide .rules{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.bg-guide .rules .col{border:1px solid var(--line);border-radius:16px;background:var(--card);padding:20px 22px}
+.bg-guide .rules .rl{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.bg-guide .rules ul{list-style:none;margin-top:12px;display:flex;flex-direction:column;gap:9px}
+.bg-guide .rules li{font-size:14px;line-height:1.4;padding-left:18px;position:relative}
+.bg-guide .rules li::before{content:'';position:absolute;left:0;top:.55em;width:6px;height:6px;border-radius:50%;background:var(--line2)}
+
+/* meta table */
+.bg-guide .meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.bg-guide .meta .m{border:1px solid var(--line);border-radius:14px;background:var(--card);padding:16px 18px}
+.bg-guide .meta .m .lab{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+.bg-guide .meta .m .val{font-family:var(--mono);font-size:14px;margin-top:8px;color:var(--ink);line-height:1.6}
+.bg-guide .note{font-size:12.5px;color:var(--faint);margin-top:26px;max-width:74ch;line-height:1.6}
+@media(max-width:820px){.bg-guide .cprev,.bg-guide .rules{grid-template-columns:1fr}}
+`
+
+type Sw = { name: string; hex: string; use: string; ink?: string }
+const SURFACES: Sw[] = [
+  { name: 'Paper', hex: '#f4efe4', use: 'The warm background behind everything' },
+  { name: 'Card', hex: '#fbf8f1', use: 'Panels and cards, one step lighter than paper' },
+  { name: 'Surface 2', hex: '#ece6d8', use: 'Wells, insets, the meditation stage' },
 ]
-const INK: Swatch[] = [
-  { name: 'Ink', hex: '#16150f', use: 'Primary text and headings', ink: '#fdfcf8' },
-  { name: 'Muted', hex: '#57534a', use: 'Secondary text, labels', ink: '#fdfcf8' },
-  { name: 'Faint', hex: '#6e6a5b', use: 'Captions, timestamps, fine print', ink: '#fdfcf8' },
+const INK: Sw[] = [
+  { name: 'Ink', hex: '#1a1712', use: 'Headings and primary text', ink: '#fbf8f1' },
+  { name: 'Muted', hex: '#6d6656', use: 'Body, secondary text, labels', ink: '#fbf8f1' },
+  { name: 'Faint', hex: '#9a9282', use: 'Captions, timestamps, fine print', ink: '#fbf8f1' },
 ]
-const SEMANTIC: Swatch[] = [
-  { name: 'Accent', hex: '#0b3d91', use: 'Interactive: anything you can click. Also the active space identity', ink: '#fff' },
-  { name: 'Alert / coral', hex: '#b23415', use: 'Urgent, out of band, debt and overdue. Never decorative', ink: '#fff' },
-  { name: 'Progress / green', hex: '#23624a', use: 'Positive, done, yours, money you have. Never used for debt', ink: '#fff' },
-  { name: 'Info / slate', hex: '#55606e', use: 'Plain data, so information reads as information', ink: '#fff' },
-  { name: 'Warn / amber', hex: '#b06612', use: 'At risk, needs attention but not urgent', ink: '#fff' },
-]
-const SPACES: Swatch[] = [
-  { name: 'Personal', hex: '#0b3d91', use: 'Flight blue, the default accent', ink: '#fff' },
-  { name: 'Work', hex: '#0f5f5a', use: 'Teal, when the Work space is active', ink: '#fff' },
-  { name: 'Off-Plate', hex: '#8a6410', use: 'Gold, when the Off-Plate space is active', ink: '#fff' },
-]
-const CATEGORY: Swatch[] = [
-  { name: 'Call', hex: '#b5654a', use: 'Category dot only', ink: '#fff' },
-  { name: 'Admin', hex: '#5b6e8c', use: 'Category dot only', ink: '#fff' },
-  { name: 'Deep', hex: '#8a6a4f', use: 'Category dot only', ink: '#fff' },
-  { name: 'Quick', hex: '#4e8a88', use: 'Category dot only', ink: '#fff' },
+const MEANING: Sw[] = [
+  { name: 'Accent — burnt orange', hex: '#d1502a', use: 'Interactive: anything you can act on. The one accent.', ink: '#fff' },
+  { name: 'Alert — brick', hex: '#9e2b12', use: 'Urgent and overdue. Rare, high alarm. Never decorative.', ink: '#fff' },
+  { name: 'Progress — green', hex: '#3f6b46', use: 'Done, yours, money you have. Never for debt.', ink: '#fff' },
+  { name: 'At risk — amber', hex: '#b06612', use: 'Behind or needs attention, not yet urgent.', ink: '#fff' },
+  { name: 'Data — slate', hex: '#55606e', use: 'Plain information, so data reads as data.', ink: '#fff' },
 ]
 
-function SwatchRow({ title, note, items }: { title: string; note?: string; items: Swatch[] }) {
+function Swatches({ items }: { items: Sw[] }) {
   return (
-    <div className="brand-block">
-      <div className="review-sec"><span className="microcap">{title}</span>{note && <span className="review-sec-note">{note}</span>}</div>
-      <div className="brand-swatches">
-        {items.map((s) => (
-          <div className="brand-swatch" key={s.name}>
-            <div className="brand-chip" style={{ background: s.hex, color: s.ink ?? '#16150f' }}>{s.hex}</div>
-            <div className="brand-swatch-body">
-              <span className="brand-swatch-name">{s.name}</span>
-              <span className="brand-swatch-use">{s.use}</span>
-            </div>
-          </div>
-        ))}
-      </div>
+    <div className="sw">
+      {items.map((s) => (
+        <div className="chip" key={s.name}>
+          <div className="col" style={{ background: s.hex }}><span className="hex">{s.hex}</span></div>
+          <div className="cb"><div className="nm">{s.name}</div><div className="us">{s.use}</div></div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -58,95 +122,124 @@ function SwatchRow({ title, note, items }: { title: string; note?: string; items
 export function BrandPage() {
   const { setPage } = useStore()
   return (
-    <div className="page">
-      <Band title="Brand & guidelines" sub="how this app is built, on purpose" actions={<button className="btn btn-quiet" onClick={() => setPage('settings')}>Back to settings</button>} />
+    <div className="bg-guide">
+      <style dangerouslySetInnerHTML={{ __html: CSS }} />
 
-      <div className="panel" style={{ marginBottom: 'var(--s5)', maxWidth: '78ch' }}>
-        <span className="microcap">The idea in one line</span>
-        <p style={{ fontSize: 'var(--text-lg)', fontFamily: 'var(--font-display)', fontWeight: 700, marginTop: 'var(--s2)' }}>Flight console on warm paper. High contrast, one accent, colour only where it means something.</p>
-        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--muted)', marginTop: 'var(--s3)', maxWidth: '68ch' }}>
-          Colour is never decoration here. Each colour carries one meaning, so a glance tells you what to act on, what is yours, and what is just information. When in doubt, use a neutral and let the one accent do the work.
-        </p>
-      </div>
-
-      <SwatchRow title="Surfaces" note="warm neutrals do most of the work" items={SURFACES} />
-      <SwatchRow title="Ink" note="high contrast on the warm paper" items={INK} />
-      <SwatchRow title="Meaning" note="the whole point: one colour, one job" items={SEMANTIC} />
-      <SwatchRow title="Space accents" note="the accent shifts with the active space" items={SPACES} />
-      <SwatchRow title="Category dots" note="muted identity, used as small dots, never as fills" items={CATEGORY} />
-
-      <div className="brand-block">
-        <div className="review-sec"><span className="microcap">Type</span><span className="review-sec-note">one family per job</span></div>
-        <div className="grid-3">
-          <div className="panel">
-            <span className="brand-swatch-use">Display</span>
-            <p style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '2rem', lineHeight: 1.1, margin: 'var(--s2) 0' }}>Cabinet Grotesk</p>
-            <span className="brand-swatch-use">Headings, big numbers, page titles</span>
-          </div>
-          <div className="panel">
-            <span className="brand-swatch-use">Body</span>
-            <p style={{ fontFamily: 'var(--font-body)', fontSize: '1.25rem', lineHeight: 1.3, margin: 'var(--s2) 0' }}>General Sans</p>
-            <span className="brand-swatch-use">Everything you read: copy, labels, inputs</span>
-          </div>
-          <div className="panel">
-            <span className="brand-swatch-use">Mono</span>
-            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '1.25rem', lineHeight: 1.3, margin: 'var(--s2) 0' }}>JetBrains Mono</p>
-            <span className="brand-swatch-use">Data only: times, counts, deltas, receipts</span>
-          </div>
+      <div className="top">
+        <div>
+          <div className="ey">Mission Control · Brand &amp; guidelines</div>
+          <h1>Warm console.<br /><em>One accent, real paper.</em></h1>
+          <p className="lede">The proposed direction for the production site: a warm, editorial personal OS. Confident display type, one burnt-orange accent, and colour used only where it carries meaning. Review this, we fix what's off, then I recolour the app to match it.</p>
         </div>
+        <button className="back" onClick={() => setPage('settings')}>Back to settings</button>
       </div>
 
-      <div className="brand-block">
-        <div className="review-sec"><span className="microcap">Shape & motion</span></div>
-        <div className="grid-3">
-          <div className="panel">
-            <span className="brand-swatch-use">Radius</span>
-            <div style={{ display: 'flex', gap: 'var(--s3)', marginTop: 'var(--s3)', alignItems: 'flex-end' }}>
-              <div style={{ width: 56, height: 56, background: 'var(--surface-2)', border: '1px solid var(--hairline-strong)', borderRadius: 'var(--r-sm)' }} />
-              <div style={{ width: 56, height: 56, background: 'var(--surface-2)', border: '1px solid var(--hairline-strong)', borderRadius: 'var(--r-md)' }} />
+      <section>
+        <div className="sh"><h2>Surfaces</h2><span>warm neutrals carry the layout</span></div>
+        <Swatches items={SURFACES} />
+      </section>
+      <section>
+        <div className="sh"><h2>Ink</h2><span>high contrast on warm paper</span></div>
+        <Swatches items={INK} />
+      </section>
+      <section>
+        <div className="sh"><h2>Meaning</h2><span>one colour, one job</span></div>
+        <Swatches items={MEANING} />
+      </section>
+
+      <section>
+        <div className="sh"><h2>Type</h2><span>one family per job</span></div>
+        <div className="spec">
+          <div className="role">Display — Bricolage Grotesque</div>
+          <div className="big" style={{ fontFamily: 'var(--disp)', fontWeight: 800, fontSize: '46px', lineHeight: 1 }}>Good morning, Michael.</div>
+          <div className="use">Page titles, greetings, big numbers. Weights 700 / 800. Tight tracking, one idea per line.</div>
+          <div className="scale"><span>H1 48–64px</span><span>H2 28–32px</span><span>Card title 15px/700</span></div>
+        </div>
+        <div className="spec">
+          <div className="role">Body — Instrument Sans</div>
+          <div className="big" style={{ fontFamily: 'var(--sans)', fontSize: '22px', lineHeight: 1.4 }}>Three things move the needle today. The rest can wait.</div>
+          <div className="use">Everything you read: copy, labels, inputs. Weights 400 / 500 / 600. Line length 45–75 characters.</div>
+          <div className="scale"><span>Body 15–17px</span><span>Small 13px</span><span>Label 12px</span></div>
+        </div>
+        <div className="spec">
+          <div className="role">Data — JetBrains Mono</div>
+          <div className="big" style={{ fontFamily: 'var(--mono)', fontSize: '20px' }}>162 900 Kč · 09:40 · +25m · 4/7</div>
+          <div className="use">Numbers only: times, counts, deltas, money, receipts. Tabular figures so columns line up. Never for prose.</div>
+        </div>
+      </section>
+
+      <section>
+        <div className="sh"><h2>Components</h2><span>how it composes</span></div>
+        <div className="cprev">
+          <div className="demo">
+            <div className="lbl">Buttons · pills · progress</div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
+              <button className="btn acc">Do it now</button>
+              <button className="btn ink">Open Compass</button>
+              <button className="btn ghost">Face a hard one</button>
             </div>
-            <span className="brand-swatch-use" style={{ display: 'block', marginTop: 'var(--s3)' }}>4px and 8px only. Nothing softer.</span>
+            <div className="pills" style={{ marginBottom: 18 }}>
+              <span className="pill now">now</span><span className="pill done">done</span><span className="pill warn">behind</span><span className="pill data">admin</span>
+            </div>
+            <div className="card-demo">
+              <h4>Debt payoff <span className="k">Compass</span></h4>
+              <div className="kpi">162 900 <span style={{ fontSize: 14, color: 'var(--faint)', fontFamily: 'var(--mono)' }}>Kč left</span></div>
+              <div className="barwrap"><i style={{ width: '25%' }} /></div>
+              <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 8 }}>55 600 paid · 25% cleared</div>
+            </div>
           </div>
-          <div className="panel">
-            <span className="brand-swatch-use">Edges</span>
-            <p style={{ fontSize: 'var(--text-sm)', marginTop: 'var(--s2)' }}>Hairlines, not shadows. 1px borders separate things; drop shadows are avoided.</p>
-          </div>
-          <div className="panel">
-            <span className="brand-swatch-use">Motion</span>
-            <p style={{ fontSize: 'var(--text-sm)', marginTop: 'var(--s2)' }}>Two curves, fast (160ms) and medium (220ms), on a single ease. No bounce, no decorative animation.</p>
+          <div className="demo">
+            <div className="lbl">The one thing</div>
+            <div className="focus">
+              <div className="t">The one thing</div>
+              <div className="h">Send the tax transfer before the Aug 1 deadline.</div>
+              <div style={{ marginTop: 12, color: 'rgba(244,239,228,.72)', fontSize: 13 }}>12 500 Kč · ~5 min</div>
+            </div>
+            <div className="card-demo" style={{ marginTop: 14 }}>
+              <h4>Twelve gym sessions <span className="k">58%</span></h4>
+              <div className="barwrap g"><i style={{ width: '58%' }} /></div>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="brand-block">
-        <div className="review-sec"><span className="microcap">Rules</span></div>
-        <div className="grid-2">
-          <div className="panel">
-            <span className="brand-swatch-use" style={{ color: 'var(--progress)' }}>Do</span>
-            <ul className="brand-rules">
-              <li>One accent per screen. Let neutrals carry the layout.</li>
-              <li>Colour only when it means something (act / yours / data / risk).</li>
-              <li>High contrast: near-black ink on warm paper.</li>
-              <li>Mono for numbers, sans for words.</li>
+      <section>
+        <div className="sh"><h2>Shape, space &amp; motion</h2></div>
+        <div className="meta">
+          <div className="m"><div className="lab">Radius</div><div className="val">Cards 16–22px<br />Pills 7px<br />Buttons 12px</div></div>
+          <div className="m"><div className="lab">Spacing</div><div className="val">4 8 12 16 20 24<br />32 40 48 64 96</div></div>
+          <div className="m"><div className="lab">Edges</div><div className="val">Hairlines, not shadows.<br />1px borders separate.</div></div>
+          <div className="m"><div className="lab">Motion</div><div className="val">Two curves, 160ms &amp; 220ms.<br />No bounce, no decoration.</div></div>
+        </div>
+      </section>
+
+      <section>
+        <div className="sh"><h2>Rules</h2></div>
+        <div className="rules">
+          <div className="col">
+            <div className="rl" style={{ color: 'var(--green)' }}>Do</div>
+            <ul>
+              <li>One accent per screen. Warm neutrals do the rest.</li>
+              <li>Colour only when it means something: act, yours, data, risk.</li>
+              <li>Display font for headings and numbers, mono for data, sans for words.</li>
+              <li>Big type, protected whitespace, one idea per screen.</li>
               <li>Full-bleed header; content on a comfortable measure.</li>
             </ul>
           </div>
-          <div className="panel">
-            <span className="brand-swatch-use" style={{ color: 'var(--alert)' }}>Never</span>
-            <ul className="brand-rules">
-              <li>Gradients, glow, or colour as decoration.</li>
+          <div className="col">
+            <div className="rl" style={{ color: 'var(--alert)' }}>Never</div>
+            <ul>
+              <li>Gradients or glow as decoration (the focus band's warmth is the one exception).</li>
               <li>Green for money owed or spent. Green is only what you have.</li>
-              <li>More than one accent, or a second display font.</li>
+              <li>A second accent, or a second display font.</li>
               <li>Drop shadows where a hairline works.</li>
-              <li>Stranded cards or capped widths that leave dead space.</li>
+              <li>Stranded cards or capped widths that leave dead space on wide screens.</li>
             </ul>
           </div>
         </div>
-      </div>
+      </section>
 
-      <p style={{ fontSize: 'var(--text-xs)', color: 'var(--faint)', marginTop: 'var(--s5)', maxWidth: '72ch' }}>
-        This is the current system, gathered from the app as it stands. Tell me what to change, palette, fonts, the meanings, and I will update this page and then recolour the app to match it.
-      </p>
+      <p className="note">This is a proposal rendered in the new direction, it does not change the rest of the app yet. Tell me what to adjust (the accent, the fonts, the meanings, the density) and I'll fix this page first, then recolour Today, Plan, Routines, Habits, Goals, Money, Review and Coach to match it.</p>
     </div>
   )
 }

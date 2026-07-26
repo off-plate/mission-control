@@ -1406,11 +1406,24 @@ a.pron-src:hover { color: var(--accent); text-decoration: underline; }
 .goal-ms-item.done { color: var(--ink); }
 .goal-ms-item.done span:last-child { text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
 
-/* ---------- Brain Dump ---------- */
-.idea-list { display: flex; flex-direction: column; margin-top: var(--s2); }
-.idea { padding: var(--s4) 0; border-top: 1px solid var(--hairline); }
-.idea:first-child { border-top: none; }
-.idea-text { font-size: var(--text-base); line-height: 1.55; color: var(--ink); max-width: 68ch; white-space: pre-wrap; }
-.idea-foot { display: flex; align-items: center; gap: var(--s3); margin-top: var(--s2); }
-.idea-foot .meta { color: var(--faint); }
-.idea-foot .assist-goto { margin-left: auto; }
+/* ---------- Brain Dump: sticky-note board ---------- */
+.note-composer-row { display: flex; align-items: center; gap: var(--s3); margin-top: var(--s3); flex-wrap: wrap; }
+.note-swatches { display: flex; gap: var(--s2); }
+.note-swatch { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--hairline-strong); cursor: pointer; }
+.note-swatch.on { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ink); }
+
+.note-filter { display: flex; flex-wrap: wrap; gap: var(--s2); margin-bottom: var(--s4); }
+.note-chip { font-family: var(--font-mono); font-size: 0.75rem; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--hairline-strong); color: var(--muted); }
+.note-chip:hover { border-color: var(--accent); color: var(--accent); }
+.note-chip.on { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+
+.sticky-board { columns: 260px; column-gap: var(--s4); }
+.sticky { break-inside: avoid; margin: 0 0 var(--s4); border-radius: 3px; padding: var(--s4) var(--s4) var(--s3); border: 1px solid rgba(26,23,18,.08); box-shadow: 0 2px 8px rgba(26,23,18,.09); display: flex; flex-direction: column; }
+.note-text { font-size: var(--text-base); line-height: 1.5; color: #201d16; white-space: pre-wrap; word-break: break-word; }
+.note-tag { color: var(--accent); font-weight: 600; }
+.note-foot { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s3); }
+.note-when { font-size: 0.6875rem; color: rgba(26,23,18,.5); }
+.note-colors { margin-left: auto; display: flex; gap: 4px; opacity: 0; transition: opacity 140ms ease-out; }
+.sticky:hover .note-colors { opacity: 1; }
+.note-dot { width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(26,23,18,.2); cursor: pointer; }
+.note-dot.on { box-shadow: 0 0 0 1.5px #fff, 0 0 0 3px rgba(26,23,18,.55); }

@@ -159,11 +159,12 @@ export const GOAL_CATEGORIES: { id: GoalCategory; label: string }[] = [
   { id: 'habits', label: 'Habits' },
 ]
 
-/** A raw captured thought on the Brain Dump page. */
+/** A sticky note on the Brain Dump board. Categories are #hashtags inside the text. */
 export interface Idea {
   id: string
   text: string
   when: string
+  color: string
 }
 
 export interface GoalMilestone {

@@ -158,7 +158,7 @@ export const MOCK_HABITS: HabitDef[] = [
 ]
 
 export const MOCK_IDEAS: Idea[] = [
-  { id: 'idea-rubberband', text: 'Rubber band on my wrist — snap it whenever I catch myself doing something I do not want to do (doomscroll, avoidance, overstimulation). A pattern interrupt, not punishment. Later: track the catches so they trend down over time.', when: 'idea' },
+  { id: 'idea-rubberband', text: 'Rubber band on my wrist — snap it whenever I catch myself doing something I do not want to do (doomscroll, avoidance, overstimulation). A pattern interrupt, not punishment. Later: track the catches so they trend down over time. #tools', when: 'idea', color: 'amber' },
 ]
 
 export const MOCK_ROUTINES: Routine[] = [
@@ -171,6 +171,7 @@ export const MOCK_ROUTINES: Routine[] = [
       { id: 'mr2', title: 'Pronunciation test', kind: 'do', note: 'Read a short passage out loud, record it, listen back once.' },
       { id: 'mr3', title: 'Jazykolam mouth stretch', kind: 'do', note: 'Loosen the jaw and lips, then a tongue-twister three times, fast and clean.', example: 'Strč prst skrz krk.' },
       { id: 'mr4', title: 'Typing test', kind: 'do', note: 'One quick round to wake the hands up.', link: 'https://monkeytype.com', linkLabel: 'Open typing test' },
+      { id: 'mr5', title: 'Remind yourself of your goals', kind: 'do', note: 'Look at what you are actually working toward before the day pulls you elsewhere.' },
     ],
   },
   {

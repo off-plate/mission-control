@@ -124,45 +124,80 @@ export function AssistantPage() {
   )
 }
 
-/* ---------------- BRAIN DUMP ---------------- */
+/* ---------------- BRAIN DUMP (sticky-note board) ---------------- */
+
+const NOTE_COLORS: { id: string; bg: string }[] = [
+  { id: 'amber', bg: '#f6ead0' },
+  { id: 'coral', bg: '#f3d8cd' },
+  { id: 'green', bg: '#dbe4d1' },
+  { id: 'blue', bg: '#d3dde6' },
+  { id: 'violet', bg: '#ded6e6' },
+  { id: 'paper', bg: '#fbf8f1' },
+]
+const colorBg = (id: string) => NOTE_COLORS.find((c) => c.id === id)?.bg ?? '#fbf8f1'
+const TAG_RE = /#[\p{L}\d_-]+/gu
+const tagsOf = (t: string) => t.match(TAG_RE) ?? []
+
+function renderNote(t: string) {
+  return t.split(/(#[\p{L}\d_-]+)/gu).map((p, i) => (/^#/.test(p) ? <span className="note-tag" key={i}>{p}</span> : <span key={i}>{p}</span>))
+}
 
 export function BrainDumpPage() {
-  const { ideas, addIdea, deleteIdea } = useStore()
+  const { ideas, addIdea, setIdeaColor } = useStore()
   const [text, setText] = useState('')
-  const submit = () => { if (!text.trim()) return; addIdea(text); setText('') }
+  const [color, setColor] = useState('amber')
+  const [activeTag, setActiveTag] = useState<string | null>(null)
+
+  const allTags = Array.from(new Set(ideas.flatMap((i) => tagsOf(i.text).map((t) => t.toLowerCase()))))
+  const shown = activeTag ? ideas.filter((i) => tagsOf(i.text).some((t) => t.toLowerCase() === activeTag)) : ideas
+  const submit = () => { if (!text.trim()) return; addIdea(text, color); setText('') }
+
   return (
     <div className="page">
-      <Band title="Brain dump" sub="get it out of your head, sort it later" />
+      <Band title="Brain dump" sub="sticky notes for whatever is in your head" />
 
-      <div className="panel" style={{ maxWidth: 820, marginBottom: 'var(--s5)' }}>
-        <span className="microcap">New idea</span>
+      <div className="panel note-composer" style={{ maxWidth: 720, marginBottom: 'var(--s5)' }}>
         <textarea
-          className="textinput" rows={2} style={{ width: '100%', marginTop: 'var(--s2)' }}
+          className="textinput" rows={2} style={{ width: '100%' }}
           value={text} onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit() }}
-          placeholder="Whatever is in your head. One line or a paragraph."
-          aria-label="New idea"
+          placeholder="Whatever is on your mind. Add a #category to group it."
+          aria-label="New note"
         />
-        <div style={{ display: 'flex', gap: 'var(--s2)', marginTop: 'var(--s3)', alignItems: 'center' }}>
-          <button className="btn btn-primary" disabled={!text.trim()} onClick={submit}>Add</button>
-          <span className="assist-note">Capture now, no fields, no sorting. Cmd/Ctrl+Enter adds it.</span>
+        <div className="note-composer-row">
+          <div className="note-swatches" role="radiogroup" aria-label="Note colour">
+            {NOTE_COLORS.map((c) => (
+              <button key={c.id} className={`note-swatch${color === c.id ? ' on' : ''}`} style={{ background: c.bg }} aria-label={c.id} aria-pressed={color === c.id} onClick={() => setColor(c.id)} />
+            ))}
+          </div>
+          <button className="btn btn-primary" style={{ marginLeft: 'auto' }} disabled={!text.trim()} onClick={submit}>Add note</button>
         </div>
       </div>
 
-      <div className="panel" style={{ maxWidth: 820 }}>
-        <span className="microcap">{ideas.length} {ideas.length === 1 ? 'idea' : 'ideas'}</span>
-        {ideas.length === 0 && <p className="bucket-empty">Nothing here yet. Dump the first thing on your mind.</p>}
-        <div className="idea-list">
-          {ideas.map((i) => (
-            <div className="idea" key={i.id}>
-              <p className="idea-text">{i.text}</p>
-              <div className="idea-foot">
-                <span className="mono meta">{i.when}</span>
-                <button className="assist-goto" onClick={() => deleteIdea(i.id)} aria-label="Delete idea">remove</button>
-              </div>
-            </div>
+      {allTags.length > 0 && (
+        <div className="note-filter">
+          <button className={`note-chip${!activeTag ? ' on' : ''}`} onClick={() => setActiveTag(null)}>all</button>
+          {allTags.map((t) => (
+            <button key={t} className={`note-chip${activeTag === t ? ' on' : ''}`} onClick={() => setActiveTag(activeTag === t ? null : t)}>{t}</button>
           ))}
         </div>
+      )}
+
+      <div className="sticky-board">
+        {shown.map((i) => (
+          <div className="sticky" key={i.id} style={{ background: colorBg(i.color) }}>
+            <p className="note-text">{renderNote(i.text)}</p>
+            <div className="note-foot">
+              <span className="mono note-when">{i.when}</span>
+              <div className="note-colors">
+                {NOTE_COLORS.map((c) => (
+                  <button key={c.id} className={`note-dot${i.color === c.id ? ' on' : ''}`} style={{ background: c.bg }} aria-label={`Set ${c.id}`} onClick={() => setIdeaColor(i.id, c.id)} />
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
+        {shown.length === 0 && <p className="bucket-empty">No notes tagged {activeTag}. Clear the filter or add one.</p>}
       </div>
     </div>
   )

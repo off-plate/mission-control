@@ -152,6 +152,17 @@ function Typing({ url, label }: { url?: string; label?: string }) {
   )
 }
 
+/* ---- Goals reminder (content to be defined together) ---- */
+function GoalsReminder({ note }: { note?: string }) {
+  const { setPage } = useStore()
+  return (
+    <div className="mr-typing">
+      <p className="mr-lead">{note ?? 'Look at what you are working toward before the day pulls you elsewhere.'}</p>
+      <button className="btn btn-quiet" onClick={() => setPage('goals')}>Open Goals ↗</button>
+    </div>
+  )
+}
+
 export function MorningRoutine({ routine }: { routine: Routine }) {
   const { toggleRoutineStep } = useStore()
   const steps = routine.steps
@@ -173,7 +184,8 @@ export function MorningRoutine({ routine }: { routine: Routine }) {
     if (stepId === 'mr1') return <Meditation url={s.link} onEnd={() => { if (!done.includes('mr1')) onComplete('mr1') }} />
     if (stepId === 'mr2') return <Pronunciation />
     if (stepId === 'mr3') return <MouthStretch />
-    return <Typing url={s.link} label={s.linkLabel} />
+    if (stepId === 'mr4') return <Typing url={s.link} label={s.linkLabel} />
+    return <GoalsReminder note={s.note} />
   }
 
   const total = steps.length

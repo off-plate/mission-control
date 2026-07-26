@@ -113,7 +113,8 @@ interface Store extends PersistedState {
   resetRoutine: (routineId: string) => void
 
   ideas: Idea[]
-  addIdea: (text: string) => void
+  addIdea: (text: string, color: string) => void
+  setIdeaColor: (id: string, color: string) => void
   deleteIdea: (id: string) => void
 
   todayIndex: number
@@ -156,6 +157,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const sleepNights = sleep ? sleep.days.filter(Boolean).length : 0
     return MOCK_GOALS.map((g) => (g.id === 'g2' ? { ...g, current: sleepNights } : g))
   }, [seededHabits])
+  // Routine step definitions come from the mock (canonical); only the user's checks
+  // (doneStepIds) are their state, so new/removed steps show up without a reseed.
+  const seededRoutines = useMemo(() => {
+    const prior = persisted?.routines
+    if (!prior) return MOCK_ROUTINES
+    return MOCK_ROUTINES.map((m) => {
+      const p = prior.find((x) => x.id === m.id)
+      return p ? { ...m, doneStepIds: p.doneStepIds.filter((id) => m.steps.some((s) => s.id === id)) } : m
+    })
+  }, [persisted])
   const [spaces, setSpaces] = useState(persisted?.spaces ?? DEFAULT_SPACES)
   const [tasks, setTasks] = useState(persisted?.tasks ?? MOCK_TASKS)
   const [habits, setHabits] = useState(persisted?.habits ?? seededHabits)
@@ -167,7 +178,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [review, setReview] = useState<ReviewState>(persisted?.review ?? { lastDoneDate: null, wins: [], outcomes: [] })
   const [assistantLog, setAssistantLog] = useState<AssistantEntry[]>(persisted?.assistantLog ?? [])
   const [coachSessions, setCoachSessions] = useState<CoachSession[]>(persisted?.coachSessions ?? [])
-  const [routines, setRoutines] = useState<Routine[]>(persisted?.routines ?? MOCK_ROUTINES)
+  const [routines, setRoutines] = useState<Routine[]>(seededRoutines)
   const [ideas, setIdeas] = useState<Idea[]>(persisted?.ideas ?? MOCK_IDEAS)
   const remoteSaveTimer = useRef<number | undefined>(undefined)
   const [space, setSpace] = useState<SpaceId>('personal')
@@ -449,11 +460,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       )
     },
 
-    addIdea: (text) => {
+    addIdea: (text, color) => {
       const t = text.trim()
       if (!t) return
-      setIdeas((prev) => [{ id: `idea-${++uid}`, text: t, when: 'just now' }, ...prev])
+      setIdeas((prev) => [{ id: `idea-${++uid}`, text: t, when: 'just now', color }, ...prev])
     },
+    setIdeaColor: (id, color) => setIdeas((prev) => prev.map((i) => (i.id === id ? { ...i, color } : i))),
     deleteIdea: (id) => setIdeas((prev) => prev.filter((i) => i.id !== id)),
 
     todayIndex,

@@ -6,24 +6,24 @@
    ============================================================ */
 
 :root {
-  --bg: #f4f1e9;
-  --surface: #fdfcf8;
-  --surface-2: #ece8dc;
-  --ink: #16150f;
-  --muted: #57534a;
-  --faint: #6e6a5b;
-  --hairline: rgba(22, 21, 15, 0.14);
-  --hairline-strong: rgba(22, 21, 15, 0.48);
+  --bg: #f4efe4;
+  --surface: #fbf8f1;
+  --surface-2: #ece6d8;
+  --ink: #1a1712;
+  --muted: #6d6656;
+  --faint: #938b7b;
+  --hairline: rgba(26, 23, 18, 0.12);
+  --hairline-strong: rgba(26, 23, 18, 0.44);
 
-  --accent: #0b3d91;
-  --accent-hover: #092f70;
-  --accent-ink: #fdfcf8;
-  --accent-wash: rgba(11, 61, 145, 0.08);
+  --accent: #d1502a;
+  --accent-hover: #b8431f;
+  --accent-ink: #ffffff;
+  --accent-wash: rgba(209, 80, 42, 0.10);
 
-  --alert: #b23415;
-  --alert-wash: rgba(178, 52, 21, 0.09);
-  --progress: #23624a;
-  --progress-wash: rgba(35, 98, 74, 0.12);
+  --alert: #9e2b12;
+  --alert-wash: rgba(158, 43, 18, 0.10);
+  --progress: #3f6b46;
+  --progress-wash: rgba(63, 107, 70, 0.12);
 
   /* Semantic layer. Meaning, not decoration:
      accent  = interactive (you can act; also the active space's identity)
@@ -45,8 +45,8 @@
 
   --shadow-pop: 0 18px 50px rgba(22, 21, 15, 0.18);
 
-  --font-display: 'Cabinet Grotesk', 'Avenir Next', sans-serif;
-  --font-body: 'General Sans', 'Helvetica Neue', sans-serif;
+  --font-display: 'Bricolage Grotesque', 'Avenir Next', sans-serif;
+  --font-body: 'Instrument Sans', 'Helvetica Neue', sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
 
   --text-xs: 0.8125rem;
@@ -1417,8 +1417,15 @@ a.pron-src:hover { color: var(--accent); text-decoration: underline; }
 .note-chip:hover { border-color: var(--accent); color: var(--accent); }
 .note-chip.on { background: var(--ink); border-color: var(--ink); color: var(--bg); }
 
-.sticky-board { columns: 260px; column-gap: var(--s4); }
-.sticky { break-inside: avoid; margin: 0 0 var(--s4); border-radius: 3px; padding: var(--s4) var(--s4) var(--s3); border: 1px solid rgba(26,23,18,.08); box-shadow: 0 2px 8px rgba(26,23,18,.09); display: flex; flex-direction: column; }
+/* Composer + notes share one grid, so notes start beside the input, not below it.
+   Four wide notes per row, then wrap. */
+.bd-grid { display: grid; grid-template-columns: repeat(4, minmax(280px, 400px)); gap: var(--s4); justify-content: start; align-items: start; }
+@media (max-width: 1360px) { .bd-grid { grid-template-columns: repeat(3, minmax(260px, 1fr)); } }
+@media (max-width: 940px) { .bd-grid { grid-template-columns: repeat(2, minmax(240px, 1fr)); } }
+@media (max-width: 600px) { .bd-grid { grid-template-columns: 1fr; } }
+.bd-composer { background: var(--surface); border: 1px solid var(--hairline-strong); border-radius: 8px; padding: var(--s4); display: flex; flex-direction: column; gap: var(--s3); }
+.bd-composer textarea { resize: vertical; }
+.sticky { border-radius: 3px; padding: var(--s4) var(--s4) var(--s3); border: 1px solid rgba(26,23,18,.08); box-shadow: 0 2px 8px rgba(26,23,18,.09); display: flex; flex-direction: column; }
 .note-text { font-size: var(--text-base); line-height: 1.5; color: #201d16; white-space: pre-wrap; word-break: break-word; }
 .note-tag { color: var(--accent); font-weight: 600; }
 .note-foot { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s3); }

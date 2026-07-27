@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { exceptionsFor } from './exceptions'
+import { Component, useEffect, useRef, useState, type ReactNode } from 'react'
+import { exceptionsFor, globalExceptions } from './exceptions'
 import { SPACE_LABELS } from './mock'
 import { DecomposeSheet } from './modals'
 import { GoalsPage, HabitsPage, PlanPage, RoutinesPage, TodayPage } from './pages1'
@@ -8,6 +8,32 @@ import { AssistantPage, BrainDumpPage } from './pages3'
 import { BrandPage } from './brand'
 import { useStore } from './store'
 import type { PageId, SpaceId } from './types'
+
+/* One failing page must not take the whole shell with it: the header, the nav
+   and every other tab keep working while the broken view shows a card. */
+class PageBoundary extends Component<{ children: ReactNode; page: string }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  componentDidUpdate(prev: { page: string }) {
+    if (prev.page !== this.props.page && this.state.failed) this.setState({ failed: false })
+  }
+  render() {
+    if (this.state.failed) {
+      return (
+        <div className="page">
+          <div className="panel" style={{ maxWidth: 620 }}>
+            <span className="microcap">This view hit an error</span>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--muted)', marginTop: 8 }}>
+              Nothing was lost. Every other tab still works; open one from the menu above, or reload to try this one again.
+            </p>
+            <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={() => location.reload()}>Reload</button>
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 function Logo() {
   return (
@@ -65,7 +91,10 @@ function PageNav({
 export default function App() {
   const { space, setSpace, page, setPage, tasks, routines } = useStore()
   const [decomposeOpen, setDecomposeOpen] = useState(false)
-  const exceptions = exceptionsFor(space, { tasks, routines })
+  // The dot follows the alerts: money and admin count from any profile.
+  const exceptions = space === 'personal'
+    ? exceptionsFor(space, { tasks, routines })
+    : [...globalExceptions({ tasks, routines }), ...exceptionsFor(space, { tasks, routines })]
 
   const tabs = NAV
 
@@ -124,6 +153,7 @@ export default function App() {
       </div>
 
       <main id="main">
+        <PageBoundary page={page}>
         {page === 'today' && <TodayPage />}
         {page === 'plan' && <PlanPage />}
         {page === 'assistant' && <AssistantPage />}
@@ -136,6 +166,7 @@ export default function App() {
         {page === 'braindump' && <BrainDumpPage />}
         {page === 'settings' && <SettingsPage />}
         {page === 'brand' && <BrandPage />}
+        </PageBoundary>
       </main>
 
       <footer className="foot">

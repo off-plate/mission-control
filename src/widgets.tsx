@@ -8,8 +8,8 @@ import {
   MOCK_TRAINING,
 } from './mock'
 import { useStore } from './store'
-import { ON_TRACK_PCT, type SizeKey, type SpaceId, type WidgetType } from './types'
-import { fmtNum, fmtTimeShort } from './util'
+import type { SizeKey, SpaceId, WidgetType } from './types'
+import { fmtNum, fmtTimeShort, goalPace } from './util'
 
 export function Spark({ data, width = 120, height = 32 }: { data: number[]; width?: number; height?: number }) {
   const max = Math.max(...data)
@@ -232,14 +232,13 @@ const GoalsBody = memo(function GoalsBody({ space }: { space: SpaceId }) {
     <div>
       {list.map((g) => {
         const pct = Math.round((g.current / g.target) * 100)
-        // Weekly goals get the first two days before they can read as drifting.
-        const weekly = g.timeframe === 'weekly'
-        const off = pct < ON_TRACK_PCT && !(weekly && todayIndex < 3)
+        // Judged against elapsed time, not a flat percentage.
+        const off = goalPace(g.current, g.target, g.timeframe ?? 'quarter') === 'behind'
         return (
           <div className="goal-row" key={g.id}>
             <div className="goal-line">
               <span className="grow">{g.name}</span>
-              <span className={`drift ${off ? 'off' : 'ok'}`}>{off ? 'drifting' : 'on track'}</span>
+              <span className={`drift ${off ? 'off' : 'ok'}`}>{off ? 'needs a push' : 'on pace'}</span>
             </div>
             <div className={`bar prog${off ? ' warn' : ''}`}>
               <i style={{ width: `${pct}%` }} />

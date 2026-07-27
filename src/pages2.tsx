@@ -3,31 +3,48 @@ import { COACH_SCENARIOS, MOCK_MONEY, MOCK_STATS } from './mock'
 import { Band } from './pages1'
 import { useStore } from './store'
 import { Spark, SparkBox } from './widgets'
-import { fmtDuration, fmtSigned, fmtWhen, isoWeekKey, localDateKey, taskMinutes } from './util'
+import { fmtDuration, fmtNum, fmtSigned, fmtWhen, goalPace, isoWeekKey, taskMinutes } from './util'
 import { analyzeAvoidance } from './coach'
 import { paymentTaskTitle } from './exceptions'
-import { ON_TRACK_PCT, type CoachFacts, type CoachSession, type TaskCategory } from './types'
+import type { CoachFacts, CoachSession, TaskCategory } from './types'
 
 /* ---------------- MONEY ---------------- */
 
 /* Money is one pool — his real finances do not split by profile — so this page
    is identical in every space instead of dead-ending outside Personal. */
+/** Kč written as a number, so paid amounts can be added up. */
+const kc = (s: string) => Number(s.replace(/[^\d]/g, '')) || 0
+
 export function MoneyPage() {
   const { tasks, addTask } = useStore()
   const f = MOCK_MONEY
+  /* Paying something has to move the number, or the one screen about his debt
+     is a poster. Every sent payment comes off the remaining balance and onto
+     the paid total, live. */
+  const sentRows = f.schedule.filter((sch) => tasks.some((t) => t.title === paymentTaskTitle(sch.name, sch.amount) && t.done))
+  const sentSum = sentRows.reduce((a, sch) => a + kc(sch.amount), 0)
+  const original = kc(f.debt.original)
+  const paid = kc(f.debt.paid) + sentSum
+  const remaining = Math.max(0, kc(f.debt.remaining) - sentSum)
+  const pct = original ? Math.round((paid / original) * 100) : 0
+
   return (
     <div className="page">
       <Band
         title="Money"
         sub="where the debt is going"
+        metrics={sentSum > 0 ? [{ v: `${fmtNum(sentSum)} Kč`, k: 'paid from here', tone: 'pos' as const }] : undefined}
       />
       <div className="grid-3">
         {/* Debt payoff */}
         <div className="panel">
           <span className="microcap">Debt payoff</span>
-          <div className="kpi">{f.debt.remaining}<span className="unit">left</span></div>
-          <div className="bar debt" style={{ marginTop: 12 }}><i style={{ width: `${f.debt.pct}%` }} /></div>
-          <div className="kpi-sub"><span className="val-pos">{f.debt.paid} paid</span> of {f.debt.original} · {f.debt.pct}% cleared</div>
+          <div className="kpi">{fmtNum(remaining)} Kč<span className="unit">left</span></div>
+          <div className="bar debt" style={{ marginTop: 12 }}><i style={{ width: `${pct}%` }} /></div>
+          <div className="kpi-sub"><span className="val-pos">{fmtNum(paid)} Kč paid</span> of {f.debt.original} · {pct}% cleared</div>
+          {sentSum > 0 && (
+            <div className="kpi-sub val-pos">{fmtNum(sentSum)} Kč of that was sent from Mission Control.</div>
+          )}
           <div className="rowlist" style={{ marginTop: 10 }}>
             {f.obligations.map((o) => (
               <div className="rowitem" key={o.id} style={{ minHeight: 34 }}>
@@ -132,7 +149,7 @@ export function ReviewPage() {
   const activeHabits = habits.filter((h) => !h.paused && h.space === space)
   const habitsKept = activeHabits.reduce((a, h) => a + h.days.filter(Boolean).length, 0)
   const spaceGoals = goals.filter((g) => g.space === space)
-  const goalsOnTrack = spaceGoals.filter((g) => (g.current / g.target) * 100 >= ON_TRACK_PCT).length
+  const goalsOnTrack = spaceGoals.filter((g) => goalPace(g.current, g.target, g.timeframe ?? 'quarter') !== 'behind').length
   const prev = review.previous
 
   const setW = (i: number, v: string) => setWins((p) => p.map((x, j) => (j === i ? v : x)))
@@ -347,7 +364,7 @@ function ReflectForm({ onSubmit, onCancel }: { onSubmit: (didIt: boolean, felt: 
 }
 
 export function CoachPage() {
-  const { space, setPage, coachOpen, setCoachOpen, coachSessions, startCoachSession, reflectCoachSession, deleteCoachSession } = useStore()
+  const { space, tasks, setPage, coachOpen, setCoachOpen, coachSessions, startCoachSession, reflectCoachSession, deleteCoachSession } = useStore()
   const [stage, setStage] = useState<CoachStage>('home')
   const [thing, setThing] = useState('')
   const [title, setTitle] = useState('')
@@ -365,11 +382,15 @@ export function CoachPage() {
     setStage('review')
   }
 
-  // Today's avoided-admin alerts deep-link here; seed the analyzer from the alert.
+  /* Today deep-links here two ways: a known scenario id, or the raw title of a
+     task that has been sitting too long. Either way Coach starts from something
+     real instead of an empty box. */
   useEffect(() => {
     if (!coachOpen) return
     const s = COACH_SCENARIOS.find((x) => x.id === coachOpen)
-    if (s) { setThing(s.title); analyze(s.title) }
+    const seed = s ? s.title : coachOpen
+    setThing(seed)
+    analyze(seed)
     setCoachOpen(null)
   }, [coachOpen])
 
@@ -385,6 +406,11 @@ export function CoachPage() {
   const open = mine.filter((s) => s.status === 'open')
   const closed = mine.filter((s) => s.status === 'closed')
   const easedCount = closed.filter((s) => s.didIt && s.felt === 'easier').length
+  // Your two oldest open tasks, offered as one-click starters.
+  const oldest = tasks
+    .filter((t) => !t.done && t.space === space && t.createdAt)
+    .sort((a, b) => (a.createdAt! < b.createdAt! ? -1 : 1))
+    .slice(0, 2)
 
   /* ---- review the breakdown Coach drafted, then commit ---- */
   if (stage === 'review') {
@@ -466,6 +492,26 @@ export function CoachPage() {
         <div className="coach-intake-row">
           <button className="btn btn-primary" disabled={!thing.trim()} onClick={() => analyze(thing)}>Face it</button>
           <span className="assist-note">Coach looks at it factually and hands you an easy first step. You do not fill in the analysis, it does.</span>
+        </div>
+
+        {/* Naming the thing is the step an avoider cannot do cold, so the page
+            offers the usual suspects and your own oldest tasks to point at. */}
+        <div className="coach-starters">
+          <span className="microcap">Or start from one of these</span>
+          <div className="coach-starter-row">
+            {oldest.map((t) => (
+              <button key={t.id} className="coach-starter is-yours" onClick={() => { setThing(t.title); analyze(t.title) }}>
+                {t.title}
+                <span className="cs-age">on your list</span>
+              </button>
+            ))}
+            {COACH_SCENARIOS.slice(0, 5).map((s) => (
+              <button key={s.id} className="coach-starter" onClick={() => { setThing(s.title); analyze(s.title) }}>
+                {s.title}
+                <span className="cs-age">{s.tag}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

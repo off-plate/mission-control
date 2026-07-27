@@ -99,11 +99,11 @@ const INK: Sw[] = [
   { name: 'Faint', hex: '#9a9282', use: 'Captions, timestamps, fine print', ink: '#fbf8f1' },
 ]
 const MEANING: Sw[] = [
-  { name: 'Accent — burnt orange', hex: '#d1502a', use: 'Interactive: anything you can act on. The one accent.', ink: '#fff' },
-  { name: 'Alert — brick', hex: '#9e2b12', use: 'Urgent and overdue. Rare, high alarm. Never decorative.', ink: '#fff' },
-  { name: 'Progress — green', hex: '#3f6b46', use: 'Done, yours, money you have. Never for debt.', ink: '#fff' },
-  { name: 'At risk — amber', hex: '#b06612', use: 'Behind or needs attention, not yet urgent.', ink: '#fff' },
-  { name: 'Data — slate', hex: '#55606e', use: 'Plain information, so data reads as data.', ink: '#fff' },
+  { name: 'Accent, burnt orange', hex: '#d1502a', use: 'Interactive: anything you can act on. The one accent.', ink: '#fff' },
+  { name: 'Alert, brick', hex: '#9e2b12', use: 'Urgent and overdue. Rare, high alarm. Never decorative.', ink: '#fff' },
+  { name: 'Progress, green', hex: '#3f6b46', use: 'Done, yours, money you have. Never for debt.', ink: '#fff' },
+  { name: 'At risk, amber', hex: '#b06612', use: 'Behind or needs attention, not yet urgent.', ink: '#fff' },
+  { name: 'Data, slate', hex: '#55606e', use: 'Plain information, so data reads as data.', ink: '#fff' },
 ]
 
 function Swatches({ items }: { items: Sw[] }) {
@@ -150,19 +150,19 @@ export function BrandPage() {
       <section>
         <div className="sh"><h2>Type</h2><span>one family per job</span></div>
         <div className="spec">
-          <div className="role">Display — Bricolage Grotesque</div>
+          <div className="role">Display: Bricolage Grotesque</div>
           <div className="big" style={{ fontFamily: 'var(--disp)', fontWeight: 800, fontSize: '46px', lineHeight: 1 }}>Good morning, Michael.</div>
           <div className="use">Page titles, greetings, big numbers. Weights 700 / 800. Tight tracking, one idea per line.</div>
           <div className="scale"><span>H1 48–64px</span><span>H2 28–32px</span><span>Card title 15px/700</span></div>
         </div>
         <div className="spec">
-          <div className="role">Body — Instrument Sans</div>
+          <div className="role">Body: Instrument Sans</div>
           <div className="big" style={{ fontFamily: 'var(--sans)', fontSize: '22px', lineHeight: 1.4 }}>Three things move the needle today. The rest can wait.</div>
           <div className="use">Everything you read: copy, labels, inputs. Weights 400 / 500 / 600. Line length 45–75 characters.</div>
           <div className="scale"><span>Body 15–17px</span><span>Small 13px</span><span>Label 12px</span></div>
         </div>
         <div className="spec">
-          <div className="role">Data — JetBrains Mono</div>
+          <div className="role">Data: JetBrains Mono</div>
           <div className="big" style={{ fontFamily: 'var(--mono)', fontSize: '20px' }}>162 900 Kč · 09:40 · +25m · 4/7</div>
           <div className="use">Numbers only: times, counts, deltas, money, receipts. Tabular figures so columns line up. Never for prose.</div>
         </div>

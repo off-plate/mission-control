@@ -1590,6 +1590,24 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .assist-tag.k-goal { color: var(--cat-admin); background: var(--info-wash); }
 .status-dot.manual { background: var(--warn); }
 
+/* ---- Touch: small controls get a 44px hit area without growing visually ----
+   .checkbox and .daydot already do this. These did not, so on a phone they
+   were 17-26px targets. The ::after is invisible and only extends the tap
+   region; .widget-title-btn is excluded because its ::after draws the chevron. */
+@media (pointer: coarse) {
+  .routine-check, .mr-check, button.est-chip, .expand-btn,
+  .note-swatch, .note-dot, .goal-ms-check, .sub-tick, .radio {
+    position: relative;
+  }
+  .routine-check::after, .mr-check::after, button.est-chip::after, .expand-btn::after,
+  .note-swatch::after, .note-dot::after, .goal-ms-check::after, .sub-tick::after, .radio::after {
+    content: '';
+    position: absolute;
+    inset: -11px;
+  }
+  .widget-title-btn { padding-block: var(--s3); }
+}
+
 /* ---- Phone: metrics grid instead of a stretched row ---- */
 @media (max-width: 639px) {
   .band-status { margin-left: 0; width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s3) var(--s4); }
@@ -1700,3 +1718,36 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .today-task > .grow, .todo-row > .grow { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .today-task .kebab-wrap, .today-task .est-chip, .today-task .expand-btn,
 .todo-row .kebab-wrap, .todo-row .est-chip, .todo-row .expand-btn { flex: none; }
+
+/* ---------- Ideology pass: cross-space alerts, momentum, coach starters ---------- */
+
+/* An alert raised in Personal but shown while you are in Work or Off-Plate. */
+.exception-row.from-other { opacity: 0.92; }
+.exc-origin {
+  flex: none; font-family: var(--font-mono); font-size: 0.625rem; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--muted); border: 1px solid var(--hairline-strong);
+  border-radius: 3px; padding: 1px 6px;
+}
+.exc-drop { color: var(--faint) !important; }
+.exc-drop:hover { color: var(--alert) !important; }
+
+/* What is actually going right, from real events only. */
+.momentum {
+  display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap;
+  padding: var(--s3) 0; margin-bottom: var(--s4);
+  border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline);
+}
+.momentum-item { font-size: var(--text-sm); color: var(--progress); }
+.momentum-item + .momentum-item { padding-left: var(--s3); border-left: 1px solid var(--hairline); }
+
+/* Coach: things to point at instead of a blank box. */
+.coach-starters { margin-top: var(--s5); padding-top: var(--s4); border-top: 1px solid var(--hairline); }
+.coach-starter-row { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s2); }
+.coach-starter {
+  text-align: left; border: 1px solid var(--hairline-strong); border-radius: var(--r-sm);
+  padding: var(--s2) var(--s3); font-size: var(--text-sm); color: var(--ink); cursor: pointer;
+  display: flex; flex-direction: column; gap: 2px; max-width: 320px;
+}
+.coach-starter:hover { border-color: var(--accent); color: var(--accent); }
+.coach-starter.is-yours { border-color: var(--accent-wash); background: var(--accent-wash); }
+.cs-age { font-family: var(--font-mono); font-size: 0.625rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); }

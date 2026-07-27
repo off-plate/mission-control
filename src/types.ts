@@ -98,6 +98,10 @@ export interface Task {
   subtasks?: SubTask[]
   /** 'HH:MM' if the user pinned it to a clock time (feeds the Calendar link). */
   at?: string
+  /** ISO date the task first appeared. Ageing is how avoidance gets detected. */
+  createdAt?: string
+  /** How many days it has been carried forward without being finished. */
+  carried?: number
 }
 
 export interface RoutineStep {

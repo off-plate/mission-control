@@ -3,12 +3,12 @@ import { COACH_SCENARIOS, MOCK_MONEY, MOCK_STATS } from './mock'
 import { AutoTextarea, Band } from './pages1'
 import { useStore } from './store'
 import { Spark, SparkBox } from './widgets'
-import { fmtDuration, fmtNum, fmtSigned, fmtWhen, goalPace, isoWeekKey, taskMinutes } from './util'
+import { fmtDuration, fmtNum, fmtSigned, fmtWhen, goalPace, inMonth, isoWeekKey, monthKey, monthName, taskMinutes } from './util'
 import { analyzeAvoidance } from './coach'
 import { getAiKey, hasAiKey, readAvoidance, setAiKey, type AvoidanceRead } from './ai'
 import { paymentTaskTitle } from './exceptions'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange, sendSignInCode, signInWithCode, signOutAccount, type Account } from './supabase'
-import { goalCurrent, ON_TRACK_PCT, type CoachFacts, type CoachSession, type TaskCategory } from './types'
+import { goalCurrent, OFFPLATE_WEEKLY_CAP_MIN, ON_TRACK_PCT, type CoachFacts, type CoachSession, type TaskCategory } from './types'
 
 /* ---------------- MONEY ---------------- */
 
@@ -110,8 +110,31 @@ function SecHead({ label }: { label: string }) {
   )
 }
 
+/* Off-Plate runs on evenings, capped at fifteen hours a week. That was the deal
+   he made when it came off the shelf, so the app has to be able to say when it
+   is being broken rather than leaving him to notice. */
+function OffPlateCap({ minutes }: { minutes: number }) {
+  const pct = Math.min(100, Math.round((minutes / OFFPLATE_WEEKLY_CAP_MIN) * 100))
+  const over = minutes > OFFPLATE_WEEKLY_CAP_MIN
+  return (
+    <div className="panel">
+      <span className="microcap">Off-Plate hours this week</span>
+      <div className={`kpi ${over ? 'val-urgent' : 'val-pos'}`}>
+        {fmtDuration(minutes)}<span className="unit">of 15h</span>
+      </div>
+      <div className={`bar prog${over ? ' warn' : ''}`}><i style={{ width: `${pct}%` }} /></div>
+      <div className="kpi-sub">
+        {over
+          ? `${fmtDuration(minutes - OFFPLATE_WEEKLY_CAP_MIN)} over the cap. The deal was that it goes back in the box.`
+          : `${fmtDuration(OFFPLATE_WEEKLY_CAP_MIN - minutes)} left before the cap.`}
+      </div>
+    </div>
+  )
+}
+
 export function ReviewPage() {
-  const { tasks, space, savedMin, accuracyPct, habits, goals, finishReview, review, weekLedger } = useStore()
+  const { tasks, space, savedMin, accuracyPct, habits, goals, finishReview, finishMonthlyReview, review, weekLedger, ledger, focusSessions } = useStore()
+  const [window_, setWindow] = useState<'week' | 'month'>('week')
   const [wins, setWins] = useState<string[]>(['', '', ''])
   const [changed, setChanged] = useState('')
   const [outcomes, setOutcomes] = useState<string[]>(['', '', ''])
@@ -130,22 +153,46 @@ export function ReviewPage() {
   const setW = (i: number, v: string) => setWins((p) => p.map((x, j) => (j === i ? v : x)))
   const setO = (i: number, v: string) => setOutcomes((p) => p.map((x, j) => (j === i ? v : x)))
 
+  /* The month is built from the two things that carry a real date: the ledger
+     and the focus sessions. Habit ticks are stored a week at a time, so a
+     calendar-month habit count would be invented rather than counted; the
+     twelve-week history below is the honest version of that longer arc. */
+  const mk = monthKey()
+  const monthLedger = ledger.filter((e) => (!e.space || e.space === space) && inMonth(e.when, mk))
+  const monthSaved = monthLedger.reduce((a, e) => a + (e.estimateMin - e.actualMin), 0)
+  const monthWorked = monthLedger.reduce((a, e) => a + e.actualMin, 0)
+  const monthFocus = focusSessions.filter((f) => f.space === space && inMonth(f.day, mk)).reduce((a, f) => a + f.minutes, 0)
+  const monthClosed = review.month?.lastMonthKey === mk
+  const prevMonth = review.month?.previous
+  const offplateWeekMin = weekLedger.reduce((a, e) => a + e.actualMin, 0)
+
   return (
     <div className="page">
       <Band
-        title="Weekly review"
-        metrics={[
-          { v: `${fmtSigned(savedMin)}`, k: 'time saved', tone: 'pos' as const },
-          { v: `${accuracyPct}%`, k: 'estimate accuracy' },
-        ]}
+        title={window_ === 'week' ? 'Weekly review' : 'Monthly review'}
+        metrics={window_ === 'week'
+          ? [
+              { v: `${fmtSigned(savedMin)}`, k: 'time saved', tone: 'pos' as const },
+              { v: `${accuracyPct}%`, k: 'estimate accuracy' },
+            ]
+          : [
+              { v: `${fmtSigned(monthSaved)}`, k: `saved in ${monthName(mk)}`, tone: 'pos' as const },
+              { v: fmtDuration(monthWorked), k: 'logged this month' },
+            ]}
       />
-      {doneThisWeek && (
+      <div className="winswitch" role="tablist" aria-label="Review window">
+        <button role="tab" aria-selected={window_ === 'week'} className={window_ === 'week' ? 'on' : ''} onClick={() => setWindow('week')}>The week</button>
+        <button role="tab" aria-selected={window_ === 'month'} className={window_ === 'month' ? 'on' : ''} onClick={() => setWindow('month')}>The month</button>
+      </div>
+      {window_ === 'week' && doneThisWeek && (
         <div className="allclear" style={{ borderColor: 'var(--progress)' }}>
           <span className="dot" aria-hidden="true" />
           Closed for this week. Your outcomes are in the backlog. The numbers below keep updating live.
         </div>
       )}
 
+      {window_ === 'week' && <>
+      {space === 'offplate' && <div style={{ marginBottom: 'var(--s4)' }}><OffPlateCap minutes={offplateWeekMin} /></div>}
       <SecHead label="This week" />
       <div className="grid-4">
         <div className="panel">
@@ -232,6 +279,139 @@ export function ReviewPage() {
         </div>
       </div>
 
+      </>}
+
+      {window_ === 'month' && <>
+      {monthClosed && (
+        <div className="allclear" style={{ borderColor: 'var(--progress)' }}>
+          <span className="dot" aria-hidden="true" />
+          Closed for {monthName(mk)}. The numbers below keep updating live.
+        </div>
+      )}
+      <SecHead label={monthName(mk)} />
+      <div className="grid-4">
+        <div className="panel">
+          <span className="microcap">Work logged</span>
+          <div className="kpi">{monthLedger.length}</div>
+          <div className="kpi-sub">{fmtDuration(monthWorked)} of it, start to finish</div>
+        </div>
+        <div className="panel">
+          <span className="microcap">Focus time</span>
+          <div className="kpi val-pos">{fmtDuration(monthFocus)}</div>
+          <div className="kpi-sub">across {focusSessions.filter((f) => f.space === space && inMonth(f.day, mk)).length} blocks</div>
+        </div>
+        <div className="panel">
+          <span className="microcap">Time saved</span>
+          <div className={`kpi ${monthSaved >= 0 ? 'val-pos' : 'val-urgent'}`}>{fmtSigned(monthSaved)}</div>
+          <div className="kpi-sub">against your own estimates</div>
+        </div>
+        {space === 'offplate'
+          ? <OffPlateCap minutes={offplateWeekMin} />
+          : (
+            <div className="panel">
+              <span className="microcap">Goals on track</span>
+              <div className="kpi">{goalsOnTrack}<span className="unit">of {spaceGoals.length}</span></div>
+              <div className="rowlist" style={{ marginTop: 8 }}>
+                {spaceGoals.slice(0, 5).map((g) => {
+                  const pct = Math.min(100, Math.round((goalCurrent(g, habits) / g.target) * 100))
+                  return (
+                    <div className="rowitem" key={g.id} style={{ minHeight: 30 }}>
+                      <span className="grow">{g.name}</span>
+                      <span className={`drift ${pct < ON_TRACK_PCT ? 'off' : 'ok'}`}>{pct}%</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+      </div>
+
+      <SecHead label="The longer arc" />
+      <div className="grid-2">
+        <div className="panel">
+          <span className="microcap">Habits kept, twelve weeks</span>
+          <div className="rowlist" style={{ marginTop: 8 }}>
+            {activeHabits.map((h) => {
+              const hist = [...(h.history ?? []), h.days.filter(Boolean).length]
+              return (
+                <div className="rowitem" key={h.id} style={{ minHeight: 34 }}>
+                  <span className="grow">{h.name}</span>
+                  {hist.length > 1
+                    ? <Spark data={hist} width={110} height={22} />
+                    : <span className="meta">first week</span>}
+                  <span className="mono meta">{hist[hist.length - 1]}/7</span>
+                </div>
+              )
+            })}
+            {activeHabits.length === 0 && <div className="empty">No active habits in this profile.</div>}
+          </div>
+        </div>
+        <div className="panel">
+          <span className="microcap">Everything logged in {monthName(mk)}</span>
+          <div className="ledger-list one-col">
+            {monthLedger.slice(0, 40).map((e) => {
+              const d = e.estimateMin - e.actualMin
+              return (
+                <div className="ledger-row" key={e.id}>
+                  <span className="mono" style={{ color: 'var(--faint)', fontSize: 'var(--text-xs)', minWidth: '3ch' }}>{fmtWhen(e.when)}</span>
+                  <span className="ledger-title">{e.title}</span>
+                  <span className="mono" style={{ color: 'var(--muted)', fontSize: 'var(--text-xs)' }}>{fmtDuration(e.estimateMin)} → {fmtDuration(e.actualMin)}</span>
+                  <span className={`delta ${d >= 0 ? 'saved' : 'over'}`}>{d >= 0 ? `+${d}m` : `${d}m`}</span>
+                </div>
+              )
+            })}
+            {monthLedger.length === 0 && <div className="empty">Nothing logged this month yet.</div>}
+          </div>
+        </div>
+      </div>
+
+      {prevMonth && (prevMonth.wins.length > 0 || prevMonth.outcomes.length > 0) && (
+        <div className="panel lastweek">
+          <span className="microcap">Last month you said</span>
+          <div className="lastweek-cols">
+            {prevMonth.wins.length > 0 && (
+              <div>
+                <span className="lastweek-h">went well</span>
+                <ul className="lastweek-list">{prevMonth.wins.map((w, i) => <li key={i}>{w}</li>)}</ul>
+              </div>
+            )}
+            {prevMonth.outcomes.length > 0 && (
+              <div>
+                <span className="lastweek-h">you committed to</span>
+                <ul className="lastweek-list">{prevMonth.outcomes.map((o, i) => <li key={i}>{o}</li>)}</ul>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      <div className="panel checkup-panel">
+        <span className="microcap">Manual checkup</span>
+        <div className="checkup-cols">
+          <div className="checkup-col">
+            <h4 className="checkup-q">What actually went well this month?</h4>
+            {wins.map((w, i) => (
+              <input key={i} className="textinput" style={{ marginBottom: 8, width: '100%' }} placeholder={`Win ${i + 1}`} value={w} onChange={(e) => setW(i, e.target.value)} aria-label={`Monthly win ${i + 1}`} />
+            ))}
+            <h4 className="checkup-q">What drifted, and one change for next month?</h4>
+            <input className="textinput" style={{ width: '100%' }} placeholder="One honest note" value={changed} onChange={(e) => setChanged(e.target.value)} aria-label="What to change next month" />
+          </div>
+          <div className="checkup-col">
+            <h4 className="checkup-q">Three outcomes for next month</h4>
+            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginBottom: 8 }}>Results you can check off. They land in the backlog.</p>
+            {outcomes.map((o, i) => (
+              <input key={i} className="textinput" style={{ marginBottom: 8, width: '100%' }} placeholder={`Outcome ${i + 1}`} value={o} onChange={(e) => setO(i, e.target.value)} aria-label={`Monthly outcome ${i + 1}`} />
+            ))}
+            <div className="coach-nav">
+              <button className="btn btn-primary" onClick={() => { finishMonthlyReview([...wins, changed].filter(Boolean), outcomes.filter(Boolean)); setWins(['', '', '']); setChanged(''); setOutcomes(['', '', '']) }}>
+                {monthClosed ? 'Update the month' : 'Close the month'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      </>}
+
+      {window_ === 'week' && <>
       <SecHead label="Checkup" />
       {/* What you said last week, so the reflection is not written into a void. */}
       {prev && (prev.wins.length > 0 || prev.outcomes.length > 0) && (
@@ -278,6 +458,7 @@ export function ReviewPage() {
           </div>
         </div>
       </div>
+      </>}
     </div>
   )
 }

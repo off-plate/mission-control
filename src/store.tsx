@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { SUPABASE_ENABLED, deleteRemoteState, saveRemoteState } from './supabase'
-import { dayIndexOf, isoWeekKey, localDateKey, periodKeyFor, slotForTime } from './util'
+import { dayIndexOf, isoWeekKey, localDateKey, monthKey, periodKeyFor, slotForTime } from './util'
 import {
   DEFAULT_SPACES,
   MOCK_GOALS,
@@ -129,6 +129,8 @@ interface Store extends PersistedState {
 
   commitPlan: (taskIds: string[], firstMoveId: string | null) => void
   finishReview: (wins: string[], outcomes: string[]) => void
+  /** Close the monthly ritual. Kept apart from the weekly one on purpose. */
+  finishMonthlyReview: (wins: string[], outcomes: string[]) => void
 
   assistantLog: AssistantEntry[]
   applyDictation: (text: string, items: { kind: 'task' | 'goal' | 'done'; text: string; estimateMin?: number }[]) => void
@@ -678,6 +680,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     /* Closing the week keeps the previous week's reflection, so next Sunday you
        can see what you said you would change. Stamped with the ISO week, so
        "closed" holds until the new week starts, not just until tomorrow. */
+    finishMonthlyReview: (wins, outcomes) => {
+      const mk = monthKey()
+      setReview((prev) => {
+        const m = prev.month
+        return {
+          ...prev,
+          month: {
+            lastMonthKey: mk,
+            wins,
+            outcomes,
+            previous: m?.lastMonthKey && m.lastMonthKey !== mk
+              ? { monthKey: m.lastMonthKey, wins: m.wins, outcomes: m.outcomes }
+              : m?.previous,
+          },
+        }
+      })
+      // What he commits to for the month lands on the list, same as the weekly one.
+      setTasks((prev) => [
+        ...outcomes.filter(Boolean).map((o) => ({
+          id: newId('t'),
+          title: o,
+          source: 'mc' as const,
+          estimateMin: 30,
+          done: false,
+          createdAt: todayKey(),
+          space,
+          list: 'backlog' as const,
+          category: 'admin' as const,
+        })),
+        ...prev,
+      ])
+    },
     finishReview: (wins, outcomes) => {
       setReview((prev) => ({
         lastDoneDate: todayKey(),

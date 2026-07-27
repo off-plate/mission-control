@@ -963,7 +963,10 @@ select.textinput { flex: 0 0 auto; min-width: 110px; }
 .ledger-title { flex: 1 1 auto; min-width: 0; }
 .ledger-list { max-width: 100%; }
 @media (min-width: 2000px) {
-  .ledger-list { columns: 2; column-gap: var(--s12); }
+  /* Two columns only where the panel is the full width of the page. Inside a
+     half-width panel they put 11 Jul to the left of 5 Jul, which reads as a
+     jumbled date order rather than as two columns. */
+  .ledger-list:not(.one-col) { columns: 2; column-gap: var(--s12); }
   .ledger-row { break-inside: avoid; }
 }
 .rowitem.flash { animation: flashrow 2.4s var(--ease); }
@@ -2269,3 +2272,12 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   .signin { align-items: flex-start; padding-top: 12vh; }
   .signin-card { margin-left: 0; }
 }
+
+/* Which window the review covers. Two states, no third. */
+.winswitch { display: inline-flex; gap: 2px; margin-bottom: var(--s4); border: 1px solid var(--hairline-strong); border-radius: 999px; padding: 3px; }
+.winswitch button {
+  font-family: var(--font-body); font-size: var(--text-sm); font-weight: 600;
+  color: var(--muted); padding: 5px 16px; border-radius: 999px; cursor: pointer;
+}
+.winswitch button.on { background: var(--accent); color: var(--bg); }
+.winswitch button:not(.on):hover { color: var(--ink); }

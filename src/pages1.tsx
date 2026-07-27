@@ -613,11 +613,13 @@ export function PlanPage() {
                               <div className="kebab-menu" role="menu">
                                 {!t.done && <button role="menuitem" onClick={() => { setBreakdownFor(t); setMenuFor(null) }}>Break it down</button>}
                                 {!t.done && <span className="kebab-sep" />}
+                                {!t.done && <span className="kebab-head">Move to</span>}
                                 {!t.done && BUCKETS.map((mb) => (
                                   <button key={mb.id} role="menuitemradio" aria-checked={(t.slot ?? 'unsorted') === mb.id} onClick={() => { dropTo(mb.id, t.id); setMenuFor(null) }}>
                                     {mb.label}
                                   </button>
                                 ))}
+                                {!t.done && <span className="kebab-sep" />}
                                 {!t.done && <span className="kebab-sep" />}
                                 {!t.done && (
                                   <button role="menuitem" onClick={() => { moveTaskList(t.id, 'backlog'); assignSlot(t.id, undefined); setMenuFor(null) }}>

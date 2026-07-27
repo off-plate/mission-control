@@ -54,6 +54,8 @@ interface PersistedState {
   ideas: Idea[]
   /** ISO week the habit checkmarks belong to; a new week archives and clears them. */
   weekKey?: string
+  /** One-time data repairs already applied to this saved state. */
+  fixes?: number
 }
 
 interface Store extends PersistedState {
@@ -163,6 +165,32 @@ function loadPersisted(): PersistedState | null {
        unreachable, since those dots are disabled, so they could never be undone. */
     const todayIdx = (new Date().getDay() + 6) % 7
     p.habits = p.habits.map((h) => ({ ...h, days: h.days.map((d, i) => (i > todayIdx ? false : d)) }))
+
+    /* A habit a routine drives is a read-out of that routine, and its dots are
+       not clickable, so a wrong value there can never be corrected by hand.
+       Two repairs, both self-healing on every load:
+       1. Today's dot always equals whether that routine is complete right now.
+       2. Earlier days seeded before the routine existed were never earned, so
+          they are cleared once (the routine's own period tracking is the only
+          thing that can legitimately set them). */
+    const drivenNow = new Map(
+      MOCK_ROUTINES.filter((r) => r.habitId).map((r) => {
+        const saved = p.routines?.find((x) => x.id === r.id)
+        const done = saved?.periodKey === periodKeyFor(r.cadence) ? (saved?.doneStepIds ?? []) : []
+        return [r.habitId as string, r.steps.length > 0 && r.steps.every((st) => done.includes(st.id))]
+      }),
+    )
+    const seededPastCleared = p.fixes ?? 0
+    p.habits = p.habits.map((h) => {
+      if (!drivenNow.has(h.id)) return h
+      const complete = drivenNow.get(h.id) as boolean
+      const days = h.days.map((d, i) => {
+        if (i === todayIdx) return complete
+        return seededPastCleared >= 1 ? d : false
+      })
+      return { ...h, days }
+    })
+    p.fixes = 1
 
     const seedG = new Map(MOCK_GOALS.map((g) => [g.id, g]))
     p.goals = p.goals.map((g) => {

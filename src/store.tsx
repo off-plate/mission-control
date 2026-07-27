@@ -69,6 +69,9 @@ interface PersistedState {
   focusSessions?: FocusSession[]
 }
 
+/** A delete you can still take back: what it was, and how to put it back. */
+export interface Undoable { id: string; label: string; restore: () => void }
+
 interface Store extends PersistedState {
   space: SpaceId
   setSpace: (s: SpaceId) => void
@@ -160,6 +163,11 @@ interface Store extends PersistedState {
   addIdea: (text: string, color: string) => void
   setIdeaColor: (id: string, color: string) => void
   deleteIdea: (id: string) => void
+
+  /** The last delete, still takeable back. Null once it is taken back or expires. */
+  undoable: Undoable | null
+  undoDelete: () => void
+  dismissUndo: () => void
 
   todayIndex: number
   /** This week's ledger rows for the active profile; savedMin/accuracy derive from it. */
@@ -314,6 +322,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // Seeded ids he has deleted, so the forward-fill never resurrects them.
   const [removedSeeds, setRemovedSeeds] = useState<string[]>(persisted?.removedSeeds ?? [])
   const [focusSessions, setFocusSessions] = useState<FocusSession[]>(persisted?.focusSessions ?? [])
+  /* The last thing you deleted, held long enough to take it back. Deliberately
+     not persisted: a delete you can still undo after a reload is not a delete. */
+  const [undoable, setUndoable] = useState<Undoable | null>(null)
   const remoteSaveTimer = useRef<number | undefined>(undefined)
   const latestJson = useRef<string>('')
   // The selected space survives a reload (kept out of the synced blob on purpose,
@@ -431,6 +442,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       : h)))
   }
 
+  /* Arming an undo replaces whatever was armed before: one step back, not a
+     history. The window is generous because a delete you notice a beat late is
+     exactly the one worth taking back. */
+  const armUndo = (label: string, restore: () => void) => setUndoable({ id: newId('u'), label, restore })
+
   const value: Store = {
     version: 3,
     spaces, tasks, habits, goals, ledger, social, sources, plan, review, routines, ideas,
@@ -543,7 +559,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ])
       }
     },
-    deleteTask: (id) => setTasks((prev) => prev.filter((t) => t.id !== id)),
+    deleteTask: (id) => {
+      const before = tasks
+      const gone = tasks.find((t) => t.id === id)
+      setTasks((prev) => prev.filter((t) => t.id !== id))
+      armUndo(gone ? `Deleted "${gone.title}"` : 'Task deleted', () => setTasks(before))
+    },
     setSubtasks: (taskId, subs) =>
       setTasks((prev) => prev.map((t) => {
         if (t.id !== taskId) return t
@@ -579,8 +600,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     togglePauseHabit: (id) =>
       setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, paused: !h.paused } : h))),
     deleteHabit: (id) => {
+      const beforeH = habits, beforeSeeds = removedSeeds
+      const gone = habits.find((h) => h.id === id)
       setHabits((prev) => prev.filter((h) => h.id !== id))
       setRemovedSeeds((prev) => (prev.includes(id) ? prev : [...prev, id]))
+      armUndo(gone ? `Deleted "${gone.name}"` : 'Habit deleted', () => {
+        setHabits(beforeH); setRemovedSeeds(beforeSeeds)
+      })
     },
 
     addGoal: (g) => setGoals((prev) => [...prev, { ...g, id: newId('g') }]),
@@ -613,7 +639,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           return { ...g, milestones, current }
         }),
       ),
-    deleteGoal: (id) => setGoals((prev) => prev.filter((g) => g.id !== id)),
+    deleteGoal: (id) => {
+      const before = goals
+      const gone = goals.find((g) => g.id === id)
+      setGoals((prev) => prev.filter((g) => g.id !== id))
+      armUndo(gone ? `Deleted "${gone.name}"` : 'Goal deleted', () => setGoals(before))
+    },
 
     setSocial: (entries) => setSocialState(entries),
     toggleSource: (id) =>
@@ -784,6 +815,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
        tick would otherwise sit there permanently unfinishable. */
     deleteRoutine: (id) => {
       const r = routines.find((x) => x.id === id)
+      // A routine takes its habit and its goal's link with it, so undo has to
+      // put all three back, not just the routine.
+      const beforeR = routines, beforeH = habits, beforeG = goals, beforeSeeds = removedSeeds
+      armUndo(r ? `Deleted "${r.title}"` : 'Routine deleted', () => {
+        setRoutines(beforeR); setHabits(beforeH); setGoals(beforeG); setRemovedSeeds(beforeSeeds)
+      })
       setRoutines((prev) => prev.filter((x) => x.id !== id))
       if (r?.habitId) {
         const hid = r.habitId
@@ -828,7 +865,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setIdeas((prev) => [{ id: newId('idea'), space, text: t, when: todayKey(), color }, ...prev])
     },
     setIdeaColor: (id, color) => setIdeas((prev) => prev.map((i) => (i.id === id ? { ...i, color } : i))),
-    deleteIdea: (id) => setIdeas((prev) => prev.filter((i) => i.id !== id)),
+    deleteIdea: (id) => {
+      const before = ideas
+      setIdeas((prev) => prev.filter((i) => i.id !== id))
+      armUndo('Note deleted', () => setIdeas(before))
+    },
+
+    undoable,
+    undoDelete: () => { undoable?.restore(); setUndoable(null) },
+    dismissUndo: () => setUndoable(null),
 
     todayIndex,
     weekLedger,
@@ -844,11 +889,32 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
   }
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
+  return <Ctx.Provider value={value}>{children}<UndoToast /></Ctx.Provider>
 }
 
 export function useStore(): Store {
   const s = useContext(Ctx)
   if (!s) throw new Error('useStore outside provider')
   return s
+}
+
+/* The bar that lets a delete be taken back. It sits above the tab bar on the
+   phone and clear of the Pomodoro badge on the desktop, and it goes away by
+   itself after ten seconds, which is long enough to notice and act. */
+function UndoToast() {
+  const { undoable, undoDelete, dismissUndo } = useStore()
+  useEffect(() => {
+    if (!undoable) return
+    const t = window.setTimeout(dismissUndo, 10000)
+    return () => window.clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [undoable?.id])
+  if (!undoable) return null
+  return (
+    <div className="undo-bar" role="status">
+      <span className="undo-what">{undoable.label}</span>
+      <button className="undo-do" onClick={undoDelete}>Undo</button>
+      <button className="undo-x" onClick={dismissUndo} aria-label="Dismiss">✕</button>
+    </div>
+  )
 }

@@ -2037,3 +2037,36 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .journal-item:last-of-type { border-bottom: none; }
 .journal-item:not(.on) { opacity: 0.5; }
 .journal-item input { width: 17px; height: 17px; accent-color: var(--accent); flex: none; }
+
+.journal-readers { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; margin-top: var(--s2); }
+.journal-readers .assist-note { flex: 1 1 auto; }
+
+/* ---------- Avoidance: the eight beats ---------- */
+.beats { display: flex; flex-direction: column; gap: var(--s4); margin: var(--s4) 0; }
+.beat { display: flex; gap: var(--s3); align-items: flex-start; }
+.beat-n {
+  flex: none; width: 26px; height: 26px; border-radius: 50%;
+  border: 1px solid var(--hairline-strong); color: var(--faint);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 0.6875rem; font-weight: 600; margin-top: 1px;
+}
+.beat-body { min-width: 0; }
+.beat-h {
+  display: block; font-family: var(--font-mono); font-size: 0.5625rem;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); margin-bottom: 4px;
+}
+.beat-body p { font-size: var(--text-sm); line-height: 1.55; color: var(--ink); max-width: 68ch; }
+.beat-body p + p { margin-top: 6px; }
+.beat-abs { color: var(--muted) !important; font-size: var(--text-xs) !important; }
+.beat-feel b, .beat-verdict b { font-weight: 600; }
+.beat-verdict { color: var(--muted) !important; }
+
+/* Beat four is the one you act on, so it carries the accent and the controls. */
+.beat-first {
+  display: flex; gap: var(--s3); align-items: flex-start;
+  background: var(--accent-wash); border-radius: var(--r-md);
+  padding: var(--s4); margin-top: var(--s4);
+}
+.beat-first .beat-n { border-color: var(--accent); color: var(--accent); }
+.beat-first .coach-field-q { display: block; font-family: var(--font-display); font-weight: 700; font-size: var(--text-base); margin-bottom: 2px; }
+.beat-first .coach-field-hint { display: block; font-size: var(--text-xs); color: var(--muted); margin-bottom: var(--s2); }

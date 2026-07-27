@@ -5,7 +5,7 @@ import { useStore } from './store'
 import { Spark, SparkBox } from './widgets'
 import { fmtDuration, fmtNum, fmtSigned, fmtWhen, goalPace, isoWeekKey, taskMinutes } from './util'
 import { analyzeAvoidance } from './coach'
-import { getAiKey, hasAiKey, setAiKey } from './ai'
+import { getAiKey, hasAiKey, readAvoidance, setAiKey, type AvoidanceRead } from './ai'
 import { paymentTaskTitle } from './exceptions'
 import type { CoachFacts, CoachSession, TaskCategory } from './types'
 
@@ -343,16 +343,40 @@ export function CoachPage() {
   const [title, setTitle] = useState('')
   const [facts, setFacts] = useState<CoachFacts>(EMPTY_FACTS)
   const [firstStep, setFirstStep] = useState('')
-  const [meta, setMeta] = useState<{ firstStepMin: number; category: TaskCategory }>({ firstStepMin: 5, category: 'admin' })
+  const [meta, setMeta] = useState<{ firstStepMin: number; category: TaskCategory }>({ firstStepMin: 10, category: 'admin' })
+  const [read, setRead] = useState<AvoidanceRead | null>(null)
+  const [fromModel, setFromModel] = useState(false)
+  const [why, setWhy] = useState('')
+  const [thinking, setThinking] = useState(false)
   const [reflectId, setReflectId] = useState<string | null>(null)
 
-  const analyze = (input: string) => {
-    const a = analyzeAvoidance(input)
+  /* His own eight-beat approach, applied by the model to what he actually
+     wrote. Without a key it falls back to the template library and says so. */
+  const analyze = async (input: string) => {
     setTitle(input.trim())
-    setFacts({ avoiding: a.avoiding, steps: a.steps, cost: a.cost })
-    setFirstStep(a.firstStep)
-    setMeta({ firstStepMin: a.firstStepMin, category: a.category })
+    setThinking(true)
     setStage('review')
+    const r = await readAvoidance(input)
+    if (r.ok) {
+      setRead(r.read)
+      setFromModel(true)
+      setFirstStep(r.read.firstStep)
+      setMeta({ firstStepMin: r.read.firstStepMin, category: r.read.category })
+      setFacts({ avoiding: r.read.naming, steps: r.read.nextPiece, cost: r.read.document })
+    } else {
+      const a = analyzeAvoidance(input)
+      setRead(null)
+      setFromModel(false)
+      setWhy(
+        r.reason === 'no-key' ? 'No Groq key yet.'
+        : r.reason === 'bad-key' ? 'That Groq key was rejected.'
+        : r.reason === 'rate-limit' ? 'Groq is rate limiting right now.'
+        : 'Groq could not be reached.')
+      setFacts({ avoiding: a.avoiding, steps: a.steps, cost: a.cost })
+      setFirstStep(a.firstStep)
+      setMeta({ firstStepMin: a.firstStepMin, category: a.category })
+    }
+    setThinking(false)
   }
 
   /* Today deep-links here two ways: a known scenario id, or the raw title of a
@@ -363,11 +387,11 @@ export function CoachPage() {
     const s = COACH_SCENARIOS.find((x) => x.id === coachOpen)
     const seed = s ? s.title : coachOpen
     setThing(seed)
-    analyze(seed)
+    void analyze(seed)
     setCoachOpen(null)
   }, [coachOpen])
 
-  const reset = () => { setStage('home'); setThing(''); setTitle(''); setFacts(EMPTY_FACTS); setFirstStep('') }
+  const reset = () => { setStage('home'); setThing(''); setTitle(''); setFacts(EMPTY_FACTS); setFirstStep(''); setRead(null); setFromModel(false); setWhy('') }
   const setFact = (k: keyof CoachFacts, v: string) => setFacts((f) => ({ ...f, [k]: v }))
   const save = () => {
     startCoachSession({ title: title.trim() || thing.trim(), facts, firstStep: firstStep.trim(), firstStepMin: meta.firstStepMin, category: meta.category })
@@ -392,38 +416,124 @@ export function CoachPage() {
         <Band title={title || 'Avoidance'} />
         <div className="panel coach-facts">
           <div className="coach-drafted">
-            <span className="microcap">Coach broke this down</span>
-            <span className="assist-note">Drafted from what you wrote. Fix anything that is off, then send the first step to Today.</span>
+            <span className="microcap">{fromModel ? 'Read through the eight beats' : 'Not a model'}</span>
+            <span className="assist-note">
+              {fromModel
+                ? 'Your own approach, applied to what you wrote. Change anything that is off, then send the first step to Today.'
+                : `${why} This came from a local pattern library instead, so it is generic. Add a Groq key in Settings to have it actually read what you wrote.`}
+            </span>
           </div>
-          <div className="coach-field">
-            <span className="coach-field-q">What you are avoiding</span>
-            <textarea className="textinput coach-ta" rows={3} value={facts.avoiding} onChange={(e) => setFact('avoiding', e.target.value)} aria-label="What you are avoiding" />
-          </div>
-          <div className="coach-field">
-            <span className="coach-field-q">The steps it takes</span>
-            <textarea className="textinput coach-ta" rows={4} value={facts.steps} onChange={(e) => setFact('steps', e.target.value)} aria-label="The steps" />
-          </div>
-          <div className="coach-field">
-            <span className="coach-field-q">If you keep putting it off</span>
-            <textarea className="textinput coach-ta" rows={3} value={facts.cost} onChange={(e) => setFact('cost', e.target.value)} aria-label="The cost" />
-          </div>
-          <div className="coach-field coach-firststep">
-            <span className="coach-field-q">Your easy first step</span>
-            <span className="coach-field-hint">Not the whole thing. The smallest move that gets you in.</span>
-            <input className="textinput" style={{ width: '100%' }} value={firstStep} onChange={(e) => setFirstStep(e.target.value)} aria-label="First step" />
-          </div>
-          <div className="coach-field-inline">
-            <span>Give it</span>
-            <input className="textinput" type="number" min={1} max={120} style={{ width: 72 }} value={meta.firstStepMin} onChange={(e) => setMeta((m) => ({ ...m, firstStepMin: Math.max(1, Number(e.target.value) || 1) }))} aria-label="Minutes" />
-            <span>min ·</span>
-            <select className="textinput" value={meta.category} onChange={(e) => setMeta((m) => ({ ...m, category: e.target.value as TaskCategory }))} aria-label="Category">
-              <option value="call">call</option><option value="admin">admin</option><option value="deep">deep</option><option value="quick">quick</option>
-            </select>
-          </div>
-          <div className="coach-nav">
-            <button className="btn btn-quiet" onClick={reset}>Back</button>
-            <button className="btn btn-primary" disabled={!firstStep.trim()} onClick={save}>Put first step on Today</button>
-          </div>
+
+          {thinking && <div className="empty" style={{ paddingTop: 20 }}>Reading what you wrote.</div>}
+
+          {!thinking && read && (
+            <div className="beats">
+              <div className="beat">
+                <span className="beat-n">1</span>
+                <div className="beat-body">
+                  <span className="beat-h">Name it</span>
+                  <p>{read.naming}</p>
+                  {read.absolutes.length > 0 && (
+                    <p className="beat-abs">The spiral talks in absolutes. You used: {read.absolutes.map((a) => `“${a}”`).join(', ')}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="beat">
+                <span className="beat-n">2</span>
+                <div className="beat-body">
+                  <span className="beat-h">The feeling is not the verdict</span>
+                  <p className="beat-feel"><b>Feel this:</b> {read.feeling}</p>
+                  <p className="beat-verdict"><b>Do not sign this:</b> {read.verdict}</p>
+                </div>
+              </div>
+
+              <div className="beat">
+                <span className="beat-n">3</span>
+                <div className="beat-body">
+                  <span className="beat-h">Open the actual document</span>
+                  <p>{read.document}</p>
+                </div>
+              </div>
+
+              <div className="beat">
+                <span className="beat-n">5</span>
+                <div className="beat-body">
+                  <span className="beat-h">On your terms, not the ambush</span>
+                  <p>{read.onYourTerms}</p>
+                </div>
+              </div>
+
+              <div className="beat">
+                <span className="beat-n">6</span>
+                <div className="beat-body">
+                  <span className="beat-h">One piece, never the stack</span>
+                  <p>{read.nextPiece}</p>
+                </div>
+              </div>
+
+              {read.defer && (
+                <div className="beat">
+                  <span className="beat-n">7</span>
+                  <div className="beat-body">
+                    <span className="beat-h">Not from the bottom</span>
+                    <p>{read.defer}</p>
+                  </div>
+                </div>
+              )}
+
+              {read.who && (
+                <div className="beat">
+                  <span className="beat-n">8</span>
+                  <div className="beat-body">
+                    <span className="beat-h">Do not carry it alone</span>
+                    <p>{read.who}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!thinking && !read && (
+            <>
+              <div className="coach-field">
+                <span className="coach-field-q">What you are avoiding</span>
+                <textarea className="textinput coach-ta" rows={3} value={facts.avoiding} onChange={(e) => setFact('avoiding', e.target.value)} aria-label="What you are avoiding" />
+              </div>
+              <div className="coach-field">
+                <span className="coach-field-q">The steps it takes</span>
+                <textarea className="textinput coach-ta" rows={4} value={facts.steps} onChange={(e) => setFact('steps', e.target.value)} aria-label="The steps" />
+              </div>
+              <div className="coach-field">
+                <span className="coach-field-q">If you keep putting it off</span>
+                <textarea className="textinput coach-ta" rows={3} value={facts.cost} onChange={(e) => setFact('cost', e.target.value)} aria-label="The cost" />
+              </div>
+            </>
+          )}
+
+          {!thinking && <div className="coach-field coach-firststep beat-first">
+            <span className="beat-n">4</span>
+            <div className="beat-body" style={{ width: '100%' }}>
+              <span className="coach-field-q">The first physical action</span>
+              <span className="coach-field-hint">Not fixing it. Starting it. That is the whole fight.</span>
+              <input className="textinput" style={{ width: '100%' }} value={firstStep} onChange={(e) => setFirstStep(e.target.value)} aria-label="First step" />
+              <div className="coach-field-inline" style={{ marginTop: 'var(--s2)' }}>
+                <span>Give it</span>
+                <input className="textinput" type="number" min={1} max={120} style={{ width: 72 }} value={meta.firstStepMin} onChange={(e) => setMeta((m) => ({ ...m, firstStepMin: Math.max(1, Number(e.target.value) || 1) }))} aria-label="Minutes" />
+                <span>min ·</span>
+                <select className="textinput" value={meta.category} onChange={(e) => setMeta((m) => ({ ...m, category: e.target.value as TaskCategory }))} aria-label="Category">
+                  <option value="call">call</option><option value="admin">admin</option><option value="deep">deep</option><option value="quick">quick</option>
+                </select>
+              </div>
+            </div>
+          </div>}
+
+          {!thinking && (
+            <div className="coach-nav">
+              <button className="btn btn-quiet" onClick={reset}>Back</button>
+              <button className="btn btn-primary" disabled={!firstStep.trim()} onClick={save}>Put first step on Today</button>
+            </div>
+          )}
         </div>
       </div>
     )
@@ -461,12 +571,12 @@ export function CoachPage() {
         <textarea
           className="textinput" rows={3} style={{ width: '100%', marginTop: 'var(--s2)' }}
           value={thing} onChange={(e) => setThing(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && thing.trim()) analyze(thing) }}
+          onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && thing.trim()) void analyze(thing) }}
           placeholder="Say it plainly. e.g. Call VZP to confirm the payment plan, or Reply to the tax office letter"
           aria-label="What you are avoiding"
         />
         <div className="coach-intake-row">
-          <button className="btn btn-primary" disabled={!thing.trim()} onClick={() => analyze(thing)}>Face it</button>
+          <button className="btn btn-primary" disabled={!thing.trim()} onClick={() => void analyze(thing)}>Face it</button>
           <span className="assist-note">Coach looks at it factually and hands you an easy first step. You do not fill in the analysis, it does.</span>
         </div>
 
@@ -479,13 +589,13 @@ export function CoachPage() {
           <span className="microcap">Or start from one of these</span>
           <div className="coach-starter-row">
             {oldest.map((t) => (
-              <button key={t.id} className="coach-starter is-yours" onClick={() => { setThing(t.title); analyze(t.title) }}>
+              <button key={t.id} className="coach-starter is-yours" onClick={() => { setThing(t.title); void analyze(t.title) }}>
                 {t.title}
                 <span className="cs-age">on your list</span>
               </button>
             ))}
             {COACH_SCENARIOS.slice(0, 5).map((s) => (
-              <button key={s.id} className="coach-starter" onClick={() => { setThing(s.title); analyze(s.title) }}>
+              <button key={s.id} className="coach-starter" onClick={() => { setThing(s.title); void analyze(s.title) }}>
                 {s.title}
                 <span className="cs-age">{s.tag}</span>
               </button>

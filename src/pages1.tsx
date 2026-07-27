@@ -643,14 +643,31 @@ export function PlanPage() {
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-function HabitRow({ h, todayIndex, actions }: { h: HabitDef; todayIndex: number; actions?: React.ReactNode }) {
-  const { toggleHabitDay } = useStore()
+function HabitRow({ h, todayIndex, actions, drivenBy }: {
+  h: HabitDef
+  todayIndex: number
+  actions?: React.ReactNode
+  /** Name of the routine that ticks this habit, when one does. */
+  drivenBy?: string
+}) {
+  const { toggleHabitDay, setPage } = useStore()
   const kept = h.days.filter(Boolean).length
   const target = habitTarget(h)
   // Weekdays-only habits do not expect the weekend, so those dots stay quiet.
   const expected = (i: number) => (h.frequency === 'weekdays' ? i < 5 : true)
+  // How many of the last 12 weeks actually hit the target. This is the number
+  // the row of bars was trying to say and never did.
+  const weeks = h.history ?? []
+  const hitWeeks = weeks.filter((n) => n >= target).length
+  const avg = weeks.length ? weeks.reduce((a, n) => a + n, 0) / weeks.length : 0
+  const trend = weeks.length === 0
+    ? null
+    : target <= 1
+      ? `kept ${hitWeeks} of the last ${weeks.length} weeks`
+      : `averaging ${avg.toFixed(1).replace(/\.0$/, '')} of ${target} a week`
+
   return (
-    <div className="habit-row">
+    <div className={`habit-row${drivenBy ? ' is-auto' : ''}`}>
       <div className="habit-row-top">
         <span className="habit-name">{h.name}</span>
         <span className="habit-count mono">{kept}/{target}<span className="habit-freq">{habitFrequencyLabel(h)}</span></span>
@@ -660,23 +677,31 @@ function HabitRow({ h, todayIndex, actions }: { h: HabitDef; todayIndex: number;
         {DAY_LABELS.map((d, i) => (
           <span className="day-cell" key={i}>
             <button
-              className={`daydot${expected(i) ? '' : ' off-day'}`}
+              className={`daydot${expected(i) ? '' : ' off-day'}${drivenBy ? ' is-auto' : ''}`}
               role="checkbox"
               aria-checked={h.days[i]}
-              disabled={i > todayIndex}
-              aria-label={`${h.name}, ${d}`}
-              onClick={() => toggleHabitDay(h.id, i)}
+              /* A habit a routine ticks is read-only here: ticking it by hand
+                 would contradict the routine that owns it. */
+              disabled={i > todayIndex || !!drivenBy}
+              aria-label={drivenBy ? `${h.name}, ${d}, set by the ${drivenBy} routine` : `${h.name}, ${d}`}
+              title={drivenBy ? `Set by the ${drivenBy} routine` : undefined}
+              onClick={() => { if (!drivenBy) toggleHabitDay(h.id, i) }}
             >
               <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
             </button>
             <span className={`day-lab${i === todayIndex ? ' today' : ''}`}>{d[0]}</span>
           </span>
         ))}
-        <span className="habit-history only-wide" aria-label={`${h.name}, 12-week history`}>
-          {(h.history ?? []).map((n, i) => (
-            <i key={i} className={n >= target ? 'hi' : ''} style={{ height: `${Math.max(3, (n / 7) * 26)}px` }} />
-          ))}
-        </span>
+      </div>
+      <div className="habit-foot">
+        {drivenBy ? (
+          <button className="habit-auto" onClick={() => setPage('routines')}>
+            Ticks itself when you finish {drivenBy}
+          </button>
+        ) : (
+          <span className="habit-manual">You tick this one</span>
+        )}
+        {trend && <span className="habit-weeks">{trend}</span>}
       </div>
     </div>
   )
@@ -756,7 +781,7 @@ export function HabitsPage() {
   const spaceHabits = habits.filter((h) => h.space === space)
   // A habit a routine drives cannot be deleted from here, or the routine would
   // mirror into nothing. Pausing stays available.
-  const mirrored = new Set(routines.map((r) => r.habitId).filter(Boolean) as string[])
+  const drivenBy = new Map(routines.filter((r) => r.habitId).map((r) => [r.habitId as string, r.title]))
   const kept = spaceHabits.filter((h) => !h.paused).reduce((a, h) => a + h.days.filter(Boolean).length, 0)
   const target = spaceHabits.filter((h) => !h.paused).reduce((a, h) => a + habitTarget(h), 0)
 
@@ -783,7 +808,7 @@ export function HabitsPage() {
             </div>
             {c.list.map((h) => (
               <div className={`habit-item${h.paused ? ' is-paused' : ''}`} key={h.id}>
-                <HabitRow h={h} todayIndex={todayIndex} actions={
+                <HabitRow h={h} todayIndex={todayIndex} drivenBy={drivenBy.get(h.id)} actions={
                   <>
                   {h.paused && <span className="col-tot mono">paused</span>}
                   {!h.paused && h.days[todayIndex] && <span className="col-tot mono val-pos">done today</span>}
@@ -794,8 +819,8 @@ export function HabitsPage() {
                         <button role="menuitem" onClick={() => { togglePauseHabit(h.id); setMenuFor(null) }}>
                           {h.paused ? 'Resume' : 'Pause'}
                         </button>
-                        {mirrored.has(h.id) ? (
-                          <span className="kebab-note">Run by a routine</span>
+                        {drivenBy.has(h.id) ? (
+                          <span className="kebab-note">Run by the {drivenBy.get(h.id)} routine</span>
                         ) : (
                           <button role="menuitem" className="danger" onClick={() => { deleteHabit(h.id); setMenuFor(null) }}>Delete</button>
                         )}

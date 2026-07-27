@@ -119,13 +119,14 @@ export interface RoutineStep {
 }
 
 /** How often a habit is meant to happen. Drives its weekly target. */
-export type HabitFrequency = 'daily' | 'weekdays' | 'times-per-week' | 'weekly'
+export type HabitFrequency = 'daily' | 'weekdays' | 'times-per-week' | 'weekly' | 'monthly'
 
 export const HABIT_FREQUENCIES: { id: HabitFrequency; label: string }[] = [
   { id: 'daily', label: 'Every day' },
   { id: 'weekdays', label: 'Monday to Friday' },
   { id: 'times-per-week', label: 'A few times a week' },
   { id: 'weekly', label: 'Once a week' },
+  { id: 'monthly', label: 'Once a month' },
 ]
 
 export interface HabitDef {
@@ -150,7 +151,7 @@ export interface HabitDef {
  *  anything that was never meant to happen seven days a week. */
 export function habitTarget(h: HabitDef): number {
   if (h.frequency === 'weekdays') return 5
-  if (h.frequency === 'weekly') return 1
+  if (h.frequency === 'weekly' || h.frequency === 'monthly') return 1
   if (h.frequency === 'times-per-week') return Math.max(1, Math.min(7, h.targetPerWeek ?? 3))
   return 7
 }
@@ -158,6 +159,7 @@ export function habitTarget(h: HabitDef): number {
 export function habitFrequencyLabel(h: HabitDef): string {
   if (h.frequency === 'weekdays') return 'Mon to Fri'
   if (h.frequency === 'weekly') return 'once a week'
+  if (h.frequency === 'monthly') return 'once a month'
   if (h.frequency === 'times-per-week') return `${habitTarget(h)}x a week`
   return 'every day'
 }

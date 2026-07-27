@@ -799,15 +799,19 @@ export function HabitsPage() {
         actions={<button className="btn btn-primary" onClick={() => setAdding(true)}>Add a habit</button>}
       />
 
-      <div className="habit-cols">
-        {cols.map((c) => (
-          <div className="panel habit-col" key={c.id}>
-            <div className="col-head">
-              <span className="microcap">{c.label}</span>
-              <span className="col-tot mono">{c.hint}</span>
-            </div>
+      {/* One band per part of the day: a heading, a rule, then that group's
+          habits side by side across the full width. Groups stack down the page,
+          so a busy morning never leaves a short evening column stranded. */}
+      {cols.map((c) => (
+        <section className="habit-section" key={c.id}>
+          <div className="section-head">
+            <span className="microcap">{c.label}</span>
+            <span className="section-hint">{c.hint}</span>
+            <span className="section-count mono">{c.list.length}</span>
+          </div>
+          <div className="habit-grid">
             {c.list.map((h) => (
-              <div className={`habit-item${h.paused ? ' is-paused' : ''}`} key={h.id}>
+              <div className={`panel habit-card${h.paused ? ' is-paused' : ''}`} key={h.id}>
                 <HabitRow h={h} todayIndex={todayIndex} drivenBy={drivenBy.get(h.id)} actions={
                   <>
                   {h.paused && <span className="col-tot mono">paused</span>}
@@ -832,9 +836,9 @@ export function HabitsPage() {
               </div>
             ))}
           </div>
-        ))}
-        {cols.length === 0 && <div className="empty">No habits in this space yet. Add one from the button above.</div>}
-      </div>
+        </section>
+      ))}
+      {cols.length === 0 && <div className="empty">No habits in this space yet. Add one from the button above.</div>}
 
       <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginTop: 16 }}>
         Missed days stay quiet on purpose. No broken streaks, no wall of missed-day marks. Multi-step routines live on the Routines tab; finishing one there checks its habit off here.

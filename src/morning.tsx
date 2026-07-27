@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from './store'
 import { FALLBACK_NEWS, loadMorningNews, twistersForDay, type MorningNews } from './morning-data'
-import type { Routine } from './types'
+import { TYPING_TARGET_WPM, type Routine } from './types'
 
 /* The Morning routine as a guided, foldable accordion. Every step starts collapsed;
    you open one to work through it and check it off yourself with the checkbox, same
@@ -157,12 +157,59 @@ function MouthStretch() {
   )
 }
 
-/* ---- Typing ---- */
-function Typing({ url, label }: { url?: string; label?: string }) {
+/* ---- Typing ----
+   This step is not "did you open it", it is "did you hit the number". You log
+   the speed you actually got; the step only checks off at the target. */
+function Typing({ url, label, routineId, stepId, wpm, best, onLog }: {
+  url?: string
+  label?: string
+  routineId: string
+  stepId: string
+  wpm?: number
+  best?: number
+  onLog: (v: number) => void
+}) {
+  const [entry, setEntry] = useState('')
+  const passed = (wpm ?? 0) >= TYPING_TARGET_WPM
+  const submit = () => {
+    const v = Math.round(Number(entry))
+    if (!Number.isFinite(v) || v <= 0) return
+    onLog(v)
+    setEntry('')
+  }
   return (
     <div className="mr-typing">
-      <p className="mr-lead">One quick round to wake the hands up.</p>
+      <p className="mr-lead">
+        One round, and you are chasing a number: <strong>{TYPING_TARGET_WPM} WPM or better</strong>.
+        Anything under that is a warm-up, not a pass.
+      </p>
       {url && <a className="btn btn-quiet" href={url} target="_blank" rel="noreferrer">{label ?? 'Open typing test'} ↗</a>}
+
+      <div className="wpm-row">
+        <label className="wpm-label" htmlFor={`wpm-${stepId}`}>Speed you hit</label>
+        <input
+          id={`wpm-${stepId}`} className="numinput" type="number" min={1} max={300}
+          placeholder="WPM" value={entry}
+          onChange={(e) => setEntry(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') submit() }}
+        />
+        <button className="btn btn-primary" disabled={!entry.trim()} onClick={submit}>Log it</button>
+      </div>
+
+      {wpm != null && (
+        <div className={`wpm-result${passed ? ' pass' : ' under'}`}>
+          <span className="wpm-big mono">{wpm}<span className="wpm-unit">WPM</span></span>
+          <span className="wpm-verdict">
+            {passed
+              ? `Target cleared. You can check this one off.`
+              : `${TYPING_TARGET_WPM - wpm} short of ${TYPING_TARGET_WPM}. Run it again.`}
+          </span>
+          <div className="wpm-bar"><i style={{ width: `${Math.min(100, Math.round((wpm / TYPING_TARGET_WPM) * 100))}%` }} /></div>
+        </div>
+      )}
+      {best != null && best > 0 && (
+        <p className="wpm-best mono">best so far {best} WPM</p>
+      )}
     </div>
   )
 }
@@ -177,14 +224,22 @@ function GoalsReminder({ note }: { note?: string }) {
 }
 
 export function MorningRoutine({ routine }: { routine: Routine }) {
-  const { toggleRoutineStep, resetRoutine } = useStore()
+  const { toggleRoutineStep, resetRoutine, setStepData, records } = useStore()
   const steps = routine.steps
   const done = routine.doneStepIds
   const [open, setOpen] = useState<string>('') // everything collapsed until you open a step
   // Held here so the countdown survives collapsing the step or auto-advancing.
   const [med, setMed] = useState<MedState>(MED_IDLE)
 
-  const onComplete = (id: string) => {
+  // The typing step is earned, not asserted: it cannot be ticked under target.
+  const typingWpm = routine.stepData?.mr4
+  const typingLocked = (typingWpm ?? 0) < TYPING_TARGET_WPM
+
+  /* `force` is used when the step earns itself, e.g. logging a passing typing
+     speed. Without it the guard would read the score from the render that is
+     already stale and refuse the very result that just unlocked it. */
+  const onComplete = (id: string, force = false) => {
+    if (!force && id === 'mr4' && typingLocked && !done.includes(id)) return
     const wasDone = done.includes(id)
     toggleRoutineStep(routine.id, id)
     if (!wasDone) {
@@ -199,7 +254,17 @@ export function MorningRoutine({ routine }: { routine: Routine }) {
     if (stepId === 'mr1') return <Meditation url={s.link} med={med} setMed={setMed} onEnd={() => { if (!done.includes('mr1')) onComplete('mr1') }} />
     if (stepId === 'mr2') return <Pronunciation />
     if (stepId === 'mr3') return <MouthStretch />
-    if (stepId === 'mr4') return <Typing url={s.link} label={s.linkLabel} />
+    if (stepId === 'mr4') return (
+      <Typing
+        url={s.link} label={s.linkLabel} routineId={routine.id} stepId="mr4"
+        wpm={typingWpm} best={records[`${routine.id}:mr4`]}
+        onLog={(v) => {
+          setStepData(routine.id, 'mr4', v)
+          // Hitting the target is the completion, so it checks itself off.
+          if (v >= TYPING_TARGET_WPM && !done.includes('mr4')) onComplete('mr4', true)
+        }}
+      />
+    )
     return <GoalsReminder note={s.note} />
   }
 
@@ -235,14 +300,24 @@ export function MorningRoutine({ routine }: { routine: Routine }) {
                   className="routine-check mr-check"
                   role="checkbox"
                   aria-checked={isDone}
-                  aria-label={`Mark ${s.title} ${isDone ? 'not done' : 'done'}`}
+                  disabled={s.id === 'mr4' && typingLocked && !isDone}
+                  aria-label={
+                    s.id === 'mr4' && typingLocked && !isDone
+                      ? `${s.title}: log ${TYPING_TARGET_WPM} WPM or better to check this off`
+                      : `Mark ${s.title} ${isDone ? 'not done' : 'done'}`
+                  }
+                  title={s.id === 'mr4' && typingLocked && !isDone ? `Hit ${TYPING_TARGET_WPM} WPM to check this off` : undefined}
                   onClick={() => onComplete(s.id)}
                 >
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </button>
                 <button className="mr-head-main" onClick={() => setOpen(isOpen ? '' : s.id)} aria-expanded={isOpen}>
                   <span className="mr-title">{s.title}</span>
-                  <span className="mr-status">{isDone ? 'done' : isOpen ? 'now' : 'to do'}</span>
+                  <span className="mr-status">
+                    {isDone ? 'done'
+                      : s.id === 'mr4' ? (typingWpm != null ? `${typingWpm} of ${TYPING_TARGET_WPM} WPM` : `${TYPING_TARGET_WPM} WPM to pass`)
+                      : isOpen ? 'now' : 'to do'}
+                  </span>
                   <svg className="mr-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </button>
               </div>

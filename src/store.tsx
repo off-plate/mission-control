@@ -56,6 +56,8 @@ interface PersistedState {
   weekKey?: string
   /** One-time data repairs already applied to this saved state. */
   fixes?: number
+  /** Personal bests, keyed by `routineId:stepId`. Survives every rollover. */
+  records?: Record<string, number>
 }
 
 interface Store extends PersistedState {
@@ -118,6 +120,11 @@ interface Store extends PersistedState {
   routines: Routine[]
   toggleRoutineStep: (routineId: string, stepId: string) => void
   resetRoutine: (routineId: string) => void
+  /** Record a number against a routine step (today's typing speed). Keeps the
+   *  all-time best in `records`, which never resets with the period. */
+  setStepData: (routineId: string, stepId: string, value: number) => void
+  /** Personal bests, keyed by `routineId:stepId`. Never cleared by a rollover. */
+  records: Record<string, number>
 
   ideas: Idea[]
   addIdea: (text: string, color: string) => void
@@ -241,8 +248,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return MOCK_ROUTINES.map((m) => {
       const p = prior.find((x) => x.id === m.id)
       const key = periodKeyFor(m.cadence)
-      if (!p || p.periodKey !== key) return { ...m, doneStepIds: [], periodKey: key }
-      return { ...m, doneStepIds: p.doneStepIds.filter((id) => m.steps.some((s) => s.id === id)), periodKey: key }
+      if (!p || p.periodKey !== key) return { ...m, doneStepIds: [], periodKey: key, stepData: {} }
+      return { ...m, doneStepIds: p.doneStepIds.filter((id) => m.steps.some((s) => s.id === id)), periodKey: key, stepData: p.stepData ?? {} }
     })
   }, [persisted])
   const [spaces, setSpaces] = useState(persisted?.spaces ?? DEFAULT_SPACES)
@@ -267,6 +274,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [coachSessions, setCoachSessions] = useState<CoachSession[]>(persisted?.coachSessions ?? [])
   const [routines, setRoutines] = useState<Routine[]>(seededRoutines)
   const [ideas, setIdeas] = useState<Idea[]>(persisted?.ideas ?? MOCK_IDEAS)
+  const [records, setRecords] = useState<Record<string, number>>(persisted?.records ?? {})
   const remoteSaveTimer = useRef<number | undefined>(undefined)
   const latestJson = useRef<string>('')
   // The selected space survives a reload (kept out of the synced blob on purpose,
@@ -313,7 +321,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const state: PersistedState = {
       version: 3, spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
-      weekKey: isoWeekKey(),
+      weekKey: isoWeekKey(), records, fixes: 1,
     }
     const json = JSON.stringify(state)
     latestJson.current = json
@@ -327,7 +335,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { void saveRemoteState(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas])
+  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, records])
 
   /* Closing the tab inside the debounce window must not lose the last change:
      flush the pending remote write the moment the page starts hiding. */
@@ -648,9 +656,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setHabits((hs) => hs.map((h) => (h.id === hid ? { ...h, days: h.days.map((d, i) => (i === todayIndex ? isComplete : d)) } : h)))
       }
     },
+    records,
+    setStepData: (routineId, stepId, value) => {
+      setRoutines((prev) => prev.map((r) => (r.id === routineId ? { ...r, stepData: { ...(r.stepData ?? {}), [stepId]: value } } : r)))
+      const key = `${routineId}:${stepId}`
+      setRecords((prev) => (value > (prev[key] ?? 0) ? { ...prev, [key]: value } : prev))
+    },
     resetRoutine: (routineId) => {
       const r = routines.find((x) => x.id === routineId)
-      setRoutines((prev) => prev.map((x) => (x.id === routineId ? { ...x, doneStepIds: [] } : x)))
+      setRoutines((prev) => prev.map((x) => (x.id === routineId ? { ...x, doneStepIds: [], stepData: {} } : x)))
       if (r?.habitId) {
         const hid = r.habitId
         setHabits((hs) => hs.map((h) => (h.id === hid ? { ...h, days: h.days.map((d, i) => (i === todayIndex ? false : d)) } : h)))

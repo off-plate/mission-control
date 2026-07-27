@@ -13,7 +13,9 @@ interface Pomo {
   focusMin: number
   breakMin: number
   cyclesDone: number
-  startFocus: () => void
+  startFocus: (minutes?: number, label?: string) => void
+  /** What this focus block is for, when it was started from a task. */
+  focusLabel: string | null
   toggle: () => void
   skip: () => void
   stop: () => void
@@ -35,7 +37,7 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStar
 const PK = 'mc-pomodoro'
 interface Saved {
   focusMin: number; breakMin: number; cyclesDone: number; cyclesDay: string
-  phase: Phase; endsAt: number | null; pausedLeft: number | null
+  phase: Phase; endsAt: number | null; pausedLeft: number | null; focusLabel: string | null
 }
 const today = () => new Date().toDateString()
 function loadPomo(): Partial<Saved> {
@@ -58,6 +60,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   const [endsAt, setEndsAt] = useState<number | null>(saved.endsAt ?? null)
   const [pausedLeft, setPausedLeft] = useState<number | null>(saved.pausedLeft ?? null)
   const [cyclesDone, setCyclesDone] = useState(saved.cyclesDone ?? 0)
+  const [focusLabel, setFocusLabel] = useState<string | null>(saved.focusLabel ?? null)
   const [, tick] = useState(0)
 
   const running = endsAt !== null
@@ -73,9 +76,9 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(PK, JSON.stringify({ focusMin, breakMin, cyclesDone, cyclesDay: today(), phase, endsAt, pausedLeft }))
+      localStorage.setItem(PK, JSON.stringify({ focusMin, breakMin, cyclesDone, cyclesDay: today(), phase, endsAt, pausedLeft, focusLabel }))
     } catch { /* noop */ }
-  }, [focusMin, breakMin, cyclesDone, phase, endsAt, pausedLeft])
+  }, [focusMin, breakMin, cyclesDone, phase, endsAt, pausedLeft, focusLabel])
 
   // Re-render twice a second while running; the clock itself comes from the deadline.
   useEffect(() => {
@@ -99,6 +102,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
       setPhase('idle')
       setEndsAt(null)
       setPausedLeft(null)
+      setFocusLabel(null)
     }
   }, [secondsLeft, phase, running, breakMin])
 
@@ -109,9 +113,13 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     return () => { document.title = 'Mission Control' }
   }, [phase, secondsLeft])
 
-  const startFocus = () => {
+  /* Started from a task, the block runs for that task's own estimate and carries
+     its name, so the badge says what you are actually doing. */
+  const startFocus = (minutes?: number, label?: string) => {
     if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission()
-    setPhase('focus'); setEndsAt(Date.now() + focusMin * 60 * 1000); setPausedLeft(null)
+    const mins = Math.max(1, Math.round(minutes ?? focusMin))
+    setFocusLabel(label ?? null)
+    setPhase('focus'); setEndsAt(Date.now() + mins * 60 * 1000); setPausedLeft(null)
   }
   const toggle = () => {
     if (phase === 'idle') { startFocus(); return }
@@ -122,9 +130,9 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     if (phase === 'focus') { setPhase('break'); setEndsAt(Date.now() + breakMin * 60 * 1000); setPausedLeft(null) }
     else { setPhase('idle'); setEndsAt(null); setPausedLeft(null) }
   }
-  const stop = () => { setPhase('idle'); setEndsAt(null); setPausedLeft(null) }
+  const stop = () => { setPhase('idle'); setEndsAt(null); setPausedLeft(null); setFocusLabel(null) }
 
-  const value: Pomo = { phase, running, secondsLeft, focusMin, breakMin, cyclesDone, startFocus, toggle, skip, stop, setFocusMin, setBreakMin }
+  const value: Pomo = { phase, running, secondsLeft, focusMin, breakMin, cyclesDone, focusLabel, startFocus, toggle, skip, stop, setFocusMin, setBreakMin }
   return (
     <Ctx.Provider value={value}>
       {children}
@@ -165,7 +173,7 @@ function PomodoroBadge() {
             <Stepper label="Break" value={p.breakMin} set={p.setBreakMin} min={5} max={30} />
           </div>
         )}
-        <button className="pomo-start" onClick={p.startFocus} aria-label={`Start a ${p.focusMin} minute focus`}>
+        <button className="pomo-start" onClick={() => p.startFocus()} aria-label={`Start a ${p.focusMin} minute focus`}>
           <ClockIcon /> Focus {p.focusMin}m
         </button>
         {p.cyclesDone > 0 && <span className="pomo-cycles mono" title="Focus blocks finished today">{p.cyclesDone} today</span>}
@@ -177,7 +185,9 @@ function PomodoroBadge() {
   const state = !p.running ? 'paused' : p.phase
   return (
     <div className={`pomo-badge active ${state}`}>
-      <span className="pomo-phase">{p.phase === 'focus' ? (p.running ? 'Focus' : 'Paused') : 'Break'}</span>
+      <span className="pomo-phase" title={p.focusLabel ?? undefined}>
+        {p.phase === 'focus' ? (p.focusLabel ?? (p.running ? 'Focus' : 'Paused')) : 'Break'}
+      </span>
       <span className="pomo-clock mono">{mmss(p.secondsLeft)}</span>
       <button className="pomo-icon" onClick={p.toggle} aria-label={p.running ? 'Pause' : 'Resume'}>{p.running ? '❚❚' : '▸'}</button>
       <button className="pomo-icon" onClick={p.skip} aria-label={p.phase === 'focus' ? 'Skip to break' : 'End break'}>⤼</button>

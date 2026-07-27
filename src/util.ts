@@ -85,10 +85,16 @@ export function slotForTime(hhmm: string): TimeSlot {
   return 'evening'
 }
 
-/** A task's real planned minutes: sum of subtasks when it has them, else its own estimate. */
+/** A task's real planned minutes: sum of subtasks when it has them, else its own
+ *  estimate. Zero means "not estimated yet", never a guess standing in for one. */
 export function taskMinutes(t: Task): number {
   if (t.subtasks && t.subtasks.length) return t.subtasks.reduce((a, s) => a + s.estimateMin, 0)
   return t.estimateMin
+}
+
+/** Has this task actually been estimated, or is it still an unknown? */
+export function isEstimated(t: Task): boolean {
+  return taskMinutes(t) > 0
 }
 
 export function fmtDuration(min: number): string {

@@ -159,6 +159,11 @@ function loadPersisted(): PersistedState | null {
     // A seeded habit added later is missing entirely; append it rather than reseed.
     for (const s of MOCK_HABITS) if (!p.habits.some((h) => h.id === s.id)) p.habits.push(s)
 
+    /* A day that has not happened yet cannot be done. Future ticks were also
+       unreachable, since those dots are disabled, so they could never be undone. */
+    const todayIdx = (new Date().getDay() + 6) % 7
+    p.habits = p.habits.map((h) => ({ ...h, days: h.days.map((d, i) => (i > todayIdx ? false : d)) }))
+
     const seedG = new Map(MOCK_GOALS.map((g) => [g.id, g]))
     p.goals = p.goals.map((g) => {
       const s = seedG.get(g.id)

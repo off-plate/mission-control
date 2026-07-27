@@ -6,11 +6,14 @@ import { breakdownTask, type Detail } from './ai'
 import { useStore } from './store'
 import { fmtDuration } from './util'
 
-export function Sheet({ title, onClose, children, note }: {
+export function Sheet({ title, onClose, children, note, steady }: {
   title: string
   onClose: () => void
   children: ReactNode
   note?: string
+  /** Hold one height across every state of the form, so switching between kinds
+   *  changes the questions rather than the size of the window asking them. */
+  steady?: boolean
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -24,7 +27,7 @@ export function Sheet({ title, onClose, children, note }: {
           <h2>{title}</h2>
           <button className="close" onClick={onClose} aria-label="Close">×</button>
         </div>
-        <div className="sheet-body">{children}</div>
+        <div className={`sheet-body${steady ? ' is-steady' : ''}`}>{children}</div>
         {note && <div className="demo-note">{note}</div>}
       </div>
     </div>

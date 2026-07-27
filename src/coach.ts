@@ -124,3 +124,26 @@ export function analyzeAvoidance(input: string): CoachAnalysis {
     category: k.category,
   }
 }
+
+/**
+ * The pattern library, shaped into the same eight beats the model fills in, so
+ * the page has one structure whether or not a key is set. It is generic and the
+ * page says so; what it must not do is look like a different feature.
+ */
+export function fallbackRead(input: string): import('./ai').AvoidanceRead {
+  const a = analyzeAvoidance(input)
+  const parts = a.steps.split(/(?<=\.)\s+/).filter(Boolean)
+  const rest = parts.slice(1).join(' ') || a.steps
+  return {
+    naming: a.avoiding,
+    absolutes: [],
+    feeling: 'Whatever this feels like right now is real, and it is not a verdict on you. Feeling it and judging yourself for it are two different acts.',
+    verdict: a.cost,
+    document: 'Open the actual thing before deciding anything about it. The letter, the form, the thread. What is in front of you is smaller than what you have been carrying.',
+    firstStep: a.firstStep,
+    firstStepMin: a.firstStepMin,
+    onYourTerms: 'Do it the way that costs you least: your hour, your words, written rather than spoken if that is easier. Nothing here says it has to be done the hard way.',
+    nextPiece: rest,
+    category: a.category,
+  }
+}

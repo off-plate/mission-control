@@ -11,7 +11,8 @@ import { useStore } from './store'
 import type { SizeKey, SpaceId, WidgetType } from './types'
 import { fmtNum, fmtTimeShort, goalPace } from './util'
 
-export function Spark({ data, width = 120, height = 32 }: { data: number[]; width?: number; height?: number }) {
+/** `fluid` makes the line span its container, so label rows underneath line up. */
+export function Spark({ data, width = 120, height = 32, fluid = false }: { data: number[]; width?: number; height?: number; fluid?: boolean }) {
   const max = Math.max(...data)
   const min = Math.min(...data)
   const pts = data
@@ -22,9 +23,16 @@ export function Spark({ data, width = 120, height = 32 }: { data: number[]; widt
     })
     .join(' ')
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
+    <svg
+      width={fluid ? '100%' : width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio={fluid ? 'none' : undefined}
+      style={fluid ? { display: 'block' } : undefined}
+      aria-hidden="true"
+    >
       <line x1="2" y1={height - 2} x2={width - 2} y2={height - 2} stroke="currentColor" strokeWidth="1" className="spark-base" opacity="0.35" />
-      <polyline points={pts} fill="none" stroke="currentColor" strokeWidth="1.5" className="spark" />
+      <polyline points={pts} fill="none" stroke="currentColor" strokeWidth="1.5" className="spark" vectorEffect={fluid ? 'non-scaling-stroke' : undefined} />
     </svg>
   )
 }

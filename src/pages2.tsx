@@ -99,10 +99,15 @@ export function MoneyPage() {
           <span className="microcap">Monthly savings</span>
           <div className="kpi val-pos">{f.savings.thisMonth}</div>
           <div className="kpi-sub">set aside this month, {f.savings.note}</div>
+          {/* Fluid, so the line and its month labels share the same axis. */}
           <div style={{ marginTop: 12 }}>
-            <Spark data={f.savings.months} width={260} height={54} />
+            <Spark data={f.savings.months} width={260} height={54} fluid />
             <div className="savings-months">
               {f.savings.monthLabels.map((m) => <span key={m}>{m}</span>)}
+            </div>
+            <div className="savings-range">
+              <span className="mono">{fmtNum(f.savings.months[0])} Kč</span>
+              <span className="mono val-pos">{fmtNum(f.savings.months[f.savings.months.length - 1])} Kč now</span>
             </div>
           </div>
           <div className="kpi-sub" style={{ marginTop: 10 }}><span className="val-pos">{f.savings.total}</span> saved so far</div>

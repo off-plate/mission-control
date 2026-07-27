@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { COACH_SCENARIOS, MOCK_MONEY, MOCK_STATS } from './mock'
-import { Band } from './pages1'
+import { AutoTextarea, Band } from './pages1'
 import { useStore } from './store'
 import { Spark, SparkBox } from './widgets'
 import { fmtDuration, fmtNum, fmtSigned, fmtWhen, goalPace, isoWeekKey, taskMinutes } from './util'
@@ -322,7 +322,7 @@ function ReflectForm({ onSubmit, onCancel }: { onSubmit: (didIt: boolean, felt: 
           </div>
         </>
       )}
-      <textarea className="textinput" rows={2} style={{ width: '100%', marginTop: 'var(--s2)' }}
+      <AutoTextarea className="textinput" minRows={2} style={{ width: '100%', marginTop: 'var(--s2)' }}
         placeholder={didIt ? 'What did it feel like? One honest line.' : 'What is actually in the way? One honest line.'}
         value={text} onChange={(e) => setText(e.target.value)} aria-label={didIt ? 'How it felt' : 'What is in the way'} />
       {!didIt && <p className="assist-note" style={{ marginTop: 'var(--s2)' }}>This stays open. An unfaced thing should keep showing up.</p>}
@@ -498,15 +498,15 @@ export function CoachPage() {
             <>
               <div className="coach-field">
                 <span className="coach-field-q">What you are avoiding</span>
-                <textarea className="textinput coach-ta" rows={3} value={facts.avoiding} onChange={(e) => setFact('avoiding', e.target.value)} aria-label="What you are avoiding" />
+                <AutoTextarea className="textinput coach-ta" minRows={3} value={facts.avoiding} onChange={(e) => setFact('avoiding', e.target.value)} aria-label="What you are avoiding" />
               </div>
               <div className="coach-field">
                 <span className="coach-field-q">The steps it takes</span>
-                <textarea className="textinput coach-ta" rows={4} value={facts.steps} onChange={(e) => setFact('steps', e.target.value)} aria-label="The steps" />
+                <AutoTextarea className="textinput coach-ta" minRows={4} value={facts.steps} onChange={(e) => setFact('steps', e.target.value)} aria-label="The steps" />
               </div>
               <div className="coach-field">
                 <span className="coach-field-q">If you keep putting it off</span>
-                <textarea className="textinput coach-ta" rows={3} value={facts.cost} onChange={(e) => setFact('cost', e.target.value)} aria-label="The cost" />
+                <AutoTextarea className="textinput coach-ta" minRows={3} value={facts.cost} onChange={(e) => setFact('cost', e.target.value)} aria-label="The cost" />
               </div>
             </>
           )}
@@ -568,8 +568,8 @@ export function CoachPage() {
       <div className="coach-two">
       <div className="panel coach-intake">
         <span className="microcap">What are you avoiding?</span>
-        <textarea
-          className="textinput" rows={3} style={{ width: '100%', marginTop: 'var(--s2)' }}
+        <AutoTextarea
+          className="textinput" minRows={3} style={{ width: '100%', marginTop: 'var(--s2)' }}
           value={thing} onChange={(e) => setThing(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && thing.trim()) void analyze(thing) }}
           placeholder="Say it plainly. e.g. Call VZP to confirm the payment plan, or Reply to the tax office letter"

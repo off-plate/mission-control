@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Band, Dropdown } from './pages1'
+import { AutoTextarea, Band, Dropdown } from './pages1'
 import { useStore } from './store'
 import { parseDictation, TAB_FOR, type ParsedItem } from './assistant'
 import { fmtDuration, fmtWhen } from './util'
@@ -165,7 +165,7 @@ function JournalReader() {
                 <label className="field-label" htmlFor="jtext">
                   {readBy === 'ai' ? 'What the AI reader got.' : 'What this device read.'} Fix anything wrong before you go on.
                 </label>
-                <textarea id="jtext" className="textinput journal-area" value={text} onChange={(e) => setText(e.target.value)} rows={10} />
+                <AutoTextarea id="jtext" className="textinput journal-area" value={text} onChange={(e) => setText(e.target.value)} minRows={10} />
                 {text.includes('[?]') && (
                   <p className="sheet-warn">[?] marks a word it could not read. Replace those before continuing.</p>
                 )}
@@ -303,9 +303,9 @@ export function AssistantPage() {
       <div className="panel assist-say">
         <span className="microcap">Dictate or type</span>
         <div className="assist-input">
-          <textarea
+          <AutoTextarea
             className="textinput assist-textarea"
-            rows={3}
+            minRows={3}
             placeholder="e.g. Call the bank about the plan, goal this week send 10 cold emails, done the accountant email"
             value={text}
             onChange={(e) => { setText(e.target.value); setParsed(null) }}
@@ -429,8 +429,8 @@ export function BrainDumpPage() {
 
       <div className="bd-grid">
         <div className="bd-composer">
-          <textarea
-            className="textinput" rows={4} style={{ width: '100%' }}
+          <AutoTextarea
+            className="textinput" minRows={4} style={{ width: '100%' }}
             value={text} onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit() }}
             placeholder="Whatever is on your mind. Add a #category to group it."

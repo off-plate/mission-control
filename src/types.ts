@@ -118,6 +118,16 @@ export interface RoutineStep {
   linkLabel?: string
 }
 
+/** How often a habit is meant to happen. Drives its weekly target. */
+export type HabitFrequency = 'daily' | 'weekdays' | 'times-per-week' | 'weekly'
+
+export const HABIT_FREQUENCIES: { id: HabitFrequency; label: string }[] = [
+  { id: 'daily', label: 'Every day' },
+  { id: 'weekdays', label: 'Monday to Friday' },
+  { id: 'times-per-week', label: 'A few times a week' },
+  { id: 'weekly', label: 'Once a week' },
+]
+
 export interface HabitDef {
   id: string
   /** Which space this habit belongs to. */
@@ -130,6 +140,26 @@ export interface HabitDef {
   history?: number[]
   /** Part of day this habit belongs to; undefined = anytime. */
   daypart?: TimeSlot
+  /** How often it is meant to happen; undefined behaves as daily. */
+  frequency?: HabitFrequency
+  /** Days a week you are aiming for, when frequency is 'times-per-week'. */
+  targetPerWeek?: number
+}
+
+/** Days a week this habit is actually aiming for. The X/7 was a lie for
+ *  anything that was never meant to happen seven days a week. */
+export function habitTarget(h: HabitDef): number {
+  if (h.frequency === 'weekdays') return 5
+  if (h.frequency === 'weekly') return 1
+  if (h.frequency === 'times-per-week') return Math.max(1, Math.min(7, h.targetPerWeek ?? 3))
+  return 7
+}
+
+export function habitFrequencyLabel(h: HabitDef): string {
+  if (h.frequency === 'weekdays') return 'Mon to Fri'
+  if (h.frequency === 'weekly') return 'once a week'
+  if (h.frequency === 'times-per-week') return `${habitTarget(h)}x a week`
+  return 'every day'
 }
 
 /** How often a routine runs. Drives the sections on the Routines page. */
@@ -206,6 +236,27 @@ export interface Goal {
   deadline?: string
   /** The concrete steps that ladder up to the objective. */
   milestones?: GoalMilestone[]
+  /** Track this goal straight off a habit: every checkoff counts toward it, so
+   *  "twelve gym sessions" fills itself as you tick the gym habit. */
+  habitId?: string
+}
+
+/** Weeks of habit history a goal's timeframe covers. */
+const TIMEFRAME_WEEKS: Record<GoalTimeframe, number> = { weekly: 1, monthly: 4, quarter: 13, half: 26 }
+
+/**
+ * A goal's real progress. When it is tied to a habit, the number is counted
+ * from that habit's checkoffs over the goal's own window, so you never log the
+ * same thing twice. Otherwise it is whatever the goal itself holds.
+ */
+export function goalCurrent(g: Goal, habits: HabitDef[]): number {
+  if (!g.habitId) return g.current
+  const h = habits.find((x) => x.id === g.habitId)
+  if (!h) return g.current
+  const thisWeek = h.days.filter(Boolean).length
+  const weeks = TIMEFRAME_WEEKS[g.timeframe ?? 'quarter']
+  const past = (h.history ?? []).slice(-(weeks - 1)).reduce((a, n) => a + n, 0)
+  return Math.min(g.target, thisWeek + (weeks > 1 ? past : 0))
 }
 
 export interface LedgerEntry {

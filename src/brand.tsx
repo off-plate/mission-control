@@ -229,6 +229,7 @@ export function BrandPage() {
           <div className="col">
             <div className="rl" style={{ color: 'var(--alert)' }}>Never</div>
             <ul>
+              <li><b>A subtitle under any title.</b> Not on a page, not on a section, not on a card. No eyebrows, no “daily / weekly / before work” under a heading that already says it. Do not even add the prop.</li>
               <li>Green for money owed or spent. Green is only what you have.</li>
               <li>A second display font.</li>
               <li>Colour with no reason behind it, or a rainbow of it for its own sake.</li>
@@ -236,6 +237,12 @@ export function BrandPage() {
             </ul>
           </div>
         </div>
+        <p className="note" style={{ marginTop: 'var(--s4)' }}>
+          The subtitle rule has one exception, and only one: a line under a heading may stay if it
+          carries a fact that appears nowhere else and that you can act on, such as a live number, a
+          deadline or a count. “3 of 5 felt easier than you feared” is data. “Two minutes, honest”
+          is a subtitle. If you cannot name the new fact, cut it.
+        </p>
       </section>
 
       <p className="note">This system is now live across the app, Today, Plan, Routines, Habits, Goals, Money, Review, Coach and the rest all run on these tokens. Tell me anything to adjust (the accent, the fonts, a colour meaning, the density) and it changes everywhere at once.</p>

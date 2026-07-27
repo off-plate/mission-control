@@ -56,7 +56,7 @@ const NAV: { id: PageId; label: string }[] = [
   { id: 'money', label: 'Money' },
   { id: 'review', label: 'Review' },
   { id: 'braindump', label: 'Brain Dump' },
-  { id: 'coach', label: 'Coach' },
+  { id: 'coach', label: 'Avoidance' },
 ]
 
 function PageNav({

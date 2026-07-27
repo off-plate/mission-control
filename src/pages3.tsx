@@ -48,7 +48,7 @@ export function AssistantPage() {
 
   return (
     <div className="page">
-      <Band title="Assistant" sub="say what’s on your mind, it files it in the right place" />
+      <Band title="Assistant" />
 
       <div className="panel" style={{ marginBottom: 'var(--s5)' }}>
         <span className="microcap">Dictate or type</span>
@@ -158,7 +158,7 @@ export function BrainDumpPage() {
 
   return (
     <div className="page">
-      <Band title="Brain dump" sub="sticky notes for whatever is in your head" />
+      <Band title="Brain dump" />
 
       {allTags.length > 0 && (
         <div className="note-filter">

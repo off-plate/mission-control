@@ -47,7 +47,7 @@
 
   --font-display: 'Bricolage Grotesque', 'Avenir Next', sans-serif;
   --font-body: 'Instrument Sans', 'Helvetica Neue', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-mono: 'Instrument Sans', 'Helvetica Neue', sans-serif;
 
   --text-xs: 0.8125rem;
   --text-sm: 0.9375rem;
@@ -325,7 +325,7 @@ main { padding-inline: var(--gutter); }
 /* ---------- Review section headers ---------- */
 .review-sec { display: flex; align-items: baseline; gap: var(--s3); margin: var(--s6) 0 var(--s3); padding-bottom: var(--s2); border-bottom: 1px solid var(--hairline); }
 .review-sec:first-of-type { margin-top: var(--s4); }
-.review-sec-note { font-size: var(--text-xs); color: var(--faint); }
+/* No .review-sec-note. Section headings carry no explanatory subtitle. */
 
 /* ---------- Break it down: pull the eye with the icon ---------- */
 .btn-breakdown svg { opacity: 0.9; }
@@ -432,7 +432,7 @@ main { padding-inline: var(--gutter); }
   font-size: var(--text-xl);
   letter-spacing: -0.01em;
 }
-.band .sub { color: var(--muted); font-size: var(--text-sm); }
+/* No .band .sub. A page title stands alone. */
 .band-status {
   margin-left: auto;
   display: flex;
@@ -1640,7 +1640,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .mr-status { font-family: var(--font-body); font-weight: 600; color: var(--muted); letter-spacing: 0.03em; }
 .mr-step.open .mr-status { color: var(--accent); }
 /* The active routine step is unmistakable: accent number, accent left edge. */
-.mr-step.open { box-shadow: inset 3px 0 0 var(--accent); }
 .mr-step.open .mr-num { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
 /* Goal status chips carry more weight. */
 .goal-status { font-weight: 700; }
@@ -1790,7 +1789,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 }
 
 /* 8. Habits: a lone card on the last row left ~2500px of dead grid. */
-.habit-cards { grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); }
 
 /* 19/20. Phone: full-width starter chips and a stacked break-down row. */
 @media (max-width: 639px) {
@@ -1807,3 +1805,39 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   .coach-side .coach-starter-row { flex-direction: column; align-items: stretch; }
   .coach-side .coach-starter { max-width: none; }
 }
+
+/* ---------- Habits grouped by part of the day ---------- */
+/* One column per daypart with its own heading, so you read down "Morning"
+   instead of scanning a flat grid for which card happens to be an evening one. */
+.habit-cols { display: grid; gap: var(--s4); grid-template-columns: 1fr; align-items: start; }
+@media (min-width: 760px) { .habit-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1280px) { .habit-cols { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1900px) { .habit-cols { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); } }
+.habit-col { display: flex; flex-direction: column; }
+.habit-item { padding: var(--s3) 0; border-bottom: 1px solid var(--hairline); }
+.habit-item:last-child { border-bottom: none; padding-bottom: 0; }
+.habit-item.is-paused { opacity: 0.55; }
+.habit-item.is-paused .habit-days { filter: grayscale(1); }
+/* Frequency reads as data beside the count, never as a label above the name. */
+.habit-freq { display: block; font-size: 0.625rem; color: var(--faint); font-weight: 400; letter-spacing: 0; }
+.habit-count { text-align: right; line-height: 1.25; }
+/* A weekday-only habit does not expect the weekend. */
+.daydot.off-day { opacity: 0.4; }
+
+/* ---------- Shared add-sheet form ---------- */
+.sheet-inline { display: flex; align-items: center; gap: var(--s2); font-size: var(--text-sm); color: var(--muted); }
+.sheet-actions { display: flex; gap: var(--s2); justify-content: flex-end; margin-top: var(--s5); }
+.sheet-body .field-label { display: block; margin-bottom: 6px; }
+.sheet-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s3); }
+@media (max-width: 560px) { .sheet-grid { grid-template-columns: 1fr; } }
+
+/* A goal that counts itself off a habit says so, and offers no manual logger. */
+.goal-linked { font-size: var(--text-xs); color: var(--progress); margin-top: 6px; }
+.goal-line .kebab-wrap { margin-left: var(--s2); }
+
+/* Status and menu sit on the habit's own name row, never on a line of their own. */
+.habit-row-top { display: flex; align-items: baseline; gap: var(--s2); }
+.habit-row-top .habit-name { flex: 1 1 auto; min-width: 0; }
+.habit-row-top .habit-count { flex: none; margin-left: auto; }
+.habit-row-top .col-tot { flex: none; }
+.habit-row-top .habit-kebab { flex: none; align-self: center; }

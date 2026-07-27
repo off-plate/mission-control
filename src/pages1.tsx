@@ -5,16 +5,17 @@ import { MOCK_MONEY, fakeDecompose } from './mock'
 import { useStore } from './store'
 import { MorningRoutine } from './morning'
 import { Sheet } from './modals'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, SLOTS, type AgendaEvent, type GoalCategory, type GoalTimeframe, type HabitDef, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, goalCurrent, habitFrequencyLabel, habitTarget, type AgendaEvent, type GoalCategory, type GoalTimeframe, type HabitDef, type HabitFrequency, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
 import { fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, gcalUrl, localDateKey, taskMinutes, toMin } from './util'
 
 /* ---------------- shared bits ---------------- */
 
+/* No `sub`. A page title does not get a subtitle restating it.
+   See DESIGN.md, "No subtitles". */
 export function Band({
-  title, sub, metrics, actions,
+  title, metrics, actions,
 }: {
   title: string
-  sub?: string
   metrics?: { v: string; k: string; tone?: 'pos' | 'urgent' | 'info' }[]
   actions?: React.ReactNode
 }) {
@@ -86,7 +87,6 @@ export function TodayPage() {
     <div className="page">
       <Band
         title={SPACE_LABELS[space]}
-        sub={`${dateLine()} · Prague`}
         metrics={[
           { v: nextEvent.v, k: nextEvent.k, tone: 'info' as const },
           { v: String(open.length), k: 'tasks open' },
@@ -385,7 +385,6 @@ export function PlanPage() {
     <div className="page">
       <Band
         title={evening ? 'Plan tomorrow' : 'Plan the day'}
-        sub={`${dateLine()} · Prague`}
         metrics={[
           { v: fmtDuration(plannedMin), k: 'planned today', tone: 'info' as const },
           { v: `${donePct}%`, k: 'to-do done', tone: 'pos' as const },
@@ -644,20 +643,24 @@ export function PlanPage() {
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-function HabitRow({ h, todayIndex }: { h: HabitDef; todayIndex: number }) {
+function HabitRow({ h, todayIndex, actions }: { h: HabitDef; todayIndex: number; actions?: React.ReactNode }) {
   const { toggleHabitDay } = useStore()
   const kept = h.days.filter(Boolean).length
+  const target = habitTarget(h)
+  // Weekdays-only habits do not expect the weekend, so those dots stay quiet.
+  const expected = (i: number) => (h.frequency === 'weekdays' ? i < 5 : true)
   return (
     <div className="habit-row">
       <div className="habit-row-top">
         <span className="habit-name">{h.name}</span>
-        <span className="habit-count mono">{kept}/7</span>
+        <span className="habit-count mono">{kept}/{target}<span className="habit-freq">{habitFrequencyLabel(h)}</span></span>
+        {actions}
       </div>
       <div className="habit-days">
         {DAY_LABELS.map((d, i) => (
           <span className="day-cell" key={i}>
             <button
-              className="daydot"
+              className={`daydot${expected(i) ? '' : ' off-day'}`}
               role="checkbox"
               aria-checked={h.days[i]}
               disabled={i > todayIndex}
@@ -671,7 +674,7 @@ function HabitRow({ h, todayIndex }: { h: HabitDef; todayIndex: number }) {
         ))}
         <span className="habit-history only-wide" aria-label={`${h.name}, 12-week history`}>
           {(h.history ?? []).map((n, i) => (
-            <i key={i} className={n >= 4 ? 'hi' : ''} style={{ height: `${Math.max(3, (n / 7) * 26)}px` }} />
+            <i key={i} className={n >= target ? 'hi' : ''} style={{ height: `${Math.max(3, (n / 7) * 26)}px` }} />
           ))}
         </span>
       </div>
@@ -679,81 +682,140 @@ function HabitRow({ h, todayIndex }: { h: HabitDef; todayIndex: number }) {
   )
 }
 
-const DP_ORDER: (TimeSlot | 'anytime')[] = ['morning', 'noon', 'afternoon', 'evening', 'anytime']
-const dpLabel = (dp?: TimeSlot) => (dp ? (SLOTS.find((s) => s.id === dp)?.label ?? 'Anytime') : 'Anytime')
+/* Habits are grouped by the part of the day they belong to, each group in its
+   own column with its own heading, so you read down "Morning" instead of
+   hunting a flat grid for which card happens to be an evening one. */
+const DAYPART_COLS: { id: TimeSlot | 'anytime'; label: string; hint: string }[] = [
+  { id: 'morning', label: 'Morning', hint: 'before noon' },
+  { id: 'noon', label: 'Noon', hint: '12 to 2 PM' },
+  { id: 'afternoon', label: 'Afternoon', hint: '2 to 6 PM' },
+  { id: 'evening', label: 'Evening', hint: 'after 6 PM' },
+  { id: 'anytime', label: 'Anytime', hint: 'no fixed hour' },
+]
 
-export function HabitsPage() {
-  const { habits, space, addHabit, togglePauseHabit, deleteHabit, routines, todayIndex } = useStore()
+function AddHabitSheet({ onClose }: { onClose: () => void }) {
+  const { addHabit } = useStore()
   const [name, setName] = useState('')
   const [daypart, setDaypart] = useState<TimeSlot | ''>('morning')
+  const [frequency, setFrequency] = useState<HabitFrequency>('daily')
+  const [perWeek, setPerWeek] = useState(3)
+
+  const submit = () => {
+    if (!name.trim()) return
+    addHabit({
+      name: name.trim(),
+      daypart: daypart || undefined,
+      frequency,
+      targetPerWeek: frequency === 'times-per-week' ? perWeek : undefined,
+    })
+    onClose()
+  }
+
+  return (
+    <Sheet title="Add a habit" onClose={onClose} note="Habits are the small things you repeat. Multi-step rituals belong on Routines.">
+      <label className="field-label" htmlFor="hname">What is the habit?</label>
+      <input
+        id="hname" className="textinput" style={{ width: '100%' }} autoFocus
+        placeholder="e.g. 20 minutes of movement"
+        value={name} onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') submit() }}
+      />
+
+      <label className="field-label" style={{ marginTop: 'var(--s4)' }} htmlFor="hpart">When in the day?</label>
+      <select id="hpart" className="textinput" style={{ width: '100%' }} value={daypart} onChange={(e) => setDaypart(e.target.value as TimeSlot | '')}>
+        {SLOTS.map((s) => <option key={s.id} value={s.id}>{s.label}, {s.hint}</option>)}
+        <option value="">Anytime</option>
+      </select>
+
+      <label className="field-label" style={{ marginTop: 'var(--s4)' }} htmlFor="hfreq">How often?</label>
+      <select id="hfreq" className="textinput" style={{ width: '100%' }} value={frequency} onChange={(e) => setFrequency(e.target.value as HabitFrequency)}>
+        {HABIT_FREQUENCIES.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+      </select>
+
+      {frequency === 'times-per-week' && (
+        <div className="sheet-inline" style={{ marginTop: 'var(--s3)' }}>
+          <span>Aiming for</span>
+          <input className="numinput" type="number" min={1} max={7} value={perWeek}
+            onChange={(e) => setPerWeek(Math.max(1, Math.min(7, Number(e.target.value) || 1)))} aria-label="Days a week" />
+          <span>days a week</span>
+        </div>
+      )}
+
+      <div className="sheet-actions">
+        <button className="btn btn-quiet" onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" disabled={!name.trim()} onClick={submit}>Add habit</button>
+      </div>
+    </Sheet>
+  )
+}
+
+export function HabitsPage() {
+  const { habits, space, togglePauseHabit, deleteHabit, routines, todayIndex } = useStore()
   const [menuFor, setMenuFor] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
   const spaceHabits = habits.filter((h) => h.space === space)
   // A habit a routine drives cannot be deleted from here, or the routine would
   // mirror into nothing. Pausing stays available.
   const mirrored = new Set(routines.map((r) => r.habitId).filter(Boolean) as string[])
   const kept = spaceHabits.filter((h) => !h.paused).reduce((a, h) => a + h.days.filter(Boolean).length, 0)
+  const target = spaceHabits.filter((h) => !h.paused).reduce((a, h) => a + habitTarget(h), 0)
 
-  const sorted = [...spaceHabits].sort((a, b) => DP_ORDER.indexOf(a.daypart ?? 'anytime') - DP_ORDER.indexOf(b.daypart ?? 'anytime'))
-
-  const add = () => {
-    if (!name.trim()) return
-    addHabit(name.trim(), daypart || undefined)
-    setName('')
-  }
+  // Only draw a column that has something in it, so empty parts of the day do
+  // not leave a labelled void.
+  const cols = DAYPART_COLS
+    .map((c) => ({ ...c, list: spaceHabits.filter((h) => (h.daypart ?? 'anytime') === c.id) }))
+    .filter((c) => c.list.length > 0)
 
   return (
     <div className="page">
-      <Band title="Habits" sub={SPACE_LABELS[space]} metrics={[{ v: String(kept), k: 'checkoffs this week' }]} />
-      <div className="panel" style={{ marginBottom: 'var(--s5)', maxWidth: 720 }}>
-        <div className="formrow" style={{ marginBottom: 0 }}>
-          <input
-            className="textinput"
-            placeholder="New habit"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') add() }}
-            aria-label="New habit name"
-          />
-          <select className="textinput" style={{ flex: '0 0 auto' }} value={daypart} onChange={(e) => setDaypart(e.target.value as TimeSlot | '')} aria-label="Part of day">
-            {SLOTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-            <option value="">Anytime</option>
-          </select>
-          <button className="btn btn-primary" disabled={!name.trim()} onClick={add}>Add habit</button>
-        </div>
-      </div>
+      <Band
+        title="Habits"
+        metrics={[{ v: `${kept}/${target}`, k: 'kept this week', tone: 'pos' as const }]}
+        actions={<button className="btn btn-primary" onClick={() => setAdding(true)}>Add a habit</button>}
+      />
 
-      <div className="grid-4 habit-cards">
-        {sorted.map((h) => (
-          <div className={`panel habit-card${h.paused ? ' is-paused' : ''}`} key={h.id}>
-            <div className="habit-card-tag">
-              <span className="microcap">{dpLabel(h.daypart)}</span>
-              {h.paused && <span className="col-tot mono">paused</span>}
-              {!h.paused && h.days[todayIndex] && <span className="col-tot mono val-pos">done today</span>}
-              <span className="kebab-wrap habit-kebab">
-                <button className="kebab" aria-label={`Options for ${h.name}`} aria-expanded={menuFor === h.id} onClick={() => setMenuFor((m) => (m === h.id ? null : h.id))}>⋯</button>
-                {menuFor === h.id && (
-                  <div className="kebab-menu" role="menu">
-                    <button role="menuitem" onClick={() => { togglePauseHabit(h.id); setMenuFor(null) }}>
-                      {h.paused ? 'Resume' : 'Pause'}
-                    </button>
-                    {mirrored.has(h.id) ? (
-                      <span className="kebab-note">Run by a routine</span>
-                    ) : (
-                      <button role="menuitem" className="danger" onClick={() => { deleteHabit(h.id); setMenuFor(null) }}>Delete</button>
-                    )}
-                  </div>
-                )}
-              </span>
+      <div className="habit-cols">
+        {cols.map((c) => (
+          <div className="panel habit-col" key={c.id}>
+            <div className="col-head">
+              <span className="microcap">{c.label}</span>
+              <span className="col-tot mono">{c.hint}</span>
             </div>
-            <HabitRow h={h} todayIndex={todayIndex} />
+            {c.list.map((h) => (
+              <div className={`habit-item${h.paused ? ' is-paused' : ''}`} key={h.id}>
+                <HabitRow h={h} todayIndex={todayIndex} actions={
+                  <>
+                  {h.paused && <span className="col-tot mono">paused</span>}
+                  {!h.paused && h.days[todayIndex] && <span className="col-tot mono val-pos">done today</span>}
+                  <span className="kebab-wrap habit-kebab">
+                    <button className="kebab" aria-label={`Options for ${h.name}`} aria-expanded={menuFor === h.id} onClick={() => setMenuFor((m) => (m === h.id ? null : h.id))}>⋯</button>
+                    {menuFor === h.id && (
+                      <div className="kebab-menu" role="menu">
+                        <button role="menuitem" onClick={() => { togglePauseHabit(h.id); setMenuFor(null) }}>
+                          {h.paused ? 'Resume' : 'Pause'}
+                        </button>
+                        {mirrored.has(h.id) ? (
+                          <span className="kebab-note">Run by a routine</span>
+                        ) : (
+                          <button role="menuitem" className="danger" onClick={() => { deleteHabit(h.id); setMenuFor(null) }}>Delete</button>
+                        )}
+                      </div>
+                    )}
+                  </span>
+                  </>
+                } />
+              </div>
+            ))}
           </div>
         ))}
-        {sorted.length === 0 && <div className="empty">No habits in this space yet. Add one above.</div>}
+        {cols.length === 0 && <div className="empty">No habits in this space yet. Add one from the button above.</div>}
       </div>
 
       <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginTop: 16 }}>
         Missed days stay quiet on purpose. No broken streaks, no wall of missed-day marks. Multi-step routines live on the Routines tab; finishing one there checks its habit off here.
       </p>
+
+      {adding && <AddHabitSheet onClose={() => setAdding(false)} />}
     </div>
   )
 }
@@ -773,7 +835,7 @@ export function RoutinesPage() {
   const sorted = [...spaceRoutines].sort((a, b) => CADENCE_ORDER.indexOf(a.cadence) - CADENCE_ORDER.indexOf(b.cadence))
   return (
     <div className="page">
-      <Band title="Routines" sub={SPACE_LABELS[space]} />
+      <Band title="Routines" />
       <div className="routine-cards">
         {sorted.length === 0 && <div className="empty">No routines in this space yet.</div>}
         {sorted.map((r) => {
@@ -785,7 +847,6 @@ export function RoutinesPage() {
           return (
             <div className={`panel routine-card${complete ? ' is-complete' : ''}`} key={r.id}>
               <div className="routine-tag">
-                <span className="microcap">{CADENCE_LABEL[r.cadence]}</span>
                 {complete
                   ? <span className="col-tot mono val-pos">{DONE_LABEL[r.cadence]}</span>
                   : <span className="routine-progress mono">{done}/{total}</span>}
@@ -830,53 +891,110 @@ export function RoutinesPage() {
 /* ---------------- GOALS ---------------- */
 
 
-export function GoalsPage() {
-  const { space, goals, bumpGoal, toggleGoalMilestone, addGoal, deleteGoal } = useStore()
-  const spaceGoals = goals.filter((g) => g.space === space)
-  const done = spaceGoals.filter((g) => g.current >= g.target).length
-  const [adding, setAdding] = useState(false)
-  const [draft, setDraft] = useState({ name: '', why: '', target: 1, unit: 'steps', deadline: '', timeframe: 'weekly' as GoalTimeframe, category: 'life' as GoalCategory })
+function AddGoalSheet({ onClose }: { onClose: () => void }) {
+  const { space, habits, addGoal } = useStore()
+  const [d, setD] = useState({
+    name: '', why: '', target: 3, unit: 'steps', deadline: '',
+    timeframe: 'weekly' as GoalTimeframe, category: 'life' as GoalCategory, habitId: '',
+  })
+  // Any habit in this profile can drive a goal, so the list grows as you do.
+  const linkable = habits.filter((h) => h.space === space && !h.paused)
+  const linked = linkable.find((h) => h.id === d.habitId)
 
   const submit = () => {
-    if (!draft.name.trim()) return
+    if (!d.name.trim()) return
     addGoal({
-      space, name: draft.name.trim(), current: 0, target: Math.max(1, draft.target), unit: draft.unit.trim() || 'steps',
-      note: '', why: draft.why.trim() || undefined, deadline: draft.deadline.trim() || undefined,
-      timeframe: draft.timeframe, category: draft.category, milestones: [],
+      space, name: d.name.trim(), current: 0, target: Math.max(1, d.target),
+      unit: d.habitId ? 'checkoffs' : (d.unit.trim() || 'steps'),
+      note: '', why: d.why.trim() || undefined, deadline: d.deadline.trim() || undefined,
+      timeframe: d.timeframe, category: d.category, milestones: [],
+      habitId: d.habitId || undefined,
     })
-    setDraft({ name: '', why: '', target: 1, unit: 'steps', deadline: '', timeframe: draft.timeframe, category: draft.category })
-    setAdding(false)
+    onClose()
   }
+
+  return (
+    <Sheet title="Add a goal" onClose={onClose} note="A goal is an outcome you can check off, with a date on it.">
+      <label className="field-label" htmlFor="gname">What is the outcome?</label>
+      <input id="gname" className="textinput" style={{ width: '100%' }} autoFocus
+        placeholder="e.g. Twelve gym sessions" value={d.name}
+        onChange={(e) => setD({ ...d, name: e.target.value })}
+        onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
+
+      <label className="field-label" style={{ marginTop: 'var(--s4)' }} htmlFor="gwhy">Why does it matter?</label>
+      <input id="gwhy" className="textinput" style={{ width: '100%' }}
+        placeholder="The thing that keeps it alive when you do not feel like it"
+        value={d.why} onChange={(e) => setD({ ...d, why: e.target.value })} />
+
+      <div className="sheet-grid" style={{ marginTop: 'var(--s4)' }}>
+        <div>
+          <label className="field-label" htmlFor="gtf">Timeframe</label>
+          <select id="gtf" className="textinput" style={{ width: '100%' }} value={d.timeframe}
+            onChange={(e) => setD({ ...d, timeframe: e.target.value as GoalTimeframe })}>
+            {GOAL_TIMEFRAMES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="field-label" htmlFor="gcat">Area of life</label>
+          <select id="gcat" className="textinput" style={{ width: '100%' }} value={d.category}
+            onChange={(e) => setD({ ...d, category: e.target.value as GoalCategory })}>
+            {GOAL_CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* The cross-link: a goal can count itself off a habit you already keep. */}
+      <label className="field-label" style={{ marginTop: 'var(--s4)' }} htmlFor="ghabit">Track it automatically?</label>
+      <select id="ghabit" className="textinput" style={{ width: '100%' }} value={d.habitId}
+        onChange={(e) => setD({ ...d, habitId: e.target.value })}>
+        <option value="">No, I will log progress myself</option>
+        {linkable.map((h) => <option key={h.id} value={h.id}>Count every “{h.name}” checkoff</option>)}
+      </select>
+      {linked && (
+        <p className="assist-note" style={{ marginTop: 6 }}>
+          Every time you tick “{linked.name}” on Habits, this goal moves. Nothing to log twice.
+        </p>
+      )}
+
+      <div className="sheet-grid" style={{ marginTop: 'var(--s4)' }}>
+        <div className="sheet-inline">
+          <span>Target</span>
+          <input className="numinput" type="number" min={1} value={d.target}
+            onChange={(e) => setD({ ...d, target: Math.max(1, Number(e.target.value) || 1) })} aria-label="Target" />
+          {d.habitId
+            ? <span>checkoffs</span>
+            : <input className="textinput" style={{ maxWidth: 120 }} placeholder="unit" value={d.unit}
+                onChange={(e) => setD({ ...d, unit: e.target.value })} aria-label="Unit" />}
+        </div>
+        <div>
+          <label className="field-label" htmlFor="gdl">By when</label>
+          <input id="gdl" className="textinput" style={{ width: '100%' }} placeholder="e.g. End of July"
+            value={d.deadline} onChange={(e) => setD({ ...d, deadline: e.target.value })} />
+        </div>
+      </div>
+
+      <div className="sheet-actions">
+        <button className="btn btn-quiet" onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" disabled={!d.name.trim()} onClick={submit}>Add goal</button>
+      </div>
+    </Sheet>
+  )
+}
+
+export function GoalsPage() {
+  const { space, goals, habits, bumpGoal, toggleGoalMilestone, deleteGoal } = useStore()
+  const spaceGoals = goals.filter((g) => g.space === space)
+  const done = spaceGoals.filter((g) => goalCurrent(g, habits) >= g.target).length
+  const [adding, setAdding] = useState(false)
+  const [menuFor, setMenuFor] = useState<string | null>(null)
 
   return (
     <div className="page">
       <Band
         title="Goals"
-        sub={SPACE_LABELS[space]}
         metrics={[{ v: `${done}/${spaceGoals.length}`, k: 'reached', tone: 'pos' as const }]}
-        actions={<button className="btn btn-primary" onClick={() => setAdding((v) => !v)}>{adding ? 'Cancel' : 'Add a goal'}</button>}
+        actions={<button className="btn btn-primary" onClick={() => setAdding(true)}>Add a goal</button>}
       />
-
-      {adding && (
-        <div className="panel goal-add">
-          <div className="formrow">
-            <input className="textinput grow" placeholder="The outcome, not the activity" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} aria-label="Objective" autoFocus />
-            <select className="textinput" value={draft.timeframe} onChange={(e) => setDraft({ ...draft, timeframe: e.target.value as GoalTimeframe })} aria-label="Timeframe">
-              {GOAL_TIMEFRAMES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
-            </select>
-            <select className="textinput" value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value as GoalCategory })} aria-label="Category">
-              {GOAL_CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-            </select>
-          </div>
-          <div className="formrow">
-            <input className="textinput grow" placeholder="Why it matters (the thing that keeps it alive)" value={draft.why} onChange={(e) => setDraft({ ...draft, why: e.target.value })} aria-label="Why" />
-            <input className="numinput" type="number" min={1} value={draft.target} onChange={(e) => setDraft({ ...draft, target: Number(e.target.value) })} aria-label="Target" />
-            <input className="textinput" style={{ maxWidth: 130 }} placeholder="unit" value={draft.unit} onChange={(e) => setDraft({ ...draft, unit: e.target.value })} aria-label="Unit" />
-            <input className="textinput" style={{ maxWidth: 160 }} placeholder="by when" value={draft.deadline} onChange={(e) => setDraft({ ...draft, deadline: e.target.value })} aria-label="Deadline" />
-            <button className="btn btn-primary" disabled={!draft.name.trim()} onClick={submit}>Add</button>
-          </div>
-        </div>
-      )}
 
       <div className="grid-2 goal-cols">
         {GOAL_TIMEFRAMES.map((tfr) => {
@@ -888,8 +1006,11 @@ export function GoalsPage() {
                 <span className="col-tot mono">{tfr.sub}</span>
               </div>
               {inTf.map((g) => {
-                const pct = Math.min(100, Math.round((g.current / g.target) * 100))
-                const status = goalPace(g.current, g.target, g.timeframe ?? 'quarter')
+                // Habit-linked goals count themselves; the rest hold their own number.
+                const current = goalCurrent(g, habits)
+                const fromHabit = habits.find((h) => h.id === g.habitId)
+                const pct = Math.min(100, Math.round((current / g.target) * 100))
+                const status = goalPace(current, g.target, g.timeframe ?? 'quarter')
                 const milestoneDriven = !!g.milestones?.length && g.target === g.milestones.length
                 const statusLabel = status === 'done' ? 'reached' : status === 'behind' ? 'needs a push' : 'on pace'
                 return (
@@ -898,14 +1019,25 @@ export function GoalsPage() {
                       <span className={`cat-dot goalcat-${g.category ?? 'life'}`} aria-hidden="true" />
                       <span className="grow goal-obj">{g.name}</span>
                       <span className={`goal-status s-${status}`}>{statusLabel}</span>
+                      <span className="kebab-wrap">
+                        <button className="kebab" aria-label={`Options for ${g.name}`} aria-expanded={menuFor === g.id} onClick={() => setMenuFor((m) => (m === g.id ? null : g.id))}>⋯</button>
+                        {menuFor === g.id && (
+                          <div className="kebab-menu" role="menu">
+                            <button role="menuitem" className="danger" onClick={() => { deleteGoal(g.id); setMenuFor(null) }}>Delete this goal</button>
+                          </div>
+                        )}
+                      </span>
                     </div>
                     {g.why && <p className="goal-why">{g.why}</p>}
                     <div className={`bar prog${status === 'behind' ? ' warn' : ''}`}><i style={{ width: `${pct}%` }} /></div>
                     <div className="goal-measure">
-                      <span className="mono meas">{fmtNum(g.current)} / {fmtNum(g.target)} {g.unit}</span>
+                      <span className="mono meas">{fmtNum(current)} / {fmtNum(g.target)} {g.unit}</span>
                       <span className="mono pct">{pct}%</span>
                       {g.deadline && <span className="goal-deadline">by {g.deadline}</span>}
                     </div>
+                    {fromHabit && (
+                      <p className="goal-linked">Counts itself from the “{fromHabit.name}” habit.</p>
+                    )}
                     {g.milestones && g.milestones.length > 0 && (
                       <ul className="goal-ms">
                         {g.milestones.map((m) => (
@@ -926,16 +1058,15 @@ export function GoalsPage() {
                     )}
                     {/* Goals measured in their own milestones advance by ticking those;
                         anything counted in other units gets a manual logger. */}
-                    <div className="goal-actions">
-                      {!milestoneDriven && (
+                    {!milestoneDriven && !g.habitId && (
+                      <div className="goal-actions">
                         <span className="goal-bump" role="group" aria-label={`Log progress for ${g.name}`}>
-                          <button onClick={() => bumpGoal(g.id, -1)} disabled={g.current <= 0} aria-label="Less">−</button>
+                          <button onClick={() => bumpGoal(g.id, -1)} disabled={current <= 0} aria-label="Less">−</button>
                           <span className="mono">log</span>
-                          <button onClick={() => bumpGoal(g.id, 1)} disabled={g.current >= g.target} aria-label="More">+</button>
+                          <button onClick={() => bumpGoal(g.id, 1)} disabled={current >= g.target} aria-label="More">+</button>
                         </span>
-                      )}
-                      <button className="goal-drop" onClick={() => deleteGoal(g.id)} aria-label={`Drop goal ${g.name}`}>drop</button>
-                    </div>
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -944,6 +1075,8 @@ export function GoalsPage() {
           )
         })}
       </div>
+
+      {adding && <AddGoalSheet onClose={() => setAdding(false)} />}
     </div>
   )
 }

@@ -88,7 +88,7 @@ interface Store extends PersistedState {
 
   toggleHabitDay: (id: string, day: number) => void
   markHabitDay: (id: string, day: number, value: boolean) => void
-  addHabit: (name: string, daypart?: import('./types').TimeSlot) => void
+  addHabit: (input: { name: string; daypart?: import('./types').TimeSlot; frequency: import('./types').HabitFrequency; targetPerWeek?: number }) => void
   togglePauseHabit: (id: string) => void
   deleteHabit: (id: string) => void
 
@@ -423,8 +423,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           h.id === id ? { ...h, days: h.days.map((d, i) => (i === day ? value : d)) } : h,
         ),
       ),
-    addHabit: (name, daypart) =>
-      setHabits((prev) => [...prev, { id: newId('h'), space, name, daypart, days: [false, false, false, false, false, false, false], paused: false }]),
+    addHabit: (input) =>
+      setHabits((prev) => [...prev, {
+        id: newId('h'), space, name: input.name, daypart: input.daypart,
+        frequency: input.frequency, targetPerWeek: input.targetPerWeek,
+        days: [false, false, false, false, false, false, false], paused: false,
+      }]),
     togglePauseHabit: (id) =>
       setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, paused: !h.paused } : h))),
     deleteHabit: (id) => setHabits((prev) => prev.filter((h) => h.id !== id)),

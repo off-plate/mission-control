@@ -150,29 +150,30 @@ export const MOCK_TASKS: Task[] = [
 export const MOCK_HABITS: HabitDef[] = [
   // personal
   {
-    id: 'h-morning', space: 'personal', name: 'Morning routine', daypart: 'morning', paused: false,
+    id: 'h-morning', frequency: 'daily', space: 'personal', name: 'Morning routine', daypart: 'morning', paused: false,
     days: [true, true, true, false, true, false, false],
     history: [2, 3, 3, 4, 4, 3, 5, 4, 5, 5, 4, 5],
   },
-  { id: 'h2', space: 'personal', name: 'Morning check-in', daypart: 'morning', days: [true, true, true, false, true, true, true], paused: false, history: [3, 4, 4, 5, 5, 4, 6, 5, 6, 6, 5, 6] },
-  { id: 'h3', space: 'personal', name: '20 min movement', daypart: 'afternoon', days: [false, true, false, true, true, false, false], paused: false, history: [0, 1, 2, 1, 3, 2, 3, 4, 3, 3, 4, 3] },
-  { id: 'h4', space: 'personal', name: 'No screens at dinner', daypart: 'evening', days: [false, false, true, true, false, false, false], paused: false, history: [0, 0, 1, 1, 2, 1, 2, 2, 3, 2, 2, 2] },
-  { id: 'h-evening', space: 'personal', name: 'Evening shutdown', daypart: 'evening', paused: false, days: [true, false, true, false, false, false, false], history: [1, 2, 2, 3, 2, 3, 3, 2, 3, 4, 3, 3] },
-  { id: 'h1', space: 'personal', name: 'Was in bed before 1:00 last night', daypart: 'morning', days: [true, true, false, true, false, true, false], paused: false, history: [1, 2, 2, 3, 2, 4, 3, 3, 4, 5, 4, 4] },
-  { id: 'h-prework', space: 'personal', name: 'Before work', paused: false, days: [true, true, false, true, false, false, false], history: [1, 2, 2, 3, 2, 3, 3, 2, 3, 4, 3, 3] },
-  { id: 'h-weekly', space: 'personal', name: 'Weekly reset', paused: false, days: [false, false, false, false, false, false, false], history: [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1] },
-  { id: 'h-monthly', space: 'personal', name: 'Monthly review', paused: false, days: [false, false, false, false, false, false, false], history: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1] },
+  { id: 'h2', frequency: 'daily', space: 'personal', name: 'Morning check-in', daypart: 'morning', days: [true, true, true, false, true, true, true], paused: false, history: [3, 4, 4, 5, 5, 4, 6, 5, 6, 6, 5, 6] },
+  { id: 'h-gym', frequency: 'times-per-week', targetPerWeek: 3, space: 'personal', name: 'Gym session', daypart: 'afternoon', days: [true, false, true, false, false, false, false], paused: false, history: [2, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2] },
+  { id: 'h3', frequency: 'times-per-week', targetPerWeek: 3, space: 'personal', name: '20 min movement', daypart: 'afternoon', days: [false, true, false, true, true, false, false], paused: false, history: [0, 1, 2, 1, 3, 2, 3, 4, 3, 3, 4, 3] },
+  { id: 'h4', frequency: 'daily', space: 'personal', name: 'No screens at dinner', daypart: 'evening', days: [false, false, true, true, false, false, false], paused: false, history: [0, 0, 1, 1, 2, 1, 2, 2, 3, 2, 2, 2] },
+  { id: 'h-evening', frequency: 'daily', space: 'personal', name: 'Evening shutdown', daypart: 'evening', paused: false, days: [true, false, true, false, false, false, false], history: [1, 2, 2, 3, 2, 3, 3, 2, 3, 4, 3, 3] },
+  { id: 'h1', frequency: 'daily', space: 'personal', name: 'Was in bed before 1:00 last night', daypart: 'morning', days: [true, true, false, true, false, true, false], paused: false, history: [1, 2, 2, 3, 2, 4, 3, 3, 4, 5, 4, 4] },
+  { id: 'h-prework', frequency: 'weekdays', space: 'personal', name: 'Before work', paused: false, days: [true, true, false, true, false, false, false], history: [1, 2, 2, 3, 2, 3, 3, 2, 3, 4, 3, 3] },
+  { id: 'h-weekly', frequency: 'weekly', space: 'personal', name: 'Weekly reset', paused: false, days: [false, false, false, false, false, false, false], history: [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1] },
+  { id: 'h-monthly', frequency: 'weekly', space: 'personal', name: 'Monthly review', paused: false, days: [false, false, false, false, false, false, false], history: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1] },
   // work
-  { id: 'w-h-startup', space: 'work', name: 'Work startup', paused: false, days: [true, true, false, true, false, false, false], history: [3, 3, 4, 3, 4, 4, 3, 4, 4, 3, 4, 4] },
-  { id: 'w-h1', space: 'work', name: 'Deep work block', daypart: 'morning', paused: false, days: [true, false, true, true, false, false, false], history: [2, 3, 2, 3, 3, 2, 4, 3, 3, 4, 3, 3] },
-  { id: 'w-h2', space: 'work', name: 'Inbox to zero', daypart: 'afternoon', paused: false, days: [true, true, true, false, false, false, false], history: [3, 4, 3, 4, 4, 3, 4, 4, 3, 4, 4, 3] },
-  { id: 'w-h-shutdown', space: 'work', name: 'Shutdown ritual', daypart: 'evening', paused: false, days: [true, true, false, false, false, false, false], history: [2, 2, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3] },
-  { id: 'w-h-weekly', space: 'work', name: 'Weekly work review', paused: false, days: [false, false, false, false, false, false, false], history: [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0] },
+  { id: 'w-h-startup', frequency: 'weekdays', space: 'work', name: 'Work startup', paused: false, days: [true, true, false, true, false, false, false], history: [3, 3, 4, 3, 4, 4, 3, 4, 4, 3, 4, 4] },
+  { id: 'w-h1', frequency: 'weekdays', space: 'work', name: 'Deep work block', daypart: 'morning', paused: false, days: [true, false, true, true, false, false, false], history: [2, 3, 2, 3, 3, 2, 4, 3, 3, 4, 3, 3] },
+  { id: 'w-h2', frequency: 'weekdays', space: 'work', name: 'Inbox to zero', daypart: 'afternoon', paused: false, days: [true, true, true, false, false, false, false], history: [3, 4, 3, 4, 4, 3, 4, 4, 3, 4, 4, 3] },
+  { id: 'w-h-shutdown', frequency: 'weekdays', space: 'work', name: 'Shutdown ritual', daypart: 'evening', paused: false, days: [true, true, false, false, false, false, false], history: [2, 2, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3] },
+  { id: 'w-h-weekly', frequency: 'weekly', space: 'work', name: 'Weekly work review', paused: false, days: [false, false, false, false, false, false, false], history: [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0] },
   // offplate
-  { id: 'o-h-outreach', space: 'offplate', name: 'Daily outreach', daypart: 'morning', paused: false, days: [true, false, true, false, false, false, false], history: [1, 2, 1, 2, 2, 1, 2, 3, 2, 2, 3, 2] },
-  { id: 'o-h1', space: 'offplate', name: 'Capture one content idea', paused: false, days: [true, true, false, true, false, false, false], history: [2, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2] },
-  { id: 'o-h2', space: 'offplate', name: 'Read 20 min in the field', daypart: 'evening', paused: false, days: [false, true, false, true, false, false, false], history: [1, 1, 2, 1, 2, 2, 1, 2, 2, 1, 2, 2] },
-  { id: 'o-h-weekly', space: 'offplate', name: 'Weekly pipeline review', paused: false, days: [false, false, false, false, false, false, false], history: [1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1] },
+  { id: 'o-h-outreach', frequency: 'weekdays', space: 'offplate', name: 'Daily outreach', daypart: 'morning', paused: false, days: [true, false, true, false, false, false, false], history: [1, 2, 1, 2, 2, 1, 2, 3, 2, 2, 3, 2] },
+  { id: 'o-h1', frequency: 'times-per-week', targetPerWeek: 4, space: 'offplate', name: 'Capture one content idea', paused: false, days: [true, true, false, true, false, false, false], history: [2, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2] },
+  { id: 'o-h2', frequency: 'times-per-week', targetPerWeek: 3, space: 'offplate', name: 'Read 20 min in the field', daypart: 'evening', paused: false, days: [false, true, false, true, false, false, false], history: [1, 1, 2, 1, 2, 2, 1, 2, 2, 1, 2, 2] },
+  { id: 'o-h-weekly', frequency: 'weekly', space: 'offplate', name: 'Weekly pipeline review', paused: false, days: [false, false, false, false, false, false, false], history: [1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1] },
 ]
 
 export const MOCK_IDEAS: Idea[] = [
@@ -327,13 +328,8 @@ export const MOCK_GOALS: Goal[] = [
     ],
   },
   {
-    id: 'g-m2', space: 'personal', name: 'Twelve gym sessions', current: 7, target: 12, unit: 'sessions', note: '', timeframe: 'monthly', category: 'health',
+    id: 'g-m2', space: 'personal', name: 'Twelve gym sessions', current: 0, target: 12, unit: 'checkoffs', note: '', timeframe: 'monthly', category: 'health', habitId: 'h-gym',
     why: 'Four sessions a week keeps the block on track.', deadline: 'End of July',
-    milestones: [
-      { id: 'g-m2-a', label: 'Weeks 1 and 2 done', done: true },
-      { id: 'g-m2-b', label: 'Week 3 done', done: false },
-      { id: 'g-m2-c', label: 'Week 4 done', done: false },
-    ],
   },
   {
     id: 'g1', space: 'personal', name: 'Every obligation on a payment plan', current: 1, target: 3, unit: 'plans agreed', note: '', timeframe: 'quarter', category: 'money',
@@ -457,6 +453,9 @@ export const MOCK_MONEY = {
     monthLabels: ['Mar', 'Apr', 'May', 'Jun', 'Jul'],
     note: 'after debt and fixed costs',
   },
+  /* Debt remaining, month by month, so the headline number has a shape behind it. */
+  debtTrend: [218500, 205000, 192000, 181000, 172000, 162900],
+  debtMonths: ['Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
   cycleLabel: 'Pay cycle',
   spentPct: 46,
   budgetLine: 'After rent and fixed costs, spending is on pace for day 12 of 30',

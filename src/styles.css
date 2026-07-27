@@ -2204,3 +2204,10 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .undo-x:hover { color: var(--bg); }
 @keyframes undo-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (max-width: 639px) { .undo-bar { left: 12px; right: 12px; bottom: 80px; } .undo-what { flex: 1; } }
+
+/* Something in Settings wants attention: sync is off, so nothing is backed up. */
+.btn.has-dot { position: relative; }
+.btn.has-dot::after {
+  content: ''; position: absolute; top: 4px; right: 4px;
+  width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+}

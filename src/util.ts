@@ -100,9 +100,28 @@ export function monthRange(key: string): DateRange {
   return { id: key, label: monthName(key), from: iso(first), to: iso(end) }
 }
 
-/** The last `n` months as keys, newest first, for the picker. */
-export function recentMonthKeys(n = 12, now = new Date()): string[] {
-  return Array.from({ length: n }, (_, i) => monthKey(new Date(now.getFullYear(), now.getMonth() - i, 1)))
+/**
+ * The months that actually hold something, newest first. Offering a fixed twelve
+ * months lists empty ones he can only find out are empty by opening them, and
+ * puts anything older than a year out of reach entirely.
+ */
+export function monthsWithData(days: string[], now = new Date()): string[] {
+  const seen = new Set(days.filter(Boolean).map((d) => d.slice(0, 7)))
+  seen.add(monthKey(now))
+  return [...seen].sort().reverse()
+}
+
+/** Everything, from the first thing he logged to today. */
+export function allTimeRange(days: string[], now = new Date()): DateRange {
+  const first = days.filter(Boolean).sort()[0]
+  const to = localDateKey(now)
+  return { id: 'all-time', label: first ? `Everything, since ${fmtWhen(first)}` : 'Everything', from: first ?? to, to }
+}
+
+/** A hand-picked pair of dates. Either end may be missing while he is typing. */
+export function customRange(from: string, to: string): DateRange {
+  const [a, b] = from && to && from > to ? [to, from] : [from, to]
+  return { id: 'custom', label: `${fmtWhen(a)} to ${fmtWhen(b)}`, from: a, to: b }
 }
 
 export function inRange(isoDate: string, r: DateRange): boolean {
@@ -144,7 +163,12 @@ export function fmtWhen(when: string): string {
   const y = new Date(); y.setDate(y.getDate() - 1)
   if (when === localDateKey(y)) return 'yesterday'
   const [yy, mm, dd] = when.split('-').map(Number)
-  return new Date(yy, mm - 1, dd).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  // A date from another year has to say so. "14 Mar" for something in 2024 reads
+  // as this March, which is worse than no date at all.
+  const opts: Intl.DateTimeFormatOptions = yy === new Date().getFullYear()
+    ? { day: 'numeric', month: 'short' }
+    : { day: 'numeric', month: 'short', year: 'numeric' }
+  return new Date(yy, mm - 1, dd).toLocaleDateString('en-GB', opts)
 }
 
 /** Next occurrence of a weekday (1=Mon..7=Sun), always in the future. */

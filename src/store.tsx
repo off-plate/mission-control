@@ -653,9 +653,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return [{ ...parent, id: pid, done: false, createdAt: todayKey(), estimateMin: est, estimated: true, subtasks }, ...prev]
       }),
     moveTaskList: (id, list) =>
-      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, list } : t))),
+      setTasks((prev) => prev.map((t) => (t.id === id
+        ? { ...t, list, plannedOn: list === 'today' ? todayKey() : undefined }
+        : t))),
     moveTasksToToday: (ids) =>
-      setTasks((prev) => prev.map((t) => (ids.includes(t.id) ? { ...t, list: 'today', slot: undefined } : t))),
+      setTasks((prev) => prev.map((t) => (ids.includes(t.id) ? { ...t, list: 'today', slot: undefined, plannedOn: todayKey() } : t))),
     assignSlot: (id, slot) =>
       setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, slot } : t))),
     /* A clock time implies a part of the day, so setting one moves the task into
@@ -663,7 +665,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
        9 AM on the schedule and sit under Evening in the list. */
     setTaskAt: (id, at) =>
       setTasks((prev) => prev.map((t) => (t.id === id
-        ? { ...t, at, list: 'today' as const, slot: at ? slotForTime(at) : t.slot }
+        ? { ...t, at, list: 'today' as const, plannedOn: t.plannedOn ?? todayKey(), slot: at ? slotForTime(at) : t.slot }
         : t))),
     toggleSubtask: (taskId, subId) =>
       setTasks((prev) =>
@@ -791,7 +793,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     commitPlan: (taskIds, firstMoveId) => {
       setTasks((prev) =>
         prev.map((t) =>
-          t.space !== space ? t : { ...t, list: taskIds.includes(t.id) ? 'today' : t.done ? t.list : 'backlog' },
+          t.space !== space ? t : {
+            ...t,
+            list: taskIds.includes(t.id) ? 'today' : t.done ? t.list : 'backlog',
+            plannedOn: taskIds.includes(t.id) ? todayKey() : t.done ? t.plannedOn : undefined,
+          },
         ),
       )
       setPlan({ committedDate: todayKey(), firstMoveId })
@@ -845,7 +851,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           /* A dictated "done" carries no measured time. Stamping actualMin with
              the default estimate would invent a perfect log and pollute the
              accuracy figure, so it stays undefined unless you said a number. */
-          newTasks.push({ id, title: it.text, source: 'mc', estimateMin: it.estimateMin ?? 15, done, actualMin: done ? it.estimateMin : undefined, createdAt: todayKey(), space, list: 'today', category: 'quick' })
+          newTasks.push({ id, title: it.text, source: 'mc', estimateMin: it.estimateMin ?? 15, done, actualMin: done ? it.estimateMin : undefined, createdAt: todayKey(), plannedOn: todayKey(), space, list: 'today', category: 'quick' })
           created.push({ id, kind: it.kind, label: it.text, tab: done ? 'today' : 'plan' })
         }
       })
@@ -867,7 +873,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     startCoachSession: (input) => {
       const taskId = newId('t')
       setTasks((prev) => [
-        { id: taskId, title: input.firstStep, source: 'mc', estimateMin: input.firstStepMin, done: false, createdAt: todayKey(), space, list: 'today', category: input.category },
+        { id: taskId, title: input.firstStep, source: 'mc', estimateMin: input.firstStepMin, done: false, createdAt: todayKey(), plannedOn: todayKey(), space, list: 'today', category: input.category },
         ...prev,
       ])
       setCoachSessions((prev) => [

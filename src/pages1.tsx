@@ -6,7 +6,7 @@ import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, daysClean, quitDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
 import { fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForDaypart, taskMinutes, toMin } from './util'
 
@@ -149,7 +149,6 @@ export function TodayPage() {
     [...open].sort((a, b) => alertRank(a) - alertRank(b) || DREAD_RANK[a.category] - DREAD_RANK[b.category])[0]
   const [addOpen, setAddOpen] = useState(false)
   const reviewDue = todayIndex === 6 && review.lastDoneDate !== localDateKey()
-  const evening = new Date().getHours() >= 21
   // Next payment badge derives from the money schedule instead of a hardcoded string.
   const nextPay = MOCK_MONEY?.schedule.find((r) => r.state === 'not sent' || r.state === 'action needed')
   const wins = momentum({ tasks: tasks.filter((t) => inView(t.space)), routines, habits: habits.filter((h) => inView(h.space)), coachSessions })
@@ -230,7 +229,7 @@ export function TodayPage() {
         <div className="pin-row">
           {firstMove && (
             <div className="firstmove">
-              <span className="microcap fm-label">{evening ? 'First move tomorrow' : 'First move'}</span>
+              <span className="microcap fm-label">First move</span>
               <span className="fm-title">{firstMove.title}</span>
               <span className="est-chip">{fmtDuration(firstMove.estimateMin)}</span>
               <button className="btn btn-primary" onClick={() => { setFocusTaskId(firstMove.id); setPage('plan') }}>Start</button>
@@ -586,7 +585,6 @@ export function PlanPage() {
   const { startFocus } = usePomodoro()
   const { routines, habits } = useStore()
   const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId, setTaskAt, inView } = useStore()
-  const evening = new Date().getHours() >= 21
   const events = MOCK_AGENDA[space]
 
   const spaceTasks = tasks.filter((t) => inView(t.space))
@@ -685,7 +683,7 @@ export function PlanPage() {
   return (
     <div className="page">
       <Band
-        title={evening ? 'Plan tomorrow' : 'Plan the day'}
+        title="Plan the day"
         metrics={[
           { v: fmtDuration(plannedMin), k: 'planned today', tone: 'info' as const },
           { v: `${donePct}%`, k: 'to-do done', tone: 'pos' as const },
@@ -971,9 +969,50 @@ export function PlanPage() {
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-function HabitRow({ h, todayIndex, actions, drivenBy, progress, goal }: {
+
+/* A longer window than the week. One square a day, oldest on the left, so sixty
+   or a hundred days reads as a shape rather than a wall of ticks. Green means
+   kept, exactly as it does everywhere else; nothing marks a missed day, because
+   a wall of misses is the guilt mechanic this app exists to avoid. */
+function HabitTrail({ h, days }: { h: HabitDef; days: number }) {
+  const { habitLog } = useStore()
+  const today = new Date()
+  const from = new Date(today); from.setDate(from.getDate() - (days - 1))
+  const fromKey = localDateKey(from)
+  const toKey = localDateKey(today)
+  const kept = h.kind === 'break'
+    ? quitKeptDays(h, fromKey, toKey)
+    : keptDaysIn(habitLog, h.id, fromKey, toKey)
+  const cells = Array.from({ length: days }, (_, i) => {
+    const d = new Date(from); d.setDate(from.getDate() + i)
+    return localDateKey(d)
+  })
+  const run = h.kind === 'break' ? (daysClean(h) ?? 0) : currentStreak(habitLog, h.id)
+  const best = h.kind === 'break' ? (daysClean(h) ?? 0) : bestStreak(habitLog, h.id)
+  return (
+    <div className="habit-trail-wrap">
+      <div className={`habit-trail w${days}`}>
+        {cells.map((day) => (
+          <span
+            key={day}
+            className={`trail-day${kept.has(day) ? ' kept' : ''}${day === toKey ? ' is-today' : ''}`}
+            title={`${fmtWhen(day)}${kept.has(day) ? ', kept' : ''}`}
+          />
+        ))}
+      </div>
+      <div className="habit-foot">
+        <span className="habit-weeks">{kept.size} of {days} days</span>
+        <span className="habit-weeks">{run} now, {best} best</span>
+      </div>
+    </div>
+  )
+}
+
+function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress, goal }: {
   h: HabitDef
   todayIndex: number
+  /** How many days back to show. Seven keeps the week of dots you can click. */
+  days?: number
   actions?: React.ReactNode
   /** Name of the routine that ticks this habit, when one does. */
   drivenBy?: string
@@ -982,7 +1021,7 @@ function HabitRow({ h, todayIndex, actions, drivenBy, progress, goal }: {
   /** A goal counting itself off this habit, if one exists. */
   goal?: Goal
 }) {
-  const { toggleHabitDay, logSlip, setPage, focusSessions, inView } = useStore()
+  const { toggleHabitDay, logSlip, setPage, focusSessions, habitLog, inView } = useStore()
   const kept = h.days.filter(Boolean).length
   const target = habitTarget(h)
   // Weekdays-only habits do not expect the weekend, so those dots stay quiet.
@@ -1050,7 +1089,7 @@ function HabitRow({ h, todayIndex, actions, drivenBy, progress, goal }: {
     const clean = daysClean(h) ?? 0
     // The week fills itself from the day he stopped: a day he did not do it is a
     // day kept, so he never has to tick anything to be given credit for it.
-    const days = quitDays(h)
+    const quitWeek = quitDays(h)
     return (
       <div className="habit-row is-quit">
         <div className="habit-row-top">
@@ -1058,13 +1097,15 @@ function HabitRow({ h, todayIndex, actions, drivenBy, progress, goal }: {
           <span className="habit-count mono">{clean}<span className="habit-freq">{clean === 1 ? 'day' : 'days'} clean</span></span>
           {actions}
         </div>
-        <div className="habit-days">
-          {DAY_LABELS.map((d, i) => (
-            <span key={i} className={`daydot is-measure${days[i] ? ' full' : ''}`} title={days[i] ? 'A day without it' : undefined}>
-              <b>{d}</b>
-            </span>
-          ))}
-        </div>
+        {window > 7 ? <HabitTrail h={h} days={window} /> : (
+          <div className="habit-days">
+            {DAY_LABELS.map((d, i) => (
+              <span key={i} className={`daydot is-measure${quitWeek[i] ? ' full' : ''}`} title={quitWeek[i] ? 'A day without it' : undefined}>
+                <b>{d}</b>
+              </span>
+            ))}
+          </div>
+        )}
         <div className="habit-foot">
           <button className="quit-slip" onClick={() => logSlip(h.id)}>I slipped today</button>
           {h.quitSince && <span className="habit-weeks">since {fmtWhen(h.quitSince)}</span>}
@@ -1077,9 +1118,14 @@ function HabitRow({ h, todayIndex, actions, drivenBy, progress, goal }: {
     <div className={`habit-row${drivenBy ? ' is-auto' : ''}`}>
       <div className="habit-row-top">
         <span className="habit-name">{h.name}</span>
-        <span className="habit-count mono">{kept}/{target}<span className="habit-freq">{habitFrequencyLabel(h)}</span></span>
+        {/* The week's count belongs to the week. Showing 1/7 above a year of
+            squares says two different things about the same habit. */}
+        {window === 7 && (
+          <span className="habit-count mono">{kept}/{target}<span className="habit-freq">{habitFrequencyLabel(h)}</span></span>
+        )}
         {actions}
       </div>
+      {window > 7 ? <HabitTrail h={h} days={window} /> : (
       <div className="habit-days">
         {DAY_LABELS.map((d, i) => (
           <span className="day-cell" key={i}>
@@ -1101,6 +1147,7 @@ function HabitRow({ h, todayIndex, actions, drivenBy, progress, goal }: {
           </span>
         ))}
       </div>
+      )}
       {goal && (
         <button className="habit-goal" onClick={() => setPage('goals')}>
           Feeding “{goal.name}”
@@ -1113,9 +1160,7 @@ function HabitRow({ h, todayIndex, actions, drivenBy, progress, goal }: {
               ? `${progress.done} of ${progress.total} steps done in ${drivenBy}`
               : `Ticks itself when you finish ${drivenBy}`}
           </button>
-        ) : (
-          <span className="habit-manual">You tick this one</span>
-        )}
+        ) : null}
         {trend && <span className="habit-weeks">{trend}</span>}
       </div>
     </div>
@@ -1258,8 +1303,18 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
   )
 }
 
+/** How far back the habit page is looking. A week is the default because that is
+ *  the rhythm; the longer windows are for the sixty and hundred day questions. */
+const HABIT_WINDOWS = [
+  { id: 7, label: 'A week' },
+  { id: 30, label: '30 days' },
+  { id: 90, label: '90 days' },
+  { id: 365, label: 'A year' },
+]
+
 export function HabitsPage() {
   const { habits, goals, space, deleteHabit, routines, todayIndex, inView } = useStore()
+  const [days, setDays] = useState(7)
   const [adding, setAdding] = useState(false)
   // Opening the goal sheet from a habit is the "set a goal on this" path.
   const [goalFor, setGoalFor] = useState<string | null>(null)
@@ -1288,7 +1343,17 @@ export function HabitsPage() {
       <Band
         title="Habits"
         metrics={[{ v: `${kept}/${target}`, k: 'kept this week', tone: 'pos' as const }]}
-        actions={<button className="btn btn-primary" onClick={() => setAdding(true)}>Add a habit</button>}
+        actions={
+          <>
+            <select
+              className="textinput rangepick" value={days} aria-label="How far back to look"
+              onChange={(e) => setDays(Number(e.target.value))}
+            >
+              {HABIT_WINDOWS.map((w) => <option key={w.id} value={w.id}>{w.label}</option>)}
+            </select>
+            <button className="btn btn-primary" onClick={() => setAdding(true)}>Add a habit</button>
+          </>
+        }
       />
 
       {/* One band per part of the day: a heading, a rule, then that group's
@@ -1303,7 +1368,7 @@ export function HabitsPage() {
           <div className="habit-grid">
             {c.list.map((h) => (
               <div className={`panel habit-card${h.paused ? ' is-paused' : ''}`} key={h.id}>
-                <HabitRow h={h} todayIndex={todayIndex} drivenBy={drivenBy.get(h.id)} progress={progressFor.get(h.id)} goal={goalOn.get(h.id)} actions={
+                <HabitRow h={h} todayIndex={todayIndex} days={days} drivenBy={drivenBy.get(h.id)} progress={progressFor.get(h.id)} goal={goalOn.get(h.id)} actions={
                   <>
                   {h.paused && <span className="col-tot mono">paused</span>}
                   {!h.paused && h.days[todayIndex] && <span className="col-tot mono val-pos">done today</span>}

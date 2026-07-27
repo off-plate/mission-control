@@ -643,12 +643,14 @@ export function PlanPage() {
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-function HabitRow({ h, todayIndex, actions, drivenBy }: {
+function HabitRow({ h, todayIndex, actions, drivenBy, progress }: {
   h: HabitDef
   todayIndex: number
   actions?: React.ReactNode
   /** Name of the routine that ticks this habit, when one does. */
   drivenBy?: string
+  /** Today's progress through the routine that drives this habit. */
+  progress?: { done: number; total: number }
 }) {
   const { toggleHabitDay, setPage } = useStore()
   const kept = h.days.filter(Boolean).length
@@ -666,6 +668,11 @@ function HabitRow({ h, todayIndex, actions, drivenBy }: {
       ? `kept ${hitWeeks} of the last ${weeks.length} weeks`
       : `averaging ${avg.toFixed(1).replace(/\.0$/, '')} of ${target} a week`
 
+  // Part-done shows as a partial fill on today's dot, so a routine you started
+  // but did not finish is visible here instead of reading as untouched.
+  const pct = progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0
+  const partial = !!progress && progress.done > 0 && progress.done < progress.total
+
   return (
     <div className={`habit-row${drivenBy ? ' is-auto' : ''}`}>
       <div className="habit-row-top">
@@ -677,7 +684,8 @@ function HabitRow({ h, todayIndex, actions, drivenBy }: {
         {DAY_LABELS.map((d, i) => (
           <span className="day-cell" key={i}>
             <button
-              className={`daydot${expected(i) ? '' : ' off-day'}${drivenBy ? ' is-auto' : ''}`}
+              className={`daydot${expected(i) ? '' : ' off-day'}${drivenBy ? ' is-auto' : ''}${i === todayIndex && partial ? ' partial' : ''}`}
+              style={i === todayIndex && partial ? ({ ['--fill' as string]: `${pct}%` } as React.CSSProperties) : undefined}
               role="checkbox"
               aria-checked={h.days[i]}
               /* A habit a routine ticks is read-only here: ticking it by hand
@@ -696,7 +704,9 @@ function HabitRow({ h, todayIndex, actions, drivenBy }: {
       <div className="habit-foot">
         {drivenBy ? (
           <button className="habit-auto" onClick={() => setPage('routines')}>
-            Ticks itself when you finish {drivenBy}
+            {progress && progress.total > 1 && progress.done < progress.total
+              ? `${progress.done} of ${progress.total} steps done in ${drivenBy}`
+              : `Ticks itself when you finish ${drivenBy}`}
           </button>
         ) : (
           <span className="habit-manual">You tick this one</span>
@@ -785,6 +795,10 @@ export function HabitsPage() {
   // A habit a routine drives cannot be deleted from here, or the routine would
   // mirror into nothing. Pausing stays available.
   const drivenBy = new Map(routines.filter((r) => r.habitId).map((r) => [r.habitId as string, r.title]))
+  // Today's step progress for each routine-driven habit.
+  const progressFor = new Map(routines.filter((r) => r.habitId).map((r) => [
+    r.habitId as string, { done: r.doneStepIds.length, total: r.steps.length },
+  ]))
   const kept = spaceHabits.filter((h) => !h.paused).reduce((a, h) => a + h.days.filter(Boolean).length, 0)
   const target = spaceHabits.filter((h) => !h.paused).reduce((a, h) => a + habitTarget(h), 0)
 
@@ -815,7 +829,7 @@ export function HabitsPage() {
           <div className="habit-grid">
             {c.list.map((h) => (
               <div className={`panel habit-card${h.paused ? ' is-paused' : ''}`} key={h.id}>
-                <HabitRow h={h} todayIndex={todayIndex} drivenBy={drivenBy.get(h.id)} actions={
+                <HabitRow h={h} todayIndex={todayIndex} drivenBy={drivenBy.get(h.id)} progress={progressFor.get(h.id)} actions={
                   <>
                   {h.paused && <span className="col-tot mono">paused</span>}
                   {!h.paused && h.days[todayIndex] && <span className="col-tot mono val-pos">done today</span>}

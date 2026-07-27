@@ -184,7 +184,13 @@ export interface Routine {
   /** Which period the checks belong to (day / ISO week / month). When the
    *  current period differs, the checks reset automatically. */
   periodKey?: string
+  /** Numbers a step recorded this period, e.g. today's typing speed. Cleared
+   *  with the checks when the period rolls over. */
+  stepData?: Record<string, number>
 }
+
+/** The typing step is only done once you actually hit the number. */
+export const TYPING_TARGET_WPM = 75
 
 export type GoalTimeframe = 'weekly' | 'monthly' | 'quarter' | 'half'
 export type GoalCategory = 'money' | 'health' | 'life' | 'work' | 'offplate' | 'habits'

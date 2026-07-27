@@ -1881,3 +1881,33 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   .habit-foot { gap: var(--s2); }
   .habit-weeks { margin-left: 0; }
 }
+
+/* A multi-step routine part-done: today's dot fills to match, so a morning you
+   started but did not finish reads differently from one you never began. */
+.daydot.partial {
+  background: linear-gradient(to top, var(--accent-wash) var(--fill, 0%), transparent var(--fill, 0%));
+  border-color: var(--accent);
+  border-style: solid;
+}
+
+/* Typing step: you are chasing a number, not ticking a box. */
+.wpm-row { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s4); flex-wrap: wrap; }
+.wpm-label { font-size: var(--text-sm); color: var(--muted); }
+.wpm-result {
+  display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap;
+  margin-top: var(--s3); padding: var(--s3); border-radius: var(--r-sm);
+  border: 1px solid var(--hairline-strong);
+}
+.wpm-result.pass { border-color: var(--progress); background: var(--progress-wash); }
+.wpm-result.under { border-color: var(--warn); background: var(--warn-wash); }
+.wpm-big { font-size: 1.5rem; font-weight: 700; line-height: 1; }
+.wpm-unit { font-size: 0.625rem; letter-spacing: 0.04em; text-transform: uppercase; margin-left: 4px; color: var(--muted); }
+.wpm-verdict { font-size: var(--text-sm); }
+.wpm-result.pass .wpm-verdict { color: var(--progress); }
+.wpm-result.under .wpm-verdict { color: var(--warn); }
+.wpm-bar { flex: 1 1 100%; height: 4px; border-radius: 2px; background: var(--hairline); overflow: hidden; margin-top: 4px; }
+.wpm-bar > i { display: block; height: 100%; background: currentColor; }
+.wpm-result.pass .wpm-bar > i { background: var(--progress); }
+.wpm-result.under .wpm-bar > i { background: var(--warn); }
+.wpm-best { font-size: var(--text-xs); color: var(--faint); margin-top: var(--s2); }
+.mr-check:disabled { cursor: not-allowed; opacity: 0.55; }

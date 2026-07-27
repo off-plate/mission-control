@@ -319,7 +319,7 @@ function ActualLog({ est, onLog, onSkip }: { est: number; onLog: (m: number) => 
 
 
 /* Breaking a task down and estimating it are actions on the task itself. */
-function TaskActions({ task, onBreakdown, onFocus }: { task: Task; onBreakdown: () => void; onFocus?: () => void }) {
+function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
   const { setEstimate } = useStore()
   const [flash, setFlash] = useState<string | null>(null)
   const hasSubs = !!task.subtasks?.length
@@ -339,16 +339,6 @@ function TaskActions({ task, onBreakdown, onFocus }: { task: Task; onBreakdown: 
           </svg>
         </button>
       )}
-      <button
-        className="task-act"
-        aria-label={hasSubs ? `Break down ${task.title} again` : `Break down ${task.title}`}
-        title={hasSubs ? 'Break it down again' : 'Break it down'}
-        onClick={onBreakdown}
-      >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-          <path d="M12 3v5M12 8l-5 4M12 8l5 4M7 12v2M17 12v2M4 16h6M14 16h6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
       <button
         className="task-act"
         disabled={hasSubs}
@@ -401,7 +391,6 @@ export function PlanPage() {
     return acc + (t.done && t.actualMin != null ? t.estimateMin - t.actualMin : 0)
   }, 0)
 
-  const [selected, setSelected] = useState<string[]>([])
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [goal, setGoal] = useState('')
   const [busy, setBusy] = useState(false)
@@ -409,6 +398,7 @@ export function PlanPage() {
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [logging, setLogging] = useState<string | null>(null)
   const [flashId, setFlashId] = useState<string | null>(null)
+  const [listDropOver, setListDropOver] = useState(false)
   const [quick, setQuick] = useState('')
   const [breakdownFor, setBreakdownFor] = useState<Task | null>(null)
 
@@ -424,8 +414,6 @@ export function PlanPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusTaskId])
 
-  const toggleSel = (id: string) =>
-    setSelected((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]))
   const toggleExp = (id: string) =>
     setExpanded((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
 
@@ -442,8 +430,19 @@ export function PlanPage() {
     }, 750)
   }
 
-  const selMin = backlogOpen.filter((t) => selected.includes(t.id)).reduce((a, t) => a + taskMinutes(t), 0)
-  const dropTo = (key: TimeSlot | 'unsorted', id: string) => assignSlot(id, key === 'unsorted' ? undefined : key)
+  /* One drop handler for both directions: into a time bucket moves the task to
+     today and slots it; onto the list sends it back to the backlog. */
+  const dropTo = (key: TimeSlot | 'unsorted', id: string) => {
+    const t = tasks.find((x) => x.id === id)
+    if (t && t.list !== 'today') moveTaskList(id, 'today')
+    assignSlot(id, key === 'unsorted' ? undefined : key)
+  }
+  const dropToList = (id: string) => {
+    const t = tasks.find((x) => x.id === id)
+    if (!t || t.list === 'backlog') return
+    moveTaskList(id, 'backlog')
+    assignSlot(id, undefined)
+  }
 
   return (
     <div className="page">
@@ -462,8 +461,14 @@ export function PlanPage() {
           <p className="col-note">Google Calendar for today. Click any name to open or schedule it in Calendar.</p>
         </div>
 
-        {/* 2 — To-do list: everything you added, any day */}
-        <div className="panel">
+        {/* 2 — To-do list: everything you added, any day. Drag out to plan it,
+            drag back to take it off today. */}
+        <div
+          className={`panel${listDropOver ? ' drop-over' : ''}`}
+          onDragOver={(e) => { e.preventDefault(); setListDropOver(true) }}
+          onDragLeave={() => setListDropOver(false)}
+          onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); if (id) dropToList(id); setListDropOver(false) }}
+        >
           <div className="col-head">
             <span className="microcap">To-do list</span>
             <span className="col-tot mono">{backlogOpen.length} here</span>
@@ -492,14 +497,12 @@ export function PlanPage() {
             const doneSubs = t.subtasks?.filter((s) => s.done).length ?? 0
             return (
               <div className="todo-item" key={t.id}>
-                <div className="todo-row">
-                  <button
-                    className={`select-box${selected.includes(t.id) ? ' on' : ''}`}
-                    role="checkbox" aria-checked={selected.includes(t.id)} aria-label={`Select: ${t.title}`}
-                    onClick={() => toggleSel(t.id)}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
-                  </button>
+                <div
+                  className="todo-row"
+                  draggable
+                  onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move' }}
+                >
+                  <span className="drag-grip" aria-hidden="true">⠿</span>
                   <span className={`cat-dot ${t.category}`} aria-hidden="true" />
                   <span className="grow">{t.title}</span>
                   {isEstimated(t) ? <span className="est-chip">~{taskMinutes(t)}m</span> : <span className="est-chip is-none">no estimate</span>}
@@ -508,11 +511,12 @@ export function PlanPage() {
                       {isExp ? '▾' : '▸'} {doneSubs}/{t.subtasks!.length}
                     </button>
                   )}
-                  <TaskActions task={t} onBreakdown={() => setBreakdownFor(t)} />
+                  <TaskActions task={t} />
                   <span className="kebab-wrap">
                     <button className="kebab" aria-label={`Options for ${t.title}`} aria-expanded={menuFor === t.id} onClick={() => setMenuFor((m) => (m === t.id ? null : t.id))}>⋯</button>
                     {menuFor === t.id && (
                       <div className="kebab-menu" role="menu">
+                        <button role="menuitem" onClick={() => { setBreakdownFor(t); setMenuFor(null) }}>Break it down</button>
                         <button role="menuitem" onClick={() => { moveTasksToToday([t.id]); setMenuFor(null) }}>Move to today</button>
                         <button role="menuitem" className="danger" onClick={() => { deleteTask(t.id); setMenuFor(null) }}>Delete</button>
                       </div>
@@ -602,11 +606,13 @@ export function PlanPage() {
                               {isExp ? '▾' : '▸'} {doneSubs}/{t.subtasks!.length}
                             </button>
                           )}
-                          {!t.done && <TaskActions task={t} onBreakdown={() => setBreakdownFor(t)} onFocus={() => startFocus(taskMinutes(t), t.title)} />}
+                          {!t.done && <TaskActions task={t} onFocus={() => startFocus(taskMinutes(t), t.title)} />}
                           <span className="kebab-wrap">
                             <button className="kebab" aria-label={`Options for ${t.title}`} aria-expanded={menuFor === t.id} onClick={() => setMenuFor((m) => (m === t.id ? null : t.id))}>⋯</button>
                             {menuFor === t.id && (
                               <div className="kebab-menu" role="menu">
+                                {!t.done && <button role="menuitem" onClick={() => { setBreakdownFor(t); setMenuFor(null) }}>Break it down</button>}
+                                {!t.done && <span className="kebab-sep" />}
                                 {!t.done && BUCKETS.map((mb) => (
                                   <button key={mb.id} role="menuitemradio" aria-checked={(t.slot ?? 'unsorted') === mb.id} onClick={() => { dropTo(mb.id, t.id); setMenuFor(null) }}>
                                     {mb.label}
@@ -692,22 +698,13 @@ export function PlanPage() {
             </div>
           )}
           {todayAll.length === 0 && (
-            <p className="col-note">Select tasks in the to-do list and move them over, then drag them into a time of day.</p>
+            <p className="col-note">Drag anything from the list into a time of day. Drag it back to take it off today.</p>
           )}
         </div>
       </div>
 
       {breakdownFor && <BreakdownSheet task={breakdownFor} onClose={() => setBreakdownFor(null)} />}
 
-      {selected.length > 0 && (
-        <div className="movebar" role="region" aria-label="Move selected tasks">
-          <span className="movebar-count">{selected.length} selected · {fmtDuration(selMin)}</span>
-          <button className="btn btn-ghost movebar-clear" onClick={() => setSelected([])}>Clear</button>
-          <button className="btn btn-primary" onClick={() => { moveTasksToToday(selected); setSelected([]) }}>
-            Move to today →
-          </button>
-        </div>
-      )}
     </div>
   )
 }
@@ -801,29 +798,40 @@ const DAYPART_COLS: { id: TimeSlot | 'anytime'; label: string; hint: string }[] 
   { id: 'anytime', label: 'Anytime', hint: 'no fixed hour' },
 ]
 
-function AddHabitSheet({ onClose }: { onClose: () => void }) {
-  const { addHabit } = useStore()
-  const [name, setName] = useState('')
-  const [daypart, setDaypart] = useState<TimeSlot | ''>('morning')
-  const [frequency, setFrequency] = useState<HabitFrequency>('daily')
-  const [perWeek, setPerWeek] = useState(3)
+/* One sheet for adding and editing. A habit a routine drives keeps its name and
+   frequency in step with that routine, so those fields are read-only here. */
+function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?: HabitDef; drivenBy?: string }) {
+  const { addHabit, updateHabit } = useStore()
+  const [name, setName] = useState(habit?.name ?? '')
+  const [daypart, setDaypart] = useState<TimeSlot | ''>(habit?.daypart ?? 'morning')
+  const [frequency, setFrequency] = useState<HabitFrequency>(habit?.frequency ?? 'daily')
+  const [perWeek, setPerWeek] = useState(habit?.targetPerWeek ?? 3)
+  const locked = !!drivenBy
 
   const submit = () => {
     if (!name.trim()) return
-    addHabit({
+    const shape = {
       name: name.trim(),
       daypart: daypart || undefined,
       frequency,
       targetPerWeek: frequency === 'times-per-week' ? perWeek : undefined,
-    })
+    }
+    if (habit) updateHabit(habit.id, locked ? { daypart: shape.daypart } : shape)
+    else addHabit(shape)
     onClose()
   }
 
   return (
-    <Sheet title="Add a habit" onClose={onClose} note="Habits are the small things you repeat. Multi-step rituals belong on Routines.">
+    <Sheet
+      title={habit ? 'Edit this habit' : 'Add a habit'}
+      onClose={onClose}
+      note={locked
+        ? `This habit is kept by the ${drivenBy} routine, so its name and frequency follow that routine. You can still move it to a different part of the day.`
+        : 'Habits are the small things you repeat. Multi-step rituals belong on Routines.'}
+    >
       <label className="field-label" htmlFor="hname">What is the habit?</label>
       <input
-        id="hname" className="textinput" style={{ width: '100%' }} autoFocus
+        id="hname" className="textinput" style={{ width: '100%' }} autoFocus={!locked} disabled={locked}
         placeholder="e.g. 20 minutes of movement"
         value={name} onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') submit() }}
@@ -836,7 +844,7 @@ function AddHabitSheet({ onClose }: { onClose: () => void }) {
       </select>
 
       <label className="field-label" style={{ marginTop: 'var(--s4)' }} htmlFor="hfreq">How often?</label>
-      <select id="hfreq" className="textinput" style={{ width: '100%' }} value={frequency} onChange={(e) => setFrequency(e.target.value as HabitFrequency)}>
+      <select id="hfreq" className="textinput" style={{ width: '100%' }} value={frequency} disabled={locked} onChange={(e) => setFrequency(e.target.value as HabitFrequency)}>
         {HABIT_FREQUENCIES.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
       </select>
 
@@ -851,18 +859,19 @@ function AddHabitSheet({ onClose }: { onClose: () => void }) {
 
       <div className="sheet-actions">
         <button className="btn btn-quiet" onClick={onClose}>Cancel</button>
-        <button className="btn btn-primary" disabled={!name.trim()} onClick={submit}>Add habit</button>
+        <button className="btn btn-primary" disabled={!name.trim()} onClick={submit}>{habit ? 'Save changes' : 'Add habit'}</button>
       </div>
     </Sheet>
   )
 }
 
 export function HabitsPage() {
-  const { habits, goals, space, togglePauseHabit, deleteHabit, routines, todayIndex } = useStore()
+  const { habits, goals, space, deleteHabit, routines, todayIndex } = useStore()
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   // Opening the goal sheet from a habit is the "set a goal on this" path.
   const [goalFor, setGoalFor] = useState<string | null>(null)
+  const [editHabit, setEditHabit] = useState<HabitDef | null>(null)
   const goalOn = new Map(goals.filter((g) => g.habitId).map((g) => [g.habitId as string, g]))
   const spaceHabits = habits.filter((h) => h.space === space)
   // A habit a routine drives cannot be deleted from here, or the routine would
@@ -910,18 +919,17 @@ export function HabitsPage() {
                     <button className="kebab" aria-label={`Options for ${h.name}`} aria-expanded={menuFor === h.id} onClick={() => setMenuFor((m) => (m === h.id ? null : h.id))}>⋯</button>
                     {menuFor === h.id && (
                       <div className="kebab-menu" role="menu">
+                        <button role="menuitem" onClick={() => { setEditHabit(h); setMenuFor(null) }}>Edit this habit</button>
                         {goalOn.has(h.id) ? (
                           <span className="kebab-note">Goal: {goalOn.get(h.id)!.name}</span>
                         ) : (
                           <button role="menuitem" onClick={() => { setGoalFor(h.id); setMenuFor(null) }}>Set a goal on this</button>
                         )}
-                        <button role="menuitem" onClick={() => { togglePauseHabit(h.id); setMenuFor(null) }}>
-                          {h.paused ? 'Resume' : 'Pause'}
-                        </button>
+                        <span className="kebab-sep" />
                         {drivenBy.has(h.id) ? (
-                          <span className="kebab-note">Run by the {drivenBy.get(h.id)} routine</span>
+                          <span className="kebab-note">Deleted with the {drivenBy.get(h.id)} routine</span>
                         ) : (
-                          <button role="menuitem" className="danger" onClick={() => { deleteHabit(h.id); setMenuFor(null) }}>Delete</button>
+                          <button role="menuitem" className="danger" onClick={() => { deleteHabit(h.id); setMenuFor(null) }}>Delete this habit</button>
                         )}
                       </div>
                     )}
@@ -939,7 +947,8 @@ export function HabitsPage() {
         Missed days stay quiet on purpose. No broken streaks, no wall of missed-day marks. Multi-step routines live on the Routines tab; finishing one there checks its habit off here.
       </p>
 
-      {adding && <AddHabitSheet onClose={() => setAdding(false)} />}
+      {adding && <HabitSheet onClose={() => setAdding(false)} />}
+      {editHabit && <HabitSheet habit={editHabit} drivenBy={drivenBy.get(editHabit.id)} onClose={() => setEditHabit(null)} />}
       {goalFor && <GoalSheet presetHabitId={goalFor} onClose={() => setGoalFor(null)} />}
     </div>
   )

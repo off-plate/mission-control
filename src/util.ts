@@ -92,9 +92,11 @@ export function taskMinutes(t: Task): number {
   return t.estimateMin
 }
 
-/** Has this task actually been estimated, or is it still an unknown? */
+/** Has this task actually been estimated, or is a number just sitting on it?
+ *  Steps count as an estimate; a bare minute value from an old default does not. */
 export function isEstimated(t: Task): boolean {
-  return taskMinutes(t) > 0
+  if (t.subtasks?.length) return true
+  return t.estimated === true && t.estimateMin > 0
 }
 
 export function fmtDuration(min: number): string {

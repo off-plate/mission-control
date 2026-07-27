@@ -98,6 +98,9 @@ export interface Task {
   subtasks?: SubTask[]
   /** 'HH:MM' if the user pinned it to a clock time (feeds the Calendar link). */
   at?: string
+  /** True once a real estimate exists, set by the estimate action or a breakdown.
+   *  Without it a number is just a leftover default, so it is not shown as one. */
+  estimated?: boolean
   /** ISO date the task first appeared. Ageing is how avoidance gets detected. */
   createdAt?: string
   /** How many days it has been carried forward without being finished. */

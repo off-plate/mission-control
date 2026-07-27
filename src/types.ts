@@ -468,7 +468,3 @@ export interface ReviewState {
     previous?: { monthKey: string; wins: string[]; outcomes: string[] }
   }
 }
-
-/** The deal he made with himself: Off-Plate gets evenings, not the week.
- *  15 hours, and if it starts eating the rest, it goes back in the box. */
-export const OFFPLATE_WEEKLY_CAP_MIN = 15 * 60

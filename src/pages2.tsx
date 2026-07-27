@@ -8,7 +8,7 @@ import { analyzeAvoidance } from './coach'
 import { getAiKey, hasAiKey, readAvoidance, setAiKey, type AvoidanceRead } from './ai'
 import { paymentTaskTitle } from './exceptions'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange, sendSignInCode, signInWithCode, signOutAccount, type Account } from './supabase'
-import { goalCurrent, OFFPLATE_WEEKLY_CAP_MIN, ON_TRACK_PCT, type CoachFacts, type CoachSession, type TaskCategory } from './types'
+import { goalCurrent, ON_TRACK_PCT, type CoachFacts, type CoachSession, type TaskCategory } from './types'
 
 /* ---------------- MONEY ---------------- */
 
@@ -110,28 +110,6 @@ function SecHead({ label }: { label: string }) {
   )
 }
 
-/* Off-Plate runs on evenings, capped at fifteen hours a week. That was the deal
-   he made when it came off the shelf, so the app has to be able to say when it
-   is being broken rather than leaving him to notice. */
-function OffPlateCap({ minutes }: { minutes: number }) {
-  const pct = Math.min(100, Math.round((minutes / OFFPLATE_WEEKLY_CAP_MIN) * 100))
-  const over = minutes > OFFPLATE_WEEKLY_CAP_MIN
-  return (
-    <div className="panel">
-      <span className="microcap">Off-Plate hours this week</span>
-      <div className={`kpi ${over ? 'val-urgent' : 'val-pos'}`}>
-        {fmtDuration(minutes)}<span className="unit">of 15h</span>
-      </div>
-      <div className={`bar prog${over ? ' warn' : ''}`}><i style={{ width: `${pct}%` }} /></div>
-      <div className="kpi-sub">
-        {over
-          ? `${fmtDuration(minutes - OFFPLATE_WEEKLY_CAP_MIN)} over the cap. The deal was that it goes back in the box.`
-          : `${fmtDuration(OFFPLATE_WEEKLY_CAP_MIN - minutes)} left before the cap.`}
-      </div>
-    </div>
-  )
-}
-
 export function ReviewPage() {
   const { tasks, space, savedMin, accuracyPct, habits, goals, finishReview, finishMonthlyReview, review, weekLedger, ledger, focusSessions } = useStore()
   const [window_, setWindow] = useState<'week' | 'month'>('week')
@@ -164,7 +142,6 @@ export function ReviewPage() {
   const monthFocus = focusSessions.filter((f) => f.space === space && inMonth(f.day, mk)).reduce((a, f) => a + f.minutes, 0)
   const monthClosed = review.month?.lastMonthKey === mk
   const prevMonth = review.month?.previous
-  const offplateWeekMin = weekLedger.reduce((a, e) => a + e.actualMin, 0)
 
   return (
     <div className="page">
@@ -192,7 +169,6 @@ export function ReviewPage() {
       )}
 
       {window_ === 'week' && <>
-      {space === 'offplate' && <div style={{ marginBottom: 'var(--s4)' }}><OffPlateCap minutes={offplateWeekMin} /></div>}
       <SecHead label="This week" />
       <div className="grid-4">
         <div className="panel">
@@ -305,25 +281,21 @@ export function ReviewPage() {
           <div className={`kpi ${monthSaved >= 0 ? 'val-pos' : 'val-urgent'}`}>{fmtSigned(monthSaved)}</div>
           <div className="kpi-sub">against your own estimates</div>
         </div>
-        {space === 'offplate'
-          ? <OffPlateCap minutes={offplateWeekMin} />
-          : (
-            <div className="panel">
-              <span className="microcap">Goals on track</span>
-              <div className="kpi">{goalsOnTrack}<span className="unit">of {spaceGoals.length}</span></div>
-              <div className="rowlist" style={{ marginTop: 8 }}>
-                {spaceGoals.slice(0, 5).map((g) => {
-                  const pct = Math.min(100, Math.round((goalCurrent(g, habits) / g.target) * 100))
-                  return (
-                    <div className="rowitem" key={g.id} style={{ minHeight: 30 }}>
-                      <span className="grow">{g.name}</span>
-                      <span className={`drift ${pct < ON_TRACK_PCT ? 'off' : 'ok'}`}>{pct}%</span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
+        <div className="panel">
+          <span className="microcap">Goals on track</span>
+          <div className="kpi">{goalsOnTrack}<span className="unit">of {spaceGoals.length}</span></div>
+          <div className="rowlist" style={{ marginTop: 8 }}>
+            {spaceGoals.slice(0, 5).map((g) => {
+              const pct = Math.min(100, Math.round((goalCurrent(g, habits) / g.target) * 100))
+              return (
+                <div className="rowitem" key={g.id} style={{ minHeight: 30 }}>
+                  <span className="grow">{g.name}</span>
+                  <span className={`drift ${pct < ON_TRACK_PCT ? 'off' : 'ok'}`}>{pct}%</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
       </div>
 
       <SecHead label="The longer arc" />

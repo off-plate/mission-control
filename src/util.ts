@@ -33,6 +33,50 @@ export function monthName(key = monthKey()): string {
   return new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
 }
 
+/* ---------- goal periods ---------- */
+
+export type GoalTf = 'weekly' | 'monthly' | 'quarter' | 'half'
+
+/** The period a goal set today belongs to. A goal for this week is for THIS
+ *  week, not for a rolling seven days that never ends. */
+export function goalPeriodKey(tf: GoalTf, now = new Date()): string {
+  if (tf === 'weekly') return isoWeekKey(now)
+  if (tf === 'monthly') return monthKey(now)
+  if (tf === 'quarter') return `${now.getFullYear()}-Q${Math.floor(now.getMonth() / 3) + 1}`
+  return `${now.getFullYear()}-H${now.getMonth() < 6 ? 1 : 2}`
+}
+
+/** The dates a goal period covers, so its progress can be counted inside it. */
+export function goalPeriodRange(tf: GoalTf, key: string): DateRange {
+  const iso2 = (d: Date) => localDateKey(d)
+  if (tf === 'weekly') {
+    const [y, w] = key.split('-W').map(Number)
+    // Monday of ISO week w: the Monday on or before 4 January, plus w-1 weeks.
+    const jan4 = new Date(y, 0, 4)
+    const mon = new Date(jan4)
+    mon.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7) + (w - 1) * 7)
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6)
+    return { id: key, label: `week of ${fmtDayShort(mon)}`, from: iso2(mon), to: iso2(sun) }
+  }
+  if (tf === 'monthly') {
+    const [y, m] = key.split('-').map(Number)
+    return { id: key, label: monthName(key), from: iso2(new Date(y, m - 1, 1)), to: iso2(new Date(y, m, 0)) }
+  }
+  if (tf === 'quarter') {
+    const [y, q] = key.split('-Q').map(Number)
+    const start = new Date(y, (q - 1) * 3, 1)
+    return { id: key, label: `Q${q} ${y}`, from: iso2(start), to: iso2(new Date(y, q * 3, 0)) }
+  }
+  const [y, h] = key.split('-H').map(Number)
+  const start = new Date(y, h === 1 ? 0 : 6, 1)
+  return { id: key, label: `${h === 1 ? 'first' : 'second'} half of ${y}`, from: iso2(start), to: iso2(new Date(y, h === 1 ? 6 : 12, 0)) }
+}
+
+/** Has this goal's period already ended? */
+export function periodIsPast(tf: GoalTf, key: string, now = new Date()): boolean {
+  return goalPeriodRange(tf, key).to < localDateKey(now)
+}
+
 /* ---------- review windows ---------- */
 
 export type RangeId = 'this-week' | 'last-week' | 'last-7' | 'last-14' | 'last-30' | 'this-month' | 'last-month' | 'last-90'

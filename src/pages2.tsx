@@ -485,6 +485,9 @@ export function CoachPage() {
     <div className="page">
       <Band title="Coach" sub="for the thing you keep circling" />
 
+      {/* Two columns above 1600px: the box on the left, everything you can act
+          on to its right, so an ultrawide screen is not two thirds empty. */}
+      <div className="coach-two">
       <div className="panel coach-intake">
         <span className="microcap">What are you avoiding?</span>
         <textarea
@@ -499,6 +502,9 @@ export function CoachPage() {
           <span className="assist-note">Coach looks at it factually and hands you an easy first step. You do not fill in the analysis, it does.</span>
         </div>
 
+      </div>
+
+      <div className="coach-side">
         {/* Naming the thing is the step an avoider cannot do cold, so the page
             offers the usual suspects and your own oldest tasks to point at. */}
         <div className="coach-starters">
@@ -518,7 +524,6 @@ export function CoachPage() {
             ))}
           </div>
         </div>
-      </div>
 
       {open.length > 0 && (
         <>
@@ -569,6 +574,8 @@ export function CoachPage() {
           </div>
         </>
       )}
+      </div>
+      </div>
 
       <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginTop: 'var(--s5)', maxWidth: '72ch' }}>
         Demo: Coach drafts the breakdown here in your browser. The real build sends what you wrote to a model that reads the actual thing, and remembers your pattern so the fifth avoided call is easier than the first.

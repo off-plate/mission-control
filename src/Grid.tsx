@@ -1,4 +1,4 @@
-import { Component, useMemo, useState, type ReactNode } from 'react'
+import { Component, useEffect, useMemo, useState, type ReactNode } from 'react'
 import ReactGridLayout, { useContainerWidth } from 'react-grid-layout'
 import { colsForWidth, formatFresh, orderFromLayout, packLayout } from './derive'
 import { WIDGET_DEFS } from './mock'
@@ -119,12 +119,30 @@ function PhoneStack({
   )
 }
 
+/* The phone breakpoint comes from the viewport, not from the measured container.
+   On a space switch the container remounts and reports width 0 for a frame; the
+   old check (`width > 0 && width < 640`) read that as "not a phone" and rendered
+   the absolutely positioned desktop grid inside a 390px box, so widgets painted
+   on top of each other with their text running off-screen. */
+function useIsPhone(): boolean {
+  const q = '(max-width: 639px)'
+  const [is, setIs] = useState(() => (typeof window === 'undefined' ? false : window.matchMedia(q).matches))
+  useEffect(() => {
+    const mq = window.matchMedia(q)
+    const on = () => setIs(mq.matches)
+    mq.addEventListener('change', on)
+    on()
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return is
+}
+
 export function SpaceGrid() {
   const { spaces, space, editing, reorderSpace, moveWidget } = useStore()
   const instances = spaces[space]
   const { width, containerRef, mounted } = useContainerWidth()
+  const phone = useIsPhone()
 
-  const phone = width > 0 && width < 640
   const cols = colsForWidth(width || 1280)
   const margin = 14
   const cellW = (width - margin * (cols - 1)) / cols
@@ -137,7 +155,8 @@ export function SpaceGrid() {
       {mounted && phone && (
         <PhoneStack instances={instances} space={space} editing={editing} moveWidget={moveWidget} />
       )}
-      {mounted && !phone && (
+      {/* Never lay out the desktop grid against an unmeasured container. */}
+      {mounted && !phone && width > 0 && (
         <ReactGridLayout
           layout={layout}
           width={width}

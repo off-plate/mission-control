@@ -2176,3 +2176,13 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .subtask:disabled { opacity: 0.6; cursor: pointer; }
 .rod-locked { flex: none; font-size: 0.5625rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--warn); }
 .habit.is-auto { border-style: dashed; cursor: pointer; }
+
+/* A measured habit: the dot is how far through the day's target you got, in
+   deepening green, rather than a yes or a no. */
+.daydot.is-measure { cursor: default; border-color: var(--hairline-strong); }
+.daydot.is-measure.partial {
+  background: linear-gradient(to top, var(--progress-wash) var(--fill, 0%), transparent var(--fill, 0%));
+  border-color: var(--progress);
+}
+.daydot.is-measure.full { background: var(--progress); border-color: var(--progress); }
+.habit-row.is-measured .habit-count { white-space: nowrap; }

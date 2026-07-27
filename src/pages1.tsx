@@ -6,9 +6,9 @@ import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, daysSinceSlip, goalCurrent, habitFrequencyLabel, habitTarget, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, daysSinceSlip, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
-import { cadenceDueLabel, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, gcalUrl, isEstimated, localDateKey, slotForDaypart, taskMinutes, toMin } from './util'
+import { cadenceDueLabel, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForDaypart, taskMinutes, toMin } from './util'
 
 /* ---------------- shared bits ---------------- */
 
@@ -897,7 +897,7 @@ function HabitRow({ h, todayIndex, actions, drivenBy, progress, goal }: {
   /** A goal counting itself off this habit, if one exists. */
   goal?: Goal
 }) {
-  const { toggleHabitDay, logSlip, setPage } = useStore()
+  const { toggleHabitDay, logSlip, setPage, focusSessions } = useStore()
   const kept = h.days.filter(Boolean).length
   const target = habitTarget(h)
   // Weekdays-only habits do not expect the weekend, so those dots stay quiet.
@@ -917,6 +917,47 @@ function HabitRow({ h, todayIndex, actions, drivenBy, progress, goal }: {
   // but did not finish is visible here instead of reading as untouched.
   const pct = progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0
   const partial = !!progress && progress.done > 0 && progress.done < progress.total
+
+  /* Measured: the dot is not yes/no, it is how far through the day's target you
+     got. A morning that reached 40 of 60 minutes reads as most of the way there
+     rather than as a failure. */
+  if (h.kind === 'measured') {
+    const target = h.dailyTargetMin ?? 60
+    const todayMin = focusMinutesOn(focusSessions, localDateKey(), h.space)
+    const weekMin = DAY_LABELS.reduce((a, _, i) => a + focusMinutesOn(focusSessions, dayOfWeekKey(i), h.space), 0)
+    return (
+      <div className="habit-row is-measured">
+        <div className="habit-row-top">
+          <span className="habit-name">{h.name}</span>
+          <span className="habit-count mono">
+            {fmtDuration(todayMin)}<span className="habit-freq">of {fmtDuration(target)} today</span>
+          </span>
+          {actions}
+        </div>
+        <div className="habit-days">
+          {DAY_LABELS.map((d, i) => {
+            const mins = focusMinutesOn(focusSessions, dayOfWeekKey(i), h.space)
+            const pct = Math.min(100, Math.round((mins / target) * 100))
+            return (
+              <span className="day-cell" key={i}>
+                <span
+                  className={`daydot is-measure${pct >= 100 ? ' full' : pct > 0 ? ' partial' : ''}`}
+                  style={{ ['--fill' as string]: `${pct}%` } as React.CSSProperties}
+                  title={`${d}: ${fmtDuration(mins)} of ${fmtDuration(target)}`}
+                  aria-label={`${d}, ${mins} of ${target} minutes`}
+                />
+                <span className={`day-lab${i === todayIndex ? ' today' : ''}`}>{d[0]}</span>
+              </span>
+            )
+          })}
+        </div>
+        <div className="habit-foot">
+          <button className="habit-auto" onClick={() => setPage('plan')}>Fills itself from your focus blocks</button>
+          <span className="habit-weeks">{fmtDuration(weekMin)} this week</span>
+        </div>
+      </div>
+    )
+  }
 
   /* A quit is a different scoreboard: days clean, and a single honest button
      for the day you slip. Day dots would be asking the wrong question. */
@@ -1010,8 +1051,10 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
   const [frequency, setFrequency] = useState<HabitFrequency>(habit?.frequency ?? 'daily')
   const [perWeek, setPerWeek] = useState(habit?.targetPerWeek ?? 3)
   const [kind, setKind] = useState<HabitKind>(habit?.kind ?? 'build')
+  const [targetMin, setTargetMin] = useState(habit?.dailyTargetMin ?? 60)
   const locked = !!drivenBy
   const quitting = kind === 'break'
+  const measured = kind === 'measured'
 
   const submit = () => {
     if (!name.trim()) return
@@ -1021,6 +1064,8 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
       frequency,
       targetPerWeek: frequency === 'times-per-week' ? perWeek : undefined,
       kind,
+      dailyTargetMin: measured ? Math.max(5, targetMin) : undefined,
+      source: measured ? ('focus' as const) : undefined,
     }
     if (habit) updateHabit(habit.id, locked ? { daypart: shape.daypart } : shape)
     else addHabit(shape)
@@ -1039,14 +1084,19 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
       <div className="seg kind-seg" role="group" aria-label="Kind of habit">
         <button aria-pressed={kind === 'build'} disabled={locked} onClick={() => setKind('build')}>Something to keep</button>
         <button aria-pressed={kind === 'break'} disabled={locked} onClick={() => setKind('break')}>Something to quit</button>
+        <button aria-pressed={kind === 'measured'} disabled={locked} onClick={() => setKind('measured')}>An amount to hit</button>
       </div>
       <p className="assist-note" style={{ marginTop: 6, marginBottom: 'var(--s4)' }}>
         {quitting
           ? 'Counted the other way round: the score is how long you have gone without it, and you only touch it on a day you slip.'
-          : 'Counted the usual way: every day you do it is a tick, against a target for the week.'}
+          : measured
+            ? 'Counted in minutes, and it fills itself: every focus block you finish adds to the day. You will see how far through you are, not just done or not.'
+            : 'Counted the usual way: every day you do it is a tick, against a target for the week.'}
       </p>
 
-      <label className="field-label" htmlFor="hname">{quitting ? 'What are you quitting?' : 'What is the habit?'}</label>
+      <label className="field-label" htmlFor="hname">
+        {quitting ? 'What are you quitting?' : measured ? 'What are you measuring?' : 'What is the habit?'}
+      </label>
       <input
         id="hname" className="textinput" style={{ width: '100%' }} autoFocus={!locked} disabled={locked}
         placeholder="e.g. 20 minutes of movement"
@@ -1060,14 +1110,22 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
         <option value="">Anytime</option>
       </select>
 
-      {!quitting && <label className="field-label" style={{ marginTop: 'var(--s4)' }} htmlFor="hfreq">How often?</label>}
-      {!quitting && (
+      {!quitting && !measured && <label className="field-label" style={{ marginTop: 'var(--s4)' }} htmlFor="hfreq">How often?</label>}
+      {!quitting && !measured && (
         <select id="hfreq" className="textinput" style={{ width: '100%' }} value={frequency} disabled={locked} onChange={(e) => setFrequency(e.target.value as HabitFrequency)}>
           {HABIT_FREQUENCIES.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
         </select>
       )}
 
-      {!quitting && frequency === 'times-per-week' && (
+      {measured && (
+        <div className="sheet-inline" style={{ marginTop: 'var(--s4)' }}>
+          <span>Aiming for</span>
+          <input className="numinput" type="number" min={5} max={600} step={5} value={targetMin}
+            onChange={(e) => setTargetMin(Math.max(5, Math.min(600, Number(e.target.value) || 5)))} aria-label="Minutes a day" />
+          <span>minutes of focus a day</span>
+        </div>
+      )}
+      {!quitting && !measured && frequency === 'times-per-week' && (
         <div className="sheet-inline" style={{ marginTop: 'var(--s3)' }}>
           <span>Aiming for</span>
           <input className="numinput" type="number" min={1} max={7} value={perWeek}
@@ -1099,7 +1157,7 @@ export function HabitsPage() {
   const progressFor = new Map(routines.filter((r) => r.habitId).map((r) => [
     r.habitId as string, { done: r.doneStepIds.length, total: r.steps.length },
   ]))
-  const building = spaceHabits.filter((h) => !h.paused && h.kind !== 'break')
+  const building = spaceHabits.filter((h) => !h.paused && h.kind !== 'break' && h.kind !== 'measured')
   const kept = building.reduce((a, h) => a + h.days.filter(Boolean).length, 0)
   const target = building.reduce((a, h) => a + habitTarget(h), 0)
 

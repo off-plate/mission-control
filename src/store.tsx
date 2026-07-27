@@ -15,6 +15,7 @@ import {
 } from './mock'
 import { goalCurrent, routineComplete, stepLocked } from './types'
 import type {
+  FocusSession,
   RoutineCadence,
   AssistantEntry,
   CoachFacts,
@@ -64,6 +65,8 @@ interface PersistedState {
   schema?: string
   /** Seeded habits and routines he deleted on purpose; never re-seeded. */
   removedSeeds?: string[]
+  /** Every finished focus block, so a measured habit has something to count. */
+  focusSessions?: FocusSession[]
 }
 
 interface Store extends PersistedState {
@@ -147,6 +150,11 @@ interface Store extends PersistedState {
   setStepData: (routineId: string, stepId: string, value: number) => void
   /** Personal bests, keyed by `routineId:stepId`. Never cleared by a rollover. */
   records: Record<string, number>
+
+  /** Finished focus blocks, newest first. Trimmed to a year. */
+  focusSessions: FocusSession[]
+  /** Called when a focus block finishes; feeds measured habits and the ledger. */
+  logFocus: (minutes: number, label?: string) => void
 
   ideas: Idea[]
   addIdea: (text: string, color: string) => void
@@ -305,6 +313,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [records, setRecords] = useState<Record<string, number>>(persisted?.records ?? {})
   // Seeded ids he has deleted, so the forward-fill never resurrects them.
   const [removedSeeds, setRemovedSeeds] = useState<string[]>(persisted?.removedSeeds ?? [])
+  const [focusSessions, setFocusSessions] = useState<FocusSession[]>(persisted?.focusSessions ?? [])
   const remoteSaveTimer = useRef<number | undefined>(undefined)
   const latestJson = useRef<string>('')
   // The selected space survives a reload (kept out of the synced blob on purpose,
@@ -351,7 +360,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const state: PersistedState = {
       version: 3, spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
-      weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds,
+      weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
     }
     const json = JSON.stringify(state)
     latestJson.current = json
@@ -365,7 +374,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { void saveRemoteState(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, records, removedSeeds])
+  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, records, removedSeeds, focusSessions])
 
   /* Closing the tab inside the debounce window must not lose the last change:
      flush the pending remote write the moment the page starts hiding. */
@@ -425,6 +434,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const value: Store = {
     version: 3,
     spaces, tasks, habits, goals, ledger, social, sources, plan, review, routines, ideas,
+    focusSessions,
+    /* A finished block is recorded once, and everything that cares reads from
+       here: measured habits fill from it, and the ledger gets it so focus time
+       counts toward estimate accuracy instead of vanishing. */
+    logFocus: (minutes, label) => {
+      if (minutes <= 0) return
+      const day = todayKey()
+      const mins = Math.round(minutes)
+      setFocusSessions((prev) => [{ id: newId('f'), day, minutes: mins, label, space }, ...prev].slice(0, 2000))
+      setLedger((prev) => [
+        { id: newId('l'), title: label ? `Focus: ${label}` : 'Focus block', category: 'deep' as TaskCategory,
+          estimateMin: mins, actualMin: mins, when: day, space, weekKey: isoWeekKey() },
+        ...prev,
+      ])
+    },
     space, setSpace,
     page, setPage,
     editing, setEditing,

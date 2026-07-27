@@ -1825,10 +1825,14 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .daydot.off-day { opacity: 0.4; }
 
 /* ---------- Shared add-sheet form ---------- */
-.sheet-inline { display: flex; align-items: center; gap: var(--s2); font-size: var(--text-sm); color: var(--muted); }
+.sheet-inline { display: flex; align-items: center; gap: var(--s2); font-size: var(--text-sm); color: var(--muted); min-width: 0; }
+.sheet-inline > .numinput { flex: 0 0 84px; }
+.sheet-inline > .textinput { flex: 1 1 auto; min-width: 0; }
+.sheet-unit { flex: none; white-space: nowrap; }
 .sheet-actions { display: flex; gap: var(--s2); justify-content: flex-end; margin-top: var(--s5); }
 .sheet-body .field-label { display: block; margin-bottom: 6px; }
-.sheet-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s3); }
+.sheet-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s4); align-items: start; }
+.sheet-grid > * { min-width: 0; }
 @media (max-width: 560px) { .sheet-grid { grid-template-columns: 1fr; } }
 
 /* A goal that counts itself off a habit says so, and offers no manual logger. */

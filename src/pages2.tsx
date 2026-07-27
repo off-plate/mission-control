@@ -7,7 +7,7 @@ import { fmtDuration, fmtNum, fmtSigned, fmtWhen, goalPace, isoWeekKey, taskMinu
 import { analyzeAvoidance } from './coach'
 import { getAiKey, hasAiKey, readAvoidance, setAiKey, type AvoidanceRead } from './ai'
 import { paymentTaskTitle } from './exceptions'
-import { SUPABASE_ENABLED, currentAccount, onAccountChange, sendSignInLink, signOutAccount, type Account } from './supabase'
+import { SUPABASE_ENABLED, currentAccount, onAccountChange, sendSignInCode, signInWithCode, signOutAccount, type Account } from './supabase'
 import { goalCurrent, ON_TRACK_PCT, type CoachFacts, type CoachSession, type TaskCategory } from './types'
 
 /* ---------------- MONEY ---------------- */
@@ -674,6 +674,7 @@ function AccountField() {
   const [ready, setReady] = useState(false)
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
+  const [code, setCode] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -696,9 +697,15 @@ function AccountField() {
 
   const send = async () => {
     setBusy(true); setErr(null)
-    const e = await sendSignInLink(email)
+    const e = await sendSignInCode(email)
     setBusy(false)
-    if (e) setErr(e); else setSent(true)
+    if (e) setErr(e); else { setSent(true); setCode('') }
+  }
+  const verify = async () => {
+    setBusy(true); setErr(null)
+    const e = await signInWithCode(email, code)
+    setBusy(false)
+    if (e) setErr(e)
   }
 
   return (
@@ -717,22 +724,42 @@ function AccountField() {
           ? <button className="btn btn-quiet" onClick={() => void signOutAccount()}>Sign out</button>
           : null}
       </div>
-      {ready && !me && (
+      {ready && !me && !sent && (
         <>
           <div className="formrow" style={{ marginTop: 'var(--s2)', marginBottom: 0 }}>
             <input
               className="textinput grow" type="email" placeholder="you@example.com" value={email}
-              onChange={(e) => { setEmail(e.target.value); setSent(false); setErr(null) }}
-              aria-label="Email for the sign-in link"
+              onChange={(e) => { setEmail(e.target.value); setErr(null) }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && email.includes('@') && !busy) void send() }}
+              aria-label="Email for the sign-in code"
             />
             <button className="btn btn-primary" disabled={!email.includes('@') || busy} onClick={() => void send()}>
-              {busy ? 'Sending...' : 'Email me a link'}
+              {busy ? 'Sending...' : 'Email me a code'}
             </button>
           </div>
           <p className="assist-note" style={{ marginTop: 6 }}>
-            {err ? err
-              : sent ? 'Sent. Open it on this device and you are in, once per device.'
-              : 'No password. A link arrives, you tap it, and this device stays signed in.'}
+            {err ?? 'No password. A code arrives, you type it back, and this device stays signed in.'}
+          </p>
+        </>
+      )}
+      {ready && !me && sent && (
+        <>
+          <div className="formrow" style={{ marginTop: 'var(--s2)', marginBottom: 0 }}>
+            <input
+              className="textinput grow mono" inputMode="numeric" autoComplete="one-time-code"
+              placeholder="00000000" value={code}
+              onChange={(e) => { setCode(e.target.value); setErr(null) }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && code.trim().length >= 6 && !busy) void verify() }}
+              aria-label="The code from the email"
+            />
+            <button className="btn btn-primary" disabled={code.trim().length < 6 || busy} onClick={() => void verify()}>
+              {busy ? 'Checking...' : 'Sign in'}
+            </button>
+          </div>
+          <p className="assist-note" style={{ marginTop: 6 }}>
+            {err ?? `Sent to ${email}. The email is titled "Your Magic Link" and holds the code.`}
+            {' '}
+            <button className="linkish" onClick={() => { setSent(false); setErr(null) }}>Use a different address</button>
           </p>
         </>
       )}

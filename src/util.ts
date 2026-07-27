@@ -169,3 +169,23 @@ export function gcalUrl(title: string, start?: string, end?: string): string {
   const e = `${ymd}T${clock(end ?? start)}`
   return `${base}&dates=${s}/${e}`
 }
+
+/* ---------- routines on the day ---------- */
+
+/**
+ * How a routine's cadence reads on the day's list. Daily and before-work belong
+ * to today; weekly and monthly are open across their whole period rather than
+ * landing on one fixed day, so they sit there until they are done and then read
+ * as done for the rest of it.
+ */
+export function cadenceDueLabel(cadence: RoutineCadence): string {
+  if (cadence === 'daily') return 'today'
+  if (cadence === 'prework') return 'before work'
+  if (cadence === 'weekly') return 'this week'
+  return 'this month'
+}
+
+/** Where a routine sits in the day, taken from the habit it mirrors. */
+export function slotForDaypart(daypart?: TimeSlot): TimeSlot | 'unsorted' {
+  return daypart ?? 'unsorted'
+}

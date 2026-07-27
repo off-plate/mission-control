@@ -8,7 +8,7 @@ import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
 import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, daysSinceSlip, goalCurrent, habitFrequencyLabel, habitTarget, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
-import { fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, gcalUrl, isEstimated, localDateKey, taskMinutes, toMin } from './util'
+import { cadenceDueLabel, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, gcalUrl, isEstimated, localDateKey, slotForDaypart, taskMinutes, toMin } from './util'
 
 /* ---------------- shared bits ---------------- */
 
@@ -454,8 +454,65 @@ function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
   )
 }
 
+/* A routine standing on the day's list. It is DERIVED from the routine, never a
+   copy of it: a copied task would drift the moment either side changed, and the
+   whole point is that finishing it here and finishing it on Routines are the
+   same act. Its steps are the subtasks. */
+function RoutineOnDay({ routine, habitName }: { routine: Routine; habitName?: string }) {
+  const { toggleRoutineStep, setPage } = useStore()
+  const [open, setOpen] = useState(false)
+  const total = routine.steps.length
+  const done = routine.doneStepIds.length
+  const complete = total > 0 && done === total
+
+  return (
+    <div className="today-item routine-on-day">
+      <div className={`today-task${complete ? ' done' : ''}`}>
+        <span className="rod-mark" aria-hidden="true" />
+        <span className="grow rod-title">{routine.title}</span>
+        <span className="rod-cadence mono">{cadenceDueLabel(routine.cadence)}</span>
+        {total > 0 && (
+          <button className="expand-btn" aria-expanded={open} onClick={() => setOpen((v) => !v)}
+            aria-label={open ? 'Collapse steps' : 'Expand steps'}>
+            {open ? '▾' : '▸'} {done}/{total}
+          </button>
+        )}
+        <Dropdown label={`Options for ${routine.title}`}>
+          <button role="menuitem" onClick={() => setPage('routines')}>Open in Routines</button>
+        </Dropdown>
+      </div>
+
+      {total === 0 && (
+        <p className="rod-empty">
+          No steps yet.{' '}
+          <button className="rod-link" onClick={() => setPage('routines')}>Write them</button>
+        </p>
+      )}
+
+      {open && total > 0 && (
+        <div className="subtask-list">
+          {routine.steps.map((s) => {
+            const checked = routine.doneStepIds.includes(s.id)
+            return (
+              <button key={s.id} className={`subtask${checked ? ' done' : ''}`} onClick={() => toggleRoutineStep(routine.id, s.id)}>
+                <span className="sub-tick" aria-hidden="true" />
+                <span className="grow">{s.title}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {complete && habitName && (
+        <p className="rod-done">Checked “{habitName}” off in Habits.</p>
+      )}
+    </div>
+  )
+}
+
 export function PlanPage() {
   const { startFocus } = usePomodoro()
+  const { routines, habits } = useStore()
   const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId } = useStore()
   const evening = new Date().getHours() >= 21
   const events = MOCK_AGENDA[space]
@@ -465,6 +522,13 @@ export function PlanPage() {
   const todayAll = spaceTasks.filter((t) => t.list === 'today')  // today incl. finished (they stay, struck)
   const todayTasks = todayAll.filter((t) => !t.done)             // still to do
   const doneUnsorted = todayAll.filter((t) => t.done && !t.slot) // finished, never scheduled
+
+  /* Routines belong on the day by their own cadence: he never adds them, they
+     are simply there. Each sits in the part of the day its habit names. */
+  const dueRoutines = routines.filter((r) => r.space === space)
+  const routineSlot = (r: Routine): TimeSlot | 'unsorted' =>
+    slotForDaypart(habits.find((h) => h.id === r.habitId)?.daypart)
+  const anytimeRoutines = dueRoutines.filter((r) => routineSlot(r) === 'unsorted')
   const plannedMin = todayTasks.reduce((a, t) => a + taskMinutes(t), 0)
 
   /* Progress counts everything in the space, today included, and counts finished
@@ -637,10 +701,24 @@ export function PlanPage() {
             {loggedAny && <span className={`col-tot mono ${savedToday >= 0 ? 'val-pos' : 'val-urgent'}`}>{savedToday >= 0 ? '+' : ''}{savedToday}m saved</span>}
             <span className="col-tot mono">{fmtDuration(plannedMin)} planned</span>
           </div>
+          {anytimeRoutines.length > 0 && (
+            <div className="bucket rod-bucket">
+              <div className="bucket-head">
+                <span className="bucket-name">On repeat</span>
+                <span className="bucket-hint">no fixed hour</span>
+              </div>
+              {anytimeRoutines.map((r) => (
+                <RoutineOnDay key={r.id} routine={r} habitName={habits.find((h) => h.id === r.habitId)?.name} />
+              ))}
+            </div>
+          )}
           {BUCKETS.map((b) => {
             // A finished task is not waiting to be scheduled, so it drops out of
             // Unsorted and joins the done group at the bottom.
             const inBucket = todayAll.filter((t) => (t.slot ?? 'unsorted') === b.id && !(b.id === 'unsorted' && t.done))
+            // Dayless routines get their own group above; they are not tasks
+            // waiting to be dragged into a time.
+            const mine = b.id === 'unsorted' ? [] : dueRoutines.filter((r) => routineSlot(r) === b.id)
             if (b.id === 'unsorted' && inBucket.length === 0) return null
             const tot = inBucket.filter((t) => !t.done).reduce((a, t) => a + taskMinutes(t), 0)
             return (
@@ -656,6 +734,9 @@ export function PlanPage() {
                   {b.hint && <span className="bucket-hint">{b.hint}</span>}
                   {tot > 0 && <span className="tot mono">{fmtDuration(tot)}</span>}
                 </div>
+                {mine.map((r) => (
+                  <RoutineOnDay key={r.id} routine={r} habitName={habits.find((h) => h.id === r.habitId)?.name} />
+                ))}
                 {inBucket.length === 0 ? (
                   <p className="bucket-empty">Drop a task here.</p>
                 ) : (

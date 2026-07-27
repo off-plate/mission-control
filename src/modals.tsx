@@ -50,11 +50,11 @@ export function BreakdownSheet({ task, onClose }: { task: Task; onClose: () => v
         setSteps(r.steps.map((s) => ({ title: s.title, why: s.why, estimateMin: s.estimateMin })))
       } else {
         setSource('local')
-        setWhy(r.reason === 'no-key'
-          ? 'The model endpoint is deployed but has no API key yet.'
-          : r.reason === 'failed'
-            ? 'The model could not be reached just now.'
-            : 'The model endpoint is not deployed yet.')
+        setWhy(
+          r.reason === 'no-key' ? 'No Groq key yet. Add one in Settings and this reads the actual task.'
+          : r.reason === 'bad-key' ? 'That Groq key was rejected. Check it in Settings.'
+          : r.reason === 'rate-limit' ? 'Groq is rate limiting right now. Try again shortly.'
+          : 'Groq could not be reached just now.')
         setSteps(fakeDecompose(task.title).map((s) => ({ ...s, estimateMin: Math.max(1, Math.round(s.estimateMin * BUFFER)) })))
       }
       setBusy(false)
@@ -69,7 +69,7 @@ export function BreakdownSheet({ task, onClose }: { task: Task; onClose: () => v
       title="Break it down"
       onClose={onClose}
       note={source === 'model'
-        ? 'Written for this task by a model, running server-side so no key is ever in this page.'
+        ? 'Written for this task by Groq, using the key saved on this device. Nothing about it is in the code.'
         : `${why} These steps came from a local pattern library instead, so treat them as a starting point.`}
     >
       <p className="sheet-task">{task.title}</p>

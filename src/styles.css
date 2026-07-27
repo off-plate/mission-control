@@ -1960,3 +1960,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .vnow-label { position: absolute; right: 2px; top: -8px; font-size: 0.5625rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); background: var(--bg); padding: 0 3px; }
 
 .sheet-warn { font-size: var(--text-xs); color: var(--warn); background: var(--warn-wash); border-radius: var(--r-sm); padding: var(--s2) var(--s3); margin-top: var(--s3); }
+
+.ai-key { margin-bottom: var(--s4); }
+.ai-key .formrow { flex-wrap: nowrap; }

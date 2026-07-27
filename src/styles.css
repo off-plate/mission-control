@@ -1911,3 +1911,10 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .wpm-result.under .wpm-bar > i { background: var(--warn); }
 .wpm-best { font-size: var(--text-xs); color: var(--faint); margin-top: var(--s2); }
 .mr-check:disabled { cursor: not-allowed; opacity: 0.55; }
+
+/* Mouth stretch: Czech and English as their own blocks, three each. */
+.stretch-lang + .stretch-lang { margin-top: var(--s4); }
+.stretch-lang-head {
+  display: block; font-family: var(--font-mono); font-size: 0.625rem;
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); margin-bottom: 6px;
+}

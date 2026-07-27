@@ -171,7 +171,7 @@ export default function App() {
 
       <footer className="foot">
         <span className="mono">V1 DEMO</span>
-        <span>All data is invented and lives only in this browser. The real build syncs two Gmail accounts, Calendar, Compass and Hevy into Supabase.</span>
+        <span>Your data, saved as you go. Calendar, mail, Compass and Hevy are not connected yet, so those surfaces stay empty rather than showing numbers that are not yours.</span>
       </footer>
 
       {decomposeOpen && <DecomposeSheet onClose={() => setDecomposeOpen(false)} />}

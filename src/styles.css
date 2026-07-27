@@ -701,7 +701,7 @@ button.est-chip:hover { color: var(--accent); background: var(--accent-wash); }
 .spark.pos { color: var(--progress); }
 .spark-base { color: var(--hairline-strong); }
 
-.habit-grid { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.habit-chips { display: flex; flex-wrap: wrap; gap: var(--s2); }
 .habit {
   display: flex;
   align-items: center;
@@ -1349,6 +1349,7 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 .routine-card { display: flex; flex-direction: column; }
 .routine-card.is-complete { border-color: var(--progress); }
 .routine-tag { display: flex; align-items: baseline; gap: var(--s3); margin-bottom: var(--s2); }
+.routine-tag .routine-card-title { flex: 1 1 auto; min-width: 0; }
 .routine-tag .routine-progress, .routine-tag .col-tot { margin-left: auto; }
 .routine-card-title { font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); }
 .routine-progress { color: var(--faint); font-size: var(--text-sm); }
@@ -1918,3 +1919,12 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   display: block; font-family: var(--font-mono); font-size: 0.625rem;
   letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); margin-bottom: 6px;
 }
+
+/* An empty routine sizes to its content instead of standing as a hollow box. */
+.routine-cards { align-items: start; }
+.routine-empty { font-size: var(--text-sm); color: var(--faint); padding: var(--s3) 0; }
+
+/* The tab bar scrolls inside itself; as a flex child it needs min-width:0 or its
+   content pushes the whole page sideways instead. */
+.topstick, .nav { min-width: 0; }
+.shell { overflow-x: clip; }

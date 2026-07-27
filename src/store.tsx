@@ -35,7 +35,7 @@ import type {
   WidgetType,
 } from './types'
 
-export const STORAGE_KEY = 'mission-control-demo-v11'
+export const STORAGE_KEY = 'mission-control-demo-v12'
 
 interface PersistedState {
   version: 3
@@ -260,16 +260,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [social, setSocialState] = useState(persisted?.social ?? MOCK_SOCIAL)
   const [sources, setSources] = useState(persisted?.sources ?? MOCK_SOURCES)
   const [plan, setPlan] = useState<PlanState>(persisted?.plan ?? { committedDate: null, firstMoveId: null })
-  /* Seed one closed week, so "Last week you said" is visible on first open
-     instead of being a feature he never sees. */
-  const [review, setReview] = useState<ReviewState>(persisted?.review ?? {
-    lastDoneDate: null, wins: [], outcomes: [],
-    previous: {
-      weekKey: 'seed',
-      wins: ['Filed the VZP form', 'Three gym sessions', 'Inbox back to zero on Friday'],
-      outcomes: ['Chase VZP for written confirmation', 'Send the tax transfer', 'One honest money talk'],
-    },
-  })
+  const [review, setReview] = useState<ReviewState>(persisted?.review ?? { lastDoneDate: null, wins: [], outcomes: [] })
   const [assistantLog, setAssistantLog] = useState<AssistantEntry[]>(persisted?.assistantLog ?? [])
   const [coachSessions, setCoachSessions] = useState<CoachSession[]>(persisted?.coachSessions ?? [])
   const [routines, setRoutines] = useState<Routine[]>(seededRoutines)

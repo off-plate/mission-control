@@ -80,7 +80,7 @@ export function TodayPage() {
   const reviewDue = todayIndex === 6 && review.lastDoneDate !== localDateKey()
   const evening = new Date().getHours() >= 21
   // Next payment badge derives from the money schedule instead of a hardcoded string.
-  const nextPay = MOCK_MONEY.schedule.find((r) => r.state === 'not sent' || r.state === 'action needed')
+  const nextPay = MOCK_MONEY?.schedule.find((r) => r.state === 'not sent' || r.state === 'action needed')
   const wins = momentum({ tasks: tasks.filter((t) => t.space === space), routines, habits: habits.filter((h) => h.space === space), coachSessions })
 
   return (
@@ -899,12 +899,15 @@ export function RoutinesPage() {
           return (
             <div className={`panel routine-card${complete ? ' is-complete' : ''}`} key={r.id}>
               <div className="routine-tag">
+                <span className="routine-card-title">{r.title}</span>
                 {complete
                   ? <span className="col-tot mono val-pos">{DONE_LABEL[r.cadence]}</span>
                   : <span className="routine-progress mono">{done}/{total}</span>}
               </div>
-              <span className="routine-card-title">{r.title}</span>
               {r.blurb && <p className="routine-blurb">{r.blurb}</p>}
+              {total === 0 && (
+                <p className="routine-empty">No steps yet. This one is yours to fill in.</p>
+              )}
               <div className="routine-steplist">
                 {r.steps.map((s) => {
                   const checked = r.doneStepIds.includes(s.id)
@@ -927,9 +930,11 @@ export function RoutinesPage() {
                 })}
               </div>
               <div className="routine-card-foot">
-                {linked
+                {linked && total > 0
                   ? <span className="assist-note">Finishing all {total} checks off “{linked.name}” in Habits.</span>
-                  : <span />}
+                  : linked
+                    ? <span className="assist-note">Add steps here and finishing them will check off “{linked.name}”.</span>
+                    : <span />}
                 {done > 0 && <button className="btn btn-ghost routine-reset" onClick={() => resetRoutine(r.id)}>Reset</button>}
               </div>
             </div>

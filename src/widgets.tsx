@@ -144,55 +144,19 @@ const TasksBody = memo(function TasksBody({ space, size }: { space: SpaceId; siz
   )
 })
 
-const MailBody = memo(function MailBody({ space, size }: { space: SpaceId; size: SizeKey }) {
-  const accounts = MOCK_MAIL[space]
-  return (
-    <div>
-      {accounts.map((a) => (
-        <div className="mail-account" key={a.addr}>
-          <span className="mail-count">{a.unread}<span className="kpi-sub" style={{ display: 'block', marginTop: 0 }}>unread</span></span>
-          <span className="mail-body-col">
-            <span className="mail-addr">{a.addr}</span>
-            {size !== 'S' && <span className="mail-top">{a.top} · {a.age}</span>}
-          </span>
-        </div>
-      ))}
-    </div>
-  )
+const MailBody = memo(function MailBody() {
+  return <div className="empty">Not connected yet. Gmail will feed this.</div>
 })
 
-const FinanceBody = memo(function FinanceBody({ size }: { size: SizeKey }) {
-  const f = MOCK_MONEY
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-        <span className="kpi val-pos" style={{ fontSize: '1.6rem' }}>{f.safeToSpend}</span>
-        <span className="kpi-sub" style={{ marginTop: 0 }}>safe to spend {f.safeUntil}</span>
-      </div>
-      <div className="kpi-sub">{f.safeMath}</div>
-      <div className="bar" style={{ marginTop: 10 }} aria-label={`Spent ${f.spentPct} percent of cycle budget`}>
-        <i style={{ width: `${f.spentPct}%` }} />
-      </div>
-      <div className="rowlist" style={{ marginTop: 6 }}>
-        <div className="rowitem" style={{ minHeight: 34 }}>
-          <span className="grow" style={{ color: 'var(--alert)', fontWeight: 500 }}>{f.nextObligation}</span>
-        </div>
-        {size === 'L' && f.obligations.map((o) => (
-          <div className="rowitem" key={o.id} style={{ minHeight: 34 }}>
-            <span className="grow" style={{ color: 'var(--muted)' }}>{o.name}</span>
-            <span className={`state-tag ${o.state === 'action needed' ? 'action' : o.state}`}>{o.state}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
+const FinanceBody = memo(function FinanceBody() {
+  return <div className="empty">Not connected yet. The real figures live in Compass.</div>
 })
 
 const HabitsBody = memo(function HabitsBody({ space }: { space: SpaceId }) {
   const { habits, toggleHabitDay, todayIndex } = useStore()
   const active = habits.filter((h) => h.space === space && !h.paused)
   return (
-    <div className="habit-grid">
+    <div className="habit-chips">
       {active.map((h) => (
         <button
           key={h.id}
@@ -209,28 +173,8 @@ const HabitsBody = memo(function HabitsBody({ space }: { space: SpaceId }) {
   )
 })
 
-const TrainingBody = memo(function TrainingBody({ size }: { size: SizeKey }) {
-  const t = MOCK_TRAINING
-  if (size === 'S') {
-    return (
-      <div>
-        <div className="kpi">{t.weeklySets.at(-1)}<span className="unit">sets this wk</span></div>
-        <div className="kpi-sub">next: {t.next}</div>
-      </div>
-    )
-  }
-  return (
-    <div>
-      <div className="rowlist">
-        <div className="rowitem"><span className="grow">{t.last}</span><span className="src-tag">hevy</span></div>
-        <div className="rowitem"><span className="grow" style={{ color: 'var(--muted)' }}>next: {t.next}</span></div>
-      </div>
-      <div style={{ marginTop: 8, display: 'flex', alignItems: 'baseline', gap: 12 }}>
-        <Spark data={t.weeklySets} />
-        <span className="kpi-sub" style={{ marginTop: 0 }}>{t.weeklySets[0]} to {t.weeklySets.at(-1)} sets per week, 8 weeks</span>
-      </div>
-    </div>
-  )
+const TrainingBody = memo(function TrainingBody() {
+  return <div className="empty">Not connected yet. Hevy will feed this.</div>
 })
 
 const GoalsBody = memo(function GoalsBody({ space }: { space: SpaceId }) {
@@ -275,53 +219,16 @@ const TimeSavedBody = memo(function TimeSavedBody() {
   )
 })
 
-const ClaudeBody = memo(function ClaudeBody({ size }: { size: SizeKey }) {
-  const c = MOCK_CLAUDE
-  return (
-    <div>
-      <div className="kpi">{c.sessionsToday}<span className="unit">sessions today</span></div>
-      {size === 'M' ? (
-        <div style={{ marginTop: 8, display: 'flex', alignItems: 'baseline', gap: 12 }}>
-          <Spark data={c.tokensWeek} />
-          <span className="kpi-sub" style={{ marginTop: 0 }}>{c.tokensWeek.at(-1)}k tokens today</span>
-        </div>
-      ) : (
-        <div className="kpi-sub">{c.note}</div>
-      )}
-    </div>
-  )
+const ClaudeBody = memo(function ClaudeBody() {
+  return <div className="empty">Not connected yet.</div>
 })
 
-const SocialBody = memo(function SocialBody({ size }: { size: SizeKey }) {
-  const { social } = useStore()
-  return (
-    <div className="rowlist">
-      {social.map((s) => (
-        <div className="rowitem" key={s.platform}>
-          <span className="grow">{s.platform}</span>
-          {size === 'L' && <span className="meta">{s.lastPost}</span>}
-          <span className="mono" style={{ fontWeight: 600 }}>{s.followers.toLocaleString('en')}</span>
-          <span className="mono meta" style={{ color: s.change >= 0 ? 'var(--progress)' : 'var(--alert)' }}>
-            {s.change >= 0 ? '+' : ''}{s.change}
-          </span>
-        </div>
-      ))}
-    </div>
-  )
+const SocialBody = memo(function SocialBody() {
+  return <div className="empty">Nothing entered yet.</div>
 })
 
 const OutreachBody = memo(function OutreachBody() {
-  return (
-    <div className="rowlist">
-      {MOCK_OUTREACH.map((o) => (
-        <div className="rowitem" key={o.name}>
-          <span className="status-dot" style={{ background: o.ok ? 'var(--progress)' : 'var(--alert)' }} />
-          <span className="grow">{o.name}</span>
-          <span className="meta">{o.state}</span>
-        </div>
-      ))}
-    </div>
-  )
+  return <div className="empty">Nothing here yet.</div>
 })
 
 const SourcesBody = memo(function SourcesBody({ size }: { size: SizeKey }) {
@@ -344,14 +251,14 @@ export function WidgetBody({ type, space, size }: { type: WidgetType; space: Spa
   switch (type) {
     case 'agenda': return <AgendaBody space={space} size={size} />
     case 'tasks': return <TasksBody space={space} size={size} />
-    case 'mail': return <MailBody space={space} size={size} />
-    case 'finance': return <FinanceBody size={size} />
+    case 'mail': return <MailBody />
+    case 'finance': return <FinanceBody />
     case 'habits': return <HabitsBody space={space} />
-    case 'training': return <TrainingBody size={size} />
+    case 'training': return <TrainingBody />
     case 'goals': return <GoalsBody space={space} />
     case 'timesaved': return <TimeSavedBody />
-    case 'claude': return <ClaudeBody size={size} />
-    case 'social': return <SocialBody size={size} />
+    case 'claude': return <ClaudeBody />
+    case 'social': return <SocialBody />
     case 'sources': return <SourcesBody size={size} />
     case 'outreach': return <OutreachBody />
   }

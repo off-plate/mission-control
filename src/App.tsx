@@ -7,6 +7,7 @@ import { AssistantPage, BrainDumpPage } from './pages3'
 import { BrandPage } from './brand'
 import { useStore } from './store'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange } from './supabase'
+import { isReadOnly } from './store'
 import type { PageId, SpaceId } from './types'
 
 /* One failing page must not take the whole shell with it: the header, the nav
@@ -154,6 +155,12 @@ export default function App() {
       <PageNav tabs={tabs} page={page} setPage={setPage} attention={exceptions.length > 0} />
       </div>
 
+      {isReadOnly() && (
+        <div className="allclear" style={{ borderColor: 'var(--alert)', margin: 'var(--s4) var(--s5) 0' }}>
+          <span className="dot" aria-hidden="true" />
+          Another device has saved a newer version of your data. Nothing here is being saved until this one is updated, so that version is not overwritten.
+        </div>
+      )}
       <main id="main">
         <PageBoundary page={page}>
         {page === 'today' && <TodayPage />}

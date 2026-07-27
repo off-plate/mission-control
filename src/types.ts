@@ -568,6 +568,10 @@ export interface CoachSession {
 }
 
 export interface PlanState {
+  /** The day work last came back to the list, and how much, so Plan can say so
+   *  once rather than letting it happen silently. */
+  returnedOn?: string
+  returnedCount?: number
   committedDate: string | null
   firstMoveId: string | null
 }
@@ -601,6 +605,8 @@ export interface ReviewState {
 
 export interface Reflection {
   id: string
+  /** Set when a later close replaced this one. Nothing is ever removed. */
+  supersededBy?: string
   /** Which window it covered, in words, e.g. 'Last week, Mon 20 Jul to Sun 26 Jul'. */
   label: string
   from: string

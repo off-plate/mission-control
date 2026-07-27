@@ -192,7 +192,7 @@ const LIBRARY: { match: RegExp; steps: DecomposedStep[] }[] = [
     steps: [
       { title: 'Find the contract number and the last letter', estimateMin: 5 },
       { title: 'Write one sentence: what you are asking them for', estimateMin: 3 },
-      { title: 'Rehearse the opening line in Coach', estimateMin: 4 },
+      { title: 'Rehearse the opening line in Avoidance', estimateMin: 4 },
       { title: 'Make the call before 11:00', why: 'queues are shortest in the morning', estimateMin: 15, category: 'call' },
       { title: 'Log the agreed next step and date', estimateMin: 3 },
     ],

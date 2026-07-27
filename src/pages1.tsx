@@ -4,8 +4,9 @@ import { MOCK_AGENDA, SPACE_LABELS, exceptionsFor, globalExceptions, momentum } 
 import { MOCK_MONEY, fakeDecompose } from './mock'
 import { useStore } from './store'
 import { MorningRoutine } from './morning'
-import { Sheet } from './modals'
+import { BreakdownSheet, Sheet } from './modals'
 import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, goalCurrent, habitFrequencyLabel, habitTarget, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
+import { estimateFor } from './estimate'
 import { fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, gcalUrl, localDateKey, taskMinutes, toMin } from './util'
 
 /* ---------------- shared bits ---------------- */
@@ -307,6 +308,45 @@ function ActualLog({ est, onLog, onSkip }: { est: number; onLog: (m: number) => 
   )
 }
 
+
+/* Breaking a task down and estimating it are actions on the task itself. */
+function TaskActions({ task, onBreakdown }: { task: Task; onBreakdown: () => void }) {
+  const { setEstimate } = useStore()
+  const [flash, setFlash] = useState<string | null>(null)
+  const hasSubs = !!task.subtasks?.length
+  return (
+    <span className="task-actions">
+      {flash && <span className="task-flash mono">{flash}</span>}
+      <button
+        className="task-act"
+        aria-label={hasSubs ? `Break down ${task.title} again` : `Break down ${task.title}`}
+        title={hasSubs ? 'Break it down again' : 'Break it down'}
+        onClick={onBreakdown}
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <path d="M12 3v5M12 8l-5 4M12 8l5 4M7 12v2M17 12v2M4 16h6M14 16h6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      <button
+        className="task-act"
+        disabled={hasSubs}
+        aria-label={hasSubs ? `${task.title} takes its estimate from its steps` : `Estimate how long ${task.title} takes`}
+        title={hasSubs ? 'Estimate comes from the steps' : 'Estimate the time'}
+        onClick={() => {
+          const e = estimateFor(task.title, task.category)
+          setEstimate(task.id, e.minutes)
+          setFlash(`~${e.minutes}m`)
+          window.setTimeout(() => setFlash(null), 1800)
+        }}
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <circle cx="12" cy="13" r="8" /><path d="M12 9v4l2.5 2M9 2h6" strokeLinecap="round" />
+        </svg>
+      </button>
+    </span>
+  )
+}
+
 export function PlanPage() {
   const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId } = useStore()
   const evening = new Date().getHours() >= 21
@@ -347,6 +387,7 @@ export function PlanPage() {
   const [logging, setLogging] = useState<string | null>(null)
   const [flashId, setFlashId] = useState<string | null>(null)
   const [quick, setQuick] = useState('')
+  const [breakdownFor, setBreakdownFor] = useState<Task | null>(null)
 
   /* Today's "Start" hands the task over here: flash it so the eye lands on it. */
   useEffect(() => {
@@ -410,7 +451,7 @@ export function PlanPage() {
               {doneCount} of {pool.length} done across this space · {fmtDuration(totalMin - doneMin)} left
             </span>
           </div>
-          {/* Add a task plainly, or hand it to the breakdown when it feels too big. */}
+          {/* Add a task; breaking it down is an action on the task itself. */}
           <div className="formrow" style={{ marginBottom: 'var(--s2)' }}>
             <input
               className="textinput"
@@ -421,17 +462,6 @@ export function PlanPage() {
               aria-label="New task"
             />
             <button className="btn btn-quiet" disabled={!quick.trim()} onClick={() => { addTask({ title: quick.trim(), source: 'mc', estimateMin: 15, space, list: 'backlog', category: 'quick' }); setQuick('') }}>Add</button>
-          </div>
-          <div className="formrow" style={{ marginBottom: 'var(--s3)' }}>
-            <input
-              className="textinput"
-              placeholder="Too big? Break it down: e.g. Set up the bank payment plan"
-              value={goal}
-              onChange={(e) => setGoal(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') generate() }}
-              aria-label="Goal to break into subtasks"
-            />
-            <button className="btn btn-primary" onClick={generate} disabled={busy || !goal.trim()}>{busy ? 'Thinking' : 'Break down'}</button>
           </div>
           {backlogOpen.map((t) => {
             const isExp = expanded.has(t.id)
@@ -455,6 +485,7 @@ export function PlanPage() {
                       {isExp ? '▾' : '▸'} {doneSubs}/{t.subtasks!.length}
                     </button>
                   )}
+                  <TaskActions task={t} onBreakdown={() => setBreakdownFor(t)} />
                   <span className="kebab-wrap">
                     <button className="kebab" aria-label={`Options for ${t.title}`} aria-expanded={menuFor === t.id} onClick={() => setMenuFor((m) => (m === t.id ? null : t.id))}>⋯</button>
                     {menuFor === t.id && (
@@ -546,6 +577,7 @@ export function PlanPage() {
                               {isExp ? '▾' : '▸'} {doneSubs}/{t.subtasks!.length}
                             </button>
                           )}
+                          {!t.done && <TaskActions task={t} onBreakdown={() => setBreakdownFor(t)} />}
                           <span className="kebab-wrap">
                             <button className="kebab" aria-label={`Options for ${t.title}`} aria-expanded={menuFor === t.id} onClick={() => setMenuFor((m) => (m === t.id ? null : t.id))}>⋯</button>
                             {menuFor === t.id && (
@@ -625,6 +657,8 @@ export function PlanPage() {
           )}
         </div>
       </div>
+
+      {breakdownFor && <BreakdownSheet task={breakdownFor} onClose={() => setBreakdownFor(null)} />}
 
       {selected.length > 0 && (
         <div className="movebar" role="region" aria-label="Move selected tasks">

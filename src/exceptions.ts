@@ -22,7 +22,7 @@ export function momentum(ctx: {
   const easier = ctx.coachSessions.filter((s) => s.didIt && s.felt === 'easier').length
   if (faced > 0) {
     out.push(easier > 0
-      ? `${faced} ${faced === 1 ? 'thing' : 'things'} faced in Coach, ${easier} ${easier === 1 ? 'was' : 'were'} easier than you feared.`
+      ? `${faced} ${faced === 1 ? 'thing' : 'things'} faced in Avoidance, ${easier} ${easier === 1 ? 'was' : 'were'} easier than you feared.`
       : `${faced} ${faced === 1 ? 'thing' : 'things'} faced instead of avoided.`)
   }
 

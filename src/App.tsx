@@ -1,7 +1,6 @@
 import { Component, useEffect, useRef, useState, type ReactNode } from 'react'
 import { exceptionsFor, globalExceptions } from './exceptions'
 import { SPACE_LABELS } from './mock'
-import { DecomposeSheet } from './modals'
 import { GoalsPage, HabitsPage, PlanPage, RoutinesPage, TodayPage } from './pages1'
 import { CoachPage, MoneyPage, ReviewPage, SettingsPage } from './pages2'
 import { AssistantPage, BrainDumpPage } from './pages3'
@@ -90,7 +89,6 @@ function PageNav({
 
 export default function App() {
   const { space, setSpace, page, setPage, tasks, routines } = useStore()
-  const [decomposeOpen, setDecomposeOpen] = useState(false)
   // The dot follows the alerts: money and admin count from any profile.
   const exceptions = space === 'personal'
     ? exceptionsFor(space, { tasks, routines })
@@ -128,12 +126,6 @@ export default function App() {
               <path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3z" strokeLinejoin="round" />
             </svg>
             Assistant
-          </button>
-          <button className="btn btn-primary btn-breakdown" onClick={() => setDecomposeOpen(true)}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <path d="M12 3v6M12 9L6.5 14M12 9l5.5 5M6.5 14v0M6.5 14a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM17.5 14a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM12 3a2.5 2.5 0 1 0 0-.01" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Break it down
           </button>
           <button
             className={`btn btn-ghost${page === 'settings' ? ' is-on' : ''}`}
@@ -174,7 +166,6 @@ export default function App() {
         <span>Your data, saved as you go. Calendar, mail, Compass and Hevy are not connected yet, so those surfaces stay empty rather than showing numbers that are not yours.</span>
       </footer>
 
-      {decomposeOpen && <DecomposeSheet onClose={() => setDecomposeOpen(false)} />}
     </div>
   )
 }

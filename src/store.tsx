@@ -91,6 +91,10 @@ interface Store extends PersistedState {
   toggleSubtask: (taskId: string, subId: string) => void
   logSubtaskActual: (taskId: string, subId: string, actualMin: number) => void
   deleteTask: (id: string) => void
+  /** Attach generated steps to an existing task; its estimate becomes their sum. */
+  setSubtasks: (taskId: string, subs: { title: string; estimateMin: number }[]) => void
+  /** Set a task's own estimate (used by the per-task estimate action). */
+  setEstimate: (taskId: string, minutes: number) => void
 
   toggleHabitDay: (id: string, day: number) => void
   markHabitDay: (id: string, day: number, value: boolean) => void
@@ -461,6 +465,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     },
     deleteTask: (id) => setTasks((prev) => prev.filter((t) => t.id !== id)),
+    setSubtasks: (taskId, subs) =>
+      setTasks((prev) => prev.map((t) => {
+        if (t.id !== taskId) return t
+        const subtasks = subs.map((s, i) => ({ id: `${taskId}s${i}${Date.now().toString(36)}`, title: s.title, estimateMin: s.estimateMin, done: false }))
+        return { ...t, subtasks, estimateMin: subtasks.reduce((a, x) => a + x.estimateMin, 0) }
+      })),
+    setEstimate: (taskId, minutes) =>
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, estimateMin: Math.max(1, Math.round(minutes)) } : t))),
 
     toggleHabitDay: (id, day) =>
       setHabits((prev) =>

@@ -5,6 +5,7 @@ import { useStore } from './store'
 import { Spark, SparkBox } from './widgets'
 import { fmtDuration, fmtNum, fmtSigned, fmtWhen, goalPace, isoWeekKey, taskMinutes } from './util'
 import { analyzeAvoidance } from './coach'
+import { getAiKey, hasAiKey, setAiKey } from './ai'
 import { paymentTaskTitle } from './exceptions'
 import type { CoachFacts, CoachSession, TaskCategory } from './types'
 
@@ -553,6 +554,37 @@ export function CoachPage() {
 
 /* ---------------- SETTINGS ---------------- */
 
+function AiKeyField() {
+  const [key, setKey] = useState(getAiKey())
+  const [saved, setSaved] = useState(false)
+  const live = hasAiKey()
+  return (
+    <div className="ai-key">
+      <div className="source-row">
+        <span className={`status-dot ${live ? 'connected' : 'off'}`} />
+        <span className="info">
+          <span className="name">Groq, for breaking tasks down</span>
+          <span className="detail" style={{ display: 'block' }}>
+            {live ? 'Connected. Break it down reads the actual task.' : 'Not set. Break it down falls back to a pattern library.'}
+          </span>
+        </span>
+        <a className="btn btn-quiet" href="https://console.groq.com/keys" target="_blank" rel="noreferrer">Get a free key ↗</a>
+      </div>
+      <div className="formrow" style={{ marginTop: 'var(--s2)', marginBottom: 0 }}>
+        <input
+          className="textinput grow" type="password" placeholder="gsk_..." value={key}
+          onChange={(e) => { setKey(e.target.value); setSaved(false) }}
+          aria-label="Groq API key"
+        />
+        <button className="btn btn-primary" onClick={() => { setAiKey(key); setSaved(true) }}>Save</button>
+      </div>
+      <p className="assist-note" style={{ marginTop: 6 }}>
+        {saved ? 'Saved on this device.' : 'Kept in this browser only. Never synced, never in the code, so it cannot leak through the public repo. You paste it once per device.'}
+      </p>
+    </div>
+  )
+}
+
 export function SettingsPage() {
   const { sources, toggleSource, resetDemo, setPage } = useStore()
   return (
@@ -586,7 +618,9 @@ export function SettingsPage() {
 
         </div>
         <div className="panel">
-          <span className="microcap">Design</span>
+          <span className="microcap">AI</span>
+          <AiKeyField />
+          <span className="microcap" style={{ marginTop: 24, display: 'block' }}>Design</span>
           <div className="source-row">
             <span className="info"><span className="name">Brand &amp; guidelines</span><span className="detail" style={{ display: 'block' }}>The colours, type and rules this app is built on</span></span>
             <button className="btn btn-quiet" onClick={() => setPage('brand')}>Open</button>

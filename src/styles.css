@@ -2217,3 +2217,55 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   color: var(--accent); text-decoration: underline; text-underline-offset: 2px;
   cursor: pointer; font-size: inherit; font-family: inherit;
 }
+
+/* Where a dragged task would land on the day. */
+.vdrop { position: absolute; left: 0; right: 0; border-top: 2px solid var(--accent); pointer-events: none; }
+.vdrop-label {
+  position: absolute; top: -9px; left: 0; background: var(--accent); color: var(--bg);
+  font-size: 0.625rem; padding: 1px 6px; border-radius: 3px;
+}
+.vev-task { cursor: grab; }
+.vev-task:active { cursor: grabbing; }
+.vev-x {
+  position: absolute; top: 3px; right: 4px; color: var(--muted);
+  font-size: 0.75rem; line-height: 1; padding: 2px 4px; cursor: pointer; opacity: 0;
+}
+.vev-task:hover .vev-x, .vev-x:focus-visible { opacity: 1; }
+.vev-x:hover { color: var(--alert); }
+.kebab-timerow { display: flex; align-items: center; gap: var(--s2); padding: 4px 10px 6px; }
+.kebab-timerow .textinput { padding: 4px 8px; font-size: var(--text-sm); }
+
+/* ---------- sign in ---------- */
+.signin {
+  min-height: 100vh; display: flex; align-items: center;
+  padding: var(--s6) var(--s5); background: var(--bg);
+}
+/* Type-led and left-ruled rather than a small box floating dead centre: the
+   heading carries the screen, and the form sits on the same rail under it. */
+.signin-card { width: 100%; max-width: 460px; margin-left: 10vw; }
+.signin-mark {
+  font-family: var(--font-body); font-weight: 600; font-size: 0.75rem;
+  text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted);
+}
+.signin-h {
+  font-size: clamp(3rem, 5.5vw, 4.75rem); line-height: 0.98; letter-spacing: -0.02em;
+  margin: var(--s3) 0 var(--s5); color: var(--accent);
+}
+.signin-label {
+  display: block; font-size: var(--text-sm); color: var(--muted); margin-bottom: 8px;
+}
+.signin .textinput { width: 100%; padding: 13px 16px; font-size: 1.0625rem; }
+.signin-code { font-size: 1.5rem; letter-spacing: 0.28em; }
+.signin-go { width: 100%; margin-top: var(--s3); justify-content: center; padding: 13px 16px; font-size: 1rem; }
+.signin-note, .signin-err { font-size: var(--text-sm); margin-top: var(--s3); }
+.signin-note { color: var(--muted); }
+.signin-err { color: var(--alert); }
+.signin-foot {
+  margin-top: var(--s7, 64px); padding-top: var(--s3); border-top: 1px solid var(--hairline);
+  display: flex; flex-direction: column; gap: 4px; align-items: flex-start;
+}
+.signin-foot-why { font-size: var(--text-xs); color: var(--faint); }
+@media (max-width: 639px) {
+  .signin { align-items: flex-start; padding-top: 12vh; }
+  .signin-card { margin-left: 0; }
+}

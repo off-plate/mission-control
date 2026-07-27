@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { SUPABASE_ENABLED, deleteRemoteState, saveRemoteState } from './supabase'
-import { dayIndexOf, isoWeekKey, localDateKey, periodKeyFor } from './util'
+import { dayIndexOf, isoWeekKey, localDateKey, periodKeyFor, slotForTime } from './util'
 import {
   DEFAULT_SPACES,
   MOCK_GOALS,
@@ -98,6 +98,9 @@ interface Store extends PersistedState {
   moveTaskList: (id: string, list: 'today' | 'backlog') => void
   moveTasksToToday: (ids: string[]) => void
   assignSlot: (id: string, slot: import('./types').TimeSlot | undefined) => void
+  /** Pin a task to a clock time ('HH:MM'), or undefined to unpin it. The slot
+   *  follows the hour, so the two never disagree. */
+  setTaskAt: (id: string, at: string | undefined) => void
   toggleSubtask: (taskId: string, subId: string) => void
   logSubtaskActual: (taskId: string, subId: string, actualMin: number) => void
   deleteTask: (id: string) => void
@@ -533,6 +536,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setTasks((prev) => prev.map((t) => (ids.includes(t.id) ? { ...t, list: 'today', slot: undefined } : t))),
     assignSlot: (id, slot) =>
       setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, slot } : t))),
+    /* A clock time implies a part of the day, so setting one moves the task into
+       the matching bucket. Leaving them free to disagree meant a task could read
+       9 AM on the schedule and sit under Evening in the list. */
+    setTaskAt: (id, at) =>
+      setTasks((prev) => prev.map((t) => (t.id === id
+        ? { ...t, at, list: 'today' as const, slot: at ? slotForTime(at) : t.slot }
+        : t))),
     toggleSubtask: (taskId, subId) =>
       setTasks((prev) =>
         prev.map((t) =>

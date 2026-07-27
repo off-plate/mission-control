@@ -311,8 +311,16 @@ function TaskName({ title, start, end, className }: { title: string; start?: str
   )
 }
 
+/** 'HH:MM' for a pixel offset down the day, snapped to the nearest quarter hour. */
+function timeAtOffset(px: number): string {
+  const mins = Math.round(((px / HOUR_PX) * 60) / 15) * 15 + START_H * 60
+  const clamped = Math.max(START_H * 60, Math.min(END_H * 60 - 15, mins))
+  return `${String(Math.floor(clamped / 60)).padStart(2, '0')}:${String(clamped % 60).padStart(2, '0')}`
+}
+
 /** Vertical day timeline: calendar events plus any task pinned to a clock time. Full height, no inner scroll. */
-function Schedule({ events, tasks }: { events: AgendaEvent[]; tasks: Task[] }) {
+function Schedule({ events, tasks, onDropAt }: { events: AgendaEvent[]; tasks: Task[]; onDropAt: (id: string, at: string) => void }) {
+  const { setTaskAt } = useStore()
   const pinned = tasks.filter((t) => t.at && !t.done)
   const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
   const startH = START_H
@@ -321,9 +329,29 @@ function Schedule({ events, tasks }: { events: AgendaEvent[]; tasks: Task[] }) {
   const hours = endH - startH
   const height = hours * HOUR_PX
   const y = (hhmm: string) => ((toMin(hhmm) - DAY_START) / 60) * HOUR_PX
+  // Where the drop would land, shown as a line while you drag over the day.
+  const [hoverAt, setHoverAt] = useState<string | null>(null)
+  const offsetIn = (e: React.DragEvent<HTMLDivElement>) =>
+    e.clientY - e.currentTarget.getBoundingClientRect().top
   return (
     <div className="vsched">
-      <div className="vsched-inner" style={{ height }}>
+      <div
+        className="vsched-inner"
+        style={{ height }}
+        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setHoverAt(timeAtOffset(offsetIn(e))) }}
+        onDragLeave={() => setHoverAt(null)}
+        onDrop={(e) => {
+          e.preventDefault()
+          const id = e.dataTransfer.getData('text/plain')
+          if (id) onDropAt(id, timeAtOffset(offsetIn(e)))
+          setHoverAt(null)
+        }}
+      >
+        {hoverAt && (
+          <div className="vdrop" style={{ top: y(hoverAt) }} aria-hidden="true">
+            <span className="vdrop-label mono">{fmtTime(hoverAt)}</span>
+          </div>
+        )}
         {Array.from({ length: hours + 1 }, (_, i) => {
           const h = startH + i
           return (
@@ -344,9 +372,14 @@ function Schedule({ events, tasks }: { events: AgendaEvent[]; tasks: Task[] }) {
           </div>
         ))}
         {pinned.map((t) => (
-          <div className="vev vev-task" key={t.id} style={{ top: y(t.at!) + 1, height: Math.max((taskMinutes(t) / 60) * HOUR_PX - 2, 42) }}>
+          <div
+            className="vev vev-task" key={t.id} draggable
+            onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move' }}
+            style={{ top: y(t.at!) + 1, height: Math.max((taskMinutes(t) / 60) * HOUR_PX - 2, 42) }}
+          >
             <TaskName title={t.title} start={t.at} className="t" />
             <span className="rng">{fmtTime(t.at!)} · task</span>
+            <button className="vev-x" aria-label={`Take ${t.title} off the clock`} onClick={() => setTaskAt(t.id, undefined)}>✕</button>
           </div>
         ))}
       </div>
@@ -522,7 +555,7 @@ export function PlanPage() {
   const todayIdx = (new Date().getDay() + 6) % 7
   const { startFocus } = usePomodoro()
   const { routines, habits } = useStore()
-  const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId } = useStore()
+  const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId, setTaskAt } = useStore()
   const evening = new Date().getHours() >= 21
   const events = MOCK_AGENDA[space]
 
@@ -605,6 +638,13 @@ export function PlanPage() {
     if (t && t.list !== 'today') moveTaskList(id, 'today')
     assignSlot(id, key === 'unsorted' ? undefined : key)
   }
+  /* Dropped onto the day itself: the task gets that clock time, comes to today
+     if it was in the backlog, and its bucket follows the hour. */
+  const dropAt = (id: string, at: string) => {
+    const t = tasks.find((x) => x.id === id)
+    if (!t) return
+    setTaskAt(id, at)
+  }
   const dropToList = (id: string) => {
     const t = tasks.find((x) => x.id === id)
     if (!t || t.list === 'backlog') return
@@ -625,8 +665,8 @@ export function PlanPage() {
         {/* 1 — Schedule */}
         <div className="panel">
           <span className="microcap">Schedule</span>
-          <Schedule events={events} tasks={todayTasks} />
-          <p className="col-note">Google Calendar for today. Click any name to open or schedule it in Calendar.</p>
+          <Schedule events={events} tasks={todayTasks} onDropAt={dropAt} />
+          <p className="col-note">Drag a task onto the day to give it a time. Click any name to open it in Google Calendar.</p>
         </div>
 
         {/* 2 — To-do list: everything you added, any day. Drag out to plan it,
@@ -794,8 +834,24 @@ export function PlanPage() {
                               </button>
                             ))}
                             {!t.done && <span className="kebab-sep" />}
+                            {/* Dragging onto the day is the fast way; on a phone
+                                there is no drag, so the time can be typed. */}
+                            {!t.done && <span className="kebab-head">At a time</span>}
                             {!t.done && (
-                              <button role="menuitem" onClick={() => { moveTaskList(t.id, 'backlog'); assignSlot(t.id, undefined) }}>Back to the list</button>
+                              <div className="kebab-timerow">
+                                <input
+                                  type="time" className="textinput" value={t.at ?? ''} step={900}
+                                  aria-label={`Clock time for ${t.title}`}
+                                  onChange={(e) => setTaskAt(t.id, e.target.value || undefined)}
+                                />
+                                {t.at && (
+                                  <button className="linkish" onClick={() => setTaskAt(t.id, undefined)}>Clear</button>
+                                )}
+                              </div>
+                            )}
+                            {!t.done && <span className="kebab-sep" />}
+                            {!t.done && (
+                              <button role="menuitem" onClick={() => { moveTaskList(t.id, 'backlog'); assignSlot(t.id, undefined); setTaskAt(t.id, undefined) }}>Back to the list</button>
                             )}
                             <button role="menuitem" className="danger" onClick={() => deleteTask(t.id)}>Delete</button>
                           </Dropdown>

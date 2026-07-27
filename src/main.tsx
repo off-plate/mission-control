@@ -6,15 +6,32 @@ import App from './App'
 import { StoreProvider, STORAGE_KEY } from './store'
 import { PomodoroProvider } from './pomodoro'
 import { SUPABASE_ENABLED, clearAuthFragment, currentAccount, loadRemoteState, onAccountChange } from './supabase'
+import { LOCAL_ONLY_KEY, SignIn } from './signin'
+
+// One root for the container's lifetime: choosing "this device only" swaps the
+// sign-in screen for the app, and a second createRoot on the same node warns.
+let _root: ReturnType<typeof createRoot> | null = null
+const root = () => (_root ??= createRoot(document.getElementById('root')!))
 
 function render() {
-  createRoot(document.getElementById('root')!).render(
+  root().render(
     <StrictMode>
       <StoreProvider>
         <PomodoroProvider>
           <App />
         </PomodoroProvider>
       </StoreProvider>
+    </StrictMode>,
+  )
+}
+
+/* Signed out on a device that has not opted out, the sign-in screen comes first.
+   Choosing "this device only" is remembered, so the choice is asked once rather
+   than every time the app opens. */
+function renderSignIn() {
+  root().render(
+    <StrictMode>
+      <SignIn onLocalOnly={() => { try { localStorage.setItem(LOCAL_ONLY_KEY, '1') } catch { /* noop */ } render() }} />
     </StrictMode>,
   )
 }
@@ -54,6 +71,9 @@ async function boot() {
           if (schema === STORAGE_KEY) localStorage.setItem(STORAGE_KEY, remote)
           else localStorage.removeItem(STORAGE_KEY)
         }
+      } else if (localStorage.getItem(LOCAL_ONLY_KEY) !== '1') {
+        renderSignIn()
+        return
       }
     } catch { /* fall back to whatever is in localStorage */ }
   }

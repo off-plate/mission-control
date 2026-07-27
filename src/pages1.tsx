@@ -6,7 +6,7 @@ import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
 import { goalPeriodKey, goalPeriodRange, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForDaypart, taskMinutes, toMin } from './util'
 
@@ -83,6 +83,44 @@ export function Dropdown({ label, children, className = '' }: { label: string; c
 
 /* No `sub`. A page title does not get a subtitle restating it.
    See DESIGN.md, "No subtitles". */
+
+/* WHICH ROOM THIS CAME FROM.
+   Only shown in All, where a row could be from any of the three. Two channels,
+   because one of them cannot carry it alone: the three space hues measure
+   between 3.7:1 and 4.4:1 on these surfaces, under the 4.5:1 a coloured word
+   would need, so the hue is a 3px rule (which needs 3:1, and all three clear it)
+   and the letter beside it is neutral --muted at 7.5:1. Colour is never the only
+   thing saying it. The rule runs the full height of its row, so three Work rows
+   in a row read as one navy stripe rather than three ticks. */
+/** In All, a new thing has to land somewhere. This says where, next to the
+ *  button that commits it, rather than as a field somewhere else on the page. */
+export function WriteTo() {
+  const { view, space, setSpace } = useStore()
+  if (view !== 'all') return null
+  return (
+    <select
+      className="textinput writeto" value={space} aria-label="Which profile this goes to"
+      onChange={(e) => setSpace(e.target.value as SpaceId)}
+    >
+      {(Object.keys(SPACE_LABELS) as SpaceId[]).map((s) => (
+        <option key={s} value={s}>{SPACE_LABELS[s]}</option>
+      ))}
+    </select>
+  )
+}
+
+export function SpaceMark({ space }: { space?: SpaceId }) {
+  const { view } = useStore()
+  if (view !== 'all' || !space) return null
+  return (
+    <span className={`spacemark s-${space}`}>
+      <i aria-hidden="true" />
+      <b aria-hidden="true">{SPACE_LABELS[space][0]}</b>
+      <span className="visually-hidden">{SPACE_LABELS[space]}</span>
+    </span>
+  )
+}
+
 export function Band({
   title, metrics, actions,
 }: {
@@ -156,7 +194,7 @@ export function TodayPage() {
   return (
     <div className="page">
       <Band
-        title={SPACE_LABELS[space]}
+        title="Today"
         metrics={[
           { v: nextEvent.v, k: nextEvent.k, tone: 'info' as const },
           { v: String(open.length), k: 'tasks open' },
@@ -511,6 +549,7 @@ function RoutineOnDay({ routine, habitName }: { routine: Routine; habitName?: st
         {/* A routine is not dragged into a time, but its checkbox still has to
             line up with the ones under it. */}
         <span className="drag-grip is-blank" aria-hidden="true">⠿</span>
+        <SpaceMark space={routine.space} />
         <button
           className="checkbox"
           role="checkbox"
@@ -828,6 +867,7 @@ export function PlanPage() {
                           onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move' }}
                         >
                           <span className="drag-grip" aria-hidden="true">⠿</span>
+                          <SpaceMark space={t.space} />
                           <button
                             className="checkbox" role="checkbox" aria-checked={t.done}
                             aria-label={t.done ? `Reopen: ${t.title}` : `Complete: ${t.title}`}
@@ -1052,6 +1092,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
     return (
       <div className="habit-row is-measured">
         <div className="habit-row-top">
+          <SpaceMark space={h.space} />
           <span className="habit-name">{h.name}</span>
           <span className="habit-count mono">
             {fmtDuration(todayMin)}<span className="habit-freq">of {fmtDuration(target)} today</span>
@@ -1093,6 +1134,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
     return (
       <div className="habit-row is-quit">
         <div className="habit-row-top">
+          <SpaceMark space={h.space} />
           <span className="habit-name">{h.name}</span>
           <span className="habit-count mono">{clean}<span className="habit-freq">{clean === 1 ? 'day' : 'days'} clean</span></span>
           {actions}
@@ -1117,6 +1159,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
   return (
     <div className={`habit-row${drivenBy ? ' is-auto' : ''}`}>
       <div className="habit-row-top">
+        <SpaceMark space={h.space} />
         <span className="habit-name">{h.name}</span>
         {/* The week's count belongs to the week. Showing 1/7 above a year of
             squares says two different things about the same habit. */}
@@ -1351,6 +1394,7 @@ export function HabitsPage() {
             >
               {HABIT_WINDOWS.map((w) => <option key={w.id} value={w.id}>{w.label}</option>)}
             </select>
+            <WriteTo />
             <button className="btn btn-primary" onClick={() => setAdding(true)}>Add a habit</button>
           </>
         }
@@ -1554,6 +1598,7 @@ export function RoutinesPage() {
             >
               {ROUTINE_WINDOWS.map((w) => <option key={w.id} value={w.id}>{w.label}</option>)}
             </select>
+            <WriteTo />
             <button className="btn btn-primary" onClick={() => setAdding(true)}>Add a routine</button>
           </>
         }
@@ -1571,6 +1616,7 @@ export function RoutinesPage() {
           return (
             <div className={`panel routine-card${complete ? ' is-complete' : ''}`} key={r.id}>
               <div className="routine-tag">
+                <SpaceMark space={r.space} />
                 <span className="routine-card-title">{r.title}</span>
                 {editingId !== r.id && (complete
                   ? <span className="col-tot mono val-pos">{DONE_LABEL[r.cadence]}</span>
@@ -1807,7 +1853,7 @@ export function GoalsPage() {
       <Band
         title="Goals"
         metrics={[{ v: `${done}/${spaceGoals.length}`, k: 'reached', tone: 'pos' as const }]}
-        actions={<button className="btn btn-primary" onClick={() => setAdding(true)}>Add a goal</button>}
+        actions={<><WriteTo /><button className="btn btn-primary" onClick={() => setAdding(true)}>Add a goal</button></>}
       />
 
       <div className="grid-2 goal-cols">
@@ -1830,6 +1876,7 @@ export function GoalsPage() {
                 return (
                   <div className="goal-card v2" key={g.id}>
                     <div className="goal-line">
+                      <SpaceMark space={g.space} />
                       <span className={`cat-dot goalcat-${g.category ?? 'life'}`} aria-hidden="true" />
                       <span className="grow goal-obj">{g.name}</span>
                       <span className={`goal-status s-${status}`}>{statusLabel}</span>

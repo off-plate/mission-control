@@ -6,6 +6,7 @@ import { CoachPage, MoneyPage, ReviewPage, SettingsPage } from './pages2'
 import { AssistantPage, BrainDumpPage } from './pages3'
 import { BrandPage } from './brand'
 import { useStore } from './store'
+import { SUPABASE_ENABLED, currentAccount, onAccountChange } from './supabase'
 import type { PageId, SpaceId } from './types'
 
 /* One failing page must not take the whole shell with it: the header, the nav
@@ -96,6 +97,15 @@ export default function App() {
 
   const tabs = NAV
 
+  /* Signed out, nothing is backed up and the phone shows a different day. That is
+     worth a mark on the gear rather than a banner across the top. */
+  const [needsSignIn, setNeedsSignIn] = useState(false)
+  useEffect(() => {
+    if (!SUPABASE_ENABLED) return
+    void currentAccount().then((a) => setNeedsSignIn(!a))
+    return onAccountChange((a) => setNeedsSignIn(!a))
+  }, [])
+
   return (
     <div className="shell">
       <div className="topstick">
@@ -128,9 +138,9 @@ export default function App() {
             Assistant
           </button>
           <button
-            className={`btn btn-ghost${page === 'settings' ? ' is-on' : ''}`}
+            className={`btn btn-ghost${page === 'settings' ? ' is-on' : ''}${needsSignIn ? ' has-dot' : ''}`}
             onClick={() => setPage('settings')}
-            aria-label="Settings"
+            aria-label={needsSignIn ? 'Settings, sync is off' : 'Settings'}
             aria-pressed={page === 'settings'}
           >
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">

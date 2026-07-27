@@ -7,6 +7,7 @@ import { fmtDuration, fmtNum, fmtSigned, fmtWhen, goalPace, isoWeekKey, taskMinu
 import { analyzeAvoidance } from './coach'
 import { getAiKey, hasAiKey, readAvoidance, setAiKey, type AvoidanceRead } from './ai'
 import { paymentTaskTitle } from './exceptions'
+import { SUPABASE_ENABLED, currentAccount, onAccountChange, sendSignInLink, signOutAccount, type Account } from './supabase'
 import { goalCurrent, ON_TRACK_PCT, type CoachFacts, type CoachSession, type TaskCategory } from './types'
 
 /* ---------------- MONEY ---------------- */
@@ -664,6 +665,81 @@ export function CoachPage() {
 
 /* ---------------- SETTINGS ---------------- */
 
+/* Sync is what makes the same day show up on the laptop and the phone, and it is
+   also the only backup. It runs behind a login because the key that reaches the
+   database ships inside this page: without a session on the request, the database
+   cannot tell him apart from anyone who opened the site. */
+function AccountField() {
+  const [me, setMe] = useState<Account | null>(null)
+  const [ready, setReady] = useState(false)
+  const [email, setEmail] = useState('')
+  const [sent, setSent] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    void currentAccount().then((a) => { setMe(a); setReady(true) })
+    return onAccountChange((a) => setMe(a))
+  }, [])
+
+  if (!SUPABASE_ENABLED) {
+    return (
+      <div className="source-row">
+        <span className="status-dot off" />
+        <span className="info">
+          <span className="name">Sync</span>
+          <span className="detail" style={{ display: 'block' }}>Off in this build. Everything stays in this browser.</span>
+        </span>
+      </div>
+    )
+  }
+
+  const send = async () => {
+    setBusy(true); setErr(null)
+    const e = await sendSignInLink(email)
+    setBusy(false)
+    if (e) setErr(e); else setSent(true)
+  }
+
+  return (
+    <div className="ai-key">
+      <div className="source-row">
+        <span className={`status-dot ${me ? 'connected' : 'off'}`} />
+        <span className="info">
+          <span className="name">Sync across your devices</span>
+          <span className="detail" style={{ display: 'block' }}>
+            {!ready ? 'Checking...'
+              : me ? `Signed in as ${me.email}. Every change is saved and reaches your other devices.`
+              : 'Signed out. This browser only, and nothing is backed up.'}
+          </span>
+        </span>
+        {me
+          ? <button className="btn btn-quiet" onClick={() => void signOutAccount()}>Sign out</button>
+          : null}
+      </div>
+      {ready && !me && (
+        <>
+          <div className="formrow" style={{ marginTop: 'var(--s2)', marginBottom: 0 }}>
+            <input
+              className="textinput grow" type="email" placeholder="you@example.com" value={email}
+              onChange={(e) => { setEmail(e.target.value); setSent(false); setErr(null) }}
+              aria-label="Email for the sign-in link"
+            />
+            <button className="btn btn-primary" disabled={!email.includes('@') || busy} onClick={() => void send()}>
+              {busy ? 'Sending...' : 'Email me a link'}
+            </button>
+          </div>
+          <p className="assist-note" style={{ marginTop: 6 }}>
+            {err ? err
+              : sent ? 'Sent. Open it on this device and you are in, once per device.'
+              : 'No password. A link arrives, you tap it, and this device stays signed in.'}
+          </p>
+        </>
+      )}
+    </div>
+  )
+}
+
 function AiKeyField() {
   const [key, setKey] = useState(getAiKey())
   const [saved, setSaved] = useState(false)
@@ -728,23 +804,20 @@ export function SettingsPage() {
 
         </div>
         <div className="panel">
-          <span className="microcap">AI</span>
+          <span className="microcap">Your account</span>
+          <AccountField />
+          <span className="microcap" style={{ marginTop: 24, display: 'block' }}>AI</span>
           <AiKeyField />
           <span className="microcap" style={{ marginTop: 24, display: 'block' }}>Design</span>
           <div className="source-row">
             <span className="info"><span className="name">Brand &amp; guidelines</span><span className="detail" style={{ display: 'block' }}>The colours, type and rules this app is built on</span></span>
             <button className="btn btn-quiet" onClick={() => setPage('brand')}>Open</button>
           </div>
-          <span className="microcap" style={{ marginTop: 24, display: 'block' }}>Demo</span>
+          <span className="microcap" style={{ marginTop: 24, display: 'block' }}>Start over</span>
           <div className="source-row">
-            <span className="info"><span className="name">Reset the demo</span><span className="detail" style={{ display: 'block' }}>Clears local changes, restores the sample data</span></span>
-            <button className="btn btn-danger" style={{ border: '1px solid var(--alert)' }} onClick={resetDemo}>Reset</button>
+            <span className="info"><span className="name">Wipe everything</span><span className="detail" style={{ display: 'block' }}>Clears this device and the saved copy. There is no undo on this one.</span></span>
+            <button className="btn btn-danger" style={{ border: '1px solid var(--alert)' }} onClick={resetDemo}>Wipe</button>
           </div>
-          <span className="microcap" style={{ marginTop: 24, display: 'block' }}>About this build</span>
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--muted)' }}>
-            V1 demo. Every page and flow works, and every change persists in this browser.
-            Not here yet: real accounts, real sync, the live AI. That is the Phase 1 backend, already specced.
-          </p>
         </div>
       </div>
     </div>

@@ -14,5 +14,5 @@ const NO_REMOTE = typeof location !== 'undefined' && new URLSearchParams(locatio
 
 export const SUPABASE_ENABLED = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY) && !NO_REMOTE
 
-/* Single-user for now: one row holds the whole app state as JSON. */
-export const STATE_ROW_ID = 'default'
+/* One row per account holds the whole app state as JSON; the row id is the
+   account's own id, which is what the database policy scopes reads to. */

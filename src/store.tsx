@@ -98,9 +98,11 @@ interface Store extends PersistedState {
 
   toggleHabitDay: (id: string, day: number) => void
   markHabitDay: (id: string, day: number, value: boolean) => void
-  addHabit: (input: { name: string; daypart?: import('./types').TimeSlot; frequency: import('./types').HabitFrequency; targetPerWeek?: number }) => void
+  addHabit: (input: { name: string; daypart?: import('./types').TimeSlot; frequency: import('./types').HabitFrequency; targetPerWeek?: number; kind?: import('./types').HabitKind }) => void
+  /** Record a slip on a habit you are trying to stop; resets the clean run. */
+  logSlip: (id: string) => void
   togglePauseHabit: (id: string) => void
-  updateHabit: (id: string, patch: Partial<Pick<HabitDef, 'name' | 'daypart' | 'frequency' | 'targetPerWeek'>>) => void
+  updateHabit: (id: string, patch: Partial<Pick<HabitDef, 'name' | 'daypart' | 'frequency' | 'targetPerWeek' | 'kind'>>) => void
   deleteHabit: (id: string) => void
 
   addGoal: (g: Omit<Goal, 'id'>) => void
@@ -491,8 +493,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setHabits((prev) => [...prev, {
         id: newId('h'), space, name: input.name, daypart: input.daypart,
         frequency: input.frequency, targetPerWeek: input.targetPerWeek,
+        kind: input.kind ?? 'build',
+        // A quit starts its clean run today, so the number means something now.
+        lastSlip: input.kind === 'break' ? todayKey() : undefined,
         days: [false, false, false, false, false, false, false], paused: false,
       }]),
+    logSlip: (id) => setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, lastSlip: todayKey() } : h))),
     updateHabit: (id, patch) => setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, ...patch } : h))),
     togglePauseHabit: (id) =>
       setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, paused: !h.paused } : h))),

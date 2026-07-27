@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { SpaceGrid } from './Grid'
 import { MOCK_AGENDA, SPACE_LABELS, exceptionsFor, globalExceptions, momentum } from './exceptions'
 import { MOCK_MONEY, fakeDecompose } from './mock'
@@ -6,11 +6,45 @@ import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, goalCurrent, habitFrequencyLabel, habitTarget, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, daysSinceSlip, goalCurrent, habitFrequencyLabel, habitTarget, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
-import { fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, gcalUrl, isEstimated, localDateKey, taskMinutes, toMin } from './util'
+import { fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, gcalUrl, isEstimated, localDateKey, taskMinutes, toMin } from './util'
 
 /* ---------------- shared bits ---------------- */
+
+/* A dropdown that opens upward when there is no room below it. Menus near the
+   bottom of the page were opening off-screen with no way to reach the items. */
+export function Dropdown({ label, children, className = '' }: { label: string; children: React.ReactNode; className?: string }) {
+  const [open, setOpen] = useState(false)
+  const [up, setUp] = useState(false)
+  const ref = useRef<HTMLSpanElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const btn = ref.current?.getBoundingClientRect()
+    const menu = ref.current?.querySelector('.kebab-menu') as HTMLElement | null
+    if (btn && menu) {
+      const need = menu.offsetHeight + 12
+      setUp(btn.bottom + need > window.innerHeight && btn.top > need)
+    }
+    const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', esc)
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc) }
+  }, [open])
+
+  return (
+    <span className={`kebab-wrap ${className}`} ref={ref}>
+      <button className="kebab" aria-label={label} aria-expanded={open} onClick={() => setOpen((v) => !v)}>⋯</button>
+      {open && (
+        <div className={`kebab-menu${up ? ' opens-up' : ''}`} role="menu" onClick={() => setOpen(false)}>
+          {children}
+        </div>
+      )}
+    </span>
+  )
+}
 
 /* No `sub`. A page title does not get a subtitle restating it.
    See DESIGN.md, "No subtitles". */
@@ -512,16 +546,12 @@ export function PlanPage() {
                     </button>
                   )}
                   <TaskActions task={t} />
-                  <span className="kebab-wrap">
-                    <button className="kebab" aria-label={`Options for ${t.title}`} aria-expanded={menuFor === t.id} onClick={() => setMenuFor((m) => (m === t.id ? null : t.id))}>⋯</button>
-                    {menuFor === t.id && (
-                      <div className="kebab-menu" role="menu">
-                        <button role="menuitem" onClick={() => { setBreakdownFor(t); setMenuFor(null) }}>Break it down</button>
-                        <button role="menuitem" onClick={() => { moveTasksToToday([t.id]); setMenuFor(null) }}>Move to today</button>
-                        <button role="menuitem" className="danger" onClick={() => { deleteTask(t.id); setMenuFor(null) }}>Delete</button>
-                      </div>
-                    )}
-                  </span>
+                  <Dropdown label={`Options for ${t.title}`}>
+                    <button role="menuitem" onClick={() => setBreakdownFor(t)}>Break it down</button>
+                    <button role="menuitem" onClick={() => moveTasksToToday([t.id])}>Move to today</button>
+                    <span className="kebab-sep" />
+                    <button role="menuitem" className="danger" onClick={() => deleteTask(t.id)}>Delete</button>
+                  </Dropdown>
                 </div>
                 {hasSubs && isExp && (
                   <div className="subtask-list">
@@ -607,29 +637,21 @@ export function PlanPage() {
                             </button>
                           )}
                           {!t.done && <TaskActions task={t} onFocus={() => startFocus(taskMinutes(t), t.title)} />}
-                          <span className="kebab-wrap">
-                            <button className="kebab" aria-label={`Options for ${t.title}`} aria-expanded={menuFor === t.id} onClick={() => setMenuFor((m) => (m === t.id ? null : t.id))}>⋯</button>
-                            {menuFor === t.id && (
-                              <div className="kebab-menu" role="menu">
-                                {!t.done && <button role="menuitem" onClick={() => { setBreakdownFor(t); setMenuFor(null) }}>Break it down</button>}
-                                {!t.done && <span className="kebab-sep" />}
-                                {!t.done && <span className="kebab-head">Move to</span>}
-                                {!t.done && BUCKETS.map((mb) => (
-                                  <button key={mb.id} role="menuitemradio" aria-checked={(t.slot ?? 'unsorted') === mb.id} onClick={() => { dropTo(mb.id, t.id); setMenuFor(null) }}>
-                                    {mb.label}
-                                  </button>
-                                ))}
-                                {!t.done && <span className="kebab-sep" />}
-                                {!t.done && <span className="kebab-sep" />}
-                                {!t.done && (
-                                  <button role="menuitem" onClick={() => { moveTaskList(t.id, 'backlog'); assignSlot(t.id, undefined); setMenuFor(null) }}>
-                                    Back to the list
-                                  </button>
-                                )}
-                                <button role="menuitem" className="danger" onClick={() => { deleteTask(t.id); setMenuFor(null) }}>Delete</button>
-                              </div>
+                          <Dropdown label={`Options for ${t.title}`}>
+                            {!t.done && <button role="menuitem" onClick={() => setBreakdownFor(t)}>Break it down</button>}
+                            {!t.done && <span className="kebab-sep" />}
+                            {!t.done && <span className="kebab-head">Move to</span>}
+                            {!t.done && BUCKETS.map((mb) => (
+                              <button key={mb.id} role="menuitemradio" aria-checked={(t.slot ?? 'unsorted') === mb.id} onClick={() => dropTo(mb.id, t.id)}>
+                                {mb.label}
+                              </button>
+                            ))}
+                            {!t.done && <span className="kebab-sep" />}
+                            {!t.done && (
+                              <button role="menuitem" onClick={() => { moveTaskList(t.id, 'backlog'); assignSlot(t.id, undefined) }}>Back to the list</button>
                             )}
-                          </span>
+                            <button role="menuitem" className="danger" onClick={() => deleteTask(t.id)}>Delete</button>
+                          </Dropdown>
                         </div>
                         {logging === t.id && (
                           <ActualLog est={taskMinutes(t)} onLog={(m) => { logActual(t.id, m); setLogging(null) }} onSkip={() => { toggleTask(t.id); setLogging(null) }} />
@@ -724,7 +746,7 @@ function HabitRow({ h, todayIndex, actions, drivenBy, progress }: {
   /** Today's progress through the routine that drives this habit. */
   progress?: { done: number; total: number }
 }) {
-  const { toggleHabitDay, setPage } = useStore()
+  const { toggleHabitDay, logSlip, setPage } = useStore()
   const kept = h.days.filter(Boolean).length
   const target = habitTarget(h)
   // Weekdays-only habits do not expect the weekend, so those dots stay quiet.
@@ -744,6 +766,28 @@ function HabitRow({ h, todayIndex, actions, drivenBy, progress }: {
   // but did not finish is visible here instead of reading as untouched.
   const pct = progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0
   const partial = !!progress && progress.done > 0 && progress.done < progress.total
+
+  /* A quit is a different scoreboard: days clean, and a single honest button
+     for the day you slip. Day dots would be asking the wrong question. */
+  if (h.kind === 'break') {
+    const clean = daysSinceSlip(h) ?? 0
+    return (
+      <div className="habit-row is-quit">
+        <div className="habit-row-top">
+          <span className="habit-name">{h.name}</span>
+          {actions}
+        </div>
+        <div className="quit-run">
+          <span className="quit-days mono">{clean}</span>
+          <span className="quit-unit">{clean === 1 ? 'day' : 'days'} without it</span>
+        </div>
+        <div className="habit-foot">
+          <button className="quit-slip" onClick={() => logSlip(h.id)}>I slipped today</button>
+          {h.lastSlip && clean > 0 && <span className="habit-weeks">last slip {fmtWhen(h.lastSlip)}</span>}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={`habit-row${drivenBy ? ' is-auto' : ''}`}>
@@ -808,7 +852,9 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
   const [daypart, setDaypart] = useState<TimeSlot | ''>(habit?.daypart ?? 'morning')
   const [frequency, setFrequency] = useState<HabitFrequency>(habit?.frequency ?? 'daily')
   const [perWeek, setPerWeek] = useState(habit?.targetPerWeek ?? 3)
+  const [kind, setKind] = useState<HabitKind>(habit?.kind ?? 'build')
   const locked = !!drivenBy
+  const quitting = kind === 'break'
 
   const submit = () => {
     if (!name.trim()) return
@@ -817,6 +863,7 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
       daypart: daypart || undefined,
       frequency,
       targetPerWeek: frequency === 'times-per-week' ? perWeek : undefined,
+      kind,
     }
     if (habit) updateHabit(habit.id, locked ? { daypart: shape.daypart } : shape)
     else addHabit(shape)
@@ -831,7 +878,18 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
         ? `This habit is kept by the ${drivenBy} routine, so its name and frequency follow that routine. You can still move it to a different part of the day.`
         : 'Habits are the small things you repeat. Multi-step rituals belong on Routines.'}
     >
-      <label className="field-label" htmlFor="hname">What is the habit?</label>
+      <span className="field-label">Which kind is this?</span>
+      <div className="seg kind-seg" role="group" aria-label="Kind of habit">
+        <button aria-pressed={kind === 'build'} disabled={locked} onClick={() => setKind('build')}>Something to keep</button>
+        <button aria-pressed={kind === 'break'} disabled={locked} onClick={() => setKind('break')}>Something to quit</button>
+      </div>
+      <p className="assist-note" style={{ marginTop: 6, marginBottom: 'var(--s4)' }}>
+        {quitting
+          ? 'Counted the other way round: the score is how long you have gone without it, and you only touch it on a day you slip.'
+          : 'Counted the usual way: every day you do it is a tick, against a target for the week.'}
+      </p>
+
+      <label className="field-label" htmlFor="hname">{quitting ? 'What are you quitting?' : 'What is the habit?'}</label>
       <input
         id="hname" className="textinput" style={{ width: '100%' }} autoFocus={!locked} disabled={locked}
         placeholder="e.g. 20 minutes of movement"
@@ -845,12 +903,14 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
         <option value="">Anytime</option>
       </select>
 
-      <label className="field-label" style={{ marginTop: 'var(--s4)' }} htmlFor="hfreq">How often?</label>
-      <select id="hfreq" className="textinput" style={{ width: '100%' }} value={frequency} disabled={locked} onChange={(e) => setFrequency(e.target.value as HabitFrequency)}>
-        {HABIT_FREQUENCIES.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
-      </select>
+      {!quitting && <label className="field-label" style={{ marginTop: 'var(--s4)' }} htmlFor="hfreq">How often?</label>}
+      {!quitting && (
+        <select id="hfreq" className="textinput" style={{ width: '100%' }} value={frequency} disabled={locked} onChange={(e) => setFrequency(e.target.value as HabitFrequency)}>
+          {HABIT_FREQUENCIES.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+        </select>
+      )}
 
-      {frequency === 'times-per-week' && (
+      {!quitting && frequency === 'times-per-week' && (
         <div className="sheet-inline" style={{ marginTop: 'var(--s3)' }}>
           <span>Aiming for</span>
           <input className="numinput" type="number" min={1} max={7} value={perWeek}
@@ -883,8 +943,9 @@ export function HabitsPage() {
   const progressFor = new Map(routines.filter((r) => r.habitId).map((r) => [
     r.habitId as string, { done: r.doneStepIds.length, total: r.steps.length },
   ]))
-  const kept = spaceHabits.filter((h) => !h.paused).reduce((a, h) => a + h.days.filter(Boolean).length, 0)
-  const target = spaceHabits.filter((h) => !h.paused).reduce((a, h) => a + habitTarget(h), 0)
+  const building = spaceHabits.filter((h) => !h.paused && h.kind !== 'break')
+  const kept = building.reduce((a, h) => a + h.days.filter(Boolean).length, 0)
+  const target = building.reduce((a, h) => a + habitTarget(h), 0)
 
   // Only draw a column that has something in it, so empty parts of the day do
   // not leave a labelled void.

@@ -132,10 +132,19 @@ export const HABIT_FREQUENCIES: { id: HabitFrequency; label: string }[] = [
   { id: 'monthly', label: 'Once a month' },
 ]
 
+/* Two opposite things are both called habits. One you are trying to keep, and
+   every day you do it is a win. One you are trying to stop, and every day you
+   do NOT do it is the win. They cannot share a scoreboard. */
+export type HabitKind = 'build' | 'break'
+
 export interface HabitDef {
   id: string
   /** Which space this habit belongs to. */
   space: SpaceId
+  /** Building something, or quitting something. Undefined behaves as 'build'. */
+  kind?: HabitKind
+  /** For a 'break' habit: the last day you slipped, as an ISO date. */
+  lastSlip?: string
   name: string
   /** Mon..Sun of the current week. */
   days: boolean[]
@@ -157,6 +166,16 @@ export function habitTarget(h: HabitDef): number {
   if (h.frequency === 'weekly' || h.frequency === 'monthly') return 1
   if (h.frequency === 'times-per-week') return Math.max(1, Math.min(7, h.targetPerWeek ?? 3))
   return 7
+}
+
+/** Days clean since the last slip, for a habit you are trying to stop. */
+export function daysSinceSlip(h: HabitDef, today = new Date()): number | null {
+  if (h.kind !== 'break' || !h.lastSlip) return null
+  const [y, m, d] = h.lastSlip.split('-').map(Number)
+  if (!y) return null
+  const then = new Date(y, m - 1, d)
+  const now = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  return Math.max(0, Math.round((now.getTime() - then.getTime()) / 86400000))
 }
 
 export function habitFrequencyLabel(h: HabitDef): string {

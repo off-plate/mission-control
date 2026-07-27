@@ -1967,7 +1967,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 /* Task rows keep every control on one line: the title is what gives way. */
 .today-task, .todo-row { flex-wrap: nowrap; }
 .today-task > .grow, .today-task > .task-link, .todo-row > .grow {
-  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.35;
 }
 .today-task > .kebab-wrap, .todo-row > .kebab-wrap, .today-task .task-actions, .todo-row .task-actions { flex: none; }
 
@@ -1986,3 +1986,25 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 }
 .kebab-menu .kebab-sep { margin: var(--s1) var(--s2); }
 .kebab-note { white-space: normal; }
+
+/* Opens upward when the bottom of the screen is close. */
+.kebab-menu.opens-up { top: auto; bottom: 100%; margin-top: 0; margin-bottom: 2px; }
+
+/* A long task wraps and the row grows; the controls stay on the first line,
+   pinned right, so nothing is hidden and nothing falls to a line of its own. */
+.today-task, .todo-row { align-items: flex-start; }
+.today-task > .checkbox, .today-task > .drag-grip, .today-task > .cat-dot,
+.todo-row > .checkbox, .todo-row > .drag-grip, .todo-row > .cat-dot { margin-top: 3px; }
+.today-task .task-actions, .today-task > .kebab-wrap, .today-task > .est-chip, .today-task > .est-vs-actual,
+.todo-row .task-actions, .todo-row > .kebab-wrap, .todo-row > .est-chip, .todo-row > .expand-btn { margin-top: 1px; }
+
+/* How deep to break a task down. */
+.detail-seg { margin-bottom: var(--s4); }
+
+/* A habit you are quitting: days clean, and one honest button. */
+.habit-row.is-quit .quit-run { display: flex; align-items: baseline; gap: var(--s2); margin: var(--s2) 0; }
+.quit-days { font-family: var(--font-display); font-size: 2rem; font-weight: 700; line-height: 1; color: var(--progress); }
+.quit-unit { font-size: var(--text-sm); color: var(--muted); }
+.quit-slip { font-size: var(--text-xs); color: var(--faint); padding: 2px 6px; border-radius: var(--r-sm); border: 1px dashed var(--hairline-strong); cursor: pointer; }
+.quit-slip:hover { color: var(--alert); border-color: var(--alert); }
+.kind-seg button { flex: 1 1 auto; }

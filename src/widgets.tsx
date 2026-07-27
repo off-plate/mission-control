@@ -91,7 +91,7 @@ const TasksBody = memo(function TasksBody({ space, size }: { space: SpaceId; siz
     <div>
       {open.length > 0 && (
         <div className="kpi-sub" style={{ marginTop: 0, marginBottom: 4 }}>
-          {open.length} open · ~{remaining} min planned
+          {open.length} open · {remaining} min planned
         </div>
       )}
       <div className="rowlist">
@@ -130,7 +130,7 @@ const TasksBody = memo(function TasksBody({ space, size }: { space: SpaceId; siz
               aria-expanded={logOpen === t.id}
               aria-label={`Log time for ${t.title}, estimated ${t.estimateMin} minutes`}
             >
-              ~{t.estimateMin}m
+              {t.estimateMin}m
             </button>
             <span className="src-tag">{t.source === 'mc' ? 'here' : t.source}</span>
           </div>

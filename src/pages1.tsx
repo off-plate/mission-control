@@ -197,7 +197,7 @@ export function TodayPage() {
             <div className="firstmove">
               <span className="microcap fm-label">{evening ? 'First move tomorrow' : 'First move'}</span>
               <span className="fm-title">{firstMove.title}</span>
-              <span className="est-chip">~{firstMove.estimateMin}m</span>
+              <span className="est-chip">{firstMove.estimateMin}m</span>
               <button className="btn btn-primary" onClick={() => { setFocusTaskId(firstMove.id); setPage('plan') }}>Start</button>
             </div>
           )}
@@ -343,6 +343,44 @@ function ActualLog({ est, onLog, onSkip }: { est: number; onLog: (m: number) => 
   )
 }
 
+
+/* The estimate is a number you can argue with. Click it and type your own; the
+   generated one is a starting point, not a verdict. */
+function EstimateChip({ task }: { task: Task }) {
+  const { setEstimate } = useStore()
+  const [editing, setEditing] = useState(false)
+  const [val, setVal] = useState('')
+  const fromSteps = !!task.subtasks?.length
+  const mins = taskMinutes(task)
+
+  if (editing) {
+    const commit = () => {
+      const n = Math.round(Number(val))
+      if (Number.isFinite(n) && n > 0) setEstimate(task.id, n)
+      setEditing(false)
+    }
+    return (
+      <input
+        className="est-input" type="number" min={1} autoFocus value={val}
+        aria-label={`Minutes for ${task.title}`}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false) }}
+      />
+    )
+  }
+  if (fromSteps) return <span className="est-chip" title="Comes from the steps">{mins}m</span>
+  return (
+    <button
+      className={`est-chip est-edit${isEstimated(task) ? '' : ' is-none'}`}
+      title="Click to set the minutes yourself"
+      aria-label={isEstimated(task) ? `${mins} minutes, click to change` : `No estimate, click to set one`}
+      onClick={() => { setVal(isEstimated(task) ? String(mins) : ''); setEditing(true) }}
+    >
+      {isEstimated(task) ? `${mins}m` : 'no estimate'}
+    </button>
+  )
+}
 
 /* Breaking a task down and estimating it are actions on the task itself. */
 function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
@@ -526,7 +564,7 @@ export function PlanPage() {
                   <span className="drag-grip" aria-hidden="true">⠿</span>
                   <span className={`cat-dot ${t.category}`} aria-hidden="true" />
                   <span className="grow">{t.title}</span>
-                  {isEstimated(t) ? <span className="est-chip">~{taskMinutes(t)}m</span> : <span className="est-chip is-none">no estimate</span>}
+                  <EstimateChip task={t} />
                   {hasSubs && (
                     <button className="expand-btn" aria-expanded={isExp} aria-label={isExp ? 'Collapse subtasks' : 'Expand subtasks'} onClick={() => toggleExp(t.id)}>
                       {isExp ? '▾' : '▸'} {doneSubs}/{t.subtasks!.length}
@@ -546,7 +584,7 @@ export function PlanPage() {
                       <div className="subtask-row" key={s.id}>
                         <span className="sub-tick" aria-hidden="true" />
                         <span className="grow" style={{ fontSize: 'var(--text-sm)' }}>{s.title}</span>
-                        <span className="est-chip">~{s.estimateMin}m</span>
+                        <span className="est-chip">{s.estimateMin}m</span>
                       </div>
                     ))}
                   </div>
@@ -612,11 +650,9 @@ export function PlanPage() {
                           <span className={`cat-dot ${t.category}`} aria-hidden="true" />
                           <TaskName title={t.title} start={t.at} className="grow" />
                           {t.done && t.actualMin != null ? (
-                            <span className="est-vs-actual mono">~{taskMinutes(t)} → {t.actualMin}m <b className={taskMinutes(t) - t.actualMin >= 0 ? 'val-pos' : 'val-urgent'}>{taskMinutes(t) - t.actualMin >= 0 ? '+' : ''}{taskMinutes(t) - t.actualMin}m</b></span>
-                          ) : isEstimated(t) ? (
-                            <span className="est-chip">~{taskMinutes(t)}m</span>
+                            <span className="est-vs-actual mono">{taskMinutes(t)} → {t.actualMin}m <b className={taskMinutes(t) - t.actualMin >= 0 ? 'val-pos' : 'val-urgent'}>{taskMinutes(t) - t.actualMin >= 0 ? '+' : ''}{taskMinutes(t) - t.actualMin}m</b></span>
                           ) : (
-                            <span className="est-chip is-none">no estimate</span>
+                            <EstimateChip task={t} />
                           )}
                           {hasSubs && (
                             <button className="expand-btn" aria-expanded={isExp} aria-label={isExp ? 'Collapse subtasks' : 'Expand subtasks'} onClick={() => toggleExp(t.id)}>
@@ -654,9 +690,9 @@ export function PlanPage() {
                                   <span className="sub-tick" aria-hidden="true" />
                                   <span className="grow">{s.title}</span>
                                   {s.done && s.actualMin != null ? (
-                                    <span className="est-vs-actual mono">~{s.estimateMin} → {s.actualMin}m <b className={s.estimateMin - s.actualMin >= 0 ? 'val-pos' : 'val-urgent'}>{s.estimateMin - s.actualMin >= 0 ? '+' : ''}{s.estimateMin - s.actualMin}m</b></span>
+                                    <span className="est-vs-actual mono">{s.estimateMin} → {s.actualMin}m <b className={s.estimateMin - s.actualMin >= 0 ? 'val-pos' : 'val-urgent'}>{s.estimateMin - s.actualMin >= 0 ? '+' : ''}{s.estimateMin - s.actualMin}m</b></span>
                                   ) : (
-                                    <span className="est-chip">~{s.estimateMin}m</span>
+                                    <span className="est-chip">{s.estimateMin}m</span>
                                   )}
                                 </button>
                                 {!s.done && (
@@ -700,9 +736,9 @@ export function PlanPage() {
                   <span className={`cat-dot ${t.category}`} aria-hidden="true" />
                   <span className="grow">{t.title}</span>
                   {t.actualMin != null
-                    ? <span className="est-vs-actual mono">~{taskMinutes(t)} → {t.actualMin}m</span>
+                    ? <span className="est-vs-actual mono">{taskMinutes(t)} → {t.actualMin}m</span>
                     : isEstimated(t)
-                      ? <span className="est-chip">~{taskMinutes(t)}m</span>
+                      ? <span className="est-chip">{taskMinutes(t)}m</span>
                       : <span className="est-chip is-none">no estimate</span>}
                 </div>
               ))}

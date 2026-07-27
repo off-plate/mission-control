@@ -223,7 +223,7 @@ export function ReviewPage() {
                 <span className="mono" style={{ color: 'var(--faint)', fontSize: 'var(--text-xs)', minWidth: '3ch' }}>{fmtWhen(e.when)}</span>
                 <span className="ledger-title">{e.title}</span>
                 <span className="src-tag">{e.category}</span>
-                <span className="mono" style={{ color: 'var(--muted)', fontSize: 'var(--text-xs)' }}>~{e.estimateMin}m → {e.actualMin}m</span>
+                <span className="mono" style={{ color: 'var(--muted)', fontSize: 'var(--text-xs)' }}>{e.estimateMin}m → {e.actualMin}m</span>
                 <span className={`delta ${d >= 0 ? 'saved' : 'over'}`}>{d >= 0 ? `+${d}m` : `${d}m`}</span>
               </div>
             )

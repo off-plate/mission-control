@@ -33,6 +33,89 @@ export function monthName(key = monthKey()): string {
   return new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
 }
 
+/* ---------- review windows ---------- */
+
+export type RangeId = 'this-week' | 'last-week' | 'last-7' | 'last-14' | 'last-30' | 'this-month' | 'last-month' | 'last-90'
+
+export interface DateRange { id: string; label: string; from: string; to: string }
+
+const iso = (d: Date) => localDateKey(d)
+const shift = (d: Date, days: number) => { const x = new Date(d); x.setDate(x.getDate() + days); return x }
+
+/** The Monday of the week a date falls in. */
+function mondayOf(d: Date): Date {
+  return shift(d, -((d.getDay() + 6) % 7))
+}
+
+/**
+ * Every window is a pair of dates, so one set of sections can report on any of
+ * them. Nothing is computed per-window: the window is only ever an input.
+ */
+export function rangeFor(id: RangeId, now = new Date()): DateRange {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  switch (id) {
+    case 'this-week': {
+      const mon = mondayOf(today)
+      return { id, label: `This week, from ${fmtDayShort(mon)}`, from: iso(mon), to: iso(today) }
+    }
+    case 'last-week': {
+      const mon = shift(mondayOf(today), -7)
+      const sun = shift(mon, 6)
+      return { id, label: `Last week, ${fmtDayShort(mon)} to ${fmtDayShort(sun)}`, from: iso(mon), to: iso(sun) }
+    }
+    case 'last-7': return { id, label: 'The last 7 days', from: iso(shift(today, -6)), to: iso(today) }
+    case 'last-14': return { id, label: 'The last 14 days', from: iso(shift(today, -13)), to: iso(today) }
+    case 'last-30': return { id, label: 'The last 30 days', from: iso(shift(today, -29)), to: iso(today) }
+    case 'last-90': return { id, label: 'The last 90 days', from: iso(shift(today, -89)), to: iso(today) }
+    case 'this-month': {
+      const first = new Date(today.getFullYear(), today.getMonth(), 1)
+      return { id, label: monthName(monthKey(today)), from: iso(first), to: iso(today) }
+    }
+    case 'last-month': {
+      const first = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+      const last = new Date(today.getFullYear(), today.getMonth(), 0)
+      return { id, label: monthName(monthKey(first)), from: iso(first), to: iso(last) }
+    }
+  }
+}
+
+export const RANGE_OPTIONS: { id: RangeId; label: string }[] = [
+  { id: 'this-week', label: 'This week' },
+  { id: 'last-week', label: 'Last week' },
+  { id: 'last-7', label: 'Last 7 days' },
+  { id: 'last-14', label: 'Last 14 days' },
+  { id: 'last-30', label: 'Last 30 days' },
+  { id: 'this-month', label: 'This month' },
+  { id: 'last-month', label: 'Last month' },
+  { id: 'last-90', label: 'Last 90 days' },
+]
+
+/** A specific calendar month, for the month list in the picker. */
+export function monthRange(key: string): DateRange {
+  const [y, m] = key.split('-').map(Number)
+  const first = new Date(y, m - 1, 1)
+  const last = new Date(y, m, 0)
+  const today = new Date()
+  const end = last > today ? today : last
+  return { id: key, label: monthName(key), from: iso(first), to: iso(end) }
+}
+
+/** The last `n` months as keys, newest first, for the picker. */
+export function recentMonthKeys(n = 12, now = new Date()): string[] {
+  return Array.from({ length: n }, (_, i) => monthKey(new Date(now.getFullYear(), now.getMonth() - i, 1)))
+}
+
+export function inRange(isoDate: string, r: DateRange): boolean {
+  return isoDate >= r.from && isoDate <= r.to
+}
+
+/** How many days the window covers, so a total can be read against its length. */
+export function rangeDays(r: DateRange): number {
+  const [y1, m1, d1] = r.from.split('-').map(Number)
+  const [y2, m2, d2] = r.to.split('-').map(Number)
+  return Math.round((new Date(y2, m2 - 1, d2).getTime() - new Date(y1, m1 - 1, d1).getTime()) / 86400000) + 1
+}
+
 /** ISO date of day `i` (Mon=0..Sun=6) in the current week. */
 export function dayOfWeekKey(i: number, now = new Date()): string {
   const d = new Date(now)

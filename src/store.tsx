@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { SUPABASE_ENABLED, deleteRemoteState, saveRemoteState } from './supabase'
-import { dayIndexOf, isoWeekKey, localDateKey, monthKey, periodKeyFor, slotForTime } from './util'
+import { dayIndexOf, dayOfWeekKey, isoWeekKey, localDateKey, periodKeyFor, slotForTime } from './util'
 import {
   DEFAULT_SPACES,
   MOCK_GOALS,
@@ -111,11 +111,11 @@ interface Store extends PersistedState {
 
   toggleHabitDay: (id: string, day: number) => void
   markHabitDay: (id: string, day: number, value: boolean) => void
-  addHabit: (input: { name: string; daypart?: import('./types').TimeSlot; frequency: import('./types').HabitFrequency; targetPerWeek?: number; kind?: import('./types').HabitKind }) => void
+  addHabit: (input: { name: string; daypart?: import('./types').TimeSlot; frequency: import('./types').HabitFrequency; targetPerWeek?: number; kind?: import('./types').HabitKind; dailyTargetMin?: number; source?: import('./types').HabitSource; quitSince?: string }) => void
   /** Record a slip on a habit you are trying to stop; resets the clean run. */
   logSlip: (id: string) => void
   togglePauseHabit: (id: string) => void
-  updateHabit: (id: string, patch: Partial<Pick<HabitDef, 'name' | 'daypart' | 'frequency' | 'targetPerWeek' | 'kind'>>) => void
+  updateHabit: (id: string, patch: Partial<Pick<HabitDef, 'name' | 'daypart' | 'frequency' | 'targetPerWeek' | 'kind' | 'dailyTargetMin' | 'source' | 'quitSince'>>) => void
   deleteHabit: (id: string) => void
 
   addGoal: (g: Omit<Goal, 'id'>) => void
@@ -128,9 +128,8 @@ interface Store extends PersistedState {
   toggleSource: (id: string) => void
 
   commitPlan: (taskIds: string[], firstMoveId: string | null) => void
-  finishReview: (wins: string[], outcomes: string[]) => void
-  /** Close the monthly ritual. Kept apart from the weekly one on purpose. */
-  finishMonthlyReview: (wins: string[], outcomes: string[]) => void
+  /** Close a window: any range, one act. Its outcomes land in the backlog. */
+  closeReview: (window: { id: string; label: string; from: string; to: string }, wins: string[], outcomes: string[]) => void
 
   assistantLog: AssistantEntry[]
   applyDictation: (text: string, items: { kind: 'task' | 'goal' | 'done'; text: string; estimateMin?: number }[]) => void
@@ -143,6 +142,9 @@ interface Store extends PersistedState {
 
   routines: Routine[]
   toggleRoutineStep: (routineId: string, stepId: string) => void
+  /** Finish or reopen a whole routine at once, the way ticking a task with
+   *  subtasks finishes all of them. */
+  setRoutineDone: (routineId: string, done: boolean) => void
   resetRoutine: (routineId: string) => void
   /** A routine and the habit that mirrors it are created together, so finishing
    *  it always has somewhere to land. */
@@ -508,12 +510,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     /* Reopening a task clears the time that was logged against it, so "skip"
        genuinely means no time recorded instead of resurfacing an old number. */
+    /* A task with steps is done when you say it is done, so its steps go with it.
+       Leaving them unticked underneath a finished parent was the app disagreeing
+       with itself. Reopening puts them all back. */
     toggleTask: (id) =>
-      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: !t.done, actualMin: t.done ? undefined : t.actualMin } : t))),
+      setTasks((prev) => prev.map((t) => {
+        if (t.id !== id) return t
+        const done = !t.done
+        return {
+          ...t,
+          done,
+          actualMin: t.done ? undefined : t.actualMin,
+          subtasks: t.subtasks?.map((sub) => ({ ...sub, done, actualMin: done ? sub.actualMin : undefined })),
+        }
+      })),
 
     logActual: (id, actualMin) => {
       const t = tasks.find((x) => x.id === id)
-      setTasks((prev) => prev.map((x) => (x.id === id ? { ...x, done: true, actualMin } : x)))
+      setTasks((prev) => prev.map((x) => (x.id === id
+        ? { ...x, done: true, actualMin, subtasks: x.subtasks?.map((sub) => ({ ...sub, done: true })) }
+        : x)))
       if (t && t.actualMin === undefined) {
         setLedger((prev) => [
           { id: newId('l'), title: t.title, category: t.category, estimateMin: t.estimateMin, actualMin, when: todayKey(), space: t.space, weekKey: isoWeekKey() },
@@ -603,8 +619,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         id: newId('h'), space, name: input.name, daypart: input.daypart,
         frequency: input.frequency, targetPerWeek: input.targetPerWeek,
         kind: input.kind ?? 'build',
-        // A quit starts its clean run today, so the number means something now.
-        lastSlip: input.kind === 'break' ? todayKey() : undefined,
+        dailyTargetMin: input.dailyTargetMin,
+        source: input.source,
+        // A quit runs from the day he says he stopped, not from the day he got
+        // round to typing it in.
+        quitSince: input.kind === 'break' ? (input.quitSince ?? todayKey()) : undefined,
         days: [false, false, false, false, false, false, false], paused: false,
       }]),
     logSlip: (id) => setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, lastSlip: todayKey() } : h))),
@@ -677,26 +696,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setPlan({ committedDate: todayKey(), firstMoveId })
     },
 
-    /* Closing the week keeps the previous week's reflection, so next Sunday you
-       can see what you said you would change. Stamped with the ISO week, so
-       "closed" holds until the new week starts, not just until tomorrow. */
-    finishMonthlyReview: (wins, outcomes) => {
-      const mk = monthKey()
+    /* One close for any window. A window that ends today and started this week
+       also marks the weekly ritual done, so the Sunday nudge keeps working. */
+    closeReview: (w, wins, outcomes) => {
       setReview((prev) => {
-        const m = prev.month
+        const kept = (prev.reflections ?? []).filter((r) => !(r.from === w.from && r.to === w.to))
+        const entry = { id: newId('rf'), label: w.label, from: w.from, to: w.to, when: todayKey(), wins, outcomes }
+        const isThisWeek = w.from === dayOfWeekKey(0) && w.to === todayKey()
         return {
           ...prev,
-          month: {
-            lastMonthKey: mk,
-            wins,
-            outcomes,
-            previous: m?.lastMonthKey && m.lastMonthKey !== mk
-              ? { monthKey: m.lastMonthKey, wins: m.wins, outcomes: m.outcomes }
-              : m?.previous,
-          },
+          lastDoneDate: isThisWeek ? todayKey() : prev.lastDoneDate,
+          lastWeekKey: isThisWeek ? isoWeekKey() : prev.lastWeekKey,
+          wins: isThisWeek ? wins : prev.wins,
+          outcomes: isThisWeek ? outcomes : prev.outcomes,
+          reflections: [entry, ...kept].slice(0, 60),
         }
       })
-      // What he commits to for the month lands on the list, same as the weekly one.
       setTasks((prev) => [
         ...outcomes.filter(Boolean).map((o) => ({
           id: newId('t'),
@@ -712,31 +727,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ...prev,
       ])
     },
-    finishReview: (wins, outcomes) => {
-      setReview((prev) => ({
-        lastDoneDate: todayKey(),
-        lastWeekKey: isoWeekKey(),
-        wins,
-        outcomes,
-        previous: prev.lastWeekKey && prev.lastWeekKey !== isoWeekKey()
-          ? { weekKey: prev.lastWeekKey, wins: prev.wins, outcomes: prev.outcomes }
-          : prev.previous,
-      }))
-      setTasks((prev) => [
-        ...outcomes.filter(Boolean).map((o) => ({
-          id: newId('t'),
-          title: o,
-          source: 'mc' as const,
-          estimateMin: 30,
-          done: false,
-          createdAt: todayKey(),
-          space,
-          list: 'backlog' as const,
-          category: 'deep' as TaskCategory,
-        })),
-        ...prev,
-      ])
-    },
+
 
     assistantLog,
     applyDictation: (text, items) => {
@@ -902,6 +893,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return { ...r, steps }
       })),
     resetRoutine: (routineId) => applyRoutine(routineId, (r) => ({ ...r, doneStepIds: [], stepData: {} })),
+    /* Ticking the routine itself ticks everything inside it, minus any step that
+       has to be earned elsewhere (the typing gate), which stays his to pass. */
+    setRoutineDone: (routineId, done) => applyRoutine(routineId, (r) => ({
+      ...r,
+      doneStepIds: done ? r.steps.filter((st) => !stepLocked(r, st.id)).map((st) => st.id) : [],
+    })),
 
     addIdea: (text, color) => {
       const t = text.trim()

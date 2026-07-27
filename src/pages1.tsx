@@ -6,7 +6,7 @@ import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, daysSinceSlip, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, daysClean, quitDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
 import { cadenceDueLabel, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForDaypart, taskMinutes, toMin } from './util'
 
@@ -491,19 +491,54 @@ function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
    copy of it: a copied task would drift the moment either side changed, and the
    whole point is that finishing it here and finishing it on Routines are the
    same act. Its steps are the subtasks. */
+/** One word for how often a routine comes round, for the tag on its row. */
+function repeatWord(c: RoutineCadence): string {
+  if (c === 'daily') return 'daily'
+  if (c === 'prework') return 'workdays'
+  if (c === 'weekly') return 'weekly'
+  return 'monthly'
+}
+
+/* A routine standing on the day's list. It is a task row, not a species of its
+   own: same checkbox, same title, same expander, same menu. The only thing that
+   marks it out is a small "repeats" tag, because a different layout for the same
+   kind of thing reads as two different apps on one page. */
 function RoutineOnDay({ routine, habitName }: { routine: Routine; habitName?: string }) {
-  const { toggleRoutineStep, setPage } = useStore()
+  const { toggleRoutineStep, setRoutineDone, setPage } = useStore()
   const [open, setOpen] = useState(false)
   const total = routine.steps.length
   const done = routine.doneStepIds.length
   const complete = total > 0 && done === total
+  /* A step that has to be earned elsewhere (the typing score) cannot be ticked
+     from here, so neither can the routine. Saying that is better than a
+     checkbox that quietly finishes four of five and stays empty. */
+  const gated = !complete && routine.steps.some((st) => !routine.doneStepIds.includes(st.id) && stepLocked(routine, st.id))
 
   return (
-    <div className="today-item routine-on-day">
+    <div className="today-item">
       <div className={`today-task${complete ? ' done' : ''}`}>
-        <span className="rod-mark" aria-hidden="true" />
-        <span className="grow rod-title">{routine.title}</span>
-        <span className="rod-cadence mono">{cadenceDueLabel(routine.cadence)}</span>
+        {/* A routine is not dragged into a time, but its checkbox still has to
+            line up with the ones under it. */}
+        <span className="drag-grip is-blank" aria-hidden="true">⠿</span>
+        <button
+          className="checkbox"
+          role="checkbox"
+          aria-checked={complete}
+          disabled={total === 0 || gated}
+          aria-label={complete ? `Reopen: ${routine.title}` : `Finish: ${routine.title}`}
+          title={total === 0
+            ? 'Write its steps first'
+            : gated
+              ? `Open it in Routines: one step has to be earned, not ticked (${TYPING_TARGET_WPM} WPM)`
+              : undefined}
+          onClick={() => setRoutineDone(routine.id, !complete)}
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+            <path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </button>
+        <span className="grow wrap2">{routine.title}</span>
+        <span className="repeat-tag" title={`Repeats ${cadenceDueLabel(routine.cadence)}`}>{repeatWord(routine.cadence)}</span>
         {total > 0 && (
           <button className="expand-btn" aria-expanded={open} onClick={() => setOpen((v) => !v)}
             aria-label={open ? 'Collapse steps' : 'Expand steps'}>
@@ -528,17 +563,18 @@ function RoutineOnDay({ routine, habitName }: { routine: Routine; habitName?: st
             const checked = routine.doneStepIds.includes(s.id)
             const locked = !checked && stepLocked(routine, s.id)
             return (
-              <button
-                key={s.id}
-                className={`subtask${checked ? ' done' : ''}`}
-                disabled={locked}
-                title={locked ? `Open this in Routines and log ${TYPING_TARGET_WPM} WPM to check it off` : undefined}
-                onClick={() => (locked ? setPage('routines') : toggleRoutineStep(routine.id, s.id))}
-              >
-                <span className="sub-tick" aria-hidden="true" />
-                <span className="grow">{s.title}</span>
-                {locked && <span className="rod-locked mono">{TYPING_TARGET_WPM} WPM to pass</span>}
-              </button>
+              <div key={s.id} className="subtask-wrap">
+                <button
+                  className={`subtask${checked ? ' done' : ''}`}
+                  disabled={locked}
+                  title={locked ? `Open this in Routines and log ${TYPING_TARGET_WPM} WPM to check it off` : undefined}
+                  onClick={() => (locked ? setPage('routines') : toggleRoutineStep(routine.id, s.id))}
+                >
+                  <span className="sub-tick" aria-hidden="true" />
+                  <span className="grow">{s.title}</span>
+                  {locked && <span className="rod-locked mono">{TYPING_TARGET_WPM} WPM to pass</span>}
+                </button>
+              </div>
             )
           })}
         </div>
@@ -666,7 +702,7 @@ export function PlanPage() {
         <div className="panel">
           <span className="microcap">Schedule</span>
           <Schedule events={events} tasks={todayTasks} onDropAt={dropAt} />
-          <p className="col-note">Drag a task onto the day to give it a time. Click any name to open it in Google Calendar.</p>
+          <p className="col-note">Drag a task onto the day to give it a time. On the day itself, a name opens in Google Calendar.</p>
         </div>
 
         {/* 2 — To-do list: everything you added, any day. Drag out to plan it,
@@ -804,15 +840,16 @@ export function PlanPage() {
                             className="checkbox" role="checkbox" aria-checked={t.done}
                             aria-label={t.done ? `Reopen: ${t.title}` : `Complete: ${t.title}`}
                             onClick={() => {
-                              if (t.done) { toggleTask(t.id); return }        // reopen
-                              if (t.subtasks?.length) { toggleTask(t.id); return } // subtasked: time comes from subtasks
-                              setLogging(t.id)                                 // flat: ask how long it took
+                              if (t.done) { toggleTask(t.id); return }  // reopen
+                              // Subtasked or flat, it asks how long it took; ticking the
+                              // parent ticks the steps inside it either way.
+                              setLogging(t.id)
                             }}
                           >
                             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
                           </button>
                           <span className={`cat-dot ${t.category}`} aria-hidden="true" />
-                          <TaskName title={t.title} start={t.at} className="grow" />
+                          <span className="grow wrap2">{t.title}</span>
                           {t.done && t.actualMin != null ? (
                             <span className="est-vs-actual mono">{fmtDuration(taskMinutes(t))} → {fmtDuration(t.actualMin)} <b className={taskMinutes(t) - t.actualMin >= 0 ? 'val-pos' : 'val-urgent'}>{taskMinutes(t) - t.actualMin >= 0 ? '+' : ''}{taskMinutes(t) - t.actualMin}m</b></span>
                           ) : (
@@ -1016,20 +1053,27 @@ function HabitRow({ h, todayIndex, actions, drivenBy, progress, goal }: {
   /* A quit is a different scoreboard: days clean, and a single honest button
      for the day you slip. Day dots would be asking the wrong question. */
   if (h.kind === 'break') {
-    const clean = daysSinceSlip(h) ?? 0
+    const clean = daysClean(h) ?? 0
+    // The week fills itself from the day he stopped: a day he did not do it is a
+    // day kept, so he never has to tick anything to be given credit for it.
+    const days = quitDays(h)
     return (
       <div className="habit-row is-quit">
         <div className="habit-row-top">
           <span className="habit-name">{h.name}</span>
+          <span className="habit-count mono">{clean}<span className="habit-freq">{clean === 1 ? 'day' : 'days'} clean</span></span>
           {actions}
         </div>
-        <div className="quit-run">
-          <span className="quit-days mono">{clean}</span>
-          <span className="quit-unit">{clean === 1 ? 'day' : 'days'} without it</span>
+        <div className="habit-days">
+          {DAY_LABELS.map((d, i) => (
+            <span key={i} className={`daydot is-measure${days[i] ? ' full' : ''}`} title={days[i] ? 'A day without it' : undefined}>
+              <b>{d}</b>
+            </span>
+          ))}
         </div>
         <div className="habit-foot">
           <button className="quit-slip" onClick={() => logSlip(h.id)}>I slipped today</button>
-          {h.lastSlip && clean > 0 && <span className="habit-weeks">last slip {fmtWhen(h.lastSlip)}</span>}
+          {h.quitSince && <span className="habit-weeks">since {fmtWhen(h.quitSince)}</span>}
         </div>
       </div>
     )
@@ -1106,6 +1150,7 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
   const [perWeek, setPerWeek] = useState(habit?.targetPerWeek ?? 3)
   const [kind, setKind] = useState<HabitKind>(habit?.kind ?? 'build')
   const [targetMin, setTargetMin] = useState(habit?.dailyTargetMin ?? 60)
+  const [since, setSince] = useState(habit?.quitSince ?? localDateKey())
   const locked = !!drivenBy
   const quitting = kind === 'break'
   const measured = kind === 'measured'
@@ -1114,12 +1159,13 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
     if (!name.trim()) return
     const shape = {
       name: name.trim(),
-      daypart: daypart || undefined,
+      daypart: quitting ? undefined : (daypart || undefined),
       frequency,
       targetPerWeek: frequency === 'times-per-week' ? perWeek : undefined,
       kind,
       dailyTargetMin: measured ? Math.max(5, targetMin) : undefined,
       source: measured ? ('focus' as const) : undefined,
+      quitSince: quitting ? (since || localDateKey()) : undefined,
     }
     if (habit) updateHabit(habit.id, locked ? { daypart: shape.daypart } : shape)
     else addHabit(shape)
@@ -1128,6 +1174,7 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
 
   return (
     <Sheet
+      steady
       title={habit ? 'Edit this habit' : 'Add a habit'}
       onClose={onClose}
       note={locked
@@ -1135,56 +1182,77 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
         : 'Habits are the small things you repeat. Multi-step rituals belong on Routines.'}
     >
       <span className="field-label">Which kind is this?</span>
-      <div className="seg kind-seg" role="group" aria-label="Kind of habit">
-        <button aria-pressed={kind === 'build'} disabled={locked} onClick={() => setKind('build')}>Something to keep</button>
-        <button aria-pressed={kind === 'break'} disabled={locked} onClick={() => setKind('break')}>Something to quit</button>
-        <button aria-pressed={kind === 'measured'} disabled={locked} onClick={() => setKind('measured')}>An amount to hit</button>
+      <div className="kindpick three">
+        <button type="button" className={kind === 'build' ? 'on' : ''} disabled={locked} onClick={() => setKind('build')}>
+          <b>Keep</b><span>Something you want to do</span>
+        </button>
+        <button type="button" className={kind === 'break' ? 'on' : ''} disabled={locked} onClick={() => setKind('break')}>
+          <b>Quit</b><span>Something you want to stop</span>
+        </button>
+        <button type="button" className={kind === 'measured' ? 'on' : ''} disabled={locked} onClick={() => setKind('measured')}>
+          <b>Amount</b><span>Minutes to hit each day</span>
+        </button>
       </div>
-      <p className="assist-note" style={{ marginTop: 6, marginBottom: 'var(--s4)' }}>
-        {quitting
-          ? 'Counted the other way round: the score is how long you have gone without it, and you only touch it on a day you slip.'
-          : measured
-            ? 'Counted in minutes, and it fills itself: every focus block you finish adds to the day. You will see how far through you are, not just done or not.'
-            : 'Counted the usual way: every day you do it is a tick, against a target for the week.'}
-      </p>
 
-      <label className="field-label" htmlFor="hname">
+      <label className="field-label" style={{ marginTop: 'var(--s4)' }} htmlFor="hname">
         {quitting ? 'What are you quitting?' : measured ? 'What are you measuring?' : 'What is the habit?'}
       </label>
       <input
         id="hname" className="textinput" style={{ width: '100%' }} autoFocus={!locked} disabled={locked}
-        placeholder="e.g. 20 minutes of movement"
+        placeholder={quitting ? 'e.g. Scrolling in bed' : 'e.g. 20 minutes of movement'}
         value={name} onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') submit() }}
       />
 
-      <label className="field-label" style={{ marginTop: 'var(--s4)' }} htmlFor="hpart">When in the day?</label>
-      <select id="hpart" className="textinput" style={{ width: '100%' }} value={daypart} onChange={(e) => setDaypart(e.target.value as TimeSlot | '')}>
-        {SLOTS.map((s) => <option key={s.id} value={s.id}>{s.label}, {s.hint}</option>)}
-        <option value="">Anytime</option>
-      </select>
-
-      {!quitting && !measured && <label className="field-label" style={{ marginTop: 'var(--s4)' }} htmlFor="hfreq">How often?</label>}
-      {!quitting && !measured && (
-        <select id="hfreq" className="textinput" style={{ width: '100%' }} value={frequency} disabled={locked} onChange={(e) => setFrequency(e.target.value as HabitFrequency)}>
-          {HABIT_FREQUENCIES.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
-        </select>
-      )}
-
-      {measured && (
-        <div className="sheet-inline" style={{ marginTop: 'var(--s4)' }}>
-          <span>Aiming for</span>
-          <input className="numinput" type="number" min={5} max={600} step={5} value={targetMin}
-            onChange={(e) => setTargetMin(Math.max(5, Math.min(600, Number(e.target.value) || 5)))} aria-label="Minutes a day" />
-          <span>minutes of focus a day</span>
+      {/* A thing you are quitting has no hour of the day; it has a day you
+          stopped, and a rhythm for checking in on it. */}
+      {quitting ? (
+        <div className="sheet-grid" style={{ marginTop: 'var(--s4)' }}>
+          <div>
+            <label className="field-label" htmlFor="hsince">Not since</label>
+            <input id="hsince" className="textinput" style={{ width: '100%' }} type="date" max={localDateKey()}
+              value={since} onChange={(e) => setSince(e.target.value)} />
+          </div>
+          <div>
+            <label className="field-label" htmlFor="hfreqq">Check in</label>
+            <select id="hfreqq" className="textinput" style={{ width: '100%' }} value={frequency} disabled={locked}
+              onChange={(e) => setFrequency(e.target.value as HabitFrequency)}>
+              {HABIT_FREQUENCIES.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+            </select>
+          </div>
         </div>
-      )}
-      {!quitting && !measured && frequency === 'times-per-week' && (
-        <div className="sheet-inline" style={{ marginTop: 'var(--s3)' }}>
-          <span>Aiming for</span>
-          <input className="numinput" type="number" min={1} max={7} value={perWeek}
-            onChange={(e) => setPerWeek(Math.max(1, Math.min(7, Number(e.target.value) || 1)))} aria-label="Days a week" />
-          <span>days a week</span>
+      ) : (
+        <div className="sheet-grid" style={{ marginTop: 'var(--s4)' }}>
+          <div>
+            <label className="field-label" htmlFor="hpart">When in the day?</label>
+            <select id="hpart" className="textinput" style={{ width: '100%' }} value={daypart} onChange={(e) => setDaypart(e.target.value as TimeSlot | '')}>
+              {SLOTS.map((s) => <option key={s.id} value={s.id}>{s.label}, {s.hint}</option>)}
+              <option value="">Anytime</option>
+            </select>
+          </div>
+          <div>
+            {measured ? (
+              <>
+                <label className="field-label" htmlFor="htarget">Minutes a day</label>
+                <input id="htarget" className="textinput" style={{ width: '100%' }} type="number" min={5} max={600} step={5} value={targetMin}
+                  onChange={(e) => setTargetMin(Math.max(5, Math.min(600, Number(e.target.value) || 5)))} />
+              </>
+            ) : frequency === 'times-per-week' ? (
+              <>
+                <label className="field-label" htmlFor="hper">Days a week</label>
+                <input id="hper" className="textinput" style={{ width: '100%' }} type="number" min={1} max={7} value={perWeek}
+                  onChange={(e) => setPerWeek(Math.max(1, Math.min(7, Number(e.target.value) || 1)))} />
+              </>
+            ) : (
+              <>
+                <label className="field-label" htmlFor="hfreq">How often?</label>
+                <select id="hfreq" className="textinput" style={{ width: '100%' }} value={frequency} disabled={locked}
+                  onChange={(e) => setFrequency(e.target.value as HabitFrequency)}>
+                  {HABIT_FREQUENCIES.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+                </select>
+              </>
+            )}
+          </div>
         </div>
       )}
 
@@ -1268,9 +1336,6 @@ export function HabitsPage() {
       ))}
       {cols.length === 0 && <div className="empty">No habits in this space yet. Add one from the button above.</div>}
 
-      <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginTop: 16 }}>
-        Missed days stay quiet on purpose. No broken streaks, no wall of missed-day marks. Multi-step routines live on the Routines tab; finishing one there checks its habit off here.
-      </p>
 
       {adding && <HabitSheet onClose={() => setAdding(false)} />}
       {editHabit && <HabitSheet habit={editHabit} drivenBy={drivenBy.get(editHabit.id)} onClose={() => setEditHabit(null)} />}
@@ -1520,12 +1585,58 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals }: {
     if (thenGoToGoals) setPage('goals')
   }
 
+  const tracking = Boolean(d.habitId)
+  /* The name follows the habit until he writes his own, then it is his and the
+     picker stops touching it. */
+  const [namedByHand, setNamedByHand] = useState(Boolean(goal?.name))
+
   return (
     <Sheet title={goal ? 'Edit this goal' : 'Add a goal'} onClose={onClose} note="A goal is an outcome you can check off, with a date on it.">
-      <label className="field-label" htmlFor="gname">What is the outcome?</label>
+      {/* The first decision, not a dropdown three fields down: is this a goal you
+          log yourself, or one of your habits counting itself? Asking it last is
+          why it kept reading as "there is no way to pick a habit". */}
+      <label className="field-label">What kind of goal?</label>
+      <div className="kindpick">
+        <button type="button" className={!tracking ? 'on' : ''} onClick={() => setD({ ...d, habitId: '' })}>
+          <b>Something new</b>
+          <span>You log the progress yourself</span>
+        </button>
+        <button
+          type="button" className={tracking ? 'on' : ''}
+          disabled={linkable.length === 0}
+          title={linkable.length === 0 ? 'Create a habit first' : undefined}
+          onClick={() => {
+            const h = linkable.find((x) => x.id === d.habitId) ?? linkable[0]
+            setD({ ...d, habitId: h?.id ?? '', name: namedByHand ? d.name : (h?.name ?? '') })
+          }}
+        >
+          <b>Track one of my habits</b>
+          <span>{linkable.length === 0 ? 'No habits yet' : 'It counts itself as you keep it'}</span>
+        </button>
+      </div>
+
+      {tracking && (
+        <>
+          <label className="field-label" style={{ marginTop: 'var(--s4)' }} htmlFor="ghabit">Which habit?</label>
+          <select id="ghabit" className="textinput" style={{ width: '100%' }} value={d.habitId}
+            onChange={(e) => {
+              const h = linkable.find((x) => x.id === e.target.value)
+              setD({ ...d, habitId: e.target.value, name: namedByHand ? d.name : (h?.name ?? '') })
+            }}>
+            {linkable.map((h) => (
+              <option key={h.id} value={h.id}>{h.name}{h.kind === 'break' ? ' (quitting)' : ''}</option>
+            ))}
+          </select>
+          <p className="assist-note" style={{ marginTop: 6 }}>
+            {linked ? `Every time “${linked.name}” is kept, this goal moves. Nothing to log twice.` : ''}
+          </p>
+        </>
+      )}
+
+      <label className="field-label" style={{ marginTop: 'var(--s4)' }} htmlFor="gname">What is the outcome?</label>
       <input id="gname" className="textinput" style={{ width: '100%' }} autoFocus
         placeholder="e.g. Twelve gym sessions" value={d.name}
-        onChange={(e) => setD({ ...d, name: e.target.value })}
+        onChange={(e) => { setNamedByHand(true); setD({ ...d, name: e.target.value }) }}
         onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
 
       <label className="field-label" style={{ marginTop: 'var(--s4)' }} htmlFor="gwhy">Why does it matter?</label>
@@ -1549,24 +1660,6 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals }: {
           </select>
         </div>
       </div>
-
-      {/* The cross-link: a goal can count itself off a habit you already keep.
-          Newest habits first, so one you just made is the first thing you see. */}
-      <label className="field-label" style={{ marginTop: 'var(--s4)' }} htmlFor="ghabit">How is progress counted?</label>
-      <select id="ghabit" className="textinput" style={{ width: '100%' }} value={d.habitId}
-        onChange={(e) => setD({ ...d, habitId: e.target.value })}>
-        <option value="">I will log it myself</option>
-        {linkable.map((h) => (
-          <option key={h.id} value={h.id}>Automatically, from the “{h.name}” habit</option>
-        ))}
-      </select>
-      <p className="assist-note" style={{ marginTop: 6 }}>
-        {linked
-          ? `Every time you tick “${linked.name}” on Habits, this goal moves. Nothing to log twice.`
-          : linkable.length > 0
-            ? 'Pick a habit above and this goal counts itself as you keep it.'
-            : 'Create a habit first and a goal can count itself off it.'}
-      </p>
 
       <div className="sheet-grid" style={{ marginTop: 'var(--s4)' }}>
         <div>

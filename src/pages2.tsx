@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { COACH_SCENARIOS, MOCK_MONEY, MOCK_STATS } from './mock'
 import { AutoTextarea, Band } from './pages1'
 import { useStore } from './store'
 import { Spark, SparkBox } from './widgets'
-import { fmtDuration, fmtNum, fmtSigned, fmtWhen, goalPace, inMonth, isoWeekKey, monthKey, monthName, taskMinutes } from './util'
-import { analyzeAvoidance } from './coach'
+import { RANGE_OPTIONS, fmtDuration, fmtNum, fmtSigned, fmtWhen, goalPace, inRange, isoWeekKey, monthName, monthRange, rangeFor, recentMonthKeys, taskMinutes, type RangeId } from './util'
+import { analyzeAvoidance, fallbackRead } from './coach'
 import { getAiKey, hasAiKey, readAvoidance, setAiKey, type AvoidanceRead } from './ai'
 import { paymentTaskTitle } from './exceptions'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange, sendSignInCode, signInWithCode, signOutAccount, type Account } from './supabase'
@@ -111,174 +111,82 @@ function SecHead({ label }: { label: string }) {
 }
 
 export function ReviewPage() {
-  const { tasks, space, savedMin, accuracyPct, habits, goals, finishReview, finishMonthlyReview, review, weekLedger, ledger, focusSessions } = useStore()
-  const [window_, setWindow] = useState<'week' | 'month'>('week')
+  const { space, habits, goals, closeReview, review, ledger, focusSessions } = useStore()
+  const [rangeId, setRangeId] = useState<string>('this-week')
+  const range = useMemo(() => (rangeId.includes('-W') || /^\d{4}-\d{2}$/.test(rangeId)
+    ? monthRange(rangeId)
+    : rangeFor(rangeId as RangeId)), [rangeId])
+
   const [wins, setWins] = useState<string[]>(['', '', ''])
   const [changed, setChanged] = useState('')
   const [outcomes, setOutcomes] = useState<string[]>(['', '', ''])
-  // "Closed" holds for the whole week, not just the day you closed it.
-  const doneThisWeek = review.lastWeekKey === isoWeekKey()
-  const s = MOCK_STATS
 
-  const doneTasks = tasks.filter((t) => t.done && t.space === space)
-  const doneMin = doneTasks.reduce((a, t) => a + taskMinutes(t), 0)
+  /* Every number below reads the same two dates. Nothing is computed per window,
+     so a week and a quarter are the same page with a different span. */
+  const rows = ledger.filter((e) => (!e.space || e.space === space) && inRange(e.when, range))
+  const saved = rows.reduce((a, e) => a + (e.estimateMin - e.actualMin), 0)
+  const worked = rows.reduce((a, e) => a + e.actualMin, 0)
+  const onTime = rows.filter((e) => Math.abs(e.estimateMin - e.actualMin) <= e.estimateMin * 0.25).length
+  const accuracy = rows.length ? Math.round((onTime / rows.length) * 100) : 0
+  const blocks = focusSessions.filter((f) => f.space === space && inRange(f.day, range))
+  const focusMin = blocks.reduce((a, f) => a + f.minutes, 0)
+
   const activeHabits = habits.filter((h) => !h.paused && h.space === space)
-  const habitsKept = activeHabits.reduce((a, h) => a + h.days.filter(Boolean).length, 0)
   const spaceGoals = goals.filter((g) => g.space === space)
   const goalsOnTrack = spaceGoals.filter((g) => goalPace(goalCurrent(g, habits), g.target, g.timeframe ?? 'quarter') !== 'behind').length
-  const prev = review.previous
+
+  const closed = (review.reflections ?? []).find((r) => r.from === range.from && r.to === range.to)
+  const previous = (review.reflections ?? []).find((r) => r.to < range.from)
 
   const setW = (i: number, v: string) => setWins((p) => p.map((x, j) => (j === i ? v : x)))
   const setO = (i: number, v: string) => setOutcomes((p) => p.map((x, j) => (j === i ? v : x)))
 
-  /* The month is built from the two things that carry a real date: the ledger
-     and the focus sessions. Habit ticks are stored a week at a time, so a
-     calendar-month habit count would be invented rather than counted; the
-     twelve-week history below is the honest version of that longer arc. */
-  const mk = monthKey()
-  const monthLedger = ledger.filter((e) => (!e.space || e.space === space) && inMonth(e.when, mk))
-  const monthSaved = monthLedger.reduce((a, e) => a + (e.estimateMin - e.actualMin), 0)
-  const monthWorked = monthLedger.reduce((a, e) => a + e.actualMin, 0)
-  const monthFocus = focusSessions.filter((f) => f.space === space && inMonth(f.day, mk)).reduce((a, f) => a + f.minutes, 0)
-  const monthClosed = review.month?.lastMonthKey === mk
-  const prevMonth = review.month?.previous
-
   return (
     <div className="page">
       <Band
-        title={window_ === 'week' ? 'Weekly review' : 'Monthly review'}
-        metrics={window_ === 'week'
-          ? [
-              { v: `${fmtSigned(savedMin)}`, k: 'time saved', tone: 'pos' as const },
-              { v: `${accuracyPct}%`, k: 'estimate accuracy' },
-            ]
-          : [
-              { v: `${fmtSigned(monthSaved)}`, k: `saved in ${monthName(mk)}`, tone: 'pos' as const },
-              { v: fmtDuration(monthWorked), k: 'logged this month' },
-            ]}
+        title="Review"
+        actions={
+          <select
+            className="textinput rangepick" value={rangeId}
+            aria-label="Which window to review"
+            onChange={(e) => setRangeId(e.target.value)}
+          >
+            <optgroup label="Recent">
+              {RANGE_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+            </optgroup>
+            <optgroup label="A month">
+              {recentMonthKeys(12).map((k) => <option key={k} value={k}>{monthName(k)}</option>)}
+            </optgroup>
+          </select>
+        }
+        metrics={[
+          { v: fmtSigned(saved), k: 'time saved', tone: 'pos' as const },
+          { v: `${accuracy}%`, k: 'estimate accuracy' },
+        ]}
       />
-      <div className="winswitch" role="tablist" aria-label="Review window">
-        <button role="tab" aria-selected={window_ === 'week'} className={window_ === 'week' ? 'on' : ''} onClick={() => setWindow('week')}>The week</button>
-        <button role="tab" aria-selected={window_ === 'month'} className={window_ === 'month' ? 'on' : ''} onClick={() => setWindow('month')}>The month</button>
-      </div>
-      {window_ === 'week' && doneThisWeek && (
+
+      <SecHead label={range.label} />
+      {closed && (
         <div className="allclear" style={{ borderColor: 'var(--progress)' }}>
           <span className="dot" aria-hidden="true" />
-          Closed for this week. Your outcomes are in the backlog. The numbers below keep updating live.
+          Closed on {fmtWhen(closed.when)}. The numbers keep updating live.
         </div>
       )}
 
-      {window_ === 'week' && <>
-      <SecHead label="This week" />
-      <div className="grid-4">
-        <div className="panel">
-          <span className="microcap">Tasks done</span>
-          <div className="kpi">{doneTasks.length}</div>
-          <div className="kpi-sub">{fmtDuration(doneMin)} of work</div>
-        </div>
-        <div className="panel">
-          <span className="microcap">Habits kept</span>
-          <div className="kpi val-pos">{habitsKept}</div>
-          <div className="kpi-sub">checkoffs across {activeHabits.length} habits</div>
-          <div className="rowlist" style={{ marginTop: 8 }}>
-            {activeHabits.map((h) => (
-              <div className="rowitem" key={h.id} style={{ minHeight: 30 }}>
-                <span className="grow">{h.name}</span>
-                <span className="mono meta">{h.days.filter(Boolean).length}/7</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="panel">
-          <span className="microcap">Goals on track</span>
-          <div className="kpi">{goalsOnTrack}<span className="unit">of {spaceGoals.length}</span></div>
-          <div className="rowlist" style={{ marginTop: 8 }}>
-            {spaceGoals.slice(0, 5).map((g) => {
-              const pct = Math.min(100, Math.round((goalCurrent(g, habits) / g.target) * 100))
-              return (
-                <div className="rowitem" key={g.id} style={{ minHeight: 30 }}>
-                  <span className="grow">{g.name}</span>
-                  <span className={`drift ${pct < 50 ? 'off' : 'ok'}`}>{pct}%</span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-        <div className="panel">
-          <span className="microcap">Time saved</span>
-          <div className={`kpi ${savedMin >= 0 ? 'val-pos' : 'val-urgent'}`}>{fmtSigned(savedMin)}</div>
-          <div className="kpi-sub">vs your own estimates</div>
-        </div>
-      </div>
-
-      <SecHead label="Trends & calibration" />
-      <div className="grid-2">
-        <div className="panel">
-          <span className="microcap">Time saved, six weeks</span>
-          <SparkBox data={[...s.weeklySavedMin, savedMin]} unit="m" caption="minutes per week saved vs your estimates, this week live" />
-          <span className="microcap" style={{ marginTop: 24, display: 'block' }}>Accuracy trend</span>
-          <SparkBox data={[...s.weeklyAccuracy, accuracyPct]} unit="%" caption="share of tasks finished within a quarter of the estimate" />
-        </div>
-        <div className="panel">
-          <span className="microcap">Your calibration factors</span>
-          <span className="review-sec-note" style={{ display: 'block', marginBottom: 'var(--s2)' }}>
-            Sample figures for now. Once the ledger has enough logged work, these are computed from your own estimate-vs-actual.
-          </span>
-          <table className="caltable">
-            <tbody>
-              {s.calibration.map((c) => (
-                <tr key={c.category}>
-                  <td style={{ fontWeight: 600 }}>{c.label}</td>
-                  <td className="f">x{c.factor.toFixed(1)}</td>
-                  <td className="n">{c.note}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <div className="panel" style={{ marginTop: 'var(--s4)' }}>
-        <span className="microcap">The ledger, estimate vs actual</span>
-        <div className="ledger-list">
-          {weekLedger.map((e) => {
-            const d = e.estimateMin - e.actualMin
-            return (
-              <div className="ledger-row" key={e.id}>
-                <span className="mono" style={{ color: 'var(--faint)', fontSize: 'var(--text-xs)', minWidth: '3ch' }}>{fmtWhen(e.when)}</span>
-                <span className="ledger-title">{e.title}</span>
-                <span className="src-tag">{e.category}</span>
-                <span className="mono" style={{ color: 'var(--muted)', fontSize: 'var(--text-xs)' }}>{fmtDuration(e.estimateMin)} → {fmtDuration(e.actualMin)}</span>
-                <span className={`delta ${d >= 0 ? 'saved' : 'over'}`}>{d >= 0 ? `+${d}m` : `${d}m`}</span>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      </>}
-
-      {window_ === 'month' && <>
-      {monthClosed && (
-        <div className="allclear" style={{ borderColor: 'var(--progress)' }}>
-          <span className="dot" aria-hidden="true" />
-          Closed for {monthName(mk)}. The numbers below keep updating live.
-        </div>
-      )}
-      <SecHead label={monthName(mk)} />
       <div className="grid-4">
         <div className="panel">
           <span className="microcap">Work logged</span>
-          <div className="kpi">{monthLedger.length}</div>
-          <div className="kpi-sub">{fmtDuration(monthWorked)} of it, start to finish</div>
+          <div className="kpi">{rows.length}</div>
+          <div className="kpi-sub">{fmtDuration(worked)} of it, start to finish</div>
         </div>
         <div className="panel">
           <span className="microcap">Focus time</span>
-          <div className="kpi val-pos">{fmtDuration(monthFocus)}</div>
-          <div className="kpi-sub">across {focusSessions.filter((f) => f.space === space && inMonth(f.day, mk)).length} blocks</div>
+          <div className="kpi val-pos">{fmtDuration(focusMin)}</div>
+          <div className="kpi-sub">across {blocks.length} {blocks.length === 1 ? 'block' : 'blocks'}</div>
         </div>
         <div className="panel">
           <span className="microcap">Time saved</span>
-          <div className={`kpi ${monthSaved >= 0 ? 'val-pos' : 'val-urgent'}`}>{fmtSigned(monthSaved)}</div>
+          <div className={`kpi ${saved >= 0 ? 'val-pos' : 'val-urgent'}`}>{fmtSigned(saved)}</div>
           <div className="kpi-sub">against your own estimates</div>
         </div>
         <div className="panel">
@@ -294,23 +202,21 @@ export function ReviewPage() {
                 </div>
               )
             })}
+            {spaceGoals.length === 0 && <div className="empty">No goals in this profile.</div>}
           </div>
         </div>
       </div>
 
-      <SecHead label="The longer arc" />
-      <div className="grid-2">
+      <SecHead label="Habits" />
+      <div>
         <div className="panel">
-          <span className="microcap">Habits kept, twelve weeks</span>
           <div className="rowlist" style={{ marginTop: 8 }}>
             {activeHabits.map((h) => {
               const hist = [...(h.history ?? []), h.days.filter(Boolean).length]
               return (
                 <div className="rowitem" key={h.id} style={{ minHeight: 34 }}>
                   <span className="grow">{h.name}</span>
-                  {hist.length > 1
-                    ? <Spark data={hist} width={110} height={22} />
-                    : <span className="meta">first week</span>}
+                  {hist.length > 1 ? <Spark data={hist} width={110} height={22} /> : <span className="meta">first week</span>}
                   <span className="mono meta">{hist[hist.length - 1]}/7</span>
                 </div>
               )
@@ -318,119 +224,77 @@ export function ReviewPage() {
             {activeHabits.length === 0 && <div className="empty">No active habits in this profile.</div>}
           </div>
         </div>
-        <div className="panel">
-          <span className="microcap">Everything logged in {monthName(mk)}</span>
-          <div className="ledger-list one-col">
-            {monthLedger.slice(0, 40).map((e) => {
-              const d = e.estimateMin - e.actualMin
-              return (
-                <div className="ledger-row" key={e.id}>
-                  <span className="mono" style={{ color: 'var(--faint)', fontSize: 'var(--text-xs)', minWidth: '3ch' }}>{fmtWhen(e.when)}</span>
-                  <span className="ledger-title">{e.title}</span>
-                  <span className="mono" style={{ color: 'var(--muted)', fontSize: 'var(--text-xs)' }}>{fmtDuration(e.estimateMin)} → {fmtDuration(e.actualMin)}</span>
-                  <span className={`delta ${d >= 0 ? 'saved' : 'over'}`}>{d >= 0 ? `+${d}m` : `${d}m`}</span>
-                </div>
-              )
-            })}
-            {monthLedger.length === 0 && <div className="empty">Nothing logged this month yet.</div>}
-          </div>
+      </div>
+
+      <SecHead label="Everything logged" />
+      <div className="panel">
+        <div className="ledger-list">
+          {rows.slice(0, 60).map((e) => {
+            const d = e.estimateMin - e.actualMin
+            return (
+              <div className="ledger-row" key={e.id}>
+                <span className="mono" style={{ color: 'var(--faint)', fontSize: 'var(--text-xs)', minWidth: '3ch' }}>{fmtWhen(e.when)}</span>
+                <span className="ledger-title">{e.title}</span>
+                <span className="src-tag">{e.category}</span>
+                <span className="mono" style={{ color: 'var(--muted)', fontSize: 'var(--text-xs)' }}>{fmtDuration(e.estimateMin)} → {fmtDuration(e.actualMin)}</span>
+                <span className={`delta ${d >= 0 ? 'saved' : 'over'}`}>{d >= 0 ? `+${d}m` : `${d}m`}</span>
+              </div>
+            )
+          })}
+          {rows.length === 0 && <div className="empty">Nothing logged in this window.</div>}
         </div>
       </div>
 
-      {prevMonth && (prevMonth.wins.length > 0 || prevMonth.outcomes.length > 0) && (
-        <div className="panel lastweek">
-          <span className="microcap">Last month you said</span>
-          <div className="lastweek-cols">
-            {prevMonth.wins.length > 0 && (
-              <div>
-                <span className="lastweek-h">went well</span>
-                <ul className="lastweek-list">{prevMonth.wins.map((w, i) => <li key={i}>{w}</li>)}</ul>
-              </div>
-            )}
-            {prevMonth.outcomes.length > 0 && (
-              <div>
-                <span className="lastweek-h">you committed to</span>
-                <ul className="lastweek-list">{prevMonth.outcomes.map((o, i) => <li key={i}>{o}</li>)}</ul>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-      <div className="panel checkup-panel">
-        <span className="microcap">Manual checkup</span>
-        <div className="checkup-cols">
-          <div className="checkup-col">
-            <h4 className="checkup-q">What actually went well this month?</h4>
-            {wins.map((w, i) => (
-              <input key={i} className="textinput" style={{ marginBottom: 8, width: '100%' }} placeholder={`Win ${i + 1}`} value={w} onChange={(e) => setW(i, e.target.value)} aria-label={`Monthly win ${i + 1}`} />
-            ))}
-            <h4 className="checkup-q">What drifted, and one change for next month?</h4>
-            <input className="textinput" style={{ width: '100%' }} placeholder="One honest note" value={changed} onChange={(e) => setChanged(e.target.value)} aria-label="What to change next month" />
-          </div>
-          <div className="checkup-col">
-            <h4 className="checkup-q">Three outcomes for next month</h4>
-            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginBottom: 8 }}>Results you can check off. They land in the backlog.</p>
-            {outcomes.map((o, i) => (
-              <input key={i} className="textinput" style={{ marginBottom: 8, width: '100%' }} placeholder={`Outcome ${i + 1}`} value={o} onChange={(e) => setO(i, e.target.value)} aria-label={`Monthly outcome ${i + 1}`} />
-            ))}
-            <div className="coach-nav">
-              <button className="btn btn-primary" onClick={() => { finishMonthlyReview([...wins, changed].filter(Boolean), outcomes.filter(Boolean)); setWins(['', '', '']); setChanged(''); setOutcomes(['', '', '']) }}>
-                {monthClosed ? 'Update the month' : 'Close the month'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-      </>}
-
-      {window_ === 'week' && <>
       <SecHead label="Checkup" />
-      {/* What you said last week, so the reflection is not written into a void. */}
-      {prev && (prev.wins.length > 0 || prev.outcomes.length > 0) && (
+      {previous && (previous.wins.length > 0 || previous.outcomes.length > 0) && (
         <div className="panel lastweek">
-          <span className="microcap">Last week you said</span>
+          <span className="microcap">{previous.label}, you said</span>
           <div className="lastweek-cols">
-            {prev.wins.length > 0 && (
+            {previous.wins.length > 0 && (
               <div>
                 <span className="lastweek-h">went well</span>
-                <ul className="lastweek-list">{prev.wins.map((w, i) => <li key={i}>{w}</li>)}</ul>
+                <ul className="lastweek-list">{previous.wins.map((w, i) => <li key={i}>{w}</li>)}</ul>
               </div>
             )}
-            {prev.outcomes.length > 0 && (
+            {previous.outcomes.length > 0 && (
               <div>
                 <span className="lastweek-h">you committed to</span>
-                <ul className="lastweek-list">{prev.outcomes.map((o, i) => <li key={i}>{o}</li>)}</ul>
+                <ul className="lastweek-list">{previous.outcomes.map((o, i) => <li key={i}>{o}</li>)}</ul>
               </div>
             )}
           </div>
         </div>
       )}
       <div className="panel checkup-panel">
-        <span className="microcap">Manual checkup</span>
         <div className="checkup-cols">
           <div className="checkup-col">
             <h4 className="checkup-q">What actually went well?</h4>
             {wins.map((w, i) => (
               <input key={i} className="textinput" style={{ marginBottom: 8, width: '100%' }} placeholder={`Win ${i + 1}`} value={w} onChange={(e) => setW(i, e.target.value)} aria-label={`Win ${i + 1}`} />
             ))}
-            <h4 className="checkup-q">What drifted, and one change for next week?</h4>
+            <h4 className="checkup-q">What drifted, and one change?</h4>
             <input className="textinput" style={{ width: '100%' }} placeholder="One honest note" value={changed} onChange={(e) => setChanged(e.target.value)} aria-label="What to change" />
           </div>
           <div className="checkup-col">
-            <h4 className="checkup-q">Three outcomes for next week</h4>
-            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginBottom: 8 }}>Results you can check off. They land in the backlog and Monday’s plan pulls from there.</p>
+            <h4 className="checkup-q">Three outcomes for next time</h4>
+            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginBottom: 8 }}>Results you can check off. They land in the backlog.</p>
             {outcomes.map((o, i) => (
               <input key={i} className="textinput" style={{ marginBottom: 8, width: '100%' }} placeholder={`Outcome ${i + 1}`} value={o} onChange={(e) => setO(i, e.target.value)} aria-label={`Outcome ${i + 1}`} />
             ))}
             <div className="coach-nav">
-              <button className="btn btn-primary" onClick={() => { finishReview([...wins, changed].filter(Boolean), outcomes.filter(Boolean)); setWins(['', '', '']); setChanged(''); setOutcomes(['', '', '']) }}>
-                {doneThisWeek ? 'Update the week' : 'Close the week'}
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  closeReview({ id: range.id, label: range.label, from: range.from, to: range.to }, [...wins, changed].filter(Boolean), outcomes.filter(Boolean))
+                  setWins(['', '', '']); setChanged(''); setOutcomes(['', '', ''])
+                }}
+              >
+                {closed ? 'Update this window' : 'Close this window'}
               </button>
             </div>
           </div>
         </div>
       </div>
-      </>}
     </div>
   )
 }
@@ -519,7 +383,9 @@ export function CoachPage() {
       setFacts({ avoiding: r.read.naming, steps: r.read.nextPiece, cost: r.read.document })
     } else {
       const a = analyzeAvoidance(input)
-      setRead(null)
+      // Same eight beats either way. Generic content is honest; a different page
+      // shape for the same feature is not.
+      setRead(fallbackRead(input))
       setFromModel(false)
       setWhy(
         r.reason === 'no-key' ? 'No Groq key yet.'
@@ -570,12 +436,17 @@ export function CoachPage() {
         <Band title={title || 'Avoidance'} />
         <div className="panel coach-facts">
           <div className="coach-drafted">
-            <span className="microcap">{fromModel ? 'Read through the eight beats' : 'Not a model'}</span>
+            <span className="microcap">{fromModel ? 'Read through the eight beats' : 'Generic, not read'}</span>
             <span className="assist-note">
               {fromModel
                 ? 'Your own approach, applied to what you wrote. Change anything that is off, then send the first step to Today.'
-                : `${why} This came from a local pattern library instead, so it is generic. Add a Groq key in Settings to have it actually read what you wrote.`}
+                : `${why} These beats came from a pattern library, so they are generic and do not know what you wrote.`}
             </span>
+            {!fromModel && (
+              <button className="btn btn-primary" style={{ marginTop: 'var(--s2)', alignSelf: 'flex-start' }} onClick={() => setPage('settings')}>
+                Add a key so it reads it
+              </button>
+            )}
           </div>
 
           {thinking && <div className="empty" style={{ paddingTop: 20 }}>Reading what you wrote.</div>}
@@ -648,28 +519,10 @@ export function CoachPage() {
             </div>
           )}
 
-          {!thinking && !read && (
-            <>
-              <div className="coach-field">
-                <span className="coach-field-q">What you are avoiding</span>
-                <AutoTextarea className="textinput coach-ta" minRows={3} value={facts.avoiding} onChange={(e) => setFact('avoiding', e.target.value)} aria-label="What you are avoiding" />
-              </div>
-              <div className="coach-field">
-                <span className="coach-field-q">The steps it takes</span>
-                <AutoTextarea className="textinput coach-ta" minRows={4} value={facts.steps} onChange={(e) => setFact('steps', e.target.value)} aria-label="The steps" />
-              </div>
-              <div className="coach-field">
-                <span className="coach-field-q">If you keep putting it off</span>
-                <AutoTextarea className="textinput coach-ta" minRows={3} value={facts.cost} onChange={(e) => setFact('cost', e.target.value)} aria-label="The cost" />
-              </div>
-            </>
-          )}
-
           {!thinking && <div className="coach-field coach-firststep beat-first">
             <span className="beat-n">4</span>
             <div className="beat-body" style={{ width: '100%' }}>
-              <span className="coach-field-q">The first physical action</span>
-              <span className="coach-field-hint">Not fixing it. Starting it. That is the whole fight.</span>
+              <span className="coach-field-q">Shrink it to the first physical action</span>
               <input className="textinput" style={{ width: '100%' }} value={firstStep} onChange={(e) => setFirstStep(e.target.value)} aria-label="First step" />
               <div className="coach-field-inline" style={{ marginTop: 'var(--s2)' }}>
                 <span>Give it</span>
@@ -809,9 +662,6 @@ export function CoachPage() {
       </div>
       </div>
 
-      <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginTop: 'var(--s5)', maxWidth: '72ch' }}>
-        Demo: Coach drafts the breakdown here in your browser. The real build sends what you wrote to a model that reads the actual thing, and remembers your pattern so the fifth avoided call is easier than the first.
-      </p>
     </div>
   )
 }

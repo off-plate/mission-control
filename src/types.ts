@@ -161,6 +161,8 @@ export interface HabitDef {
   kind?: HabitKind
   /** For a 'break' habit: the last day you slipped, as an ISO date. */
   lastSlip?: string
+  /** The day he stopped. Every day since counts itself as kept. */
+  quitSince?: string
   name: string
   /** Mon..Sun of the current week. */
   days: boolean[]
@@ -213,6 +215,43 @@ export function habitTarget(h: HabitDef): number {
 export function daysSinceSlip(h: HabitDef, today = new Date()): number | null {
   if (h.kind !== 'break' || !h.lastSlip) return null
   const [y, m, d] = h.lastSlip.split('-').map(Number)
+  if (!y) return null
+  const then = new Date(y, m - 1, d)
+  const now = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  return Math.max(0, Math.round((now.getTime() - then.getTime()) / 86400000))
+}
+
+/**
+ * Which days of the current week count as kept for a habit you are quitting.
+ * Every day from the day you stopped up to today is a day you did not do it, so
+ * it fills itself; you only come back to it on a day you slip. Future days stay
+ * blank because they have not happened.
+ */
+export function quitDays(h: HabitDef, today = new Date()): boolean[] {
+  const out = [false, false, false, false, false, false, false]
+  if (h.kind !== 'break' || !h.quitSince) return out
+  const [y, m, d] = h.quitSince.split('-').map(Number)
+  if (!y) return out
+  const since = new Date(y, m - 1, d)
+  const todayIdx = (today.getDay() + 6) % 7
+  const monday = new Date(today)
+  monday.setDate(monday.getDate() - todayIdx)
+  for (let i = 0; i <= todayIdx; i++) {
+    const day = new Date(monday)
+    day.setDate(monday.getDate() + i)
+    // A slip after the quit date breaks the run; that day is not kept.
+    const iso = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
+    out[i] = day >= since && h.lastSlip !== iso
+  }
+  return out
+}
+
+/** Days clean, counted from the day he stopped, or from his last slip. */
+export function daysClean(h: HabitDef, today = new Date()): number | null {
+  if (h.kind !== 'break') return null
+  const from = h.lastSlip && h.quitSince && h.lastSlip > h.quitSince ? h.lastSlip : h.quitSince
+  if (!from) return null
+  const [y, m, d] = from.split('-').map(Number)
   if (!y) return null
   const then = new Date(y, m - 1, d)
   const now = new Date(today.getFullYear(), today.getMonth(), today.getDate())
@@ -459,12 +498,19 @@ export interface ReviewState {
   outcomes: string[]
   /** Last week's reflection, kept so this week can read what you said you'd change. */
   previous?: { weekKey: string; wins: string[]; outcomes: string[] }
-  /** The monthly ritual, kept apart from the weekly one so closing one does not
-   *  close the other. */
-  month?: {
-    lastMonthKey?: string
-    wins: string[]
-    outcomes: string[]
-    previous?: { monthKey: string; wins: string[]; outcomes: string[] }
-  }
+  /** Every window he has closed, newest first. One shape for all of them, so a
+   *  week and a month are the same act over a different span. */
+  reflections?: Reflection[]
+}
+
+export interface Reflection {
+  id: string
+  /** Which window it covered, in words, e.g. 'Last week, Mon 20 Jul to Sun 26 Jul'. */
+  label: string
+  from: string
+  to: string
+  /** The day he closed it. */
+  when: string
+  wins: string[]
+  outcomes: string[]
 }

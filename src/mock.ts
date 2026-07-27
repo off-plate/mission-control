@@ -110,7 +110,8 @@ export const MOCK_TASKS: Task[] = []
 export const MOCK_HABITS: HabitDef[] = [
   { id: 'h-morning', space: 'personal', name: 'Morning routine', daypart: 'morning', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-prework', space: 'personal', name: 'Before work', frequency: 'weekdays', paused: false, days: [false, false, false, false, false, false, false], history: [] },
-  { id: 'h-evening', space: 'personal', name: 'Evening shutdown', daypart: 'evening', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
+  { id: 'h-evening', space: 'personal', name: 'Before bed routine', daypart: 'evening', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
+  { id: 'h-nightwork', space: 'personal', name: 'Night work routine', daypart: 'evening', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-weekly', space: 'personal', name: 'Weekly reset', frequency: 'weekly', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-monthly', space: 'personal', name: 'Monthly review', frequency: 'monthly', paused: false, days: [false, false, false, false, false, false, false], history: [] },
 ]
@@ -133,7 +134,8 @@ export const MOCK_ROUTINES: Routine[] = [
     ],
   },
   { id: 'r-prework', space: 'personal', title: 'Before work', cadence: 'prework', habitId: 'h-prework', doneStepIds: [], steps: [] },
-  { id: 'r-evening', space: 'personal', title: 'Evening shutdown', cadence: 'daily', habitId: 'h-evening', doneStepIds: [], steps: [] },
+  { id: 'r-evening', space: 'personal', title: 'Before bed routine', cadence: 'daily', habitId: 'h-evening', doneStepIds: [], steps: [] },
+  { id: 'r-nightwork', space: 'personal', title: 'Night work routine', cadence: 'daily', habitId: 'h-nightwork', doneStepIds: [], steps: [] },
   { id: 'r-weekly', space: 'personal', title: 'Weekly reset', cadence: 'weekly', habitId: 'h-weekly', doneStepIds: [], steps: [] },
   { id: 'r-monthly', space: 'personal', title: 'Monthly review', cadence: 'monthly', habitId: 'h-monthly', doneStepIds: [], steps: [] },
 ]

@@ -47,7 +47,7 @@
 
   --font-display: 'Bricolage Grotesque', 'Avenir Next', sans-serif;
   --font-body: 'Instrument Sans', 'Helvetica Neue', sans-serif;
-  --font-mono: 'Instrument Sans', 'Helvetica Neue', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --text-xs: 0.8125rem;
   --text-sm: 0.9375rem;
@@ -1596,11 +1596,13 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
    region; .widget-title-btn is excluded because its ::after draws the chevron. */
 @media (pointer: coarse) {
   .routine-check, .mr-check, button.est-chip, .expand-btn,
-  .note-swatch, .note-dot, .goal-ms-check, .sub-tick, .radio {
+  .note-swatch, .note-dot, .goal-ms-check, .sub-tick, .radio,
+  .goal-bump button, .goal-drop, .kebab, .exc-drop {
     position: relative;
   }
   .routine-check::after, .mr-check::after, button.est-chip::after, .expand-btn::after,
-  .note-swatch::after, .note-dot::after, .goal-ms-check::after, .sub-tick::after, .radio::after {
+  .note-swatch::after, .note-dot::after, .goal-ms-check::after, .sub-tick::after, .radio::after,
+  .goal-bump button::after, .goal-drop::after, .kebab::after, .exc-drop::after {
     content: '';
     position: absolute;
     inset: -11px;
@@ -1754,3 +1756,54 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 
 /* Savings sparkline endpoints, so five numbers about his money are readable. */
 .savings-range { display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--faint); margin-top: 4px; }
+
+/* ---------- Design-gate fixes ---------- */
+
+/* 23. Short pages left the footer stranded mid-viewport with empty space below. */
+.shell { display: flex; flex-direction: column; min-height: 100dvh; }
+.shell > main { flex: 1 0 auto; }
+
+/* 3. Ultrawide: Coach put one 60rem panel in the left third of a 3440 screen.
+   Above 1600px the intake and everything you can act on sit side by side. */
+@media (min-width: 1600px) {
+  .coach-two { display: grid; grid-template-columns: minmax(0, 60rem) minmax(0, 1fr); gap: var(--s5); align-items: start; }
+  .coach-intake { max-width: none; margin-bottom: 0; }
+}
+
+/* 3. Brain dump reserved eight empty tracks with auto-fill. auto-fit collapses
+   them, and the notes stay a readable width instead of stretching. */
+.bd-grid { grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 460px)); justify-content: start; }
+
+/* 5. Phone Review: a wrapped goal name pushed its percentage onto the next line,
+   below the hairline, so the number read as the NEXT goal's. Keep them together. */
+.rowitem { flex-wrap: nowrap; }
+.rowitem > .grow { min-width: 0; overflow-wrap: anywhere; }
+.rowitem > .drift, .rowitem > .est-chip, .rowitem > .src-tag, .rowitem > .state-tag { flex: none; }
+
+/* 11/13. Wide rows: pin the action to a rail so a 3440 band does not carry
+   2000px of empty tint between a sentence and its button. */
+@media (min-width: 1600px) {
+  .exception-row, .firstmove, .momentum { --rail: 1400px; }
+  .exception-row > span:nth-of-type(2) { max-width: var(--rail); }
+  .money-compass { max-width: 1500px; }
+  .widget .rowitem > .grow { max-width: 900px; }
+}
+
+/* 8. Habits: a lone card on the last row left ~2500px of dead grid. */
+.habit-cards { grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); }
+
+/* 19/20. Phone: full-width starter chips and a stacked break-down row. */
+@media (max-width: 639px) {
+  .coach-starter { max-width: none; width: 100%; }
+  .plan-cols .formrow { flex-wrap: wrap; }
+  .plan-cols .formrow > .textinput { flex: 1 1 100%; }
+}
+
+/* Brain dump: the composer is a left rail, notes flow beside it, so a sparse
+   board still reads as a workspace instead of two boxes in a corner. */
+@media (min-width: 1600px) {
+  .bd-grid { grid-template-columns: 420px repeat(auto-fit, minmax(320px, 420px)); }
+  .coach-side .coach-starters { margin-top: 0; padding-top: 0; border-top: none; }
+  .coach-side .coach-starter-row { flex-direction: column; align-items: stretch; }
+  .coach-side .coach-starter { max-width: none; }
+}

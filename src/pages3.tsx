@@ -132,7 +132,7 @@ const NOTE_COLORS: { id: string; bg: string }[] = [
   { id: 'coral', bg: '#f3d8cd' },
   { id: 'green', bg: '#dbe4d1' },
   { id: 'blue', bg: '#d3dde6' },
-  { id: 'violet', bg: '#ded6e6' },
+  { id: 'clay', bg: '#e4d8cb' },
   { id: 'paper', bg: '#fbf8f1' },
 ]
 const colorBg = (id: string) => NOTE_COLORS.find((c) => c.id === id)?.bg ?? '#fbf8f1'

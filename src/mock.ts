@@ -311,7 +311,7 @@ export const MOCK_GOALS: Goal[] = [
   },
   {
     id: 'g-w2', space: 'personal', name: 'One honest money talk with GF', current: 0, target: 3, unit: 'steps', note: '', timeframe: 'weekly', category: 'life',
-    why: 'Being a role model starts with her seeing the real numbers, not a softened version.', deadline: 'This week',
+    why: 'She sees the real numbers this week.', deadline: 'This week',
     milestones: [
       { id: 'g-w2-a', label: 'Pick the evening', done: false },
       { id: 'g-w2-b', label: 'Show the two agreed plans', done: false },
@@ -320,7 +320,7 @@ export const MOCK_GOALS: Goal[] = [
   },
   {
     id: 'g-m1', space: 'personal', name: 'No new overdue debt this month', current: 2, target: 2, unit: 'kept', note: '', timeframe: 'monthly', category: 'money',
-    why: 'One new overdue undoes a month of progress. This is the floor to hold.', deadline: 'End of July',
+    why: 'One new overdue undoes a month of progress.', deadline: 'End of July',
     milestones: [
       { id: 'g-m1-a', label: 'Every payment sent on time', done: true },
       { id: 'g-m1-b', label: 'Nothing new put on a card', done: true },
@@ -328,7 +328,7 @@ export const MOCK_GOALS: Goal[] = [
   },
   {
     id: 'g-m2', space: 'personal', name: 'Twelve gym sessions', current: 7, target: 12, unit: 'sessions', note: '', timeframe: 'monthly', category: 'health',
-    why: 'Proving Ground block. Consistency is the point, not intensity.', deadline: 'End of July',
+    why: 'Four sessions a week keeps the block on track.', deadline: 'End of July',
     milestones: [
       { id: 'g-m2-a', label: 'Weeks 1 and 2 done', done: true },
       { id: 'g-m2-b', label: 'Week 3 done', done: false },
@@ -337,7 +337,7 @@ export const MOCK_GOALS: Goal[] = [
   },
   {
     id: 'g1', space: 'personal', name: 'Every obligation on a payment plan', current: 1, target: 3, unit: 'plans agreed', note: '', timeframe: 'quarter', category: 'money',
-    why: 'Nothing avoided. Everything on rails with an agreed plan is what ends the spiral.', deadline: 'End of Q3',
+    why: 'Every creditor on an agreed plan is what ends the spiral.', deadline: 'End of Q3',
     milestones: [
       { id: 'g1-a', label: 'VZP plan confirmed in writing', done: false },
       { id: 'g1-b', label: 'Moneta plan agreed', done: false },
@@ -353,7 +353,7 @@ export const MOCK_GOALS: Goal[] = [
   },
   {
     id: 'g-h1', space: 'personal', name: 'Debt down by 60 000 Kč', current: 22000, target: 60000, unit: 'Kč paid', note: '', timeframe: 'half', category: 'money',
-    why: 'The number that proves the spiral is actually reversing, not just holding.', deadline: 'End of year',
+    why: '22 000 paid so far. 38 000 to go before the year is out.', deadline: 'End of year',
     milestones: [
       { id: 'g-h1-a', label: 'First 20 000 paid', done: true },
       { id: 'g-h1-b', label: '40 000 paid', done: false },

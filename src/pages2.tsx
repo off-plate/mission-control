@@ -7,7 +7,7 @@ import { fmtDuration, fmtNum, fmtSigned, fmtWhen, goalPace, isoWeekKey, taskMinu
 import { analyzeAvoidance } from './coach'
 import { getAiKey, hasAiKey, readAvoidance, setAiKey, type AvoidanceRead } from './ai'
 import { paymentTaskTitle } from './exceptions'
-import type { CoachFacts, CoachSession, TaskCategory } from './types'
+import { goalCurrent, ON_TRACK_PCT, type CoachFacts, type CoachSession, type TaskCategory } from './types'
 
 /* ---------------- MONEY ---------------- */
 
@@ -123,7 +123,7 @@ export function ReviewPage() {
   const activeHabits = habits.filter((h) => !h.paused && h.space === space)
   const habitsKept = activeHabits.reduce((a, h) => a + h.days.filter(Boolean).length, 0)
   const spaceGoals = goals.filter((g) => g.space === space)
-  const goalsOnTrack = spaceGoals.filter((g) => goalPace(g.current, g.target, g.timeframe ?? 'quarter') !== 'behind').length
+  const goalsOnTrack = spaceGoals.filter((g) => goalPace(goalCurrent(g, habits), g.target, g.timeframe ?? 'quarter') !== 'behind').length
   const prev = review.previous
 
   const setW = (i: number, v: string) => setWins((p) => p.map((x, j) => (j === i ? v : x)))
@@ -170,7 +170,7 @@ export function ReviewPage() {
           <div className="kpi">{goalsOnTrack}<span className="unit">of {spaceGoals.length}</span></div>
           <div className="rowlist" style={{ marginTop: 8 }}>
             {spaceGoals.slice(0, 5).map((g) => {
-              const pct = Math.min(100, Math.round((g.current / g.target) * 100))
+              const pct = Math.min(100, Math.round((goalCurrent(g, habits) / g.target) * 100))
               return (
                 <div className="rowitem" key={g.id} style={{ minHeight: 30 }}>
                   <span className="grow">{g.name}</span>

@@ -8,7 +8,7 @@ import {
   MOCK_TRAINING,
 } from './mock'
 import { useStore } from './store'
-import type { SizeKey, SpaceId, WidgetType } from './types'
+import { goalCurrent, ON_TRACK_PCT, type SizeKey, type SpaceId, type WidgetType } from './types'
 import { fmtDuration, fmtNum, fmtTimeShort, goalPace } from './util'
 
 /** `fluid` makes the line span its container, so label rows underneath line up. */
@@ -153,16 +153,20 @@ const FinanceBody = memo(function FinanceBody() {
 })
 
 const HabitsBody = memo(function HabitsBody({ space }: { space: SpaceId }) {
-  const { habits, toggleHabitDay, todayIndex } = useStore()
+  const { habits, routines, toggleHabitDay, setPage, todayIndex } = useStore()
   const active = habits.filter((h) => h.space === space && !h.paused)
+  /* A habit a routine drives is a read-out here too. Ticking it by hand looked
+     like it worked and was reverted on the next load. */
+  const driven = new Map(routines.filter((r) => r.habitId).map((r) => [r.habitId as string, r.title]))
   return (
     <div className="habit-chips">
       {active.map((h) => (
         <button
           key={h.id}
-          className="habit"
+          className={`habit${driven.has(h.id) ? ' is-auto' : ''}`}
           aria-pressed={h.days[todayIndex]}
-          onClick={() => toggleHabitDay(h.id, todayIndex)}
+          title={driven.has(h.id) ? `Ticks itself when you finish ${driven.get(h.id)}` : undefined}
+          onClick={() => (driven.has(h.id) ? setPage('routines') : toggleHabitDay(h.id, todayIndex))}
         >
           <span className="tick" aria-hidden="true" />
           {h.name}
@@ -178,12 +182,13 @@ const TrainingBody = memo(function TrainingBody() {
 })
 
 const GoalsBody = memo(function GoalsBody({ space }: { space: SpaceId }) {
-  const { goals, todayIndex } = useStore()
+  const { goals, habits, todayIndex } = useStore()
   const list = goals.filter((g) => g.space === space)
   return (
     <div>
       {list.map((g) => {
-        const pct = Math.round((g.current / g.target) * 100)
+        const cur = goalCurrent(g, habits)
+        const pct = Math.round((cur / g.target) * 100)
         // Judged against elapsed time, not a flat percentage.
         const off = goalPace(g.current, g.target, g.timeframe ?? 'quarter') === 'behind'
         return (

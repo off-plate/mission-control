@@ -6,7 +6,7 @@ import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, daysSinceSlip, goalCurrent, habitFrequencyLabel, habitTarget, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, daysSinceSlip, goalCurrent, habitFrequencyLabel, habitTarget, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
 import { cadenceDueLabel, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, gcalUrl, isEstimated, localDateKey, slotForDaypart, taskMinutes, toMin } from './util'
 
@@ -493,10 +493,18 @@ function RoutineOnDay({ routine, habitName }: { routine: Routine; habitName?: st
         <div className="subtask-list">
           {routine.steps.map((s) => {
             const checked = routine.doneStepIds.includes(s.id)
+            const locked = !checked && stepLocked(routine, s.id)
             return (
-              <button key={s.id} className={`subtask${checked ? ' done' : ''}`} onClick={() => toggleRoutineStep(routine.id, s.id)}>
+              <button
+                key={s.id}
+                className={`subtask${checked ? ' done' : ''}`}
+                disabled={locked}
+                title={locked ? `Open this in Routines and log ${TYPING_TARGET_WPM} WPM to check it off` : undefined}
+                onClick={() => (locked ? setPage('routines') : toggleRoutineStep(routine.id, s.id))}
+              >
                 <span className="sub-tick" aria-hidden="true" />
                 <span className="grow">{s.title}</span>
+                {locked && <span className="rod-locked mono">{TYPING_TARGET_WPM} WPM to pass</span>}
               </button>
             )
           })}
@@ -511,6 +519,7 @@ function RoutineOnDay({ routine, habitName }: { routine: Routine; habitName?: st
 }
 
 export function PlanPage() {
+  const todayIdx = (new Date().getDay() + 6) % 7
   const { startFocus } = usePomodoro()
   const { routines, habits } = useStore()
   const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId } = useStore()
@@ -525,7 +534,8 @@ export function PlanPage() {
 
   /* Routines belong on the day by their own cadence: he never adds them, they
      are simply there. Each sits in the part of the day its habit names. */
-  const dueRoutines = routines.filter((r) => r.space === space)
+  const isWeekend = todayIdx >= 5
+  const dueRoutines = routines.filter((r) => r.space === space && !(r.cadence === 'prework' && isWeekend))
   const routineSlot = (r: Routine): TimeSlot | 'unsorted' =>
     slotForDaypart(habits.find((h) => h.id === r.habitId)?.daypart)
   const anytimeRoutines = dueRoutines.filter((r) => routineSlot(r) === 'unsorted')
@@ -737,9 +747,9 @@ export function PlanPage() {
                 {mine.map((r) => (
                   <RoutineOnDay key={r.id} routine={r} habitName={habits.find((h) => h.id === r.habitId)?.name} />
                 ))}
-                {inBucket.length === 0 ? (
+                {inBucket.length === 0 && mine.length === 0 ? (
                   <p className="bucket-empty">Drop a task here.</p>
-                ) : (
+                ) : inBucket.length === 0 ? null : (
                   inBucket.map((t) => {
                     const isExp = expanded.has(t.id)
                     const hasSubs = !!t.subtasks?.length
@@ -995,7 +1005,8 @@ const DAYPART_COLS: { id: TimeSlot | 'anytime'; label: string; hint: string }[] 
 function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?: HabitDef; drivenBy?: string }) {
   const { addHabit, updateHabit } = useStore()
   const [name, setName] = useState(habit?.name ?? '')
-  const [daypart, setDaypart] = useState<TimeSlot | ''>(habit?.daypart ?? 'morning')
+  // Editing keeps whatever it had, including none. Only a new habit defaults.
+  const [daypart, setDaypart] = useState<TimeSlot | ''>(habit ? (habit.daypart ?? '') : 'morning')
   const [frequency, setFrequency] = useState<HabitFrequency>(habit?.frequency ?? 'daily')
   const [perWeek, setPerWeek] = useState(habit?.targetPerWeek ?? 3)
   const [kind, setKind] = useState<HabitKind>(habit?.kind ?? 'build')
@@ -1340,7 +1351,7 @@ export function RoutinesPage() {
                   : linked
                     ? <span className="assist-note">Add steps here and finishing them will check off “{linked.name}”.</span>
                     : <span />}
-                {done > 0 && <button className="btn btn-ghost routine-reset" onClick={() => resetRoutine(r.id)}>Reset</button>}
+                {(done > 0 || complete) && <button className="btn btn-ghost routine-reset" onClick={() => resetRoutine(r.id)}>Reset</button>}
               </div>
               </>
               )}

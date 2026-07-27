@@ -209,6 +209,25 @@ export interface Routine {
   /** Numbers a step recorded this period, e.g. today's typing speed. Cleared
    *  with the checks when the period rolls over. */
   stepData?: Record<string, number>
+  /** The day the mirror last ticked this routine's habit, as an ISO date. A
+   *  weekly routine finished on Tuesday must clear TUESDAY when it is undone on
+   *  Friday, not whatever day happens to be today. */
+  completedOn?: string | null
+}
+
+/** Is this routine finished for the period it is currently in? An empty routine
+ *  is never complete: there is nothing to have done. */
+export function routineComplete(r: Routine, currentPeriodKey: string): boolean {
+  if (r.periodKey !== currentPeriodKey) return false
+  return r.steps.length > 0 && r.steps.every((s) => r.doneStepIds.includes(s.id))
+}
+
+/** Steps that cannot be ticked by hand until something is true. The typing test
+ *  is earned at 75 WPM, and that has to hold on every surface, not only on the
+ *  one where the rule happens to be written. */
+export function stepLocked(r: Routine, stepId: string): boolean {
+  if (stepId !== 'mr4') return false
+  return (r.stepData?.mr4 ?? 0) < TYPING_TARGET_WPM
 }
 
 /** The typing step is only done once you actually hit the number. */

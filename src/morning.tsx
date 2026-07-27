@@ -287,9 +287,13 @@ export function MorningRoutine({ routine, onEdit }: { routine: Routine; onEdit?:
         url={s.link} label={s.linkLabel} routineId={routine.id} stepId="mr4"
         wpm={typingWpm} best={records[`${routine.id}:mr4`]}
         onLog={(v) => {
+          // Hitting the target is the completion; the store does both at once.
           setStepData(routine.id, 'mr4', v)
-          // Hitting the target is the completion, so it checks itself off.
-          if (v >= TYPING_TARGET_WPM && !done.includes('mr4')) onComplete('mr4', true)
+          if (v >= TYPING_TARGET_WPM) {
+            const idx = steps.findIndex((x) => x.id === 'mr4')
+            const next = steps.slice(idx + 1).find((x) => !done.includes(x.id))
+            setOpen(next ? next.id : '')
+          }
         }}
       />
     )

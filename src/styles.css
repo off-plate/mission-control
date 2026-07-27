@@ -1207,9 +1207,9 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 .kebab-menu {
   position: absolute; top: 100%; right: 0; z-index: 40; margin-top: 2px;
   background: var(--surface); border: 1px solid var(--hairline-strong); border-radius: var(--r-md);
-  box-shadow: var(--shadow-pop); padding: var(--s1); display: flex; flex-direction: column; min-width: 130px;
+  box-shadow: var(--shadow-pop); padding: var(--s2); display: flex; flex-direction: column; min-width: 210px; max-width: 280px;
 }
-.kebab-menu button { text-align: left; padding: var(--s2) var(--s3); border-radius: var(--r-sm); font-size: var(--text-sm); color: var(--ink); }
+.kebab-menu button { text-align: left; padding: var(--s2) var(--s3); border-radius: var(--r-sm); font-size: var(--text-sm); color: var(--ink); white-space: nowrap; min-height: 34px; }
 .kebab-menu button:hover { background: var(--accent-wash); color: var(--accent); }
 .kebab-menu button[aria-checked="true"] { color: var(--accent); font-weight: 600; }
 
@@ -1976,3 +1976,13 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .todo-row:active { cursor: grabbing; }
 .todo-row .drag-grip { color: var(--faint); flex: none; cursor: grab; }
 .plan-cols > .panel.drop-over { outline: 2px dashed var(--accent); outline-offset: -4px; }
+
+/* The menu names its groups, so a run of time slots is obviously a "move to"
+   list and not five unrelated commands. */
+.kebab-head {
+  display: block; padding: var(--s2) var(--s3) 4px;
+  font-family: var(--font-mono); font-size: 0.5625rem; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--faint);
+}
+.kebab-menu .kebab-sep { margin: var(--s1) var(--s2); }
+.kebab-note { white-space: normal; }

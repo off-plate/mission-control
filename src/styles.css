@@ -1931,3 +1931,19 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 
 /* A section with no data yet reads as a waiting slot, not a number. */
 .kpi.nodata { color: var(--faint); }
+
+/* Per-task actions: break it down, estimate the time. */
+.task-actions { display: inline-flex; align-items: center; gap: 2px; flex: none; }
+.task-act {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: var(--r-sm);
+  color: var(--faint); cursor: pointer;
+}
+.task-act:hover:not(:disabled) { color: var(--accent); background: var(--accent-wash); }
+.task-act:disabled { opacity: 0.3; cursor: default; }
+.task-flash { font-size: var(--text-xs); color: var(--progress); margin-right: 4px; }
+.sheet-task {
+  font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg);
+  margin-bottom: var(--s3);
+}
+@media (pointer: coarse) { .task-act { width: 40px; height: 40px; } }

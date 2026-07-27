@@ -211,7 +211,6 @@ export function MorningRoutine({ routine }: { routine: Routine }) {
   return (
     <div className="panel routine-card mr-card">
       <div className="routine-tag">
-        <span className="microcap">Daily</span>
         {/* A running meditation stays visible even when its panel is closed. */}
         {medRunning && open !== 'mr1' && (
           <button className="mr-running mono" onClick={() => setOpen('mr1')}>

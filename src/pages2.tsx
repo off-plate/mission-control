@@ -32,7 +32,6 @@ export function MoneyPage() {
     <div className="page">
       <Band
         title="Money"
-        sub="where the debt is going"
         metrics={sentSum > 0 ? [{ v: `${fmtNum(sentSum)} Kč`, k: 'paid from here', tone: 'pos' as const }] : undefined}
       />
       <div className="grid-3">
@@ -45,14 +44,16 @@ export function MoneyPage() {
           {sentSum > 0 && (
             <div className="kpi-sub val-pos">{fmtNum(sentSum)} Kč of that was sent from Mission Control.</div>
           )}
-          <div className="rowlist" style={{ marginTop: 10 }}>
-            {f.obligations.map((o) => (
-              <div className="rowitem" key={o.id} style={{ minHeight: 34 }}>
-                <span className="grow" style={{ color: 'var(--muted)' }}>{o.name}</span>
-                <span className="mono meta">{o.monthly}</span>
-                <span className={`state-tag ${o.state === 'action needed' ? 'action' : o.state}`}>{o.state}</span>
-              </div>
-            ))}
+          {/* The shape behind the headline: what the balance has actually done. */}
+          <div style={{ marginTop: 'var(--s4)' }}>
+            <Spark data={f.debtTrend.map((n) => -n)} width={260} height={54} fluid />
+            <div className="savings-months">
+              {f.debtMonths.map((m) => <span key={m}>{m}</span>)}
+            </div>
+            <div className="savings-range">
+              <span className="mono">{fmtNum(f.debtTrend[0])} Kč</span>
+              <span className="mono val-pos">{fmtNum(remaining)} Kč now</span>
+            </div>
           </div>
         </div>
 
@@ -61,37 +62,12 @@ export function MoneyPage() {
           <span className="microcap">Monthly payments</span>
           <div className="kpi">{f.debt.monthly}<span className="unit">/ month</span></div>
           <div className="kpi-sub">across your payment plans</div>
-          <div className="rowlist" style={{ marginTop: 12 }}>
-            {f.schedule.map((sch) => {
-              // Same title Today's alert uses, so paying it once clears both surfaces.
-              const taskTitle = paymentTaskTitle(sch.name, sch.amount)
-              const queued = tasks.find((t) => t.title === taskTitle)
-              const urgent = sch.state === 'action needed' || sch.state === 'not sent'
-              const sent = queued?.done
-              return (
-                <div className="rowitem wrap-row" key={sch.date + sch.name}>
-                  <span className="mono meta" style={{ minWidth: '9ch' }}>{sch.date}</span>
-                  <span className="grow">{sch.name}</span>
-                  <span className="mono" style={{ fontWeight: 600 }}>{sch.amount}</span>
-                  {sent ? (
-                    <span className="state-tag agreed">sent</span>
-                  ) : (
-                    <span className={`state-tag ${urgent ? 'action' : sch.state === 'pending' ? 'pending' : sch.state === 'scheduled' ? 'scheduled' : 'waiting'}`}>{sch.state}</span>
-                  )}
-                  {urgent && !sent && (
-                    queued ? (
-                      <span className="microcap" style={{ color: 'var(--progress)' }}>on today</span>
-                    ) : (
-                      <button className="btn btn-ghost" style={{ minHeight: 30, fontSize: 'var(--text-xs)' }}
-                        onClick={() => addTask({ title: taskTitle, source: 'mc', estimateMin: 5, space: 'personal', list: 'today', category: 'admin' })}>
-                        Add to today
-                      </button>
-                    )
-                  )}
-                </div>
-              )
-            })}
+          <div className="bar prog" style={{ marginTop: 'var(--s4)' }}><i style={{ width: `${f.spentPct}%` }} /></div>
+          <div className="kpi-sub">{f.budgetLine}</div>
+          <div className="kpi-sub" style={{ marginTop: 'var(--s4)' }}>
+            <span className="val-pos">{f.safeToSpend}</span> safe to spend {f.safeUntil}
           </div>
+          <div className="kpi-sub">{f.safeMath}</div>
         </div>
 
         {/* Monthly savings over time */}
@@ -131,11 +107,12 @@ export function MoneyPage() {
 
 /* ---------------- REVIEW (weekly reset + stats, merged) ---------------- */
 
-function SecHead({ label, note }: { label: string; note?: string }) {
+/* A section heading is the heading. No explanatory note: it restated the
+   label and added nothing you could act on. See DESIGN.md, "No subtitles". */
+function SecHead({ label }: { label: string }) {
   return (
     <div className="review-sec">
       <span className="microcap">{label}</span>
-      {note && <span className="review-sec-note">{note}</span>}
     </div>
   )
 }
@@ -164,7 +141,6 @@ export function ReviewPage() {
     <div className="page">
       <Band
         title="Weekly review"
-        sub="the week in numbers, then a quick checkup"
         metrics={[
           { v: `${fmtSigned(savedMin)}`, k: 'time saved', tone: 'pos' as const },
           { v: `${accuracyPct}%`, k: 'estimate accuracy' },
@@ -177,7 +153,7 @@ export function ReviewPage() {
         </div>
       )}
 
-      <SecHead label="This week" note="live, straight off what you logged" />
+      <SecHead label="This week" />
       <div className="grid-4">
         <div className="panel">
           <span className="microcap">Tasks done</span>
@@ -219,7 +195,7 @@ export function ReviewPage() {
         </div>
       </div>
 
-      <SecHead label="Trends & calibration" note="six weeks back, this week live" />
+      <SecHead label="Trends & calibration" />
       <div className="grid-2">
         <div className="panel">
           <span className="microcap">Time saved, six weeks</span>
@@ -263,7 +239,7 @@ export function ReviewPage() {
         </div>
       </div>
 
-      <SecHead label="Checkup" note="two minutes, honest" />
+      <SecHead label="Checkup" />
       {/* What you said last week, so the reflection is not written into a void. */}
       {prev && (prev.wins.length > 0 || prev.outcomes.length > 0) && (
         <div className="panel lastweek">
@@ -421,7 +397,7 @@ export function CoachPage() {
   if (stage === 'review') {
     return (
       <div className="page">
-        <Band title={title || 'Coach'} sub="what it actually is" />
+        <Band title={title || 'Avoidance'} />
         <div className="panel coach-facts">
           <div className="coach-drafted">
             <span className="microcap">Coach broke this down</span>
@@ -464,7 +440,7 @@ export function CoachPage() {
   if (stage === 'saved') {
     return (
       <div className="page">
-        <Band title={title || 'Coach'} sub="on your list" />
+        <Band title={title || 'Avoidance'} />
         <div className="panel coach-facts">
           <div className="allclear" style={{ borderColor: 'var(--progress)', marginTop: 0 }}>
             <span className="dot" aria-hidden="true" />
@@ -483,7 +459,7 @@ export function CoachPage() {
   /* ---- home: name the thing, Coach breaks it down ---- */
   return (
     <div className="page">
-      <Band title="Coach" sub="for the thing you keep circling" />
+      <Band title="Avoidance" />
 
       {/* Two columns above 1600px: the box on the left, everything you can act
           on to its right, so an ultrawide screen is not two thirds empty. */}
@@ -527,7 +503,7 @@ export function CoachPage() {
 
       {open.length > 0 && (
         <>
-          <SecHead label="Open loops" note="you started these, close them when they are done" />
+          <SecHead label="Open loops" />
           <div className="coach-loops">
             {open.map((s) => (
               <div className="panel coach-loop" key={s.id}>
@@ -558,7 +534,7 @@ export function CoachPage() {
 
       {closed.length > 0 && (
         <>
-          <SecHead label="What you faced" note={easedCount ? `${easedCount} of ${closed.length} felt easier than you feared` : undefined} />
+          <SecHead label="What you faced" />
           <div className="coach-history">
             {closed.map((s) => (
               <div className="coach-closed" key={s.id}>
@@ -590,7 +566,7 @@ export function SettingsPage() {
   const { sources, toggleSource, resetDemo, setPage } = useStore()
   return (
     <div className="page">
-      <Band title="Settings" sub="connections and controls" />
+      <Band title="Settings" />
       <div className="grid-2">
         <div className="panel">
           <span className="microcap">Connected sources</span>

@@ -17,6 +17,12 @@ export function isoWeekKey(date = new Date()): string {
   return `${t.getUTCFullYear()}-W${String(week).padStart(2, '0')}`
 }
 
+/** Mon=0..Sun=6 for an ISO date, matching the habit day array. */
+export function dayIndexOf(isoDate: string): number {
+  const [y, m, d] = isoDate.split('-').map(Number)
+  return (new Date(y, m - 1, d).getDay() + 6) % 7
+}
+
 /** The period a routine's checks belong to. When the key changes, the checks reset. */
 export function periodKeyFor(cadence: RoutineCadence, d = new Date()): string {
   if (cadence === 'weekly') return isoWeekKey(d)

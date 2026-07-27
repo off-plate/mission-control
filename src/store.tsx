@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { SUPABASE_ENABLED, deleteRemoteState, saveRemoteState } from './supabase'
-import { isoWeekKey, localDateKey, periodKeyFor } from './util'
+import { dayIndexOf, isoWeekKey, localDateKey, periodKeyFor } from './util'
 import {
   DEFAULT_SPACES,
   MOCK_GOALS,
@@ -13,6 +13,7 @@ import {
   MOCK_TASKS,
   WIDGET_DEFS,
 } from './mock'
+import { goalCurrent, routineComplete, stepLocked } from './types'
 import type {
   RoutineCadence,
   AssistantEntry,
@@ -61,6 +62,8 @@ interface PersistedState {
   records?: Record<string, number>
   /** Which storage schema wrote this. A row from an older one is not reused. */
   schema?: string
+  /** Seeded habits and routines he deleted on purpose; never re-seeded. */
+  removedSeeds?: string[]
 }
 
 interface Store extends PersistedState {
@@ -186,7 +189,8 @@ function loadPersisted(): PersistedState | null {
       return s ? { ...h, frequency: h.frequency ?? s.frequency, targetPerWeek: h.targetPerWeek ?? s.targetPerWeek } : h
     })
     // A seeded habit added later is missing entirely; append it rather than reseed.
-    for (const s of MOCK_HABITS) if (!p.habits.some((h) => h.id === s.id)) p.habits.push(s)
+    const removed = new Set(p.removedSeeds ?? [])
+    for (const s of MOCK_HABITS) if (!removed.has(s.id) && !p.habits.some((h) => h.id === s.id)) p.habits.push(s)
 
     /* A day that has not happened yet cannot be done. Future ticks were also
        unreachable, since those dots are disabled, so they could never be undone. */
@@ -194,26 +198,31 @@ function loadPersisted(): PersistedState | null {
     p.habits = p.habits.map((h) => ({ ...h, days: h.days.map((d, i) => (i > todayIdx ? false : d)) }))
 
     /* A habit a routine drives is a read-out of that routine, and its dots are
-       not clickable, so a wrong value there can never be corrected by hand.
-       Two repairs, both self-healing on every load:
-       1. Today's dot always equals whether that routine is complete right now.
-       2. Earlier days seeded before the routine existed were never earned, so
-          they are cleared once (the routine's own period tracking is the only
-          thing that can legitimately set them). */
+       not clickable, so a wrong value there can never be corrected by hand. It
+       is therefore re-derived on every load, from HIS routines. It used to read
+       MOCK_ROUTINES, which meant the moment he wrote his own steps the mock's
+       list (empty, for four of them) decided the answer: the tick was wiped on
+       the next reload, or asserted for a routine he had not finished. */
+    const savedRoutines = p.routines ?? []
     const drivenNow = new Map(
-      MOCK_ROUTINES.filter((r) => r.habitId).map((r) => {
-        const saved = p.routines?.find((x) => x.id === r.id)
-        const done = saved?.periodKey === periodKeyFor(r.cadence) ? (saved?.doneStepIds ?? []) : []
-        return [r.habitId as string, r.steps.length > 0 && r.steps.every((st) => done.includes(st.id))]
+      savedRoutines.filter((r) => r.habitId).map((r) => {
+        const complete = routineComplete(r, periodKeyFor(r.cadence))
+        return [r.habitId as string, { complete, on: complete ? (r.completedOn ?? localDateKey()) : null }]
       }),
     )
     const seededPastCleared = p.fixes ?? 0
+    const thisWeek = isoWeekKey()
     p.habits = p.habits.map((h) => {
-      if (!drivenNow.has(h.id)) return h
-      const complete = drivenNow.get(h.id) as boolean
-      const days = h.days.map((d, i) => {
-        if (i === todayIdx) return complete
-        return seededPastCleared >= 1 ? d : false
+      const d = drivenNow.get(h.id)
+      if (!d) return h
+      /* The tick belongs to the day it was earned, not to today. A weekly
+         routine finished on Tuesday keeps Tuesday's dot for the rest of the
+         week, and loses THAT dot when it is undone on Friday. */
+      const idx = d.on && isoWeekKey(new Date(d.on)) === thisWeek ? dayIndexOf(d.on) : null
+      const days = h.days.map((day, i) => {
+        if (!d.complete) return seededPastCleared >= 1 && i !== todayIdx ? day : false
+        if (idx !== null) return i === idx
+        return i === todayIdx
       })
       return { ...h, days }
     })
@@ -294,6 +303,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [routines, setRoutines] = useState<Routine[]>(seededRoutines)
   const [ideas, setIdeas] = useState<Idea[]>(persisted?.ideas ?? MOCK_IDEAS)
   const [records, setRecords] = useState<Record<string, number>>(persisted?.records ?? {})
+  // Seeded ids he has deleted, so the forward-fill never resurrects them.
+  const [removedSeeds, setRemovedSeeds] = useState<string[]>(persisted?.removedSeeds ?? [])
   const remoteSaveTimer = useRef<number | undefined>(undefined)
   const latestJson = useRef<string>('')
   // The selected space survives a reload (kept out of the synced blob on purpose,
@@ -340,7 +351,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const state: PersistedState = {
       version: 3, spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
-      weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY,
+      weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds,
     }
     const json = JSON.stringify(state)
     latestJson.current = json
@@ -354,7 +365,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { void saveRemoteState(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, records])
+  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, records, removedSeeds])
 
   /* Closing the tab inside the debounce window must not lose the last change:
      flush the pending remote write the moment the page starts hiding. */
@@ -388,6 +399,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     (weekLedger.filter((e) => Math.abs(e.actualMin - e.estimateMin) <= e.estimateMin * 0.25).length /
       Math.max(1, weekLedger.length)) * 100,
   )
+
+  /* Apply a change to a routine and re-derive its habit from the result. The
+     tick is written to the day it was earned and cleared from that same day, so
+     a weekly routine undone three days later does not clear the wrong dot. */
+  const applyRoutine = (routineId: string, change: (r: Routine) => Routine) => {
+    const before = routines.find((x) => x.id === routineId)
+    if (!before) return
+    const after = change(before)
+    const key = periodKeyFor(after.cadence)
+    const wasComplete = routineComplete(before, periodKeyFor(before.cadence))
+    const isComplete = routineComplete(after, key)
+    const completedOn = isComplete ? (wasComplete ? before.completedOn ?? todayKey() : todayKey()) : null
+    setRoutines((prev) => prev.map((x) => (x.id === routineId ? { ...after, periodKey: key, completedOn } : x)))
+    if (!before.habitId || wasComplete === isComplete) return
+    const hid = before.habitId
+    const clearIdx = before.completedOn && isoWeekKey(new Date(before.completedOn)) === isoWeekKey()
+      ? dayIndexOf(before.completedOn)
+      : todayIndex
+    setHabits((hs) => hs.map((h) => (h.id === hid
+      ? { ...h, days: h.days.map((d, i) => (isComplete ? (i === todayIndex ? true : d) : (i === clearIdx ? false : d))) }
+      : h)))
+  }
 
   const value: Store = {
     version: 3,
@@ -521,7 +554,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     updateHabit: (id, patch) => setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, ...patch } : h))),
     togglePauseHabit: (id) =>
       setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, paused: !h.paused } : h))),
-    deleteHabit: (id) => setHabits((prev) => prev.filter((h) => h.id !== id)),
+    deleteHabit: (id) => {
+      setHabits((prev) => prev.filter((h) => h.id !== id))
+      setRemovedSeeds((prev) => (prev.includes(id) ? prev : [...prev, id]))
+    },
 
     addGoal: (g) => setGoals((prev) => [...prev, { ...g, id: newId('g') }]),
     /* Editing a goal is how a habit gets attached to one that already exists.
@@ -672,25 +708,32 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setCoachSessions((prev) => prev.filter((x) => x.id !== id))
     },
 
-    /* The habit mirror only fires on a real transition: completing the routine
-       ticks the habit, un-completing it unticks. Any other step toggle leaves
-       the habit alone, so a day you ticked by hand is never silently wiped. */
+    /* Every path that can change whether a routine is complete goes through
+       this, so the habit can never disagree with the routine. Adding, deleting
+       or reordering a step changes completeness just as ticking one does, and
+       those used to skip the mirror entirely. */
     toggleRoutineStep: (routineId, stepId) => {
       const r = routines.find((x) => x.id === routineId)
       if (!r) return
+      // A gated step (the typing test) obeys the same rule on every surface.
+      if (!r.doneStepIds.includes(stepId) && stepLocked(r, stepId)) return
       const has = r.doneStepIds.includes(stepId)
       const doneStepIds = has ? r.doneStepIds.filter((x) => x !== stepId) : [...r.doneStepIds, stepId]
-      const wasComplete = r.steps.length > 0 && r.steps.every((s) => r.doneStepIds.includes(s.id))
-      const isComplete = r.steps.length > 0 && r.steps.every((s) => doneStepIds.includes(s.id))
-      setRoutines((prev) => prev.map((x) => (x.id === routineId ? { ...x, doneStepIds } : x)))
-      if (r.habitId && wasComplete !== isComplete) {
-        const hid = r.habitId
-        setHabits((hs) => hs.map((h) => (h.id === hid ? { ...h, days: h.days.map((d, i) => (i === todayIndex ? isComplete : d)) } : h)))
-      }
+      applyRoutine(routineId, (x) => ({ ...x, doneStepIds }))
     },
     records,
+    /* Logging the number IS completing the step, in one action. Keeping them
+       apart meant the gate read the old score and refused the very result that
+       had just satisfied it. */
     setStepData: (routineId, stepId, value) => {
-      setRoutines((prev) => prev.map((r) => (r.id === routineId ? { ...r, stepData: { ...(r.stepData ?? {}), [stepId]: value } } : r)))
+      applyRoutine(routineId, (r) => {
+        const stepData = { ...(r.stepData ?? {}), [stepId]: value }
+        const passes = !stepLocked({ ...r, stepData }, stepId)
+        const doneStepIds = passes && !r.doneStepIds.includes(stepId)
+          ? [...r.doneStepIds, stepId]
+          : !passes ? r.doneStepIds.filter((x) => x !== stepId) : r.doneStepIds
+        return { ...r, stepData, doneStepIds }
+      })
       const key = `${routineId}:${stepId}`
       setRecords((prev) => (value > (prev[key] ?? 0) ? { ...prev, [key]: value } : prev))
     },
@@ -718,20 +761,31 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     deleteRoutine: (id) => {
       const r = routines.find((x) => x.id === id)
       setRoutines((prev) => prev.filter((x) => x.id !== id))
-      if (r?.habitId) setHabits((hs) => hs.filter((h) => h.id !== r.habitId))
+      if (r?.habitId) {
+        const hid = r.habitId
+        setHabits((hs) => hs.filter((h) => h.id !== hid))
+        /* A goal counting off that habit keeps the progress it earned and goes
+           back to being logged by hand, rather than pointing at nothing and
+           freezing forever. */
+        setGoals((gs) => gs.map((g) => (g.habitId === hid
+          ? { ...g, habitId: undefined, current: goalCurrent(g, habits), unit: g.unit === 'checkoffs' ? 'done' : g.unit }
+          : g)))
+        setRemovedSeeds((prev) => (prev.includes(hid) ? prev : [...prev, hid]))
+      }
+      setRemovedSeeds((prev) => (prev.includes(id) ? prev : [...prev, id]))
     },
     addRoutineStep: (routineId, step) =>
-      setRoutines((prev) => prev.map((r) => (r.id === routineId
-        ? { ...r, steps: [...r.steps, { id: newId('st'), kind: 'do' as const, ...step }] }
-        : r))),
+      applyRoutine(routineId, (r) => ({ ...r, steps: [...r.steps, { id: newId('st'), kind: 'do' as const, ...step }] })),
     updateRoutineStep: (routineId, stepId, patch) =>
       setRoutines((prev) => prev.map((r) => (r.id === routineId
         ? { ...r, steps: r.steps.map((s) => (s.id === stepId ? { ...s, ...patch } : s)) }
         : r))),
     deleteRoutineStep: (routineId, stepId) =>
-      setRoutines((prev) => prev.map((r) => (r.id === routineId
-        ? { ...r, steps: r.steps.filter((s) => s.id !== stepId), doneStepIds: r.doneStepIds.filter((x) => x !== stepId) }
-        : r))),
+      applyRoutine(routineId, (r) => ({
+        ...r,
+        steps: r.steps.filter((s) => s.id !== stepId),
+        doneStepIds: r.doneStepIds.filter((x) => x !== stepId),
+      })),
     moveRoutineStep: (routineId, stepId, dir) =>
       setRoutines((prev) => prev.map((r) => {
         if (r.id !== routineId) return r
@@ -742,14 +796,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ;[steps[i], steps[j]] = [steps[j], steps[i]]
         return { ...r, steps }
       })),
-    resetRoutine: (routineId) => {
-      const r = routines.find((x) => x.id === routineId)
-      setRoutines((prev) => prev.map((x) => (x.id === routineId ? { ...x, doneStepIds: [], stepData: {} } : x)))
-      if (r?.habitId) {
-        const hid = r.habitId
-        setHabits((hs) => hs.map((h) => (h.id === hid ? { ...h, days: h.days.map((d, i) => (i === todayIndex ? false : d)) } : h)))
-      }
-    },
+    resetRoutine: (routineId) => applyRoutine(routineId, (r) => ({ ...r, doneStepIds: [], stepData: {} })),
 
     addIdea: (text, color) => {
       const t = text.trim()

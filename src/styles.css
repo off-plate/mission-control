@@ -1751,3 +1751,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .coach-starter:hover { border-color: var(--accent); color: var(--accent); }
 .coach-starter.is-yours { border-color: var(--accent-wash); background: var(--accent-wash); }
 .cs-age { font-family: var(--font-mono); font-size: 0.625rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); }
+
+/* Savings sparkline endpoints, so five numbers about his money are readable. */
+.savings-range { display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--faint); margin-top: 4px; }

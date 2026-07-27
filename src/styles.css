@@ -2338,3 +2338,24 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .routine-trail-wrap { display: flex; flex-direction: column; gap: 6px; margin: var(--s3) 0; }
 .past-goal { gap: var(--s3); }
 .past-goal .btn { flex: none; padding: 3px 10px; font-size: var(--text-xs); }
+
+/* ---------- which room a row came from (All view only) ---------- */
+/* Two channels on purpose. The hue is a rule, which needs 3:1 and clears it on
+   every surface; the letter is neutral, which clears 4.5:1. Neither depends on
+   the other, and dropping the colour leaves the meaning intact. */
+.spacemark { flex: none; display: inline-flex; align-items: center; gap: 6px; align-self: stretch; }
+.spacemark > i { width: 3px; border-radius: 2px; align-self: stretch; min-height: 14px; background: var(--mark); }
+.spacemark > b {
+  font-family: var(--font-body); font-weight: 700; font-size: 0.625rem;
+  letter-spacing: 0.06em; color: var(--muted); width: 1ch; text-align: center;
+}
+.spacemark.s-personal { --mark: #d1502a; }
+.spacemark.s-work { --mark: #1d4e79; }
+.spacemark.s-offplate { --mark: #8a6410; }
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+/* All is a view across the three rooms, so it borrows no room's accent. */
+[data-space="all"] { --accent: #15130f; --accent-hover: #000; --accent-wash: rgba(21, 19, 15, 0.07); }
+.writeto { padding: 7px 10px; font-size: var(--text-sm); min-width: 110px; }

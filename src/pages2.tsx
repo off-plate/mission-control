@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { COACH_SCENARIOS, MOCK_MONEY, MOCK_STATS } from './mock'
-import { AutoTextarea, Band } from './pages1'
+import { AutoTextarea, Band, SpaceMark } from './pages1'
 import { useStore } from './store'
 import { Spark, SparkBox } from './widgets'
 import { RANGE_OPTIONS, allTimeRange, customRange, fmtDuration, fmtNum, fmtSigned, fmtWhen, goalPace, inRange, isoWeekKey, localDateKey, monthName, monthRange, monthsWithData, rangeFor, taskMinutes, type RangeId } from './util'
@@ -273,6 +273,7 @@ export function ReviewPage() {
             const d = e.estimateMin - e.actualMin
             return (
               <div className="ledger-row" key={e.id}>
+                <SpaceMark space={e.space} />
                 <span className="mono" style={{ color: 'var(--faint)', fontSize: 'var(--text-xs)', minWidth: '3ch' }}>{fmtWhen(e.when)}</span>
                 <span className="ledger-title">{e.title}</span>
                 <span className="src-tag">{e.category}</span>

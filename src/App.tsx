@@ -8,7 +8,7 @@ import { BrandPage } from './brand'
 import { useStore } from './store'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange } from './supabase'
 import { isReadOnly } from './store'
-import type { PageId, SpaceId } from './types'
+import type { PageId, SpaceId, ViewId } from './types'
 
 /* One failing page must not take the whole shell with it: the header, the nav
    and every other tab keep working while the broken view shows a card. */
@@ -90,7 +90,7 @@ function PageNav({
 }
 
 export default function App() {
-  const { space, setSpace, page, setPage, tasks, routines } = useStore()
+  const { space, view, setView, page, setPage, tasks, routines } = useStore()
   // The dot follows the alerts: money and admin count from any profile.
   const exceptions = space === 'personal'
     ? exceptionsFor(space, { tasks, routines })
@@ -116,14 +116,14 @@ export default function App() {
           <span className="brand-name">Mission Control</span>
         </div>
         <nav className="spaces" aria-label="Spaces">
-          {(Object.keys(SPACE_LABELS) as SpaceId[]).map((s) => (
+          {(['all', ...Object.keys(SPACE_LABELS)] as ViewId[]).map((s) => (
             <button
               key={s}
               className="space-btn"
-              aria-pressed={space === s}
-              onClick={() => setSpace(s)}
+              aria-pressed={view === s}
+              onClick={() => setView(s)}
             >
-              {SPACE_LABELS[s]}
+              {s === 'all' ? 'All' : SPACE_LABELS[s as SpaceId]}
             </button>
           ))}
         </nav>

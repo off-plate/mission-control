@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { AutoTextarea, Band, Dropdown } from './pages1'
 import { useStore } from './store'
+import { SpaceMark } from './pages1'
 import { parseDictation, TAB_FOR, type ParsedItem } from './assistant'
 import { fmtDuration, fmtWhen } from './util'
 import { extractFromJournal, hasAiKey, parseSpoken, shrinkImage, transcribeImage, type JournalItems } from './ai'

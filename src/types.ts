@@ -1,5 +1,8 @@
 export type SpaceId = 'personal' | 'work' | 'offplate'
 
+/** One shared on-track threshold, so Goals, Review and the widget never disagree. */
+export const ON_TRACK_PCT = 50
+
 export type PageId =
   | 'today'
   | 'plan'
@@ -142,6 +145,9 @@ export interface Routine {
   habitId?: string
   /** Step ids checked so far this period. */
   doneStepIds: string[]
+  /** Which period the checks belong to (day / ISO week / month). When the
+   *  current period differs, the checks reset automatically. */
+  periodKey?: string
 }
 
 export type GoalTimeframe = 'weekly' | 'monthly' | 'quarter' | 'half'
@@ -205,6 +211,10 @@ export interface LedgerEntry {
   estimateMin: number
   actualMin: number
   when: string
+  /** Which profile the work belonged to (older rows have none). */
+  space?: SpaceId
+  /** ISO week, so "time saved this week" means this week. */
+  weekKey?: string
 }
 
 export interface AgendaEvent {
@@ -263,6 +273,8 @@ export interface CoachScenario {
  *  once you check back, whether you did it and how it really felt. */
 export interface CoachSession {
   id: string
+  /** Profile the loop was opened in (older sessions have none and show everywhere). */
+  space?: SpaceId
   title: string
   facts: CoachFacts
   firstStep: string
@@ -295,6 +307,10 @@ export interface AssistantEntry {
 
 export interface ReviewState {
   lastDoneDate: string | null
+  /** ISO week the review was closed in; "closed" holds until the next week. */
+  lastWeekKey?: string
   wins: string[]
   outcomes: string[]
+  /** Last week's reflection, kept so this week can read what you said you'd change. */
+  previous?: { weekKey: string; wins: string[]; outcomes: string[] }
 }

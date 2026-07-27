@@ -31,11 +31,15 @@ export function parseDictation(input: string): ParsedItem[] {
       let kind: ParsedItem['kind'] = 'task'
       if (GOAL_LEADS.test(raw) || GOAL_HINTS.test(raw)) kind = 'goal'
       if (DONE_LEADS.test(raw) || DONE_HINTS.test(raw)) kind = 'done'
+      /* Strip the words that only told us WHICH bucket this is. Leaving them in
+         produced labels like "Goal this week send 10 cold emails". */
       const text = raw
         .replace(TASK_LEADS, '')
         .replace(GOAL_LEADS, '')
         .replace(DONE_LEADS, '')
-        .replace(/^(i (need to|have to|should|want to)|today i want to|remind me to)\s+/i, '')
+        .replace(/^(goal|cíl)\s+(this\s+(week|month|quarter|year)\s+)?/i, '')
+        .replace(/^(done|finished|completed|hotovo)\s+(with\s+)?/i, '')
+        .replace(/^(i (need to|have to|should|want to)|today i want to|remind me to|už jsem|udělal jsem)\s+/i, '')
         .replace(/\s+/g, ' ')
         .trim()
       return { kind, text: text.charAt(0).toUpperCase() + text.slice(1), estimateMin: estimate(raw) }

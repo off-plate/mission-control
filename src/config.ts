@@ -8,7 +8,11 @@
 export const SUPABASE_URL = 'https://fhfempisopwsdkmvywbt.supabase.co'
 export const SUPABASE_ANON_KEY = 'sb_publishable_MDxQPm0SzLHFTnDqg-eyyQ_0yposnES'
 
-export const SUPABASE_ENABLED = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY)
+/* ?noremote in the URL runs the app fully local: no remote hydration, no remote
+   writes. Used by automated testing so the real database is never touched. */
+const NO_REMOTE = typeof location !== 'undefined' && new URLSearchParams(location.search).has('noremote')
+
+export const SUPABASE_ENABLED = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY) && !NO_REMOTE
 
 /* Single-user for now: one row holds the whole app state as JSON. */
 export const STATE_ROW_ID = 'default'

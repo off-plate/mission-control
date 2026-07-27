@@ -1,4 +1,60 @@
-import type { Task, TimeSlot } from './types'
+import type { RoutineCadence, Task, TimeSlot } from './types'
+
+/* ---------- dates & periods ---------- */
+
+/** Local (Prague) calendar date as 'YYYY-MM-DD'. Never UTC — the day must flip at his midnight. */
+export function localDateKey(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** ISO-8601 week key, e.g. '2026-W31'. Drives the weekly rollover. */
+export function isoWeekKey(date = new Date()): string {
+  const t = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const dayNum = (t.getUTCDay() + 6) % 7
+  t.setUTCDate(t.getUTCDate() - dayNum + 3)
+  const firstThursday = new Date(Date.UTC(t.getUTCFullYear(), 0, 4))
+  const week = 1 + Math.round(((t.getTime() - firstThursday.getTime()) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7)
+  return `${t.getUTCFullYear()}-W${String(week).padStart(2, '0')}`
+}
+
+/** The period a routine's checks belong to. When the key changes, the checks reset. */
+export function periodKeyFor(cadence: RoutineCadence, d = new Date()): string {
+  if (cadence === 'weekly') return isoWeekKey(d)
+  if (cadence === 'monthly') return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  return localDateKey(d) // daily and prework reset every day
+}
+
+/** Render a stored ISO date (or legacy label) as a short human string. */
+export function fmtWhen(when: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(when)) return when
+  const today = localDateKey()
+  if (when === today) return 'today'
+  const y = new Date(); y.setDate(y.getDate() - 1)
+  if (when === localDateKey(y)) return 'yesterday'
+  const [yy, mm, dd] = when.split('-').map(Number)
+  return new Date(yy, mm - 1, dd).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
+/** Next occurrence of a weekday (1=Mon..7=Sun), always in the future. */
+export function nextDow(dow: number, from = new Date()): Date {
+  const d = new Date(from)
+  const cur = ((d.getDay() + 6) % 7) + 1
+  const add = ((dow - cur) + 7) % 7 || 7
+  d.setDate(d.getDate() + add)
+  return d
+}
+
+/** 'Fri 31 Jul' style label used across Money and the exception rows. */
+export function fmtDayShort(d: Date): string {
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
+/** Last business day of the current month (tax transfers must beat the deadline). */
+export function lastBusinessDayOfMonth(from = new Date()): Date {
+  const d = new Date(from.getFullYear(), from.getMonth() + 1, 0)
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1)
+  return d
+}
 
 /** 24h 'HH:MM' -> '5:30 PM' (Michael wants AM/PM, never 24h). */
 export function fmtTime(hhmm: string): string {
@@ -36,11 +92,24 @@ export function taskMinutes(t: Task): number {
 }
 
 export function fmtDuration(min: number): string {
-  const h = Math.floor(min / 60)
-  const m = min % 60
-  if (h && m) return `${h}h ${m}m`
-  if (h) return `${h}h`
-  return `${m}m`
+  const sign = min < 0 ? '-' : ''
+  const a = Math.abs(min)
+  const h = Math.floor(a / 60)
+  const m = a % 60
+  if (h && m) return `${sign}${h}h ${m}m`
+  if (h) return `${sign}${h}h`
+  return `${sign}${m}m`
+}
+
+/** Czech thousands spacing, so 60000 reads 60 000 everywhere it appears. */
+export function fmtNum(n: number): string {
+  return n.toLocaleString('cs-CZ').replace(/ /g, ' ')
+}
+
+/** Signed h/m for "time saved", where a negative total means you ran over. */
+export function fmtSigned(min: number): string {
+  const a = Math.abs(min)
+  return `${min < 0 ? '-' : ''}${Math.floor(a / 60)}h ${a % 60}m`
 }
 
 /**

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { MOCK_EXCEPTIONS_FOR } from './exceptions'
+import { exceptionsFor } from './exceptions'
 import { SPACE_LABELS } from './mock'
 import { DecomposeSheet } from './modals'
 import { GoalsPage, HabitsPage, PlanPage, RoutinesPage, TodayPage } from './pages1'
@@ -63,9 +63,9 @@ function PageNav({
 }
 
 export default function App() {
-  const { space, setSpace, page, setPage } = useStore()
+  const { space, setSpace, page, setPage, tasks, routines } = useStore()
   const [decomposeOpen, setDecomposeOpen] = useState(false)
-  const exceptions = MOCK_EXCEPTIONS_FOR(space)
+  const exceptions = exceptionsFor(space, { tasks, routines })
 
   const tabs = NAV
 

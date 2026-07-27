@@ -2070,3 +2070,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .beat-first .beat-n { border-color: var(--accent); color: var(--accent); }
 .beat-first .coach-field-q { display: block; font-family: var(--font-display); font-weight: 700; font-size: var(--text-base); margin-bottom: 2px; }
 .beat-first .coach-field-hint { display: block; font-size: var(--text-xs); color: var(--muted); margin-bottom: var(--s2); }
+
+/* Each Plan column sizes to its own content. The schedule was being stretched to
+   match the Today column, so one long broken-down task left it hours of blank. */
+.plan-cols { align-items: start; }

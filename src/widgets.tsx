@@ -9,7 +9,7 @@ import {
 } from './mock'
 import { useStore } from './store'
 import type { SizeKey, SpaceId, WidgetType } from './types'
-import { fmtNum, fmtTimeShort, goalPace } from './util'
+import { fmtDuration, fmtNum, fmtTimeShort, goalPace } from './util'
 
 /** `fluid` makes the line span its container, so label rows underneath line up. */
 export function Spark({ data, width = 120, height = 32, fluid = false }: { data: number[]; width?: number; height?: number; fluid?: boolean }) {
@@ -91,7 +91,7 @@ const TasksBody = memo(function TasksBody({ space, size }: { space: SpaceId; siz
     <div>
       {open.length > 0 && (
         <div className="kpi-sub" style={{ marginTop: 0, marginBottom: 4 }}>
-          {open.length} open · {remaining} min planned
+          {open.length} open · {fmtDuration(remaining)} planned
         </div>
       )}
       <div className="rowlist">
@@ -130,7 +130,7 @@ const TasksBody = memo(function TasksBody({ space, size }: { space: SpaceId; siz
               aria-expanded={logOpen === t.id}
               aria-label={`Log time for ${t.title}, estimated ${t.estimateMin} minutes`}
             >
-              {t.estimateMin}m
+              {fmtDuration(t.estimateMin)}
             </button>
             <span className="src-tag">{t.source === 'mc' ? 'here' : t.source}</span>
           </div>

@@ -197,7 +197,7 @@ export function TodayPage() {
             <div className="firstmove">
               <span className="microcap fm-label">{evening ? 'First move tomorrow' : 'First move'}</span>
               <span className="fm-title">{firstMove.title}</span>
-              <span className="est-chip">{firstMove.estimateMin}m</span>
+              <span className="est-chip">{fmtDuration(firstMove.estimateMin)}</span>
               <button className="btn btn-primary" onClick={() => { setFocusTaskId(firstMove.id); setPage('plan') }}>Start</button>
             </div>
           )}
@@ -369,7 +369,7 @@ function EstimateChip({ task }: { task: Task }) {
       />
     )
   }
-  if (fromSteps) return <span className="est-chip" title="Comes from the steps">{mins}m</span>
+  if (fromSteps) return <span className="est-chip" title="Comes from the steps">{fmtDuration(mins)}</span>
   return (
     <button
       className={`est-chip est-edit${isEstimated(task) ? '' : ' is-none'}`}
@@ -377,7 +377,7 @@ function EstimateChip({ task }: { task: Task }) {
       aria-label={isEstimated(task) ? `${mins} minutes, click to change` : `No estimate, click to set one`}
       onClick={() => { setVal(isEstimated(task) ? String(mins) : ''); setEditing(true) }}
     >
-      {isEstimated(task) ? `${mins}m` : 'no estimate'}
+      {isEstimated(task) ? fmtDuration(mins) : 'no estimate'}
     </button>
   )
 }
@@ -584,7 +584,7 @@ export function PlanPage() {
                       <div className="subtask-row" key={s.id}>
                         <span className="sub-tick" aria-hidden="true" />
                         <span className="grow" style={{ fontSize: 'var(--text-sm)' }}>{s.title}</span>
-                        <span className="est-chip">{s.estimateMin}m</span>
+                        <span className="est-chip">{fmtDuration(s.estimateMin)}</span>
                       </div>
                     ))}
                   </div>
@@ -650,7 +650,7 @@ export function PlanPage() {
                           <span className={`cat-dot ${t.category}`} aria-hidden="true" />
                           <TaskName title={t.title} start={t.at} className="grow" />
                           {t.done && t.actualMin != null ? (
-                            <span className="est-vs-actual mono">{taskMinutes(t)} → {t.actualMin}m <b className={taskMinutes(t) - t.actualMin >= 0 ? 'val-pos' : 'val-urgent'}>{taskMinutes(t) - t.actualMin >= 0 ? '+' : ''}{taskMinutes(t) - t.actualMin}m</b></span>
+                            <span className="est-vs-actual mono">{fmtDuration(taskMinutes(t))} → {fmtDuration(t.actualMin)} <b className={taskMinutes(t) - t.actualMin >= 0 ? 'val-pos' : 'val-urgent'}>{taskMinutes(t) - t.actualMin >= 0 ? '+' : ''}{taskMinutes(t) - t.actualMin}m</b></span>
                           ) : (
                             <EstimateChip task={t} />
                           )}
@@ -690,9 +690,9 @@ export function PlanPage() {
                                   <span className="sub-tick" aria-hidden="true" />
                                   <span className="grow">{s.title}</span>
                                   {s.done && s.actualMin != null ? (
-                                    <span className="est-vs-actual mono">{s.estimateMin} → {s.actualMin}m <b className={s.estimateMin - s.actualMin >= 0 ? 'val-pos' : 'val-urgent'}>{s.estimateMin - s.actualMin >= 0 ? '+' : ''}{s.estimateMin - s.actualMin}m</b></span>
+                                    <span className="est-vs-actual mono">{fmtDuration(s.estimateMin)} → {fmtDuration(s.actualMin)} <b className={s.estimateMin - s.actualMin >= 0 ? 'val-pos' : 'val-urgent'}>{s.estimateMin - s.actualMin >= 0 ? '+' : ''}{s.estimateMin - s.actualMin}m</b></span>
                                   ) : (
-                                    <span className="est-chip">{s.estimateMin}m</span>
+                                    <span className="est-chip">{fmtDuration(s.estimateMin)}</span>
                                   )}
                                 </button>
                                 {!s.done && (
@@ -736,9 +736,9 @@ export function PlanPage() {
                   <span className={`cat-dot ${t.category}`} aria-hidden="true" />
                   <span className="grow">{t.title}</span>
                   {t.actualMin != null
-                    ? <span className="est-vs-actual mono">{taskMinutes(t)} → {t.actualMin}m</span>
+                    ? <span className="est-vs-actual mono">{fmtDuration(taskMinutes(t))} → {fmtDuration(t.actualMin)}</span>
                     : isEstimated(t)
-                      ? <span className="est-chip">{taskMinutes(t)}m</span>
+                      ? <span className="est-chip">{fmtDuration(taskMinutes(t))}</span>
                       : <span className="est-chip is-none">no estimate</span>}
                 </div>
               ))}

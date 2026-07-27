@@ -4,6 +4,7 @@ import { BUFFER } from './estimate'
 import type { Task } from './types'
 import { breakdownTask, type Detail } from './ai'
 import { useStore } from './store'
+import { fmtDuration } from './util'
 
 export function Sheet({ title, onClose, children, note }: {
   title: string
@@ -97,7 +98,7 @@ export function BreakdownSheet({ task, onClose }: { task: Task; onClose: () => v
                 {s.title}
                 {s.why && <span className="why">{s.why}</span>}
               </span>
-              <span className="est-chip">{s.estimateMin}m</span>
+              <span className="est-chip">{fmtDuration(s.estimateMin)}</span>
             </div>
           ))}
           {source === 'local' && (

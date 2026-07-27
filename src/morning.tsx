@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from './store'
-import { FALLBACK_NEWS, loadMorningNews, twistersForDay, type MorningNews } from './morning-data'
+import { FALLBACK_NEWS, PER_LANG, loadMorningNews, twistersForDay, type MorningNews } from './morning-data'
 import { TYPING_TARGET_WPM, type Routine } from './types'
 
 /* The Morning routine as a guided, foldable accordion. Every step starts collapsed;
@@ -141,18 +141,34 @@ function Pronunciation() {
 
 /* ---- Mouth stretch: three rotating full-sentence tongue twisters ---- */
 function MouthStretch() {
-  const { group, items } = twistersForDay()
+  const { group, cs, en } = twistersForDay()
   return (
     <div className="mr-stretch">
-      <p className="mr-lead">Group {group} today. Say each one three times, fast and clean.</p>
-      <ol className="stretch-list">
-        {items.map((tw, i) => (
-          <li className="stretch-item" key={i}>
-            <span className={`stretch-tag lang-${tw.lang}`}>{tw.lang === 'cs' ? 'CZ' : 'EN'}</span>
-            <span className="stretch-text">{tw.text}</span>
-          </li>
-        ))}
-      </ol>
+      <p className="mr-lead">
+        Group {group} today, {PER_LANG} Czech and {PER_LANG} English. Say each one three times, fast and clean.
+      </p>
+      <div className="stretch-lang">
+        <span className="stretch-lang-head">Česky</span>
+        <ol className="stretch-list">
+          {cs.map((tw, i) => (
+            <li className="stretch-item" key={`cs${i}`}>
+              <span className="stretch-tag lang-cs">CZ</span>
+              <span className="stretch-text">{tw.text}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+      <div className="stretch-lang">
+        <span className="stretch-lang-head">English</span>
+        <ol className="stretch-list">
+          {en.map((tw, i) => (
+            <li className="stretch-item" key={`en${i}`}>
+              <span className="stretch-tag lang-en">EN</span>
+              <span className="stretch-text">{tw.text}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
     </div>
   )
 }

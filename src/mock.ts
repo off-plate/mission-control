@@ -162,7 +162,7 @@ export const MOCK_HABITS: HabitDef[] = [
   { id: 'h1', frequency: 'daily', space: 'personal', name: 'Was in bed before 1:00 last night', daypart: 'morning', days: [true, true, false, true, false, true, false], paused: false, history: [1, 2, 2, 3, 2, 4, 3, 3, 4, 5, 4, 4] },
   { id: 'h-prework', frequency: 'weekdays', space: 'personal', name: 'Before work', paused: false, days: [true, true, false, true, false, false, false], history: [1, 2, 2, 3, 2, 3, 3, 2, 3, 4, 3, 3] },
   { id: 'h-weekly', frequency: 'weekly', space: 'personal', name: 'Weekly reset', paused: false, days: [false, false, false, false, false, false, false], history: [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1] },
-  { id: 'h-monthly', frequency: 'weekly', space: 'personal', name: 'Monthly review', paused: false, days: [false, false, false, false, false, false, false], history: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1] },
+  { id: 'h-monthly', frequency: 'monthly', space: 'personal', name: 'Monthly review', paused: false, days: [false, false, false, false, false, false, false], history: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1] },
   // work
   { id: 'w-h-startup', frequency: 'weekdays', space: 'work', name: 'Work startup', paused: false, days: [true, true, false, true, false, false, false], history: [3, 3, 4, 3, 4, 4, 3, 4, 4, 3, 4, 4] },
   { id: 'w-h1', frequency: 'weekdays', space: 'work', name: 'Deep work block', daypart: 'morning', paused: false, days: [true, false, true, true, false, false, false], history: [2, 3, 2, 3, 3, 2, 4, 3, 3, 4, 3, 3] },

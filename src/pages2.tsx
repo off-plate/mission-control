@@ -158,7 +158,7 @@ export function ReviewPage() {
         <div className="panel">
           <span className="microcap">Tasks done</span>
           <div className="kpi">{doneTasks.length}</div>
-          <div className="kpi-sub">{fmtDuration(doneMin)} of work · {accuracyPct}% within estimate</div>
+          <div className="kpi-sub">{fmtDuration(doneMin)} of work</div>
         </div>
         <div className="panel">
           <span className="microcap">Habits kept</span>
@@ -191,7 +191,7 @@ export function ReviewPage() {
         <div className="panel">
           <span className="microcap">Time saved</span>
           <div className={`kpi ${savedMin >= 0 ? 'val-pos' : 'val-urgent'}`}>{fmtSigned(savedMin)}</div>
-          <div className="kpi-sub">vs your own estimates · {accuracyPct}% accuracy. Everything here traces to something you logged.</div>
+          <div className="kpi-sub">vs your own estimates</div>
         </div>
       </div>
 

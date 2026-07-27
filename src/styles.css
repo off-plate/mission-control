@@ -1841,3 +1841,14 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .habit-row-top .habit-count { flex: none; margin-left: auto; }
 .habit-row-top .col-tot { flex: none; }
 .habit-row-top .habit-kebab { flex: none; align-self: center; }
+
+/* A habit a routine owns: its dots are a read-out, not a control. */
+.daydot.is-auto { cursor: default; }
+.daydot.is-auto:not([aria-checked="true"]) { border-style: dashed; }
+.habit-foot { display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap; margin-top: 6px; }
+.habit-auto {
+  font-size: var(--text-xs); color: var(--accent); padding: 0; text-align: left; cursor: pointer;
+}
+.habit-auto:hover { text-decoration: underline; }
+.habit-manual { font-size: var(--text-xs); color: var(--faint); }
+.habit-weeks { font-size: var(--text-xs); color: var(--muted); margin-left: auto; }

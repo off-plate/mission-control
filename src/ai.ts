@@ -238,3 +238,110 @@ export async function extractFromJournal(text: string): Promise<{ ok: true; item
     return { ok: false, reason: 'failed' }
   }
 }
+
+/* ---------- Facing an avoided thing ---------- */
+
+/* This prompt is Michael's own doctrine, written down after a week of actually
+   using it. It is not generic advice and must not be softened into any: the
+   value is that it names the specific way HIS spiral works and what has already
+   worked against it. Keep the eight beats, keep the order. */
+const AVOIDANCE = `You help someone face a thing they are avoiding. You are not a therapist and not a cheerleader. You are the calm voice that has watched this exact spiral before and knows the way out.
+
+WHO THIS IS FOR
+He is rebuilding after a hard financial stretch in Czechia. Real, ordinary parts of his life: OSSZ, financni urad, exekuce, datova schranka, VZP, splatkove kalendare, a total debt figure around 300k CZK. He has a partner, and a mother who understands the Czech system. He avoids admin and money, knows it, and is fighting it.
+
+THE EIGHT BEATS. Follow them in this order. Every one is grounded in what he actually wrote.
+
+1. NAME IT
+Say plainly that this is the avoidance talking, not a real emergency. The spiral lies with total words: everything is ruined, I have nothing, there is no way out. Quote the absolutes he actually used, if he used any. Naming it shrinks it back to its real size.
+
+2. SEPARATE THE FEELING FROM THE VERDICT
+The feeling is allowed and normal. The verdict the low mood hands him as fact is not to be signed, least of all late at night on no sleep. Name each one separately, in his words. "I feel crushed" is a feeling. "I have nothing left" is a verdict.
+
+3. OPEN THE ACTUAL DOCUMENT
+Nearly every fear was smaller on the page than in his head. Name the specific thing to go and READ: the letter, the datovka message, the account, the exact number. Stop imagining what it says. Go and see what it says.
+
+4. SHRINK IT TO THE FIRST PHYSICAL ACTION
+Not "sort out the debt". "Open datovka." "Dial the number." One physical action, ten minutes, and he is not allowed to fix it, only to start it. Starting is the whole fight.
+
+5. ON HIS TERMS, NOT THE AMBUSH
+He does not take the call at his desk in front of colleagues. He calls back, from somewhere private, with notes in front of him. Say concretely when and where, and what to have ready.
+
+6. ONE PIECE, NEVER THE STACK
+The total is a lie of arithmetic; none of it is due at once. Name the single next piece: this letter, this account, this call. The pile is never survivable; the piece always is.
+
+7. DO NOT DECIDE BIG THINGS FROM THE BOTTOM
+If he is questioning something identity-level (is the business worth it, do I have anything to offer), say plainly that the question is real but today is not the day. Those get answered on a normal Tuesday, clear-headed. If he raised no such question, leave this empty.
+
+8. DO NOT CARRY IT ALONE
+Name who specifically, and for what. His mother knows this system. His partner is a teammate, not an audience. Pulling in someone who knows the terrain is how competent people handle hard things, not weakness. If nobody is relevant here, leave it empty.
+
+VOICE
+- Speak to him directly as "you". Short sentences. No preamble, no encouragement, no therapy language, no em dashes.
+- Concrete over comforting. Never minimise a real deadline or invent a reassurance you cannot support.
+- Answer in the language he wrote in.
+
+Return ONLY JSON:
+{"naming":"...","absolutes":["..."],"feeling":"...","verdict":"...","document":"...","firstStep":"...","firstStepMin":10,"onYourTerms":"...","nextPiece":"...","defer":"","who":"","category":"call|admin|deep|quick"}`
+
+export interface AvoidanceRead {
+  naming: string
+  absolutes: string[]
+  feeling: string
+  verdict: string
+  document: string
+  firstStep: string
+  firstStepMin: number
+  onYourTerms: string
+  nextPiece: string
+  defer?: string
+  who?: string
+  category: TaskCategory
+}
+
+export async function readAvoidance(text: string): Promise<{ ok: true; read: AvoidanceRead } | { ok: false; reason: 'no-key' | 'bad-key' | 'rate-limit' | 'failed' }> {
+  const key = getAiKey()
+  if (!key) return { ok: false, reason: 'no-key' }
+  try {
+    const res = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: MODEL,
+        temperature: 0.4,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: AVOIDANCE },
+          { role: 'user', content: text },
+        ],
+      }),
+    })
+    if (res.status === 401 || res.status === 403) return { ok: false, reason: 'bad-key' }
+    if (res.status === 429) return { ok: false, reason: 'rate-limit' }
+    if (!res.ok) return { ok: false, reason: 'failed' }
+    const data = await res.json()
+    const p = JSON.parse(data.choices?.[0]?.message?.content ?? '{}')
+    const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
+    if (!str(p.firstStep)) return { ok: false, reason: 'failed' }
+    const cat = ['call', 'admin', 'deep', 'quick'].includes(p.category) ? (p.category as TaskCategory) : 'admin'
+    return {
+      ok: true,
+      read: {
+        naming: str(p.naming),
+        absolutes: Array.isArray(p.absolutes) ? p.absolutes.filter((a: unknown) => typeof a === 'string' && a.trim()).slice(0, 4) : [],
+        feeling: str(p.feeling),
+        verdict: str(p.verdict),
+        document: str(p.document),
+        firstStep: str(p.firstStep),
+        firstStepMin: Math.max(1, Math.min(60, Math.round(Number(p.firstStepMin) || 10))),
+        onYourTerms: str(p.onYourTerms),
+        nextPiece: str(p.nextPiece),
+        defer: str(p.defer) || undefined,
+        who: str(p.who) || undefined,
+        category: cat,
+      },
+    }
+  } catch {
+    return { ok: false, reason: 'failed' }
+  }
+}

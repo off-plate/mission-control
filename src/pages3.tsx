@@ -4,6 +4,7 @@ import { useStore } from './store'
 import { parseDictation, TAB_FOR, type ParsedItem } from './assistant'
 import { fmtWhen } from './util'
 import { extractFromJournal, hasAiKey, shrinkImage, transcribeImage, type JournalItems } from './ai'
+import { readImage } from './ocr'
 import type { HabitFrequency } from './types'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -23,32 +24,52 @@ function JournalReader() {
   const [text, setText] = useState('')
   const [items, setItems] = useState<JournalItems | null>(null)
   const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [pct, setPct] = useState(0)
+  const [conf, setConf] = useState<number | null>(null)
+  const [readBy, setReadBy] = useState<'device' | 'ai'>('device')
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const reset = () => { setPhoto(null); setStage('idle'); setError(''); setText(''); setItems(null); setPicked(new Set()) }
+  const reset = () => {
+    setPhoto(null); setStage('idle'); setError(''); setText(''); setItems(null)
+    setPicked(new Set()); setPct(0); setConf(null); setReadBy('device')
+  }
 
+  /* Read it here on the machine first: no key, no account, and the photo never
+     leaves the device. The AI reader is a second opinion for messy writing. */
   const onFile = async (file?: File) => {
     if (!file) return
-    setError(''); setItems(null); setText(''); setStage('reading')
+    setError(''); setItems(null); setText(''); setConf(null); setPct(0); setStage('reading')
     try {
       const url = await shrinkImage(file)
       setPhoto(url)
-      const r = await transcribeImage(url)
-      if (!r.ok) {
-        setStage('idle')
-        setError(
-          r.reason === 'no-key' ? 'No Groq key yet. Add one in Settings and this can read your page.'
-          : r.reason === 'bad-key' ? 'That Groq key was rejected. Check it in Settings.'
-          : r.reason === 'rate-limit' ? 'Groq is rate limiting. Wait a moment and try again.'
-          : r.reason === 'too-big' ? 'That photo is too large even after shrinking.'
-          : 'Could not read the photo. Try a straighter, better lit shot.')
-        return
-      }
+      const r = await readImage(url, 'ces+eng', setPct)
+      setReadBy('device')
+      setConf(r.confidence)
       setText(r.text)
+      if (!r.text) setError('Nothing legible came out of that. Try a straighter, better lit shot, or use the AI reader below.')
       setStage('review')
-    } catch {
-      setStage('idle'); setError('Could not open that image.')
+    } catch (e) {
+      setStage('idle')
+      setError(`Could not read that image. ${e instanceof Error ? e.message : ''}`.trim())
     }
+  }
+
+  /* Same photo, better reader, for when the on-device pass mangles cursive. */
+  const readWithAi = async () => {
+    if (!photo) return
+    setError(''); setStage('reading')
+    const r = await transcribeImage(photo)
+    if (!r.ok) {
+      setStage('review')
+      setError(
+        r.reason === 'no-key' ? 'No Groq key yet. Add one in Settings to use the AI reader.'
+        : r.reason === 'bad-key' ? 'That Groq key was rejected. Check it in Settings.'
+        : r.reason === 'rate-limit' ? 'Groq is rate limiting. Wait a moment and try again.'
+        : r.reason === 'too-big' ? 'That photo is too large even after shrinking.'
+        : 'The AI reader could not be reached. The text above is still yours to edit.')
+      return
+    }
+    setReadBy('ai'); setConf(null); setText(r.text); setStage('review')
   }
 
   const findItems = async () => {
@@ -81,8 +102,9 @@ function JournalReader() {
     <div className="panel journal">
       <span className="microcap">Read a page of your journal</span>
       <p className="assist-note" style={{ marginTop: 6 }}>
-        Photograph a written page and it transcribes what is there. You read the transcript, fix what it
-        got wrong, and choose what becomes real. The photo and the text stay on this page.
+        Photograph a written page and it transcribes what is there, on this device, with no key and
+        nothing uploaded. You read the transcript, fix what it got wrong, and choose what becomes real.
+        Nothing here is saved anywhere until you do.
       </p>
 
       <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden
@@ -91,7 +113,7 @@ function JournalReader() {
       {stage === 'idle' && !photo && (
         <div className="journal-drop">
           <button className="btn btn-primary" onClick={() => fileRef.current?.click()}>Take or choose a photo</button>
-          {!hasAiKey() && <span className="assist-note">Needs a Groq key, set in Settings.</span>}
+          <span className="assist-note">Works offline. Clear writing reads well; joined-up cursive needs the AI reader.</span>
         </div>
       )}
 
@@ -105,14 +127,42 @@ function JournalReader() {
           </div>
 
           <div className="journal-text">
-            {busy && <div className="empty">{stage === 'reading' ? 'Reading the page.' : 'Looking for what you committed to.'}</div>}
+            {busy && (
+              <div className="empty">
+                {stage === 'reading'
+                  ? `Reading the page on this device${pct > 0 && pct < 100 ? `, ${pct}%` : ''}.`
+                  : 'Looking for what you committed to.'}
+              </div>
+            )}
             {!busy && (
               <>
-                <label className="field-label" htmlFor="jtext">What it read. Fix anything wrong before you go on.</label>
+                <label className="field-label" htmlFor="jtext">
+                  {readBy === 'ai' ? 'What the AI reader got.' : 'What this device read.'} Fix anything wrong before you go on.
+                </label>
                 <textarea id="jtext" className="textinput journal-area" value={text} onChange={(e) => setText(e.target.value)} rows={10} />
                 {text.includes('[?]') && (
                   <p className="sheet-warn">[?] marks a word it could not read. Replace those before continuing.</p>
                 )}
+                {readBy === 'device' && conf !== null && conf < 70 && (
+                  <p className="sheet-warn">
+                    Low confidence ({conf}%). On-device reading struggles with joined-up handwriting. The AI reader handles cursive far better.
+                  </p>
+                )}
+                <div className="journal-readers">
+                  <span className="assist-note">
+                    {readBy === 'device'
+                      ? `Read here on your device${conf !== null ? `, ${conf}% confident` : ''}. The photo never left it.`
+                      : 'Read by Groq. The photo was sent to it for this one call.'}
+                  </span>
+                  {readBy === 'device' && (
+                    <button className="btn btn-quiet" onClick={readWithAi} disabled={!hasAiKey()} title={hasAiKey() ? 'Send this photo to Groq for a better read' : 'Needs a Groq key in Settings'}>
+                      Try the AI reader
+                    </button>
+                  )}
+                  {readBy === 'ai' && (
+                    <button className="btn btn-quiet" onClick={() => photo && onFile(undefined)} disabled>Read by AI</button>
+                  )}
+                </div>
                 <div className="coach-nav" style={{ marginTop: 'var(--s3)' }}>
                   <button className="btn btn-primary" disabled={!text.trim()} onClick={findItems}>
                     {items ? 'Look again' : 'Find tasks, goals and habits'}

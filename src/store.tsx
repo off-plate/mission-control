@@ -43,6 +43,14 @@ import type {
 } from './types'
 
 export const STORAGE_KEY = 'mission-control-demo-v12'
+/** The untouched copy of whatever was saved before this build migrated it. */
+export const BACKUP_KEY = 'mission-control-backup-v3'
+
+/* Saved state written by a NEWER build than this one. This build cannot read it,
+   so it must not write either: seeding fresh and saving would replace whatever
+   the newer device wrote with an empty start. The app runs, and says so. */
+let futureBlob = false
+export function isReadOnly(): boolean { return futureBlob }
 
 interface PersistedState {
   version: 3
@@ -75,6 +83,8 @@ interface PersistedState {
   habitLog?: HabitTick[]
   /** Every day a routine was finished, dated. */
   routineLog?: RoutineDone[]
+  /** How many rows had no space and were filed as Personal on migration. */
+  spaceGuessed?: number
 }
 
 /** A delete you can still take back: what it was, and how to put it back. */
@@ -212,8 +222,22 @@ function loadPersisted(): PersistedState | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
+
+    /* Copy the raw blob aside before a single transform runs, and never touch it
+       again. Everything below rewrites his saved state in place; if any of it is
+       wrong, this is the copy that gets him back. */
+    try {
+      if (localStorage.getItem(BACKUP_KEY) !== raw) localStorage.setItem(BACKUP_KEY, raw)
+    } catch { /* a full quota must not stop the app loading */ }
+
     const p = JSON.parse(raw) as PersistedState
-    if (p.version !== 3 || (p.schema && p.schema !== STORAGE_KEY)) return null
+    /* Refuse only a blob from a FUTURE version, which this build cannot
+       understand. Refusing an older one returned null, which seeded the mock
+       data and then wrote it straight over his real state on the first change.
+       That was the most dangerous line in the file. */
+    if ((p.version ?? 0) > 3) { futureBlob = true; return null }
+    if (p.schema && p.schema !== STORAGE_KEY) return null
+    p.version = 3
     /* Week rollover: when the saved state belongs to an earlier ISO week, each
        habit's checkmarks are archived into its 12-week history and cleared, so
        Monday always starts a fresh row instead of showing last week's ticks. */
@@ -249,6 +273,52 @@ function loadPersisted(): PersistedState | null {
         days: [false, false, false, false, false, false, false],
       }))
     }
+    /* A row written before spaces existed has no space, which used to mean it
+       counted everywhere. Stamp it once, and record that it was a guess rather
+       than something he chose, so the number is at least in one place only. */
+    {
+      let guessed = 0
+      const stamp = <T extends { space?: SpaceId }>(rows: T[] | undefined) =>
+        (rows ?? []).map((r) => (r.space ? r : (guessed++, { ...r, space: 'personal' as SpaceId })))
+      p.ledger = stamp(p.ledger)
+      p.coachSessions = stamp(p.coachSessions)
+      p.focusSessions = stamp(p.focusSessions)
+      if (guessed) p.spaceGuessed = (p.spaceGuessed ?? 0) + guessed
+    }
+
+    /* THE DAY ROLLS OVER. Today's list has to mean today. Nothing ever cleared
+       it, so a task moved to today stayed there for good and finished ones sat
+       struck through underneath forever: a plan from forty days ago was still
+       "today".
+
+       Unfinished work goes back to the list rather than following him into the
+       new day. Re-choosing it is the whole point of planning a day, and silently
+       re-planning it is how the pile formed in the first place. Nothing is lost:
+       it is in the list, and Plan says how many came back so it is not a silent
+       disappearance. Finished work leaves the day list and lives in the ledger,
+       which already carries its date. */
+    {
+      const today = localDateKey()
+      const returned: string[] = []
+      p.tasks = (p.tasks ?? []).map((t) => {
+        if (t.list !== 'today') return t
+        // A task with no stamp predates this rule; treat it as planned today so
+        // an upgrade does not sweep his current list out from under him.
+        const on = t.plannedOn ?? today
+        if (on === today) return { ...t, plannedOn: on }
+        if (t.done) return { ...t, list: 'backlog' as const, plannedOn: undefined }
+        returned.push(t.id)
+        return { ...t, list: 'backlog' as const, plannedOn: undefined, slot: undefined, at: undefined }
+      })
+      p.plan = {
+        ...(p.plan ?? { committedDate: null, firstMoveId: null }),
+        // Yesterday's first move is not today's.
+        firstMoveId: p.plan?.committedDate === today ? p.plan.firstMoveId : null,
+        returnedOn: returned.length ? today : p.plan?.returnedOn,
+        returnedCount: returned.length ? returned.length : (p.plan?.returnedOn === today ? p.plan?.returnedCount : 0),
+      }
+    }
+
     /* A goal whose period has ended stops counting and keeps the number it
        finished on. Nothing is deleted: it moves to the past, where he can look
        at how it went and set it again if he wants to. */
@@ -409,6 +479,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [focusSessions, setFocusSessions] = useState<FocusSession[]>(persisted?.focusSessions ?? [])
   const [habitLog, setHabitLog] = useState<HabitTick[]>(persisted?.habitLog ?? [])
   const [routineLog, setRoutineLog] = useState<RoutineDone[]>(persisted?.routineLog ?? [])
+  const [spaceGuessed] = useState<number>(persisted?.spaceGuessed ?? 0)
   /* The last thing you deleted, held long enough to take it back. Deliberately
      not persisted: a delete you can still undo after a reload is not a delete. */
   const [undoable, setUndoable] = useState<Undoable | null>(null)
@@ -433,7 +504,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const space: SpaceId = isSpace(view) ? view : writeSpace
   const setSpace = (s: SpaceId) => setWriteSpace(s)
   const setView = (v: ViewId) => { setViewState(v); if (isSpace(v)) setWriteSpace(v) }
-  const inView = (s?: SpaceId) => view === 'all' || !s || s === view
+  /* A record belongs to exactly one space. The old form treated a space-less row
+     as belonging to all three at once, so the same ledger row was counted in
+     Personal AND Work AND Off-Plate and every time-saved figure was wrong. Rows
+     written before spaces existed are stamped on load instead. */
+  const inView = (s?: SpaceId) => view === 'all' || s === view
   const [page, setPageState] = useState<PageId>(pageFromHash)
   const [editing, setEditing] = useState(false)
   const [focusTaskId, setFocusTaskId] = useState<string | null>(null)
@@ -471,10 +546,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    // Refuse to write over state a newer build saved.
+    if (futureBlob) return
+
     const state: PersistedState = {
       version: 3, spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
       weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
-      habitLog, routineLog,
+      habitLog, routineLog, spaceGuessed,
     }
     const json = JSON.stringify(state)
     latestJson.current = json
@@ -515,7 +593,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
      week/space and are treated as this week's so the demo still shows numbers.
      Net, including overruns; the headline equals the sum of the visible rows. */
   const weekLedger = ledger.filter(
-    (e) => (!e.weekKey || e.weekKey === isoWeekKey()) && (!e.space || e.space === space),
+    (e) => (!e.weekKey || e.weekKey === isoWeekKey()) && inView(e.space),
   )
   const savedMin = weekLedger.reduce((acc, e) => acc + (e.estimateMin - e.actualMin), 0)
   const accuracyPct = Math.round(
@@ -583,7 +661,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (minutes <= 0) return
       const day = todayKey()
       const mins = Math.round(minutes)
-      setFocusSessions((prev) => [{ id: newId('f'), day, minutes: mins, label, space }, ...prev].slice(0, 2000))
+      // No cap: a focus block is a dated record and the history views read it.
+      setFocusSessions((prev) => [{ id: newId('f'), day, minutes: mins, label, space }, ...prev])
       setLedger((prev) => [
         { id: newId('l'), title: label ? `Focus: ${label}` : 'Focus block', category: 'deep' as TaskCategory,
           estimateMin: mins, actualMin: mins, when: day, space, weekKey: isoWeekKey() },
@@ -842,8 +921,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
        also marks the weekly ritual done, so the Sunday nudge keeps working. */
     closeReview: (w, wins, outcomes) => {
       setReview((prev) => {
-        const kept = (prev.reflections ?? []).filter((r) => !(r.from === w.from && r.to === w.to))
-        const entry = { id: newId('rf'), label: w.label, from: w.from, to: w.to, when: todayKey(), wins, outcomes }
+        /* Closing the same window again appends and supersedes. It used to drop
+           the previous one, so a second close with empty boxes erased what he
+           had written the first time. */
+        const prior = (prev.reflections ?? []).find((r) => r.from === w.from && r.to === w.to && !r.supersededBy)
+        const id = newId('rf')
+        const kept = (prev.reflections ?? []).map((r) => (r.id === prior?.id ? { ...r, supersededBy: id } : r))
+        const entry = { id, label: w.label, from: w.from, to: w.to, when: todayKey(), wins, outcomes }
         const isThisWeek = w.from === dayOfWeekKey(0) && w.to === todayKey()
         return {
           ...prev,
@@ -851,7 +935,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           lastWeekKey: isThisWeek ? isoWeekKey() : prev.lastWeekKey,
           wins: isThisWeek ? wins : prev.wins,
           outcomes: isThisWeek ? outcomes : prev.outcomes,
-          reflections: [entry, ...kept].slice(0, 60),
+          // No cap. This is a handful of sentences a week, and it is his writing.
+          reflections: [entry, ...kept],
         }
       })
       setTasks((prev) => [

@@ -152,8 +152,19 @@ export function ReviewPage() {
   const spaceGoals = goals.filter((g) => inView(g.space))
   const goalsOnTrack = spaceGoals.filter((g) => goalPace(goalCurrent(g, habits), g.target, g.timeframe ?? 'quarter') !== 'behind').length
 
-  const closed = (review.reflections ?? []).find((r) => r.from === range.from && r.to === range.to)
-  const previous = (review.reflections ?? []).find((r) => r.to < range.from)
+  const live = (review.reflections ?? []).filter((r) => !r.supersededBy)
+  const closed = live.find((r) => r.from === range.from && r.to === range.to)
+  const previous = live.find((r) => r.to < range.from)
+
+  /* Reopening a closed window loads what he wrote. It used to show only a
+     banner, so pressing the button again saved three empty boxes over it. */
+  useEffect(() => {
+    const w = closed?.wins ?? []
+    setWins([w[0] ?? '', w[1] ?? '', w[2] ?? ''])
+    setChanged(w.length > 3 ? w.slice(3).join(' ') : '')
+    const o = closed?.outcomes ?? []
+    setOutcomes([o[0] ?? '', o[1] ?? '', o[2] ?? ''])
+  }, [closed?.id, range.from, range.to])
 
   const setW = (i: number, v: string) => setWins((p) => p.map((x, j) => (j === i ? v : x)))
   const setO = (i: number, v: string) => setOutcomes((p) => p.map((x, j) => (j === i ? v : x)))

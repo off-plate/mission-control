@@ -148,6 +148,22 @@ function loadPersisted(): PersistedState | null {
         days: [false, false, false, false, false, false, false],
       }))
     }
+    /* Forward-fill fields added after this state was saved, so an existing
+       install picks up new wiring (habit frequencies, habit-linked goals)
+       without losing anything he has logged. Only ever fills a blank. */
+    const seedH = new Map(MOCK_HABITS.map((h) => [h.id, h]))
+    p.habits = p.habits.map((h) => {
+      const s = seedH.get(h.id)
+      return s ? { ...h, frequency: h.frequency ?? s.frequency, targetPerWeek: h.targetPerWeek ?? s.targetPerWeek } : h
+    })
+    // A seeded habit added later is missing entirely; append it rather than reseed.
+    for (const s of MOCK_HABITS) if (!p.habits.some((h) => h.id === s.id)) p.habits.push(s)
+
+    const seedG = new Map(MOCK_GOALS.map((g) => [g.id, g]))
+    p.goals = p.goals.map((g) => {
+      const s = seedG.get(g.id)
+      return s?.habitId && !g.habitId ? { ...g, habitId: s.habitId, unit: s.unit } : g
+    })
     return p
   } catch {
     return null

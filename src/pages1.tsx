@@ -923,7 +923,7 @@ function AddGoalSheet({ onClose }: { onClose: () => void }) {
     timeframe: 'weekly' as GoalTimeframe, category: 'life' as GoalCategory, habitId: '',
   })
   // Any habit in this profile can drive a goal, so the list grows as you do.
-  const linkable = habits.filter((h) => h.space === space && !h.paused)
+  const linkable = [...habits.filter((h) => h.space === space && !h.paused)].reverse()
   const linked = linkable.find((h) => h.id === d.habitId)
 
   const submit = () => {
@@ -968,28 +968,35 @@ function AddGoalSheet({ onClose }: { onClose: () => void }) {
         </div>
       </div>
 
-      {/* The cross-link: a goal can count itself off a habit you already keep. */}
-      <label className="field-label" style={{ marginTop: 'var(--s4)' }} htmlFor="ghabit">Track it automatically?</label>
+      {/* The cross-link: a goal can count itself off a habit you already keep.
+          Newest habits first, so one you just made is the first thing you see. */}
+      <label className="field-label" style={{ marginTop: 'var(--s4)' }} htmlFor="ghabit">How is progress counted?</label>
       <select id="ghabit" className="textinput" style={{ width: '100%' }} value={d.habitId}
         onChange={(e) => setD({ ...d, habitId: e.target.value })}>
-        <option value="">No, I will log progress myself</option>
-        {linkable.map((h) => <option key={h.id} value={h.id}>Count every “{h.name}” checkoff</option>)}
+        <option value="">I will log it myself</option>
+        {linkable.map((h) => (
+          <option key={h.id} value={h.id}>Automatically, from the “{h.name}” habit</option>
+        ))}
       </select>
-      {linked && (
-        <p className="assist-note" style={{ marginTop: 6 }}>
-          Every time you tick “{linked.name}” on Habits, this goal moves. Nothing to log twice.
-        </p>
-      )}
+      <p className="assist-note" style={{ marginTop: 6 }}>
+        {linked
+          ? `Every time you tick “${linked.name}” on Habits, this goal moves. Nothing to log twice.`
+          : linkable.length > 0
+            ? 'Pick a habit above and this goal counts itself as you keep it.'
+            : 'Create a habit first and a goal can count itself off it.'}
+      </p>
 
       <div className="sheet-grid" style={{ marginTop: 'var(--s4)' }}>
-        <div className="sheet-inline">
-          <span>Target</span>
-          <input className="numinput" type="number" min={1} value={d.target}
-            onChange={(e) => setD({ ...d, target: Math.max(1, Number(e.target.value) || 1) })} aria-label="Target" />
-          {d.habitId
-            ? <span>checkoffs</span>
-            : <input className="textinput" style={{ maxWidth: 120 }} placeholder="unit" value={d.unit}
-                onChange={(e) => setD({ ...d, unit: e.target.value })} aria-label="Unit" />}
+        <div>
+          <label className="field-label" htmlFor="gtarget">Target</label>
+          <div className="sheet-inline">
+            <input id="gtarget" className="numinput" type="number" min={1} value={d.target}
+              onChange={(e) => setD({ ...d, target: Math.max(1, Number(e.target.value) || 1) })} />
+            {d.habitId
+              ? <span className="sheet-unit">checkoffs</span>
+              : <input className="textinput" placeholder="unit, e.g. sessions" value={d.unit}
+                  onChange={(e) => setD({ ...d, unit: e.target.value })} aria-label="Unit" />}
+          </div>
         </div>
         <div>
           <label className="field-label" htmlFor="gdl">By when</label>

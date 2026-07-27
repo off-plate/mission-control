@@ -95,6 +95,7 @@ interface Store extends PersistedState {
   deleteHabit: (id: string) => void
 
   addGoal: (g: Omit<Goal, 'id'>) => void
+  updateGoal: (id: string, patch: Partial<Omit<Goal, 'id' | 'space'>>) => void
   bumpGoal: (id: string, delta: number) => void
   toggleGoalMilestone: (goalId: string, milestoneId: string) => void
   deleteGoal: (id: string) => void
@@ -483,6 +484,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     deleteHabit: (id) => setHabits((prev) => prev.filter((h) => h.id !== id)),
 
     addGoal: (g) => setGoals((prev) => [...prev, { ...g, id: newId('g') }]),
+    /* Editing a goal is how a habit gets attached to one that already exists.
+       Clearing the link keeps whatever the habit had counted, so the number
+       does not jump backwards when you switch to logging by hand. */
+    updateGoal: (id, patch) =>
+      setGoals((prev) => prev.map((g) => {
+        if (g.id !== id) return g
+        const next = { ...g, ...patch }
+        if ('habitId' in patch && !patch.habitId && g.habitId) next.current = g.current
+        return next
+      })),
     bumpGoal: (id, delta) =>
       setGoals((prev) =>
         prev.map((g) =>

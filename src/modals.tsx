@@ -97,7 +97,7 @@ export function BreakdownSheet({ task, onClose }: { task: Task; onClose: () => v
                 {s.title}
                 {s.why && <span className="why">{s.why}</span>}
               </span>
-              <span className="est-chip">~{s.estimateMin}m</span>
+              <span className="est-chip">{s.estimateMin}m</span>
             </div>
           ))}
           {source === 'local' && (

@@ -3,10 +3,166 @@ import { Band, Dropdown } from './pages1'
 import { useStore } from './store'
 import { parseDictation, TAB_FOR, type ParsedItem } from './assistant'
 import { fmtWhen } from './util'
+import { extractFromJournal, hasAiKey, shrinkImage, transcribeImage, type JournalItems } from './ai'
+import type { HabitFrequency } from './types'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 const KIND_LABEL: Record<ParsedItem['kind'], string> = { task: 'task', goal: 'goal', done: 'done' }
+
+/* Photograph a journal page, read it, and turn what you committed to into real
+   items. Nothing is saved until you have read the transcript and chosen: the
+   model can produce fluent, confident Czech you never wrote, and its confidence
+   score says nothing about whether it is right. The photo and the transcript
+   stay in this page and are never written to the database. */
+function JournalReader() {
+  const { space, addTask, addGoal, addHabit } = useStore()
+  const [photo, setPhoto] = useState<string | null>(null)
+  const [stage, setStage] = useState<'idle' | 'reading' | 'thinking' | 'review'>('idle')
+  const [error, setError] = useState('')
+  const [text, setText] = useState('')
+  const [items, setItems] = useState<JournalItems | null>(null)
+  const [picked, setPicked] = useState<Set<string>>(new Set())
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const reset = () => { setPhoto(null); setStage('idle'); setError(''); setText(''); setItems(null); setPicked(new Set()) }
+
+  const onFile = async (file?: File) => {
+    if (!file) return
+    setError(''); setItems(null); setText(''); setStage('reading')
+    try {
+      const url = await shrinkImage(file)
+      setPhoto(url)
+      const r = await transcribeImage(url)
+      if (!r.ok) {
+        setStage('idle')
+        setError(
+          r.reason === 'no-key' ? 'No Groq key yet. Add one in Settings and this can read your page.'
+          : r.reason === 'bad-key' ? 'That Groq key was rejected. Check it in Settings.'
+          : r.reason === 'rate-limit' ? 'Groq is rate limiting. Wait a moment and try again.'
+          : r.reason === 'too-big' ? 'That photo is too large even after shrinking.'
+          : 'Could not read the photo. Try a straighter, better lit shot.')
+        return
+      }
+      setText(r.text)
+      setStage('review')
+    } catch {
+      setStage('idle'); setError('Could not open that image.')
+    }
+  }
+
+  const findItems = async () => {
+    setStage('thinking'); setError('')
+    const r = await extractFromJournal(text)
+    if (!r.ok) { setStage('review'); setError('Could not pull items out of that. You can still edit the text and try again.'); return }
+    setItems(r.items)
+    const all = new Set<string>()
+    r.items.tasks.forEach((_, i) => all.add(`t${i}`))
+    r.items.goals.forEach((_, i) => all.add(`g${i}`))
+    r.items.habits.forEach((_, i) => all.add(`h${i}`))
+    setPicked(all)
+    setStage('review')
+  }
+
+  const toggle = (k: string) => setPicked((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })
+
+  const save = () => {
+    if (!items) return
+    items.tasks.forEach((t, i) => { if (picked.has(`t${i}`)) addTask({ title: t.title, source: 'mc', estimateMin: t.estimateMin ?? 0, space, list: 'backlog', category: 'quick' }) })
+    items.goals.forEach((g, i) => { if (picked.has(`g${i}`)) addGoal({ space, name: g.title, current: 0, target: 3, unit: 'steps', note: '', why: g.why, timeframe: 'weekly', category: 'life', milestones: [] }) })
+    items.habits.forEach((h, i) => { if (picked.has(`h${i}`)) addHabit({ name: h.title, frequency: (h.frequency as HabitFrequency) ?? 'daily', kind: 'build' }) })
+    reset()
+  }
+
+  const total = items ? items.tasks.length + items.goals.length + items.habits.length : 0
+  const busy = stage === 'reading' || stage === 'thinking'
+
+  return (
+    <div className="panel journal">
+      <span className="microcap">Read a page of your journal</span>
+      <p className="assist-note" style={{ marginTop: 6 }}>
+        Photograph a written page and it transcribes what is there. You read the transcript, fix what it
+        got wrong, and choose what becomes real. The photo and the text stay on this page.
+      </p>
+
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden
+        onChange={(e) => onFile(e.target.files?.[0])} />
+
+      {stage === 'idle' && !photo && (
+        <div className="journal-drop">
+          <button className="btn btn-primary" onClick={() => fileRef.current?.click()}>Take or choose a photo</button>
+          {!hasAiKey() && <span className="assist-note">Needs a Groq key, set in Settings.</span>}
+        </div>
+      )}
+
+      {error && <p className="sheet-warn">{error}</p>}
+
+      {photo && (
+        <div className="journal-work">
+          <div className="journal-shot">
+            <img src={photo} alt="The page you photographed" />
+            <button className="btn btn-quiet" onClick={reset}>Different photo</button>
+          </div>
+
+          <div className="journal-text">
+            {busy && <div className="empty">{stage === 'reading' ? 'Reading the page.' : 'Looking for what you committed to.'}</div>}
+            {!busy && (
+              <>
+                <label className="field-label" htmlFor="jtext">What it read. Fix anything wrong before you go on.</label>
+                <textarea id="jtext" className="textinput journal-area" value={text} onChange={(e) => setText(e.target.value)} rows={10} />
+                {text.includes('[?]') && (
+                  <p className="sheet-warn">[?] marks a word it could not read. Replace those before continuing.</p>
+                )}
+                <div className="coach-nav" style={{ marginTop: 'var(--s3)' }}>
+                  <button className="btn btn-primary" disabled={!text.trim()} onClick={findItems}>
+                    {items ? 'Look again' : 'Find tasks, goals and habits'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {items && !busy && (
+        <div className="journal-items">
+          {total === 0 && <p className="bucket-empty">Nothing in that page reads as something to do. That is a fine answer.</p>}
+          {items.tasks.map((t, i) => (
+            <label className={`journal-item${picked.has(`t${i}`) ? ' on' : ''}`} key={`t${i}`}>
+              <input type="checkbox" checked={picked.has(`t${i}`)} onChange={() => toggle(`t${i}`)} />
+              <span className="assist-tag k-task">task</span>
+              <span className="grow">{t.title}</span>
+              {t.estimateMin ? <span className="est-chip">{t.estimateMin}m</span> : null}
+            </label>
+          ))}
+          {items.goals.map((g, i) => (
+            <label className={`journal-item${picked.has(`g${i}`) ? ' on' : ''}`} key={`g${i}`}>
+              <input type="checkbox" checked={picked.has(`g${i}`)} onChange={() => toggle(`g${i}`)} />
+              <span className="assist-tag k-goal">goal</span>
+              <span className="grow">{g.title}</span>
+            </label>
+          ))}
+          {items.habits.map((h, i) => (
+            <label className={`journal-item${picked.has(`h${i}`) ? ' on' : ''}`} key={`h${i}`}>
+              <input type="checkbox" checked={picked.has(`h${i}`)} onChange={() => toggle(`h${i}`)} />
+              <span className="assist-tag k-done">habit</span>
+              <span className="grow">{h.title}</span>
+              <span className="mono meta">{h.frequency}</span>
+            </label>
+          ))}
+          {total > 0 && (
+            <div className="coach-nav" style={{ marginTop: 'var(--s3)' }}>
+              <button className="btn btn-quiet" onClick={reset}>Discard</button>
+              <button className="btn btn-primary" disabled={picked.size === 0} onClick={save}>
+                Add {picked.size} {picked.size === 1 ? 'item' : 'items'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function AssistantPage() {
   const { applyDictation, assistantLog, revertAssistantItem, setPage } = useStore()
@@ -50,6 +206,9 @@ export function AssistantPage() {
     <div className="page">
       <Band title="Assistant" />
 
+      <JournalReader />
+
+
       <div className="panel" style={{ marginBottom: 'var(--s5)' }}>
         <span className="microcap">Dictate or type</span>
         <div className="assist-input">
@@ -87,7 +246,7 @@ export function AssistantPage() {
                   <option value="done">done</option>
                 </select>
                 <span className="grow">{p.text}</span>
-                {p.estimateMin != null && <span className="est-chip">~{p.estimateMin}m</span>}
+                {p.estimateMin != null && <span className="est-chip">{p.estimateMin}m</span>}
                 <span className="assist-dest mono">→ {TAB_FOR[p.kind]}</span>
               </div>
             ))}

@@ -58,6 +58,8 @@ interface PersistedState {
   fixes?: number
   /** Personal bests, keyed by `routineId:stepId`. Survives every rollover. */
   records?: Record<string, number>
+  /** Which storage schema wrote this. A row from an older one is not reused. */
+  schema?: string
 }
 
 interface Store extends PersistedState {
@@ -146,7 +148,7 @@ function loadPersisted(): PersistedState | null {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const p = JSON.parse(raw) as PersistedState
-    if (p.version !== 3) return null
+    if (p.version !== 3 || (p.schema && p.schema !== STORAGE_KEY)) return null
     /* Week rollover: when the saved state belongs to an earlier ISO week, each
        habit's checkmarks are archived into its 12-week history and cleared, so
        Monday always starts a fresh row instead of showing last week's ticks. */
@@ -312,7 +314,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const state: PersistedState = {
       version: 3, spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
-      weekKey: isoWeekKey(), records, fixes: 1,
+      weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY,
     }
     const json = JSON.stringify(state)
     latestJson.current = json

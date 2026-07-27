@@ -22,12 +22,21 @@ function render() {
 /* When Supabase is configured, hydrate localStorage from the saved state before the
    store reads it, so the database is the source of truth. If there is no saved row
    yet, we leave localStorage untouched (no data loss) and the store seeds the row on
-   the first change. When Supabase is not configured this is a no-op. */
+   the first change. When Supabase is not configured this is a no-op.
+
+   The remote row carries the schema it was written under. Bumping the local key
+   alone did nothing: the old row was hydrated straight into the new key, so a
+   clean slate came back full. A row from a different schema is ignored, the app
+   seeds fresh, and the first change overwrites the row. */
 async function boot() {
   if (SUPABASE_ENABLED) {
     try {
       const remote = await loadRemoteState()
-      if (remote) localStorage.setItem(STORAGE_KEY, remote)
+      if (remote) {
+        const schema = (JSON.parse(remote) as { schema?: string }).schema
+        if (schema === STORAGE_KEY) localStorage.setItem(STORAGE_KEY, remote)
+        else localStorage.removeItem(STORAGE_KEY)
+      }
     } catch { /* fall back to whatever is in localStorage */ }
   }
   render()

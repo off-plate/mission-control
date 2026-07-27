@@ -15,32 +15,85 @@ import type { CoachFacts, CoachSession, TaskCategory } from './types'
 /** Kč written as a number, so paid amounts can be added up. */
 const kc = (s: string) => Number(s.replace(/[^\d]/g, '')) || 0
 
+/* The sections stay; only the numbers are gone. An empty section that names
+   what belongs there is a place for real data to land. An invented number is
+   not. */
+function NoData({ label }: { label: string }) {
+  return <div className="kpi nodata">&mdash;<span className="unit">{label}</span></div>
+}
+
 export function MoneyPage() {
   const f = MOCK_MONEY
 
-  /* Nothing is invented here. Until Compass feeds this page it says so, rather
-     than showing balances that are not his. */
-  if (!f) {
-    return (
-      <div className="page">
-        <Band title="Money" />
-        <div className="panel money-compass">
-          <div className="money-compass-copy">
-            <span className="microcap">Not connected yet</span>
-            <p>
-              Your debts, budget and payment plans live in Compass. This page stays empty until
-              that link exists, because a number here that is not yours is worse than no number.
-            </p>
-          </div>
-          <a className="btn btn-primary money-compass-btn" href="https://compass-money.netlify.app" target="_blank" rel="noreferrer">
-            Open Compass
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M7 17L17 7M17 7H8M17 7v9" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          </a>
+  return (
+    <div className="page">
+      <Band title="Money" />
+      <div className="grid-3">
+        <div className="panel">
+          <span className="microcap">Debt payoff</span>
+          {f ? (
+            <>
+              <div className="kpi">{fmtNum(kc(f.debt.remaining))} Kč<span className="unit">left</span></div>
+              <div className="bar debt" style={{ marginTop: 12 }}><i style={{ width: `${f.debt.pct}%` }} /></div>
+              <div className="kpi-sub"><span className="val-pos">{f.debt.paid} paid</span> of {f.debt.original}</div>
+            </>
+          ) : (
+            <>
+              <NoData label="left" />
+              <div className="bar debt" style={{ marginTop: 12 }}><i style={{ width: '0%' }} /></div>
+              <div className="kpi-sub">What you still owe, and how much of it is cleared.</div>
+            </>
+          )}
+        </div>
+
+        <div className="panel">
+          <span className="microcap">Monthly payments</span>
+          {f ? (
+            <>
+              <div className="kpi">{f.debt.monthly}<span className="unit">/ month</span></div>
+              <div className="kpi-sub">across your payment plans</div>
+            </>
+          ) : (
+            <>
+              <NoData label="/ month" />
+              <div className="bar prog" style={{ marginTop: 12 }}><i style={{ width: '0%' }} /></div>
+              <div className="kpi-sub">What leaves the account each month across your payment plans.</div>
+            </>
+          )}
+        </div>
+
+        <div className="panel">
+          <span className="microcap">Monthly savings</span>
+          {f ? (
+            <>
+              <div className="kpi val-pos">{f.savings.thisMonth}</div>
+              <div className="kpi-sub">set aside this month</div>
+            </>
+          ) : (
+            <>
+              <NoData label="this month" />
+              <div className="kpi-sub">What you managed to put aside, month by month.</div>
+            </>
+          )}
         </div>
       </div>
-    )
-  }
-  return null
+
+      <div className="panel money-compass" style={{ marginTop: 'var(--s5)' }}>
+        <div className="money-compass-copy">
+          <span className="microcap">{f ? 'The full picture lives in Compass' : 'Not connected yet'}</span>
+          <p>
+            {f
+              ? 'Debts, budget, goals and the five-year plan are managed in Compass. This page is the at-a-glance readout.'
+              : 'Your debts, budget and payment plans live in Compass. These panels stay empty until that link exists, because a number here that is not yours is worse than none.'}
+          </p>
+        </div>
+        <a className="btn btn-primary money-compass-btn" href="https://compass-money.netlify.app" target="_blank" rel="noreferrer">
+          Open Compass
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M7 17L17 7M17 7H8M17 7v9" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </a>
+      </div>
+    </div>
+  )
 }
 
 /* ---------------- REVIEW (weekly reset + stats, merged) ---------------- */

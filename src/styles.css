@@ -1928,3 +1928,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
    content pushes the whole page sideways instead. */
 .topstick, .nav { min-width: 0; }
 .shell { overflow-x: clip; }
+
+/* A section with no data yet reads as a waiting slot, not a number. */
+.kpi.nodata { color: var(--faint); }

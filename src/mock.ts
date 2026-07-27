@@ -111,30 +111,33 @@ export const SPACE_LABELS: Record<SpaceId, string> = {
   offplate: 'Off-Plate',
 }
 
+/** Seed ages, so the ageing detector has real history on a fresh install. */
+const ago = (d: number) => { const x = new Date(); x.setDate(x.getDate() - d); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}` }
+
 export const MOCK_TASKS: Task[] = [
-  { id: 't1', title: 'Reply to the accountant about missing documents', source: 'ticktick', estimateMin: 15, done: false, space: 'personal', list: 'today', category: 'admin', slot: 'morning', at: '09:30' },
-  { id: 't2', title: 'Book car service before the Italy trip', source: 'ticktick', estimateMin: 10, done: false, space: 'personal', list: 'today', category: 'quick', slot: 'noon' },
-  { id: 't3', title: 'Check Datová schránka', source: 'mc', estimateMin: 5, done: false, space: 'personal', list: 'today', category: 'admin', slot: 'morning' },
-  { id: 't4', title: 'Move washing machine repair card to Done', source: 'trello', estimateMin: 5, done: true, actualMin: 3, space: 'personal', list: 'today', category: 'quick', slot: 'morning' },
-  { id: 't10', title: 'Sort the insurance letters into one folder', source: 'mc', estimateMin: 20, done: false, space: 'personal', list: 'backlog', category: 'admin',
+  { id: 't1', createdAt: ago(11), title: 'Reply to the accountant about missing documents', source: 'ticktick', estimateMin: 15, done: false, space: 'personal', list: 'today', category: 'admin', slot: 'morning', at: '09:30' },
+  { id: 't2', createdAt: ago(3), title: 'Book car service before the Italy trip', source: 'ticktick', estimateMin: 10, done: false, space: 'personal', list: 'today', category: 'quick', slot: 'noon' },
+  { id: 't3', createdAt: ago(1), title: 'Check Datová schránka', source: 'mc', estimateMin: 5, done: false, space: 'personal', list: 'today', category: 'admin', slot: 'morning' },
+  { id: 't4', createdAt: ago(0), title: 'Move washing machine repair card to Done', source: 'trello', estimateMin: 5, done: true, actualMin: 3, space: 'personal', list: 'today', category: 'quick', slot: 'morning' },
+  { id: 't10', createdAt: ago(9), title: 'Sort the insurance letters into one folder', source: 'mc', estimateMin: 20, done: false, space: 'personal', list: 'backlog', category: 'admin',
     subtasks: [
       { id: 't10a', title: 'Open the pile and split by sender', estimateMin: 4, done: false },
       { id: 't10b', title: 'Scan each into the Insurance folder', estimateMin: 10, done: false },
       { id: 't10c', title: 'Write down any deadline you spot', estimateMin: 6, done: false },
     ] },
-  { id: 't11', title: 'Cancel the streaming service you never open', source: 'ticktick', estimateMin: 10, done: false, space: 'personal', list: 'backlog', category: 'quick' },
-  { id: 't12', title: 'Plan the August budget with the trip included', source: 'mc', estimateMin: 40, done: false, space: 'personal', list: 'backlog', category: 'deep',
+  { id: 't11', createdAt: ago(21), title: 'Cancel the streaming service you never open', source: 'ticktick', estimateMin: 10, done: false, space: 'personal', list: 'backlog', category: 'quick' },
+  { id: 't12', createdAt: ago(4), title: 'Plan the August budget with the trip included', source: 'mc', estimateMin: 40, done: false, space: 'personal', list: 'backlog', category: 'deep',
     subtasks: [
       { id: 't12a', title: 'List every fixed cost for August', estimateMin: 10, done: false },
       { id: 't12b', title: 'Add the trip line, about 20 000 Kč', estimateMin: 8, done: false },
       { id: 't12c', title: 'Subtract from expected income', estimateMin: 7, done: false },
       { id: 't12d', title: 'Set the safe-to-spend number', estimateMin: 5, done: false },
     ] },
-  { id: 't5', title: 'Prep talking points for Tuesday sync', source: 'ticktick', estimateMin: 25, done: false, space: 'work', list: 'today', category: 'deep', slot: 'morning' },
-  { id: 't6', title: 'Review the two open pull requests', source: 'jira', estimateMin: 40, done: false, space: 'work', list: 'today', category: 'deep', slot: 'afternoon' },
-  { id: 't7', title: 'Close DASH-214: onboarding empty state', source: 'jira', estimateMin: 30, done: false, space: 'work', list: 'backlog', category: 'deep' },
-  { id: 't8', title: 'Send follow-up to Thursday’s workshop lead', source: 'ticktick', estimateMin: 15, done: false, space: 'offplate', list: 'today', category: 'call', slot: 'morning' },
-  { id: 't9', title: 'Draft next LinkedIn post from the outline', source: 'trello', estimateMin: 30, done: false, space: 'offplate', list: 'backlog', category: 'deep',
+  { id: 't5', createdAt: ago(2), title: 'Prep talking points for Tuesday sync', source: 'ticktick', estimateMin: 25, done: false, space: 'work', list: 'today', category: 'deep', slot: 'morning' },
+  { id: 't6', createdAt: ago(1), title: 'Review the two open pull requests', source: 'jira', estimateMin: 40, done: false, space: 'work', list: 'today', category: 'deep', slot: 'afternoon' },
+  { id: 't7', createdAt: ago(6), title: 'Close DASH-214: onboarding empty state', source: 'jira', estimateMin: 30, done: false, space: 'work', list: 'backlog', category: 'deep' },
+  { id: 't8', createdAt: ago(8), title: 'Send follow-up to Thursday’s workshop lead', source: 'ticktick', estimateMin: 15, done: false, space: 'offplate', list: 'today', category: 'call', slot: 'morning' },
+  { id: 't9', createdAt: ago(3), title: 'Draft next LinkedIn post from the outline', source: 'trello', estimateMin: 30, done: false, space: 'offplate', list: 'backlog', category: 'deep',
     subtasks: [
       { id: 't9a', title: 'Pick one concrete story from this week', estimateMin: 5, done: false },
       { id: 't9b', title: 'Draft 8 to 10 lines, no editing', estimateMin: 15, done: false },
@@ -154,7 +157,8 @@ export const MOCK_HABITS: HabitDef[] = [
   { id: 'h2', space: 'personal', name: 'Morning check-in', daypart: 'morning', days: [true, true, true, false, true, true, true], paused: false, history: [3, 4, 4, 5, 5, 4, 6, 5, 6, 6, 5, 6] },
   { id: 'h3', space: 'personal', name: '20 min movement', daypart: 'afternoon', days: [false, true, false, true, true, false, false], paused: false, history: [0, 1, 2, 1, 3, 2, 3, 4, 3, 3, 4, 3] },
   { id: 'h4', space: 'personal', name: 'No screens at dinner', daypart: 'evening', days: [false, false, true, true, false, false, false], paused: false, history: [0, 0, 1, 1, 2, 1, 2, 2, 3, 2, 2, 2] },
-  { id: 'h1', space: 'personal', name: 'In bed before 1:00', daypart: 'evening', days: [true, true, false, true, false, true, false], paused: false, history: [1, 2, 2, 3, 2, 4, 3, 3, 4, 5, 4, 4] },
+  { id: 'h-evening', space: 'personal', name: 'Evening shutdown', daypart: 'evening', paused: false, days: [true, false, true, false, false, false, false], history: [1, 2, 2, 3, 2, 3, 3, 2, 3, 4, 3, 3] },
+  { id: 'h1', space: 'personal', name: 'Was in bed before 1:00 last night', daypart: 'morning', days: [true, true, false, true, false, true, false], paused: false, history: [1, 2, 2, 3, 2, 4, 3, 3, 4, 5, 4, 4] },
   { id: 'h-prework', space: 'personal', name: 'Before work', paused: false, days: [true, true, false, true, false, false, false], history: [1, 2, 2, 3, 2, 3, 3, 2, 3, 4, 3, 3] },
   { id: 'h-weekly', space: 'personal', name: 'Weekly reset', paused: false, days: [false, false, false, false, false, false, false], history: [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1] },
   { id: 'h-monthly', space: 'personal', name: 'Monthly review', paused: false, days: [false, false, false, false, false, false, false], history: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1] },
@@ -172,7 +176,7 @@ export const MOCK_HABITS: HabitDef[] = [
 ]
 
 export const MOCK_IDEAS: Idea[] = [
-  { id: 'idea-rubberband', space: 'personal', text: 'Rubber band on my wrist — snap it whenever I catch myself doing something I do not want to do (doomscroll, avoidance, overstimulation). A pattern interrupt, not punishment. Later: track the catches so they trend down over time. #tools', when: 'idea', color: 'amber' },
+  { id: 'idea-rubberband', space: 'personal', text: 'Rubber band on my wrist, snap it whenever I catch myself doing something I do not want to do (doomscroll, avoidance, overstimulation). A pattern interrupt, not punishment. Later: track the catches so they trend down over time. #tools', when: 'idea', color: 'amber' },
   { id: 'idea-work-1', space: 'work', text: 'A starter repo I can clone for every new project so I stop re-scaffolding the same setup each time. #tools', when: 'idea', color: 'blue' },
   { id: 'idea-offplate-1', space: 'offplate', text: 'Offer a free 20-minute automation teardown as the lead magnet. Show one process, name where the hours go, no pitch. #offers', when: 'idea', color: 'green' },
 ]
@@ -181,7 +185,7 @@ export const MOCK_ROUTINES: Routine[] = [
   // personal
   {
     id: 'r-morning', space: 'personal', title: 'Morning routine', cadence: 'daily', habitId: 'h-morning',
-    blurb: 'The four things that start the day right. Check them off as you go; finishing all four ticks the Morning routine habit for today.',
+    blurb: 'The things that start the day right. Check them off as you go; finishing the set ticks the Morning routine habit for today.',
     doneStepIds: [],
     steps: [
       { id: 'mr1', title: 'Meditation', kind: 'timer', seconds: 600, note: 'Sit, eyes closed, follow the breath. Ten minutes, no phone.', link: 'https://www.youtube.com/watch?v=1ZYbU82GVz4', linkLabel: 'Open the soundtrack' },
@@ -200,6 +204,17 @@ export const MOCK_ROUTINES: Routine[] = [
       { id: 'pw2', title: 'Pick the one task', kind: 'do', note: 'Name the single outcome for this block. Not a list, one thing.' },
       { id: 'pw3', title: 'Kill the distractions', kind: 'do', note: 'Notifications off, messaging closed. Decide when you will check them next.' },
       { id: 'pw4', title: 'Start a focus timer', kind: 'do', note: 'Open the Pomodoro and start the block before the resistance talks you out of it.' },
+    ],
+  },
+  {
+    id: 'r-evening', space: 'personal', title: 'Evening shutdown', cadence: 'daily', habitId: 'h-evening',
+    blurb: 'Close the day so it does not follow you to bed. Runs from 9 PM; the sleep habit is answered tomorrow morning, honestly.',
+    doneStepIds: [],
+    steps: [
+      { id: 'ev1', title: 'Close the open loops', kind: 'do', note: 'Anything you said you would do today: finish it, move it, or drop it. No silent carry-over.' },
+      { id: 'ev2', title: 'Name tomorrow’s first move', kind: 'do', note: 'One line, so the morning starts without deciding anything.' },
+      { id: 'ev3', title: 'Phone out of the bedroom', kind: 'do', note: 'The overstimulation loop breaks here or it does not break.' },
+      { id: 'ev4', title: 'Lights out target set', kind: 'do', note: 'Midnight at the latest. Cap the evening work now, not when you are already past it.' },
     ],
   },
   {

@@ -358,15 +358,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     },
 
-    addTask: (t) => setTasks((prev) => [{ ...t, id: newId('t'), done: false }, ...prev]),
+    addTask: (t) => setTasks((prev) => [{ ...t, id: newId('t'), done: false, createdAt: todayKey() }, ...prev]),
     addTasks: (ts) =>
-      setTasks((prev) => [...ts.map((t) => ({ ...t, id: newId('t'), done: false })), ...prev]),
+      setTasks((prev) => [...ts.map((t) => ({ ...t, id: newId('t'), done: false, createdAt: todayKey() })), ...prev]),
     addTaskWithSubtasks: (parent, subs) =>
       setTasks((prev) => {
         const pid = newId('t')
         const subtasks = subs.map((sub, i) => ({ id: `${pid}s${i}`, title: sub.title, estimateMin: sub.estimateMin, done: false }))
         const est = subtasks.reduce((a, s) => a + s.estimateMin, 0)
-        return [{ ...parent, id: pid, done: false, estimateMin: est, subtasks }, ...prev]
+        return [{ ...parent, id: pid, done: false, createdAt: todayKey(), estimateMin: est, subtasks }, ...prev]
       }),
     moveTaskList: (id, list) =>
       setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, list } : t))),
@@ -481,6 +481,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           source: 'mc' as const,
           estimateMin: 30,
           done: false,
+          createdAt: todayKey(),
           space,
           list: 'backlog' as const,
           category: 'deep' as TaskCategory,
@@ -504,7 +505,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           /* A dictated "done" carries no measured time. Stamping actualMin with
              the default estimate would invent a perfect log and pollute the
              accuracy figure, so it stays undefined unless you said a number. */
-          newTasks.push({ id, title: it.text, source: 'mc', estimateMin: it.estimateMin ?? 15, done, actualMin: done ? it.estimateMin : undefined, space, list: 'today', category: 'quick' })
+          newTasks.push({ id, title: it.text, source: 'mc', estimateMin: it.estimateMin ?? 15, done, actualMin: done ? it.estimateMin : undefined, createdAt: todayKey(), space, list: 'today', category: 'quick' })
           created.push({ id, kind: it.kind, label: it.text, tab: done ? 'today' : 'plan' })
         }
       })
@@ -526,7 +527,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     startCoachSession: (input) => {
       const taskId = newId('t')
       setTasks((prev) => [
-        { id: taskId, title: input.firstStep, source: 'mc', estimateMin: input.firstStepMin, done: false, space, list: 'today', category: input.category },
+        { id: taskId, title: input.firstStep, source: 'mc', estimateMin: input.firstStepMin, done: false, createdAt: todayKey(), space, list: 'today', category: input.category },
         ...prev,
       ])
       setCoachSessions((prev) => [

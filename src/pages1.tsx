@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { SpaceGrid } from './Grid'
-import { MOCK_AGENDA, SPACE_LABELS, exceptionsFor } from './exceptions'
+import { MOCK_AGENDA, SPACE_LABELS, exceptionsFor, globalExceptions, momentum } from './exceptions'
 import { MOCK_MONEY, fakeDecompose } from './mock'
 import { useStore } from './store'
 import { MorningRoutine } from './morning'
 import { Sheet } from './modals'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, ON_TRACK_PCT, SLOTS, type AgendaEvent, type GoalCategory, type GoalTimeframe, type HabitDef, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
-import { fmtDuration, fmtNum, fmtSigned, fmtTime, fmtTimeShort, gcalUrl, localDateKey, taskMinutes, toMin } from './util'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, SLOTS, type AgendaEvent, type GoalCategory, type GoalTimeframe, type HabitDef, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
+import { fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, gcalUrl, localDateKey, taskMinutes, toMin } from './util'
 
 /* ---------------- shared bits ---------------- */
 
@@ -59,9 +59,14 @@ const dateLine = () =>
 /* ---------------- TODAY ---------------- */
 
 export function TodayPage() {
-  const { space, tasks, routines, plan, editing, setEditing, setPage, savedMin, todayIndex, review, addTask, setCoachOpen, setFocusTaskId, sources } = useStore()
+  const { space, tasks, routines, habits, coachSessions, plan, editing, setEditing, setPage, savedMin, todayIndex, review, addTask, deleteTask, setCoachOpen, setFocusTaskId, sources } = useStore()
   const nextEvent = useNextEvent(space)
   const exceptions = exceptionsFor(space, { tasks, routines })
+  /* Money and official post follow you into Work and Off-Plate. Sitting in the
+     Work profile all day used to mean the app told you nothing was wrong. */
+  const shownExceptions = space === 'personal'
+    ? exceptions
+    : [...globalExceptions({ tasks, routines }), ...exceptions]
   const open = tasks.filter((t) => t.space === space && t.list === 'today' && !t.done)
   const DREAD_RANK = { admin: 0, call: 1, deep: 2, quick: 3 }
   const alertTaskTitles = new Set(exceptions.map((x) => x.task?.title).filter(Boolean) as string[])
@@ -75,6 +80,7 @@ export function TodayPage() {
   const evening = new Date().getHours() >= 21
   // Next payment badge derives from the money schedule instead of a hardcoded string.
   const nextPay = MOCK_MONEY.schedule.find((r) => r.state === 'not sent' || r.state === 'action needed')
+  const wins = momentum({ tasks: tasks.filter((t) => t.space === space), routines, habits: habits.filter((h) => h.space === space), coachSessions })
 
   return (
     <div className="page">
@@ -100,30 +106,35 @@ export function TodayPage() {
         }
       />
 
-      {exceptions.length > 0 ? (
+      {shownExceptions.length > 0 ? (
         <div className="exceptions" role="alert" aria-label="Needs attention">
-          {exceptions.map((x) => {
+          {shownExceptions.map((x) => {
             const queued = x.task ? tasks.find((t) => t.title === x.task!.title) : undefined
             const resolved = queued?.done
             if (resolved) return null
             return (
-              <div className="exception-row" key={x.id}>
+              <div className={`exception-row${x.fromPersonal && space !== 'personal' ? ' from-other' : ''}`} key={x.id}>
                 <span className="dot" aria-hidden="true" />
+                {x.fromPersonal && space !== 'personal' && <span className="exc-origin">Personal</span>}
                 <span>{x.text}</span>
                 <span className="when">{x.when}</span>
                 {x.action === 'add-task' && x.task && (
                   queued ? (
                     <span className="microcap" style={{ color: 'var(--progress)', marginLeft: 'var(--s2)' }}>queued for today</span>
                   ) : (
-                    <button onClick={() => addTask({ title: x.task!.title, source: 'mc', estimateMin: x.task!.estimateMin, space, list: 'today', category: 'admin' })}>
+                    <button onClick={() => addTask({ title: x.task!.title, source: 'mc', estimateMin: x.task!.estimateMin, space: 'personal', list: 'today', category: 'admin' })}>
                       {x.actionLabel}
                     </button>
                   )
                 )}
                 {x.action === 'coach' && (
-                  <button onClick={() => { setCoachOpen(x.coachId ?? null); setPage('coach') }}>
-                    {x.actionLabel ?? 'Walk me through it'}
-                  </button>
+                  <>
+                    <button onClick={() => { setCoachOpen(x.coachId ?? x.coachSeed ?? null); setPage('coach') }}>
+                      {x.actionLabel ?? 'Walk me through it'}
+                    </button>
+                    {/* An old task deserves an honest second option: face it or let it go. */}
+                    {x.taskId && <button className="exc-drop" onClick={() => deleteTask(x.taskId!)}>Drop it</button>}
+                  </>
                 )}
               </div>
             )
@@ -132,7 +143,15 @@ export function TodayPage() {
       ) : (
         <div className="allclear">
           <span className="dot" aria-hidden="true" />
-          Nothing is on fire in this space.
+          Nothing is on fire, here or in Personal.
+        </div>
+      )}
+
+      {/* The other side of the ledger. Only real events, never a score. */}
+      {wins.length > 0 && (
+        <div className="momentum" aria-label="What is going right">
+          <span className="microcap">Going right</span>
+          {wins.map((w, i) => <span className="momentum-item" key={i}>{w}</span>)}
         </div>
       )}
 
@@ -855,9 +874,9 @@ export function GoalsPage() {
               </div>
               {inTf.map((g) => {
                 const pct = Math.min(100, Math.round((g.current / g.target) * 100))
-                const status = g.current >= g.target ? 'done' : pct < ON_TRACK_PCT ? 'behind' : 'ontrack'
+                const status = goalPace(g.current, g.target, g.timeframe ?? 'quarter')
                 const milestoneDriven = !!g.milestones?.length && g.target === g.milestones.length
-                const statusLabel = status === 'done' ? 'reached' : status === 'behind' ? 'behind' : 'on track'
+                const statusLabel = status === 'done' ? 'reached' : status === 'behind' ? 'needs a push' : 'on pace'
                 return (
                   <div className="goal-card v2" key={g.id}>
                     <div className="goal-line">

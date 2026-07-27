@@ -101,6 +101,40 @@ export function fmtDuration(min: number): string {
   return `${sign}${m}m`
 }
 
+/**
+ * Is a goal keeping pace, judged against how much of its window has elapsed
+ * rather than a flat percentage. A weekly goal at 0 of 3 on Monday morning is
+ * not "behind", it has barely started; calling that failure is the guilt
+ * mechanic this app is supposed to avoid. Only fall behind when the pace you
+ * would now need is meaningfully worse than the pace you signed up for.
+ */
+export function goalPace(
+  current: number,
+  target: number,
+  timeframe: 'weekly' | 'monthly' | 'quarter' | 'half' = 'quarter',
+  now = new Date(),
+): 'done' | 'ontrack' | 'behind' {
+  if (target <= 0 || current >= target) return current >= target ? 'done' : 'ontrack'
+  const elapsed = (() => {
+    if (timeframe === 'weekly') return (((now.getDay() + 6) % 7) + 1) / 7
+    if (timeframe === 'monthly') {
+      const days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+      return now.getDate() / days
+    }
+    if (timeframe === 'quarter') {
+      const qStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1)
+      const qEnd = new Date(qStart.getFullYear(), qStart.getMonth() + 3, 0)
+      return (now.getTime() - qStart.getTime()) / (qEnd.getTime() - qStart.getTime())
+    }
+    const hStart = new Date(now.getFullYear(), now.getMonth() < 6 ? 0 : 6, 1)
+    const hEnd = new Date(hStart.getFullYear(), hStart.getMonth() + 6, 0)
+    return (now.getTime() - hStart.getTime()) / (hEnd.getTime() - hStart.getTime())
+  })()
+  const done = current / target
+  // A quarter of the window of slack before anything is called behind.
+  return done + 0.25 >= Math.min(1, elapsed) ? 'ontrack' : 'behind'
+}
+
 /** Czech thousands spacing, so 60000 reads 60 000 everywhere it appears. */
 export function fmtNum(n: number): string {
   return n.toLocaleString('cs-CZ').replace(/ /g, ' ')

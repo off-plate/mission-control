@@ -6,7 +6,7 @@ import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, daysSinceSlip, goalCurrent, habitFrequencyLabel, habitTarget, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, daysSinceSlip, goalCurrent, habitFrequencyLabel, habitTarget, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
 import { fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, gcalUrl, isEstimated, localDateKey, taskMinutes, toMin } from './util'
 
@@ -1085,17 +1085,116 @@ export const DONE_LABEL: Record<RoutineCadence, string> = {
   daily: 'done today', prework: 'done today', weekly: 'done this week', monthly: 'done this month',
 }
 
+/* Writing the steps of a routine. Editing is a mode on the card rather than a
+   separate screen, because the thing you are editing is the thing you look at. */
+function StepEditor({ routine }: { routine: Routine }) {
+  const { addRoutineStep, updateRoutineStep, deleteRoutineStep, moveRoutineStep } = useStore()
+  const [title, setTitle] = useState('')
+  const [note, setNote] = useState('')
+
+  const add = () => {
+    if (!title.trim()) return
+    addRoutineStep(routine.id, { title: title.trim(), note: note.trim() || undefined })
+    setTitle(''); setNote('')
+  }
+
+  return (
+    <div className="step-editor">
+      {routine.steps.map((s, i) => (
+        <div className="step-edit-row" key={s.id}>
+          <span className="step-order">
+            <button aria-label={`Move ${s.title} up`} disabled={i === 0} onClick={() => moveRoutineStep(routine.id, s.id, -1)}>↑</button>
+            <button aria-label={`Move ${s.title} down`} disabled={i === routine.steps.length - 1} onClick={() => moveRoutineStep(routine.id, s.id, 1)}>↓</button>
+          </span>
+          <span className="step-edit-fields">
+            <input className="textinput" value={s.title} aria-label={`Step ${i + 1} title`}
+              onChange={(e) => updateRoutineStep(routine.id, s.id, { title: e.target.value })} />
+            <input className="textinput step-note" value={s.note ?? ''} placeholder="What it involves, if it needs saying"
+              aria-label={`Step ${i + 1} note`}
+              onChange={(e) => updateRoutineStep(routine.id, s.id, { note: e.target.value })} />
+          </span>
+          <button className="step-drop" aria-label={`Delete ${s.title}`} onClick={() => deleteRoutineStep(routine.id, s.id)}>×</button>
+        </div>
+      ))}
+
+      <div className="step-add">
+        <input className="textinput" placeholder="Add a step" value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') add() }} aria-label="New step" />
+        <input className="textinput step-note" placeholder="Note, optional" value={note}
+          onChange={(e) => setNote(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') add() }} aria-label="New step note" />
+        <button className="btn btn-primary" disabled={!title.trim()} onClick={add}>Add</button>
+      </div>
+    </div>
+  )
+}
+
+function AddRoutineSheet({ onClose }: { onClose: () => void }) {
+  const { addRoutine } = useStore()
+  const [title, setTitle] = useState('')
+  const [cadence, setCadence] = useState<RoutineCadence>('daily')
+  const [daypart, setDaypart] = useState<TimeSlot | ''>('morning')
+
+  const submit = () => {
+    if (!title.trim()) return
+    addRoutine({ title: title.trim(), cadence, daypart: daypart || undefined })
+    onClose()
+  }
+
+  return (
+    <Sheet title="Add a routine" onClose={onClose} note="A routine is a set of steps you run on a rhythm. Finishing all of them checks off a habit of the same name, created with it.">
+      <label className="field-label" htmlFor="rtitle">What is the routine?</label>
+      <input id="rtitle" className="textinput" style={{ width: '100%' }} autoFocus placeholder="e.g. Evening shutdown"
+        value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
+
+      <div className="sheet-grid" style={{ marginTop: 'var(--s4)' }}>
+        <div>
+          <label className="field-label" htmlFor="rcad">How often does it run?</label>
+          <select id="rcad" className="textinput" style={{ width: '100%' }} value={cadence} onChange={(e) => setCadence(e.target.value as RoutineCadence)}>
+            <option value="daily">Every day</option>
+            <option value="prework">Before work, on weekdays</option>
+            <option value="weekly">Once a week</option>
+            <option value="monthly">Once a month</option>
+          </select>
+        </div>
+        <div>
+          <label className="field-label" htmlFor="rpart">When in the day?</label>
+          <select id="rpart" className="textinput" style={{ width: '100%' }} value={daypart} onChange={(e) => setDaypart(e.target.value as TimeSlot | '')}>
+            {SLOTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+            <option value="">Anytime</option>
+          </select>
+        </div>
+      </div>
+
+      <p className="assist-note" style={{ marginTop: 'var(--s3)' }}>You write the steps on the card once it exists.</p>
+
+      <div className="sheet-actions">
+        <button className="btn btn-quiet" onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" disabled={!title.trim()} onClick={submit}>Add routine</button>
+      </div>
+    </Sheet>
+  )
+}
+
 export function RoutinesPage() {
-  const { routines, space, toggleRoutineStep, resetRoutine, habits } = useStore()
+  const { routines, space, toggleRoutineStep, resetRoutine, deleteRoutine, habits } = useStore()
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
   const spaceRoutines = routines.filter((r) => r.space === space)
   const sorted = [...spaceRoutines].sort((a, b) => CADENCE_ORDER.indexOf(a.cadence) - CADENCE_ORDER.indexOf(b.cadence))
   return (
     <div className="page">
-      <Band title="Routines" />
+      <Band
+        title="Routines"
+        actions={<button className="btn btn-primary" onClick={() => setAdding(true)}>Add a routine</button>}
+      />
       <div className="routine-cards">
-        {sorted.length === 0 && <div className="empty">No routines in this space yet.</div>}
+        {sorted.length === 0 && <div className="empty">No routines in this space yet. Add one from the button above.</div>}
         {sorted.map((r) => {
-          if (r.id === 'r-morning') return <MorningRoutine routine={r} key={r.id} />
+          if (r.id === 'r-morning' && editingId !== r.id) {
+            return <MorningRoutine routine={r} key={r.id} onEdit={() => setEditingId(r.id)} />
+          }
           const total = r.steps.length
           const done = r.doneStepIds.length
           const complete = total > 0 && done === total
@@ -1104,13 +1203,34 @@ export function RoutinesPage() {
             <div className={`panel routine-card${complete ? ' is-complete' : ''}`} key={r.id}>
               <div className="routine-tag">
                 <span className="routine-card-title">{r.title}</span>
-                {complete
+                {editingId !== r.id && (complete
                   ? <span className="col-tot mono val-pos">{DONE_LABEL[r.cadence]}</span>
-                  : <span className="routine-progress mono">{done}/{total}</span>}
+                  : <span className="routine-progress mono">{done}/{total}</span>)}
+                <Dropdown label={`Options for ${r.title}`}>
+                  <button role="menuitem" onClick={() => setEditingId(editingId === r.id ? null : r.id)}>
+                    {editingId === r.id ? 'Done editing' : 'Edit the steps'}
+                  </button>
+                  <span className="kebab-sep" />
+                  <button role="menuitem" className="danger" onClick={() => deleteRoutine(r.id)}>
+                    Delete this routine
+                  </button>
+                </Dropdown>
               </div>
               {r.blurb && <p className="routine-blurb">{r.blurb}</p>}
+              {editingId === r.id ? (
+                <>
+                  <StepEditor routine={r} />
+                  <div className="routine-card-foot" style={{ marginTop: 'var(--s3)' }}>
+                    <span className="assist-note">Changes save as you type.</span>
+                    <button className="btn btn-primary routine-reset" onClick={() => setEditingId(null)}>Done</button>
+                  </div>
+                </>
+              ) : (
+              <>
               {total === 0 && (
-                <p className="routine-empty">No steps yet. This one is yours to fill in.</p>
+                <p className="routine-empty">
+                  No steps yet. Open the menu and write them.
+                </p>
               )}
               <div className="routine-steplist">
                 {r.steps.map((s) => {
@@ -1141,10 +1261,14 @@ export function RoutinesPage() {
                     : <span />}
                 {done > 0 && <button className="btn btn-ghost routine-reset" onClick={() => resetRoutine(r.id)}>Reset</button>}
               </div>
+              </>
+              )}
             </div>
           )
         })}
       </div>
+
+      {adding && <AddRoutineSheet onClose={() => setAdding(false)} />}
     </div>
   )
 }

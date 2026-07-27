@@ -2124,3 +2124,29 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 
 /* A grown field must not be shrunk again by the column it sits in. */
 .autogrow { flex: none; }
+
+/* ---------- Writing the steps of a routine ---------- */
+.step-editor { display: flex; flex-direction: column; gap: var(--s2); margin-top: var(--s3); }
+.step-edit-row { display: flex; align-items: flex-start; gap: var(--s2); }
+.step-order { display: flex; flex-direction: column; gap: 2px; flex: none; padding-top: 4px; }
+.step-order button {
+  width: 22px; height: 18px; border-radius: 3px; border: 1px solid var(--hairline-strong);
+  color: var(--faint); font-size: 0.625rem; line-height: 1; cursor: pointer;
+}
+.step-order button:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+.step-order button:disabled { opacity: 0.3; cursor: default; }
+.step-edit-fields { display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; min-width: 0; }
+.step-note { font-size: var(--text-xs); color: var(--muted); }
+.step-drop {
+  flex: none; width: 28px; height: 28px; border-radius: var(--r-sm); color: var(--faint);
+  font-size: var(--text-base); line-height: 1; cursor: pointer; margin-top: 3px;
+}
+.step-drop:hover { color: var(--alert); background: var(--alert-wash); }
+.step-add {
+  display: flex; gap: var(--s2); align-items: flex-start; margin-top: var(--s2);
+  padding-top: var(--s3); border-top: 1px solid var(--hairline);
+}
+.step-add > .textinput { flex: 1 1 auto; min-width: 0; }
+.step-add > .btn { flex: none; }
+.mr-edit { font-size: var(--text-xs); color: var(--faint); padding: 2px 6px; border-radius: var(--r-sm); cursor: pointer; }
+.mr-edit:hover { color: var(--accent); background: var(--accent-wash); }

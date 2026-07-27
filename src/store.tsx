@@ -14,6 +14,7 @@ import {
   WIDGET_DEFS,
 } from './mock'
 import type {
+  RoutineCadence,
   AssistantEntry,
   CoachFacts,
   CoachSession,
@@ -129,6 +130,15 @@ interface Store extends PersistedState {
   routines: Routine[]
   toggleRoutineStep: (routineId: string, stepId: string) => void
   resetRoutine: (routineId: string) => void
+  /** A routine and the habit that mirrors it are created together, so finishing
+   *  it always has somewhere to land. */
+  addRoutine: (input: { title: string; cadence: RoutineCadence; blurb?: string; daypart?: import('./types').TimeSlot }) => void
+  updateRoutine: (id: string, patch: Partial<Pick<Routine, 'title' | 'cadence' | 'blurb'>>) => void
+  deleteRoutine: (id: string) => void
+  addRoutineStep: (routineId: string, step: { title: string; note?: string; link?: string; linkLabel?: string }) => void
+  updateRoutineStep: (routineId: string, stepId: string, patch: Partial<Pick<import('./types').RoutineStep, 'title' | 'note' | 'link' | 'linkLabel'>>) => void
+  deleteRoutineStep: (routineId: string, stepId: string) => void
+  moveRoutineStep: (routineId: string, stepId: string, dir: -1 | 1) => void
   /** Record a number against a routine step (today's typing speed). Keeps the
    *  all-time best in `records`, which never resets with the period. */
   setStepData: (routineId: string, stepId: string, value: number) => void
@@ -251,14 +261,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // (doneStepIds) are their state, so new/removed steps show up without a reseed.
   // Checks carry the period they were made in (day / week / month); a check from
   // an earlier period is dropped, so routines reset themselves on schedule.
+  /* Routines are his once they exist: the mock only seeds an empty install. This
+     used to be the other way round, rebuilding every routine from the mock on
+     each load, which threw away any step he wrote the moment he reloaded.
+     Checks carry the period they were made in; one from an earlier period is
+     dropped, so a routine resets itself on schedule. */
   const seededRoutines = useMemo(() => {
     const prior = persisted?.routines
-    if (!prior) return MOCK_ROUTINES.map((m) => ({ ...m, periodKey: periodKeyFor(m.cadence) }))
-    return MOCK_ROUTINES.map((m) => {
-      const p = prior.find((x) => x.id === m.id)
-      const key = periodKeyFor(m.cadence)
-      if (!p || p.periodKey !== key) return { ...m, doneStepIds: [], periodKey: key, stepData: {} }
-      return { ...m, doneStepIds: p.doneStepIds.filter((id) => m.steps.some((s) => s.id === id)), periodKey: key, stepData: p.stepData ?? {} }
+    const base = prior && prior.length ? prior : MOCK_ROUTINES
+    return base.map((r) => {
+      const key = periodKeyFor(r.cadence)
+      if (r.periodKey !== key) return { ...r, doneStepIds: [], stepData: {}, periodKey: key }
+      return {
+        ...r,
+        doneStepIds: r.doneStepIds.filter((id) => r.steps.some((st) => st.id === id)),
+        stepData: r.stepData ?? {},
+        periodKey: key,
+      }
     })
   }, [persisted])
   const [spaces, setSpaces] = useState(persisted?.spaces ?? DEFAULT_SPACES)
@@ -675,6 +694,54 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const key = `${routineId}:${stepId}`
       setRecords((prev) => (value > (prev[key] ?? 0) ? { ...prev, [key]: value } : prev))
     },
+    addRoutine: (input) => {
+      const hid = newId('h')
+      const rid = newId('r')
+      setHabits((prev) => [...prev, {
+        id: hid, space, name: input.title, daypart: input.daypart, kind: 'build',
+        frequency: input.cadence === 'weekly' ? 'weekly' : input.cadence === 'monthly' ? 'monthly' : input.cadence === 'prework' ? 'weekdays' : 'daily',
+        days: [false, false, false, false, false, false, false], paused: false, history: [],
+      }])
+      setRoutines((prev) => [...prev, {
+        id: rid, space, title: input.title, cadence: input.cadence, blurb: input.blurb,
+        steps: [], doneStepIds: [], habitId: hid, periodKey: periodKeyFor(input.cadence), stepData: {},
+      }])
+    },
+    updateRoutine: (id, patch) => {
+      setRoutines((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+      // The mirrored habit carries the routine's name, so keep them in step.
+      const r = routines.find((x) => x.id === id)
+      if (r?.habitId && patch.title) setHabits((hs) => hs.map((h) => (h.id === r.habitId ? { ...h, name: patch.title as string } : h)))
+    },
+    /* Deleting a routine takes its habit with it: a habit only a routine could
+       tick would otherwise sit there permanently unfinishable. */
+    deleteRoutine: (id) => {
+      const r = routines.find((x) => x.id === id)
+      setRoutines((prev) => prev.filter((x) => x.id !== id))
+      if (r?.habitId) setHabits((hs) => hs.filter((h) => h.id !== r.habitId))
+    },
+    addRoutineStep: (routineId, step) =>
+      setRoutines((prev) => prev.map((r) => (r.id === routineId
+        ? { ...r, steps: [...r.steps, { id: newId('st'), kind: 'do' as const, ...step }] }
+        : r))),
+    updateRoutineStep: (routineId, stepId, patch) =>
+      setRoutines((prev) => prev.map((r) => (r.id === routineId
+        ? { ...r, steps: r.steps.map((s) => (s.id === stepId ? { ...s, ...patch } : s)) }
+        : r))),
+    deleteRoutineStep: (routineId, stepId) =>
+      setRoutines((prev) => prev.map((r) => (r.id === routineId
+        ? { ...r, steps: r.steps.filter((s) => s.id !== stepId), doneStepIds: r.doneStepIds.filter((x) => x !== stepId) }
+        : r))),
+    moveRoutineStep: (routineId, stepId, dir) =>
+      setRoutines((prev) => prev.map((r) => {
+        if (r.id !== routineId) return r
+        const steps = [...r.steps]
+        const i = steps.findIndex((s) => s.id === stepId)
+        const j = i + dir
+        if (i < 0 || j < 0 || j >= steps.length) return r
+        ;[steps[i], steps[j]] = [steps[j], steps[i]]
+        return { ...r, steps }
+      })),
     resetRoutine: (routineId) => {
       const r = routines.find((x) => x.id === routineId)
       setRoutines((prev) => prev.map((x) => (x.id === routineId ? { ...x, doneStepIds: [], stepData: {} } : x)))

@@ -230,6 +230,17 @@ function Typing({ url, label, routineId, stepId, wpm, best, onLog }: {
   )
 }
 
+/* Any step he wrote himself: his own words, and a link if he gave one. */
+function PlainStep({ note, link, linkLabel }: { note?: string; link?: string; linkLabel?: string }) {
+  return (
+    <div className="mr-typing">
+      {note && <p className="mr-lead">{note}</p>}
+      {link && <a className="btn btn-quiet" href={link} target="_blank" rel="noreferrer">{linkLabel ?? 'Open'} ↗</a>}
+      {!note && !link && <p className="mr-lead">Mark it off when it is done.</p>}
+    </div>
+  )
+}
+
 /* ---- Goals reminder (content to be defined together) ---- */
 function GoalsReminder({ note }: { note?: string }) {
   return (
@@ -239,7 +250,7 @@ function GoalsReminder({ note }: { note?: string }) {
   )
 }
 
-export function MorningRoutine({ routine }: { routine: Routine }) {
+export function MorningRoutine({ routine, onEdit }: { routine: Routine; onEdit?: () => void }) {
   const { toggleRoutineStep, resetRoutine, setStepData, records } = useStore()
   const steps = routine.steps
   const done = routine.doneStepIds
@@ -270,6 +281,7 @@ export function MorningRoutine({ routine }: { routine: Routine }) {
     if (stepId === 'mr1') return <Meditation url={s.link} med={med} setMed={setMed} onEnd={() => { if (!done.includes('mr1')) onComplete('mr1') }} />
     if (stepId === 'mr2') return <Pronunciation />
     if (stepId === 'mr3') return <MouthStretch />
+    if (stepId === 'mr5') return <GoalsReminder note={s.note} />
     if (stepId === 'mr4') return (
       <Typing
         url={s.link} label={s.linkLabel} routineId={routine.id} stepId="mr4"
@@ -281,7 +293,7 @@ export function MorningRoutine({ routine }: { routine: Routine }) {
         }}
       />
     )
-    return <GoalsReminder note={s.note} />
+    return <PlainStep note={s.note} link={s.link} linkLabel={s.linkLabel} />
   }
 
   const total = steps.length
@@ -302,6 +314,9 @@ export function MorningRoutine({ routine }: { routine: Routine }) {
         {doneCount === total
           ? <span className="col-tot mono val-pos">done today</span>
           : <span className="routine-progress mono">{doneCount}/{total}</span>}
+        {onEdit && (
+          <button className="mr-edit" onClick={onEdit} aria-label="Edit the steps of this routine">Edit steps</button>
+        )}
       </div>
       {routine.blurb && <p className="routine-blurb">{routine.blurb}</p>}
 

@@ -2150,3 +2150,24 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .step-add > .btn { flex: none; }
 .mr-edit { font-size: var(--text-xs); color: var(--faint); padding: 2px 6px; border-radius: var(--r-sm); cursor: pointer; }
 .mr-edit:hover { color: var(--accent); background: var(--accent-wash); }
+
+/* ---------- A routine standing on the day's list ---------- */
+/* Marked so it reads as a recurring thing rather than a one-off task he added. */
+.routine-on-day .today-task { background: var(--accent-wash); border-radius: var(--r-sm); }
+.rod-mark {
+  flex: none; width: 14px; height: 14px; border-radius: 4px;
+  border: 1.5px solid var(--accent); position: relative;
+}
+.rod-mark::after {
+  content: ''; position: absolute; inset: 2px; border-radius: 2px;
+  background: repeating-linear-gradient(45deg, var(--accent) 0 2px, transparent 2px 4px);
+  opacity: 0.55;
+}
+.routine-on-day .today-task.done .rod-mark { background: var(--progress); border-color: var(--progress); }
+.routine-on-day .today-task.done .rod-mark::after { background: none; }
+.rod-title { font-weight: 600; }
+.rod-cadence { flex: none; font-size: 0.5625rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); }
+.rod-empty { font-size: var(--text-xs); color: var(--faint); padding: 4px 0 0 26px; }
+.rod-link { color: var(--accent); text-decoration: underline; cursor: pointer; padding: 0; }
+.rod-done { font-size: var(--text-xs); color: var(--progress); padding: 4px 0 0 26px; }
+.rod-bucket { border-bottom: 1px solid var(--hairline); padding-bottom: var(--s3); margin-bottom: var(--s3); }

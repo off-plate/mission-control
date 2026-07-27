@@ -311,25 +311,25 @@ export function AssistantPage() {
             onChange={(e) => { setText(e.target.value); setParsed(null) }}
             aria-label="What's on your mind"
           />
-          {voiceSupported && (
-            <button className={`assist-mic${listening ? ' on' : ''}`} onClick={voice} aria-label={listening ? 'Stop listening' : 'Dictate'} title="Dictate (Czech)">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0M12 19v3" strokeLinecap="round" />
-              </svg>
+          <div className="assist-tools">
+            {voiceSupported && (
+              <button className={`assist-mic${listening ? ' on' : ''}`} onClick={voice} aria-label={listening ? 'Stop listening' : 'Dictate'} title="Dictate (Czech)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0M12 19v3" strokeLinecap="round" />
+                </svg>
+              </button>
+            )}
+            {listening && <span className="assist-listening">listening</span>}
+            <button className="btn btn-primary assist-go" onClick={() => void understand()} disabled={!text.trim() || busy}>
+              {busy ? 'Reading' : 'Understand'}
             </button>
-          )}
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 'var(--s2)', marginTop: 'var(--s3)', alignItems: 'center', flexWrap: 'wrap' }}>
-          <button className="btn btn-primary" onClick={() => void understand()} disabled={!text.trim() || busy}>
-            {busy ? 'Reading' : 'Understand'}
-          </button>
-          {listening && <span className="microcap" style={{ color: 'var(--alert)' }}>listening…</span>}
-          <span className="assist-note">
-            {voiceSupported
-              ? 'The mic uses your browser\u2019s speech recognition, set to Czech. In Chrome that audio goes to Google to be transcribed.'
-              : 'This browser has no speech recognition, so type instead. Chrome and Safari have it; Firefox does not.'}
-          </span>
-        </div>
+        <p className="assist-note assist-mic-note">
+          {voiceSupported
+            ? 'The mic uses your browser speech recognition, set to Czech. In Chrome that audio goes to Google to be transcribed.'
+            : 'This browser has no speech recognition, so type instead. Chrome and Safari have it; Firefox does not.'}
+        </p>
 
         {parsed && (
           <div className="assist-proposed">

@@ -3,7 +3,7 @@ import { Band, Dropdown } from './pages1'
 import { useStore } from './store'
 import { parseDictation, TAB_FOR, type ParsedItem } from './assistant'
 import { fmtDuration, fmtWhen } from './util'
-import { extractFromJournal, hasAiKey, shrinkImage, transcribeImage, type JournalItems } from './ai'
+import { extractFromJournal, hasAiKey, parseSpoken, shrinkImage, transcribeImage, type JournalItems } from './ai'
 import { readImage } from './ocr'
 import type { HabitFrequency } from './types'
 
@@ -34,19 +34,42 @@ function JournalReader() {
     setPicked(new Set()); setPct(0); setConf(null); setReadBy('device')
   }
 
-  /* Read it here on the machine first: no key, no account, and the photo never
-     leaves the device. The AI reader is a second opinion for messy writing. */
+  const aiProblem = (reason: string) =>
+    reason === 'no-key' ? 'No Groq key yet. Add one in Settings for the better reader.'
+    : reason === 'bad-key' ? 'That Groq key was rejected. Check it in Settings.'
+    : reason === 'rate-limit' ? 'Groq is rate limiting. Wait a moment and read again.'
+    : reason === 'too-big' ? 'That photo is too large even after shrinking.'
+    : reason === 'all-thinking' ? 'The reader talked itself in circles and never produced a transcript.'
+    : 'Groq could not be reached.'
+
+  /* The AI reader goes first: it is markedly better on handwriting, which is the
+     whole point of photographing a journal. On-device is the fallback for when
+     there is no key or Groq is unreachable, and stays one click away regardless. */
   const onFile = async (file?: File) => {
     if (!file) return
     setError(''); setItems(null); setText(''); setConf(null); setPct(0); setStage('reading')
+    let url: string
     try {
-      const url = await shrinkImage(file)
+      url = await shrinkImage(file)
       setPhoto(url)
+    } catch (e) {
+      setStage('idle')
+      setError(`Could not open that image. ${e instanceof Error ? e.message : ''}`.trim())
+      return
+    }
+
+    if (hasAiKey()) {
+      const r = await transcribeImage(url)
+      if (r.ok) { setReadBy('ai'); setConf(null); setText(r.text); setStage('review'); return }
+      setError(`${aiProblem(r.reason)} Reading it on this device instead.`)
+    } else {
+      setError('No Groq key yet, so this is the on-device reader. Add a key in Settings for a much better read of handwriting.')
+    }
+
+    try {
       const r = await readImage(url, 'ces+eng', setPct)
-      setReadBy('device')
-      setConf(r.confidence)
-      setText(r.text)
-      if (!r.text) setError('Nothing legible came out of that. Try a straighter, better lit shot, or use the AI reader below.')
+      setReadBy('device'); setConf(r.confidence); setText(r.text)
+      if (!r.text) setError('Nothing legible came out of that. Try a straighter, better lit shot.')
       setStage('review')
     } catch (e) {
       setStage('idle')
@@ -54,23 +77,22 @@ function JournalReader() {
     }
   }
 
-  /* Same photo, better reader, for when the on-device pass mangles cursive. */
-  const readWithAi = async () => {
+  /* Read the same photo the other way. */
+  const rereadWith = async (how: 'ai' | 'device') => {
     if (!photo) return
-    setError(''); setStage('reading')
-    const r = await transcribeImage(photo)
-    if (!r.ok) {
-      setStage('review')
-      setError(
-        r.reason === 'no-key' ? 'No Groq key yet. Add one in Settings to use the AI reader.'
-        : r.reason === 'bad-key' ? 'That Groq key was rejected. Check it in Settings.'
-        : r.reason === 'rate-limit' ? 'Groq is rate limiting. Wait a moment and try again.'
-        : r.reason === 'too-big' ? 'That photo is too large even after shrinking.'
-        : r.reason === 'all-thinking' ? 'The reader talked itself in circles and never produced a transcript. Try again, or crop tighter to the writing.'
-        : 'The AI reader could not be reached. The text above is still yours to edit.')
+    setError(''); setPct(0); setStage('reading')
+    if (how === 'ai') {
+      const r = await transcribeImage(photo)
+      if (!r.ok) { setStage('review'); setError(`${aiProblem(r.reason)} The text above is still yours to edit.`); return }
+      setReadBy('ai'); setConf(null); setText(r.text); setStage('review')
       return
     }
-    setReadBy('ai'); setConf(null); setText(r.text); setStage('review')
+    try {
+      const r = await readImage(photo, 'ces+eng', setPct)
+      setReadBy('device'); setConf(r.confidence); setText(r.text); setStage('review')
+    } catch {
+      setStage('review'); setError('The on-device reader failed on that image.')
+    }
   }
 
   const findItems = async () => {
@@ -103,9 +125,8 @@ function JournalReader() {
     <div className="panel journal">
       <span className="microcap">Read a page of your journal</span>
       <p className="assist-note" style={{ marginTop: 6 }}>
-        Photograph a written page and it transcribes what is there, on this device, with no key and
-        nothing uploaded. You read the transcript, fix what it got wrong, and choose what becomes real.
-        Nothing here is saved anywhere until you do.
+        Photograph a written page and it transcribes what is there. You read the transcript, fix what
+        it got wrong, and choose what becomes real. Nothing here is saved anywhere until you do.
       </p>
 
       <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden
@@ -114,7 +135,11 @@ function JournalReader() {
       {stage === 'idle' && !photo && (
         <div className="journal-drop">
           <button className="btn btn-primary" onClick={() => fileRef.current?.click()}>Take or choose a photo</button>
-          <span className="assist-note">Works offline. Clear writing reads well; joined-up cursive needs the AI reader.</span>
+          <span className="assist-note">
+            {hasAiKey()
+              ? 'Read by Groq, which handles handwriting best. An on-device reader is one click away if you would rather not send the photo.'
+              : 'No Groq key yet, so this reads on your device. Clear writing is fine; handwriting needs a key, set in Settings.'}
+          </span>
         </div>
       )}
 
@@ -131,7 +156,7 @@ function JournalReader() {
             {busy && (
               <div className="empty">
                 {stage === 'reading'
-                  ? `Reading the page on this device${pct > 0 && pct < 100 ? `, ${pct}%` : ''}.`
+                  ? (pct > 0 && pct < 100 ? `Reading the page on this device, ${pct}%.` : 'Reading the page.')
                   : 'Looking for what you committed to.'}
               </div>
             )}
@@ -151,17 +176,18 @@ function JournalReader() {
                 )}
                 <div className="journal-readers">
                   <span className="assist-note">
-                    {readBy === 'device'
-                      ? `Read here on your device${conf !== null ? `, ${conf}% confident` : ''}. The photo never left it.`
-                      : 'Read by Groq. The photo was sent to it for this one call.'}
+                    {readBy === 'ai'
+                      ? 'Read by Groq. The photo was sent to it for this one call.'
+                      : `Read on this device${conf !== null ? `, ${conf}% confident` : ''}. The photo never left it.`}
                   </span>
-                  {readBy === 'device' && (
-                    <button className="btn btn-quiet" onClick={readWithAi} disabled={!hasAiKey()} title={hasAiKey() ? 'Send this photo to Groq for a better read' : 'Needs a Groq key in Settings'}>
-                      Try the AI reader
+                  {readBy === 'ai' ? (
+                    <button className="btn btn-quiet" onClick={() => rereadWith('device')} title="Read it again without sending the photo anywhere">
+                      Read on this device
                     </button>
-                  )}
-                  {readBy === 'ai' && (
-                    <button className="btn btn-quiet" onClick={() => photo && onFile(undefined)} disabled>Read by AI</button>
+                  ) : (
+                    <button className="btn btn-quiet" onClick={() => rereadWith('ai')} disabled={!hasAiKey()} title={hasAiKey() ? 'Send this photo to Groq for a better read' : 'Needs a Groq key in Settings'}>
+                      Read with AI
+                    </button>
                   )}
                 </div>
                 <div className="coach-nav" style={{ marginTop: 'var(--s3)' }}>
@@ -220,12 +246,25 @@ export function AssistantPage() {
   const [text, setText] = useState('')
   const [parsed, setParsed] = useState<ParsedItem[] | null>(null)
   const [listening, setListening] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [fellBack, setFellBack] = useState('')
   const recRef = useRef<any>(null)
   const voiceSupported = typeof window !== 'undefined' && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)
 
-  const understand = () => {
-    const p = parseDictation(text)
-    setParsed(p.length ? p : [])
+  /* The model reads what you actually said. The regex splitter is the fallback
+     for no key or an unreachable Groq, and says so rather than passing itself
+     off as the same thing. */
+  const understand = async () => {
+    setBusy(true); setFellBack('')
+    const r = await parseSpoken(text)
+    if (r.ok) { setParsed(r.items); setBusy(false); return }
+    setFellBack(
+      r.reason === 'no-key' ? 'No Groq key, so this was split by keyword. Add a key in Settings for a real read.'
+      : r.reason === 'rate-limit' ? 'Groq is rate limiting, so this was split by keyword.'
+      : r.reason === 'bad-key' ? 'That Groq key was rejected, so this was split by keyword.'
+      : 'Groq could not be reached, so this was split by keyword.')
+    setParsed(parseDictation(text))
+    setBusy(false)
   }
 
   const apply = () => {
@@ -257,10 +296,11 @@ export function AssistantPage() {
     <div className="page">
       <Band title="Assistant" />
 
-      <JournalReader />
+      <div className="assist-cols">
+        <JournalReader />
 
 
-      <div className="panel" style={{ marginBottom: 'var(--s5)' }}>
+      <div className="panel assist-say">
         <span className="microcap">Dictate or type</span>
         <div className="assist-input">
           <textarea
@@ -280,14 +320,21 @@ export function AssistantPage() {
           )}
         </div>
         <div style={{ display: 'flex', gap: 'var(--s2)', marginTop: 'var(--s3)', alignItems: 'center', flexWrap: 'wrap' }}>
-          <button className="btn btn-primary" onClick={understand} disabled={!text.trim()}>Understand</button>
+          <button className="btn btn-primary" onClick={() => void understand()} disabled={!text.trim() || busy}>
+            {busy ? 'Reading' : 'Understand'}
+          </button>
           {listening && <span className="microcap" style={{ color: 'var(--alert)' }}>listening…</span>}
-          <span className="assist-note">Demo parser. The real build sends this to a model (Groq, free) and files it the same way.</span>
+          <span className="assist-note">
+            {voiceSupported
+              ? 'The mic uses your browser\u2019s speech recognition, set to Czech. In Chrome that audio goes to Google to be transcribed.'
+              : 'This browser has no speech recognition, so type instead. Chrome and Safari have it; Firefox does not.'}
+          </span>
         </div>
 
         {parsed && (
           <div className="assist-proposed">
             <span className="microcap" style={{ display: 'block', marginBottom: 'var(--s2)' }}>It will file these</span>
+            {fellBack && <p className="sheet-warn" style={{ marginTop: 0, marginBottom: 'var(--s2)' }}>{fellBack}</p>}
             {parsed.length === 0 && <p className="bucket-empty">Nothing to file. Try naming a task, a goal, or something you finished.</p>}
             {parsed.map((p, i) => (
               <div className="assist-row" key={i}>
@@ -311,7 +358,9 @@ export function AssistantPage() {
         )}
       </div>
 
-      <div className="panel">
+      </div>
+
+      <div className="panel assist-history">
         <span className="microcap">History · what went where</span>
         {assistantLog.length === 0 && <p className="bucket-empty">Nothing filed yet. Everything you dictate shows here, and you can undo any of it.</p>}
         {assistantLog.map((entry) => (

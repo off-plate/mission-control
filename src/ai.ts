@@ -364,3 +364,59 @@ export async function readAvoidance(text: string): Promise<{ ok: true; read: Avo
     return { ok: false, reason: 'failed' }
   }
 }
+
+/* ---------- Filing what you said ---------- */
+
+const SPOKEN = `You take something spoken or typed quickly and file each part of it.
+
+Each item is one of:
+- "task": something to do.
+- "goal": an outcome with a finish line.
+- "done": something already finished, spoken in the past tense.
+
+Rules:
+- Split on the real boundaries between items, not on punctuation. One sentence can hold two items; three sentences can be one.
+- Strip the words that only signalled the bucket. "goal this week send ten cold emails" files as "Send ten cold emails", not "Goal this week send ten cold emails".
+- Keep his own wording otherwise, in the language he used. Do not translate, tidy or expand.
+- If he said how long something takes, put it in estimateMin. Never guess one he did not say.
+- Take nothing that is not there. Thinking aloud with no commitment in it returns an empty list.
+- Output only JSON. No commentary, no <think> blocks.
+
+Return ONLY JSON: {"items":[{"kind":"task|goal|done","text":"...","estimateMin":15}]}`
+
+export interface SpokenItem {
+  kind: 'task' | 'goal' | 'done'
+  text: string
+  estimateMin?: number
+}
+
+export async function parseSpoken(input: string): Promise<{ ok: true; items: SpokenItem[] } | { ok: false; reason: string }> {
+  const key = getAiKey()
+  if (!key) return { ok: false, reason: 'no-key' }
+  try {
+    const res = await groq({
+      model: MODEL,
+      temperature: 0.1,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: SPOKEN },
+        { role: 'user', content: input },
+      ],
+    }, key)
+    if (res.status === 401 || res.status === 403) return { ok: false, reason: 'bad-key' }
+    if (res.status === 429) return { ok: false, reason: 'rate-limit' }
+    if (!res.ok) return { ok: false, reason: 'failed' }
+    const data = await res.json()
+    const p = JSON.parse(stripReasoning(data.choices?.[0]?.message?.content ?? '') || '{}')
+    const items: SpokenItem[] = (p.items ?? [])
+      .filter((i: { text?: string }) => typeof i?.text === 'string' && i.text.trim())
+      .map((i: { kind?: string; text: string; estimateMin?: number }) => ({
+        kind: (['task', 'goal', 'done'].includes(i.kind ?? '') ? i.kind : 'task') as SpokenItem['kind'],
+        text: i.text.trim(),
+        estimateMin: Number(i.estimateMin) > 0 ? Math.round(Number(i.estimateMin)) : undefined,
+      }))
+    return { ok: true, items }
+  } catch {
+    return { ok: false, reason: 'failed' }
+  }
+}

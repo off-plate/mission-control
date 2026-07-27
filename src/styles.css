@@ -2074,3 +2074,12 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 /* Each Plan column sizes to its own content. The schedule was being stretched to
    match the Today column, so one long broken-down task left it hours of blank. */
 .plan-cols { align-items: start; }
+
+/* Assistant: the two ways in sit side by side, and what they filed runs under
+   both, because the history belongs to neither one on its own. */
+.assist-cols { display: grid; gap: var(--s4); grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1100px) { .assist-cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.assist-cols > * { min-width: 0; margin-bottom: 0 !important; }
+.assist-say { display: flex; flex-direction: column; }
+.assist-history { margin-top: var(--s4); }
+.journal { margin-bottom: 0; }

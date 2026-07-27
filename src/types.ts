@@ -113,6 +113,9 @@ export interface Task {
   estimated?: boolean
   /** ISO date the task first appeared. Ageing is how avoidance gets detected. */
   createdAt?: string
+  /** The day it was put on the list. Without this, "today" means "every day I
+   *  ever moved this to today", which is what it used to mean. */
+  plannedOn?: string
   /** How many days it has been carried forward without being finished. */
   carried?: number
 }
@@ -158,6 +161,44 @@ export type HabitSource = 'focus'
  * undated counts, so neither could ever be the truth.
  */
 export interface HabitTick { habitId: string; day: string }
+
+/** The days a habit was kept inside a window, as a set of ISO dates. */
+export function keptDaysIn(log: HabitTick[], habitId: string, from: string, to: string): Set<string> {
+  return new Set(log.filter((t) => t.habitId === habitId && t.day >= from && t.day <= to).map((t) => t.day))
+}
+
+/**
+ * The run of consecutive days up to today. Today not being ticked yet does not
+ * break a run: at nine in the morning nothing is done, and telling him a hundred
+ * day streak is over because he has not done it *yet* is a lie with a guilt
+ * mechanic attached.
+ */
+export function currentStreak(log: HabitTick[], habitId: string, today = new Date()): number {
+  const kept = new Set(log.filter((t) => t.habitId === habitId).map((t) => t.day))
+  const key = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+  const d = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  if (!kept.has(key(d))) d.setDate(d.getDate() - 1)  // today is still open
+  let n = 0
+  while (kept.has(key(d))) { n++; d.setDate(d.getDate() - 1) }
+  return n
+}
+
+/** The longest run this habit has ever had. */
+export function bestStreak(log: HabitTick[], habitId: string): number {
+  const days = [...new Set(log.filter((t) => t.habitId === habitId).map((t) => t.day))].sort()
+  let best = 0, run = 0, prev = ''
+  for (const day of days) {
+    if (prev) {
+      const [y, m, d] = prev.split('-').map(Number)
+      const next = new Date(y, m - 1, d + 1)
+      const nextKey = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`
+      run = day === nextKey ? run + 1 : 1
+    } else run = 1
+    prev = day
+    if (run > best) best = run
+  }
+  return best
+}
 
 /** A day a routine was finished, kept so "which day did I do it" has an answer. */
 export interface RoutineDone { routineId: string; day: string; periodKey: string }
@@ -263,6 +304,22 @@ export function quitDays(h: HabitDef, today = new Date()): boolean[] {
     // A slip after the quit date breaks the run; that day is not kept.
     const iso = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
     out[i] = day >= since && h.lastSlip !== iso
+  }
+  return out
+}
+
+/** The days inside a window that a quit habit was kept, derived rather than
+ *  ticked: every day from the day he stopped, minus any day he logged a slip. */
+export function quitKeptDays(h: HabitDef, from: string, to: string): Set<string> {
+  const out = new Set<string>()
+  if (h.kind !== 'break' || !h.quitSince) return out
+  const start = h.quitSince > from ? h.quitSince : from
+  const [y, m, d] = start.split('-').map(Number)
+  if (!y) return out
+  for (const cur = new Date(y, m - 1, d); ; cur.setDate(cur.getDate() + 1)) {
+    const key = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`
+    if (key > to) break
+    if (h.lastSlip !== key) out.add(key)
   }
   return out
 }

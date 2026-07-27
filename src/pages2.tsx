@@ -3,7 +3,7 @@ import { COACH_SCENARIOS, MOCK_MONEY, MOCK_STATS } from './mock'
 import { AutoTextarea, Band } from './pages1'
 import { useStore } from './store'
 import { Spark, SparkBox } from './widgets'
-import { RANGE_OPTIONS, fmtDuration, fmtNum, fmtSigned, fmtWhen, goalPace, inRange, isoWeekKey, monthName, monthRange, rangeFor, recentMonthKeys, taskMinutes, type RangeId } from './util'
+import { RANGE_OPTIONS, allTimeRange, customRange, fmtDuration, fmtNum, fmtSigned, fmtWhen, goalPace, inRange, isoWeekKey, localDateKey, monthName, monthRange, monthsWithData, rangeFor, taskMinutes, type RangeId } from './util'
 import { analyzeAvoidance, fallbackRead } from './coach'
 import { getAiKey, hasAiKey, readAvoidance, setAiKey, type AvoidanceRead } from './ai'
 import { paymentTaskTitle } from './exceptions'
@@ -111,11 +111,28 @@ function SecHead({ label }: { label: string }) {
 }
 
 export function ReviewPage() {
-  const { space, habits, goals, closeReview, review, ledger, focusSessions, inView } = useStore()
+  const { space, habits, goals, closeReview, review, ledger, focusSessions, habitLog, routineLog, inView } = useStore()
   const [rangeId, setRangeId] = useState<string>('this-week')
-  const range = useMemo(() => (rangeId.includes('-W') || /^\d{4}-\d{2}$/.test(rangeId)
-    ? monthRange(rangeId)
-    : rangeFor(rangeId as RangeId)), [rangeId])
+  const [from, setFrom] = useState(localDateKey())
+  const [to, setTo] = useState(localDateKey())
+
+  /* Which windows are worth offering comes from the data, not from a fixed list
+     of the last twelve months. A fixed list offers empty months he can only find
+     out are empty by opening them, and hides anything older than a year. */
+  const dated = useMemo(() => [
+    ...ledger.filter((e) => inView(e.space)).map((e) => e.when),
+    ...focusSessions.filter((f) => inView(f.space)).map((f) => f.day),
+    ...habitLog.map((t) => t.day),
+    ...routineLog.map((r) => r.day),
+  ], [ledger, focusSessions, habitLog, routineLog, inView])
+  const months = useMemo(() => monthsWithData(dated), [dated])
+
+  const range = useMemo(() => {
+    if (rangeId === 'all-time') return allTimeRange(dated)
+    if (rangeId === 'custom') return customRange(from, to)
+    if (/^\d{4}-\d{2}$/.test(rangeId)) return monthRange(rangeId)
+    return rangeFor(rangeId as RangeId)
+  }, [rangeId, dated, from, to])
 
   const [wins, setWins] = useState<string[]>(['', '', ''])
   const [changed, setChanged] = useState('')
@@ -155,7 +172,11 @@ export function ReviewPage() {
               {RANGE_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
             </optgroup>
             <optgroup label="A month">
-              {recentMonthKeys(12).map((k) => <option key={k} value={k}>{monthName(k)}</option>)}
+              {months.map((k) => <option key={k} value={k}>{monthName(k)}</option>)}
+            </optgroup>
+            <optgroup label="Or">
+              <option value="all-time">Everything</option>
+              <option value="custom">Pick the dates</option>
             </optgroup>
           </select>
         }
@@ -166,6 +187,14 @@ export function ReviewPage() {
       />
 
       <SecHead label={range.label} />
+      {rangeId === 'custom' && (
+        <div className="daterange">
+          <label htmlFor="rfrom">From</label>
+          <input id="rfrom" className="textinput" type="date" value={from} max={localDateKey()} onChange={(e) => setFrom(e.target.value)} />
+          <label htmlFor="rto">to</label>
+          <input id="rto" className="textinput" type="date" value={to} max={localDateKey()} onChange={(e) => setTo(e.target.value)} />
+        </div>
+      )}
       {closed && (
         <div className="allclear" style={{ borderColor: 'var(--progress)' }}>
           <span className="dot" aria-hidden="true" />

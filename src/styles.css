@@ -1842,7 +1842,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   font-size: var(--text-xs); color: var(--accent); padding: 0; text-align: left; cursor: pointer;
 }
 .habit-auto:hover { text-decoration: underline; }
-.habit-manual { font-size: var(--text-xs); color: var(--faint); }
 .habit-weeks { font-size: var(--text-xs); color: var(--muted); margin-left: auto; }
 
 /* ---------- Habits: a band per part of the day ---------- */
@@ -2317,3 +2316,22 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
    strip with two thirds of the page empty beside it. The first-action card and
    the buttons stay full width underneath, where the decision belongs. */
 @media (min-width: 1500px) { .coach-facts { max-width: 68rem; } }
+
+/* A window picked by hand, named above it by the same heading as any other. */
+.daterange { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s4); flex-wrap: wrap; }
+.daterange label { font-size: var(--text-sm); color: var(--muted); }
+.daterange .textinput { padding: 6px 10px; font-size: var(--text-sm); }
+
+/* ---------- a habit over a longer window ---------- */
+/* One square a day, oldest on the left. Green means kept, the same green as
+   everywhere else. A missed day is simply not green: no wall of misses. */
+.habit-trail-wrap { margin-top: var(--s2); }
+.habit-trail { display: grid; gap: 2px; grid-auto-flow: column; grid-template-rows: repeat(7, 1fr); }
+.habit-trail.w30 { grid-template-rows: repeat(5, 1fr); }
+.trail-day {
+  width: 100%; aspect-ratio: 1; min-width: 5px; border-radius: 2px;
+  background: var(--surface-2); border: 1px solid transparent;
+}
+.trail-day.kept { background: var(--progress); }
+.trail-day.is-today { border-color: var(--accent); }
+.habit-trail.w30 .trail-day { border-radius: 3px; }

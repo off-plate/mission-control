@@ -49,15 +49,47 @@ export function onAccountChange(fn: (a: Account | null) => void): () => void {
   return () => data.subscription.unsubscribe()
 }
 
-/** Email a one-time sign-in link. Returns an error message, or null on success. */
-export async function sendSignInLink(email: string): Promise<string | null> {
+/* Sign-in is a code typed back in, not a link clicked.
+
+   The Supabase project is shared with his other apps, and its email template is
+   the one Compass wrote: it sends a numeric code rather than a confirmation URL.
+   Rather than fight over a template several apps depend on, take the code. It
+   also sidesteps the redirect allow-list entirely, and a link still works if the
+   template ever changes, because the client reads one out of the URL by itself. */
+
+/* Supabase phrases its refusals for developers. These are the ones he can
+   actually hit, said plainly. Anything else is passed through as-is rather than
+   swallowed, because a message I did not anticipate is worth seeing. */
+function plainly(msg: string): string {
+  const m = msg.toLowerCase()
+  if (m.includes('signups not allowed')) return 'That address has no account here. Use the one your other apps sign in with.'
+  if (m.includes('invalid') || m.includes('expired')) return 'That code did not work. They expire after an hour, so ask for a new one.'
+  if (m.includes('rate limit') || m.includes('too many')) return 'Too many tries. Wait a minute and ask again.'
+  if (m.includes('failed to fetch') || m.includes('network')) return 'No connection. The app keeps working on this device.'
+  return msg
+}
+
+/** Email a one-time sign-in code. Returns an error message, or null on success. */
+export async function sendSignInCode(email: string): Promise<string | null> {
   const c = db()
   if (!c) return 'Sync is not configured in this build.'
   const { error } = await c.auth.signInWithOtp({
     email: email.trim(),
     options: { emailRedirectTo: location.origin + location.pathname },
   })
-  return error ? error.message : null
+  return error ? plainly(error.message) : null
+}
+
+/** Exchange the emailed code for a session. Returns an error message, or null. */
+export async function signInWithCode(email: string, code: string): Promise<string | null> {
+  const c = db()
+  if (!c) return 'Sync is not configured in this build.'
+  const { error } = await c.auth.verifyOtp({
+    email: email.trim(),
+    token: code.replace(/\s+/g, ''),
+    type: 'email',
+  })
+  return error ? plainly(error.message) : null
 }
 
 export async function signOutAccount(): Promise<void> {

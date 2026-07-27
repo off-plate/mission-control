@@ -2211,3 +2211,9 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   content: ''; position: absolute; top: 4px; right: 4px;
   width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
 }
+
+/* An inline action inside a sentence, not a button sitting next to one. */
+.linkish {
+  color: var(--accent); text-decoration: underline; text-underline-offset: 2px;
+  cursor: pointer; font-size: inherit; font-family: inherit;
+}

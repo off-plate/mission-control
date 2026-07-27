@@ -1806,23 +1806,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   .coach-side .coach-starter { max-width: none; }
 }
 
-/* ---------- Habits grouped by part of the day ---------- */
-/* One column per daypart with its own heading, so you read down "Morning"
-   instead of scanning a flat grid for which card happens to be an evening one. */
-.habit-cols { display: grid; gap: var(--s4); grid-template-columns: 1fr; align-items: start; }
-@media (min-width: 760px) { .habit-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 1280px) { .habit-cols { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (min-width: 1900px) { .habit-cols { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); } }
-.habit-col { display: flex; flex-direction: column; }
-.habit-item { padding: var(--s3) 0; border-bottom: 1px solid var(--hairline); }
-.habit-item:last-child { border-bottom: none; padding-bottom: 0; }
-.habit-item.is-paused { opacity: 0.55; }
-.habit-item.is-paused .habit-days { filter: grayscale(1); }
-/* Frequency reads as data beside the count, never as a label above the name. */
-.habit-freq { display: block; font-size: 0.625rem; color: var(--faint); font-weight: 400; letter-spacing: 0; }
-.habit-count { text-align: right; line-height: 1.25; }
-/* A weekday-only habit does not expect the weekend. */
-.daydot.off-day { opacity: 0.4; }
 
 /* ---------- Shared add-sheet form ---------- */
 .sheet-inline { display: flex; align-items: center; gap: var(--s2); font-size: var(--text-sm); color: var(--muted); min-width: 0; }
@@ -1856,3 +1839,45 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .habit-auto:hover { text-decoration: underline; }
 .habit-manual { font-size: var(--text-xs); color: var(--faint); }
 .habit-weeks { font-size: var(--text-xs); color: var(--muted); margin-left: auto; }
+
+/* ---------- Habits: a band per part of the day ---------- */
+/* Heading, rule, then that group's habits side by side across the full width.
+   Groups stack down the page, so a busy morning never strands a short evening. */
+.habit-section + .habit-section { margin-top: var(--s6); }
+.section-head {
+  display: flex; align-items: baseline; gap: var(--s3);
+  padding-bottom: var(--s2); margin-bottom: var(--s3);
+  border-bottom: 1px solid var(--hairline-strong);
+}
+.section-hint { font-size: var(--text-xs); color: var(--faint); }
+.section-count { margin-left: auto; font-size: var(--text-xs); color: var(--faint); }
+.habit-grid { display: grid; gap: var(--s4); grid-template-columns: minmax(0, 1fr); align-items: start; }
+.habit-grid > * { min-width: 0; }
+@media (min-width: 720px)  { .habit-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1200px) { .habit-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1800px) { .habit-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 2600px) { .habit-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+.habit-card { display: flex; flex-direction: column; }
+.habit-card.is-paused { opacity: 0.55; }
+.habit-card.is-paused .habit-days { filter: grayscale(1); }
+/* A weekday-only habit does not expect the weekend. */
+.daydot.off-day { opacity: 0.4; }
+
+/* The frequency sits under the count, not welded to it ("0/7every day"). */
+.habit-freq { display: block; font-size: 0.625rem; color: var(--faint); font-weight: 400; letter-spacing: 0; }
+.habit-count { text-align: right; line-height: 1.25; }
+/* Name row never wraps its controls onto a second line: the title truncates. */
+.habit-row-top { flex-wrap: nowrap; }
+.habit-row-top .habit-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Cards in a band share one height, so a row reads as a row. */
+.habit-grid { align-items: stretch; }
+.habit-card .habit-row { display: flex; flex-direction: column; height: 100%; }
+.habit-card .habit-foot { margin-top: auto; padding-top: var(--s2); }
+
+/* Phone: the day dots and the name row must fit 390px without pushing the page. */
+@media (max-width: 639px) {
+  .habit-days { flex-wrap: nowrap; gap: 2px; }
+  .habit-days .day-cell { min-width: 0; flex: 1 1 auto; }
+  .habit-foot { gap: var(--s2); }
+  .habit-weeks { margin-left: 0; }
+}

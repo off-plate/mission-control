@@ -161,10 +161,6 @@ export default function App() {
         </PageBoundary>
       </main>
 
-      <footer className="foot">
-        <span className="mono">V1 DEMO</span>
-        <span>Your data, saved as you go. Calendar, mail, Compass and Hevy are not connected yet, so those surfaces stay empty rather than showing numbers that are not yours.</span>
-      </footer>
 
     </div>
   )

@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { Band, Dropdown } from './pages1'
 import { useStore } from './store'
 import { parseDictation, TAB_FOR, type ParsedItem } from './assistant'
-import { fmtWhen } from './util'
+import { fmtDuration, fmtWhen } from './util'
 import { extractFromJournal, hasAiKey, shrinkImage, transcribeImage, type JournalItems } from './ai'
 import { readImage } from './ocr'
 import type { HabitFrequency } from './types'
@@ -182,7 +182,7 @@ function JournalReader() {
               <input type="checkbox" checked={picked.has(`t${i}`)} onChange={() => toggle(`t${i}`)} />
               <span className="assist-tag k-task">task</span>
               <span className="grow">{t.title}</span>
-              {t.estimateMin ? <span className="est-chip">{t.estimateMin}m</span> : null}
+              {t.estimateMin ? <span className="est-chip">{fmtDuration(t.estimateMin)}</span> : null}
             </label>
           ))}
           {items.goals.map((g, i) => (
@@ -296,7 +296,7 @@ export function AssistantPage() {
                   <option value="done">done</option>
                 </select>
                 <span className="grow">{p.text}</span>
-                {p.estimateMin != null && <span className="est-chip">{p.estimateMin}m</span>}
+                {p.estimateMin != null && <span className="est-chip">{fmtDuration(p.estimateMin)}</span>}
                 <span className="assist-dest mono">→ {TAB_FOR[p.kind]}</span>
               </div>
             ))}

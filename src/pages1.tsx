@@ -623,7 +623,7 @@ export function PlanPage() {
   const todayIdx = (new Date().getDay() + 6) % 7
   const { startFocus } = usePomodoro()
   const { routines, habits } = useStore()
-  const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId, setTaskAt, inView } = useStore()
+  const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId, setTaskAt, plan, setPage, inView } = useStore()
   const events = MOCK_AGENDA[space]
 
   const spaceTasks = tasks.filter((t) => inView(t.space))
@@ -728,6 +728,18 @@ export function PlanPage() {
           { v: `${donePct}%`, k: 'to-do done', tone: 'pos' as const },
         ]}
       />
+      {/* What came back overnight. Said once, on the day it happened, with the
+          count and a way to take it back in one move. The alternative was work
+          quietly vanishing from the day, which is worse than a wall of it. */}
+      {plan.returnedOn === localDateKey() && (plan.returnedCount ?? 0) > 0 && (
+        <div className="handoff">
+          <span className="grow">
+            {plan.returnedCount} {plan.returnedCount === 1 ? 'thing' : 'things'} you did not get to went back to the list.
+          </span>
+          <button className="btn btn-quiet" onClick={() => setPage('plan')}>Show me</button>
+        </div>
+      )}
+
       <div className="grid-3 plan-cols">
         {/* 1 — Schedule */}
         <div className="panel">

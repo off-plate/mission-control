@@ -66,6 +66,7 @@ function JournalReader() {
         : r.reason === 'bad-key' ? 'That Groq key was rejected. Check it in Settings.'
         : r.reason === 'rate-limit' ? 'Groq is rate limiting. Wait a moment and try again.'
         : r.reason === 'too-big' ? 'That photo is too large even after shrinking.'
+        : r.reason === 'all-thinking' ? 'The reader talked itself in circles and never produced a transcript. Try again, or crop tighter to the writing.'
         : 'The AI reader could not be reached. The text above is still yours to edit.')
       return
     }

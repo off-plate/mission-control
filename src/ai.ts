@@ -77,6 +77,34 @@ export function detectLang(text: string): 'cs' | 'en' {
   return (text.match(weak) ?? []).length >= 2 ? 'cs' : 'en'
 }
 
+/* Reasoning models emit their scratchpad in <think> blocks, and when the budget
+   runs out mid-thought the block is never even closed, so the answer is lost
+   inside it. Groq is asked to hide the reasoning, and this strips whatever still
+   gets through, including an unterminated block. */
+function stripReasoning(raw: string): string {
+  // Closed blocks first.
+  let s = raw.replace(/<think>[\s\S]*?<\/think>/gi, '')
+  /* Then any block still open: the budget ran out mid-thought, so everything
+     from that tag onward is scratchpad and there is no answer after it. This
+     has to run BEFORE stray tags are removed, or there is nothing left to spot. */
+  const open = s.search(/<(think|thinking|reasoning)\b/i)
+  if (open !== -1) s = s.slice(0, open)
+  return s.replace(/<\/?(think|thinking|reasoning)>/gi, '').trim()
+}
+
+/** Groq rejects unknown params on some models, so the reasoning flags are sent
+ *  first and dropped on a 400 rather than failing the whole call. */
+async function groq(body: Record<string, unknown>, key: string): Promise<Response> {
+  const send = (b: Record<string, unknown>) => fetch(ENDPOINT, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(b),
+  })
+  const res = await send({ ...body, reasoning_format: 'hidden', reasoning_effort: 'none' })
+  if (res.status !== 400) return res
+  return send(body)
+}
+
 export interface AiStep { title: string; why?: string; estimateMin: number }
 
 export type BreakdownResult =
@@ -87,24 +115,20 @@ export async function breakdownTask(title: string, category: TaskCategory, detai
   const key = getAiKey()
   if (!key) return { ok: false, reason: 'no-key' }
   try {
-    const res = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: MODEL,
-        temperature: 0.3,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: systemFor(detail, detectLang(title)) },
-          { role: 'user', content: `Task: ${title}\nKind of work: ${category}` },
-        ],
-      }),
-    })
+    const res = await groq({
+      model: MODEL,
+      temperature: 0.3,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: systemFor(detail, detectLang(title)) },
+        { role: 'user', content: `Task: ${title}\nKind of work: ${category}` },
+      ],
+    }, key)
     if (res.status === 401 || res.status === 403) return { ok: false, reason: 'bad-key' }
     if (res.status === 429) return { ok: false, reason: 'rate-limit' }
     if (!res.ok) return { ok: false, reason: 'failed' }
     const data = await res.json()
-    const parsed = JSON.parse(data.choices?.[0]?.message?.content ?? '{}')
+    const parsed = JSON.parse(stripReasoning(data.choices?.[0]?.message?.content ?? '') || '{}')
     const steps: AiStep[] = (parsed.steps ?? [])
       .filter((s: { title?: string }) => typeof s?.title === 'string' && s.title.trim())
       .slice(0, 14)
@@ -147,38 +171,41 @@ Rules:
 - Czech diacritics matter: ě š č ř ž ý á í é ú ů ň ť ď. Restore them properly.
 - Keep the line breaks and any bullets or dashes the page has.
 - If a word is genuinely unreadable, write [?] in its place. NEVER invent a word to fill a gap.
-- Output only the transcription. No preamble, no commentary, no markdown fences.`
+- Output ONLY the transcription. Nothing else at all.
+- Do not think aloud, do not explain, do not describe the page or its layout, do not weigh up what a word might be. No preamble, no commentary, no markdown fences, no <think> blocks.
+- Start your reply with the first word on the page.`
 
 export type TranscribeResult =
   | { ok: true; text: string }
-  | { ok: false; reason: 'no-key' | 'bad-key' | 'rate-limit' | 'too-big' | 'failed' }
+  | { ok: false; reason: 'no-key' | 'bad-key' | 'rate-limit' | 'too-big' | 'all-thinking' | 'failed' }
 
 export async function transcribeImage(dataUrl: string): Promise<TranscribeResult> {
   const key = getAiKey()
   if (!key) return { ok: false, reason: 'no-key' }
   if (dataUrl.length > 20 * 1024 * 1024) return { ok: false, reason: 'too-big' }
   try {
-    const res = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: VISION_MODEL,
-        temperature: 0,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'text', text: TRANSCRIBE },
-            { type: 'image_url', image_url: { url: dataUrl } },
-          ],
-        }],
-      }),
-    })
+    const res = await groq({
+      model: VISION_MODEL,
+      temperature: 0,
+      // Room for a full page once the reasoning is out of the way.
+      max_tokens: 2000,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: TRANSCRIBE },
+          { type: 'image_url', image_url: { url: dataUrl } },
+        ],
+      }],
+    }, key)
     if (res.status === 401 || res.status === 403) return { ok: false, reason: 'bad-key' }
     if (res.status === 429) return { ok: false, reason: 'rate-limit' }
     if (res.status === 413) return { ok: false, reason: 'too-big' }
     if (!res.ok) return { ok: false, reason: 'failed' }
     const data = await res.json()
-    const text = (data.choices?.[0]?.message?.content ?? '').trim()
+    const raw = data.choices?.[0]?.message?.content ?? ''
+    const text = stripReasoning(raw)
+    // It spent the whole budget reasoning and never wrote the transcript.
+    if (!text && raw.trim()) return { ok: false, reason: 'all-thinking' }
     if (!text) return { ok: false, reason: 'failed' }
     return { ok: true, text }
   } catch {
@@ -209,22 +236,18 @@ export async function extractFromJournal(text: string): Promise<{ ok: true; item
   const key = getAiKey()
   if (!key) return { ok: false, reason: 'no-key' }
   try {
-    const res = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: MODEL,
-        temperature: 0.1,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: EXTRACT },
-          { role: 'user', content: text },
-        ],
-      }),
-    })
+    const res = await groq({
+      model: MODEL,
+      temperature: 0.1,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: EXTRACT },
+        { role: 'user', content: text },
+      ],
+    }, key)
     if (!res.ok) return { ok: false, reason: 'failed' }
     const data = await res.json()
-    const p = JSON.parse(data.choices?.[0]?.message?.content ?? '{}')
+    const p = JSON.parse(stripReasoning(data.choices?.[0]?.message?.content ?? '') || '{}')
     const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : '')
     return {
       ok: true,
@@ -303,24 +326,20 @@ export async function readAvoidance(text: string): Promise<{ ok: true; read: Avo
   const key = getAiKey()
   if (!key) return { ok: false, reason: 'no-key' }
   try {
-    const res = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: MODEL,
-        temperature: 0.4,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: AVOIDANCE },
-          { role: 'user', content: text },
-        ],
-      }),
-    })
+    const res = await groq({
+      model: MODEL,
+      temperature: 0.4,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: AVOIDANCE },
+        { role: 'user', content: text },
+      ],
+    }, key)
     if (res.status === 401 || res.status === 403) return { ok: false, reason: 'bad-key' }
     if (res.status === 429) return { ok: false, reason: 'rate-limit' }
     if (!res.ok) return { ok: false, reason: 'failed' }
     const data = await res.json()
-    const p = JSON.parse(data.choices?.[0]?.message?.content ?? '{}')
+    const p = JSON.parse(stripReasoning(data.choices?.[0]?.message?.content ?? '') || '{}')
     const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
     if (!str(p.firstStep)) return { ok: false, reason: 'failed' }
     const cat = ['call', 'admin', 'deep', 'quick'].includes(p.category) ? (p.category as TaskCategory) : 'admin'

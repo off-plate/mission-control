@@ -100,6 +100,7 @@ interface Store extends PersistedState {
   markHabitDay: (id: string, day: number, value: boolean) => void
   addHabit: (input: { name: string; daypart?: import('./types').TimeSlot; frequency: import('./types').HabitFrequency; targetPerWeek?: number }) => void
   togglePauseHabit: (id: string) => void
+  updateHabit: (id: string, patch: Partial<Pick<HabitDef, 'name' | 'daypart' | 'frequency' | 'targetPerWeek'>>) => void
   deleteHabit: (id: string) => void
 
   addGoal: (g: Omit<Goal, 'id'>) => void
@@ -430,7 +431,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const pid = newId('t')
         const subtasks = subs.map((sub, i) => ({ id: `${pid}s${i}`, title: sub.title, estimateMin: sub.estimateMin, done: false }))
         const est = subtasks.reduce((a, s) => a + s.estimateMin, 0)
-        return [{ ...parent, id: pid, done: false, createdAt: todayKey(), estimateMin: est, subtasks }, ...prev]
+        return [{ ...parent, id: pid, done: false, createdAt: todayKey(), estimateMin: est, estimated: true, subtasks }, ...prev]
       }),
     moveTaskList: (id, list) =>
       setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, list } : t))),
@@ -469,10 +470,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setTasks((prev) => prev.map((t) => {
         if (t.id !== taskId) return t
         const subtasks = subs.map((s, i) => ({ id: `${taskId}s${i}${Date.now().toString(36)}`, title: s.title, estimateMin: s.estimateMin, done: false }))
-        return { ...t, subtasks, estimateMin: subtasks.reduce((a, x) => a + x.estimateMin, 0) }
+        return { ...t, subtasks, estimateMin: subtasks.reduce((a, x) => a + x.estimateMin, 0), estimated: true }
       })),
     setEstimate: (taskId, minutes) =>
-      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, estimateMin: Math.max(1, Math.round(minutes)) } : t))),
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, estimateMin: Math.max(1, Math.round(minutes)), estimated: true } : t))),
 
     toggleHabitDay: (id, day) =>
       setHabits((prev) =>
@@ -492,6 +493,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         frequency: input.frequency, targetPerWeek: input.targetPerWeek,
         days: [false, false, false, false, false, false, false], paused: false,
       }]),
+    updateHabit: (id, patch) => setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, ...patch } : h))),
     togglePauseHabit: (id) =>
       setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, paused: !h.paused } : h))),
     deleteHabit: (id) => setHabits((prev) => prev.filter((h) => h.id !== id)),

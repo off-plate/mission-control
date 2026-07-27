@@ -1963,3 +1963,16 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 
 .ai-key { margin-bottom: var(--s4); }
 .ai-key .formrow { flex-wrap: nowrap; }
+
+/* Task rows keep every control on one line: the title is what gives way. */
+.today-task, .todo-row { flex-wrap: nowrap; }
+.today-task > .grow, .today-task > .task-link, .todo-row > .grow {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.today-task > .kebab-wrap, .todo-row > .kebab-wrap, .today-task .task-actions, .todo-row .task-actions { flex: none; }
+
+/* Drag a task straight from the list into a time of day, and back again. */
+.todo-row { cursor: grab; }
+.todo-row:active { cursor: grabbing; }
+.todo-row .drag-grip { color: var(--faint); flex: none; cursor: grab; }
+.plan-cols > .panel.drop-over { outline: 2px dashed var(--accent); outline-offset: -4px; }

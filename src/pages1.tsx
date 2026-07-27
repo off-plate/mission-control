@@ -8,7 +8,7 @@ import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
 import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, daysClean, quitDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
-import { cadenceDueLabel, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForDaypart, taskMinutes, toMin } from './util'
+import { fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForDaypart, taskMinutes, toMin } from './util'
 
 /* ---------------- shared bits ---------------- */
 
@@ -491,14 +491,6 @@ function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
    copy of it: a copied task would drift the moment either side changed, and the
    whole point is that finishing it here and finishing it on Routines are the
    same act. Its steps are the subtasks. */
-/** One word for how often a routine comes round, for the tag on its row. */
-function repeatWord(c: RoutineCadence): string {
-  if (c === 'daily') return 'daily'
-  if (c === 'prework') return 'workdays'
-  if (c === 'weekly') return 'weekly'
-  return 'monthly'
-}
-
 /* A routine standing on the day's list. It is a task row, not a species of its
    own: same checkbox, same title, same expander, same menu. The only thing that
    marks it out is a small "repeats" tag, because a different layout for the same
@@ -538,7 +530,9 @@ function RoutineOnDay({ routine, habitName }: { routine: Routine; habitName?: st
           </svg>
         </button>
         <span className="grow wrap2">{routine.title}</span>
-        <span className="repeat-tag" title={`Repeats ${cadenceDueLabel(routine.cadence)}`}>{repeatWord(routine.cadence)}</span>
+        {/* One tag, saying the one thing it needs to: this is a routine, it put
+            itself here. Cadence words were never asked for. */}
+        <span className="repeat-tag">routine</span>
         {total > 0 && (
           <button className="expand-btn" aria-expanded={open} onClick={() => setOpen((v) => !v)}
             aria-label={open ? 'Collapse steps' : 'Expand steps'}>

@@ -354,9 +354,9 @@ function Schedule({ events, tasks }: { events: AgendaEvent[]; tasks: Task[] }) {
   )
 }
 
-const BUCKETS: { id: TimeSlot | 'unsorted'; label: string; hint?: string }[] = [
-  { id: 'unsorted', label: 'Unsorted', hint: 'drag into a time' },
-  ...SLOTS.map((s) => ({ id: s.id, label: s.label, hint: s.hint })),
+const BUCKETS: { id: TimeSlot | 'unsorted'; label: string }[] = [
+  { id: 'unsorted', label: 'Unsorted' },
+  ...SLOTS.map((s) => ({ id: s.id, label: s.label })),
 ]
 
 /** Inline "how long did it take?" logger shown when you finish a task or subtask. */
@@ -715,7 +715,6 @@ export function PlanPage() {
             <div className="bucket rod-bucket">
               <div className="bucket-head">
                 <span className="bucket-name">On repeat</span>
-                <span className="bucket-hint">no fixed hour</span>
               </div>
               {anytimeRoutines.map((r) => (
                 <RoutineOnDay key={r.id} routine={r} habitName={habits.find((h) => h.id === r.habitId)?.name} />
@@ -741,7 +740,6 @@ export function PlanPage() {
               >
                 <div className="bucket-head">
                   <span className="bucket-name">{b.label}</span>
-                  {b.hint && <span className="bucket-hint">{b.hint}</span>}
                   {tot > 0 && <span className="tot mono">{fmtDuration(tot)}</span>}
                 </div>
                 {mine.map((r) => (
@@ -1033,12 +1031,12 @@ function HabitRow({ h, todayIndex, actions, drivenBy, progress, goal }: {
 /* Habits are grouped by the part of the day they belong to, each group in its
    own column with its own heading, so you read down "Morning" instead of
    hunting a flat grid for which card happens to be an evening one. */
-const DAYPART_COLS: { id: TimeSlot | 'anytime'; label: string; hint: string }[] = [
-  { id: 'morning', label: 'Morning', hint: 'before noon' },
-  { id: 'noon', label: 'Noon', hint: '12 to 2 PM' },
-  { id: 'afternoon', label: 'Afternoon', hint: '2 to 6 PM' },
-  { id: 'evening', label: 'Evening', hint: 'after 6 PM' },
-  { id: 'anytime', label: 'Anytime', hint: 'no fixed hour' },
+const DAYPART_COLS: { id: TimeSlot | 'anytime'; label: string }[] = [
+  { id: 'morning', label: 'Morning' },
+  { id: 'noon', label: 'Noon' },
+  { id: 'afternoon', label: 'Afternoon' },
+  { id: 'evening', label: 'Evening' },
+  { id: 'anytime', label: 'Anytime' },
 ]
 
 /* One sheet for adding and editing. A habit a routine drives keeps its name and
@@ -1182,7 +1180,6 @@ export function HabitsPage() {
         <section className="habit-section" key={c.id}>
           <div className="section-head">
             <span className="microcap">{c.label}</span>
-            <span className="section-hint">{c.hint}</span>
             <span className="section-count mono">{c.list.length}</span>
           </div>
           <div className="habit-grid">

@@ -1220,7 +1220,6 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 .bucket:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
 .bucket-head { display: flex; align-items: baseline; gap: var(--s2); margin-bottom: var(--s1); }
 .bucket-name { font-family: var(--font-display); font-weight: 700; font-size: var(--text-base); }
-.bucket-hint { font-size: 0.6875rem; color: var(--faint); }
 .bucket-head .tot { margin-left: auto; font-family: var(--font-mono); font-size: 0.6875rem; color: var(--info); }
 .bucket.drop-zone { min-height: 56px; }
 .bucket-empty { font-size: var(--text-xs); color: var(--faint); padding: var(--s3); border: 1px dashed var(--hairline-strong); border-radius: var(--r-sm); text-align: center; }
@@ -1852,7 +1851,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   padding-bottom: var(--s2); margin-bottom: var(--s3);
   border-bottom: 1px solid var(--hairline-strong);
 }
-.section-hint { font-size: var(--text-xs); color: var(--faint); }
 .section-count { margin-left: auto; font-size: var(--text-xs); color: var(--faint); }
 .habit-grid { display: grid; gap: var(--s4); grid-template-columns: minmax(0, 1fr); align-items: start; }
 .habit-grid > * { min-width: 0; }
@@ -2186,3 +2184,23 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 }
 .daydot.is-measure.full { background: var(--progress); border-color: var(--progress); }
 .habit-row.is-measured .habit-count { white-space: nowrap; }
+
+/* ---------- undo ---------- */
+.undo-bar {
+  position: fixed; left: 20px; bottom: 20px; z-index: 70;
+  display: flex; align-items: center; gap: var(--s2);
+  background: var(--ink); color: var(--bg);
+  border-radius: 999px; padding: 8px 8px 8px 16px; box-shadow: var(--shadow-pop);
+  animation: undo-in 180ms ease-out;
+}
+.undo-what { font-size: var(--text-sm); max-width: 42ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.undo-do {
+  font-family: var(--font-body); font-weight: 600; font-size: var(--text-sm);
+  color: var(--bg); border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px; padding: 3px 12px; cursor: pointer;
+}
+.undo-do:hover { background: rgba(255, 255, 255, 0.14); border-color: var(--bg); }
+.undo-x { color: rgba(255, 255, 255, 0.6); padding: 2px 6px; cursor: pointer; }
+.undo-x:hover { color: var(--bg); }
+@keyframes undo-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (max-width: 639px) { .undo-bar { left: 12px; right: 12px; bottom: 80px; } .undo-what { flex: 1; } }

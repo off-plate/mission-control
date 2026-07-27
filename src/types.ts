@@ -459,4 +459,16 @@ export interface ReviewState {
   outcomes: string[]
   /** Last week's reflection, kept so this week can read what you said you'd change. */
   previous?: { weekKey: string; wins: string[]; outcomes: string[] }
+  /** The monthly ritual, kept apart from the weekly one so closing one does not
+   *  close the other. */
+  month?: {
+    lastMonthKey?: string
+    wins: string[]
+    outcomes: string[]
+    previous?: { monthKey: string; wins: string[]; outcomes: string[] }
+  }
 }
+
+/** The deal he made with himself: Off-Plate gets evenings, not the week.
+ *  15 hours, and if it starts eating the rest, it goes back in the box. */
+export const OFFPLATE_WEEKLY_CAP_MIN = 15 * 60

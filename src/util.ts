@@ -17,6 +17,22 @@ export function isoWeekKey(date = new Date()): string {
   return `${t.getUTCFullYear()}-W${String(week).padStart(2, '0')}`
 }
 
+/** Calendar month key, e.g. '2026-07'. Drives the monthly review window. */
+export function monthKey(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+/** Is an ISO date inside the given month key? */
+export function inMonth(iso: string, key = monthKey()): boolean {
+  return iso.slice(0, 7) === key
+}
+
+/** 'July 2026', for naming the window a monthly review covers. */
+export function monthName(key = monthKey()): string {
+  const [y, m] = key.split('-').map(Number)
+  return new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+}
+
 /** ISO date of day `i` (Mon=0..Sun=6) in the current week. */
 export function dayOfWeekKey(i: number, now = new Date()): string {
   const d = new Date(now)

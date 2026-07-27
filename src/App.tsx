@@ -118,7 +118,7 @@ export default function App() {
         </nav>
         <div className="topbar-right">
           <button
-            className={`btn btn-quiet${page === 'assistant' ? ' is-on' : ''}`}
+            className={`btn btn-accent${page === 'assistant' ? ' is-on' : ''}`}
             onClick={() => setPage('assistant')}
             aria-pressed={page === 'assistant'}
           >

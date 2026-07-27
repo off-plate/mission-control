@@ -760,7 +760,7 @@ export function PlanPage() {
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-function HabitRow({ h, todayIndex, actions, drivenBy, progress }: {
+function HabitRow({ h, todayIndex, actions, drivenBy, progress, goal }: {
   h: HabitDef
   todayIndex: number
   actions?: React.ReactNode
@@ -768,6 +768,8 @@ function HabitRow({ h, todayIndex, actions, drivenBy, progress }: {
   drivenBy?: string
   /** Today's progress through the routine that drives this habit. */
   progress?: { done: number; total: number }
+  /** A goal counting itself off this habit, if one exists. */
+  goal?: Goal
 }) {
   const { toggleHabitDay, logSlip, setPage } = useStore()
   const kept = h.days.filter(Boolean).length
@@ -840,6 +842,11 @@ function HabitRow({ h, todayIndex, actions, drivenBy, progress }: {
           </span>
         ))}
       </div>
+      {goal && (
+        <button className="habit-goal" onClick={() => setPage('goals')}>
+          Feeding “{goal.name}”
+        </button>
+      )}
       <div className="habit-foot">
         {drivenBy ? (
           <button className="habit-auto" onClick={() => setPage('routines')}>
@@ -996,7 +1003,7 @@ export function HabitsPage() {
           <div className="habit-grid">
             {c.list.map((h) => (
               <div className={`panel habit-card${h.paused ? ' is-paused' : ''}`} key={h.id}>
-                <HabitRow h={h} todayIndex={todayIndex} drivenBy={drivenBy.get(h.id)} progress={progressFor.get(h.id)} actions={
+                <HabitRow h={h} todayIndex={todayIndex} drivenBy={drivenBy.get(h.id)} progress={progressFor.get(h.id)} goal={goalOn.get(h.id)} actions={
                   <>
                   {h.paused && <span className="col-tot mono">paused</span>}
                   {!h.paused && h.days[todayIndex] && <span className="col-tot mono val-pos">done today</span>}
@@ -1029,7 +1036,7 @@ export function HabitsPage() {
 
       {adding && <HabitSheet onClose={() => setAdding(false)} />}
       {editHabit && <HabitSheet habit={editHabit} drivenBy={drivenBy.get(editHabit.id)} onClose={() => setEditHabit(null)} />}
-      {goalFor && <GoalSheet presetHabitId={goalFor} onClose={() => setGoalFor(null)} />}
+      {goalFor && <GoalSheet presetHabitId={goalFor} thenGoToGoals onClose={() => setGoalFor(null)} />}
     </div>
   )
 }
@@ -1112,12 +1119,15 @@ export function RoutinesPage() {
 
 /* One sheet for creating and editing. `goal` edits an existing one; `presetHabitId`
    opens it prefilled from a habit, which is how "set a goal on this habit" works. */
-function GoalSheet({ onClose, goal, presetHabitId }: {
+function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals }: {
   onClose: () => void
   goal?: Goal
   presetHabitId?: string
+  /** Opened from a habit: show him the goal he just made, rather than saving
+   *  it silently and leaving him staring at the page he started on. */
+  thenGoToGoals?: boolean
 }) {
-  const { space, habits, addGoal, updateGoal } = useStore()
+  const { space, habits, addGoal, updateGoal, setPage } = useStore()
   const preset = habits.find((h) => h.id === presetHabitId)
   const [d, setD] = useState({
     name: goal?.name ?? (preset ? preset.name : ''),
@@ -1145,6 +1155,7 @@ function GoalSheet({ onClose, goal, presetHabitId }: {
     if (goal) updateGoal(goal.id, shape)
     else addGoal({ space, current: 0, note: '', milestones: [], ...shape })
     onClose()
+    if (thenGoToGoals) setPage('goals')
   }
 
   return (

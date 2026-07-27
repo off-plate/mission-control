@@ -286,9 +286,11 @@ main { padding-inline: var(--gutter); }
 /* ---------- Assistant (dictation) ---------- */
 .assist-input { position: relative; margin-top: var(--s3); }
 .assist-textarea { width: 100%; resize: vertical; line-height: 1.5; padding-right: 52px; }
+/* The mic sits in the tool row with the button, not pinned to a corner. */
 .assist-mic {
-  position: absolute; top: 8px; right: 8px; width: 36px; height: 36px; border-radius: 50%;
+  flex: none; width: 36px; height: 36px; border-radius: 50%;
   border: 1px solid var(--hairline-strong); color: var(--muted); display: grid; place-items: center;
+  cursor: pointer;
 }
 .assist-mic:hover { border-color: var(--accent); color: var(--accent); }
 .assist-mic.on { background: var(--alert); border-color: var(--alert); color: var(--bg); animation: pomo-pulse 1.4s ease-in-out infinite; }
@@ -2077,9 +2079,42 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 
 /* Assistant: the two ways in sit side by side, and what they filed runs under
    both, because the history belongs to neither one on its own. */
-.assist-cols { display: grid; gap: var(--s4); grid-template-columns: minmax(0, 1fr); align-items: start; }
+.assist-cols { display: grid; gap: var(--s4); grid-template-columns: minmax(0, 1fr); align-items: stretch; }
 @media (min-width: 1100px) { .assist-cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
 .assist-cols > * { min-width: 0; margin-bottom: 0 !important; }
 .assist-say { display: flex; flex-direction: column; }
 .assist-history { margin-top: var(--s4); }
 .journal { margin-bottom: 0; }
+
+/* A habit feeding a goal says so on the card, and opens it. */
+.habit-goal {
+  display: block; text-align: left; font-size: var(--text-xs); color: var(--progress);
+  padding: 0; margin-top: 6px; cursor: pointer;
+}
+.habit-goal:hover { text-decoration: underline; }
+
+/* The Assistant is a place you go, so it wears the profile's accent rather than
+   dissolving into the header. */
+.btn-accent {
+  color: var(--accent); border: 1px solid var(--accent);
+  background: var(--accent-wash);
+}
+.btn-accent:hover { background: var(--accent); color: var(--bg); }
+.btn-accent.is-on { background: var(--accent); color: var(--bg); }
+
+/* The dictation box is one block: the field, then the mic and the button on the
+   row beneath it, inside the same frame. The mic was floating off on its own and
+   the button had been orphaned below the whole panel. */
+.assist-input {
+  display: flex; flex-direction: column; gap: var(--s2);
+  border: 1px solid var(--hairline-strong); border-radius: var(--r-md);
+  background: var(--bg); padding: var(--s3); margin-top: var(--s3);
+}
+.assist-input:focus-within { border-color: var(--accent); }
+.assist-textarea { border: none; background: transparent; padding: 0; resize: vertical; min-height: 5.5rem; }
+.assist-textarea:focus { outline: none; box-shadow: none; }
+.assist-tools { display: flex; align-items: center; gap: var(--s2); }
+.assist-go { margin-left: auto; }
+.assist-listening { font-size: var(--text-xs); color: var(--alert); }
+.assist-mic-note { margin-top: var(--s2); }
+.journal, .assist-say { height: 100%; }

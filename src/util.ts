@@ -17,6 +17,13 @@ export function isoWeekKey(date = new Date()): string {
   return `${t.getUTCFullYear()}-W${String(week).padStart(2, '0')}`
 }
 
+/** ISO date of day `i` (Mon=0..Sun=6) in the current week. */
+export function dayOfWeekKey(i: number, now = new Date()): string {
+  const d = new Date(now)
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + i)
+  return localDateKey(d)
+}
+
 /** Mon=0..Sun=6 for an ISO date, matching the habit day array. */
 export function dayIndexOf(isoDate: string): number {
   const [y, m, d] = isoDate.split('-').map(Number)

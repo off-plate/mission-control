@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { useStore } from './store'
 
 /* A global Pomodoro that lives above the whole app: a bottom-right badge you
    see on every tab, a corner ambient glow that shows the state at a glance,
@@ -51,6 +52,7 @@ function loadPomo(): Partial<Saved> {
 }
 
 export function PomodoroProvider({ children }: { children: ReactNode }) {
+  const { logFocus } = useStore()
   const saved = useState(loadPomo)[0]
   const [focusMin, setFocusMin] = useState(saved.focusMin ?? 25)
   const [breakMin, setBreakMin] = useState(saved.breakMin ?? 5)
@@ -94,6 +96,8 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     if (phase === 'idle' || !running || secondsLeft > 0) return
     if (phase === 'focus') {
       setCyclesDone((c) => c + 1)
+      // The block is only counted once it is actually finished.
+      logFocus(focusMin, focusLabel ?? undefined)
       notify('Focus done', `Nice. ${breakMin} minute break.`)
       setPhase('break')
       setEndsAt(Date.now() + breakMin * 60 * 1000)
@@ -104,6 +108,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
       setPausedLeft(null)
       setFocusLabel(null)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [secondsLeft, phase, running, breakMin])
 
   // browser-tab countdown

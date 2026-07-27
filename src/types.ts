@@ -135,7 +135,23 @@ export const HABIT_FREQUENCIES: { id: HabitFrequency; label: string }[] = [
 /* Two opposite things are both called habits. One you are trying to keep, and
    every day you do it is a win. One you are trying to stop, and every day you
    do NOT do it is the win. They cannot share a scoreboard. */
-export type HabitKind = 'build' | 'break'
+export type HabitKind = 'build' | 'break' | 'measured'
+
+/** What fills a measured habit. Focus time is the only source for now; the shape
+ *  is here so a second one does not need a migration. */
+export type HabitSource = 'focus'
+
+/** A finished focus block. Kept as history, not just a count, so a measured
+ *  habit can be filled from it and the week can be looked back at. */
+export interface FocusSession {
+  id: string
+  /** Local date, so a block at 23:50 belongs to that day and not to UTC's. */
+  day: string
+  minutes: number
+  /** What it was for, when it was started from a task. */
+  label?: string
+  space: SpaceId
+}
 
 export interface HabitDef {
   id: string
@@ -157,6 +173,31 @@ export interface HabitDef {
   frequency?: HabitFrequency
   /** Days a week you are aiming for, when frequency is 'times-per-week'. */
   targetPerWeek?: number
+  /** For a 'measured' habit: minutes a day you are aiming for. */
+  dailyTargetMin?: number
+  /** What fills it, when it fills itself. */
+  source?: HabitSource
+}
+
+/** Minutes of focus logged on a given day, in this habit's profile. */
+export function focusMinutesOn(sessions: FocusSession[], day: string, space: SpaceId): number {
+  return sessions.filter((s) => s.day === day && s.space === space).reduce((a, s) => a + s.minutes, 0)
+}
+
+/** How far through its daily target a measured habit is on a given day, 0..1. */
+export function measuredProgress(h: HabitDef, sessions: FocusSession[], day: string): number {
+  const target = h.dailyTargetMin ?? 60
+  if (target <= 0) return 0
+  return Math.min(1, focusMinutesOn(sessions, day, h.space) / target)
+}
+
+/** Minutes as h/m, kept here so the type layer can label itself. */
+function fmtMins(min: number): string {
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  if (h && m) return `${h}h ${m}m`
+  if (h) return `${h}h`
+  return `${m}m`
 }
 
 /** Days a week this habit is actually aiming for. The X/7 was a lie for
@@ -179,6 +220,7 @@ export function daysSinceSlip(h: HabitDef, today = new Date()): number | null {
 }
 
 export function habitFrequencyLabel(h: HabitDef): string {
+  if (h.kind === 'measured') return `${fmtMins(h.dailyTargetMin ?? 60)} a day`
   if (h.frequency === 'weekdays') return 'Mon to Fri'
   if (h.frequency === 'weekly') return 'once a week'
   if (h.frequency === 'monthly') return 'once a month'

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Band } from './pages1'
+import { Band, Dropdown } from './pages1'
 import { useStore } from './store'
 import { parseDictation, TAB_FOR, type ParsedItem } from './assistant'
 import { fmtWhen } from './util'
@@ -148,7 +148,6 @@ export function BrainDumpPage() {
   const [text, setText] = useState('')
   const [color, setColor] = useState('amber')
   const [activeTag, setActiveTag] = useState<string | null>(null)
-  const [menuFor, setMenuFor] = useState<string | null>(null)
 
   const spaceIdeas = ideas.filter((i) => i.space === space)
   const allTags = Array.from(new Set(spaceIdeas.flatMap((i) => tagsOf(i.text).map((t) => t.toLowerCase()))))
@@ -199,18 +198,13 @@ export function BrainDumpPage() {
                 ))}
               </div>
               {/* An idea worth doing becomes a task; one that is spent comes off the board. */}
-              <span className="kebab-wrap note-kebab">
-                <button className="kebab" aria-label="Note options" aria-expanded={menuFor === i.id} onClick={() => setMenuFor((m) => (m === i.id ? null : i.id))}>⋯</button>
-                {menuFor === i.id && (
-                  <div className="kebab-menu" role="menu">
-                    <button role="menuitem" onClick={() => {
-                      addTask({ title: i.text.replace(TAG_RE, '').trim().slice(0, 120), source: 'mc', estimateMin: 30, space, list: 'backlog', category: 'deep' })
-                      setMenuFor(null); setPage('plan')
-                    }}>Make it a task</button>
-                    <button role="menuitem" className="danger" onClick={() => { deleteIdea(i.id); setMenuFor(null) }}>Delete</button>
-                  </div>
-                )}
-              </span>
+              <Dropdown label="Note options" className="note-kebab">
+                <button role="menuitem" onClick={() => {
+                  addTask({ title: i.text.replace(TAG_RE, '').trim().slice(0, 120), source: 'mc', estimateMin: 0, space, list: 'backlog', category: 'deep' })
+                  setPage('plan')
+                }}>Make it a task</button>
+                <button role="menuitem" className="danger" onClick={() => deleteIdea(i.id)}>Delete</button>
+              </Dropdown>
             </div>
           </div>
         ))}

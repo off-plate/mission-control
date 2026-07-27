@@ -262,7 +262,10 @@ const WIDGET_DEFS_LIST = WIDGET_DEFS
 /* ---------------- PLAN ---------------- */
 
 const HOUR_PX = 42             // tall enough that a 30-minute block fits its own label
-const MIN_SPAN_H = 10          // never so short that the column looks truncated
+/* The whole day, midnight to midnight. He wants to see the full day, not a
+   window I decided was the interesting part of it. */
+const START_H = 0
+const END_H = 24
 
 /** The task/event name IS the link; clicking opens (or schedules) it in Google Calendar. */
 function TaskName({ title, start, end, className }: { title: string; start?: string; end?: string; className?: string }) {
@@ -276,20 +279,9 @@ function TaskName({ title, start, end, className }: { title: string; start?: str
 /** Vertical day timeline: calendar events plus any task pinned to a clock time. Full height, no inner scroll. */
 function Schedule({ events, tasks }: { events: AgendaEvent[]; tasks: Task[] }) {
   const pinned = tasks.filter((t) => t.at && !t.done)
-  /* The window follows the day you are actually in: it always covers now, plus
-     whatever is scheduled, padded by an hour. No arbitrary start hour. */
   const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
-  const marks = [
-    nowMin,
-    ...events.flatMap((e) => [toMin(e.start), toMin(e.end)]),
-    ...pinned.map((t) => toMin(t.at!)),
-  ]
-  let startH = Math.max(0, Math.floor(Math.min(...marks) / 60) - 1)
-  let endH = Math.min(24, Math.ceil(Math.max(...marks) / 60) + 1)
-  if (endH - startH < MIN_SPAN_H) {
-    endH = Math.min(24, startH + MIN_SPAN_H)
-    startH = Math.max(0, endH - MIN_SPAN_H)
-  }
+  const startH = START_H
+  const endH = END_H
   const DAY_START = startH * 60
   const hours = endH - startH
   const height = hours * HOUR_PX
@@ -355,11 +347,9 @@ function ActualLog({ est, onLog, onSkip }: { est: number; onLog: (m: number) => 
 /* Breaking a task down and estimating it are actions on the task itself. */
 function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
   const { setEstimate } = useStore()
-  const [flash, setFlash] = useState<string | null>(null)
   const hasSubs = !!task.subtasks?.length
   return (
     <span className="task-actions">
-      {flash && <span className="task-flash mono">{flash}</span>}
       {onFocus && (
         <button
           className="task-act task-focus"
@@ -381,8 +371,6 @@ function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
         onClick={() => {
           const e = estimateFor(task.title, task.category)
           setEstimate(task.id, e.minutes)
-          setFlash(`~${e.minutes}m`)
-          window.setTimeout(() => setFlash(null), 1800)
         }}
       >
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -429,7 +417,6 @@ export function PlanPage() {
   const [goal, setGoal] = useState('')
   const [busy, setBusy] = useState(false)
   const [dropKey, setDropKey] = useState<string | null>(null)
-  const [menuFor, setMenuFor] = useState<string | null>(null)
   const [logging, setLogging] = useState<string | null>(null)
   const [flashId, setFlashId] = useState<string | null>(null)
   const [listDropOver, setListDropOver] = useState(false)
@@ -929,7 +916,6 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
 
 export function HabitsPage() {
   const { habits, goals, space, deleteHabit, routines, todayIndex } = useStore()
-  const [menuFor, setMenuFor] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   // Opening the goal sheet from a habit is the "set a goal on this" path.
   const [goalFor, setGoalFor] = useState<string | null>(null)
@@ -978,25 +964,20 @@ export function HabitsPage() {
                   <>
                   {h.paused && <span className="col-tot mono">paused</span>}
                   {!h.paused && h.days[todayIndex] && <span className="col-tot mono val-pos">done today</span>}
-                  <span className="kebab-wrap habit-kebab">
-                    <button className="kebab" aria-label={`Options for ${h.name}`} aria-expanded={menuFor === h.id} onClick={() => setMenuFor((m) => (m === h.id ? null : h.id))}>⋯</button>
-                    {menuFor === h.id && (
-                      <div className="kebab-menu" role="menu">
-                        <button role="menuitem" onClick={() => { setEditHabit(h); setMenuFor(null) }}>Edit this habit</button>
-                        {goalOn.has(h.id) ? (
-                          <span className="kebab-note">Goal: {goalOn.get(h.id)!.name}</span>
-                        ) : (
-                          <button role="menuitem" onClick={() => { setGoalFor(h.id); setMenuFor(null) }}>Set a goal on this</button>
-                        )}
-                        <span className="kebab-sep" />
-                        {drivenBy.has(h.id) ? (
-                          <span className="kebab-note">Deleted with the {drivenBy.get(h.id)} routine</span>
-                        ) : (
-                          <button role="menuitem" className="danger" onClick={() => { deleteHabit(h.id); setMenuFor(null) }}>Delete this habit</button>
-                        )}
-                      </div>
+                  <Dropdown label={`Options for ${h.name}`} className="habit-kebab">
+                    <button role="menuitem" onClick={() => setEditHabit(h)}>Edit this habit</button>
+                    {goalOn.has(h.id) ? (
+                      <span className="kebab-note">Goal: {goalOn.get(h.id)!.name}</span>
+                    ) : (
+                      <button role="menuitem" onClick={() => setGoalFor(h.id)}>Set a goal on this</button>
                     )}
-                  </span>
+                    <span className="kebab-sep" />
+                    {drivenBy.has(h.id) ? (
+                      <span className="kebab-note">Deleted with the {drivenBy.get(h.id)} routine</span>
+                    ) : (
+                      <button role="menuitem" className="danger" onClick={() => deleteHabit(h.id)}>Delete this habit</button>
+                    )}
+                  </Dropdown>
                   </>
                 } />
               </div>
@@ -1211,7 +1192,6 @@ export function GoalsPage() {
   const done = spaceGoals.filter((g) => goalCurrent(g, habits) >= g.target).length
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<Goal | null>(null)
-  const [menuFor, setMenuFor] = useState<string | null>(null)
 
   return (
     <div className="page">
@@ -1244,15 +1224,10 @@ export function GoalsPage() {
                       <span className={`cat-dot goalcat-${g.category ?? 'life'}`} aria-hidden="true" />
                       <span className="grow goal-obj">{g.name}</span>
                       <span className={`goal-status s-${status}`}>{statusLabel}</span>
-                      <span className="kebab-wrap">
-                        <button className="kebab" aria-label={`Options for ${g.name}`} aria-expanded={menuFor === g.id} onClick={() => setMenuFor((m) => (m === g.id ? null : g.id))}>⋯</button>
-                        {menuFor === g.id && (
-                          <div className="kebab-menu" role="menu">
-                            <button role="menuitem" onClick={() => { setEditing(g); setMenuFor(null) }}>Edit this goal</button>
-                            <button role="menuitem" className="danger" onClick={() => { deleteGoal(g.id); setMenuFor(null) }}>Delete this goal</button>
-                          </div>
-                        )}
-                      </span>
+                      <Dropdown label={`Options for ${g.name}`}>
+                        <button role="menuitem" onClick={() => setEditing(g)}>Edit this goal</button>
+                        <button role="menuitem" className="danger" onClick={() => deleteGoal(g.id)}>Delete this goal</button>
+                      </Dropdown>
                     </div>
                     {g.why && <p className="goal-why">{g.why}</p>}
                     <div className={`bar prog${status === 'behind' ? ' warn' : ''}`}><i style={{ width: `${pct}%` }} /></div>

@@ -17,7 +17,7 @@ const KIND_LABEL: Record<ParsedItem['kind'], string> = { task: 'task', goal: 'go
    score says nothing about whether it is right. The photo and the transcript
    stay in this page and are never written to the database. */
 function JournalReader() {
-  const { space, addTask, addGoal, addHabit } = useStore()
+  const { space, addTask, addGoal, addHabit, inView } = useStore()
   const [photo, setPhoto] = useState<string | null>(null)
   const [stage, setStage] = useState<'idle' | 'reading' | 'thinking' | 'review'>('idle')
   const [error, setError] = useState('')
@@ -242,7 +242,7 @@ function JournalReader() {
 }
 
 export function AssistantPage() {
-  const { applyDictation, assistantLog, revertAssistantItem, setPage } = useStore()
+  const { applyDictation, assistantLog, revertAssistantItem, setPage, inView } = useStore()
   const [text, setText] = useState('')
   const [parsed, setParsed] = useState<ParsedItem[] | null>(null)
   const [listening, setListening] = useState(false)
@@ -403,12 +403,12 @@ function renderNote(t: string) {
 }
 
 export function BrainDumpPage() {
-  const { ideas, space, addIdea, setIdeaColor, deleteIdea, addTask, setPage } = useStore()
+  const { ideas, space, addIdea, setIdeaColor, deleteIdea, addTask, setPage, inView } = useStore()
   const [text, setText] = useState('')
   const [color, setColor] = useState('amber')
   const [activeTag, setActiveTag] = useState<string | null>(null)
 
-  const spaceIdeas = ideas.filter((i) => i.space === space)
+  const spaceIdeas = ideas.filter((i) => inView(i.space))
   const allTags = Array.from(new Set(spaceIdeas.flatMap((i) => tagsOf(i.text).map((t) => t.toLowerCase()))))
   const tag = activeTag && allTags.includes(activeTag) ? activeTag : null
   const shown = tag ? spaceIdeas.filter((i) => tagsOf(i.text).some((t) => t.toLowerCase() === tag)) : spaceIdeas

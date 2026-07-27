@@ -131,7 +131,7 @@ const dateLine = () =>
 /* ---------------- TODAY ---------------- */
 
 export function TodayPage() {
-  const { space, tasks, routines, habits, coachSessions, plan, editing, setEditing, setPage, savedMin, todayIndex, review, addTask, deleteTask, setCoachOpen, setFocusTaskId, sources } = useStore()
+  const { space, tasks, routines, habits, coachSessions, plan, editing, setEditing, setPage, savedMin, todayIndex, review, addTask, deleteTask, setCoachOpen, setFocusTaskId, sources, inView } = useStore()
   const nextEvent = useNextEvent(space)
   const exceptions = exceptionsFor(space, { tasks, routines })
   /* Money and official post follow you into Work and Off-Plate. Sitting in the
@@ -139,20 +139,20 @@ export function TodayPage() {
   const shownExceptions = space === 'personal'
     ? exceptions
     : [...globalExceptions({ tasks, routines }), ...exceptions]
-  const open = tasks.filter((t) => t.space === space && t.list === 'today' && !t.done)
+  const open = tasks.filter((t) => inView(t.space) && t.list === 'today' && !t.done)
   const DREAD_RANK = { admin: 0, call: 1, deep: 2, quick: 3 }
   const alertTaskTitles = new Set(exceptions.map((x) => x.task?.title).filter(Boolean) as string[])
   const alertRank = (t: Task) => (alertTaskTitles.has(t.title) ? 0 : 1)
   const firstMove =
     open.find((t) => alertTaskTitles.has(t.title)) ??
-    tasks.find((t) => t.id === plan.firstMoveId && !t.done && t.space === space) ??
+    tasks.find((t) => t.id === plan.firstMoveId && !t.done && inView(t.space)) ??
     [...open].sort((a, b) => alertRank(a) - alertRank(b) || DREAD_RANK[a.category] - DREAD_RANK[b.category])[0]
   const [addOpen, setAddOpen] = useState(false)
   const reviewDue = todayIndex === 6 && review.lastDoneDate !== localDateKey()
   const evening = new Date().getHours() >= 21
   // Next payment badge derives from the money schedule instead of a hardcoded string.
   const nextPay = MOCK_MONEY?.schedule.find((r) => r.state === 'not sent' || r.state === 'action needed')
-  const wins = momentum({ tasks: tasks.filter((t) => t.space === space), routines, habits: habits.filter((h) => h.space === space), coachSessions })
+  const wins = momentum({ tasks: tasks.filter((t) => inView(t.space)), routines, habits: habits.filter((h) => inView(h.space)), coachSessions })
 
   return (
     <div className="page">
@@ -266,7 +266,7 @@ export function TodayPage() {
 /* Uses the shared Sheet so it inherits Escape-to-close, the way every other
    dialog in the app behaves. */
 function AddWidgetInline({ onClose }: { onClose: () => void }) {
-  const { spaces, space, addWidget } = useStore()
+  const { spaces, space, addWidget, inView } = useStore()
   const present = new Set(spaces[space].map((w) => w.type))
   return (
     <Sheet
@@ -320,7 +320,7 @@ function timeAtOffset(px: number): string {
 
 /** Vertical day timeline: calendar events plus any task pinned to a clock time. Full height, no inner scroll. */
 function Schedule({ events, tasks, onDropAt }: { events: AgendaEvent[]; tasks: Task[]; onDropAt: (id: string, at: string) => void }) {
-  const { setTaskAt } = useStore()
+  const { setTaskAt, inView } = useStore()
   const pinned = tasks.filter((t) => t.at && !t.done)
   const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
   const startH = START_H
@@ -415,7 +415,7 @@ function ActualLog({ est, onLog, onSkip }: { est: number; onLog: (m: number) => 
 /* The estimate is a number you can argue with. Click it and type your own; the
    generated one is a starting point, not a verdict. */
 function EstimateChip({ task }: { task: Task }) {
-  const { setEstimate } = useStore()
+  const { setEstimate, inView } = useStore()
   const [editing, setEditing] = useState(false)
   const [val, setVal] = useState('')
   const fromSteps = !!task.subtasks?.length
@@ -452,7 +452,7 @@ function EstimateChip({ task }: { task: Task }) {
 
 /* Breaking a task down and estimating it are actions on the task itself. */
 function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
-  const { setEstimate } = useStore()
+  const { setEstimate, inView } = useStore()
   const hasSubs = !!task.subtasks?.length
   return (
     <span className="task-actions">
@@ -496,7 +496,7 @@ function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
    marks it out is a small "repeats" tag, because a different layout for the same
    kind of thing reads as two different apps on one page. */
 function RoutineOnDay({ routine, habitName }: { routine: Routine; habitName?: string }) {
-  const { toggleRoutineStep, setRoutineDone, setPage } = useStore()
+  const { toggleRoutineStep, setRoutineDone, setPage, inView } = useStore()
   const [open, setOpen] = useState(false)
   const total = routine.steps.length
   const done = routine.doneStepIds.length
@@ -585,11 +585,11 @@ export function PlanPage() {
   const todayIdx = (new Date().getDay() + 6) % 7
   const { startFocus } = usePomodoro()
   const { routines, habits } = useStore()
-  const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId, setTaskAt } = useStore()
+  const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId, setTaskAt, inView } = useStore()
   const evening = new Date().getHours() >= 21
   const events = MOCK_AGENDA[space]
 
-  const spaceTasks = tasks.filter((t) => t.space === space)
+  const spaceTasks = tasks.filter((t) => inView(t.space))
   const backlogOpen = spaceTasks.filter((t) => !t.done && t.list === 'backlog') // the to-do pool
   const todayAll = spaceTasks.filter((t) => t.list === 'today')  // today incl. finished (they stay, struck)
   const todayTasks = todayAll.filter((t) => !t.done)             // still to do
@@ -598,7 +598,7 @@ export function PlanPage() {
   /* Routines belong on the day by their own cadence: he never adds them, they
      are simply there. Each sits in the part of the day its habit names. */
   const isWeekend = todayIdx >= 5
-  const dueRoutines = routines.filter((r) => r.space === space && !(r.cadence === 'prework' && isWeekend))
+  const dueRoutines = routines.filter((r) => inView(r.space) && !(r.cadence === 'prework' && isWeekend))
   const routineSlot = (r: Routine): TimeSlot | 'unsorted' =>
     slotForDaypart(habits.find((h) => h.id === r.habitId)?.daypart)
   const anytimeRoutines = dueRoutines.filter((r) => routineSlot(r) === 'unsorted')
@@ -982,7 +982,7 @@ function HabitRow({ h, todayIndex, actions, drivenBy, progress, goal }: {
   /** A goal counting itself off this habit, if one exists. */
   goal?: Goal
 }) {
-  const { toggleHabitDay, logSlip, setPage, focusSessions } = useStore()
+  const { toggleHabitDay, logSlip, setPage, focusSessions, inView } = useStore()
   const kept = h.days.filter(Boolean).length
   const target = habitTarget(h)
   // Weekdays-only habits do not expect the weekend, so those dots stay quiet.
@@ -1136,7 +1136,7 @@ const DAYPART_COLS: { id: TimeSlot | 'anytime'; label: string }[] = [
 /* One sheet for adding and editing. A habit a routine drives keeps its name and
    frequency in step with that routine, so those fields are read-only here. */
 function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?: HabitDef; drivenBy?: string }) {
-  const { addHabit, updateHabit } = useStore()
+  const { addHabit, updateHabit, inView } = useStore()
   const [name, setName] = useState(habit?.name ?? '')
   // Editing keeps whatever it had, including none. Only a new habit defaults.
   const [daypart, setDaypart] = useState<TimeSlot | ''>(habit ? (habit.daypart ?? '') : 'morning')
@@ -1259,13 +1259,13 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
 }
 
 export function HabitsPage() {
-  const { habits, goals, space, deleteHabit, routines, todayIndex } = useStore()
+  const { habits, goals, space, deleteHabit, routines, todayIndex, inView } = useStore()
   const [adding, setAdding] = useState(false)
   // Opening the goal sheet from a habit is the "set a goal on this" path.
   const [goalFor, setGoalFor] = useState<string | null>(null)
   const [editHabit, setEditHabit] = useState<HabitDef | null>(null)
   const goalOn = new Map(goals.filter((g) => g.habitId).map((g) => [g.habitId as string, g]))
-  const spaceHabits = habits.filter((h) => h.space === space)
+  const spaceHabits = habits.filter((h) => inView(h.space))
   // A habit a routine drives cannot be deleted from here, or the routine would
   // mirror into nothing. Pausing stays available.
   const drivenBy = new Map(routines.filter((r) => r.habitId).map((r) => [r.habitId as string, r.title]))
@@ -1350,7 +1350,7 @@ export const DONE_LABEL: Record<RoutineCadence, string> = {
 /* Writing the steps of a routine. Editing is a mode on the card rather than a
    separate screen, because the thing you are editing is the thing you look at. */
 function StepEditor({ routine }: { routine: Routine }) {
-  const { addRoutineStep, updateRoutineStep, deleteRoutineStep, moveRoutineStep } = useStore()
+  const { addRoutineStep, updateRoutineStep, deleteRoutineStep, moveRoutineStep, inView } = useStore()
   const [title, setTitle] = useState('')
   const [note, setNote] = useState('')
 
@@ -1393,7 +1393,7 @@ function StepEditor({ routine }: { routine: Routine }) {
 }
 
 function AddRoutineSheet({ onClose }: { onClose: () => void }) {
-  const { addRoutine } = useStore()
+  const { addRoutine, inView } = useStore()
   const [title, setTitle] = useState('')
   const [cadence, setCadence] = useState<RoutineCadence>('daily')
   const [daypart, setDaypart] = useState<TimeSlot | ''>('morning')
@@ -1440,10 +1440,10 @@ function AddRoutineSheet({ onClose }: { onClose: () => void }) {
 }
 
 export function RoutinesPage() {
-  const { routines, space, toggleRoutineStep, resetRoutine, deleteRoutine, habits } = useStore()
+  const { routines, space, toggleRoutineStep, resetRoutine, deleteRoutine, habits, inView } = useStore()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
-  const spaceRoutines = routines.filter((r) => r.space === space)
+  const spaceRoutines = routines.filter((r) => inView(r.space))
   const sorted = [...spaceRoutines].sort((a, b) => CADENCE_ORDER.indexOf(a.cadence) - CADENCE_ORDER.indexOf(b.cadence))
   return (
     <div className="page">
@@ -1548,7 +1548,7 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals }: {
    *  it silently and leaving him staring at the page he started on. */
   thenGoToGoals?: boolean
 }) {
-  const { space, habits, addGoal, updateGoal, setPage } = useStore()
+  const { space, habits, addGoal, updateGoal, setPage, inView } = useStore()
   const preset = habits.find((h) => h.id === presetHabitId)
   const [d, setD] = useState({
     name: goal?.name ?? (preset ? preset.name : ''),
@@ -1561,7 +1561,7 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals }: {
     habitId: goal?.habitId ?? presetHabitId ?? '',
   })
   // Any habit in this profile can drive a goal, so the list grows as you do.
-  const linkable = [...habits.filter((h) => h.space === space && !h.paused)].reverse()
+  const linkable = [...habits.filter((h) => inView(h.space) && !h.paused)].reverse()
   const linked = linkable.find((h) => h.id === d.habitId)
 
   const submit = () => {
@@ -1683,8 +1683,8 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals }: {
 }
 
 export function GoalsPage() {
-  const { space, goals, habits, bumpGoal, toggleGoalMilestone, deleteGoal } = useStore()
-  const spaceGoals = goals.filter((g) => g.space === space)
+  const { space, goals, habits, bumpGoal, toggleGoalMilestone, deleteGoal, inView } = useStore()
+  const spaceGoals = goals.filter((g) => inView(g.space))
   const done = spaceGoals.filter((g) => goalCurrent(g, habits) >= g.target).length
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<Goal | null>(null)

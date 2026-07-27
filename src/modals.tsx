@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { fakeDecompose, type DecomposedStep } from './mock'
 import { BUFFER } from './estimate'
 import type { Task } from './types'
+import { breakdownTask } from './ai'
 import { useStore } from './store'
 
 export function Sheet({ title, onClose, children, note }: {
@@ -36,14 +37,30 @@ export function BreakdownSheet({ task, onClose }: { task: Task; onClose: () => v
   const { setSubtasks } = useStore()
   const [busy, setBusy] = useState(true)
   const [steps, setSteps] = useState<DecomposedStep[] | null>(null)
+  const [source, setSource] = useState<'model' | 'local'>('local')
+  const [why, setWhy] = useState<string>('')
 
   useEffect(() => {
-    const t = window.setTimeout(() => {
-      setSteps(fakeDecompose(task.title).map((s) => ({ ...s, estimateMin: Math.max(1, Math.round(s.estimateMin * BUFFER)) })))
+    let live = true
+    void (async () => {
+      const r = await breakdownTask(task.title, task.category)
+      if (!live) return
+      if (r.ok) {
+        setSource('model')
+        setSteps(r.steps.map((s) => ({ title: s.title, why: s.why, estimateMin: s.estimateMin })))
+      } else {
+        setSource('local')
+        setWhy(r.reason === 'no-key'
+          ? 'The model endpoint is deployed but has no API key yet.'
+          : r.reason === 'failed'
+            ? 'The model could not be reached just now.'
+            : 'The model endpoint is not deployed yet.')
+        setSteps(fakeDecompose(task.title).map((s) => ({ ...s, estimateMin: Math.max(1, Math.round(s.estimateMin * BUFFER)) })))
+      }
       setBusy(false)
-    }, 650)
-    return () => window.clearTimeout(t)
-  }, [task.title])
+    })()
+    return () => { live = false }
+  }, [task.title, task.category])
 
   const total = steps?.reduce((a, s) => a + s.estimateMin, 0) ?? 0
 
@@ -51,11 +68,13 @@ export function BreakdownSheet({ task, onClose }: { task: Task; onClose: () => v
     <Sheet
       title="Break it down"
       onClose={onClose}
-      note="Demo: the steps come from a local library. The real build sends this task to a model and calibrates each estimate against your own logged history."
+      note={source === 'model'
+        ? 'Written for this task by a model, running server-side so no key is ever in this page.'
+        : `${why} These steps came from a local pattern library instead, so treat them as a starting point.`}
     >
       <p className="sheet-task">{task.title}</p>
 
-      {busy && <div className="empty" style={{ paddingTop: 24 }} aria-live="polite">Splitting it into steps and estimating each one.</div>}
+      {busy && <div className="empty" style={{ paddingTop: 24 }} aria-live="polite">Reading this task and working out the steps.</div>}
 
       {steps && (
         <div style={{ marginTop: 12 }}>
@@ -69,9 +88,12 @@ export function BreakdownSheet({ task, onClose }: { task: Task; onClose: () => v
               <span className="est-chip">~{s.estimateMin}m</span>
             </div>
           ))}
+          {source === 'local' && (
+            <p className="sheet-warn">Not a model. A local pattern library matched this task, so read the steps before you accept them.</p>
+          )}
           <div className="total-line">
             <span>Planned <span className="mono">{total}m</span></span>
-            <span style={{ color: 'var(--muted)' }}>Every step carries the {BUFFER}x buffer, so this is the number that gets saved.</span>
+            <span style={{ color: 'var(--muted)' }}>{source === 'model' ? 'Estimated per step by the model. This is the number that gets saved.' : `Every step carries the ${BUFFER}x buffer, so this is the number that gets saved.`}</span>
           </div>
           <div className="sheet-actions">
             <button className="btn btn-quiet" onClick={onClose}>Cancel</button>

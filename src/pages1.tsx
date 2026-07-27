@@ -3,11 +3,12 @@ import { SpaceGrid } from './Grid'
 import { MOCK_AGENDA, SPACE_LABELS, exceptionsFor, globalExceptions, momentum } from './exceptions'
 import { MOCK_MONEY, fakeDecompose } from './mock'
 import { useStore } from './store'
+import { usePomodoro } from './pomodoro'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
 import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, goalCurrent, habitFrequencyLabel, habitTarget, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
-import { fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, gcalUrl, localDateKey, taskMinutes, toMin } from './util'
+import { fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, gcalUrl, isEstimated, localDateKey, taskMinutes, toMin } from './util'
 
 /* ---------------- shared bits ---------------- */
 
@@ -227,8 +228,7 @@ const WIDGET_DEFS_LIST = WIDGET_DEFS
 /* ---------------- PLAN ---------------- */
 
 const HOUR_PX = 42             // tall enough that a 30-minute block fits its own label
-const DEFAULT_START = 7 * 60   // the day he actually lives in, when nothing is earlier
-const DEFAULT_END = 23 * 60
+const MIN_SPAN_H = 10          // never so short that the column looks truncated
 
 /** The task/event name IS the link; clicking opens (or schedules) it in Google Calendar. */
 function TaskName({ title, start, end, className }: { title: string; start?: string; end?: string; className?: string }) {
@@ -242,16 +242,20 @@ function TaskName({ title, start, end, className }: { title: string; start?: str
 /** Vertical day timeline: calendar events plus any task pinned to a clock time. Full height, no inner scroll. */
 function Schedule({ events, tasks }: { events: AgendaEvent[]; tasks: Task[] }) {
   const pinned = tasks.filter((t) => t.at && !t.done)
-  /* Show the hours the day actually occupies, padded by one, instead of a fixed
-     midnight-to-midnight column with nine empty hours at the top. */
+  /* The window follows the day you are actually in: it always covers now, plus
+     whatever is scheduled, padded by an hour. No arbitrary start hour. */
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
   const marks = [
+    nowMin,
     ...events.flatMap((e) => [toMin(e.start), toMin(e.end)]),
     ...pinned.map((t) => toMin(t.at!)),
   ]
-  const first = marks.length ? Math.min(...marks) : DEFAULT_START
-  const last = marks.length ? Math.max(...marks) : DEFAULT_END
-  const startH = Math.max(0, Math.floor(Math.min(first, DEFAULT_START) / 60) - 1)
-  const endH = Math.min(24, Math.ceil(Math.max(last, DEFAULT_END) / 60) + 1)
+  let startH = Math.max(0, Math.floor(Math.min(...marks) / 60) - 1)
+  let endH = Math.min(24, Math.ceil(Math.max(...marks) / 60) + 1)
+  if (endH - startH < MIN_SPAN_H) {
+    endH = Math.min(24, startH + MIN_SPAN_H)
+    startH = Math.max(0, endH - MIN_SPAN_H)
+  }
   const DAY_START = startH * 60
   const hours = endH - startH
   const height = hours * HOUR_PX
@@ -267,6 +271,11 @@ function Schedule({ events, tasks }: { events: AgendaEvent[]; tasks: Task[] }) {
             </div>
           )
         })}
+        {nowMin >= DAY_START && nowMin <= endH * 60 && (
+          <div className="vnow" style={{ top: ((nowMin - DAY_START) / 60) * HOUR_PX }} aria-hidden="true">
+            <span className="vnow-dot" /><span className="vnow-label mono">now</span>
+          </div>
+        )}
         {events.map((e) => (
           <div className="vev vev-cal" key={e.id} style={{ top: y(e.start) + 1, height: Math.max(((toMin(e.end) - toMin(e.start)) / 60) * HOUR_PX - 2, 42) }}>
             <TaskName title={e.title} start={e.start} end={e.end} className="t" />
@@ -310,13 +319,26 @@ function ActualLog({ est, onLog, onSkip }: { est: number; onLog: (m: number) => 
 
 
 /* Breaking a task down and estimating it are actions on the task itself. */
-function TaskActions({ task, onBreakdown }: { task: Task; onBreakdown: () => void }) {
+function TaskActions({ task, onBreakdown, onFocus }: { task: Task; onBreakdown: () => void; onFocus?: () => void }) {
   const { setEstimate } = useStore()
   const [flash, setFlash] = useState<string | null>(null)
   const hasSubs = !!task.subtasks?.length
   return (
     <span className="task-actions">
       {flash && <span className="task-flash mono">{flash}</span>}
+      {onFocus && (
+        <button
+          className="task-act task-focus"
+          disabled={!isEstimated(task)}
+          aria-label={isEstimated(task) ? `Focus on ${task.title} for ${taskMinutes(task)} minutes` : `Estimate ${task.title} before starting a focus block`}
+          title={isEstimated(task) ? `Focus ${taskMinutes(task)}m on this` : 'Estimate it first'}
+          onClick={onFocus}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <path d="M8 5.5v13l10-6.5-10-6.5z" strokeLinejoin="round" />
+          </svg>
+        </button>
+      )}
       <button
         className="task-act"
         aria-label={hasSubs ? `Break down ${task.title} again` : `Break down ${task.title}`}
@@ -348,6 +370,7 @@ function TaskActions({ task, onBreakdown }: { task: Task; onBreakdown: () => voi
 }
 
 export function PlanPage() {
+  const { startFocus } = usePomodoro()
   const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId } = useStore()
   const evening = new Date().getHours() >= 21
   const events = MOCK_AGENDA[space]
@@ -458,10 +481,10 @@ export function PlanPage() {
               placeholder="Add something to the list"
               value={quick}
               onChange={(e) => setQuick(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && quick.trim()) { addTask({ title: quick.trim(), source: 'mc', estimateMin: 15, space, list: 'backlog', category: 'quick' }); setQuick('') } }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && quick.trim()) { addTask({ title: quick.trim(), source: 'mc', estimateMin: 0, space, list: 'backlog', category: 'quick' }); setQuick('') } }}
               aria-label="New task"
             />
-            <button className="btn btn-quiet" disabled={!quick.trim()} onClick={() => { addTask({ title: quick.trim(), source: 'mc', estimateMin: 15, space, list: 'backlog', category: 'quick' }); setQuick('') }}>Add</button>
+            <button className="btn btn-quiet" disabled={!quick.trim()} onClick={() => { addTask({ title: quick.trim(), source: 'mc', estimateMin: 0, space, list: 'backlog', category: 'quick' }); setQuick('') }}>Add</button>
           </div>
           {backlogOpen.map((t) => {
             const isExp = expanded.has(t.id)
@@ -479,7 +502,7 @@ export function PlanPage() {
                   </button>
                   <span className={`cat-dot ${t.category}`} aria-hidden="true" />
                   <span className="grow">{t.title}</span>
-                  <span className="est-chip">~{taskMinutes(t)}m</span>
+                  {isEstimated(t) ? <span className="est-chip">~{taskMinutes(t)}m</span> : <span className="est-chip is-none">no estimate</span>}
                   {hasSubs && (
                     <button className="expand-btn" aria-expanded={isExp} aria-label={isExp ? 'Collapse subtasks' : 'Expand subtasks'} onClick={() => toggleExp(t.id)}>
                       {isExp ? '▾' : '▸'} {doneSubs}/{t.subtasks!.length}
@@ -569,15 +592,17 @@ export function PlanPage() {
                           <TaskName title={t.title} start={t.at} className="grow" />
                           {t.done && t.actualMin != null ? (
                             <span className="est-vs-actual mono">~{taskMinutes(t)} → {t.actualMin}m <b className={taskMinutes(t) - t.actualMin >= 0 ? 'val-pos' : 'val-urgent'}>{taskMinutes(t) - t.actualMin >= 0 ? '+' : ''}{taskMinutes(t) - t.actualMin}m</b></span>
-                          ) : (
+                          ) : isEstimated(t) ? (
                             <span className="est-chip">~{taskMinutes(t)}m</span>
+                          ) : (
+                            <span className="est-chip is-none">no estimate</span>
                           )}
                           {hasSubs && (
                             <button className="expand-btn" aria-expanded={isExp} aria-label={isExp ? 'Collapse subtasks' : 'Expand subtasks'} onClick={() => toggleExp(t.id)}>
                               {isExp ? '▾' : '▸'} {doneSubs}/{t.subtasks!.length}
                             </button>
                           )}
-                          {!t.done && <TaskActions task={t} onBreakdown={() => setBreakdownFor(t)} />}
+                          {!t.done && <TaskActions task={t} onBreakdown={() => setBreakdownFor(t)} onFocus={() => startFocus(taskMinutes(t), t.title)} />}
                           <span className="kebab-wrap">
                             <button className="kebab" aria-label={`Options for ${t.title}`} aria-expanded={menuFor === t.id} onClick={() => setMenuFor((m) => (m === t.id ? null : t.id))}>⋯</button>
                             {menuFor === t.id && (
@@ -604,7 +629,7 @@ export function PlanPage() {
                         {hasSubs && isExp && (
                           <div className="subtask-list">
                             {t.subtasks!.map((s) => (
-                              <div key={s.id}>
+                              <div key={s.id} className="subtask-wrap">
                                 <button
                                   className={`subtask${s.done ? ' done' : ''}`}
                                   onClick={() => { if (s.done) toggleSubtask(t.id, s.id); else setLogging(`sub|${t.id}|${s.id}`) }}
@@ -617,6 +642,18 @@ export function PlanPage() {
                                     <span className="est-chip">~{s.estimateMin}m</span>
                                   )}
                                 </button>
+                                {!s.done && (
+                                  <button
+                                    className="task-act task-focus sub-focus"
+                                    aria-label={`Focus on ${s.title} for ${s.estimateMin} minutes`}
+                                    title={`Focus ${s.estimateMin}m on this step`}
+                                    onClick={() => startFocus(s.estimateMin, s.title)}
+                                  >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                      <path d="M8 5.5v13l10-6.5-10-6.5z" strokeLinejoin="round" />
+                                    </svg>
+                                  </button>
+                                )}
                                 {logging === `sub|${t.id}|${s.id}` && (
                                   <ActualLog est={s.estimateMin} onLog={(m) => { logSubtaskActual(t.id, s.id, m); setLogging(null) }} onSkip={() => { toggleSubtask(t.id, s.id); setLogging(null) }} />
                                 )}
@@ -647,7 +684,9 @@ export function PlanPage() {
                   <span className="grow">{t.title}</span>
                   {t.actualMin != null
                     ? <span className="est-vs-actual mono">~{taskMinutes(t)} → {t.actualMin}m</span>
-                    : <span className="est-chip">~{taskMinutes(t)}m</span>}
+                    : isEstimated(t)
+                      ? <span className="est-chip">~{taskMinutes(t)}m</span>
+                      : <span className="est-chip is-none">no estimate</span>}
                 </div>
               ))}
             </div>

@@ -1947,3 +1947,16 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   margin-bottom: var(--s3);
 }
 @media (pointer: coarse) { .task-act { width: 40px; height: 40px; } }
+
+/* Start a focus block on a task or a single step, for its own estimate. */
+.task-focus:not(:disabled) { color: var(--accent); }
+.subtask-wrap { display: flex; align-items: center; gap: 2px; }
+.subtask-wrap > .subtask { flex: 1 1 auto; min-width: 0; }
+.sub-focus { width: 26px; height: 26px; flex: none; }
+.est-chip.is-none { color: var(--faint); background: transparent; border: 1px dashed var(--hairline-strong); }
+/* The now line on the day column. */
+.vnow { position: absolute; left: 0; right: 0; border-top: 1px solid var(--accent); z-index: 3; pointer-events: none; }
+.vnow-dot { position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.vnow-label { position: absolute; right: 2px; top: -8px; font-size: 0.5625rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); background: var(--bg); padding: 0 3px; }
+
+.sheet-warn { font-size: var(--text-xs); color: var(--warn); background: var(--warn-wash); border-radius: var(--r-sm); padding: var(--s2) var(--s3); margin-top: var(--s3); }

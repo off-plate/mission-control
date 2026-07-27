@@ -15,6 +15,7 @@ import type {
   WidgetInstance,
   WidgetType,
 } from './types'
+import { fmtDayShort, lastBusinessDayOfMonth, nextDow } from './util'
 
 /* All data in this file is invented for the demo. No real accounts,
    no real balances, no real creditors. The real app reads Supabase. */
@@ -42,7 +43,7 @@ export const WIDGET_DEFS: Record<WidgetType, WidgetDef> = {
   },
   training: {
     type: 'training', title: 'Training', description: 'Hevy: last session and weekly volume',
-    supportedSizes: ['S', 'M', 'L'], defaultSize: 'M', freshMinutes: 95, staleAfter: 60 * 26, page: 'today',
+    supportedSizes: ['S', 'M', 'L'], defaultSize: 'M', freshMinutes: 95, staleAfter: 60 * 26, page: 'goals',
   },
   goals: {
     type: 'goals', title: 'Goals', description: 'Targets across timeframes and drift',
@@ -419,7 +420,13 @@ export const MOCK_CLAUDE = {
 
 /* Money page. Every figure is invented and deliberately generic. */
 /* One consistent invented model: every schedule row derives from an obligation,
-   percentages match remaining/total, and dates respect their own deadlines. */
+   percentages match remaining/total, and dates respect their own deadlines.
+   Dates are computed relative to today so the page never shows a past "due". */
+const D_FRI = nextDow(5)                     // next Friday: insurance installment
+const D_TAX = lastBusinessDayOfMonth()       // tax transfer beats the month-end deadline
+const D_MON = nextDow(1)                     // next Monday: bank loan installment
+const D_FRI2 = new Date(D_FRI); D_FRI2.setDate(D_FRI2.getDate() + 28)
+
 export const MOCK_MONEY = {
   debt: {
     original: '218 500 Kč',
@@ -442,17 +449,17 @@ export const MOCK_MONEY = {
   safeUntil: 'until payday, 18 days',
   safeMath: 'This cycle\u2019s installments (18 000 Kč) are already reserved',
   totalRemaining: '162 900 Kč',
-  nextObligation: 'Friday installment: 2 400 Kč, not sent',
+  nextObligation: `${fmtDayShort(D_FRI)} installment: 2 400 Kč, not sent`,
   obligations: [
-    { id: 'o1', name: 'Health insurance payment plan', monthly: '2 400 Kč / month', remaining: '62 400 Kč remaining of 96 000', progressPct: 35, state: 'agreed', next: 'Installment due Friday 24 Jul' },
+    { id: 'o1', name: 'Health insurance payment plan', monthly: '2 400 Kč / month', remaining: '62 400 Kč remaining of 96 000', progressPct: 35, state: 'agreed', next: `Installment due ${fmtDayShort(D_FRI)}` },
     { id: 'o2', name: 'Bank loan payment plan', monthly: '3 100 Kč / month', remaining: '88 000 Kč remaining of 110 000', progressPct: 20, state: 'waiting', next: 'Written confirmation pending' },
-    { id: 'o3', name: 'Tax office settlement', monthly: '12 500 Kč, one payment', remaining: '12 500 Kč remaining of 12 500', progressPct: 0, state: 'action needed', next: 'Deadline Aug 1, pay by Fri 31 Jul' },
+    { id: 'o3', name: 'Tax office settlement', monthly: '12 500 Kč, one payment', remaining: '12 500 Kč remaining of 12 500', progressPct: 0, state: 'action needed', next: `Pay by ${fmtDayShort(D_TAX)}, the deadline is the 1st` },
   ] as Obligation[],
   schedule: [
-    { date: 'Fri 24 Jul', name: 'Insurance installment', amount: '2 400 Kč', state: 'not sent' },
-    { date: 'Fri 31 Jul', name: 'Tax office transfer, last business day before the Aug 1 deadline', amount: '12 500 Kč', state: 'action needed' },
-    { date: 'Mon 3 Aug', name: 'Bank loan installment, plan confirmation pending', amount: '3 100 Kč', state: 'pending' },
-    { date: 'Mon 24 Aug', name: 'Insurance installment', amount: '2 400 Kč', state: 'scheduled' },
+    { date: fmtDayShort(D_FRI), name: 'Insurance installment', amount: '2 400 Kč', state: 'not sent' },
+    { date: fmtDayShort(D_TAX), name: 'Tax office transfer, last business day before the deadline', amount: '12 500 Kč', state: 'action needed' },
+    { date: fmtDayShort(D_MON), name: 'Bank loan installment, plan confirmation pending', amount: '3 100 Kč', state: 'pending' },
+    { date: fmtDayShort(D_FRI2), name: 'Insurance installment', amount: '2 400 Kč', state: 'scheduled' },
   ],
 }
 
@@ -480,19 +487,12 @@ export const MOCK_STATS = {
 
 export interface DecomposedStep { title: string; why?: string; estimateMin: number; category?: 'call' | 'admin' | 'deep' | 'quick' }
 
+/* Order matters: the most specific matcher must come first. A generic /plan/
+   used to sit at the top and swallowed "set up the bank payment plan", which is
+   the field's own placeholder, so the money steps were unreachable. */
 const LIBRARY: { match: RegExp; steps: DecomposedStep[] }[] = [
   {
-    match: /week|týden|plan/i,
-    steps: [
-      { title: 'Empty every inbox into one list', why: 'mail, TickTick, Trello, notes', estimateMin: 8 },
-      { title: 'Pick three outcomes for the week', why: 'results you can check off, like: plan sent', estimateMin: 6 },
-      { title: 'Slot the three outcomes into real calendar blocks', estimateMin: 7, category: 'admin' },
-      { title: 'Book the unpleasant call first', why: 'hardest thing gets the best slot', estimateMin: 4 },
-      { title: 'Set Sunday reminder for the next reset', estimateMin: 2 },
-    ],
-  },
-  {
-    match: /plan|payment|splátk|bank|insur|poji|call|zavol|phone/i,
+    match: /payment|splátk|bank|insur|poji|invoice|faktur|tax|daň|call|zavol|phone/i,
     steps: [
       { title: 'Find the contract number and the last letter', estimateMin: 5 },
       { title: 'Write one sentence: what you are asking them for', estimateMin: 3 },
@@ -509,6 +509,16 @@ const LIBRARY: { match: RegExp; steps: DecomposedStep[] }[] = [
       { title: 'Cut a third of it', why: 'shorter always reads better', estimateMin: 6 },
       { title: 'Add one specific number or receipt', estimateMin: 4 },
       { title: 'Schedule for tomorrow 8:30', estimateMin: 3 },
+    ],
+  },
+  {
+    match: /week|týden|reset|review|plan the/i,
+    steps: [
+      { title: 'Empty every inbox into one list', why: 'mail, TickTick, Trello, notes', estimateMin: 8 },
+      { title: 'Pick three outcomes for the week', why: 'results you can check off, like: plan sent', estimateMin: 6 },
+      { title: 'Slot the three outcomes into real calendar blocks', estimateMin: 7, category: 'admin' },
+      { title: 'Book the unpleasant call first', why: 'hardest thing gets the best slot', estimateMin: 4 },
+      { title: 'Set Sunday reminder for the next reset', estimateMin: 2 },
     ],
   },
 ]

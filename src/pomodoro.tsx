@@ -30,13 +30,40 @@ export function usePomodoro(): Pomo {
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`
 
+/* State that must survive a reload: your timer settings, today's cycle count,
+   and any running phase (kept as a wall-clock deadline, not a countdown). */
+const PK = 'mc-pomodoro'
+interface Saved {
+  focusMin: number; breakMin: number; cyclesDone: number; cyclesDay: string
+  phase: Phase; endsAt: number | null; pausedLeft: number | null
+}
+const today = () => new Date().toDateString()
+function loadPomo(): Partial<Saved> {
+  try {
+    const raw = localStorage.getItem(PK)
+    if (!raw) return {}
+    const s = JSON.parse(raw) as Saved
+    // The cycle count is a "today" number; a new day starts at zero.
+    return s.cyclesDay === today() ? s : { ...s, cyclesDone: 0 }
+  } catch { return {} }
+}
+
 export function PomodoroProvider({ children }: { children: ReactNode }) {
-  const [focusMin, setFocusMin] = useState(25)
-  const [breakMin, setBreakMin] = useState(5)
-  const [phase, setPhase] = useState<Phase>('idle')
-  const [running, setRunning] = useState(false)
-  const [secondsLeft, setSecondsLeft] = useState(0)
-  const [cyclesDone, setCyclesDone] = useState(0)
+  const saved = useState(loadPomo)[0]
+  const [focusMin, setFocusMin] = useState(saved.focusMin ?? 25)
+  const [breakMin, setBreakMin] = useState(saved.breakMin ?? 5)
+  const [phase, setPhase] = useState<Phase>(saved.phase ?? 'idle')
+  // A phase is stored as the moment it ends, so a backgrounded or reloaded tab
+  // still shows the true remaining time instead of drifting behind.
+  const [endsAt, setEndsAt] = useState<number | null>(saved.endsAt ?? null)
+  const [pausedLeft, setPausedLeft] = useState<number | null>(saved.pausedLeft ?? null)
+  const [cyclesDone, setCyclesDone] = useState(saved.cyclesDone ?? 0)
+  const [, tick] = useState(0)
+
+  const running = endsAt !== null
+  const secondsLeft = endsAt !== null
+    ? Math.max(0, Math.round((endsAt - Date.now()) / 1000))
+    : pausedLeft ?? 0
 
   const notify = (title: string, body: string) => {
     if ('Notification' in window && Notification.permission === 'granted') {
@@ -44,11 +71,19 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // 1-second tick while running
+  useEffect(() => {
+    try {
+      localStorage.setItem(PK, JSON.stringify({ focusMin, breakMin, cyclesDone, cyclesDay: today(), phase, endsAt, pausedLeft }))
+    } catch { /* noop */ }
+  }, [focusMin, breakMin, cyclesDone, phase, endsAt, pausedLeft])
+
+  // Re-render twice a second while running; the clock itself comes from the deadline.
   useEffect(() => {
     if (!running || phase === 'idle') return
-    const id = window.setInterval(() => setSecondsLeft((s) => Math.max(0, s - 1)), 1000)
-    return () => window.clearInterval(id)
+    const id = window.setInterval(() => tick((n) => n + 1), 500)
+    const onShow = () => tick((n) => n + 1)
+    document.addEventListener('visibilitychange', onShow)
+    return () => { window.clearInterval(id); document.removeEventListener('visibilitychange', onShow) }
   }, [running, phase])
 
   // phase transitions at zero
@@ -58,12 +93,12 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
       setCyclesDone((c) => c + 1)
       notify('Focus done', `Nice. ${breakMin} minute break.`)
       setPhase('break')
-      setSecondsLeft(breakMin * 60)
+      setEndsAt(Date.now() + breakMin * 60 * 1000)
     } else {
       notify('Break over', 'Back to it when you are ready.')
       setPhase('idle')
-      setRunning(false)
-      setSecondsLeft(0)
+      setEndsAt(null)
+      setPausedLeft(null)
     }
   }, [secondsLeft, phase, running, breakMin])
 
@@ -76,14 +111,18 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
 
   const startFocus = () => {
     if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission()
-    setPhase('focus'); setSecondsLeft(focusMin * 60); setRunning(true)
+    setPhase('focus'); setEndsAt(Date.now() + focusMin * 60 * 1000); setPausedLeft(null)
   }
-  const toggle = () => { if (phase === 'idle') startFocus(); else setRunning((r) => !r) }
+  const toggle = () => {
+    if (phase === 'idle') { startFocus(); return }
+    if (running) { setPausedLeft(secondsLeft); setEndsAt(null) }        // pause: freeze what is left
+    else { setEndsAt(Date.now() + (pausedLeft ?? 0) * 1000); setPausedLeft(null) } // resume from there
+  }
   const skip = () => {
-    if (phase === 'focus') { setPhase('break'); setSecondsLeft(breakMin * 60); setRunning(true) }
-    else { setPhase('idle'); setRunning(false); setSecondsLeft(0) }
+    if (phase === 'focus') { setPhase('break'); setEndsAt(Date.now() + breakMin * 60 * 1000); setPausedLeft(null) }
+    else { setPhase('idle'); setEndsAt(null); setPausedLeft(null) }
   }
-  const stop = () => { setPhase('idle'); setRunning(false); setSecondsLeft(0) }
+  const stop = () => { setPhase('idle'); setEndsAt(null); setPausedLeft(null) }
 
   const value: Pomo = { phase, running, secondsLeft, focusMin, breakMin, cyclesDone, startFocus, toggle, skip, stop, setFocusMin, setBreakMin }
   return (
@@ -129,6 +168,7 @@ function PomodoroBadge() {
         <button className="pomo-start" onClick={p.startFocus} aria-label={`Start a ${p.focusMin} minute focus`}>
           <ClockIcon /> Focus {p.focusMin}m
         </button>
+        {p.cyclesDone > 0 && <span className="pomo-cycles mono" title="Focus blocks finished today">{p.cyclesDone} today</span>}
         <button className="pomo-icon" aria-label="Timer settings" aria-expanded={setupOpen} onClick={() => setSetupOpen((v) => !v)}>⚙</button>
       </div>
     )

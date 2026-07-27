@@ -27,6 +27,10 @@ export function Sheet({ title, onClose, children, note }: {
   )
 }
 
+/** Optimism correction applied to every generated estimate. The real app derives
+ *  this per category from the logged ledger; here it is one honest constant. */
+const BUFFER = 1.3
+
 export function DecomposeSheet({ onClose }: { onClose: () => void }) {
   const { addTaskWithSubtasks, space } = useStore()
   const [goal, setGoal] = useState('')
@@ -47,14 +51,18 @@ export function DecomposeSheet({ onClose }: { onClose: () => void }) {
     }, 850)
   }
 
+  const buffered = steps?.map((s) => ({ ...s, estimateMin: Math.max(1, Math.round(s.estimateMin * BUFFER)) })) ?? null
   const total = steps?.reduce((a, s) => a + s.estimateMin, 0) ?? 0
-  const calibrated = Math.round(total * 1.3)
+  // Summed from the rounded steps, so the headline equals what gets created.
+  const calibrated = buffered?.reduce((a, s) => a + s.estimateMin, 0) ?? 0
 
+  /* The buffered number is the one that gets created. Showing 39m and then
+     saving 30m would quietly re-teach the optimism this is meant to correct. */
   const accept = () => {
-    if (!steps) return
+    if (!buffered) return
     addTaskWithSubtasks(
       { title: goal.trim(), source: 'mc', estimateMin: 0, space, list: dest, category: 'deep' },
-      steps.map((s) => ({ title: s.title, estimateMin: s.estimateMin })),
+      buffered.map((s) => ({ title: s.title, estimateMin: s.estimateMin })),
     )
     onClose()
   }
@@ -87,9 +95,9 @@ export function DecomposeSheet({ onClose }: { onClose: () => void }) {
         </div>
       )}
 
-      {steps && (
+      {buffered && (
         <div style={{ marginTop: 20 }}>
-          {steps.map((s, i) => (
+          {buffered.map((s, i) => (
             <div className="step-item" key={i} style={{ animationDelay: `${i * 70}ms` }}>
               <span className="n">{i + 1}</span>
               <span className="grow">
@@ -100,9 +108,9 @@ export function DecomposeSheet({ onClose }: { onClose: () => void }) {
             </div>
           ))}
           <div className="total-line">
-            <span>Raw estimate <span className="mono">{total}m</span></span>
+            <span>Planned <span className="mono">{calibrated}m</span></span>
             <span style={{ color: 'var(--muted)' }}>
-              Plan for <span className="mono">{calibrated}m</span> with the 1.3x buffer. The real app computes the buffer from your logged history.
+              Raw steps add up to <span className="mono">{total}m</span>; each one carries the 1.3x buffer. The real app computes that buffer from your own logged history.
             </span>
           </div>
           <div style={{ display: 'flex', marginTop: 16, gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -111,7 +119,7 @@ export function DecomposeSheet({ onClose }: { onClose: () => void }) {
               <button aria-pressed={dest === 'backlog'} onClick={() => setDest('backlog')}>backlog</button>
             </div>
             <button className="btn btn-primary" onClick={accept} style={{ marginLeft: 'auto' }}>
-              Add as a task with {steps.length} subtasks
+              Add as a task with {buffered.length} subtasks
             </button>
           </div>
         </div>

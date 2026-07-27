@@ -3,30 +3,18 @@ import { COACH_SCENARIOS, MOCK_MONEY, MOCK_STATS } from './mock'
 import { Band } from './pages1'
 import { useStore } from './store'
 import { Spark, SparkBox } from './widgets'
-import { fmtDuration, taskMinutes } from './util'
+import { fmtDuration, fmtSigned, fmtWhen, isoWeekKey, localDateKey, taskMinutes } from './util'
 import { analyzeAvoidance } from './coach'
-import type { CoachFacts, CoachSession, TaskCategory } from './types'
+import { paymentTaskTitle } from './exceptions'
+import { ON_TRACK_PCT, type CoachFacts, type CoachSession, type TaskCategory } from './types'
 
 /* ---------------- MONEY ---------------- */
 
+/* Money is one pool — his real finances do not split by profile — so this page
+   is identical in every space instead of dead-ending outside Personal. */
 export function MoneyPage() {
-  const { space, setSpace: setSpage, tasks, addTask } = useStore()
+  const { tasks, addTask } = useStore()
   const f = MOCK_MONEY
-  if (space !== 'personal') {
-    return (
-      <div className="page">
-        <Band title="Money" sub="personal space only" />
-        <div className="panel">
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--muted)' }}>
-            Money lives in the Personal space.
-          </p>
-          <button className="btn btn-quiet" style={{ marginTop: 12 }} onClick={() => setSpage('personal')}>
-            Switch to Personal
-          </button>
-        </div>
-      </div>
-    )
-  }
   return (
     <div className="page">
       <Band
@@ -58,18 +46,24 @@ export function MoneyPage() {
           <div className="kpi-sub">across your payment plans</div>
           <div className="rowlist" style={{ marginTop: 12 }}>
             {f.schedule.map((sch) => {
-              const taskTitle = `Send: ${sch.name.split(',')[0]} (${sch.amount})`
+              // Same title Today's alert uses, so paying it once clears both surfaces.
+              const taskTitle = paymentTaskTitle(sch.name, sch.amount)
               const queued = tasks.find((t) => t.title === taskTitle)
               const urgent = sch.state === 'action needed' || sch.state === 'not sent'
+              const sent = queued?.done
               return (
                 <div className="rowitem wrap-row" key={sch.date + sch.name}>
                   <span className="mono meta" style={{ minWidth: '9ch' }}>{sch.date}</span>
                   <span className="grow">{sch.name}</span>
                   <span className="mono" style={{ fontWeight: 600 }}>{sch.amount}</span>
-                  <span className={`state-tag ${urgent ? 'action' : sch.state === 'pending' ? 'pending' : sch.state === 'scheduled' ? 'scheduled' : 'waiting'}`}>{sch.state}</span>
-                  {urgent && (
+                  {sent ? (
+                    <span className="state-tag agreed">sent</span>
+                  ) : (
+                    <span className={`state-tag ${urgent ? 'action' : sch.state === 'pending' ? 'pending' : sch.state === 'scheduled' ? 'scheduled' : 'waiting'}`}>{sch.state}</span>
+                  )}
+                  {urgent && !sent && (
                     queued ? (
-                      <span className="microcap" style={{ color: 'var(--progress)' }}>{queued.done ? 'done' : 'on today'}</span>
+                      <span className="microcap" style={{ color: 'var(--progress)' }}>on today</span>
                     ) : (
                       <button className="btn btn-ghost" style={{ minHeight: 30, fontSize: 'var(--text-xs)' }}
                         onClick={() => addTask({ title: taskTitle, source: 'mc', estimateMin: 5, space: 'personal', list: 'today', category: 'admin' })}>
@@ -125,20 +119,21 @@ function SecHead({ label, note }: { label: string; note?: string }) {
 }
 
 export function ReviewPage() {
-  const { tasks, space, savedMin, accuracyPct, habits, goals, finishReview, review, ledger } = useStore()
+  const { tasks, space, savedMin, accuracyPct, habits, goals, finishReview, review, weekLedger } = useStore()
   const [wins, setWins] = useState<string[]>(['', '', ''])
   const [changed, setChanged] = useState('')
   const [outcomes, setOutcomes] = useState<string[]>(['', '', ''])
-  const todayKey = new Date().toISOString().slice(0, 10)
-  const doneToday = review.lastDoneDate === todayKey
+  // "Closed" holds for the whole week, not just the day you closed it.
+  const doneThisWeek = review.lastWeekKey === isoWeekKey()
   const s = MOCK_STATS
 
   const doneTasks = tasks.filter((t) => t.done && t.space === space)
   const doneMin = doneTasks.reduce((a, t) => a + taskMinutes(t), 0)
-  const activeHabits = habits.filter((h) => !h.paused)
+  const activeHabits = habits.filter((h) => !h.paused && h.space === space)
   const habitsKept = activeHabits.reduce((a, h) => a + h.days.filter(Boolean).length, 0)
   const spaceGoals = goals.filter((g) => g.space === space)
-  const goalsOnTrack = spaceGoals.filter((g) => g.current / g.target >= 0.5).length
+  const goalsOnTrack = spaceGoals.filter((g) => (g.current / g.target) * 100 >= ON_TRACK_PCT).length
+  const prev = review.previous
 
   const setW = (i: number, v: string) => setWins((p) => p.map((x, j) => (j === i ? v : x)))
   const setO = (i: number, v: string) => setOutcomes((p) => p.map((x, j) => (j === i ? v : x)))
@@ -149,11 +144,11 @@ export function ReviewPage() {
         title="Weekly review"
         sub="the week in numbers, then a quick checkup"
         metrics={[
-          { v: `${Math.floor(savedMin / 60)}h ${savedMin % 60}m`, k: 'time saved', tone: 'pos' as const },
+          { v: `${fmtSigned(savedMin)}`, k: 'time saved', tone: 'pos' as const },
           { v: `${accuracyPct}%`, k: 'estimate accuracy' },
         ]}
       />
-      {doneToday && (
+      {doneThisWeek && (
         <div className="allclear" style={{ borderColor: 'var(--progress)' }}>
           <span className="dot" aria-hidden="true" />
           Closed for this week. Your outcomes are in the backlog. The numbers below keep updating live.
@@ -197,7 +192,7 @@ export function ReviewPage() {
         </div>
         <div className="panel">
           <span className="microcap">Time saved</span>
-          <div className={`kpi ${savedMin >= 0 ? 'val-pos' : 'val-urgent'}`}>{Math.floor(savedMin / 60)}h {savedMin % 60}m</div>
+          <div className={`kpi ${savedMin >= 0 ? 'val-pos' : 'val-urgent'}`}>{fmtSigned(savedMin)}</div>
           <div className="kpi-sub">vs your own estimates · {accuracyPct}% accuracy. Everything here traces to something you logged.</div>
         </div>
       </div>
@@ -212,6 +207,9 @@ export function ReviewPage() {
         </div>
         <div className="panel">
           <span className="microcap">Your calibration factors</span>
+          <span className="review-sec-note" style={{ display: 'block', marginBottom: 'var(--s2)' }}>
+            Sample figures for now. Once the ledger has enough logged work, these are computed from your own estimate-vs-actual.
+          </span>
           <table className="caltable">
             <tbody>
               {s.calibration.map((c) => (
@@ -228,11 +226,11 @@ export function ReviewPage() {
       <div className="panel" style={{ marginTop: 'var(--s4)' }}>
         <span className="microcap">The ledger, estimate vs actual</span>
         <div className="ledger-list">
-          {ledger.map((e) => {
+          {weekLedger.map((e) => {
             const d = e.estimateMin - e.actualMin
             return (
               <div className="ledger-row" key={e.id}>
-                <span className="mono" style={{ color: 'var(--faint)', fontSize: 'var(--text-xs)', minWidth: '3ch' }}>{e.when}</span>
+                <span className="mono" style={{ color: 'var(--faint)', fontSize: 'var(--text-xs)', minWidth: '3ch' }}>{fmtWhen(e.when)}</span>
                 <span className="ledger-title">{e.title}</span>
                 <span className="src-tag">{e.category}</span>
                 <span className="mono" style={{ color: 'var(--muted)', fontSize: 'var(--text-xs)' }}>~{e.estimateMin}m → {e.actualMin}m</span>
@@ -244,6 +242,26 @@ export function ReviewPage() {
       </div>
 
       <SecHead label="Checkup" note="two minutes, honest" />
+      {/* What you said last week, so the reflection is not written into a void. */}
+      {prev && (prev.wins.length > 0 || prev.outcomes.length > 0) && (
+        <div className="panel lastweek">
+          <span className="microcap">Last week you said</span>
+          <div className="lastweek-cols">
+            {prev.wins.length > 0 && (
+              <div>
+                <span className="lastweek-h">went well</span>
+                <ul className="lastweek-list">{prev.wins.map((w, i) => <li key={i}>{w}</li>)}</ul>
+              </div>
+            )}
+            {prev.outcomes.length > 0 && (
+              <div>
+                <span className="lastweek-h">you committed to</span>
+                <ul className="lastweek-list">{prev.outcomes.map((o, i) => <li key={i}>{o}</li>)}</ul>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       <div className="panel checkup-panel">
         <span className="microcap">Manual checkup</span>
         <div className="checkup-cols">
@@ -263,7 +281,7 @@ export function ReviewPage() {
             ))}
             <div className="coach-nav">
               <button className="btn btn-primary" onClick={() => { finishReview([...wins, changed].filter(Boolean), outcomes.filter(Boolean)); setWins(['', '', '']); setChanged(''); setOutcomes(['', '', '']) }}>
-                {doneToday ? 'Update the week' : 'Close the week'}
+                {doneThisWeek ? 'Update the week' : 'Close the week'}
               </button>
             </div>
           </div>
@@ -303,16 +321,26 @@ function ReflectForm({ onSubmit, onCancel }: { onSubmit: (didIt: boolean, felt: 
         <button className={didIt ? 'on' : ''} onClick={() => setDidIt(true)}>Yes</button>
         <button className={!didIt ? 'on' : ''} onClick={() => setDidIt(false)}>Not yet</button>
       </div>
-      <span className="coach-field-q">How did it actually feel?</span>
-      <div className="coach-choice wrap">
-        {FELT_OPTS.map((o) => (
-          <button key={o.key} className={felt === o.key ? 'on' : ''} onClick={() => setFelt(o.key)}>{o.label}</button>
-        ))}
-      </div>
-      <textarea className="textinput" rows={2} style={{ width: '100%', marginTop: 'var(--s2)' }} placeholder="What did it feel like? One honest line." value={text} onChange={(e) => setText(e.target.value)} aria-label="How it felt" />
+      {/* "How did it feel" only makes sense once you have actually done it. */}
+      {didIt && (
+        <>
+          <span className="coach-field-q">How did it actually feel?</span>
+          <div className="coach-choice wrap">
+            {FELT_OPTS.map((o) => (
+              <button key={o.key} className={felt === o.key ? 'on' : ''} onClick={() => setFelt(o.key)}>{o.label}</button>
+            ))}
+          </div>
+        </>
+      )}
+      <textarea className="textinput" rows={2} style={{ width: '100%', marginTop: 'var(--s2)' }}
+        placeholder={didIt ? 'What did it feel like? One honest line.' : 'What is actually in the way? One honest line.'}
+        value={text} onChange={(e) => setText(e.target.value)} aria-label={didIt ? 'How it felt' : 'What is in the way'} />
+      {!didIt && <p className="assist-note" style={{ marginTop: 'var(--s2)' }}>This stays open. An unfaced thing should keep showing up.</p>}
       <div className="coach-nav">
         <button className="btn btn-quiet" onClick={onCancel}>Cancel</button>
-        <button className="btn btn-primary" onClick={() => onSubmit(didIt, felt, text.trim())}>Close the loop</button>
+        <button className="btn btn-primary" onClick={() => onSubmit(didIt, felt, text.trim())}>
+          {didIt ? 'Close the loop' : 'Save the note'}
+        </button>
       </div>
     </div>
   )
@@ -352,9 +380,11 @@ export function CoachPage() {
     setStage('saved')
   }
 
-  const open = coachSessions.filter((s) => s.status === 'open')
-  const closed = coachSessions.filter((s) => s.status === 'closed')
-  const easedCount = closed.filter((s) => s.felt === 'easier').length
+  // Loops belong to the profile they were opened in (older ones show everywhere).
+  const mine = coachSessions.filter((s) => !s.space || s.space === space)
+  const open = mine.filter((s) => s.status === 'open')
+  const closed = mine.filter((s) => s.status === 'closed')
+  const easedCount = closed.filter((s) => s.didIt && s.felt === 'easier').length
 
   /* ---- review the breakdown Coach drafted, then commit ---- */
   if (stage === 'review') {
@@ -447,9 +477,12 @@ export function CoachPage() {
               <div className="panel coach-loop" key={s.id}>
                 <div className="coach-loop-head">
                   <span className="grow">{s.title}</span>
-                  <span className="mono meta">{s.when}</span>
+                  <span className="mono meta">{fmtWhen(s.when)}</span>
                 </div>
                 <div className="coach-loop-step">First step: {s.firstStep}</div>
+                {s.didIt === false && s.reflection && (
+                  <div className="coach-loop-blocked">In the way: {s.reflection}</div>
+                )}
                 {reflectId === s.id ? (
                   <ReflectForm
                     onCancel={() => setReflectId(null)}

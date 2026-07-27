@@ -81,8 +81,11 @@ html { font-size: 16px; }
    Interactive elements adopt the active space's accent, so Personal, Work
    and Off-Plate each feel like a different room. Personal keeps the base
    flight blue. */
+/* Work reads blue, not green. The old #0f5f5a sat in the same family as
+   --progress (#3f6b46), so in the Work space "you can click this" and "this
+   is done" were the same colour. One meaning per hue. */
 [data-space="work"] {
-  --accent: #0f5f5a; --accent-hover: #0b4a46; --accent-wash: rgba(15, 95, 90, 0.10);
+  --accent: #1d4e79; --accent-hover: #163c5d; --accent-wash: rgba(29, 78, 121, 0.10);
 }
 [data-space="offplate"] {
   --accent: #8a6410; --accent-hover: #6f5009; --accent-wash: rgba(138, 100, 16, 0.11);
@@ -193,17 +196,24 @@ main { padding-inline: var(--gutter); }
 .val-urgent { color: var(--alert); }
 .val-info { color: var(--info); }
 
-.cat-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+/* Task category dots are gone. They were aria-hidden, had no legend on any
+   page that showed them, sat beside a text tag that already named the
+   category, and on phone their width broke the row flex-basis so every task
+   cost three lines. The category still reads as text where it matters. */
+.cat-dot { display: none; }
 .cat-dot.call { background: var(--cat-call); }
 .cat-dot.admin { background: var(--cat-admin); }
 .cat-dot.deep { background: var(--cat-deep); }
 .cat-dot.quick { background: var(--cat-quick); }
+/* Category hues only. Never the accent (interactive), the warn (drifting) or
+   the progress green (yours/done): reusing those made a goal's category dot
+   read as its status. The dot itself is hidden on goal cards below. */
 .goalcat-money { background: var(--cat-call); }
 .goalcat-health { background: var(--cat-quick); }
 .goalcat-life { background: var(--cat-admin); }
-.goalcat-work { background: var(--accent); }
-.goalcat-offplate { background: var(--warn); }
-.goalcat-habits { background: var(--progress); }
+.goalcat-work { background: var(--cat-deep); }
+.goalcat-offplate { background: var(--cat-call); }
+.goalcat-habits { background: var(--cat-quick); }
 
 /* goals: cards inside timeframe columns */
 .goal-col .goal-card { padding: var(--s3) 0; border-bottom: 1px solid var(--hairline); }
@@ -225,14 +235,14 @@ main { padding-inline: var(--gutter); }
 .savings-months { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.625rem; color: var(--faint); margin-top: 2px; }
 
 /* ---------- Pomodoro (global) ---------- */
+/* A quiet edge, not four pulsing corner glows. The glow version was the
+   aurora/blur-orb background the design canon forbids, painted over every
+   page for the whole focus block. */
 .pomo-ambient {
   position: fixed; inset: 0; pointer-events: none; z-index: 45;
-  background:
-    radial-gradient(circle at 0 0, var(--glow), transparent 20%),
-    radial-gradient(circle at 100% 0, var(--glow), transparent 20%),
-    radial-gradient(circle at 0 100%, var(--glow), transparent 20%),
-    radial-gradient(circle at 100% 100%, var(--glow), transparent 20%);
-  animation: pomo-pulse 4.5s ease-in-out infinite;
+  background: none;
+  box-shadow: inset 0 0 0 2px var(--glow);
+  animation: none;
 }
 .pomo-ambient.focus { --glow: color-mix(in oklab, var(--accent) 34%, transparent); }
 .pomo-ambient.break { --glow: color-mix(in oklab, var(--progress) 40%, transparent); }
@@ -303,9 +313,11 @@ main { padding-inline: var(--gutter); }
 .assist-goto { font-family: var(--font-mono); font-size: 0.6875rem; color: var(--info); white-space: nowrap; }
 .assist-goto:hover { color: var(--accent); text-decoration: underline; }
 
-/* ---------- Review checkup: two-column form so it fills the width ---------- */
-.checkup-panel { max-width: 1100px; }
-.checkup-cols { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s5) var(--s8); margin-top: var(--s3); }
+/* ---------- Review checkup: fills the width like every other panel ----------
+   No max-width cap: a capped card on a 3440 screen strands itself in the left
+   third. The columns re-flow instead, so the form gains columns as the screen
+   widens rather than leaving dead paper beside it. */
+.checkup-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: var(--s5) var(--s8); margin-top: var(--s3); }
 .checkup-col { display: flex; flex-direction: column; }
 .checkup-col .coach-nav { margin-top: auto; }
 @media (max-width: 719px) { .checkup-cols { grid-template-columns: 1fr; } }
@@ -382,15 +394,26 @@ main { padding-inline: var(--gutter); }
   font-size: var(--text-sm);
   font-weight: 600;
   white-space: nowrap;
+  text-decoration: none;
 }
 .btn-primary { background: var(--accent); color: var(--accent-ink); }
 .btn-primary:hover { background: var(--accent-hover); }
-.btn-primary:disabled { opacity: 0.45; cursor: default; }
+/* A waiting button is a quiet control, not a bleached accent. A half-faded
+   accent fill read as "broken" on the pages where it is the only colour. */
+.btn-primary:disabled {
+  opacity: 1;
+  background: var(--surface-2);
+  color: var(--faint);
+  box-shadow: inset 0 0 0 1px var(--hairline-strong);
+  cursor: default;
+}
 .btn-quiet { color: var(--ink); border: 1px solid var(--hairline-strong); background: none; }
 .btn-quiet:hover { border-color: var(--ink); }
 .btn-quiet[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: var(--accent-wash); }
-.btn-ghost { color: var(--muted); border: 1px solid transparent; }
-.btn-ghost:hover { color: var(--ink); border-color: var(--hairline-strong); }
+/* Ghost buttons are real actions ("Add to today", "Reset", "→ backlog").
+   They carry the accent at rest so they never read as static labels. */
+.btn-ghost { color: var(--ink); border: 1px solid var(--hairline); background: none; }
+.btn-ghost:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-wash); }
 .btn-danger { color: var(--alert); border: 1px solid transparent; }
 .btn-danger:hover { border-color: var(--alert); background: var(--alert-wash); }
 
@@ -418,7 +441,7 @@ main { padding-inline: var(--gutter); }
   flex-wrap: wrap;
 }
 .band-metric { text-align: right; }
-.band-metric .v { font-family: var(--font-mono); font-weight: 600; font-size: var(--text-lg); display: block; line-height: 1.2; }
+.band-metric .v { font-family: var(--font-display); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; font-size: var(--text-lg); display: block; line-height: 1.2; }
 .band-metric .k { color: var(--muted); font-size: 0.6875rem; font-family: var(--font-body); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
 .band-actions { display: flex; gap: var(--s2); align-items: center; }
 
@@ -478,10 +501,14 @@ main { padding-inline: var(--gutter); }
   font-weight: 500;
 }
 .exception-row + .exception-row { border-top: 1px solid var(--hairline); }
-.exception-row .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--alert); flex: none; }
+/* The row is already fully alert-coloured and inside an alert-bordered band.
+   A red dot on top of that says "urgent" for the fourth time. */
+.exception-row .dot { display: none; }
+/* Deadline pills are data, not controls: no border, so they stop outranking
+   the actual buttons beside them. Bordered = pressable, filled = data. */
 .exception-row .when {
   color: var(--alert); font-size: var(--text-xs); white-space: nowrap; font-family: var(--font-mono);
-  font-weight: 600; border: 1px solid var(--alert); border-radius: 3px; padding: 0 6px;
+  font-weight: 600; border: none; background: var(--alert-wash); border-radius: 3px; padding: 1px 6px;
 }
 .exception-row button { margin-left: var(--s2); color: var(--accent); font-weight: 600; font-size: var(--text-sm); white-space: nowrap; }
 
@@ -554,7 +581,9 @@ main { padding-inline: var(--gutter); }
 .widget-menu-btn { color: var(--faint); padding: 0 var(--s1); line-height: 1; }
 .widget-menu-btn:hover { color: var(--ink); }
 
-.widget-body { flex: 1; padding: var(--s3) var(--s4) var(--s4); overflow: hidden; position: relative; }
+/* Tiles scroll their overflow. With plain `hidden` the Goals tile ended
+   mid-glyph and silently dropped its last row. */
+.widget-body { flex: 1; padding: var(--s3) var(--s4) var(--s4); overflow: hidden auto; scrollbar-width: thin; position: relative; }
 .widget-body.scroll { overflow-y: auto; scrollbar-width: thin; }
 
 .widget-menu {
@@ -593,8 +622,13 @@ main { padding-inline: var(--gutter); }
   line-height: 1;
   color: var(--ink);
 }
-.kpi .unit { font-family: var(--font-body); font-size: 0.32em; color: var(--muted); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; margin-left: 6px; }
+.kpi .unit { font-family: var(--font-body); font-size: 0.28em; color: var(--muted); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; margin-left: 0.45em; }
 .kpi-sub { color: var(--muted); font-size: var(--text-xs); margin-top: var(--s2); }
+/* .kpi sets an explicit ink colour, which silently beat the semantic value
+   classes, so a positive or urgent KPI rendered plain black. */
+.kpi.val-pos { color: var(--progress); }
+.kpi.val-urgent { color: var(--alert); }
+.kpi.val-info { color: var(--info); }
 
 .rowlist { display: flex; flex-direction: column; }
 .rowitem {
@@ -661,7 +695,10 @@ button.est-chip:hover { color: var(--accent); background: var(--accent-wash); }
 /* drifting (warn) must win over prog: green only when truly on track */
 .bar.warn > i, .bar.prog.warn > i { background: var(--warn); }
 
-.spark { color: var(--accent); }
+/* Charts are data, not actions. Defaulting every sparkline to the accent
+   spent the "you can act on this" colour on read-only trend lines. */
+.spark { color: var(--info); }
+.spark.pos { color: var(--progress); }
 .spark-base { color: var(--hairline-strong); }
 
 .habit-grid { display: flex; flex-wrap: wrap; gap: var(--s2); }
@@ -715,7 +752,7 @@ button.est-chip:hover { color: var(--accent); background: var(--accent-wash); }
    Standalone flow cards center themselves; grids span the width. */
 .grid-2 { display: grid; gap: var(--s5); grid-template-columns: 1fr; }
 .grid-3 { display: grid; gap: var(--s5); grid-template-columns: 1fr; }
-.grid-4 { display: grid; gap: var(--s5); grid-template-columns: 1fr; align-items: start; }
+.grid-4 { display: grid; gap: var(--s5); grid-template-columns: 1fr; align-items: stretch; }
 .grid-2 > *, .grid-3 > *, .grid-4 > * { min-width: 0; }
 @media (min-width: 900px) { .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1280px) { .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
@@ -726,7 +763,9 @@ button.est-chip:hover { color: var(--accent); background: var(--accent-wash); }
 
 .page-grid { display: grid; gap: var(--s5); grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); align-items: start; }
 .page-grid > * { min-width: 0; }
-.grid-2, .grid-3 { align-items: start; }
+/* Cards in a row end on a shared baseline instead of stair-stepping. */
+.grid-2, .grid-3 { align-items: stretch; }
+.grid-2 > .panel, .grid-3 > .panel, .grid-4 > .panel { display: flex; flex-direction: column; }
 
 /* tasks board: one column filtered on small screens, three side by side on wide */
 .tasks-board { display: grid; gap: var(--s5); grid-template-columns: 1fr; }
@@ -747,7 +786,9 @@ button.est-chip:hover { color: var(--accent); background: var(--accent-wash); }
   border-radius: var(--r-md);
   padding: var(--s5);
 }
-.panel > .microcap { display: block; margin-bottom: var(--s3); }
+/* Card titles read as titles. They were the same muted grey as body meta,
+   which is a big part of why the pages felt flat. */
+.panel > .microcap { display: block; margin-bottom: var(--s3); color: var(--ink); }
 .panel-wide { grid-column: 1 / -1; }
 
 .formrow { display: flex; gap: var(--s2); margin-bottom: var(--s3); flex-wrap: wrap; }
@@ -787,7 +828,7 @@ select.textinput { flex: 0 0 auto; min-width: 110px; }
 .habit-week th:first-child { text-align: left; }
 .habit-week td { padding: var(--s2); border-top: 1px solid var(--hairline); text-align: center; }
 .habit-week td:first-child { text-align: left; font-weight: 500; font-size: var(--text-sm); }
-.habit-week .today-col { background: var(--accent-wash); }
+.habit-week .today-col { background: var(--surface-2); }
 .habit-week { width: auto; }
 .habit-week th, .habit-week td { padding-inline: var(--s2); }
 .habit-history { display: flex; gap: 3px; align-items: flex-end; height: 26px; }
@@ -810,7 +851,7 @@ select.textinput { flex: 0 0 auto; min-width: 110px; }
 .habit-days { display: flex; gap: var(--s3); align-items: flex-end; margin-top: var(--s3); flex-wrap: wrap; }
 .day-cell { display: grid; justify-items: center; gap: 4px; }
 .day-lab { font-family: var(--font-mono); font-size: 0.625rem; color: var(--faint); }
-.day-lab.today { color: var(--accent); font-weight: 600; }
+.day-lab.today { color: var(--ink); font-weight: 700; }
 .habit-days .habit-history { margin-left: auto; }
 .only-wide { display: none; }
 @media (min-width: 720px) { .only-wide { display: flex; } }
@@ -969,6 +1010,10 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 .status-dot.connected { background: var(--progress); }
 .status-dot.off { background: var(--faint); }
 .status-dot.manual { background: var(--accent); }
+.status-dot.warn { background: var(--warn); }
+/* In Settings the toggle beside it already states on/off. The dot stays in
+   the compact Sources widget, where it is the only state signal in the row. */
+.source-row .status-dot { display: none; }
 
 .toggle {
   width: 44px; height: 24px; border-radius: 12px;
@@ -1109,24 +1154,36 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 .col-note { font-size: var(--text-xs); color: var(--muted); margin-top: var(--s3); }
 
 /* vertical schedule / timeline: full height, the page scrolls, not the section */
-.vsched { position: relative; border: 1px solid var(--hairline); border-radius: var(--r-md); background: var(--bg); }
+/* The schedule always draws a full 24 hours. Unbounded, it forced the whole
+   Plan row to its height and left the neighbouring panels as tall empty boxes. */
+.vsched { position: relative; border: 1px solid var(--hairline); border-radius: var(--r-md); background: var(--bg); max-height: 68vh; overflow-y: auto; scrollbar-width: thin; }
 .vsched-inner { position: relative; margin-left: 52px; }
 .hline { position: absolute; left: 0; right: var(--s2); border-top: 1px solid var(--hairline); }
 .hlabel { position: absolute; left: -52px; top: -0.55em; width: 48px; text-align: right; font-family: var(--font-mono); font-size: 0.625rem; color: var(--info); }
 .vev { position: absolute; left: var(--s2); right: var(--s3); border-radius: var(--r-sm); padding: 2px 6px; overflow: hidden; line-height: 1.2; }
-.vev-cal { background: var(--accent-wash); border: 1px solid var(--accent); }
+/* A calendar block is something that exists, not something to click. Solid
+   border still means calendar, dashed still means a task you placed. */
+.vev-cal { background: var(--info-wash); border: 1px solid var(--info); }
 .vev-task { background: var(--info-wash); border: 1px dashed var(--info); }
 .vev .t { font-size: 0.6875rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
 .vev .rng { font-family: var(--font-mono); font-size: 0.5625rem; color: var(--info); white-space: nowrap; }
-.vev-cal .rng { color: var(--accent); }
+.vev-cal .rng { color: var(--info); }
 
 .cal-link { font-family: var(--font-body); font-size: 0.6875rem; font-weight: 600; color: var(--accent); white-space: nowrap; }
 .cal-link:hover { text-decoration: underline; }
 
-/* task name IS the link */
-.task-link { color: var(--ink); text-decoration: none; }
-.task-link:hover { color: var(--accent); text-decoration: underline; }
-.vev .task-link { color: var(--accent); }
+/* The task name IS the link, so it carries a resting hairline underline.
+   Previously it was plain dark text and the page needed a caption telling
+   you the names were clickable. */
+.task-link {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--hairline-strong);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.task-link:hover { color: var(--accent); text-decoration-color: currentColor; }
+.vev .task-link { color: var(--ink); }
 
 /* to-do progress: done vs time left */
 .todo-progress { margin-bottom: var(--s4); }
@@ -1288,7 +1345,7 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ---------- Routines: named checklists you run on repeat ---------- */
 .routine-group { margin-bottom: var(--s4); }
-.routine-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: var(--s4); align-items: start; }
+.routine-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: var(--s4); align-items: stretch; }
 .routine-card { display: flex; flex-direction: column; }
 .routine-card.is-complete { border-color: var(--progress); }
 .routine-tag { display: flex; align-items: baseline; gap: var(--s3); margin-bottom: var(--s2); }
@@ -1305,7 +1362,9 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
   transition: background 140ms ease-out, border-color 140ms ease-out, color 140ms ease-out;
 }
 .routine-check:hover { border-color: var(--accent); }
-.routine-step.checked .routine-check { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+/* Done is green everywhere, including here. This tick was the one checkbox in
+   the app that turned orange when completed. */
+.routine-step.checked .routine-check { background: var(--progress); border-color: var(--progress); color: var(--bg); }
 .routine-step-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .routine-step-body .l { font-weight: 600; font-size: var(--text-base); display: flex; align-items: center; gap: var(--s2); }
 .routine-step.checked .routine-step-body .l { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
@@ -1391,8 +1450,10 @@ a.pron-src:hover { color: var(--accent); text-decoration: underline; }
 .goal-card.v2:first-of-type { border-top: none; }
 .goal-obj { font-family: var(--font-display); font-weight: 700; font-size: var(--text-base); }
 .goal-status { flex: none; font-family: var(--font-mono); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; border-radius: 3px; padding: 2px 7px; }
-.goal-status.s-done { color: var(--progress); background: var(--progress-wash); }
-.goal-status.s-ontrack { color: var(--info); background: var(--info-wash); }
+/* On track is green like every other "this is going well" signal; done is the
+   filled terminal state so the two stay distinguishable. */
+.goal-status.s-done { color: var(--bg); background: var(--progress); }
+.goal-status.s-ontrack { color: var(--progress); background: var(--progress-wash); }
 .goal-status.s-behind { color: var(--warn); background: var(--warn-wash); }
 .goal-why { font-size: var(--text-sm); color: var(--muted); line-height: 1.45; margin: var(--s2) 0 var(--s3); max-width: 60ch; }
 .goal-measure { display: flex; align-items: baseline; gap: var(--s3); margin-top: var(--s2); font-size: var(--text-xs); }
@@ -1401,9 +1462,17 @@ a.pron-src:hover { color: var(--accent); text-decoration: underline; }
 .goal-measure .goal-deadline { margin-left: auto; color: var(--info); font-family: var(--font-mono); }
 .goal-ms { list-style: none; display: flex; flex-direction: column; gap: 5px; margin-top: var(--s3); }
 .goal-ms-item { display: flex; align-items: center; gap: var(--s2); font-size: var(--text-sm); color: var(--muted); }
-.goal-ms-check { flex: none; width: 16px; height: 16px; display: grid; place-items: center; border: 1.5px solid var(--hairline-strong); border-radius: 4px; color: transparent; }
+/* Milestones are real controls again: ticking one advances the goal it belongs
+   to, so the checkbox now behaves the way it always looked. */
+.goal-ms-check {
+  flex: none; width: 17px; height: 17px; border-radius: 4px;
+  border: 1.5px solid var(--hairline-strong); background: transparent;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: background 140ms ease-out, border-color 140ms ease-out;
+}
+.goal-ms-check:hover { border-color: var(--accent); }
 .goal-ms-item.done .goal-ms-check { background: var(--progress); border-color: var(--progress); color: var(--bg); }
-.goal-ms-item.done { color: var(--ink); }
+.goal-ms-item.done { color: var(--progress); }
 .goal-ms-item.done span:last-child { text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
 
 /* ---------- Brain Dump: sticky-note board ---------- */
@@ -1419,8 +1488,9 @@ a.pron-src:hover { color: var(--accent); text-decoration: underline; }
 
 /* Composer + notes share one grid, so notes start beside the input, not below it.
    Four wide notes per row, then wrap. */
-.bd-grid { display: grid; grid-template-columns: repeat(4, minmax(280px, 400px)); gap: var(--s4); justify-content: start; align-items: start; }
-@media (max-width: 1360px) { .bd-grid { grid-template-columns: repeat(3, minmax(260px, 1fr)); } }
+/* The board fills the screen. A hard 4 x 400px cap stopped it at roughly half
+   an ultrawide viewport and left the notes huddled in the top-left corner. */
+.bd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); gap: var(--s4); align-items: start; }
 @media (max-width: 940px) { .bd-grid { grid-template-columns: repeat(2, minmax(240px, 1fr)); } }
 @media (max-width: 600px) { .bd-grid { grid-template-columns: 1fr; } }
 .bd-composer { background: var(--surface); border: 1px solid var(--hairline-strong); border-radius: 8px; padding: var(--s4); display: flex; flex-direction: column; gap: var(--s3); }
@@ -1435,11 +1505,109 @@ a.pron-src:hover { color: var(--accent); text-decoration: underline; }
 .note-dot { width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(26,23,18,.2); cursor: pointer; }
 .note-dot.on { box-shadow: 0 0 0 1.5px #fff, 0 0 0 3px rgba(26,23,18,.55); }
 
+/* ============================================================
+   DESIGN PASS (whole-site review)
+   Responsiveness first, then one-meaning-per-colour, then
+   affordances. Every rule here replaces a fixed cap, a colour
+   doing two jobs, or a control with no resting cue.
+   ============================================================ */
+
+/* ---- Fill the screen: no card strands itself on a wide monitor ---- */
+/* The tall list inside one stat card no longer sets the height of the row. */
+.grid-4 > .panel .rowlist { max-height: 15rem; overflow-y: auto; scrollbar-width: thin; }
+/* Four goal timeframes read as one row on an ultrawide instead of a 2x2 block. */
+@media (min-width: 2000px) {
+  .grid-2.goal-cols { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+/* The missing middle step: two columns before three. */
+@media (min-width: 900px) and (max-width: 1279px) {
+  .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid-3 > .panel:nth-child(3) { grid-column: 1 / -1; }
+}
+/* Debt and payment names wrap instead of truncating mid-word. */
+@media (max-width: 1700px) {
+  .grid-3 .rowitem { flex-wrap: wrap; row-gap: var(--s1); min-height: 0; padding-block: var(--s3); }
+  .grid-3 .rowitem .grow { flex: 1 1 100%; white-space: normal; overflow: visible; text-overflow: clip; }
+}
+/* Content caps in rem so they grow with the root-font ramp on big monitors. */
+.textinput { max-width: 44rem; }
+.coach-facts { max-width: 48rem; }
+/* Coach is a real content column, not a 680px field in a 3300px card. */
+.coach-intake { max-width: min(100%, 60rem); }
+.coach-intake .textinput { max-width: none; }
+.coach-intake > .microcap {
+  font-family: var(--font-display); font-size: var(--text-lg); font-weight: 700;
+  letter-spacing: -0.01em; text-transform: none; color: var(--ink);
+}
+/* One open loop grows to a sane width instead of hugging a 9-column skeleton. */
+.coach-loops { grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 460px)); justify-content: start; }
+/* Calendar blocks keep their label on one baseline instead of being sliced. */
+.vev { padding: 3px 6px; min-height: 22px; display: flex; align-items: baseline; gap: 6px; }
+.vev .t { flex: 1 1 auto; min-width: 0; }
+.vev .rng { flex: none; }
+
+/* ---- Affordances: bordered means pressable, filled means data ---- */
+button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
+.expand-btn { border: 1px solid var(--hairline-strong); border-radius: 3px; padding: 1px 6px; }
+.exception-row button { text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px; }
+.exception-row button:hover { color: var(--accent-hover); text-decoration-color: currentColor; }
+.status-strip button { border-bottom: 1px dotted var(--hairline-strong); }
+.status-strip button:hover { color: var(--accent); border-bottom-color: var(--accent); }
+/* Widget titles navigate, so they get a resting cue. */
+.widget-title-btn::after { content: '\203A'; font-size: 0.95rem; line-height: 1; color: var(--faint); margin-left: 2px; }
+.widget-title-btn:hover::after { color: var(--accent); }
+/* The inert marker is a solid bullet; only the ring shape means checkable. */
+.subtask-row .sub-tick { width: 5px; height: 5px; border-radius: 50%; background: var(--faint); border: none; flex: none; }
+/* Quick-log chips hold their space so rows do not jump on hover. */
+@media (hover: hover) {
+  .rowitem .actual-chips { display: flex; visibility: hidden; }
+  .rowitem:hover .actual-chips, .rowitem:focus-within .actual-chips { visibility: visible; }
+}
+/* Foldable routine steps respond to the pointer. */
+.mr-head-main { border-radius: var(--r-sm); }
+.mr-head-main:hover { background: var(--accent-wash); }
+.mr-chev { color: var(--muted); }
+.mr-head-main:hover .mr-chev { color: var(--accent); }
+.habit:hover .tick { border-color: var(--accent); }
+
+/* ---- Brain dump ---- */
+/* A hashtag inside a note is emphasis, not an action. The filter chip above
+   it is the clickable one, and they looked identical. */
+.note-tag { color: rgba(26, 23, 18, 0.55); font-weight: 700; }
+.note-colors { opacity: 0.35; }
+@media (hover: none) { .note-colors { opacity: 1; } }
+.note-dot.on { box-shadow: 0 0 0 1.5px var(--surface), 0 0 0 3px var(--ink); }
+
+/* ---- Money rows line up as columns ---- */
+.rowitem.wrap-row > .mono:not(.meta) { min-width: 9ch; text-align: right; }
+.rowitem.wrap-row .state-tag { flex: none; min-width: 13ch; text-align: center; }
+
+/* ---- Habits: missed days stay genuinely quiet ---- */
+.habit-history i { background: transparent; box-shadow: none; border-bottom: 1px solid var(--hairline); }
+.habit-history i.hi { background: var(--progress); border-bottom-color: var(--progress); }
+
+/* ---- Category labels stop borrowing semantic colours ---- */
+.assist-tag.k-goal { color: var(--cat-admin); background: var(--info-wash); }
+.status-dot.manual { background: var(--warn); }
+
+/* ---- Phone: metrics grid instead of a stretched row ---- */
+@media (max-width: 639px) {
+  .band-status { margin-left: 0; width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s3) var(--s4); }
+  .band-status .band-metric { text-align: left; }
+}
+
 /* ===== Warm brand: contrast, depth, and state that actually reads ===== */
 /* Lift surfaces off the paper so cards, not colour alone, create hierarchy. */
-.panel, .card, .routine-card, .mr-card, .goal-col, .habit-card, .coach-loop, .scenario, .bucket, .checkup-panel {
+/* Only real cards get the card shadow. Sections that live INSIDE a card
+   (.bucket, .habit-group) must never cast one: a shadow with no surface
+   behind it reads as a ghost box nested in the real card. */
+.panel, .card, .routine-card, .mr-card, .goal-col, .habit-card, .coach-loop, .scenario,
+.widget, .firstmove, .bd-composer {
   box-shadow: 0 1px 2px rgba(26, 23, 18, 0.05), 0 12px 34px -22px rgba(26, 23, 18, 0.34);
 }
+.bucket, .bucket.drop-zone { box-shadow: none; border-radius: 0; }
+/* Restore the drop-target highlight only while a task is actually over it. */
+.bucket.drop-zone.drop-over { border-radius: var(--r-md); }
 /* Cadence label pops in the accent so each routine reads as a titled thing. */
 .routine-tag .microcap { color: var(--accent); }
 .routine-progress { color: var(--muted); font-weight: 600; }
@@ -1463,3 +1631,72 @@ a.pron-src:hover { color: var(--accent); text-decoration: underline; }
 
 /* Drop zones are full-width targets, not prose (override the global p measure). */
 .bucket-empty { max-width: none; width: 100%; }
+
+/* ---------- Controls added in the functional pass ---------- */
+
+/* Kebab menus gained destructive items and a divider. */
+.kebab-menu button.danger { color: var(--alert); }
+.kebab-menu button.danger:hover { background: var(--alert-wash); color: var(--alert); }
+.kebab-sep { display: block; height: 1px; background: var(--hairline); margin: var(--s2) 0; }
+.kebab-note { display: block; padding: var(--s2) var(--s3); font-size: var(--text-xs); color: var(--faint); }
+
+/* Habits: pause and delete live behind the card's kebab. */
+.habit-kebab { margin-left: var(--s2); }
+.habit-card.is-paused { opacity: 0.62; }
+.habit-card.is-paused .habit-days { filter: grayscale(1); }
+
+/* Goals: log progress, drop a goal, add a new one. */
+.goal-actions { display: flex; align-items: center; gap: var(--s3); margin-top: var(--s3); }
+.goal-bump { display: inline-flex; align-items: center; gap: var(--s2); }
+.goal-bump button {
+  width: 26px; height: 26px; border-radius: var(--r-sm); border: 1px solid var(--hairline-strong);
+  color: var(--ink); font-size: var(--text-sm); line-height: 1; cursor: pointer;
+}
+.goal-bump button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.goal-bump button:disabled { opacity: 0.35; cursor: default; }
+.goal-bump .mono { font-size: 0.625rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); }
+.goal-drop { margin-left: auto; font-size: var(--text-xs); color: var(--faint); padding: 2px 6px; border-radius: var(--r-sm); }
+.goal-drop:hover { color: var(--alert); background: var(--alert-wash); }
+.goal-add { margin-bottom: var(--s5); }
+.goal-add .formrow + .formrow { margin-top: var(--s3); }
+
+/* Morning routine: a running meditation stays visible when its panel is closed. */
+.mr-running {
+  font-size: var(--text-xs); color: var(--accent); background: var(--accent-wash);
+  border-radius: 999px; padding: 2px 10px; cursor: pointer;
+}
+.mr-running:hover { background: var(--accent-wash); text-decoration: underline; }
+.mr-card .routine-card-foot { display: flex; align-items: center; gap: var(--s3); }
+
+/* Review: last week's reflection, shown above this week's checkup. */
+.lastweek { margin-bottom: var(--s4); }
+.lastweek-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--s4); margin-top: var(--s2); }
+.lastweek-h { display: block; font-size: 0.625rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); margin-bottom: 6px; font-family: var(--font-mono); }
+.lastweek-list { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.lastweek-list li { font-size: var(--text-sm); color: var(--muted); padding-left: var(--s3); position: relative; }
+.lastweek-list li::before { content: ''; position: absolute; left: 0; top: 0.6em; width: 4px; height: 4px; border-radius: 50%; background: var(--hairline-strong); }
+
+/* Coach: what is blocking an open loop you have not done yet. */
+.coach-loop-blocked {
+  font-size: var(--text-sm); color: var(--warn); background: var(--warn-wash);
+  border-radius: var(--r-sm); padding: var(--s2) var(--s3); margin-top: var(--s2);
+}
+
+/* Brain dump: note actions sit at the end of the footer. */
+.note-kebab { margin-left: auto; }
+.sticky .kebab { color: rgba(0, 0, 0, 0.45); }
+.sticky .kebab:hover { color: rgba(0, 0, 0, 0.8); }
+
+/* Pomodoro: blocks finished today. */
+.pomo-cycles { font-size: var(--text-xs); color: var(--faint); padding-right: 4px; }
+
+/* The floating focus badge used to sit on top of the last drop zone. */
+.page { padding-bottom: 76px; }
+.status-strip.is-empty { display: none; }
+/* Finished-but-unscheduled work, below the time buckets. */
+.done-group { margin-top: var(--s4); padding-top: var(--s3); border-top: 1px solid var(--hairline); }
+.done-group .today-task { margin-top: 4px; }
+/* Task rows keep their controls on one line; the title truncates instead. */
+.today-task > .grow, .todo-row > .grow { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.today-task .kebab-wrap, .today-task .est-chip, .today-task .expand-btn,
+.todo-row .kebab-wrap, .todo-row .est-chip, .todo-row .expand-btn { flex: none; }

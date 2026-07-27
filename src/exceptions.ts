@@ -1,6 +1,18 @@
-import type { SpaceId } from './types'
+import { MOCK_MONEY } from './mock'
+import type { Routine, SpaceId, Task } from './types'
 
 export { SPACE_LABELS, MOCK_AGENDA } from './mock'
+
+/* Exceptions are DERIVED from live state, not hardcoded: money rows that still
+   need sending, the weekly Datová schránka check not done this week, an old
+   unanswered lead. When you act (queue the task, tick the routine step), the
+   alert disappears on its own. */
+
+/** One canonical task title per payment, shared by Money and Today's alert, so
+ *  queueing or paying it in one place is recognised in the other. */
+export function paymentTaskTitle(name: string, amount: string): string {
+  return `Send: ${name.split(',')[0]} (${amount})`
+}
 
 export interface ExceptionItem {
   id: string
@@ -12,23 +24,59 @@ export interface ExceptionItem {
   task?: { title: string; estimateMin: number }
 }
 
-function daysToFriday(): number {
-  const day = new Date().getDay() // Sun=0..Sat=6
-  return ((5 - day) + 7) % 7 || 7
-}
+export function exceptionsFor(space: SpaceId, ctx: { tasks: Task[]; routines: Routine[] }): ExceptionItem[] {
+  const out: ExceptionItem[] = []
 
-const PERSONAL: ExceptionItem[] = [
-  { id: 'x0', text: 'Tax settlement 12 500 Kč set aside, transfer not sent.', when: 'pay by Fri 31 Jul', action: 'add-task', actionLabel: 'Add the tax transfer', task: { title: 'Arrange the 12 500 Kč tax transfer', estimateMin: 15 } },
-  { id: 'x1', text: 'Installment 2 400 Kč due Friday. Not sent yet.', when: `in ${daysToFriday()} days`, action: 'add-task', actionLabel: 'Add the transfer to today', task: { title: 'Send the 2 400 Kč installment', estimateMin: 5 } },
-  { id: 'x2', text: 'Datová schránka unchecked for 8 days. Sunday rule slipped.', when: '8 days', action: 'coach', coachId: 'datova-schranka' },
-]
+  if (space === 'personal') {
+    // Money: every schedule row that still needs an action becomes an alert.
+    // TodayPage hides it once its task is queued and done.
+    for (const row of MOCK_MONEY.schedule) {
+      if (row.state !== 'not sent' && row.state !== 'action needed') continue
+      const short = row.name.split(',')[0]
+      out.push({
+        id: `x-money-${row.date}-${short}`,
+        text: `${short}: ${row.amount} due ${row.date}, not sent.`,
+        when: row.date,
+        action: 'add-task',
+        actionLabel: 'Add the transfer to today',
+        task: { title: paymentTaskTitle(row.name, row.amount), estimateMin: 5 },
+      })
+    }
 
-const OFFPLATE: ExceptionItem[] = [
-  { id: 'x3', text: 'Workshop lead from Thursday still has no reply.', when: '3 days', action: 'coach', coachId: 'chase-supplier', actionLabel: 'Draft the follow-up' },
-]
+    /* Datová schránka: one fact, two places you can settle it. Either tick the
+       weekly-reset step, or finish a task that says you checked it. Both clear
+       the alert, so it can never nag about something already done. */
+    const weekly = ctx.routines.find((r) => r.id === 'r-weekly')
+    const viaTask = ctx.tasks.some((t) => t.done && /datov[áa]\s*schr[áa]nk/i.test(t.title))
+    const dsChecked = weekly?.doneStepIds.includes('wk1') || viaTask
+    if (weekly && !dsChecked) {
+      const isSunday = new Date().getDay() === 0
+      out.push({
+        id: 'x-datovka',
+        text: 'Datová schránka not checked this week.',
+        when: isSunday ? 'Sunday rule, today' : 'weekly rule',
+        action: 'coach',
+        coachId: 'datova-schranka',
+        actionLabel: 'Walk me through it',
+      })
+    }
+  }
 
-export function MOCK_EXCEPTIONS_FOR(space: SpaceId | string): ExceptionItem[] {
-  if (space === 'personal') return PERSONAL
-  if (space === 'offplate') return OFFPLATE
-  return []
+  if (space === 'offplate') {
+    // A lead that is still waiting on a reply. Derived from the open task, so
+    // sending the follow-up (completing the task) clears the alert itself.
+    const lead = ctx.tasks.find((t) => t.space === 'offplate' && !t.done && /follow-up|workshop lead/i.test(t.title))
+    if (lead) {
+      out.push({
+        id: 'x-lead',
+        text: 'Workshop lead from Thursday still has no reply.',
+        when: 'open',
+        action: 'coach',
+        coachId: 'chase-supplier',
+        actionLabel: 'Draft the follow-up',
+      })
+    }
+  }
+
+  return out
 }

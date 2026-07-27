@@ -8,8 +8,8 @@ import {
   MOCK_TRAINING,
 } from './mock'
 import { useStore } from './store'
-import type { SizeKey, SpaceId, WidgetType } from './types'
-import { fmtTimeShort } from './util'
+import { ON_TRACK_PCT, type SizeKey, type SpaceId, type WidgetType } from './types'
+import { fmtNum, fmtTimeShort } from './util'
 
 export function Spark({ data, width = 120, height = 32 }: { data: number[]; width?: number; height?: number }) {
   const max = Math.max(...data)
@@ -94,7 +94,12 @@ const TasksBody = memo(function TasksBody({ space, size }: { space: SpaceId; siz
               role="checkbox"
               aria-checked={t.done}
               aria-label={t.done ? `Reopen: ${t.title}` : `Complete: ${t.title}`}
-              onClick={() => toggleTask(t.id)}
+              onClick={() => {
+                // Same contract as Plan: finishing asks how long it really took,
+                // otherwise the estimate ledger quietly stops learning.
+                if (t.done || t.subtasks?.length) { toggleTask(t.id); return }
+                setLogOpen(logOpen === t.id ? null : t.id)
+              }}
             >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
                 <path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -122,7 +127,10 @@ const TasksBody = memo(function TasksBody({ space, size }: { space: SpaceId; siz
             <span className="src-tag">{t.source === 'mc' ? 'here' : t.source}</span>
           </div>
         ))}
-        {open.length === 0 && <div className="empty">Everything due today is done. Log off proud.</div>}
+        {open.length === 0 && list.length > 0 && (
+          <div className="kpi-sub" style={{ paddingTop: 6 }}>All done. That is everything you planned for today.</div>
+        )}
+        {list.length === 0 && <div className="empty">Nothing planned today. Pull something over on the Plan page.</div>}
       </div>
     </div>
   )
@@ -224,8 +232,9 @@ const GoalsBody = memo(function GoalsBody({ space }: { space: SpaceId }) {
     <div>
       {list.map((g) => {
         const pct = Math.round((g.current / g.target) * 100)
-        const weekly = /this week/.test(g.unit)
-        const off = pct < 50 && !(weekly && todayIndex < 3)
+        // Weekly goals get the first two days before they can read as drifting.
+        const weekly = g.timeframe === 'weekly'
+        const off = pct < ON_TRACK_PCT && !(weekly && todayIndex < 3)
         return (
           <div className="goal-row" key={g.id}>
             <div className="goal-line">
@@ -235,7 +244,7 @@ const GoalsBody = memo(function GoalsBody({ space }: { space: SpaceId }) {
             <div className={`bar prog${off ? ' warn' : ''}`}>
               <i style={{ width: `${pct}%` }} />
             </div>
-            <div className="kpi-sub">{g.current} of {g.target} {g.unit}</div>
+            <div className="kpi-sub">{fmtNum(g.current)} of {fmtNum(g.target)} {g.unit}</div>
           </div>
         )
       })}
@@ -246,11 +255,13 @@ const GoalsBody = memo(function GoalsBody({ space }: { space: SpaceId }) {
 
 const TimeSavedBody = memo(function TimeSavedBody() {
   const { savedMin, accuracyPct, setPage } = useStore()
-  const h = Math.floor(savedMin / 60)
-  const m = savedMin % 60
+  const abs = Math.abs(savedMin)
+  const h = Math.floor(abs / 60)
+  const m = abs % 60
+  const sign = savedMin < 0 ? '-' : ''
   return (
     <button onClick={() => setPage('review')} style={{ textAlign: 'left', display: 'block', width: '100%' }} aria-label="Open the time saved log">
-      <div className={`kpi${savedMin >= 0 ? ' val-pos' : ' val-urgent'}`}>{h > 0 ? `${h}h ${m}` : m}<span className="unit">min</span></div>
+      <div className={`kpi${savedMin >= 0 ? ' val-pos' : ' val-urgent'}`}>{h > 0 ? `${sign}${h}h ${m}` : `${sign}${m}`}<span className="unit">min</span></div>
       <div className="kpi-sub">net minutes under your own estimates this week</div>
       <div className="kpi-sub">estimate accuracy {accuracyPct}%</div>
     </button>

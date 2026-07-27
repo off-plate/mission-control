@@ -46,27 +46,42 @@ function chime(times = 1) {
   } catch { /* audio not available; the timer still works */ }
 }
 
-/* ---- Meditation ---- */
-function Meditation({ url, onEnd }: { url?: string; onEnd: () => void }) {
+/* ---- Meditation ----
+   The timer state lives in MorningRoutine, not here, so collapsing this panel
+   (or auto-advancing to the next step) does not unmount a running countdown.
+   It also runs off a wall-clock deadline, so a backgrounded tab cannot drift. */
+interface MedState {
+  phase: 'idle' | 'prep' | 'run' | 'ended'
+  endsAt: number | null
+}
+const MED_IDLE: MedState = { phase: 'idle', endsAt: null }
+
+function Meditation({ url, med, setMed, onEnd }: {
+  url?: string
+  med: MedState
+  setMed: (s: MedState) => void
+  onEnd: () => void
+}) {
   const id = ytId(url)
-  const [phase, setPhase] = useState<'idle' | 'prep' | 'run' | 'ended'>('idle')
-  const [left, setLeft] = useState(PREP_SECONDS)
-  const timer = useRef<number | undefined>(undefined)
+  const [, tick] = useState(0)
+  const { phase, endsAt } = med
+  const left = endsAt ? Math.max(0, Math.round((endsAt - Date.now()) / 1000)) : PREP_SECONDS
 
   useEffect(() => {
     if (phase !== 'prep' && phase !== 'run') return
-    timer.current = window.setInterval(() => setLeft((l) => l - 1), 1000)
-    return () => window.clearInterval(timer.current)
+    const t = window.setInterval(() => tick((n) => n + 1), 500)
+    return () => window.clearInterval(t)
   }, [phase])
 
   useEffect(() => {
-    if (phase === 'prep' && left <= 0) { chime(1); setPhase('run'); setLeft(MED_SECONDS) }
-    else if (phase === 'run' && left <= 0) { chime(2); setPhase('ended'); onEnd() }
+    if (!endsAt || left > 0) return
+    if (phase === 'prep') { chime(1); setMed({ phase: 'run', endsAt: Date.now() + MED_SECONDS * 1000 }) }
+    else if (phase === 'run') { chime(2); setMed({ phase: 'ended', endsAt: null }); onEnd() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [left, phase])
+  }, [left, phase, endsAt])
 
-  const start = () => { setPhase('prep'); setLeft(PREP_SECONDS) }
-  const reset = () => { window.clearInterval(timer.current); setPhase('idle'); setLeft(PREP_SECONDS) }
+  const start = () => setMed({ phase: 'prep', endsAt: Date.now() + PREP_SECONDS * 1000 })
+  const reset = () => setMed(MED_IDLE)
 
   const label = phase === 'prep' ? 'Settle in' : phase === 'run' ? 'Meditation' : phase === 'ended' ? 'Done' : 'Ready'
   const clock = phase === 'ended' ? '0:00' : mmss(left)
@@ -162,10 +177,12 @@ function GoalsReminder({ note }: { note?: string }) {
 }
 
 export function MorningRoutine({ routine }: { routine: Routine }) {
-  const { toggleRoutineStep } = useStore()
+  const { toggleRoutineStep, resetRoutine } = useStore()
   const steps = routine.steps
   const done = routine.doneStepIds
   const [open, setOpen] = useState<string>('') // everything collapsed until you open a step
+  // Held here so the countdown survives collapsing the step or auto-advancing.
+  const [med, setMed] = useState<MedState>(MED_IDLE)
 
   const onComplete = (id: string) => {
     const wasDone = done.includes(id)
@@ -179,7 +196,7 @@ export function MorningRoutine({ routine }: { routine: Routine }) {
 
   const body = (stepId: string) => {
     const s = steps.find((x) => x.id === stepId)!
-    if (stepId === 'mr1') return <Meditation url={s.link} onEnd={() => { if (!done.includes('mr1')) onComplete('mr1') }} />
+    if (stepId === 'mr1') return <Meditation url={s.link} med={med} setMed={setMed} onEnd={() => { if (!done.includes('mr1')) onComplete('mr1') }} />
     if (stepId === 'mr2') return <Pronunciation />
     if (stepId === 'mr3') return <MouthStretch />
     if (stepId === 'mr4') return <Typing url={s.link} label={s.linkLabel} />
@@ -188,10 +205,19 @@ export function MorningRoutine({ routine }: { routine: Routine }) {
 
   const total = steps.length
   const doneCount = done.length
+  const medRunning = med.phase === 'prep' || med.phase === 'run'
+  const medLeft = med.endsAt ? Math.max(0, Math.round((med.endsAt - Date.now()) / 1000)) : 0
 
   return (
     <div className="panel routine-card mr-card">
       <div className="routine-tag">
+        <span className="microcap">Daily</span>
+        {/* A running meditation stays visible even when its panel is closed. */}
+        {medRunning && open !== 'mr1' && (
+          <button className="mr-running mono" onClick={() => setOpen('mr1')}>
+            {med.phase === 'prep' ? 'settling' : 'meditating'} {mmss(medLeft)}
+          </button>
+        )}
         {doneCount === total
           ? <span className="col-tot mono val-pos">done today</span>
           : <span className="routine-progress mono">{doneCount}/{total}</span>}
@@ -229,6 +255,9 @@ export function MorningRoutine({ routine }: { routine: Routine }) {
 
       <div className="routine-card-foot" style={{ marginTop: 'var(--s4)' }}>
         <span className="assist-note">Finishing all {total} checks off “Morning routine” in Habits.</span>
+        {doneCount > 0 && (
+          <button className="btn btn-ghost routine-reset" onClick={() => { resetRoutine(routine.id); setMed(MED_IDLE); setOpen('') }}>Reset</button>
+        )}
       </div>
     </div>
   )

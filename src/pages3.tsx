@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { Band } from './pages1'
 import { useStore } from './store'
 import { parseDictation, TAB_FOR, type ParsedItem } from './assistant'
+import { fmtWhen } from './util'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -49,7 +50,7 @@ export function AssistantPage() {
     <div className="page">
       <Band title="Assistant" sub="say what’s on your mind, it files it in the right place" />
 
-      <div className="panel" style={{ maxWidth: 820, marginBottom: 'var(--s5)' }}>
+      <div className="panel" style={{ marginBottom: 'var(--s5)' }}>
         <span className="microcap">Dictate or type</span>
         <div className="assist-input">
           <textarea
@@ -100,14 +101,14 @@ export function AssistantPage() {
         )}
       </div>
 
-      <div className="panel" style={{ maxWidth: 820 }}>
+      <div className="panel">
         <span className="microcap">History · what went where</span>
         {assistantLog.length === 0 && <p className="bucket-empty">Nothing filed yet. Everything you dictate shows here, and you can undo any of it.</p>}
         {assistantLog.map((entry) => (
           <div className="assist-log" key={entry.id}>
             <div className="assist-log-head">
               <span className="grow">“{entry.text}”</span>
-              <span className="mono meta">{entry.when}</span>
+              <span className="mono meta">{fmtWhen(entry.when)}</span>
             </div>
             {entry.items.map((it) => (
               <div className="assist-log-item" key={it.id}>
@@ -143,10 +144,11 @@ function renderNote(t: string) {
 }
 
 export function BrainDumpPage() {
-  const { ideas, space, addIdea, setIdeaColor } = useStore()
+  const { ideas, space, addIdea, setIdeaColor, deleteIdea, addTask, setPage } = useStore()
   const [text, setText] = useState('')
   const [color, setColor] = useState('amber')
   const [activeTag, setActiveTag] = useState<string | null>(null)
+  const [menuFor, setMenuFor] = useState<string | null>(null)
 
   const spaceIdeas = ideas.filter((i) => i.space === space)
   const allTags = Array.from(new Set(spaceIdeas.flatMap((i) => tagsOf(i.text).map((t) => t.toLowerCase()))))
@@ -190,12 +192,25 @@ export function BrainDumpPage() {
           <div className="sticky" key={i.id} style={{ background: colorBg(i.color) }}>
             <p className="note-text">{renderNote(i.text)}</p>
             <div className="note-foot">
-              <span className="mono note-when">{i.when}</span>
+              <span className="mono note-when">{fmtWhen(i.when)}</span>
               <div className="note-colors">
                 {NOTE_COLORS.map((c) => (
                   <button key={c.id} className={`note-dot${i.color === c.id ? ' on' : ''}`} style={{ background: c.bg }} aria-label={`Set ${c.id}`} onClick={() => setIdeaColor(i.id, c.id)} />
                 ))}
               </div>
+              {/* An idea worth doing becomes a task; one that is spent comes off the board. */}
+              <span className="kebab-wrap note-kebab">
+                <button className="kebab" aria-label="Note options" aria-expanded={menuFor === i.id} onClick={() => setMenuFor((m) => (m === i.id ? null : i.id))}>⋯</button>
+                {menuFor === i.id && (
+                  <div className="kebab-menu" role="menu">
+                    <button role="menuitem" onClick={() => {
+                      addTask({ title: i.text.replace(TAG_RE, '').trim().slice(0, 120), source: 'mc', estimateMin: 30, space, list: 'backlog', category: 'deep' })
+                      setMenuFor(null); setPage('plan')
+                    }}>Make it a task</button>
+                    <button role="menuitem" className="danger" onClick={() => { deleteIdea(i.id); setMenuFor(null) }}>Delete</button>
+                  </div>
+                )}
+              </span>
             </div>
           </div>
         ))}

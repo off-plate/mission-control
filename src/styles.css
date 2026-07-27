@@ -2335,3 +2335,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .trail-day.kept { background: var(--progress); }
 .trail-day.is-today { border-color: var(--accent); }
 .habit-trail.w30 .trail-day { border-radius: 3px; }
+.routine-trail-wrap { display: flex; flex-direction: column; gap: 6px; margin: var(--s3) 0; }
+.past-goal { gap: var(--s3); }
+.past-goal .btn { flex: none; padding: 3px 10px; font-size: var(--text-xs); }

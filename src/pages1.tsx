@@ -8,7 +8,7 @@ import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
 import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
-import { fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForDaypart, taskMinutes, toMin } from './util'
+import { goalPeriodKey, goalPeriodRange, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForDaypart, taskMinutes, toMin } from './util'
 
 /* ---------------- shared bits ---------------- */
 
@@ -1504,9 +1504,41 @@ function AddRoutineSheet({ onClose }: { onClose: () => void }) {
   )
 }
 
+/* Which routines were finished on which day, drawn the same way a habit's longer
+   window is: one square a day, green when it was finished. Same language for the
+   same question, rather than a second chart type for the same idea. */
+function RoutineTrail({ routineId, days }: { routineId: string; days: number }) {
+  const { routineLog } = useStore()
+  const today = new Date()
+  const done = new Set(routineLog.filter((r) => r.routineId === routineId).map((r) => r.day))
+  const cells = Array.from({ length: days }, (_, i) => {
+    const d = new Date(today); d.setDate(today.getDate() - (days - 1 - i))
+    return localDateKey(d)
+  })
+  const hit = cells.filter((c) => done.has(c)).length
+  return (
+    <div className="routine-trail-wrap">
+      <div className={`habit-trail w${days}`}>
+        {cells.map((day) => (
+          <span key={day} className={`trail-day${done.has(day) ? ' kept' : ''}${day === cells[cells.length - 1] ? ' is-today' : ''}`}
+            title={`${fmtWhen(day)}${done.has(day) ? ', finished' : ''}`} />
+        ))}
+      </div>
+      <span className="habit-weeks">{hit} of the last {days} days</span>
+    </div>
+  )
+}
+
+const ROUTINE_WINDOWS = [
+  { id: 0, label: 'Just today' },
+  { id: 30, label: '30 days' },
+  { id: 90, label: '90 days' },
+]
+
 export function RoutinesPage() {
   const { routines, space, toggleRoutineStep, resetRoutine, deleteRoutine, habits, inView } = useStore()
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [trailDays, setTrailDays] = useState(0)
   const [adding, setAdding] = useState(false)
   const spaceRoutines = routines.filter((r) => inView(r.space))
   const sorted = [...spaceRoutines].sort((a, b) => CADENCE_ORDER.indexOf(a.cadence) - CADENCE_ORDER.indexOf(b.cadence))
@@ -1514,7 +1546,17 @@ export function RoutinesPage() {
     <div className="page">
       <Band
         title="Routines"
-        actions={<button className="btn btn-primary" onClick={() => setAdding(true)}>Add a routine</button>}
+        actions={
+          <>
+            <select
+              className="textinput rangepick" value={trailDays} aria-label="How far back to look"
+              onChange={(e) => setTrailDays(Number(e.target.value))}
+            >
+              {ROUTINE_WINDOWS.map((w) => <option key={w.id} value={w.id}>{w.label}</option>)}
+            </select>
+            <button className="btn btn-primary" onClick={() => setAdding(true)}>Add a routine</button>
+          </>
+        }
       />
       <div className="routine-cards">
         {sorted.length === 0 && <div className="empty">No routines in this space yet. Add one from the button above.</div>}
@@ -1544,6 +1586,7 @@ export function RoutinesPage() {
                 </Dropdown>
               </div>
               {r.blurb && <p className="routine-blurb">{r.blurb}</p>}
+              {trailDays > 0 && editingId !== r.id && <RoutineTrail routineId={r.id} days={trailDays} />}
               {editingId === r.id ? (
                 <>
                   <StepEditor routine={r} />
@@ -1748,9 +1791,14 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals }: {
 }
 
 export function GoalsPage() {
-  const { space, goals, habits, bumpGoal, toggleGoalMilestone, deleteGoal, inView } = useStore()
-  const spaceGoals = goals.filter((g) => inView(g.space))
-  const done = spaceGoals.filter((g) => goalCurrent(g, habits) >= g.target).length
+  const { space, goals, habits, habitLog, bumpGoal, toggleGoalMilestone, deleteGoal, repeatGoal, inView } = useStore()
+  const all = goals.filter((g) => inView(g.space))
+  /* A goal belongs to a period. The ones whose period has ended are not deleted
+     and do not keep counting: they sit below with the number they finished on. */
+  const spaceGoals = all.filter((g) => !g.closed)
+  const past = all.filter((g) => g.closed).sort((a, b) => (a.closed!.on < b.closed!.on ? 1 : -1))
+  const nowOf = (g: Goal) => goalCurrent(g, habits, habitLog, goalPeriodRange((g.timeframe ?? 'quarter') as GoalTf, g.periodKey ?? goalPeriodKey((g.timeframe ?? 'quarter') as GoalTf)))
+  const done = spaceGoals.filter((g) => nowOf(g) >= g.target).length
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<Goal | null>(null)
 
@@ -1773,7 +1821,7 @@ export function GoalsPage() {
               </div>
               {inTf.map((g) => {
                 // Habit-linked goals count themselves; the rest hold their own number.
-                const current = goalCurrent(g, habits)
+                const current = nowOf(g)
                 const fromHabit = habits.find((h) => h.id === g.habitId)
                 const pct = Math.min(100, Math.round((current / g.target) * 100))
                 const status = goalPace(current, g.target, g.timeframe ?? 'quarter')
@@ -1837,6 +1885,37 @@ export function GoalsPage() {
           )
         })}
       </div>
+
+      {/* Where last week's goals went. They keep the number they finished on, and
+          any of them can be set again for the period we are in now. */}
+      {past.length > 0 && (
+        <>
+          <div className="section-head" style={{ marginTop: 'var(--s6)' }}>
+            <span className="microcap">Finished periods</span>
+            <span className="section-count mono">{past.length}</span>
+          </div>
+          <div className="panel">
+            <div className="rowlist">
+              {past.map((g) => {
+                const tf = (g.timeframe ?? 'quarter') as GoalTf
+                const label = goalPeriodRange(tf, g.periodKey ?? '').label
+                const hit = g.closed!.final >= g.target
+                return (
+                  <div className="rowitem past-goal" key={g.id}>
+                    <span className="grow">{g.name}</span>
+                    <span className="meta">{label}</span>
+                    <span className={`mono ${hit ? 'val-pos' : 'val-urgent'}`}>{fmtNum(g.closed!.final)} of {fmtNum(g.target)}</span>
+                    <button className="btn btn-quiet" onClick={() => repeatGoal(g.id)}>Set it again</button>
+                    <Dropdown label={`Options for ${g.name}`}>
+                      <button role="menuitem" className="danger" onClick={() => deleteGoal(g.id)}>Delete this goal</button>
+                    </Dropdown>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </>
+      )}
 
       {adding && <GoalSheet onClose={() => setAdding(false)} />}
       {editing && <GoalSheet goal={editing} onClose={() => setEditing(null)} />}

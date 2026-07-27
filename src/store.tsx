@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { SUPABASE_ENABLED, deleteRemoteState, saveRemoteState } from './supabase'
-import { dayIndexOf, dayOfWeekKey, isoWeekKey, localDateKey, periodKeyFor, slotForTime } from './util'
+import { dayIndexOf, dayOfWeekKey, goalPeriodKey, goalPeriodRange, isoWeekKey, localDateKey, periodIsPast, periodKeyFor, slotForTime, type GoalTf } from './util'
 import {
   DEFAULT_SPACES,
   MOCK_GOALS,
@@ -139,6 +139,8 @@ interface Store extends PersistedState {
   bumpGoal: (id: string, delta: number) => void
   toggleGoalMilestone: (goalId: string, milestoneId: string) => void
   deleteGoal: (id: string) => void
+  /** Start the same goal again for the current period. */
+  repeatGoal: (id: string) => void
 
   setSocial: (entries: SocialEntry[]) => void
   toggleSource: (id: string) => void
@@ -247,6 +249,18 @@ function loadPersisted(): PersistedState | null {
         days: [false, false, false, false, false, false, false],
       }))
     }
+    /* A goal whose period has ended stops counting and keeps the number it
+       finished on. Nothing is deleted: it moves to the past, where he can look
+       at how it went and set it again if he wants to. */
+    p.goals = (p.goals ?? []).map((g) => {
+      const tf = (g.timeframe ?? 'quarter') as GoalTf
+      const key = g.periodKey ?? goalPeriodKey(tf)
+      if (g.closed || !periodIsPast(tf, key)) return { ...g, periodKey: key }
+      const range = goalPeriodRange(tf, key)
+      const final = goalCurrent(g, p.habits ?? [], p.habitLog ?? [], range)
+      return { ...g, periodKey: key, closed: { on: range.to, final } }
+    })
+
     /* A day that has not happened yet cannot have been kept. The week array has
        always been cleaned of future ticks; the log has to be cleaned the same way
        or the two disagree the moment a migration or a clock change writes one. */
@@ -743,7 +757,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       })
     },
 
-    addGoal: (g) => setGoals((prev) => [...prev, { ...g, id: newId('g') }]),
+    /* A goal is set for a period. Without one it was a rolling window that never
+       ended, so "this week's goals" quietly became "goals, forever". */
+    addGoal: (g) => setGoals((prev) => [...prev, {
+      ...g,
+      id: newId('g'),
+      periodKey: g.periodKey ?? goalPeriodKey((g.timeframe ?? 'quarter') as GoalTf),
+    }]),
+    /** Set the same goal again for the period we are in now. */
+    repeatGoal: (id) => {
+      const g = goals.find((x) => x.id === id)
+      if (!g) return
+      const tf = (g.timeframe ?? 'quarter') as GoalTf
+      setGoals((prev) => [...prev, {
+        ...g,
+        id: newId('g'),
+        periodKey: goalPeriodKey(tf),
+        current: 0,
+        closed: undefined,
+        milestones: g.milestones?.map((m) => ({ ...m, done: false })),
+      }])
+      setPageState('goals')
+    },
     /* Editing a goal is how a habit gets attached to one that already exists.
        Clearing the link keeps whatever the habit had counted, so the number
        does not jump backwards when you switch to logging by hand. */

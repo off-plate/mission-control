@@ -447,6 +447,13 @@ export interface Goal {
   /** Track this goal straight off a habit: every checkoff counts toward it, so
    *  "twelve gym sessions" fills itself as you tick the gym habit. */
   habitId?: string
+  /** The period this goal was set for: '2026-W31', '2026-07', '2026-Q3'. A goal
+   *  for this week is for THIS week. Without it, a weekly goal was a rolling
+   *  seven days that never ended and never went anywhere. */
+  periodKey?: string
+  /** Set when its period ended, with the number it finished on, so a past goal
+   *  keeps its result instead of quietly continuing to count. */
+  closed?: { on: string; final: number }
 }
 
 /** Weeks of habit history a goal's timeframe covers. */
@@ -457,10 +464,21 @@ const TIMEFRAME_WEEKS: Record<GoalTimeframe, number> = { weekly: 1, monthly: 4, 
  * from that habit's checkoffs over the goal's own window, so you never log the
  * same thing twice. Otherwise it is whatever the goal itself holds.
  */
-export function goalCurrent(g: Goal, habits: HabitDef[]): number {
+export function goalCurrent(g: Goal, habits: HabitDef[], log?: HabitTick[], range?: { from: string; to: string }): number {
+  // A closed goal keeps the number it finished on. It is history, not a counter.
+  if (g.closed) return g.closed.final
   if (!g.habitId) return g.current
   const h = habits.find((x) => x.id === g.habitId)
   if (!h) return g.current
+  /* Counted from the dated ticks inside the goal's own period. The old sum of
+     this week's array plus N undated weekly counts was a rolling window that
+     never ended, which is why a weekly goal never rolled over. */
+  if (log && range) {
+    const kept = h.kind === 'break'
+      ? quitKeptDays(h, range.from, range.to).size
+      : keptDaysIn(log, h.id, range.from, range.to).size
+    return Math.min(g.target, kept)
+  }
   const thisWeek = h.days.filter(Boolean).length
   const weeks = TIMEFRAME_WEEKS[g.timeframe ?? 'quarter']
   const past = (h.history ?? []).slice(-(weeks - 1)).reduce((a, n) => a + n, 0)

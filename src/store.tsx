@@ -14,8 +14,12 @@ import {
   WIDGET_DEFS,
 } from './mock'
 import { goalCurrent, routineComplete, stepLocked } from './types'
+import { isSpace } from './types'
 import type {
+  ViewId,
   FocusSession,
+  HabitTick,
+  RoutineDone,
   RoutineCadence,
   AssistantEntry,
   CoachFacts,
@@ -67,14 +71,26 @@ interface PersistedState {
   removedSeeds?: string[]
   /** Every finished focus block, so a measured habit has something to count. */
   focusSessions?: FocusSession[]
+  /** Every day a habit was kept, dated. The durable record behind days[]. */
+  habitLog?: HabitTick[]
+  /** Every day a routine was finished, dated. */
+  routineLog?: RoutineDone[]
 }
 
 /** A delete you can still take back: what it was, and how to put it back. */
 export interface Undoable { id: string; label: string; restore: () => void }
 
 interface Store extends PersistedState {
+  /** What he is looking at. 'all' shows every space at once. */
+  view: ViewId
+  setView: (v: ViewId) => void
+  /** Where a newly created thing lands. In a single space that is the space he is
+   *  in; in All it is whichever space he last worked in, and he can change it. */
   space: SpaceId
   setSpace: (s: SpaceId) => void
+  /** Does this record belong in what he is looking at? One predicate, so a page
+   *  never has to know whether it is in a single space or in All. */
+  inView: (s?: SpaceId) => boolean
   page: PageId
   setPage: (p: PageId) => void
   editing: boolean
@@ -166,6 +182,10 @@ interface Store extends PersistedState {
   /** Called when a focus block finishes; feeds measured habits and the ledger. */
   logFocus: (minutes: number, label?: string) => void
 
+  /** Every dated habit tick and routine completion. The record days[] caches. */
+  habitLog: HabitTick[]
+  routineLog: RoutineDone[]
+
   ideas: Idea[]
   addIdea: (text: string, color: string) => void
   setIdeaColor: (id: string, color: string) => void
@@ -196,6 +216,30 @@ function loadPersisted(): PersistedState | null {
        habit's checkmarks are archived into its 12-week history and cleared, so
        Monday always starts a fresh row instead of showing last week's ticks. */
     const wk = isoWeekKey()
+
+    /* One-time migration to the dated habit log. Whatever is ticked in the week
+       array right now becomes dated entries, so nothing he has logged is lost by
+       moving to the durable record. history[] holds twelve undated weekly counts
+       and stays exactly as it is: inventing dates for it would be fabrication,
+       and the new log simply starts here and grows. */
+    if (!p.habitLog) {
+      const ticks: HabitTick[] = []
+      // Ticks belong to the week the saved state was written in, not to this one.
+      const base = p.weekKey === wk ? new Date() : null
+      if (base) {
+        for (const h of p.habits ?? []) {
+          h.days.forEach((on, i) => { if (on) ticks.push({ habitId: h.id, day: dayOfWeekKey(i, base) }) })
+        }
+      }
+      p.habitLog = ticks
+    }
+    if (!p.routineLog) {
+      // A routine that is currently complete carries the day it was completed.
+      p.routineLog = (p.routines ?? [])
+        .filter((r) => r.completedOn && routineComplete(r, periodKeyFor(r.cadence)))
+        .map((r) => ({ routineId: r.id, day: r.completedOn as string, periodKey: r.periodKey ?? periodKeyFor(r.cadence) }))
+    }
+
     if (p.weekKey && p.weekKey !== wk) {
       p.habits = p.habits.map((h) => ({
         ...h,
@@ -203,6 +247,26 @@ function loadPersisted(): PersistedState | null {
         days: [false, false, false, false, false, false, false],
       }))
     }
+    /* A day that has not happened yet cannot have been kept. The week array has
+       always been cleaned of future ticks; the log has to be cleaned the same way
+       or the two disagree the moment a migration or a clock change writes one. */
+    p.habitLog = (p.habitLog ?? []).filter((t) => t.day <= localDateKey())
+    p.routineLog = (p.routineLog ?? []).filter((r) => r.day <= localDateKey())
+
+    /* The week array is a cache. Rebuilding it from the log on every load means
+       the log is the one truth and the two can never drift apart. */
+    {
+      const thisWeek = new Set(
+        (p.habitLog ?? [])
+          .filter((t) => isoWeekKey(new Date(t.day)) === wk)
+          .map((t) => `${t.habitId}|${t.day}`),
+      )
+      p.habits = p.habits.map((h) => ({
+        ...h,
+        days: Array.from({ length: 7 }, (_, i) => thisWeek.has(`${h.id}|${dayOfWeekKey(i)}`)),
+      }))
+    }
+
     /* Forward-fill fields added after this state was saved, so an existing
        install picks up new wiring (habit frequencies, habit-linked goals)
        without losing anything he has logged. Only ever fills a blank. */
@@ -329,28 +393,45 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // Seeded ids he has deleted, so the forward-fill never resurrects them.
   const [removedSeeds, setRemovedSeeds] = useState<string[]>(persisted?.removedSeeds ?? [])
   const [focusSessions, setFocusSessions] = useState<FocusSession[]>(persisted?.focusSessions ?? [])
+  const [habitLog, setHabitLog] = useState<HabitTick[]>(persisted?.habitLog ?? [])
+  const [routineLog, setRoutineLog] = useState<RoutineDone[]>(persisted?.routineLog ?? [])
   /* The last thing you deleted, held long enough to take it back. Deliberately
      not persisted: a delete you can still undo after a reload is not a delete. */
   const [undoable, setUndoable] = useState<Undoable | null>(null)
   const remoteSaveTimer = useRef<number | undefined>(undefined)
   const latestJson = useRef<string>('')
-  // The selected space survives a reload (kept out of the synced blob on purpose,
-  // so working on the phone does not flip the desktop's space).
-  const [space, setSpace] = useState<SpaceId>(() => {
+  /* The view and the write-space survive a reload, kept out of the synced blob on
+     purpose so working on the phone does not flip the desktop. All is the default:
+     the whole point is that nothing hides in a profile he did not open. */
+  const [view, setViewState] = useState<ViewId>(() => {
+    try {
+      const v = localStorage.getItem('mc-view')
+      return v === 'work' || v === 'offplate' || v === 'personal' || v === 'all' ? v : 'all'
+    } catch { return 'all' }
+  })
+  const [writeSpace, setWriteSpace] = useState<SpaceId>(() => {
     try {
       const s = localStorage.getItem('mc-space')
       return s === 'work' || s === 'offplate' || s === 'personal' ? s : 'personal'
     } catch { return 'personal' }
   })
+  // In a single space, new things land there. In All he picks, and the pick sticks.
+  const space: SpaceId = isSpace(view) ? view : writeSpace
+  const setSpace = (s: SpaceId) => setWriteSpace(s)
+  const setView = (v: ViewId) => { setViewState(v); if (isSpace(v)) setWriteSpace(v) }
+  const inView = (s?: SpaceId) => view === 'all' || !s || s === view
   const [page, setPageState] = useState<PageId>(pageFromHash)
   const [editing, setEditing] = useState(false)
   const [focusTaskId, setFocusTaskId] = useState<string | null>(null)
   const [coachOpen, setCoachOpen] = useState<string | null>(null)
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-space', space)
-    try { localStorage.setItem('mc-space', space) } catch { /* noop */ }
-  }, [space])
+    document.documentElement.setAttribute('data-space', view)
+    try {
+      localStorage.setItem('mc-view', view)
+      localStorage.setItem('mc-space', writeSpace)
+    } catch { /* noop */ }
+  }, [view, writeSpace])
 
   /* Date watcher: if the app sits open across midnight (or a laptop wakes up
      the next morning), reload once so routines, habits and "today" all roll
@@ -379,6 +460,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const state: PersistedState = {
       version: 3, spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
       weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
+      habitLog, routineLog,
     }
     const json = JSON.stringify(state)
     latestJson.current = json
@@ -392,7 +474,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { void saveRemoteState(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, records, removedSeeds, focusSessions])
+  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, records, removedSeeds, focusSessions, habitLog, routineLog])
 
   /* Closing the tab inside the debounce window must not lose the last change:
      flush the pending remote write the moment the page starts hiding. */
@@ -427,6 +509,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       Math.max(1, weekLedger.length)) * 100,
   )
 
+  /** Tick or untick one day of one habit, in the log and in the week cache. */
+  const markDay = (habitId: string, dayIndex: number, value: boolean) => {
+    const day = dayOfWeekKey(dayIndex)
+    setHabitLog((prev) => {
+      const without = prev.filter((t) => !(t.habitId === habitId && t.day === day))
+      return value ? [...without, { habitId, day }] : without
+    })
+    setHabits((prev) => prev.map((h) => (h.id === habitId
+      ? { ...h, days: h.days.map((d, i) => (i === dayIndex ? value : d)) }
+      : h)))
+  }
+
   /* Apply a change to a routine and re-derive its habit from the result. The
      tick is written to the day it was earned and cleared from that same day, so
      a weekly routine undone three days later does not clear the wrong dot. */
@@ -439,14 +533,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const isComplete = routineComplete(after, key)
     const completedOn = isComplete ? (wasComplete ? before.completedOn ?? todayKey() : todayKey()) : null
     setRoutines((prev) => prev.map((x) => (x.id === routineId ? { ...after, periodKey: key, completedOn } : x)))
-    if (!before.habitId || wasComplete === isComplete) return
+    if (wasComplete === isComplete) return
+
+    /* Which day this routine was finished, kept for good. completedOn holds only
+       the most recent one, so on its own it could never answer "which day did I
+       do it" for any day but the last. */
+    setRoutineLog((prev) => {
+      const without = prev.filter((r) => !(r.routineId === routineId && r.periodKey === key))
+      return isComplete ? [...without, { routineId, day: todayKey(), periodKey: key }] : without
+    })
+
+    if (!before.habitId) return
     const hid = before.habitId
     const clearIdx = before.completedOn && isoWeekKey(new Date(before.completedOn)) === isoWeekKey()
       ? dayIndexOf(before.completedOn)
       : todayIndex
-    setHabits((hs) => hs.map((h) => (h.id === hid
-      ? { ...h, days: h.days.map((d, i) => (isComplete ? (i === todayIndex ? true : d) : (i === clearIdx ? false : d))) }
-      : h)))
+    // Through markDay, so a routine-driven tick lands in the durable log too.
+    markDay(hid, isComplete ? todayIndex : clearIdx, isComplete)
   }
 
   /* Arming an undo replaces whatever was armed before: one step back, not a
@@ -457,7 +560,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const value: Store = {
     version: 3,
     spaces, tasks, habits, goals, ledger, social, sources, plan, review, routines, ideas,
-    focusSessions,
+    focusSessions, habitLog, routineLog,
+    view, setView, inView,
     /* A finished block is recorded once, and everything that cares reads from
        here: measured habits fill from it, and the ledger gets it so focus time
        counts toward estimate accuracy instead of vanishing. */
@@ -602,18 +706,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setEstimate: (taskId, minutes) =>
       setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, estimateMin: Math.max(1, Math.round(minutes)), estimated: true } : t))),
 
-    toggleHabitDay: (id, day) =>
-      setHabits((prev) =>
-        prev.map((h) =>
-          h.id === id ? { ...h, days: h.days.map((d, i) => (i === day ? !d : d)) } : h,
-        ),
-      ),
-    markHabitDay: (id, day, value) =>
-      setHabits((prev) =>
-        prev.map((h) =>
-          h.id === id ? { ...h, days: h.days.map((d, i) => (i === day ? value : d)) } : h,
-        ),
-      ),
+    /* Both of these write the dated log first: that is the record that survives
+       the week rolling over. days[] is a cache of the current week and is kept in
+       step here, and rebuilt from the log on every load. */
+    toggleHabitDay: (id, day) => {
+      const h = habits.find((x) => x.id === id)
+      if (!h) return
+      markDay(id, day, !h.days[day])
+    },
+    markHabitDay: (id, day, value) => markDay(id, day, value),
     addHabit: (input) =>
       setHabits((prev) => [...prev, {
         id: newId('h'), space, name: input.name, daypart: input.daypart,

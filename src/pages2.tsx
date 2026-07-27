@@ -111,7 +111,7 @@ function SecHead({ label }: { label: string }) {
 }
 
 export function ReviewPage() {
-  const { space, habits, goals, closeReview, review, ledger, focusSessions } = useStore()
+  const { space, habits, goals, closeReview, review, ledger, focusSessions, inView } = useStore()
   const [rangeId, setRangeId] = useState<string>('this-week')
   const range = useMemo(() => (rangeId.includes('-W') || /^\d{4}-\d{2}$/.test(rangeId)
     ? monthRange(rangeId)
@@ -123,16 +123,16 @@ export function ReviewPage() {
 
   /* Every number below reads the same two dates. Nothing is computed per window,
      so a week and a quarter are the same page with a different span. */
-  const rows = ledger.filter((e) => (!e.space || e.space === space) && inRange(e.when, range))
+  const rows = ledger.filter((e) => inView(e.space) && inRange(e.when, range))
   const saved = rows.reduce((a, e) => a + (e.estimateMin - e.actualMin), 0)
   const worked = rows.reduce((a, e) => a + e.actualMin, 0)
   const onTime = rows.filter((e) => Math.abs(e.estimateMin - e.actualMin) <= e.estimateMin * 0.25).length
   const accuracy = rows.length ? Math.round((onTime / rows.length) * 100) : 0
-  const blocks = focusSessions.filter((f) => f.space === space && inRange(f.day, range))
+  const blocks = focusSessions.filter((f) => inView(f.space) && inRange(f.day, range))
   const focusMin = blocks.reduce((a, f) => a + f.minutes, 0)
 
-  const activeHabits = habits.filter((h) => !h.paused && h.space === space)
-  const spaceGoals = goals.filter((g) => g.space === space)
+  const activeHabits = habits.filter((h) => !h.paused && inView(h.space))
+  const spaceGoals = goals.filter((g) => inView(g.space))
   const goalsOnTrack = spaceGoals.filter((g) => goalPace(goalCurrent(g, habits), g.target, g.timeframe ?? 'quarter') !== 'behind').length
 
   const closed = (review.reflections ?? []).find((r) => r.from === range.from && r.to === range.to)
@@ -355,7 +355,7 @@ function ReflectForm({ onSubmit, onCancel }: { onSubmit: (didIt: boolean, felt: 
 }
 
 export function CoachPage() {
-  const { space, tasks, setPage, coachOpen, setCoachOpen, coachSessions, startCoachSession, reflectCoachSession, deleteCoachSession } = useStore()
+  const { space, tasks, setPage, coachOpen, setCoachOpen, coachSessions, startCoachSession, reflectCoachSession, deleteCoachSession, inView } = useStore()
   const [stage, setStage] = useState<CoachStage>('home')
   const [thing, setThing] = useState('')
   const [title, setTitle] = useState('')
@@ -419,13 +419,13 @@ export function CoachPage() {
   }
 
   // Loops belong to the profile they were opened in (older ones show everywhere).
-  const mine = coachSessions.filter((s) => !s.space || s.space === space)
+  const mine = coachSessions.filter((s) => inView(s.space))
   const open = mine.filter((s) => s.status === 'open')
   const closed = mine.filter((s) => s.status === 'closed')
   const easedCount = closed.filter((s) => s.didIt && s.felt === 'easier').length
   // Your two oldest open tasks, offered as one-click starters.
   const oldest = tasks
-    .filter((t) => !t.done && t.space === space && t.createdAt)
+    .filter((t) => !t.done && inView(t.space) && t.createdAt)
     .sort((a, b) => (a.createdAt! < b.createdAt! ? -1 : 1))
     .slice(0, 2)
 
@@ -803,7 +803,7 @@ function AiKeyField() {
 }
 
 export function SettingsPage() {
-  const { sources, toggleSource, resetDemo, setPage } = useStore()
+  const { sources, toggleSource, resetDemo, setPage, inView } = useStore()
   return (
     <div className="page">
       <Band title="Settings" />

@@ -81,9 +81,9 @@ const AgendaBody = memo(function AgendaBody({ space, size }: { space: SpaceId; s
 })
 
 const TasksBody = memo(function TasksBody({ space, size }: { space: SpaceId; size: SizeKey }) {
-  const { tasks, toggleTask, logActual } = useStore()
+  const { tasks, toggleTask, logActual, inView } = useStore()
   const [logOpen, setLogOpen] = useState<string | null>(null)
-  const list = tasks.filter((t) => t.space === space && t.list === 'today')
+  const list = tasks.filter((t) => inView(t.space) && t.list === 'today')
   const open = list.filter((t) => !t.done)
   const remaining = open.reduce((a, t) => a + t.estimateMin, 0)
   const shown = size === 'M' ? list.slice(0, 3) : list
@@ -153,8 +153,8 @@ const FinanceBody = memo(function FinanceBody() {
 })
 
 const HabitsBody = memo(function HabitsBody({ space }: { space: SpaceId }) {
-  const { habits, routines, toggleHabitDay, setPage, todayIndex } = useStore()
-  const active = habits.filter((h) => h.space === space && !h.paused)
+  const { habits, routines, toggleHabitDay, setPage, todayIndex, inView } = useStore()
+  const active = habits.filter((h) => inView(h.space) && !h.paused)
   /* A habit a routine drives is a read-out here too. Ticking it by hand looked
      like it worked and was reverted on the next load. */
   const driven = new Map(routines.filter((r) => r.habitId).map((r) => [r.habitId as string, r.title]))
@@ -182,8 +182,8 @@ const TrainingBody = memo(function TrainingBody() {
 })
 
 const GoalsBody = memo(function GoalsBody({ space }: { space: SpaceId }) {
-  const { goals, habits, todayIndex } = useStore()
-  const list = goals.filter((g) => g.space === space)
+  const { goals, habits, todayIndex, inView } = useStore()
+  const list = goals.filter((g) => inView(g.space))
   return (
     <div>
       {list.map((g) => {
@@ -210,7 +210,7 @@ const GoalsBody = memo(function GoalsBody({ space }: { space: SpaceId }) {
 })
 
 const TimeSavedBody = memo(function TimeSavedBody() {
-  const { savedMin, accuracyPct, setPage } = useStore()
+  const { savedMin, accuracyPct, setPage, inView } = useStore()
   const abs = Math.abs(savedMin)
   const h = Math.floor(abs / 60)
   const m = abs % 60
@@ -237,7 +237,7 @@ const OutreachBody = memo(function OutreachBody() {
 })
 
 const SourcesBody = memo(function SourcesBody({ size }: { size: SizeKey }) {
-  const { sources } = useStore()
+  const { sources, inView } = useStore()
   const shown = size === 'S' ? sources.slice(0, 4) : sources
   return (
     <div className="rowlist">

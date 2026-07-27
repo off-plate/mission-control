@@ -1,5 +1,15 @@
 export type SpaceId = 'personal' | 'work' | 'offplate'
 
+/** What you are looking at. 'all' is not a space anything can belong to: it is a
+ *  view across the three. Storage always uses SpaceId, never this. */
+export type ViewId = SpaceId | 'all'
+
+export const SPACES: SpaceId[] = ['personal', 'work', 'offplate']
+
+export function isSpace(v: ViewId): v is SpaceId {
+  return v !== 'all'
+}
+
 /** One shared on-track threshold, so Goals, Review and the widget never disagree. */
 export const ON_TRACK_PCT = 50
 
@@ -140,6 +150,17 @@ export type HabitKind = 'build' | 'break' | 'measured'
 /** What fills a measured habit. Focus time is the only source for now; the shape
  *  is here so a second one does not need a migration. */
 export type HabitSource = 'focus'
+
+/**
+ * A day a habit was kept. This is the durable record; `days[]` on the habit is a
+ * cache of the current week rebuilt from these on load. The week array alone
+ * cannot answer "how have I done over a hundred days", and `history[]` is twelve
+ * undated counts, so neither could ever be the truth.
+ */
+export interface HabitTick { habitId: string; day: string }
+
+/** A day a routine was finished, kept so "which day did I do it" has an answer. */
+export interface RoutineDone { routineId: string; day: string; periodKey: string }
 
 /** A finished focus block. Kept as history, not just a count, so a measured
  *  habit can be filled from it and the week can be looked back at. */

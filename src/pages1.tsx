@@ -5,7 +5,7 @@ import { MOCK_MONEY, fakeDecompose } from './mock'
 import { useStore } from './store'
 import { MorningRoutine } from './morning'
 import { Sheet } from './modals'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, goalCurrent, habitFrequencyLabel, habitTarget, type AgendaEvent, type GoalCategory, type GoalTimeframe, type HabitDef, type HabitFrequency, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, goalCurrent, habitFrequencyLabel, habitTarget, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type RoutineCadence, type Task, type TaskCategory, type TimeSlot } from './types'
 import { fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, gcalUrl, localDateKey, taskMinutes, toMin } from './util'
 
 /* ---------------- shared bits ---------------- */
@@ -775,9 +775,12 @@ function AddHabitSheet({ onClose }: { onClose: () => void }) {
 }
 
 export function HabitsPage() {
-  const { habits, space, togglePauseHabit, deleteHabit, routines, todayIndex } = useStore()
+  const { habits, goals, space, togglePauseHabit, deleteHabit, routines, todayIndex } = useStore()
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
+  // Opening the goal sheet from a habit is the "set a goal on this" path.
+  const [goalFor, setGoalFor] = useState<string | null>(null)
+  const goalOn = new Map(goals.filter((g) => g.habitId).map((g) => [g.habitId as string, g]))
   const spaceHabits = habits.filter((h) => h.space === space)
   // A habit a routine drives cannot be deleted from here, or the routine would
   // mirror into nothing. Pausing stays available.
@@ -820,6 +823,11 @@ export function HabitsPage() {
                     <button className="kebab" aria-label={`Options for ${h.name}`} aria-expanded={menuFor === h.id} onClick={() => setMenuFor((m) => (m === h.id ? null : h.id))}>⋯</button>
                     {menuFor === h.id && (
                       <div className="kebab-menu" role="menu">
+                        {goalOn.has(h.id) ? (
+                          <span className="kebab-note">Goal: {goalOn.get(h.id)!.name}</span>
+                        ) : (
+                          <button role="menuitem" onClick={() => { setGoalFor(h.id); setMenuFor(null) }}>Set a goal on this</button>
+                        )}
                         <button role="menuitem" onClick={() => { togglePauseHabit(h.id); setMenuFor(null) }}>
                           {h.paused ? 'Resume' : 'Pause'}
                         </button>
@@ -845,6 +853,7 @@ export function HabitsPage() {
       </p>
 
       {adding && <AddHabitSheet onClose={() => setAdding(false)} />}
+      {goalFor && <GoalSheet presetHabitId={goalFor} onClose={() => setGoalFor(null)} />}
     </div>
   )
 }
@@ -920,11 +929,24 @@ export function RoutinesPage() {
 /* ---------------- GOALS ---------------- */
 
 
-function AddGoalSheet({ onClose }: { onClose: () => void }) {
-  const { space, habits, addGoal } = useStore()
+/* One sheet for creating and editing. `goal` edits an existing one; `presetHabitId`
+   opens it prefilled from a habit, which is how "set a goal on this habit" works. */
+function GoalSheet({ onClose, goal, presetHabitId }: {
+  onClose: () => void
+  goal?: Goal
+  presetHabitId?: string
+}) {
+  const { space, habits, addGoal, updateGoal } = useStore()
+  const preset = habits.find((h) => h.id === presetHabitId)
   const [d, setD] = useState({
-    name: '', why: '', target: 3, unit: 'steps', deadline: '',
-    timeframe: 'weekly' as GoalTimeframe, category: 'life' as GoalCategory, habitId: '',
+    name: goal?.name ?? (preset ? preset.name : ''),
+    why: goal?.why ?? '',
+    target: goal?.target ?? (preset ? habitTarget(preset) * 4 : 3),
+    unit: goal?.unit ?? 'steps',
+    deadline: goal?.deadline ?? '',
+    timeframe: goal?.timeframe ?? ('monthly' as GoalTimeframe),
+    category: goal?.category ?? ('life' as GoalCategory),
+    habitId: goal?.habitId ?? presetHabitId ?? '',
   })
   // Any habit in this profile can drive a goal, so the list grows as you do.
   const linkable = [...habits.filter((h) => h.space === space && !h.paused)].reverse()
@@ -932,18 +954,20 @@ function AddGoalSheet({ onClose }: { onClose: () => void }) {
 
   const submit = () => {
     if (!d.name.trim()) return
-    addGoal({
-      space, name: d.name.trim(), current: 0, target: Math.max(1, d.target),
+    const shape = {
+      name: d.name.trim(), target: Math.max(1, d.target),
       unit: d.habitId ? 'checkoffs' : (d.unit.trim() || 'steps'),
-      note: '', why: d.why.trim() || undefined, deadline: d.deadline.trim() || undefined,
-      timeframe: d.timeframe, category: d.category, milestones: [],
+      why: d.why.trim() || undefined, deadline: d.deadline.trim() || undefined,
+      timeframe: d.timeframe, category: d.category,
       habitId: d.habitId || undefined,
-    })
+    }
+    if (goal) updateGoal(goal.id, shape)
+    else addGoal({ space, current: 0, note: '', milestones: [], ...shape })
     onClose()
   }
 
   return (
-    <Sheet title="Add a goal" onClose={onClose} note="A goal is an outcome you can check off, with a date on it.">
+    <Sheet title={goal ? 'Edit this goal' : 'Add a goal'} onClose={onClose} note="A goal is an outcome you can check off, with a date on it.">
       <label className="field-label" htmlFor="gname">What is the outcome?</label>
       <input id="gname" className="textinput" style={{ width: '100%' }} autoFocus
         placeholder="e.g. Twelve gym sessions" value={d.name}
@@ -1011,7 +1035,7 @@ function AddGoalSheet({ onClose }: { onClose: () => void }) {
 
       <div className="sheet-actions">
         <button className="btn btn-quiet" onClick={onClose}>Cancel</button>
-        <button className="btn btn-primary" disabled={!d.name.trim()} onClick={submit}>Add goal</button>
+        <button className="btn btn-primary" disabled={!d.name.trim()} onClick={submit}>{goal ? 'Save changes' : 'Add goal'}</button>
       </div>
     </Sheet>
   )
@@ -1022,6 +1046,7 @@ export function GoalsPage() {
   const spaceGoals = goals.filter((g) => g.space === space)
   const done = spaceGoals.filter((g) => goalCurrent(g, habits) >= g.target).length
   const [adding, setAdding] = useState(false)
+  const [editing, setEditing] = useState<Goal | null>(null)
   const [menuFor, setMenuFor] = useState<string | null>(null)
 
   return (
@@ -1059,6 +1084,7 @@ export function GoalsPage() {
                         <button className="kebab" aria-label={`Options for ${g.name}`} aria-expanded={menuFor === g.id} onClick={() => setMenuFor((m) => (m === g.id ? null : g.id))}>⋯</button>
                         {menuFor === g.id && (
                           <div className="kebab-menu" role="menu">
+                            <button role="menuitem" onClick={() => { setEditing(g); setMenuFor(null) }}>Edit this goal</button>
                             <button role="menuitem" className="danger" onClick={() => { deleteGoal(g.id); setMenuFor(null) }}>Delete this goal</button>
                           </div>
                         )}
@@ -1112,7 +1138,8 @@ export function GoalsPage() {
         })}
       </div>
 
-      {adding && <AddGoalSheet onClose={() => setAdding(false)} />}
+      {adding && <GoalSheet onClose={() => setAdding(false)} />}
+      {editing && <GoalSheet goal={editing} onClose={() => setEditing(null)} />}
     </div>
   )
 }

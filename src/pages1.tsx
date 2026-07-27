@@ -225,9 +225,9 @@ const WIDGET_DEFS_LIST = WIDGET_DEFS
 
 /* ---------------- PLAN ---------------- */
 
-const DAY_START = 0            // full day, midnight to midnight, shrunk to fit
-const DAY_END = 24 * 60
 const HOUR_PX = 42             // tall enough that a 30-minute block fits its own label
+const DEFAULT_START = 7 * 60   // the day he actually lives in, when nothing is earlier
+const DEFAULT_END = 23 * 60
 
 /** The task/event name IS the link; clicking opens (or schedules) it in Google Calendar. */
 function TaskName({ title, start, end, className }: { title: string; start?: string; end?: string; className?: string }) {
@@ -240,17 +240,32 @@ function TaskName({ title, start, end, className }: { title: string; start?: str
 
 /** Vertical day timeline: calendar events plus any task pinned to a clock time. Full height, no inner scroll. */
 function Schedule({ events, tasks }: { events: AgendaEvent[]; tasks: Task[] }) {
-  const height = ((DAY_END - DAY_START) / 60) * HOUR_PX
-  const y = (hhmm: string) => ((toMin(hhmm) - DAY_START) / 60) * HOUR_PX
   const pinned = tasks.filter((t) => t.at && !t.done)
+  /* Show the hours the day actually occupies, padded by one, instead of a fixed
+     midnight-to-midnight column with nine empty hours at the top. */
+  const marks = [
+    ...events.flatMap((e) => [toMin(e.start), toMin(e.end)]),
+    ...pinned.map((t) => toMin(t.at!)),
+  ]
+  const first = marks.length ? Math.min(...marks) : DEFAULT_START
+  const last = marks.length ? Math.max(...marks) : DEFAULT_END
+  const startH = Math.max(0, Math.floor(Math.min(first, DEFAULT_START) / 60) - 1)
+  const endH = Math.min(24, Math.ceil(Math.max(last, DEFAULT_END) / 60) + 1)
+  const DAY_START = startH * 60
+  const hours = endH - startH
+  const height = hours * HOUR_PX
+  const y = (hhmm: string) => ((toMin(hhmm) - DAY_START) / 60) * HOUR_PX
   return (
     <div className="vsched">
       <div className="vsched-inner" style={{ height }}>
-        {Array.from({ length: 25 }, (_, h) => (
-          <div key={h} className="hline" style={{ top: h * HOUR_PX }}>
-            {h % 2 === 0 && h < 24 && <span className="hlabel">{fmtTimeShort(`${h}:00`)}</span>}
-          </div>
-        ))}
+        {Array.from({ length: hours + 1 }, (_, i) => {
+          const h = startH + i
+          return (
+            <div key={h} className="hline" style={{ top: i * HOUR_PX }}>
+              {h % 2 === 0 && h < 24 && <span className="hlabel">{fmtTimeShort(`${h}:00`)}</span>}
+            </div>
+          )
+        })}
         {events.map((e) => (
           <div className="vev vev-cal" key={e.id} style={{ top: y(e.start) + 1, height: Math.max(((toMin(e.end) - toMin(e.start)) / 60) * HOUR_PX - 2, 42) }}>
             <TaskName title={e.title} start={e.start} end={e.end} className="t" />

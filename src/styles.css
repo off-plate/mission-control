@@ -2359,3 +2359,11 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 /* All is a view across the three rooms, so it borrows no room's accent. */
 [data-space="all"] { --accent: #15130f; --accent-hover: #000; --accent-wash: rgba(21, 19, 15, 0.07); }
 .writeto { padding: 7px 10px; font-size: var(--text-sm); min-width: 110px; }
+
+/* What came back to the list overnight. A fact and a way back, not a scolding. */
+.handoff {
+  display: flex; align-items: center; gap: var(--s3); margin-bottom: var(--s4);
+  padding: 10px 14px; border: 1px solid var(--hairline-strong); border-radius: var(--r-md);
+  font-size: var(--text-sm); color: var(--muted);
+}
+.handoff .btn { flex: none; }

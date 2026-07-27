@@ -2045,15 +2045,27 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .journal-readers .assist-note { flex: 1 1 auto; }
 
 /* ---------- Avoidance: the eight beats ---------- */
-.beats { display: flex; flex-direction: column; gap: var(--s4); margin: var(--s4) 0; }
-.beat { display: flex; gap: var(--s3); align-items: flex-start; }
+/* A sequence, read top to bottom, with a rule down its left so eight steps
+   read as one run rather than eight loose paragraphs. */
+.beats { display: flex; flex-direction: column; gap: 0; margin: var(--s4) 0; list-style: none; }
+.beat {
+  display: flex; gap: var(--s3); align-items: flex-start;
+  padding: var(--s4) 0 var(--s4) var(--s3);
+  border-left: 1px solid var(--hairline);
+}
+.beat:first-child { padding-top: var(--s2); }
+.beat:last-child { padding-bottom: var(--s2); }
+/* The one beat you do something in, rather than read. */
+.beat-action {
+  background: var(--accent-wash); border-left-color: var(--accent);
+  border-radius: 0 var(--r-md) var(--r-md) 0; padding-right: var(--s4);
+}
+.beat-action .beat-n { border-color: var(--accent); color: var(--accent); }
+.beat-action .beat-h { color: var(--accent); }
 .beat-n {
-  /* Hidden, not deleted: the beats keep their real numbers in the markup for
-     anyone reading it, but on screen 4 sitting under 6 read as a bug. */
-  display: none;
   flex: none; width: 26px; height: 26px; border-radius: 50%;
   border: 1px solid var(--hairline-strong); color: var(--faint);
-  align-items: center; justify-content: center;
+  display: inline-flex; align-items: center; justify-content: center;
   font-family: var(--font-mono); font-size: 0.6875rem; font-weight: 600; margin-top: 1px;
 }
 .beat-body { min-width: 0; }
@@ -2304,7 +2316,4 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 /* The eight beats on a wide screen: two reading columns rather than one narrow
    strip with two thirds of the page empty beside it. The first-action card and
    the buttons stay full width underneath, where the decision belongs. */
-@media (min-width: 1500px) {
-  .coach-facts { max-width: 92rem; }
-  .beats { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s4) var(--s7, 56px); align-items: start; }
-}
+@media (min-width: 1500px) { .coach-facts { max-width: 68rem; } }

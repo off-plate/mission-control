@@ -451,89 +451,90 @@ export function CoachPage() {
 
           {thinking && <div className="empty" style={{ paddingTop: 20 }}>Reading what you wrote.</div>}
 
+          {/* His eight beats, in his order, all eight present. Rendering only the
+              ones the model filled left holes at 4 and 7, and a two-column grid
+              turned 1..8 into a zigzag, so the sequence he wrote was unreadable. */}
           {!thinking && read && (
-            <div className="beats">
-              <div className="beat">
+            <ol className="beats">
+              <li className="beat">
                 <span className="beat-n">1</span>
                 <div className="beat-body">
-                  <span className="beat-h">Name it</span>
+                  <span className="beat-h">Name it out loud</span>
                   <p>{read.naming}</p>
                   {read.absolutes.length > 0 && (
                     <p className="beat-abs">The spiral talks in absolutes. You used: {read.absolutes.map((a) => `“${a}”`).join(', ')}</p>
                   )}
                 </div>
-              </div>
+              </li>
 
-              <div className="beat">
+              <li className="beat">
                 <span className="beat-n">2</span>
                 <div className="beat-body">
-                  <span className="beat-h">The feeling is not the verdict</span>
+                  <span className="beat-h">Separate the feeling from the verdict</span>
                   <p className="beat-feel"><b>Feel this:</b> {read.feeling}</p>
                   <p className="beat-verdict"><b>Do not sign this:</b> {read.verdict}</p>
                 </div>
-              </div>
+              </li>
 
-              <div className="beat">
+              <li className="beat">
                 <span className="beat-n">3</span>
                 <div className="beat-body">
                   <span className="beat-h">Open the actual document</span>
                   <p>{read.document}</p>
                 </div>
-              </div>
+              </li>
 
-              <div className="beat">
+              <li className="beat beat-action">
+                <span className="beat-n">4</span>
+                <div className="beat-body" style={{ width: '100%' }}>
+                  <span className="beat-h">Shrink it to the first physical action</span>
+                  <input className="textinput" style={{ width: '100%', marginTop: 6 }} value={firstStep}
+                    onChange={(e) => setFirstStep(e.target.value)} aria-label="First step" />
+                  <div className="coach-field-inline" style={{ marginTop: 'var(--s2)' }}>
+                    <span>Give it</span>
+                    <input className="textinput" type="number" min={1} max={120} style={{ width: 72 }} value={meta.firstStepMin}
+                      onChange={(e) => setMeta((m) => ({ ...m, firstStepMin: Math.max(1, Number(e.target.value) || 1) }))} aria-label="Minutes" />
+                    <span>min ·</span>
+                    <select className="textinput" value={meta.category} onChange={(e) => setMeta((m) => ({ ...m, category: e.target.value as TaskCategory }))} aria-label="Category">
+                      <option value="call">call</option><option value="admin">admin</option><option value="deep">deep</option><option value="quick">quick</option>
+                    </select>
+                  </div>
+                </div>
+              </li>
+
+              <li className="beat">
                 <span className="beat-n">5</span>
                 <div className="beat-body">
-                  <span className="beat-h">On your terms, not the ambush</span>
+                  <span className="beat-h">Take it on your terms</span>
                   <p>{read.onYourTerms}</p>
                 </div>
-              </div>
+              </li>
 
-              <div className="beat">
+              <li className="beat">
                 <span className="beat-n">6</span>
                 <div className="beat-body">
                   <span className="beat-h">One piece, never the stack</span>
                   <p>{read.nextPiece}</p>
                 </div>
-              </div>
+              </li>
 
-              {read.defer && (
-                <div className="beat">
-                  <span className="beat-n">7</span>
-                  <div className="beat-body">
-                    <span className="beat-h">Not from the bottom</span>
-                    <p>{read.defer}</p>
-                  </div>
+              <li className="beat">
+                <span className="beat-n">7</span>
+                <div className="beat-body">
+                  <span className="beat-h">Do not decide big things from the bottom</span>
+                  <p>{read.defer || 'Nothing here is a decision of that size. If one shows up, it waits for a clear-headed day.'}</p>
                 </div>
-              )}
+              </li>
 
-              {read.who && (
-                <div className="beat">
-                  <span className="beat-n">8</span>
-                  <div className="beat-body">
-                    <span className="beat-h">Do not carry it alone</span>
-                    <p>{read.who}</p>
-                  </div>
+              <li className="beat">
+                <span className="beat-n">8</span>
+                <div className="beat-body">
+                  <span className="beat-h">Do not carry it fully alone</span>
+                  <p>{read.who || 'Say it out loud to one person who knows the terrain. Not for rescue, just so it is not only in your head.'}</p>
                 </div>
-              )}
-            </div>
+              </li>
+            </ol>
           )}
-
-          {!thinking && <div className="coach-field coach-firststep beat-first">
-            <span className="beat-n">4</span>
-            <div className="beat-body" style={{ width: '100%' }}>
-              <span className="coach-field-q">Shrink it to the first physical action</span>
-              <input className="textinput" style={{ width: '100%' }} value={firstStep} onChange={(e) => setFirstStep(e.target.value)} aria-label="First step" />
-              <div className="coach-field-inline" style={{ marginTop: 'var(--s2)' }}>
-                <span>Give it</span>
-                <input className="textinput" type="number" min={1} max={120} style={{ width: 72 }} value={meta.firstStepMin} onChange={(e) => setMeta((m) => ({ ...m, firstStepMin: Math.max(1, Number(e.target.value) || 1) }))} aria-label="Minutes" />
-                <span>min ·</span>
-                <select className="textinput" value={meta.category} onChange={(e) => setMeta((m) => ({ ...m, category: e.target.value as TaskCategory }))} aria-label="Category">
-                  <option value="call">call</option><option value="admin">admin</option><option value="deep">deep</option><option value="quick">quick</option>
-                </select>
-              </div>
-            </div>
-          </div>}
 
           {!thinking && (
             <div className="coach-nav">

@@ -229,9 +229,7 @@ const GENERIC: DecomposedStep[] = [
 
 export function fakeDecompose(goal: string): DecomposedStep[] {
   const hit = LIBRARY.find((l) => l.match.test(goal))
-  const base = hit ? hit.steps : GENERIC
-  const count = 3 + (goal.length % 3)
-  return base.slice(0, Math.max(3, Math.min(base.length, count + 2)))
+  return hit ? hit.steps : GENERIC
 }
 
 /* ---- coach scenarios, canned for the demo ---- */

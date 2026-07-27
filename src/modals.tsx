@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { fakeDecompose, type DecomposedStep } from './mock'
 import { BUFFER } from './estimate'
 import type { Task } from './types'
-import { breakdownTask } from './ai'
+import { breakdownTask, type Detail } from './ai'
 import { useStore } from './store'
 
 export function Sheet({ title, onClose, children, note }: {
@@ -39,11 +39,13 @@ export function BreakdownSheet({ task, onClose }: { task: Task; onClose: () => v
   const [steps, setSteps] = useState<DecomposedStep[] | null>(null)
   const [source, setSource] = useState<'model' | 'local'>('local')
   const [why, setWhy] = useState<string>('')
+  const [detail, setDetail] = useState<Detail>('normal')
 
   useEffect(() => {
     let live = true
+    setBusy(true)
     void (async () => {
-      const r = await breakdownTask(task.title, task.category)
+      const r = await breakdownTask(task.title, task.category, detail)
       if (!live) return
       if (r.ok) {
         setSource('model')
@@ -60,7 +62,7 @@ export function BreakdownSheet({ task, onClose }: { task: Task; onClose: () => v
       setBusy(false)
     })()
     return () => { live = false }
-  }, [task.title, task.category])
+  }, [task.title, task.category, detail])
 
   const total = steps?.reduce((a, s) => a + s.estimateMin, 0) ?? 0
 
@@ -73,6 +75,16 @@ export function BreakdownSheet({ task, onClose }: { task: Task; onClose: () => v
         : `${why} These steps came from a local pattern library instead, so treat them as a starting point.`}
     >
       <p className="sheet-task">{task.title}</p>
+
+      {/* How far down to break it. Some days the shape is enough; some days you
+          need every single move spelled out. */}
+      <div className="seg detail-seg" role="group" aria-label="How detailed">
+        {(['light', 'normal', 'deep'] as Detail[]).map((d) => (
+          <button key={d} aria-pressed={detail === d} onClick={() => setDetail(d)}>
+            {d === 'light' ? 'Just the shape' : d === 'normal' ? 'Normal' : 'Every move'}
+          </button>
+        ))}
+      </div>
 
       {busy && <div className="empty" style={{ paddingTop: 24 }} aria-live="polite">Reading this task and working out the steps.</div>}
 

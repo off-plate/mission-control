@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { SpaceGrid } from './Grid'
 import { MOCK_AGENDA, SPACE_LABELS, exceptionsFor, globalExceptions, momentum } from './exceptions'
 import { MOCK_MONEY, fakeDecompose } from './mock'
@@ -11,6 +11,41 @@ import { estimateFor } from './estimate'
 import { fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, gcalUrl, isEstimated, localDateKey, taskMinutes, toMin } from './util'
 
 /* ---------------- shared bits ---------------- */
+
+/* A field that grows with what you type, up to a ceiling, then scrolls. Dragging
+   a resize grip to see your own sentence is not a thing anyone should be doing. */
+export function AutoTextarea({
+  value, minRows = 3, maxRows = 18, className = '', onChange, ...rest
+}: Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'rows'> & {
+  value: string
+  minRows?: number
+  maxRows?: number
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = 'auto'
+    const cs = getComputedStyle(el)
+    const line = parseFloat(cs.lineHeight) || 20
+    const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
+    const max = line * maxRows + pad
+    el.style.height = `${Math.min(el.scrollHeight, max)}px`
+    el.style.overflowY = el.scrollHeight > max ? 'auto' : 'hidden'
+  }, [value, maxRows])
+
+  return (
+    <textarea
+      {...rest}
+      ref={ref}
+      className={`autogrow ${className}`.trim()}
+      rows={minRows}
+      value={value}
+      onChange={onChange}
+    />
+  )
+}
 
 /* A dropdown that opens upward when there is no room below it. Menus near the
    bottom of the page were opening off-screen with no way to reach the items. */

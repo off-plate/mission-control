@@ -8,7 +8,7 @@ import { analyzeAvoidance, fallbackRead } from './coach'
 import { getAiKey, hasAiKey, readAvoidance, setAiKey, type AvoidanceRead } from './ai'
 import { paymentTaskTitle } from './exceptions'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange, sendSignInCode, signInWithCode, signOutAccount, type Account } from './supabase'
-import { goalCurrent, ON_TRACK_PCT, type CoachFacts, type CoachSession, type TaskCategory } from './types'
+import { goalCurrent, ON_TRACK_PCT, stepSeries, type CoachFacts, type CoachSession, type TaskCategory } from './types'
 
 /* ---------------- MONEY ---------------- */
 
@@ -111,7 +111,7 @@ function SecHead({ label }: { label: string }) {
 }
 
 export function ReviewPage() {
-  const { space, habits, goals, closeReview, review, ledger, focusSessions, habitLog, routineLog, inView } = useStore()
+  const { space, habits, goals, closeReview, review, ledger, focusSessions, habitLog, routineLog, stepLog, routines, records, inView } = useStore()
   const [rangeId, setRangeId] = useState<string>('this-week')
   const [from, setFrom] = useState(localDateKey())
   const [to, setTo] = useState(localDateKey())
@@ -151,6 +151,25 @@ export function ReviewPage() {
   const activeHabits = habits.filter((h) => !h.paused && !h.archivedAt && inView(h.space))
   const spaceGoals = goals.filter((g) => inView(g.space))
   const goalsOnTrack = spaceGoals.filter((g) => goalPace(goalCurrent(g, habits), g.target, g.timeframe ?? 'quarter') !== 'behind').length
+
+  /* One row per step that has ever recorded a number, holding the runs inside
+     this window. The best is all-time on purpose: a personal best does not stop
+     being one because you are looking at a shorter window. */
+  const numberSeries = useMemo(() => {
+    const steps = [...new Set(stepLog.map((e) => `${e.routineId}|${e.stepId}`))]
+    return steps.map((key) => {
+      const [routineId, stepId] = key.split('|')
+      const routine = routines.find((r) => r.id === routineId)
+      const runs = stepSeries(stepLog, routineId, stepId).filter((e) => inRange(e.day, range))
+      return {
+        key,
+        label: routine?.steps.find((s) => s.id === stepId)?.title ?? routine?.title ?? 'A routine step',
+        space: routine?.space,
+        runs,
+        best: records[`${routineId}:${stepId}`] ?? 0,
+      }
+    }).filter((n) => n.runs.length > 0 && inView(n.space))
+  }, [stepLog, routines, records, range, inView])
 
   const live = (review.reflections ?? []).filter((r) => !r.supersededBy)
   const closed = live.find((r) => r.from === range.from && r.to === range.to)
@@ -265,6 +284,31 @@ export function ReviewPage() {
           </div>
         </div>
       </div>
+
+      {/* Numbers a routine step recorded, over the same window as everything
+          else on this page. Looking back at them is a Review job, not something
+          to read while you are still typing the number in. */}
+      {numberSeries.length > 0 && (
+        <>
+          <SecHead label="Numbers" />
+          <div className="panel">
+            <div className="rowlist" style={{ marginTop: 8 }}>
+              {numberSeries.map((n) => (
+                <div className="numrow" key={n.key}>
+                  <span className="grow">{n.label}</span>
+                  <Spark data={n.runs.map((r) => r.value)} width={140} height={26} />
+                  <span className="mono meta">
+                    {n.runs.length === 1
+                      ? `${n.runs[0].value}, once`
+                      : `${n.runs[0].value} to ${n.runs[n.runs.length - 1].value}, ${n.runs.length} runs`}
+                    {n.best > 0 ? `, best ${n.best}` : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       <SecHead label="Everything logged" />
       <div className="panel">

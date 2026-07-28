@@ -2412,3 +2412,15 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 /* A record is a column of short rows, so it gets a rail. Left to fill 2560px the
    title sat at one edge and its number at the other, half a metre apart. */
 .day-page .day-panel, .day-page .empty, .day-page .day-foot { max-width: 940px; }
+/* A number a routine step recorded, over the reviewed window. */
+.numrow { display: flex; align-items: center; gap: var(--s3); min-height: 34px; font-size: var(--text-sm); }
+.numrow .grow { flex: 1 1 auto; min-width: 0; }
+.numrow .meta { flex: none; }
+/* On a phone the label, the line and the figures cannot share one row without
+   the label wrapping to two lines against a squeezed chart. The chart drops
+   to its own line instead. */
+@media (max-width: 560px) {
+  .numrow { flex-wrap: wrap; padding: 6px 0; }
+  .numrow .grow { flex: 1 0 100%; }
+  .numrow svg { order: 3; flex: 1 1 auto; }
+}

@@ -17,7 +17,10 @@ export function Spark({ data, width = 120, height = 32, fluid = false }: { data:
   const min = Math.min(...data)
   const pts = data
     .map((v, i) => {
-      const x = (i / (data.length - 1)) * (width - 4) + 2
+      /* One point divides by zero and emits "NaN,23" into the path, which the
+         browser rejects and the whole line disappears. A single reading sits in
+         the middle: there is no slope to draw yet. */
+      const x = data.length === 1 ? width / 2 : (i / (data.length - 1)) * (width - 4) + 2
       const y = height - 3 - ((v - min) / Math.max(1, max - min)) * (height - 6)
       return `${x.toFixed(1)},${y.toFixed(1)}`
     })

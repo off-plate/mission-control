@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { COACH_SCENARIOS, MOCK_MONEY, MOCK_STATS } from './mock'
 import { AutoTextarea, Band, SpaceMark } from './pages1'
 import { useStore } from './store'
@@ -116,8 +116,8 @@ function SecHead({ label }: { label: string }) {
  * marked. A sparkline in a table row could show none of that, and stretched
  * across a wide monitor it showed less than nothing.
  */
-function NumberChart({ runs, target, unit }: { runs: StepEntry[]; target?: number; unit: string }) {
-  const W = 680, H = 220, L = 44, R = 14, T = 16, B = 30
+function NumberChart({ runs, target, unit, width }: { runs: StepEntry[]; target?: number; unit: string; width: number }) {
+  const W = width, H = 180, L = 40, R = 16, T = 14, B = 30
   const vals = runs.map((r) => r.value)
   const lo = Math.min(...vals, ...(target ? [target] : []))
   const hi = Math.max(...vals, ...(target ? [target] : []))
@@ -158,6 +158,27 @@ function NumberChart({ runs, target, unit }: { runs: StepEntry[]; target?: numbe
         <text x={W - R} y={H - 8} textAnchor="end" className="nc-axis">{fmtWhen(runs[runs.length - 1].day)}</text>
       )}
     </svg>
+  )
+}
+
+/* An SVG at width:100% scales its HEIGHT with its width, so a full-width panel
+   turned a slim chart into a poster. This measures the space it has been given
+   and draws at that exact size, one unit to the pixel: full width, fixed
+   height, and text that never rescales. */
+function ChartArea({ runs, target, unit }: { runs: StepEntry[]; target?: number; unit: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [w, setW] = useState(0)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const ro = new ResizeObserver(([e]) => setW(Math.round(e.contentRect.width)))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  return (
+    <div className="numchart-scroll" ref={ref}>
+      {w > 0 && <NumberChart runs={runs} target={target} unit={unit} width={Math.max(460, w)} />}
+    </div>
   )
 }
 
@@ -370,9 +391,7 @@ export function ReviewPage() {
                     Scrolls rather than shrinks: scaled to a phone's width the
                     whole drawing shrinks with it and every label goes to about
                     four pixels. */}
-                <div className="numchart-scroll">
-                  <NumberChart runs={n.runs} target={n.target} unit={n.unit} />
-                </div>
+                <ChartArea runs={n.runs} target={n.target} unit={n.unit} />
               </div>
             )
           })}

@@ -1896,30 +1896,8 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 /* Typing step: you are chasing a number, not ticking a box. */
 .wpm-row { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s4); flex-wrap: wrap; }
 .wpm-label { font-size: var(--text-sm); color: var(--muted); }
-.wpm-result {
-  display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap;
-  margin-top: var(--s3); padding: var(--s3); border-radius: var(--r-sm);
-  border: 1px solid var(--hairline-strong);
-}
-.wpm-result.pass { border-color: var(--progress); background: var(--progress-wash); }
-.wpm-result.under { border-color: var(--warn); background: var(--warn-wash); }
-.wpm-big { font-size: 1.5rem; font-weight: 700; line-height: 1; }
-.wpm-unit { font-size: 0.625rem; letter-spacing: 0.04em; text-transform: uppercase; margin-left: 4px; color: var(--muted); }
-.wpm-verdict { font-size: var(--text-sm); }
-.wpm-result.pass .wpm-verdict { color: var(--progress); }
-.wpm-result.under .wpm-verdict { color: var(--warn); }
-.wpm-bar { flex: 1 1 100%; height: 4px; border-radius: 2px; background: var(--hairline); overflow: hidden; margin-top: 4px; }
-.wpm-bar > i { display: block; height: 100%; background: currentColor; }
-.wpm-result.pass .wpm-bar > i { background: var(--progress); }
-.wpm-result.under .wpm-bar > i { background: var(--warn); }
-.wpm-best { font-size: var(--text-xs); color: var(--faint); margin-top: var(--s2); }
 /* Every run he has logged, oldest on the left. One accent, no axis, no grid:
    the shape of the climb is the whole point and anything else is furniture. */
-.wpm-series { margin-top: var(--s3); }
-.wpm-bars { display: flex; align-items: flex-end; gap: 3px; height: 44px; }
-.wpm-bars i { flex: 1 1 0; min-width: 3px; background: var(--line); border-radius: 2px 2px 0 0; }
-.wpm-bars i.pass { background: var(--progress); }
-.wpm-series .wpm-best { margin-top: 6px; }
 .mr-check:disabled { cursor: not-allowed; opacity: 0.55; }
 
 /* Mouth stretch: Czech and English as their own blocks, three each. */
@@ -2413,14 +2391,27 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
    title sat at one edge and its number at the other, half a metre apart. */
 .day-page .day-panel, .day-page .empty, .day-page .day-foot { max-width: 940px; }
 /* A number a routine step recorded, over the reviewed window. */
-.numrow { display: flex; align-items: center; gap: var(--s3); min-height: 34px; font-size: var(--text-sm); }
-.numrow .grow { flex: 1 1 auto; min-width: 0; }
-.numrow .meta { flex: none; }
 /* On a phone the label, the line and the figures cannot share one row without
    the label wrapping to two lines against a squeezed chart. The chart drops
    to its own line instead. */
 @media (max-width: 560px) {
-  .numrow { flex-wrap: wrap; padding: 6px 0; }
-  .numrow .grow { flex: 1 0 100%; }
-  .numrow svg { order: 3; flex: 1 1 auto; }
 }
+
+/* ---------- a measured number over time ---------- */
+/* A chart, not a sparkline: dated axis, real spread, and the target drawn as a
+   line you can see yourself crossing. Capped in width, because a graph stretched
+   across a wide monitor flattens every slope it is meant to show. */
+.numpanel { max-width: 1100px; margin-bottom: var(--s4); }
+.numpanel-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3); flex-wrap: wrap; }
+.numpanel-title { font-size: var(--text-md); font-weight: 600; }
+.numpanel-fig { font-size: var(--text-xs); color: var(--muted); }
+.numchart-scroll { overflow-x: auto; margin-top: var(--s3); }
+.numchart { display: block; width: 100%; min-width: 520px; height: auto; overflow: visible; }
+.nc-grid { stroke: var(--hairline); stroke-width: 1; }
+.nc-axis { font-size: 11px; fill: var(--faint); font-family: var(--font-mono); }
+.nc-target { stroke: var(--progress); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: 0.85; }
+.nc-target-lab { font-size: 11px; fill: var(--progress); font-family: var(--font-mono); }
+.nc-line { stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.nc-dot { fill: var(--surface); stroke: var(--ink); stroke-width: 2; }
+.nc-dot.pass { fill: var(--progress); stroke: var(--progress); }
+.nc-val { font-size: 11px; fill: var(--muted); font-family: var(--font-mono); }

@@ -5,6 +5,7 @@ import { GoalsPage, HabitsPage, PlanPage, RoutinesPage, TodayPage } from './page
 import { CoachPage, MoneyPage, ReviewPage, SettingsPage } from './pages2'
 import { AssistantPage, BrainDumpPage } from './pages3'
 import { BrandPage } from './brand'
+import { DayPage } from './day'
 import { useStore } from './store'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange } from './supabase'
 import { isReadOnly } from './store'
@@ -175,6 +176,7 @@ export default function App() {
         {page === 'braindump' && <BrainDumpPage />}
         {page === 'settings' && <SettingsPage />}
         {page === 'brand' && <BrandPage />}
+        {page === 'day' && <DayPage />}
         </PageBoundary>
       </main>
 

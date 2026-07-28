@@ -154,10 +154,10 @@ const FinanceBody = memo(function FinanceBody() {
 
 const HabitsBody = memo(function HabitsBody({ space }: { space: SpaceId }) {
   const { habits, routines, toggleHabitDay, setPage, todayIndex, inView } = useStore()
-  const active = habits.filter((h) => inView(h.space) && !h.paused)
+  const active = habits.filter((h) => inView(h.space) && !h.paused && !h.archivedAt)
   /* A habit a routine drives is a read-out here too. Ticking it by hand looked
      like it worked and was reverted on the next load. */
-  const driven = new Map(routines.filter((r) => r.habitId).map((r) => [r.habitId as string, r.title]))
+  const driven = new Map(routines.filter((r) => r.habitId && !r.archivedAt).map((r) => [r.habitId as string, r.title]))
   return (
     <div className="habit-chips">
       {active.map((h) => (

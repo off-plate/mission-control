@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { SUPABASE_ENABLED, deleteRemoteState, saveRemoteState } from './supabase'
+import { roll } from './roll'
 import { dayIndexOf, dayOfWeekKey, goalPeriodKey, goalPeriodRange, isoWeekKey, localDateKey, periodIsPast, periodKeyFor, slotForTime, type GoalTf } from './util'
 import {
   DEFAULT_SPACES,
@@ -18,8 +19,10 @@ import { isSpace } from './types'
 import type {
   ViewId,
   FocusSession,
+  HabitSlip,
   HabitTick,
   RoutineDone,
+  StepEntry,
   RoutineCadence,
   AssistantEntry,
   CoachFacts,
@@ -83,6 +86,12 @@ interface PersistedState {
   habitLog?: HabitTick[]
   /** Every day a routine was finished, dated. */
   routineLog?: RoutineDone[]
+  /** Every day he slipped on a habit he is quitting, dated. */
+  slips?: HabitSlip[]
+  /** Every number a routine step recorded, dated. `records` keeps only the best. */
+  stepLog?: StepEntry[]
+  /** The last day the rollover ran. Everything after it is unsealed. */
+  lastRollDay?: string
   /** How many rows had no space and were filed as Personal on migration. */
   spaceGuessed?: number
 }
@@ -103,6 +112,9 @@ interface Store extends PersistedState {
   inView: (s?: SpaceId) => boolean
   page: PageId
   setPage: (p: PageId) => void
+  /** The day being looked back at, when the route names one. */
+  dayKey: string | null
+  openDay: (iso: string) => void
   editing: boolean
   setEditing: (v: boolean) => void
   focusTaskId: string | null
@@ -197,6 +209,9 @@ interface Store extends PersistedState {
   /** Every dated habit tick and routine completion. The record days[] caches. */
   habitLog: HabitTick[]
   routineLog: RoutineDone[]
+  /** Every dated slip, and every dated number a routine step recorded. */
+  slips: HabitSlip[]
+  stepLog: StepEntry[]
 
   ideas: Idea[]
   addIdea: (text: string, color: string) => void
@@ -259,6 +274,24 @@ function loadPersisted(): PersistedState | null {
       }
       p.habitLog = ticks
     }
+    /* The one date each quit habit was carrying becomes the first record in its
+       slip history. Everything after it is appended rather than overwriting. */
+    if (!p.slips) {
+      p.slips = (p.habits ?? [])
+        .filter((h) => h.kind === 'break' && h.lastSlip)
+        .map((h) => ({ habitId: h.id, day: h.lastSlip as string }))
+    }
+    if (!p.stepLog) {
+      /* What is in stepData belongs to the period it was recorded in, and the
+         only date that period gives us for certain is a daily one. A weekly or
+         monthly routine's current number has no day, so it starts the series
+         from the next one he logs rather than inventing a date for it. */
+      p.stepLog = (p.routines ?? []).flatMap((r) =>
+        r.cadence === 'weekly' || r.cadence === 'monthly' || !r.periodKey
+          ? []
+          : Object.entries(r.stepData ?? {}).map(([stepId, value]) => ({ routineId: r.id, stepId, day: r.periodKey as string, value })),
+      )
+    }
     if (!p.routineLog) {
       // A routine that is currently complete carries the day it was completed.
       p.routineLog = (p.routines ?? [])
@@ -266,13 +299,6 @@ function loadPersisted(): PersistedState | null {
         .map((r) => ({ routineId: r.id, day: r.completedOn as string, periodKey: r.periodKey ?? periodKeyFor(r.cadence) }))
     }
 
-    if (p.weekKey && p.weekKey !== wk) {
-      p.habits = p.habits.map((h) => ({
-        ...h,
-        history: [...(h.history ?? []).slice(-11), h.days.filter(Boolean).length],
-        days: [false, false, false, false, false, false, false],
-      }))
-    }
     /* A row written before spaces existed has no space, which used to mean it
        counted everywhere. Stamp it once, and record that it was a guess rather
        than something he chose, so the number is at least in one place only. */
@@ -286,38 +312,10 @@ function loadPersisted(): PersistedState | null {
       if (guessed) p.spaceGuessed = (p.spaceGuessed ?? 0) + guessed
     }
 
-    /* THE DAY ROLLS OVER. Today's list has to mean today. Nothing ever cleared
-       it, so a task moved to today stayed there for good and finished ones sat
-       struck through underneath forever: a plan from forty days ago was still
-       "today".
-
-       Unfinished work goes back to the list rather than following him into the
-       new day. Re-choosing it is the whole point of planning a day, and silently
-       re-planning it is how the pile formed in the first place. Nothing is lost:
-       it is in the list, and Plan says how many came back so it is not a silent
-       disappearance. Finished work leaves the day list and lives in the ledger,
-       which already carries its date. */
-    {
-      const today = localDateKey()
-      const returned: string[] = []
-      p.tasks = (p.tasks ?? []).map((t) => {
-        if (t.list !== 'today') return t
-        // A task with no stamp predates this rule; treat it as planned today so
-        // an upgrade does not sweep his current list out from under him.
-        const on = t.plannedOn ?? today
-        if (on === today) return { ...t, plannedOn: on }
-        if (t.done) return { ...t, list: 'backlog' as const, plannedOn: undefined }
-        returned.push(t.id)
-        return { ...t, list: 'backlog' as const, plannedOn: undefined, slot: undefined, at: undefined }
-      })
-      p.plan = {
-        ...(p.plan ?? { committedDate: null, firstMoveId: null }),
-        // Yesterday's first move is not today's.
-        firstMoveId: p.plan?.committedDate === today ? p.plan.firstMoveId : null,
-        returnedOn: returned.length ? today : p.plan?.returnedOn,
-        returnedCount: returned.length ? returned.length : (p.plan?.returnedOn === today ? p.plan?.returnedCount : 0),
-      }
-    }
+    /* Everything that has to happen because time passed happens in one place,
+       walking from the day it last ran. Each of these used to be its own "is the
+       saved week this week?" test, each firing once no matter how long the gap. */
+    roll(p)
 
     /* A goal whose period has ended stops counting and keeps the number it
        finished on. Nothing is deleted: it moves to the past, where he can look
@@ -376,7 +374,7 @@ function loadPersisted(): PersistedState | null {
        the next reload, or asserted for a routine he had not finished. */
     const savedRoutines = p.routines ?? []
     const drivenNow = new Map(
-      savedRoutines.filter((r) => r.habitId).map((r) => {
+      savedRoutines.filter((r) => r.habitId && !r.archivedAt).map((r) => {
         const complete = routineComplete(r, periodKeyFor(r.cadence))
         return [r.habitId as string, { complete, on: complete ? (r.completedOn ?? localDateKey()) : null }]
       }),
@@ -410,10 +408,14 @@ function loadPersisted(): PersistedState | null {
   }
 }
 
-function pageFromHash(): PageId {
+/* One route carries an argument: a past day. '#/day/2026-07-14' is a real
+   address, so a date anywhere in the app can simply link to the day it names. */
+function routeFromHash(): { page: PageId; day: string | null } {
   const h = location.hash.replace('#/', '')
+  const m = h.match(/^day\/(\d{4}-\d{2}-\d{2})$/)
+  if (m) return { page: 'day', day: m[1] }
   const pages: PageId[] = ['today', 'plan', 'assistant', 'habits', 'routines', 'goals', 'money', 'review', 'coach', 'stats', 'settings', 'brand', 'braindump']
-  return (pages as string[]).includes(h) ? (h as PageId) : 'today'
+  return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
 }
 
 /* Ids must survive reloads without colliding: a plain counter restarts at the
@@ -479,7 +481,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [focusSessions, setFocusSessions] = useState<FocusSession[]>(persisted?.focusSessions ?? [])
   const [habitLog, setHabitLog] = useState<HabitTick[]>(persisted?.habitLog ?? [])
   const [routineLog, setRoutineLog] = useState<RoutineDone[]>(persisted?.routineLog ?? [])
+  const [slips, setSlips] = useState<HabitSlip[]>(persisted?.slips ?? [])
+  const [stepLog, setStepLog] = useState<StepEntry[]>(persisted?.stepLog ?? [])
   const [spaceGuessed] = useState<number>(persisted?.spaceGuessed ?? 0)
+  const [lastRollDay] = useState<string | undefined>(persisted?.lastRollDay)
   /* The last thing you deleted, held long enough to take it back. Deliberately
      not persisted: a delete you can still undo after a reload is not a delete. */
   const [undoable, setUndoable] = useState<Undoable | null>(null)
@@ -509,7 +514,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
      Personal AND Work AND Off-Plate and every time-saved figure was wrong. Rows
      written before spaces existed are stamped on load instead. */
   const inView = (s?: SpaceId) => view === 'all' || s === view
-  const [page, setPageState] = useState<PageId>(pageFromHash)
+  const [route, setRoute] = useState(routeFromHash)
+  const { page, day: dayKey } = route
+  const setPageState = (p: PageId) => setRoute({ page: p, day: null })
   const [editing, setEditing] = useState(false)
   const [focusTaskId, setFocusTaskId] = useState<string | null>(null)
   const [coachOpen, setCoachOpen] = useState<string | null>(null)
@@ -534,14 +541,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    const onHash = () => setPageState(pageFromHash())
+    const onHash = () => setRoute(routeFromHash())
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
   const setPage = (p: PageId) => {
     location.hash = `/${p}`
-    setPageState(p)
+    setRoute({ page: p, day: null })
+    window.scrollTo({ top: 0 })
+  }
+  /** Open one day of the record. Today goes to Today, which is the live one. */
+  const openDay = (iso: string) => {
+    if (iso === todayKey()) { setPage('today'); return }
+    location.hash = `/day/${iso}`
+    setRoute({ page: 'day', day: iso })
     window.scrollTo({ top: 0 })
   }
 
@@ -552,7 +566,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const state: PersistedState = {
       version: 3, spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
       weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
-      habitLog, routineLog, spaceGuessed,
+      habitLog, routineLog, slips, stepLog, spaceGuessed, lastRollDay: lastRollDay ?? localDateKey(),
     }
     const json = JSON.stringify(state)
     latestJson.current = json
@@ -566,7 +580,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { void saveRemoteState(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, records, removedSeeds, focusSessions, habitLog, routineLog])
+  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog])
 
   /* Closing the tab inside the debounce window must not lose the last change:
      flush the pending remote write the moment the page starts hiding. */
@@ -652,7 +666,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const value: Store = {
     version: 3,
     spaces, tasks, habits, goals, ledger, social, sources, plan, review, routines, ideas,
-    focusSessions, habitLog, routineLog,
+    focusSessions, habitLog, routineLog, slips, stepLog,
     view, setView, inView,
     /* A finished block is recorded once, and everything that cares reads from
        here: measured habits fill from it, and the ledger gets it so focus time
@@ -670,7 +684,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ])
     },
     space, setSpace,
-    page, setPage,
+    page, setPage, dayKey, openDay,
     editing, setEditing,
     focusTaskId, setFocusTaskId,
     coachOpen, setCoachOpen,
@@ -822,14 +836,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         quitSince: input.kind === 'break' ? (input.quitSince ?? todayKey()) : undefined,
         days: [false, false, false, false, false, false, false], paused: false,
       }]),
-    logSlip: (id) => setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, lastSlip: todayKey() } : h))),
+    /* A slip is a dated record, appended. It used to overwrite one field, so the
+       second slip erased the first and the clean run before it went with it.
+       Saying it out loud is hard enough without it also being irreversible, so
+       it can be taken back like any other change. */
+    logSlip: (id) => {
+      const day = todayKey()
+      if (slips.some((s) => s.habitId === id && s.day === day)) return
+      const before = slips
+      setSlips((prev) => [...prev, { habitId: id, day }])
+      armUndo('Slip logged for today', () => setSlips(before))
+    },
     updateHabit: (id, patch) => setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, ...patch } : h))),
     togglePauseHabit: (id) =>
       setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, paused: !h.paused } : h))),
+    /* Retired, not erased. Removing the row removed the only thing that could
+       name its ticks, so a hundred days of a habit he stopped became a hundred
+       orphan records: still on disk, unreadable, and gone from every day he
+       looked back at. It comes off the page; its history stays legible. */
     deleteHabit: (id) => {
       const beforeH = habits, beforeSeeds = removedSeeds
       const gone = habits.find((h) => h.id === id)
-      setHabits((prev) => prev.filter((h) => h.id !== id))
+      setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, archivedAt: todayKey() } : h)))
       setRemovedSeeds((prev) => (prev.includes(id) ? prev : [...prev, id]))
       armUndo(gone ? `Deleted "${gone.name}"` : 'Habit deleted', () => {
         setHabits(beforeH); setRemovedSeeds(beforeSeeds)
@@ -932,7 +960,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return {
           ...prev,
           lastDoneDate: isThisWeek ? todayKey() : prev.lastDoneDate,
-          lastWeekKey: isThisWeek ? isoWeekKey() : prev.lastWeekKey,
           wins: isThisWeek ? wins : prev.wins,
           outcomes: isThisWeek ? outcomes : prev.outcomes,
           // No cap. This is a handful of sentences a week, and it is his writing.
@@ -1051,6 +1078,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           : !passes ? r.doneStepIds.filter((x) => x !== stepId) : r.doneStepIds
         return { ...r, stepData, doneStepIds }
       })
+      /* The number goes on the record with its date. stepData holds only the
+         current period and records only the all-time maximum, so every score
+         between the first one and the best one was thrown away and no
+         progression could be drawn. The latest entry for a day replaces it. */
+      const day = todayKey()
+      setStepLog((prev) => [...prev.filter((e) => !(e.routineId === routineId && e.stepId === stepId && e.day === day)), { routineId, stepId, day, value }])
       const key = `${routineId}:${stepId}`
       setRecords((prev) => (value > (prev[key] ?? 0) ? { ...prev, [key]: value } : prev))
     },
@@ -1083,10 +1116,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       armUndo(r ? `Deleted "${r.title}"` : 'Routine deleted', () => {
         setRoutines(beforeR); setHabits(beforeH); setGoals(beforeG); setRemovedSeeds(beforeSeeds)
       })
-      setRoutines((prev) => prev.filter((x) => x.id !== id))
+      setRoutines((prev) => prev.map((x) => (x.id === id ? { ...x, archivedAt: todayKey() } : x)))
       if (r?.habitId) {
         const hid = r.habitId
-        setHabits((hs) => hs.filter((h) => h.id !== hid))
+        setHabits((hs) => hs.map((h) => (h.id === hid ? { ...h, archivedAt: todayKey() } : h)))
         /* A goal counting off that habit keeps the progress it earned and goes
            back to being logged by hand, rather than pointing at nothing and
            freezing forever. */

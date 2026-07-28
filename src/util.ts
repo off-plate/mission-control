@@ -199,6 +199,46 @@ export function periodKeyFor(cadence: RoutineCadence, d = new Date()): string {
   return localDateKey(d) // daily and prework reset every day
 }
 
+/**
+ * The chances a routine had to be finished inside a window, one entry per period
+ * it actually runs on. Drawing one square a day for a WEEKLY routine reported six
+ * misses out of every seven, which is not a miss at all: those days were never
+ * asked for. A weekly routine gets one square a week, a monthly one a month.
+ */
+export function routinePeriods(cadence: RoutineCadence, days: number, now = new Date()): { key: string; from: string; to: string; label: string }[] {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const start = shift(today, -(days - 1))
+  const out: { key: string; from: string; to: string; label: string }[] = []
+  if (cadence === 'weekly') {
+    for (const cur = mondayOf(start); cur <= today; cur.setDate(cur.getDate() + 7)) {
+      const sun = shift(cur, 6)
+      out.push({ key: isoWeekKey(cur), from: iso(cur), to: iso(sun), label: `week of ${fmtDayShort(cur)}` })
+    }
+    return out
+  }
+  if (cadence === 'monthly') {
+    for (const cur = new Date(start.getFullYear(), start.getMonth(), 1); cur <= today; cur.setMonth(cur.getMonth() + 1)) {
+      const key = monthKey(cur)
+      const last = new Date(cur.getFullYear(), cur.getMonth() + 1, 0)
+      out.push({ key, from: iso(cur), to: iso(last), label: monthName(key) })
+    }
+    return out
+  }
+  // Daily and prework both reset every day, so every day is its own chance.
+  for (let i = 0; i < days; i++) {
+    const d = shift(start, i)
+    out.push({ key: iso(d), from: iso(d), to: iso(d), label: fmtWhen(iso(d)) })
+  }
+  return out
+}
+
+/** What one period of a routine is called, for reading a count against it. */
+export function periodNoun(cadence: RoutineCadence, n: number): string {
+  if (cadence === 'weekly') return n === 1 ? 'week' : 'weeks'
+  if (cadence === 'monthly') return n === 1 ? 'month' : 'months'
+  return n === 1 ? 'day' : 'days'
+}
+
 /** Render a stored ISO date (or legacy label) as a short human string. */
 export function fmtWhen(when: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(when)) return when

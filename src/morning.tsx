@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from './store'
 import { FALLBACK_NEWS, PER_LANG, loadMorningNews, twistersForDay, type MorningNews } from './morning-data'
-import { TYPING_TARGET_WPM, type Routine } from './types'
+import { TYPING_TARGET_WPM, stepSeries, type Routine, type StepEntry } from './types'
+import { fmtWhen } from './util'
 
 /* The Morning routine as a guided, foldable accordion. Every step starts collapsed;
    you open one to work through it and check it off yourself with the checkbox, same
@@ -176,13 +177,14 @@ function MouthStretch() {
 /* ---- Typing ----
    This step is not "did you open it", it is "did you hit the number". You log
    the speed you actually got; the step only checks off at the target. */
-function Typing({ url, label, routineId, stepId, wpm, best, onLog }: {
+function Typing({ url, label, stepId, wpm, best, series, onLog }: {
   url?: string
   label?: string
-  routineId: string
   stepId: string
   wpm?: number
   best?: number
+  /** Every score he has logged on this step, oldest first. */
+  series: StepEntry[]
   onLog: (v: number) => void
 }) {
   const [entry, setEntry] = useState('')
@@ -223,7 +225,29 @@ function Typing({ url, label, routineId, stepId, wpm, best, onLog }: {
           <div className="wpm-bar"><i style={{ width: `${Math.min(100, Math.round((wpm / TYPING_TARGET_WPM) * 100))}%` }} /></div>
         </div>
       )}
-      {best != null && best > 0 && (
+      {/* Every run he has logged, oldest on the left. The all-time best was the
+          only number that survived a rollover, so the whole climb up to it was
+          invisible: one score and a maximum say nothing about whether you are
+          getting faster. */}
+      {series.length > 1 && (
+        <div className="wpm-series">
+          <div className="wpm-bars" role="img" aria-label={`${series.length} runs logged, from ${series[0].value} to ${series[series.length - 1].value} WPM`}>
+            {series.slice(-24).map((e) => (
+              <i
+                key={e.day}
+                className={e.value >= TYPING_TARGET_WPM ? 'pass' : ''}
+                style={{ height: `${Math.max(6, Math.min(100, Math.round((e.value / Math.max(TYPING_TARGET_WPM, ...series.map((x) => x.value))) * 100)))}%` }}
+                title={`${fmtWhen(e.day)}: ${e.value} WPM`}
+              />
+            ))}
+          </div>
+          <p className="wpm-best mono">
+            {series.length} runs, {series[0].value} to {series[series.length - 1].value} WPM
+            {best != null && best > 0 ? `, best ${best}` : ''}
+          </p>
+        </div>
+      )}
+      {series.length <= 1 && best != null && best > 0 && (
         <p className="wpm-best mono">best so far {best} WPM</p>
       )}
     </div>
@@ -251,7 +275,7 @@ function GoalsReminder({ note }: { note?: string }) {
 }
 
 export function MorningRoutine({ routine, onEdit }: { routine: Routine; onEdit?: () => void }) {
-  const { toggleRoutineStep, resetRoutine, setStepData, records } = useStore()
+  const { toggleRoutineStep, resetRoutine, setStepData, records, stepLog } = useStore()
   const steps = routine.steps
   const done = routine.doneStepIds
   const [open, setOpen] = useState<string>('') // everything collapsed until you open a step
@@ -284,8 +308,9 @@ export function MorningRoutine({ routine, onEdit }: { routine: Routine; onEdit?:
     if (stepId === 'mr5') return <GoalsReminder note={s.note} />
     if (stepId === 'mr4') return (
       <Typing
-        url={s.link} label={s.linkLabel} routineId={routine.id} stepId="mr4"
+        url={s.link} label={s.linkLabel} stepId="mr4"
         wpm={typingWpm} best={records[`${routine.id}:mr4`]}
+        series={stepSeries(stepLog, routine.id, 'mr4')}
         onLog={(v) => {
           // Hitting the target is the completion; the store does both at once.
           setStepData(routine.id, 'mr4', v)

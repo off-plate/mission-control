@@ -148,7 +148,7 @@ export function ReviewPage() {
   const blocks = focusSessions.filter((f) => inView(f.space) && inRange(f.day, range))
   const focusMin = blocks.reduce((a, f) => a + f.minutes, 0)
 
-  const activeHabits = habits.filter((h) => !h.paused && inView(h.space))
+  const activeHabits = habits.filter((h) => !h.paused && !h.archivedAt && inView(h.space))
   const spaceGoals = goals.filter((g) => inView(g.space))
   const goalsOnTrack = spaceGoals.filter((g) => goalPace(goalCurrent(g, habits), g.target, g.timeframe ?? 'quarter') !== 'behind').length
 

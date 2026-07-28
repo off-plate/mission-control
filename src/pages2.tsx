@@ -137,18 +137,13 @@ function NumberChart({ runs, target, unit }: { runs: StepEntry[]; target?: numbe
           <text x={L - 8} y={y(t) + 4} textAnchor="end" className="nc-axis">{Math.round(t)}</text>
         </g>
       ))}
-      {target != null && (
-        <>
-          <line x1={L} y1={y(target)} x2={W - R} y2={y(target)} className="nc-target" />
-          <text x={L + 4} y={y(target) - 6} className="nc-target-lab">{target} {unit} target</text>
-        </>
-      )}
+      {target != null && <line x1={L} y1={y(target)} x2={W - R} y2={y(target)} className="nc-target" />}
       {runs.length > 1 && (
         <polyline className="nc-line" fill="none"
           points={runs.map((r, i) => `${x(i).toFixed(1)},${y(r.value).toFixed(1)}`).join(' ')} />
       )}
       {runs.map((r, i) => (
-        <g key={r.day}>
+        <g key={`${r.at ?? r.day}${i}`}>
           <circle cx={x(i)} cy={y(r.value)} r={4} className={`nc-dot${target != null && r.value >= target ? ' pass' : ''}`}>
             <title>{`${fmtWhen(r.day)}: ${r.value} ${unit}`}</title>
           </circle>
@@ -158,7 +153,8 @@ function NumberChart({ runs, target, unit }: { runs: StepEntry[]; target?: numbe
         </g>
       ))}
       <text x={L} y={H - 8} className="nc-axis">{fmtWhen(runs[0].day)}</text>
-      {runs.length > 1 && (
+      {/* Several runs on one day would print the same date at both ends. */}
+      {runs[0].day !== runs[runs.length - 1].day && (
         <text x={W - R} y={H - 8} textAnchor="end" className="nc-axis">{fmtWhen(runs[runs.length - 1].day)}</text>
       )}
     </svg>
@@ -355,6 +351,12 @@ export function ReviewPage() {
               <div className="panel numpanel" key={n.key}>
                 <div className="numpanel-head">
                   <span className="numpanel-title">{n.label}</span>
+                  {n.target != null && (
+                    <span className="numpanel-legend">
+                      <svg width="22" height="6" aria-hidden="true"><line x1="0" y1="3" x2="22" y2="3" className="nc-target" /></svg>
+                      {n.target} {n.unit} target
+                    </span>
+                  )}
                   <span className="numpanel-fig mono">
                     {n.runs.length > 1
                       ? `${n.runs.length} runs, ${n.runs[0].value} to ${last.value} ${n.unit}`
@@ -362,12 +364,22 @@ export function ReviewPage() {
                     {n.best > 0 ? `, best ${n.best}` : ''}
                   </span>
                 </div>
-                {/* Scrolls rather than shrinks. Scaled down to a phone's width
-                    the whole drawing shrinks with it, and every label goes to
-                    about four pixels. */}
-                <div className="numchart-scroll">
-                  <NumberChart runs={n.runs} target={n.target} unit={n.unit} />
-                </div>
+                {/* One reading is not a graph. Drawing the axes around it gave a
+                    half-metre of empty chart with a dot floating in the middle
+                    and a y axis invented out of nothing. It says the number and
+                    waits for a second run. */}
+                {n.runs.length < 2 ? (
+                  <p className="numpanel-one">
+                    One run so far{n.target != null ? `, ${last.value >= n.target ? 'over' : `${n.target - last.value} short of`} the ${n.target} ${n.unit} target` : ''}. The line starts at two.
+                  </p>
+                ) : (
+                  /* Scrolls rather than shrinks: scaled to a phone's width the
+                     whole drawing shrinks with it and every label goes to about
+                     four pixels. */
+                  <div className="numchart-scroll">
+                    <NumberChart runs={n.runs} target={n.target} unit={n.unit} />
+                  </div>
+                )}
               </div>
             )
           })}

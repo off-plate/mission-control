@@ -124,7 +124,7 @@ function NumberChart({ runs, target, unit }: { runs: StepEntry[]; target?: numbe
   // A flat series still needs a band to sit in, or every point lands on one line.
   const pad = Math.max(4, Math.round((hi - lo) * 0.15))
   const yMin = Math.max(0, lo - pad), yMax = hi + pad
-  const x = (i: number) => (runs.length === 1 ? (L + W - R) / 2 : L + (i / (runs.length - 1)) * (W - L - R))
+  const x = (i: number) => (runs.length === 1 ? L : L + (i / (runs.length - 1)) * (W - L - R))
   const y = (v: number) => T + (1 - (v - yMin) / Math.max(1, yMax - yMin)) * (H - T - B)
   const ticks = [yMax, Math.round((yMax + yMin) / 2), yMin]
 
@@ -364,22 +364,15 @@ export function ReviewPage() {
                     {n.best > 0 ? `, best ${n.best}` : ''}
                   </span>
                 </div>
-                {/* One reading is not a graph. Drawing the axes around it gave a
-                    half-metre of empty chart with a dot floating in the middle
-                    and a y axis invented out of nothing. It says the number and
-                    waits for a second run. */}
-                {n.runs.length < 2 ? (
-                  <p className="numpanel-one">
-                    One run so far{n.target != null ? `, ${last.value >= n.target ? 'over' : `${n.target - last.value} short of`} the ${n.target} ${n.unit} target` : ''}. The line starts at two.
-                  </p>
-                ) : (
-                  /* Scrolls rather than shrinks: scaled to a phone's width the
-                     whole drawing shrinks with it and every label goes to about
-                     four pixels. */
-                  <div className="numchart-scroll">
-                    <NumberChart runs={n.runs} target={n.target} unit={n.unit} />
-                  </div>
-                )}
+                {/* Always drawn, from the first run. A chart with one point on
+                    it is the start of the chart; replacing it with a sentence
+                    means the graph only appears once you no longer need telling.
+                    Scrolls rather than shrinks: scaled to a phone's width the
+                    whole drawing shrinks with it and every label goes to about
+                    four pixels. */}
+                <div className="numchart-scroll">
+                  <NumberChart runs={n.runs} target={n.target} unit={n.unit} />
+                </div>
               </div>
             )
           })}

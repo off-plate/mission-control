@@ -842,16 +842,6 @@ export function PlanPage() {
             {loggedAny && <span className={`col-tot mono ${savedToday >= 0 ? 'val-pos' : 'val-urgent'}`}>{savedToday >= 0 ? '+' : ''}{savedToday}m saved</span>}
             <span className="col-tot mono">{fmtDuration(plannedMin)} planned</span>
           </div>
-          {anytimeRoutines.length > 0 && (
-            <div className="bucket rod-bucket">
-              <div className="bucket-head">
-                <span className="bucket-name">On repeat</span>
-              </div>
-              {anytimeRoutines.map((r) => (
-                <RoutineOnDay key={r.id} routine={r} habitName={habits.find((h) => h.id === r.habitId)?.name} />
-              ))}
-            </div>
-          )}
           {BUCKETS.map((b) => {
             // A finished task is not waiting to be scheduled, so it drops out of
             // Unsorted and joins the done group at the bottom.
@@ -860,6 +850,17 @@ export function PlanPage() {
             // waiting to be dragged into a time.
             const mine = b.id === 'unsorted' ? [] : dueRoutines.filter((r) => routineSlot(r) === b.id)
             if (b.id === 'unsorted' && inBucket.length === 0) return null
+            /* One ordered list: what is still to do first, his own work ahead of
+               the repeats, and everything finished sunk to the bottom. A ticked
+               task sitting between two open ones is the list telling him he has
+               work above AND below something already handled. */
+            const rDone = (r: Routine) => r.steps.length > 0 && r.doneStepIds.length === r.steps.length
+            const items = [
+              ...inBucket.filter((x) => !x.done).map((task) => ({ kind: 'task' as const, task })),
+              ...mine.filter((r) => !rDone(r)).map((routine) => ({ kind: 'repeat' as const, routine })),
+              ...inBucket.filter((x) => x.done).map((task) => ({ kind: 'task' as const, task })),
+              ...mine.filter(rDone).map((routine) => ({ kind: 'repeat' as const, routine })),
+            ]
             const tot = inBucket.filter((t) => !t.done).reduce((a, t) => a + taskMinutes(t), 0)
             return (
               <div
@@ -873,13 +874,15 @@ export function PlanPage() {
                   <span className="bucket-name">{b.label}</span>
                   {tot > 0 && <span className="tot mono">{fmtDuration(tot)}</span>}
                 </div>
-                {mine.map((r) => (
-                  <RoutineOnDay key={r.id} routine={r} habitName={habits.find((h) => h.id === r.habitId)?.name} />
-                ))}
-                {inBucket.length === 0 && mine.length === 0 ? (
+                {items.length === 0 ? (
                   <p className="bucket-empty">Drop a task here.</p>
-                ) : inBucket.length === 0 ? null : (
-                  inBucket.map((t) => {
+                ) : (
+                  items.map((it) => {
+                    if (it.kind === 'repeat') {
+                      const r = it.routine
+                      return <RoutineOnDay key={r.id} routine={r} habitName={habits.find((h) => h.id === r.habitId)?.name} />
+                    }
+                    const t = it.task
                     const isExp = expanded.has(t.id)
                     const hasSubs = !!t.subtasks?.length
                     const doneSubs = t.subtasks?.filter((s) => s.done).length ?? 0
@@ -994,6 +997,16 @@ export function PlanPage() {
               </div>
             )
           })}
+          {anytimeRoutines.length > 0 && (
+            <div className="bucket rod-bucket">
+              <div className="bucket-head">
+                <span className="bucket-name">On repeat</span>
+              </div>
+              {anytimeRoutines.map((r) => (
+                <RoutineOnDay key={r.id} routine={r} habitName={habits.find((h) => h.id === r.habitId)?.name} />
+              ))}
+            </div>
+          )}
           {/* Finished-but-unscheduled work, kept visible without asking to be planned. */}
           {doneUnsorted.length > 0 && (
             <div className="done-group">

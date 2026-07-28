@@ -2406,7 +2406,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
    wide a 680x220 chart renders 480px tall, which is what made it look like a
    poster. Fixed drawing, whatever the panel does. */
 .numpanel { margin-bottom: var(--s4); }
-.numpanel-legend { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); color: var(--progress); }
 .numpanel-head { display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap; }
 .numpanel-head .numpanel-fig { margin-left: auto; }
 .numpanel-title { font-size: var(--text-md); font-weight: 600; }
@@ -2416,7 +2415,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .nc-grid { stroke: var(--hairline); stroke-width: 1; }
 .nc-axis { font-size: 11px; fill: var(--faint); font-family: var(--font-mono); }
 .nc-target { stroke: var(--progress); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: 0.85; }
-.nc-target-lab { font-size: 11px; fill: var(--progress); font-family: var(--font-mono); }
+.nc-target-lab { font-size: 11px; fill: var(--progress); font-family: var(--font-mono); font-weight: 600; }
 .nc-line { stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .nc-dot { fill: var(--surface); stroke: var(--ink); stroke-width: 2; }
 .nc-dot.pass { fill: var(--progress); stroke: var(--progress); }

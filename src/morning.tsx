@@ -176,15 +176,13 @@ function MouthStretch() {
 /* ---- Typing ----
    This step is not "did you open it", it is "did you hit the number". You log
    the speed you actually got; the step only checks off at the target. */
-function Typing({ url, label, stepId, wpm, onLog }: {
+function Typing({ url, label, stepId, onLog }: {
   url?: string
   label?: string
   stepId: string
-  wpm?: number
   onLog: (v: number) => void
 }) {
   const [entry, setEntry] = useState('')
-  const passed = (wpm ?? 0) >= TYPING_TARGET_WPM
   const submit = () => {
     const v = Math.round(Number(entry))
     if (!Number.isFinite(v) || v <= 0) return
@@ -210,21 +208,10 @@ function Typing({ url, label, stepId, wpm, onLog }: {
         <button className="btn btn-primary" disabled={!entry.trim()} onClick={submit}>Log it</button>
       </div>
 
-      {wpm != null && (
-        <div className={`wpm-result${passed ? ' pass' : ' under'}`}>
-          <span className="wpm-big mono">{wpm}<span className="wpm-unit">WPM</span></span>
-          <span className="wpm-verdict">
-            {passed
-              ? `Target cleared. You can check this one off.`
-              : `${TYPING_TARGET_WPM - wpm} short of ${TYPING_TARGET_WPM}. Run it again.`}
-          </span>
-          <div className="wpm-bar"><i style={{ width: `${Math.min(100, Math.round((wpm / TYPING_TARGET_WPM) * 100))}%` }} /></div>
-        </div>
-      )}
-      {/* No history here. Logging the number and looking back at the numbers are
-          two different jobs, and this panel is for the first one: did the run
-          pass, can the step be checked off. Every score he has logged lives in
-          Review, under Numbers. */}
+      {/* Nothing else. You type the number and you are done: the step's own
+          checkbox is what tells you it unlocked, and the score itself lives in
+          Review under Numbers. A result card here restated the number you had
+          just typed, in a box the size of the step. */}
     </div>
   )
 }
@@ -283,7 +270,7 @@ export function MorningRoutine({ routine, onEdit }: { routine: Routine; onEdit?:
     if (stepId === 'mr5') return <GoalsReminder note={s.note} />
     if (stepId === 'mr4') return (
       <Typing
-        url={s.link} label={s.linkLabel} stepId="mr4" wpm={typingWpm}
+        url={s.link} label={s.linkLabel} stepId="mr4"
         onLog={(v) => {
           // Hitting the target is the completion; the store does both at once.
           setStepData(routine.id, 'mr4', v)

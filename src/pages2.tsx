@@ -8,7 +8,7 @@ import { analyzeAvoidance, fallbackRead } from './coach'
 import { getAiKey, hasAiKey, readAvoidance, setAiKey, type AvoidanceRead } from './ai'
 import { paymentTaskTitle } from './exceptions'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange, sendSignInCode, signInWithCode, signOutAccount, type Account } from './supabase'
-import { goalCurrent, ON_TRACK_PCT, stepSeries, type CoachFacts, type CoachSession, type TaskCategory } from './types'
+import { goalCurrent, ON_TRACK_PCT, STEP_UNITS, stepSeries, type StepEntry, type CoachFacts, type CoachSession, type TaskCategory } from './types'
 
 /* ---------------- MONEY ---------------- */
 
@@ -110,6 +110,61 @@ function SecHead({ label }: { label: string }) {
   )
 }
 
+/**
+ * A number over time, drawn properly: a dated axis, the real spread on the y
+ * axis, the target as a line you can see yourself crossing, and every run
+ * marked. A sparkline in a table row could show none of that, and stretched
+ * across a wide monitor it showed less than nothing.
+ */
+function NumberChart({ runs, target, unit }: { runs: StepEntry[]; target?: number; unit: string }) {
+  const W = 680, H = 220, L = 44, R = 14, T = 16, B = 30
+  const vals = runs.map((r) => r.value)
+  const lo = Math.min(...vals, ...(target ? [target] : []))
+  const hi = Math.max(...vals, ...(target ? [target] : []))
+  // A flat series still needs a band to sit in, or every point lands on one line.
+  const pad = Math.max(4, Math.round((hi - lo) * 0.15))
+  const yMin = Math.max(0, lo - pad), yMax = hi + pad
+  const x = (i: number) => (runs.length === 1 ? (L + W - R) / 2 : L + (i / (runs.length - 1)) * (W - L - R))
+  const y = (v: number) => T + (1 - (v - yMin) / Math.max(1, yMax - yMin)) * (H - T - B)
+  const ticks = [yMax, Math.round((yMax + yMin) / 2), yMin]
+
+  return (
+    <svg className="numchart" viewBox={`0 0 ${W} ${H}`} role="img"
+      aria-label={`${runs.length} runs, from ${vals[0]} to ${vals[vals.length - 1]} ${unit}`}>
+      {ticks.map((t) => (
+        <g key={t}>
+          <line x1={L} y1={y(t)} x2={W - R} y2={y(t)} className="nc-grid" />
+          <text x={L - 8} y={y(t) + 4} textAnchor="end" className="nc-axis">{Math.round(t)}</text>
+        </g>
+      ))}
+      {target != null && (
+        <>
+          <line x1={L} y1={y(target)} x2={W - R} y2={y(target)} className="nc-target" />
+          <text x={L + 4} y={y(target) - 6} className="nc-target-lab">{target} {unit} target</text>
+        </>
+      )}
+      {runs.length > 1 && (
+        <polyline className="nc-line" fill="none"
+          points={runs.map((r, i) => `${x(i).toFixed(1)},${y(r.value).toFixed(1)}`).join(' ')} />
+      )}
+      {runs.map((r, i) => (
+        <g key={r.day}>
+          <circle cx={x(i)} cy={y(r.value)} r={4} className={`nc-dot${target != null && r.value >= target ? ' pass' : ''}`}>
+            <title>{`${fmtWhen(r.day)}: ${r.value} ${unit}`}</title>
+          </circle>
+          {(runs.length <= 8 || i === 0 || i === runs.length - 1) && (
+            <text x={x(i)} y={y(r.value) - 11} textAnchor="middle" className="nc-val">{r.value}</text>
+          )}
+        </g>
+      ))}
+      <text x={L} y={H - 8} className="nc-axis">{fmtWhen(runs[0].day)}</text>
+      {runs.length > 1 && (
+        <text x={W - R} y={H - 8} textAnchor="end" className="nc-axis">{fmtWhen(runs[runs.length - 1].day)}</text>
+      )}
+    </svg>
+  )
+}
+
 export function ReviewPage() {
   const { space, habits, goals, closeReview, review, ledger, focusSessions, habitLog, routineLog, stepLog, routines, records, inView } = useStore()
   const [rangeId, setRangeId] = useState<string>('this-week')
@@ -161,12 +216,15 @@ export function ReviewPage() {
       const [routineId, stepId] = key.split('|')
       const routine = routines.find((r) => r.id === routineId)
       const runs = stepSeries(stepLog, routineId, stepId).filter((e) => inRange(e.day, range))
+      const meta = STEP_UNITS[stepId]
       return {
         key,
         label: routine?.steps.find((s) => s.id === stepId)?.title ?? routine?.title ?? 'A routine step',
         space: routine?.space,
         runs,
         best: records[`${routineId}:${stepId}`] ?? 0,
+        unit: meta?.unit ?? '',
+        target: meta?.target,
       }
     }).filter((n) => n.runs.length > 0 && inView(n.space))
   }, [stepLog, routines, records, range, inView])
@@ -291,22 +349,28 @@ export function ReviewPage() {
       {numberSeries.length > 0 && (
         <>
           <SecHead label="Numbers" />
-          <div className="panel">
-            <div className="rowlist" style={{ marginTop: 8 }}>
-              {numberSeries.map((n) => (
-                <div className="numrow" key={n.key}>
-                  <span className="grow">{n.label}</span>
-                  <Spark data={n.runs.map((r) => r.value)} width={140} height={26} />
-                  <span className="mono meta">
-                    {n.runs.length === 1
-                      ? `${n.runs[0].value}, once`
-                      : `${n.runs[0].value} to ${n.runs[n.runs.length - 1].value}, ${n.runs.length} runs`}
+          {numberSeries.map((n) => {
+            const last = n.runs[n.runs.length - 1]
+            return (
+              <div className="panel numpanel" key={n.key}>
+                <div className="numpanel-head">
+                  <span className="numpanel-title">{n.label}</span>
+                  <span className="numpanel-fig mono">
+                    {n.runs.length > 1
+                      ? `${n.runs.length} runs, ${n.runs[0].value} to ${last.value} ${n.unit}`
+                      : `${last.value} ${n.unit}, once`}
                     {n.best > 0 ? `, best ${n.best}` : ''}
                   </span>
                 </div>
-              ))}
-            </div>
-          </div>
+                {/* Scrolls rather than shrinks. Scaled down to a phone's width
+                    the whole drawing shrinks with it, and every label goes to
+                    about four pixels. */}
+                <div className="numchart-scroll">
+                  <NumberChart runs={n.runs} target={n.target} unit={n.unit} />
+                </div>
+              </div>
+            )
+          })}
         </>
       )}
 

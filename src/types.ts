@@ -448,6 +448,12 @@ export function stepLocked(r: Routine, stepId: string): boolean {
 /** The typing step is only done once you actually hit the number. */
 export const TYPING_TARGET_WPM = 75
 
+/** What a measured step's number means, so a chart of it can label its own axis
+ *  and draw the line you are chasing. Steps not listed here are just numbers. */
+export const STEP_UNITS: Record<string, { unit: string; target?: number }> = {
+  mr4: { unit: 'WPM', target: TYPING_TARGET_WPM },
+}
+
 export type GoalTimeframe = 'weekly' | 'monthly' | 'quarter' | 'half'
 export type GoalCategory = 'money' | 'health' | 'life' | 'work' | 'offplate' | 'habits'
 

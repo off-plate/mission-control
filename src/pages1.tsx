@@ -6,9 +6,9 @@ import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
-import { goalPeriodKey, goalPeriodRange, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForDaypart, taskMinutes, toMin } from './util'
+import { goalPeriodKey, goalPeriodRange, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, periodNoun, routinePeriods, slotForDaypart, taskMinutes, toMin } from './util'
 
 /* ---------------- shared bits ---------------- */
 
@@ -163,6 +163,14 @@ function useNextEvent(space: string): { v: string; k: string } {
   return { v: `${fmtTimeShort(next.start)} ${next.title.split(':')[0]}`, k: 'next event' }
 }
 
+/** Yesterday's date. Stepping the calendar day, not subtracting 24 hours, so
+ *  the clocks changing does not land it on the wrong day twice a year. */
+const prevDay = (): string => {
+  const d = new Date()
+  d.setDate(d.getDate() - 1)
+  return localDateKey(d)
+}
+
 const dateLine = () =>
   new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
 
@@ -189,7 +197,7 @@ export function TodayPage() {
   const reviewDue = todayIndex === 6 && review.lastDoneDate !== localDateKey()
   // Next payment badge derives from the money schedule instead of a hardcoded string.
   const nextPay = MOCK_MONEY?.schedule.find((r) => r.state === 'not sent' || r.state === 'action needed')
-  const wins = momentum({ tasks: tasks.filter((t) => inView(t.space)), routines, habits: habits.filter((h) => inView(h.space)), coachSessions })
+  const wins = momentum({ tasks: tasks.filter((t) => inView(t.space)), routines, habits: habits.filter((h) => inView(h.space) && !h.archivedAt), coachSessions })
 
   return (
     <div className="page">
@@ -623,7 +631,7 @@ export function PlanPage() {
   const todayIdx = (new Date().getDay() + 6) % 7
   const { startFocus } = usePomodoro()
   const { routines, habits } = useStore()
-  const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId, setTaskAt, plan, setPage, inView } = useStore()
+  const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId, setTaskAt, plan, setPage, openDay, inView } = useStore()
   const events = MOCK_AGENDA[space]
 
   const spaceTasks = tasks.filter((t) => inView(t.space))
@@ -635,7 +643,7 @@ export function PlanPage() {
   /* Routines belong on the day by their own cadence: he never adds them, they
      are simply there. Each sits in the part of the day its habit names. */
   const isWeekend = todayIdx >= 5
-  const dueRoutines = routines.filter((r) => inView(r.space) && !(r.cadence === 'prework' && isWeekend))
+  const dueRoutines = routines.filter((r) => inView(r.space) && !r.archivedAt && !(r.cadence === 'prework' && isWeekend))
   const routineSlot = (r: Routine): TimeSlot | 'unsorted' =>
     slotForDaypart(habits.find((h) => h.id === r.habitId)?.daypart)
   const anytimeRoutines = dueRoutines.filter((r) => routineSlot(r) === 'unsorted')
@@ -727,6 +735,9 @@ export function PlanPage() {
           { v: fmtDuration(plannedMin), k: 'planned today', tone: 'info' as const },
           { v: `${donePct}%`, k: 'to-do done', tone: 'pos' as const },
         ]}
+        /* The way back into the record. Every day before this one is addressable
+           from here, and from there one arrow at a time. */
+        actions={<button className="btn btn-ghost" onClick={() => openDay(prevDay())}>Yesterday</button>}
       />
       {/* What came back overnight. Said once, on the day it happened, with the
           count and a way to take it back in one move. The alternative was work
@@ -736,6 +747,7 @@ export function PlanPage() {
           <span className="grow">
             {plan.returnedCount} {plan.returnedCount === 1 ? 'thing' : 'things'} you did not get to went back to the list.
           </span>
+          <button className="btn btn-quiet" onClick={() => openDay(prevDay())}>See yesterday</button>
           <button className="btn btn-quiet" onClick={() => setPage('plan')}>Show me</button>
         </div>
       )}
@@ -1027,28 +1039,37 @@ const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
    kept, exactly as it does everywhere else; nothing marks a missed day, because
    a wall of misses is the guilt mechanic this app exists to avoid. */
 function HabitTrail({ h, days }: { h: HabitDef; days: number }) {
-  const { habitLog } = useStore()
+  const { habitLog, slips, openDay } = useStore()
   const today = new Date()
   const from = new Date(today); from.setDate(from.getDate() - (days - 1))
   const fromKey = localDateKey(from)
   const toKey = localDateKey(today)
   const kept = h.kind === 'break'
-    ? quitKeptDays(h, fromKey, toKey)
+    ? quitKeptDays(h, slips, fromKey, toKey)
     : keptDaysIn(habitLog, h.id, fromKey, toKey)
+  // A slip is a fact on the record, so it is drawn as one rather than left to
+  // read as an ordinary blank day.
+  const slipped = h.kind === 'break' ? slipDays(slips, h.id) : new Set<string>()
   const cells = Array.from({ length: days }, (_, i) => {
     const d = new Date(from); d.setDate(from.getDate() + i)
     return localDateKey(d)
   })
-  const run = h.kind === 'break' ? (daysClean(h) ?? 0) : currentStreak(habitLog, h.id)
-  const best = h.kind === 'break' ? (daysClean(h) ?? 0) : bestStreak(habitLog, h.id)
+  /* Best run used to read the same number as the current one for a quit, because
+     one overwritten date could only describe the run he is in now. */
+  const run = h.kind === 'break' ? (daysClean(h, slips) ?? 0) : currentStreak(habitLog, h.id)
+  const best = h.kind === 'break' ? bestCleanRun(h, slips) : bestStreak(habitLog, h.id)
   return (
     <div className="habit-trail-wrap">
       <div className={`habit-trail w${days}`}>
+        {/* Every square is the day it stands for, so the answer to "what happened
+            on that one" is one click away rather than nowhere. */}
         {cells.map((day) => (
-          <span
+          <button
             key={day}
-            className={`trail-day${kept.has(day) ? ' kept' : ''}${day === toKey ? ' is-today' : ''}`}
-            title={`${fmtWhen(day)}${kept.has(day) ? ', kept' : ''}`}
+            className={`trail-day${kept.has(day) ? ' kept' : ''}${slipped.has(day) ? ' slipped' : ''}${day === toKey ? ' is-today' : ''}`}
+            title={`${fmtWhen(day)}${slipped.has(day) ? ', slipped' : kept.has(day) ? ', kept' : ''}`}
+            aria-label={`${fmtWhen(day)}${slipped.has(day) ? ', slipped' : kept.has(day) ? ', kept' : ', not kept'}`}
+            onClick={() => openDay(day)}
           />
         ))}
       </div>
@@ -1073,7 +1094,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
   /** A goal counting itself off this habit, if one exists. */
   goal?: Goal
 }) {
-  const { toggleHabitDay, logSlip, setPage, focusSessions, habitLog, inView } = useStore()
+  const { toggleHabitDay, logSlip, setPage, focusSessions, habitLog, slips, inView } = useStore()
   const kept = h.days.filter(Boolean).length
   const target = habitTarget(h)
   // Weekdays-only habits do not expect the weekend, so those dots stay quiet.
@@ -1139,10 +1160,12 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
   /* A quit is a different scoreboard: days clean, and a single honest button
      for the day you slip. Day dots would be asking the wrong question. */
   if (h.kind === 'break') {
-    const clean = daysClean(h) ?? 0
+    const clean = daysClean(h, slips) ?? 0
     // The week fills itself from the day he stopped: a day he did not do it is a
     // day kept, so he never has to tick anything to be given credit for it.
-    const quitWeek = quitDays(h)
+    const quitWeek = quitDays(h, slips)
+    const slipsSoFar = slipCount(h, slips)
+    const best = bestCleanRun(h, slips)
     return (
       <div className="habit-row is-quit">
         <div className="habit-row-top">
@@ -1162,7 +1185,11 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
         )}
         <div className="habit-foot">
           <button className="quit-slip" onClick={() => logSlip(h.id)}>I slipped today</button>
-          {h.quitSince && <span className="habit-weeks">since {fmtWhen(h.quitSince)}</span>}
+          <span className="habit-weeks">
+            {h.quitSince ? `since ${fmtWhen(h.quitSince)}` : ''}
+            {slipsSoFar > 0 ? `, ${slipsSoFar} slip${slipsSoFar === 1 ? '' : 's'}` : ''}
+            {best > clean ? `, ${best} best run` : ''}
+          </span>
         </div>
       </div>
     )
@@ -1375,12 +1402,12 @@ export function HabitsPage() {
   const [goalFor, setGoalFor] = useState<string | null>(null)
   const [editHabit, setEditHabit] = useState<HabitDef | null>(null)
   const goalOn = new Map(goals.filter((g) => g.habitId).map((g) => [g.habitId as string, g]))
-  const spaceHabits = habits.filter((h) => inView(h.space))
+  const spaceHabits = habits.filter((h) => inView(h.space) && !h.archivedAt)
   // A habit a routine drives cannot be deleted from here, or the routine would
   // mirror into nothing. Pausing stays available.
-  const drivenBy = new Map(routines.filter((r) => r.habitId).map((r) => [r.habitId as string, r.title]))
+  const drivenBy = new Map(routines.filter((r) => r.habitId && !r.archivedAt).map((r) => [r.habitId as string, r.title]))
   // Today's step progress for each routine-driven habit.
-  const progressFor = new Map(routines.filter((r) => r.habitId).map((r) => [
+  const progressFor = new Map(routines.filter((r) => r.habitId && !r.archivedAt).map((r) => [
     r.habitId as string, { done: r.doneStepIds.length, total: r.steps.length },
   ]))
   const building = spaceHabits.filter((h) => !h.paused && h.kind !== 'break' && h.kind !== 'measured')
@@ -1563,24 +1590,31 @@ function AddRoutineSheet({ onClose }: { onClose: () => void }) {
 /* Which routines were finished on which day, drawn the same way a habit's longer
    window is: one square a day, green when it was finished. Same language for the
    same question, rather than a second chart type for the same idea. */
-function RoutineTrail({ routineId, days }: { routineId: string; days: number }) {
-  const { routineLog } = useStore()
-  const today = new Date()
-  const done = new Set(routineLog.filter((r) => r.routineId === routineId).map((r) => r.day))
-  const cells = Array.from({ length: days }, (_, i) => {
-    const d = new Date(today); d.setDate(today.getDate() - (days - 1 - i))
-    return localDateKey(d)
-  })
-  const hit = cells.filter((c) => done.has(c)).length
+function RoutineTrail({ routine, days }: { routine: Routine; days: number }) {
+  const { routineLog, openDay } = useStore()
+  const done = routineLog.filter((r) => r.routineId === routine.id).map((r) => r.day)
+  /* One square per chance it had, not per calendar day. A weekly routine drawn a
+     day at a time reported six misses in every seven, and those six days were
+     never asked for: it read as failure at a thing that was going fine. */
+  const cells = routinePeriods(routine.cadence, days)
+  const hit = cells.filter((c) => done.some((d) => d >= c.from && d <= c.to)).length
+  const noun = periodNoun(routine.cadence, cells.length)
   return (
     <div className="routine-trail-wrap">
-      <div className={`habit-trail w${days}`}>
-        {cells.map((day) => (
-          <span key={day} className={`trail-day${done.has(day) ? ' kept' : ''}${day === cells[cells.length - 1] ? ' is-today' : ''}`}
-            title={`${fmtWhen(day)}${done.has(day) ? ', finished' : ''}`} />
-        ))}
+      {/* Thirteen weeks read as thirteen squares in a row; ninety days need the
+          packed grid the habit trail uses. Same square, two densities. */}
+      <div className={`routine-trail${cells.length > 40 ? ' dense' : ''}`}>
+        {cells.map((c, i) => {
+          const on = done.find((d) => d >= c.from && d <= c.to)
+          return (
+            <button key={c.key} className={`trail-day${on ? ' kept' : ''}${i === cells.length - 1 ? ' is-today' : ''}`}
+              title={`${c.label}${on ? `, finished ${fmtWhen(on)}` : ''}`}
+              aria-label={`${c.label}${on ? `, finished ${fmtWhen(on)}` : ', not finished'}`}
+              onClick={() => openDay(on ?? c.to)} />
+          )
+        })}
       </div>
-      <span className="habit-weeks">{hit} of the last {days} days</span>
+      <span className="habit-weeks">{hit} of the last {cells.length} {noun}</span>
     </div>
   )
 }
@@ -1596,7 +1630,7 @@ export function RoutinesPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [trailDays, setTrailDays] = useState(0)
   const [adding, setAdding] = useState(false)
-  const spaceRoutines = routines.filter((r) => inView(r.space))
+  const spaceRoutines = routines.filter((r) => inView(r.space) && !r.archivedAt)
   const sorted = [...spaceRoutines].sort((a, b) => CADENCE_ORDER.indexOf(a.cadence) - CADENCE_ORDER.indexOf(b.cadence))
   return (
     <div className="page">
@@ -1644,7 +1678,7 @@ export function RoutinesPage() {
                 </Dropdown>
               </div>
               {r.blurb && <p className="routine-blurb">{r.blurb}</p>}
-              {trailDays > 0 && editingId !== r.id && <RoutineTrail routineId={r.id} days={trailDays} />}
+              {trailDays > 0 && editingId !== r.id && <RoutineTrail routine={r} days={trailDays} />}
               {editingId === r.id ? (
                 <>
                   <StepEditor routine={r} />
@@ -1714,7 +1748,7 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals }: {
    *  it silently and leaving him staring at the page he started on. */
   thenGoToGoals?: boolean
 }) {
-  const { space, habits, addGoal, updateGoal, setPage, inView } = useStore()
+  const { space, habits, addGoal, updateGoal, setPage } = useStore()
   const preset = habits.find((h) => h.id === presetHabitId)
   const [d, setD] = useState({
     name: goal?.name ?? (preset ? preset.name : ''),
@@ -1726,8 +1760,10 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals }: {
     category: goal?.category ?? ('life' as GoalCategory),
     habitId: goal?.habitId ?? presetHabitId ?? '',
   })
-  // Any habit in this profile can drive a goal, so the list grows as you do.
-  const linkable = [...habits.filter((h) => inView(h.space) && !h.paused)].reverse()
+  /* Only habits from the profile this goal is being written into. In All every
+     habit was on offer, so a goal filed under Personal could count off a Work
+     habit and then show a number nothing on that page could explain. */
+  const linkable = [...habits.filter((h) => h.space === space && !h.paused && !h.archivedAt)].reverse()
   const linked = linkable.find((h) => h.id === d.habitId)
 
   const submit = () => {

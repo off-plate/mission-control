@@ -1913,6 +1913,13 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .wpm-result.pass .wpm-bar > i { background: var(--progress); }
 .wpm-result.under .wpm-bar > i { background: var(--warn); }
 .wpm-best { font-size: var(--text-xs); color: var(--faint); margin-top: var(--s2); }
+/* Every run he has logged, oldest on the left. One accent, no axis, no grid:
+   the shape of the climb is the whole point and anything else is furniture. */
+.wpm-series { margin-top: var(--s3); }
+.wpm-bars { display: flex; align-items: flex-end; gap: 3px; height: 44px; }
+.wpm-bars i { flex: 1 1 0; min-width: 3px; background: var(--line); border-radius: 2px 2px 0 0; }
+.wpm-bars i.pass { background: var(--progress); }
+.wpm-series .wpm-best { margin-top: 6px; }
 .mr-check:disabled { cursor: not-allowed; opacity: 0.55; }
 
 /* Mouth stretch: Czech and English as their own blocks, three each. */
@@ -2335,7 +2342,16 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .trail-day.kept { background: var(--progress); }
 .trail-day.is-today { border-color: var(--accent); }
 .habit-trail.w30 .trail-day { border-radius: 3px; }
+/* A slip is a fact, drawn as one. Not red: it is a day on the record, not an
+   alarm, and the run either side of it is the thing worth reading. */
+.trail-day.slipped { background: var(--surface-3, var(--line)); border-color: var(--line); }
 .routine-trail-wrap { display: flex; flex-direction: column; gap: 6px; margin: var(--s3) 0; }
+/* One square per chance the routine had. Thirteen weeks fit in a row; ninety
+   days need the packed grid. */
+.routine-trail { display: flex; flex-wrap: wrap; gap: 3px; }
+.routine-trail .trail-day { width: 11px; height: 11px; aspect-ratio: auto; flex: none; border-radius: 3px; }
+.routine-trail.dense { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 1fr); gap: 2px; }
+.routine-trail.dense .trail-day { width: 100%; height: auto; aspect-ratio: 1; min-width: 5px; border-radius: 2px; }
 .past-goal { gap: var(--s3); }
 .past-goal .btn { flex: none; padding: 3px 10px; font-size: var(--text-xs); }
 
@@ -2367,3 +2383,32 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   font-size: var(--text-sm); color: var(--muted);
 }
 .handoff .btn { flex: none; }
+
+/* ---------- one day of the record ---------- */
+/* Read-only by design. Rows are the same shape as everywhere else so a day reads
+   as the same app looked at from a different angle, not a second design. */
+.day-panel { margin-bottom: var(--s4); }
+.day-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3); margin-bottom: var(--s3); }
+.day-fig { font-size: var(--text-xs); color: var(--muted); }
+.day-rows { display: flex; flex-direction: column; }
+.day-row {
+  display: flex; align-items: center; gap: var(--s3);
+  padding: 9px 0; border-top: 1px solid var(--hairline);
+  font-size: var(--text-sm);
+}
+.day-rows .day-row:first-child { border-top: 0; }
+.day-row-title { flex: 1 1 auto; min-width: 0; }
+.day-row-fig { flex: none; font-size: var(--text-xs); color: var(--muted); }
+.day-row.is-slip .day-row-title { color: var(--muted); }
+.day-tag {
+  flex: none; padding: 1px 7px; border: 1px solid var(--hairline-strong); border-radius: 999px;
+  font-size: var(--text-xs); color: var(--faint);
+}
+.day-foot { margin-top: var(--s4); font-size: var(--text-xs); color: var(--faint); }
+/* A trail square is a link to the day it stands for. */
+.trail-day { padding: 0; font: inherit; color: inherit; cursor: pointer; }
+.trail-day:hover { border-color: var(--accent); }
+.trail-day:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* A record is a column of short rows, so it gets a rail. Left to fill 2560px the
+   title sat at one edge and its number at the other, half a metre apart. */
+.day-page .day-panel, .day-page .empty, .day-page .day-foot { max-width: 940px; }

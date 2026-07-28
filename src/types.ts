@@ -27,6 +27,8 @@ export type PageId =
   | 'settings'
   | 'brand'
   | 'braindump'
+  /** One day of the record, read-only. Carries a date in the route. */
+  | 'day'
 
 export type WidgetType =
   | 'agenda'
@@ -203,6 +205,21 @@ export function bestStreak(log: HabitTick[], habitId: string): number {
 /** A day a routine was finished, kept so "which day did I do it" has an answer. */
 export interface RoutineDone { routineId: string; day: string; periodKey: string }
 
+/**
+ * A number a routine step recorded on a day: today's typing speed, and anything
+ * else measured the same way later. `stepData` holds only the current period and
+ * `records` only the all-time maximum, so every score between the first and the
+ * best was thrown away and no progression could ever be drawn.
+ */
+export interface StepEntry { routineId: string; stepId: string; day: string; value: number }
+
+/** One step's scores over time, oldest first, one per day (the last of that day). */
+export function stepSeries(log: StepEntry[], routineId: string, stepId: string): StepEntry[] {
+  const byDay = new Map<string, StepEntry>()
+  for (const e of log) if (e.routineId === routineId && e.stepId === stepId) byDay.set(e.day, e)
+  return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day))
+}
+
 /** A finished focus block. Kept as history, not just a count, so a measured
  *  habit can be filled from it and the week can be looked back at. */
 export interface FocusSession {
@@ -221,7 +238,11 @@ export interface HabitDef {
   space: SpaceId
   /** Building something, or quitting something. Undefined behaves as 'build'. */
   kind?: HabitKind
-  /** For a 'break' habit: the last day you slipped, as an ISO date. */
+  /** The day it was retired. An archived habit is off the page but its history
+   *  stays readable, so deleting a habit no longer erases the days you kept it. */
+  archivedAt?: string
+  /** Migrated away: the last day you slipped, as one overwritable date. Slips
+   *  are HabitSlip records now; this is read once on load and then left alone. */
   lastSlip?: string
   /** The day he stopped. Every day since counts itself as kept. */
   quitSince?: string
@@ -273,15 +294,21 @@ export function habitTarget(h: HabitDef): number {
   return 7
 }
 
-/** Days clean since the last slip, for a habit you are trying to stop. */
-export function daysSinceSlip(h: HabitDef, today = new Date()): number | null {
-  if (h.kind !== 'break' || !h.lastSlip) return null
-  const [y, m, d] = h.lastSlip.split('-').map(Number)
-  if (!y) return null
-  const then = new Date(y, m - 1, d)
-  const now = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  return Math.max(0, Math.round((now.getTime() - then.getTime()) / 86400000))
+/**
+ * A day you slipped on a habit you are quitting. One record per day, kept for
+ * good. `lastSlip` held ONE date, so the second slip erased the first: a quit
+ * with four slips in it looked identical to one with a single slip, and the
+ * clean run before each of them was gone. This is the same move as HabitTick,
+ * for the same reason.
+ */
+export interface HabitSlip { habitId: string; day: string }
+
+/** The days this habit was slipped on, as a set of ISO dates. */
+export function slipDays(slips: HabitSlip[], habitId: string): Set<string> {
+  return new Set(slips.filter((s) => s.habitId === habitId).map((s) => s.day))
 }
+
+const isoOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
 /**
  * Which days of the current week count as kept for a habit you are quitting.
@@ -289,51 +316,78 @@ export function daysSinceSlip(h: HabitDef, today = new Date()): number | null {
  * it fills itself; you only come back to it on a day you slip. Future days stay
  * blank because they have not happened.
  */
-export function quitDays(h: HabitDef, today = new Date()): boolean[] {
+export function quitDays(h: HabitDef, slips: HabitSlip[], today = new Date()): boolean[] {
   const out = [false, false, false, false, false, false, false]
   if (h.kind !== 'break' || !h.quitSince) return out
   const [y, m, d] = h.quitSince.split('-').map(Number)
   if (!y) return out
   const since = new Date(y, m - 1, d)
+  const slipped = slipDays(slips, h.id)
   const todayIdx = (today.getDay() + 6) % 7
   const monday = new Date(today)
   monday.setDate(monday.getDate() - todayIdx)
   for (let i = 0; i <= todayIdx; i++) {
     const day = new Date(monday)
     day.setDate(monday.getDate() + i)
-    // A slip after the quit date breaks the run; that day is not kept.
-    const iso = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
-    out[i] = day >= since && h.lastSlip !== iso
+    // Any slip on or after the quit date breaks that day; it is not kept.
+    out[i] = day >= since && !slipped.has(isoOf(day))
   }
   return out
 }
 
 /** The days inside a window that a quit habit was kept, derived rather than
- *  ticked: every day from the day he stopped, minus any day he logged a slip. */
-export function quitKeptDays(h: HabitDef, from: string, to: string): Set<string> {
+ *  ticked: every day from the day he stopped, minus every day he logged a slip. */
+export function quitKeptDays(h: HabitDef, slips: HabitSlip[], from: string, to: string): Set<string> {
   const out = new Set<string>()
   if (h.kind !== 'break' || !h.quitSince) return out
   const start = h.quitSince > from ? h.quitSince : from
   const [y, m, d] = start.split('-').map(Number)
   if (!y) return out
+  const slipped = slipDays(slips, h.id)
   for (const cur = new Date(y, m - 1, d); ; cur.setDate(cur.getDate() + 1)) {
-    const key = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`
+    const key = isoOf(cur)
     if (key > to) break
-    if (h.lastSlip !== key) out.add(key)
+    if (!slipped.has(key)) out.add(key)
   }
   return out
 }
 
-/** Days clean, counted from the day he stopped, or from his last slip. */
-export function daysClean(h: HabitDef, today = new Date()): number | null {
+/** Days clean, counted from the day he stopped, or from his most recent slip. */
+export function daysClean(h: HabitDef, slips: HabitSlip[], today = new Date()): number | null {
   if (h.kind !== 'break') return null
-  const from = h.lastSlip && h.quitSince && h.lastSlip > h.quitSince ? h.lastSlip : h.quitSince
+  const last = [...slipDays(slips, h.id)].sort().pop()
+  const from = last && h.quitSince && last > h.quitSince ? last : h.quitSince
   if (!from) return null
   const [y, m, d] = from.split('-').map(Number)
   if (!y) return null
   const then = new Date(y, m - 1, d)
   const now = new Date(today.getFullYear(), today.getMonth(), today.getDate())
   return Math.max(0, Math.round((now.getTime() - then.getTime()) / 86400000))
+}
+
+/**
+ * The longest clean run since he stopped. With one overwritten date this could
+ * only ever be the current run, so a quit that reached 60 days and then slipped
+ * reported its best as 1. Every stretch between slips is now on the record.
+ */
+export function bestCleanRun(h: HabitDef, slips: HabitSlip[], today = new Date()): number {
+  if (h.kind !== 'break' || !h.quitSince) return 0
+  const [y, m, d] = h.quitSince.split('-').map(Number)
+  if (!y) return 0
+  const slipped = slipDays(slips, h.id)
+  const end = isoOf(new Date(today.getFullYear(), today.getMonth(), today.getDate()))
+  let best = 0, run = 0
+  for (const cur = new Date(y, m - 1, d); isoOf(cur) <= end; cur.setDate(cur.getDate() + 1)) {
+    if (slipped.has(isoOf(cur))) run = 0
+    else if (++run > best) best = run
+  }
+  return best
+}
+
+/** How many days he has slipped since he stopped, so the honest count is visible. */
+export function slipCount(h: HabitDef, slips: HabitSlip[]): number {
+  const since = h.quitSince
+  return [...slipDays(slips, h.id)].filter((d) => !since || d >= since).length
 }
 
 export function habitFrequencyLabel(h: HabitDef): string {
@@ -354,6 +408,8 @@ export interface Routine {
   id: string
   /** Which space this routine belongs to. */
   space: SpaceId
+  /** The day it was retired. Its record of which days it was finished stays. */
+  archivedAt?: string
   title: string
   cadence: RoutineCadence
   blurb?: string
@@ -464,7 +520,7 @@ const TIMEFRAME_WEEKS: Record<GoalTimeframe, number> = { weekly: 1, monthly: 4, 
  * from that habit's checkoffs over the goal's own window, so you never log the
  * same thing twice. Otherwise it is whatever the goal itself holds.
  */
-export function goalCurrent(g: Goal, habits: HabitDef[], log?: HabitTick[], range?: { from: string; to: string }): number {
+export function goalCurrent(g: Goal, habits: HabitDef[], log?: HabitTick[], range?: { from: string; to: string }, slips: HabitSlip[] = []): number {
   // A closed goal keeps the number it finished on. It is history, not a counter.
   if (g.closed) return g.closed.final
   if (!g.habitId) return g.current
@@ -475,7 +531,7 @@ export function goalCurrent(g: Goal, habits: HabitDef[], log?: HabitTick[], rang
      never ended, which is why a weekly goal never rolled over. */
   if (log && range) {
     const kept = h.kind === 'break'
-      ? quitKeptDays(h, range.from, range.to).size
+      ? quitKeptDays(h, slips, range.from, range.to).size
       : keptDaysIn(log, h.id, range.from, range.to).size
     return Math.min(g.target, kept)
   }
@@ -590,14 +646,14 @@ export interface AssistantEntry {
   items: AssistantItem[]
 }
 
+/* `lastWeekKey` and `previous` used to live here. Nothing read either: the first
+   was written on every close and never asked for, the second was declared and
+   never written at all. Fields that look like state but are not are how the next
+   change gets built on a lie, so they are gone. `reflections` is the record. */
 export interface ReviewState {
   lastDoneDate: string | null
-  /** ISO week the review was closed in; "closed" holds until the next week. */
-  lastWeekKey?: string
   wins: string[]
   outcomes: string[]
-  /** Last week's reflection, kept so this week can read what you said you'd change. */
-  previous?: { weekKey: string; wins: string[]; outcomes: string[] }
   /** Every window he has closed, newest first. One shape for all of them, so a
    *  week and a month are the same act over a different span. */
   reflections?: Reflection[]

@@ -211,13 +211,21 @@ export interface RoutineDone { routineId: string; day: string; periodKey: string
  * `records` only the all-time maximum, so every score between the first and the
  * best was thrown away and no progression could ever be drawn.
  */
-export interface StepEntry { routineId: string; stepId: string; day: string; value: number }
+export interface StepEntry {
+  routineId: string
+  stepId: string
+  day: string
+  /** The moment it was logged. Two runs in one day are two runs. */
+  at?: string
+  value: number
+}
 
-/** One step's scores over time, oldest first, one per day (the last of that day). */
+/** Every run of one step, oldest first. It used to keep one per day, so a second
+ *  attempt the same morning erased the first one. */
 export function stepSeries(log: StepEntry[], routineId: string, stepId: string): StepEntry[] {
-  const byDay = new Map<string, StepEntry>()
-  for (const e of log) if (e.routineId === routineId && e.stepId === stepId) byDay.set(e.day, e)
-  return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day))
+  return log
+    .filter((e) => e.routineId === routineId && e.stepId === stepId)
+    .sort((a, b) => (a.at ?? a.day).localeCompare(b.at ?? b.day))
 }
 
 /** A finished focus block. Kept as history, not just a count, so a measured

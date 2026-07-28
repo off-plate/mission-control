@@ -1093,12 +1093,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           : !passes ? r.doneStepIds.filter((x) => x !== stepId) : r.doneStepIds
         return { ...r, stepData, doneStepIds }
       })
-      /* The number goes on the record with its date. stepData holds only the
-         current period and records only the all-time maximum, so every score
-         between the first one and the best one was thrown away and no
-         progression could be drawn. The latest entry for a day replaces it. */
-      const day = todayKey()
-      setStepLog((prev) => [...prev.filter((e) => !(e.routineId === routineId && e.stepId === stepId && e.day === day)), { routineId, stepId, day, value }])
+      /* Every run is kept, with the moment it happened. Keying by day and
+         replacing meant a second attempt erased the first: run 76 in the
+         morning and 83 in the evening and the 76 was gone, which is the same
+         thing `records` was already doing wrong at a slower rate. */
+      setStepLog((prev) => [...prev, { routineId, stepId, day: todayKey(), at: new Date().toISOString(), value }])
       const key = `${routineId}:${stepId}`
       setRecords((prev) => (value > (prev[key] ?? 0) ? { ...prev, [key]: value } : prev))
     },

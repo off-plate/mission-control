@@ -126,7 +126,7 @@ function NumberChart({ runs, target, unit, width }: { runs: StepEntry[]; target?
   const yMin = Math.max(0, lo - pad), yMax = hi + pad
   const x = (i: number) => (runs.length === 1 ? L : L + (i / (runs.length - 1)) * (W - L - R))
   const y = (v: number) => T + (1 - (v - yMin) / Math.max(1, yMax - yMin)) * (H - T - B)
-  const ticks = [yMax, Math.round((yMax + yMin) / 2), yMin]
+  const ticks = [yMax, yMin]
 
   return (
     <svg className="numchart" viewBox={`0 0 ${W} ${H}`} role="img"
@@ -137,7 +137,12 @@ function NumberChart({ runs, target, unit, width }: { runs: StepEntry[]; target?
           <text x={L - 8} y={y(t) + 4} textAnchor="end" className="nc-axis">{Math.round(t)}</text>
         </g>
       ))}
-      {target != null && <line x1={L} y1={y(target)} x2={W - R} y2={y(target)} className="nc-target" />}
+      {target != null && (
+        <>
+          <line x1={L} y1={y(target)} x2={W - R} y2={y(target)} className="nc-target" />
+          <text x={L - 8} y={y(target) + 4} textAnchor="end" className="nc-target-lab">{target}</text>
+        </>
+      )}
       {runs.length > 1 && (
         <polyline className="nc-line" fill="none"
           points={runs.map((r, i) => `${x(i).toFixed(1)},${y(r.value).toFixed(1)}`).join(' ')} />
@@ -367,23 +372,13 @@ export function ReviewPage() {
         <>
           <SecHead label="Numbers" />
           {numberSeries.map((n) => {
-            const last = n.runs[n.runs.length - 1]
             return (
               <div className="panel numpanel" key={n.key}>
                 <div className="numpanel-head">
                   <span className="numpanel-title">{n.label}</span>
-                  {n.target != null && (
-                    <span className="numpanel-legend">
-                      <svg width="22" height="6" aria-hidden="true"><line x1="0" y1="3" x2="22" y2="3" className="nc-target" /></svg>
-                      {n.target} {n.unit} target
-                    </span>
+                  {n.best > Math.max(...n.runs.map((r) => r.value)) && (
+                    <span className="numpanel-fig mono">best {n.best} {n.unit}, before this window</span>
                   )}
-                  <span className="numpanel-fig mono">
-                    {n.runs.length > 1
-                      ? `${n.runs.length} runs, ${n.runs[0].value} to ${last.value} ${n.unit}`
-                      : `${last.value} ${n.unit}, once`}
-                    {n.best > 0 ? `, best ${n.best}` : ''}
-                  </span>
                 </div>
                 {/* Always drawn, from the first run. A chart with one point on
                     it is the start of the chart; replacing it with a sentence

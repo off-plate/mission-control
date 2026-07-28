@@ -349,6 +349,21 @@ function loadPersisted(): PersistedState | null {
       }))
     }
 
+    /* A rename of a SEEDED row has to reach state that already exists. Renaming
+       it in the seed alone did nothing here: routines and habits are his once
+       they exist, so the loader never touches their titles, and the new name
+       only ever appeared on a fresh install. This renames the seeded row only
+       while it still carries the exact old name, so anything he has renamed
+       himself is left alone and running it twice changes nothing. */
+    {
+      const renames: [string, string, string][] = [['r-evening', 'Evening shutdown', 'Before bed routine']]
+      for (const [id, was, now] of renames) {
+        p.routines = (p.routines ?? []).map((r) => (r.id === id && r.title === was ? { ...r, title: now } : r))
+        const hid = (p.routines ?? []).find((r) => r.id === id)?.habitId
+        p.habits = (p.habits ?? []).map((h) => ((h.id === hid || h.id === id.replace(/^r-/, 'h-')) && h.name === was ? { ...h, name: now } : h))
+      }
+    }
+
     /* Forward-fill fields added after this state was saved, so an existing
        install picks up new wiring (habit frequencies, habit-linked goals)
        without losing anything he has logged. Only ever fills a blank. */

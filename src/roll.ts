@@ -108,6 +108,7 @@ export function roll<T extends Rollable>(p: T, now = new Date()): T {
     firstMoveId: plan.committedDate === today ? plan.firstMoveId : null,
     returnedOn: returned.length ? today : plan.returnedOn,
     returnedCount: returned.length ? returned.length : (plan.returnedOn === today ? plan.returnedCount : 0),
+    returnedIds: returned.length ? returned : (plan.returnedOn === today ? plan.returnedIds : undefined),
   }
 
   p.lastRollDay = today

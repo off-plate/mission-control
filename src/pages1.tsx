@@ -681,9 +681,20 @@ export function PlanPage() {
   const [dropKey, setDropKey] = useState<string | null>(null)
   const [logging, setLogging] = useState<string | null>(null)
   const [flashId, setFlashId] = useState<string | null>(null)
+  const [flashIds, setFlashIds] = useState<string[]>([])
   const [listDropOver, setListDropOver] = useState(false)
   const [quick, setQuick] = useState('')
   const [breakdownFor, setBreakdownFor] = useState<Task | null>(null)
+
+  /* "Show me" points at the work that came back overnight: scroll the list into
+     view and mark those rows for a couple of seconds. */
+  const showReturned = () => {
+    const ids = plan.returnedIds ?? []
+    setFlashIds(ids)
+    const first = document.querySelector(`[data-todo-id="${ids[0]}"]`)
+    ;(first ?? document.querySelector('.todo-col'))?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    window.setTimeout(() => setFlashIds([]), 2600)
+  }
 
   /* Today's "Start" hands the task over here: flash it so the eye lands on it. */
   useEffect(() => {
@@ -752,10 +763,14 @@ export function PlanPage() {
       {plan.returnedOn === localDateKey() && (plan.returnedCount ?? 0) > 0 && (
         <div className="handoff">
           <span className="grow">
-            {plan.returnedCount} {plan.returnedCount === 1 ? 'thing' : 'things'} you did not get to went back to the list.
+            {plan.returnedCount === 1
+              ? '1 thing you did not finish is back on the list.'
+              : `${plan.returnedCount} things you did not finish are back on the list.`}
           </span>
           <button className="btn btn-quiet" onClick={() => openDay(prevDay())}>See yesterday</button>
-          <button className="btn btn-quiet" onClick={() => setPage('plan')}>Show me</button>
+          {/* This used to route to Plan from Plan, which is nothing happening.
+              It now finds them on the list and marks them for a moment. */}
+          <button className="btn btn-quiet" onClick={showReturned}>Show me</button>
         </div>
       )}
 
@@ -770,7 +785,7 @@ export function PlanPage() {
         {/* 2 — To-do list: everything you added, any day. Drag out to plan it,
             drag back to take it off today. */}
         <div
-          className={`panel${listDropOver ? ' drop-over' : ''}`}
+          className={`panel todo-col${listDropOver ? ' drop-over' : ''}`}
           onDragOver={(e) => { e.preventDefault(); setListDropOver(true) }}
           onDragLeave={() => setListDropOver(false)}
           onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); if (id) dropToList(id); setListDropOver(false) }}
@@ -802,9 +817,9 @@ export function PlanPage() {
             const hasSubs = !!t.subtasks?.length
             const doneSubs = t.subtasks?.filter((s) => s.done).length ?? 0
             return (
-              <div className="todo-item" key={t.id}>
+              <div className="todo-item" key={t.id} data-todo-id={t.id}>
                 <div
-                  className="todo-row"
+                  className={`todo-row${flashIds.includes(t.id) ? ' flash' : ''}`}
                   draggable
                   onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move' }}
                 >

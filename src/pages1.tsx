@@ -6,7 +6,7 @@ import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
 import { goalPeriodKey, goalPeriodRange, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, periodNoun, routinePeriods, slotForDaypart, taskMinutes, toMin } from './util'
 
@@ -631,11 +631,18 @@ export function PlanPage() {
   const todayIdx = (new Date().getDay() + 6) % 7
   const { startFocus } = usePomodoro()
   const { routines, habits } = useStore()
-  const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId, setTaskAt, plan, setPage, openDay, inView } = useStore()
+  const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId, setTaskAt, plan, setPage, openDay, view, inView } = useStore()
   const events = MOCK_AGENDA[space]
 
   const spaceTasks = tasks.filter((t) => inView(t.space))
   const backlogOpen = spaceTasks.filter((t) => !t.done && t.list === 'backlog') // the to-do pool
+  /* In All the three rooms would otherwise interleave into one undifferentiated
+     pile. Grouped by room, in the order of the switcher above, so the list reads
+     the same way the app is laid out. In a single room there is nothing to
+     group, so his own order is left alone. */
+  const backlogSorted = view === 'all'
+    ? [...backlogOpen].sort((a, b) => SPACES.indexOf(a.space) - SPACES.indexOf(b.space))
+    : backlogOpen
   const todayAll = spaceTasks.filter((t) => t.list === 'today')  // today incl. finished (they stay, struck)
   const todayTasks = todayAll.filter((t) => !t.done)             // still to do
   const doneUnsorted = todayAll.filter((t) => t.done && !t.slot) // finished, never scheduled
@@ -775,7 +782,7 @@ export function PlanPage() {
           <div className="todo-progress" aria-label={`${doneCount} of ${pool.length} tasks done`}>
             <div className="bar prog"><i style={{ width: `${donePct}%` }} /></div>
             <span className="todo-progress-label">
-              {doneCount} of {pool.length} done across this space · {fmtDuration(totalMin - doneMin)} left
+              {doneCount} of {pool.length} done · {fmtDuration(totalMin - doneMin)} left
             </span>
           </div>
           {/* Add a task; breaking it down is an action on the task itself. */}
@@ -790,7 +797,7 @@ export function PlanPage() {
             />
             <button className="btn btn-quiet" disabled={!quick.trim()} onClick={() => { addTask({ title: quick.trim(), source: 'mc', estimateMin: 0, space, list: 'backlog', category: 'quick' }); setQuick('') }}>Add</button>
           </div>
-          {backlogOpen.map((t) => {
+          {backlogSorted.map((t) => {
             const isExp = expanded.has(t.id)
             const hasSubs = !!t.subtasks?.length
             const doneSubs = t.subtasks?.filter((s) => s.done).length ?? 0
@@ -802,6 +809,7 @@ export function PlanPage() {
                   onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move' }}
                 >
                   <span className="drag-grip" aria-hidden="true">⠿</span>
+                  <SpaceMark space={t.space} />
                   <span className={`cat-dot ${t.category}`} aria-hidden="true" />
                   <span className="grow">{t.title}</span>
                   <EstimateChip task={t} />
@@ -1266,11 +1274,11 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
    own column with its own heading, so you read down "Morning" instead of
    hunting a flat grid for which card happens to be an evening one. */
 const DAYPART_COLS: { id: TimeSlot | 'anytime'; label: string }[] = [
+  { id: 'anytime', label: 'Anytime' },
   { id: 'morning', label: 'Morning' },
   { id: 'noon', label: 'Noon' },
   { id: 'afternoon', label: 'Afternoon' },
   { id: 'evening', label: 'Evening' },
-  { id: 'anytime', label: 'Anytime' },
 ]
 
 /* One sheet for adding and editing. A habit a routine drives keeps its name and
@@ -1463,7 +1471,7 @@ export function HabitsPage() {
           </div>
           <div className="habit-grid">
             {c.list.map((h) => (
-              <div className={`panel habit-card${h.paused ? ' is-paused' : ''}`} key={h.id}>
+              <div className={`panel habit-card is-${h.kind ?? 'build'}${h.paused ? ' is-paused' : ''}`} key={h.id}>
                 <HabitRow h={h} todayIndex={todayIndex} days={days} drivenBy={drivenBy.get(h.id)} progress={progressFor.get(h.id)} goal={goalOn.get(h.id)} actions={
                   <>
                   {h.paused && <span className="col-tot mono">paused</span>}

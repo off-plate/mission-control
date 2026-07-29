@@ -642,6 +642,8 @@ export interface PlanState {
    *  once rather than letting it happen silently. */
   returnedOn?: string
   returnedCount?: number
+  /** Which ones. Without the ids, "show me" had nothing to show. */
+  returnedIds?: string[]
   committedDate: string | null
   firstMoveId: string | null
 }

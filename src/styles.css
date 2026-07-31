@@ -2440,3 +2440,11 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .nc-dot { fill: var(--surface); stroke: var(--ink); stroke-width: 2; }
 .nc-dot.pass { fill: var(--progress); stroke: var(--progress); }
 .nc-val { font-size: 11px; fill: var(--muted); font-family: var(--font-mono); }
+
+/* Work that keeps coming back. Not an alarm: a fact, in the row, so the age of
+   a thing being avoided is visible instead of counted in silence. */
+.carried-tag {
+  flex: none; padding: 1px 7px; border-radius: 999px;
+  border: 1px solid var(--hairline-strong); background: var(--surface-2);
+  font-size: 0.625rem; letter-spacing: 0.03em; color: var(--muted);
+}

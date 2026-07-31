@@ -72,6 +72,29 @@ export function goalPeriodRange(tf: GoalTf, key: string): DateRange {
   return { id: key, label: `${h === 1 ? 'first' : 'second'} half of ${y}`, from: iso2(start), to: iso2(new Date(y, h === 1 ? 6 : 12, 0)) }
 }
 
+/**
+ * WHICH week, month, quarter or half this is, with dates. "This week" and "This
+ * quarter" name a position relative to now and nothing else: three weeks later
+ * the same words describe a different period, and a goal you set in July read
+ * identically to one set in September. The label was also hardcoded ("Q3 2026",
+ * "by year end"), so it would have been wrong from October onwards.
+ */
+export function periodLabel(tf: GoalTf, key = goalPeriodKey(tf)): string {
+  const r = goalPeriodRange(tf, key)
+  const d = (iso: string) => {
+    const [y, m, day] = iso.split('-').map(Number)
+    return new Date(y, m - 1, day).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  }
+  if (tf === 'weekly') return `${d(r.from)} to ${d(r.to)}`
+  if (tf === 'monthly') return monthName(key)
+  if (tf === 'quarter') {
+    const [qy, q] = key.split('-Q')
+    return `Q${q} ${qy}, ${d(r.from)} to ${d(r.to)}`
+  }
+  const [y, h] = key.split('-H')
+  return `${h === '1' ? 'first' : 'second'} half of ${y}, ${d(r.from)} to ${d(r.to)}`
+}
+
 /** Has this goal's period already ended? */
 export function periodIsPast(tf: GoalTf, key: string, now = new Date()): boolean {
   return goalPeriodRange(tf, key).to < localDateKey(now)

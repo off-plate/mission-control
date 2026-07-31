@@ -8,7 +8,7 @@ import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
 import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
-import { goalPeriodKey, goalPeriodRange, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, periodNoun, routinePeriods, slotForDaypart, taskMinutes, toMin } from './util'
+import { goalPeriodKey, goalPeriodRange, periodLabel, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, periodNoun, routinePeriods, slotForDaypart, taskMinutes, toMin } from './util'
 
 /* ---------------- shared bits ---------------- */
 
@@ -640,9 +640,16 @@ export function PlanPage() {
      pile. Grouped by room, in the order of the switcher above, so the list reads
      the same way the app is laid out. In a single room there is nothing to
      group, so his own order is left alone. */
-  const backlogSorted = view === 'all'
-    ? [...backlogOpen].sort((a, b) => SPACES.indexOf(a.space) - SPACES.indexOf(b.space))
-    : backlogOpen
+  /* Work that came back from a day he planned goes to the top, oldest first,
+     and says how many days it has been carried. The rollover was already
+     counting this and showing it nowhere, so a task on its fifth return looked
+     exactly like one added a minute ago. */
+  const cameBack = backlogOpen.filter((x) => (x.carried ?? 0) > 0).sort((a, b) => (b.carried ?? 0) - (a.carried ?? 0))
+  const fresh = backlogOpen.filter((x) => !(x.carried ?? 0))
+  const byRoom = (list: Task[]) => (view === 'all'
+    ? [...list].sort((a, b) => SPACES.indexOf(a.space) - SPACES.indexOf(b.space))
+    : list)
+  const backlogSorted = [...cameBack, ...byRoom(fresh)]
   const todayAll = spaceTasks.filter((t) => t.list === 'today')  // today incl. finished (they stay, struck)
   const todayTasks = todayAll.filter((t) => !t.done)             // still to do
   const doneUnsorted = todayAll.filter((t) => t.done && !t.slot) // finished, never scheduled
@@ -827,6 +834,11 @@ export function PlanPage() {
                   <SpaceMark space={t.space} />
                   <span className={`cat-dot ${t.category}`} aria-hidden="true" />
                   <span className="grow">{t.title}</span>
+                  {(t.carried ?? 0) > 0 && (
+                    <span className="carried-tag mono" title={`Planned and not finished on ${t.carried} ${t.carried === 1 ? 'day' : 'days'}`}>
+                      {t.carried === 1 ? 'came back' : `came back ${t.carried}x`}
+                    </span>
+                  )}
                   <EstimateChip task={t} />
                   {hasSubs && (
                     <button className="expand-btn" aria-expanded={isExp} aria-label={isExp ? 'Collapse subtasks' : 'Expand subtasks'} onClick={() => toggleExp(t.id)}>
@@ -1881,7 +1893,7 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals }: {
           <label className="field-label" htmlFor="gtf">Timeframe</label>
           <select id="gtf" className="textinput" style={{ width: '100%' }} value={d.timeframe}
             onChange={(e) => setD({ ...d, timeframe: e.target.value as GoalTimeframe })}>
-            {GOAL_TIMEFRAMES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+            {GOAL_TIMEFRAMES.map((t) => <option key={t.id} value={t.id}>{t.label} · {periodLabel(t.id as GoalTf)}</option>)}
           </select>
         </div>
         <div>
@@ -1947,7 +1959,7 @@ export function GoalsPage() {
             <div className="panel goal-col" key={tfr.id}>
               <div className="col-head">
                 <span className="microcap">{tfr.label}</span>
-                <span className="col-tot mono">{tfr.sub}</span>
+                <span className="col-tot mono">{periodLabel(tfr.id as GoalTf)}</span>
               </div>
               {inTf.map((g) => {
                 // Habit-linked goals count themselves; the rest hold their own number.

@@ -465,11 +465,15 @@ export const STEP_UNITS: Record<string, { unit: string; target?: number }> = {
 export type GoalTimeframe = 'weekly' | 'monthly' | 'quarter' | 'half'
 export type GoalCategory = 'money' | 'health' | 'life' | 'work' | 'offplate' | 'habits'
 
-export const GOAL_TIMEFRAMES: { id: GoalTimeframe; label: string; sub: string }[] = [
-  { id: 'weekly', label: 'This week', sub: '7 days' },
-  { id: 'monthly', label: 'This month', sub: '30 days' },
-  { id: 'quarter', label: 'This quarter', sub: 'Q3 2026' },
-  { id: 'half', label: 'Half year', sub: 'by year end' },
+/* No `sub` here any more. It held "Q3 2026" and "by year end" as literal
+   strings, so from October onwards the app would have been naming the wrong
+   quarter with total confidence. Which period this is gets computed from the
+   date at render time: see periodLabel(). */
+export const GOAL_TIMEFRAMES: { id: GoalTimeframe; label: string }[] = [
+  { id: 'weekly', label: 'This week' },
+  { id: 'monthly', label: 'This month' },
+  { id: 'quarter', label: 'This quarter' },
+  { id: 'half', label: 'Half year' },
 ]
 
 export const GOAL_CATEGORIES: { id: GoalCategory; label: string }[] = [

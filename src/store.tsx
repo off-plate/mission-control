@@ -375,6 +375,14 @@ function loadPersisted(): PersistedState | null {
     // A seeded habit added later is missing entirely; append it rather than reseed.
     const removed = new Set(p.removedSeeds ?? [])
     for (const s of MOCK_HABITS) if (!removed.has(s.id) && !p.habits.some((h) => h.id === s.id)) p.habits.push(s)
+    /* Same for a seeded ROUTINE added after this state was saved. Routines are
+       his once they exist, so the loader hands his own list straight back and a
+       new seed would otherwise only ever appear on a fresh install, which is
+       exactly how the renamed evening routine went missing. Appending one row
+       adds nothing to what he has already written, and a routine he deleted is
+       in removedSeeds, so this cannot resurrect it. */
+    p.routines = p.routines ?? []
+    for (const s of MOCK_ROUTINES) if (!removed.has(s.id) && !p.routines.some((r) => r.id === s.id)) p.routines.push(s)
 
     /* A day that has not happened yet cannot be done. Future ticks were also
        unreachable, since those dots are disabled, so they could never be undone. */

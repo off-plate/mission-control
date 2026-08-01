@@ -118,7 +118,7 @@ export const MOCK_HABITS: HabitDef[] = [
   { id: 'h-creatine', space: 'personal', name: 'Take creatine', daypart: 'morning', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-prework', space: 'personal', name: 'Before work', frequency: 'weekdays', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-evening', space: 'personal', name: 'Before bed routine', daypart: 'evening', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
-  { id: 'h-nightwork', space: 'personal', name: 'Night work routine', daypart: 'evening', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
+  { id: 'h-nightwork', space: 'offplate', name: 'Night work routine', daypart: 'evening', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   /* No daypart: brain rot does not keep office hours, so this sits in Anytime
      until he decides it belongs to a part of the day. */
   { id: 'h-brainrot', space: 'personal', name: 'Out Brain Rot', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
@@ -167,7 +167,19 @@ export const MOCK_ROUTINES: Routine[] = [
       { id: 'be6', title: 'Set the alarm', kind: 'do' },
     ],
   },
-  { id: 'r-nightwork', space: 'personal', title: 'Night work routine', cadence: 'daily', habitId: 'h-nightwork', doneStepIds: [], steps: [] },
+  /* Night work is Off-Plate work: evening business sessions, ended on purpose.
+     The end time is a step because the midnight rule is policy, not mood. */
+  {
+    id: 'r-nightwork', space: 'offplate', title: 'Night work routine', cadence: 'daily', habitId: 'h-nightwork',
+    doneStepIds: [],
+    steps: [
+      { id: 'nw1', title: 'Define the tasks for the night', kind: 'do', note: 'Off today\u2019s list.' },
+      { id: 'nw2', title: 'Set the end time', kind: 'do', note: 'Decide when you stop before you start.' },
+      { id: 'nw3', title: 'Clear the desk', kind: 'do', note: 'Phone out of reach. Nothing else open.' },
+      { id: 'nw4', title: 'Start with the first task', kind: 'do' },
+      { id: 'nw5', title: 'Stop at the end time', kind: 'do', note: 'Write one line: where you stopped and what\u2019s next.' },
+    ],
+  },
   {
     id: 'r-brainrot', space: 'personal', title: 'Out Brain Rot', cadence: 'daily', habitId: 'h-brainrot', repeatable: true,
     doneStepIds: [],

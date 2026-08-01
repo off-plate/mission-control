@@ -81,6 +81,10 @@ function DaySchedule({ day }: { day: string }) {
           stamped moments, and past days ticked by hand. Named, not placed. */}
       {untimed.length > 0 && (
         <div className="cal-untimed">
+          {/* Bare chips read as clutter with no name. The caption carries the
+              one fact the hours cannot: these were done, the clock was not
+              recorded, which only happens to ticks from before stamping. */}
+          <span className="cal-untimed-cap mono">done this day, no clock time recorded</span>
           {untimed.map((u, i) => (
             <span className={`cal-chip k-${u.kind}`} key={i}>
               <i aria-hidden="true" />{u.title}

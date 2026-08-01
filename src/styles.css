@@ -878,7 +878,10 @@ select.textinput { flex: 0 0 auto; min-width: 110px; }
   position: relative;
 }
 .daydot:hover { border-color: var(--progress); }
-.daydot[aria-checked="true"] { background: var(--progress); border-color: var(--progress); color: var(--bg); }
+/* .kept carries the same paint as a checked dot: the auto habit's card marked
+   kept days with a class no rule ever styled, so a day the log had ticked drew
+   as an empty circle and the card read "1 of 7" over seven blanks. */
+.daydot[aria-checked="true"], .daydot.kept { background: var(--progress); border-color: var(--progress); color: var(--bg); }
 .daydot:disabled { opacity: 0.65; cursor: default; }
 .habit-paused td { opacity: 0.75; }
 
@@ -2646,3 +2649,4 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 @keyframes est-spin { to { transform: rotate(360deg); } }
 /* which hours a part of the day means */
 .bucket-hours { font-size: 0.6875rem; color: var(--faint); margin-left: var(--s2); }
+.cal-untimed-cap { flex: 1 0 100%; font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); }

@@ -389,6 +389,15 @@ function loadPersisted(): PersistedState | null {
       }))
     }
 
+    /* Night work moves home to Off-Plate, 2026-08-02: it is business-evening
+       work, not personal life. Space is not something the UI lets him edit on a
+       routine, so this cannot be overriding a choice of his. Runs once. */
+    if (!p.removedSeeds.includes('fix:nightwork-space')) {
+      p.removedSeeds.push('fix:nightwork-space')
+      p.routines = (p.routines ?? []).map((r) => (r.id === 'r-nightwork' && r.space === 'personal' ? { ...r, space: 'offplate' } : r))
+      p.habits = (p.habits ?? []).map((h) => (h.id === 'h-nightwork' && h.space === 'personal' ? { ...h, space: 'offplate' } : h))
+    }
+
     /* Week rollover: when the saved state belongs to an earlier ISO week, each
        habit's checkmarks are archived into its 12-week history and cleared, so
        Monday always starts a fresh row instead of showing last week's ticks. */

@@ -412,7 +412,9 @@ export function fmtNum(n: number): string {
 /** Signed h/m for "time saved", where a negative total means you ran over. */
 export function fmtSigned(min: number): string {
   const a = Math.abs(min)
-  return `${min < 0 ? '-' : ''}${Math.floor(a / 60)}h ${a % 60}m`
+  const sign = min < 0 ? '-' : '+'
+  if (a < 60) return `${sign}${a}m`
+  return a % 60 === 0 ? `${sign}${a / 60}h` : `${sign}${Math.floor(a / 60)}h ${a % 60}m`
 }
 
 /**

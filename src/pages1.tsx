@@ -9,6 +9,7 @@ import { BreakdownSheet, Sheet } from './modals'
 import { Linkify } from './widgets'
 import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, isCounted, COUNT_PERIODS, routineComplete, routineProgress, routineRunsOn, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
+import { estimateTask } from './ai'
 import { goalPeriodKey, goalPeriodRange, habitPeriodRange, periodKeyFor, periodLabel, shiftPeriodKey, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForMoment, taskMinutes, toMin } from './util'
 
 /* ---------------- shared bits ---------------- */
@@ -433,6 +434,9 @@ export function Schedule({ events, tasks, onDropAt }: { events: AgendaEvent[]; t
   )
 }
 
+/* Each part of the day says WHICH hours it means, in the header, because
+   "Morning" answers nothing about where 12:30 goes. */
+const BUCKET_HINT: Record<string, string> = Object.fromEntries(SLOTS.map((s) => [s.id, s.hint]))
 const BUCKETS: { id: TimeSlot | 'unsorted'; label: string }[] = [
   { id: 'unsorted', label: 'Unsorted' },
   ...SLOTS.map((s) => ({ id: s.id, label: s.label })),
@@ -572,6 +576,17 @@ function EstimateChip({ task }: { task: Task }) {
 function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
   const { setEstimate, inView } = useStore()
   const hasSubs = !!task.subtasks?.length
+  const [thinking, setThinking] = useState(false)
+  /* The AI reads the task; the local rule of thumb only catches the fall. A
+     flat default dressed as an estimate taught him to ignore the button. */
+  const estimate = async () => {
+    if (thinking) return
+    setThinking(true)
+    try {
+      const ai = await estimateTask(task.title, task.category)
+      setEstimate(task.id, ai ?? estimateFor(task.title, task.category).minutes)
+    } finally { setThinking(false) }
+  }
   return (
     <span className="task-actions">
       {onFocus && (
@@ -592,14 +607,15 @@ function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
         disabled={hasSubs}
         aria-label={hasSubs ? `${task.title} takes its estimate from its steps` : `Estimate how long ${task.title} takes`}
         title={hasSubs ? 'Estimate comes from the steps' : 'Estimate the time'}
-        onClick={() => {
-          const e = estimateFor(task.title, task.category)
-          setEstimate(task.id, e.minutes)
-        }}
+        onClick={estimate}
       >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-          <circle cx="12" cy="13" r="8" /><path d="M12 9v4l2.5 2M9 2h6" strokeLinecap="round" />
-        </svg>
+        {thinking
+          ? <span className="est-thinking" aria-label="Estimating" />
+          : (
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <circle cx="12" cy="13" r="8" /><path d="M12 9v4l2.5 2M9 2h6" strokeLinecap="round" />
+            </svg>
+          )}
       </button>
     </span>
   )
@@ -728,7 +744,7 @@ export function PlanPage() {
   const todayIdx = (new Date().getDay() + 6) % 7
   const { startFocus } = usePomodoro()
   const { routines, habits } = useStore()
-  const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId, setTaskAt, plan, setPage, openDay, view, inView } = useStore()
+  const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId, setTaskAt, plan, setPage, openDay, view, inView, focusSessions } = useStore()
 
   const spaceTasks = tasks.filter((t) => inView(t.space))
   const backlogOpen = spaceTasks.filter((t) => !t.done && t.list === 'backlog') // the to-do pool
@@ -773,11 +789,23 @@ export function PlanPage() {
   const doneCount = pool.filter((t) => t.done).length
   const donePct = totalMin ? Math.round((doneMin / totalMin) * 100) : 0
 
-  // time saved today: estimate minus actual, only for what you finished in Today
-  const loggedAny = todayAll.some((t) => t.actualMin != null || t.subtasks?.some((s) => s.actualMin != null))
+  /* Time saved today: estimate minus what it actually took. A task finished
+     through the focus timer never had its minutes typed in, so its focus blocks
+     ARE its actual; without that, an hour of overrun quietly vanished from the
+     number and "saved" read positive on a day that ran long. */
+  const focusActual = (t: Task) => {
+    const want = t.title.trim().toLowerCase()
+    const mins = focusSessions
+      .filter((f) => f.day === localDateKey() && (f.label ?? '').trim().toLowerCase() === want && inView(f.space))
+      .reduce((a, f) => a + f.minutes, 0)
+    return mins > 0 ? mins : null
+  }
+  const actualOf = (t: Task) => t.actualMin ?? (t.done ? focusActual(t) : null)
+  const loggedAny = todayAll.some((t) => actualOf(t) != null || t.subtasks?.some((x) => x.actualMin != null))
   const savedToday = todayAll.reduce((acc, t) => {
-    if (t.subtasks?.length) return acc + t.subtasks.reduce((a, s) => a + (s.done && s.actualMin != null ? s.estimateMin - s.actualMin : 0), 0)
-    return acc + (t.done && t.actualMin != null ? t.estimateMin - t.actualMin : 0)
+    if (t.subtasks?.length) return acc + t.subtasks.reduce((a, x) => a + (x.done && x.actualMin != null ? x.estimateMin - x.actualMin : 0), 0)
+    const actual = actualOf(t)
+    return acc + (t.done && actual != null ? t.estimateMin - actual : 0)
   }, 0)
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -858,6 +886,7 @@ export function PlanPage() {
         metrics={[
           { v: fmtDuration(plannedMin), k: 'planned today', tone: 'info' as const },
           { v: `${donePct}%`, k: 'to-do done', tone: 'pos' as const },
+          ...(loggedAny ? [{ v: fmtSigned(savedToday), k: savedToday >= 0 ? 'saved today' : 'over estimate', tone: (savedToday >= 0 ? 'pos' : 'urgent') as 'pos' | 'urgent' }] : []),
         ]}
         /* The way back into the record. Every day before this one is addressable
            from here, and from there one arrow at a time. */
@@ -893,15 +922,11 @@ export function PlanPage() {
           onDragLeave={() => setListDropOver(false)}
           onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); if (id) dropToList(id); setListDropOver(false) }}
         >
+          {/* One line that says what the list holds and what is left. The bar
+              and the bare "10 here" were three tellings of half a fact. */}
           <div className="col-head">
             <span className="microcap">To-do list</span>
-            <span className="col-tot mono">{backlogOpen.length} here</span>
-          </div>
-          <div className="todo-progress" aria-label={`${doneCount} of ${pool.length} tasks done`}>
-            <div className="bar prog"><i style={{ width: `${donePct}%` }} /></div>
-            <span className="todo-progress-label">
-              {doneCount} of {pool.length} done · {fmtDuration(totalMin - doneMin)} left
-            </span>
+            <span className="col-tot mono">{doneCount} of {pool.length} done · {fmtDuration(totalMin - doneMin)} left</span>
           </div>
           {/* Add a task; breaking it down is an action on the task itself. */}
           <div className="formrow" style={{ marginBottom: 'var(--s2)' }}>
@@ -967,7 +992,6 @@ export function PlanPage() {
         <div className="panel">
           <div className="col-head">
             <span className="microcap">Today</span>
-            {loggedAny && <span className={`col-tot mono ${savedToday >= 0 ? 'val-pos' : 'val-urgent'}`}>{savedToday >= 0 ? '+' : ''}{savedToday}m saved</span>}
             <span className="col-tot mono">{fmtDuration(plannedMin)} planned</span>
           </div>
           {BUCKETS.map((b) => {
@@ -1000,6 +1024,7 @@ export function PlanPage() {
               >
                 <div className="bucket-head">
                   <span className="bucket-name">{b.label}</span>
+                  {BUCKET_HINT[b.id] && <span className="bucket-hours mono">{BUCKET_HINT[b.id]}</span>}
                   {tot > 0 && <span className="tot mono">{fmtDuration(tot)}</span>}
                 </div>
                 {items.length === 0 ? (

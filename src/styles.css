@@ -2641,3 +2641,8 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .goal-nav-btn { min-width: 26px; min-height: 24px; border: 1px solid var(--hairline); border-radius: 4px; color: var(--muted); font-size: var(--text-sm); line-height: 1; }
 .goal-nav-btn:hover { border-color: var(--hairline-strong); color: var(--ink); }
 .goal-nav-btn.now { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.03em; padding: 0 6px; }
+/* the clock button while the model is thinking */
+.est-thinking { width: 13px; height: 13px; border: 2px solid var(--hairline-strong); border-top-color: var(--accent); border-radius: 50%; display: inline-block; animation: est-spin 0.7s linear infinite; }
+@keyframes est-spin { to { transform: rotate(360deg); } }
+/* which hours a part of the day means */
+.bucket-hours { font-size: 0.6875rem; color: var(--faint); margin-left: var(--s2); }

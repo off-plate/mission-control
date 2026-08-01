@@ -107,6 +107,34 @@ async function groq(body: Record<string, unknown>, key: string): Promise<Respons
 
 export interface AiStep { title: string; why?: string; estimateMin: number }
 
+/** One realistic estimate for a task, from the same model that writes the
+ *  breakdowns. The clock button used a local rule of thumb that read as "15m
+ *  for everything"; if AI estimates the steps, it estimates the whole too. */
+export async function estimateTask(title: string, category: TaskCategory): Promise<number | null> {
+  const key = getAiKey()
+  if (!key) return null
+  try {
+    const res = await groq({
+      model: MODEL,
+      temperature: 0.2,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: 'You estimate how long a personal task realistically takes for one focused person, including the usual friction (finding things, small interruptions). Reply as JSON: {"minutes": <integer 5-480>}. Round to a sensible 5-minute step. No text outside the JSON.' },
+        { role: 'user', content: `Task: ${title}
+Kind of work: ${category}` },
+      ],
+    }, key)
+    if (!res.ok) return null
+    const data = await res.json()
+    const parsed = JSON.parse(stripReasoning(data.choices?.[0]?.message?.content ?? '') || '{}')
+    const n = Number(parsed.minutes)
+    if (!Number.isFinite(n) || n <= 0) return null
+    return Math.max(5, Math.min(480, Math.round(n / 5) * 5))
+  } catch {
+    return null
+  }
+}
+
 export type BreakdownResult =
   | { ok: true; steps: AiStep[] }
   | { ok: false; reason: 'no-key' | 'bad-key' | 'rate-limit' | 'failed' }

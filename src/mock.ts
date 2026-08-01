@@ -129,6 +129,12 @@ export const MOCK_HABITS: HabitDef[] = [
      long he focused, so asking him to confirm it would be asking twice. */
   { id: 'h-focus1h', space: 'personal', name: 'Focus for more than 1h', frequency: 'daily', paused: false, auto: { from: 'focus', minutes: 60 }, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-morningwork', space: 'work', name: 'Morning Big Time work routine', daypart: 'morning', frequency: 'weekdays', paused: false, days: [false, false, false, false, false, false, false], history: [] },
+  /* One per working workspace, all fed by the clock: thirty minutes of focus
+     on that workspace's OWN tasks keeps it, partial blocks included, because a
+     banked half-block is still minutes worked. */
+  { id: 'h-focus-work', space: 'work', name: 'Focus for 30 minutes', frequency: 'daily', paused: false, auto: { from: 'focus', minutes: 30 }, days: [false, false, false, false, false, false, false], history: [] },
+  { id: 'h-focus-offplate', space: 'offplate', name: 'Focus for 30 minutes', frequency: 'daily', paused: false, auto: { from: 'focus', minutes: 30 }, days: [false, false, false, false, false, false, false], history: [] },
+  { id: 'h-focus-corner', space: 'corner', name: 'Focus for 30 minutes', frequency: 'daily', paused: false, auto: { from: 'focus', minutes: 30 }, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-weekly', space: 'personal', name: 'Weekly review', frequency: 'weekly', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-monthly', space: 'personal', name: 'Monthly review', frequency: 'monthly', paused: false, days: [false, false, false, false, false, false, false], history: [] },
 ]

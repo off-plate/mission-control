@@ -233,7 +233,7 @@ interface Store extends PersistedState {
   deleteFocus: (id: string) => void
   /** Keep any auto habit whose measured total has reached its threshold. The
    *  running block counts: `extraMin` is what the timer has on the clock now. */
-  syncAutoHabits: (extraMin?: number) => void
+  syncAutoHabits: (extraMin?: number, label?: string) => void
 
   /** Every dated habit tick and routine completion. The record days[] caches. */
   habitLog: HabitTick[]
@@ -918,7 +918,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
      clock, because an hour that is still running is still an hour. The rule runs
      over every day in the record, so correcting or deleting a block takes back a
      day it no longer earns. */
-  const autoFrom = (sessions: FocusSession[], extra: number) => {
+  const autoFrom = (sessions: FocusSession[], extra: number, extraLabel?: string) => {
+    // Declared below in this scope; only ever CALLED after both exist.
+    const extraSpace = extra > 0 ? spaceOfLabel(extraLabel) : null
     const today = todayKey()
     const rules = habits.filter((h) => h.auto?.from === 'focus' && !h.archivedAt)
     if (!rules.length) return
@@ -929,7 +931,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const src = `auto:focus:${h.id}`
       for (const day of days) {
         const mins = sessions.filter((s) => s.day === day && s.space === h.space).reduce((a, s) => a + s.minutes, 0)
-          + (day === today ? extra : 0)
+          + (day === today && extraSpace === h.space ? extra : 0)
         const has = next.some((t) => t.habitId === h.id && t.day === day && t.src === src)
         const earns = mins >= (h.auto?.minutes ?? 60)
         if (earns && !has) next = [...next, { habitId: h.id, day, src, at: day === today ? new Date().toISOString() : undefined }]
@@ -947,11 +949,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   /* One writer for finished focus, whatever day it belongs to. A block that
      crosses midnight banks its first half onto yesterday through this exact
      path, so both halves look identical to everything downstream. */
+  /* Which workspace a block's WORK belongs to: the task it names, wherever he
+     happened to be standing when the timer rang. Big Time work done while the
+     app showed Personal is still Big Time work. */
+  const spaceOfLabel = (label?: string): SpaceId => {
+    if (label) {
+      const want = label.trim().toLowerCase()
+      const t = tasks.find((x) => x.title.trim().toLowerCase() === want)
+      if (t) return t.space
+      const holder = tasks.find((x) => x.subtasks?.some((st) => st.title.trim().toLowerCase() === want))
+      if (holder) return holder.space
+    }
+    return space
+  }
+
   const logFocusOn = (day: string, minutes: number, label?: string, at?: string) => {
     if (minutes <= 0) return
     const mins = Math.round(minutes)
     const lid = newId('l')
-    const next = [{ id: newId('f'), day, minutes: mins, label, space, ledgerId: lid, at: at ?? new Date().toISOString() }, ...focusSessions]
+    const next = [{ id: newId('f'), day, minutes: mins, label, space: spaceOfLabel(label), ledgerId: lid, at: at ?? new Date().toISOString() }, ...focusSessions]
     setFocusSessions(next)
     setLedger((prev) => [
       { id: lid, title: label ? `Focus: ${label}` : 'Focus block', category: 'deep' as TaskCategory,
@@ -1117,7 +1133,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (gone?.ledgerId) setLedger((prev) => prev.filter((l) => l.id !== gone.ledgerId))
       autoFrom(next, 0)
     },
-    syncAutoHabits: (extraMin = 0) => autoFrom(focusSessions, extraMin),
+    syncAutoHabits: (extraMin = 0, label) => autoFrom(focusSessions, extraMin, label),
     space, setSpace,
     page, setPage, dayKey, openDay,
     editing, setEditing,

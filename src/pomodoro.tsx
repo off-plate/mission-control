@@ -183,7 +183,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
      minutes on the clock are offered up as they accumulate. */
   const elapsedMin = phase === 'focus' && running ? Math.max(0, Math.floor((blockMin * 60 - secondsLeft) / 60)) : 0
   useEffect(() => {
-    if (elapsedMin > 0) syncAutoHabits(elapsedMin)
+    if (elapsedMin > 0) syncAutoHabits(elapsedMin, focusLabel ?? undefined)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elapsedMin])
 

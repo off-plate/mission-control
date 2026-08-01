@@ -12,6 +12,47 @@ import { goalCurrent, ON_TRACK_PCT, type SizeKey, type SpaceId, type WidgetType 
 import { fmtDuration, fmtNum, fmtTimeShort, goalPace } from './util'
 
 /** `fluid` makes the line span its container, so label rows underneath line up. */
+/* A pasted URL is an address, not prose: shown raw it swallowed two lines of a
+   task title. Wherever free text renders, links collapse to a short clickable
+   host/path and the words around them stay words. */
+const URL_RE = /https?:\/\/[^\s<>"')]+/g
+
+function shortUrl(raw: string): string {
+  try {
+    const u = new URL(raw)
+    const seg = u.pathname.split('/').filter(Boolean)[0]
+    const path = seg ? `/${seg}` : ''
+    const s = `${u.hostname.replace(/^www\./, '')}${path}`
+    return s.length > 34 ? `${s.slice(0, 33)}…` : `${s}${u.pathname.split('/').filter(Boolean).length > 1 ? '/…' : ''}`
+  } catch { return raw.length > 34 ? `${raw.slice(0, 33)}…` : raw }
+}
+
+export function Linkify({ text }: { text: string }) {
+  const parts: React.ReactNode[] = []
+  let last = 0
+  for (const m of text.matchAll(URL_RE)) {
+    const at = m.index ?? 0
+    if (at > last) parts.push(text.slice(last, at))
+    const url = m[0]
+    parts.push(
+      <a
+        key={at} className="txt-link" href={url} target="_blank" rel="noreferrer" title={url}
+        /* The row underneath has its own ideas about clicks and drags; opening
+           a link must not toggle, drag or expand anything. */
+        onClick={(e) => e.stopPropagation()}
+        draggable={false}
+        onDragStart={(e) => e.preventDefault()}
+      >
+        {shortUrl(url)}
+      </a>,
+    )
+    last = at + url.length
+  }
+  if (parts.length === 0) return <>{text}</>
+  if (last < text.length) parts.push(text.slice(last))
+  return <>{parts}</>
+}
+
 export function Spark({ data, width = 120, height = 32, fluid = false }: { data: number[]; width?: number; height?: number; fluid?: boolean }) {
   const max = Math.max(...data)
   const min = Math.min(...data)
@@ -117,7 +158,7 @@ const TasksBody = memo(function TasksBody({ space, size }: { space: SpaceId; siz
               </svg>
             </button>
             <span className={`cat-dot ${t.category}`} title={t.category} aria-hidden="true" />
-            <span className="grow wrap2">{t.title}</span>
+            <span className="grow wrap2"><Linkify text={t.title} /></span>
             {!t.done && t.actualMin === undefined && (
               <span className={`actual-chips${logOpen === t.id ? ' open' : ''}`} title="Done in...">
                 {[Math.max(1, Math.round(t.estimateMin / 3)), t.estimateMin].map((m) => (

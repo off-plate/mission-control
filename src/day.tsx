@@ -1,4 +1,5 @@
 import { useStore } from './store'
+import { Linkify } from './widgets'
 import { Band, SpaceMark } from './pages1'
 import { fmtDuration, localDateKey } from './util'
 import { quitKeptDays, slipDays } from './types'
@@ -151,7 +152,7 @@ export function DayPage() {
             {focus.map((f) => (
               <div className="day-row" key={f.id}>
                 <SpaceMark space={f.space} />
-                <span className="day-row-title">{f.label ?? 'Focus block'}</span>
+                <span className="day-row-title"><Linkify text={f.label ?? 'Focus block'} /></span>
                 <span className="day-row-fig mono">{fmtDuration(f.minutes)}</span>
               </div>
             ))}

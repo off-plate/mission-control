@@ -6,6 +6,7 @@ import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
+import { Linkify } from './widgets'
 import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, isCounted, COUNT_PERIODS, routineComplete, routineProgress, routineRunsOn, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
 import { goalPeriodKey, goalPeriodRange, habitPeriodRange, periodKeyFor, periodLabel, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForMoment, taskMinutes, toMin } from './util'
@@ -472,7 +473,7 @@ function SubtaskRow({ taskId, sub }: { taskId: string; sub: SubTask }) {
   return (
     <div className={`subtask-row${sub.done ? ' is-done' : ''}`}>
       <span className="sub-tick" aria-hidden="true" />
-      <span className="grow" style={{ fontSize: 'var(--text-sm)' }}>{sub.title}</span>
+      <span className="grow" style={{ fontSize: 'var(--text-sm)' }}><Linkify text={sub.title} /></span>
       <span className="est-chip">{sub.done && sub.actualMin != null ? `${fmtDuration(sub.actualMin)} taken` : fmtDuration(sub.estimateMin)}</span>
       <span className="sub-tools">
         <button className="sub-tool" aria-label={`Edit step: ${sub.title}`} onClick={() => setEditing(true)}>Edit</button>
@@ -925,7 +926,7 @@ export function PlanPage() {
                   <span className="drag-grip" aria-hidden="true">⠿</span>
                   <SpaceMark space={t.space} />
                   <span className={`cat-dot ${t.category}`} aria-hidden="true" />
-                  <span className="grow">{t.title}</span>
+                  <span className="grow"><Linkify text={t.title} /></span>
                   {(t.carried ?? 0) > 0 && (
                     <span className="carried-tag mono" title={`Planned and not finished on ${t.carried} ${t.carried === 1 ? 'day' : 'days'}`}>
                       {t.carried === 1 ? 'came back' : `came back ${t.carried}x`}
@@ -1032,7 +1033,7 @@ export function PlanPage() {
                             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
                           </button>
                           <span className={`cat-dot ${t.category}`} aria-hidden="true" />
-                          <span className="grow wrap2">{t.title}</span>
+                          <span className="grow wrap2"><Linkify text={t.title} /></span>
                           {t.done && t.actualMin != null ? (
                             <span className="est-vs-actual mono">{fmtDuration(taskMinutes(t))} → {fmtDuration(t.actualMin)} <b className={taskMinutes(t) - t.actualMin >= 0 ? 'val-pos' : 'val-urgent'}>{taskMinutes(t) - t.actualMin >= 0 ? '+' : ''}{taskMinutes(t) - t.actualMin}m</b></span>
                           ) : (

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
 import { Band } from './pages1'
+import { Linkify } from './widgets'
 import { fmtDuration, fmtWhen, localDateKey } from './util'
 import type { FocusSession } from './types'
 
@@ -43,7 +44,7 @@ function Row({ f }: { f: FocusSession }) {
   }
   return (
     <div className="focus-row">
-      <span className="grow">{f.label ?? 'Focus block'}</span>
+      <span className="grow"><Linkify text={f.label ?? 'Focus block'} /></span>
       {clock(f.at) && <span className="focus-at mono">{clock(f.at)}</span>}
       <span className="est-chip">{fmtDuration(f.minutes)}</span>
       <span className="sub-tools">

@@ -220,8 +220,6 @@ interface Store extends PersistedState {
   updateFocus: (id: string, patch: { minutes?: number; label?: string }) => void
   /** Remove a focus block, and the ledger row it wrote with it. */
   deleteFocus: (id: string) => void
-  /** Record focus done away from the app, on any day. */
-  addFocusManual: (input: { minutes: number; label?: string; day: string }) => void
   /** Keep any auto habit whose measured total has reached its threshold. The
    *  running block counts: `extraMin` is what the timer has on the clock now. */
   syncAutoHabits: (extraMin?: number) => void
@@ -911,7 +909,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const mins = Math.round(minutes)
       // No cap: a focus block is a dated record and the history views read it.
       const lid = newId('l')
-      const next = [{ id: newId('f'), day, minutes: mins, label, space, ledgerId: lid }, ...focusSessions]
+      const next = [{ id: newId('f'), day, minutes: mins, label, space, ledgerId: lid, at: new Date().toISOString() }, ...focusSessions]
       setFocusSessions(next)
       setLedger((prev) => [
         { id: lid, title: label ? `Focus: ${label}` : 'Focus block', category: 'deep' as TaskCategory,
@@ -943,18 +941,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const next = focusSessions.filter((f) => f.id !== id)
       setFocusSessions(next)
       if (gone?.ledgerId) setLedger((prev) => prev.filter((l) => l.id !== gone.ledgerId))
-      autoFrom(next, 0)
-    },
-    addFocusManual: ({ minutes, label, day }) => {
-      const mins = Math.max(1, Math.round(minutes))
-      const lid = newId('l')
-      const next = [{ id: newId('f'), day, minutes: mins, label, space, ledgerId: lid, manual: true }, ...focusSessions]
-      setFocusSessions(next)
-      setLedger((prev) => [
-        { id: lid, title: label ? `Focus: ${label}` : 'Focus block', category: 'deep' as TaskCategory,
-          estimateMin: mins, actualMin: mins, when: day, space, weekKey: isoWeekKey() },
-        ...prev,
-      ])
       autoFrom(next, 0)
     },
     syncAutoHabits: (extraMin = 0) => autoFrom(focusSessions, extraMin),

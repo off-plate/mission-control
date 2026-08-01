@@ -311,8 +311,8 @@ export interface FocusSession {
   /** The ledger row this block wrote, so editing or deleting the block can keep
    *  the ledger honest instead of leaving an orphan behind. */
   ledgerId?: string
-  /** Entered by hand rather than timed, e.g. focus done away from the app. */
-  manual?: boolean
+  /** When the block finished, so the history can say when as well as how long. */
+  at?: string
 }
 
 export interface HabitDef {

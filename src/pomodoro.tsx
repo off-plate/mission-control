@@ -12,6 +12,10 @@ interface Pomo {
   running: boolean
   secondsLeft: number
   focusMin: number
+  /** How long the block currently running was started for. NOT the setting: a
+   *  block started from a task runs for that task's estimate, and reading the
+   *  setting instead reported the wrong length and a negative elapsed time. */
+  blockMin: number
   breakMin: number
   cyclesDone: number
   startFocus: (minutes?: number, label?: string) => void
@@ -37,7 +41,7 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStar
    and any running phase (kept as a wall-clock deadline, not a countdown). */
 const PK = 'mc-pomodoro'
 interface Saved {
-  focusMin: number; breakMin: number; cyclesDone: number; cyclesDay: string
+  focusMin: number; blockMin: number; breakMin: number; cyclesDone: number; cyclesDay: string
   phase: Phase; endsAt: number | null; pausedLeft: number | null; focusLabel: string | null
 }
 const today = () => new Date().toDateString()
@@ -55,6 +59,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   const { logFocus, syncAutoHabits } = useStore()
   const saved = useState(loadPomo)[0]
   const [focusMin, setFocusMin] = useState(saved.focusMin ?? 25)
+  const [blockMin, setBlockMin] = useState(saved.blockMin ?? saved.focusMin ?? 25)
   const [breakMin, setBreakMin] = useState(saved.breakMin ?? 5)
   const [phase, setPhase] = useState<Phase>(saved.phase ?? 'idle')
   // A phase is stored as the moment it ends, so a backgrounded or reloaded tab
@@ -78,9 +83,9 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(PK, JSON.stringify({ focusMin, breakMin, cyclesDone, cyclesDay: today(), phase, endsAt, pausedLeft, focusLabel }))
+      localStorage.setItem(PK, JSON.stringify({ focusMin, blockMin, breakMin, cyclesDone, cyclesDay: today(), phase, endsAt, pausedLeft, focusLabel }))
     } catch { /* noop */ }
-  }, [focusMin, breakMin, cyclesDone, phase, endsAt, pausedLeft, focusLabel])
+  }, [focusMin, blockMin, breakMin, cyclesDone, phase, endsAt, pausedLeft, focusLabel])
 
   // Re-render twice a second while running; the clock itself comes from the deadline.
   useEffect(() => {
@@ -94,7 +99,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   /* An hour that is still running is still an hour. A habit kept by focus time
      would otherwise wait for the block to finish before admitting it, so the
      minutes on the clock are offered up as they accumulate. */
-  const elapsedMin = phase === 'focus' && running ? Math.floor((focusMin * 60 - secondsLeft) / 60) : 0
+  const elapsedMin = phase === 'focus' && running ? Math.max(0, Math.floor((blockMin * 60 - secondsLeft) / 60)) : 0
   useEffect(() => {
     if (elapsedMin > 0) syncAutoHabits(elapsedMin)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -106,7 +111,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     if (phase === 'focus') {
       setCyclesDone((c) => c + 1)
       // The block is only counted once it is actually finished.
-      logFocus(focusMin, focusLabel ?? undefined)
+      logFocus(blockMin, focusLabel ?? undefined)
       notify('Focus done', `Nice. ${breakMin} minute break.`)
       setPhase('break')
       setEndsAt(Date.now() + breakMin * 60 * 1000)
@@ -132,6 +137,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   const startFocus = (minutes?: number, label?: string) => {
     if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission()
     const mins = Math.max(1, Math.round(minutes ?? focusMin))
+    setBlockMin(mins)
     setFocusLabel(label ?? null)
     setPhase('focus'); setEndsAt(Date.now() + mins * 60 * 1000); setPausedLeft(null)
   }
@@ -146,7 +152,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   }
   const stop = () => { setPhase('idle'); setEndsAt(null); setPausedLeft(null); setFocusLabel(null) }
 
-  const value: Pomo = { phase, running, secondsLeft, focusMin, breakMin, cyclesDone, focusLabel, startFocus, toggle, skip, stop, setFocusMin, setBreakMin }
+  const value: Pomo = { phase, running, secondsLeft, focusMin, blockMin, breakMin, cyclesDone, focusLabel, startFocus, toggle, skip, stop, setFocusMin, setBreakMin }
   return (
     <Ctx.Provider value={value}>
       {children}

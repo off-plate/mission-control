@@ -52,7 +52,7 @@ function loadPomo(): Partial<Saved> {
 }
 
 export function PomodoroProvider({ children }: { children: ReactNode }) {
-  const { logFocus } = useStore()
+  const { logFocus, syncAutoHabits } = useStore()
   const saved = useState(loadPomo)[0]
   const [focusMin, setFocusMin] = useState(saved.focusMin ?? 25)
   const [breakMin, setBreakMin] = useState(saved.breakMin ?? 5)
@@ -90,6 +90,15 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     document.addEventListener('visibilitychange', onShow)
     return () => { window.clearInterval(id); document.removeEventListener('visibilitychange', onShow) }
   }, [running, phase])
+
+  /* An hour that is still running is still an hour. A habit kept by focus time
+     would otherwise wait for the block to finish before admitting it, so the
+     minutes on the clock are offered up as they accumulate. */
+  const elapsedMin = phase === 'focus' && running ? Math.floor((focusMin * 60 - secondsLeft) / 60) : 0
+  useEffect(() => {
+    if (elapsedMin > 0) syncAutoHabits(elapsedMin)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elapsedMin])
 
   // phase transitions at zero
   useEffect(() => {

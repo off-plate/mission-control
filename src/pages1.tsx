@@ -1202,6 +1202,10 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
   goal?: Goal
 }) {
   const { toggleHabitDay, logSlip, logCount, setPage, focusSessions, habitLog, slips, inView } = useStore()
+  /* The block on the clock counts toward today, so an hour reached while the
+     timer is still running shows here rather than after it stops. */
+  const pomo = usePomodoro()
+  const liveFocusMin = pomo.phase === 'focus' && pomo.running ? Math.floor((pomo.focusMin * 60 - pomo.secondsLeft) / 60) : 0
   const kept = h.days.filter(Boolean).length
   const target = habitTarget(h)
   // Weekdays-only habits do not expect the weekend, so those dots stay quiet.
@@ -1229,6 +1233,44 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
      only ever fitted work he sits and times; most things he wants more of are
      things he DOES, and asking him for "20 minutes of cold showers a day" was
      the wrong question dressed as a target. */
+  /* Kept by the clock, not by him. It shows how far today has got and says what
+     is keeping it, so a tick he cannot press never reads as a tick that failed. */
+  if (h.auto?.from === 'focus') {
+    const need = h.auto.minutes
+    const todayMin = focusMinutesOn(focusSessions, localDateKey(), h.space) + liveFocusMin
+    const kept7 = keptDaysIn(habitLog, h.id, dayOfWeekKey(0), dayOfWeekKey(6)).size
+    return (
+      <div className="habit-row is-count">
+        <div className="habit-row-top">
+          <SpaceMark space={h.space} />
+          <span className="habit-name">{h.name}</span>
+          <span className="habit-count mono">
+            {fmtDuration(todayMin)}<span className="habit-freq">of {fmtDuration(need)} today</span>
+          </span>
+          {actions}
+        </div>
+        <div className="count-bar" aria-hidden="true">
+          <span style={{ width: `${Math.min(100, Math.round((todayMin / need) * 100))}%` }} />
+        </div>
+        <div className="habit-days">
+          {DAY_LABELS.map((d, i) => {
+            const on = keptDaysIn(habitLog, h.id, dayOfWeekKey(i), dayOfWeekKey(i)).size > 0
+            return (
+              <span className="day-cell" key={i}>
+                <span className={`daydot${on ? ' kept' : ''}`} aria-label={`${d}, ${on ? 'kept' : 'not kept'}`} />
+                <span className={`day-lab${i === todayIndex ? ' today' : ''}`}>{d[0]}</span>
+              </span>
+            )
+          })}
+        </div>
+        <div className="habit-foot">
+          <button className="habit-auto" onClick={() => setPage('focus')}>Kept by your focus blocks</button>
+          <span className="habit-weeks">{kept7} of 7 this week</span>
+        </div>
+      </div>
+    )
+  }
+
   if (isCounted(h)) {
     const per = h.per ?? 'day'
     const range = habitPeriodRange(per)

@@ -216,6 +216,15 @@ interface Store extends PersistedState {
   focusSessions: FocusSession[]
   /** Called when a focus block finishes; feeds measured habits and the ledger. */
   logFocus: (minutes: number, label?: string) => void
+  /** Correct a focus block: its length, or what it was for. */
+  updateFocus: (id: string, patch: { minutes?: number; label?: string }) => void
+  /** Remove a focus block, and the ledger row it wrote with it. */
+  deleteFocus: (id: string) => void
+  /** Record focus done away from the app, on any day. */
+  addFocusManual: (input: { minutes: number; label?: string; day: string }) => void
+  /** Keep any auto habit whose measured total has reached its threshold. The
+   *  running block counts: `extraMin` is what the timer has on the clock now. */
+  syncAutoHabits: (extraMin?: number) => void
 
   /** Every dated habit tick and routine completion. The record days[] caches. */
   habitLog: HabitTick[]
@@ -518,7 +527,7 @@ function routeFromHash(): { page: PageId; day: string | null } {
   const h = location.hash.replace('#/', '')
   const m = h.match(/^day\/(\d{4}-\d{2}-\d{2})$/)
   if (m) return { page: 'day', day: m[1] }
-  const pages: PageId[] = ['today', 'plan', 'assistant', 'habits', 'routines', 'goals', 'money', 'review', 'coach', 'stats', 'settings', 'brand', 'braindump']
+  const pages: PageId[] = ['today', 'plan', 'assistant', 'habits', 'routines', 'goals', 'money', 'review', 'coach', 'stats', 'settings', 'brand', 'braindump', 'focus']
   return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
 }
 
@@ -692,6 +701,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog])
 
+  /* Focus history that predates the rule, or a day whose blocks were edited in
+     another session, still has to be answered for. One pass on mount settles it. */
+  useEffect(() => { autoFrom(focusSessions, 0) }, [])
+
   /* Closing the tab inside the debounce window must not lose the last change:
      flush the pending remote write the moment the page starts hiding. */
   useEffect(() => {
@@ -745,6 +758,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const held = next.some((t) => t.habitId === habitId && t.day === day)
     setHabits((prev) => prev.map((h) => (h.id === habitId
       ? { ...h, days: h.days.map((d, i) => (i === idx ? held : d)) }
+      : h)))
+  }
+
+  /* A habit the app keeps for him. Focus minutes are already measured, so a
+     habit that only says "did you focus for an hour" should never need a tick:
+     it reads the total and answers itself. `extra` is the block currently on the
+     clock, because an hour that is still running is still an hour. The rule runs
+     over every day in the record, so correcting or deleting a block takes back a
+     day it no longer earns. */
+  const autoFrom = (sessions: FocusSession[], extra: number) => {
+    const today = todayKey()
+    const rules = habits.filter((h) => h.auto?.from === 'focus' && !h.archivedAt)
+    if (!rules.length) return
+    const days = new Set(sessions.map((s) => s.day))
+    days.add(today)
+    let next = habitLog
+    for (const h of rules) {
+      const src = `auto:focus:${h.id}`
+      for (const day of days) {
+        const mins = sessions.filter((s) => s.day === day && s.space === h.space).reduce((a, s) => a + s.minutes, 0)
+          + (day === today ? extra : 0)
+        const has = next.some((t) => t.habitId === h.id && t.day === day && t.src === src)
+        const earns = mins >= (h.auto?.minutes ?? 60)
+        if (earns && !has) next = [...next, { habitId: h.id, day, src }]
+        if (!earns && has) next = next.filter((t) => !(t.habitId === h.id && t.day === day && t.src === src))
+      }
+    }
+    if (next === habitLog) return
+    setHabitLog(next)
+    const idx = (new Date().getDay() + 6) % 7
+    setHabits((prev) => prev.map((h) => (rules.some((r) => r.id === h.id)
+      ? { ...h, days: h.days.map((d, i) => (i === idx ? next.some((t) => t.habitId === h.id && t.day === today) : d)) }
       : h)))
   }
 
@@ -865,13 +910,54 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const day = todayKey()
       const mins = Math.round(minutes)
       // No cap: a focus block is a dated record and the history views read it.
-      setFocusSessions((prev) => [{ id: newId('f'), day, minutes: mins, label, space }, ...prev])
+      const lid = newId('l')
+      const next = [{ id: newId('f'), day, minutes: mins, label, space, ledgerId: lid }, ...focusSessions]
+      setFocusSessions(next)
       setLedger((prev) => [
-        { id: newId('l'), title: label ? `Focus: ${label}` : 'Focus block', category: 'deep' as TaskCategory,
+        { id: lid, title: label ? `Focus: ${label}` : 'Focus block', category: 'deep' as TaskCategory,
           estimateMin: mins, actualMin: mins, when: day, space, weekKey: isoWeekKey() },
         ...prev,
       ])
+      autoFrom(next, 0)
     },
+    updateFocus: (id, patch) => {
+      const next = focusSessions.map((f) => (f.id === id
+        ? { ...f, ...(patch.minutes !== undefined ? { minutes: Math.max(1, Math.round(patch.minutes)) } : {}), ...(patch.label !== undefined ? { label: patch.label } : {}) }
+        : f))
+      setFocusSessions(next)
+      const f = next.find((x) => x.id === id)
+      // The ledger row is the same block seen from the other side; keep them equal.
+      if (f?.ledgerId) {
+        setLedger((prev) => prev.map((l) => (l.id === f.ledgerId
+          ? { ...l, estimateMin: f.minutes, actualMin: f.minutes, title: f.label ? `Focus: ${f.label}` : 'Focus block' }
+          : l)))
+      }
+      autoFrom(next, 0)
+    },
+    deleteFocus: (id) => {
+      const gone = focusSessions.find((f) => f.id === id)
+      const beforeF = focusSessions, beforeL = ledger, beforeH = habitLog
+      armUndo(gone ? `Removed a ${gone.minutes}m focus block` : 'Focus block removed', () => {
+        setFocusSessions(beforeF); setLedger(beforeL); setHabitLog(beforeH)
+      })
+      const next = focusSessions.filter((f) => f.id !== id)
+      setFocusSessions(next)
+      if (gone?.ledgerId) setLedger((prev) => prev.filter((l) => l.id !== gone.ledgerId))
+      autoFrom(next, 0)
+    },
+    addFocusManual: ({ minutes, label, day }) => {
+      const mins = Math.max(1, Math.round(minutes))
+      const lid = newId('l')
+      const next = [{ id: newId('f'), day, minutes: mins, label, space, ledgerId: lid, manual: true }, ...focusSessions]
+      setFocusSessions(next)
+      setLedger((prev) => [
+        { id: lid, title: label ? `Focus: ${label}` : 'Focus block', category: 'deep' as TaskCategory,
+          estimateMin: mins, actualMin: mins, when: day, space, weekKey: isoWeekKey() },
+        ...prev,
+      ])
+      autoFrom(next, 0)
+    },
+    syncAutoHabits: (extraMin = 0) => autoFrom(focusSessions, extraMin),
     space, setSpace,
     page, setPage, dayKey, openDay,
     editing, setEditing,

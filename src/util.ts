@@ -95,6 +95,19 @@ export function periodLabel(tf: GoalTf, key = goalPeriodKey(tf)): string {
   return `${h === '1' ? 'first' : 'second'} half of ${y}, ${d(r.from)} to ${d(r.to)}`
 }
 
+/** The period key N steps away from the current one: last week, next quarter.
+ *  Weeks step by seven days, months and quarters by calendar months, so the
+ *  arithmetic can never invent a period that does not exist. */
+export function shiftPeriodKey(tf: GoalTf, offset: number, now = new Date()): string {
+  if (offset === 0) return goalPeriodKey(tf, now)
+  if (tf === 'weekly') {
+    const d = new Date(now); d.setDate(d.getDate() + offset * 7)
+    return goalPeriodKey(tf, d)
+  }
+  const months = tf === 'monthly' ? offset : tf === 'quarter' ? offset * 3 : offset * 6
+  return goalPeriodKey(tf, new Date(now.getFullYear(), now.getMonth() + months, 1))
+}
+
 /** Has this goal's period already ended? */
 export function periodIsPast(tf: GoalTf, key: string, now = new Date()): boolean {
   return goalPeriodRange(tf, key).to < localDateKey(now)

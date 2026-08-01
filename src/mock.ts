@@ -129,7 +129,7 @@ export const MOCK_HABITS: HabitDef[] = [
      long he focused, so asking him to confirm it would be asking twice. */
   { id: 'h-focus1h', space: 'personal', name: 'Focus for more than 1h', frequency: 'daily', paused: false, auto: { from: 'focus', minutes: 60 }, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-morningwork', space: 'work', name: 'Morning work routine', daypart: 'morning', frequency: 'weekdays', paused: false, days: [false, false, false, false, false, false, false], history: [] },
-  { id: 'h-weekly', space: 'personal', name: 'Weekly reset', frequency: 'weekly', paused: false, days: [false, false, false, false, false, false, false], history: [] },
+  { id: 'h-weekly', space: 'personal', name: 'Weekly review', frequency: 'weekly', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-monthly', space: 'personal', name: 'Monthly review', frequency: 'monthly', paused: false, days: [false, false, false, false, false, false, false], history: [] },
 ]
 
@@ -175,7 +175,7 @@ export const MOCK_ROUTINES: Routine[] = [
       { id: 'br5', title: 'Start', kind: 'do', note: 'Work on the one task.' },
     ],
   },
-  { id: 'r-weekly', space: 'personal', title: 'Weekly reset', cadence: 'weekly', habitId: 'h-weekly', doneStepIds: [], steps: [] },
+  { id: 'r-weekly', space: 'personal', title: 'Weekly review', cadence: 'weekly', habitId: 'h-weekly', doneStepIds: [], steps: [] },
   { id: 'r-monthly', space: 'personal', title: 'Monthly review', cadence: 'monthly', habitId: 'h-monthly', doneStepIds: [], steps: [] },
 ]
 

@@ -1421,6 +1421,11 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 .subtask.alt { padding-left: var(--s2); }
 
 .routine-dur { font-size: 0.6875rem; color: var(--faint); font-weight: 400; }
+.step-optional {
+  font-size: 0.625rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint);
+  font-weight: 500; border: 1px solid var(--hairline); border-radius: 3px; padding: 1px 5px;
+}
+.routine-step.checked .step-optional { text-decoration: none; }
 .routine-link { font-size: var(--text-sm); color: var(--accent); align-self: flex-start; }
 .routine-link:hover { text-decoration: underline; }
 .routine-card-foot { display: flex; align-items: center; gap: var(--s3); margin-top: auto; padding-top: var(--s3); }

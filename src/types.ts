@@ -139,6 +139,10 @@ export interface RoutineStep {
   note?: string
   /** e.g. a tongue-twister to read aloud. */
   example?: string
+  /** Worth doing, not required. It does not hold the routine open and it does
+   *  not count towards the routine's own total, so skipping it costs nothing
+   *  and doing it never leaves the count short of the finish line. */
+  optional?: boolean
   /** A habit this step keeps. Ticking the step keeps the habit for the day and
    *  unticking gives it back, without the step's routine having to own it: the
    *  same habit can be fed by a step in several routines. */
@@ -476,7 +480,22 @@ export interface Routine {
  *  is never complete: there is nothing to have done. */
 export function routineComplete(r: Routine, currentPeriodKey: string): boolean {
   if (r.periodKey !== currentPeriodKey) return false
-  return r.steps.length > 0 && r.steps.every((s) => r.doneStepIds.includes(s.id))
+  return r.steps.length > 0 && requiredSteps(r).every((s) => r.doneStepIds.includes(s.id))
+}
+
+/** The steps that actually have to happen. A routine made entirely of optional
+ *  steps would otherwise be finished before it started, so in that case every
+ *  step counts and the word optional means nothing, which is the honest read. */
+export function requiredSteps(r: Routine): RoutineStep[] {
+  const need = r.steps.filter((s) => !s.optional)
+  return need.length ? need : r.steps
+}
+
+/** How far through a routine he is, counting only what it needs. Counting the
+ *  optional ones too would park a finished routine at five of six. */
+export function routineProgress(r: Routine): { done: number; total: number } {
+  const need = requiredSteps(r)
+  return { done: need.filter((s) => r.doneStepIds.includes(s.id)).length, total: need.length }
 }
 
 /** Steps that cannot be ticked by hand until something is true. The typing test

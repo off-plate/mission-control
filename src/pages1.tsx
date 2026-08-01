@@ -489,10 +489,11 @@ function SubtaskRow({ taskId, sub }: { taskId: string; sub: SubTask }) {
 function EditTaskSheet({ task, onClose }: { task: Task; onClose: () => void }) {
   const { updateTask } = useStore()
   const [title, setTitle] = useState(task.title)
-  const [mins, setMins] = useState(String(taskMinutes(task) || 15))
-  const derived = !!task.subtasks?.length
+  /* Only the words. The minutes already have a home of their own, on the
+     estimate chip and on each step, and a second door to the same number is
+     how two numbers disagree. */
   const save = () => {
-    updateTask(task.id, { title, ...(derived ? {} : { estimateMin: Number(mins) || undefined }) })
+    updateTask(task.id, { title })
     onClose()
   }
   return (
@@ -501,14 +502,6 @@ function EditTaskSheet({ task, onClose }: { task: Task; onClose: () => void }) {
       <input id="et-title" className="textinput" style={{ width: '100%' }} value={title} autoFocus
         onChange={(e) => setTitle(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter' && title.trim()) save() }} />
-      <label className="field-label" htmlFor="et-min" style={{ marginTop: 'var(--s4)' }}>Minutes</label>
-      {derived ? (
-        <p className="assist-note">Its estimate is the sum of its steps, so it is edited on the steps.</p>
-      ) : (
-        <input id="et-min" className="textinput mono" style={{ width: 120 }} type="number" min={1} max={600} value={mins}
-          onChange={(e) => setMins(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && title.trim()) save() }} />
-      )}
       <div className="sheet-actions">
         <button className="btn btn-quiet" onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" disabled={!title.trim()} onClick={save}>Save changes</button>

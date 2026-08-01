@@ -112,6 +112,9 @@ export const MOCK_HABITS: HabitDef[] = [
   { id: 'h-prework', space: 'personal', name: 'Before work', frequency: 'weekdays', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-evening', space: 'personal', name: 'Before bed routine', daypart: 'evening', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-nightwork', space: 'personal', name: 'Night work routine', daypart: 'evening', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
+  /* No daypart: brain rot does not keep office hours, so this sits in Anytime
+     until he decides it belongs to a part of the day. */
+  { id: 'h-brainrot', space: 'personal', name: 'Out Brain Rot', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-weekly', space: 'personal', name: 'Weekly reset', frequency: 'weekly', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-monthly', space: 'personal', name: 'Monthly review', frequency: 'monthly', paused: false, days: [false, false, false, false, false, false, false], history: [] },
 ]
@@ -136,6 +139,7 @@ export const MOCK_ROUTINES: Routine[] = [
   { id: 'r-prework', space: 'personal', title: 'Before work', cadence: 'prework', habitId: 'h-prework', doneStepIds: [], steps: [] },
   { id: 'r-evening', space: 'personal', title: 'Before bed routine', cadence: 'daily', habitId: 'h-evening', doneStepIds: [], steps: [] },
   { id: 'r-nightwork', space: 'personal', title: 'Night work routine', cadence: 'daily', habitId: 'h-nightwork', doneStepIds: [], steps: [] },
+  { id: 'r-brainrot', space: 'personal', title: 'Out Brain Rot', cadence: 'daily', habitId: 'h-brainrot', doneStepIds: [], steps: [] },
   { id: 'r-weekly', space: 'personal', title: 'Weekly reset', cadence: 'weekly', habitId: 'h-weekly', doneStepIds: [], steps: [] },
   { id: 'r-monthly', space: 'personal', title: 'Monthly review', cadence: 'monthly', habitId: 'h-monthly', doneStepIds: [], steps: [] },
 ]

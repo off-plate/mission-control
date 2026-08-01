@@ -6,9 +6,9 @@ import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, countIn, countTarget, isCounted, COUNT_PERIODS, routineComplete, routineProgress, routineRunsOn, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, isCounted, COUNT_PERIODS, routineComplete, routineProgress, routineRunsOn, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
-import { goalPeriodKey, goalPeriodRange, habitPeriodRange, periodKeyFor, periodLabel, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, periodNoun, routinePeriods, slotForMoment, taskMinutes, toMin } from './util'
+import { goalPeriodKey, goalPeriodRange, habitPeriodRange, periodKeyFor, periodLabel, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForMoment, taskMinutes, toMin } from './util'
 
 /* ---------------- shared bits ---------------- */
 
@@ -1208,6 +1208,10 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
   const liveFocusMin = pomo.phase === 'focus' && pomo.running ? Math.floor((pomo.focusMin * 60 - pomo.secondsLeft) / 60) : 0
   const kept = h.days.filter(Boolean).length
   const target = habitTarget(h)
+  /* Twice in a day is not the same as once. The log has held both since
+     meditation started being fed by two routines; without this the card said
+     the same thing either way. */
+  const timesToday = habitCountOn(habitLog, h.id, localDateKey())
   // Weekdays-only habits do not expect the weekend, so those dots stay quiet.
   const expected = (i: number) => (h.frequency === 'weekdays' ? i < 5 : true)
   // How many of the last 12 weeks actually hit the target. This is the number
@@ -1392,7 +1396,10 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
         {/* The week's count belongs to the week. Showing 1/7 above a year of
             squares says two different things about the same habit. */}
         {window === 7 && (
-          <span className="habit-count mono">{kept}/{target}<span className="habit-freq">{habitFrequencyLabel(h)}</span></span>
+          <span className="habit-count mono">
+            {kept}/{target}
+            <span className="habit-freq">{timesToday > 1 ? `${timesToday}x today` : habitFrequencyLabel(h)}</span>
+          </span>
         )}
         {actions}
       </div>

@@ -1914,7 +1914,10 @@ export function RoutinesPage() {
       <div className="routine-cards">
         {sorted.length === 0 && <div className="empty">No routines in this space yet. Add one from the button above.</div>}
         {sorted.map((r) => {
-          if (r.id === 'r-morning' && editingId !== r.id) {
+          /* Every MORNING ritual gets the same guided format, whatever its
+             workspace: one look for one kind of thing. A morning routine with
+             no steps yet keeps the plain card, which is where steps are added. */
+          if ((r.id === 'r-morning' || r.id === 'r-morningwork') && r.steps.length > 0 && editingId !== r.id) {
             return <MorningRoutine routine={r} key={r.id} onEdit={() => setEditingId(r.id)} />
           }
           const { done, total } = routineProgress(r)

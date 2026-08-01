@@ -443,16 +443,20 @@ export function quitDays(h: HabitDef, slips: HabitSlip[], today = new Date()): b
 
 /** The days inside a window that a quit habit was kept, derived rather than
  *  ticked: every day from the day he stopped, minus every day he logged a slip. */
-export function quitKeptDays(h: HabitDef, slips: HabitSlip[], from: string, to: string): Set<string> {
+export function quitKeptDays(h: HabitDef, slips: HabitSlip[], from: string, to: string, today = isoOf(new Date())): Set<string> {
   const out = new Set<string>()
   if (h.kind !== 'break' || !h.quitSince) return out
   const start = h.quitSince > from ? h.quitSince : from
   const [y, m, d] = start.split('-').map(Number)
   if (!y) return out
+  /* Only days that have actually happened. Counting the window's future days
+     as clean handed a monthly quit goal all thirty days at birth, so it was
+     REACHED on the 1st before the month had asked anything of him. */
+  const end = to < today ? to : today
   const slipped = slipDays(slips, h.id)
   for (const cur = new Date(y, m - 1, d); ; cur.setDate(cur.getDate() + 1)) {
     const key = isoOf(cur)
-    if (key > to) break
+    if (key > end) break
     if (!slipped.has(key)) out.add(key)
   }
   return out

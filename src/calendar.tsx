@@ -14,36 +14,46 @@ const DOW = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 const HOUR_PX = 42
 const HOURS = 24
 
-/** Everything that happened on one day, placed at its wall-clock moment. */
+/** Everything that happened on one day. What carries a wall-clock moment lands
+ *  on the hours; what does not is still SAID, in the untimed strip, because a
+ *  habit kept before the clock existed is not less kept. */
 interface Moment { at: string; title: string; kind: 'task' | 'habit' | 'routine' | 'focus'; minutes?: number }
 
-function useDayMoments(day: string): Moment[] {
+function useDayHappenings(day: string): { timed: Moment[]; untimed: { title: string; kind: Moment['kind'] }[] } {
   const { tasks, habits, habitLog, routines, routineLog, focusSessions, inView } = useStore()
   return useMemo(() => {
-    const out: Moment[] = []
+    const timed: Moment[] = []
+    const untimed: { title: string; kind: Moment['kind'] }[] = []
+    const tell = (at: string | undefined, title: string, kind: Moment['kind'], minutes?: number) => {
+      if (at) timed.push({ at, title, kind, minutes })
+      else if (!untimed.some((u) => u.title === title)) untimed.push({ title, kind })
+    }
     for (const f of focusSessions) {
-      if (f.day === day && f.at && inView(f.space)) out.push({ at: f.at, title: f.label ?? 'Focus block', kind: 'focus', minutes: f.minutes })
+      if (f.day === day && inView(f.space)) tell(f.at, f.label ?? 'Focus block', 'focus', f.minutes)
     }
     for (const t of tasks) {
-      if (t.done && t.doneAt?.startsWith(day) && inView(t.space)) out.push({ at: t.doneAt, title: t.title, kind: 'task' })
+      if (t.done && inView(t.space)) {
+        if (t.doneAt?.startsWith(day)) tell(t.doneAt, t.title, 'task')
+      }
     }
     for (const r of routineLog) {
-      if (r.day === day && r.at) {
-        const ro = routines.find((x) => x.id === r.routineId)
-        if (ro && inView(ro.space)) out.push({ at: r.at, title: ro.title, kind: 'routine' })
-      }
+      if (r.day !== day) continue
+      const ro = routines.find((x) => x.id === r.routineId)
+      if (ro && inView(ro.space)) tell(r.at, ro.title, 'routine')
     }
+    /* One row per habit per day here: the schedule tells each MOMENT, but a
+       pre-clock day only knows THAT it was kept. */
+    const seen = new Set<string>()
     for (const t of habitLog) {
-      if (t.day === day && t.at && !t.src?.startsWith('auto:')) {
-        const h = habits.find((x) => x.id === t.habitId)
-        // A routine-step tick is already told as its routine; the habit the
-        // routine mirrors would say the same thing twice at the same hour.
-        if (h && inView(h.space) && !routines.some((r) => r.habitId === h.id && !r.archivedAt)) {
-          out.push({ at: t.at, title: h.name, kind: 'habit' })
-        }
-      }
+      if (t.day !== day || t.src?.startsWith('auto:')) continue
+      const h = habits.find((x) => x.id === t.habitId)
+      // A routine-step tick is already told as its routine; the habit the
+      // routine mirrors would say the same thing twice at the same hour.
+      if (!h || !inView(h.space) || routines.some((r) => r.habitId === h.id && !r.archivedAt)) continue
+      if (t.at) tell(t.at, h.name, 'habit')
+      else if (!seen.has(h.id)) { seen.add(h.id); tell(undefined, h.name, 'habit') }
     }
-    return out.sort((a, b) => a.at.localeCompare(b.at))
+    return { timed: timed.sort((a, b) => a.at.localeCompare(b.at)), untimed }
   }, [tasks, habits, habitLog, routines, routineLog, focusSessions, day, inView])
 }
 
@@ -54,7 +64,7 @@ const minutesOf = (iso: string) => { const d = new Date(iso); return d.getHours(
 function DaySchedule({ day }: { day: string }) {
   const { tasks, inView } = useStore()
   const pomo = usePomodoro()
-  const moments = useDayMoments(day)
+  const { timed: moments, untimed } = useDayHappenings(day)
   const isToday = day === localDateKey()
   const y = (mins: number) => (mins / 60) * HOUR_PX
   const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
@@ -63,7 +73,19 @@ function DaySchedule({ day }: { day: string }) {
   const liveMin = isToday && pomo.phase === 'focus' ? Math.max(0, Math.floor((pomo.blockMin * 60 - pomo.secondsLeft) / 60)) : 0
 
   return (
-    <div className="vsched cal-sched">
+    <>
+      {/* Kept and finished without a clock time: history from before the app
+          stamped moments, and past days ticked by hand. Named, not placed. */}
+      {untimed.length > 0 && (
+        <div className="cal-untimed">
+          {untimed.map((u, i) => (
+            <span className={`cal-chip k-${u.kind}`} key={i}>
+              <i aria-hidden="true" />{u.title}
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="vsched cal-sched">
       <div className="vsched-inner" style={{ height: HOURS * HOUR_PX }}>
         {Array.from({ length: HOURS + 1 }, (_, h) => (
           <div key={h} className="hline" style={{ top: h * HOUR_PX }}>
@@ -103,7 +125,8 @@ function DaySchedule({ day }: { day: string }) {
           )
         })}
       </div>
-    </div>
+      </div>
+    </>
   )
 }
 

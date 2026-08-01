@@ -191,18 +191,16 @@ function MonthGrid({ year, month, selected, counts, onPick }: {
 export function CalendarPage() {
   const { openDay } = useStore()
   const [selected, setSelected] = useState(localDateKey())
-  /* The four months on show, as an offset from the current one. History gets
-     one month by default because the record is mostly behind you. */
-  const [from, setFrom] = useState(-1)
+  /* ONE month on show, moved with the arrows. Four at once buried the one that
+     matters under three walls of numbers. */
+  const [from, setFrom] = useState(0)
   const counts = useDayCounts()
   const isToday = selected === localDateKey()
   const doneOn = counts.get(selected) ?? 0
 
   const now = new Date()
-  const months = Array.from({ length: 4 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() + from + i, 1)
-    return { year: d.getFullYear(), month: d.getMonth() }
-  })
+  const shown = new Date(now.getFullYear(), now.getMonth() + from, 1)
+  const month = { year: shown.getFullYear(), month: shown.getMonth() }
 
   return (
     <div className="page">
@@ -211,9 +209,9 @@ export function CalendarPage() {
         metrics={doneOn > 0 ? [{ v: String(doneOn), k: `finished ${isToday ? 'today' : fmtWhen(selected)}`, tone: 'pos' as const }] : []}
         actions={
           <span className="cal-nav">
-            <button className="btn btn-ghost" onClick={() => setFrom((f) => f - 1)} aria-label="Earlier months">←</button>
-            <button className="btn btn-ghost" onClick={() => setFrom(-1)} disabled={from === -1}>Now</button>
-            <button className="btn btn-ghost" onClick={() => setFrom((f) => f + 1)} aria-label="Later months">→</button>
+            <button className="btn btn-ghost" onClick={() => setFrom((f) => f - 1)} aria-label="Previous month">←</button>
+            <button className="btn btn-ghost" onClick={() => { setFrom(0); setSelected(localDateKey()) }} disabled={from === 0}>Now</button>
+            <button className="btn btn-ghost" onClick={() => setFrom((f) => f + 1)} aria-label="Next month">→</button>
           </span>
         }
       />
@@ -230,11 +228,9 @@ export function CalendarPage() {
 
         {/* 2+3 — four months of the record */}
         <div className="cal-wide">
-          <div className="cal-months">
-            {months.map((m) => (
-              <MonthGrid key={`${m.year}-${m.month}`} year={m.year} month={m.month}
-                selected={selected} counts={counts} onPick={setSelected} />
-            ))}
+          <div className="cal-months one">
+            <MonthGrid year={month.year} month={month.month}
+              selected={selected} counts={counts} onPick={setSelected} />
           </div>
         </div>
       </div>

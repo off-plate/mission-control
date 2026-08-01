@@ -2589,6 +2589,15 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 85%;
 }
 .cal-months { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s4); }
+/* One month, generous cells; the arrows do the travelling. */
+.cal-months.one { grid-template-columns: 1fr; }
+.cal-months.one .cal-month { max-width: 880px; }
+.cal-months.one .cal-grid { gap: 4px; }
+.cal-months.one .cal-day { aspect-ratio: auto; min-height: 84px; align-items: flex-start; justify-content: flex-start; padding: 8px; border-color: var(--hairline); }
+.cal-months.one .cal-day:hover { border-color: var(--hairline-strong); }
+.cal-months.one .cal-num { font-size: var(--text-sm); }
+.cal-months.one .cal-marks { margin-top: auto; }
+.cal-months.one .cal-marks i { width: 6px; height: 6px; }
 .cal-month-name { margin-bottom: var(--s2); }
 .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
 .cal-dow { font-size: 0.625rem; color: var(--faint); text-align: center; padding-bottom: 2px; }

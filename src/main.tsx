@@ -6,6 +6,7 @@ import App from './App'
 import { StoreProvider, STORAGE_KEY } from './store'
 import { PomodoroProvider } from './pomodoro'
 import { SUPABASE_ENABLED, clearAuthFragment, currentAccount, loadRemoteState, onAccountChange } from './supabase'
+import { mergeStates } from './sync-merge'
 import { LOCAL_ONLY_KEY, SignIn } from './signin'
 
 // One root for the container's lifetime: choosing "this device only" swaps the
@@ -68,8 +69,13 @@ async function boot() {
         const remote = await loadRemoteState()
         if (remote) {
           const schema = (JSON.parse(remote) as { schema?: string }).schema
-          if (schema === STORAGE_KEY) localStorage.setItem(STORAGE_KEY, remote)
-          else localStorage.removeItem(STORAGE_KEY)
+          if (schema === STORAGE_KEY) {
+            /* Merged, never pasted over: this device may hold work the remote
+               row does not, when a staler device saved after it. Hydrating the
+               remote blob wholesale is how two evenings were lost. */
+            const local = localStorage.getItem(STORAGE_KEY)
+            localStorage.setItem(STORAGE_KEY, local ? mergeStates(local, remote) : remote)
+          } else localStorage.removeItem(STORAGE_KEY)
         }
       } else if (localStorage.getItem(LOCAL_ONLY_KEY) !== '1') {
         renderSignIn()

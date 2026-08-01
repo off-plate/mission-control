@@ -792,10 +792,17 @@ export function PlanPage() {
   const [breakdownFor, setBreakdownFor] = useState<Task | null>(null)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
 
+  /* The returned work that is still actually waiting. The bar reads from this,
+     so finishing or deleting the last of it takes the bar away with it. */
+  const returnedLeft = (plan.returnedIds ?? []).filter((id) => {
+    const t = tasks.find((x) => x.id === id)
+    return !!t && !t.done
+  })
+
   /* "Show me" points at the work that came back overnight: scroll the list into
      view and mark those rows for a couple of seconds. */
   const showReturned = () => {
-    const ids = plan.returnedIds ?? []
+    const ids = returnedLeft
     setFlashIds(ids)
     const first = document.querySelector(`[data-todo-id="${ids[0]}"]`)
     ;(first ?? document.querySelector('.todo-col'))?.scrollIntoView({ block: 'center', behavior: 'smooth' })
@@ -859,12 +866,15 @@ export function PlanPage() {
       {/* What came back overnight. Said once, on the day it happened, with the
           count and a way to take it back in one move. The alternative was work
           quietly vanishing from the day, which is worse than a wall of it. */}
-      {plan.returnedOn === localDateKey() && (plan.returnedCount ?? 0) > 0 && (
+      {/* Counted live against the tasks themselves: the bar names unfinished
+          work, so finishing it (or deleting it) takes the bar away. A banner
+          about work already done is nagging, not information. */}
+      {plan.returnedOn === localDateKey() && returnedLeft.length > 0 && (
         <div className="handoff">
           <span className="grow">
-            {plan.returnedCount === 1
+            {returnedLeft.length === 1
               ? '1 thing you did not finish is back on the list.'
-              : `${plan.returnedCount} things you did not finish are back on the list.`}
+              : `${returnedLeft.length} things you did not finish are back on the list.`}
           </span>
           <button className="btn btn-quiet" onClick={() => openDay(prevDay())}>See yesterday</button>
           {/* This used to route to Plan from Plan, which is nothing happening.
@@ -1221,7 +1231,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
   /** A goal counting itself off this habit, if one exists. */
   goal?: Goal
 }) {
-  const { toggleHabitDay, logSlip, logCount, setPage, focusSessions, habitLog, slips, inView } = useStore()
+  const { toggleHabitDay, assertRoutineDay, logSlip, logCount, setPage, focusSessions, habitLog, slips, inView } = useStore()
   /* The block on the clock counts toward today, so an hour reached while the
      timer is still running shows here rather than after it stops. */
   const pomo = usePomodoro()
@@ -1432,12 +1442,16 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
               style={i === todayIndex && partial ? ({ ['--fill' as string]: `${pct}%` } as React.CSSProperties) : undefined}
               role="checkbox"
               aria-checked={h.days[i]}
-              /* A habit a routine ticks is read-only here: ticking it by hand
-                 would contradict the routine that owns it. */
-              disabled={i > todayIndex || !!drivenBy}
-              aria-label={drivenBy ? `${h.name}, ${d}, set by the ${drivenBy} routine` : `${h.name}, ${d}`}
-              title={drivenBy ? `Set by the ${drivenBy} routine` : undefined}
-              onClick={() => { if (!drivenBy) toggleHabitDay(h.id, i) }}
+              /* TODAY belongs to the routine: ticking it by hand would
+                 contradict the checklist that owns it. A day already gone is
+                 his to correct, because a lost write must never become a
+                 permanent lie about what he did. */
+              disabled={i > todayIndex || (!!drivenBy && i === todayIndex)}
+              aria-label={drivenBy
+                ? (i === todayIndex ? `${h.name}, ${d}, set by the ${drivenBy} routine` : `${h.name}, ${d}, correct this day by hand`)
+                : `${h.name}, ${d}`}
+              title={drivenBy ? (i === todayIndex ? `Set by the ${drivenBy} routine` : `Done via ${drivenBy}? Set the record straight.`) : undefined}
+              onClick={() => { if (drivenBy) { if (i < todayIndex) assertRoutineDay(h.id, i) } else toggleHabitDay(h.id, i) }}
             >
               <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
             </button>

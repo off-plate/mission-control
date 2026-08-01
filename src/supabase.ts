@@ -121,13 +121,19 @@ export async function loadRemoteState(): Promise<string | null> {
   }
 }
 
-/** Upsert the whole state blob against the signed-in account. */
+import { mergeStates } from './sync-merge'
+
+/** Upsert the state against the signed-in account. NEVER blind: the remote head
+ *  is read first and the dated logs of both sides are united, so a save from a
+ *  stale tab can no longer erase work a fresher one already banked. */
 export async function saveRemoteState(json: string): Promise<void> {
   const c = db()
   const me = await currentAccount()
   if (!c || !me) return
   try {
-    const data = JSON.parse(json)
+    const head = await loadRemoteState()
+    const merged = head ? mergeStates(json, head) : json
+    const data = JSON.parse(merged)
     const { error } = await c.from(TABLE).upsert({ id: me.id, owner: me.id, data, updated_at: new Date().toISOString() })
     if (error) console.warn('supabase save:', error.message)
   } catch (e) {

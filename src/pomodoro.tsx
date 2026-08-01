@@ -77,6 +77,9 @@ const PK = 'mc-pomodoro'
 interface Saved {
   focusMin: number; blockMin: number; breakMin: number; cyclesDone: number; cyclesDay: string
   phase: Phase; endsAt: number | null; pausedLeft: number | null; focusLabel: string | null
+  /** When the running block began, so a block crossing midnight can hand each
+   *  day the minutes that were actually worked on it. */
+  startedAt: number | null
 }
 const today = () => new Date().toDateString()
 function loadPomo(): Partial<Saved> {
@@ -90,7 +93,7 @@ function loadPomo(): Partial<Saved> {
 }
 
 export function PomodoroProvider({ children }: { children: ReactNode }) {
-  const { logFocus, syncAutoHabits, tasks } = useStore()
+  const { logFocus, logFocusOn, syncAutoHabits, tasks } = useStore()
   const saved = useState(loadPomo)[0]
   const [focusMin, setFocusMin] = useState(saved.focusMin ?? 25)
   /* A block saved by an older version has no blockMin. Falling back to the
@@ -123,6 +126,12 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   const [pausedLeft, setPausedLeft] = useState<number | null>(saved.pausedLeft ?? null)
   const [cyclesDone, setCyclesDone] = useState(saved.cyclesDone ?? 0)
   const [focusLabel, setFocusLabel] = useState<string | null>(saved.focusLabel ?? null)
+  /* A block saved without a start recovers it from its own arithmetic. */
+  const [startedAt, setStartedAt] = useState<number | null>(() => {
+    if (saved.startedAt) return saved.startedAt
+    if (saved.phase === 'focus' && saved.endsAt) return saved.endsAt - (saved.blockMin ?? saved.focusMin ?? 25) * 60000
+    return null
+  })
   const [, tick] = useState(0)
 
   const running = endsAt !== null
@@ -138,9 +147,9 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(PK, JSON.stringify({ focusMin, blockMin, breakMin, cyclesDone, cyclesDay: today(), phase, endsAt, pausedLeft, focusLabel }))
+      localStorage.setItem(PK, JSON.stringify({ focusMin, blockMin, breakMin, cyclesDone, cyclesDay: today(), phase, endsAt, pausedLeft, focusLabel, startedAt }))
     } catch { /* noop */ }
-  }, [focusMin, blockMin, breakMin, cyclesDone, phase, endsAt, pausedLeft, focusLabel])
+  }, [focusMin, blockMin, breakMin, cyclesDone, phase, endsAt, pausedLeft, focusLabel, startedAt])
 
   // Re-render twice a second while running; the clock itself comes from the deadline.
   useEffect(() => {
@@ -150,6 +159,24 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     document.addEventListener('visibilitychange', onShow)
     return () => { window.clearInterval(id); document.removeEventListener('visibilitychange', onShow) }
   }, [running, phase])
+
+  /* A block that crosses midnight hands yesterday its share the moment the day
+     flips: the pre-midnight minutes are logged onto yesterday as their own
+     finished block, and what remains keeps running as today's. Every counter
+     downstream then reads the right day without knowing this ever happened. */
+  useEffect(() => {
+    if (phase !== 'focus' || startedAt === null) return
+    const startDay = new Date(startedAt)
+    const now = new Date()
+    if (startDay.getFullYear() === now.getFullYear() && startDay.getMonth() === now.getMonth() && startDay.getDate() === now.getDate()) return
+    const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const before = Math.min(blockMin - 1, Math.max(1, Math.round((midnight.getTime() - startedAt) / 60000)))
+    const day = `${startDay.getFullYear()}-${String(startDay.getMonth() + 1).padStart(2, '0')}-${String(startDay.getDate()).padStart(2, '0')}`
+    logFocusOn(day, before, focusLabel ?? undefined, new Date(midnight.getTime() - 1000).toISOString())
+    setBlockMin((b) => Math.max(1, b - before))
+    setStartedAt(midnight.getTime())
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, startedAt, secondsLeft])
 
   /* An hour that is still running is still an hour. A habit kept by focus time
      would otherwise wait for the block to finish before admitting it, so the
@@ -197,6 +224,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission()
     const mins = Math.max(1, Math.round(minutes ?? focusMin))
     setBlockMin(mins)
+    setStartedAt(Date.now())
     setFocusLabel(label ?? null)
     setPhase('focus'); setEndsAt(Date.now() + mins * 60 * 1000); setPausedLeft(null)
   }
@@ -222,7 +250,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   const startBreak = () => { setPhase('break'); setEndsAt(Date.now() + breakMin * 60 * 1000); setPausedLeft(null) }
   /* Or more focus instead. A fresh block under the same name, logged on its own
      when IT finishes, so the extension is recorded as the extra work it is. */
-  const extend = (min: number) => { setPhase('focus'); setBlockMin(min); setEndsAt(Date.now() + min * 60 * 1000); setPausedLeft(null) }
+  const extend = (min: number) => { setPhase('focus'); setBlockMin(min); setStartedAt(Date.now()); setEndsAt(Date.now() + min * 60 * 1000); setPausedLeft(null) }
   const dismiss = () => { setPhase('idle'); setEndsAt(null); setPausedLeft(null); setFocusLabel(null) }
 
   const value: Pomo = { phase, running, secondsLeft, focusMin, blockMin, breakMin, cyclesDone, focusLabel, startFocus, toggle, skip, stop, startBreak, extend, dismiss, setFocusMin, setBreakMin }

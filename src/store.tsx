@@ -77,6 +77,7 @@ interface PersistedState {
   fixes?: number
   /** Personal bests, keyed by `routineId:stepId`. Survives every rollover. */
   records?: Record<string, number>
+  savedAt?: number
   /** Which storage schema wrote this. A row from an older one is not reused. */
   schema?: string
   /** Seeded habits and routines he deleted on purpose; never re-seeded. */
@@ -156,6 +157,10 @@ interface Store extends PersistedState {
   setEstimate: (taskId: string, minutes: number) => void
 
   toggleHabitDay: (id: string, day: number) => void
+  /** Assert or retract a PAST day of a routine-driven habit by hand. The
+   *  routine owns today; the record of a day already gone is his to correct,
+   *  because a lost write must never be a permanent lie. */
+  assertRoutineDay: (habitId: string, dayIndex: number) => void
   markHabitDay: (id: string, day: number, value: boolean) => void
   addHabit: (input: { name: string; daypart?: import('./types').TimeSlot; frequency: import('./types').HabitFrequency; targetPerWeek?: number; kind?: import('./types').HabitKind; dailyTargetMin?: number; measure?: 'minutes' | 'times'; per?: import('./types').CountPeriod; targetCount?: number; source?: import('./types').HabitSource; quitSince?: string }) => void
   /** Record a slip on a habit you are trying to stop; resets the clean run. */
@@ -219,6 +224,9 @@ interface Store extends PersistedState {
   focusSessions: FocusSession[]
   /** Called when a focus block finishes; feeds measured habits and the ledger. */
   logFocus: (minutes: number, label?: string) => void
+  /** Log a finished stretch of focus onto a SPECIFIC day. The half of a block
+   *  worked before midnight belongs to the day it was worked on. */
+  logFocusOn: (day: string, minutes: number, label?: string, at?: string) => void
   /** Correct a focus block: its length, or what it was for. */
   updateFocus: (id: string, patch: { minutes?: number; label?: string }) => void
   /** Remove a focus block, and the ledger row it wrote with it. */
@@ -323,6 +331,50 @@ function loadPersisted(): PersistedState | null {
       }
     }
 
+    /* A block logged across midnight was filed whole onto the day it FINISHED,
+       handing today an hour that was mostly worked yesterday: wrong day record,
+       wrong habit day, wrong goal hours, twice. Any session whose start
+       (finish minus length) lands on an earlier day is split at midnight into
+       two sessions, each on the day its minutes were actually worked. Runs
+       once; the timer itself now banks at midnight so new ones arrive split. */
+    if (!p.removedSeeds.includes('fix:focus-split')) {
+      p.removedSeeds.push('fix:focus-split')
+      const out: FocusSession[] = []
+      for (const f of p.focusSessions ?? []) {
+        if (!f.at) { out.push(f); continue }
+        const end = new Date(f.at)
+        const start = new Date(end.getTime() - f.minutes * 60000)
+        const startDay = localDateKey(start)
+        if (startDay >= f.day) { out.push(f); continue }
+        const midnight = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+        const before = Math.round((midnight.getTime() - start.getTime()) / 60000)
+        const after = f.minutes - before
+        if (before < 1 || after < 1) { out.push(f); continue }
+        const lid = `${f.ledgerId ?? f.id}-pre`
+        out.push({ ...f, id: `${f.id}-pre`, day: startDay, minutes: before, ledgerId: lid, at: new Date(midnight.getTime() - 1000).toISOString() })
+        out.push({ ...f, minutes: after })
+        if (f.ledgerId) {
+          p.ledger = (p.ledger ?? []).flatMap((l) => (l.id === f.ledgerId
+            ? [{ ...l, id: lid, estimateMin: before, actualMin: before, when: startDay }, { ...l, estimateMin: after, actualMin: after }]
+            : [l]))
+        }
+      }
+      p.focusSessions = out
+    }
+
+    /* 2026-08-02: Michael finished Out Brain Rot on the evening of Aug 1 and
+       the rows are simply not in his state; the load path provably keeps them,
+       so the write itself was lost (most likely an older tab writing the blob
+       over the newer one). His word is the record: the finish is put back. */
+    if (!p.removedSeeds.includes('fix:obr-0801')) {
+      p.removedSeeds.push('fix:obr-0801')
+      const day = '2026-08-01'
+      if (!(p.habitLog ?? []).some((t) => t.habitId === 'h-brainrot' && t.day === day)) {
+        p.habitLog = [...(p.habitLog ?? []), { habitId: 'h-brainrot', day }]
+        p.routineLog = [...(p.routineLog ?? []), { routineId: 'r-brainrot', day, periodKey: day, run: 0 }]
+      }
+    }
+
     /* Week rollover: when the saved state belongs to an earlier ISO week, each
        habit's checkmarks are archived into its 12-week history and cleared, so
        Monday always starts a fresh row instead of showing last week's ticks. */
@@ -390,14 +442,31 @@ function loadPersisted(): PersistedState | null {
     /* A goal whose period has ended stops counting and keeps the number it
        finished on. Nothing is deleted: it moves to the past, where he can look
        at how it went and set it again if he wants to. */
+    const renewals: Goal[] = []
     p.goals = (p.goals ?? []).map((g) => {
       const tf = (g.timeframe ?? 'quarter') as GoalTf
       const key = g.periodKey ?? goalPeriodKey(tf)
       if (g.closed || !periodIsPast(tf, key)) return { ...g, periodKey: key }
       const range = goalPeriodRange(tf, key)
       const final = goalCurrent(g, p.habits ?? [], p.habitLog ?? [], range, p.slips ?? [], p.focusSessions ?? [])
+      /* A goal that counts ITSELF renews itself: three hours of focus a week is
+         a standing bar, not a one-off, and making him re-set it every Monday is
+         how the bar quietly disappears. The closed one keeps its result; a
+         fresh copy opens for the period we are in now. Hand-logged goals stay
+         one-off, with "Set it again" for the ones he wants back. */
+      if (g.habitId) {
+        renewals.push({
+          ...g, id: `${g.id}-r${goalPeriodKey(tf).replace(/[^0-9A-Za-z]/g, '')}`,
+          current: 0, milestones: [], closed: undefined, periodKey: goalPeriodKey(tf),
+        })
+      }
       return { ...g, periodKey: key, closed: { on: range.to, final } }
     })
+    for (const r of renewals) {
+      const dupe = p.goals.some((g) => !g.closed && g.habitId === r.habitId && g.name === r.name
+        && (g.timeframe ?? 'quarter') === (r.timeframe ?? 'quarter') && g.periodKey === r.periodKey)
+      if (!dupe) p.goals.push(r)
+    }
 
     /* A day that has not happened yet cannot have been kept. The week array has
        always been cleaned of future ticks; the log has to be cleaned the same way
@@ -741,7 +810,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     const state: PersistedState = {
       version: 3, spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
-      weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
+      savedAt: Date.now(), weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
       habitLog, routineLog, slips, stepLog, spaceGuessed, lastRollDay: lastRollDay ?? localDateKey(),
     }
     const json = JSON.stringify(state)
@@ -848,6 +917,40 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setHabits((prev) => prev.map((h) => (rules.some((r) => r.id === h.id)
       ? { ...h, days: h.days.map((d, i) => (i === idx ? next.some((t) => t.habitId === h.id && t.day === today) : d)) }
       : h)))
+  }
+
+  /* One writer for finished focus, whatever day it belongs to. A block that
+     crosses midnight banks its first half onto yesterday through this exact
+     path, so both halves look identical to everything downstream. */
+  const logFocusOn = (day: string, minutes: number, label?: string, at?: string) => {
+    if (minutes <= 0) return
+    const mins = Math.round(minutes)
+    const lid = newId('l')
+    const next = [{ id: newId('f'), day, minutes: mins, label, space, ledgerId: lid, at: at ?? new Date().toISOString() }, ...focusSessions]
+    setFocusSessions(next)
+    setLedger((prev) => [
+      { id: lid, title: label ? `Focus: ${label}` : 'Focus block', category: 'deep' as TaskCategory,
+        estimateMin: mins, actualMin: mins, when: day, space, weekKey: isoWeekKey(new Date(`${day}T12:00:00`)) },
+      ...prev,
+    ])
+    autoFrom(next, 0)
+  }
+
+  /* The hand-correction path for a routine-kept day. Writes BOTH records, the
+     habit row and the routine's own finish, so the calendar, the goals and the
+     day page agree with the dot. */
+  const assertRoutineDay = (habitId: string, dayIndex: number) => {
+    const day = dayOfWeekKey(dayIndex)
+    if (day >= todayKey()) return
+    const r = routines.find((x) => x.habitId === habitId && !x.archivedAt)
+    const has = habitLog.some((t) => t.habitId === habitId && t.day === day)
+    markDay(habitId, dayIndex, !has)
+    if (!r) return
+    const pk = r.cadence === 'weekly' ? isoWeekKey(new Date(`${day}T12:00:00`))
+      : r.cadence === 'monthly' ? day.slice(0, 7) : day
+    setRoutineLog((prev) => (has
+      ? prev.filter((x) => !(x.routineId === r.id && x.day === day))
+      : [...prev, { routineId: r.id, day, periodKey: pk, run: 0 }]))
   }
 
   /** Tick or untick one day of one habit, in the log and in the week cache. */
@@ -962,21 +1065,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     /* A finished block is recorded once, and everything that cares reads from
        here: measured habits fill from it, and the ledger gets it so focus time
        counts toward estimate accuracy instead of vanishing. */
-    logFocus: (minutes, label) => {
-      if (minutes <= 0) return
-      const day = todayKey()
-      const mins = Math.round(minutes)
-      // No cap: a focus block is a dated record and the history views read it.
-      const lid = newId('l')
-      const next = [{ id: newId('f'), day, minutes: mins, label, space, ledgerId: lid, at: new Date().toISOString() }, ...focusSessions]
-      setFocusSessions(next)
-      setLedger((prev) => [
-        { id: lid, title: label ? `Focus: ${label}` : 'Focus block', category: 'deep' as TaskCategory,
-          estimateMin: mins, actualMin: mins, when: day, space, weekKey: isoWeekKey() },
-        ...prev,
-      ])
-      autoFrom(next, 0)
-    },
+    logFocus: (minutes, label) => logFocusOn(todayKey(), minutes, label, new Date().toISOString()),
+    logFocusOn,
     updateFocus: (id, patch) => {
       const next = focusSessions.map((f) => (f.id === id
         ? { ...f, ...(patch.minutes !== undefined ? { minutes: Math.max(1, Math.round(patch.minutes)) } : {}), ...(patch.label !== undefined ? { label: patch.label } : {}) }
@@ -1185,6 +1275,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     /* Both of these write the dated log first: that is the record that survives
        the week rolling over. days[] is a cache of the current week and is kept in
        step here, and rebuilt from the log on every load. */
+    assertRoutineDay,
     toggleHabitDay: (id, day) => {
       const h = habits.find((x) => x.id === id)
       if (!h) return

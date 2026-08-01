@@ -2482,3 +2482,10 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   border: 1px solid var(--hairline-strong); background: var(--surface-2);
   font-size: 0.625rem; letter-spacing: 0.03em; color: var(--muted);
 }
+
+/* ---------- counted habit: a number of times inside a stretch ---------- */
+.count-bar { height: 4px; border-radius: 2px; background: var(--hairline); overflow: hidden; margin: var(--s2) 0; }
+.count-bar > span { display: block; height: 100%; background: var(--progress); }
+.count-do { display: flex; align-items: center; gap: var(--s2); }
+.count-add { min-height: 30px; font-size: var(--text-xs); }
+.count-undo { min-height: 30px; font-size: var(--text-xs); color: var(--muted); }

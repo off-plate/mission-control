@@ -176,6 +176,31 @@ export type HabitKind = 'build' | 'break' | 'measured'
  *  is here so a second one does not need a migration. */
 export type HabitSource = 'focus'
 
+export type CountPeriod = 'day' | 'week' | 'month'
+
+export const COUNT_PERIODS: { id: CountPeriod; label: string }[] = [
+  { id: 'day', label: 'a day' },
+  { id: 'week', label: 'a week' },
+  { id: 'month', label: 'a month' },
+]
+
+/** True when a measured habit counts occurrences rather than minutes. */
+export function isCounted(h: HabitDef): boolean {
+  return h.kind === 'measured' && h.measure === 'times'
+}
+
+/** How many of a counted habit he is aiming for in its period. */
+export function countTarget(h: HabitDef): number {
+  return Math.max(1, h.targetCount ?? 1)
+}
+
+/** How many times a habit was logged inside a window. Every row counts, not
+ *  every day: three walks on Tuesday are three, which is the whole point of a
+ *  target written in times rather than in days. */
+export function countIn(log: HabitTick[], habitId: string, from: string, to: string): number {
+  return log.filter((t) => t.habitId === habitId && t.day >= from && t.day <= to).length
+}
+
 /**
  * A day a habit was kept. This is the durable record; `days[]` on the habit is a
  * cache of the current week rebuilt from these on load. The week array alone
@@ -307,6 +332,15 @@ export interface HabitDef {
   targetPerWeek?: number
   /** For a 'measured' habit: minutes a day you are aiming for. */
   dailyTargetMin?: number
+  /** What a measured habit counts. Minutes come from focus sessions, so they
+   *  only ever fitted work you sit and time. Times are things you DO, logged one
+   *  tap each, which is what most of them actually are. Absent means minutes,
+   *  because that is what every measured habit was before this existed. */
+  measure?: 'minutes' | 'times'
+  /** For a 'times' habit: the stretch the target is counted over. */
+  per?: CountPeriod
+  /** For a 'times' habit: how many in that stretch. */
+  targetCount?: number
   /** What fills it, when it fills itself. */
   source?: HabitSource
 }
@@ -438,6 +472,7 @@ export function slipCount(h: HabitDef, slips: HabitSlip[]): number {
 }
 
 export function habitFrequencyLabel(h: HabitDef): string {
+  if (isCounted(h)) return `${countTarget(h)}x ${COUNT_PERIODS.find((p) => p.id === (h.per ?? 'day'))!.label}`
   if (h.kind === 'measured') return `${fmtMins(h.dailyTargetMin ?? 60)} a day`
   if (h.frequency === 'weekdays') return 'Mon to Fri'
   if (h.frequency === 'weekly') return 'once a week'

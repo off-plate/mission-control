@@ -591,11 +591,14 @@ export function CoachPage() {
   const open = mine.filter((s) => s.status === 'open')
   const closed = mine.filter((s) => s.status === 'closed')
   const easedCount = closed.filter((s) => s.didIt && s.felt === 'easier').length
-  // Your two oldest open tasks, offered as one-click starters.
+  /* The starters are HIS list, ranked by how avoided a thing looks: what keeps
+     coming back first, then what has waited longest. Canned scenarios only fill
+     whatever room his own tasks leave. */
   const oldest = tasks
-    .filter((t) => !t.done && inView(t.space) && t.createdAt)
-    .sort((a, b) => (a.createdAt! < b.createdAt! ? -1 : 1))
-    .slice(0, 2)
+    .filter((t) => !t.done && inView(t.space))
+    .sort((a, b) => (b.carried ?? 0) - (a.carried ?? 0)
+      || ((a.createdAt ?? '9999') < (b.createdAt ?? '9999') ? -1 : 1))
+    .slice(0, 4)
 
   /* ---- review the breakdown Coach drafted, then commit ---- */
   if (stage === 'review') {
@@ -767,10 +770,10 @@ export function CoachPage() {
             {oldest.map((t) => (
               <button key={t.id} className="coach-starter is-yours" onClick={() => { setThing(t.title); void analyze(t.title) }}>
                 {t.title}
-                <span className="cs-age">on your list</span>
+                <span className="cs-age">{(t.carried ?? 0) > 0 ? `came back ${t.carried}x` : t.createdAt ? `since ${fmtWhen(t.createdAt)}` : 'on your list'}</span>
               </button>
             ))}
-            {COACH_SCENARIOS.slice(0, 5).map((s) => (
+            {COACH_SCENARIOS.slice(0, Math.max(0, 6 - oldest.length)).map((s) => (
               <button key={s.id} className="coach-starter" onClick={() => { setThing(s.title); void analyze(s.title) }}>
                 {s.title}
                 <span className="cs-age">{s.tag}</span>

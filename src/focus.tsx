@@ -86,6 +86,9 @@ export function FocusPage() {
           </span>
           <span className="focus-live-left mono">{mmss(pomo.secondsLeft)}</span>
           <button className="btn btn-ghost focus-btn" onClick={pomo.toggle}>{pomo.running ? 'Pause' : 'Resume'}</button>
+          <button className="btn btn-ghost focus-btn" onClick={pomo.skip}>
+            {pomo.phase === 'focus' ? 'Skip to break' : 'End break'}
+          </button>
           <button className="btn btn-ghost focus-btn" onClick={pomo.stop}>Stop</button>
         </div>
       )}

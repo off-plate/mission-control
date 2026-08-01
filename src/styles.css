@@ -2400,6 +2400,9 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .spacemark.s-personal { --mark: #d1502a; }
 .spacemark.s-work { --mark: #1d4e79; }
 .spacemark.s-offplate { --mark: #8a6410; }
+/* Michael's Corner wears its own green, the V3 brand lead, so the mark is not
+   another warm tone next to Personal's red. */
+.spacemark.s-corner { --mark: #1E5244; }
 .visually-hidden {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;

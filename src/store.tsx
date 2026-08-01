@@ -271,6 +271,10 @@ function loadPersisted(): PersistedState | null {
     if ((p.version ?? 0) > 3) { futureBlob = true; return null }
     if (p.schema && p.schema !== STORAGE_KEY) return null
     p.version = 3
+    /* A workspace added after this state was saved. His saved record only has
+       the spaces that existed then, so a new one is filled from the defaults
+       while every space he has arranged himself is handed back untouched. */
+    if (p.spaces) p.spaces = { ...DEFAULT_SPACES, ...p.spaces }
     /* Week rollover: when the saved state belongs to an earlier ISO week, each
        habit's checkmarks are archived into its 12-week history and cleared, so
        Monday always starts a fresh row instead of showing last week's ticks. */
@@ -613,13 +617,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [view, setViewState] = useState<ViewId>(() => {
     try {
       const v = localStorage.getItem('mc-view')
-      return v === 'work' || v === 'offplate' || v === 'personal' || v === 'all' ? v : 'all'
+      return v === 'work' || v === 'offplate' || v === 'personal' || v === 'corner' || v === 'all' ? v : 'all'
     } catch { return 'all' }
   })
   const [writeSpace, setWriteSpace] = useState<SpaceId>(() => {
     try {
       const s = localStorage.getItem('mc-space')
-      return s === 'work' || s === 'offplate' || s === 'personal' ? s : 'personal'
+      return s === 'work' || s === 'offplate' || s === 'personal' || s === 'corner' ? s : 'personal'
     } catch { return 'personal' }
   })
   // In a single space, new things land there. In All he picks, and the pick sticks.

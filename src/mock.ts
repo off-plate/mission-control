@@ -92,12 +92,17 @@ export const DEFAULT_SPACES: Record<SpaceId, WidgetInstance[]> = {
     { id: wid('tasks'), type: 'tasks', size: 'L' },
     { id: wid('goals'), type: 'goals', size: 'M' },
   ],
+  corner: [
+    { id: wid('tasks'), type: 'tasks', size: 'L' },
+    { id: wid('goals'), type: 'goals', size: 'M' },
+  ],
 }
 
 export const SPACE_LABELS: Record<SpaceId, string> = {
   personal: 'Personal',
-  work: 'Work',
+  work: 'Big Time',
   offplate: 'Off-Plate',
+  corner: 'Michael\u2019s Corner',
 }
 
 /** Seed ages, so the ageing detector has real history on a fresh install. */
@@ -177,9 +182,9 @@ export const MOCK_GOALS: Goal[] = []
 
 export const MOCK_LEDGER: LedgerEntry[] = []
 
-export const MOCK_AGENDA: Record<SpaceId, AgendaEvent[]> = { personal: [], work: [], offplate: [] }
+export const MOCK_AGENDA: Record<SpaceId, AgendaEvent[]> = { personal: [], work: [], offplate: [], corner: [] }
 
-export const MOCK_MAIL: Record<SpaceId, { addr: string; unread: number; top: string; age: string }[]> = { personal: [], work: [], offplate: [] }
+export const MOCK_MAIL: Record<SpaceId, { addr: string; unread: number; top: string; age: string }[]> = { personal: [], work: [], offplate: [], corner: [] }
 
 export const MOCK_SOCIAL: SocialEntry[] = []
 

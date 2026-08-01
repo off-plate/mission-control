@@ -676,7 +676,7 @@ function routeFromHash(): { page: PageId; day: string | null } {
   const h = location.hash.replace('#/', '')
   const m = h.match(/^day\/(\d{4}-\d{2}-\d{2})$/)
   if (m) return { page: 'day', day: m[1] }
-  const pages: PageId[] = ['today', 'plan', 'assistant', 'habits', 'routines', 'goals', 'money', 'review', 'coach', 'stats', 'settings', 'brand', 'braindump', 'focus', 'calendar']
+  const pages: PageId[] = ['today', 'plan', 'assistant', 'habits', 'routines', 'goals', 'money', 'review', 'coach', 'stats', 'settings', 'brand', 'braindump', 'focus', 'calendar', 'board']
   return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
 }
 

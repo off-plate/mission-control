@@ -237,7 +237,7 @@ function GoalsReminder({ note }: { note?: string }) {
 }
 
 export function MorningRoutine({ routine, onEdit }: { routine: Routine; onEdit?: () => void }) {
-  const { toggleRoutineStep, resetRoutine, setStepData } = useStore()
+  const { toggleRoutineStep, setStepData } = useStore()
   const steps = routine.steps
   const done = routine.doneStepIds
   const [open, setOpen] = useState<string>('') // everything collapsed until you open a step
@@ -349,9 +349,8 @@ export function MorningRoutine({ routine, onEdit }: { routine: Routine; onEdit?:
 
       <div className="routine-card-foot" style={{ marginTop: 'var(--s4)' }}>
         <span className="assist-note">Finishing all {total} checks off “Morning routine” in Habits.</span>
-        {doneCount > 0 && (
-          <button className="btn btn-ghost routine-reset" onClick={() => { resetRoutine(routine.id); setMed(MED_IDLE); setOpen('') }}>Reset</button>
-        )}
+        {/* No reset: it un-finished the routine, which deleted the record that
+            he had done it. The morning routine happens once a day anyway. */}
       </div>
     </div>
   )

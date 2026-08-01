@@ -234,7 +234,15 @@ export function bestStreak(log: HabitTick[], habitId: string): number {
 }
 
 /** A day a routine was finished, kept so "which day did I do it" has an answer. */
-export interface RoutineDone { routineId: string; day: string; periodKey: string }
+/** One completed run of a routine. `run` counts runs within the period, so a
+ *  routine done three times in a day leaves three rows rather than one row
+ *  overwritten twice. Finishing it again must never cost him the earlier one. */
+export interface RoutineDone { routineId: string; day: string; periodKey: string; run?: number; at?: string }
+
+/** How many times a routine was finished on one day. */
+export function routineRunsOn(log: RoutineDone[], routineId: string, day: string): number {
+  return log.filter((r) => r.routineId === routineId && r.day === day).length
+}
 
 /**
  * A number a routine step recorded on a day: today's typing speed, and anything
@@ -465,6 +473,14 @@ export interface Routine {
   stepData?: Record<string, number>
   /** For a step that offers a choice, the alt he picked this period. */
   stepChoice?: Record<string, string>
+  /** Can be run more than once in its period. The morning routine happens once
+   *  and is then done for the day; Out Brain Rot is a reset he may need three
+   *  times before dinner. Only a repeatable routine offers to start again, and
+   *  starting again keeps every run before it. */
+  repeatable?: boolean
+  /** Which run of this period the current checks belong to. Runs before it are
+   *  finished and recorded; this counter is what keeps their records apart. */
+  run?: number
   /** The moment the first step was ticked, as an ISO timestamp. A routine is not
    *  on his day until he has actually started it, and it lands in the part of
    *  the day he started it in. Cleared with the checks at the period roll, so

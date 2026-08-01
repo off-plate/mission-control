@@ -143,7 +143,7 @@ export const MOCK_ROUTINES: Routine[] = [
   { id: 'r-evening', space: 'personal', title: 'Before bed routine', cadence: 'daily', habitId: 'h-evening', doneStepIds: [], steps: [] },
   { id: 'r-nightwork', space: 'personal', title: 'Night work routine', cadence: 'daily', habitId: 'h-nightwork', doneStepIds: [], steps: [] },
   {
-    id: 'r-brainrot', space: 'personal', title: 'Out Brain Rot', cadence: 'daily', habitId: 'h-brainrot',
+    id: 'r-brainrot', space: 'personal', title: 'Out Brain Rot', cadence: 'daily', habitId: 'h-brainrot', repeatable: true,
     doneStepIds: [],
     steps: [
       /* The first step in the app that can be answered two ways. Whether he

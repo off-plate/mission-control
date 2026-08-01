@@ -419,3 +419,13 @@ export function gcalUrl(title: string, start?: string, end?: string): string {
 export function slotForDaypart(daypart?: TimeSlot): TimeSlot | 'unsorted' {
   return daypart ?? 'unsorted'
 }
+
+/** Which part of the day a stored moment belongs to. A routine is filed under
+ *  the time he actually started it, not the time it was meant to happen: the
+ *  day should record what he did. It defers to slotForTime rather than
+ *  repeating the boundaries, so a routine and a task can never disagree about
+ *  where 2 PM lands. */
+export function slotForMoment(iso: string): TimeSlot {
+  const d = new Date(iso)
+  return slotForTime(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`)
+}

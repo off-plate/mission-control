@@ -1391,6 +1391,35 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 .routine-step.checked .routine-step-body .l { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
 .routine-step-body .h { font-size: var(--text-sm); color: var(--muted); line-height: 1.4; }
 .routine-step-body .ex { font-size: var(--text-sm); color: var(--info); }
+/* A step with two ways to answer it. The two sit under the step title as one
+   pair, hairline-boxed, with the word between them doing the explaining. The
+   step above them keeps a blank the width of a checkbox so every title on the
+   card still starts on the same vertical line. */
+/* Not a checkbox, and it must not look like one even when the step is done: it
+   only holds the width so titles stay on one vertical line. */
+.routine-step .routine-check.is-blank,
+.routine-step.checked .routine-check.is-blank { border-color: transparent; background: none; }
+.alt-set { display: flex; flex-direction: column; gap: var(--s1); margin-top: var(--s2); }
+.alt-opt {
+  display: flex; align-items: flex-start; gap: var(--s2); text-align: left; width: 100%;
+  padding: var(--s2) var(--s3); border: 1px solid var(--hairline); border-radius: 4px;
+  transition: border-color 140ms ease-out, background 140ms ease-out;
+}
+.alt-opt:hover { border-color: var(--accent); }
+.alt-tick { flex: none; width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; border: 1.5px solid var(--faint); }
+.alt-opt.picked { border-color: var(--progress); background: var(--progress-wash); }
+.alt-opt.picked .alt-tick { background: var(--progress); border-color: var(--progress); }
+/* Own class names, not the step's l/h: inside a finished step those inherit the
+   strikethrough, which struck out the option he did NOT pick and read as a
+   refusal rather than a choice. */
+.alt-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.alt-l { font-weight: 600; font-size: var(--text-sm); }
+.alt-h { font-size: var(--text-sm); color: var(--muted); line-height: 1.4; }
+.alt-opt:not(.picked) .alt-l { color: var(--muted); font-weight: 500; }
+.alt-or { font-size: var(--text-xs); color: var(--faint); padding-left: var(--s3); }
+/* In the compact list under a Today row the same choice is two plain rows. */
+.subtask.alt { padding-left: var(--s2); }
+
 .routine-dur { font-size: 0.6875rem; color: var(--faint); font-weight: 400; }
 .routine-link { font-size: var(--text-sm); color: var(--accent); align-self: flex-start; }
 .routine-link:hover { text-decoration: underline; }

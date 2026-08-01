@@ -182,6 +182,9 @@ interface Store extends PersistedState {
 
   routines: Routine[]
   toggleRoutineStep: (routineId: string, stepId: string) => void
+  /** Pick one of a step's alternatives, which ticks the step. Picking the same
+   *  one again unpicks it. */
+  toggleRoutineAlt: (routineId: string, stepId: string, altId: string) => void
   /** Finish or reopen a whole routine at once, the way ticking a task with
    *  subtasks finishes all of them. */
   setRoutineDone: (routineId: string, done: boolean) => void
@@ -384,6 +387,18 @@ function loadPersisted(): PersistedState | null {
     p.routines = p.routines ?? []
     for (const s of MOCK_ROUTINES) if (!removed.has(s.id) && !p.routines.some((r) => r.id === s.id)) p.routines.push(s)
 
+    /* A seeded routine that shipped empty and later gained steps has to hand
+       them over ONCE, and only while he has written none of his own. The marker
+       goes in removedSeeds so emptying the routine yourself is respected: a step
+       list he cleared must not grow back on the next reload. */
+    p.removedSeeds = p.removedSeeds ?? []
+    for (const s of MOCK_ROUTINES) {
+      const mark = `${s.id}:steps`
+      if (!s.steps.length || p.removedSeeds.includes(mark)) continue
+      p.routines = p.routines.map((r) => (r.id === s.id && r.steps.length === 0 ? { ...r, steps: s.steps } : r))
+      p.removedSeeds.push(mark)
+    }
+
     /* A day that has not happened yet cannot be done. Future ticks were also
        unreachable, since those dots are disabled, so they could never be undone. */
     const todayIdx = (new Date().getDay() + 6) % 7
@@ -476,11 +491,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const base = prior && prior.length ? prior : MOCK_ROUTINES
     return base.map((r) => {
       const key = periodKeyFor(r.cadence)
-      if (r.periodKey !== key) return { ...r, doneStepIds: [], stepData: {}, periodKey: key }
+      // A new period starts nothing: the checks, the choices and the moment it
+      // was started all belong to the period they were made in.
+      if (r.periodKey !== key) return { ...r, doneStepIds: [], stepData: {}, stepChoice: {}, startedAt: undefined, periodKey: key }
+      const doneStepIds = r.doneStepIds.filter((id) => r.steps.some((st) => st.id === id))
       return {
         ...r,
-        doneStepIds: r.doneStepIds.filter((id) => r.steps.some((st) => st.id === id)),
+        doneStepIds,
         stepData: r.stepData ?? {},
+        stepChoice: r.stepChoice ?? {},
+        // A routine whose every tick was deleted with its steps is not underway.
+        startedAt: doneStepIds.length ? r.startedAt : undefined,
         periodKey: key,
       }
     })
@@ -649,6 +670,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ? { ...h, days: h.days.map((d, i) => (i === dayIndex ? value : d)) }
       : h)))
   }
+
+  /* A routine reaches his day by being started, not by existing. The first tick
+     stamps the moment, and that moment decides which part of the day it files
+     itself under. Ticking a second step must not move it, so the stamp is only
+     ever written when there is none. Undoing back to nothing ticked takes the
+     stamp away again: a routine he opened and closed was not started. */
+  const stamped = (r: Routine): Routine => ({
+    ...r,
+    startedAt: r.doneStepIds.length === 0 ? undefined : (r.startedAt ?? new Date().toISOString()),
+  })
 
   /* Apply a change to a routine and re-derive its habit from the result. The
      tick is written to the day it was earned and cleared from that same day, so
@@ -1086,7 +1117,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (!r.doneStepIds.includes(stepId) && stepLocked(r, stepId)) return
       const has = r.doneStepIds.includes(stepId)
       const doneStepIds = has ? r.doneStepIds.filter((x) => x !== stepId) : [...r.doneStepIds, stepId]
-      applyRoutine(routineId, (x) => ({ ...x, doneStepIds }))
+      applyRoutine(routineId, (x) => stamped({ ...x, doneStepIds }))
+    },
+    /* Picking one of a step's alternatives IS ticking that step. The choice is
+       kept so the day record can say which way he went, and picking the same one
+       again clears it, which is the only way to undo a step that has no checkbox
+       of its own. */
+    toggleRoutineAlt: (routineId, stepId, altId) => {
+      applyRoutine(routineId, (r) => {
+        const off = r.stepChoice?.[stepId] === altId
+        const stepChoice = { ...(r.stepChoice ?? {}) }
+        if (off) delete stepChoice[stepId]
+        else stepChoice[stepId] = altId
+        const doneStepIds = off
+          ? r.doneStepIds.filter((x) => x !== stepId)
+          : r.doneStepIds.includes(stepId) ? r.doneStepIds : [...r.doneStepIds, stepId]
+        return stamped({ ...r, stepChoice, doneStepIds })
+      })
     },
     records,
     /* Logging the number IS completing the step, in one action. Keeping them
@@ -1099,7 +1146,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const doneStepIds = passes && !r.doneStepIds.includes(stepId)
           ? [...r.doneStepIds, stepId]
           : !passes ? r.doneStepIds.filter((x) => x !== stepId) : r.doneStepIds
-        return { ...r, stepData, doneStepIds }
+        return stamped({ ...r, stepData, doneStepIds })
       })
       /* Every run is kept, with the moment it happened. Keying by day and
          replacing meant a second attempt erased the first: run 76 in the
@@ -1174,12 +1221,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ;[steps[i], steps[j]] = [steps[j], steps[i]]
         return { ...r, steps }
       })),
-    resetRoutine: (routineId) => applyRoutine(routineId, (r) => ({ ...r, doneStepIds: [], stepData: {} })),
+    resetRoutine: (routineId) => applyRoutine(routineId, (r) => ({ ...r, doneStepIds: [], stepData: {}, stepChoice: {}, startedAt: undefined })),
     /* Ticking the routine itself ticks everything inside it, minus any step that
        has to be earned elsewhere (the typing gate), which stays his to pass. */
-    setRoutineDone: (routineId, done) => applyRoutine(routineId, (r) => ({
+    setRoutineDone: (routineId, done) => applyRoutine(routineId, (r) => stamped({
       ...r,
       doneStepIds: done ? r.steps.filter((st) => !stepLocked(r, st.id)).map((st) => st.id) : [],
+      stepChoice: done ? r.stepChoice : {},
     })),
 
     addIdea: (text, color) => {

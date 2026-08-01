@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { SpaceGrid } from './Grid'
 import { MOCK_AGENDA, SPACE_LABELS, exceptionsFor, globalExceptions, momentum } from './exceptions'
 import { MOCK_MONEY, fakeDecompose } from './mock'
@@ -8,7 +8,7 @@ import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
 import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
-import { goalPeriodKey, goalPeriodRange, periodLabel, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, periodNoun, routinePeriods, slotForDaypart, taskMinutes, toMin } from './util'
+import { goalPeriodKey, goalPeriodRange, periodLabel, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, periodNoun, routinePeriods, slotForMoment, taskMinutes, toMin } from './util'
 
 /* ---------------- shared bits ---------------- */
 
@@ -541,7 +541,7 @@ function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
    marks it out is a small "repeats" tag, because a different layout for the same
    kind of thing reads as two different apps on one page. */
 function RoutineOnDay({ routine, habitName }: { routine: Routine; habitName?: string }) {
-  const { toggleRoutineStep, setRoutineDone, setPage, inView } = useStore()
+  const { toggleRoutineStep, toggleRoutineAlt, setRoutineDone, setPage, inView } = useStore()
   const [open, setOpen] = useState(false)
   const total = routine.steps.length
   const done = routine.doneStepIds.length
@@ -602,6 +602,28 @@ function RoutineOnDay({ routine, habitName }: { routine: Routine; habitName?: st
           {routine.steps.map((s) => {
             const checked = routine.doneStepIds.includes(s.id)
             const locked = !checked && stepLocked(routine, s.id)
+            /* A step with a choice is ticked by picking one of its answers, so
+               here it offers the answers instead of a checkbox that would have
+               to guess which one he meant. */
+            if (s.alts?.length) {
+              return (
+                <div key={s.id} className="subtask-wrap">
+                  {s.alts.map((a) => {
+                    const picked = routine.stepChoice?.[s.id] === a.id
+                    return (
+                      <button
+                        key={a.id}
+                        className={`subtask alt${picked ? ' done' : ''}`}
+                        onClick={() => toggleRoutineAlt(routine.id, s.id, a.id)}
+                      >
+                        <span className="sub-tick" aria-hidden="true" />
+                        <span className="grow">{a.title}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )
+            }
             return (
               <div key={s.id} className="subtask-wrap">
                 <button
@@ -654,13 +676,15 @@ export function PlanPage() {
   const todayTasks = todayAll.filter((t) => !t.done)             // still to do
   const doneUnsorted = todayAll.filter((t) => t.done && !t.slot) // finished, never scheduled
 
-  /* Routines belong on the day by their own cadence: he never adds them, they
-     are simply there. Each sits in the part of the day its habit names. */
+  /* A routine reaches the day by being started, not by existing. Until he ticks
+     his first step it lives on the Routines page only, so Today opens as the
+     work he chose rather than a wall of things the app put there. The moment it
+     starts it files itself under the time he started it: this list is a record
+     of the day, not a plan for it. */
   const isWeekend = todayIdx >= 5
-  const dueRoutines = routines.filter((r) => inView(r.space) && !r.archivedAt && !(r.cadence === 'prework' && isWeekend))
+  const dueRoutines = routines.filter((r) => inView(r.space) && !r.archivedAt && r.startedAt && !(r.cadence === 'prework' && isWeekend))
   const routineSlot = (r: Routine): TimeSlot | 'unsorted' =>
-    slotForDaypart(habits.find((h) => h.id === r.habitId)?.daypart)
-  const anytimeRoutines = dueRoutines.filter((r) => routineSlot(r) === 'unsorted')
+    r.startedAt ? slotForMoment(r.startedAt) : 'unsorted'
   const plannedMin = todayTasks.reduce((a, t) => a + taskMinutes(t), 0)
 
   /* Progress counts everything in the space, today included, and counts finished
@@ -1032,16 +1056,8 @@ export function PlanPage() {
               </div>
             )
           })}
-          {anytimeRoutines.length > 0 && (
-            <div className="bucket rod-bucket">
-              <div className="bucket-head">
-                <span className="bucket-name">On repeat</span>
-              </div>
-              {anytimeRoutines.map((r) => (
-                <RoutineOnDay key={r.id} routine={r} habitName={habits.find((h) => h.id === r.habitId)?.name} />
-              ))}
-            </div>
-          )}
+          {/* No dayless group any more: a routine on the day has been started,
+              and the moment it started is a real time, so it always has a slot. */}
           {/* Finished-but-unscheduled work, kept visible without asking to be planned. */}
           {doneUnsorted.length > 0 && (
             <div className="done-group">
@@ -1674,7 +1690,7 @@ const ROUTINE_WINDOWS = [
 ]
 
 export function RoutinesPage() {
-  const { routines, space, toggleRoutineStep, resetRoutine, deleteRoutine, habits, inView } = useStore()
+  const { routines, space, toggleRoutineStep, toggleRoutineAlt, resetRoutine, deleteRoutine, habits, inView } = useStore()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [trailDays, setTrailDays] = useState(0)
   const [adding, setAdding] = useState(false)
@@ -1747,9 +1763,16 @@ export function RoutinesPage() {
                   const checked = r.doneStepIds.includes(s.id)
                   return (
                     <div className={`routine-step${checked ? ' checked' : ''}`} key={s.id}>
-                      <button className="routine-check" role="checkbox" aria-checked={checked} aria-label={s.title} onClick={() => toggleRoutineStep(r.id, s.id)}>
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                      </button>
+                      {/* A step answered by a choice has no checkbox of its own:
+                          it is ticked by the answer, and a second control that
+                          could disagree with the answer is a bug waiting. */}
+                      {s.alts?.length ? (
+                        <span className="routine-check is-blank" aria-hidden="true" />
+                      ) : (
+                        <button className="routine-check" role="checkbox" aria-checked={checked} aria-label={s.title} onClick={() => toggleRoutineStep(r.id, s.id)}>
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        </button>
+                      )}
                       <span className="routine-step-body">
                         <span className="l">
                           {s.title}
@@ -1758,6 +1781,29 @@ export function RoutinesPage() {
                         {s.note && <span className="h">{s.note}</span>}
                         {s.example && <span className="ex mono">{s.example}</span>}
                         {s.link && <a className="routine-link" href={s.link} target="_blank" rel="noreferrer">{s.linkLabel ?? 'Open'} ↗</a>}
+                        {s.alts?.length ? (
+                          <span className="alt-set">
+                            {s.alts.map((a, i) => {
+                              const picked = r.stepChoice?.[s.id] === a.id
+                              return (
+                                <Fragment key={a.id}>
+                                  {i > 0 && <span className="alt-or">or</span>}
+                                  <button
+                                    className={`alt-opt${picked ? ' picked' : ''}`}
+                                    aria-pressed={picked}
+                                    onClick={() => toggleRoutineAlt(r.id, s.id, a.id)}
+                                  >
+                                    <span className="alt-tick" aria-hidden="true" />
+                                    <span className="alt-body">
+                                      <span className="alt-l">{a.title}</span>
+                                      {a.note && <span className="alt-h">{a.note}</span>}
+                                    </span>
+                                  </button>
+                                </Fragment>
+                              )
+                            })}
+                          </span>
+                        ) : null}
                       </span>
                     </div>
                   )

@@ -122,6 +122,14 @@ export interface Task {
   carried?: number
 }
 
+/** One of the ways a step can be answered. Which one he picked is worth keeping:
+ *  a month of "caffeine" every morning is the routine telling him something. */
+export interface RoutineAlt {
+  id: string
+  title: string
+  note?: string
+}
+
 export interface RoutineStep {
   id: string
   title: string
@@ -131,6 +139,10 @@ export interface RoutineStep {
   note?: string
   /** e.g. a tongue-twister to read aloud. */
   example?: string
+  /** Two ways to answer one step. "Move or caffeine" is a single step with a
+   *  choice inside it, not two steps of which one gets skipped every day.
+   *  Picking any one of them satisfies the step. */
+  alts?: RoutineAlt[]
   /** optional external tool to open (typing test, etc.). */
   link?: string
   linkLabel?: string
@@ -432,6 +444,13 @@ export interface Routine {
   /** Numbers a step recorded this period, e.g. today's typing speed. Cleared
    *  with the checks when the period rolls over. */
   stepData?: Record<string, number>
+  /** For a step that offers a choice, the alt he picked this period. */
+  stepChoice?: Record<string, string>
+  /** The moment the first step was ticked, as an ISO timestamp. A routine is not
+   *  on his day until he has actually started it, and it lands in the part of
+   *  the day he started it in. Cleared with the checks at the period roll, so
+   *  every day begins with nothing claiming to be underway. */
+  startedAt?: string
   /** The day the mirror last ticked this routine's habit, as an ISO date. A
    *  weekly routine finished on Tuesday must clear TUESDAY when it is undone on
    *  Friday, not whatever day happens to be today. */

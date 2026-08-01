@@ -67,6 +67,9 @@ function DaySchedule({ day }: { day: string }) {
   const { timed: moments, untimed } = useDayHappenings(day)
   const isToday = day === localDateKey()
   const y = (mins: number) => (mins / 60) * HOUR_PX
+  /* A block can only occupy the day it is drawn in. Without the cap, a block
+     whose arithmetic leaks past midnight painted hours nobody worked. */
+  const capped = (top: number, h: number) => Math.min(h, HOURS * HOUR_PX - top - 2)
   const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
   const pinned = isToday ? tasks.filter((t) => t.at && !t.done && t.list === 'today' && inView(t.space)) : []
   /* The block on the clock right now belongs on the clock too. */
@@ -98,13 +101,13 @@ function DaySchedule({ day }: { day: string }) {
           </div>
         )}
         {pinned.map((t) => (
-          <div className="vev vev-task" key={t.id} style={{ top: y(minutesOf(`${day}T${t.at}:00`)) + 1, minHeight: 24 }}>
+          <div className="vev vev-task" key={t.id} style={{ top: y(minutesOf(`${day}T${t.at}:00`)) + 1, minHeight: 24, maxHeight: capped(y(minutesOf(`${day}T${t.at}:00`)), 9999) }}>
             <span className="t">{t.title}</span>
             <span className="rng">{fmtTime(t.at!)} · planned</span>
           </div>
         ))}
         {liveMin > 0 && (
-          <div className="vev vev-live" style={{ top: y(nowMin - liveMin) + 1, height: Math.max((liveMin / 60) * HOUR_PX - 2, 24) }}>
+          <div className="vev vev-live" style={{ top: y(Math.max(0, nowMin - liveMin)) + 1, height: capped(y(Math.max(0, nowMin - liveMin)), Math.max((liveMin / 60) * HOUR_PX - 2, 24)) }}>
             <span className="t">{pomo.focusLabel ?? 'Focus'}</span>
             <span className="rng">running, {fmtDuration(liveMin)} so far</span>
           </div>
@@ -113,7 +116,7 @@ function DaySchedule({ day }: { day: string }) {
           const start = m.minutes ? minutesOf(m.at) - m.minutes : minutesOf(m.at)
           return m.minutes ? (
             <div className={`vev vev-done k-${m.kind}`} key={i}
-              style={{ top: y(Math.max(0, start)) + 1, height: Math.max((m.minutes / 60) * HOUR_PX - 2, 24) }}>
+              style={{ top: y(Math.max(0, start)) + 1, height: capped(y(Math.max(0, start)), Math.max((m.minutes / 60) * HOUR_PX - 2, 24)) }}>
               <span className="t">{m.title}</span>
               <span className="rng">{fmtTime(`${Math.floor(start / 60)}:${String(start % 60).padStart(2, '0')}`)} · {fmtDuration(m.minutes)}</span>
             </div>
@@ -136,7 +139,7 @@ function useDayCounts(): Map<string, number> {
   return useMemo(() => {
     const m = new Map<string, number>()
     const add = (day: string) => m.set(day, (m.get(day) ?? 0) + 1)
-    for (const t of tasks) if (t.done && t.doneAt && inView(t.space)) add(t.doneAt.slice(0, 10))
+    for (const t of tasks) if (t.done && t.doneAt && inView(t.space)) add(localDateKey(new Date(t.doneAt)))
     for (const t of habitLog) {
       const h = habits.find((x) => x.id === t.habitId)
       if (h && inView(h.space)) add(t.day)

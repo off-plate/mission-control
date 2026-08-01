@@ -2591,9 +2591,11 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .cal-months { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s4); }
 /* One month, generous cells; the arrows do the travelling. */
 .cal-months.one { grid-template-columns: 1fr; }
-.cal-months.one .cal-month { max-width: 880px; }
-.cal-months.one .cal-grid { gap: 4px; }
-.cal-months.one .cal-day { aspect-ratio: auto; min-height: 84px; align-items: flex-start; justify-content: flex-start; padding: 8px; border-color: var(--hairline); }
+/* The month takes the room it is given: two thirds of the page is exactly the
+   canvas a month deserves, not a strip in its corner. */
+.cal-months.one .cal-month { max-width: none; width: 100%; }
+.cal-months.one .cal-grid { gap: 6px; }
+.cal-months.one .cal-day { aspect-ratio: auto; min-height: 108px; align-items: flex-start; justify-content: flex-start; padding: 10px; border-color: var(--hairline); }
 .cal-months.one .cal-day:hover { border-color: var(--hairline-strong); }
 .cal-months.one .cal-num { font-size: var(--text-sm); }
 .cal-months.one .cal-marks { margin-top: auto; }

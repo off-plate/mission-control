@@ -278,6 +278,39 @@ function loadPersisted(): PersistedState | null {
        the spaces that existed then, so a new one is filled from the defaults
        while every space he has arranged himself is handed back untouched. */
     if (p.spaces) p.spaces = { ...DEFAULT_SPACES, ...p.spaces }
+    /* One-time repair of focus blocks logged at the wrong length. While the
+       timer read its length from the SETTING, a block started from a task was
+       recorded at the setting's minutes, not the task's. The truth is still in
+       the plan: each block names what it was for, and the task, its steps or
+       its ledger row still carry the estimate. Case-blind, because the label
+       may have been typed back before the task was renamed. Runs once. */
+    p.removedSeeds = p.removedSeeds ?? []
+    if (!p.removedSeeds.includes('fix:focus-lengths')) {
+      p.removedSeeds.push('fix:focus-lengths')
+      const estimateFor = (label: string): number | null => {
+        const want = label.trim().toLowerCase()
+        for (const t of p.tasks ?? []) {
+          if (t.title.trim().toLowerCase() === want) {
+            return t.subtasks?.length ? t.subtasks.reduce((a, x) => a + x.estimateMin, 0) : t.estimateMin
+          }
+          const st = t.subtasks?.find((x) => x.title.trim().toLowerCase() === want)
+          if (st) return st.estimateMin
+        }
+        const l = (p.ledger ?? []).find((x) => !x.title.startsWith('Focus:') && x.title.trim().toLowerCase() === want)
+        return l ? l.estimateMin : null
+      }
+      p.focusSessions = (p.focusSessions ?? []).map((f) => {
+        if (!f.label) return f
+        const est = estimateFor(f.label)
+        // Only ever raised: the bug truncated, it never inflated.
+        if (est == null || f.minutes >= est) return f
+        if (f.ledgerId) {
+          p.ledger = (p.ledger ?? []).map((l) => (l.id === f.ledgerId ? { ...l, estimateMin: est, actualMin: est } : l))
+        }
+        return { ...f, minutes: est }
+      })
+    }
+
     /* Week rollover: when the saved state belongs to an earlier ISO week, each
        habit's checkmarks are archived into its 12-week history and cleared, so
        Monday always starts a fresh row instead of showing last week's ticks. */

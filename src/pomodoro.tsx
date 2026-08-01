@@ -6,7 +6,10 @@ import { taskMinutes } from './util'
    see on every tab, a corner ambient glow that shows the state at a glance,
    a browser-tab countdown, and a notification when a phase ends. */
 
-type Phase = 'idle' | 'focus' | 'break'
+/* 'await' sits between focus and break: the block is finished and logged, and
+   nothing further happens until he says so. A break that starts itself decides
+   for him that the next thing is rest, and he asked it to stop deciding. */
+type Phase = 'idle' | 'focus' | 'break' | 'await'
 
 interface Pomo {
   phase: Phase
@@ -25,6 +28,12 @@ interface Pomo {
   toggle: () => void
   skip: () => void
   stop: () => void
+  /** Approve the break the finished block earned. */
+  startBreak: () => void
+  /** Keep going instead: a fresh block under the same name. */
+  extend: (min: number) => void
+  /** Neither: close the popup and stand down. */
+  dismiss: () => void
   setFocusMin: (n: number) => void
   setBreakMin: (n: number) => void
 }
@@ -34,6 +43,30 @@ export function usePomodoro(): Pomo {
   const c = useContext(Ctx)
   if (!c) throw new Error('usePomodoro outside provider')
   return c
+}
+
+/* An audible end, generated on the spot: no file, nothing fetched, works under
+   the strictest CSP. Browsers only allow audio after a user gesture, and a
+   session always starts with one (starting the timer), so by the time a block
+   ends the context is unlockable. */
+let audioCtx: AudioContext | null = null
+function chime() {
+  try {
+    audioCtx = audioCtx ?? new AudioContext()
+    const ctx = audioCtx
+    if (ctx.state === 'suspended') void ctx.resume()
+    const t0 = ctx.currentTime
+    for (const [freq, at, dur] of [[660, 0, 0.18], [880, 0.22, 0.34]] as const) {
+      const o = ctx.createOscillator()
+      const g = ctx.createGain()
+      o.type = 'sine'; o.frequency.value = freq
+      g.gain.setValueAtTime(0.0001, t0 + at)
+      g.gain.exponentialRampToValueAtTime(0.12, t0 + at + 0.02)
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + at + dur)
+      o.connect(g).connect(ctx.destination)
+      o.start(t0 + at); o.stop(t0 + at + dur + 0.05)
+    }
+  } catch { /* no audio device; the popup still says it */ }
 }
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`
@@ -69,9 +102,12 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   const [blockMin, setBlockMin] = useState(() => {
     if (saved.blockMin) return saved.blockMin
     if (saved.phase === 'focus' && saved.focusLabel) {
-      const t = tasks.find((x) => x.title === saved.focusLabel)
+      const want = saved.focusLabel.trim().toLowerCase()
+      /* Case-blind, and DONE tasks count too: by the time this runs he may have
+         finished or renamed the thing the block was started from. */
+      const t = tasks.find((x) => x.title.trim().toLowerCase() === want)
       if (t) return taskMinutes(t)
-      const st = tasks.flatMap((x) => x.subtasks ?? []).find((x) => x.title === saved.focusLabel)
+      const st = tasks.flatMap((x) => x.subtasks ?? []).find((x) => x.title.trim().toLowerCase() === want)
       if (st) return st.estimateMin
     }
     if (saved.phase === 'focus' && saved.endsAt) {
@@ -131,10 +167,14 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
       setCyclesDone((c) => c + 1)
       // The block is only counted once it is actually finished.
       logFocus(blockMin, focusLabel ?? undefined)
-      notify('Focus done', `Nice. ${breakMin} minute break.`)
-      setPhase('break')
-      setEndsAt(Date.now() + breakMin * 60 * 1000)
-    } else {
+      chime()
+      notify('Focus done', 'Your call: break, or keep going.')
+      /* The block is banked; what happens next is his. */
+      setPhase('await')
+      setEndsAt(null)
+      setPausedLeft(null)
+    } else if (phase === 'break') {
+      chime()
       notify('Break over', 'Back to it when you are ready.')
       setPhase('idle')
       setEndsAt(null)
@@ -178,12 +218,19 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     else { setPhase('idle'); setEndsAt(null); setPausedLeft(null) }
   }
   const stop = () => { bankPartial(); setPhase('idle'); setEndsAt(null); setPausedLeft(null); setFocusLabel(null) }
+  /* From the finished-focus popup: the break he approved. */
+  const startBreak = () => { setPhase('break'); setEndsAt(Date.now() + breakMin * 60 * 1000); setPausedLeft(null) }
+  /* Or more focus instead. A fresh block under the same name, logged on its own
+     when IT finishes, so the extension is recorded as the extra work it is. */
+  const extend = (min: number) => { setPhase('focus'); setBlockMin(min); setEndsAt(Date.now() + min * 60 * 1000); setPausedLeft(null) }
+  const dismiss = () => { setPhase('idle'); setEndsAt(null); setPausedLeft(null); setFocusLabel(null) }
 
-  const value: Pomo = { phase, running, secondsLeft, focusMin, blockMin, breakMin, cyclesDone, focusLabel, startFocus, toggle, skip, stop, setFocusMin, setBreakMin }
+  const value: Pomo = { phase, running, secondsLeft, focusMin, blockMin, breakMin, cyclesDone, focusLabel, startFocus, toggle, skip, stop, startBreak, extend, dismiss, setFocusMin, setBreakMin }
   return (
     <Ctx.Provider value={value}>
       {children}
       <PomodoroAmbient />
+      {phase === 'await' && <FocusDoneModal />}
       <PomodoroBadge />
     </Ctx.Provider>
   )
@@ -192,8 +239,28 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
 function PomodoroAmbient() {
   const { phase, running } = usePomodoro()
   if (phase === 'idle') return null
-  const state = !running ? 'paused' : phase
+  const state = phase === 'await' ? 'await' : !running ? 'paused' : phase
   return <div className={`pomo-ambient ${state}`} aria-hidden="true" />
+}
+
+/* The end of a block is an event, not a transition: it stops, says so out loud,
+   and waits. Nothing counts down while this is open. */
+function FocusDoneModal() {
+  const p = usePomodoro()
+  return (
+    <div className="pomo-done-veil" role="dialog" aria-modal="true" aria-label="Focus finished">
+      <div className="pomo-done">
+        <span className="pomo-done-kicker mono">focus finished</span>
+        <h2>{p.focusLabel ?? 'Focus block'}</h2>
+        <p>{p.blockMin} minutes, banked. What now?</p>
+        <div className="pomo-done-actions">
+          <button className="btn btn-primary" onClick={p.startBreak}>Take the {p.breakMin}m break</button>
+          <button className="btn btn-ghost" onClick={() => p.extend(10)}>10 more minutes</button>
+          <button className="btn btn-ghost" onClick={p.dismiss}>Done for now</button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function Stepper({ label, value, set, min, max }: { label: string; value: number; set: (n: number) => void; min: number; max: number }) {
@@ -229,13 +296,13 @@ function PomodoroBadge() {
     )
   }
 
-  const state = !p.running ? 'paused' : p.phase
+  const state = p.phase === 'await' ? 'await' : !p.running ? 'paused' : p.phase
   return (
     <div className={`pomo-badge active ${state}`}>
       <span className="pomo-phase" title={p.focusLabel ?? undefined}>
-        {p.phase === 'focus' ? (p.focusLabel ?? (p.running ? 'Focus' : 'Paused')) : 'Break'}
+        {p.phase === 'focus' ? (p.focusLabel ?? (p.running ? 'Focus' : 'Paused')) : p.phase === 'await' ? 'Focus finished' : 'Break'}
       </span>
-      <span className="pomo-clock mono">{mmss(p.secondsLeft)}</span>
+      <span className="pomo-clock mono">{p.phase === 'await' ? 'done' : mmss(p.secondsLeft)}</span>
       <button className="pomo-icon" onClick={p.toggle} aria-label={p.running ? 'Pause' : 'Resume'}>{p.running ? '❚❚' : '▸'}</button>
       <button className="pomo-icon" onClick={p.skip} aria-label={p.phase === 'focus' ? 'Skip to break' : 'End break'}>⤼</button>
       <button className="pomo-icon" onClick={p.stop} aria-label="Stop">✕</button>

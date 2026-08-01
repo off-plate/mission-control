@@ -6,6 +6,7 @@ import { CoachPage, MoneyPage, ReviewPage, SettingsPage } from './pages2'
 import { AssistantPage, BrainDumpPage } from './pages3'
 import { BrandPage } from './brand'
 import { DayPage } from './day'
+import { CalendarPage } from './calendar'
 import { FocusPage } from './focus'
 import { useStore } from './store'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange } from './supabase'
@@ -53,6 +54,7 @@ function Logo() {
 const NAV: { id: PageId; label: string }[] = [
   { id: 'today', label: 'Today' },
   { id: 'plan', label: 'Plan' },
+  { id: 'calendar', label: 'Calendar' },
   { id: 'habits', label: 'Habits' },
   { id: 'routines', label: 'Routines' },
   { id: 'goals', label: 'Goals' },
@@ -168,6 +170,7 @@ export default function App() {
         <PageBoundary page={page}>
         {page === 'today' && <TodayPage />}
         {page === 'plan' && <PlanPage />}
+        {page === 'calendar' && <CalendarPage />}
         {page === 'assistant' && <AssistantPage />}
         {page === 'habits' && <HabitsPage />}
         {page === 'routines' && <RoutinesPage />}

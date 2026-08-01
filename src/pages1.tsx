@@ -364,7 +364,7 @@ function timeAtOffset(px: number): string {
 }
 
 /** Vertical day timeline: calendar events plus any task pinned to a clock time. Full height, no inner scroll. */
-function Schedule({ events, tasks, onDropAt }: { events: AgendaEvent[]; tasks: Task[]; onDropAt: (id: string, at: string) => void }) {
+export function Schedule({ events, tasks, onDropAt }: { events: AgendaEvent[]; tasks: Task[]; onDropAt: (id: string, at: string) => void }) {
   const { setTaskAt, inView } = useStore()
   const pinned = tasks.filter((t) => t.at && !t.done)
   const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
@@ -479,6 +479,40 @@ function SubtaskRow({ taskId, sub }: { taskId: string; sub: SubTask }) {
         <button className="sub-tool" aria-label={`Remove step: ${sub.title}`} onClick={() => deleteSubtask(taskId, sub.id)}>Remove</button>
       </span>
     </div>
+  )
+}
+
+/* Editing what a task says and how big it claims to be. Everything on the list
+   is his, generated or typed, so every row can be corrected without a detour
+   through delete-and-retype. */
+function EditTaskSheet({ task, onClose }: { task: Task; onClose: () => void }) {
+  const { updateTask } = useStore()
+  const [title, setTitle] = useState(task.title)
+  const [mins, setMins] = useState(String(taskMinutes(task) || 15))
+  const derived = !!task.subtasks?.length
+  const save = () => {
+    updateTask(task.id, { title, ...(derived ? {} : { estimateMin: Number(mins) || undefined }) })
+    onClose()
+  }
+  return (
+    <Sheet title="Edit this task" onClose={onClose}>
+      <label className="field-label" htmlFor="et-title">What is it?</label>
+      <input id="et-title" className="textinput" style={{ width: '100%' }} value={title} autoFocus
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && title.trim()) save() }} />
+      <label className="field-label" htmlFor="et-min" style={{ marginTop: 'var(--s4)' }}>Minutes</label>
+      {derived ? (
+        <p className="assist-note">Its estimate is the sum of its steps, so it is edited on the steps.</p>
+      ) : (
+        <input id="et-min" className="textinput mono" style={{ width: 120 }} type="number" min={1} max={600} value={mins}
+          onChange={(e) => setMins(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && title.trim()) save() }} />
+      )}
+      <div className="sheet-actions">
+        <button className="btn btn-quiet" onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" disabled={!title.trim()} onClick={save}>Save changes</button>
+      </div>
+    </Sheet>
   )
 }
 
@@ -701,7 +735,6 @@ export function PlanPage() {
   const { startFocus } = usePomodoro()
   const { routines, habits } = useStore()
   const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId, setTaskAt, plan, setPage, openDay, view, inView } = useStore()
-  const events = MOCK_AGENDA[space]
 
   const spaceTasks = tasks.filter((t) => inView(t.space))
   const backlogOpen = spaceTasks.filter((t) => !t.done && t.list === 'backlog') // the to-do pool
@@ -763,6 +796,7 @@ export function PlanPage() {
   const [listDropOver, setListDropOver] = useState(false)
   const [quick, setQuick] = useState('')
   const [breakdownFor, setBreakdownFor] = useState<Task | null>(null)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
 
   /* "Show me" points at the work that came back overnight: scroll the list into
      view and mark those rows for a couple of seconds. */
@@ -809,13 +843,6 @@ export function PlanPage() {
     if (t && t.list !== 'today') moveTaskList(id, 'today')
     assignSlot(id, key === 'unsorted' ? undefined : key)
   }
-  /* Dropped onto the day itself: the task gets that clock time, comes to today
-     if it was in the backlog, and its bucket follows the hour. */
-  const dropAt = (id: string, at: string) => {
-    const t = tasks.find((x) => x.id === id)
-    if (!t) return
-    setTaskAt(id, at)
-  }
   const dropToList = (id: string) => {
     const t = tasks.find((x) => x.id === id)
     if (!t || t.list === 'backlog') return
@@ -852,15 +879,9 @@ export function PlanPage() {
         </div>
       )}
 
-      <div className="grid-3 plan-cols">
-        {/* 1 — Schedule */}
-        <div className="panel">
-          <span className="microcap">Schedule</span>
-          <Schedule events={events} tasks={todayTasks} onDropAt={dropAt} />
-          <p className="col-note">Drag a task onto the day to give it a time. On the day itself, a name opens in Google Calendar.</p>
-        </div>
-
-        {/* 2 — To-do list: everything you added, any day. Drag out to plan it,
+      {/* The hourly schedule lives on Calendar now; Plan is the list and the day. */}
+      <div className="grid-3 plan-cols plan-two">
+        {/* 1 — To-do list: everything you added, any day. Drag out to plan it,
             drag back to take it off today. */}
         <div
           className={`panel todo-col${listDropOver ? ' drop-over' : ''}`}
@@ -918,6 +939,7 @@ export function PlanPage() {
                   )}
                   <TaskActions task={t} />
                   <Dropdown label={`Options for ${t.title}`}>
+                    <button role="menuitem" onClick={() => setEditingTask(t)}>Edit</button>
                     <button role="menuitem" onClick={() => setBreakdownFor(t)}>Break it down</button>
                     <button role="menuitem" onClick={() => moveTasksToToday([t.id])}>Move to today</button>
                     <span className="kebab-sep" />
@@ -937,7 +959,7 @@ export function PlanPage() {
           {backlogOpen.length === 0 && <div className="empty">Nothing on the list. Generate a task above when something lands.</div>}
         </div>
 
-        {/* 3 — Today: drag tasks from Unsorted into a time of day */}
+        {/* 2 — Today: drag tasks from Unsorted into a time of day */}
         <div className="panel">
           <div className="col-head">
             <span className="microcap">Today</span>
@@ -1049,7 +1071,10 @@ export function PlanPage() {
                             )}
                             {!t.done && <span className="kebab-sep" />}
                             {!t.done && (
-                              <button role="menuitem" onClick={() => { moveTaskList(t.id, 'backlog'); assignSlot(t.id, undefined); setTaskAt(t.id, undefined) }}>Back to the list</button>
+                              <>
+                                <button role="menuitem" onClick={() => setEditingTask(t)}>Edit</button>
+                                <button role="menuitem" onClick={() => { moveTaskList(t.id, 'backlog'); assignSlot(t.id, undefined); setTaskAt(t.id, undefined) }}>Back to the list</button>
+                              </>
                             )}
                             <button role="menuitem" className="danger" onClick={() => deleteTask(t.id)}>Delete</button>
                           </Dropdown>
@@ -1131,6 +1156,7 @@ export function PlanPage() {
       </div>
 
       {breakdownFor && <BreakdownSheet task={breakdownFor} onClose={() => setBreakdownFor(null)} />}
+      {editingTask && <EditTaskSheet task={editingTask} onClose={() => setEditingTask(null)} />}
 
     </div>
   )

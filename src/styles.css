@@ -2545,3 +2545,46 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 }
 .focus-step:hover { border-color: var(--accent); color: var(--accent); }
 .focus-step.on { border-color: var(--ink); background: var(--ink); color: var(--bg); }
+
+/* ---------- calendar ---------- */
+/* Two columns of plan now that the schedule lives on Calendar. */
+.plan-two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.cal-cols { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); align-items: start; }
+.cal-wide { min-width: 0; }
+.cal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s3); }
+.cal-nav { display: flex; gap: var(--s1); padding-top: var(--s2); }
+.cal-months { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s4); }
+.cal-month-name { margin-bottom: var(--s2); }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.cal-dow { font-size: 0.625rem; color: var(--faint); text-align: center; padding-bottom: 2px; }
+.cal-day {
+  position: relative; aspect-ratio: 1; border: 1px solid transparent; border-radius: 4px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+}
+.cal-day:hover { border-color: var(--hairline-strong); }
+.cal-num { font-size: var(--text-xs); color: var(--muted); }
+.cal-day.has-any .cal-num { color: var(--ink); font-weight: 600; }
+.cal-day.is-today { border-color: var(--accent); }
+.cal-day.is-picked { background: var(--ink); }
+.cal-day.is-picked .cal-num { color: var(--bg); }
+.cal-marks { display: flex; gap: 2px; }
+.cal-marks i { width: 4px; height: 4px; border-radius: 50%; background: var(--progress); }
+.cal-day.is-picked .cal-marks i { background: var(--bg); }
+
+/* one day, told by the hour */
+.dayrec { margin-top: var(--s3); }
+.dayrec-row { display: flex; align-items: center; gap: var(--s2); padding: var(--s2) 0; border-top: 1px solid var(--hairline); font-size: var(--text-sm); }
+.dayrec-row:first-child { border-top: none; }
+.dayrec-at { color: var(--faint); font-size: var(--text-xs); width: 40px; flex: none; }
+.dayrec-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--progress); }
+.dayrec-row.k-focus .dayrec-dot { background: var(--info); }
+.dayrec-row.k-routine .dayrec-dot { background: var(--accent); }
+.dayrec-row.k-habit .dayrec-dot { background: var(--progress); }
+.dayrec-row .grow { min-width: 0; }
+.dayrec-kind { font-size: 0.625rem; color: var(--faint); text-transform: uppercase; letter-spacing: 0.04em; }
+
+@media (max-width: 900px) {
+  .cal-cols { grid-template-columns: 1fr; }
+  .cal-months { grid-template-columns: 1fr; }
+  .plan-two { grid-template-columns: 1fr; }
+}

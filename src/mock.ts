@@ -128,6 +128,7 @@ export const MOCK_HABITS: HabitDef[] = [
   /* Kept by the focus timer itself. Nothing to tick: the app already knows how
      long he focused, so asking him to confirm it would be asking twice. */
   { id: 'h-focus1h', space: 'personal', name: 'Focus for more than 1h', frequency: 'daily', paused: false, auto: { from: 'focus', minutes: 60 }, days: [false, false, false, false, false, false, false], history: [] },
+  { id: 'h-morningwork', space: 'work', name: 'Morning work routine', daypart: 'morning', frequency: 'weekdays', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-weekly', space: 'personal', name: 'Weekly reset', frequency: 'weekly', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-monthly', space: 'personal', name: 'Monthly review', frequency: 'monthly', paused: false, days: [false, false, false, false, false, false, false], history: [] },
 ]
@@ -143,7 +144,7 @@ export const MOCK_ROUTINES: Routine[] = [
     doneStepIds: [],
     steps: [
       { id: 'mr0', title: 'Take creatine', kind: 'do', habitId: 'h-creatine', note: 'First thing, before the rest of the ritual. A scoop, water, done.' },
-      { id: 'mr1', title: 'Meditation', kind: 'timer', seconds: 600, habitId: 'h-meditation', note: 'Sit, eyes closed, follow the breath. Ten minutes, no phone.', link: 'https://www.youtube.com/watch?v=1ZYbU82GVz4', linkLabel: 'Open the soundtrack' },
+      { id: 'mr1', title: 'Meditation', kind: 'timer', seconds: 300, habitId: 'h-meditation', note: 'Sit, eyes closed, follow the breath. Five minutes, no phone.', link: 'https://www.youtube.com/watch?v=1ZYbU82GVz4', linkLabel: 'Open the soundtrack' },
       { id: 'mr2', title: 'Pronunciation test', kind: 'do', note: 'Read a short passage out loud, record it, listen back once.' },
       { id: 'mr3', title: 'Jazykolam mouth stretch', kind: 'do', note: 'Loosen the jaw and lips, then a tongue-twister three times, fast and clean.', example: 'Strč prst skrz krk.' },
       { id: 'mr4', title: 'Typing test', kind: 'do', note: 'One quick round to wake the hands up.', link: 'https://monkeytype.com', linkLabel: 'Open typing test' },
@@ -151,6 +152,9 @@ export const MOCK_ROUTINES: Routine[] = [
     ],
   },
   { id: 'r-prework', space: 'personal', title: 'Before work', cadence: 'prework', habitId: 'h-prework', doneStepIds: [], steps: [] },
+  /* Big Time's own morning ritual. Weekday-gated like Before work: a work
+     routine has no Saturday. Steps are his to write. */
+  { id: 'r-morningwork', space: 'work', title: 'Morning work routine', cadence: 'prework', habitId: 'h-morningwork', doneStepIds: [], steps: [] },
   { id: 'r-evening', space: 'personal', title: 'Before bed routine', cadence: 'daily', habitId: 'h-evening', doneStepIds: [], steps: [] },
   { id: 'r-nightwork', space: 'personal', title: 'Night work routine', cadence: 'daily', habitId: 'h-nightwork', doneStepIds: [], steps: [] },
   {

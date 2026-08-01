@@ -509,7 +509,7 @@ function loadPersisted(): PersistedState | null {
        while it still carries the exact old name, so anything he has renamed
        himself is left alone and running it twice changes nothing. */
     {
-      const renames: [string, string, string][] = [['r-evening', 'Evening shutdown', 'Before bed routine']]
+      const renames: [string, string, string][] = [['r-evening', 'Evening shutdown', 'Before bed routine'], ['r-weekly', 'Weekly reset', 'Weekly review']]
       for (const [id, was, now] of renames) {
         p.routines = (p.routines ?? []).map((r) => (r.id === id && r.title === was ? { ...r, title: now } : r))
         const hid = (p.routines ?? []).find((r) => r.id === id)?.habitId
@@ -841,9 +841,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog])
 
-  /* Focus history that predates the rule, or a day whose blocks were edited in
-     another session, still has to be answered for. One pass on mount settles it. */
-  useEffect(() => { autoFrom(focusSessions, 0) }, [])
+  /* The auto pass follows the sessions: history that predates the rule, blocks
+     edited elsewhere, or a merge that brought rows back all resolve on the next
+     change, not only on the next visit. Idempotent, so re-running is free. */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { autoFrom(focusSessions, 0) }, [focusSessions])
 
   /* Closing the tab inside the debounce window must not lose the last change:
      flush the pending remote write the moment the page starts hiding. */

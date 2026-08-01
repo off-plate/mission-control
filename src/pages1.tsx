@@ -1782,6 +1782,15 @@ export function HabitsPage() {
 /* ---------------- ROUTINES ---------------- */
 
 const CADENCE_ORDER: RoutineCadence[] = ['daily', 'prework', 'weekly', 'monthly']
+/* The seeded routines in the order a day actually runs: wake, get to work,
+   reset when the brain fries, wind the night down, go to bed, then the longer
+   loops. His own routines slot in by cadence near their kin. */
+const DAY_FLOW = ['r-morning', 'r-prework', 'r-morningwork', 'r-brainrot', 'r-nightwork', 'r-evening', 'r-weekly', 'r-monthly']
+const flowRank = (r: Routine): number => {
+  const i = DAY_FLOW.indexOf(r.id)
+  if (i !== -1) return i
+  return ({ daily: 4.5, prework: 2.5, weekly: 6.5, monthly: 7.5 } as Record<string, number>)[r.cadence] ?? 9
+}
 const CADENCE_LABEL: Record<RoutineCadence, string> = { daily: 'Daily', prework: 'Before work', weekly: 'Weekly', monthly: 'Monthly' }
 /** "done today" would be wrong on a monthly routine; each cadence names its own period. */
 export const DONE_LABEL: Record<RoutineCadence, string> = {
@@ -1890,7 +1899,7 @@ export function RoutinesPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const spaceRoutines = routines.filter((r) => inView(r.space) && !r.archivedAt)
-  const sorted = [...spaceRoutines].sort((a, b) => CADENCE_ORDER.indexOf(a.cadence) - CADENCE_ORDER.indexOf(b.cadence))
+  const sorted = [...spaceRoutines].sort((a, b) => flowRank(a) - flowRank(b))
   return (
     <div className="page">
       <Band

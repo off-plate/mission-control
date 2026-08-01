@@ -6,7 +6,7 @@ import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, countIn, countTarget, isCounted, COUNT_PERIODS, routineComplete, routineProgress, routineRunsOn, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, countIn, countTarget, isCounted, COUNT_PERIODS, routineComplete, routineProgress, routineRunsOn, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
 import { goalPeriodKey, goalPeriodRange, habitPeriodRange, periodKeyFor, periodLabel, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, periodNoun, routinePeriods, slotForMoment, taskMinutes, toMin } from './util'
 
@@ -436,6 +436,51 @@ const BUCKETS: { id: TimeSlot | 'unsorted'; label: string }[] = [
   { id: 'unsorted', label: 'Unsorted' },
   ...SLOTS.map((s) => ({ id: s.id, label: s.label })),
 ]
+
+/* A generated breakdown is a draft. The wording is the model's, the minutes are
+   a guess, and sometimes a step is simply not his, so every one of them can be
+   rewritten, re-estimated or thrown away. */
+function SubtaskRow({ taskId, sub }: { taskId: string; sub: SubTask }) {
+  const { updateSubtask, deleteSubtask } = useStore()
+  const [editing, setEditing] = useState(false)
+  const [title, setTitle] = useState(sub.title)
+  const [mins, setMins] = useState(String(sub.estimateMin))
+
+  const save = () => {
+    const t = title.trim()
+    // An empty title would leave a row with nothing in it; keep the old one.
+    updateSubtask(taskId, sub.id, { title: t || sub.title, estimateMin: Number(mins) || sub.estimateMin })
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <div className="subtask-row is-editing">
+        <input className="textinput sub-edit-title" value={title} autoFocus
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { setTitle(sub.title); setMins(String(sub.estimateMin)); setEditing(false) } }} />
+        <input className="textinput sub-edit-min mono" type="number" min={1} max={480} value={mins}
+          onChange={(e) => setMins(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') save() }} />
+        <button className="btn btn-primary sub-btn" onClick={save}>Save</button>
+      </div>
+    )
+  }
+  /* Finished stays finished here. This row drew every step the same way, so a
+     task sent back to the list showed work he had already done as untouched:
+     the record was intact, the page simply refused to say so. */
+  return (
+    <div className={`subtask-row${sub.done ? ' is-done' : ''}`}>
+      <span className="sub-tick" aria-hidden="true" />
+      <span className="grow" style={{ fontSize: 'var(--text-sm)' }}>{sub.title}</span>
+      <span className="est-chip">{sub.done && sub.actualMin != null ? `${fmtDuration(sub.actualMin)} taken` : fmtDuration(sub.estimateMin)}</span>
+      <span className="sub-tools">
+        <button className="sub-tool" aria-label={`Edit step: ${sub.title}`} onClick={() => setEditing(true)}>Edit</button>
+        <button className="sub-tool" aria-label={`Remove step: ${sub.title}`} onClick={() => deleteSubtask(taskId, sub.id)}>Remove</button>
+      </span>
+    </div>
+  )
+}
 
 /** Inline "how long did it take?" logger shown when you finish a task or subtask. */
 function ActualLog({ est, onLog, onSkip }: { est: number; onLog: (m: number) => void; onSkip: () => void }) {
@@ -882,11 +927,7 @@ export function PlanPage() {
                 {hasSubs && isExp && (
                   <div className="subtask-list">
                     {t.subtasks!.map((s) => (
-                      <div className="subtask-row" key={s.id}>
-                        <span className="sub-tick" aria-hidden="true" />
-                        <span className="grow" style={{ fontSize: 'var(--text-sm)' }}>{s.title}</span>
-                        <span className="est-chip">{fmtDuration(s.estimateMin)}</span>
-                      </div>
+                      <SubtaskRow key={s.id} taskId={t.id} sub={s} />
                     ))}
                   </div>
                 )}

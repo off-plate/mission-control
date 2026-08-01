@@ -141,6 +141,10 @@ interface Store extends PersistedState {
    *  follows the hour, so the two never disagree. */
   setTaskAt: (id: string, at: string | undefined) => void
   toggleSubtask: (taskId: string, subId: string) => void
+  /** Rename a step of a task, or change how long it is expected to take. */
+  updateSubtask: (taskId: string, subId: string, patch: { title?: string; estimateMin?: number }) => void
+  /** Drop a step. A generated breakdown is a suggestion, not a contract. */
+  deleteSubtask: (taskId: string, subId: string) => void
   logSubtaskActual: (taskId: string, subId: string, actualMin: number) => void
   deleteTask: (id: string) => void
   /** Attach generated steps to an existing task; its estimate becomes their sum. */
@@ -955,10 +959,43 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     /* A clock time implies a part of the day, so setting one moves the task into
        the matching bucket. Leaving them free to disagree meant a task could read
        9 AM on the schedule and sit under Evening in the list. */
+    /* Giving a task a time puts it on today. TAKING the time away must not:
+       "Back to the list" clears the time as part of sending a task away, and
+       this forced list back to 'today' every time, so the task never left. */
     setTaskAt: (id, at) =>
-      setTasks((prev) => prev.map((t) => (t.id === id
-        ? { ...t, at, list: 'today' as const, plannedOn: t.plannedOn ?? todayKey(), slot: at ? slotForTime(at) : t.slot }
-        : t))),
+      setTasks((prev) => prev.map((t) => {
+        if (t.id !== id) return t
+        if (!at) return { ...t, at: undefined }
+        return { ...t, at, list: 'today' as const, plannedOn: t.plannedOn ?? todayKey(), slot: slotForTime(at) }
+      })),
+    /* A breakdown is generated, so it is a first draft: wrong wording, wrong
+       minutes, sometimes a step that is not his at all. Both edits re-derive the
+       parent's estimate, because with a breakdown present the parent's number IS
+       the sum of its steps, and leaving it stale would quietly misreport the day. */
+    updateSubtask: (taskId, subId, patch) =>
+      setTasks((prev) => prev.map((t) => {
+        if (t.id !== taskId || !t.subtasks) return t
+        const subtasks = t.subtasks.map((s) => (s.id === subId
+          ? { ...s, ...(patch.title !== undefined ? { title: patch.title } : {}), ...(patch.estimateMin !== undefined ? { estimateMin: Math.max(1, patch.estimateMin) } : {}) }
+          : s))
+        return { ...t, subtasks, estimateMin: subtasks.reduce((a, s) => a + s.estimateMin, 0), estimated: true }
+      })),
+    deleteSubtask: (taskId, subId) => {
+      const before = tasks
+      const t = tasks.find((x) => x.id === taskId)
+      const gone = t?.subtasks?.find((s) => s.id === subId)
+      armUndo(gone ? `Removed "${gone.title}"` : 'Step removed', () => setTasks(before))
+      setTasks((prev) => prev.map((x) => {
+        if (x.id !== taskId || !x.subtasks) return x
+        const subtasks = x.subtasks.filter((s) => s.id !== subId)
+        /* The last step going leaves a plain task. Its estimate came from the
+           steps, so with none left the number is whatever the final step
+           happened to be, which is not the size of the task: keep it as a
+           starting point but stop calling it an estimate. */
+        if (!subtasks.length) return { ...x, subtasks: undefined, estimated: false }
+        return { ...x, subtasks, estimateMin: subtasks.reduce((a, s) => a + s.estimateMin, 0), estimated: true }
+      }))
+    },
     toggleSubtask: (taskId, subId) =>
       setTasks((prev) =>
         prev.map((t) =>

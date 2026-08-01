@@ -130,6 +130,9 @@ interface Store extends PersistedState {
   moveWidget: (space: SpaceId, id: string, dir: -1 | 1) => void
 
   toggleTask: (id: string) => void
+  /** Rename a task or change its estimate. With a breakdown present the
+   *  estimate is the sum of its steps, so only the title is editable then. */
+  updateTask: (id: string, patch: { title?: string; estimateMin?: number }) => void
   logActual: (id: string, actualMin: number) => void
   addTask: (t: Omit<Task, 'id' | 'done'>) => void
   addTasks: (tasks: Omit<Task, 'id' | 'done'>[]) => void
@@ -529,7 +532,7 @@ function routeFromHash(): { page: PageId; day: string | null } {
   const h = location.hash.replace('#/', '')
   const m = h.match(/^day\/(\d{4}-\d{2}-\d{2})$/)
   if (m) return { page: 'day', day: m[1] }
-  const pages: PageId[] = ['today', 'plan', 'assistant', 'habits', 'routines', 'goals', 'money', 'review', 'coach', 'stats', 'settings', 'brand', 'braindump', 'focus']
+  const pages: PageId[] = ['today', 'plan', 'assistant', 'habits', 'routines', 'goals', 'money', 'review', 'coach', 'stats', 'settings', 'brand', 'braindump', 'focus', 'calendar']
   return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
 }
 
@@ -748,7 +751,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const idx = (new Date().getDay() + 6) % 7
     let next = habitLog
     if (delta === 1) {
-      next = [...habitLog, { habitId, day, src: `count#${Date.now()}${Math.round(performance.now())}` }]
+      next = [...habitLog, { habitId, day, src: `count#${Date.now()}${Math.round(performance.now())}`, at: new Date().toISOString() }]
     } else {
       const mine = habitLog.filter((t) => t.habitId === habitId && t.day === day)
       const last = mine[mine.length - 1]
@@ -783,7 +786,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           + (day === today ? extra : 0)
         const has = next.some((t) => t.habitId === h.id && t.day === day && t.src === src)
         const earns = mins >= (h.auto?.minutes ?? 60)
-        if (earns && !has) next = [...next, { habitId: h.id, day, src }]
+        if (earns && !has) next = [...next, { habitId: h.id, day, src, at: day === today ? new Date().toISOString() : undefined }]
         if (!earns && has) next = next.filter((t) => !(t.habitId === h.id && t.day === day && t.src === src))
       }
     }
@@ -800,7 +803,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const day = dayOfWeekKey(dayIndex)
     setHabitLog((prev) => {
       const without = prev.filter((t) => !(t.habitId === habitId && t.day === day))
-      return value ? [...without, { habitId, day }] : without
+      return value ? [...without, { habitId, day, at: day === todayKey() ? new Date().toISOString() : undefined }] : without
     })
     setHabits((prev) => prev.map((h) => (h.id === habitId
       ? { ...h, days: h.days.map((d, i) => (i === dayIndex ? value : d)) }
@@ -821,7 +824,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     let next = habitLog
     for (const c of changes) {
       next = next.filter((t) => !(t.habitId === c.habitId && t.day === day && t.src === c.src))
-      if (c.on) next = [...next, { habitId: c.habitId, day, src: c.src }]
+      if (c.on) next = [...next, { habitId: c.habitId, day, src: c.src, at: new Date().toISOString() }]
     }
     setHabitLog(next)
     const idx = (new Date().getDay() + 6) % 7
@@ -996,15 +999,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return {
           ...t,
           done,
+          // Finishing is a moment, and the calendar wants to know which one.
+          doneAt: done ? new Date().toISOString() : undefined,
           actualMin: t.done ? undefined : t.actualMin,
           subtasks: t.subtasks?.map((sub) => ({ ...sub, done, actualMin: done ? sub.actualMin : undefined })),
         }
+      })),
+    updateTask: (id, patch) =>
+      setTasks((prev) => prev.map((t) => {
+        if (t.id !== id) return t
+        const title = patch.title !== undefined && patch.title.trim() ? patch.title.trim() : t.title
+        // A breakdown owns the estimate; a bare number only applies without one.
+        const est = patch.estimateMin !== undefined && !t.subtasks?.length
+          ? { estimateMin: Math.max(1, Math.round(patch.estimateMin)), estimated: true }
+          : {}
+        return { ...t, title, ...est }
       })),
 
     logActual: (id, actualMin) => {
       const t = tasks.find((x) => x.id === id)
       setTasks((prev) => prev.map((x) => (x.id === id
-        ? { ...x, done: true, actualMin, subtasks: x.subtasks?.map((sub) => ({ ...sub, done: true })) }
+        ? { ...x, done: true, doneAt: x.doneAt ?? new Date().toISOString(), actualMin, subtasks: x.subtasks?.map((sub) => ({ ...sub, done: true })) }
         : x)))
       if (t && t.actualMin === undefined) {
         setLedger((prev) => [
@@ -1087,7 +1102,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const subs = (parent?.subtasks ?? []).map((s) => (s.id === subId ? { ...s, done: true, actualMin } : s))
       const allDone = subs.length > 0 && subs.every((s) => s.done)
       setTasks((prev) =>
-        prev.map((t) => (t.id === taskId && t.subtasks ? { ...t, subtasks: subs, done: allDone || t.done } : t)),
+        prev.map((t) => (t.id === taskId && t.subtasks
+          ? { ...t, subtasks: subs, done: allDone || t.done, doneAt: allDone && !t.done ? new Date().toISOString() : t.doneAt }
+          : t)),
       )
       if (parent && allDone && !parent.done) {
         const est = subs.reduce((a, s) => a + s.estimateMin, 0)

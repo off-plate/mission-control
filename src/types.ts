@@ -27,6 +27,7 @@ export type PageId =
   | 'settings'
   | 'brand'
   | 'braindump'
+  | 'calendar'
   /** Focus blocks: the history, and the ones he wants to fix. */
   | 'focus'
   /** One day of the record, read-only. Carries a date in the route. */
@@ -122,6 +123,9 @@ export interface Task {
   plannedOn?: string
   /** How many days it has been carried forward without being finished. */
   carried?: number
+  /** The moment it was finished, so the day's record can say WHEN, not only
+   *  that. Cleared if it is reopened. */
+  doneAt?: string
 }
 
 /** One of the ways a step can be answered. Which one he picked is worth keeping:
@@ -219,7 +223,14 @@ export function countIn(log: HabitTick[], habitId: string, from: string, to: str
  *  one of them must not undo the other, so each writes its own row. A tick he
  *  made by hand on the Habits page has no src. The day is kept as long as any
  *  row survives; counting the rows is how often he did it. */
-export interface HabitTick { habitId: string; day: string; src?: string }
+export interface HabitTick {
+  habitId: string
+  day: string
+  src?: string
+  /** The moment the tick was made, only when it was made ON its day. A past
+   *  day ticked by hand on Friday has no honest clock time, so it gets none. */
+  at?: string
+}
 
 /** How many times a habit was kept on one day, not merely whether it was. */
 export function habitCountOn(log: HabitTick[], habitId: string, day: string): number {

@@ -5,10 +5,17 @@ import { Band } from './pages1'
 import { fmtDuration, fmtWhen, localDateKey } from './util'
 import type { FocusSession } from './types'
 
-/* Focus blocks were written and never shown. The timer recorded them, habits and
-   the ledger read them, and there was no page where he could see what he had
-   actually done, correct a block that ran long, or add one he did away from the
-   app. This is that page. */
+/* What this page is for: the block running now, and the record of the ones
+   already done. Nothing is entered here. A focus block is started from the work
+   it belongs to and carries that work's name and its length with it, so a form
+   asking him to type one in would be asking him to invent it. The only number he
+   sets here is the break, because the break is the one no task can tell him. */
+
+const clock = (iso?: string) => (iso
+  ? new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  : null)
+
+const mmss = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`
 
 function Row({ f }: { f: FocusSession }) {
   const { updateFocus, deleteFocus } = useStore()
@@ -37,7 +44,7 @@ function Row({ f }: { f: FocusSession }) {
   return (
     <div className="focus-row">
       <span className="grow">{f.label ?? 'Focus block'}</span>
-      {f.manual && <span className="focus-tag mono">by hand</span>}
+      {clock(f.at) && <span className="focus-at mono">{clock(f.at)}</span>}
       <span className="est-chip">{fmtDuration(f.minutes)}</span>
       <span className="sub-tools">
         <button className="sub-tool" onClick={() => setEditing(true)} aria-label={`Edit this ${f.minutes} minute block`}>Edit</button>
@@ -48,15 +55,14 @@ function Row({ f }: { f: FocusSession }) {
 }
 
 export function FocusPage() {
-  const { focusSessions, addFocusManual, inView } = useStore()
+  const { focusSessions, inView } = useStore()
   const pomo = usePomodoro()
-  const [mins, setMins] = useState('30')
-  const [label, setLabel] = useState('')
-  const [day, setDay] = useState(localDateKey())
 
   const mine = focusSessions.filter((f) => inView(f.space))
-  const live = pomo.phase === 'focus' && pomo.running ? Math.floor((pomo.focusMin * 60 - pomo.secondsLeft) / 60) : 0
-  const today = mine.filter((f) => f.day === localDateKey()).reduce((a, f) => a + f.minutes, 0) + live
+  const elapsed = pomo.phase === 'focus' && pomo.running
+    ? Math.max(0, Math.floor((pomo.blockMin * 60 - pomo.secondsLeft) / 60))
+    : 0
+  const today = mine.filter((f) => f.day === localDateKey()).reduce((a, f) => a + f.minutes, 0) + elapsed
 
   /* Grouped by day, newest first: the question this page answers is "what have I
      actually done", and that is a question about days. */
@@ -64,32 +70,40 @@ export function FocusPage() {
 
   return (
     <div className="page focus-page">
-      <Band
-        title="Focus"
-        metrics={[{ v: fmtDuration(today), k: 'today', tone: 'pos' as const }]}
-      />
+      <Band title="Focus" metrics={[{ v: fmtDuration(today), k: 'today', tone: 'pos' as const }]} />
 
-      {live > 0 && (
-        <div className="panel focus-live">
-          <span className="grow">{pomo.focusLabel ?? 'Focus'}, running now</span>
-          <span className="est-chip">{fmtDuration(live)} so far</span>
+      {/* Shown whenever a block exists, paused included: a paused block is still
+          the one he is in the middle of. */}
+      {pomo.phase !== 'idle' && (
+        <div className={`panel focus-live is-${pomo.phase}${pomo.running ? '' : ' is-paused'}`}>
+          <span className="focus-live-what">
+            <span className="l">{pomo.phase === 'focus' ? (pomo.focusLabel ?? 'Focus') : 'Break'}</span>
+            <span className="h">
+              {pomo.phase === 'focus'
+                ? `${fmtDuration(elapsed)} of ${fmtDuration(pomo.blockMin)}${pomo.running ? '' : ', paused'}`
+                : `${fmtDuration(pomo.breakMin)} break${pomo.running ? '' : ', paused'}`}
+            </span>
+          </span>
+          <span className="focus-live-left mono">{mmss(pomo.secondsLeft)}</span>
+          <button className="btn btn-ghost focus-btn" onClick={pomo.toggle}>{pomo.running ? 'Pause' : 'Resume'}</button>
+          <button className="btn btn-ghost focus-btn" onClick={pomo.stop}>Stop</button>
         </div>
       )}
 
-      <div className="panel focus-add">
-        <input className="textinput focus-label" value={label} placeholder="Focus done away from the app"
-          onChange={(e) => setLabel(e.target.value)} />
-        <input className="textinput focus-min mono" type="number" min={1} max={600} value={mins}
-          onChange={(e) => setMins(e.target.value)} aria-label="Minutes" />
-        <input className="textinput focus-day" type="date" max={localDateKey()} value={day}
-          onChange={(e) => setDay(e.target.value)} aria-label="Which day" />
-        <button className="btn btn-primary" disabled={!Number(mins)}
-          onClick={() => { addFocusManual({ minutes: Number(mins), label: label.trim() || undefined, day }); setLabel('') }}>
-          Add it
-        </button>
+      {/* The one number no task can supply. */}
+      <div className="focus-settings">
+        <span className="microcap">Break after each block</span>
+        <span className="focus-steps">
+          {[3, 5, 10, 15, 20].map((n) => (
+            <button key={n} className={`focus-step${pomo.breakMin === n ? ' on' : ''}`}
+              aria-pressed={pomo.breakMin === n} onClick={() => pomo.setBreakMin(n)}>
+              {n}m
+            </button>
+          ))}
+        </span>
       </div>
 
-      {days.length === 0 && <div className="empty">No focus blocks yet. Start the timer and they land here.</div>}
+      {days.length === 0 && <div className="empty">No focus blocks yet. Start one from a task and it lands here.</div>}
 
       {days.map((d) => {
         const list = mine.filter((f) => f.day === d)

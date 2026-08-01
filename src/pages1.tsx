@@ -1205,7 +1205,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
   /* The block on the clock counts toward today, so an hour reached while the
      timer is still running shows here rather than after it stops. */
   const pomo = usePomodoro()
-  const liveFocusMin = pomo.phase === 'focus' && pomo.running ? Math.floor((pomo.focusMin * 60 - pomo.secondsLeft) / 60) : 0
+  const liveFocusMin = pomo.phase === 'focus' && pomo.running ? Math.max(0, Math.floor((pomo.blockMin * 60 - pomo.secondsLeft) / 60)) : 0
   const kept = h.days.filter(Boolean).length
   const target = habitTarget(h)
   /* Twice in a day is not the same as once. The log has held both since

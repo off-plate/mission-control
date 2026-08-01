@@ -2103,21 +2103,14 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals }: {
         placeholder="The thing that keeps it alive when you do not feel like it"
         value={d.why} onChange={(e) => setD({ ...d, why: e.target.value })} />
 
-      <div className="sheet-grid" style={{ marginTop: 'var(--s4)' }}>
-        <div>
-          <label className="field-label" htmlFor="gtf">Timeframe</label>
-          <select id="gtf" className="textinput" style={{ width: '100%' }} value={d.timeframe}
-            onChange={(e) => setD({ ...d, timeframe: e.target.value as GoalTimeframe })}>
-            {GOAL_TIMEFRAMES.map((t) => <option key={t.id} value={t.id}>{t.label} · {periodLabel(t.id as GoalTf)}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="field-label" htmlFor="gcat">Area of life</label>
-          <select id="gcat" className="textinput" style={{ width: '100%' }} value={d.category}
-            onChange={(e) => setD({ ...d, category: e.target.value as GoalCategory })}>
-            {GOAL_CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-          </select>
-        </div>
+      {/* No area-of-life question. The category survives on the row only as a
+         stored default; a goal already knows which space it lives in. */}
+      <div style={{ marginTop: 'var(--s4)' }}>
+        <label className="field-label" htmlFor="gtf">Timeframe</label>
+        <select id="gtf" className="textinput" style={{ width: '100%' }} value={d.timeframe}
+          onChange={(e) => setD({ ...d, timeframe: e.target.value as GoalTimeframe })}>
+          {GOAL_TIMEFRAMES.map((t) => <option key={t.id} value={t.id}>{t.label} · {periodLabel(t.id as GoalTf)}</option>)}
+        </select>
       </div>
 
       <div className="sheet-grid" style={{ marginTop: 'var(--s4)' }}>

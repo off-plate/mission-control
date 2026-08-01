@@ -6,7 +6,7 @@ import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, routineComplete, routineProgress, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, routineComplete, routineProgress, routineRunsOn, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
 import { goalPeriodKey, goalPeriodRange, periodKeyFor, periodLabel, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, periodNoun, routinePeriods, slotForMoment, taskMinutes, toMin } from './util'
 
@@ -1653,48 +1653,14 @@ function AddRoutineSheet({ onClose }: { onClose: () => void }) {
   )
 }
 
-/* Which routines were finished on which day, drawn the same way a habit's longer
-   window is: one square a day, green when it was finished. Same language for the
-   same question, rather than a second chart type for the same idea. */
-function RoutineTrail({ routine, days }: { routine: Routine; days: number }) {
-  const { routineLog, openDay } = useStore()
-  const done = routineLog.filter((r) => r.routineId === routine.id).map((r) => r.day)
-  /* One square per chance it had, not per calendar day. A weekly routine drawn a
-     day at a time reported six misses in every seven, and those six days were
-     never asked for: it read as failure at a thing that was going fine. */
-  const cells = routinePeriods(routine.cadence, days)
-  const hit = cells.filter((c) => done.some((d) => d >= c.from && d <= c.to)).length
-  const noun = periodNoun(routine.cadence, cells.length)
-  return (
-    <div className="routine-trail-wrap">
-      {/* Thirteen weeks read as thirteen squares in a row; ninety days need the
-          packed grid the habit trail uses. Same square, two densities. */}
-      <div className={`routine-trail${cells.length > 40 ? ' dense' : ''}`}>
-        {cells.map((c, i) => {
-          const on = done.find((d) => d >= c.from && d <= c.to)
-          return (
-            <button key={c.key} className={`trail-day${on ? ' kept' : ''}${i === cells.length - 1 ? ' is-today' : ''}`}
-              title={`${c.label}${on ? `, finished ${fmtWhen(on)}` : ''}`}
-              aria-label={`${c.label}${on ? `, finished ${fmtWhen(on)}` : ', not finished'}`}
-              onClick={() => openDay(on ?? c.to)} />
-          )
-        })}
-      </div>
-      <span className="habit-weeks">{hit} of the last {cells.length} {noun}</span>
-    </div>
-  )
-}
 
-const ROUTINE_WINDOWS = [
-  { id: 0, label: 'Just today' },
-  { id: 30, label: '30 days' },
-  { id: 90, label: '90 days' },
-]
+/* No window picker and no history trail here. Routines are the thing you run;
+   how often you have run it is a habits question, and it is answered on Habits.
+*/
 
 export function RoutinesPage() {
-  const { routines, space, toggleRoutineStep, toggleRoutineAlt, resetRoutine, deleteRoutine, habits, inView } = useStore()
+  const { routines, space, toggleRoutineStep, toggleRoutineAlt, startAgain, routineLog, deleteRoutine, habits, inView } = useStore()
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [trailDays, setTrailDays] = useState(0)
   const [adding, setAdding] = useState(false)
   const spaceRoutines = routines.filter((r) => inView(r.space) && !r.archivedAt)
   const sorted = [...spaceRoutines].sort((a, b) => CADENCE_ORDER.indexOf(a.cadence) - CADENCE_ORDER.indexOf(b.cadence))
@@ -1704,12 +1670,6 @@ export function RoutinesPage() {
         title="Routines"
         actions={
           <>
-            <select
-              className="textinput rangepick" value={trailDays} aria-label="How far back to look"
-              onChange={(e) => setTrailDays(Number(e.target.value))}
-            >
-              {ROUTINE_WINDOWS.map((w) => <option key={w.id} value={w.id}>{w.label}</option>)}
-            </select>
             <WriteTo />
             <button className="btn btn-primary" onClick={() => setAdding(true)}>Add a routine</button>
           </>
@@ -1730,7 +1690,13 @@ export function RoutinesPage() {
                 <SpaceMark space={r.space} />
                 <span className="routine-card-title">{r.title}</span>
                 {editingId !== r.id && (complete
-                  ? <span className="col-tot mono val-pos">{DONE_LABEL[r.cadence]}</span>
+                  /* Twice through says so. Without the count, doing it again
+                     would look exactly like never having done it twice. */
+                  ? <span className="col-tot mono val-pos">
+                    {routineRunsOn(routineLog, r.id, localDateKey()) > 1
+                      ? `done ${routineRunsOn(routineLog, r.id, localDateKey())}x today`
+                      : DONE_LABEL[r.cadence]}
+                  </span>
                   : <span className="routine-progress mono">{done}/{total}</span>)}
                 <Dropdown label={`Options for ${r.title}`}>
                   <button role="menuitem" onClick={() => setEditingId(editingId === r.id ? null : r.id)}>
@@ -1743,7 +1709,6 @@ export function RoutinesPage() {
                 </Dropdown>
               </div>
               {r.blurb && <p className="routine-blurb">{r.blurb}</p>}
-              {trailDays > 0 && editingId !== r.id && <RoutineTrail routine={r} days={trailDays} />}
               {editingId === r.id ? (
                 <>
                   <StepEditor routine={r} />
@@ -1818,7 +1783,14 @@ export function RoutinesPage() {
                   : linked
                     ? <span className="assist-note">Add steps here and finishing them will check off “{linked.name}”.</span>
                     : <span />}
-                {(done > 0 || complete) && <button className="btn btn-ghost routine-reset" onClick={() => resetRoutine(r.id)}>Reset</button>}
+                {/* No reset. Clearing the checks used to un-finish the routine,
+                    which deleted its row from the log and took back its habit
+                    tick: a button that erased the fact he had done it. Starting
+                    again is the only thing that ever made sense here, and only
+                    for a routine meant to be run more than once a period. */}
+                {complete && r.repeatable && (
+                  <button className="btn btn-ghost routine-reset" onClick={() => startAgain(r.id)}>Do it again</button>
+                )}
               </div>
               </>
               )}

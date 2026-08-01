@@ -189,7 +189,8 @@ interface Store extends PersistedState {
   /** Finish or reopen a whole routine at once, the way ticking a task with
    *  subtasks finishes all of them. */
   setRoutineDone: (routineId: string, done: boolean) => void
-  resetRoutine: (routineId: string) => void
+  /** Open a fresh run of a repeatable routine, keeping every run before it. */
+  startAgain: (routineId: string) => void
   /** A routine and the habit that mirrors it are created together, so finishing
    *  it always has somewhere to land. */
   addRoutine: (input: { title: string; cadence: RoutineCadence; blurb?: string; daypart?: import('./types').TimeSlot }) => void
@@ -552,7 +553,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const key = periodKeyFor(r.cadence)
       // A new period starts nothing: the checks, the choices and the moment it
       // was started all belong to the period they were made in.
-      if (r.periodKey !== key) return { ...r, doneStepIds: [], stepData: {}, stepChoice: {}, startedAt: undefined, periodKey: key }
+      if (r.periodKey !== key) return { ...r, doneStepIds: [], stepData: {}, stepChoice: {}, startedAt: undefined, run: 0, periodKey: key }
       const doneStepIds = r.doneStepIds.filter((id) => r.steps.some((st) => st.id === id))
       return {
         ...r,
@@ -784,17 +785,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (!st.habitId) return []
       const was = before.doneStepIds.includes(st.id)
       const is = after.doneStepIds.includes(st.id)
-      return was === is ? [] : [{ habitId: st.habitId, src: `${routineId}:${st.id}`, on: is }]
+      return was === is ? [] : [{ habitId: st.habitId, src: `${routineId}:${st.id}#${after.run ?? 0}`, on: is }]
     }))
 
     if (wasComplete === isComplete) return
 
     /* Which day this routine was finished, kept for good. completedOn holds only
        the most recent one, so on its own it could never answer "which day did I
-       do it" for any day but the last. */
+       do it" for any day but the last.
+
+       Rows are keyed by the RUN they belong to, not by the period. Finishing a
+       repeatable routine a second time therefore adds a second row instead of
+       replacing the first, and undoing the run he is in cannot reach the runs he
+       already finished. */
+    const run = after.run ?? 0
     setRoutineLog((prev) => {
-      const without = prev.filter((r) => !(r.routineId === routineId && r.periodKey === key))
-      return isComplete ? [...without, { routineId, day: todayKey(), periodKey: key }] : without
+      const without = prev.filter((r) => !(r.routineId === routineId && r.periodKey === key && (r.run ?? 0) === run))
+      return isComplete
+        ? [...without, { routineId, day: todayKey(), periodKey: key, run, at: new Date().toISOString() }]
+        : without
     })
 
     if (!before.habitId) return
@@ -802,8 +811,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const clearIdx = before.completedOn && isoWeekKey(new Date(before.completedOn)) === isoWeekKey()
       ? dayIndexOf(before.completedOn)
       : todayIndex
+    /* An earlier run of this period still counts. Undoing the run in progress
+       must not take back a routine he genuinely finished this morning. */
+    const earlier = routineLog.some((r) => r.routineId === routineId && r.periodKey === key && (r.run ?? 0) !== run)
     // Through markDay, so a routine-driven tick lands in the durable log too.
-    markDay(hid, isComplete ? todayIndex : clearIdx, isComplete)
+    markDay(hid, isComplete ? todayIndex : clearIdx, isComplete || earlier)
   }
 
   /* Arming an undo replaces whatever was armed before: one step back, not a
@@ -1315,7 +1327,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ;[steps[i], steps[j]] = [steps[j], steps[i]]
         return { ...r, steps }
       })),
-    resetRoutine: (routineId) => applyRoutine(routineId, (r) => ({ ...r, doneStepIds: [], stepData: {}, stepChoice: {}, startedAt: undefined })),
+    /* Not a reset. The run he just finished stays in the log, keeps its habit
+       tick and keeps whatever its steps recorded; this only opens a fresh run on
+       top of it. Nothing he has done can be taken back by starting again. */
+    startAgain: (routineId) => applyRoutine(routineId, (r) => ({
+      ...r, run: (r.run ?? 0) + 1, doneStepIds: [], stepData: {}, stepChoice: {}, startedAt: undefined,
+    })),
     /* Ticking the routine itself ticks everything inside it, minus any step that
        has to be earned elsewhere (the typing gate), which stays his to pass. */
     /* Finishing the routine finishes what it needs. An optional step is not

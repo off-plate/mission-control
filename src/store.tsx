@@ -375,6 +375,20 @@ function loadPersisted(): PersistedState | null {
       }
     }
 
+    /* Meditation drops from ten minutes to five, 2026-08-02. The step is his
+       once it exists, so the seed cannot reach it; this rewrites the timer ONLY
+       while it still holds the old seeded value, so a length he chose himself
+       is never touched, and it runs once. */
+    if (!p.removedSeeds.includes('fix:mr1-5min')) {
+      p.removedSeeds.push('fix:mr1-5min')
+      p.routines = (p.routines ?? []).map((r) => (r.id !== 'r-morning' ? r : {
+        ...r,
+        steps: r.steps.map((st) => (st.id === 'mr1' && st.seconds === 600
+          ? { ...st, seconds: 300, note: st.note?.includes('Ten minutes') ? st.note.replace('Ten minutes', 'Five minutes') : st.note }
+          : st)),
+      }))
+    }
+
     /* Week rollover: when the saved state belongs to an earlier ISO week, each
        habit's checkmarks are archived into its 12-week history and cleared, so
        Monday always starts a fresh row instead of showing last week's ticks. */

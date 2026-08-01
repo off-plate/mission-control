@@ -15,7 +15,7 @@ import {
   MOCK_TASKS,
   WIDGET_DEFS,
 } from './mock'
-import { goalCurrent, requiredSteps, routineComplete, stepLocked } from './types'
+import { goalCurrent, isTimeFed, requiredSteps, routineComplete, stepLocked } from './types'
 import { isSpace } from './types'
 import type {
   ViewId,
@@ -395,7 +395,7 @@ function loadPersisted(): PersistedState | null {
       const key = g.periodKey ?? goalPeriodKey(tf)
       if (g.closed || !periodIsPast(tf, key)) return { ...g, periodKey: key }
       const range = goalPeriodRange(tf, key)
-      const final = goalCurrent(g, p.habits ?? [], p.habitLog ?? [], range)
+      const final = goalCurrent(g, p.habits ?? [], p.habitLog ?? [], range, p.slips ?? [], p.focusSessions ?? [])
       return { ...g, periodKey: key, closed: { on: range.to, final } }
     })
 
@@ -559,6 +559,13 @@ function loadPersisted(): PersistedState | null {
       return { ...h, days }
     })
     p.fixes = 1
+
+    /* A goal already linked to a time habit was filed in 'checkoffs' before
+       hours existed. The unit follows what the habit actually measures. */
+    p.goals = (p.goals ?? []).map((g) => {
+      const h = g.habitId ? (p.habits ?? []).find((x) => x.id === g.habitId) : undefined
+      return h && isTimeFed(h) && g.unit === 'checkoffs' ? { ...g, unit: 'hours' } : g
+    })
 
     const seedG = new Map(MOCK_GOALS.map((g) => [g.id, g]))
     p.goals = p.goals.map((g) => {

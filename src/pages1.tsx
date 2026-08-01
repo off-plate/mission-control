@@ -7,7 +7,7 @@ import { usePomodoro } from './pomodoro'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
 import { Linkify } from './widgets'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, isCounted, COUNT_PERIODS, routineComplete, routineProgress, routineRunsOn, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, isCounted, COUNT_PERIODS, routineComplete, routineProgress, routineRunsOn, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
 import { goalPeriodKey, goalPeriodRange, habitPeriodRange, periodKeyFor, periodLabel, shiftPeriodKey, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForMoment, taskMinutes, toMin } from './util'
 
@@ -2030,7 +2030,7 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals, periodOffsets 
     if (!d.name.trim()) return
     const shape = {
       name: d.name.trim(), target: Math.max(1, d.target),
-      unit: d.habitId ? 'checkoffs' : (d.unit.trim() || 'steps'),
+      unit: d.habitId ? (linked && isTimeFed(linked) ? 'hours' : 'checkoffs') : (d.unit.trim() || 'steps'),
       why: d.why.trim() || undefined, deadline: d.deadline.trim() || undefined,
       timeframe: d.timeframe, category: d.category,
       habitId: d.habitId || undefined,
@@ -2118,7 +2118,7 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals, periodOffsets 
             <input id="gtarget" className="numinput" type="number" min={1} value={d.target}
               onChange={(e) => setD({ ...d, target: Math.max(1, Number(e.target.value) || 1) })} />
             {d.habitId
-              ? <span className="sheet-unit">checkoffs</span>
+              ? <span className="sheet-unit">{linked && isTimeFed(linked) ? 'hours of focus' : 'checkoffs'}</span>
               : <input className="textinput" placeholder="unit, e.g. sessions" value={d.unit}
                   onChange={(e) => setD({ ...d, unit: e.target.value })} aria-label="Unit" />}
           </div>
@@ -2139,7 +2139,7 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals, periodOffsets 
 }
 
 export function GoalsPage() {
-  const { space, goals, habits, habitLog, bumpGoal, toggleGoalMilestone, deleteGoal, repeatGoal, inView } = useStore()
+  const { space, goals, habits, habitLog, focusSessions, slips, bumpGoal, toggleGoalMilestone, deleteGoal, repeatGoal, inView } = useStore()
   const all = goals.filter((g) => inView(g.space))
   /* A goal belongs to a period. The ones whose period has ended are not deleted
      and do not keep counting: they sit below with the number they finished on. */
@@ -2150,7 +2150,7 @@ export function GoalsPage() {
      goals are planned before next week exists. Half-year stays put. */
   const [offsets, setOffsets] = useState<Record<string, number>>({})
   const shift = (tf: string, d: number) => setOffsets((o) => ({ ...o, [tf]: (o[tf] ?? 0) + d }))
-  const nowOf = (g: Goal) => goalCurrent(g, habits, habitLog, goalPeriodRange((g.timeframe ?? 'quarter') as GoalTf, g.periodKey ?? goalPeriodKey((g.timeframe ?? 'quarter') as GoalTf)))
+  const nowOf = (g: Goal) => goalCurrent(g, habits, habitLog, goalPeriodRange((g.timeframe ?? 'quarter') as GoalTf, g.periodKey ?? goalPeriodKey((g.timeframe ?? 'quarter') as GoalTf)), slips, focusSessions)
   const done = spaceGoals.filter((g) => nowOf(g) >= g.target).length
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<Goal | null>(null)

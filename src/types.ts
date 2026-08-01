@@ -672,7 +672,13 @@ const TIMEFRAME_WEEKS: Record<GoalTimeframe, number> = { weekly: 1, monthly: 4, 
  * from that habit's checkoffs over the goal's own window, so you never log the
  * same thing twice. Otherwise it is whatever the goal itself holds.
  */
-export function goalCurrent(g: Goal, habits: HabitDef[], log?: HabitTick[], range?: { from: string; to: string }, slips: HabitSlip[] = []): number {
+/** Does this habit measure TIME rather than days: kept by the focus clock, or
+ *  filled by focus minutes. A goal on such a habit is a goal about hours. */
+export function isTimeFed(h: HabitDef): boolean {
+  return h.auto?.from === 'focus' || (h.kind === 'measured' && h.source === 'focus')
+}
+
+export function goalCurrent(g: Goal, habits: HabitDef[], log?: HabitTick[], range?: { from: string; to: string }, slips: HabitSlip[] = [], sessions: FocusSession[] = []): number {
   // A closed goal keeps the number it finished on. It is history, not a counter.
   if (g.closed) return g.closed.final
   if (!g.habitId) return g.current
@@ -681,6 +687,13 @@ export function goalCurrent(g: Goal, habits: HabitDef[], log?: HabitTick[], rang
   /* Counted from the dated ticks inside the goal's own period. The old sum of
      this week's array plus N undated weekly counts was a rolling window that
      never ended, which is why a weekly goal never rolled over. */
+  if (range && isTimeFed(h)) {
+    /* HOURS of focus inside the period, not days it happened on: a goal of 3 on
+       a time habit means three hours, and it fills itself from the blocks. */
+    const mins = sessions.filter((s) => s.day >= range.from && s.day <= range.to && s.space === h.space)
+      .reduce((a, s) => a + s.minutes, 0)
+    return Math.min(g.target, Math.round((mins / 60) * 10) / 10)
+  }
   if (log && range) {
     const kept = h.kind === 'break'
       ? quitKeptDays(h, slips, range.from, range.to).size

@@ -2621,3 +2621,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .cal-chip i { width: 6px; height: 6px; border-radius: 50%; background: var(--progress); }
 .cal-chip.k-routine i { background: var(--accent); }
 .cal-chip.k-focus i { background: var(--info); }
+/* a pasted URL, shortened to its address and made clickable */
+.txt-link { color: var(--accent); text-decoration: underline; text-decoration-color: var(--hairline-strong); text-underline-offset: 2px; word-break: keep-all; }
+.txt-link:hover { text-decoration-color: var(--accent); }
+.today-task.done .txt-link, .subtask.done .txt-link { color: var(--faint); }

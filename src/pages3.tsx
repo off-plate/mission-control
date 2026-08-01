@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { AutoTextarea, Band, Dropdown } from './pages1'
 import { useStore } from './store'
+import { Linkify } from './widgets'
 import { SpaceMark } from './pages1'
 import { parseDictation, TAB_FOR, type ParsedItem } from './assistant'
 import { fmtDuration, fmtWhen } from './util'
@@ -209,7 +210,7 @@ function JournalReader() {
             <label className={`journal-item${picked.has(`t${i}`) ? ' on' : ''}`} key={`t${i}`}>
               <input type="checkbox" checked={picked.has(`t${i}`)} onChange={() => toggle(`t${i}`)} />
               <span className="assist-tag k-task">task</span>
-              <span className="grow">{t.title}</span>
+              <span className="grow"><Linkify text={t.title} /></span>
               {t.estimateMin ? <span className="est-chip">{fmtDuration(t.estimateMin)}</span> : null}
             </label>
           ))}
@@ -344,7 +345,7 @@ export function AssistantPage() {
                   <option value="goal">goal</option>
                   <option value="done">done</option>
                 </select>
-                <span className="grow">{p.text}</span>
+                <span className="grow"><Linkify text={p.text} /></span>
                 {p.estimateMin != null && <span className="est-chip">{fmtDuration(p.estimateMin)}</span>}
                 <span className="assist-dest mono">→ {TAB_FOR[p.kind]}</span>
               </div>
@@ -400,7 +401,8 @@ const TAG_RE = /#[\p{L}\d_-]+/gu
 const tagsOf = (t: string) => t.match(TAG_RE) ?? []
 
 function renderNote(t: string) {
-  return t.split(/(#[\p{L}\d_-]+)/gu).map((p, i) => (/^#/.test(p) ? <span className="note-tag" key={i}>{p}</span> : <span key={i}>{p}</span>))
+  // Tags stay tags; everything between them also gets its URLs shortened.
+  return t.split(/(#[\p{L}\d_-]+)/gu).map((p, i) => (/^#/.test(p) ? <span className="note-tag" key={i}>{p}</span> : <span key={i}><Linkify text={p} /></span>))
 }
 
 export function BrainDumpPage() {

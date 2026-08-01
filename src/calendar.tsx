@@ -1,19 +1,20 @@
 import { useMemo, useState } from 'react'
 import { useStore } from './store'
-import { Band, Schedule, SpaceMark } from './pages1'
-import { MOCK_AGENDA } from './mock'
-import { fmtDuration, fmtTime, fmtWhen, localDateKey, monthName, monthKey } from './util'
-import type { SpaceId, Task } from './types'
+import { usePomodoro } from './pomodoro'
+import { Band } from './pages1'
+import { fmtDuration, fmtTime, fmtTimeShort, fmtWhen, localDateKey, monthName } from './util'
 
 /* The month view and the day view of the same record. The grid answers "which
-   days did things actually happen", the schedule answers "when in that day",
-   and clicking a day swaps the schedule onto it. Today keeps the live schedule
-   with its draggable pinned tasks; any other day is read-only, because the past
-   is a record and the future has no clock times yet. */
+   days did things actually happen"; the schedule answers "when in that day",
+   drawn ON the hours, because a finished thing happened AT a time and a list
+   beside the clock was the clock refusing to say so. Clicking a day swaps the
+   schedule onto it. */
 
 const DOW = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+const HOUR_PX = 42
+const HOURS = 24
 
-/** Everything with a wall-clock moment on one day, for the hour column. */
+/** Everything that happened on one day, placed at its wall-clock moment. */
 interface Moment { at: string; title: string; kind: 'task' | 'habit' | 'routine' | 'focus'; minutes?: number }
 
 function useDayMoments(day: string): Moment[] {
@@ -35,7 +36,7 @@ function useDayMoments(day: string): Moment[] {
     for (const t of habitLog) {
       if (t.day === day && t.at && !t.src?.startsWith('auto:')) {
         const h = habits.find((x) => x.id === t.habitId)
-        // A routine-step tick is already told as its routine; a habit the
+        // A routine-step tick is already told as its routine; the habit the
         // routine mirrors would say the same thing twice at the same hour.
         if (h && inView(h.space) && !routines.some((r) => r.habitId === h.id && !r.archivedAt)) {
           out.push({ at: t.at, title: h.name, kind: 'habit' })
@@ -46,29 +47,67 @@ function useDayMoments(day: string): Moment[] {
   }, [tasks, habits, habitLog, routines, routineLog, focusSessions, day, inView])
 }
 
-/** The hourly record of one day: what happened, at the hour it happened. */
-function DayRecord({ day }: { day: string }) {
+const minutesOf = (iso: string) => { const d = new Date(iso); return d.getHours() * 60 + d.getMinutes() }
+
+/** One day on the clock: every hour visible, the record drawn at its times, and
+ *  for today also the tasks pinned to a time and the NOW line. */
+function DaySchedule({ day }: { day: string }) {
+  const { tasks, inView } = useStore()
+  const pomo = usePomodoro()
   const moments = useDayMoments(day)
-  if (moments.length === 0) {
-    return <div className="empty">Nothing with a clock time on this day.</div>
-  }
+  const isToday = day === localDateKey()
+  const y = (mins: number) => (mins / 60) * HOUR_PX
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
+  const pinned = isToday ? tasks.filter((t) => t.at && !t.done && t.list === 'today' && inView(t.space)) : []
+  /* The block on the clock right now belongs on the clock too. */
+  const liveMin = isToday && pomo.phase === 'focus' ? Math.max(0, Math.floor((pomo.blockMin * 60 - pomo.secondsLeft) / 60)) : 0
+
   return (
-    <div className="dayrec">
-      {moments.map((m, i) => (
-        <div className={`dayrec-row k-${m.kind}`} key={i}>
-          <span className="dayrec-at mono">
-            {new Date(m.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-          </span>
-          <span className="dayrec-dot" aria-hidden="true" />
-          <span className="grow">{m.title}</span>
-          <span className="dayrec-kind mono">{m.minutes ? fmtDuration(m.minutes) : m.kind}</span>
-        </div>
-      ))}
+    <div className="vsched cal-sched">
+      <div className="vsched-inner" style={{ height: HOURS * HOUR_PX }}>
+        {Array.from({ length: HOURS + 1 }, (_, h) => (
+          <div key={h} className="hline" style={{ top: h * HOUR_PX }}>
+            {h % 2 === 0 && h < 24 && <span className="hlabel">{fmtTimeShort(`${h}:00`)}</span>}
+          </div>
+        ))}
+        {isToday && (
+          <div className="vnow" style={{ top: y(nowMin) }} aria-hidden="true">
+            <span className="vnow-dot" /><span className="vnow-label mono">now</span>
+          </div>
+        )}
+        {pinned.map((t) => (
+          <div className="vev vev-task" key={t.id} style={{ top: y(minutesOf(`${day}T${t.at}:00`)) + 1, minHeight: 24 }}>
+            <span className="t">{t.title}</span>
+            <span className="rng">{fmtTime(t.at!)} · planned</span>
+          </div>
+        ))}
+        {liveMin > 0 && (
+          <div className="vev vev-live" style={{ top: y(nowMin - liveMin) + 1, height: Math.max((liveMin / 60) * HOUR_PX - 2, 24) }}>
+            <span className="t">{pomo.focusLabel ?? 'Focus'}</span>
+            <span className="rng">running, {fmtDuration(liveMin)} so far</span>
+          </div>
+        )}
+        {moments.map((m, i) => {
+          const start = m.minutes ? minutesOf(m.at) - m.minutes : minutesOf(m.at)
+          return m.minutes ? (
+            <div className={`vev vev-done k-${m.kind}`} key={i}
+              style={{ top: y(Math.max(0, start)) + 1, height: Math.max((m.minutes / 60) * HOUR_PX - 2, 24) }}>
+              <span className="t">{m.title}</span>
+              <span className="rng">{fmtTime(`${Math.floor(start / 60)}:${String(start % 60).padStart(2, '0')}`)} · {fmtDuration(m.minutes)}</span>
+            </div>
+          ) : (
+            <div className={`vmark k-${m.kind}`} key={i} style={{ top: y(minutesOf(m.at)) }}>
+              <span className="vmark-dot" aria-hidden="true" />
+              <span className="vmark-t">{m.title}</span>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
 
-/** Which days of a month have anything finished on them, and how much. */
+/** Which days have anything finished on them, and how much. */
 function useDayCounts(): Map<string, number> {
   const { tasks, habitLog, routineLog, focusSessions, habits, routines, inView } = useStore()
   return useMemo(() => {
@@ -113,7 +152,6 @@ function MonthGrid({ year, month, selected, counts, onPick }: {
               aria-label={`${fmtWhen(day)}${n ? `, ${n} things finished` : ''}`}
             >
               <span className="cal-num mono">{i + 1}</span>
-              {/* How much happened, said in dots, capped where it stops meaning more. */}
               {n > 0 && (
                 <span className="cal-marks" aria-hidden="true">
                   {Array.from({ length: Math.min(n, 4) }, (_, k) => <i key={k} />)}
@@ -128,14 +166,14 @@ function MonthGrid({ year, month, selected, counts, onPick }: {
 }
 
 export function CalendarPage() {
-  const { tasks, space, openDay, inView } = useStore()
+  const { openDay } = useStore()
   const [selected, setSelected] = useState(localDateKey())
   /* The four months on show, as an offset from the current one. History gets
      one month by default because the record is mostly behind you. */
   const [from, setFrom] = useState(-1)
   const counts = useDayCounts()
-  const today = localDateKey()
-  const isToday = selected === today
+  const isToday = selected === localDateKey()
+  const doneOn = counts.get(selected) ?? 0
 
   const now = new Date()
   const months = Array.from({ length: 4 }, (_, i) => {
@@ -143,39 +181,32 @@ export function CalendarPage() {
     return { year: d.getFullYear(), month: d.getMonth() }
   })
 
-  const todayTasks: Task[] = tasks.filter((t) => inView(t.space) && t.list === 'today' && !t.done)
-  const events = MOCK_AGENDA[space as SpaceId] ?? []
-  const doneOn = counts.get(selected) ?? 0
-
   return (
     <div className="page">
+      <Band
+        title="Calendar"
+        metrics={doneOn > 0 ? [{ v: String(doneOn), k: `finished ${isToday ? 'today' : fmtWhen(selected)}`, tone: 'pos' as const }] : []}
+        actions={
+          <span className="cal-nav">
+            <button className="btn btn-ghost" onClick={() => setFrom((f) => f - 1)} aria-label="Earlier months">←</button>
+            <button className="btn btn-ghost" onClick={() => setFrom(-1)} disabled={from === -1}>Now</button>
+            <button className="btn btn-ghost" onClick={() => setFrom((f) => f + 1)} aria-label="Later months">→</button>
+          </span>
+        }
+      />
+
       <div className="grid-3 cal-cols">
-        {/* 1 — the day, by the hour */}
+        {/* 1 — the picked day, on the clock */}
         <div className="panel">
           <div className="col-head">
             <span className="microcap">{isToday ? 'Today' : fmtWhen(selected)}</span>
             <button className="linkish" onClick={() => openDay(selected)}>Open the day record</button>
           </div>
-          {isToday ? (
-            <>
-              <Schedule events={events} tasks={todayTasks} onDropAt={() => {}} />
-              <DayRecord day={selected} />
-            </>
-          ) : (
-            <DayRecord day={selected} />
-          )}
+          <DaySchedule day={selected} />
         </div>
 
         {/* 2+3 — four months of the record */}
         <div className="cal-wide">
-          <div className="cal-head">
-            <Band title="Calendar" metrics={doneOn > 0 ? [{ v: String(doneOn), k: `finished ${isToday ? 'today' : 'that day'}`, tone: 'pos' as const }] : []} />
-            <span className="cal-nav">
-              <button className="btn btn-ghost" onClick={() => setFrom((f) => f - 1)} aria-label="Earlier months">←</button>
-              <button className="btn btn-ghost" onClick={() => setFrom(-1)} disabled={from === -1}>Now</button>
-              <button className="btn btn-ghost" onClick={() => setFrom((f) => f + 1)} aria-label="Later months">→</button>
-            </span>
-          </div>
           <div className="cal-months">
             {months.map((m) => (
               <MonthGrid key={`${m.year}-${m.month}`} year={m.year} month={m.month}

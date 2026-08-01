@@ -114,6 +114,8 @@ export const MOCK_TASKS: Task[] = []
    routine, so no day is pre-ticked and no history is invented. */
 export const MOCK_HABITS: HabitDef[] = [
   { id: 'h-morning', space: 'personal', name: 'Morning routine', daypart: 'morning', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
+  /* Fed by the first step of the morning routine, same wiring as meditation. */
+  { id: 'h-creatine', space: 'personal', name: 'Take creatine', daypart: 'morning', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-prework', space: 'personal', name: 'Before work', frequency: 'weekdays', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-evening', space: 'personal', name: 'Before bed routine', daypart: 'evening', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-nightwork', space: 'personal', name: 'Night work routine', daypart: 'evening', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
@@ -140,6 +142,7 @@ export const MOCK_ROUTINES: Routine[] = [
     
     doneStepIds: [],
     steps: [
+      { id: 'mr0', title: 'Take creatine', kind: 'do', habitId: 'h-creatine', note: 'First thing, before the rest of the ritual. A scoop, water, done.' },
       { id: 'mr1', title: 'Meditation', kind: 'timer', seconds: 600, habitId: 'h-meditation', note: 'Sit, eyes closed, follow the breath. Ten minutes, no phone.', link: 'https://www.youtube.com/watch?v=1ZYbU82GVz4', linkLabel: 'Open the soundtrack' },
       { id: 'mr2', title: 'Pronunciation test', kind: 'do', note: 'Read a short passage out loud, record it, listen back once.' },
       { id: 'mr3', title: 'Jazykolam mouth stretch', kind: 'do', note: 'Loosen the jaw and lips, then a tongue-twister three times, fast and clean.', example: 'Strč prst skrz krk.' },
@@ -176,7 +179,7 @@ export const MOCK_ROUTINES: Routine[] = [
    Only these are inserted into a routine that already has steps. Without the
    list, every seeded step would look like one that had gone missing, and a step
    he deleted months ago would reappear the next time he opened the app. */
-export const LATE_STEPS = new Set(['br-ice'])
+export const LATE_STEPS = new Set(['br-ice', 'mr0'])
 
 export const MOCK_GOALS: Goal[] = []
 

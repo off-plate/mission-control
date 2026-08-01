@@ -591,14 +591,14 @@ export function CoachPage() {
   const open = mine.filter((s) => s.status === 'open')
   const closed = mine.filter((s) => s.status === 'closed')
   const easedCount = closed.filter((s) => s.didIt && s.felt === 'easier').length
-  /* The starters are HIS list, ranked by how avoided a thing looks: what keeps
-     coming back first, then what has waited longest. Canned scenarios only fill
-     whatever room his own tasks leave. */
+  /* The starters are HIS list, all of it: every open task from the plan and
+     the backlog, ranked by how avoided a thing looks, what keeps coming back
+     first, then what has waited longest. Canned scenarios only appear when the
+     list is empty, because the point of this page is HIS things. */
   const oldest = tasks
     .filter((t) => !t.done && inView(t.space))
     .sort((a, b) => (b.carried ?? 0) - (a.carried ?? 0)
       || ((a.createdAt ?? '9999') < (b.createdAt ?? '9999') ? -1 : 1))
-    .slice(0, 4)
 
   /* ---- review the breakdown Coach drafted, then commit ---- */
   if (stage === 'review') {
@@ -773,7 +773,7 @@ export function CoachPage() {
                 <span className="cs-age">{(t.carried ?? 0) > 0 ? `came back ${t.carried}x` : t.createdAt ? `since ${fmtWhen(t.createdAt)}` : 'on your list'}</span>
               </button>
             ))}
-            {COACH_SCENARIOS.slice(0, Math.max(0, 6 - oldest.length)).map((s) => (
+            {COACH_SCENARIOS.slice(0, oldest.length === 0 ? 5 : 0).map((s) => (
               <button key={s.id} className="coach-starter" onClick={() => { setThing(s.title); void analyze(s.title) }}>
                 {s.title}
                 <span className="cs-age">{s.tag}</span>

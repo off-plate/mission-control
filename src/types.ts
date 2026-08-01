@@ -27,6 +27,8 @@ export type PageId =
   | 'settings'
   | 'brand'
   | 'braindump'
+  /** Focus blocks: the history, and the ones he wants to fix. */
+  | 'focus'
   /** One day of the record, read-only. Carries a date in the route. */
   | 'day'
 
@@ -176,6 +178,10 @@ export type HabitKind = 'build' | 'break' | 'measured'
  *  is here so a second one does not need a migration. */
 export type HabitSource = 'focus'
 
+/** A habit nothing has to tick: it is kept by something the app already
+ *  measures. Focus time is the first, and the threshold is the habit's own. */
+export interface AutoRule { from: 'focus'; minutes: number }
+
 export type CountPeriod = 'day' | 'week' | 'month'
 
 export const COUNT_PERIODS: { id: CountPeriod; label: string }[] = [
@@ -302,6 +308,11 @@ export interface FocusSession {
   /** What it was for, when it was started from a task. */
   label?: string
   space: SpaceId
+  /** The ledger row this block wrote, so editing or deleting the block can keep
+   *  the ledger honest instead of leaving an orphan behind. */
+  ledgerId?: string
+  /** Entered by hand rather than timed, e.g. focus done away from the app. */
+  manual?: boolean
 }
 
 export interface HabitDef {
@@ -341,6 +352,9 @@ export interface HabitDef {
   per?: CountPeriod
   /** For a 'times' habit: how many in that stretch. */
   targetCount?: number
+  /** Kept automatically once the day's measured total reaches the threshold.
+   *  He should not have to tick a box to confirm what the app already timed. */
+  auto?: AutoRule
   /** What fills it, when it fills itself. */
   source?: HabitSource
 }
@@ -472,6 +486,7 @@ export function slipCount(h: HabitDef, slips: HabitSlip[]): number {
 }
 
 export function habitFrequencyLabel(h: HabitDef): string {
+  if (h.auto?.from === 'focus') return `over ${Math.round(h.auto.minutes / 60 * 10) / 10}h of focus a day`
   if (isCounted(h)) return `${countTarget(h)}x ${COUNT_PERIODS.find((p) => p.id === (h.per ?? 'day'))!.label}`
   if (h.kind === 'measured') return `${fmtMins(h.dailyTargetMin ?? 60)} a day`
   if (h.frequency === 'weekdays') return 'Mon to Fri'

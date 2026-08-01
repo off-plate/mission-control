@@ -6,6 +6,7 @@ import { CoachPage, MoneyPage, ReviewPage, SettingsPage } from './pages2'
 import { AssistantPage, BrainDumpPage } from './pages3'
 import { BrandPage } from './brand'
 import { DayPage } from './day'
+import { FocusPage } from './focus'
 import { useStore } from './store'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange } from './supabase'
 import { isReadOnly } from './store'
@@ -57,6 +58,7 @@ const NAV: { id: PageId; label: string }[] = [
   { id: 'goals', label: 'Goals' },
   { id: 'money', label: 'Money' },
   { id: 'review', label: 'Review' },
+  { id: 'focus', label: 'Focus' },
   { id: 'braindump', label: 'Brain Dump' },
   { id: 'coach', label: 'Avoidance' },
 ]
@@ -173,6 +175,7 @@ export default function App() {
         {page === 'money' && <MoneyPage />}
         {(page === 'review' || page === 'stats') && <ReviewPage />}
         {page === 'coach' && <CoachPage />}
+        {page === 'focus' && <FocusPage />}
         {page === 'braindump' && <BrainDumpPage />}
         {page === 'settings' && <SettingsPage />}
         {page === 'brand' && <BrandPage />}

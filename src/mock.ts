@@ -118,6 +118,9 @@ export const MOCK_HABITS: HabitDef[] = [
   /* Fed by a STEP, not by a whole routine: the meditation in the morning
      routine and the one in Out Brain Rot both keep it, and either is enough. */
   { id: 'h-meditation', space: 'personal', name: 'Meditation', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
+  /* Kept by the focus timer itself. Nothing to tick: the app already knows how
+     long he focused, so asking him to confirm it would be asking twice. */
+  { id: 'h-focus1h', space: 'personal', name: 'Focus for more than 1h', frequency: 'daily', paused: false, auto: { from: 'focus', minutes: 60 }, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-weekly', space: 'personal', name: 'Weekly reset', frequency: 'weekly', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-monthly', space: 'personal', name: 'Monthly review', frequency: 'monthly', paused: false, days: [false, false, false, false, false, false, false], history: [] },
 ]

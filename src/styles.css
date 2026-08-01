@@ -2504,3 +2504,21 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .subtask-row.is-done .grow { text-decoration: line-through; color: var(--faint); }
 .subtask-row.is-done .sub-tick { background: var(--progress); border-color: var(--progress); }
 .subtask-row.is-done .est-chip { color: var(--progress); }
+
+/* ---------- focus history ---------- */
+.focus-row { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) 0; border-top: 1px solid var(--hairline); }
+.focus-row:first-child { border-top: none; }
+.focus-row .grow { flex: 1; min-width: 0; font-size: var(--text-sm); }
+.focus-tag { font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--faint); }
+.focus-label { flex: 1 1 220px; min-width: 0; min-height: 34px; }
+/* Fixed, not flexed: a minutes box stretched across a wide screen invites a
+   four-digit answer to a two-digit question. */
+.focus-min { flex: 0 0 76px; width: 76px; min-height: 34px; }
+.focus-day { flex: 0 0 160px; width: 160px; min-height: 34px; }
+.focus-btn { min-height: 34px; font-size: var(--text-xs); }
+/* A list of one-line rows is a reading column, not a dashboard: it stops where
+   the eye stops rather than running the width of a 27 inch screen. */
+.focus-page .panel, .focus-page .habit-section, .focus-page .empty { max-width: 940px; }
+.focus-add { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+.focus-live { display: flex; align-items: center; gap: var(--s3); }
+.focus-live .grow { flex: 1; min-width: 0; }

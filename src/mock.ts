@@ -115,6 +115,9 @@ export const MOCK_HABITS: HabitDef[] = [
   /* No daypart: brain rot does not keep office hours, so this sits in Anytime
      until he decides it belongs to a part of the day. */
   { id: 'h-brainrot', space: 'personal', name: 'Out Brain Rot', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
+  /* Fed by a STEP, not by a whole routine: the meditation in the morning
+     routine and the one in Out Brain Rot both keep it, and either is enough. */
+  { id: 'h-meditation', space: 'personal', name: 'Meditation', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-weekly', space: 'personal', name: 'Weekly reset', frequency: 'weekly', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-monthly', space: 'personal', name: 'Monthly review', frequency: 'monthly', paused: false, days: [false, false, false, false, false, false, false], history: [] },
 ]
@@ -129,7 +132,7 @@ export const MOCK_ROUTINES: Routine[] = [
     
     doneStepIds: [],
     steps: [
-      { id: 'mr1', title: 'Meditation', kind: 'timer', seconds: 600, note: 'Sit, eyes closed, follow the breath. Ten minutes, no phone.', link: 'https://www.youtube.com/watch?v=1ZYbU82GVz4', linkLabel: 'Open the soundtrack' },
+      { id: 'mr1', title: 'Meditation', kind: 'timer', seconds: 600, habitId: 'h-meditation', note: 'Sit, eyes closed, follow the breath. Ten minutes, no phone.', link: 'https://www.youtube.com/watch?v=1ZYbU82GVz4', linkLabel: 'Open the soundtrack' },
       { id: 'mr2', title: 'Pronunciation test', kind: 'do', note: 'Read a short passage out loud, record it, listen back once.' },
       { id: 'mr3', title: 'Jazykolam mouth stretch', kind: 'do', note: 'Loosen the jaw and lips, then a tongue-twister three times, fast and clean.', example: 'Strč prst skrz krk.' },
       { id: 'mr4', title: 'Typing test', kind: 'do', note: 'One quick round to wake the hands up.', link: 'https://monkeytype.com', linkLabel: 'Open typing test' },
@@ -150,15 +153,22 @@ export const MOCK_ROUTINES: Routine[] = [
         { id: 'br1-move', title: 'Move', note: 'Time available, so something hard: run, StairMaster, heavy gym session.' },
         { id: 'br1-caffeine', title: 'Caffeine', note: 'No time, so coffee. Take it immediately, do not wait for it to kick in.' },
       ] },
+      { id: 'br-ice', title: 'Wash your face in ice cold water', kind: 'do' },
       { id: 'br2', title: 'To-do list', kind: 'do', note: 'Sit down. Write what you want to do and what your focus is. Kill all distractions, phone away, no screens for at least 10 minutes.' },
       { id: 'br3', title: 'Pick one task', kind: 'do', note: 'One. Off the list you just wrote.' },
-      { id: 'br4', title: 'Meditate', kind: 'timer', seconds: 300, note: 'Calm music. Minimum 5 minutes.' },
+      { id: 'br4', title: 'Meditate', kind: 'timer', seconds: 300, habitId: 'h-meditation', note: 'Calm music. Minimum 5 minutes.' },
       { id: 'br5', title: 'Start', kind: 'do', note: 'Work on the one task.' },
     ],
   },
   { id: 'r-weekly', space: 'personal', title: 'Weekly reset', cadence: 'weekly', habitId: 'h-weekly', doneStepIds: [], steps: [] },
   { id: 'r-monthly', space: 'personal', title: 'Monthly review', cadence: 'monthly', habitId: 'h-monthly', doneStepIds: [], steps: [] },
 ]
+
+/* Steps added to a seeded routine AFTER its list had already been handed over.
+   Only these are inserted into a routine that already has steps. Without the
+   list, every seeded step would look like one that had gone missing, and a step
+   he deleted months ago would reappear the next time he opened the app. */
+export const LATE_STEPS = new Set(['br-ice'])
 
 export const MOCK_GOALS: Goal[] = []
 

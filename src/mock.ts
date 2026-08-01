@@ -128,7 +128,7 @@ export const MOCK_HABITS: HabitDef[] = [
   /* Kept by the focus timer itself. Nothing to tick: the app already knows how
      long he focused, so asking him to confirm it would be asking twice. */
   { id: 'h-focus1h', space: 'personal', name: 'Focus for more than 1h', frequency: 'daily', paused: false, auto: { from: 'focus', minutes: 60 }, days: [false, false, false, false, false, false, false], history: [] },
-  { id: 'h-morningwork', space: 'work', name: 'Morning work routine', daypart: 'morning', frequency: 'weekdays', paused: false, days: [false, false, false, false, false, false, false], history: [] },
+  { id: 'h-morningwork', space: 'work', name: 'Morning Big Time work routine', daypart: 'morning', frequency: 'weekdays', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-weekly', space: 'personal', name: 'Weekly review', frequency: 'weekly', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-monthly', space: 'personal', name: 'Monthly review', frequency: 'monthly', paused: false, days: [false, false, false, false, false, false, false], history: [] },
 ]
@@ -154,8 +154,19 @@ export const MOCK_ROUTINES: Routine[] = [
   { id: 'r-prework', space: 'personal', title: 'Before work', cadence: 'prework', habitId: 'h-prework', doneStepIds: [], steps: [] },
   /* Big Time's own morning ritual. Weekday-gated like Before work: a work
      routine has no Saturday. Steps are his to write. */
-  { id: 'r-morningwork', space: 'work', title: 'Morning work routine', cadence: 'prework', habitId: 'h-morningwork', doneStepIds: [], steps: [] },
-  { id: 'r-evening', space: 'personal', title: 'Before bed routine', cadence: 'daily', habitId: 'h-evening', doneStepIds: [], steps: [] },
+  { id: 'r-morningwork', space: 'work', title: 'Morning Big Time work routine', cadence: 'prework', habitId: 'h-morningwork', doneStepIds: [], steps: [] },
+  {
+    id: 'r-evening', space: 'personal', title: 'Before bed routine', cadence: 'daily', habitId: 'h-evening',
+    doneStepIds: [],
+    steps: [
+      { id: 'be1', title: 'Prepare to-do list for tomorrow', kind: 'do' },
+      { id: 'be2', title: 'Prepare clothes for tomorrow', kind: 'do', note: 'Laid out and ready.' },
+      { id: 'be3', title: 'Prepare creatine', kind: 'do', note: 'Scoop into the glass, water in, leave it on the counter.' },
+      { id: 'be4', title: 'Brush teeth', kind: 'do' },
+      { id: 'be5', title: 'Fold today\u2019s clothes', kind: 'do', note: 'Off, folded, put away.' },
+      { id: 'be6', title: 'Set the alarm', kind: 'do' },
+    ],
+  },
   { id: 'r-nightwork', space: 'personal', title: 'Night work routine', cadence: 'daily', habitId: 'h-nightwork', doneStepIds: [], steps: [] },
   {
     id: 'r-brainrot', space: 'personal', title: 'Out Brain Rot', cadence: 'daily', habitId: 'h-brainrot', repeatable: true,

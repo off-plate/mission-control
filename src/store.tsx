@@ -15,7 +15,7 @@ import {
   MOCK_TASKS,
   WIDGET_DEFS,
 } from './mock'
-import { goalCurrent, routineComplete, stepLocked } from './types'
+import { goalCurrent, requiredSteps, routineComplete, stepLocked } from './types'
 import { isSpace } from './types'
 import type {
   ViewId,
@@ -419,16 +419,42 @@ function loadPersisted(): PersistedState | null {
       if (steps !== mine.steps) p.routines = p.routines.map((r) => (r.id === s.id ? { ...r, steps } : r))
     }
 
-    /* A step that gained a habit link after his list was saved. Steps are his,
-       so this fills a blank and never overwrites: the wiring reaches the rows he
-       already has without touching a word of what they say. */
+    /* Wiring a step gained after his list was saved: a habit it keeps, or the
+       fact that it is optional. Steps are his, so this fills a blank and never
+       overwrites, reaching the rows he already has without touching a word of
+       what they say. */
     for (const s of MOCK_ROUTINES) {
-      const links = new Map(s.steps.filter((st) => st.habitId).map((st) => [st.id, st.habitId!]))
-      if (!links.size) continue
+      const seeded = new Map(s.steps.map((st) => [st.id, st]))
       p.routines = p.routines.map((r) => (r.id !== s.id ? r : {
         ...r,
-        steps: r.steps.map((st) => (!st.habitId && links.has(st.id) ? { ...st, habitId: links.get(st.id) } : st)),
+        steps: r.steps.map((st) => {
+          const from = seeded.get(st.id)
+          if (!from) return st
+          return {
+            ...st,
+            habitId: st.habitId ?? from.habitId,
+            optional: st.optional ?? from.optional,
+          }
+        }),
       }))
+    }
+
+    /* A seeded step that has since MOVED in the seed. Order is his the moment he
+       touches it, so this runs once and then never again: the marker is what
+       stops a step he has deliberately dragged elsewhere from being pulled back
+       into place on every reload. */
+    const moves: [string, string, number][] = [['r-brainrot', 'br-ice', 0]]
+    for (const [rid, sid, to] of moves) {
+      const mark = `${rid}:step:${sid}:at${to}`
+      if (p.removedSeeds.includes(mark)) continue
+      p.removedSeeds.push(mark)
+      p.routines = p.routines.map((r) => {
+        if (r.id !== rid) return r
+        const step = r.steps.find((x) => x.id === sid)
+        if (!step) return r
+        const rest = r.steps.filter((x) => x.id !== sid)
+        return { ...r, steps: [...rest.slice(0, to), step, ...rest.slice(to)] }
+      })
     }
 
     /* A day that has not happened yet cannot be done. Future ticks were also
@@ -1292,9 +1318,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     resetRoutine: (routineId) => applyRoutine(routineId, (r) => ({ ...r, doneStepIds: [], stepData: {}, stepChoice: {}, startedAt: undefined })),
     /* Ticking the routine itself ticks everything inside it, minus any step that
        has to be earned elsewhere (the typing gate), which stays his to pass. */
+    /* Finishing the routine finishes what it needs. An optional step is not
+       claimed on his behalf, because ticking "wash your face" for him would be
+       the app putting words in his mouth, but one he has already ticked stays. */
     setRoutineDone: (routineId, done) => applyRoutine(routineId, (r) => stamped({
       ...r,
-      doneStepIds: done ? r.steps.filter((st) => !stepLocked(r, st.id)).map((st) => st.id) : [],
+      doneStepIds: done
+        ? [...new Set([
+          ...r.doneStepIds.filter((id) => r.steps.some((st) => st.id === id && st.optional)),
+          ...requiredSteps(r).filter((st) => !stepLocked(r, st.id)).map((st) => st.id),
+        ])]
+        : [],
       stepChoice: done ? r.stepChoice : {},
     })),
 

@@ -6,9 +6,9 @@ import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, routineComplete, routineProgress, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
-import { goalPeriodKey, goalPeriodRange, periodLabel, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, periodNoun, routinePeriods, slotForMoment, taskMinutes, toMin } from './util'
+import { goalPeriodKey, goalPeriodRange, periodKeyFor, periodLabel, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, periodNoun, routinePeriods, slotForMoment, taskMinutes, toMin } from './util'
 
 /* ---------------- shared bits ---------------- */
 
@@ -543,9 +543,10 @@ function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
 function RoutineOnDay({ routine, habitName }: { routine: Routine; habitName?: string }) {
   const { toggleRoutineStep, toggleRoutineAlt, setRoutineDone, setPage, inView } = useStore()
   const [open, setOpen] = useState(false)
-  const total = routine.steps.length
-  const done = routine.doneStepIds.length
-  const complete = total > 0 && done === total
+  // Counts what the routine needs, so an optional step neither pads the total
+  // nor keeps a finished routine one short of it.
+  const { done, total } = routineProgress(routine)
+  const complete = routineComplete(routine, periodKeyFor(routine.cadence))
   /* A step that has to be earned elsewhere (the typing score) cannot be ticked
      from here, so neither can the routine. Saying that is better than a
      checkbox that quietly finishes four of five and stays empty. */
@@ -634,6 +635,7 @@ function RoutineOnDay({ routine, habitName }: { routine: Routine; habitName?: st
                 >
                   <span className="sub-tick" aria-hidden="true" />
                   <span className="grow">{s.title}</span>
+                  {s.optional && <span className="step-optional mono">optional</span>}
                   {locked && <span className="rod-locked mono">{TYPING_TARGET_WPM} WPM to pass</span>}
                 </button>
               </div>
@@ -913,7 +915,7 @@ export function PlanPage() {
                the repeats, and everything finished sunk to the bottom. A ticked
                task sitting between two open ones is the list telling him he has
                work above AND below something already handled. */
-            const rDone = (r: Routine) => r.steps.length > 0 && r.doneStepIds.length === r.steps.length
+            const rDone = (r: Routine) => routineComplete(r, periodKeyFor(r.cadence))
             const items = [
               ...inBucket.filter((x) => !x.done).map((task) => ({ kind: 'task' as const, task })),
               ...mine.filter((r) => !rDone(r)).map((routine) => ({ kind: 'repeat' as const, routine })),
@@ -1472,7 +1474,7 @@ export function HabitsPage() {
   const drivenBy = new Map(routines.filter((r) => r.habitId && !r.archivedAt).map((r) => [r.habitId as string, r.title]))
   // Today's step progress for each routine-driven habit.
   const progressFor = new Map(routines.filter((r) => r.habitId && !r.archivedAt).map((r) => [
-    r.habitId as string, { done: r.doneStepIds.length, total: r.steps.length },
+    r.habitId as string, routineProgress(r),
   ]))
   const building = spaceHabits.filter((h) => !h.paused && h.kind !== 'break' && h.kind !== 'measured')
   const kept = building.reduce((a, h) => a + h.days.filter(Boolean).length, 0)
@@ -1719,9 +1721,8 @@ export function RoutinesPage() {
           if (r.id === 'r-morning' && editingId !== r.id) {
             return <MorningRoutine routine={r} key={r.id} onEdit={() => setEditingId(r.id)} />
           }
-          const total = r.steps.length
-          const done = r.doneStepIds.length
-          const complete = total > 0 && done === total
+          const { done, total } = routineProgress(r)
+          const complete = routineComplete(r, periodKeyFor(r.cadence))
           const linked = r.habitId ? habits.find((h) => h.id === r.habitId) : null
           return (
             <div className={`panel routine-card${complete ? ' is-complete' : ''}`} key={r.id}>
@@ -1777,6 +1778,8 @@ export function RoutinesPage() {
                         <span className="l">
                           {s.title}
                           {s.kind === 'timer' && s.seconds ? <span className="routine-dur mono">{Math.round(s.seconds / 60)}m</span> : null}
+                          {/* Says why this row is not in the count above. */}
+                          {s.optional && <span className="step-optional mono">optional</span>}
                         </span>
                         {s.note && <span className="h">{s.note}</span>}
                         {s.example && <span className="ex mono">{s.example}</span>}

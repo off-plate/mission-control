@@ -149,11 +149,11 @@ export const MOCK_ROUTINES: Routine[] = [
       /* The first step in the app that can be answered two ways. Whether he
          moved or reached for coffee is the interesting part, so the choice is
          recorded rather than flattened into one tick. */
+      { id: 'br-ice', title: 'Wash your face in ice cold water', kind: 'do', optional: true },
       { id: 'br1', title: 'Move or caffeine', kind: 'do', alts: [
         { id: 'br1-move', title: 'Move', note: 'Time available, so something hard: run, StairMaster, heavy gym session.' },
         { id: 'br1-caffeine', title: 'Caffeine', note: 'No time, so coffee. Take it immediately, do not wait for it to kick in.' },
       ] },
-      { id: 'br-ice', title: 'Wash your face in ice cold water', kind: 'do' },
       { id: 'br2', title: 'To-do list', kind: 'do', note: 'Sit down. Write what you want to do and what your focus is. Kill all distractions, phone away, no screens for at least 10 minutes.' },
       { id: 'br3', title: 'Pick one task', kind: 'do', note: 'One. Off the list you just wrote.' },
       { id: 'br4', title: 'Meditate', kind: 'timer', seconds: 300, habitId: 'h-meditation', note: 'Calm music. Minimum 5 minutes.' },

@@ -150,11 +150,11 @@ interface Store extends PersistedState {
 
   toggleHabitDay: (id: string, day: number) => void
   markHabitDay: (id: string, day: number, value: boolean) => void
-  addHabit: (input: { name: string; daypart?: import('./types').TimeSlot; frequency: import('./types').HabitFrequency; targetPerWeek?: number; kind?: import('./types').HabitKind; dailyTargetMin?: number; source?: import('./types').HabitSource; quitSince?: string }) => void
+  addHabit: (input: { name: string; daypart?: import('./types').TimeSlot; frequency: import('./types').HabitFrequency; targetPerWeek?: number; kind?: import('./types').HabitKind; dailyTargetMin?: number; measure?: 'minutes' | 'times'; per?: import('./types').CountPeriod; targetCount?: number; source?: import('./types').HabitSource; quitSince?: string }) => void
   /** Record a slip on a habit you are trying to stop; resets the clean run. */
   logSlip: (id: string) => void
   togglePauseHabit: (id: string) => void
-  updateHabit: (id: string, patch: Partial<Pick<HabitDef, 'name' | 'daypart' | 'frequency' | 'targetPerWeek' | 'kind' | 'dailyTargetMin' | 'source' | 'quitSince'>>) => void
+  updateHabit: (id: string, patch: Partial<Pick<HabitDef, 'name' | 'daypart' | 'frequency' | 'targetPerWeek' | 'kind' | 'dailyTargetMin' | 'measure' | 'per' | 'targetCount' | 'source' | 'quitSince'>>) => void
   deleteHabit: (id: string) => void
 
   addGoal: (g: Omit<Goal, 'id'>) => void
@@ -191,6 +191,8 @@ interface Store extends PersistedState {
   setRoutineDone: (routineId: string, done: boolean) => void
   /** Open a fresh run of a repeatable routine, keeping every run before it. */
   startAgain: (routineId: string) => void
+  /** Log one occurrence of a counted habit, or take the last one back. */
+  logCount: (habitId: string, delta: 1 | -1) => void
   /** A routine and the habit that mirrors it are created together, so finishing
    *  it always has somewhere to land. */
   addRoutine: (input: { title: string; cadence: RoutineCadence; blurb?: string; daypart?: import('./types').TimeSlot }) => void
@@ -719,6 +721,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       Math.max(1, weekLedger.length)) * 100,
   )
 
+  /* A counted habit is logged one tap at a time: three walks on Tuesday are
+     three rows, not one day ticked. Taking one back removes the most recent row
+     rather than the day, because the day may still hold two more. */
+  const logCount = (habitId: string, delta: 1 | -1) => {
+    const day = todayKey()
+    const idx = (new Date().getDay() + 6) % 7
+    let next = habitLog
+    if (delta === 1) {
+      next = [...habitLog, { habitId, day, src: `count#${Date.now()}${Math.round(performance.now())}` }]
+    } else {
+      const mine = habitLog.filter((t) => t.habitId === habitId && t.day === day)
+      const last = mine[mine.length - 1]
+      if (!last) return
+      const at = habitLog.lastIndexOf(last)
+      next = [...habitLog.slice(0, at), ...habitLog.slice(at + 1)]
+    }
+    setHabitLog(next)
+    const held = next.some((t) => t.habitId === habitId && t.day === day)
+    setHabits((prev) => prev.map((h) => (h.id === habitId
+      ? { ...h, days: h.days.map((d, i) => (i === idx ? held : d)) }
+      : h)))
+  }
+
   /** Tick or untick one day of one habit, in the log and in the week cache. */
   const markDay = (habitId: string, dayIndex: number, value: boolean) => {
     const day = dayOfWeekKey(dayIndex)
@@ -990,6 +1015,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         frequency: input.frequency, targetPerWeek: input.targetPerWeek,
         kind: input.kind ?? 'build',
         dailyTargetMin: input.dailyTargetMin,
+        /* Copied across explicitly, like every other field here. A row built
+           field by field drops anything the shape gains later, silently. */
+        measure: input.measure,
+        per: input.per,
+        targetCount: input.targetCount,
         source: input.source,
         // A quit runs from the day he says he stopped, not from the day he got
         // round to typing it in.
@@ -1330,6 +1360,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     /* Not a reset. The run he just finished stays in the log, keeps its habit
        tick and keeps whatever its steps recorded; this only opens a fresh run on
        top of it. Nothing he has done can be taken back by starting again. */
+    logCount,
     startAgain: (routineId) => applyRoutine(routineId, (r) => ({
       ...r, run: (r.run ?? 0) + 1, doneStepIds: [], stepData: {}, stepChoice: {}, startedAt: undefined,
     })),

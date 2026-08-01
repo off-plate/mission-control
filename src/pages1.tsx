@@ -6,9 +6,9 @@ import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, routineComplete, routineProgress, routineRunsOn, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, countIn, countTarget, isCounted, COUNT_PERIODS, routineComplete, routineProgress, routineRunsOn, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
-import { goalPeriodKey, goalPeriodRange, periodKeyFor, periodLabel, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, periodNoun, routinePeriods, slotForMoment, taskMinutes, toMin } from './util'
+import { goalPeriodKey, goalPeriodRange, habitPeriodRange, periodKeyFor, periodLabel, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, periodNoun, routinePeriods, slotForMoment, taskMinutes, toMin } from './util'
 
 /* ---------------- shared bits ---------------- */
 
@@ -1160,7 +1160,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
   /** A goal counting itself off this habit, if one exists. */
   goal?: Goal
 }) {
-  const { toggleHabitDay, logSlip, setPage, focusSessions, habitLog, slips, inView } = useStore()
+  const { toggleHabitDay, logSlip, logCount, setPage, focusSessions, habitLog, slips, inView } = useStore()
   const kept = h.days.filter(Boolean).length
   const target = habitTarget(h)
   // Weekdays-only habits do not expect the weekend, so those dots stay quiet.
@@ -1184,6 +1184,46 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
   /* Measured: the dot is not yes/no, it is how far through the day's target you
      got. A morning that reached 40 of 60 minutes reads as most of the way there
      rather than as a failure. */
+  /* Counted: a number of times inside a stretch, logged one tap each. Minutes
+     only ever fitted work he sits and times; most things he wants more of are
+     things he DOES, and asking him for "20 minutes of cold showers a day" was
+     the wrong question dressed as a target. */
+  if (isCounted(h)) {
+    const per = h.per ?? 'day'
+    const range = habitPeriodRange(per)
+    const target = countTarget(h)
+    const have = countIn(habitLog, h.id, range.from, range.to)
+    const label = COUNT_PERIODS.find((p) => p.id === per)!.label
+    return (
+      <div className="habit-row is-count">
+        <div className="habit-row-top">
+          <SpaceMark space={h.space} />
+          <span className="habit-name">{h.name}</span>
+          <span className="habit-count mono">
+            {have}<span className="habit-freq">of {target} {label}</span>
+          </span>
+          {actions}
+        </div>
+        <div className="count-bar" aria-hidden="true">
+          <span style={{ width: `${Math.min(100, Math.round((have / target) * 100))}%` }} />
+        </div>
+        <div className="habit-foot">
+          <span className="count-do">
+            <button className="btn btn-primary count-add" onClick={() => logCount(h.id, 1)}>
+              Did it
+            </button>
+            {have > 0 && (
+              <button className="btn btn-ghost count-undo" onClick={() => logCount(h.id, -1)}>
+                Take one back
+              </button>
+            )}
+          </span>
+          <span className="habit-weeks">{countIn(habitLog, h.id, dayOfWeekKey(0), dayOfWeekKey(6))} this week</span>
+        </div>
+      </div>
+    )
+  }
+
   if (h.kind === 'measured') {
     const target = h.dailyTargetMin ?? 60
     const todayMin = focusMinutesOn(focusSessions, localDateKey(), h.space)
@@ -1337,6 +1377,9 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
   const [perWeek, setPerWeek] = useState(habit?.targetPerWeek ?? 3)
   const [kind, setKind] = useState<HabitKind>(habit?.kind ?? 'build')
   const [targetMin, setTargetMin] = useState(habit?.dailyTargetMin ?? 60)
+  const [measure, setMeasure] = useState<'minutes' | 'times'>(habit?.measure ?? 'times')
+  const [per, setPer] = useState<CountPeriod>(habit?.per ?? 'day')
+  const [count, setCount] = useState(habit?.targetCount ?? 1)
   const [since, setSince] = useState(habit?.quitSince ?? localDateKey())
   const locked = !!drivenBy
   const quitting = kind === 'break'
@@ -1350,8 +1393,12 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
       frequency,
       targetPerWeek: frequency === 'times-per-week' ? perWeek : undefined,
       kind,
-      dailyTargetMin: measured ? Math.max(5, targetMin) : undefined,
-      source: measured ? ('focus' as const) : undefined,
+      measure: measured ? measure : undefined,
+      per: measured && measure === 'times' ? per : undefined,
+      targetCount: measured && measure === 'times' ? Math.max(1, count) : undefined,
+      dailyTargetMin: measured && measure === 'minutes' ? Math.max(5, targetMin) : undefined,
+      // Focus blocks fill minutes. A count is his to log, so it has no source.
+      source: measured && measure === 'minutes' ? ('focus' as const) : undefined,
       quitSince: quitting ? (since || localDateKey()) : undefined,
     }
     if (habit) updateHabit(habit.id, locked ? { daypart: shape.daypart } : shape)
@@ -1377,7 +1424,7 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
           <b>Quit</b><span>Something you want to stop</span>
         </button>
         <button type="button" className={kind === 'measured' ? 'on' : ''} disabled={locked} onClick={() => setKind('measured')}>
-          <b>Amount</b><span>Minutes to hit each day</span>
+          <b>Amount</b><span>A number to hit, in times or minutes</span>
         </button>
       </div>
 
@@ -1420,9 +1467,12 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
           <div>
             {measured ? (
               <>
-                <label className="field-label" htmlFor="htarget">Minutes a day</label>
-                <input id="htarget" className="textinput" style={{ width: '100%' }} type="number" min={5} max={600} step={5} value={targetMin}
-                  onChange={(e) => setTargetMin(Math.max(5, Math.min(600, Number(e.target.value) || 5)))} />
+                <label className="field-label" htmlFor="hmeasure">Counting what?</label>
+                <select id="hmeasure" className="textinput" style={{ width: '100%' }} value={measure}
+                  onChange={(e) => setMeasure(e.target.value as 'minutes' | 'times')}>
+                  <option value="times">Times you do it</option>
+                  <option value="minutes">Minutes of focus time</option>
+                </select>
               </>
             ) : frequency === 'times-per-week' ? (
               <>
@@ -1440,6 +1490,34 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
               </>
             )}
           </div>
+        </div>
+      )}
+
+      {/* The target itself, once he has said what he is counting. */}
+      {measured && (
+        <div className="sheet-grid" style={{ marginTop: 'var(--s4)' }}>
+          {measure === 'times' ? (
+            <>
+              <div>
+                <label className="field-label" htmlFor="hcount">How many times?</label>
+                <input id="hcount" className="textinput" style={{ width: '100%' }} type="number" min={1} max={99} value={count}
+                  onChange={(e) => setCount(Math.max(1, Math.min(99, Number(e.target.value) || 1)))} />
+              </div>
+              <div>
+                <label className="field-label" htmlFor="hcper">In what stretch?</label>
+                <select id="hcper" className="textinput" style={{ width: '100%' }} value={per}
+                  onChange={(e) => setPer(e.target.value as CountPeriod)}>
+                  {COUNT_PERIODS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+                </select>
+              </div>
+            </>
+          ) : (
+            <div>
+              <label className="field-label" htmlFor="htarget">Minutes a day</label>
+              <input id="htarget" className="textinput" style={{ width: '100%' }} type="number" min={5} max={600} step={5} value={targetMin}
+                onChange={(e) => setTargetMin(Math.max(5, Math.min(600, Number(e.target.value) || 5)))} />
+            </div>
+          )}
         </div>
       )}
 

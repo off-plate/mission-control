@@ -413,6 +413,14 @@ export function gcalUrl(title: string, start?: string, end?: string): string {
   return `${base}&dates=${s}/${e}`
 }
 
+/** The window a counted habit's target is measured over. Weeks and months defer
+ *  to the goal ranges so one definition of "this week" serves the whole app. */
+export function habitPeriodRange(per: 'day' | 'week' | 'month', now = new Date()): { from: string; to: string } {
+  if (per === 'day') { const d = localDateKey(now); return { from: d, to: d } }
+  const tf = per === 'week' ? 'weekly' : 'monthly'
+  return goalPeriodRange(tf, goalPeriodKey(tf, now))
+}
+
 /* ---------- routines on the day ---------- */
 
 /** Where a routine sits in the day, taken from the habit it mirrors. */

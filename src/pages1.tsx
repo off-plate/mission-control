@@ -9,7 +9,7 @@ import { BreakdownSheet, Sheet } from './modals'
 import { Linkify } from './widgets'
 import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, isCounted, COUNT_PERIODS, routineComplete, routineProgress, routineRunsOn, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
-import { goalPeriodKey, goalPeriodRange, habitPeriodRange, periodKeyFor, periodLabel, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForMoment, taskMinutes, toMin } from './util'
+import { goalPeriodKey, goalPeriodRange, habitPeriodRange, periodKeyFor, periodLabel, shiftPeriodKey, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForMoment, taskMinutes, toMin } from './util'
 
 /* ---------------- shared bits ---------------- */
 
@@ -1997,13 +1997,16 @@ export function RoutinesPage() {
 
 /* One sheet for creating and editing. `goal` edits an existing one; `presetHabitId`
    opens it prefilled from a habit, which is how "set a goal on this habit" works. */
-function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals }: {
+function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals, periodOffsets }: {
   onClose: () => void
   goal?: Goal
   presetHabitId?: string
   /** Opened from a habit: show him the goal he just made, rather than saving
    *  it silently and leaving him staring at the page he started on. */
   thenGoToGoals?: boolean
+  /** Where each column is looking. A goal added while browsing next week is
+   *  FOR next week; that is what planning forward means. */
+  periodOffsets?: Record<string, number>
 }) {
   const { space, habits, addGoal, updateGoal, setPage } = useStore()
   const preset = habits.find((h) => h.id === presetHabitId)
@@ -2031,6 +2034,7 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals }: {
       why: d.why.trim() || undefined, deadline: d.deadline.trim() || undefined,
       timeframe: d.timeframe, category: d.category,
       habitId: d.habitId || undefined,
+      periodKey: shiftPeriodKey(d.timeframe as GoalTf, d.timeframe === 'half' ? 0 : (periodOffsets?.[d.timeframe] ?? 0)),
     }
     if (goal) updateGoal(goal.id, shape)
     else addGoal({ space, current: 0, note: '', milestones: [], ...shape })
@@ -2141,6 +2145,11 @@ export function GoalsPage() {
      and do not keep counting: they sit below with the number they finished on. */
   const spaceGoals = all.filter((g) => !g.closed)
   const past = all.filter((g) => g.closed).sort((a, b) => (a.closed!.on < b.closed!.on ? 1 : -1))
+  /* Which period each column is looking at, as steps from now. Zero is today;
+     back shows what a finished period ended on, forward is where next week's
+     goals are planned before next week exists. Half-year stays put. */
+  const [offsets, setOffsets] = useState<Record<string, number>>({})
+  const shift = (tf: string, d: number) => setOffsets((o) => ({ ...o, [tf]: (o[tf] ?? 0) + d }))
   const nowOf = (g: Goal) => goalCurrent(g, habits, habitLog, goalPeriodRange((g.timeframe ?? 'quarter') as GoalTf, g.periodKey ?? goalPeriodKey((g.timeframe ?? 'quarter') as GoalTf)))
   const done = spaceGoals.filter((g) => nowOf(g) >= g.target).length
   const [adding, setAdding] = useState(false)
@@ -2156,13 +2165,29 @@ export function GoalsPage() {
 
       <div className="grid-2 goal-cols">
         {GOAL_TIMEFRAMES.map((tfr) => {
-          const inTf = spaceGoals.filter((g) => (g.timeframe ?? 'quarter') === tfr.id)
+          const off = tfr.id === 'half' ? 0 : (offsets[tfr.id] ?? 0)
+          const shownKey = shiftPeriodKey(tfr.id as GoalTf, off)
+          /* At zero this is exactly the open goals of the running period. Away
+             from zero it is that period's own rows, closed ones included: a
+             finished week shows what it finished on. */
+          const inTf = all.filter((g) => (g.timeframe ?? 'quarter') === tfr.id
+            && (g.periodKey ?? goalPeriodKey(tfr.id as GoalTf)) === shownKey)
           return (
             <div className="panel goal-col" key={tfr.id}>
               <div className="col-head">
                 <span className="microcap">{tfr.label}</span>
-                <span className="col-tot mono">{periodLabel(tfr.id as GoalTf)}</span>
+                <span className="col-tot mono">{periodLabel(tfr.id as GoalTf, shownKey)}</span>
+                {tfr.id !== 'half' && (
+                  <span className="goal-nav">
+                    <button className="goal-nav-btn" aria-label={`Earlier ${tfr.label.toLowerCase()}`} onClick={() => shift(tfr.id, -1)}>‹</button>
+                    {off !== 0 && <button className="goal-nav-btn now" onClick={() => setOffsets((o) => ({ ...o, [tfr.id]: 0 }))}>now</button>}
+                    <button className="goal-nav-btn" aria-label={`Later ${tfr.label.toLowerCase()}`} onClick={() => shift(tfr.id, 1)}>›</button>
+                  </span>
+                )}
               </div>
+              {inTf.length === 0 && off !== 0 && (
+                <div className="empty">{off < 0 ? 'No goals were set for this one.' : 'Nothing planned here yet.'}</div>
+              )}
               {inTf.map((g) => {
                 // Habit-linked goals count themselves; the rest hold their own number.
                 const current = nowOf(g)
@@ -2170,7 +2195,11 @@ export function GoalsPage() {
                 const pct = Math.min(100, Math.round((current / g.target) * 100))
                 const status = goalPace(current, g.target, g.timeframe ?? 'quarter')
                 const milestoneDriven = !!g.milestones?.length && g.target === g.milestones.length
-                const statusLabel = status === 'done' ? 'reached' : status === 'behind' ? 'needs a push' : 'on pace'
+                /* A future period has no pace to be behind on, and a closed one
+                   is a result, not a race. Only the running period gets judged. */
+                const statusLabel = off > 0 ? 'planned'
+                  : g.closed ? (g.closed.final >= g.target ? 'reached' : `ended at ${fmtNum(g.closed.final)}`)
+                    : status === 'done' ? 'reached' : status === 'behind' ? 'needs a push' : 'on pace'
                 return (
                   <div className="goal-card v2" key={g.id}>
                     <div className="goal-line">
@@ -2262,7 +2291,7 @@ export function GoalsPage() {
         </>
       )}
 
-      {adding && <GoalSheet onClose={() => setAdding(false)} />}
+      {adding && <GoalSheet periodOffsets={offsets} onClose={() => setAdding(false)} />}
       {editing && <GoalSheet goal={editing} onClose={() => setEditing(null)} />}
     </div>
   )

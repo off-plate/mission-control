@@ -8,6 +8,7 @@ import {
   MOCK_HABITS,
   MOCK_IDEAS,
   MOCK_LEDGER,
+  LATE_STEPS,
   MOCK_ROUTINES,
   MOCK_SOCIAL,
   MOCK_SOURCES,
@@ -387,16 +388,47 @@ function loadPersisted(): PersistedState | null {
     p.routines = p.routines ?? []
     for (const s of MOCK_ROUTINES) if (!removed.has(s.id) && !p.routines.some((r) => r.id === s.id)) p.routines.push(s)
 
-    /* A seeded routine that shipped empty and later gained steps has to hand
-       them over ONCE, and only while he has written none of his own. The marker
-       goes in removedSeeds so emptying the routine yourself is respected: a step
-       list he cleared must not grow back on the next reload. */
+    /* A step added to a seeded routine after this state was saved has to reach
+       it, and a whole-list seed cannot do that once the routine has any steps at
+       all. So each seeded step is handed over ONCE, at the position it holds in
+       the seed, and the fact that it was handed over is remembered. Delete it
+       afterwards and it stays deleted, which is the whole point of the marker:
+       the app fills gaps, it does not overrule him. */
     p.removedSeeds = p.removedSeeds ?? []
     for (const s of MOCK_ROUTINES) {
-      const mark = `${s.id}:steps`
-      if (!s.steps.length || p.removedSeeds.includes(mark)) continue
-      p.routines = p.routines.map((r) => (r.id === s.id && r.steps.length === 0 ? { ...r, steps: s.steps } : r))
-      p.removedSeeds.push(mark)
+      if (!s.steps.length) continue
+      const mine = p.routines.find((r) => r.id === s.id)
+      if (!mine) continue
+      const block = `${s.id}:steps`
+      /* The whole list, once, and only while he has written none of his own. */
+      if (mine.steps.length === 0 && !p.removedSeeds.includes(block)) {
+        p.routines = p.routines.map((r) => (r.id === s.id ? { ...r, steps: s.steps } : r))
+        p.removedSeeds.push(block, ...s.steps.map((st) => `${s.id}:step:${st.id}`))
+        continue
+      }
+      /* Into a list he already has, only a step that was added after that list
+         was delivered, at the position it holds in the seed. Everything else was
+         handed over long ago, so its absence means he deleted it. */
+      let steps = mine.steps
+      s.steps.forEach((st, i) => {
+        const mark = `${s.id}:step:${st.id}`
+        if (!LATE_STEPS.has(st.id) || p.removedSeeds!.includes(mark) || steps.some((x) => x.id === st.id)) return
+        steps = [...steps.slice(0, i), st, ...steps.slice(i)]
+        p.removedSeeds!.push(mark)
+      })
+      if (steps !== mine.steps) p.routines = p.routines.map((r) => (r.id === s.id ? { ...r, steps } : r))
+    }
+
+    /* A step that gained a habit link after his list was saved. Steps are his,
+       so this fills a blank and never overwrites: the wiring reaches the rows he
+       already has without touching a word of what they say. */
+    for (const s of MOCK_ROUTINES) {
+      const links = new Map(s.steps.filter((st) => st.habitId).map((st) => [st.id, st.habitId!]))
+      if (!links.size) continue
+      p.routines = p.routines.map((r) => (r.id !== s.id ? r : {
+        ...r,
+        steps: r.steps.map((st) => (!st.habitId && links.has(st.id) ? { ...st, habitId: links.get(st.id) } : st)),
+      }))
     }
 
     /* A day that has not happened yet cannot be done. Future ticks were also
@@ -407,7 +439,8 @@ function loadPersisted(): PersistedState | null {
     /* A habit a routine drives is a read-out of that routine, and its dots are
        not clickable, so a wrong value there can never be corrected by hand. It
        is therefore re-derived on every load, from HIS routines. It used to read
-       MOCK_ROUTINES, which meant the moment he wrote his own steps the mock's
+       LATE_STEPS,
+  MOCK_ROUTINES, which meant the moment he wrote his own steps the mock's
        list (empty, for four of them) decided the answer: the tick was wiped on
        the next reload, or asserted for a routine he had not finished. */
     const savedRoutines = p.routines ?? []
@@ -671,6 +704,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       : h)))
   }
 
+  /* A habit kept by a routine STEP rather than by a whole routine. Each step
+     writes its own row for the day, so meditating in the morning routine and
+     again inside Out Brain Rot leaves two rows: the day stays kept while either
+     is ticked, undoing one does not undo the other, and the number of rows is
+     how often he actually did it. */
+  const syncStepHabits = (changes: { habitId: string; src: string; on: boolean }[]) => {
+    if (!changes.length) return
+    const day = todayKey()
+    /* Applied as one batch rather than one call per step: ticking a whole
+       routine changes several steps in a single event, and one-at-a-time each
+       would compute its result from the same stale log and undo the last. */
+    let next = habitLog
+    for (const c of changes) {
+      next = next.filter((t) => !(t.habitId === c.habitId && t.day === day && t.src === c.src))
+      if (c.on) next = [...next, { habitId: c.habitId, day, src: c.src }]
+    }
+    setHabitLog(next)
+    const idx = (new Date().getDay() + 6) % 7
+    const held = new Map(changes.map((c) => [c.habitId, next.some((t) => t.habitId === c.habitId && t.day === day)]))
+    setHabits((prev) => prev.map((h) => (held.has(h.id)
+      ? { ...h, days: h.days.map((d, i) => (i === idx ? held.get(h.id)! : d)) }
+      : h)))
+  }
+
   /* A routine reaches his day by being started, not by existing. The first tick
      stamps the moment, and that moment decides which part of the day it files
      itself under. Ticking a second step must not move it, so the stamp is only
@@ -693,6 +750,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const isComplete = routineComplete(after, key)
     const completedOn = isComplete ? (wasComplete ? before.completedOn ?? todayKey() : todayKey()) : null
     setRoutines((prev) => prev.map((x) => (x.id === routineId ? { ...after, periodKey: key, completedOn } : x)))
+
+    /* A step that keeps a habit reports itself on every toggle, not only when
+       the routine as a whole flips: meditation counts the moment he meditates,
+       whatever the other four steps are doing. */
+    syncStepHabits(after.steps.flatMap((st) => {
+      if (!st.habitId) return []
+      const was = before.doneStepIds.includes(st.id)
+      const is = after.doneStepIds.includes(st.id)
+      return was === is ? [] : [{ habitId: st.habitId, src: `${routineId}:${st.id}`, on: is }]
+    }))
+
     if (wasComplete === isComplete) return
 
     /* Which day this routine was finished, kept for good. completedOn holds only

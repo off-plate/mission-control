@@ -139,6 +139,10 @@ export interface RoutineStep {
   note?: string
   /** e.g. a tongue-twister to read aloud. */
   example?: string
+  /** A habit this step keeps. Ticking the step keeps the habit for the day and
+   *  unticking gives it back, without the step's routine having to own it: the
+   *  same habit can be fed by a step in several routines. */
+  habitId?: string
   /** Two ways to answer one step. "Move or caffeine" is a single step with a
    *  choice inside it, not two steps of which one gets skipped every day.
    *  Picking any one of them satisfies the step. */
@@ -174,7 +178,18 @@ export type HabitSource = 'focus'
  * cannot answer "how have I done over a hundred days", and `history[]` is twelve
  * undated counts, so neither could ever be the truth.
  */
-export interface HabitTick { habitId: string; day: string }
+/** One day a habit was kept. `src` names the routine step that ticked it, as
+ *  `routineId:stepId`. Two routines can keep the same habit on the same day
+ *  (meditation sits in the morning routine AND in Out Brain Rot), and undoing
+ *  one of them must not undo the other, so each writes its own row. A tick he
+ *  made by hand on the Habits page has no src. The day is kept as long as any
+ *  row survives; counting the rows is how often he did it. */
+export interface HabitTick { habitId: string; day: string; src?: string }
+
+/** How many times a habit was kept on one day, not merely whether it was. */
+export function habitCountOn(log: HabitTick[], habitId: string, day: string): number {
+  return log.filter((t) => t.habitId === habitId && t.day === day).length
+}
 
 /** The days a habit was kept inside a window, as a set of ISO dates. */
 export function keptDaysIn(log: HabitTick[], habitId: string, from: string, to: string): Set<string> {

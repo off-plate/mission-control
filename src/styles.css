@@ -2612,3 +2612,12 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   .cal-months { grid-template-columns: 1fr; }
   .plan-two { grid-template-columns: 1fr; }
 }
+/* things that happened on a day but carry no clock time */
+.cal-untimed { display: flex; flex-wrap: wrap; gap: var(--s2); margin-bottom: var(--s3); }
+.cal-chip {
+  display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); color: var(--muted);
+  border: 1px solid var(--hairline); border-radius: 4px; padding: 3px 8px;
+}
+.cal-chip i { width: 6px; height: 6px; border-radius: 50%; background: var(--progress); }
+.cal-chip.k-routine i { background: var(--accent); }
+.cal-chip.k-focus i { background: var(--info); }

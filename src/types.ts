@@ -28,6 +28,7 @@ export type PageId =
   | 'brand'
   | 'braindump'
   | 'calendar'
+  | 'board'
   /** Focus blocks: the history, and the ones he wants to fix. */
   | 'focus'
   /** One day of the record, read-only. Carries a date in the route. */

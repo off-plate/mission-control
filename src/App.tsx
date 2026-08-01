@@ -6,6 +6,7 @@ import { CoachPage, MoneyPage, ReviewPage, SettingsPage } from './pages2'
 import { AssistantPage, BrainDumpPage } from './pages3'
 import { BrandPage } from './brand'
 import { DayPage } from './day'
+import { BoardPage } from './board'
 import { CalendarPage } from './calendar'
 import { FocusPage } from './focus'
 import { useStore } from './store'
@@ -63,6 +64,7 @@ const NAV: { id: PageId; label: string }[] = [
   { id: 'focus', label: 'Focus' },
   { id: 'braindump', label: 'Brain Dump' },
   { id: 'coach', label: 'Avoidance' },
+  { id: 'board', label: 'Vision' },
 ]
 
 function PageNav({
@@ -179,6 +181,7 @@ export default function App() {
         {(page === 'review' || page === 'stats') && <ReviewPage />}
         {page === 'coach' && <CoachPage />}
         {page === 'focus' && <FocusPage />}
+        {page === 'board' && <BoardPage />}
         {page === 'braindump' && <BrainDumpPage />}
         {page === 'settings' && <SettingsPage />}
         {page === 'brand' && <BrandPage />}

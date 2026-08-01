@@ -2654,3 +2654,40 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 /* which hours a part of the day means */
 .bucket-hours { font-size: 0.6875rem; color: var(--faint); margin-left: var(--s2); }
 .cal-untimed-cap { flex: 1 0 100%; font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); }
+
+/* ---------- the vision board: the one page off the house style ---------- */
+.board-page {
+  --bp-bg: #101014; --bp-ink: #f2efe8; --bp-mut: #8f8d86; --bp-acc: #e8ff6a;
+  background: var(--bp-bg); color: var(--bp-ink);
+  margin: 0 calc(-1 * var(--s5)); padding: var(--s7) var(--s6) var(--s8);
+  min-height: calc(100vh - 120px);
+}
+.board-head { max-width: 1400px; margin: 0 auto var(--s6); display: flex; align-items: baseline; gap: var(--s4); }
+.board-head h1 { font-size: clamp(2.6rem, 6vw, 5rem); line-height: 0.95; letter-spacing: -0.02em; }
+.board-why { color: var(--bp-mut); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.08em; }
+.board-wall { max-width: 1400px; margin: 0 auto; columns: 4 280px; column-gap: 18px; }
+.bcard {
+  break-inside: avoid; margin: 0 0 18px; border-radius: 10px; overflow: hidden;
+  transform: rotate(var(--tilt, 0deg));
+  transition: transform 180ms ease-out;
+}
+.bcard:hover { transform: rotate(0deg) scale(1.015); }
+.b-statement { background: var(--bp-ink); color: var(--bp-bg); padding: 26px 24px 30px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.05; }
+.b-statement.s-xl { font-size: clamp(1.8rem, 3.2vw, 2.6rem); }
+.b-statement.s-lg { font-size: clamp(1.3rem, 2.2vw, 1.7rem); }
+.b-quote { background: transparent; border: 1px solid #2c2c33; padding: 24px 22px; }
+.b-quote p { font-size: 1.05rem; line-height: 1.5; font-style: italic; }
+.b-quote cite { display: block; margin-top: 12px; color: var(--bp-mut); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; font-style: normal; }
+.b-number { background: #17171c; padding: 26px 22px; display: flex; flex-direction: column; gap: 6px; }
+.b-number .bn { font-size: clamp(2.6rem, 5vw, 4rem); line-height: 1; color: var(--bp-acc); }
+.b-number .bl { color: var(--bp-mut); font-size: 0.85rem; }
+.b-rule { background: var(--bp-acc); color: #14140a; padding: 16px 20px; font-weight: 700; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.b-image img { display: block; width: 100%; height: auto; }
+.b-image { position: relative; background: #17171c; }
+.b-image figcaption {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 26px 14px 12px;
+  color: rgba(255,255,255,0.85); font-size: 0.7rem; letter-spacing: 0.05em;
+  background: linear-gradient(transparent, rgba(0,0,0,0.65));
+}
+.board-foot { max-width: 1400px; margin: var(--s6) auto 0; color: var(--bp-mut); font-size: var(--text-xs); }
+@media (max-width: 700px) { .board-wall { columns: 2 160px; } .board-page { margin: 0 calc(-1 * var(--s4)); padding: var(--s5) var(--s4); } }

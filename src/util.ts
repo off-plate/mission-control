@@ -382,8 +382,13 @@ export function goalPace(
     return (now.getTime() - hStart.getTime()) / (hEnd.getTime() - hStart.getTime())
   })()
   const done = current / target
-  // A quarter of the window of slack before anything is called behind.
-  return done + 0.25 >= Math.min(1, elapsed) ? 'ontrack' : 'behind'
+  /* Behind means the pace now REQUIRED is at least double the pace signed up
+     for, i.e. what is left no longer fits the time left without working twice
+     as hard. A flat slack margin flagged a quarter goal at zero on day 23 of
+     92, when there was still ample time to finish it, which is exactly the
+     false alarm that teaches you to ignore the tag. */
+  const timeLeft = Math.max(0.001, 1 - Math.min(elapsed, 1))
+  return (1 - done) / timeLeft < 2 ? 'ontrack' : 'behind'
 }
 
 /** Czech thousands spacing, so 60000 reads 60 000 everywhere it appears. */

@@ -311,6 +311,18 @@ function loadPersisted(): PersistedState | null {
       })
     }
 
+    /* Michael's own correction, 2026-08-01: the finish-the-app block actually
+       ran 64 minutes, longer than the estimate the automatic repair raised it
+       to, because he extended it. His number wins over any derived one. Once. */
+    if (!p.removedSeeds.includes('fix:focus-64')) {
+      p.removedSeeds.push('fix:focus-64')
+      const f = (p.focusSessions ?? []).find((x) => /finish fil/i.test(x.label ?? ''))
+      if (f) {
+        f.minutes = 64
+        if (f.ledgerId) p.ledger = (p.ledger ?? []).map((l) => (l.id === f.ledgerId ? { ...l, estimateMin: 64, actualMin: 64 } : l))
+      }
+    }
+
     /* Week rollover: when the saved state belongs to an earlier ISO week, each
        habit's checkmarks are archived into its 12-week history and cleared, so
        Monday always starts a fresh row instead of showing last week's ticks. */

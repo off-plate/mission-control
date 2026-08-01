@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { useStore } from './store'
+import { taskMinutes } from './util'
 
 /* A global Pomodoro that lives above the whole app: a bottom-right badge you
    see on every tab, a corner ambient glow that shows the state at a glance,
@@ -56,10 +57,28 @@ function loadPomo(): Partial<Saved> {
 }
 
 export function PomodoroProvider({ children }: { children: ReactNode }) {
-  const { logFocus, syncAutoHabits } = useStore()
+  const { logFocus, syncAutoHabits, tasks } = useStore()
   const saved = useState(loadPomo)[0]
   const [focusMin, setFocusMin] = useState(saved.focusMin ?? 25)
-  const [blockMin, setBlockMin] = useState(saved.blockMin ?? saved.focusMin ?? 25)
+  /* A block saved by an older version has no blockMin. Falling back to the
+     SETTING declared his running 45 minute block to be 25 and elapsed went
+     negative. The truth is recoverable: a block started from a task carries the
+     task's title, and the task still knows its own estimate. Only when nothing
+     matches does the remaining time set the floor, which can undercount the
+     elapsed part but can never call it negative. */
+  const [blockMin, setBlockMin] = useState(() => {
+    if (saved.blockMin) return saved.blockMin
+    if (saved.phase === 'focus' && saved.focusLabel) {
+      const t = tasks.find((x) => x.title === saved.focusLabel)
+      if (t) return taskMinutes(t)
+      const st = tasks.flatMap((x) => x.subtasks ?? []).find((x) => x.title === saved.focusLabel)
+      if (st) return st.estimateMin
+    }
+    if (saved.phase === 'focus' && saved.endsAt) {
+      return Math.max(saved.focusMin ?? 25, Math.ceil((saved.endsAt - Date.now()) / 60000))
+    }
+    return saved.focusMin ?? 25
+  })
   const [breakMin, setBreakMin] = useState(saved.breakMin ?? 5)
   const [phase, setPhase] = useState<Phase>(saved.phase ?? 'idle')
   // A phase is stored as the moment it ends, so a backgrounded or reloaded tab
@@ -146,11 +165,19 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     if (running) { setPausedLeft(secondsLeft); setEndsAt(null) }        // pause: freeze what is left
     else { setEndsAt(Date.now() + (pausedLeft ?? 0) * 1000); setPausedLeft(null) } // resume from there
   }
+  /* Ending a focus block early still happened. The minutes were already counted
+     live toward any focus-kept habit, so discarding them here would take back an
+     hour he genuinely did; what was actually worked is logged as the block. */
+  const bankPartial = () => {
+    if (phase !== 'focus') return
+    const done = Math.floor((blockMin * 60 - secondsLeft) / 60)
+    if (done >= 1) logFocus(done, focusLabel ?? undefined)
+  }
   const skip = () => {
-    if (phase === 'focus') { setPhase('break'); setEndsAt(Date.now() + breakMin * 60 * 1000); setPausedLeft(null) }
+    if (phase === 'focus') { bankPartial(); setPhase('break'); setEndsAt(Date.now() + breakMin * 60 * 1000); setPausedLeft(null) }
     else { setPhase('idle'); setEndsAt(null); setPausedLeft(null) }
   }
-  const stop = () => { setPhase('idle'); setEndsAt(null); setPausedLeft(null); setFocusLabel(null) }
+  const stop = () => { bankPartial(); setPhase('idle'); setEndsAt(null); setPausedLeft(null); setFocusLabel(null) }
 
   const value: Pomo = { phase, running, secondsLeft, focusMin, blockMin, breakMin, cyclesDone, focusLabel, startFocus, toggle, skip, stop, setFocusMin, setBreakMin }
   return (

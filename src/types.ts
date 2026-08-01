@@ -1,10 +1,10 @@
-export type SpaceId = 'personal' | 'work' | 'offplate'
+export type SpaceId = 'personal' | 'work' | 'offplate' | 'corner'
 
 /** What you are looking at. 'all' is not a space anything can belong to: it is a
  *  view across the three. Storage always uses SpaceId, never this. */
 export type ViewId = SpaceId | 'all'
 
-export const SPACES: SpaceId[] = ['personal', 'work', 'offplate']
+export const SPACES: SpaceId[] = ['personal', 'work', 'offplate', 'corner']
 
 export function isSpace(v: ViewId): v is SpaceId {
   return v !== 'all'

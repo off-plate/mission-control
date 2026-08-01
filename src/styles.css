@@ -1372,7 +1372,11 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ---------- Routines: named checklists you run on repeat ---------- */
 .routine-group { margin-bottom: var(--s4); }
-.routine-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: var(--s4); align-items: stretch; }
+/* auto-FILL, not auto-fit: fit collapses the empty tracks, so a workspace with
+   one routine stretched its card across the entire page while Personal's five
+   sat in neat columns. The empty tracks are what hold a lone card to the same
+   width its siblings get elsewhere. */
+.routine-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--s4); align-items: stretch; }
 .routine-card { display: flex; flex-direction: column; }
 .routine-card.is-complete { border-color: var(--progress); }
 .routine-tag { display: flex; align-items: baseline; gap: var(--s3); margin-bottom: var(--s2); }

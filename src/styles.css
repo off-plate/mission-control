@@ -1400,8 +1400,8 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
    needs packs them without changing the reading order, which stays left to
    right, day order first. Falls back to a plain grid if the measuring never
    runs. */
-.routine-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--s4); align-items: start; }
-.routine-cards.is-packed { row-gap: 0; column-gap: var(--s4); grid-auto-rows: 4px; }
+.routine-cards { display: flex; align-items: flex-start; gap: var(--s4); }
+.routine-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: var(--s4); }
 .routine-card { display: flex; flex-direction: column; }
 .routine-card.is-complete { border-color: var(--progress); }
 /* Head of a card: the title is the control that opens and shuts it, the state
@@ -1425,11 +1425,25 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 .routine-tag .routine-progress, .routine-tag .col-tot { margin-left: auto; flex: none; white-space: nowrap; }
 /* Shut, a card is one line. Ten of them read as a list of what he has, which is
    what the page is for when he is not running one. */
-.routine-card.is-shut { padding-block: var(--s3); }
+/* Shut, a card is a fixed block: the same height whatever the length of its
+   name, so a row of them lines up instead of stepping up and down. It carries
+   the name, how far through it is, and the step it is asking for next, which is
+   what makes it worth looking at rather than a label. */
+.routine-card.is-shut { height: 108px; overflow: hidden; justify-content: space-between; }
 .routine-card.is-shut .routine-tag { margin-bottom: 0; }
-/* One notch down while shut: at four columns a display-size title ran to three
-   lines and every card in the row grew to match the longest name. */
-.routine-card.is-shut .routine-card-title { font-size: var(--text-base); }
+.routine-card.is-shut .routine-card-title {
+  font-size: var(--text-base); line-height: 1.2;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.routine-next {
+  display: flex; align-items: baseline; gap: var(--s2); width: 100%; text-align: left;
+  padding: var(--s2) 0 0 22px; color: var(--muted); font-size: var(--text-sm); min-width: 0;
+}
+.routine-next .rn-cap { flex: none; font-size: 0.5625rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--faint); }
+.routine-next .rn-t { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.routine-next:hover .rn-t { color: var(--ink); }
+.routine-next .rn-done { color: var(--progress); }
+.routine-next .rn-empty { color: var(--faint); }
 .routine-card-title { font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); line-height: 1.15; }
 .routine-progress { color: var(--faint); font-size: var(--text-sm); }
 .routine-blurb { font-size: var(--text-sm); color: var(--muted); margin: var(--s2) 0 var(--s3); max-width: 54ch; }

@@ -1955,37 +1955,38 @@ function AddRoutineSheet({ onClose }: { onClose: () => void }) {
    how often you have run it is a habits question, and it is answered on Habits.
 */
 
-/* Packs cards of different heights into columns without holes, and without
-   giving up left-to-right order the way CSS columns would. Each card spans as
-   many 4px rows as it is tall; the observer re-measures on resize and whenever a
-   card grows, which is what happens every time a step is ticked or the editor
-   opens. */
-const ROW = 4
-function usePackedGrid(deps: unknown[]) {
-  const ref = useRef<HTMLDivElement>(null)
+/* Real columns, not a grid. A grid re-flows every card after the one that grew,
+   so opening the first routine threw the last one into a different column while
+   he was looking at it. Here each card is dealt a column and stays in it: only
+   the cards UNDER the one he opened move, and only inside that column. Reading
+   order across the first row is still left to right, day order first. */
+const COL_MIN = 340
+/* A callback ref, not a ref object: the second list only exists once he stands
+   in a single workspace, and an effect keyed on mount alone never measured it,
+   so it stayed at one column and its cards ran the width of the page. */
+function useColumns(): [(el: HTMLDivElement | null) => void, number] {
+  const [node, setNode] = useState<HTMLDivElement | null>(null)
+  const [cols, setCols] = useState(1)
   useEffect(() => {
-    const grid = ref.current
-    if (!grid || typeof ResizeObserver === 'undefined') return
-    /* The packed grid has NO row gap of its own (the span carries it), so the
-       spacing has to come from the column gap. Reading rowGap here gave 0 and
-       stacked the cards flush against each other. */
-    const gap = parseFloat(getComputedStyle(grid).columnGap || '16')
-    const measure = () => {
-      for (const child of Array.from(grid.children) as HTMLElement[]) {
-        const h = child.getBoundingClientRect().height
-        if (!h) continue
-        child.style.gridRowEnd = `span ${Math.max(1, Math.ceil((h + gap) / ROW))}`
-      }
+    if (!node) return
+    const fit = () => {
+      const w = node.clientWidth
+      if (w) setCols(Math.max(1, Math.min(6, Math.floor((w + 16) / (COL_MIN + 16)))))
     }
-    grid.classList.add('is-packed')
-    measure()
-    const ro = new ResizeObserver(measure)
-    ro.observe(grid)
-    for (const child of Array.from(grid.children)) ro.observe(child)
+    fit()
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(fit)
+    ro.observe(node)
     return () => ro.disconnect()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps)
-  return ref
+  }, [node])
+  return [setNode, cols]
+}
+
+/** Deal the cards left to right across the columns, so reading order survives. */
+function dealt<T>(items: T[], cols: number): T[][] {
+  const out: T[][] = Array.from({ length: cols }, () => [])
+  items.forEach((it, i) => out[i % cols].push(it))
+  return out
 }
 
 /* Every routine, in every workspace, on one page. A day is not lived one
@@ -2008,20 +2009,39 @@ export function RoutinesPage() {
     (habits.find((h) => h.id === r.habitId)?.daypart ?? slotForMoment(new Date().toISOString())) as TimeSlot
   const [editingId, setEditingId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
-  /* One open at a time. Two half-open routines is two half-done routines. */
-  const [openId, setOpenId] = useState<string | null>(null)
-  /* Finished is finished: the card that just got its last tick shuts itself,
-     which is what makes the page settle back down without him tidying it. */
+  /* As many open as he wants. */
+  const [open, setOpen] = useState<Set<string>>(new Set())
+  const isOpen = (id: string) => open.has(id) || editingId === id
+  const setOpenId = (id: string | null, on = true) => setOpen((prev) => {
+    const next = new Set(prev)
+    if (id === null) return new Set()
+    if (on) next.add(id); else next.delete(id)
+    return next
+  })
+  /* A card shuts itself the moment it is FINISHED, not while it is finished:
+     the difference matters, because reopening a routine he has already done is
+     how he looks at what he did, and closing it again in his face was the app
+     arguing with him. So this fires on the transition only, and a card he opens
+     afterwards stays open. */
+  const wasDone = useRef<Record<string, boolean>>({})
   useEffect(() => {
-    if (!openId || editingId === openId) return
-    const r = routines.find((x) => x.id === openId)
-    if (r && routineComplete(r, periodKeyFor(r.cadence))) {
-      const t = window.setTimeout(() => setOpenId((cur) => (cur === r.id ? null : cur)), 600)
-      return () => window.clearTimeout(t)
+    const shutting: string[] = []
+    for (const r of routines) {
+      const done = routineComplete(r, periodKeyFor(r.cadence))
+      const before = wasDone.current[r.id]
+      if (done && before === false && open.has(r.id) && editingId !== r.id) shutting.push(r.id)
+      wasDone.current[r.id] = done
     }
-  }, [routines, openId, editingId])
-  const hereRef = usePackedGrid([routines, view, editingId, openId])
-  const elseRef = usePackedGrid([routines, view, editingId, openId])
+    if (!shutting.length) return
+    const t = window.setTimeout(() => setOpen((prev) => {
+      const next = new Set(prev)
+      for (const id of shutting) next.delete(id)
+      return next
+    }), 700)
+    return () => window.clearTimeout(t)
+  }, [routines, open, editingId])
+  const [hereRef, hereCols] = useColumns()
+  const [elseRef, elseCols] = useColumns()
   const live = routines.filter((r) => !r.archivedAt)
   const byFlow = (a: Routine, b: Routine) => flowRank(a) - flowRank(b)
   /* In All nothing is "elsewhere": one list, day order, as before. */
@@ -2064,9 +2084,14 @@ export function RoutinesPage() {
              open the one you are doing, work down it, and it shuts itself the
              moment it is finished. Ten open cards was a page you had to scroll
              past to find the one you wanted. */
-          if (openId !== r.id && editingId !== r.id) {
+          if (!isOpen(r.id)) {
+            const complete = routineComplete(r, periodKeyFor(r.cadence))
+            /* The step he would do next, so a shut card still tells him what it
+               is asking of him rather than only its name. */
+            const next = complete ? null : r.steps.find((s) => !r.doneStepIds.includes(s.id) && !s.optional)
+              ?? r.steps.find((s) => !r.doneStepIds.includes(s.id))
             return (
-              <div className={`panel routine-card is-shut${routineComplete(r, periodKeyFor(r.cadence)) ? ' is-complete' : ''}`} key={r.id}>
+              <div className={`panel routine-card is-shut${complete ? ' is-complete' : ''}`} key={r.id}>
                 <div className="routine-tag">
                   <button className="routine-open" onClick={() => setOpenId(r.id)} aria-expanded={false}>
                     <SpaceMark space={r.space} always />
@@ -2075,6 +2100,13 @@ export function RoutinesPage() {
                   {status(r)}
                   {menu(r)}
                 </div>
+                <button className="routine-next" onClick={() => setOpenId(r.id)}>
+                  {next
+                    ? <><span className="rn-cap mono">next</span><span className="rn-t">{next.title}</span></>
+                    : complete
+                      ? <span className="rn-t rn-done">All of it, done.</span>
+                      : <span className="rn-t rn-empty">No steps yet.</span>}
+                </button>
               </div>
             )
           }
@@ -2082,14 +2114,14 @@ export function RoutinesPage() {
              workspace: one look for one kind of thing. A morning routine with
              no steps yet keeps the plain card, which is where steps are added. */
           if ((r.id === 'r-morning' || r.id === 'r-morningwork') && r.steps.length > 0 && editingId !== r.id) {
-            return <MorningRoutine routine={r} key={r.id} onEdit={() => setEditingId(r.id)} onShut={() => setOpenId(null)} />
+            return <MorningRoutine routine={r} key={r.id} onEdit={() => setEditingId(r.id)} onShut={() => setOpenId(r.id, false)} />
           }
           const { total } = routineProgress(r)
           const complete = routineComplete(r, periodKeyFor(r.cadence))
           return (
             <div className={`panel routine-card${complete ? ' is-complete' : ''}`} key={r.id}>
               <div className="routine-tag">
-                <button className="routine-open is-open" onClick={() => { setOpenId(null); setEditingId(null) }} aria-expanded>
+                <button className="routine-open is-open" onClick={() => { setOpenId(r.id, false); setEditingId(null) }} aria-expanded>
                   <SpaceMark space={r.space} always />
                   <span className="routine-card-title">{r.title}</span>
                 </button>
@@ -2196,12 +2228,18 @@ export function RoutinesPage() {
       />
       <div className="routine-cards" ref={hereRef}>
         {here.length === 0 && <div className="empty">No routines in this workspace yet. Add one from the button above.</div>}
-        {here.map(card)}
+        {dealt(here, hereCols).map((col, i) => (
+          <div className="routine-col" key={i}>{col.map(card)}</div>
+        ))}
       </div>
       {elsewhere.length > 0 && (
         <>
           <div className="routine-split"><span className="mono">Other workspaces</span></div>
-          <div className="routine-cards" ref={elseRef}>{elsewhere.map(card)}</div>
+          <div className="routine-cards" ref={elseRef}>
+            {dealt(elsewhere, elseCols).map((col, i) => (
+              <div className="routine-col" key={i}>{col.map(card)}</div>
+            ))}
+          </div>
         </>
       )}
 

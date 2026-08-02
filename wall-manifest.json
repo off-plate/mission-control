@@ -1,3 +1,64 @@
 {
-  "images": {}
+  "images": {
+    "challenger": {
+      "w": 900,
+      "h": 600,
+      "lqip": "data:image/webp;base64,UklGRloAAABXRUJQVlA4IE4AAACwAwCdASoYABAAPu1iqU2ppaQiMAgBMB2JaQDKACHP08RMLj784AD+2sLHyXfi2mlXILmX8ICK47ot6nTERK7/EhDb6at7KjTzxJaAAAA=",
+      "credit": "i.pinimg.com",
+      "license": "",
+      "creator": "",
+      "caption": "the Challenger, kept, not sold",
+      "source": "https://fr.pinterest.com/pin/56717276552800425/",
+      "query": "dodge challenger scat pack muscle car night",
+      "original": "1536x1024"
+    },
+    "gym-six": {
+      "w": 900,
+      "h": 1200,
+      "lqip": "data:image/webp;base64,UklGRgABAABXRUJQVlA4IPQAAADQBQCdASoYACAAPu1grFAppSQisBgIATAdiWkACBpYm7Bsdn+T8uPXEr7gTrToYD8rEQ2fI44AAP7Zna0MXrQ7vkJYu7LwgjbjAjlriFR2CC+pI0t/+wWbbM5yGgneHh4QsCPJFyxHsU5hkliIiVlkVLtnUCu4C9t+Pc605dgVd5CRuOQdhG1XX+yWussCHnC0/AP8D+03dwl6GmNJZS9qvf9h/gJB+CWphdnlm+E4Kv02xUWsfFTYD6kKx/DlRpLPKKoOTbWDfar+WvIQFB3sp0KUq8L+w9iVj4LlsLDoHjHW+NzLGtZ8qSNWwpmYleEV8AAA",
+      "credit": "i.pinimg.com",
+      "license": "",
+      "creator": "",
+      "caption": "the gym at six",
+      "source": "https://www.pinterest.com/pin/602497256438527700/",
+      "query": "empty gym early morning weights window light",
+      "original": "3060x4080"
+    },
+    "liguria": {
+      "w": 900,
+      "h": 600,
+      "lqip": "data:image/webp;base64,UklGRqgAAABXRUJQVlA4IJwAAACwBACdASoYABAAPu1iqU2ppaOiMAgBMB2JbACdHYCNq2/+A8ctRHQWIb57AouwAPpZRMQ4TZnyObC88REYNVLaEfJEHuot4+xTpxjiZ9HxWFpd6800NSVPs7xHG6653s3xzjL36bx0vvcGvDcUuU4yiRSqzs4hNe8D12+9/nzuk5zjS0HyNcdfsMYG+zPXJwOm+J4QTtv1LNbqAAA=",
+      "credit": "get.pxhere.com",
+      "license": "",
+      "creator": "",
+      "caption": "Liguria, August",
+      "source": "https://pxhere.com/en/photo/548132",
+      "query": "cinque terre liguria coast summer sea",
+      "original": "6000x4000"
+    },
+    "calm-desk": {
+      "w": 900,
+      "h": 1200,
+      "lqip": "data:image/webp;base64,UklGRtQAAABXRUJQVlA4IMgAAABQBQCdASoYACAAPu1qqU8ppiOiMBgIATAdiUAVhmHQn1Xc8D6Nl3GCuGBM8y/RtfeRJ8gA/sBrFHcWWzqXhUFq494qRGdPTwtitrb1z/w4Xy1lfJ9tyzu6m2rzJe39cmTKgEnuhrD1bo88ACMMMAEmxgOfZqqDhv0kORGq0IWnruPclbJ/GokGK3oB/IW715dlD/jLQtoKOPoh8FgW+kfvaF+Evcup8galGqenIxtYU3KVg49bHKj7SS/OmK0GGjVwKdhfxlCAAA==",
+      "credit": "i.pinimg.com",
+      "license": "",
+      "creator": "",
+      "caption": "the calm desk, every morning",
+      "source": "https://www.pinterest.com/pin/workspace-idea-in-2025--1142366261740617488/",
+      "query": "calm minimalist desk morning light coffee",
+      "original": "3072x4096"
+    },
+    "corner-night": {
+      "w": 900,
+      "h": 1350,
+      "lqip": "data:image/webp;base64,UklGRsIAAABXRUJQVlA4ILYAAACQBgCdASoYACQAPu1mq02ppaQiMBqqqTAdiWMAwGQWeN3U/rUU3OdnNahHe79gX+kLk+eMeSqUDVT4YjgAAP7Zw3hvl0Y2RL7DV0N1KRo3XUnSFlx/1jFa4DRSTpM+nXAsO7I53FZcQYErFcvTv2Ta2U+dlSL/tCtALluuUuEZukuzbXgQjfze98pvFw58e9EQWZGuWdZElJf6D9i3wvyis44Ssf0I7qQAqtuai8IXJpGV1KAAAA==",
+      "credit": "i.pinimg.com",
+      "license": "",
+      "creator": "",
+      "caption": "the Corner, built at night",
+      "source": "https://in.pinterest.com/pin/683350943478591786/",
+      "query": "editing desk at night monitor glow dark room",
+      "original": "3000x4500"
+    }
+  }
 }

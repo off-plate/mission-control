@@ -10,7 +10,7 @@ import { Linkify } from './widgets'
 import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, isCounted, COUNT_PERIODS, routineComplete, routineProgress, routineRunsOn, slotMinutes, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
 import { estimateTask } from './ai'
-import { goalPeriodKey, goalPeriodRange, habitPeriodRange, periodKeyFor, periodLabel, shiftPeriodKey, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForMoment, taskMinutes, toMin } from './util'
+import { goalPeriodKey, goalPeriodRange, habitPeriodRange, periodIsPast, periodKeyFor, periodLabel, shiftPeriodKey, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForMoment, taskMinutes, toMin } from './util'
 
 /* ---------------- shared bits ---------------- */
 
@@ -260,6 +260,9 @@ export function TodayPage() {
                       {x.actionLabel}
                     </button>
                   )
+                )}
+                {x.action === 'open-goals' && (
+                  <button onClick={() => setPage('goals')}>{x.actionLabel ?? 'Open Goals'}</button>
                 )}
                 {x.action === 'coach' && (
                   <>
@@ -2607,6 +2610,45 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals, periodOffsets 
   )
 }
 
+/** What "move it to the one running now" is called, per timeframe. */
+const TF_NOW: Record<GoalTimeframe, string> = {
+  weekly: 'this week', monthly: 'this month', quarter: 'this quarter', half: 'this half',
+}
+
+/* What a period promised and did not deliver. A week that ends must not drop
+   the things he put on it: they are still on his to-do list, but the PROMISE
+   needs an answer, so it stands here until he gives one. Two answers, both
+   honest: carry it into the period running now, or admit it is not happening
+   and take it off. Nothing here is stored: acting on it removes it. */
+function LeftBehind() {
+  const { tasks, commitTask, inView } = useStore()
+  const left = tasks.filter((t) => !t.done && inView(t.space) && t.horizon && t.horizonKey
+    && periodIsPast(t.horizon as GoalTf, t.horizonKey))
+  if (!left.length) return null
+  return (
+    <div className="panel left-behind">
+      <div className="col-head">
+        <span className="microcap">Left behind</span>
+        <span className="col-tot mono">{left.length}</span>
+      </div>
+      {left.map((t) => {
+        const tf = t.horizon as GoalTf
+        return (
+          <div className="lb-row" key={t.id}>
+            <SpaceMark space={t.space} />
+            <span className="grow">{t.title}</span>
+            <span className="meta mono">{goalPeriodRange(tf, t.horizonKey!).label}</span>
+            <button className="btn btn-quiet" onClick={() => commitTask(t.id, t.horizon, goalPeriodKey(tf))}>
+              Move to {TF_NOW[t.horizon!]}
+            </button>
+            <button className="sub-tool" onClick={() => commitTask(t.id)}>Take off</button>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 /* The work a period is for. Not a goal with a number on it and not a second
    copy of anything: the same tasks he already keeps in the plan, standing under
    the week or the month he promised them to. He ticks one in the plan and it is
@@ -2723,6 +2765,8 @@ export function GoalsPage() {
         metrics={[{ v: `${done}/${spaceGoals.length}`, k: 'reached', tone: 'pos' as const }]}
         actions={<><WriteTo /><button className="btn btn-primary" onClick={() => setAdding(true)}>Add a goal</button></>}
       />
+
+      <LeftBehind />
 
       <div className="grid-2 goal-cols">
         {GOAL_TIMEFRAMES.map((tfr) => {

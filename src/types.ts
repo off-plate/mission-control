@@ -345,6 +345,10 @@ export interface HabitDef {
    *  habit added today did not fail the ninety days before it existed, so the
    *  trail counts its chances from here and the card says when it began. */
   startedOn?: string
+  /** The start date whose days have already been written into the log. Kept so
+   *  the fill happens once per date: a day he unticks afterwards stays
+   *  unticked, and a date he moves gets its new stretch filled. */
+  filledSince?: string
   name: string
   /** Mon..Sun of the current week. */
   days: boolean[]

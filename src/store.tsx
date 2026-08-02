@@ -511,6 +511,33 @@ function loadPersisted(): PersistedState | null {
     p.habitLog = (p.habitLog ?? []).filter((t) => t.day <= localDateKey())
     p.routineLog = (p.routineLog ?? []).filter((r) => r.day <= localDateKey())
 
+    /* A start date that never got its days. The date field shipped one build
+       before the filling did, so a habit he had been keeping since July sat at
+       0/7 with the date sitting right there on its card. Every habit carrying a
+       start it has not been filled for gets those days written now, up to
+       yesterday. Marked by filledSince, so this runs once per date and a day he
+       unticks afterwards stays unticked. Runs before the week cache below, which
+       then picks it up for free. */
+    {
+      const today = localDateKey()
+      const filled: HabitTick[] = []
+      p.habits = (p.habits ?? []).map((h) => {
+        if (h.kind === 'break' || !h.startedOn || h.filledSince) return h
+        const have = new Set((p.habitLog ?? []).filter((t) => t.habitId === h.id).map((t) => t.day))
+        const cursor = new Date(`${h.startedOn}T12:00:00`)
+        const end = new Date(`${today}T12:00:00`)
+        if (!Number.isNaN(cursor.getTime())) {
+          while (cursor < end) {
+            const key = localDateKey(cursor)
+            if (!have.has(key)) filled.push({ habitId: h.id, day: key, src: 'since' })
+            cursor.setDate(cursor.getDate() + 1)
+          }
+        }
+        return { ...h, filledSince: h.startedOn }
+      })
+      if (filled.length) p.habitLog = [...(p.habitLog ?? []), ...filled]
+    }
+
     /* The week array is a cache. Rebuilding it from the log on every load means
        the log is the one truth and the two can never drift apart. */
     {
@@ -1031,11 +1058,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (!have.has(key)) rows.push({ habitId, day: key, src: 'since' })
       cursor.setDate(cursor.getDate() + 1)
     }
-    if (!rows.length) return
     const filled = new Set(rows.map((r) => r.day))
-    setHabitLog((prev) => [...prev, ...rows])
+    if (rows.length) setHabitLog((prev) => [...prev, ...rows])
     setHabits((prev) => prev.map((h) => (h.id !== habitId ? h : {
       ...h,
+      // The date is now accounted for, whether or not it needed any new rows.
+      filledSince: from,
       days: h.days.map((v, i) => v || filled.has(dayOfWeekKey(i))),
     })))
   }
@@ -1388,6 +1416,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // And the same courtesy the other way round: a habit he has been keeping
         // since June starts in June, not on the day he typed it in here.
         startedOn: input.kind === 'break' ? undefined : (input.startedOn ?? todayKey()),
+        filledSince: input.kind === 'break' ? undefined : (input.startedOn ?? todayKey()),
         days: [false, false, false, false, false, false, false], paused: false,
       }])
       // Started before today means those days were kept. Say so in the record.
@@ -1412,8 +1441,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
          never deletes a day already logged: a day recorded as kept is his, and
          no edit here is allowed to take one back. */
       if (patch.startedOn && patch.kind !== 'break') {
-        const was = habits.find((h) => h.id === id)?.startedOn
-        if (!was || patch.startedOn < was) backfillKept(id, patch.startedOn, was)
+        const had = habits.find((h) => h.id === id)?.filledSince
+        if (patch.startedOn !== had) backfillKept(id, patch.startedOn, had)
       }
     },
     togglePauseHabit: (id) =>

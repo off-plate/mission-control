@@ -175,6 +175,23 @@ await step('phone: plan is usable at 390', async () => {
   await mp.close()
 })
 
+await step('focus: stopping mid-block banks the elapsed minutes', async () => {
+  // Its own page with a controlled clock: fast-forward 20 of 25 minutes and
+  // stop. The block must land in focusSessions as 20 minutes, not vanish.
+  const cp = await b.newPage({ viewport: { width: 1200, height: 900 } })
+  await cp.clock.install()
+  await cp.goto(URL); await cp.waitForTimeout(300)
+  await cp.evaluate((K) => { localStorage.removeItem(K); localStorage.removeItem('mc-pomodoro') }, KEY)
+  await cp.goto(`${URL}#/focus`); await cp.reload(); await cp.waitForTimeout(600)
+  await cp.locator('.pomo-start').click(); await cp.waitForTimeout(300)
+  await cp.clock.fastForward('20:00'); await cp.waitForTimeout(600)
+  await cp.locator('.pomo-badge button[aria-label="Stop"]').click(); await cp.waitForTimeout(500)
+  const s = await cp.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
+  const total = (s.focusSessions ?? []).reduce((a, f) => a + f.minutes, 0)
+  if (total < 19 || total > 21) throw new Error(`banked ${total}m of a stopped 20m block`)
+  await cp.close()
+})
+
 await b.close(); server.close()
 if (errors.length) console.log(`CONSOLE ERRORS (${errors.length}): ${errors[0]}`)
 console.log(`${pass} pass, ${fail} fail${errors.length ? `, ${errors.length} console errors` : ', 0 console errors'}`)

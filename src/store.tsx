@@ -1645,7 +1645,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       items.forEach((it) => {
         const id = newId('a')
         if (it.kind === 'goal') {
-          newGoals.push({ id, space, name: it.text, current: 0, target: 1, unit: 'done', note: 'added by assistant', timeframe: 'weekly', category: 'life' })
+          newGoals.push({ id, space, name: it.text, current: 0, target: 1, unit: 'done', note: 'added by assistant', timeframe: 'weekly', category: 'life', periodKey: goalPeriodKey('weekly') })
           created.push({ id, kind: 'goal', label: it.text, tab: 'goals' })
         } else {
           const done = it.kind === 'done'

@@ -1,6 +1,7 @@
 import { MOCK_MONEY } from './mock'
 import type { Routine, SpaceId, Task } from './types'
-import { goalPeriodRange, localDateKey, periodIsPast, type GoalTf } from './util'
+import { goalPeriodRange, localDateKey, periodIsPast, taskMinutes, type GoalTf } from './util'
+import { SLOTS, slotMinutes } from './types'
 
 export { SPACE_LABELS, MOCK_AGENDA } from './mock'
 
@@ -72,7 +73,7 @@ export interface ExceptionItem {
   id: string
   text: string
   when: string
-  action?: 'coach' | 'add-task' | 'open-goals'
+  action?: 'coach' | 'add-task' | 'open-goals' | 'open-plan'
   coachId?: string
   /** Free text handed to Coach's analyser (used by the ageing alerts). */
   coachSeed?: string
@@ -115,6 +116,29 @@ export function exceptionsFor(space: SpaceId, ctx: { tasks: Task[]; routines: Ro
       })
     }
 
+  }
+
+  /* The slot math on Plan knows when a day cannot fit itself; the alert row
+     said "Nothing is on fire" over the same data. An over-planned day IS the
+     thing on fire today: it means the evening is already lost at breakfast. */
+  const today = localDateKey()
+  const todays = ctx.tasks.filter((t) => t.space === space && t.list === 'today' && !t.done && (t.plannedOn ?? today) === today)
+  const overSlots = SLOTS.map((sl) => ({
+    label: sl.label.toLowerCase(),
+    over: todays.filter((t) => t.slot === sl.id).reduce((a, t) => a + taskMinutes(t), 0) - slotMinutes(sl.id),
+  })).filter((x) => x.over > 0)
+  if (overSlots.length) {
+    const worst = overSlots.sort((a, b) => b.over - a.over)[0]
+    const fmt = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h ${m % 60 ? `${m % 60}m` : ''}`.trim() : `${m}m`)
+    out.push({
+      id: 'x-overplanned',
+      text: overSlots.length === 1
+        ? `Today is over-planned: ${fmt(worst.over)} more in the ${worst.label} than the ${worst.label} holds.`
+        : `Today is over-planned in ${overSlots.length} parts of the day, worst is the ${worst.label} at ${fmt(worst.over)} over.`,
+      when: 'today',
+      action: 'open-plan',
+      actionLabel: 'Rebalance',
+    })
   }
 
   /* A period that ends does not get to quietly drop what he promised it. The

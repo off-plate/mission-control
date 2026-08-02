@@ -7,7 +7,7 @@ import { usePomodoro } from './pomodoro'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
 import { Linkify } from './widgets'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, isCounted, COUNT_PERIODS, routineComplete, routineProgress, routineRunsOn, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, isCounted, COUNT_PERIODS, routineComplete, routineProgress, routineRunsOn, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
 import { estimateTask } from './ai'
 import { goalPeriodKey, goalPeriodRange, habitPeriodRange, periodKeyFor, periodLabel, shiftPeriodKey, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForMoment, taskMinutes, toMin } from './util'
@@ -210,7 +210,7 @@ export function TodayPage() {
           { v: String(open.length), k: 'tasks open' },
           ...(space === 'personal' && nextPay
             ? [{ v: `${nextPay.amount} ${nextPay.date.split(' ')[0]}`, k: 'next payment', tone: 'urgent' as const }]
-            : [{ v: `${fmtSigned(savedMin)}`, k: 'under estimate', tone: 'pos' as const }]),
+            : savedMin !== 0 ? [{ v: `${fmtSigned(savedMin)}`, k: savedMin > 0 ? 'under estimate' : 'over estimate', tone: (savedMin > 0 ? 'pos' : 'urgent') as 'pos' | 'urgent' }] : []),
         ]}
         actions={
           <>
@@ -261,7 +261,7 @@ export function TodayPage() {
       ) : (
         <div className="allclear">
           <span className="dot" aria-hidden="true" />
-          Nothing is on fire, here or in Personal.
+          Nothing is on fire.
         </div>
       )}
 
@@ -885,7 +885,7 @@ export function PlanPage() {
         title="Plan the day"
         metrics={[
           { v: fmtDuration(plannedMin), k: 'planned today', tone: 'info' as const },
-          { v: `${donePct}%`, k: 'to-do done', tone: 'pos' as const },
+          { v: pool.length ? `${donePct}%` : '—', k: pool.length ? 'to-do done' : 'no tasks yet', tone: (pool.length && donePct > 0 ? 'pos' : 'info') as 'pos' | 'info' },
           ...(loggedAny ? [{ v: fmtSigned(savedToday), k: savedToday >= 0 ? 'saved today' : 'over estimate', tone: (savedToday >= 0 ? 'pos' : 'urgent') as 'pos' | 'urgent' }] : []),
         ]}
         /* The way back into the record. Every day before this one is addressable
@@ -992,7 +992,6 @@ export function PlanPage() {
         <div className="panel">
           <div className="col-head">
             <span className="microcap">Today</span>
-            <span className="col-tot mono">{fmtDuration(plannedMin)} planned</span>
           </div>
           {BUCKETS.map((b) => {
             // A finished task is not waiting to be scheduled, so it drops out of
@@ -1688,7 +1687,7 @@ const HABIT_WINDOWS = [
 ]
 
 export function HabitsPage() {
-  const { habits, goals, space, deleteHabit, routines, todayIndex, inView } = useStore()
+  const { habits, goals, space, deleteHabit, togglePauseHabit, routines, todayIndex, inView } = useStore()
   const [days, setDays] = useState(7)
   const [adding, setAdding] = useState(false)
   // Opening the goal sheet from a habit is the "set a goal on this" path.
@@ -1698,7 +1697,10 @@ export function HabitsPage() {
   const spaceHabits = habits.filter((h) => inView(h.space) && !h.archivedAt)
   // A habit a routine drives cannot be deleted from here, or the routine would
   // mirror into nothing. Pausing stays available.
-  const drivenBy = new Map(routines.filter((r) => r.habitId && !r.archivedAt).map((r) => [r.habitId as string, r.title]))
+  /* Ownership needs something to own: a routine with no steps cannot be
+     finished, so until steps exist its habit stays hand-tickable instead of
+     sitting locked behind a checklist that is not written yet. */
+  const drivenBy = new Map(routines.filter((r) => r.habitId && !r.archivedAt && r.steps.length > 0).map((r) => [r.habitId as string, r.title]))
   // Today's step progress for each routine-driven habit.
   const progressFor = new Map(routines.filter((r) => r.habitId && !r.archivedAt).map((r) => [
     r.habitId as string, routineProgress(r),
@@ -1717,7 +1719,7 @@ export function HabitsPage() {
     <div className="page">
       <Band
         title="Habits"
-        metrics={[{ v: `${kept}/${target}`, k: 'kept this week', tone: 'pos' as const }]}
+        metrics={[{ v: `${kept}/${target}`, k: 'kept this week', tone: (kept > 0 ? 'pos' : 'info') as 'pos' | 'info' }]}
         actions={
           <>
             <select
@@ -1750,6 +1752,7 @@ export function HabitsPage() {
                   {!h.paused && h.days[todayIndex] && <span className="col-tot mono val-pos">done today</span>}
                   <Dropdown label={`Options for ${h.name}`} className="habit-kebab">
                     <button role="menuitem" onClick={() => setEditHabit(h)}>Edit this habit</button>
+                    <button role="menuitem" onClick={() => togglePauseHabit(h.id)}>{h.paused ? 'Resume it' : 'Pause it'}</button>
                     {goalOn.has(h.id) ? (
                       <span className="kebab-note">Goal: {goalOn.get(h.id)!.name}</span>
                     ) : (
@@ -1958,10 +1961,9 @@ export function RoutinesPage() {
                 </>
               ) : (
               <>
+              {/* One sentence; the card footer already says what finishing does. */}
               {total === 0 && (
-                <p className="routine-empty">
-                  No steps yet. Open the menu and write them.
-                </p>
+                <p className="routine-empty">No steps yet. Open the menu and write them.</p>
               )}
               <div className="routine-steplist">
                 {r.steps.map((s) => {
@@ -2019,9 +2021,7 @@ export function RoutinesPage() {
               <div className="routine-card-foot">
                 {linked && total > 0
                   ? <span className="assist-note">Finishing all {total} checks off “{linked.name}” in Habits.</span>
-                  : linked
-                    ? <span className="assist-note">Add steps here and finishing them will check off “{linked.name}”.</span>
-                    : <span />}
+                  : <span />}
                 {/* No reset. Clearing the checks used to un-finish the routine,
                     which deleted its row from the log and took back its habit
                     tick: a button that erased the fact he had done it. Starting
@@ -2071,6 +2071,17 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals, periodOffsets 
     category: goal?.category ?? ('life' as GoalCategory),
     habitId: goal?.habitId ?? presetHabitId ?? '',
   })
+  /* Milestones existed in the data and on the card, but no sheet ever offered
+     them, so the feature was unreachable. A goal made of milestones counts
+     itself by ticking them: the target follows the list. */
+  const [milestones, setMilestones] = useState<GoalMilestone[]>(goal?.milestones ?? [])
+  const [msDraft, setMsDraft] = useState('')
+  const addMs = () => {
+    const t = msDraft.trim()
+    if (!t) return
+    setMilestones((prev) => [...prev, { id: `ms-${Date.now().toString(36)}-${prev.length}`, label: t, done: false }])
+    setMsDraft('')
+  }
   /* Only habits from the profile this goal is being written into. In All every
      habit was on offer, so a goal filed under Personal could count off a Work
      habit and then show a number nothing on that page could explain. */
@@ -2086,9 +2097,11 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals, periodOffsets 
       timeframe: d.timeframe, category: d.category,
       habitId: d.habitId || undefined,
       periodKey: shiftPeriodKey(d.timeframe as GoalTf, d.timeframe === 'half' ? 0 : (periodOffsets?.[d.timeframe] ?? 0)),
+      milestones,
+      ...(milestones.length && !d.habitId ? { target: milestones.length, unit: 'milestones' } : {}),
     }
     if (goal) updateGoal(goal.id, shape)
-    else addGoal({ space, current: 0, note: '', milestones: [], ...shape })
+    else addGoal({ space, current: 0, note: '', ...shape })
     onClose()
     if (thenGoToGoals) setPage('goals')
   }
@@ -2180,6 +2193,31 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals, periodOffsets 
             value={d.deadline} onChange={(e) => setD({ ...d, deadline: e.target.value })} />
         </div>
       </div>
+
+      {/* Only for hand-logged goals: a habit-linked goal already counts itself. */}
+      {!d.habitId && (
+        <div style={{ marginTop: 'var(--s4)' }}>
+          <label className="field-label" htmlFor="gms">Milestones, if it comes in steps</label>
+          {milestones.length > 0 && (
+            <div className="ms-list">
+              {milestones.map((m) => (
+                <div className="ms-row" key={m.id}>
+                  <span className="grow">{m.label}</span>
+                  <button className="sub-tool" aria-label={`Remove milestone: ${m.label}`}
+                    onClick={() => setMilestones((prev) => prev.filter((x) => x.id !== m.id))}>Remove</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="formrow">
+            <input id="gms" className="textinput" style={{ flex: 1 }} placeholder="e.g. Outline written"
+              value={msDraft} onChange={(e) => setMsDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addMs() } }} />
+            <button className="btn btn-quiet" disabled={!msDraft.trim()} onClick={addMs}>Add</button>
+          </div>
+          {milestones.length > 0 && <p className="assist-note">The target becomes {milestones.length}: one per milestone, ticked on the goal card.</p>}
+        </div>
+      )}
 
       <div className="sheet-actions">
         <button className="btn btn-quiet" onClick={onClose}>Cancel</button>

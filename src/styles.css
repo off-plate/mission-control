@@ -90,6 +90,9 @@ html { font-size: 16px; }
 [data-space="offplate"] {
   --accent: #8a6410; --accent-hover: #6f5009; --accent-wash: rgba(138, 100, 16, 0.11);
 }
+[data-space="corner"] {
+  --accent: #1E5244; --accent-hover: #163f34; --accent-wash: rgba(30, 82, 68, 0.10);
+}
 
 /* ---------- base ---------- */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -450,6 +453,13 @@ main { padding-inline: var(--gutter); }
   gap: var(--s8);
   flex-wrap: wrap;
 }
+/* On a phone the band cannot push its actions off the edge: metrics and the
+   primary button wrap to their own full-width rows instead. */
+@media (max-width: 640px) {
+  .band-status { margin-left: 0; width: 100%; gap: var(--s3) var(--s5); }
+  .band-actions { flex: 1 0 100%; flex-wrap: wrap; }
+  .band-actions .btn { flex: 1 1 auto; }
+}
 .band-metric { text-align: right; }
 .band-metric .v { font-family: var(--font-display); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; font-size: var(--text-lg); display: block; line-height: 1.2; }
 .band-metric .k { color: var(--muted); font-size: 0.6875rem; font-family: var(--font-body); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
@@ -486,7 +496,9 @@ main { padding-inline: var(--gutter); }
   font-family: var(--font-mono);
   font-size: 0.75rem;
   color: var(--muted);
-  white-space: nowrap;
+  /* nowrap clipped the strip mid-word on a phone; wrapping is just reading */
+  white-space: normal;
+  text-align: left;
   padding: var(--s1) 0;
 }
 .status-strip button:hover { color: var(--accent); }
@@ -593,7 +605,10 @@ main { padding-inline: var(--gutter); }
 
 /* Tiles scroll their overflow. With plain `hidden` the Goals tile ended
    mid-glyph and silently dropped its last row. */
-.widget-body { flex: 1; padding: var(--s3) var(--s4) var(--s4); overflow: hidden auto; scrollbar-width: thin; position: relative; }
+.widget-body { flex: 1; padding: var(--s3) var(--s4) var(--s4); overflow: hidden auto; scrollbar-width: thin; position: relative;
+  /* content taller than the cell fades out instead of being sliced mid-row */
+  mask-image: linear-gradient(#000 calc(100% - 16px), transparent);
+}
 .widget-body.scroll { overflow-y: auto; scrollbar-width: thin; }
 
 .widget-menu {
@@ -2629,6 +2644,10 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   .cal-cols { grid-template-columns: 1fr; }
   .cal-months { grid-template-columns: 1fr; }
   .plan-two { grid-template-columns: 1fr; }
+  /* The month is what a phone comes for; a thousand pixels of empty hour rail
+     before it buried the calendar under its own schedule. */
+  .cal-cols > .panel { order: 2; }
+  .cal-cols > .cal-wide { order: 1; }
 }
 /* things that happened on a day but carry no clock time */
 .cal-untimed { display: flex; flex-wrap: wrap; gap: var(--s2); margin-bottom: var(--s3); }
@@ -2691,3 +2710,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 }
 .board-foot { max-width: 1400px; margin: var(--s6) auto 0; color: var(--bp-mut); font-size: var(--text-xs); }
 @media (max-width: 700px) { .board-wall { columns: 2 160px; } .board-page { margin: 0 calc(-1 * var(--s4)); padding: var(--s5) var(--s4); } }
+/* milestone rows in the goal sheet */
+.ms-list { display: flex; flex-direction: column; margin-bottom: var(--s2); }
+.ms-row { display: flex; align-items: center; gap: var(--s3); padding: var(--s1) 0; font-size: var(--text-sm); border-bottom: 1px solid var(--hairline); }
+.ms-row:last-child { border-bottom: none; }

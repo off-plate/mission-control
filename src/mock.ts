@@ -229,7 +229,15 @@ export const MOCK_ROUTINES: Routine[] = [
       { id: 'wr4', title: 'Plan Monday’s tasks', kind: 'do' },
     ],
   },
-  { id: 'r-monthly', space: 'personal', title: 'Monthly review', cadence: 'monthly', habitId: 'h-monthly', doneStepIds: [], steps: [] },
+  {
+    id: 'r-monthly', space: 'personal', title: 'Monthly review', cadence: 'monthly', habitId: 'h-monthly',
+    doneStepIds: [],
+    steps: [
+      { id: 'mo1', title: 'Review last month’s goals', kind: 'do' },
+      { id: 'mo2', title: 'Plan next month’s goals', kind: 'do' },
+      { id: 'mo3', title: 'Review the finances', kind: 'do', note: 'Savings, total spent, total received, debt update.' },
+    ],
+  },
 ]
 
 /* Steps added to a seeded routine AFTER its list had already been handed over.

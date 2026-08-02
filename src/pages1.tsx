@@ -1788,7 +1788,7 @@ const CADENCE_ORDER: RoutineCadence[] = ['daily', 'prework', 'weekly', 'monthly'
 /* The seeded routines in the order a day actually runs: wake, get to work,
    reset when the brain fries, wind the night down, go to bed, then the longer
    loops. His own routines slot in by cadence near their kin. */
-const DAY_FLOW = ['r-morning', 'r-prework', 'r-morningwork', 'r-brainrot', 'r-nightwork', 'r-evening', 'r-weekly', 'r-monthly']
+const DAY_FLOW = ['r-wakeup', 'r-morning', 'r-prework', 'r-morningwork', 'r-brainrot', 'r-nightwork', 'r-evening', 'r-weekly', 'r-monthly']
 const flowRank = (r: Routine): number => {
   const i = DAY_FLOW.indexOf(r.id)
   if (i !== -1) return i

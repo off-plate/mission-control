@@ -398,6 +398,20 @@ function loadPersisted(): PersistedState | null {
       p.habits = (p.habits ?? []).map((h) => (h.id === 'h-nightwork' && h.space === 'personal' ? { ...h, space: 'offplate' } : h))
     }
 
+    /* Creatine moves out of the morning routine and into After wake up,
+       2026-08-02. Only the seeded step is pulled, and only while it still looks
+       seeded, so a creatine step he rewrote himself stays where he put it. The
+       habit is untouched: the new routine's step carries the same habitId, so
+       every tick he has ever logged still belongs to it. */
+    if (!p.removedSeeds.includes('fix:creatine-moves')) {
+      p.removedSeeds.push('fix:creatine-moves', 'r-morning:step:mr0')
+      p.routines = (p.routines ?? []).map((r) => (r.id !== 'r-morning' ? r : {
+        ...r,
+        steps: r.steps.filter((st) => !(st.id === 'mr0' && st.title === 'Take creatine')),
+        doneStepIds: r.doneStepIds.filter((id) => id !== 'mr0'),
+      }))
+    }
+
     /* Week rollover: when the saved state belongs to an earlier ISO week, each
        habit's checkmarks are archived into its 12-week history and cleared, so
        Monday always starts a fresh row instead of showing last week's ticks. */

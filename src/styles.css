@@ -2402,6 +2402,8 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   background: var(--surface-2); border: 1px solid transparent;
 }
 .trail-day.kept { background: var(--progress); }
+/* Before the habit existed. Not a missed day, so not drawn as one. */
+.trail-day.before-start { background: transparent; box-shadow: inset 0 0 0 1px var(--hairline); }
 .trail-day.is-today { border-color: var(--accent); }
 .habit-trail.w30 .trail-day { border-radius: 3px; }
 /* A slip is a fact, drawn as one. Not red: it is a day on the record, not an

@@ -1218,6 +1218,11 @@ function HabitTrail({ h, days }: { h: HabitDef; days: number }) {
     const d = new Date(from); d.setDate(from.getDate() + i)
     return localDateKey(d)
   })
+  /* The day it began, either way round. A square before it is not a day he
+     missed, it is a day the habit did not exist, so it is drawn as empty space
+     and left out of the count underneath. */
+  const began = h.kind === 'break' ? h.quitSince : h.startedOn
+  const chances = began ? cells.filter((d) => d >= began) : cells
   /* Best run used to read the same number as the current one for a quit, because
      one overwritten date could only describe the run he is in now. */
   const run = h.kind === 'break' ? (daysClean(h, slips) ?? 0) : currentStreak(habitLog, h.id)
@@ -1230,7 +1235,7 @@ function HabitTrail({ h, days }: { h: HabitDef; days: number }) {
         {cells.map((day) => (
           <button
             key={day}
-            className={`trail-day${kept.has(day) ? ' kept' : ''}${slipped.has(day) ? ' slipped' : ''}${day === toKey ? ' is-today' : ''}`}
+            className={`trail-day${began && day < began ? ' before-start' : ''}${kept.has(day) ? ' kept' : ''}${slipped.has(day) ? ' slipped' : ''}${day === toKey ? ' is-today' : ''}`}
             title={`${fmtWhen(day)}${slipped.has(day) ? ', slipped' : kept.has(day) ? ', kept' : ''}`}
             aria-label={`${fmtWhen(day)}${slipped.has(day) ? ', slipped' : kept.has(day) ? ', kept' : ', not kept'}`}
             onClick={() => openDay(day)}
@@ -1238,7 +1243,10 @@ function HabitTrail({ h, days }: { h: HabitDef; days: number }) {
         ))}
       </div>
       <div className="habit-foot">
-        <span className="habit-weeks">{kept.size} of {days} days</span>
+        <span className="habit-weeks">{chances.filter((d) => kept.has(d)).length} of {chances.length} days</span>
+        {/* Only when it lands inside the squares being drawn: there it is the
+            fact that explains the empty ones. */}
+        {began && began > fromKey && <span className="habit-weeks">from {fmtWhen(began)}</span>}
         <span className="habit-weeks">{run} now, {best} best</span>
       </div>
     </div>
@@ -1532,6 +1540,7 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
   const [per, setPer] = useState<CountPeriod>(habit?.per ?? 'day')
   const [count, setCount] = useState(habit?.targetCount ?? 1)
   const [since, setSince] = useState(habit?.quitSince ?? localDateKey())
+  const [startedOn, setStartedOn] = useState(habit?.startedOn ?? localDateKey())
   const locked = !!drivenBy
   const quitting = kind === 'break'
   const measured = kind === 'measured'
@@ -1551,6 +1560,7 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
       // Focus blocks fill minutes. A count is his to log, so it has no source.
       source: measured && measure === 'minutes' ? ('focus' as const) : undefined,
       quitSince: quitting ? (since || localDateKey()) : undefined,
+      startedOn: quitting ? undefined : (startedOn || localDateKey()),
     }
     if (habit) updateHabit(habit.id, locked ? { daypart: shape.daypart } : shape)
     else addHabit(shape)
@@ -1669,6 +1679,19 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
                 onChange={(e) => setTargetMin(Math.max(5, Math.min(600, Number(e.target.value) || 5)))} />
             </div>
           )}
+        </div>
+      )}
+
+      {/* A Keep or an Amount gets the same date a Quit gets. Without it, one
+          added today reads as ninety days of nothing, and a habit he has in
+          fact been keeping since spring starts its count on the wrong day. */}
+      {!quitting && (
+        <div className="sheet-grid" style={{ marginTop: 'var(--s4)' }}>
+          <div>
+            <label className="field-label" htmlFor="hstart">Started on</label>
+            <input id="hstart" className="textinput" style={{ width: '100%' }} type="date" max={localDateKey()}
+              value={startedOn} onChange={(e) => setStartedOn(e.target.value)} />
+          </div>
         </div>
       )}
 

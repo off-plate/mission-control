@@ -2109,8 +2109,19 @@ export function RoutinesPage() {
     (habits.find((h) => h.id === r.habitId)?.daypart ?? slotForMoment(new Date().toISOString())) as TimeSlot
   const [editingId, setEditingId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
-  /* As many open as he wants. */
-  const [open, setOpen] = useState<Set<string>>(new Set())
+  /* As many open as he wants, and they stay open. Leaving for Habits and coming
+     back to find every card shut again was the page throwing away the one thing
+     he had told it: this is the routine I am running. Which cards are open is a
+     view, so it lives in its own key and never touches the synced data. */
+  const [open, setOpen] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem('mc:open-routines')
+      return new Set(raw ? (JSON.parse(raw) as string[]) : [])
+    } catch { return new Set() }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('mc:open-routines', JSON.stringify([...open])) } catch { /* private mode */ }
+  }, [open])
   const isOpen = (id: string) => open.has(id) || editingId === id
   const setOpenId = (id: string | null, on = true) => setOpen((prev) => {
     const next = new Set(prev)

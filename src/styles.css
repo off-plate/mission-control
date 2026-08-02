@@ -1394,7 +1394,14 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
    one routine stretched its card across the entire page while Personal's five
    sat in neat columns. The empty tracks are what hold a lone card to the same
    width its siblings get elsewhere. */
-.routine-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--s4); align-items: stretch; }
+/* Cards of wildly different heights: Out Brain Rot is four times the height of
+   an empty card, and on a grid every row is as tall as its tallest card, so the
+   page filled with holes. Rows of 4px with each card spanning as many as it
+   needs packs them without changing the reading order, which stays left to
+   right, day order first. Falls back to a plain grid if the measuring never
+   runs. */
+.routine-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--s4); align-items: start; }
+.routine-cards.is-packed { gap: 0 var(--s4); grid-auto-rows: 4px; }
 .routine-card { display: flex; flex-direction: column; }
 .routine-card.is-complete { border-color: var(--progress); }
 .routine-tag { display: flex; align-items: baseline; gap: var(--s3); margin-bottom: var(--s2); }
@@ -1995,7 +2002,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 }
 
 /* An empty routine sizes to its content instead of standing as a hollow box. */
-.routine-cards { align-items: start; }
+
 /* Where the workspace you are standing in ends and the rest of the day begins. */
 .routine-split { display: flex; align-items: center; gap: var(--s3); margin: var(--s8) 0 var(--s4); }
 .routine-split span { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--faint); }

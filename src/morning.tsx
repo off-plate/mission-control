@@ -351,12 +351,8 @@ export function MorningRoutine({ routine, onEdit }: { routine: Routine; onEdit?:
         })}
       </div>
 
-      <div className="routine-card-foot" style={{ marginTop: 'var(--s4)' }}>
-        {/* The routine's own name, because this card also runs the Big Time one. */}
-        <span className="assist-note">Finishing all {total} checks off “{routine.title}” in Habits.</span>
-        {/* No reset: it un-finished the routine, which deleted the record that
-            he had done it. The morning routine happens once a day anyway. */}
-      </div>
+      {/* No footer: no line about which habit this checks off, and no reset,
+          which used to delete the record that he had done it. */}
     </div>
   )
 }

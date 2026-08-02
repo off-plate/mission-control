@@ -560,6 +560,11 @@ export interface Routine {
    *  the day he started it in. Cleared with the checks at the period roll, so
    *  every day begins with nothing claiming to be underway. */
   startedAt?: string
+  /** Put on a day's list on purpose, before it was started. Starting a routine
+   *  files it under the clock; PLANNING one is the other direction, and its slot
+   *  is where he wants it to happen rather than where it happened. Carries its
+   *  day, so yesterday's plan cannot haunt this morning. */
+  planned?: { day: string; slot?: TimeSlot }
   /** The day the mirror last ticked this routine's habit, as an ISO date. A
    *  weekly routine finished on Tuesday must clear TUESDAY when it is undone on
    *  Friday, not whatever day happens to be today. */

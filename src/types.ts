@@ -341,6 +341,10 @@ export interface HabitDef {
   lastSlip?: string
   /** The day he stopped. Every day since counts itself as kept. */
   quitSince?: string
+  /** The day he started keeping it: the Keep and Amount answer to quitSince. A
+   *  habit added today did not fail the ninety days before it existed, so the
+   *  trail counts its chances from here and the card says when it began. */
+  startedOn?: string
   name: string
   /** Mon..Sun of the current week. */
   days: boolean[]

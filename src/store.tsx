@@ -162,11 +162,11 @@ interface Store extends PersistedState {
    *  because a lost write must never be a permanent lie. */
   assertRoutineDay: (habitId: string, dayIndex: number) => void
   markHabitDay: (id: string, day: number, value: boolean) => void
-  addHabit: (input: { name: string; daypart?: import('./types').TimeSlot; frequency: import('./types').HabitFrequency; targetPerWeek?: number; kind?: import('./types').HabitKind; dailyTargetMin?: number; measure?: 'minutes' | 'times'; per?: import('./types').CountPeriod; targetCount?: number; source?: import('./types').HabitSource; quitSince?: string }) => void
+  addHabit: (input: { name: string; daypart?: import('./types').TimeSlot; frequency: import('./types').HabitFrequency; targetPerWeek?: number; kind?: import('./types').HabitKind; dailyTargetMin?: number; measure?: 'minutes' | 'times'; per?: import('./types').CountPeriod; targetCount?: number; source?: import('./types').HabitSource; quitSince?: string; startedOn?: string }) => void
   /** Record a slip on a habit you are trying to stop; resets the clean run. */
   logSlip: (id: string) => void
   togglePauseHabit: (id: string) => void
-  updateHabit: (id: string, patch: Partial<Pick<HabitDef, 'name' | 'daypart' | 'frequency' | 'targetPerWeek' | 'kind' | 'dailyTargetMin' | 'measure' | 'per' | 'targetCount' | 'source' | 'quitSince'>>) => void
+  updateHabit: (id: string, patch: Partial<Pick<HabitDef, 'name' | 'daypart' | 'frequency' | 'targetPerWeek' | 'kind' | 'dailyTargetMin' | 'measure' | 'per' | 'targetCount' | 'source' | 'quitSince' | 'startedOn'>>) => void
   deleteHabit: (id: string) => void
 
   addGoal: (g: Omit<Goal, 'id'>) => void
@@ -1354,6 +1354,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // A quit runs from the day he says he stopped, not from the day he got
         // round to typing it in.
         quitSince: input.kind === 'break' ? (input.quitSince ?? todayKey()) : undefined,
+        // And the same courtesy the other way round: a habit he has been keeping
+        // since June starts in June, not on the day he typed it in here.
+        startedOn: input.kind === 'break' ? undefined : (input.startedOn ?? todayKey()),
         days: [false, false, false, false, false, false, false], paused: false,
       }]),
     /* A slip is a dated record, appended. It used to overwrite one field, so the

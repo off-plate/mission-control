@@ -5,6 +5,8 @@
    is agreed. The one hard rule kept from the canon: no real financial figures,
    because the bundle is public. */
 
+import { wallImage } from './wall-images'
+
 const TILT = [-2, 1.5, -1, 2, -1.5, 1, -2.5, 0.5]
 
 /** Abstract image stand-ins, generated inline so nothing external loads and
@@ -18,7 +20,12 @@ type Card =
   | { kind: 'statement'; text: string; size?: 'xl' | 'lg' }
   | { kind: 'quote'; text: string; by?: string }
   | { kind: 'number'; value: string; label: string }
-  | { kind: 'image'; src: string; caption?: string }
+  /** `photo` names a key in the generated manifest, put there by the Jarvis
+   *  wall-image skill. `src` is the inline stand-in used until a real
+   *  photograph replaces it. A card with a photo key that is not in the
+   *  manifest falls back to its stand-in rather than rendering a broken
+   *  image, so removing a file can never leave a hole in the wall. */
+  | { kind: 'image'; src: string; caption?: string; photo?: string }
   | { kind: 'rule'; text: string }
 
 /* Demo copy written to LAND, not to decorate: his own stakes, said plainly.
@@ -44,7 +51,61 @@ const DEMO: Card[] = [
   { kind: 'statement', text: 'Off-Plate exists because you kept the evening promises nobody checked.', size: 'lg' },
 ]
 
+/** The site is served from a sub path on Pages, so every wall file has to be
+ *  asked for relative to that base and not from the domain root. */
+const BASE = (import.meta as unknown as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/'
+
+/* What the browser is told a wall column measures, so it can pick the right
+ *  width off the srcset before layout. These mirror styles.css exactly: 420px
+ *  columns above 1900, 160px on a phone, 300px in between. */
+const WALL_SIZES = '(min-width: 1900px) 420px, (max-width: 700px) 160px, 300px'
+
+/** One photograph. Two WebP widths, its own height reserved up front, and the
+ *  24px blur standing in until the file lands. Everything below the first
+ *  screen loads only when it is scrolled to. */
+function Photo({
+  card, style, eager,
+}: {
+  card: Extract<Card, { kind: 'image' }>
+  style: React.CSSProperties
+  eager: boolean
+}) {
+  const img = card.photo ? wallImage(card.photo) : undefined
+  if (!img) {
+    return (
+      <figure className="bcard b-image" style={style}>
+        <img src={card.src} alt={card.caption ?? ''} loading="lazy" decoding="async" />
+        {card.caption && <figcaption className="mono">{card.caption}</figcaption>}
+      </figure>
+    )
+  }
+  const srcset = img.srcset.split(', ').map((part) => BASE + part).join(', ')
+  return (
+    <figure
+      className="bcard b-image"
+      style={{ ...style, backgroundImage: `url("${img.lqip}")` }}
+    >
+      <img
+        src={BASE + img.src}
+        srcSet={srcset}
+        sizes={WALL_SIZES}
+        width={img.w}
+        height={img.h}
+        alt={card.caption ?? ''}
+        loading={eager ? 'eager' : 'lazy'}
+        fetchPriority={eager ? 'high' : 'auto'}
+        decoding="async"
+      />
+      {card.caption && <figcaption className="mono">{card.caption}</figcaption>}
+    </figure>
+  )
+}
+
 export function BoardPage() {
+  /* Only what is on screen at the top loads straight away. Everything after
+     the second photograph waits for the scroll, which is what keeps a wall of
+     photographs off the first paint. */
+  let shown = 0
   return (
     <div className="board-page">
       <header className="board-head">
@@ -55,12 +116,8 @@ export function BoardPage() {
           const tilt = TILT[i % TILT.length]
           const style = { ['--tilt' as string]: `${tilt}deg` } as React.CSSProperties
           if (c.kind === 'image') {
-            return (
-              <figure className="bcard b-image" style={style} key={i}>
-                <img src={c.src} alt={c.caption ?? ''} loading="lazy" />
-                {c.caption && <figcaption className="mono">{c.caption}</figcaption>}
-              </figure>
-            )
+            shown += 1
+            return <Photo card={c} style={style} eager={shown <= 2} key={i} />
           }
           if (c.kind === 'quote') {
             return (

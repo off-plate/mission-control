@@ -1401,13 +1401,36 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
    right, day order first. Falls back to a plain grid if the measuring never
    runs. */
 .routine-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--s4); align-items: start; }
-.routine-cards.is-packed { gap: 0 var(--s4); grid-auto-rows: 4px; }
+.routine-cards.is-packed { row-gap: 0; column-gap: var(--s4); grid-auto-rows: 4px; }
 .routine-card { display: flex; flex-direction: column; }
 .routine-card.is-complete { border-color: var(--progress); }
-.routine-tag { display: flex; align-items: baseline; gap: var(--s3); margin-bottom: var(--s2); }
+/* Head of a card: the title is the control that opens and shuts it, the state
+   sits at the end of the same line and never wraps, and the menu stays put.
+   Baseline alignment made a two-line title drag the state down with it. */
+.routine-tag { display: flex; align-items: center; gap: var(--s3); margin-bottom: var(--s2); }
+.routine-open {
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: var(--s3);
+  text-align: left; padding: 0; color: inherit; font: inherit;
+}
+.routine-open::before {
+  content: ''; flex: none; width: 7px; height: 7px; margin-right: 1px;
+  border-right: 1.6px solid var(--faint); border-bottom: 1.6px solid var(--faint);
+  transform: rotate(-45deg); transition: transform 140ms var(--ease);
+}
+.routine-open.is-open::before { transform: rotate(45deg); }
+.routine-open:hover::before { border-color: var(--accent); }
+.routine-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+.routine-open .spacemark { align-self: center; }
 .routine-tag .routine-card-title { flex: 1 1 auto; min-width: 0; }
-.routine-tag .routine-progress, .routine-tag .col-tot { margin-left: auto; }
-.routine-card-title { font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); }
+.routine-tag .routine-progress, .routine-tag .col-tot { margin-left: auto; flex: none; white-space: nowrap; }
+/* Shut, a card is one line. Ten of them read as a list of what he has, which is
+   what the page is for when he is not running one. */
+.routine-card.is-shut { padding-block: var(--s3); }
+.routine-card.is-shut .routine-tag { margin-bottom: 0; }
+/* One notch down while shut: at four columns a display-size title ran to three
+   lines and every card in the row grew to match the longest name. */
+.routine-card.is-shut .routine-card-title { font-size: var(--text-base); }
+.routine-card-title { font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); line-height: 1.15; }
 .routine-progress { color: var(--faint); font-size: var(--text-sm); }
 .routine-blurb { font-size: var(--text-sm); color: var(--muted); margin: var(--s2) 0 var(--s3); max-width: 54ch; }
 .routine-steplist { display: flex; flex-direction: column; margin-top: var(--s3); }
@@ -2740,7 +2763,14 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .b-number .bl { color: var(--bp-mut); font-size: 0.85rem; }
 .b-rule { background: var(--bp-acc); color: #14140a; padding: 16px 20px; font-weight: 700; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.04em; }
 .b-image img { display: block; width: 100%; height: auto; }
-.b-image { position: relative; background: #17171c; }
+/* The inline background is the 24px blur held in the manifest, so a card
+   carries the photograph's own colour from first paint and the real file
+   arrives over it. background-color stays the floor for the stand-in cards,
+   which have no blur of their own. */
+.b-image {
+  position: relative; background-color: #17171c;
+  background-size: cover; background-position: center;
+}
 .b-image figcaption {
   position: absolute; left: 0; right: 0; bottom: 0; padding: 26px 14px 12px;
   color: rgba(255,255,255,0.85); font-size: 0.7rem; letter-spacing: 0.05em;

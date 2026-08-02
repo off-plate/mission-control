@@ -237,7 +237,7 @@ function GoalsReminder({ note }: { note?: string }) {
   )
 }
 
-export function MorningRoutine({ routine, onEdit }: { routine: Routine; onEdit?: () => void }) {
+export function MorningRoutine({ routine, onEdit, onShut }: { routine: Routine; onEdit?: () => void; onShut?: () => void }) {
   const { toggleRoutineStep, setStepData } = useStore()
   const steps = routine.steps
   const done = routine.doneStepIds
@@ -295,9 +295,12 @@ export function MorningRoutine({ routine, onEdit }: { routine: Routine; onEdit?:
     <div className="panel routine-card mr-card">
       <div className="routine-tag">
         {/* Routines now list every workspace at once, so this card carries its
-            own colour and letter like the plain ones beside it. */}
-        <SpaceMark space={routine.space} always />
-        <span className="routine-card-title">{routine.title}</span>
+            own colour and letter like the plain ones beside it. The title is
+            the control that shuts it again. */}
+        <button className="routine-open is-open" onClick={onShut} aria-expanded disabled={!onShut}>
+          <SpaceMark space={routine.space} always />
+          <span className="routine-card-title">{routine.title}</span>
+        </button>
         {/* A running meditation stays visible even when its panel is closed. */}
         {medRunning && open !== 'mr1' && (
           <button className="mr-running mono" onClick={() => setOpen('mr1')}>

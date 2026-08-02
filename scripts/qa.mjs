@@ -63,6 +63,9 @@ await step('habits: tick a build habit and persist', async () => {
 })
 await step('routines: choice step ticks and starts the routine', async () => {
   await fresh('routines')
+  // Cards are shut by default now: open the one being run first.
+  await page.locator('.routine-card', { hasText: 'Out Brain Rot' }).first().locator('.routine-open').click()
+  await page.waitForTimeout(300)
   await page.locator('.routine-card', { hasText: 'Out Brain Rot' }).first().locator('.alt-opt', { hasText: 'Move' }).click()
   await page.waitForTimeout(400)
   const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)

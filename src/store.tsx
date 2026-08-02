@@ -608,6 +608,25 @@ function loadPersisted(): PersistedState | null {
     p.routines = p.routines ?? []
     for (const s of MOCK_ROUTINES) if (!removed.has(s.id) && !p.routines.some((r) => r.id === s.id)) p.routines.push(s)
 
+    /* Asked for again. The loader is right never to resurrect a routine on its
+       own, so a routine deleted months ago stays deleted, and one of these was
+       missing from his own state for exactly that reason. But him naming it
+       again is not the same as never having deleted it: these four he asked for
+       by name on 2026-08-02, so each comes back once with its habit, its
+       deletion mark cleared, and behaves like any other seeded row afterwards.
+       A routine still present is not touched. */
+    if (!p.removedSeeds?.includes('fix:asked-again-2026-08-02')) {
+      p.removedSeeds = [...(p.removedSeeds ?? []), 'fix:asked-again-2026-08-02']
+      for (const id of ['r-prework', 'r-morningwork', 'r-nightwork', 'r-invoicing']) {
+        const seed = MOCK_ROUTINES.find((r) => r.id === id)
+        if (!seed || p.routines.some((r) => r.id === id)) continue
+        p.removedSeeds = p.removedSeeds.filter((m) => m !== id && m !== seed.habitId)
+        p.routines.push(seed)
+        const h = MOCK_HABITS.find((x) => x.id === seed.habitId)
+        if (h && !p.habits.some((x) => x.id === h.id)) p.habits.push(h)
+      }
+    }
+
     /* A step added to a seeded routine after this state was saved has to reach
        it, and a whole-list seed cannot do that once the routine has any steps at
        all. So each seeded step is handed over ONCE, at the position it holds in

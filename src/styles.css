@@ -1985,6 +1985,10 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 
 /* An empty routine sizes to its content instead of standing as a hollow box. */
 .routine-cards { align-items: start; }
+/* Where the workspace you are standing in ends and the rest of the day begins. */
+.routine-split { display: flex; align-items: center; gap: var(--s3); margin: var(--s8) 0 var(--s4); }
+.routine-split span { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--faint); }
+.routine-split::after { content: ''; flex: 1; height: 1px; background: var(--hairline); }
 .routine-empty { font-size: var(--text-sm); color: var(--faint); padding: var(--s3) 0; }
 
 /* The tab bar scrolls inside itself; as a flex child it needs min-width:0 or its
@@ -2675,16 +2679,30 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .cal-untimed-cap { flex: 1 0 100%; font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); }
 
 /* ---------- the vision board: the one page off the house style ---------- */
+/* Edge to edge, on any screen. main carries a --gutter, and the old rule only
+   pulled back --s5, which left a pale strip of app down both sides of a page
+   whose whole job is to stop feeling like the app. The bottom margin eats the
+   shell's own tail padding so the black runs to the end of the scroll. */
 .board-page {
   --bp-bg: #101014; --bp-ink: #f2efe8; --bp-mut: #8f8d86; --bp-acc: #e8ff6a;
   background: var(--bp-bg); color: var(--bp-ink);
-  margin: 0 calc(-1 * var(--s5)); padding: var(--s7) var(--s6) var(--s8);
-  min-height: calc(100vh - 120px);
+  margin-inline: calc(-1 * var(--gutter));
+  margin-bottom: calc(-1 * var(--s12));
+  padding: var(--s10) var(--gutter) var(--s12);
+  min-height: calc(100dvh - 108px);
 }
-.board-head { max-width: 1400px; margin: 0 auto var(--s6); display: flex; align-items: baseline; gap: var(--s4); }
+/* The title gets air under it. This padding used to name --s7, which is not a
+   token in the scale, so the whole shorthand was invalid and computed to zero:
+   the wall started hard against the nav. */
+.board-head { margin: 0 0 var(--s10); }
 .board-head h1 { font-size: clamp(2.6rem, 6vw, 5rem); line-height: 0.95; letter-spacing: -0.02em; }
-.board-why { color: var(--bp-mut); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.08em; }
-.board-wall { max-width: 1400px; margin: 0 auto; columns: 4 280px; column-gap: 18px; }
+/* Column WIDTH, not a column count: the wall takes as many columns as the
+   screen can hold, so an ultrawide fills and a laptop does not go spindly. */
+.board-wall { columns: 300px; column-gap: 18px; }
+/* On an ultrawide, 300px columns turn the wall into eight thin strips with a
+   ragged empty corner. Wider columns, fewer of them: the words get bigger and
+   the wall still ends where the screen does. */
+@media (min-width: 1900px) { .board-wall { columns: 420px; column-gap: 22px; } }
 .bcard {
   break-inside: avoid; margin: 0 0 18px; border-radius: 10px; overflow: hidden;
   transform: rotate(var(--tilt, 0deg));
@@ -2708,8 +2726,12 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   color: rgba(255,255,255,0.85); font-size: 0.7rem; letter-spacing: 0.05em;
   background: linear-gradient(transparent, rgba(0,0,0,0.65));
 }
-.board-foot { max-width: 1400px; margin: var(--s6) auto 0; color: var(--bp-mut); font-size: var(--text-xs); }
-@media (max-width: 700px) { .board-wall { columns: 2 160px; } .board-page { margin: 0 calc(-1 * var(--s4)); padding: var(--s5) var(--s4); } }
+.board-foot { margin: var(--s8) 0 0; color: var(--bp-mut); font-size: var(--text-xs); }
+@media (max-width: 700px) {
+  .board-wall { columns: 160px; }
+  .board-page { padding: var(--s6) var(--s4) var(--s10); }
+  .board-head { margin-bottom: var(--s6); }
+}
 /* milestone rows in the goal sheet */
 .ms-list { display: flex; flex-direction: column; margin-bottom: var(--s2); }
 .ms-row { display: flex; align-items: center; gap: var(--s3); padding: var(--s1) 0; font-size: var(--text-sm); border-bottom: 1px solid var(--hairline); }

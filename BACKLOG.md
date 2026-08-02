@@ -18,10 +18,10 @@ Plan        all spaces   <- absorbs Brain Dump as its capture rail
 Calendar    all spaces   <- absorbs the hidden #/day/ record as its selected-day state
 Habits      all spaces   <- absorbs Routines (a routine is a habit with steps)
 Goals       all spaces
-Money       Personal and All only
+Money       Personal and All only   <- DONE, shipped 2026-08-02
 Review      all spaces   <- absorbs Focus history; the timer stays the floating pill
 Avoidance   all spaces
-Vision      all spaces, the exempt wall
+Why's       all spaces, the exempt wall
 ```
 
 Why each merge is safe: every one joins two surfaces that already tell the same
@@ -30,10 +30,10 @@ tab is a break picker plus a history already retold on Review, on Calendar's day
 column and on the day record. The day record restates the day the calendar
 already draws. Brain Dump is pre-task capture.
 
-Money is the odd one: `MoneyPage` ignores the space switcher entirely, so the
-same personal debt readout renders under Big Time, Off-Plate and Corner. Its
-alerts already reach every space through `globalExceptions`, so scoping the tab
-to Personal loses nothing and keeps debt off a work screen.
+Money is off this list: he agreed it on 2026-08-02 and it shipped on its own,
+ahead of the merge. The tab renders in Personal and All only, and standing on it
+while switching to a work space walks back to Today. Its alerts still reach every
+space through `globalExceptions`, so nothing was lost by hiding the page.
 
 Measured reason, not taste: 12 tabs scroll two viewports at 390px; 9 fit in one
 swipe, leaving the five-space switcher as the only second axis.

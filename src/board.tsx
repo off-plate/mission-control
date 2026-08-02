@@ -49,7 +49,6 @@ export function BoardPage() {
     <div className="board-page">
       <header className="board-head">
         <h1>The wall</h1>
-        <p className="board-why mono">why the rest of this app exists</p>
       </header>
       <div className="board-wall">
         {DEMO.map((c, i) => {

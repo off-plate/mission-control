@@ -150,20 +150,22 @@ export default function App() {
         <div className="topbar-right">
           {/* mymind cannot be embedded: it answers with frame-ancestors 'none',
               which forbids every iframe anywhere, so a panel inside this page is
-              not something the app is allowed to build. A named window is the
-              nearest honest thing: one click, one window, and clicking again
-              raises the same one instead of piling up tabs. */}
-          <button
+              not something the app is allowed to build. A plain link in a new
+              tab then, not a sized window: that opened as a Chrome app window,
+              which is not what he asked for and not where he keeps his tabs. */}
+          <a
             className="btn btn-ghost"
-            onClick={() => window.open('https://access.mymind.com/everything', 'mymind', 'width=1280,height=940')}
-            title="Open mymind in its own window"
+            href="https://access.mymind.com/everything"
+            target="_blank"
+            rel="noreferrer"
+            title="Open My Mind in a new tab"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <rect x="3" y="6" width="11" height="14" rx="2" />
               <path d="M8 3h11a2 2 0 0 1 2 2v11" strokeLinecap="round" />
             </svg>
-            Mind
-          </button>
+            My Mind
+          </a>
           <button
             className={`btn btn-accent${page === 'assistant' ? ' is-on' : ''}`}
             onClick={() => setPage('assistant')}

@@ -1,137 +1,5 @@
 {
   "images": {
-    "challenger": {
-      "w": 900,
-      "h": 600,
-      "lqip": "data:image/webp;base64,UklGRloAAABXRUJQVlA4IE4AAACwAwCdASoYABAAPu1iqU2ppaQiMAgBMB2JaQDKACHP08RMLj784AD+2sLHyXfi2mlXILmX8ICK47ot6nTERK7/EhDb6at7KjTzxJaAAAA=",
-      "credit": "i.pinimg.com",
-      "license": "",
-      "creator": "",
-      "caption": "the Challenger, kept, not sold",
-      "source": "https://fr.pinterest.com/pin/56717276552800425/",
-      "query": "dodge challenger scat pack muscle car night",
-      "original": "1536x1024"
-    },
-    "gym-six": {
-      "w": 900,
-      "h": 1200,
-      "lqip": "data:image/webp;base64,UklGRgABAABXRUJQVlA4IPQAAADQBQCdASoYACAAPu1grFAppSQisBgIATAdiWkACBpYm7Bsdn+T8uPXEr7gTrToYD8rEQ2fI44AAP7Zna0MXrQ7vkJYu7LwgjbjAjlriFR2CC+pI0t/+wWbbM5yGgneHh4QsCPJFyxHsU5hkliIiVlkVLtnUCu4C9t+Pc605dgVd5CRuOQdhG1XX+yWussCHnC0/AP8D+03dwl6GmNJZS9qvf9h/gJB+CWphdnlm+E4Kv02xUWsfFTYD6kKx/DlRpLPKKoOTbWDfar+WvIQFB3sp0KUq8L+w9iVj4LlsLDoHjHW+NzLGtZ8qSNWwpmYleEV8AAA",
-      "credit": "i.pinimg.com",
-      "license": "",
-      "creator": "",
-      "caption": "the gym at six",
-      "source": "https://www.pinterest.com/pin/602497256438527700/",
-      "query": "empty gym early morning weights window light",
-      "original": "3060x4080"
-    },
-    "liguria": {
-      "w": 900,
-      "h": 600,
-      "lqip": "data:image/webp;base64,UklGRqgAAABXRUJQVlA4IJwAAACwBACdASoYABAAPu1iqU2ppaOiMAgBMB2JbACdHYCNq2/+A8ctRHQWIb57AouwAPpZRMQ4TZnyObC88REYNVLaEfJEHuot4+xTpxjiZ9HxWFpd6800NSVPs7xHG6653s3xzjL36bx0vvcGvDcUuU4yiRSqzs4hNe8D12+9/nzuk5zjS0HyNcdfsMYG+zPXJwOm+J4QTtv1LNbqAAA=",
-      "credit": "get.pxhere.com",
-      "license": "",
-      "creator": "",
-      "caption": "Liguria, August",
-      "source": "https://pxhere.com/en/photo/548132",
-      "query": "cinque terre liguria coast summer sea",
-      "original": "6000x4000"
-    },
-    "calm-desk": {
-      "w": 900,
-      "h": 1200,
-      "lqip": "data:image/webp;base64,UklGRtQAAABXRUJQVlA4IMgAAABQBQCdASoYACAAPu1qqU8ppiOiMBgIATAdiUAVhmHQn1Xc8D6Nl3GCuGBM8y/RtfeRJ8gA/sBrFHcWWzqXhUFq494qRGdPTwtitrb1z/w4Xy1lfJ9tyzu6m2rzJe39cmTKgEnuhrD1bo88ACMMMAEmxgOfZqqDhv0kORGq0IWnruPclbJ/GokGK3oB/IW715dlD/jLQtoKOPoh8FgW+kfvaF+Evcup8galGqenIxtYU3KVg49bHKj7SS/OmK0GGjVwKdhfxlCAAA==",
-      "credit": "i.pinimg.com",
-      "license": "",
-      "creator": "",
-      "caption": "the calm desk, every morning",
-      "source": "https://www.pinterest.com/pin/workspace-idea-in-2025--1142366261740617488/",
-      "query": "calm minimalist desk morning light coffee",
-      "original": "3072x4096"
-    },
-    "corner-night": {
-      "w": 900,
-      "h": 1350,
-      "lqip": "data:image/webp;base64,UklGRsIAAABXRUJQVlA4ILYAAACQBgCdASoYACQAPu1mq02ppaQiMBqqqTAdiWMAwGQWeN3U/rUU3OdnNahHe79gX+kLk+eMeSqUDVT4YjgAAP7Zw3hvl0Y2RL7DV0N1KRo3XUnSFlx/1jFa4DRSTpM+nXAsO7I53FZcQYErFcvTv2Ta2U+dlSL/tCtALluuUuEZukuzbXgQjfze98pvFw58e9EQWZGuWdZElJf6D9i3wvyis44Ssf0I7qQAqtuai8IXJpGV1KAAAA==",
-      "credit": "i.pinimg.com",
-      "license": "",
-      "creator": "",
-      "caption": "the Corner, built at night",
-      "source": "https://in.pinterest.com/pin/683350943478591786/",
-      "query": "editing desk at night monitor glow dark room",
-      "original": "3000x4500"
-    },
-    "family-field": {
-      "w": 900,
-      "h": 1350,
-      "lqip": "data:image/webp;base64,UklGRsgAAABXRUJQVlA4ILwAAAAwBQCdASoYACQAPu1uqlAppqOiqrgMATAdiWkA0qwFWV9zmFE6Adfd5BmmJ5iZPdlwAAD9+iGqKj8MkFxmooUOC72CsT0f/6zxQT9jcemeM1cZxdRTSCjwJ5Qnm1oxawoRhA9ZB9XDCU7dHm5rk6oJaDE9ozSoO4K0ojZ6mOB2By+7X+ryZYj86HGd15fTM2DWCFRsrlfgldt0isHv2kQKPZAQjg4jsmoqPpS6t7rx+KckCfAqxQUBxgAAAA==",
-      "credit": "i.pinimg.com",
-      "license": "",
-      "creator": "",
-      "caption": "what all of it is for",
-      "source": "https://www.pinterest.com/pin/18507048539001125/",
-      "query": "old family photograph 1990s film grain faded",
-      "original": "4480x6720"
-    },
-    "old-photo": {
-      "w": 900,
-      "h": 1284,
-      "lqip": "data:image/webp;base64,UklGRvoAAABXRUJQVlA4IO4AAABwBwCdASoYACIAPu1opk+ppiMiKqwBMB2JZwDDsa4xpFrKD435k3LkDUcIlnE8T2M/LwjD0Dwrg0lbtRavtX2pHbxLAAD5I483TgtHxIWy+JmBVsbU7g6gUL5apVBMuGaRbfMdl97k6zxcCl0QbAgc2OgIMr4rPJR21wISJurTpPsxnVqDVneGp1qOhOXF4RK2TYq7c7ljraT1tYYDIapZuFsccIg4jxZ/pMnEbdKDGiItZcIWkaEstKUHi20vjjiNX4I9c/IhBpSiIaOu6RPhTrNlw5WRfZu8/iahB2vOvAcSLS6Tl0A79arwAAAA",
-      "credit": "memoreel.family",
-      "license": "",
-      "creator": "",
-      "caption": "the ones who came before you",
-      "source": "https://memoreel.family/how-to-restore-old-photos",
-      "query": "old family photograph 1990s film grain faded",
-      "original": "1403x2001"
-    },
-    "red-car": {
-      "w": 900,
-      "h": 598,
-      "lqip": "data:image/webp;base64,UklGRtgAAABXRUJQVlA4IMwAAABQBACdASoYABAAPu1iqU2ppaOiMAgBMB2JagCdAYtymhGqbj3qD6vuB0WoAP7A/sX86oL8+rqwHtdf4WoBgAY8pcVkf4DImldJ/WcwniKxXZr5spDbaP/jb/iNWzt4l2Y78Oa/Mecr9pp9Lzl8yfgchNKBluGaXr77YwJq6wtMrOYdsWwndXn4uS++9MXMb3MmtkNdO0WwYEJB+Bbc6tozMzVXxMIwcEkp/ZEr9nWvH7qGqP/viuGar3+6AVfZ8SG6UNyL5QIfgaoVAAA=",
-      "credit": "i.redd.it",
-      "license": "",
-      "creator": "",
-      "caption": "your father's era. Your turn now.",
-      "source": "https://www.reddit.com/r/OldSchoolCool/comments/1c6r5wo/another_from_my_fathers_35mm_slides_early/",
-      "query": "documentary film photograph father and son kitchen morning 35mm",
-      "original": "2604x1731"
-    },
-    "prague-dawn": {
-      "w": 900,
-      "h": 1200,
-      "lqip": "data:image/webp;base64,UklGRuAAAABXRUJQVlA4INQAAADQBQCdASoYACAAPu1cqE2ppKQiN/VYATAdiUAZQAHonDpPfwlyHThsaHXK9gQHCI+TjlhQ6E5gAP4E7kcaHfqkV+QnBUA2MgDh3LdXCgL1f3D49fE7EAx5S7Nk6SsI28XdBg+lwL+yEV+0QDIKpo5E6gbE9R0RtfpgC1oTVbSzFMd+z+R21Og6375HOimOclRQ8YFR69yH66FP1pG0n0Do6hDOlFERKFhlaU5vvjdhnPGfsubNMIMLnsNNg553Dt2XuN3sebctRmKsbP4FO8OKxGKAAA==",
-      "credit": "images.pexels.com",
-      "license": "",
-      "creator": "",
-      "caption": "Prague, before it wakes up",
-      "source": "https://www.pexels.com/search/PRAGUE%20EMPTY%20STREET/",
-      "query": "prague old town empty street early morning fog",
-      "original": "3024x4032"
-    },
-    "prague-night": {
-      "w": 900,
-      "h": 663,
-      "lqip": "data:image/webp;base64,UklGRqAAAABXRUJQVlA4IJQAAAAQBQCdASoYABIAPu1mqk8ppaOiKA1RMB2JYwCdM1j73Cam/gTVmNSBoATcmlUOktYAAP7jHqSKTKGwR//HhkrKDowEmaxMsR1eVyu3JUpXndrBmwEgGqlSN/YAF9NqwALtsopVKAkepdHnk/EAcvDPuYocoLCb0Fap4ib7Mcw/5g6QklKq6og6qiLMXkeZjdDUe4AA",
-      "credit": "libreshot.com",
-      "license": "",
-      "creator": "",
-      "caption": "the long way home",
-      "source": "https://libreshot.com/old-street-in-prague/",
-      "query": "prague old town empty street early morning fog",
-      "original": "3500x2580"
-    },
-    "the-bar": {
-      "w": 900,
-      "h": 563,
-      "lqip": "data:image/webp;base64,UklGRsAAAABXRUJQVlA4ILQAAAAwBACdASoYAA4APu1iqU2ppaOiMAgBMB2JYwBTAJcAxwAhkpI1LDJDZQAA+yEF/9LXpaJFbzzf9pzUYTSOUhoE1bMJVyrRy/XEIdmEy9hm5WPbGP+HuzZmPMjHHsPrYpLcFfQPW/nzuKzifaecAU551R3LZ5l9JstNNqjoe/QsExFyvldn9HSby+N+V7IbnOv5pqtx+EIDu2HHw5yDZfM8zIzXTeqkOk2vp0yD6i/yec3AAAA=",
-      "credit": "cdnimg.co",
-      "license": "",
-      "creator": "",
-      "caption": "chalk, then the set",
-      "source": "https://evmt.co/blogs/news/liquid-chalk-lifting",
-      "query": "barbell plates chalk hands close up dark gym",
-      "original": "2048x1152"
-    },
     "late-desk": {
       "w": 900,
       "h": 675,
@@ -143,30 +11,6 @@
       "source": "https://in.pinterest.com/pin/late-night-study-sessions-for-maximum-productivity--25966135343971840/",
       "query": "desk lamp late night working film photograph window city lights",
       "original": "3264x2448"
-    },
-    "golden-field": {
-      "w": 900,
-      "h": 600,
-      "lqip": "data:image/webp;base64,UklGRn4AAABXRUJQVlA4IHIAAAAQBACdASoYABAAPu1iqU2ppaOiMAgBMB2JZACdACHogp6M2FR255YUUgD+l5vFY4M3edyroHkKJRpsiFupUWTkufGl+JkfbGtIylQ5E2BGWoRYQA7oAidDg82msfHXWISOBcwmKGpUf9VkH4gBCSC9gAA=",
-      "credit": "i.pinimg.com",
-      "license": "",
-      "creator": "",
-      "caption": "summer, the kind you remember",
-      "source": "https://www.pinterest.com/pin/golden-hour-photography-grass-field-at-seven-sisters--621215342380424130/",
-      "query": "czech countryside summer field golden hour film photograph",
-      "original": "2940x1960"
-    },
-    "her": {
-      "w": 900,
-      "h": 1344,
-      "lqip": "data:image/webp;base64,UklGRuoAAABXRUJQVlA4IN4AAACQBgCdASoYACQAPu1uq1GppiOipWzJMB2JYgCpJ5OFrqpf8kxKSoxrBJ8Z5oZBrSJ5lUUdywPEHZ1+YHQAAP73BOro7lb6v3itvn0195b1vZ1aYZieNgfwU/0BTAvIEnukiAOVswCuHAGbWNtXEkn2OMNyexlTAoXl7PIDEmylPw3Q6ivT5+wzgMkttqAU09kadyIFTVpvcKs+CK+zzkdP66JMsEa/hM8nZeY9aklOAN70fEvJiSQ5vkWYCXbhFDEfZbhUzW4qJHUXmuRkAuI0swCXGsOGYRJ2SWMoAAA=",
-      "credit": "i.pinimg.com",
-      "license": "",
-      "creator": "",
-      "caption": "her. The whole reason.",
-      "source": "https://www.pinterest.com/gemma10/golden-hour-photos/",
-      "query": "czech countryside summer field golden hour film photograph",
-      "original": "1400x2090"
     },
     "amg-gtr": {
       "w": 900,
@@ -205,28 +49,28 @@
       "original": "2896x1931"
     },
     "newborn": {
-      "w": 900,
-      "h": 1200,
-      "lqip": "data:image/webp;base64,UklGRgABAABXRUJQVlA4IPQAAACwBgCdASoYACAAPu1grFAppSQisBgIATAdiUATpnHk5Sa97umKQ64qbyUeVl2QWrLm6b8z5bxm4wfPHipOwAD1WRzs4NBOPgGY2QVAgU1v4tGO4GOCyy2lYnHZDc4dpXtDINvKSWZX2TPjPCmmd+M609Cnmw01Vpwk+RAZjWqR5AW0EiltorULZCYCwVJ220D7TXnOS7FAiRVxRPuM5yoXWCFunzKulJ8Hp+HgZ5uiNnowT6vZkJtlBlxLFwVkW3qFJWqXmvNT06CeBlBQdOmFrNr6FopySXBxnvj8toY2ab29jIykkE/r2VjFs/VC5o/AAAAA",
+      "w": 736,
+      "h": 877,
+      "lqip": "data:image/webp;base64,UklGRuwAAABXRUJQVlA4IOAAAACQBQCdASoYAB0APu1qrlCppaQiqAqpMB2JaQAIG26mjhnr3U/0mP8JXVWm1QJeI4pti1dXwAD+1N/8hR7GVmhXTMTNpb+ZnyPdBWR8fZwcXlKa0rX3OXFfui5Wg8Gh3zdSUdC5dkMc5n0b7fEWJB0NedGllFIf2TJZc+IWYX7UM3jjVWaLdkbzWWoPpdQsRekn1VrRBhrcuAb8I4gO1eUwxIAb4PrMO3QIWY1Rb5AxVx9ulCS6Z7HKWxGT9mwkLutMXt/JBZdLPBJmnwR3g3ZrgEgBx0gwS0KsJGDKoAAAAA==",
       "credit": "i.pinimg.com",
       "license": "",
       "creator": "",
       "caption": "the day you carry him out",
-      "source": "https://www.pinterest.com/pin/dad-newborn-car-seat-pic-in-2025--141511613287528198/",
-      "query": "father carrying newborn car seat leaving hospital walking away behind",
-      "original": "3024x4032"
+      "source": "https://i.pinimg.com/736x/70/93/a3/7093a3ae1598337b915f6234a8c75a95.jpg",
+      "query": "newborn hospital exact",
+      "original": "736x877"
     },
     "zyzz": {
       "w": 900,
-      "h": 563,
-      "lqip": "data:image/webp;base64,UklGRmYAAABXRUJQVlA4IFoAAADQAwCdASoYAA4APu1iqU2ppaOiMAgBMB2JZwAAWk8O/Kn3GTxPSKAA/ujb35tXPpnXkcRo7tmBCP31ymyRNSdfLX4jSYnKb2TZdKf11f0e+BdcCe7CN8KAAAA=",
-      "credit": "wallpaperaccess.com",
+      "h": 1575,
+      "lqip": "data:image/webp;base64,UklGRqwBAABXRUJQVlA4IKABAACQCACdASoYACsAPu1mrE+ppSQiKqoBMB2JaQASBh2mYB2bJgSp1t9e7hyPbQwWC5eYrblW+IqKCtjgq2lpX905R8w8e7yn9HH+y1lzgAD+70TPUztI8z1KUmi1Az3ZqmRgunZQeclHBfBbIkhQaI6bGeatF7UazTcUoqTy0+TVW5w7lAm8ieAp76cqnc94eiCwDX/X0/SCpkwg12pa6WjIgBQdsKN4FiQDgOVbnxcZXFt8BOnGIfY9ilj5369jZ00lQ30bYjgzA7ynAgEGCv7mBr3R3EGxKcEBJzrMa4aK8669N1nvLvVqGkqhPRT549vLo2XksXxlncnxARVWUGpn6GjS/pq3Q3r+s4yBATdN6BRAfzICdpWWUD4+mSd+8sLAx87kO73sGAz5mjOcwwYebCMZNciQ0wQpEZ6puxSe6aw8hUD9CPwtonL+fJNHejUECvKqLKGWLLmHE/CrGZd5C7Dn/WhammrQazXQlk4w2QObz2976wdnCTUZ7odjk1DWeWlhPefYatKTMJaE8RzqvB+4XogsZ0Mj5amaRgAAAA==",
+      "credit": "i.pinimg.com",
       "license": "",
       "creator": "",
-      "caption": "Zyzz. We are all gonna make it.",
-      "source": "https://wallpaperaccess.com/zyzz",
-      "query": "zyzz aesthetic bodybuilding legend wallpaper",
-      "original": "2268x1276"
+      "caption": "Zyzz",
+      "source": "https://www.pinterest.com/pin/560627853625154153/",
+      "query": "zyzz wallpaper",
+      "original": "1080x1920"
     },
     "noel-deyzel": {
       "w": 900,

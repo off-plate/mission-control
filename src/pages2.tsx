@@ -433,7 +433,7 @@ export function ReviewPage() {
                 <span className="ledger-title">{e.title}</span>
                 <span className="src-tag">{e.category}</span>
                 <span className="mono" style={{ color: 'var(--muted)', fontSize: 'var(--text-xs)' }}>{fmtDuration(e.estimateMin)} → {fmtDuration(e.actualMin)}</span>
-                <span className={`delta ${d >= 0 ? 'saved' : 'over'}`}>{d >= 0 ? `+${d}m` : `${d}m`}</span>
+                <span className={`delta ${d >= 0 ? 'saved' : 'over'}`}>{d >= 0 ? `+${d}m` : `${-d}m over`}</span>
               </div>
             )
           })}

@@ -891,6 +891,26 @@ export function PlanPage() {
   const [breakdownFor, setBreakdownFor] = useState<Task | null>(null)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
 
+  /* On a laptop the four parts of the day run well past the fold, so each part
+     folds away and the whole set folds with one button. Which ones are shut is a
+     view he set rather than something that happened to his data, so it lives in
+     localStorage and never goes near the sync. */
+  const [shutSlots, setShutSlots] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem('mc:shut-slots')
+      return new Set(raw ? (JSON.parse(raw) as string[]) : [])
+    } catch { return new Set() }
+  })
+  const keepShut = (next: Set<string>) => {
+    setShutSlots(next)
+    try { localStorage.setItem('mc:shut-slots', JSON.stringify([...next])) } catch { /* private mode */ }
+  }
+  const setShut = (id: string, on: boolean) => {
+    const next = new Set(shutSlots)
+    if (on) next.add(id); else next.delete(id)
+    keepShut(next)
+  }
+
   /* The returned work that is still actually waiting. The bar reads from this,
      so finishing or deleting the last of it takes the bar away with it. */
   const returnedLeft = (plan.returnedIds ?? []).filter((id) => {
@@ -1063,6 +1083,18 @@ export function PlanPage() {
         <div className="panel">
           <div className="col-head">
             <span className="microcap">Today</span>
+            {(() => {
+              const shown = BUCKETS.filter((b) => b.id !== 'unsorted' || todayAll.some((t) => !t.slot && !t.done)).map((b) => b.id)
+              const allShut = shown.length > 0 && shown.every((id) => shutSlots.has(id))
+              return (
+                <button
+                  className="fold-all"
+                  onClick={() => keepShut(allShut ? new Set() : new Set(shown))}
+                >
+                  {allShut ? 'Expand all' : 'Collapse all'}
+                </button>
+              )
+            })()}
           </div>
           {BUCKETS.map((b) => {
             // A finished task is not waiting to be scheduled, so it drops out of
@@ -1087,17 +1119,30 @@ export function PlanPage() {
             /* Unsorted is not a part of the day and has no hours to run out of. */
             const cap = b.id === 'unsorted' ? 0 : slotMinutes(b.id as TimeSlot)
             const over = cap > 0 ? tot - cap : 0
+            const shut = shutSlots.has(b.id)
+            const left = inBucket.filter((x) => !x.done).length + mine.filter((r) => !rDone(r)).length
             return (
               <div
-                className={`bucket drop-zone${dropKey === b.id ? ' drop-over' : ''}`}
+                className={`bucket drop-zone${dropKey === b.id ? ' drop-over' : ''}${shut ? ' is-shut' : ''}`}
                 key={b.id}
-                onDragOver={(e) => { e.preventDefault(); setDropKey(b.id) }}
+                /* A task cannot be dropped into a part of the day he cannot see,
+                   so hovering one open is the only honest thing to do. */
+                onDragOver={(e) => { e.preventDefault(); setDropKey(b.id); if (shut) setShut(b.id, false) }}
                 onDragLeave={() => setDropKey((k) => (k === b.id ? null : k))}
                 onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); if (id) dropTo(b.id, id); setDropKey(null) }}
               >
-                <div className="bucket-head">
+                <button
+                  className="bucket-head"
+                  aria-expanded={!shut}
+                  aria-label={`${b.label}, ${shut ? 'expand' : 'collapse'}`}
+                  onClick={() => setShut(b.id, !shut)}
+                >
+                  <span className="fold-caret" aria-hidden="true" />
                   <span className="bucket-name">{b.label}</span>
                   {BUCKET_HINT[b.id] && <span className="bucket-hours mono">{BUCKET_HINT[b.id]}</span>}
+                  {/* Shut, the rows are gone and the count is the only thing left
+                      saying whether there is anything in there. */}
+                  {shut && left > 0 && <span className="bucket-left mono">{left} left</span>}
                   {/* What is planned against what the window actually holds, for
                       THIS workspace only. Four hours of work in a two hour
                       window is not ambition, it is a day that was over before it
@@ -1110,8 +1155,8 @@ export function PlanPage() {
                       </span>
                     )
                     : <span className="tot mono">{fmtDuration(tot)}</span>)}
-                </div>
-                {items.length === 0 ? (
+                </button>
+                {shut ? null : items.length === 0 ? (
                   <p className="bucket-empty">Drop a task here.</p>
                 ) : (
                   items.map((it) => {

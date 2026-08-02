@@ -1251,7 +1251,32 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 /* today buckets */
 .bucket { margin-top: var(--s4); padding-top: var(--s4); border-top: 1px solid var(--hairline); }
 .bucket:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
-.bucket-head { display: flex; align-items: baseline; gap: var(--s2); margin-bottom: var(--s1); }
+/* The head is the fold: the whole line is the target, so folding a part of the
+   day away is one tap wherever the eye already is. */
+.bucket-head {
+  display: flex; align-items: baseline; gap: var(--s2); margin-bottom: var(--s1);
+  width: 100%; text-align: left; padding: 0; color: inherit; font: inherit;
+}
+.fold-caret {
+  align-self: center; flex: none; width: 7px; height: 7px; margin-right: 1px;
+  border-right: 1.6px solid var(--faint); border-bottom: 1.6px solid var(--faint);
+  transform: rotate(45deg); transition: transform 140ms var(--ease);
+}
+.bucket.is-shut .fold-caret { transform: rotate(-45deg); }
+.bucket-head:hover .fold-caret { border-color: var(--accent); }
+.bucket-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+.bucket-left { font-size: 0.6875rem; color: var(--faint); margin-left: auto; }
+.bucket-left + .tot { margin-left: var(--s2); }
+/* Folded, the point is to get the day back on one screen, so the rhythm tightens
+   with it. */
+.bucket.drop-zone.is-shut { min-height: 0; }
+.bucket.is-shut { margin-top: var(--s3); padding-top: var(--s3); }
+.bucket.is-shut .bucket-head { margin-bottom: 0; }
+.fold-all {
+  margin-left: auto; font-family: var(--font-mono); font-size: 0.6875rem;
+  color: var(--info); border: 1px solid var(--hairline-strong); border-radius: 3px; padding: 1px 6px;
+}
+.fold-all:hover { color: var(--accent); border-color: var(--accent); }
 .bucket-name { font-family: var(--font-display); font-weight: 700; font-size: var(--text-base); }
 .bucket-head .tot { margin-left: auto; font-family: var(--font-mono); font-size: 0.6875rem; color: var(--info); }
 .bucket.drop-zone { min-height: 56px; }

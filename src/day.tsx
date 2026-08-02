@@ -194,7 +194,11 @@ export function DayPage() {
       )}
 
       <p className="day-foot">
-        A day that has passed is a record, so nothing on it can be changed here.{' '}
+        {/* Today has not passed; telling him it had made the sentence a lie on
+            the one day he opens most. */}
+        {day === localDateKey()
+          ? 'Today is still being written; this page is its record so far.'
+          : 'A day that has passed is a record, so nothing on it can be changed here.'}{' '}
         <button className="linkish" onClick={() => openDay(shiftDay(day, -1))}>The day before</button>
       </p>
     </div>

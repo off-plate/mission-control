@@ -1,6 +1,6 @@
 import { Component, useEffect, useMemo, useState, type ReactNode } from 'react'
 import ReactGridLayout, { useContainerWidth } from 'react-grid-layout'
-import { colsForWidth, formatFresh, orderFromLayout, packLayout } from './derive'
+import { colsForWidth, orderFromLayout, packLayout } from './derive'
 import { WIDGET_DEFS } from './mock'
 import { useStore } from './store'
 import type { SpaceId, WidgetInstance } from './types'
@@ -39,9 +39,10 @@ function WidgetFrame({ inst, space }: { inst: WidgetInstance; space: SpaceId }) 
         >
           <h2 className="widget-title">{def.title}</h2>
         </button>
-        <span className={`widget-fresh${stale ? ' stale' : ''}`}>
-          {stale ? `stale, ${formatFresh(def.freshMinutes)}` : formatFresh(def.freshMinutes)}
-        </span>
+        {/* No freshness theatre. Every widget reads local data that is current
+            by definition; "2 min ago" seconds after first load was a seeded
+            constant wearing a timestamp's clothes. Stamps return when a real
+            synced source exists to be stale. */}
         {editing && (
           <button
             className="widget-menu-btn"

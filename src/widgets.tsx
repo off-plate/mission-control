@@ -6,6 +6,7 @@ import {
   MOCK_MONEY,
   MOCK_OUTREACH,
   MOCK_TRAINING,
+  SPACE_LABELS,
 } from './mock'
 import { useStore } from './store'
 import { goalCurrent, ON_TRACK_PCT, type SizeKey, type SpaceId, type WidgetType } from './types'
@@ -177,7 +178,9 @@ const TasksBody = memo(function TasksBody({ space, size }: { space: SpaceId; siz
             >
               {fmtDuration(t.estimateMin)}
             </button>
-            <span className="src-tag">{t.source === 'mc' ? 'here' : t.source}</span>
+            {/* A source tag earns its place only when the source is somewhere
+                else. Seven grey "here" chips were noise dressed as links. */}
+            {t.source !== 'mc' && <span className="src-tag">{t.source}</span>}
           </div>
         ))}
         {open.length === 0 && list.length > 0 && (
@@ -203,6 +206,10 @@ const HabitsBody = memo(function HabitsBody({ space }: { space: SpaceId }) {
   /* A habit a routine drives is a read-out here too. Ticking it by hand looked
      like it worked and was reverted on the next load. */
   const driven = new Map(routines.filter((r) => r.habitId && !r.archivedAt).map((r) => [r.habitId as string, r.title]))
+  /* Three chips reading "Focus for 30 minutes" with nothing telling them
+     apart: when a name collides, the workspace says which one this is. */
+  const names = new Map<string, number>()
+  for (const h of active) names.set(h.name, (names.get(h.name) ?? 0) + 1)
   return (
     <div className="habit-chips">
       {active.map((h) => (
@@ -210,11 +217,12 @@ const HabitsBody = memo(function HabitsBody({ space }: { space: SpaceId }) {
           key={h.id}
           className={`habit${driven.has(h.id) ? ' is-auto' : ''}`}
           aria-pressed={h.days[todayIndex]}
-          title={driven.has(h.id) ? `Ticks itself when you finish ${driven.get(h.id)}` : undefined}
+          title={driven.has(h.id) ? `Ticks itself when you finish “${driven.get(h.id)}”` : undefined}
           onClick={() => (driven.has(h.id) ? setPage('routines') : toggleHabitDay(h.id, todayIndex))}
         >
           <span className="tick" aria-hidden="true" />
           {h.name}
+          {(names.get(h.name) ?? 0) > 1 && <span className="habit-qual">{SPACE_LABELS[h.space]}</span>}
         </button>
       ))}
       {active.length === 0 && <div className="empty">No active habits. Add one on the Habits page.</div>}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { COACH_SCENARIOS, MOCK_MONEY, MOCK_STATS } from './mock'
+import { COACH_SCENARIOS, MOCK_MONEY, MOCK_STATS, SPACE_LABELS } from './mock'
 import { AutoTextarea, Band, SpaceMark } from './pages1'
 import { useStore } from './store'
 import { Spark, SparkBox } from './widgets'
@@ -309,7 +309,7 @@ export function ReviewPage() {
           /* Green is earned: a week with nothing logged shows no-data, not a
              proud +0m, and accuracy is not asserted from zero estimates. */
           ...(rows.length ? [
-            { v: fmtSigned(saved), k: saved >= 0 ? 'time saved' : 'time over', tone: (saved >= 0 ? 'pos' : 'urgent') as 'pos' | 'urgent' },
+            { v: saved >= 0 ? fmtSigned(saved) : fmtDuration(-saved), k: saved >= 0 ? 'time saved' : 'over your estimates', tone: (saved >= 0 ? 'pos' : 'urgent') as 'pos' | 'urgent' },
             { v: `${accuracy}%`, k: 'estimate accuracy' },
           ] : [{ v: '—', k: 'nothing logged yet', tone: 'info' as const }]),
         ]}
@@ -351,8 +351,8 @@ export function ReviewPage() {
           <div className="kpi-sub">across {blocks.length} {blocks.length === 1 ? 'block' : 'blocks'}</div>
         </div>
         <div className="panel">
-          <span className="microcap">Time saved</span>
-          <div className={`kpi ${saved >= 0 ? 'val-pos' : 'val-urgent'}`}>{fmtSigned(saved)}</div>
+          <span className="microcap">{saved >= 0 ? 'Time saved' : 'Time over'}</span>
+          <div className={`kpi ${saved >= 0 ? 'val-pos' : 'val-urgent'}`}>{saved >= 0 ? fmtSigned(saved) : fmtDuration(-saved)}</div>
           <div className="kpi-sub">against your own estimates</div>
         </div>
         <div className="panel panel-wide">
@@ -379,9 +379,10 @@ export function ReviewPage() {
           <div className="rowlist" style={{ marginTop: 8 }}>
             {activeHabits.map((h) => {
               const hist = [...(h.history ?? []), h.days.filter(Boolean).length]
+              const twin = activeHabits.some((x) => x.id !== h.id && x.name === h.name)
               return (
                 <div className="rowitem" key={h.id} style={{ minHeight: 34 }}>
-                  <span className="grow">{h.name}</span>
+                  <span className="grow">{h.name}{twin && <span className="habit-qual">{SPACE_LABELS[h.space]}</span>}</span>
                   {hist.length > 1 ? <Spark data={hist} width={110} height={22} /> : <span className="meta">first week</span>}
                   <span className="mono meta">{hist[hist.length - 1]}/7</span>
                 </div>
@@ -792,24 +793,21 @@ export function CoachPage() {
 
       <div className="coach-side">
         {/* Naming the thing is the step an avoider cannot do cold, so the page
-            offers the usual suspects and your own oldest tasks to point at. */}
-        <div className="coach-starters">
-          <span className="microcap">Or start from one of these</span>
-          <div className="coach-starter-row">
-            {oldest.map((t) => (
-              <button key={t.id} className="coach-starter is-yours" onClick={() => { setThing(t.title); void analyze(t.title) }}>
-                {t.title}
-                <span className="cs-age">{(t.carried ?? 0) > 0 ? `came back ${t.carried}x` : t.createdAt ? `since ${fmtWhen(t.createdAt)}` : 'on your list'}</span>
-              </button>
-            ))}
-            {COACH_SCENARIOS.slice(0, oldest.length === 0 ? 5 : 0).map((s) => (
-              <button key={s.id} className="coach-starter" onClick={() => { setThing(s.title); void analyze(s.title) }}>
-                {s.title}
-                <span className="cs-age">{s.tag}</span>
-              </button>
-            ))}
+            points at his own oldest waiting tasks. With nothing waiting the
+            whole block stays home: a header over zero items reads as broken. */}
+        {oldest.length > 0 && (
+          <div className="coach-starters">
+            <span className="microcap">Or start from one of these</span>
+            <div className="coach-starter-row">
+              {oldest.slice(0, 5).map((t) => (
+                <button key={t.id} className="coach-starter is-yours" onClick={() => { setThing(t.title); void analyze(t.title) }}>
+                  {t.title}
+                  <span className="cs-age">{(t.carried ?? 0) > 0 ? `came back ${t.carried}x` : t.createdAt ? `since ${fmtWhen(t.createdAt)}` : 'on your list'}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
       {open.length > 0 && (
         <>

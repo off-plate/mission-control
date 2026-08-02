@@ -200,6 +200,7 @@ const shortDay = (key: string): string => {
 
 export function TodayPage() {
   const { space, tasks, routines, habits, coachSessions, plan, editing, setEditing, setPage, savedMin, todayIndex, review, addTask, deleteTask, setCoachOpen, setFocusTaskId, sources, inView } = useStore()
+  const pomo = usePomodoro()
   const nextEvent = useNextEvent(space)
   const exceptions = exceptionsFor(space, { tasks, routines })
   /* Money and official post follow you into Work and Off-Plate. Sitting in the
@@ -268,6 +269,9 @@ export function TodayPage() {
                 {x.action === 'open-goals' && (
                   <button onClick={() => setPage('goals')}>{x.actionLabel ?? 'Open Goals'}</button>
                 )}
+                {x.action === 'open-plan' && (
+                  <button onClick={() => setPage('plan')}>{x.actionLabel ?? 'Open the plan'}</button>
+                )}
                 {x.action === 'coach' && (
                   <>
                     <button onClick={() => { setCoachOpen(x.coachId ?? x.coachSeed ?? null); setPage('coach') }}>
@@ -303,7 +307,19 @@ export function TodayPage() {
               <span className="microcap fm-label">First move</span>
               <span className="fm-title">{firstMove.title}</span>
               <span className="est-chip">{fmtDuration(firstMove.estimateMin)}</span>
-              <button className="btn btn-primary" onClick={() => { setFocusTaskId(firstMove.id); setPage('plan') }}>Start</button>
+              {/* Start means start: the clock begins on this task for its own
+                  estimate, and Plan opens with it highlighted. A button that
+                  said Start and only navigated was the first lie of the day. */}
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  pomo.startFocus(isEstimated(firstMove) && firstMove.estimateMin > 0 ? taskMinutes(firstMove) : undefined, firstMove.title)
+                  setFocusTaskId(firstMove.id)
+                  setPage('plan')
+                }}
+              >
+                Start
+              </button>
             </div>
           )}
           {reviewDue && space === 'personal' && (
@@ -1033,6 +1049,12 @@ export function PlanPage() {
           {/* This used to route to Plan from Plan, which is nothing happening.
               It now finds them on the list and marks them for a moment. */}
           <button className="btn btn-quiet" onClick={showReturned}>Show me</button>
+          {/* Re-choosing them is the point of the rollover; re-dragging them one
+              by one is just its tax. One press puts all of them back on today,
+              unsorted, still his to place. */}
+          <button className="btn btn-primary" onClick={() => { moveTasksToToday(returnedLeft); setAhead(false) }}>
+            Replan {returnedLeft.length === 1 ? 'it' : `all ${returnedLeft.length}`} for today
+          </button>
         </div>
       )}
 
@@ -1110,7 +1132,7 @@ export function PlanPage() {
               </div>
             )
           })}
-          {backlogOpen.length === 0 && <div className="empty">Nothing on the list. Generate a task above when something lands.</div>}
+          {backlogOpen.length === 0 && <div className="empty">Nothing waiting. Add the first task above.</div>}
         </div>
 
         {/* 2 — The day: drag tasks from Unsorted into a time of day */}

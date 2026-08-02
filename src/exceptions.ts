@@ -1,6 +1,6 @@
 import { MOCK_MONEY } from './mock'
 import type { Routine, SpaceId, Task } from './types'
-import { localDateKey } from './util'
+import { goalPeriodRange, localDateKey, periodIsPast, type GoalTf } from './util'
 
 export { SPACE_LABELS, MOCK_AGENDA } from './mock'
 
@@ -72,7 +72,7 @@ export interface ExceptionItem {
   id: string
   text: string
   when: string
-  action?: 'coach' | 'add-task'
+  action?: 'coach' | 'add-task' | 'open-goals'
   coachId?: string
   /** Free text handed to Coach's analyser (used by the ageing alerts). */
   coachSeed?: string
@@ -115,6 +115,27 @@ export function exceptionsFor(space: SpaceId, ctx: { tasks: Task[]; routines: Ro
       })
     }
 
+  }
+
+  /* A period that ends does not get to quietly drop what he promised it. The
+     tasks are still on his list either way, but the PROMISE needs answering:
+     move it to the period running now, or admit it is not happening. This is
+     derived, so acting on it in Goals takes the alert away with it. */
+  const left = ctx.tasks.filter((t) => !t.done && t.space === space && t.horizon && t.horizonKey
+    && periodIsPast(t.horizon as GoalTf, t.horizonKey))
+  if (left.length) {
+    const oldest = left
+      .map((t) => goalPeriodRange(t.horizon as GoalTf, t.horizonKey!))
+      .sort((a, b) => (a.to < b.to ? -1 : 1))[0]
+    out.push({
+      id: 'x-left-behind',
+      text: left.length === 1
+        ? `One thing you promised is still unfinished: “${left[0].title}”.`
+        : `${left.length} things you promised are still unfinished.`,
+      when: oldest.label,
+      action: 'open-goals',
+      actionLabel: 'Decide now',
+    })
   }
 
   /* The real avoidance detector: anything still open a week after it appeared,

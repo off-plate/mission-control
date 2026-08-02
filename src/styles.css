@@ -2776,6 +2776,23 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .today-task.done .txt-link, .subtask.done .txt-link { color: var(--faint); }
 /* travelling between goal periods */
 .goal-nav { display: flex; gap: 2px; margin-left: var(--s2); }
+/* What a period promised and did not deliver, at the top of the page so it is
+   answered rather than scrolled past. Warm border, not red: this is a decision
+   to make, not a failure to be shouted at. */
+.left-behind { border-color: var(--alert); margin-bottom: var(--s5); }
+.lb-row {
+  display: flex; align-items: center; gap: var(--s3);
+  padding: var(--s3) 0; border-top: 1px solid var(--hairline); font-size: var(--text-sm);
+}
+.lb-row:first-of-type { border-top: none; }
+.lb-row .grow { min-width: 0; }
+.lb-row .meta { font-size: 0.6875rem; color: var(--faint); flex: none; }
+.lb-row .btn, .lb-row .sub-tool { flex: none; }
+@media (max-width: 620px) {
+  .lb-row { flex-wrap: wrap; }
+  .lb-row .grow { flex: 1 1 100%; }
+}
+
 /* The tasks a period is for, under its goals. Same rule as everywhere else on
    this page: hairline above, no box of its own, nothing that reads as a second
    panel inside the first. */

@@ -2764,6 +2764,40 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .today-task.done .txt-link, .subtask.done .txt-link { color: var(--faint); }
 /* travelling between goal periods */
 .goal-nav { display: flex; gap: 2px; margin-left: var(--s2); }
+/* The tasks a period is for, under its goals. Same rule as everywhere else on
+   this page: hairline above, no box of its own, nothing that reads as a second
+   panel inside the first. */
+.period-tasks { margin-top: var(--s5); padding-top: var(--s4); border-top: 1px solid var(--hairline); }
+.ptask-head { display: flex; align-items: center; gap: var(--s3); margin-bottom: var(--s2); }
+.ptask-head .microcap { margin-bottom: 0; }
+.ptask-head .col-tot { margin-left: 0; }
+.ptask-add { margin-left: auto; }
+.ptask {
+  display: flex; align-items: center; gap: var(--s2);
+  font-size: var(--text-sm); padding: var(--s2) 0; border-top: 1px solid var(--hairline);
+}
+.ptask:first-of-type { border-top: none; }
+.ptask .grow { min-width: 0; }
+.ptask.done { color: var(--progress); }
+.ptask.done .goal-ms-check { background: var(--progress); border-color: var(--progress); color: var(--bg); }
+.ptask.done .grow { text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
+.ptask .sub-tool { flex: none; opacity: 0; transition: opacity 140ms var(--ease); }
+.ptask:hover .sub-tool, .ptask .sub-tool:focus-visible { opacity: 1; }
+.ptask-add-box { margin-top: var(--s3); display: flex; flex-direction: column; gap: var(--s2); }
+.ptask-offer { display: flex; flex-direction: column; border: 1px solid var(--hairline); border-radius: var(--r-sm); overflow: hidden; }
+.ptask-offer-row {
+  display: flex; align-items: center; gap: var(--s2); width: 100%; text-align: left;
+  padding: var(--s2) var(--s3); font-size: var(--text-sm); color: var(--ink);
+  border-top: 1px solid var(--hairline);
+}
+.ptask-offer-row:first-child { border-top: none; }
+.ptask-offer-row:hover { background: var(--accent-wash); color: var(--accent); }
+.ptask-offer-row .meta { font-size: 0.6875rem; color: var(--faint); flex: none; }
+.ptask-new { align-self: flex-start; }
+/* Touch has no hover, so the way off a period must be there without one. */
+@media (hover: none) {
+  .ptask .sub-tool { opacity: 1; }
+}
 .goal-nav-btn { min-width: 26px; min-height: 24px; border: 1px solid var(--hairline); border-radius: 4px; color: var(--muted); font-size: var(--text-sm); line-height: 1; }
 .goal-nav-btn:hover { border-color: var(--hairline-strong); color: var(--ink); }
 .goal-nav-btn.now { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.03em; padding: 0 6px; }

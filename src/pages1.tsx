@@ -2566,6 +2566,98 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals, periodOffsets 
   )
 }
 
+/* The work a period is for. Not a goal with a number on it and not a second
+   copy of anything: the same tasks he already keeps in the plan, standing under
+   the week or the month he promised them to. He ticks one in the plan and it is
+   ticked here, because there is only ever one of it. */
+function PeriodTasks({ tf, periodKey }: { tf: GoalTimeframe; periodKey: string }) {
+  const { tasks, toggleTask, commitTask, addTask, space, inView } = useStore()
+  const [adding, setAdding] = useState(false)
+  const [q, setQ] = useState('')
+  const mine = tasks.filter((t) => inView(t.space) && t.horizon === tf && t.horizonKey === periodKey)
+  const list = [...mine.filter((t) => !t.done), ...mine.filter((t) => t.done)]
+  const doneN = mine.filter((t) => t.done).length
+  const term = q.trim().toLowerCase()
+  /* What he can put here: anything open that is not already promised to a
+     period. Something already promised to this month is not offered to this
+     week as well, because then finishing it would fill two promises at once. */
+  const offer = tasks
+    .filter((t) => inView(t.space) && !t.done && !t.horizon && (!term || t.title.toLowerCase().includes(term)))
+    .slice(0, 6)
+  const put = (id: string) => { commitTask(id, tf, periodKey); setQ(''); setAdding(false) }
+  const create = () => {
+    const title = q.trim()
+    if (!title) return
+    addTask({ title, source: 'mc', estimateMin: 0, space, list: 'backlog', category: 'quick', horizon: tf, horizonKey: periodKey })
+    setQ('')
+    setAdding(false)
+  }
+  return (
+    <div className="period-tasks">
+      <div className="ptask-head">
+        <span className="microcap">Tasks</span>
+        {mine.length > 0 && <span className="col-tot mono">{doneN} of {mine.length} done</span>}
+        <button
+          className="goal-nav-btn ptask-add"
+          aria-label={adding ? 'Close' : 'Put a task on this period'}
+          aria-expanded={adding}
+          onClick={() => { setAdding((a) => !a); setQ('') }}
+        >
+          {adding ? '×' : '+'}
+        </button>
+      </div>
+      {list.map((t) => (
+        <div className={`ptask${t.done ? ' done' : ''}`} key={t.id}>
+          <button
+            className="goal-ms-check"
+            role="checkbox"
+            aria-checked={t.done}
+            aria-label={`${t.title}, ${t.done ? 'done' : 'not done'}`}
+            onClick={() => toggleTask(t.id)}
+          >
+            {t.done && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+          </button>
+          <SpaceMark space={t.space} />
+          <span className="grow">{t.title}</span>
+          <button className="sub-tool" aria-label={`Take “${t.title}” off this period`} onClick={() => commitTask(t.id)}>Take off</button>
+        </div>
+      ))}
+      {adding && (
+        <div className="ptask-add-box">
+          <input
+            className="textinput"
+            autoFocus
+            placeholder="Find a task, or write a new one"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') { setAdding(false); setQ('') }
+              if (e.key !== 'Enter') return
+              e.preventDefault()
+              // The one it is showing him wins; otherwise the words he typed
+              // become a new task on the to-do list, promised to this period.
+              if (offer.length === 1 && term) put(offer[0].id); else create()
+            }}
+            aria-label="Find a task, or write a new one"
+          />
+          {offer.length > 0 && (
+            <div className="ptask-offer">
+              {offer.map((t) => (
+                <button key={t.id} className="ptask-offer-row" onClick={() => put(t.id)}>
+                  <SpaceMark space={t.space} />
+                  <span className="grow">{t.title}</span>
+                  <span className="mono meta">{t.list === 'today' ? 'today' : 'to-do'}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {term && <button className="btn btn-quiet ptask-new" onClick={create}>Add “{q.trim()}” as a new task</button>}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function GoalsPage() {
   const { space, goals, habits, habitLog, focusSessions, slips, bumpGoal, toggleGoalMilestone, deleteGoal, repeatGoal, inView } = useStore()
   const all = goals.filter((g) => inView(g.space))
@@ -2683,6 +2775,7 @@ export function GoalsPage() {
                 )
               })}
               {inTf.length === 0 && <p className="bucket-empty">No goals here yet.</p>}
+              <PeriodTasks tf={tfr.id} periodKey={shownKey} />
             </div>
           )
         })}

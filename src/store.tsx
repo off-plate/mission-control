@@ -532,7 +532,7 @@ function loadPersisted(): PersistedState | null {
        while it still carries the exact old name, so anything he has renamed
        himself is left alone and running it twice changes nothing. */
     {
-      const renames: [string, string, string][] = [['r-evening', 'Evening shutdown', 'Before bed routine'], ['r-weekly', 'Weekly reset', 'Weekly review'], ['r-morningwork', 'Morning work routine', 'Morning Big Time work routine']]
+      const renames: [string, string, string][] = [['r-evening', 'Evening shutdown', 'Before bed routine'], ['r-weekly', 'Weekly reset', 'Weekly review'], ['r-morningwork', 'Morning work routine', 'Morning Big Time work routine'], ['r-morning', 'Morning routine', 'Morning Preparation']]
       for (const [id, was, now] of renames) {
         p.routines = (p.routines ?? []).map((r) => (r.id === id && r.title === was ? { ...r, title: now } : r))
         const hid = (p.routines ?? []).find((r) => r.id === id)?.habitId

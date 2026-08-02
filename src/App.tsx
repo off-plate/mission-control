@@ -64,8 +64,15 @@ const NAV: { id: PageId; label: string }[] = [
   { id: 'focus', label: 'Focus' },
   { id: 'braindump', label: 'Brain Dump' },
   { id: 'coach', label: 'Avoidance' },
-  { id: 'board', label: 'Vision' },
+  { id: 'board', label: 'Why’s' },
 ]
+
+/* Money is the one page that is not about the space you are standing in: it is
+   his debt, his ledger, his household. On a Big Time or Off-Plate screen it is
+   somebody else's business, so the tab is Personal and All only. Nothing is
+   lost by hiding it: money alerts still reach every space through
+   globalExceptions. */
+const PERSONAL_ONLY: PageId[] = ['money']
 
 function PageNav({
   tabs, page, setPage, attention,
@@ -103,7 +110,13 @@ export default function App() {
     ? exceptionsFor(space, { tasks, routines })
     : [...globalExceptions({ tasks, routines }), ...exceptionsFor(space, { tasks, routines })]
 
-  const tabs = NAV
+  const moneyOk = view === 'personal' || view === 'all'
+  const tabs = moneyOk ? NAV : NAV.filter((t) => !PERSONAL_ONLY.includes(t.id))
+  /* Standing on a page that this space does not have leaves a blank screen and
+     no lit tab. Walk back to Today instead. */
+  useEffect(() => {
+    if (!moneyOk && PERSONAL_ONLY.includes(page)) setPage('today')
+  }, [moneyOk, page])
 
   /* Signed out, nothing is backed up and the phone shows a different day. That is
      worth a mark on the gear rather than a banner across the top. */
@@ -177,7 +190,7 @@ export default function App() {
         {page === 'habits' && <HabitsPage />}
         {page === 'routines' && <RoutinesPage />}
         {page === 'goals' && <GoalsPage />}
-        {page === 'money' && <MoneyPage />}
+        {page === 'money' && moneyOk && <MoneyPage />}
         {(page === 'review' || page === 'stats') && <ReviewPage />}
         {page === 'coach' && <CoachPage />}
         {page === 'focus' && <FocusPage />}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useStore } from './store'
 import { FALLBACK_NEWS, PER_LANG, loadMorningNews, twistersForDay, type MorningNews } from './morning-data'
 import { TYPING_TARGET_WPM, type Routine } from './types'
+import { SpaceMark } from './pages1'
 
 /* The Morning routine as a guided, foldable accordion. Every step starts collapsed;
    you open one to work through it and check it off yourself with the checkbox, same
@@ -293,6 +294,9 @@ export function MorningRoutine({ routine, onEdit }: { routine: Routine; onEdit?:
   return (
     <div className="panel routine-card mr-card">
       <div className="routine-tag">
+        {/* Routines now list every workspace at once, so this card carries its
+            own colour and letter like the plain ones beside it. */}
+        <SpaceMark space={routine.space} always />
         <span className="routine-card-title">{routine.title}</span>
         {/* A running meditation stays visible even when its panel is closed. */}
         {medRunning && open !== 'mr1' && (
@@ -348,7 +352,8 @@ export function MorningRoutine({ routine, onEdit }: { routine: Routine; onEdit?:
       </div>
 
       <div className="routine-card-foot" style={{ marginTop: 'var(--s4)' }}>
-        <span className="assist-note">Finishing all {total} checks off “Morning routine” in Habits.</span>
+        {/* The routine's own name, because this card also runs the Big Time one. */}
+        <span className="assist-note">Finishing all {total} checks off “{routine.title}” in Habits.</span>
         {/* No reset: it un-finished the routine, which deleted the record that
             he had done it. The morning routine happens once a day anyway. */}
       </div>

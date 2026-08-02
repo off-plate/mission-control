@@ -111,9 +111,12 @@ export function WriteTo() {
   )
 }
 
-export function SpaceMark({ space }: { space?: SpaceId }) {
+/** `always` is for a page that mixes workspaces even inside one workspace, like
+ *  Routines: there the colour and the letter are the only thing telling two
+ *  cards apart, so they cannot be tied to the All view. */
+export function SpaceMark({ space, always }: { space?: SpaceId; always?: boolean }) {
   const { view } = useStore()
-  if (view !== 'all' || !space) return null
+  if ((view !== 'all' && !always) || !space) return null
   return (
     <span className={`spacemark s-${space}`}>
       <i aria-hidden="true" />
@@ -1897,26 +1900,27 @@ function AddRoutineSheet({ onClose }: { onClose: () => void }) {
    how often you have run it is a habits question, and it is answered on Habits.
 */
 
+/* Every routine, in every workspace, on one page. A day is not lived one
+   workspace at a time: the morning ritual, the Big Time start and the night
+   session all belong to the same day, and hiding two thirds of them behind the
+   switcher made him hunt for a card he had already written. So the switcher
+   ORDERS this page instead of filtering it: the space he is standing in comes
+   first, in the order a day runs, then the rest. The colour bar and letter stay
+   on permanently here, because they are what tells the two halves apart. */
+const SPACE_RANK: Record<SpaceId, number> = { personal: 0, work: 1, offplate: 2, corner: 3 }
+
 export function RoutinesPage() {
-  const { routines, space, toggleRoutineStep, toggleRoutineAlt, startAgain, routineLog, deleteRoutine, habits, inView } = useStore()
+  const { routines, view, space, toggleRoutineStep, toggleRoutineAlt, startAgain, routineLog, deleteRoutine, habits } = useStore()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
-  const spaceRoutines = routines.filter((r) => inView(r.space) && !r.archivedAt)
-  const sorted = [...spaceRoutines].sort((a, b) => flowRank(a) - flowRank(b))
-  return (
-    <div className="page">
-      <Band
-        title="Routines"
-        actions={
-          <>
-            <WriteTo />
-            <button className="btn btn-primary" onClick={() => setAdding(true)}>Add a routine</button>
-          </>
-        }
-      />
-      <div className="routine-cards">
-        {sorted.length === 0 && <div className="empty">No routines in this space yet. Add one from the button above.</div>}
-        {sorted.map((r) => {
+  const live = routines.filter((r) => !r.archivedAt)
+  const byFlow = (a: Routine, b: Routine) => flowRank(a) - flowRank(b)
+  /* In All nothing is "elsewhere": one list, day order, as before. */
+  const here = (view === 'all' ? live : live.filter((r) => r.space === view)).sort(byFlow)
+  const elsewhere = (view === 'all' ? [] : live.filter((r) => r.space !== view))
+    .sort((a, b) => SPACE_RANK[a.space] - SPACE_RANK[b.space] || byFlow(a, b))
+
+  const card = (r: Routine) => {
           /* Every MORNING ritual gets the same guided format, whatever its
              workspace: one look for one kind of thing. A morning routine with
              no steps yet keeps the plain card, which is where steps are added. */
@@ -1929,7 +1933,7 @@ export function RoutinesPage() {
           return (
             <div className={`panel routine-card${complete ? ' is-complete' : ''}`} key={r.id}>
               <div className="routine-tag">
-                <SpaceMark space={r.space} />
+                <SpaceMark space={r.space} always />
                 <span className="routine-card-title">{r.title}</span>
                 {editingId !== r.id && (complete
                   /* Twice through says so. Without the count, doing it again
@@ -2035,8 +2039,29 @@ export function RoutinesPage() {
               )}
             </div>
           )
-        })}
+  }
+
+  return (
+    <div className="page">
+      <Band
+        title="Routines"
+        actions={
+          <>
+            <WriteTo />
+            <button className="btn btn-primary" onClick={() => setAdding(true)}>Add a routine</button>
+          </>
+        }
+      />
+      <div className="routine-cards">
+        {here.length === 0 && <div className="empty">No routines in this workspace yet. Add one from the button above.</div>}
+        {here.map(card)}
       </div>
+      {elsewhere.length > 0 && (
+        <>
+          <div className="routine-split"><span className="mono">Other workspaces</span></div>
+          <div className="routine-cards">{elsewhere.map(card)}</div>
+        </>
+      )}
 
       {adding && <AddRoutineSheet onClose={() => setAdding(false)} />}
     </div>

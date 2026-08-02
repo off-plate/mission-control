@@ -1,9 +1,21 @@
 /* The vision board: the one page allowed off the house style. Everything else
    in the app is the machine; this is the reason the machine exists. A wall of
    words, numbers and images with no repeating rhythm, meant to be LOOKED at,
-   not operated. Demo content for now; it becomes his to fill once the design
-   is agreed. The one hard rule kept from the canon: no real financial figures,
-   because the bundle is public. */
+   not operated. This is his real wall now, not a demo.
+
+   Two rules kept from the canon. No real financial figures, because the bundle
+   is public. And firm, never cruel: the wall pushes, it does not shame. He is
+   already hard enough on himself, and a wall that shames gets avoided like
+   everything else he avoids, which would make it worthless.
+
+   The five kinds and what each is for, so this stays coherent as it grows:
+     statement  the heavy ones. What is actually at stake, said plainly.
+     quote      borrowed words, only where someone said it better than we can.
+     number     one figure he can act on or measure himself against.
+     image      a photograph, placed by the Jarvis wall-image skill.
+     rule       a standing order. Imperative, present tense, nothing to
+                interpret. These are the only cards in a loud colour because
+                on a wall meant to be felt, they are the ones to be obeyed. */
 
 import { wallImage } from './wall-images'
 
@@ -28,27 +40,74 @@ type Card =
   | { kind: 'image'; src: string; caption?: string; photo?: string }
   | { kind: 'rule'; text: string }
 
-/* Demo copy written to LAND, not to decorate: his own stakes, said plainly.
-   Firm, never cruel; the wall pushes, it does not shame. */
-const DEMO: Card[] = [
+/* Written to LAND, not to decorate: his own stakes, said plainly. Deliberately
+   long, because the point of a wall is that you scroll it and keep finding
+   things, and a short one gets memorised and stops working by the third visit.
+   Ordered so no two cards of the same kind sit together for long. */
+const WALL: Card[] = [
   { kind: 'statement', text: 'She doesn\u2019t need promises. She needs to see it.', size: 'xl' },
   { kind: 'image', src: art('#4a68b8', '#1a2440'), photo: 'calm-desk', caption: 'the calm desk, every morning' },
   { kind: 'number', value: '500', label: 'stairmaster floors. The body keeps the score.' },
   { kind: 'quote', text: 'Nobody is coming. Good. You\u2019re already here.' },
+  { kind: 'statement', text: 'You were never lazy. You were scared. Scared is a thing you can fix.', size: 'xl' },
+  { kind: 'rule', text: 'Open it the day it arrives' },
   { kind: 'image', src: art('#c2603a', '#3d1f12'), photo: 'liguria', caption: 'Liguria, August. Earned, not escaped to.' },
+  { kind: 'quote', text: 'We suffer more often in imagination than in reality.', by: 'Seneca' },
   { kind: 'rule', text: 'Bed by midnight' },
   { kind: 'statement', text: 'The mailbox stopped being scary the day you started opening it.', size: 'lg' },
+  { kind: 'number', value: '+2.5', label: 'kg on the bench every week. The bar does not care how you slept.' },
   { kind: 'image', src: art('#2e8a6e', '#123126'), photo: 'corner-night', caption: 'the Corner, built at night' },
   { kind: 'quote', text: 'You do not rise to the level of your goals. You fall to the level of your systems.', by: 'James Clear' },
+  { kind: 'statement', text: 'Nobody is coming to fix this. Good. You would not have respected it if they had.', size: 'lg' },
   { kind: 'number', value: '1h', label: 'of real focus, every day. That is the whole trick.' },
+  { kind: 'rule', text: 'Datov\u00e1 schr\u00e1nka, every Sunday' },
   { kind: 'statement', text: 'The 2 AM version of you is not owed your company.', size: 'lg' },
+  { kind: 'quote', text: 'Kdo chce, hled\u00e1 zp\u016fsob. Kdo nechce, hled\u00e1 d\u016fvod.', by: '\u010cesk\u00e9 p\u0159\u00edslov\u00ed' },
   { kind: 'image', src: art('#b8912e', '#33260c'), photo: 'challenger', caption: 'the Challenger, kept, not sold' },
+  { kind: 'number', value: '180', label: 'grams of protein. Every day, not most days.' },
   { kind: 'statement', text: 'Your future kids will only ever meet the man you are building now.', size: 'xl' },
+  { kind: 'rule', text: 'Hardest call before 11:00' },
+  { kind: 'quote', text: 'The most important conversations you will ever have are the ones you have with yourself.', by: 'David Goggins' },
+  { kind: 'statement', text: 'You are the first one in this family to open every letter.', size: 'lg' },
+  { kind: 'number', value: '00:00', label: 'Lights out. Tomorrow is decided the night before, every time.' },
   { kind: 'rule', text: 'One task, then the next' },
-  { kind: 'quote', text: 'Hard choices, easy life. Easy choices, hard life.', by: 'Jerzy Gregorek' },
   { kind: 'image', src: art('#7a5cc4', '#241a42'), photo: 'gym-six', caption: 'the gym at six' },
+  { kind: 'quote', text: 'Hard choices, easy life. Easy choices, hard life.', by: 'Jerzy Gregorek' },
+  { kind: 'statement', text: 'In ten years this is the year you will point at.', size: 'xl' },
   { kind: 'number', value: '0', label: 'letters unopened. Zero. That is what control feels like.' },
+  { kind: 'rule', text: 'Tell her the real number' },
+  { kind: 'statement', text: 'The man who fixes this is the same man who avoided it. That is the entire point.', size: 'lg' },
+  { kind: 'quote', text: 'Beyond a certain point there is no return. That point has to be reached.', by: 'Franz Kafka' },
+  { kind: 'number', value: '10', label: 'days on the Ligurian coast in August. Booked, not dreamed about.' },
   { kind: 'statement', text: 'Off-Plate exists because you kept the evening promises nobody checked.', size: 'lg' },
+  { kind: 'rule', text: 'No 2 AM sessions' },
+  { kind: 'quote', text: 'The world breaks everyone, and afterward many are strong at the broken places.', by: 'Ernest Hemingway' },
+  { kind: 'statement', text: 'Your kids will inherit your habits long before they inherit anything else.', size: 'xl' },
+  { kind: 'number', value: '+5', label: 'kg off the floor every Saturday. Small, relentless, unarguable.' },
+  { kind: 'rule', text: 'Phone stays out of the first ten minutes' },
+  { kind: 'statement', text: 'The boy who wanted the loud car grew up and kept it. Keep the rest too.', size: 'lg' },
+  { kind: 'quote', text: 'Discipline equals freedom.', by: 'Jocko Willink' },
+  { kind: 'number', value: '2400', label: 'kcal. The quiet number that decides all the loud ones.' },
+  { kind: 'statement', text: 'A calm man is not a man without problems. He is a man who wrote them down.', size: 'lg' },
+  { kind: 'rule', text: 'If it takes two minutes, it happens now' },
+  { kind: 'quote', text: 'First say to yourself what you would be, then do what you have to do.', by: 'Epictetus' },
+  { kind: 'statement', text: 'Nobody sees the Tuesday. The Tuesday is the whole thing.', size: 'xl' },
+  { kind: 'number', value: '5', label: 'iron days, Monday to Friday. Saturday only if you want it.' },
+  { kind: 'rule', text: 'Log the set before you rest' },
+  { kind: 'statement', text: 'One day she will say we got through that, and she will mean you.', size: 'xl' },
+  { kind: 'quote', text: 'When we are no longer able to change a situation, we are challenged to change ourselves.', by: 'Viktor Frankl' },
+  { kind: 'statement', text: 'It did not arrive in one day and it will not leave in one day. Show up anyway.', size: 'lg' },
+  { kind: 'number', value: '7', label: 'days between you and the next Sunday check. That is the whole system.' },
+  { kind: 'rule', text: 'Finish what is open before starting what is new' },
+  { kind: 'statement', text: 'Stop waiting to feel ready. Ready is something you feel afterwards.', size: 'lg' },
+  { kind: 'quote', text: 'You are in danger of living a life so comfortable and soft that you will die without ever realizing your true potential.', by: 'David Goggins' },
+  { kind: 'number', value: '4', label: 'spaces, one life. Personal, Big Time, Off-Plate, the Corner.' },
+  { kind: 'statement', text: 'There is a version of this life where money is boring. It is closer than it feels.', size: 'lg' },
+  { kind: 'rule', text: 'Write it down or it did not happen' },
+  { kind: 'quote', text: 'You have power over your mind, not outside events. Realize this, and you will find strength.', by: 'Marcus Aurelius' },
+  { kind: 'statement', text: 'Every hard thing you have finished started as a thing you did not want to start.', size: 'lg' },
+  { kind: 'rule', text: 'Eat before you train, not after' },
+  { kind: 'statement', text: 'You have already done the hardest part, which was starting to look.', size: 'xl' },
 ]
 
 /** The site is served from a sub path on Pages, so every wall file has to be
@@ -112,7 +171,7 @@ export function BoardPage() {
         <h1>The wall</h1>
       </header>
       <div className="board-wall">
-        {DEMO.map((c, i) => {
+        {WALL.map((c, i) => {
           const tilt = TILT[i % TILT.length]
           const style = { ['--tilt' as string]: `${tilt}deg` } as React.CSSProperties
           if (c.kind === 'image') {
@@ -145,7 +204,6 @@ export function BoardPage() {
           )
         })}
       </div>
-      <p className="board-foot mono">demo wall · your own images, words and numbers replace these once the design is approved</p>
     </div>
   )
 }

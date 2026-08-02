@@ -618,12 +618,14 @@ export function CoachPage() {
   const open = mine.filter((s) => s.status === 'open')
   const closed = mine.filter((s) => s.status === 'closed')
   const easedCount = closed.filter((s) => s.didIt && s.felt === 'easier').length
-  /* The starters are HIS list, all of it: every open task from the plan and
-     the backlog, ranked by how avoided a thing looks, what keeps coming back
-     first, then what has waited longest. Canned scenarios only appear when the
-     list is empty, because the point of this page is HIS things. */
+  /* The starters are what he has NOT planned. A task he has put on today is a
+     task he has decided to do; leaving it on the list is the avoidance, which
+     is his own definition, so moving something to today takes it off this page
+     and moving it back puts it here again. Ranked by what keeps coming back
+     first, then by what has waited longest. Canned scenarios only appear when
+     there is nothing of his own, because the point of the page is his things. */
   const oldest = tasks
-    .filter((t) => !t.done && inView(t.space))
+    .filter((t) => !t.done && t.list !== 'today' && inView(t.space))
     .sort((a, b) => (b.carried ?? 0) - (a.carried ?? 0)
       || ((a.createdAt ?? '9999') < (b.createdAt ?? '9999') ? -1 : 1))
 

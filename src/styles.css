@@ -1441,6 +1441,20 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
   .band-actions .btn-primary { flex: 1 1 auto; }
   /* Day-part heads and the day switch wrap instead of colliding. */
   .col-head { flex-wrap: wrap; row-gap: var(--s1); }
+  /* The returned-work banner: sentence on its own line, buttons under it.
+     Unwrapped, the primary button ran 41px past the screen edge with its
+     label cut to "Replan all 2 for t". */
+  .handoff { flex-wrap: wrap; }
+  .handoff > .grow { flex: 1 1 100%; }
+  /* To-do rows match the day rows: title line, then a controls line. Without
+     this, adjacent rows wrapped differently and the two lists disagreed. */
+  .todo-row .grow { flex-basis: 100% !important; }
+  /* Assistant parse rows: what he said gets the width; where it goes wraps
+     under it instead of squeezing Czech into a five-line sliver. */
+  .assist-row { flex-wrap: wrap; }
+  .assist-row .grow { flex: 1 1 100%; }
+  /* The alert row's one action must be tappable on the device it fires on. */
+  .exception-row button { min-height: 44px; }
   .movebar { left: var(--s4); right: var(--s4); transform: none; justify-content: space-between; }
 }
 .rowitem .btn-danger { position: relative; }

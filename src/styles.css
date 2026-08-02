@@ -783,7 +783,7 @@ button.est-chip:hover { color: var(--accent); background: var(--accent-wash); }
 @media (min-width: 1280px) { .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (min-width: 720px) { .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1200px) { .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.grid-3 .panel-wide, .grid-2 .panel-wide { grid-column: 1 / -1; }
+.grid-3 .panel-wide, .grid-2 .panel-wide, .grid-4 .panel-wide { grid-column: 1 / -1; }
 @keyframes pagein { from { opacity: 0; transform: translateY(4px); } }
 
 .page-grid { display: grid; gap: var(--s5); grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); align-items: start; }
@@ -1311,6 +1311,9 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
   border: 1px solid var(--hairline-strong); border-radius: 4px; padding: 3px 9px; color: var(--ink); min-height: 32px;
 }
 .actual-chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
+/* What the timer clocked, offered ahead of the guesses. */
+.actual-chip.is-tracked { border-color: var(--info); color: var(--info); background: var(--info-wash); }
+.actual-chip.is-tracked .mono { font-size: 0.625rem; opacity: 0.8; margin-left: 3px; }
 .actual-skip { color: var(--muted); font-family: var(--font-body); font-weight: 500; }
 .actual-input { width: 64px; min-height: 32px; border: 1px solid var(--hairline-strong); border-radius: 4px; background: var(--bg); padding: 2px 8px; font-family: var(--font-mono); font-size: 0.75rem; }
 .actual-input:focus { outline: none; border-color: var(--accent); }

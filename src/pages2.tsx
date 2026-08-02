@@ -217,13 +217,28 @@ export function ReviewPage() {
 
   /* Every number below reads the same two dates. Nothing is computed per window,
      so a week and a quarter are the same page with a different span. */
-  const rows = ledger.filter((e) => inView(e.space) && inRange(e.when, range))
+  const blocks = focusSessions.filter((f) => inView(f.space) && inRange(f.day, range))
+  const focusMin = blocks.reduce((a, f) => a + f.minutes, 0)
+  /* A focus block writes its own ledger row, with the estimate equal to what it
+     ran. Counted among the tasks it inflated the work count and handed the
+     accuracy figure a free 100% every time he sat down. The blocks are told in
+     their own panel, so the task numbers here are tasks only. */
+  const fromFocus = new Set(focusSessions.map((f) => f.ledgerId).filter(Boolean) as string[])
+  const rows = ledger.filter((e) => inView(e.space) && inRange(e.when, range) && !fromFocus.has(e.id))
   const saved = rows.reduce((a, e) => a + (e.estimateMin - e.actualMin), 0)
   const worked = rows.reduce((a, e) => a + e.actualMin, 0)
   const onTime = rows.filter((e) => Math.abs(e.estimateMin - e.actualMin) <= e.estimateMin * 0.25).length
   const accuracy = rows.length ? Math.round((onTime / rows.length) * 100) : 0
-  const blocks = focusSessions.filter((f) => inView(f.space) && inRange(f.day, range))
-  const focusMin = blocks.reduce((a, f) => a + f.minutes, 0)
+
+  /* What he actually did, counted. The page held the times and the shapes but
+     never the plain totals, which are the first thing you want when you sit
+     down to look back at a month. */
+  const habitSpace = new Map(habits.map((h) => [h.id, h.space]))
+  const myTicks = habitLog.filter((t) => inRange(t.day, range) && inView(habitSpace.get(t.habitId)))
+  const keptTimes = myTicks.length
+  const keptDays = new Set(myTicks.map((t) => `${t.habitId}|${t.day}`)).size
+  const routineSpace = new Map(routines.map((r) => [r.id, r.space]))
+  const routinesDone = routineLog.filter((r) => inRange(r.day, range) && inView(routineSpace.get(r.routineId))).length
 
   const activeHabits = habits.filter((h) => !h.paused && !h.archivedAt && inView(h.space))
   const spaceGoals = goals.filter((g) => inView(g.space))
@@ -271,7 +286,7 @@ export function ReviewPage() {
   return (
     <div className="page">
       <Band
-        title="Review"
+        title="Reflect"
         actions={
           <select
             className="textinput rangepick" value={rangeId}
@@ -318,9 +333,17 @@ export function ReviewPage() {
 
       <div className="grid-4">
         <div className="panel">
-          <span className="microcap">Work logged</span>
-          <div className="kpi">{rows.length}</div>
+          <span className="microcap">Finished</span>
+          <div className="kpi">{rows.length}<span className="unit">{rows.length === 1 ? 'task' : 'tasks'}</span></div>
           <div className="kpi-sub">{fmtDuration(worked)} of it, start to finish</div>
+        </div>
+        <div className="panel">
+          <span className="microcap">Habits kept</span>
+          <div className="kpi val-pos">{keptDays}</div>
+          <div className="kpi-sub">
+            {keptTimes > keptDays ? `${keptTimes} times in all, ` : ''}
+            {routinesDone} {routinesDone === 1 ? 'routine' : 'routines'} finished
+          </div>
         </div>
         <div className="panel">
           <span className="microcap">Focus time</span>
@@ -332,7 +355,7 @@ export function ReviewPage() {
           <div className={`kpi ${saved >= 0 ? 'val-pos' : 'val-urgent'}`}>{fmtSigned(saved)}</div>
           <div className="kpi-sub">against your own estimates</div>
         </div>
-        <div className="panel">
+        <div className="panel panel-wide">
           <span className="microcap">Goals on track</span>
           <div className="kpi">{goalsOnTrack}<span className="unit">of {spaceGoals.length}</span></div>
           <div className="rowlist" style={{ marginTop: 8 }}>
@@ -370,7 +393,7 @@ export function ReviewPage() {
       </div>
 
       {/* Numbers a routine step recorded, over the same window as everything
-          else on this page. Looking back at them is a Review job, not something
+          else on this page. Looking back at them is a Reflect job, not something
           to read while you are still typing the number in. */}
       {numberSeries.length > 0 && (
         <>

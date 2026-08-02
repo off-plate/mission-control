@@ -518,12 +518,22 @@ function EditTaskSheet({ task, onClose }: { task: Task; onClose: () => void }) {
 }
 
 /** Inline "how long did it take?" logger shown when you finish a task or subtask. */
-function ActualLog({ est, onLog, onSkip }: { est: number; onLog: (m: number) => void; onSkip: () => void }) {
+function ActualLog({ est, tracked, onLog, onSkip }: { est: number; tracked?: number | null; onLog: (m: number) => void; onSkip: () => void }) {
   const [custom, setCustom] = useState('')
-  const chips = Array.from(new Set([Math.max(1, Math.round(est / 2)), est, est * 2]))
+  /* The timer already knows. Guesses off the estimate were the only offer here,
+     so a block plus the ten minutes he extended it by got thrown away the moment
+     he tapped "45m", and the day's saved-time went back to being fiction. What
+     was actually clocked comes first, and it counts every block on this task
+     today, extensions included. */
+  const chips = Array.from(new Set([Math.max(1, Math.round(est / 2)), est, est * 2])).filter((m) => m !== tracked)
   return (
     <div className="actual-log" role="group" aria-label="How long did it take?">
       <span className="actual-log-q">How long?</span>
+      {tracked ? (
+        <button className="actual-chip is-tracked" onClick={() => onLog(tracked)}>
+          {fmtDuration(tracked)} <span className="mono">tracked</span>
+        </button>
+      ) : null}
       {chips.map((m) => <button key={m} className="actual-chip" onClick={() => onLog(m)}>{m}m</button>)}
       <input
         className="actual-input" type="number" min={1} placeholder="min" value={custom}
@@ -745,7 +755,8 @@ function RoutineOnDay({ routine, habitName }: { routine: Routine; habitName?: st
 
 export function PlanPage() {
   const todayIdx = (new Date().getDay() + 6) % 7
-  const { startFocus } = usePomodoro()
+  const pomo = usePomodoro()
+  const { startFocus } = pomo
   const { routines, habits } = useStore()
   const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId, setTaskAt, plan, setPage, openDay, view, inView, focusSessions } = useStore()
 
@@ -796,13 +807,21 @@ export function PlanPage() {
      through the focus timer never had its minutes typed in, so its focus blocks
      ARE its actual; without that, an hour of overrun quietly vanished from the
      number and "saved" read positive on a day that ran long. */
-  const focusActual = (t: Task) => {
-    const want = t.title.trim().toLowerCase()
-    const mins = focusSessions
+  /* Every block clocked against this title today, plus the one still running if
+     it carries the same name. A block finished and then extended is two rows,
+     so this has to add them up rather than read the last one. */
+  const trackedFor = (title: string) => {
+    const want = title.trim().toLowerCase()
+    const logged = focusSessions
       .filter((f) => f.day === localDateKey() && (f.label ?? '').trim().toLowerCase() === want && inView(f.space))
       .reduce((a, f) => a + f.minutes, 0)
+    const live = pomo.phase === 'focus' && (pomo.focusLabel ?? '').trim().toLowerCase() === want
+      ? Math.max(0, Math.floor((pomo.blockMin * 60 - pomo.secondsLeft) / 60))
+      : 0
+    const mins = logged + live
     return mins > 0 ? mins : null
   }
+  const focusActual = (t: Task) => trackedFor(t.title)
   const actualOf = (t: Task) => t.actualMin ?? (t.done ? focusActual(t) : null)
   const loggedAny = todayAll.some((t) => actualOf(t) != null || t.subtasks?.some((x) => x.actualMin != null))
   const savedToday = todayAll.reduce((acc, t) => {
@@ -1111,7 +1130,7 @@ export function PlanPage() {
                           </Dropdown>
                         </div>
                         {logging === t.id && (
-                          <ActualLog est={taskMinutes(t)} onLog={(m) => { logActual(t.id, m); setLogging(null) }} onSkip={() => { toggleTask(t.id); setLogging(null) }} />
+                          <ActualLog est={taskMinutes(t)} tracked={trackedFor(t.title)} onLog={(m) => { logActual(t.id, m); setLogging(null) }} onSkip={() => { toggleTask(t.id); setLogging(null) }} />
                         )}
                         {hasSubs && isExp && (
                           <div className="subtask-list">
@@ -1142,7 +1161,7 @@ export function PlanPage() {
                                   </button>
                                 )}
                                 {logging === `sub|${t.id}|${s.id}` && (
-                                  <ActualLog est={s.estimateMin} onLog={(m) => { logSubtaskActual(t.id, s.id, m); setLogging(null) }} onSkip={() => { toggleSubtask(t.id, s.id); setLogging(null) }} />
+                                  <ActualLog est={s.estimateMin} tracked={trackedFor(s.title)} onLog={(m) => { logSubtaskActual(t.id, s.id, m); setLogging(null) }} onSkip={() => { toggleSubtask(t.id, s.id); setLogging(null) }} />
                                 )}
                               </div>
                             ))}

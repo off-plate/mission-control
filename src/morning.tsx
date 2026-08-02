@@ -211,7 +211,7 @@ function Typing({ url, label, stepId, onLog }: {
 
       {/* Nothing else. You type the number and you are done: the step's own
           checkbox is what tells you it unlocked, and the score itself lives in
-          Review under Numbers. A result card here restated the number you had
+          Reflect under Numbers. A result card here restated the number you had
           just typed, in a box the size of the step. */}
     </div>
   )

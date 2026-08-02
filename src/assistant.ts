@@ -25,8 +25,10 @@ const DONE_LEADS = /^(done|hotovo)\b\s*[:\-]?\s*/i
    follows a goal word and belongs to the routing, not to the goal's name. */
 const HORIZON_TAIL = /^((na|za|do|pro)\s+)?((konce?\s+)?(tento|tenhle|tohoto|p[řr][íi][šs]t[íi])\s+)?(t[ýy]den|t[ýy]dne|m[ěe]s[íi]ce?|kvart[áa]lu?|roku?|this\s+(week|month|quarter|year))\s*/i
 
+const DURATION = /(\d+)\s*(hours?|hrs?|h|hodin[ay]?|minutes?|mins?|min|minut[ya]?|m)\b/i
+
 function estimate(line: string): number | undefined {
-  const m = line.match(/(\d+)\s*(hours?|hrs?|h|hodin[ay]?|minutes?|mins?|min|minut[ya]?|m)\b/i)
+  const m = line.match(DURATION)
   if (!m) return undefined
   const n = Number(m[1])
   return /^h/i.test(m[2]) ? n * 60 : n
@@ -52,11 +54,15 @@ export function parseDictation(input: string): ParsedItem[] {
           .replace(/^(done|finished|completed|hotovo)\s+(with\s+)?/i, '')
           .replace(/^(u[žz] jsem|ud[ěe]lal jsem|dokon[čc]il jsem)\s+/i, '')
       }
+      const est = estimate(raw)
       text = text
         .replace(/^(i (need to|have to|should)|today i want to|remind me to|mus[íi]m|m[ěe]l bych)\s+/i, '')
         .replace(/\s+/g, ' ')
         .trim()
-      return { kind, text: text.charAt(0).toUpperCase() + text.slice(1), estimateMin: estimate(raw) }
+      /* The duration's meaning became the chip, so the words leave the title:
+         "zavolat do VZP 20 minut" + a 20m chip said the number twice. */
+      if (est !== undefined) text = text.replace(DURATION, '').replace(/\s{2,}/g, ' ').replace(/[,;]\s*$/, '').trim()
+      return { kind, text: text.charAt(0).toUpperCase() + text.slice(1), estimateMin: est }
     })
     .filter((p) => p.text.length > 1)
 }

@@ -231,7 +231,7 @@ export function TodayPage() {
           { v: String(open.length), k: 'tasks open' },
           ...(space === 'personal' && nextPay
             ? [{ v: `${nextPay.amount} ${nextPay.date.split(' ')[0]}`, k: 'next payment', tone: 'urgent' as const }]
-            : savedMin !== 0 ? [{ v: `${fmtSigned(savedMin)}`, k: savedMin > 0 ? 'under estimate' : 'over estimate', tone: (savedMin > 0 ? 'pos' : 'urgent') as 'pos' | 'urgent' }] : []),
+            : savedMin !== 0 ? [{ v: savedMin > 0 ? fmtSigned(savedMin) : fmtDuration(-savedMin), k: savedMin > 0 ? 'under estimate' : 'over your estimates', tone: (savedMin > 0 ? 'pos' : 'urgent') as 'pos' | 'urgent' }] : []),
         ]}
         actions={
           <>
@@ -1026,7 +1026,7 @@ export function PlanPage() {
         metrics={[
           { v: fmtDuration(plannedMin), k: ahead ? 'planned tomorrow' : 'planned today', tone: 'info' as const },
           { v: pool.length ? `${donePct}%` : '—', k: pool.length ? 'to-do done' : 'no tasks yet', tone: (pool.length && donePct > 0 ? 'pos' : 'info') as 'pos' | 'info' },
-          ...(loggedAny ? [{ v: fmtSigned(savedToday), k: savedToday >= 0 ? 'saved today' : 'over estimate', tone: (savedToday >= 0 ? 'pos' : 'urgent') as 'pos' | 'urgent' }] : []),
+          ...(loggedAny ? [{ v: savedToday >= 0 ? fmtSigned(savedToday) : fmtDuration(-savedToday), k: savedToday >= 0 ? 'saved today' : 'over your estimates', tone: (savedToday >= 0 ? 'pos' : 'urgent') as 'pos' | 'urgent' }] : []),
         ]}
         /* The way back into the record. Every day before this one is addressable
            from here, and from there one arrow at a time. */

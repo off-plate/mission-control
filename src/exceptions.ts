@@ -133,7 +133,7 @@ export function exceptionsFor(space: SpaceId, ctx: { tasks: Task[]; routines: Ro
     out.push({
       id: 'x-overplanned',
       text: overSlots.length === 1
-        ? `Today is over-planned: ${fmt(worst.over)} more in the ${worst.label} than the ${worst.label} holds.`
+        ? `Today is over-planned: ${fmt(worst.over)} more in the ${worst.label} than it holds.`
         : `Today is over-planned in ${overSlots.length} parts of the day, worst is the ${worst.label} at ${fmt(worst.over)} over.`,
       when: 'today',
       action: 'open-plan',

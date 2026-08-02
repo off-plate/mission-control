@@ -1966,7 +1966,10 @@ function usePackedGrid(deps: unknown[]) {
   useEffect(() => {
     const grid = ref.current
     if (!grid || typeof ResizeObserver === 'undefined') return
-    const gap = parseFloat(getComputedStyle(grid).rowGap || '0')
+    /* The packed grid has NO row gap of its own (the span carries it), so the
+       spacing has to come from the column gap. Reading rowGap here gave 0 and
+       stacked the cards flush against each other. */
+    const gap = parseFloat(getComputedStyle(grid).columnGap || '16')
     const measure = () => {
       for (const child of Array.from(grid.children) as HTMLElement[]) {
         const h = child.getBoundingClientRect().height
@@ -2005,8 +2008,20 @@ export function RoutinesPage() {
     (habits.find((h) => h.id === r.habitId)?.daypart ?? slotForMoment(new Date().toISOString())) as TimeSlot
   const [editingId, setEditingId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
-  const hereRef = usePackedGrid([routines, view, editingId])
-  const elseRef = usePackedGrid([routines, view, editingId])
+  /* One open at a time. Two half-open routines is two half-done routines. */
+  const [openId, setOpenId] = useState<string | null>(null)
+  /* Finished is finished: the card that just got its last tick shuts itself,
+     which is what makes the page settle back down without him tidying it. */
+  useEffect(() => {
+    if (!openId || editingId === openId) return
+    const r = routines.find((x) => x.id === openId)
+    if (r && routineComplete(r, periodKeyFor(r.cadence))) {
+      const t = window.setTimeout(() => setOpenId((cur) => (cur === r.id ? null : cur)), 600)
+      return () => window.clearTimeout(t)
+    }
+  }, [routines, openId, editingId])
+  const hereRef = usePackedGrid([routines, view, editingId, openId])
+  const elseRef = usePackedGrid([routines, view, editingId, openId])
   const live = routines.filter((r) => !r.archivedAt)
   const byFlow = (a: Routine, b: Routine) => flowRank(a) - flowRank(b)
   /* In All nothing is "elsewhere": one list, day order, as before. */
@@ -2014,47 +2029,72 @@ export function RoutinesPage() {
   const elsewhere = (view === 'all' ? [] : live.filter((r) => r.space !== view))
     .sort((a, b) => SPACE_RANK[a.space] - SPACE_RANK[b.space] || byFlow(a, b))
 
+  /* The same menu wherever the card is, open or shut. */
+  const menu = (r: Routine) => (
+    <Dropdown label={`Options for ${r.title}`}>
+      <button role="menuitem" onClick={() => { setEditingId(editingId === r.id ? null : r.id); setOpenId(r.id) }}>
+        {editingId === r.id ? 'Done editing' : 'Edit the steps'}
+      </button>
+      {/* On the day's list before it is started, so a day can be planned and
+          not only recorded. It lands in the part of the day it belongs to and
+          can be moved from there. */}
+      {onDay(r)
+        ? (r.planned && !r.startedAt
+          ? <button role="menuitem" onClick={() => planRoutine(r.id)}>Take off today</button>
+          : <button role="menuitem" onClick={() => setPage('plan')}>See it on today</button>)
+        : <button role="menuitem" onClick={() => planRoutine(r.id, plannedSlotFor(r))}>Add to today</button>}
+      <span className="kebab-sep" />
+      <button role="menuitem" className="danger" onClick={() => deleteRoutine(r.id)}>
+        Delete this routine
+      </button>
+    </Dropdown>
+  )
+
+  /* The state of a routine in one line: how far through it is, or that it is
+     done for its period, and twice through says so. */
+  const status = (r: Routine) => {
+    const { done, total } = routineProgress(r)
+    if (!routineComplete(r, periodKeyFor(r.cadence))) return <span className="routine-progress mono">{done}/{total}</span>
+    const runs = routineRunsOn(routineLog, r.id, localDateKey())
+    return <span className="col-tot mono val-pos">{runs > 1 ? `done ${runs}x today` : DONE_LABEL[r.cadence]}</span>
+  }
+
   const card = (r: Routine) => {
+          /* Shut by default. A routine is a thing you run, not a thing you read:
+             open the one you are doing, work down it, and it shuts itself the
+             moment it is finished. Ten open cards was a page you had to scroll
+             past to find the one you wanted. */
+          if (openId !== r.id && editingId !== r.id) {
+            return (
+              <div className={`panel routine-card is-shut${routineComplete(r, periodKeyFor(r.cadence)) ? ' is-complete' : ''}`} key={r.id}>
+                <div className="routine-tag">
+                  <button className="routine-open" onClick={() => setOpenId(r.id)} aria-expanded={false}>
+                    <SpaceMark space={r.space} always />
+                    <span className="routine-card-title">{r.title}</span>
+                  </button>
+                  {status(r)}
+                  {menu(r)}
+                </div>
+              </div>
+            )
+          }
           /* Every MORNING ritual gets the same guided format, whatever its
              workspace: one look for one kind of thing. A morning routine with
              no steps yet keeps the plain card, which is where steps are added. */
           if ((r.id === 'r-morning' || r.id === 'r-morningwork') && r.steps.length > 0 && editingId !== r.id) {
-            return <MorningRoutine routine={r} key={r.id} onEdit={() => setEditingId(r.id)} />
+            return <MorningRoutine routine={r} key={r.id} onEdit={() => setEditingId(r.id)} onShut={() => setOpenId(null)} />
           }
-          const { done, total } = routineProgress(r)
+          const { total } = routineProgress(r)
           const complete = routineComplete(r, periodKeyFor(r.cadence))
-          const linked = r.habitId ? habits.find((h) => h.id === r.habitId) : null
           return (
             <div className={`panel routine-card${complete ? ' is-complete' : ''}`} key={r.id}>
               <div className="routine-tag">
-                <SpaceMark space={r.space} always />
-                <span className="routine-card-title">{r.title}</span>
-                {editingId !== r.id && (complete
-                  /* Twice through says so. Without the count, doing it again
-                     would look exactly like never having done it twice. */
-                  ? <span className="col-tot mono val-pos">
-                    {routineRunsOn(routineLog, r.id, localDateKey()) > 1
-                      ? `done ${routineRunsOn(routineLog, r.id, localDateKey())}x today`
-                      : DONE_LABEL[r.cadence]}
-                  </span>
-                  : <span className="routine-progress mono">{done}/{total}</span>)}
-                <Dropdown label={`Options for ${r.title}`}>
-                  <button role="menuitem" onClick={() => setEditingId(editingId === r.id ? null : r.id)}>
-                    {editingId === r.id ? 'Done editing' : 'Edit the steps'}
-                  </button>
-                  {/* On the day's list before it is started, so a day can be
-                      planned and not only recorded. It lands in the part of the
-                      day it belongs to and can be moved from there. */}
-                  {onDay(r)
-                    ? (r.planned && !r.startedAt
-                      ? <button role="menuitem" onClick={() => planRoutine(r.id)}>Take off today</button>
-                      : <button role="menuitem" onClick={() => setPage('plan')}>See it on today</button>)
-                    : <button role="menuitem" onClick={() => planRoutine(r.id, plannedSlotFor(r))}>Add to today</button>}
-                  <span className="kebab-sep" />
-                  <button role="menuitem" className="danger" onClick={() => deleteRoutine(r.id)}>
-                    Delete this routine
-                  </button>
-                </Dropdown>
+                <button className="routine-open is-open" onClick={() => { setOpenId(null); setEditingId(null) }} aria-expanded>
+                  <SpaceMark space={r.space} always />
+                  <span className="routine-card-title">{r.title}</span>
+                </button>
+                {editingId !== r.id && status(r)}
+                {menu(r)}
               </div>
               {r.blurb && <p className="routine-blurb">{r.blurb}</p>}
               {editingId === r.id ? (

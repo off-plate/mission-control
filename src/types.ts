@@ -82,12 +82,22 @@ export type TaskCategory = 'call' | 'admin' | 'deep' | 'quick'
 
 export type TimeSlot = 'morning' | 'noon' | 'afternoon' | 'evening'
 
-export const SLOTS: { id: TimeSlot; label: string; hint: string }[] = [
-  { id: 'morning', label: 'Morning', hint: 'before noon' },
-  { id: 'noon', label: 'Noon', hint: '12 to 2 PM' },
-  { id: 'afternoon', label: 'Afternoon', hint: '2 to 6 PM' },
-  { id: 'evening', label: 'Evening', hint: 'after 6 PM' },
+/* Each part of the day is a real span of hours, not a vague word: `from` and
+   `to` are the clock, and the hint is written from them so the label and the
+   capacity can never disagree. Morning starts at 6 and evening stops at
+   midnight, which is his own bed-by-midnight rule, so a night that runs past it
+   is over budget by definition. */
+export const SLOTS: { id: TimeSlot; label: string; hint: string; from: number; to: number }[] = [
+  { id: 'morning', label: 'Morning', hint: '6 AM to noon', from: 6, to: 12 },
+  { id: 'noon', label: 'Noon', hint: '12 to 2 PM', from: 12, to: 14 },
+  { id: 'afternoon', label: 'Afternoon', hint: '2 to 6 PM', from: 14, to: 18 },
+  { id: 'evening', label: 'Evening', hint: '6 PM to midnight', from: 18, to: 24 },
 ]
+/** How many minutes that part of the day actually holds. */
+export const slotMinutes = (id: TimeSlot): number => {
+  const s = SLOTS.find((x) => x.id === id)
+  return s ? (s.to - s.from) * 60 : 0
+}
 
 export interface SubTask {
   id: string

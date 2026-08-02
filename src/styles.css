@@ -1425,25 +1425,23 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 .routine-tag .routine-progress, .routine-tag .col-tot { margin-left: auto; flex: none; white-space: nowrap; }
 /* Shut, a card is one line. Ten of them read as a list of what he has, which is
    what the page is for when he is not running one. */
-/* Shut, a card is a fixed block: the same height whatever the length of its
-   name, so a row of them lines up instead of stepping up and down. It carries
-   the name, how far through it is, and the step it is asking for next, which is
-   what makes it worth looking at rather than a label. */
-.routine-card.is-shut { height: 108px; overflow: hidden; justify-content: space-between; }
+/* Shut, a card is a fixed block, the same height whatever the length of its
+   name, so a row of them lines up instead of stepping up and down. It holds the
+   name, how far through it is, and the first step it is still asking for, drawn
+   as the step it is: a real checkbox he can tick from here. */
+.routine-card.is-shut { height: 132px; overflow: hidden; }
 .routine-card.is-shut .routine-tag { margin-bottom: 0; }
 .routine-card.is-shut .routine-card-title {
   font-size: var(--text-base); line-height: 1.2;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-.routine-next {
-  display: flex; align-items: baseline; gap: var(--s2); width: 100%; text-align: left;
-  padding: var(--s2) 0 0 22px; color: var(--muted); font-size: var(--text-sm); min-width: 0;
+.routine-steplist.is-peek { margin-top: auto; padding-top: var(--s2); border-top: 1px solid var(--hairline); }
+.routine-steplist.is-peek .routine-step { border: 0; padding: var(--s2) 0 0; }
+.routine-steplist.is-peek .routine-step-body .l {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-.routine-next .rn-cap { flex: none; font-size: 0.5625rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--faint); }
-.routine-next .rn-t { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.routine-next:hover .rn-t { color: var(--ink); }
-.routine-next .rn-done { color: var(--progress); }
-.routine-next .rn-empty { color: var(--faint); }
+.routine-peek-note { padding-top: var(--s2); font-size: var(--text-sm); color: var(--faint); }
+.routine-card.is-shut.is-complete .routine-peek-note { color: var(--progress); }
 .routine-card-title { font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); line-height: 1.15; }
 .routine-progress { color: var(--faint); font-size: var(--text-sm); }
 .routine-blurb { font-size: var(--text-sm); color: var(--muted); margin: var(--s2) 0 var(--s3); max-width: 54ch; }
@@ -1493,7 +1491,7 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 /* In the compact list under a Today row the same choice is two plain rows. */
 .subtask.alt { padding-left: var(--s2); }
 
-.routine-dur { font-size: 0.6875rem; color: var(--faint); font-weight: 400; }
+.routine-dur { font-size: 0.6875rem; color: var(--faint); font-weight: 400; margin-left: 6px; }
 .step-optional {
   font-size: 0.625rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint);
   font-weight: 500; border: 1px solid var(--hairline); border-radius: 3px; padding: 1px 5px;
@@ -2733,6 +2731,10 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 @keyframes est-spin { to { transform: rotate(360deg); } }
 /* which hours a part of the day means */
 .bucket-hours { font-size: 0.6875rem; color: var(--faint); margin-left: var(--s2); }
+/* More planned than the hours hold. Said once, in the head, where the total
+   already is: no banner, no red card, just the number telling the truth. */
+.tot.is-over { color: var(--alert); display: inline-flex; align-items: baseline; gap: 6px; }
+.tot.is-over b { font-weight: 600; font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.05em; }
 .cal-untimed-cap { flex: 1 0 100%; font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); }
 
 /* ---------- the vision board: the one page off the house style ---------- */
@@ -2790,7 +2792,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   color: rgba(255,255,255,0.85); font-size: 0.7rem; letter-spacing: 0.05em;
   background: linear-gradient(transparent, rgba(0,0,0,0.65));
 }
-.board-foot { margin: var(--s8) 0 0; color: var(--bp-mut); font-size: var(--text-xs); }
 @media (max-width: 700px) {
   .board-wall { columns: 160px; }
   .board-page { padding: var(--s6) var(--s4) var(--s10); }

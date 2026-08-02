@@ -7,7 +7,7 @@ import { usePomodoro } from './pomodoro'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
 import { Linkify } from './widgets'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, isCounted, COUNT_PERIODS, routineComplete, routineProgress, routineRunsOn, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, isCounted, COUNT_PERIODS, routineComplete, routineProgress, routineRunsOn, slotMinutes, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
 import { estimateTask } from './ai'
 import { goalPeriodKey, goalPeriodRange, habitPeriodRange, periodKeyFor, periodLabel, shiftPeriodKey, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForMoment, taskMinutes, toMin } from './util'
@@ -448,6 +448,42 @@ const BUCKETS: { id: TimeSlot | 'unsorted'; label: string }[] = [
 /* A generated breakdown is a draft. The wording is the model's, the minutes are
    a guess, and sometimes a step is simply not his, so every one of them can be
    rewritten, re-estimated or thrown away. */
+/* Edit or drop one step, from wherever it is shown. The list had this and the
+   day did not, which is backwards: the day is where he finds out the number was
+   wrong. Opens in place, saves on Enter or on Save, Escape puts it back. */
+function SubEdit({ taskId, sub }: { taskId: string; sub: SubTask }) {
+  const { updateSubtask, deleteSubtask } = useStore()
+  const [editing, setEditing] = useState(false)
+  const [title, setTitle] = useState(sub.title)
+  const [mins, setMins] = useState(String(sub.estimateMin))
+  const save = () => {
+    updateSubtask(taskId, sub.id, { title: title.trim() || sub.title, estimateMin: Number(mins) || sub.estimateMin })
+    setEditing(false)
+  }
+  const cancel = () => { setTitle(sub.title); setMins(String(sub.estimateMin)); setEditing(false) }
+  if (!editing) {
+    return (
+      <span className="sub-tools">
+        <button className="sub-tool" aria-label={`Edit step: ${sub.title}`} onClick={() => setEditing(true)}>Edit</button>
+        <button className="sub-tool" aria-label={`Remove step: ${sub.title}`} onClick={() => deleteSubtask(taskId, sub.id)}>Remove</button>
+      </span>
+    )
+  }
+  return (
+    <div className="subtask-row is-editing" style={{ flex: '1 0 100%' }}>
+      <input className="textinput sub-edit-title" value={title} autoFocus
+        aria-label={`Step title: ${sub.title}`}
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') cancel() }} />
+      <input className="textinput sub-edit-min mono" type="number" min={1} max={480} value={mins}
+        aria-label={`Minutes for ${sub.title}`}
+        onChange={(e) => setMins(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') cancel() }} />
+      <button className="btn btn-primary sub-btn" onClick={save}>Save</button>
+    </div>
+  )
+}
+
 function SubtaskRow({ taskId, sub }: { taskId: string; sub: SubTask }) {
   const { updateSubtask, deleteSubtask } = useStore()
   const [editing, setEditing] = useState(false)
@@ -1048,6 +1084,9 @@ export function PlanPage() {
               ...mine.filter(rDone).map((routine) => ({ kind: 'repeat' as const, routine })),
             ]
             const tot = inBucket.filter((t) => !t.done).reduce((a, t) => a + taskMinutes(t), 0)
+            /* Unsorted is not a part of the day and has no hours to run out of. */
+            const cap = b.id === 'unsorted' ? 0 : slotMinutes(b.id as TimeSlot)
+            const over = cap > 0 ? tot - cap : 0
             return (
               <div
                 className={`bucket drop-zone${dropKey === b.id ? ' drop-over' : ''}`}
@@ -1059,7 +1098,18 @@ export function PlanPage() {
                 <div className="bucket-head">
                   <span className="bucket-name">{b.label}</span>
                   {BUCKET_HINT[b.id] && <span className="bucket-hours mono">{BUCKET_HINT[b.id]}</span>}
-                  {tot > 0 && <span className="tot mono">{fmtDuration(tot)}</span>}
+                  {/* What is planned against what the window actually holds, for
+                      THIS workspace only. Four hours of work in a two hour
+                      window is not ambition, it is a day that was over before it
+                      started, and the app knew both numbers all along. */}
+                  {tot > 0 && (over > 0
+                    ? (
+                      <span className="tot mono is-over" title={`${fmtDuration(tot)} planned, ${fmtDuration(cap)} in this part of the day`}>
+                        {fmtDuration(tot)} of {fmtDuration(cap)}
+                        <b>{fmtDuration(over)} over</b>
+                      </span>
+                    )
+                    : <span className="tot mono">{fmtDuration(tot)}</span>)}
                 </div>
                 {items.length === 0 ? (
                   <p className="bucket-empty">Drop a task here.</p>
@@ -1173,6 +1223,11 @@ export function PlanPage() {
                                     </svg>
                                   </button>
                                 )}
+                                {/* The same tools the list gives a step. A step
+                                    could only be corrected before he planned it,
+                                    so the day he actually works from was the one
+                                    place a wrong number was stuck. */}
+                                {!s.done && <SubEdit taskId={t.id} sub={s} />}
                                 {logging === `sub|${t.id}|${s.id}` && (
                                   <ActualLog est={s.estimateMin} tracked={trackedFor(s.title)} onLog={(m) => { logSubtaskActual(t.id, s.id, m); setLogging(null) }} onSkip={() => { toggleSubtask(t.id, s.id); setLogging(null) }} />
                                 )}
@@ -2086,10 +2141,8 @@ export function RoutinesPage() {
              past to find the one you wanted. */
           if (!isOpen(r.id)) {
             const complete = routineComplete(r, periodKeyFor(r.cadence))
-            /* The step he would do next, so a shut card still tells him what it
-               is asking of him rather than only its name. */
-            const next = complete ? null : r.steps.find((s) => !r.doneStepIds.includes(s.id) && !s.optional)
-              ?? r.steps.find((s) => !r.doneStepIds.includes(s.id))
+            /* The first step it is still asking for. */
+            const next = complete ? null : r.steps.find((s) => !r.doneStepIds.includes(s.id))
             return (
               <div className={`panel routine-card is-shut${complete ? ' is-complete' : ''}`} key={r.id}>
                 <div className="routine-tag">
@@ -2100,13 +2153,38 @@ export function RoutinesPage() {
                   {status(r)}
                   {menu(r)}
                 </div>
-                <button className="routine-next" onClick={() => setOpenId(r.id)}>
-                  {next
-                    ? <><span className="rn-cap mono">next</span><span className="rn-t">{next.title}</span></>
-                    : complete
-                      ? <span className="rn-t rn-done">All of it, done.</span>
-                      : <span className="rn-t rn-empty">No steps yet.</span>}
-                </button>
+                {/* The step itself, drawn exactly as it is drawn inside the
+                    routine, checkbox and all, so the first thing it asks of him
+                    can be ticked without opening anything. */}
+                <div className="routine-steplist is-peek">
+                  {next ? (
+                    <div className="routine-step">
+                      {next.alts?.length ? (
+                        <span className="routine-check is-blank" aria-hidden="true" />
+                      ) : (
+                        <button
+                          className="routine-check"
+                          role="checkbox"
+                          aria-checked={false}
+                          aria-label={next.title}
+                          disabled={stepLocked(r, next.id)}
+                          onClick={() => toggleRoutineStep(r.id, next.id)}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        </button>
+                      )}
+                      <span className="routine-step-body">
+                        <span className="l">
+                          {next.title}
+                          {next.kind === 'timer' && next.seconds ? <span className="routine-dur mono">{Math.round(next.seconds / 60)}m</span> : null}
+                          {next.optional && <span className="step-optional mono">optional</span>}
+                        </span>
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="routine-peek-note">{complete ? 'All of it, done.' : 'No steps yet. Open the menu and write them.'}</p>
+                  )}
+                </div>
               </div>
             )
           }

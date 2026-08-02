@@ -1010,6 +1010,36 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       : [...prev, { routineId: r.id, day, periodKey: pk, run: 0 }]))
   }
 
+  /* "I have been keeping this since June" is a claim about days, so it is
+     written as days: every day from the start to YESTERDAY is marked kept, in
+     the log and in this week's cache. Today is deliberately left alone, because
+     a habit added this morning has not been done yet and a green dot for it
+     would be a lie. A day he already has a row for is never touched, so this
+     cannot double-tick, cannot overwrite a day he corrected by hand, and running
+     it twice changes nothing. */
+  const backfillKept = (habitId: string, from?: string, until?: string) => {
+    const today = todayKey()
+    const stop = until && until < today ? until : today
+    if (!from || from >= stop) return
+    const have = new Set(habitLog.filter((t) => t.habitId === habitId).map((t) => t.day))
+    const rows: HabitTick[] = []
+    const cursor = new Date(`${from}T12:00:00`)
+    const end = new Date(`${stop}T12:00:00`)
+    if (Number.isNaN(cursor.getTime())) return
+    while (cursor < end) {
+      const key = localDateKey(cursor)
+      if (!have.has(key)) rows.push({ habitId, day: key, src: 'since' })
+      cursor.setDate(cursor.getDate() + 1)
+    }
+    if (!rows.length) return
+    const filled = new Set(rows.map((r) => r.day))
+    setHabitLog((prev) => [...prev, ...rows])
+    setHabits((prev) => prev.map((h) => (h.id !== habitId ? h : {
+      ...h,
+      days: h.days.map((v, i) => v || filled.has(dayOfWeekKey(i))),
+    })))
+  }
+
   /** Tick or untick one day of one habit, in the log and in the week cache. */
   const markDay = (habitId: string, dayIndex: number, value: boolean) => {
     const day = dayOfWeekKey(dayIndex)
@@ -1339,9 +1369,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       markDay(id, day, !h.days[day])
     },
     markHabitDay: (id, day, value) => markDay(id, day, value),
-    addHabit: (input) =>
+    addHabit: (input) => {
+      const id = newId('h')
       setHabits((prev) => [...prev, {
-        id: newId('h'), space, name: input.name, daypart: input.daypart,
+        id, space, name: input.name, daypart: input.daypart,
         frequency: input.frequency, targetPerWeek: input.targetPerWeek,
         kind: input.kind ?? 'build',
         dailyTargetMin: input.dailyTargetMin,
@@ -1358,7 +1389,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // since June starts in June, not on the day he typed it in here.
         startedOn: input.kind === 'break' ? undefined : (input.startedOn ?? todayKey()),
         days: [false, false, false, false, false, false, false], paused: false,
-      }]),
+      }])
+      // Started before today means those days were kept. Say so in the record.
+      if (input.kind !== 'break') backfillKept(id, input.startedOn)
+    },
     /* A slip is a dated record, appended. It used to overwrite one field, so the
        second slip erased the first and the clean run before it went with it.
        Saying it out loud is hard enough without it also being irreversible, so
@@ -1370,7 +1404,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setSlips((prev) => [...prev, { habitId: id, day }])
       armUndo('Slip logged for today', () => setSlips(before))
     },
-    updateHabit: (id, patch) => setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, ...patch } : h))),
+    updateHabit: (id, patch) => {
+      setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, ...patch } : h)))
+      /* Moving the start date EARLIER claims the days it just reached back
+         over, and only those. Saving the sheet again with the same date must
+         not re-tick a day he has since unticked, and moving the date later
+         never deletes a day already logged: a day recorded as kept is his, and
+         no edit here is allowed to take one back. */
+      if (patch.startedOn && patch.kind !== 'break') {
+        const was = habits.find((h) => h.id === id)?.startedOn
+        if (!was || patch.startedOn < was) backfillKept(id, patch.startedOn, was)
+      }
+    },
     togglePauseHabit: (id) =>
       setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, paused: !h.paused } : h))),
     /* Retired, not erased. Removing the row removed the only thing that could

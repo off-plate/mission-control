@@ -137,6 +137,14 @@ export interface Task {
   /** The moment it was finished, so the day's record can say WHEN, not only
    *  that. Cleared if it is reopened. */
   doneAt?: string
+  /** Committed to a period on the Goals page: "this is one of the things this
+   *  month is for". There is no second copy of the task anywhere: finishing it
+   *  in the plan is what finishes it there, because it is the same task.
+   *  horizonKey pins WHICH month ('2026-08'), the same way a goal does, so a
+   *  week that ends does not quietly drag its unfinished work into the next
+   *  one as though he had planned it there. */
+  horizon?: GoalTimeframe
+  horizonKey?: string
 }
 
 /** One of the ways a step can be answered. Which one he picked is worth keeping:

@@ -138,6 +138,10 @@ interface Store extends PersistedState {
   addTask: (t: Omit<Task, 'id' | 'done'>) => void
   addTasks: (tasks: Omit<Task, 'id' | 'done'>[]) => void
   addTaskWithSubtasks: (parent: Omit<Task, 'id' | 'done' | 'subtasks'>, subs: { title: string; estimateMin: number }[]) => void
+  /** Put a task on a period in Goals, or take it off again with no horizon. The
+   *  key defaults to the period running now; a Goals column passes its own when
+   *  he is standing in next week. */
+  commitTask: (id: string, horizon?: import('./types').GoalTimeframe, key?: string) => void
   moveTaskList: (id: string, list: 'today' | 'backlog') => void
   moveTasksToToday: (ids: string[]) => void
   assignSlot: (id: string, slot: import('./types').TimeSlot | undefined) => void
@@ -1336,6 +1340,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const est = subtasks.reduce((a, s) => a + s.estimateMin, 0)
         return [{ ...parent, id: pid, done: false, createdAt: todayKey(), estimateMin: est, estimated: true, subtasks }, ...prev]
       }),
+    commitTask: (id, horizon, key) =>
+      setTasks((prev) => prev.map((t) => (t.id === id
+        ? {
+          ...t,
+          horizon,
+          horizonKey: horizon ? (key ?? goalPeriodKey(horizon as GoalTf)) : undefined,
+        }
+        : t))),
     moveTaskList: (id, list) =>
       setTasks((prev) => prev.map((t) => (t.id === id
         ? { ...t, list, plannedOn: list === 'today' ? todayKey() : undefined }

@@ -60,7 +60,7 @@ const NAV: { id: PageId; label: string }[] = [
   { id: 'routines', label: 'Routines' },
   { id: 'goals', label: 'Goals' },
   { id: 'money', label: 'Money' },
-  { id: 'review', label: 'Review' },
+  { id: 'review', label: 'Reflect' },
   { id: 'focus', label: 'Focus' },
   { id: 'braindump', label: 'Brain Dump' },
   { id: 'coach', label: 'Avoidance' },

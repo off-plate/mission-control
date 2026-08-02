@@ -233,6 +233,7 @@ export const MOCK_ROUTINES: Routine[] = [
     id: 'r-monthly', space: 'personal', title: 'Monthly review', cadence: 'monthly', habitId: 'h-monthly',
     doneStepIds: [],
     steps: [
+      { id: 'mo0', title: 'Reflect the month', kind: 'do' },
       { id: 'mo1', title: 'Review last month’s goals', kind: 'do' },
       { id: 'mo2', title: 'Plan next month’s goals', kind: 'do' },
       { id: 'mo3', title: 'Review the finances', kind: 'do', note: 'Savings, total spent, total received, debt update.' },
@@ -244,7 +245,7 @@ export const MOCK_ROUTINES: Routine[] = [
    Only these are inserted into a routine that already has steps. Without the
    list, every seeded step would look like one that had gone missing, and a step
    he deleted months ago would reappear the next time he opened the app. */
-export const LATE_STEPS = new Set(['br-ice', 'wu0', 'be7'])
+export const LATE_STEPS = new Set(['br-ice', 'wu0', 'be7', 'mo0'])
 
 export const MOCK_GOALS: Goal[] = []
 

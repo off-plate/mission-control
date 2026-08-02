@@ -291,8 +291,12 @@ export function ReviewPage() {
           </select>
         }
         metrics={[
-          { v: fmtSigned(saved), k: 'time saved', tone: 'pos' as const },
-          { v: `${accuracy}%`, k: 'estimate accuracy' },
+          /* Green is earned: a week with nothing logged shows no-data, not a
+             proud +0m, and accuracy is not asserted from zero estimates. */
+          ...(rows.length ? [
+            { v: fmtSigned(saved), k: saved >= 0 ? 'time saved' : 'time over', tone: (saved >= 0 ? 'pos' : 'urgent') as 'pos' | 'urgent' },
+            { v: `${accuracy}%`, k: 'estimate accuracy' },
+          ] : [{ v: '—', k: 'nothing logged yet', tone: 'info' as const }]),
         ]}
       />
 

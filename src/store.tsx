@@ -629,7 +629,9 @@ function loadPersisted(): PersistedState | null {
        the next reload, or asserted for a routine he had not finished. */
     const savedRoutines = p.routines ?? []
     const drivenNow = new Map(
-      savedRoutines.filter((r) => r.habitId && !r.archivedAt).map((r) => {
+      /* A step-less routine owns nothing yet: its habit is hand-ticked until
+         steps exist, and this pass must not wipe those ticks on every load. */
+      savedRoutines.filter((r) => r.habitId && !r.archivedAt && r.steps.length > 0).map((r) => {
         const complete = routineComplete(r, periodKeyFor(r.cadence))
         return [r.habitId as string, { complete, on: complete ? (r.completedOn ?? localDateKey()) : null }]
       }),

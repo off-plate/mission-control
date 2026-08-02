@@ -175,13 +175,6 @@ export const WALL_IMAGES: Record<string, WallImage> = {
     lqip: "data:image/webp;base64,UklGRrYAAABXRUJQVlA4IKoAAACQBACdASoYAA4APu1iqU2ppaOiMAgBMB2JYgCdIExCucuKXT864sB/t3Uv5kAA4V0+vc3kx8KbanmEWf8pYC675ZWibPED9D/3C4M2KErgqI+h2Fhwp+5/WUhZPDTSd4fhgUceZ0pCngy+qFc6dG8n7919sAPUUpjfN+PjNQo8WF5zWNwP+jeXFZKjQPPb4l6LZMl5EAcXE1nQfbuET0CRnihWqJTR8h0AAA==",
     credit: "i.pinimg.com",
   },
-  "windows-lit": {
-    src: 'wall/windows-lit-900.webp',
-    srcset: "wall/windows-lit-450.webp 450w, wall/windows-lit-675.webp 675w, wall/windows-lit-900.webp 900w",
-    w: 900, h: 563,
-    lqip: "data:image/webp;base64,UklGRr4AAABXRUJQVlA4ILIAAADwBACdASoYAA0APu1iqU2ppaOiMAgBMB2JZACdMoR3H1/E2B72EFyfbXq9wgFSaCQA/uzY5o1on4cGE6Rk+lSyM55PZ/zPi7/+GXY1sDM2wnX1usRnV+RJdPzodPCY+zoR3QgYdpMlHb7VuBADSBvnFJMlcon8NiVSanWAfGFEjR8mvX6iCscFNJpOZtrovWTWP1w94eqfNhy5uO7gm54v2gIRS5AQ85Oc+oVnmXICgAAA",
-    credit: "i.pinimg.com",
-  },
   "workspace": {
     src: 'wall/workspace-900.webp',
     srcset: "wall/workspace-450.webp 450w, wall/workspace-675.webp 675w, wall/workspace-900.webp 900w",

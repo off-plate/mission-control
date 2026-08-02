@@ -1623,7 +1623,15 @@ a.pron-src:hover { color: var(--accent); text-decoration: underline; }
 /* One open loop grows to a sane width instead of hugging a 9-column skeleton. */
 .coach-loops { grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 460px)); justify-content: start; }
 /* Calendar blocks keep their label on one baseline instead of being sliced. */
-.vev { padding: 3px 6px; min-height: 22px; display: flex; align-items: baseline; gap: 6px; }
+.vev { padding: 3px 6px; display: flex; align-items: baseline; gap: 6px; }
+/* A planned task has no length yet, so it gets a readable box. A block that
+   ran has a real one, and stretching it to fit its own text told him he had
+   worked half an hour when he had stopped after ten minutes. */
+.vev-task { min-height: 22px; }
+.vev.is-thin { padding: 0; overflow: visible; display: block; }
+.vev.is-thin > .t, .vev.is-thin > .rng { position: absolute; top: 100%; font-size: 0.625rem; line-height: 1.15; white-space: nowrap; }
+.vev.is-thin > .t { left: 6px; max-width: 62%; overflow: hidden; text-overflow: ellipsis; }
+.vev.is-thin > .rng { right: 6px; }
 .vev .t { flex: 1 1 auto; min-width: 0; }
 .vev .rng { flex: none; }
 

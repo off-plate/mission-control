@@ -75,6 +75,39 @@ function DaySchedule({ day }: { day: string }) {
   /* The block on the clock right now belongs on the clock too. */
   const liveMin = isToday && pomo.phase === 'focus' ? Math.max(0, Math.floor((pomo.blockMin * 60 - pomo.secondsLeft) / 60)) : 0
 
+  /* Everything that occupies a stretch of the clock, drawn to the length it
+     actually ran. Two blocks that overlap take a lane each instead of being
+     stacked on top of one another, which is what turned a stopped block and
+     the one after it into a single unreadable smear. */
+  const bars: { key: string; cls: string; title: string; sub: string; startMin: number; minutes: number; lane: number }[] = []
+  if (liveMin > 0) {
+    bars.push({
+      key: 'live', cls: 'vev-live', title: pomo.focusLabel ?? 'Focus',
+      sub: `running, ${fmtDuration(liveMin)} so far`,
+      startMin: Math.max(0, nowMin - liveMin), minutes: liveMin, lane: 0,
+    })
+  }
+  moments.forEach((m, i) => {
+    if (!m.minutes) return
+    const start = Math.max(0, minutesOf(m.at) - m.minutes)
+    bars.push({
+      key: `m${i}`, cls: `vev-done k-${m.kind}`, title: m.title,
+      sub: `${fmtTime(`${Math.floor(start / 60)}:${String(start % 60).padStart(2, '0')}`)} · ${fmtDuration(m.minutes)}`,
+      startMin: start, minutes: m.minutes, lane: 0,
+    })
+  })
+  bars.sort((a, b) => a.startMin - b.startMin)
+  /* A short block reserves a little more room than it fills, because its label
+     sits underneath it. */
+  const laneFree: number[] = []
+  for (const b of bars) {
+    let i = laneFree.findIndex((free) => free <= b.startMin)
+    if (i === -1) { i = laneFree.length; laneFree.push(0) }
+    laneFree[i] = b.startMin + Math.max(b.minutes, 22)
+    b.lane = i
+  }
+  const lanes = Math.max(1, laneFree.length)
+
   return (
     <>
       {/* Kept and finished without a clock time: history from before the app
@@ -110,27 +143,33 @@ function DaySchedule({ day }: { day: string }) {
             <span className="rng">{fmtTime(t.at!)} · planned</span>
           </div>
         ))}
-        {liveMin > 0 && (
-          <div className="vev vev-live" style={{ top: y(Math.max(0, nowMin - liveMin)) + 1, height: capped(y(Math.max(0, nowMin - liveMin)), Math.max((liveMin / 60) * HOUR_PX - 2, 24)) }}>
-            <span className="t">{pomo.focusLabel ?? 'Focus'}</span>
-            <span className="rng">running, {fmtDuration(liveMin)} so far</span>
-          </div>
-        )}
-        {moments.map((m, i) => {
-          const start = m.minutes ? minutesOf(m.at) - m.minutes : minutesOf(m.at)
-          return m.minutes ? (
-            <div className={`vev vev-done k-${m.kind}`} key={i}
-              style={{ top: y(Math.max(0, start)) + 1, height: capped(y(Math.max(0, start)), Math.max((m.minutes / 60) * HOUR_PX - 2, 24)) }}>
-              <span className="t">{m.title}</span>
-              <span className="rng">{fmtTime(`${Math.floor(start / 60)}:${String(start % 60).padStart(2, '0')}`)} · {fmtDuration(m.minutes)}</span>
-            </div>
-          ) : (
-            <div className={`vmark k-${m.kind}`} key={i} style={{ top: y(minutesOf(m.at)) }}>
-              <span className="vmark-dot" aria-hidden="true" />
-              <span className="vmark-t">{m.title}</span>
+        {bars.map((b) => {
+          const h = capped(y(b.startMin), Math.max(3, (b.minutes / 60) * HOUR_PX - 1))
+          /* Under about twenty minutes there is no room for two lines inside
+             the block, so the words move below it and the block keeps its true
+             height. Padding it out to fit its own label is what made a ten
+             minute block look like half an hour of work. */
+          const thin = h < 20
+          const width = 100 / lanes
+          return (
+            <div className={`vev ${b.cls}${thin ? ' is-thin' : ''}`} key={b.key}
+              style={{
+                top: y(b.startMin) + 1, height: h,
+                left: `calc(${b.lane * width}% + 6px)`,
+                width: `calc(${width}% - 12px)`,
+                right: 'auto',
+              }}>
+              <span className="t">{b.title}</span>
+              <span className="rng">{b.sub}</span>
             </div>
           )
         })}
+        {moments.filter((m) => !m.minutes).map((m, i) => (
+          <div className={`vmark k-${m.kind}`} key={i} style={{ top: y(minutesOf(m.at)) }}>
+            <span className="vmark-dot" aria-hidden="true" />
+            <span className="vmark-t">{m.title}</span>
+          </div>
+        ))}
       </div>
       </div>
     </>

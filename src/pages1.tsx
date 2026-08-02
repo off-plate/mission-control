@@ -176,8 +176,21 @@ const prevDay = (): string => {
   return localDateKey(d)
 }
 
+/** Tomorrow's date, stepped the same careful way. */
+const nextDay = (): string => {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  return localDateKey(d)
+}
+
 const dateLine = () =>
   new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+
+/** 'Mon 3 Aug' for a date key, for the head of the day being planned. */
+const shortDay = (key: string): string => {
+  const [y, m, d] = key.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+}
 
 /* ---------------- TODAY ---------------- */
 
@@ -190,7 +203,7 @@ export function TodayPage() {
   const shownExceptions = space === 'personal'
     ? exceptions
     : [...globalExceptions({ tasks, routines }), ...exceptions]
-  const open = tasks.filter((t) => inView(t.space) && t.list === 'today' && !t.done)
+  const open = tasks.filter((t) => inView(t.space) && t.list === 'today' && !t.done && (t.plannedOn ?? localDateKey()) === localDateKey())
   const DREAD_RANK = { admin: 0, call: 1, deep: 2, quick: 3 }
   const alertTaskTitles = new Set(exceptions.map((x) => x.task?.title).filter(Boolean) as string[])
   const alertRank = (t: Task) => (alertTaskTitles.has(t.title) ? 0 : 1)
@@ -678,7 +691,7 @@ function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
    own: same checkbox, same title, same expander, same menu. The only thing that
    marks it out is a small "repeats" tag, because a different layout for the same
    kind of thing reads as two different apps on one page. */
-function RoutineOnDay({ routine }: { routine: Routine }) {
+function RoutineOnDay({ routine, day }: { routine: Routine; day?: string }) {
   const { toggleRoutineStep, toggleRoutineAlt, setRoutineDone, planRoutine, setPage, inView } = useStore()
   const [open, setOpen] = useState(false)
   // Counts what the routine needs, so an optional step neither pads the total
@@ -729,12 +742,12 @@ function RoutineOnDay({ routine }: { routine: Routine }) {
               so a routine can be planned into the evening and then pulled
               forward without leaving the day. */}
           {SLOTS.filter((s) => s.id !== routine.planned?.slot).map((s) => (
-            <button key={s.id} role="menuitem" onClick={() => planRoutine(routine.id, s.id)}>Move to {s.label.toLowerCase()}</button>
+            <button key={s.id} role="menuitem" onClick={() => planRoutine(routine.id, s.id, day)}>Move to {s.label.toLowerCase()}</button>
           ))}
           <span className="kebab-sep" />
           <button role="menuitem" onClick={() => setPage('routines')}>Open in Routines</button>
           {routine.planned && !routine.startedAt && (
-            <button role="menuitem" onClick={() => planRoutine(routine.id)}>Take off today</button>
+            <button role="menuitem" onClick={() => planRoutine(routine.id)}>Take it off</button>
           )}
         </Dropdown>
       </div>
@@ -819,7 +832,14 @@ export function PlanPage() {
     ? [...list].sort((a, b) => SPACES.indexOf(a.space) - SPACES.indexOf(b.space))
     : list)
   const backlogSorted = [...cameBack, ...byRoom(fresh)]
-  const todayAll = spaceTasks.filter((t) => t.list === 'today')  // today incl. finished (they stay, struck)
+  /* Which day the right hand column is laying out. Sunday evening is exactly
+     when a week gets planned, and until now the app could only ever mean today,
+     so Monday could not be touched until Monday. One step forward is all this
+     is: today, or tomorrow. */
+  const [ahead, setAhead] = useState(false)
+  const planDay = ahead ? nextDay() : localDateKey()
+  const onDay = (t: Task) => t.list === 'today' && (t.plannedOn ?? localDateKey()) === planDay
+  const todayAll = spaceTasks.filter(onDay)                      // the day incl. finished (they stay, struck)
   const todayTasks = todayAll.filter((t) => !t.done)             // still to do
   const doneUnsorted = todayAll.filter((t) => t.done && !t.slot) // finished, never scheduled
 
@@ -828,16 +848,21 @@ export function PlanPage() {
      work he chose rather than a wall of things the app put there. The moment it
      starts it files itself under the time he started it: this list is a record
      of the day, not a plan for it. */
-  const isWeekend = todayIdx >= 5
+  /* Tomorrow's weekend is not today's: a Sunday planning Monday must not hide
+     the work routines it is planning. */
+  const dayIdx = ahead ? (todayIdx + 1) % 7 : todayIdx
+  const isWeekend = dayIdx >= 5
   const today = localDateKey()
-  const onToday = (r: Routine) => !!r.startedAt || r.planned?.day === today
+  /* Started counts as on today only. A routine cannot have been started on a day
+     that has not happened, so tomorrow shows exactly what he has planned onto it. */
+  const onToday = (r: Routine) => (ahead ? r.planned?.day === planDay : (!!r.startedAt || r.planned?.day === planDay))
   const dueRoutines = routines.filter((r) => inView(r.space) && !r.archivedAt && onToday(r) && !(r.cadence === 'prework' && isWeekend))
   /* A slot he chose wins over the clock: planning it for the evening and
      starting it early should not throw it back to the morning while he is
      looking at it. */
   const routineSlot = (r: Routine): TimeSlot | 'unsorted' =>
-    r.planned?.day === today && r.planned.slot ? r.planned.slot
-      : r.startedAt ? slotForMoment(r.startedAt) : 'unsorted'
+    r.planned?.day === planDay && r.planned.slot ? r.planned.slot
+      : (!ahead && r.startedAt) ? slotForMoment(r.startedAt) : 'unsorted'
   const plannedMin = todayTasks.reduce((a, t) => a + taskMinutes(t), 0)
 
   /* Progress counts everything in the space, today included, and counts finished
@@ -960,7 +985,8 @@ export function PlanPage() {
      today and slots it; onto the list sends it back to the backlog. */
   const dropTo = (key: TimeSlot | 'unsorted', id: string) => {
     const t = tasks.find((x) => x.id === id)
-    if (t && t.list !== 'today') moveTaskList(id, 'today')
+    // Onto the day being shown, which is not always today.
+    if (t && (t.list !== 'today' || (t.plannedOn ?? localDateKey()) !== planDay)) moveTaskList(id, 'today', planDay)
     assignSlot(id, key === 'unsorted' ? undefined : key)
   }
   const dropToList = (id: string) => {
@@ -975,7 +1001,7 @@ export function PlanPage() {
       <Band
         title="Plan the day"
         metrics={[
-          { v: fmtDuration(plannedMin), k: 'planned today', tone: 'info' as const },
+          { v: fmtDuration(plannedMin), k: ahead ? 'planned tomorrow' : 'planned today', tone: 'info' as const },
           { v: pool.length ? `${donePct}%` : '—', k: pool.length ? 'to-do done' : 'no tasks yet', tone: (pool.length && donePct > 0 ? 'pos' : 'info') as 'pos' | 'info' },
           ...(loggedAny ? [{ v: fmtSigned(savedToday), k: savedToday >= 0 ? 'saved today' : 'over estimate', tone: (savedToday >= 0 ? 'pos' : 'urgent') as 'pos' | 'urgent' }] : []),
         ]}
@@ -1062,6 +1088,7 @@ export function PlanPage() {
                     <button role="menuitem" onClick={() => setEditingTask(t)}>Edit</button>
                     <button role="menuitem" onClick={() => setBreakdownFor(t)}>Break it down</button>
                     <button role="menuitem" onClick={() => moveTasksToToday([t.id])}>Move to today</button>
+                    <button role="menuitem" onClick={() => { moveTasksToToday([t.id], nextDay()); setAhead(true) }}>Move to tomorrow</button>
                     <span className="kebab-sep" />
                     <button role="menuitem" className="danger" onClick={() => deleteTask(t.id)}>Delete</button>
                   </Dropdown>
@@ -1079,10 +1106,16 @@ export function PlanPage() {
           {backlogOpen.length === 0 && <div className="empty">Nothing on the list. Generate a task above when something lands.</div>}
         </div>
 
-        {/* 2 — Today: drag tasks from Unsorted into a time of day */}
+        {/* 2 — The day: drag tasks from Unsorted into a time of day */}
         <div className="panel">
           <div className="col-head">
-            <span className="microcap">Today</span>
+            {/* Which day this column lays out. Two days is the whole range: the
+                one he is in, and the one he is about to be in. */}
+            <span className="day-switch" role="group" aria-label="Which day to plan">
+              <button className="microcap" aria-pressed={!ahead} onClick={() => setAhead(false)}>Today</button>
+              <button className="microcap" aria-pressed={ahead} onClick={() => setAhead(true)}>Tomorrow</button>
+            </span>
+            <span className="col-tot mono">{shortDay(planDay)}</span>
             {(() => {
               const shown = BUCKETS.filter((b) => b.id !== 'unsorted' || todayAll.some((t) => !t.slot && !t.done)).map((b) => b.id)
               const allShut = shown.length > 0 && shown.every((id) => shutSlots.has(id))
@@ -1162,7 +1195,7 @@ export function PlanPage() {
                   items.map((it) => {
                     if (it.kind === 'repeat') {
                       const r = it.routine
-                      return <RoutineOnDay key={r.id} routine={r} />
+                      return <RoutineOnDay key={r.id} routine={r} day={planDay} />
                     }
                     const t = it.task
                     const isExp = expanded.has(t.id)
@@ -2101,7 +2134,10 @@ const SPACE_RANK: Record<SpaceId, number> = { personal: 0, work: 1, offplate: 2,
 export function RoutinesPage() {
   const { routines, view, space, toggleRoutineStep, toggleRoutineAlt, startAgain, planRoutine, setPage, routineLog, deleteRoutine, habits } = useStore()
   const today = localDateKey()
-  const onDay = (r: Routine) => !!r.startedAt || r.planned?.day === today
+  const tomorrow = nextDay()
+  /* On a day means on either day he can plan: today, or the one he laid out
+     last night. */
+  const onDay = (r: Routine) => !!r.startedAt || r.planned?.day === today || r.planned?.day === tomorrow
   /* Where it goes when he puts it on the day: the part of the day it belongs to
      if it has one, otherwise the part of the day it is now. Either way he can
      move it from the list itself. */
@@ -2171,9 +2207,14 @@ export function RoutinesPage() {
           can be moved from there. */}
       {onDay(r)
         ? (r.planned && !r.startedAt
-          ? <button role="menuitem" onClick={() => planRoutine(r.id)}>Take off today</button>
+          ? <button role="menuitem" onClick={() => planRoutine(r.id)}>Take it off {r.planned.day === today ? 'today' : 'tomorrow'}</button>
           : <button role="menuitem" onClick={() => setPage('plan')}>See it on today</button>)
-        : <button role="menuitem" onClick={() => planRoutine(r.id, plannedSlotFor(r))}>Add to today</button>}
+        : (
+          <>
+            <button role="menuitem" onClick={() => planRoutine(r.id, plannedSlotFor(r))}>Add to today</button>
+            <button role="menuitem" onClick={() => planRoutine(r.id, plannedSlotFor(r), tomorrow)}>Add to tomorrow</button>
+          </>
+        )}
       <span className="kebab-sep" />
       <button role="menuitem" className="danger" onClick={() => deleteRoutine(r.id)}>
         Delete this routine

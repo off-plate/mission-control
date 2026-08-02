@@ -97,6 +97,10 @@ export function roll<T extends Rollable>(p: T, now = new Date()): T {
     // upgrade does not sweep his current list out from under him.
     const on = t.plannedOn ?? today
     if (on === today) return { ...t, plannedOn: on }
+    /* A day that has not arrived yet is a plan, not a failure. Sunday evening
+       lays out Monday, and sweeping that back to the list overnight would undo
+       the only thing planning ahead is for. */
+    if (on > today) return t
     if (t.done) return { ...t, list: 'backlog' as const, plannedOn: undefined }
     returned.push(t.id)
     return { ...t, list: 'backlog' as const, plannedOn: undefined, slot: undefined, at: undefined, carried: (t.carried ?? 0) + 1 }

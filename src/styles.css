@@ -1272,6 +1272,15 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 .bucket.drop-zone.is-shut { min-height: 0; }
 .bucket.is-shut { margin-top: var(--s3); padding-top: var(--s3); }
 .bucket.is-shut .bucket-head { margin-bottom: 0; }
+/* Today or tomorrow. Two words, the live one in ink and the other quiet, so the
+   head still reads as a heading rather than a pair of buttons. */
+.day-switch { display: flex; align-items: baseline; gap: var(--s3); }
+.day-switch .microcap { margin-bottom: 0; color: var(--faint); transition: color 140ms var(--ease); }
+.day-switch .microcap[aria-pressed='true'] { color: var(--ink); }
+.day-switch .microcap:hover { color: var(--ink); }
+.day-switch .microcap[aria-pressed='true']::after {
+  content: ''; display: block; height: 1.5px; background: var(--accent); margin-top: 3px;
+}
 .fold-all {
   margin-left: auto; font-family: var(--font-mono); font-size: 0.6875rem;
   color: var(--info); border: 1px solid var(--hairline-strong); border-radius: 3px; padding: 1px 6px;
@@ -1460,7 +1469,10 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
    so the card cut its own text off at the bottom edge. Instead both blocks
    reserve their two lines, which makes every card the same height by
    construction, at any width, with nothing clipped. */
-.routine-card.is-shut { overflow: hidden; }
+/* No clipping on the card itself: the two blocks inside it clamp their own
+   text, and hiding the overflow here cut the options menu in half the moment it
+   opened over the bottom edge. */
+.routine-card.is-shut { overflow: visible; }
 .routine-card.is-shut .routine-tag { margin-bottom: 0; align-items: flex-start; }
 .routine-card.is-shut .routine-open { align-items: flex-start; }
 .routine-card.is-shut .routine-open::before { margin-top: 0.42em; }

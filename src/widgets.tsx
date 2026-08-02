@@ -9,7 +9,7 @@ import {
 } from './mock'
 import { useStore } from './store'
 import { goalCurrent, ON_TRACK_PCT, type SizeKey, type SpaceId, type WidgetType } from './types'
-import { fmtDuration, fmtNum, fmtTimeShort, goalPace } from './util'
+import { fmtDuration, fmtNum, fmtTimeShort, goalPace, localDateKey } from './util'
 
 /** `fluid` makes the line span its container, so label rows underneath line up. */
 /* A pasted URL is an address, not prose: shown raw it swallowed two lines of a
@@ -127,7 +127,8 @@ const AgendaBody = memo(function AgendaBody({ space, size }: { space: SpaceId; s
 const TasksBody = memo(function TasksBody({ space, size }: { space: SpaceId; size: SizeKey }) {
   const { tasks, toggleTask, logActual, inView } = useStore()
   const [logOpen, setLogOpen] = useState<string | null>(null)
-  const list = tasks.filter((t) => inView(t.space) && t.list === 'today')
+  // Today's work only: a task laid out for tomorrow is not on this list yet.
+  const list = tasks.filter((t) => inView(t.space) && t.list === 'today' && (t.plannedOn ?? localDateKey()) === localDateKey())
   const open = list.filter((t) => !t.done)
   const remaining = open.reduce((a, t) => a + t.estimateMin, 0)
   const shown = size === 'M' ? list.slice(0, 3) : list

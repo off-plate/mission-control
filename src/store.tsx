@@ -142,8 +142,10 @@ interface Store extends PersistedState {
    *  key defaults to the period running now; a Goals column passes its own when
    *  he is standing in next week. */
   commitTask: (id: string, horizon?: import('./types').GoalTimeframe, key?: string) => void
-  moveTaskList: (id: string, list: 'today' | 'backlog') => void
-  moveTasksToToday: (ids: string[]) => void
+  /** `day` plans it for a day other than today ('YYYY-MM-DD'), which is how
+   *  Sunday evening gets to lay out Monday. */
+  moveTaskList: (id: string, list: 'today' | 'backlog', day?: string) => void
+  moveTasksToToday: (ids: string[], day?: string) => void
   assignSlot: (id: string, slot: import('./types').TimeSlot | undefined) => void
   /** Pin a task to a clock time ('HH:MM'), or undefined to unpin it. The slot
    *  follows the hour, so the two never disagree. */
@@ -207,9 +209,10 @@ interface Store extends PersistedState {
   setRoutineDone: (routineId: string, done: boolean) => void
   /** Open a fresh run of a repeatable routine, keeping every run before it. */
   startAgain: (routineId: string) => void
-  /** Put a routine on today's list before it is started, so a day can be planned
-   *  and not only recorded. `slot` undefined takes it back off the list. */
-  planRoutine: (routineId: string, slot?: import('./types').TimeSlot) => void
+  /** Put a routine on a day's list before it is started, so a day can be planned
+   *  and not only recorded. `slot` undefined takes it back off the list, and
+   *  `day` defaults to today. */
+  planRoutine: (routineId: string, slot?: import('./types').TimeSlot, day?: string) => void
   /** Log one occurrence of a counted habit, or take the last one back. */
   logCount: (habitId: string, delta: 1 | -1) => void
   /** A routine and the habit that mirrors it are created together, so finishing
@@ -431,10 +434,12 @@ function loadPersisted(): PersistedState | null {
     }
 
     /* A plan is for a day. Yesterday's cannot be allowed to sit on this morning's
-       list pretending it was chosen. */
+       list pretending it was chosen. Tomorrow's is a different matter: he put it
+       there on purpose and it has not had its day yet, so only the past is
+       swept. */
     {
       const today = localDateKey()
-      p.routines = (p.routines ?? []).map((r) => (r.planned && r.planned.day !== today ? { ...r, planned: undefined } : r))
+      p.routines = (p.routines ?? []).map((r) => (r.planned && r.planned.day < today ? { ...r, planned: undefined } : r))
     }
 
     /* Week rollover: when the saved state belongs to an earlier ISO week, each
@@ -1348,12 +1353,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           horizonKey: horizon ? (key ?? goalPeriodKey(horizon as GoalTf)) : undefined,
         }
         : t))),
-    moveTaskList: (id, list) =>
+    moveTaskList: (id, list, day) =>
       setTasks((prev) => prev.map((t) => (t.id === id
-        ? { ...t, list, plannedOn: list === 'today' ? todayKey() : undefined }
+        ? { ...t, list, plannedOn: list === 'today' ? (day ?? todayKey()) : undefined }
         : t))),
-    moveTasksToToday: (ids) =>
-      setTasks((prev) => prev.map((t) => (ids.includes(t.id) ? { ...t, list: 'today', slot: undefined, plannedOn: todayKey() } : t))),
+    moveTasksToToday: (ids, day) =>
+      setTasks((prev) => prev.map((t) => (ids.includes(t.id) ? { ...t, list: 'today', slot: undefined, plannedOn: day ?? todayKey() } : t))),
     assignSlot: (id, slot) =>
       setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, slot } : t))),
     /* A clock time implies a part of the day, so setting one moves the task into
@@ -1827,8 +1832,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
        under the clock that has already run, planning says where he intends it to
        go. Nothing is copied, so the row on the day IS the routine and ticking a
        step in either place is one act. */
-    planRoutine: (routineId, slot) => applyRoutine(routineId, (r) => ({
-      ...r, planned: slot ? { day: todayKey(), slot } : undefined,
+    planRoutine: (routineId, slot, day) => applyRoutine(routineId, (r) => ({
+      ...r, planned: slot ? { day: day ?? todayKey(), slot } : undefined,
     })),
     /* Ticking the routine itself ticks everything inside it, minus any step that
        has to be earned elsewhere (the typing gate), which stays his to pass. */

@@ -71,7 +71,7 @@ function DaySchedule({ day }: { day: string }) {
      whose arithmetic leaks past midnight painted hours nobody worked. */
   const capped = (top: number, h: number) => Math.min(h, HOURS * HOUR_PX - top - 2)
   const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
-  const pinned = isToday ? tasks.filter((t) => t.at && !t.done && t.list === 'today' && inView(t.space)) : []
+  const pinned = isToday ? tasks.filter((t) => t.at && !t.done && t.list === 'today' && (t.plannedOn ?? localDateKey()) === localDateKey() && inView(t.space)) : []
   /* The block on the clock right now belongs on the clock too. */
   const liveMin = isToday && pomo.phase === 'focus' ? Math.max(0, Math.floor((pomo.blockMin * 60 - pomo.secondsLeft) / 60)) : 0
 

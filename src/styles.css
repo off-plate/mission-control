@@ -286,7 +286,12 @@ main { padding-inline: var(--gutter); }
 .pomo-step button { width: 26px; height: 26px; border: 1px solid var(--hairline-strong); border-radius: 6px; color: var(--ink); }
 .pomo-step button:hover { border-color: var(--accent); color: var(--accent); }
 .pomo-step-val { min-width: 3.5ch; text-align: center; font-weight: 600; }
-@media (max-width: 639px) { .pomo-badge { bottom: 80px; right: 12px; } }
+@media (max-width: 639px) {
+  .pomo-badge { bottom: max(12px, env(safe-area-inset-bottom)); right: 12px; }
+  /* The pill is fixed, so the page needs room at the end: without this it
+     permanently sat on the last rows' checkboxes and kebabs. */
+  #main { padding-bottom: 104px; }
+}
 
 /* ---------- Assistant (dictation) ---------- */
 .assist-input { position: relative; margin-top: var(--s3); }
@@ -1376,8 +1381,13 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 @media (max-width: 639px) {
   .hide-phone { display: none; }
   .brand-name { display: none; }
-  .topbar { gap: var(--s2); row-gap: var(--s2); }
-  .topbar-right { margin-left: 0; width: 100%; justify-content: space-between; gap: var(--s1); }
+  .topbar { gap: var(--s2); row-gap: var(--s2); padding-block: var(--s2); }
+  /* Row one: logo and the three actions. Row two: the workspace switcher on a
+     single scrollable line, never wrapping "Big Time" onto two. */
+  .topbar-right { margin-left: auto; width: auto; justify-content: flex-end; gap: var(--s1); }
+  .spaces { order: 3; flex: 1 1 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .spaces::-webkit-scrollbar { display: none; }
+  .space-btn { white-space: nowrap; flex: 1 0 auto; }
   .btn, .chip { min-height: 44px; font-size: var(--text-xs); padding-inline: var(--s2); }
   .space-btn { min-height: 44px; font-size: var(--text-xs); }
   .habit { min-height: 44px; }
@@ -1407,10 +1417,25 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 
   /* Plan: title owns line one, controls wrap to line two */
   .today-task { flex-wrap: wrap; min-height: 0; padding-block: var(--s3); }
-  .today-task .grow { flex: 1 1 calc(100% - 30px); white-space: normal; overflow: visible; text-overflow: clip; }
+  /* The checkbox and the title share the first line; the chip and the tools
+     take the second. A full-width basis orphaned the checkbox on a line of
+     its own above the title, which read as three unrelated rows. */
+  .today-task .grow, .todo-row .grow {
+    flex: 1 1 auto; min-width: 56% !important;
+    white-space: normal; overflow: visible; text-overflow: clip;
+  }
   .today-task .slot-pick button { width: 32px; height: 32px; }
   .todo-row { flex-wrap: wrap; }
-  .todo-row .grow { flex: 1 1 calc(100% - 30px); white-space: normal; overflow: visible; text-overflow: clip; }
+  /* HTML5 drag does not exist on touch: the grip was a dead control eating
+     title width. Moving between parts of the day lives in the row's menu. */
+  .today-task .drag-grip, .todo-row .drag-grip { display: none; }
+  /* The band's controls stack full-width so the write-to select cannot poke
+     past the screen edge and every control is a real tap target. */
+  .band-actions { width: 100%; flex-wrap: wrap; }
+  .band-actions .writeto, .band-actions .rangepick { max-width: 100%; flex: 1 1 40%; }
+  .band-actions .btn-primary { flex: 1 1 auto; }
+  /* Day-part heads and the day switch wrap instead of colliding. */
+  .col-head { flex-wrap: wrap; row-gap: var(--s1); }
   .movebar { left: var(--s4); right: var(--s4); transform: none; justify-content: space-between; }
 }
 .rowitem .btn-danger { position: relative; }
@@ -1778,15 +1803,21 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 @media (pointer: coarse) {
   .routine-check, .mr-check, button.est-chip, .expand-btn,
   .note-swatch, .note-dot, .goal-ms-check, .sub-tick, .radio,
-  .goal-bump button, .goal-drop, .kebab, .exc-drop {
+  .goal-bump button, .goal-drop, .kebab, .exc-drop,
+  .goal-nav-btn, .task-act, .habit-auto, .fold-all, .sub-tool,
+  .toggle, .focus-step, .note-chip, .quit-slip,
+  .day-switch .microcap, .linkish {
     position: relative;
   }
   .routine-check::after, .mr-check::after, button.est-chip::after, .expand-btn::after,
   .note-swatch::after, .note-dot::after, .goal-ms-check::after, .sub-tick::after, .radio::after,
-  .goal-bump button::after, .goal-drop::after, .kebab::after, .exc-drop::after {
+  .goal-bump button::after, .goal-drop::after, .kebab::after, .exc-drop::after,
+  .goal-nav-btn::after, .task-act::after, .habit-auto::after, .fold-all::after, .sub-tool::after,
+  .toggle::after, .focus-step::after, .note-chip::after, .quit-slip::after,
+  .day-switch .microcap::after, .linkish::after {
     content: '';
     position: absolute;
-    inset: -11px;
+    inset: -9px;
   }
   .widget-title-btn { padding-block: var(--s3); }
 }
@@ -2197,8 +2228,14 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .ai-key { margin-bottom: var(--s4); }
 .ai-key .formrow { flex-wrap: nowrap; }
 
-/* Task rows keep every control on one line: the title is what gives way. */
-.today-task, .todo-row { flex-wrap: nowrap; }
+/* Task rows keep every control on one line: the title is what gives way.
+   On a WIDE screen. On a phone there is no line that can hold seven controls,
+   so the title takes real width and the controls wrap under it; this rule was
+   unqualified and silently overrode the phone block above, which is how titles
+   ended up broken mid-letter in a 90px sliver. */
+@media (min-width: 640px) {
+  .today-task, .todo-row { flex-wrap: nowrap; }
+}
 .today-task > .grow, .today-task > .task-link, .todo-row > .grow {
   min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.35;
 }

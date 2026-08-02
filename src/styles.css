@@ -825,6 +825,11 @@ button.est-chip:hover { color: var(--accent); background: var(--accent-wash); }
   min-height: 40px;
 }
 .textinput { flex: 1; min-width: 180px; max-width: 680px; }
+/* iOS zooms the whole page onto any focused input under 16px and leaves it
+   zoomed. On a phone, every field is 16px, and the zoom never happens. */
+@media (max-width: 639px) {
+  .textinput, .numinput, select.textinput, textarea { font-size: 1rem; }
+}
 .numinput { width: 90px; font-family: var(--font-mono); }
 .textinput:focus, .numinput:focus { outline: none; border-color: var(--accent); }
 .textinput::placeholder { color: var(--faint); }

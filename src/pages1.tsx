@@ -306,7 +306,7 @@ export function TodayPage() {
             <div className="firstmove">
               <span className="microcap fm-label">First move</span>
               <span className="fm-title">{firstMove.title}</span>
-              <span className="est-chip">{fmtDuration(firstMove.estimateMin)}</span>
+              {isEstimated(firstMove) && firstMove.estimateMin > 0 && <span className="est-chip">{fmtDuration(firstMove.estimateMin)}</span>}
               {/* Start means start: the clock begins on this task for its own
                   estimate, and Plan opens with it highlighted. A button that
                   said Start and only navigated was the first lie of the day. */}
@@ -959,11 +959,14 @@ export function PlanPage() {
     keepShut(next)
   }
 
-  /* The returned work that is still actually waiting. The bar reads from this,
-     so finishing or deleting the last of it takes the bar away with it. */
+  /* The returned work that is still actually waiting ON THE LIST. The bar
+     reads from this, so replanning, finishing or deleting the last of it takes
+     the bar away with it. Without the list check, pressing Replan moved both
+     tasks and left the bar claiming they were back on a list that read
+     "Nothing waiting" right underneath. */
   const returnedLeft = (plan.returnedIds ?? []).filter((id) => {
     const t = tasks.find((x) => x.id === id)
-    return !!t && !t.done
+    return !!t && !t.done && t.list === 'backlog'
   })
 
   /* "Show me" points at the work that came back overnight: scroll the list into
@@ -1375,7 +1378,10 @@ export function PlanPage() {
             </div>
           )}
           {todayAll.length === 0 && (
-            <p className="col-note">Drag anything from the list into a time of day. Drag it back to take it off today.</p>
+            <p className="col-note">
+              <span className="hide-touch">Drag anything from the list into a time of day. Drag it back to take it off today.</span>
+              <span className="only-touch">Use a task's ⋯ menu to put it into a time of day, or send it back to the list.</span>
+            </p>
           )}
         </div>
       </div>

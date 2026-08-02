@@ -3017,3 +3017,11 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .ms-list { display: flex; flex-direction: column; margin-bottom: var(--s2); }
 .ms-row { display: flex; align-items: center; gap: var(--s3); padding: var(--s1) 0; font-size: var(--text-sm); border-bottom: 1px solid var(--hairline); }
 .ms-row:last-child { border-bottom: none; }
+
+/* Copy that names a gesture only shows where the gesture exists: HTML5 drag
+   does not happen on touch, and the grips are hidden there. */
+.only-touch { display: none; }
+@media (pointer: coarse) {
+  .hide-touch { display: none; }
+  .only-touch { display: inline; }
+}

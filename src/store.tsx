@@ -203,6 +203,9 @@ interface Store extends PersistedState {
   setRoutineDone: (routineId: string, done: boolean) => void
   /** Open a fresh run of a repeatable routine, keeping every run before it. */
   startAgain: (routineId: string) => void
+  /** Put a routine on today's list before it is started, so a day can be planned
+   *  and not only recorded. `slot` undefined takes it back off the list. */
+  planRoutine: (routineId: string, slot?: import('./types').TimeSlot) => void
   /** Log one occurrence of a counted habit, or take the last one back. */
   logCount: (habitId: string, delta: 1 | -1) => void
   /** A routine and the habit that mirrors it are created together, so finishing
@@ -412,6 +415,24 @@ function loadPersisted(): PersistedState | null {
       }))
     }
 
+    /* Night work moves from Off-Plate to Personal, his call on 2026-08-02. The
+       workspace of a row he owns is never touched by the loader, so this is the
+       explicit one-time move, habit included. Everything logged against either
+       keeps its id and therefore its history; only which workspace shows it
+       changes. */
+    if (!p.removedSeeds.includes('fix:nightwork-personal')) {
+      p.removedSeeds.push('fix:nightwork-personal')
+      p.routines = (p.routines ?? []).map((r) => (r.id === 'r-nightwork' && r.space === 'offplate' ? { ...r, space: 'personal' } : r))
+      p.habits = (p.habits ?? []).map((h) => (h.id === 'h-nightwork' && h.space === 'offplate' ? { ...h, space: 'personal' } : h))
+    }
+
+    /* A plan is for a day. Yesterday's cannot be allowed to sit on this morning's
+       list pretending it was chosen. */
+    {
+      const today = localDateKey()
+      p.routines = (p.routines ?? []).map((r) => (r.planned && r.planned.day !== today ? { ...r, planned: undefined } : r))
+    }
+
     /* Week rollover: when the saved state belongs to an earlier ISO week, each
        habit's checkmarks are archived into its 12-week history and cleared, so
        Monday always starts a fresh row instead of showing last week's ticks. */
@@ -559,7 +580,7 @@ function loadPersisted(): PersistedState | null {
        while it still carries the exact old name, so anything he has renamed
        himself is left alone and running it twice changes nothing. */
     {
-      const renames: [string, string, string][] = [['r-evening', 'Evening shutdown', 'Before bed routine'], ['r-weekly', 'Weekly reset', 'Weekly review'], ['r-morningwork', 'Morning work routine', 'Morning Big Time work routine'], ['r-morning', 'Morning routine', 'Morning Preparation']]
+      const renames: [string, string, string][] = [['r-evening', 'Evening shutdown', 'Before bed routine'], ['r-weekly', 'Weekly reset', 'Weekly review'], ['r-morningwork', 'Morning work routine', 'Morning Big Time work routine'], ['r-morning', 'Morning routine', 'Morning Preparation'], ['r-prework', 'Before work', 'Before work routine']]
       for (const [id, was, now] of renames) {
         p.routines = (p.routines ?? []).map((r) => (r.id === id && r.title === was ? { ...r, title: now } : r))
         const hid = (p.routines ?? []).find((r) => r.id === id)?.habitId
@@ -1770,6 +1791,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     logCount,
     startAgain: (routineId) => applyRoutine(routineId, (r) => ({
       ...r, run: (r.run ?? 0) + 1, doneStepIds: [], stepData: {}, stepChoice: {}, startedAt: undefined,
+    })),
+    /* Planning is the other direction from starting: starting files a routine
+       under the clock that has already run, planning says where he intends it to
+       go. Nothing is copied, so the row on the day IS the routine and ticking a
+       step in either place is one act. */
+    planRoutine: (routineId, slot) => applyRoutine(routineId, (r) => ({
+      ...r, planned: slot ? { day: todayKey(), slot } : undefined,
     })),
     /* Ticking the routine itself ticks everything inside it, minus any step that
        has to be earned elsewhere (the typing gate), which stays his to pass. */

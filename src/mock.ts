@@ -117,9 +117,9 @@ export const MOCK_HABITS: HabitDef[] = [
   { id: 'h-wakeup', space: 'personal', name: 'After wake up', daypart: 'morning', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   /* Fed by a step of the after-wake-up routine, same wiring as meditation. */
   { id: 'h-creatine', space: 'personal', name: 'Take creatine', daypart: 'morning', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
-  { id: 'h-prework', space: 'personal', name: 'Before work', frequency: 'weekdays', paused: false, days: [false, false, false, false, false, false, false], history: [] },
+  { id: 'h-prework', space: 'personal', name: 'Before work routine', frequency: 'weekdays', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-evening', space: 'personal', name: 'Before bed routine', daypart: 'evening', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
-  { id: 'h-nightwork', space: 'offplate', name: 'Night work routine', daypart: 'evening', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
+  { id: 'h-nightwork', space: 'personal', name: 'Night work routine', daypart: 'evening', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   /* No daypart: brain rot does not keep office hours, so this sits in Anytime
      until he decides it belongs to a part of the day. */
   { id: 'h-brainrot', space: 'personal', name: 'Out Brain Rot', frequency: 'daily', paused: false, days: [false, false, false, false, false, false, false], history: [] },
@@ -137,6 +137,7 @@ export const MOCK_HABITS: HabitDef[] = [
   { id: 'h-focus-offplate', space: 'offplate', name: 'Focus for 30 minutes', frequency: 'daily', paused: false, auto: { from: 'focus', minutes: 30 }, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-focus-corner', space: 'corner', name: 'Focus for 30 minutes', frequency: 'daily', paused: false, auto: { from: 'focus', minutes: 30 }, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-weekly', space: 'personal', name: 'Weekly review', frequency: 'weekly', paused: false, days: [false, false, false, false, false, false, false], history: [] },
+  { id: 'h-invoicing', space: 'work', name: 'Invoicing routine', frequency: 'monthly', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-monthly', space: 'personal', name: 'Monthly review', frequency: 'monthly', paused: false, days: [false, false, false, false, false, false, false], history: [] },
 ]
 
@@ -171,10 +172,43 @@ export const MOCK_ROUTINES: Routine[] = [
       { id: 'mr5', title: 'Remind yourself of your goals', kind: 'do', note: 'Look at what you are actually working toward before the day pulls you elsewhere.' },
     ],
   },
-  { id: 'r-prework', space: 'personal', title: 'Before work', cadence: 'prework', habitId: 'h-prework', doneStepIds: [], steps: [] },
+  {
+    id: 'r-prework', space: 'personal', title: 'Before work routine', cadence: 'prework', habitId: 'h-prework',
+    doneStepIds: [],
+    steps: [
+      { id: 'pw1', title: 'Clean up the workdesk', kind: 'do' },
+      { id: 'pw2', title: 'Bring water to the desk', kind: 'do' },
+      { id: 'pw3', title: 'Define the specific task', kind: 'do' },
+      { id: 'pw4', title: 'Find ambient music', kind: 'do', optional: true },
+      { id: 'pw5', title: 'Set the focus for the time you want the task to take', kind: 'do' },
+    ],
+  },
   /* Big Time's own morning ritual. Weekday-gated like Before work: a work
      routine has no Saturday. Steps are his to write. */
-  { id: 'r-morningwork', space: 'work', title: 'Morning Big Time work routine', cadence: 'prework', habitId: 'h-morningwork', doneStepIds: [], steps: [] },
+  {
+    id: 'r-morningwork', space: 'work', title: 'Morning Big Time work routine', cadence: 'prework', habitId: 'h-morningwork',
+    doneStepIds: [],
+    steps: [
+      { id: 'mw1', title: 'See yesterday’s and last week’s focuses', kind: 'do', note: 'In Google Calendar. Move whatever you did not finish to today or this week.' },
+      { id: 'mw2', title: 'Go through the email notifications and clean the inbox', kind: 'do' },
+      { id: 'mw3', title: 'Go through the Trello notifications and updates', kind: 'do' },
+      { id: 'mw4', title: 'Go through the Jira updates', kind: 'do' },
+      { id: 'mw5', title: 'Define today’s focuses in the calendar', kind: 'do', note: 'And plan ahead, if you can.' },
+    ],
+  },
+  /* Invoicing is a Big Time job with an order to it, and the order is the point:
+     the hours have to be right before a description is written for them. */
+  {
+    id: 'r-invoicing', space: 'work', title: 'Invoicing routine', cadence: 'monthly', habitId: 'h-invoicing',
+    repeatable: true,
+    doneStepIds: [],
+    steps: [
+      { id: 'in1', title: 'Go through every project in Costlocker', kind: 'do' },
+      { id: 'in2', title: 'Review the hours inside each project', kind: 'do' },
+      { id: 'in3', title: 'Prepare placeholders wherever there will be external expenses', kind: 'do' },
+      { id: 'in4', title: 'Prepare the descriptions for the invoicing', kind: 'do' },
+    ],
+  },
   {
     id: 'r-evening', space: 'personal', title: 'Before bed routine', cadence: 'daily', habitId: 'h-evening',
     doneStepIds: [],
@@ -191,7 +225,7 @@ export const MOCK_ROUTINES: Routine[] = [
   /* Night work is Off-Plate work: evening business sessions, ended on purpose.
      The end time is a step because the midnight rule is policy, not mood. */
   {
-    id: 'r-nightwork', space: 'offplate', title: 'Night work routine', cadence: 'daily', habitId: 'h-nightwork',
+    id: 'r-nightwork', space: 'personal', title: 'Night work routine', cadence: 'daily', habitId: 'h-nightwork',
     doneStepIds: [],
     steps: [
       { id: 'nw1', title: 'Define the tasks for the night', kind: 'do', note: 'Off today\u2019s list.' },

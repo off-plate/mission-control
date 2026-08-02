@@ -642,8 +642,8 @@ function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
    own: same checkbox, same title, same expander, same menu. The only thing that
    marks it out is a small "repeats" tag, because a different layout for the same
    kind of thing reads as two different apps on one page. */
-function RoutineOnDay({ routine, habitName }: { routine: Routine; habitName?: string }) {
-  const { toggleRoutineStep, toggleRoutineAlt, setRoutineDone, setPage, inView } = useStore()
+function RoutineOnDay({ routine }: { routine: Routine }) {
+  const { toggleRoutineStep, toggleRoutineAlt, setRoutineDone, planRoutine, setPage, inView } = useStore()
   const [open, setOpen] = useState(false)
   // Counts what the routine needs, so an optional step neither pads the total
   // nor keeps a finished routine one short of it.
@@ -689,7 +689,17 @@ function RoutineOnDay({ routine, habitName }: { routine: Routine; habitName?: st
           </button>
         )}
         <Dropdown label={`Options for ${routine.title}`}>
+          {/* Moving it is the same menu as putting it here in the first place,
+              so a routine can be planned into the evening and then pulled
+              forward without leaving the day. */}
+          {SLOTS.filter((s) => s.id !== routine.planned?.slot).map((s) => (
+            <button key={s.id} role="menuitem" onClick={() => planRoutine(routine.id, s.id)}>Move to {s.label.toLowerCase()}</button>
+          ))}
+          <span className="kebab-sep" />
           <button role="menuitem" onClick={() => setPage('routines')}>Open in Routines</button>
+          {routine.planned && !routine.startedAt && (
+            <button role="menuitem" onClick={() => planRoutine(routine.id)}>Take off today</button>
+          )}
         </Dropdown>
       </div>
 
@@ -746,9 +756,6 @@ function RoutineOnDay({ routine, habitName }: { routine: Routine; habitName?: st
         </div>
       )}
 
-      {complete && habitName && (
-        <p className="rod-done">Checked “{habitName}” off in Habits.</p>
-      )}
     </div>
   )
 }
@@ -786,9 +793,15 @@ export function PlanPage() {
      starts it files itself under the time he started it: this list is a record
      of the day, not a plan for it. */
   const isWeekend = todayIdx >= 5
-  const dueRoutines = routines.filter((r) => inView(r.space) && !r.archivedAt && r.startedAt && !(r.cadence === 'prework' && isWeekend))
+  const today = localDateKey()
+  const onToday = (r: Routine) => !!r.startedAt || r.planned?.day === today
+  const dueRoutines = routines.filter((r) => inView(r.space) && !r.archivedAt && onToday(r) && !(r.cadence === 'prework' && isWeekend))
+  /* A slot he chose wins over the clock: planning it for the evening and
+     starting it early should not throw it back to the morning while he is
+     looking at it. */
   const routineSlot = (r: Routine): TimeSlot | 'unsorted' =>
-    r.startedAt ? slotForMoment(r.startedAt) : 'unsorted'
+    r.planned?.day === today && r.planned.slot ? r.planned.slot
+      : r.startedAt ? slotForMoment(r.startedAt) : 'unsorted'
   const plannedMin = todayTasks.reduce((a, t) => a + taskMinutes(t), 0)
 
   /* Progress counts everything in the space, today included, and counts finished
@@ -1054,7 +1067,7 @@ export function PlanPage() {
                   items.map((it) => {
                     if (it.kind === 'repeat') {
                       const r = it.routine
-                      return <RoutineOnDay key={r.id} routine={r} habitName={habits.find((h) => h.id === r.habitId)?.name} />
+                      return <RoutineOnDay key={r.id} routine={r} />
                     }
                     const t = it.task
                     const isExp = expanded.has(t.id)
@@ -1942,6 +1955,36 @@ function AddRoutineSheet({ onClose }: { onClose: () => void }) {
    how often you have run it is a habits question, and it is answered on Habits.
 */
 
+/* Packs cards of different heights into columns without holes, and without
+   giving up left-to-right order the way CSS columns would. Each card spans as
+   many 4px rows as it is tall; the observer re-measures on resize and whenever a
+   card grows, which is what happens every time a step is ticked or the editor
+   opens. */
+const ROW = 4
+function usePackedGrid(deps: unknown[]) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const grid = ref.current
+    if (!grid || typeof ResizeObserver === 'undefined') return
+    const gap = parseFloat(getComputedStyle(grid).rowGap || '0')
+    const measure = () => {
+      for (const child of Array.from(grid.children) as HTMLElement[]) {
+        const h = child.getBoundingClientRect().height
+        if (!h) continue
+        child.style.gridRowEnd = `span ${Math.max(1, Math.ceil((h + gap) / ROW))}`
+      }
+    }
+    grid.classList.add('is-packed')
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(grid)
+    for (const child of Array.from(grid.children)) ro.observe(child)
+    return () => ro.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps)
+  return ref
+}
+
 /* Every routine, in every workspace, on one page. A day is not lived one
    workspace at a time: the morning ritual, the Big Time start and the night
    session all belong to the same day, and hiding two thirds of them behind the
@@ -1952,9 +1995,18 @@ function AddRoutineSheet({ onClose }: { onClose: () => void }) {
 const SPACE_RANK: Record<SpaceId, number> = { personal: 0, work: 1, offplate: 2, corner: 3 }
 
 export function RoutinesPage() {
-  const { routines, view, space, toggleRoutineStep, toggleRoutineAlt, startAgain, routineLog, deleteRoutine, habits } = useStore()
+  const { routines, view, space, toggleRoutineStep, toggleRoutineAlt, startAgain, planRoutine, setPage, routineLog, deleteRoutine, habits } = useStore()
+  const today = localDateKey()
+  const onDay = (r: Routine) => !!r.startedAt || r.planned?.day === today
+  /* Where it goes when he puts it on the day: the part of the day it belongs to
+     if it has one, otherwise the part of the day it is now. Either way he can
+     move it from the list itself. */
+  const plannedSlotFor = (r: Routine): TimeSlot =>
+    (habits.find((h) => h.id === r.habitId)?.daypart ?? slotForMoment(new Date().toISOString())) as TimeSlot
   const [editingId, setEditingId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
+  const hereRef = usePackedGrid([routines, view, editingId])
+  const elseRef = usePackedGrid([routines, view, editingId])
   const live = routines.filter((r) => !r.archivedAt)
   const byFlow = (a: Routine, b: Routine) => flowRank(a) - flowRank(b)
   /* In All nothing is "elsewhere": one list, day order, as before. */
@@ -1990,6 +2042,14 @@ export function RoutinesPage() {
                   <button role="menuitem" onClick={() => setEditingId(editingId === r.id ? null : r.id)}>
                     {editingId === r.id ? 'Done editing' : 'Edit the steps'}
                   </button>
+                  {/* On the day's list before it is started, so a day can be
+                      planned and not only recorded. It lands in the part of the
+                      day it belongs to and can be moved from there. */}
+                  {onDay(r)
+                    ? (r.planned && !r.startedAt
+                      ? <button role="menuitem" onClick={() => planRoutine(r.id)}>Take off today</button>
+                      : <button role="menuitem" onClick={() => setPage('plan')}>See it on today</button>)
+                    : <button role="menuitem" onClick={() => planRoutine(r.id, plannedSlotFor(r))}>Add to today</button>}
                   <span className="kebab-sep" />
                   <button role="menuitem" className="danger" onClick={() => deleteRoutine(r.id)}>
                     Delete this routine
@@ -2065,9 +2125,9 @@ export function RoutinesPage() {
                 })}
               </div>
               <div className="routine-card-foot">
-                {linked && total > 0
-                  ? <span className="assist-note">Finishing all {total} checks off “{linked.name}” in Habits.</span>
-                  : <span />}
+                {/* No line about the habit it checks off. He knows: he wrote the
+                    routine, and the same sentence on every card was noise. */}
+                <span />
                 {/* No reset. Clearing the checks used to un-finish the routine,
                     which deleted its row from the log and took back its habit
                     tick: a button that erased the fact he had done it. Starting
@@ -2094,14 +2154,14 @@ export function RoutinesPage() {
           </>
         }
       />
-      <div className="routine-cards">
+      <div className="routine-cards" ref={hereRef}>
         {here.length === 0 && <div className="empty">No routines in this workspace yet. Add one from the button above.</div>}
         {here.map(card)}
       </div>
       {elsewhere.length > 0 && (
         <>
           <div className="routine-split"><span className="mono">Other workspaces</span></div>
-          <div className="routine-cards">{elsewhere.map(card)}</div>
+          <div className="routine-cards" ref={elseRef}>{elsewhere.map(card)}</div>
         </>
       )}
 

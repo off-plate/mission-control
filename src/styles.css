@@ -230,15 +230,9 @@ main { padding-inline: var(--gutter); }
 .est-vs-actual { font-size: 0.75rem; color: var(--info); white-space: nowrap; }
 .est-vs-actual b { font-weight: 600; }
 
-/* each habit is its own separate card */
-.habit-card-tag { display: flex; align-items: baseline; gap: var(--s2); margin-bottom: var(--s2); }
-.habit-card-tag .col-tot { margin-left: auto; }
-.habit-card .habit-row { border-bottom: none; padding: 0; }
-.habit-card.is-routine { outline: 1px solid var(--accent-wash); }
 /* Keeping something and quitting something are opposite games with opposite
-   scoreboards. On one cream card each they read as the same thing. */
-.habit-card.is-break { background: var(--surface-2); border-color: var(--hairline-strong); }
-.habit-card.is-break .habit-name::after {
+   scoreboards, so a quit says so on its own line. */
+.habit-line.is-break .habit-name::after {
   content: 'quitting'; margin-left: var(--s2); padding: 1px 7px; border-radius: 999px;
   border: 1px solid var(--hairline-strong); font-family: var(--font-mono);
   font-size: 0.625rem; letter-spacing: 0.04em; color: var(--muted); vertical-align: 2px;
@@ -1808,7 +1802,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 /* Only real cards get the card shadow. Sections that live INSIDE a card
    (.bucket, .habit-group) must never cast one: a shadow with no surface
    behind it reads as a ghost box nested in the real card. */
-.panel, .card, .routine-card, .mr-card, .goal-col, .habit-card, .coach-loop, .scenario,
+.panel, .card, .routine-card, .mr-card, .goal-col, .coach-loop, .scenario,
 .widget, .firstmove, .bd-composer {
   box-shadow: 0 1px 2px rgba(26, 23, 18, 0.05), 0 12px 34px -22px rgba(26, 23, 18, 0.34);
 }
@@ -1848,8 +1842,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 
 /* Habits: pause and delete live behind the card's kebab. */
 .habit-kebab { margin-left: var(--s2); }
-.habit-card.is-paused { opacity: 0.62; }
-.habit-card.is-paused .habit-days { filter: grayscale(1); }
 
 /* Goals: log progress, drop a goal, add a new one. */
 .goal-actions { display: flex; align-items: center; gap: var(--s3); margin-top: var(--s3); }
@@ -2029,35 +2021,99 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 /* ---------- Habits: a band per part of the day ---------- */
 /* Heading, rule, then that group's habits side by side across the full width.
    Groups stack down the page, so a busy morning never strands a short evening. */
-.habit-section + .habit-section { margin-top: var(--s6); }
+/* ---------- Habits, as a list ----------
+   Sixteen identical bordered cards in a grid gave the page no rank, left two
+   thirds of every card empty and stranded the last card of each group. One
+   panel per group, hairline separated rows inside it: the same shape the to-do
+   list and the day already use. */
+.habit-section + .habit-section { margin-top: var(--s5); }
+/* The strip is seven 26px dots and their gaps. Spelled out, not guessed at a
+   number: the gap is in rem, so on a 2560 screen a hardcoded 254px wrapped the
+   week onto two lines. */
+:root { --daystrip: calc(7 * 26px + 6 * var(--s3)); --habit-foot-col: 200px; --habit-menu-col: 34px; }
+.habit-list .col-head { margin-bottom: var(--s2); }
+.habit-list .col-head .col-tot { margin-left: 0; }
+.habit-line { border-top: 1px solid var(--hairline); }
+.habit-line:first-of-type { border-top: none; }
+.habit-line.is-paused { opacity: 0.55; }
+.habit-line.is-paused .habit-days { filter: grayscale(1); }
+.habit-line .habit-row { border-bottom: none; }
+
+/* The week of a habit, always in the same column, so the strips line up down
+   the page and the weekday letters can be printed once at the top. */
+.habit-list.w7 .habit-row {
+  display: grid; align-items: center; column-gap: var(--s4); row-gap: var(--s1);
+  /* Every column fixed but the name: an "auto" menu column measured itself per
+     row, so the legend row (which has no menu) sat 41px to the right of the
+     dots it was labelling. */
+  grid-template-columns: minmax(0, 1fr) var(--daystrip) var(--habit-foot-col) var(--habit-menu-col);
+  grid-template-areas: 'name days foot menu';
+  padding: var(--s2) 0;
+}
+.habit-actions { display: flex; align-items: center; gap: var(--s2); }
+.habit-list.w7 .habit-actions { grid-area: menu; }
+/* The workspace, when the name alone cannot tell two habits apart. */
+.habit-qual {
+  font-family: var(--font-mono); font-size: 0.625rem; font-weight: 400;
+  color: var(--faint); margin-left: var(--s2); text-transform: uppercase; letter-spacing: 0.04em;
+}
+.habit-list.w7 .habit-row-top { grid-area: name; min-width: 0; }
+.habit-list.w7 .habit-days { grid-area: days; margin-top: 0; justify-content: space-between; }
+.habit-list.w7 .count-bar { grid-area: days; margin: 0; }
+.habit-list.w7 .habit-foot { grid-area: foot; margin-top: 0; justify-content: flex-end; text-align: right; }
+.habit-list.w7 .habit-foot .habit-weeks { margin-left: 0; }
+.habit-list.w7 .habit-goal { grid-area: foot; justify-self: end; }
+/* The legend is a row of the same grid, so it cannot drift out of line. */
+.habit-list .habit-row.is-legend { padding: 0 0 var(--s1); }
+.habit-list .habit-row.is-legend .day-lab { width: 26px; text-align: center; }
+.habit-list .habit-row.is-legend .habit-days { justify-content: space-between; }
+/* Today is a column, not a bold letter under one dot. */
+.day-cell.is-today .daydot { box-shadow: 0 0 0 1px var(--hairline-strong); }
+.day-cell.is-today .daydot.kept, .day-cell.is-today .daydot.full { box-shadow: none; }
+/* A dot the routine owns is not his to press, so it does not draw as one. */
+.daydot.is-locked { border-style: dotted; opacity: 0.75; }
+
+@media (max-width: 1000px) {
+  .habit-list.w7 .habit-row {
+    grid-template-columns: minmax(0, 1fr) var(--daystrip) var(--habit-menu-col);
+    grid-template-areas: 'name days menu' 'foot foot foot';
+  }
+  .habit-list.w7 .habit-foot { justify-content: flex-start; text-align: left; }
+  .habit-list .habit-days.is-legend { margin-right: 0; }
+}
+@media (max-width: 700px) {
+  .habit-list.w7 .habit-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'name menu' 'days days' 'foot foot'; }
+  .habit-list .habit-row.is-legend { display: none; }
+  .habit-list.w7 .habit-days { justify-content: flex-start; gap: var(--s2); }
+  .habit-list .habit-days.is-legend { display: none; }
+}
 .section-head {
   display: flex; align-items: baseline; gap: var(--s3);
   padding-bottom: var(--s2); margin-bottom: var(--s3);
   border-bottom: 1px solid var(--hairline-strong);
 }
 .section-count { margin-left: auto; font-size: var(--text-xs); color: var(--faint); }
-.habit-grid { display: grid; gap: var(--s4); grid-template-columns: minmax(0, 1fr); align-items: start; }
-.habit-grid > * { min-width: 0; }
-@media (min-width: 720px)  { .habit-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 1200px) { .habit-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (min-width: 1800px) { .habit-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-@media (min-width: 2600px) { .habit-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
-.habit-card { display: flex; flex-direction: column; }
-.habit-card.is-paused { opacity: 0.55; }
-.habit-card.is-paused .habit-days { filter: grayscale(1); }
+.habit-line > * { min-width: 0; }
+/* Very wide: two lists side by side rather than one list stretched across a
+   screen where the strip and the name sit half a metre apart. */
+/* Very wide: two columns, packed by height rather than laid out in rows. A
+   grid put the tall group in row one and left the third group waiting under a
+   thousand pixels of nothing. */
+@media (min-width: 1800px) {
+  .habit-cols { columns: 2; column-gap: var(--s5); }
+  .habit-section { break-inside: avoid; }
+  .habit-section + .habit-section { margin-top: var(--s5); }
+}
 /* A weekday-only habit does not expect the weekend. */
 .daydot.off-day { opacity: 0.4; }
 
-/* The frequency sits under the count, not welded to it ("0/7every day"). */
+/* What is left of the small print: a count of times done today, and nothing
+   that restates the row's own cadence. */
 .habit-freq { display: block; font-size: 0.625rem; color: var(--faint); font-weight: 400; letter-spacing: 0; }
 .habit-count { text-align: right; line-height: 1.25; }
 /* Name row never wraps its controls onto a second line: the title truncates. */
 .habit-row-top { flex-wrap: nowrap; }
 .habit-row-top .habit-name { overflow-wrap: anywhere; }
-/* Cards in a band share one height, so a row reads as a row. */
-.habit-grid { align-items: stretch; }
-.habit-card .habit-row { display: flex; flex-direction: column; height: 100%; }
-.habit-card .habit-foot { margin-top: auto; padding-top: var(--s2); }
 
 /* Phone: the day dots and the name row must fit 390px without pushing the page. */
 @media (max-width: 639px) {

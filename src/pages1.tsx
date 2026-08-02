@@ -104,8 +104,12 @@ export function WriteTo() {
       className="textinput writeto" value={space} aria-label="Which profile this goes to"
       onChange={(e) => setSpace(e.target.value as SpaceId)}
     >
+      {/* It sits where a filter sits and it is not one: it decides where a NEW
+          thing gets written. Saying so in the option is cheaper than teaching
+          him that "All" up top and "Personal" here are not contradicting each
+          other. */}
       {(Object.keys(SPACE_LABELS) as SpaceId[]).map((s) => (
-        <option key={s} value={s}>{SPACE_LABELS[s]}</option>
+        <option key={s} value={s}>Add to {SPACE_LABELS[s]}</option>
       ))}
     </select>
   )
@@ -1421,9 +1425,11 @@ function HabitTrail({ h, days }: { h: HabitDef; days: number }) {
   )
 }
 
-function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress, goal }: {
+function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress, goal, qualify }: {
   h: HabitDef
   todayIndex: number
+  /** The workspace, spelled out, when another visible habit has the same name. */
+  qualify?: string
   /** How many days back to show. Seven keeps the week of dots you can click. */
   days?: number
   actions?: React.ReactNode
@@ -1441,6 +1447,9 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
   const liveFocusMin = pomo.phase === 'focus' && pomo.running ? Math.max(0, Math.floor((pomo.blockMin * 60 - pomo.secondsLeft) / 60)) : 0
   const kept = h.days.filter(Boolean).length
   const target = habitTarget(h)
+  /* Once a week or once a month: the week strip is the wrong instrument, and
+     the fraction underneath it was arithmetic between two different units. */
+  const periodic = h.frequency === 'weekly' || h.frequency === 'monthly'
   /* Twice in a day is not the same as once. The log has held both since
      meditation started being fed by two routines; without this the card said
      the same thing either way. */
@@ -1480,29 +1489,33 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
       <div className="habit-row is-count">
         <div className="habit-row-top">
           <SpaceMark space={h.space} />
-          <span className="habit-name">{h.name}</span>
+          <span className="habit-name">{h.name}{qualify && <span className="habit-qual">{qualify}</span>}</span>
           <span className="habit-count mono">
             {fmtDuration(todayMin)}<span className="habit-freq">of {fmtDuration(need)} today</span>
           </span>
-          {actions}
         </div>
-        <div className="count-bar" aria-hidden="true">
-          <span style={{ width: `${Math.min(100, Math.round((todayMin / need) * 100))}%` }} />
-        </div>
+        <span className="habit-actions">{actions}</span>
+        {/* One strip, and it is the week: the bar said today, the dots said the
+            week and the line under them said the week again, so the row stated
+            zero four times. */}
         <div className="habit-days">
           {DAY_LABELS.map((d, i) => {
             const on = keptDaysIn(habitLog, h.id, dayOfWeekKey(i), dayOfWeekKey(i)).size > 0
+            const isToday = i === todayIndex
             return (
-              <span className="day-cell" key={i}>
-                <span className={`daydot${on ? ' kept' : ''}`} aria-label={`${d}, ${on ? 'kept' : 'not kept'}`} />
-                <span className={`day-lab${i === todayIndex ? ' today' : ''}`}>{d[0]}</span>
+              <span className={`day-cell${isToday ? ' is-today' : ''}`} key={i}>
+                <span
+                  className={`daydot is-measure${on ? ' full' : isToday && todayMin > 0 ? ' partial' : ''}`}
+                  style={isToday && !on ? ({ ['--fill' as string]: `${Math.min(100, Math.round((todayMin / need) * 100))}%` } as React.CSSProperties) : undefined}
+                  aria-label={`${d}, ${on ? 'kept' : 'not kept'}`}
+                />
               </span>
             )
           })}
         </div>
         <div className="habit-foot">
-          <button className="habit-auto" onClick={() => setPage('focus')}>Kept by your focus blocks</button>
           <span className="habit-weeks">{kept7} of 7 this week</span>
+          <button className="habit-auto" onClick={() => setPage('focus')}>Open Focus</button>
         </div>
       </div>
     )
@@ -1518,12 +1531,12 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
       <div className="habit-row is-count">
         <div className="habit-row-top">
           <SpaceMark space={h.space} />
-          <span className="habit-name">{h.name}</span>
+          <span className="habit-name">{h.name}{qualify && <span className="habit-qual">{qualify}</span>}</span>
           <span className="habit-count mono">
             {have}<span className="habit-freq">of {target} {label}</span>
           </span>
-          {actions}
         </div>
+        <span className="habit-actions">{actions}</span>
         <div className="count-bar" aria-hidden="true">
           <span style={{ width: `${Math.min(100, Math.round((have / target) * 100))}%` }} />
         </div>
@@ -1552,25 +1565,24 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
       <div className="habit-row is-measured">
         <div className="habit-row-top">
           <SpaceMark space={h.space} />
-          <span className="habit-name">{h.name}</span>
+          <span className="habit-name">{h.name}{qualify && <span className="habit-qual">{qualify}</span>}</span>
           <span className="habit-count mono">
             {fmtDuration(todayMin)}<span className="habit-freq">of {fmtDuration(target)} today</span>
           </span>
-          {actions}
         </div>
+        <span className="habit-actions">{actions}</span>
         <div className="habit-days">
           {DAY_LABELS.map((d, i) => {
             const mins = focusMinutesOn(focusSessions, dayOfWeekKey(i), h.space)
             const pct = Math.min(100, Math.round((mins / target) * 100))
             return (
-              <span className="day-cell" key={i}>
+              <span className={`day-cell${i === todayIndex ? ' is-today' : ''}`} key={i}>
                 <span
                   className={`daydot is-measure${pct >= 100 ? ' full' : pct > 0 ? ' partial' : ''}`}
                   style={{ ['--fill' as string]: `${pct}%` } as React.CSSProperties}
                   title={`${d}: ${fmtDuration(mins)} of ${fmtDuration(target)}`}
                   aria-label={`${d}, ${mins} of ${target} minutes`}
                 />
-                <span className={`day-lab${i === todayIndex ? ' today' : ''}`}>{d[0]}</span>
               </span>
             )
           })}
@@ -1596,10 +1608,10 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
       <div className="habit-row is-quit">
         <div className="habit-row-top">
           <SpaceMark space={h.space} />
-          <span className="habit-name">{h.name}</span>
+          <span className="habit-name">{h.name}{qualify && <span className="habit-qual">{qualify}</span>}</span>
           <span className="habit-count mono">{clean}<span className="habit-freq">{clean === 1 ? 'day' : 'days'} clean</span></span>
-          {actions}
         </div>
+        <span className="habit-actions">{actions}</span>
         {window > 7 ? <HabitTrail h={h} days={window} /> : (
           <div className="habit-days">
             {DAY_LABELS.map((d, i) => (
@@ -1625,23 +1637,29 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
     <div className={`habit-row${drivenBy ? ' is-auto' : ''}`}>
       <div className="habit-row-top">
         <SpaceMark space={h.space} />
-        <span className="habit-name">{h.name}</span>
+        <span className="habit-name">{h.name}{qualify && <span className="habit-qual">{qualify}</span>}</span>
         {/* The week's count belongs to the week. Showing 1/7 above a year of
             squares says two different things about the same habit. */}
+        {/* A weekly habit has a target of one, and this counted DAYS in the
+            week, so a weekly review ticked four times read "4/1". A period
+            habit says whether the period is kept; a daily one keeps its
+            fraction. */}
         {window === 7 && (
           <span className="habit-count mono">
-            {kept}/{target}
-            <span className="habit-freq">{timesToday > 1 ? `${timesToday}x today` : habitFrequencyLabel(h)}</span>
+            {periodic
+              ? (kept >= target ? 'kept' : 'not yet')
+              : `${kept}/${target}`}
+            {timesToday > 1 && <span className="habit-freq">{timesToday}x today</span>}
           </span>
         )}
-        {actions}
       </div>
+      <span className="habit-actions">{actions}</span>
       {window > 7 ? <HabitTrail h={h} days={window} /> : (
       <div className="habit-days">
         {DAY_LABELS.map((d, i) => (
-          <span className="day-cell" key={i}>
+          <span className={`day-cell${i === todayIndex ? ' is-today' : ''}`} key={i}>
             <button
-              className={`daydot${expected(i) ? '' : ' off-day'}${drivenBy ? ' is-auto' : ''}${i === todayIndex && partial ? ' partial' : ''}`}
+              className={`daydot${expected(i) ? '' : ' off-day'}${drivenBy ? ' is-auto' : ''}${i === todayIndex && partial ? ' partial' : ''}${drivenBy && i === todayIndex ? ' is-locked' : ''}`}
               style={i === todayIndex && partial ? ({ ['--fill' as string]: `${pct}%` } as React.CSSProperties) : undefined}
               role="checkbox"
               aria-checked={h.days[i]}
@@ -1658,7 +1676,6 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
             >
               <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
             </button>
-            <span className={`day-lab${i === todayIndex ? ' today' : ''}`}>{d[0]}</span>
           </span>
         ))}
       </div>
@@ -1669,29 +1686,36 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
         </button>
       )}
       <div className="habit-foot">
+        {trend && <span className="habit-weeks">{trend}</span>}
+        {/* The row is already called after the routine. Saying "ticks itself
+            when you finish Before work routine" on a row named Before work
+            routine is the card restating its own title; the steps left today
+            are the only new fact, and the link is an action, not a sentence. */}
         {drivenBy ? (
           <button className="habit-auto" onClick={() => setPage('routines')}>
             {progress && progress.total > 1 && progress.done < progress.total
-              ? `${progress.done} of ${progress.total} steps done in ${drivenBy}`
-              : `Ticks itself when you finish ${drivenBy}`}
+              ? `${progress.done} of ${progress.total} steps`
+              : 'Open the routine'}
           </button>
         ) : null}
-        {trend && <span className="habit-weeks">{trend}</span>}
       </div>
     </div>
   )
 }
 
-/* Habits are grouped by the part of the day they belong to, each group in its
-   own column with its own heading, so you read down "Morning" instead of
-   hunting a flat grid for which card happens to be an evening one. */
-const DAYPART_COLS: { id: TimeSlot | 'anytime'; label: string }[] = [
-  { id: 'anytime', label: 'Anytime' },
-  { id: 'morning', label: 'Morning' },
-  { id: 'noon', label: 'Noon' },
-  { id: 'afternoon', label: 'Afternoon' },
-  { id: 'evening', label: 'Evening' },
+/* Habits used to be grouped by the part of the day they belong to. That axis
+   described nothing: ten of sixteen landed in "Anytime", which is the group
+   that means no group, and it was printed first. The axis that decides what a
+   row IS, and whether he can touch it, is who keeps it. Three groups, his own
+   first, because those are the only ones with a live checkbox in them. */
+type Keeper = 'you' | 'routine' | 'clock'
+const KEEPER_GROUPS: { id: Keeper; label: string }[] = [
+  { id: 'you', label: 'You keep these' },
+  { id: 'routine', label: 'Your routines keep these' },
+  { id: 'clock', label: 'The clock keeps these' },
 ]
+/* Inside a group, the day still runs in order. */
+const DAYPART_RANK: Record<string, number> = { morning: 0, noon: 1, afternoon: 2, evening: 3, anytime: 4 }
 
 /* One sheet for adding and editing. A habit a routine drives keeps its name and
    frequency in step with that routine, so those fields are read-only here. */
@@ -1899,21 +1923,41 @@ export function HabitsPage() {
   const progressFor = new Map(routines.filter((r) => r.habitId && !r.archivedAt).map((r) => [
     r.habitId as string, routineProgress(r),
   ]))
-  const building = spaceHabits.filter((h) => !h.paused && h.kind !== 'break' && h.kind !== 'measured')
-  const kept = building.reduce((a, h) => a + h.days.filter(Boolean).length, 0)
-  const target = building.reduce((a, h) => a + habitTarget(h), 0)
+  /* What the page opens with used to be kept-this-week over the sum of every
+     habit's weekly target: 49 of 90, a number mixing dailies, weekdays and
+     monthlies across four workspaces that he could not reconstruct from
+     anything on screen. What he wants on a Sunday morning is what is still
+     open TODAY. */
+  const dueToday = spaceHabits.filter((h) => {
+    if (h.paused || h.kind === 'break') return false
+    if (h.frequency === 'weekdays' && todayIndex >= 5) return false
+    // Once a week or once a month, and already kept: nothing is due.
+    if ((h.frequency === 'weekly' || h.frequency === 'monthly') && h.days.some(Boolean)) return false
+    return true
+  })
+  const doneToday = dueToday.filter((h) => h.days[todayIndex]).length
 
-  // Only draw a column that has something in it, so empty parts of the day do
-  // not leave a labelled void.
-  const cols = DAYPART_COLS
-    .map((c) => ({ ...c, list: spaceHabits.filter((h) => (h.daypart ?? 'anytime') === c.id) }))
+  /* Grouped by who keeps it, and inside a group what is still open comes
+     first: a habit already ticked is a receipt, not a thing to do. */
+  const keeperOf = (h: HabitDef): Keeper =>
+    (h.auto?.from === 'focus' || h.kind === 'measured') ? 'clock' : drivenBy.has(h.id) ? 'routine' : 'you'
+  const rank = (h: HabitDef) =>
+    (h.paused ? 2 : h.days[todayIndex] ? 1 : 0) * 10 + (DAYPART_RANK[h.daypart ?? 'anytime'] ?? 4)
+  /* Three habits called "Focus for 30 minutes" differed by a coloured bar and a
+     single letter. In All they are indistinguishable, so the workspace gets
+     said. */
+  const nameCount = new Map<string, number>()
+  for (const h of spaceHabits) nameCount.set(h.name, (nameCount.get(h.name) ?? 0) + 1)
+  const qualifyOf = (h: HabitDef) => ((nameCount.get(h.name) ?? 0) > 1 ? SPACE_LABELS[h.space] : undefined)
+  const cols = KEEPER_GROUPS
+    .map((c) => ({ ...c, list: spaceHabits.filter((h) => keeperOf(h) === c.id).sort((a, b) => rank(a) - rank(b)) }))
     .filter((c) => c.list.length > 0)
 
   return (
     <div className="page">
       <Band
         title="Habits"
-        metrics={[{ v: `${kept}/${target}`, k: 'kept this week', tone: (kept > 0 ? 'pos' : 'info') as 'pos' | 'info' }]}
+        metrics={[{ v: `${doneToday}/${dueToday.length}`, k: 'done today', tone: (doneToday > 0 ? 'pos' : 'info') as 'pos' | 'info' }]}
         actions={
           <>
             <select
@@ -1928,19 +1972,35 @@ export function HabitsPage() {
         }
       />
 
-      {/* One band per part of the day: a heading, a rule, then that group's
-          habits side by side across the full width. Groups stack down the page,
-          so a busy morning never leaves a short evening column stranded. */}
+      {/* One panel per group, hairline separated rows inside it, the same shape
+          the rest of the app uses for a list. Sixteen identical bordered cards
+          in a grid left two thirds of every card empty, stranded the last card
+          of each group in a row of its own, and gave nothing on the page a rank.
+          The weekday letters are printed once at the top of the list instead of
+          once per row, which is where 112 of them came from. */}
+      <div className="habit-cols">
       {cols.map((c) => (
         <section className="habit-section" key={c.id}>
-          <div className="section-head">
-            <span className="microcap">{c.label}</span>
-            <span className="section-count mono">{c.list.length}</span>
-          </div>
-          <div className="habit-grid">
+          <div className={`panel habit-list${days === 7 ? ' w7' : ''}`}>
+            <div className="col-head">
+              <span className="microcap">{c.label}</span>
+              <span className="col-tot mono">{c.list.length}</span>
+            </div>
+            {/* The weekday letters ride the same grid as the rows, so they can
+                never drift out of line with the dots underneath them. */}
+            {days === 7 && (
+              <div className="habit-row is-legend" aria-hidden="true">
+                <span className="habit-row-top" />
+                <span className="habit-days">
+                  {DAY_LABELS.map((d, i) => (
+                    <span className={`day-lab${i === todayIndex ? ' today' : ''}`} key={i}>{d[0]}</span>
+                  ))}
+                </span>
+              </div>
+            )}
             {c.list.map((h) => (
-              <div className={`panel habit-card is-${h.kind ?? 'build'}${h.paused ? ' is-paused' : ''}`} key={h.id}>
-                <HabitRow h={h} todayIndex={todayIndex} days={days} drivenBy={drivenBy.get(h.id)} progress={progressFor.get(h.id)} goal={goalOn.get(h.id)} actions={
+              <div className={`habit-line is-${h.kind ?? 'build'}${h.paused ? ' is-paused' : ''}`} key={h.id}>
+                <HabitRow h={h} todayIndex={todayIndex} days={days} qualify={qualifyOf(h)} drivenBy={drivenBy.get(h.id)} progress={progressFor.get(h.id)} goal={goalOn.get(h.id)} actions={
                   <>
                   {h.paused && <span className="col-tot mono">paused</span>}
                   {!h.paused && h.days[todayIndex] && <span className="col-tot mono val-pos">done today</span>}
@@ -1954,7 +2014,7 @@ export function HabitsPage() {
                     )}
                     <span className="kebab-sep" />
                     {drivenBy.has(h.id) ? (
-                      <span className="kebab-note">Deleted with the {drivenBy.get(h.id)} routine</span>
+                      <span className="kebab-note">Deleted with “{drivenBy.get(h.id)}”</span>
                     ) : (
                       <button role="menuitem" className="danger" onClick={() => deleteHabit(h.id)}>Delete this habit</button>
                     )}
@@ -1966,6 +2026,7 @@ export function HabitsPage() {
           </div>
         </section>
       ))}
+      </div>
       {cols.length === 0 && <div className="empty">No habits in this space yet. Add one from the button above.</div>}
 
 

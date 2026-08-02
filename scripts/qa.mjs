@@ -55,7 +55,7 @@ await step('plan: add, estimate visible, complete via chips', async () => {
 })
 await step('habits: tick a build habit and persist', async () => {
   await fresh('habits')
-  const dot = page.locator('.habit-card', { hasText: 'Meditation' }).first().locator('.daydot:not([disabled])').last()
+  const dot = page.locator('.habit-line', { hasText: 'Meditation' }).first().locator('.daydot:not([disabled])').last()
   await dot.click(); await page.waitForTimeout(400)
   await page.reload(); await page.waitForTimeout(600)
   const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)

@@ -1028,7 +1028,7 @@ export function PlanPage() {
         title="Plan the day"
         metrics={[
           { v: fmtDuration(plannedMin), k: ahead ? 'planned tomorrow' : 'planned today', tone: 'info' as const },
-          { v: pool.length ? `${donePct}%` : '—', k: pool.length ? 'to-do done' : 'no tasks yet', tone: (pool.length && donePct > 0 ? 'pos' : 'info') as 'pos' | 'info' },
+          { v: pool.length ? `${donePct}%` : '—', k: pool.length ? 'of planned time done' : 'no tasks yet', tone: (pool.length && donePct > 0 ? 'pos' : 'info') as 'pos' | 'info' },
           ...(loggedAny ? [{ v: savedToday >= 0 ? fmtSigned(savedToday) : fmtDuration(-savedToday), k: savedToday >= 0 ? 'saved today' : 'over your estimates', tone: (savedToday >= 0 ? 'pos' : 'urgent') as 'pos' | 'urgent' }] : []),
         ]}
         /* The way back into the record. Every day before this one is addressable
@@ -1075,7 +1075,10 @@ export function PlanPage() {
               and the bare "10 here" were three tellings of half a fact. */}
           <div className="col-head">
             <span className="microcap">To-do list</span>
-            <span className="col-tot mono">{doneCount} of {pool.length} done · {fmtDuration(totalMin - doneMin)} left</span>
+            {/* This head counts what the list below it shows. The whole pool's
+                "0 of 5 done" over "Nothing waiting" was two truths about two
+                different lists wearing one label. */}
+            <span className="col-tot mono">{backlogOpen.length} waiting · {fmtDuration(backlogOpen.reduce((a, t) => a + taskMinutes(t), 0))}</span>
           </div>
           {/* Add a task; breaking it down is an action on the task itself. */}
           <div className="formrow" style={{ marginBottom: 'var(--s2)' }}>
@@ -1121,6 +1124,12 @@ export function PlanPage() {
                     <button role="menuitem" onClick={() => setBreakdownFor(t)}>Break it down</button>
                     <button role="menuitem" onClick={() => moveTasksToToday([t.id])}>Move to today</button>
                     <button role="menuitem" onClick={() => { moveTasksToToday([t.id], nextDay()); setAhead(true) }}>Move to tomorrow</button>
+                    {/* Straight into a part of the day: today-then-slot used to
+                        be two separate trips through this same menu. */}
+                    <span className="kebab-head">Straight into today</span>
+                    {SLOTS.map((sl) => (
+                      <button key={sl.id} role="menuitem" onClick={() => dropTo(sl.id, t.id)}>{sl.label}</button>
+                    ))}
                     <span className="kebab-sep" />
                     <button role="menuitem" className="danger" onClick={() => deleteTask(t.id)}>Delete</button>
                   </Dropdown>
@@ -1453,11 +1462,14 @@ function HabitTrail({ h, days }: { h: HabitDef; days: number }) {
   )
 }
 
-function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress, goal, qualify }: {
+function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy, progress, goal, qualify }: {
   h: HabitDef
   todayIndex: number
   /** The workspace, spelled out, when another visible habit has the same name. */
   qualify?: string
+  /** "done today" / "paused", rendered in the foot column where words fit;
+   *  in the menu column they shoved the kebab out of the panel. */
+  stateTag?: React.ReactNode
   /** How many days back to show. Seven keeps the week of dots you can click. */
   days?: number
   actions?: React.ReactNode
@@ -1541,7 +1553,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
             )
           })}
         </div>
-        <div className="habit-foot">
+        <div className="habit-foot">{stateTag}
           <span className="habit-weeks">{kept7} of 7 this week</span>
           <button className="habit-auto" onClick={() => setPage('focus')}>Open Focus</button>
         </div>
@@ -1568,7 +1580,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
         <div className="count-bar" aria-hidden="true">
           <span style={{ width: `${Math.min(100, Math.round((have / target) * 100))}%` }} />
         </div>
-        <div className="habit-foot">
+        <div className="habit-foot">{stateTag}
           <span className="count-do">
             <button className="btn btn-primary count-add" onClick={() => logCount(h.id, 1)}>
               Did it
@@ -1615,7 +1627,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
             )
           })}
         </div>
-        <div className="habit-foot">
+        <div className="habit-foot">{stateTag}
           <button className="habit-auto" onClick={() => setPage('plan')}>Fills itself from your focus blocks</button>
           <span className="habit-weeks">{fmtDuration(weekMin)} this week</span>
         </div>
@@ -1649,7 +1661,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
             ))}
           </div>
         )}
-        <div className="habit-foot">
+        <div className="habit-foot">{stateTag}
           <button className="quit-slip" onClick={() => logSlip(h.id)}>I slipped today</button>
           <span className="habit-weeks">
             {h.quitSince ? `since ${fmtWhen(h.quitSince)}` : ''}
@@ -1713,7 +1725,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, drivenBy, progress
           Feeding “{goal.name}”
         </button>
       )}
-      <div className="habit-foot">
+      <div className="habit-foot">{stateTag}
         {trend && <span className="habit-weeks">{trend}</span>}
         {/* The row is already called after the routine. Saying "ticks itself
             when you finish Before work routine" on a row named Before work
@@ -2028,10 +2040,13 @@ export function HabitsPage() {
             )}
             {c.list.map((h) => (
               <div className={`habit-line is-${h.kind ?? 'build'}${h.paused ? ' is-paused' : ''}`} key={h.id}>
-                <HabitRow h={h} todayIndex={todayIndex} days={days} qualify={qualifyOf(h)} drivenBy={drivenBy.get(h.id)} progress={progressFor.get(h.id)} goal={goalOn.get(h.id)} actions={
+                <HabitRow h={h} todayIndex={todayIndex} days={days} qualify={qualifyOf(h)} drivenBy={drivenBy.get(h.id)} progress={progressFor.get(h.id)} goal={goalOn.get(h.id)} stateTag={
                   <>
-                  {h.paused && <span className="col-tot mono">paused</span>}
-                  {!h.paused && h.days[todayIndex] && <span className="col-tot mono val-pos">done today</span>}
+                    {h.paused && <span className="col-tot mono">paused</span>}
+                    {!h.paused && h.days[todayIndex] && <span className="col-tot mono val-pos">done today</span>}
+                  </>
+                } actions={
+                  <>
                   <Dropdown label={`Options for ${h.name}`} className="habit-kebab">
                     <button role="menuitem" onClick={() => setEditHabit(h)}>Edit this habit</button>
                     <button role="menuitem" onClick={() => togglePauseHabit(h.id)}>{h.paused ? 'Resume it' : 'Pause it'}</button>
@@ -2869,7 +2884,11 @@ export function GoalsPage() {
           return (
             <div className="panel goal-col" key={tfr.id}>
               <div className="col-head">
-                <span className="microcap">{tfr.label}</span>
+                {/* Paged away from now, "This week" would be a lie over last
+                    week's dates. The label follows the period being shown. */}
+                <span className="microcap">
+                  {off === 0 ? tfr.label : `${off < 0 ? 'An earlier' : 'A coming'} ${tfr.id === 'weekly' ? 'week' : tfr.id === 'monthly' ? 'month' : 'quarter'}`}
+                </span>
                 <span className="col-tot mono">{periodLabel(tfr.id as GoalTf, shownKey)}</span>
                 {tfr.id !== 'half' && (
                   <span className="goal-nav">
@@ -2911,7 +2930,7 @@ export function GoalsPage() {
                     <div className="goal-measure">
                       <span className="mono meas">{fmtNum(current)} / {fmtNum(g.target)} {g.unit}</span>
                       <span className="mono pct">{pct}%</span>
-                      {g.deadline && <span className="goal-deadline">by {g.deadline}</span>}
+                      {g.deadline && <span className="goal-deadline">by {/^\d{4}-\d{2}-\d{2}$/.test(g.deadline) ? fmtWhen(g.deadline) : g.deadline}</span>}
                     </div>
                     {fromHabit && (
                       <p className="goal-linked">Counts itself from the “{fromHabit.name}” habit.</p>

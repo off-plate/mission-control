@@ -24,12 +24,34 @@ function NoData({ label }: { label: string }) {
   return <div className="kpi nodata">&mdash;<span className="unit">{label}</span></div>
 }
 
+function CompassCard({ f }: { f: unknown }) {
+  return (
+    <div className="panel money-compass" style={{ marginTop: f ? 'var(--s5)' : 0, marginBottom: f ? 0 : 'var(--s5)' }}>
+      <div className="money-compass-copy">
+        <span className="microcap">{f ? 'The full picture lives in Compass' : 'Not connected yet'}</span>
+        <p>
+          {f
+            ? 'Debts, budget, goals and the five-year plan are managed in Compass. This page is the at-a-glance readout.'
+            : 'Your debts, budget and payment plans live in Compass. These panels stay empty until that link exists, because a number here that is not yours is worse than none.'}
+        </p>
+      </div>
+      <a className="btn btn-primary money-compass-btn" href="https://compass-money.netlify.app" target="_blank" rel="noreferrer">
+        Open Compass
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M7 17L17 7M17 7H8M17 7v9" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      </a>
+    </div>
+  )
+}
+
 export function MoneyPage() {
   const f = MOCK_MONEY
 
   return (
     <div className="page">
       <Band title="Money" />
+      {/* Unlinked, the one thing he can DO on this page comes first instead of
+          hiding under three empty scaffolds. */}
+      {!f && <CompassCard f={f} />}
       <div className="grid-3">
         <div className="panel">
           <span className="microcap">Debt payoff</span>
@@ -43,7 +65,6 @@ export function MoneyPage() {
             <>
               <NoData label="left" />
               <div className="bar debt" style={{ marginTop: 12 }}><i style={{ width: '0%' }} /></div>
-              <div className="kpi-sub">What you still owe, and how much of it is cleared.</div>
             </>
           )}
         </div>
@@ -59,7 +80,6 @@ export function MoneyPage() {
             <>
               <NoData label="/ month" />
               <div className="bar prog" style={{ marginTop: 12 }}><i style={{ width: '0%' }} /></div>
-              <div className="kpi-sub">What leaves the account each month across your payment plans.</div>
             </>
           )}
         </div>
@@ -74,26 +94,12 @@ export function MoneyPage() {
           ) : (
             <>
               <NoData label="this month" />
-              <div className="kpi-sub">What you managed to put aside, month by month.</div>
             </>
           )}
         </div>
       </div>
 
-      <div className="panel money-compass" style={{ marginTop: 'var(--s5)' }}>
-        <div className="money-compass-copy">
-          <span className="microcap">{f ? 'The full picture lives in Compass' : 'Not connected yet'}</span>
-          <p>
-            {f
-              ? 'Debts, budget, goals and the five-year plan are managed in Compass. This page is the at-a-glance readout.'
-              : 'Your debts, budget and payment plans live in Compass. These panels stay empty until that link exists, because a number here that is not yours is worse than none.'}
-          </p>
-        </div>
-        <a className="btn btn-primary money-compass-btn" href="https://compass-money.netlify.app" target="_blank" rel="noreferrer">
-          Open Compass
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M7 17L17 7M17 7H8M17 7v9" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        </a>
-      </div>
+      {f && <CompassCard f={f} />}
     </div>
   )
 }
@@ -275,7 +281,8 @@ export function ReviewPage() {
   useEffect(() => {
     const w = closed?.wins ?? []
     setWins([w[0] ?? '', w[1] ?? '', w[2] ?? ''])
-    setChanged(w.length > 3 ? w.slice(3).join(' ') : '')
+    /* Older closes rode the note in wins[3]; it has its own field now. */
+    setChanged(closed?.drifted ?? (w.length > 3 ? w.slice(3).join(' ') : ''))
     const o = closed?.outcomes ?? []
     setOutcomes([o[0] ?? '', o[1] ?? '', o[2] ?? ''])
   }, [closed?.id, range.from, range.to])
@@ -310,7 +317,7 @@ export function ReviewPage() {
              proud +0m, and accuracy is not asserted from zero estimates. */
           ...(rows.length ? [
             { v: saved >= 0 ? fmtSigned(saved) : fmtDuration(-saved), k: saved >= 0 ? 'time saved' : 'over your estimates', tone: (saved >= 0 ? 'pos' : 'urgent') as 'pos' | 'urgent' },
-            { v: `${accuracy}%`, k: 'estimate accuracy' },
+            { v: `${accuracy}%`, k: 'within a quarter of the estimate' },
           ] : [{ v: '—', k: 'nothing logged yet', tone: 'info' as const }]),
         ]}
       />
@@ -481,7 +488,9 @@ export function ReviewPage() {
               <button
                 className="btn btn-primary"
                 onClick={() => {
-                  closeReview({ id: range.id, label: range.label, from: range.from, to: range.to }, [...wins, changed].filter(Boolean), outcomes.filter(Boolean))
+                  /* Wins keep their three positions so an empty first box can
+                     never promote the note into a win on reopen. */
+                  closeReview({ id: range.id, label: range.label, from: range.from, to: range.to }, wins.map((x) => x.trim()), outcomes.filter(Boolean), changed)
                   setWins(['', '', '']); setChanged(''); setOutcomes(['', '', ''])
                 }}
               >
@@ -1015,19 +1024,13 @@ export function SettingsPage() {
                 <span className="name">{s.name}</span>
                 <span className="detail" style={{ display: 'block' }}>{s.detail}</span>
               </span>
-              {s.status === 'manual' ? (
-                <span className="src-tag">manual</span>
-              ) : (
-                <button
-                  className="toggle"
-                  role="switch"
-                  aria-checked={s.status === 'connected'}
-                  aria-label={`${s.name} ${s.status === 'connected' ? 'connected' : 'off'}`}
-                  onClick={() => toggleSource(s.id)}
-                >
-                  <i />
-                </button>
-              )}
+              {/* No switch: flipping one set the row to "connected" while its
+                  own detail still said "Not connected yet", and Today's footer
+                  started counting a fantasy as "1 of 6 live". A source becomes
+                  a switch the day a real connect flow exists behind it. */}
+              {s.status === 'manual'
+                ? <span className="src-tag">manual</span>
+                : <span className="src-tag">{s.status === 'connected' ? 'live' : 'not connected'}</span>}
             </div>
           ))}
 

@@ -53,3 +53,10 @@ Set via `data-space` on `<html>`. The app is light only: there is no dark mode a
 - No green anywhere near debt or owed money, and never as a category.
 - No fifth functional color. More color comes from the muted category set, never the functional set.
 - No purple/indigo/violet, no gradients, no glass. Richness = many quiet hues on warm paper, the opposite aesthetic.
+
+## The Wall (Why's) — the sanctioned exception
+
+The Why's board is a dark poster wall with its own highlight colour. That is
+deliberate art direction, not drift: it is the one surface meant to feel like
+a different room. Do not "fix" it back to the light palette, and do not use
+it as precedent for dark surfaces anywhere else.

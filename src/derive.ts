@@ -58,6 +58,19 @@ export function packLayout(instances: WidgetInstance[], cols: number): LayoutIte
       item.w += gap
     }
   }
+
+  /* One height per shelf: the tallest widget on a row sets it. Mixed heights
+     had a habits card slicing its chips at its bottom edge while the widget
+     beside it carried two hundred pixels of nothing. */
+  const byShelf = new Map<number, typeof placed>()
+  for (const item of placed) {
+    const shelf = byShelf.get(item.y) ?? []
+    shelf.push(item); byShelf.set(item.y, shelf)
+  }
+  for (const shelf of byShelf.values()) {
+    const tallest = Math.max(...shelf.map((i) => i.h))
+    for (const item of shelf) item.h = tallest
+  }
   return placed
 }
 

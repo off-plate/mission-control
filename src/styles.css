@@ -290,7 +290,7 @@ main { padding-inline: var(--gutter); }
   .pomo-badge { bottom: max(12px, env(safe-area-inset-bottom)); right: 12px; }
   /* The pill is fixed, so the page needs room at the end: without this it
      permanently sat on the last rows' checkboxes and kebabs. */
-  #main { padding-bottom: 104px; }
+  #main { padding-bottom: 128px; }
 }
 
 /* ---------- Assistant (dictation) ---------- */
@@ -605,8 +605,10 @@ main { padding-inline: var(--gutter); }
 /* Tiles scroll their overflow. With plain `hidden` the Goals tile ended
    mid-glyph and silently dropped its last row. */
 .widget-body { flex: 1; padding: var(--s3) var(--s4) var(--s4); overflow: hidden auto; scrollbar-width: thin; position: relative;
-  /* content taller than the cell fades out instead of being sliced mid-row */
-  mask-image: linear-gradient(#000 calc(100% - 16px), transparent);
+  /* Content taller than the cell dissolves instead of being sliced mid-row.
+     Sixteen pixels could not soften a forty-pixel habit pill, which left hard
+     half-chips at the card edge reading as broken rendering. */
+  mask-image: linear-gradient(#000 calc(100% - 52px), transparent);
 }
 .widget-body.scroll { overflow-y: auto; scrollbar-width: thin; }
 
@@ -2696,7 +2698,9 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .trail-day:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* A record is a column of short rows, so it gets a rail. Left to fill 2560px the
    title sat at one edge and its number at the other, half a metre apart. */
-.day-page .day-panel, .day-page .empty, .day-page .day-foot { max-width: 940px; }
+/* Everything on the page shares the cap and the centre, so no stray child
+   (settings row, empty state) is left hugging the gutter. */
+.day-page > * { max-width: 940px; margin-inline: auto; }
 /* A number a routine step recorded, over the reviewed window. */
 /* On a phone the label, the line and the figures cannot share one row without
    the label wrapping to two lines against a squeezed chart. The chart drops
@@ -2789,10 +2793,10 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .focus-btn { min-height: 34px; font-size: var(--text-xs); }
 /* A list of one-line rows is a reading column, not a dashboard: it stops where
    the eye stops rather than running the width of a 27 inch screen. */
-.focus-page .panel, .focus-page .habit-section, .focus-page .empty { max-width: 940px; }
-.focus-live { display: flex; align-items: center; gap: var(--s3); border-left: 3px solid var(--progress); }
-.focus-live.is-break { border-left-color: var(--info); }
-.focus-live.is-paused { border-left-color: var(--hairline-strong); }
+.focus-page > * { max-width: 940px; margin-inline: auto; }
+.focus-live { display: flex; align-items: center; gap: var(--s3); border-color: var(--progress); background: var(--progress-wash); }
+.focus-live.is-break { border-color: var(--info); background: var(--info-wash); }
+.focus-live.is-paused { border-color: var(--hairline-strong); background: var(--surface-2); }
 .focus-live-what { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .focus-live-what .l { font-weight: 600; font-size: var(--text-base); }
 .focus-live-what .h { font-size: var(--text-sm); color: var(--muted); }
@@ -2805,7 +2809,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   .focus-live-what { flex: 1 0 100%; }
 }
 /* The break length, as a row of choices rather than a box to type in. */
-.focus-settings { display: flex; align-items: center; gap: var(--s3); max-width: 940px; margin: var(--s4) 0 var(--s5); flex-wrap: wrap; }
+.focus-settings { display: flex; align-items: center; gap: var(--s3); max-width: 940px; margin: var(--s4) auto var(--s5); flex-wrap: wrap; }
 .focus-steps { display: flex; gap: var(--s2); }
 .focus-step {
   font-family: var(--font-mono); font-size: 0.75rem; min-height: 30px; padding: 2px 10px;

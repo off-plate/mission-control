@@ -188,7 +188,7 @@ interface Store extends PersistedState {
 
   commitPlan: (taskIds: string[], firstMoveId: string | null) => void
   /** Close a window: any range, one act. Its outcomes land in the backlog. */
-  closeReview: (window: { id: string; label: string; from: string; to: string }, wins: string[], outcomes: string[]) => void
+  closeReview: (window: { id: string; label: string; from: string; to: string }, wins: string[], outcomes: string[], drifted?: string) => void
 
   assistantLog: AssistantEntry[]
   applyDictation: (text: string, items: { kind: 'task' | 'goal' | 'done'; text: string; estimateMin?: number }[]) => void
@@ -379,7 +379,12 @@ function loadPersisted(): PersistedState | null {
     if (!p.removedSeeds.includes('fix:obr-0801')) {
       p.removedSeeds.push('fix:obr-0801')
       const day = '2026-08-01'
-      if (!(p.habitLog ?? []).some((t) => t.habitId === 'h-brainrot' && t.day === day)) {
+      /* Evidence first: only a profile whose log already reaches back before
+         the lost day can have lost it. On a fresh or wiped profile this wrote
+         a first of August that never happened on that device, and Wipe
+         everything quietly un-wiped. */
+      const livedThrough = (p.habitLog ?? []).some((t) => t.day < day)
+      if (livedThrough && !(p.habitLog ?? []).some((t) => t.habitId === 'h-brainrot' && t.day === day)) {
         p.habitLog = [...(p.habitLog ?? []), { habitId: 'h-brainrot', day }]
         p.routineLog = [...(p.routineLog ?? []), { routineId: 'r-brainrot', day, periodKey: day, run: 0 }]
       }
@@ -1577,14 +1582,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
 
     setSocial: (entries) => setSocialState(entries),
-    toggleSource: (id) =>
-      setSources((prev) =>
-        prev.map((s) =>
-          s.id === id && s.status !== 'manual'
-            ? { ...s, status: s.status === 'connected' ? 'off' : 'connected' }
-            : s,
-        ),
-      ),
+    /* Connecting a source is a real OAuth flow, not a boolean. Until one
+       exists, nothing in the app may flip a status to "connected". */
+    toggleSource: () => {},
 
     commitPlan: (taskIds, firstMoveId) => {
       setTasks((prev) =>
@@ -1601,7 +1601,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     /* One close for any window. A window that ends today and started this week
        also marks the weekly ritual done, so the Sunday nudge keeps working. */
-    closeReview: (w, wins, outcomes) => {
+    closeReview: (w, wins, outcomes, drifted) => {
       setReview((prev) => {
         /* Closing the same window again appends and supersedes. It used to drop
            the previous one, so a second close with empty boxes erased what he
@@ -1609,7 +1609,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const prior = (prev.reflections ?? []).find((r) => r.from === w.from && r.to === w.to && !r.supersededBy)
         const id = newId('rf')
         const kept = (prev.reflections ?? []).map((r) => (r.id === prior?.id ? { ...r, supersededBy: id } : r))
-        const entry = { id, label: w.label, from: w.from, to: w.to, when: todayKey(), wins, outcomes }
+        const entry = { id, label: w.label, from: w.from, to: w.to, when: todayKey(), wins, drifted: drifted?.trim() || undefined, outcomes }
         const isThisWeek = w.from === dayOfWeekKey(0) && w.to === todayKey()
         return {
           ...prev,

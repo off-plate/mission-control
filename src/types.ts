@@ -869,5 +869,9 @@ export interface Reflection {
   /** The day he closed it. */
   when: string
   wins: string[]
+  /** The honest "what drifted" note. Its own field: it used to ride in wins[3],
+   *  and with an empty win above it the reopen loader promoted self-criticism
+   *  into a win. */
+  drifted?: string
   outcomes: string[]
 }

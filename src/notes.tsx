@@ -96,6 +96,16 @@ function Editor({ note, onChange }: { note: Note; onChange: (md: string) => void
        <div>, and a dash typed there was staying a dash. */
     if (!block || (block.tagName !== 'P' && block.tagName !== 'DIV')) return
     const text = block.textContent ?? ''
+    /* Three dashes on their own line: a divider. Checked before the bullet
+       rule, which needs a space after the dash and so never sees these. */
+    if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(text)) {
+      const hr = document.createElement('hr')
+      const after = document.createElement('p')
+      after.innerHTML = '<br>'
+      block.replaceWith(hr, after)
+      caretToEnd(after)
+      return
+    }
     const m = text.match(/^(#{1,3}|[-*]|>|\[\s?\]|\[[xX]\])[  ]/)
     if (!m) return
     const rest = escHtml(text.slice(m[0].length)) || '<br>'
@@ -151,6 +161,68 @@ function Editor({ note, onChange }: { note: Note; onChange: (md: string) => void
     emit()
   }
 
+  /* A table of his own size. The picker is two numbers rather than a hover
+     grid, because he asked for a custom amount and a drawn grid caps out. */
+  const insertTable = (rows: number, cols: number) => {
+    const root = ref.current
+    if (!root) return
+    root.focus()
+    const cell = (tag: string) => `<${tag}><br></${tag}>`
+    const head = `<tr>${cell('th').repeat(cols)}</tr>`
+    const body = `<tr>${cell('td').repeat(cols)}</tr>`.repeat(Math.max(0, rows - 1))
+    const tmp = document.createElement('div')
+    tmp.innerHTML = `<table><thead>${head}</thead><tbody>${body}</tbody></table><p><br></p>`
+    const nodes = [...tmp.childNodes]
+    const block = blockAt(root)
+    if (block) block.replaceWith(...nodes); else root.append(...nodes)
+    const first = (nodes[0] as HTMLElement).querySelector('th')
+    if (first) caretToEnd(first)
+    emit()
+  }
+
+  /* Growing a table he is standing in, because a table you cannot add a row to
+     is a table you have to delete and remake. */
+  const grow = (what: 'row' | 'col') => {
+    const root = ref.current
+    if (!root) return
+    const sel = window.getSelection()
+    const from = sel?.focusNode
+    const cellNow = from ? ((from.nodeType === 3 ? from.parentElement : from as HTMLElement)?.closest('td,th') as HTMLElement | null) : null
+    const here = blockAt(root)
+    const table = (cellNow?.closest('table') ?? (here?.tagName === 'TABLE' ? here : null)) as HTMLTableElement | null
+    if (!table) return
+    if (what === 'row') {
+      const width = table.rows[0]?.cells.length ?? 1
+      const tbody = table.tBodies[0] ?? table.appendChild(document.createElement('tbody'))
+      const tr = document.createElement('tr')
+      tr.innerHTML = '<td><br></td>'.repeat(width)
+      tbody.append(tr)
+      caretToEnd(tr.cells[0])
+    } else {
+      for (const tr of [...table.rows]) {
+        const c = document.createElement(tr.parentElement?.tagName === 'THEAD' ? 'th' : 'td')
+        c.innerHTML = '<br>'
+        tr.append(c)
+      }
+      const cells = table.rows[0]?.cells
+      if (cells?.length) caretToEnd(cells[cells.length - 1])
+    }
+    emit()
+  }
+
+  const divider = () => {
+    const root = ref.current
+    if (!root) return
+    root.focus()
+    const hr = document.createElement('hr')
+    const after = document.createElement('p')
+    after.innerHTML = '<br>'
+    const block = blockAt(root)
+    if (block) block.replaceWith(hr, after); else root.append(hr, after)
+    caretToEnd(after)
+    emit()
+  }
+
   const T = ({ on, label, children }: { on: () => void; label: string; children: React.ReactNode }) => (
     <button className="nt-tool" title={label} aria-label={label} onMouseDown={(e) => e.preventDefault()} onClick={on}>{children}</button>
   )
@@ -175,6 +247,23 @@ function Editor({ note, onChange }: { note: Note; onChange: (md: string) => void
         </T>
         <T label="Quote" on={() => toggleBlock('blockquote')}>&rdquo;</T>
         <span className="nt-toolsep" aria-hidden="true" />
+        <T label="Divider" on={divider}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <path d="M3 12h18" strokeLinecap="round" />
+          </svg>
+        </T>
+        <TablePicker onPick={insertTable} />
+        <T label="Add a row" on={() => grow('row')}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="8" rx="1.6" /><path d="M12 15v6M9 18h6" strokeLinecap="round" />
+          </svg>
+        </T>
+        <T label="Add a column" on={() => grow('col')}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <rect x="4" y="3" width="8" height="18" rx="1.6" /><path d="M18 9v6M15 12h6" strokeLinecap="round" />
+          </svg>
+        </T>
+        <span className="nt-toolsep" aria-hidden="true" />
         <T label="Clear formatting" on={() => cmd('removeFormat')}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path d="M6 5h13M9.5 5L7 19M14 12l6 7M20 12l-6 7" strokeLinecap="round" />
@@ -195,6 +284,40 @@ function Editor({ note, onChange }: { note: Note; onChange: (md: string) => void
         onMouseDown={onMouseDown}
       />
     </div>
+  )
+}
+
+/** Two numbers and a button. He asked for a custom amount of rows and columns,
+ *  and a drawn hover grid caps out at whatever size somebody else decided. */
+function TablePicker({ onPick }: { onPick: (rows: number, cols: number) => void }) {
+  const [open, setOpen] = useState(false)
+  const [rows, setRows] = useState(3)
+  const [cols, setCols] = useState(3)
+  const wrap = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const off = (e: MouseEvent) => { if (!wrap.current?.contains(e.target as Node)) setOpen(false) }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', off)
+    document.addEventListener('keydown', esc)
+    return () => { document.removeEventListener('mousedown', off); document.removeEventListener('keydown', esc) }
+  }, [open])
+  const go = () => { onPick(Math.max(1, Math.min(20, rows)), Math.max(1, Math.min(10, cols))); setOpen(false) }
+  return (
+    <span className="nt-tablepick" ref={wrap}>
+      <button className="nt-tool" title="Table" aria-label="Table" aria-expanded={open} onMouseDown={(e) => e.preventDefault()} onClick={() => setOpen((v) => !v)}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 10h18M9 10v10M15 10v10" />
+        </svg>
+      </button>
+      {open && (
+        <div className="nt-tablemenu">
+          <label>Rows<input className="textinput" type="number" min={1} max={20} value={rows} onChange={(e) => setRows(Number(e.target.value))} /></label>
+          <label>Columns<input className="textinput" type="number" min={1} max={10} value={cols} onChange={(e) => setCols(Number(e.target.value))} /></label>
+          <button className="btn btn-primary" onClick={go}>Insert</button>
+        </div>
+      )}
+    </span>
   )
 }
 

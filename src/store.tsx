@@ -514,6 +514,22 @@ function loadPersisted(): PersistedState | null {
       p.notes = notes
     }
 
+    /* Michael's ask, 2026-08-03: the money gets looked at before bed, not
+       discovered at the end of the month. The step is his once the routine
+       exists, so the seed cannot reach it; this adds it once, after the to-do
+       list, and only if it is not already there. */
+    if (!p.removedSeeds.includes('fix:bed-compass')) {
+      p.removedSeeds.push('fix:bed-compass')
+      p.routines = (p.routines ?? []).map((r) => {
+        if (r.id !== 'r-evening' || r.steps.some((st) => st.id === 'be8')) return r
+        const step = { id: 'be8', title: 'Review Compass finances', kind: 'do' as const, link: 'https://compass-money.netlify.app', linkLabel: 'Open Compass' }
+        const at = r.steps.findIndex((st) => st.id === 'be1')
+        const steps = [...r.steps]
+        steps.splice(at < 0 ? 0 : at + 1, 0, step)
+        return { ...r, steps }
+      })
+    }
+
     /* A plan is for a day. Yesterday's cannot be allowed to sit on this morning's
        list pretending it was chosen. Tomorrow's is a different matter: he put it
        there on purpose and it has not had its day yet, so only the past is

@@ -192,6 +192,38 @@ await step('focus: stopping mid-block banks the elapsed minutes', async () => {
   await cp.close()
 })
 
+await step('sync: two tabs both keep what they added', async () => {
+  /* His own repro. Two tabs of one browser share localStorage, so each save
+     used to replace the other's lists wholesale. */
+  const ctx = await b.newContext({ viewport: { width: 1300, height: 900 } })
+  const A = await ctx.newPage(), B = await ctx.newPage()
+  const add = async (page, title) => {
+    await page.bringToFront()
+    if (!/#\/plan/.test(page.url())) { await page.goto(`${URL}#/plan`); await page.waitForTimeout(600) }
+    await page.locator('input[placeholder="Add something to the list"]').fill(title)
+    await page.getByRole('button', { name: 'Add', exact: true }).click()
+    await page.waitForTimeout(500)
+  }
+  await A.goto(URL); await A.waitForTimeout(300)
+  await A.evaluate((K) => localStorage.removeItem(K), KEY)
+  await A.goto(`${URL}#/plan`); await A.reload(); await A.waitForTimeout(700)
+  await B.goto(`${URL}#/plan`); await B.waitForTimeout(700)
+  await add(A, 'Tab A task')
+  await add(B, 'Tab B task')
+  await A.bringToFront(); await A.waitForTimeout(700)
+  const titles = await A.evaluate((K) => JSON.parse(localStorage.getItem(K)).tasks.map((t) => t.title), KEY)
+  if (!titles.includes('Tab A task') || !titles.includes('Tab B task')) throw new Error(`lost one: ${titles.join(', ')}`)
+  // and a delete on one side is not undone by the other
+  await A.locator('.todo-row', { hasText: 'Tab B task' }).getByRole('button', { name: /Options/ }).click()
+  await A.getByRole('menuitem', { name: 'Delete' }).click(); await A.waitForTimeout(600)
+  await add(B, 'Tab B later')
+  await A.bringToFront(); await A.waitForTimeout(800)
+  const after = await A.evaluate((K) => JSON.parse(localStorage.getItem(K)).tasks.map((t) => t.title), KEY)
+  if (after.includes('Tab B task')) throw new Error('a deleted task came back')
+  if (!after.includes('Tab B later') || !after.includes('Tab A task')) throw new Error('a live task was lost')
+  await ctx.close()
+})
+
 await b.close(); server.close()
 if (errors.length) console.log(`CONSOLE ERRORS (${errors.length}): ${errors[0]}`)
 console.log(`${pass} pass, ${fail} fail${errors.length ? `, ${errors.length} console errors` : ', 0 console errors'}`)

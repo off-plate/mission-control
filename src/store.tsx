@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { SUPABASE_ENABLED, deleteRemoteState, saveRemoteState } from './supabase'
+import { SUPABASE_ENABLED, deleteRemoteState, loadRemoteState, saveRemoteState } from './supabase'
 import { roll } from './roll'
+import { mergeStates, rowKey, type Tomb } from './sync-merge'
 import { dayIndexOf, dayOfWeekKey, goalPeriodKey, goalPeriodRange, isoWeekKey, localDateKey, periodIsPast, periodKeyFor, slotForTime, type GoalTf } from './util'
 import {
   DEFAULT_SPACES,
@@ -96,6 +97,8 @@ interface PersistedState {
   lastRollDay?: string
   /** How many rows had no space and were filed as Personal on migration. */
   spaceGuessed?: number
+  /** Keys of rows deliberately deleted, so a merge cannot resurrect them. */
+  graveyard?: Tomb[]
 }
 
 /** A delete you can still take back: what it was, and how to put it back. */
@@ -863,6 +866,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [routineLog, setRoutineLog] = useState<RoutineDone[]>(persisted?.routineLog ?? [])
   const [slips, setSlips] = useState<HabitSlip[]>(persisted?.slips ?? [])
   const [stepLog, setStepLog] = useState<StepEntry[]>(persisted?.stepLog ?? [])
+  /* What he deliberately deleted. Every collection is united across devices
+     now, so a row missing here is only "not seen yet" unless something says
+     otherwise: this is that something. Without it, deleting a task on the
+     laptop lets any phone that still holds the row put it back. */
+  const [graveyard, setGraveyard] = useState<Tomb[]>(persisted?.graveyard ?? [])
+  const bury = (...keys: string[]) =>
+    setGraveyard((g) => [...g.filter((t) => !keys.includes(t.k)), ...keys.map((k) => ({ k, at: Date.now() }))].slice(-900))
+  /* Not a removal: a dated opposite. Another device that still holds the
+     tombstone would otherwise re-bury this the next time it saved anything. */
+  const digUp = (...keys: string[]) =>
+    setGraveyard((g) => [...g.filter((t) => !keys.includes(t.k)), ...keys.map((k) => ({ k, at: Date.now(), undone: true }))].slice(-900))
   const [spaceGuessed] = useState<number>(persisted?.spaceGuessed ?? 0)
   const [lastRollDay] = useState<string | undefined>(persisted?.lastRollDay)
   /* The last thing you deleted, held long enough to take it back. Deliberately
@@ -946,7 +960,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const state: PersistedState = {
       version: 3, spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
       savedAt: Date.now(), weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
-      habitLog, routineLog, slips, stepLog, spaceGuessed, lastRollDay: lastRollDay ?? localDateKey(),
+      habitLog, routineLog, slips, stepLog, spaceGuessed, graveyard, lastRollDay: lastRollDay ?? localDateKey(),
     }
     const json = JSON.stringify(state)
     latestJson.current = json
@@ -960,7 +974,78 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { void saveRemoteState(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog])
+  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, graveyard])
+
+  /* ---- state that arrived from somewhere else ----
+     Another tab of this browser, or this account on another device. Merged in,
+     never pasted over: what is in memory here is one side of the merge and his
+     work on this device survives it. Applying it makes the save effect fire,
+     which is how the merged truth goes back out to everyone. */
+  const applyExternal = (incoming: string) => {
+    const mine = latestJson.current || localStorage.getItem(STORAGE_KEY) || ''
+    if (!incoming || incoming === mine) return
+    const merged = mine ? mergeStates(mine, incoming) : incoming
+    let p: PersistedState
+    try { p = JSON.parse(merged) as PersistedState } catch { return }
+    if (p.schema !== STORAGE_KEY) return
+    /* Nothing new once the dates are set aside: stop, or two tabs would answer
+       each other's saves forever. */
+    const strip = (j: string) => { try { const o = JSON.parse(j) as Record<string, unknown>; delete o.savedAt; return JSON.stringify(o) } catch { return j } }
+    if (mine && strip(merged) === strip(mine)) return
+    if (p.tasks) setTasks(p.tasks)
+    if (p.habits) setHabits(p.habits)
+    if (p.goals) setGoals(p.goals)
+    if (p.routines) setRoutines(p.routines)
+    if (p.ideas) setIdeas(p.ideas)
+    if (p.ledger) setLedger(p.ledger)
+    if (p.focusSessions) setFocusSessions(p.focusSessions)
+    if (p.habitLog) setHabitLog(p.habitLog)
+    if (p.routineLog) setRoutineLog(p.routineLog)
+    if (p.slips) setSlips(p.slips)
+    if (p.stepLog) setStepLog(p.stepLog)
+    if (p.coachSessions) setCoachSessions(p.coachSessions)
+    if (p.assistantLog) setAssistantLog(p.assistantLog)
+    if (p.spaces) setSpaces(p.spaces)
+    if (p.plan) setPlan(p.plan)
+    if (p.review) setReview(p.review)
+    if (p.records) setRecords(p.records)
+    if (p.removedSeeds) setRemovedSeeds(p.removedSeeds)
+    if (p.graveyard) setGraveyard(p.graveyard)
+  }
+
+  /* Another tab of the same browser. It writes localStorage; this fires there
+     and nowhere else, which is exactly the signal needed. */
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== STORAGE_KEY || !e.newValue || futureBlob) return
+      applyExternal(e.newValue)
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  })
+
+  /* Another device. A tab left open all afternoon held a copy of the morning
+     and would eventually push it; now it catches up whenever he looks at it,
+     and once a minute while he is looking. */
+  useEffect(() => {
+    if (!SUPABASE_ENABLED || futureBlob) return
+    let stop = false
+    const pull = async () => {
+      if (document.visibilityState !== 'visible') return
+      const remote = await loadRemoteState()
+      if (!stop && remote) applyExternal(remote)
+    }
+    const onWake = () => { void pull() }
+    document.addEventListener('visibilitychange', onWake)
+    window.addEventListener('focus', onWake)
+    const id = window.setInterval(onWake, 60000)
+    return () => {
+      stop = true
+      document.removeEventListener('visibilitychange', onWake)
+      window.removeEventListener('focus', onWake)
+      window.clearInterval(id)
+    }
+  })
 
   /* The auto pass follows the sessions: history that predates the rule, blocks
      edited elsewhere, or a merge that brought rows back all resolve on the next
@@ -1268,11 +1353,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     deleteFocus: (id) => {
       const gone = focusSessions.find((f) => f.id === id)
       const beforeF = focusSessions, beforeL = ledger, beforeH = habitLog
+      const keys = [rowKey('focusSessions', { id }), ...(gone?.ledgerId ? [rowKey('ledger', { id: gone.ledgerId })] : [])]
       armUndo(gone ? `Removed a ${gone.minutes}m focus block` : 'Focus block removed', () => {
-        setFocusSessions(beforeF); setLedger(beforeL); setHabitLog(beforeH)
+        setFocusSessions(beforeF); setLedger(beforeL); setHabitLog(beforeH); digUp(...keys)
       })
       const next = focusSessions.filter((f) => f.id !== id)
       setFocusSessions(next)
+      bury(...keys)
       if (gone?.ledgerId) setLedger((prev) => prev.filter((l) => l.id !== gone.ledgerId))
       autoFrom(next, 0)
     },
@@ -1453,7 +1540,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const before = tasks
       const gone = tasks.find((t) => t.id === id)
       setTasks((prev) => prev.filter((t) => t.id !== id))
-      armUndo(gone ? `Deleted "${gone.title}"` : 'Task deleted', () => setTasks(before))
+      bury(rowKey('tasks', { id }))
+      armUndo(gone ? `Deleted "${gone.title}"` : 'Task deleted', () => { setTasks(before); digUp(rowKey('tasks', { id })) })
     },
     setSubtasks: (taskId, subs) =>
       setTasks((prev) => prev.map((t) => {
@@ -1593,7 +1681,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const before = goals
       const gone = goals.find((g) => g.id === id)
       setGoals((prev) => prev.filter((g) => g.id !== id))
-      armUndo(gone ? `Deleted "${gone.name}"` : 'Goal deleted', () => setGoals(before))
+      bury(rowKey('goals', { id }))
+      armUndo(gone ? `Deleted "${gone.name}"` : 'Goal deleted', () => { setGoals(before); digUp(rowKey('goals', { id })) })
     },
 
     setSocial: (entries) => setSocialState(entries),
@@ -1875,7 +1964,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     deleteIdea: (id) => {
       const before = ideas
       setIdeas((prev) => prev.filter((i) => i.id !== id))
-      armUndo('Note deleted', () => setIdeas(before))
+      bury(rowKey('ideas', { id }))
+      armUndo('Note deleted', () => { setIdeas(before); digUp(rowKey('ideas', { id })) })
     },
 
     undoable,

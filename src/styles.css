@@ -2082,7 +2082,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 /* The strip is seven 26px dots and their gaps. Spelled out, not guessed at a
    number: the gap is in rem, so on a 2560 screen a hardcoded 254px wrapped the
    week onto two lines. */
-:root { --daystrip: calc(7 * 26px + 6 * var(--s3)); --habit-foot-col: 200px; --habit-menu-col: 34px; }
+:root { --daystrip: calc(7 * 26px + 6 * var(--s3)); --habit-foot-col: 240px; --habit-menu-col: 34px; }
 .habit-list .col-head { margin-bottom: var(--s2); }
 .habit-list .col-head .col-tot { margin-left: 0; }
 .habit-line { border-top: 1px solid var(--hairline); }
@@ -2112,7 +2112,10 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .habit-list.w7 .habit-row-top { grid-area: name; min-width: 0; }
 .habit-list.w7 .habit-days { grid-area: days; margin-top: 0; justify-content: space-between; }
 .habit-list.w7 .count-bar { grid-area: days; margin: 0; }
-.habit-list.w7 .habit-foot { grid-area: foot; margin-top: 0; justify-content: flex-end; text-align: right; }
+.habit-list.w7 .habit-foot {
+  grid-area: foot; margin-top: 0; justify-content: flex-end; text-align: right;
+  flex-wrap: nowrap; white-space: nowrap; gap: var(--s2);
+}
 .habit-list.w7 .habit-foot .habit-weeks { margin-left: 0; }
 .habit-list.w7 .habit-goal { grid-area: foot; justify-self: end; }
 /* The legend is a row of the same grid, so it cannot drift out of line. */
@@ -3028,4 +3031,21 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 @media (pointer: coarse) {
   .hide-touch { display: none; }
   .only-touch { display: inline; }
+}
+
+/* A habit kept once a week or once a month is measured in weeks or months.
+   Five of its own periods, this one last and ringed, in the same column the
+   weekday dots use so the rows still line up. */
+.habit-days.is-period { display: flex; align-items: center; gap: var(--s3); justify-content: flex-end; }
+.period-unit { font-size: 0.625rem; color: var(--faint); margin-right: auto; letter-spacing: 0.03em; }
+.periodcell {
+  width: 26px; height: 26px; border-radius: 5px; flex: none;
+  border: 1.5px solid var(--hairline-strong); background: none;
+}
+.periodcell.kept { background: var(--progress); border-color: var(--progress); }
+.periodcell.is-now { border-color: var(--faint); box-shadow: 0 0 0 1px var(--hairline-strong); }
+.periodcell.is-now.kept { box-shadow: none; }
+@media (max-width: 700px) {
+  .habit-days.is-period { justify-content: flex-start; }
+  .period-unit { margin-right: var(--s2); }
 }

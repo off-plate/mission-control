@@ -259,9 +259,8 @@ await step('notes: brain dumps came across, and search reaches every folder', as
   // write one, in Czech, with a tag. A new note starts in its title.
   await page.getByRole('button', { name: 'New note' }).click(); await page.waitForTimeout(300)
   await page.locator('textarea[aria-label="Note title"]').fill('Zavolat na úkol #vzp')
-  await page.keyboard.press('Enter'); await page.waitForTimeout(200)
-  await page.locator('textarea[aria-label="Note text"]').fill('Druhý řádek s detailem')
-  await page.keyboard.press('Escape'); await page.waitForTimeout(400)
+  await page.locator('.nt-editor').click()
+  await page.keyboard.type('Druhý řádek s detailem'); await page.waitForTimeout(400)
   const saved = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
   const mine = (saved.notes ?? []).find((n) => n.title.startsWith('Zavolat'))
   if (!mine) throw new Error('the note was not saved')
@@ -283,8 +282,7 @@ await step('notes: a folder he made, and its notes surviving its deletion', asyn
   await page.locator('input[aria-label^="New folder in"]').fill('Taxes')
   await page.keyboard.press('Enter'); await page.waitForTimeout(400)
   await page.getByRole('button', { name: 'New note' }).click(); await page.waitForTimeout(300)
-  await page.locator('textarea[aria-label="Note title"]').fill('Do not lose me')
-  await page.keyboard.press('Escape'); await page.waitForTimeout(400)
+  await page.locator('textarea[aria-label="Note title"]').fill('Do not lose me'); await page.waitForTimeout(400)
   let s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
   const f = (s.noteFolders ?? []).find((x) => x.name === 'Taxes')
   if (!f) throw new Error('the folder was not created')
@@ -336,8 +334,7 @@ await step('phone: notes are usable at 390', async () => {
   const firstRow = (await mp.locator('.nt-row').first().boundingBox()).y
   if (firstRow > 520) throw new Error(`the first note starts ${Math.round(firstRow)}px down`)
   await mp.getByRole('button', { name: 'New note' }).click(); await mp.waitForTimeout(300)
-  await mp.locator('textarea[aria-label="Note title"]').fill('Telefonní poznámka #test')
-  await mp.keyboard.press('Escape'); await mp.waitForTimeout(400)
+  await mp.locator('textarea[aria-label="Note title"]').fill('Telefonní poznámka #test'); await mp.waitForTimeout(400)
   over = await mp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
   if (over > 0) throw new Error(`horizontal overflow ${over}px with a note open`)
   // the open note has the screen to itself
@@ -346,6 +343,69 @@ await step('phone: notes are usable at 390', async () => {
   const s = await mp.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
   if (!(s.notes ?? []).some((n) => n.title.startsWith('Telefonní'))) throw new Error('the phone note was not saved')
   await mp.close()
+})
+
+await step('notes: the editor formats as he types, and the marks survive a reload', async () => {
+  /* His own list, verbatim: a dash makes a bullet, cmd-B makes bold, italic
+     works, and a checkbox is something you click. All of it round-trips
+     through markdown, which is what the sync and the search read. */
+  await fresh('notes')
+  await page.locator('.nt-folder-top').first().click(); await page.waitForTimeout(300)
+  await page.getByRole('button', { name: 'New note' }).click(); await page.waitForTimeout(300)
+  await page.locator('textarea[aria-label="Note title"]').fill('Formatting')
+  await page.locator('.nt-editor').click()
+  await page.keyboard.type('- first item')
+  if (!(await page.locator('.nt-editor ul li').count())) throw new Error('a dash did not make a bullet')
+  await page.keyboard.press('Enter'); await page.keyboard.type('second item')
+  await page.keyboard.press('Enter'); await page.keyboard.press('Enter')
+  await page.keyboard.type('plain ')
+  await page.keyboard.press('Meta+b'); await page.keyboard.type('bold'); await page.keyboard.press('Meta+b')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('[] tick me'); await page.waitForTimeout(300)
+  const box = await page.locator('.nt-editor li[data-done]').first().boundingBox()
+  await page.mouse.click(box.x + 9, box.y + 12); await page.waitForTimeout(500)
+  const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
+  const md = (s.notes ?? []).find((n) => n.title === 'Formatting')?.body ?? ''
+  for (const want of ['- first item', '- second item', '**bold**', '- [x] tick me']) {
+    if (!md.includes(want)) throw new Error(`${want} is not in the stored note: ${JSON.stringify(md)}`)
+  }
+  await page.reload(); await page.waitForTimeout(800)
+  await page.locator('.nt-folder-top').first().click(); await page.waitForTimeout(400)
+  await page.locator('.nt-row', { hasText: 'Formatting' }).first().click(); await page.waitForTimeout(400)
+  if ((await page.locator('.nt-editor ul li').count()) < 3) throw new Error('the formatting did not come back after a reload')
+})
+
+await step('notes: the columns drag, and nothing jumps when a folder is clicked', async () => {
+  await fresh('notes')
+  const before = (await page.locator('.nt-side').boundingBox()).width
+  const g = await page.locator('.nt-grip').first().boundingBox()
+  await page.mouse.move(g.x + 5, g.y + 200)
+  await page.mouse.down()
+  await page.mouse.move(g.x + 125, g.y + 200, { steps: 8 })
+  await page.mouse.up(); await page.waitForTimeout(300)
+  const after = (await page.locator('.nt-side').boundingBox()).width
+  if (after - before < 80) throw new Error(`the sidebar went ${Math.round(before)} -> ${Math.round(after)}`)
+  await page.reload(); await page.waitForTimeout(800)
+  if (Math.abs((await page.locator('.nt-side').boundingBox()).width - after) > 3) throw new Error('the width was not remembered')
+  // a folder row must not change shape when it becomes the open one
+  const row = page.locator('.nt-folder-row').nth(1)
+  const a = await row.locator('.nt-folder').boundingBox()
+  await row.locator('.nt-folder').click(); await page.waitForTimeout(300)
+  const c = await row.locator('.nt-folder').boundingBox()
+  if (Math.abs(a.width - c.width) > 1 || Math.abs(a.x - c.x) > 1) throw new Error('the row shifted when it was selected')
+})
+
+await step('notes: the note menu opens where it can be reached', async () => {
+  await fresh('notes')
+  // An earlier step left the workspace switcher elsewhere; stand where the
+  // seeded note actually is, or there is no open note to have a menu.
+  await page.locator('.nt-folder-top').first().click(); await page.waitForTimeout(400)
+  await page.locator('.nt-pane').getByRole('button', { name: 'Note options' }).click(); await page.waitForTimeout(300)
+  if (!(await page.locator('.nt-pane .kebab-menu').count())) throw new Error('the menu did not open')
+  const m = await page.locator('.nt-pane .kebab-menu').boundingBox()
+  if (m.x + m.width > 1502) throw new Error('the menu runs off the right edge')
+  if (!(await page.getByRole('menuitem', { name: 'Make it a task' }).isVisible())) throw new Error('its items are not visible')
+  await page.keyboard.press('Escape')
 })
 
 await b.close(); server.close()

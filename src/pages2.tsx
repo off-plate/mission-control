@@ -3,8 +3,9 @@ import { COACH_SCENARIOS, MOCK_MONEY, MOCK_STATS, SPACE_LABELS } from './mock'
 import { AutoTextarea, Band, SpaceMark } from './pages1'
 import { useStore } from './store'
 import { Spark, SparkBox } from './widgets'
-import { RANGE_OPTIONS, allTimeRange, customRange, fmtDuration, fmtNum, fmtSigned, fmtWhen, goalPace, inRange, isoWeekKey, localDateKey, monthName, monthRange, monthsWithData, rangeFor, taskMinutes, type RangeId } from './util'
+import { RANGE_OPTIONS, allTimeRange, customRange, fmtDuration, fmtNum, fmtSigned, fmtWhen, goalPace, goalPeriodRange, inRange, isoWeekKey, localDateKey, monthName, monthRange, monthsWithData, rangeFor, taskMinutes, type GoalTf, type RangeId } from './util'
 import { analyzeAvoidance, fallbackRead } from './coach'
+import { WALL } from './board'
 import { getAiKey, hasAiKey, readAvoidance, setAiKey, type AvoidanceRead } from './ai'
 import { paymentTaskTitle } from './exceptions'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange, sendSignInCode, signInWithCode, signOutAccount, type Account } from './supabase'
@@ -193,8 +194,46 @@ function ChartArea({ runs, target, unit }: { runs: StepEntry[]; target?: number;
   )
 }
 
+/** The window of the same length immediately before this one. A number with
+ *  nothing to compare it to is trivia; a number with a direction is a fact. */
+function priorRange(r: { from: string; to: string }): { id: string; label: string; from: string; to: string } {
+  const d = (iso: string) => { const [y, m, day] = iso.split('-').map(Number); return new Date(y, m - 1, day) }
+  const key = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+  const days = Math.max(1, Math.round((d(r.to).getTime() - d(r.from).getTime()) / 86400000) + 1)
+  const to = d(r.from); to.setDate(to.getDate() - 1)
+  const from = new Date(to); from.setDate(from.getDate() - (days - 1))
+  return { id: 'prior', label: 'the window before', from: key(from), to: key(to) }
+}
+
+/** How many of its own occasions a routine had inside a window. */
+function occasionsIn(cadence: string, r: { from: string; to: string }): number {
+  const d = (iso: string) => { const [y, m, day] = iso.split('-').map(Number); return new Date(y, m - 1, day) }
+  const days = Math.max(1, Math.round((d(r.to).getTime() - d(r.from).getTime()) / 86400000) + 1)
+  if (cadence === 'weekly') return Math.max(1, Math.round(days / 7))
+  if (cadence === 'monthly') return Math.max(1, Math.round(days / 30))
+  if (cadence === 'prework') {
+    let n = 0
+    const cur = d(r.from)
+    for (let i = 0; i < days; i++) { const wd = (cur.getDay() + 6) % 7; if (wd < 5) n++; cur.setDate(cur.getDate() + 1) }
+    return Math.max(1, n)
+  }
+  return days
+}
+
+/** A direction on a number, drawn only when there is something to compare. */
+function Delta({ now, before, unit = '' }: { now: number; before: number; unit?: string }) {
+  if (before === 0 && now === 0) return null
+  const d = now - before
+  if (d === 0) return <span className="rf-delta same">same as before</span>
+  return (
+    <span className={`rf-delta ${d > 0 ? 'up' : 'down'}`}>
+      {d > 0 ? '+' : ''}{unit === 'm' ? fmtDuration(Math.abs(d)) : Math.abs(d)}{unit && unit !== 'm' ? ` ${unit}` : ''} {d > 0 ? 'more' : 'less'} than before
+    </span>
+  )
+}
+
 export function ReviewPage() {
-  const { space, habits, goals, closeReview, review, ledger, focusSessions, habitLog, routineLog, stepLog, routines, records, inView } = useStore()
+  const { space, tasks, habits, goals, closeReview, review, ledger, focusSessions, habitLog, routineLog, stepLog, routines, records, coachSessions, setPage, inView } = useStore()
   const [rangeId, setRangeId] = useState<string>('this-week')
   const [from, setFrom] = useState(localDateKey())
   const [to, setTo] = useState(localDateKey())
@@ -244,6 +283,53 @@ export function ReviewPage() {
   const keptDays = new Set(myTicks.map((t) => `${t.habitId}|${t.day}`)).size
   const routineSpace = new Map(routines.map((r) => [r.id, r.space]))
   const routinesDone = routineLog.filter((r) => inRange(r.day, range) && inView(routineSpace.get(r.routineId))).length
+
+  /* How long this window is, in days. The written question follows it. */
+  const spanDays = Math.max(1, Math.round((new Date(range.to).getTime() - new Date(range.from).getTime()) / 86400000) + 1)
+
+  /* ---- the window before this one, for direction ---- */
+  const prior = useMemo(() => priorRange(range), [range.from, range.to])
+  const priorRows = ledger.filter((e) => inView(e.space) && inRange(e.when, prior) && !fromFocus.has(e.id))
+  const priorFocus = focusSessions.filter((f) => inView(f.space) && inRange(f.day, prior)).reduce((a, f) => a + f.minutes, 0)
+  const priorKept = new Set(habitLog.filter((t) => inRange(t.day, prior) && inView(habitSpace.get(t.habitId))).map((t) => `${t.habitId}|${t.day}`)).size
+
+  /* ---- what he promised this window, and whether it landed ----
+     The tasks he put on a week or a month in Goals. Nothing is inferred: a
+     promise is done or it is not, and one whose period has ended without
+     being done is the one worth naming. */
+  const promises = tasks.filter((t) => inView(t.space) && t.horizon && t.horizonKey
+    && (() => { const r = goalPeriodRange(t.horizon as GoalTf, t.horizonKey!); return r.from <= range.to && r.to >= range.from })())
+  const promisesKept = promises.filter((t) => t.done)
+  const promisesOpen = promises.filter((t) => !t.done)
+
+  /* ---- which routines are actually still running ----
+     A routine dies weeks before he notices. The log knows exactly when it
+     started slipping, and never said so anywhere. */
+  const adherence = routines
+    .filter((r) => !r.archivedAt && inView(r.space))
+    .map((r) => {
+      const ran = new Set(routineLog.filter((x) => x.routineId === r.id && inRange(x.day, range)).map((x) => x.day)).size
+      const due = occasionsIn(r.cadence, range)
+      return { id: r.id, title: r.title, space: r.space, ran, due, pct: due ? Math.round((ran / due) * 100) : 0 }
+    })
+    .sort((a, b) => b.pct - a.pct)
+
+  /* ---- what he avoided ----
+     `carried` has been counted on every task that came back and shown as a
+     chip on one row. Summed up, it is the most honest line on this page. */
+  const cameBack = tasks.filter((t) => inView(t.space) && !t.done && (t.carried ?? 0) > 0)
+    .sort((a, b) => (b.carried ?? 0) - (a.carried ?? 0))
+  const oldestOpen = tasks.filter((t) => inView(t.space) && !t.done && t.createdAt)
+    .sort((a, b) => (a.createdAt! < b.createdAt! ? -1 : 1))[0]
+  const facedIn = coachSessions.filter((c) => inView(c.space) && inRange(c.when, range))
+  const facedDone = facedIn.filter((c) => c.didIt)
+
+  /* ---- where the time went ----
+     Not a total, a split: the same hour spent on admin and on deep work is
+     the same hour only to a clock. */
+  const byCategory = ['deep', 'admin', 'call', 'quick'].map((c) => ({
+    c, min: rows.filter((e) => e.category === c).reduce((a, e) => a + e.actualMin, 0),
+  })).filter((x) => x.min > 0).sort((a, b) => b.min - a.min)
 
   const activeHabits = habits.filter((h) => !h.paused && !h.archivedAt && inView(h.space))
   const spaceGoals = goals.filter((g) => inView(g.space))
@@ -342,6 +428,7 @@ export function ReviewPage() {
           <span className="microcap">Finished</span>
           <div className="kpi">{rows.length}<span className="unit">{rows.length === 1 ? 'task' : 'tasks'}</span></div>
           <div className="kpi-sub">{fmtDuration(worked)} of it, start to finish</div>
+          <Delta now={rows.length} before={priorRows.length} />
         </div>
         <div className="panel">
           <span className="microcap">Habits kept</span>
@@ -349,11 +436,13 @@ export function ReviewPage() {
           <div className="kpi-sub">
             {routinesDone} {routinesDone === 1 ? 'routine' : 'routines'} finished
           </div>
+          <Delta now={keptDays} before={priorKept} />
         </div>
         <div className="panel">
           <span className="microcap">Focus time</span>
           <div className="kpi val-pos">{fmtDuration(focusMin)}</div>
           <div className="kpi-sub">across {blocks.length} {blocks.length === 1 ? 'block' : 'blocks'}</div>
+          <Delta now={focusMin} before={priorFocus} unit="m" />
         </div>
         <div className="panel">
           <span className="microcap">{saved >= 0 ? 'Time saved' : 'Time over'}</span>
@@ -378,6 +467,112 @@ export function ReviewPage() {
         </div>
       </div>
 
+      {/* What this window was FOR. The tasks he promised to a week or a month
+          in Goals, and whether they landed. This is the first question a
+          review has to answer and the page never asked it. */}
+      {promises.length > 0 && (
+        <>
+          <SecHead label="What you promised" />
+          <div className="panel">
+            <div className="rf-promise-head">
+              <span className="kpi">{promisesKept.length}<span className="unit">of {promises.length} landed</span></span>
+              {promisesOpen.length > 0 && (
+                <button className="linkish" onClick={() => setPage('goals')}>
+                  {promisesOpen.length} still open
+                </button>
+              )}
+            </div>
+            <div className="rowlist" style={{ marginTop: 8 }}>
+              {promises.slice(0, 8).map((t) => (
+                <div className="rowitem" key={t.id} style={{ minHeight: 30 }}>
+                  <span className={`grow${t.done ? ' rf-done' : ''}`}>{t.title}</span>
+                  <span className="meta mono">{goalPeriodRange(t.horizon as GoalTf, t.horizonKey!).label}</span>
+                  <span className={`drift ${t.done ? 'ok' : 'off'}`}>{t.done ? 'done' : 'open'}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Which routines are still alive. A routine dies quietly, weeks before
+          the feeling of it arrives, and the log knew all along. */}
+      {adherence.length > 0 && (
+        <>
+          <SecHead label="Routines that held" />
+          <div className="panel">
+            <div className="rowlist" style={{ marginTop: 8 }}>
+              {adherence.map((a) => (
+                <div className="rowitem" key={a.id} style={{ minHeight: 30 }}>
+                  <span className="grow">{a.title}</span>
+                  <span className="meta mono">{a.ran} of {a.due}</span>
+                  <span className={`drift ${a.pct >= 60 ? 'ok' : 'off'}`}>{a.pct}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* The honest half. Work that keeps coming back, the oldest thing still
+          waiting, and what he faced instead of moving. */}
+      {(cameBack.length > 0 || oldestOpen || facedIn.length > 0) && (
+        <>
+          <SecHead label="What you avoided" />
+          <div className="grid-3">
+            <div className="panel">
+              <span className="microcap">Came back</span>
+              <div className={`kpi ${cameBack.length ? 'val-urgent' : ''}`}>{cameBack.length}</div>
+              <div className="kpi-sub">
+                {cameBack[0]
+                  ? `“${cameBack[0].title}” has come back ${cameBack[0].carried}x`
+                  : 'Nothing was pushed to another day.'}
+              </div>
+            </div>
+            <div className="panel">
+              <span className="microcap">Oldest thing waiting</span>
+              {oldestOpen ? (
+                <>
+                  <div className="kpi">{Math.max(0, Math.round((new Date(localDateKey()).getTime() - new Date(oldestOpen.createdAt!).getTime()) / 86400000))}<span className="unit">days</span></div>
+                  <div className="kpi-sub">{oldestOpen.title}</div>
+                </>
+              ) : (
+                <div className="kpi-sub" style={{ marginTop: 8 }}>Nothing is ageing on the list.</div>
+              )}
+            </div>
+            <div className="panel">
+              <span className="microcap">Faced in Avoidance</span>
+              <div className="kpi val-pos">{facedDone.length}<span className="unit">of {facedIn.length}</span></div>
+              <div className="kpi-sub">
+                {facedIn.filter((c) => c.didIt && c.felt === 'easier').length > 0
+                  ? `${facedIn.filter((c) => c.didIt && c.felt === 'easier').length} felt easier than you feared`
+                  : 'Naming it is the step that costs the most.'}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* An hour of admin and an hour of deep work are the same hour only to a
+          clock. */}
+      {byCategory.length > 0 && (
+        <>
+          <SecHead label="Where the time went" />
+          <div className="panel">
+            <div className="rowlist" style={{ marginTop: 8 }}>
+              {byCategory.map((b) => (
+                <div className="rowitem" key={b.c} style={{ minHeight: 30 }}>
+                  <span className={`cat-dot ${b.c}`} aria-hidden="true" />
+                  <span className="grow">{b.c === 'deep' ? 'Deep work' : b.c === 'admin' ? 'Admin' : b.c === 'call' ? 'Calls' : 'Quick things'}</span>
+                  <span className="bar prog rf-bar"><i style={{ width: `${Math.round((b.min / worked) * 100)}%` }} /></span>
+                  <span className="meta mono">{fmtDuration(b.min)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
       <SecHead label="Habits" />
       <div>
         <div className="panel">
@@ -385,11 +580,23 @@ export function ReviewPage() {
             {activeHabits.map((h) => {
               const hist = [...(h.history ?? []), h.days.filter(Boolean).length]
               const twin = activeHabits.some((x) => x.id !== h.id && x.name === h.name)
+              /* Kept days inside THIS window, against the days it could have
+                 been kept. The spark shows the shape; this says the rate. */
+              const keptHere = new Set(habitLog.filter((t) => t.habitId === h.id && inRange(t.day, range)).map((t) => t.day)).size
+              const chances = Math.max(1, Math.round((new Date(range.to).getTime() - new Date(range.from).getTime()) / 86400000) + 1)
+              /* Dying, not stillborn: it was kept before this window and not
+                 once inside it. A habit that never started gets no red word;
+                 the page would be a wall of accusation and he would stop
+                 opening it. */
+              const keptEver = habitLog.some((t) => t.habitId === h.id && t.day < range.from)
+              const dying = keptEver && keptHere === 0 && chances >= 7
               return (
                 <div className="rowitem" key={h.id} style={{ minHeight: 34 }}>
                   <span className="grow">{h.name}{twin && <span className="habit-qual">{SPACE_LABELS[h.space]}</span>}</span>
+                  {/* Said plainly, once, where he can act on it. */}
+                  {dying && <span className="rf-dead">kept before, not once here</span>}
                   {hist.length > 1 ? <Spark data={hist} width={110} height={22} /> : <span className="meta">first week</span>}
-                  <span className="mono meta">{hist[hist.length - 1]}/7</span>
+                  <span className="mono meta">{keptHere} of {chances} days</span>
                 </div>
               )
             })}
@@ -446,7 +653,28 @@ export function ReviewPage() {
         </div>
       </div>
 
+      {/* A month is long enough to have forgotten why. The last thing it shows
+          is his own wall, in his own words, picked by the window so it holds
+          still while he reads it. */}
+      {spanDays > 10 && (() => {
+        const lines = WALL.filter((c) => c.kind === 'statement' || c.kind === 'quote' || c.kind === 'rule')
+        if (!lines.length) return null
+        const seed = [...range.from].reduce((a, ch) => a + ch.charCodeAt(0), 0)
+        const card = lines[seed % lines.length] as { kind: string; text: string; by?: string }
+        return (
+          <>
+            <SecHead label="Why any of this" />
+            <button className="panel rf-why" onClick={() => setPage('board')}>
+              <span className="rf-why-text">{card.text}</span>
+              {card.by && <span className="rf-why-by">{card.by}</span>}
+            </button>
+          </>
+        )
+      })()}
+
       <SecHead label="Checkup" />
+      {/* The question follows the window. A quarter does not deserve the same
+          question as a Tuesday. */}
       {previous && (previous.wins.length > 0 || previous.outcomes.length > 0) && (
         <div className="panel lastweek">
           <span className="microcap">{previous.label}, you said</span>
@@ -463,6 +691,12 @@ export function ReviewPage() {
                 <ul className="lastweek-list">{previous.outcomes.map((o, i) => <li key={i}>{o}</li>)}</ul>
               </div>
             )}
+            {previous.drifted && (
+              <div>
+                <span className="lastweek-h">what drifted</span>
+                <ul className="lastweek-list"><li>{previous.drifted}</li></ul>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -473,7 +707,7 @@ export function ReviewPage() {
             {wins.map((w, i) => (
               <input key={i} className="textinput" style={{ marginBottom: 8, width: '100%' }} placeholder={`Win ${i + 1}`} value={w} onChange={(e) => setW(i, e.target.value)} aria-label={`Win ${i + 1}`} />
             ))}
-            <h4 className="checkup-q">What drifted, and one change?</h4>
+            <h4 className="checkup-q">{spanDays > 60 ? 'Is this still what you want?' : spanDays > 10 ? 'What do you stop doing?' : 'What got in the way?'}</h4>
             <input className="textinput" style={{ width: '100%' }} placeholder="One honest note" value={changed} onChange={(e) => setChanged(e.target.value)} aria-label="What to change" />
           </div>
           <div className="checkup-col">

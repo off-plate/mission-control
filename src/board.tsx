@@ -44,7 +44,7 @@ type Card =
    long, because the point of a wall is that you scroll it and keep finding
    things, and a short one gets memorised and stops working by the third visit.
    Ordered so no two cards of the same kind sit together for long. */
-const WALL: Card[] = [
+export const WALL: Card[] = [
   { kind: 'image', src: art('#5a5f66', '#14161a'), photo: 'amg-gtr', caption: 'AMG GT R' },
   { kind: 'statement', text: 'She doesn’t need promises. She needs to see it.', size: 'xl' },
   { kind: 'number', value: '226', label: 'kilometres in one Ironman day. Swim, then bike, then run, and nothing stops in between.' },

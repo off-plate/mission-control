@@ -37,8 +37,25 @@ export function mdToHtml(md: string): string {
   let list: 'ul' | 'todo' | null = null
   const shut = () => { if (list) { out.push('</ul>'); list = null } }
 
-  for (const raw of lines) {
-    const line = raw.replace(/\s+$/, '')
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].replace(/\s+$/, '')
+    /* A pipe table, GFM style. The separator row is what tells a table from a
+       line that merely has pipes in it, so both rows have to be there. */
+    if (/^\s*\|.*\|\s*$/.test(line) && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1] ?? '')) {
+      shut()
+      const rows: string[][] = []
+      const cells = (l: string) => l.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim())
+      const head = cells(line)
+      i += 1
+      while (i + 1 < lines.length && /^\s*\|.*\|\s*$/.test(lines[i + 1] ?? '')) { i += 1; rows.push(cells(lines[i])) }
+      const width = Math.max(head.length, ...rows.map((r) => r.length), 1)
+      const cellsOf = (r: string[], tag: string) =>
+        Array.from({ length: width }, (_, c) => `<${tag}>${inlineToHtml(r[c] ?? '')}</${tag}>`).join('')
+      out.push(`<table><thead><tr>${cellsOf(head, 'th')}</tr></thead><tbody>${rows.map((r) => `<tr>${cellsOf(r, 'td')}</tr>`).join('')}</tbody></table>`)
+      continue
+    }
+    /* Three dashes or more on their own line: a divider, his ask of 2026-08-03. */
+    if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) { shut(); out.push('<hr>'); continue }
     const todo = line.match(/^\s*[-*]\s+\[([ xX])\]\s?(.*)$/)
     if (todo) {
       if (list !== 'todo') { shut(); out.push('<ul class="todo">'); list = 'todo' }
@@ -92,6 +109,18 @@ export function htmlToMd(root: HTMLElement): string {
       case 'H4': push(`## ${inlineToMd(el).trim()}`); return
       case 'H5': case 'H6': push(`### ${inlineToMd(el).trim()}`); return
       case 'BLOCKQUOTE': push(`> ${inlineToMd(el).trim()}`); return
+      case 'HR': push('---'); return
+      case 'TABLE': {
+        const rows = [...el.querySelectorAll('tr')]
+        if (!rows.length) return
+        const cellsOf = (tr: Element) => [...tr.children].map((c) => inlineToMd(c).trim().replace(/\|/g, '\\|') || ' ')
+        const width = Math.max(...rows.map((r) => r.children.length), 1)
+        const pad = (r: string[]) => Array.from({ length: width }, (_, i) => r[i] ?? ' ')
+        push(`| ${pad(cellsOf(rows[0])).join(' | ')} |`)
+        push(`|${' --- |'.repeat(width)}`)
+        for (const r of rows.slice(1)) push(`| ${pad(cellsOf(r)).join(' | ')} |`)
+        return
+      }
       case 'UL': case 'OL': {
         for (const li of [...el.children]) {
           const done = (li as HTMLElement).dataset.done

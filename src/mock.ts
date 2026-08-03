@@ -214,6 +214,7 @@ export const MOCK_ROUTINES: Routine[] = [
     doneStepIds: [],
     steps: [
       { id: 'be1', title: 'Prepare to-do list for tomorrow', kind: 'do' },
+      { id: 'be8', title: 'Review Compass finances', kind: 'do', link: 'https://compass-money.netlify.app', linkLabel: 'Open Compass' },
       { id: 'be2', title: 'Prepare clothes for tomorrow', kind: 'do', note: 'Laid out and ready.' },
       { id: 'be3', title: 'Prepare creatine', kind: 'do', note: 'Scoop into the glass, water in, leave it on the counter.' },
       { id: 'be4', title: 'Brush teeth', kind: 'do' },

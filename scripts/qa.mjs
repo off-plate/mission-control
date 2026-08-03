@@ -375,6 +375,54 @@ await step('notes: the editor formats as he types, and the marks survive a reloa
   if ((await page.locator('.nt-editor ul li').count()) < 3) throw new Error('the formatting did not come back after a reload')
 })
 
+await step('notes: three dashes make a divider, and a table he sized himself', async () => {
+  await fresh('notes')
+  await page.locator('.nt-folder-top').first().click(); await page.waitForTimeout(300)
+  await page.getByRole('button', { name: 'New note' }).click(); await page.waitForTimeout(300)
+  await page.locator('textarea[aria-label="Note title"]').fill('Divider and table')
+  await page.locator('.nt-editor').click()
+  await page.keyboard.type('above')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('---'); await page.waitForTimeout(300)
+  if (!(await page.locator('.nt-editor hr').count())) throw new Error('three dashes did not make a divider')
+  await page.keyboard.type('below'); await page.waitForTimeout(300)
+  // a table of his own size
+  await page.getByRole('button', { name: 'Table', exact: true }).click(); await page.waitForTimeout(200)
+  await page.locator('.nt-tablemenu input').first().fill('3')
+  await page.locator('.nt-tablemenu input').nth(1).fill('2')
+  await page.getByRole('button', { name: 'Insert' }).click(); await page.waitForTimeout(300)
+  if ((await page.locator('.nt-editor table tr').count()) !== 3) throw new Error('wrong number of rows')
+  if ((await page.locator('.nt-editor table tr').first().locator('th').count()) !== 2) throw new Error('wrong number of columns')
+  // type into a cell, then grow the table
+  await page.locator('.nt-editor th').first().click()
+  await page.keyboard.type('Věřitel'); await page.waitForTimeout(300)
+  await page.getByRole('button', { name: 'Add a row' }).click(); await page.waitForTimeout(300)
+  if ((await page.locator('.nt-editor table tr').count()) !== 4) throw new Error('add a row did nothing')
+  await page.waitForTimeout(400)
+  const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
+  const md = (s.notes ?? []).find((n) => n.title === 'Divider and table')?.body ?? ''
+  if (!md.includes('---')) throw new Error(`no divider stored: ${JSON.stringify(md)}`)
+  if (!/\| Věřitel \|/.test(md)) throw new Error(`the cell text was not stored: ${JSON.stringify(md)}`)
+  await page.reload(); await page.waitForTimeout(800)
+  await page.locator('.nt-folder-top').first().click(); await page.waitForTimeout(300)
+  await page.locator('.nt-row', { hasText: 'Divider and table' }).first().click(); await page.waitForTimeout(400)
+  if (!(await page.locator('.nt-editor hr').count())) throw new Error('the divider did not come back')
+  if ((await page.locator('.nt-editor table tr').count()) < 4) throw new Error('the table did not come back whole')
+})
+
+await step('routines: before bed reviews Compass', async () => {
+  await fresh('routines')
+  const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
+  const step8 = (s.routines ?? []).find((r) => r.id === 'r-evening')?.steps?.find((x) => x.id === 'be8')
+  if (!step8) throw new Error('the Compass step is not in the routine')
+  if (step8.link !== 'https://compass-money.netlify.app') throw new Error(`links to ${step8.link}`)
+  await page.locator('.routine-card', { hasText: 'Before bed routine' }).first().locator('.routine-open').click()
+  await page.waitForTimeout(400)
+  const row = page.locator('.routine-card', { hasText: 'Before bed routine' }).first()
+  if (!(await row.getByText('Review Compass finances').count())) throw new Error('the step does not render')
+  if (!(await row.getByRole('link', { name: /Compass/ }).count())) throw new Error('no link under it')
+})
+
 await step('notes: the columns drag, and nothing jumps when a folder is clicked', async () => {
   await fresh('notes')
   const before = (await page.locator('.nt-side').boundingBox()).width

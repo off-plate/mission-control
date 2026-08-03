@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { SUPABASE_ENABLED, deleteRemoteState, loadRemoteState, saveRemoteState } from './supabase'
 import { roll } from './roll'
-import { mergeStates, rowKey, type Tomb } from './sync-merge'
+import { bodyHash, mergeStates, rowKey, type Tomb } from './sync-merge'
 import { dayIndexOf, dayOfWeekKey, goalPeriodKey, goalPeriodRange, isoWeekKey, localDateKey, periodIsPast, periodKeyFor, slotForTime, type GoalTf } from './util'
 import {
   DEFAULT_SPACES,
@@ -17,7 +17,7 @@ import {
   WIDGET_DEFS,
 } from './mock'
 import { goalCurrent, isTimeFed, requiredSteps, routineComplete, stepLocked } from './types'
-import { isSpace } from './types'
+import { isSpace, SPACES, spaceFolderId } from './types'
 import type {
   ViewId,
   FocusSession,
@@ -31,6 +31,8 @@ import type {
   CoachSession,
   Goal,
   Idea,
+  Note,
+  NoteFolder,
   Routine,
   HabitDef,
   LedgerEntry,
@@ -72,6 +74,10 @@ interface PersistedState {
   coachSessions: CoachSession[]
   routines: Routine[]
   ideas: Idea[]
+  /** Notes, and the folders he made for them. Workspace folders are derived,
+   *  not stored, so `noteFolders` only ever holds his own. */
+  notes?: Note[]
+  noteFolders?: NoteFolder[]
   /** ISO week the habit checkmarks belong to; a new week archives and clears them. */
   weekKey?: string
   /** One-time data repairs already applied to this saved state. */
@@ -255,10 +261,28 @@ interface Store extends PersistedState {
   slips: HabitSlip[]
   stepLog: StepEntry[]
 
-  ideas: Idea[]
-  addIdea: (text: string, color: string) => void
-  setIdeaColor: (id: string, color: string) => void
-  deleteIdea: (id: string) => void
+  /* ---- Notes ----
+     The folder is the note's address and its workspace both: move a note into
+     another workspace's folder and it changes workspace, because two places
+     recording the same fact is how they end up disagreeing. */
+  notes: Note[]
+  noteFolders: NoteFolder[]
+  /** Makes an empty note in that folder and hands back its id to open. */
+  addNote: (folderId: string, body?: string) => string
+  updateNote: (id: string, patch: Partial<Pick<Note, 'title' | 'body' | 'color' | 'pinned'>>) => void
+  moveNote: (id: string, folderId: string) => void
+  deleteNote: (id: string) => void
+  /** The losing body from another device: take it into this note, or drop it. */
+  keepNoteConflict: (id: string) => void
+  dropNoteConflict: (id: string) => void
+  addNoteFolder: (space: SpaceId, name: string) => string
+  renameNoteFolder: (id: string, name: string) => void
+  /** Deletes the folder only. Its notes move up to the workspace folder, because
+   *  a folder is a shelf and emptying a shelf does not burn the books. */
+  deleteNoteFolder: (id: string) => void
+  /** Rewrites a tag everywhere it appears. A tag you cannot rename is a tag you
+   *  stop using once it is misspelled. */
+  renameNoteTag: (from: string, to: string) => void
 
   /** The last delete, still takeable back. Null once it is taken back or expires. */
   undoable: Undoable | null
@@ -454,6 +478,40 @@ function loadPersisted(): PersistedState | null {
       p.removedSeeds.push('fix:nightwork-personal')
       p.routines = (p.routines ?? []).map((r) => (r.id === 'r-nightwork' && r.space === 'offplate' ? { ...r, space: 'personal' } : r))
       p.habits = (p.habits ?? []).map((h) => (h.id === 'h-nightwork' && h.space === 'offplate' ? { ...h, space: 'personal' } : h))
+    }
+
+    /* Notes, 2026-08-03. The Brain Dump board becomes a real notes app, and
+       everything already on that board comes across: each sticky becomes a
+       note in a "Brain dumps" folder inside the workspace it was captured in,
+       keeping its text, its colour and its date. His instruction was plain,
+       keep whatever is in the brain dumps.
+
+       The ideas array is left exactly where it is rather than deleted. A phone
+       still running the old bundle renders that array, and an empty one would
+       show him a board he never cleared. It costs a few hundred bytes and it
+       stops a downgrade from looking like a data loss. Runs once. */
+    if (!p.removedSeeds.includes('fix:notes-v1')) {
+      p.removedSeeds.push('fix:notes-v1')
+      const folders: NoteFolder[] = [...(p.noteFolders ?? [])]
+      const notes: Note[] = [...(p.notes ?? [])]
+      for (const i of p.ideas ?? []) {
+        const id = `note-${i.id}`
+        if (notes.some((n) => n.id === id)) continue
+        const space: SpaceId = SPACES.includes(i.space) ? i.space : 'personal'
+        const bin = `nf-braindump-${space}`
+        if (!folders.some((f) => f.id === bin)) {
+          folders.push({ id: bin, space, name: 'Brain dumps', parentId: spaceFolderId(space), order: 0 })
+        }
+        /* The seeded stickies carry the word 'idea' where a date belongs. */
+        const day = /^\d{4}-\d{2}-\d{2}$/.test(i.when ?? '') ? i.when : localDateKey()
+        const body = (i.text ?? '').trim()
+        notes.push({
+          id, space, folderId: bin, title: noteTitle(body), body,
+          color: i.color ?? 'amber', when: day, updatedAt: Date.parse(day) || Date.now(),
+        })
+      }
+      p.noteFolders = folders
+      p.notes = notes
     }
 
     /* A plan is for a day. Yesterday's cannot be allowed to sit on this morning's
@@ -791,8 +849,49 @@ function routeFromHash(): { page: PageId; day: string | null } {
   const h = location.hash.replace('#/', '')
   const m = h.match(/^day\/(\d{4}-\d{2}-\d{2})$/)
   if (m) return { page: 'day', day: m[1] }
-  const pages: PageId[] = ['today', 'plan', 'assistant', 'habits', 'routines', 'goals', 'money', 'review', 'coach', 'stats', 'settings', 'brand', 'braindump', 'focus', 'calendar', 'board']
+  // The board's old address still resolves: a bookmark lands on its successor.
+  if (h === 'braindump') return { page: 'notes', day: null }
+  const pages: PageId[] = ['today', 'plan', 'assistant', 'habits', 'routines', 'goals', 'money', 'review', 'coach', 'stats', 'settings', 'brand', 'notes', 'focus', 'calendar', 'board']
   return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
+}
+
+/* The first line of a note is its title, the way it is in every notes app worth
+   using: no second field to fill in, nothing to keep in step with the text, and
+   an untitled note is simply one whose first line is short. Cached on the row so
+   the list and the search do not re-derive it for every note on every keystroke. */
+function noteTitle(body: string): string {
+  const first = body.split('\n').map((l) => l.trim()).find((l) => l.length > 0) ?? ''
+  return first.replace(/^#{1,3}\s+/, '').replace(/^[-*]\s+(\[[ xX]\]\s*)?/, '').slice(0, 120)
+}
+
+/** Which workspace a folder belongs to. A workspace folder says so in its id;
+ *  one he made says so on the row. Either way there is one answer, and a note's
+ *  workspace is read from here rather than being a second thing to keep in step. */
+function spaceOfFolder(id: string, folders: NoteFolder[]): SpaceId | null {
+  const m = id.match(/^nf-space-(.+)$/)
+  if (m && (SPACES as string[]).includes(m[1])) return m[1] as SpaceId
+  return folders.find((f) => f.id === id)?.space ?? null
+}
+
+/* What a profile that has never saved anything starts with. The seeded stickies
+   become notes on exactly the terms the migration uses, so a fresh install and a
+   migrated one are the same shape. */
+function seedNoteFolders(): NoteFolder[] {
+  const spaces = [...new Set(MOCK_IDEAS.map((i) => i.space))]
+  return spaces.map((s) => ({ id: `nf-braindump-${s}`, space: s, name: 'Brain dumps', parentId: spaceFolderId(s), order: 0 }))
+}
+
+function seedNotes(): Note[] {
+  return MOCK_IDEAS.map((i) => ({
+    id: `note-${i.id}`,
+    space: i.space,
+    folderId: `nf-braindump-${i.space}`,
+    title: noteTitle(i.text),
+    body: i.text,
+    color: i.color,
+    when: localDateKey(),
+    updatedAt: Date.now(),
+  }))
 }
 
 /* Ids must survive reloads without colliding: a plain counter restarts at the
@@ -858,6 +957,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [coachSessions, setCoachSessions] = useState<CoachSession[]>(persisted?.coachSessions ?? [])
   const [routines, setRoutines] = useState<Routine[]>(seededRoutines)
   const [ideas, setIdeas] = useState<Idea[]>(persisted?.ideas ?? MOCK_IDEAS)
+  /* A fresh profile has never run the migration, so the seeded stickies are
+     turned into notes here on the same terms: same folder, same text. */
+  const [notes, setNotes] = useState<Note[]>(persisted?.notes ?? seedNotes())
+  const [noteFolders, setNoteFolders] = useState<NoteFolder[]>(persisted?.noteFolders ?? seedNoteFolders())
   const [records, setRecords] = useState<Record<string, number>>(persisted?.records ?? {})
   // Seeded ids he has deleted, so the forward-fill never resurrects them.
   const [removedSeeds, setRemovedSeeds] = useState<string[]>(persisted?.removedSeeds ?? [])
@@ -959,6 +1062,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     const state: PersistedState = {
       version: 3, spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
+      notes, noteFolders,
       savedAt: Date.now(), weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
       habitLog, routineLog, slips, stepLog, spaceGuessed, graveyard, lastRollDay: lastRollDay ?? localDateKey(),
     }
@@ -974,7 +1078,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { void saveRemoteState(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, graveyard])
+  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, graveyard])
 
   /* ---- state that arrived from somewhere else ----
      Another tab of this browser, or this account on another device. Merged in,
@@ -997,6 +1101,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (p.goals) setGoals(p.goals)
     if (p.routines) setRoutines(p.routines)
     if (p.ideas) setIdeas(p.ideas)
+    /* Arrays, not truthiness: deleting the last note on the other device has to
+       arrive here too, and an empty array is a real answer. */
+    if (Array.isArray(p.notes)) setNotes(p.notes)
+    if (Array.isArray(p.noteFolders)) setNoteFolders(p.noteFolders)
     if (p.ledger) setLedger(p.ledger)
     if (p.focusSessions) setFocusSessions(p.focusSessions)
     if (p.habitLog) setHabitLog(p.habitLog)
@@ -1955,17 +2063,89 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       stepChoice: done ? r.stepChoice : {},
     })),
 
-    addIdea: (text, color) => {
-      const t = text.trim()
-      if (!t) return
-      setIdeas((prev) => [{ id: newId('idea'), space, text: t, when: todayKey(), color }, ...prev])
+    notes, noteFolders,
+    addNote: (folderId, body = '') => {
+      const id = newId('note')
+      const sp = spaceOfFolder(folderId, noteFolders) ?? space
+      setNotes((prev) => [{
+        id, space: sp, folderId, title: noteTitle(body), body,
+        color: 'amber', when: todayKey(), updatedAt: Date.now(), hist: [],
+      }, ...prev])
+      return id
     },
-    setIdeaColor: (id, color) => setIdeas((prev) => prev.map((i) => (i.id === id ? { ...i, color } : i))),
-    deleteIdea: (id) => {
-      const before = ideas
-      setIdeas((prev) => prev.filter((i) => i.id !== id))
-      bury(rowKey('ideas', { id }))
-      armUndo('Note deleted', () => { setIdeas(before); digUp(rowKey('ideas', { id })) })
+    /* Every body this note has had leaves its hash behind. That trail is what
+       lets a merge on another device tell "I am behind" from "we both wrote",
+       so the cost of keeping it is one small string per edit. */
+    updateNote: (id, patch) => setNotes((prev) => prev.map((n) => {
+      if (n.id !== id) return n
+      const bodyChanged = patch.body !== undefined && patch.body !== n.body
+      return {
+        ...n, ...patch,
+        title: patch.body !== undefined ? noteTitle(patch.body) : n.title,
+        hist: bodyChanged ? [...(n.hist ?? []), bodyHash(n.body)].slice(-40) : n.hist,
+        updatedAt: Date.now(),
+      }
+    })),
+    moveNote: (id, folderId) => setNotes((prev) => prev.map((n) => (n.id === id
+      ? { ...n, folderId, space: spaceOfFolder(folderId, noteFolders) ?? n.space, updatedAt: Date.now() }
+      : n))),
+    deleteNote: (id) => {
+      const before = notes
+      setNotes((prev) => prev.filter((n) => n.id !== id))
+      bury(rowKey('notes', { id }))
+      armUndo('Note deleted', () => { setNotes(before); digUp(rowKey('notes', { id })) })
+    },
+    /* The other device's paragraph joins this one under a rule, rather than him
+       having to copy it out by hand before it can be dismissed. */
+    keepNoteConflict: (id) => setNotes((prev) => prev.map((n) => (n.id === id && n.conflict
+      ? {
+        ...n,
+        body: `${n.body}\n\n--- from another device ---\n${n.conflict.body}`,
+        title: n.title,
+        hist: [...(n.hist ?? []), bodyHash(n.body), bodyHash(n.conflict.body)].slice(-40),
+        conflict: undefined,
+        updatedAt: Date.now(),
+      }
+      : n))),
+    dropNoteConflict: (id) => setNotes((prev) => prev.map((n) => (n.id === id
+      ? { ...n, conflict: undefined, hist: [...(n.hist ?? []), ...(n.conflict ? [bodyHash(n.conflict.body)] : [])].slice(-40), updatedAt: Date.now() }
+      : n))),
+
+    addNoteFolder: (sp, name) => {
+      const id = newId('nf')
+      const order = noteFolders.filter((f) => f.space === sp).length
+      setNoteFolders((prev) => [...prev, { id, space: sp, name: name.trim() || 'New folder', parentId: spaceFolderId(sp), order }])
+      return id
+    },
+    renameNoteFolder: (id, name) => setNoteFolders((prev) => prev.map((f) => (f.id === id ? { ...f, name: name.trim() || f.name } : f))),
+    /* Deleting a shelf does not burn the books: its notes go up to the workspace
+       folder, where he can still find every one of them. */
+    deleteNoteFolder: (id) => {
+      const folder = noteFolders.find((f) => f.id === id)
+      if (!folder) return
+      const beforeFolders = noteFolders
+      const beforeNotes = notes
+      setNoteFolders((prev) => prev.filter((f) => f.id !== id))
+      setNotes((prev) => prev.map((n) => (n.folderId === id ? { ...n, folderId: folder.parentId, updatedAt: Date.now() } : n)))
+      bury(rowKey('noteFolders', { id }))
+      const moved = notes.filter((n) => n.folderId === id).length
+      armUndo(moved ? `Folder deleted, ${moved} ${moved === 1 ? 'note' : 'notes'} moved up` : 'Folder deleted', () => {
+        setNoteFolders(beforeFolders); setNotes(beforeNotes); digUp(rowKey('noteFolders', { id }))
+      })
+    },
+    renameNoteTag: (from, to) => {
+      const clean = to.replace(/^#/, '').replace(/[^\p{L}\d_/-]/gu, '')
+      if (!clean) return
+      /* Not \b: that boundary is spelled in ASCII, so #test would reach inside
+         #testů and rename half a Czech word. The lookahead asks the real
+         question, which is whether the tag actually ends there. */
+      const esc = from.replace(/^#/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const re = new RegExp(`#${esc}(?![\\p{L}\\d_/-])`, 'giu')
+      setNotes((prev) => prev.map((n) => {
+        const body = n.body.replace(re, `#${clean}`)
+        if (body === n.body) return n
+        return { ...n, body, title: noteTitle(body), hist: [...(n.hist ?? []), bodyHash(n.body)].slice(-40), updatedAt: Date.now() }
+      }))
     },
 
     undoable,

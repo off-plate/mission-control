@@ -224,6 +224,98 @@ await step('sync: two tabs both keep what they added', async () => {
   await ctx.close()
 })
 
+await step('notes: brain dumps came across, and search reaches every folder', async () => {
+  await fresh('notes')
+  const bin = page.locator('.nt-folder', { hasText: 'Brain dumps' }).first()
+  if (!(await bin.count())) throw new Error('no Brain dumps folder')
+  await bin.click(); await page.waitForTimeout(200)
+  if (!(await page.locator('.nt-row', { hasText: 'Rubber band' }).count())) throw new Error('the board did not come across')
+  // write one, in Czech, with a tag
+  await page.getByRole('button', { name: 'New note' }).click()
+  await page.locator('textarea[aria-label="Note text"]').fill('Zavolat na úkol #vzp\nDruhý řádek s detailem')
+  await page.getByRole('button', { name: 'Done', exact: true }).click(); await page.waitForTimeout(400)
+  const saved = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
+  const mine = (saved.notes ?? []).find((n) => n.title.startsWith('Zavolat'))
+  if (!mine) throw new Error('the note was not saved')
+  if (mine.folderId !== 'nf-braindump-personal') throw new Error(`landed in ${mine.folderId}`)
+  // stand somewhere else, then search without the accents
+  await page.locator('.nt-folder.nt-top').first().click(); await page.waitForTimeout(200)
+  await page.locator('input[aria-label="Search notes"]').fill('ukol'); await page.waitForTimeout(300)
+  if (!(await page.locator('.nt-row', { hasText: 'Zavolat' }).count())) throw new Error('accent-blind search missed it')
+  await page.locator('input[aria-label="Search notes"]').fill(''); await page.waitForTimeout(200)
+  await page.locator('.note-chip', { hasText: '#vzp' }).first().click(); await page.waitForTimeout(300)
+  const rows = await page.locator('.nt-row').count()
+  if (rows !== 1) throw new Error(`the tag filter showed ${rows} notes`)
+})
+
+await step('notes: a folder he made, and its notes surviving its deletion', async () => {
+  await fresh('notes')
+  await page.locator('.nt-group').first().locator('.nt-addfolder').click()
+  await page.locator('input[aria-label^="New folder in"]').fill('Taxes')
+  await page.keyboard.press('Enter'); await page.waitForTimeout(400)
+  await page.getByRole('button', { name: 'New note' }).click()
+  await page.locator('textarea[aria-label="Note text"]').fill('Do not lose me')
+  await page.getByRole('button', { name: 'Done', exact: true }).click(); await page.waitForTimeout(400)
+  let s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
+  const f = (s.noteFolders ?? []).find((x) => x.name === 'Taxes')
+  if (!f) throw new Error('the folder was not created')
+  if (f.parentId !== 'nf-space-personal') throw new Error(`nested under ${f.parentId}`)
+  const wrote = (s.notes ?? []).find((n) => n.title === 'Do not lose me')
+  if (wrote?.folderId !== f.id) throw new Error('the note did not land in the new folder')
+  // deleting the shelf must not burn the books
+  await page.locator('.nt-folder-row', { hasText: 'Taxes' }).getByRole('button', { name: /options/i }).click()
+  await page.getByRole('menuitem', { name: /Delete folder/ }).click(); await page.waitForTimeout(500)
+  s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
+  if ((s.noteFolders ?? []).some((x) => x.id === f.id)) throw new Error('the folder is still there')
+  const after = (s.notes ?? []).find((n) => n.title === 'Do not lose me')
+  if (!after) throw new Error('the note went with the folder')
+  if (after.folderId !== 'nf-space-personal') throw new Error(`the note ended up in ${after.folderId}`)
+})
+
+await step('notes: a body from another device is kept, never dropped', async () => {
+  await page.goto(URL); await page.waitForTimeout(300)
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    s.notes = [{
+      id: 'n-conf', space: 'personal', folderId: 'nf-space-personal',
+      title: 'Laptop version', body: 'Laptop version', color: 'amber',
+      when: '2026-08-03', updatedAt: Date.now(), conflict: { body: 'Phone version', at: Date.now() - 60000 },
+    }]
+    localStorage.setItem(K, JSON.stringify(s))
+  }, KEY)
+  await page.goto(`${URL}#/notes`); await page.reload(); await page.waitForTimeout(700)
+  // An earlier step left the workspace switcher somewhere else, and the switcher
+  // is what decides which folder opens. Stand in Personal first.
+  await page.locator('.nt-folder.nt-top').first().click(); await page.waitForTimeout(200)
+  await page.locator('.nt-row', { hasText: 'Laptop version' }).first().click(); await page.waitForTimeout(200)
+  if (!(await page.locator('.nt-conflict').count())) throw new Error('the other version was not shown')
+  await page.getByRole('button', { name: 'Add it to this note' }).click(); await page.waitForTimeout(400)
+  const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
+  const n = (s.notes ?? []).find((x) => x.id === 'n-conf')
+  if (!n?.body.includes('Phone version')) throw new Error('the other version was lost')
+  if (n.conflict) throw new Error('the flag stayed up after he answered it')
+})
+
+await step('phone: notes are usable at 390', async () => {
+  const mp = await b.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
+  await mp.goto(URL); await mp.waitForTimeout(300)
+  await mp.evaluate((K) => localStorage.removeItem(K), KEY)
+  await mp.goto(`${URL}#/notes`); await mp.reload(); await mp.waitForTimeout(700)
+  let over = await mp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  if (over > 0) throw new Error(`horizontal overflow ${over}px on the list`)
+  await mp.getByRole('button', { name: 'New note' }).click(); await mp.waitForTimeout(300)
+  await mp.locator('textarea[aria-label="Note text"]').fill('Telefonní poznámka #test')
+  await mp.getByRole('button', { name: 'Done', exact: true }).click(); await mp.waitForTimeout(400)
+  over = await mp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  if (over > 0) throw new Error(`horizontal overflow ${over}px with a note open`)
+  // the open note has the screen to itself: the rail must not still be taking width
+  const noteW = (await mp.locator('.nt-note').boundingBox()).width
+  if (noteW < 300) throw new Error(`the open note is only ${Math.round(noteW)}px wide`)
+  const s = await mp.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
+  if (!(s.notes ?? []).some((n) => n.title.startsWith('Telefonní'))) throw new Error('the phone note was not saved')
+  await mp.close()
+})
+
 await b.close(); server.close()
 if (errors.length) console.log(`CONSOLE ERRORS (${errors.length}): ${errors[0]}`)
 console.log(`${pass} pass, ${fail} fail${errors.length ? `, ${errors.length} console errors` : ', 0 console errors'}`)

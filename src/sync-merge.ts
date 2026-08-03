@@ -21,7 +21,10 @@
    key is dropped from both sides. Undo digs it back up.
 
    What still loses: two devices editing the SAME row. That row is one thing and
-   the later edit wins it. Nothing else here is a conflict. */
+   the later edit wins it. Nothing else here is a conflict.
+
+   Notes are the exception, because a note is not a field he can retype: see
+   resolveNote, where a body that loses is kept on the note instead of dropped. */
 
 type Row = Record<string, unknown>
 
@@ -59,11 +62,56 @@ const ENTITY_KEYS: Record<string, (r: Row) => string> = {
   goals: (r) => `goals:${r.id}`,
   routines: (r) => `routines:${r.id}`,
   ideas: (r) => `ideas:${r.id}`,
+  notes: (r) => `notes:${r.id}`,
+  noteFolders: (r) => `noteFolders:${r.id}`,
   coachSessions: (r) => `coachSessions:${r.id}`,
   assistantLog: (r) => `assistantLog:${r.id}`,
 }
 
 const ALL_KEYS: Record<string, (r: Row) => string> = { ...LOG_KEYS, ...ENTITY_KEYS }
+
+/** FNV-1a over a body, short and stable. Not security, just identity: two
+ *  devices must agree on the hash of the same text without exchanging it. */
+export function bodyHash(s: string): string {
+  let h = 0x811c9dc5
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) }
+  return (h >>> 0).toString(36)
+}
+
+/* A note is the one row where "the newer side wins" is not good enough. Every
+   other row is a handful of fields he can retype in seconds; a note is the
+   paragraph he wrote on the train, and losing it silently is the whole reason
+   this file exists.
+
+   The hard part is telling apart two cases that look identical in a blob:
+   this device simply has not received the other's edit yet, and both devices
+   edited since they last agreed. Declaring a conflict on the first would put a
+   scary banner on a note every time an ordinary save propagates. So each note
+   carries the hashes of the bodies it has already had. If the losing body is
+   one of the winner's ancestors, the loser is merely behind, and the newer
+   text stands alone. If it is not, they genuinely diverged, and the loser's
+   body is kept on the note rather than thrown away. */
+function resolveNote(a: Row, b: Row): Row {
+  const at = (r: Row) => (typeof r.updatedAt === 'number' ? r.updatedAt : 0)
+  const [win, lose] = at(b) > at(a) ? [b, a] : [a, b]
+  const wb = String(win.body ?? '')
+  const lb = String(lose.body ?? '')
+  const hist = [...new Set([...(lose.hist as string[] ?? []), ...(win.hist as string[] ?? [])])].slice(-40)
+  const out: Row = { ...win, hist }
+  /* A conflict already on either side outlives this merge: it is unanswered
+     work, and only he closes it. */
+  const kept = (win.conflict ?? lose.conflict) as { body: string; at: number } | undefined
+  if (kept) out.conflict = kept
+  if (wb === lb || !lb) return out
+  // The loser is an ancestor of the winner: ordinary propagation, nothing lost.
+  if (hist.includes(bodyHash(lb))) return out
+  // Two lineages. Keep the newer text as the note and the older text beside it.
+  if (!kept || kept.body !== lb) out.conflict = { body: lb, at: at(lose) }
+  return out
+}
+
+/** Fields where being on the newer side is not enough to win outright. */
+const RESOLVE: Record<string, (a: Row, b: Row) => Row> = { notes: resolveNote }
 
 /** The key a row is buried under, so the store can bury or dig up the same
  *  thing this file will look for. */
@@ -107,12 +155,17 @@ export function mergeStates(a: string, b: string): string {
     for (const [field, keyOf] of Object.entries(ALL_KEYS)) {
       // Absent on both sides stays absent, rather than becoming an empty list.
       if (newer[field] === undefined && older[field] === undefined) continue
+      const resolve = RESOLVE[field]
       const seen = new Map<string, Row>()
+      /* The newer side goes in first, so whatever is already in the map came
+         from it and the row in hand came from the older one. */
       for (const row of [...((newer[field] as Row[]) ?? []), ...((older[field] as Row[]) ?? [])]) {
         if (!row || typeof row !== 'object') continue
         const k = keyOf(row)
         if (buried.has(k)) continue
-        if (!seen.has(k)) seen.set(k, row)
+        const have = seen.get(k)
+        if (!have) seen.set(k, row)
+        else if (resolve) seen.set(k, resolve(have, row))
       }
       out[field] = [...seen.values()]
     }

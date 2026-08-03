@@ -3,7 +3,8 @@ import { exceptionsFor, globalExceptions } from './exceptions'
 import { SPACE_LABELS } from './mock'
 import { GoalsPage, HabitsPage, PlanPage, RoutinesPage, TodayPage } from './pages1'
 import { CoachPage, MoneyPage, ReviewPage, SettingsPage } from './pages2'
-import { AssistantPage, BrainDumpPage } from './pages3'
+import { AssistantPage } from './pages3'
+import { NotesPage } from './notes'
 import { BrandPage } from './brand'
 import { DayPage } from './day'
 import { BoardPage } from './board'
@@ -62,7 +63,7 @@ const NAV: { id: PageId; label: string }[] = [
   { id: 'money', label: 'Money' },
   { id: 'review', label: 'Reflect' },
   { id: 'focus', label: 'Focus' },
-  { id: 'braindump', label: 'Brain Dump' },
+  { id: 'notes', label: 'Notes' },
   { id: 'coach', label: 'Avoidance' },
   { id: 'board', label: 'Why’s' },
 ]
@@ -213,7 +214,7 @@ export default function App() {
         {page === 'coach' && <CoachPage />}
         {page === 'focus' && <FocusPage />}
         {page === 'board' && <BoardPage />}
-        {page === 'braindump' && <BrainDumpPage />}
+        {page === 'notes' && <NotesPage />}
         {page === 'settings' && <SettingsPage />}
         {page === 'brand' && <BrandPage />}
         {page === 'day' && <DayPage />}

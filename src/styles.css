@@ -3049,3 +3049,25 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   .habit-days.is-period { justify-content: flex-start; }
   .period-unit { margin-right: var(--s2); }
 }
+
+/* ---------- Reflect: the questions the page can now answer ---------- */
+/* A number with a direction under it. Quiet: the number is the headline. */
+.rf-delta { display: block; margin-top: var(--s2); font-family: var(--font-mono); font-size: 0.625rem; color: var(--faint); }
+.rf-delta.up { color: var(--progress); }
+.rf-delta.down { color: var(--alert); }
+.rf-delta.same { color: var(--faint); }
+.rf-promise-head { display: flex; align-items: baseline; gap: var(--s3); }
+.rf-promise-head .kpi { margin: 0; }
+.rf-promise-head .linkish { margin-left: auto; font-size: var(--text-xs); }
+.rf-done { text-decoration: line-through; text-decoration-color: var(--hairline-strong); color: var(--muted); }
+.rf-dead { font-family: var(--font-mono); font-size: 0.625rem; color: var(--alert); white-space: nowrap; }
+.rf-bar { flex: 0 0 120px; height: 4px; }
+/* His own wall, at the end of a long window. A card, not a decoration: it
+   opens the wall. */
+.rf-why { display: block; width: 100%; text-align: left; padding: var(--s6) var(--s5); }
+.rf-why-text { display: block; font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); line-height: 1.25; max-width: 46ch; }
+.rf-why-by { display: block; margin-top: var(--s3); font-family: var(--font-mono); font-size: 0.6875rem; color: var(--faint); }
+.rf-why:hover .rf-why-text { color: var(--accent); }
+@media (max-width: 700px) {
+  .rf-bar { flex: 0 0 60px; }
+}

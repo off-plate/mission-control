@@ -179,6 +179,11 @@ export interface RoutineStep {
   /** optional external tool to open (typing test, etc.). */
   link?: string
   linkLabel?: string
+  /** A page of this app the step opens, for a step whose work IS a page here:
+   *  "review last week" belongs in Reflect, not in a second place that asks
+   *  the same question. */
+  goto?: PageId
+  gotoLabel?: string
 }
 
 /** How often a habit is meant to happen. Drives its weekly target. */

@@ -32,8 +32,13 @@ export function DayPage() {
   const day = dayKey ?? localDateKey()
   const today = localDateKey()
 
-  const finished = ledger.filter((e) => e.when === day && inView(e.space))
   const focus = focusSessions.filter((f) => f.day === day && inView(f.space))
+  /* A focus block writes its own ledger row so its minutes are counted once.
+     That row is TIME, not a finished task: listed under Finished it inflated
+     the count and made this page disagree with Plan about the same day. The
+     blocks have their own panel below. */
+  const fromFocus = new Set(focusSessions.map((f) => f.ledgerId).filter(Boolean) as string[])
+  const finished = ledger.filter((e) => e.when === day && inView(e.space) && !fromFocus.has(e.id))
   const focusMin = focus.reduce((a, f) => a + f.minutes, 0)
 
   /* A habit he has since retired still kept the days he kept it. Deleting the

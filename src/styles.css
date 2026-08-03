@@ -2174,7 +2174,12 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 /* The strip is seven 26px dots and their gaps. Spelled out, not guessed at a
    number: the gap is in rem, so on a 2560 screen a hardcoded 254px wrapped the
    week onto two lines. */
-:root { --daystrip: calc(7 * 26px + 6 * var(--s3)); --habit-foot-col: 240px; --habit-menu-col: 34px; }
+/* 264 rather than 240, and wider again on a big screen where the type scales
+   up with it. At 240 a quitting row's "I slipped today" plus "since 12 Apr, 114
+   best run" measured 256 and 314, so the pair overflowed its own column to the
+   LEFT and sat on top of Sunday's dot. */
+:root { --daystrip: calc(7 * 26px + 6 * var(--s3)); --habit-foot-col: 264px; --habit-menu-col: 34px; }
+@media (min-width: 1600px) { :root { --habit-foot-col: 340px; } }
 .habit-list .col-head { margin-bottom: var(--s2); }
 .habit-list .col-head .col-tot { margin-left: 0; }
 .habit-line { border-top: 1px solid var(--hairline); }
@@ -2206,8 +2211,14 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .habit-list.w7 .count-bar { grid-area: days; margin: 0; }
 .habit-list.w7 .habit-foot {
   grid-area: foot; margin-top: 0; justify-content: flex-end; text-align: right;
-  flex-wrap: nowrap; white-space: nowrap; gap: var(--s2);
+  flex-wrap: nowrap; white-space: nowrap; gap: var(--s2); min-width: 0;
 }
+/* A quitting row carries an ACTION and a STAT in one slot. The button takes the
+   left edge of the column, so every I slipped today lines up down the page
+   instead of floating to wherever that row's sentence happened to end, and the
+   sentence takes what is left and shrinks rather than spilling over the dots. */
+.habit-list.w7 .habit-foot .quit-slip { flex: none; margin-right: auto; }
+.habit-list.w7 .habit-foot .habit-weeks { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .habit-list.w7 .habit-foot .habit-weeks { margin-left: 0; }
 .habit-list.w7 .habit-goal { grid-area: foot; justify-self: end; }
 /* The legend is a row of the same grid, so it cannot drift out of line. */

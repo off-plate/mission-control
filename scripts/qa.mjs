@@ -224,6 +224,32 @@ await step('sync: two tabs both keep what they added', async () => {
   await ctx.close()
 })
 
+await step('habits: a quitting row keeps its slip button off the day dots', async () => {
+  /* The foot column is a fixed width, so a long "since 12 Apr, 114 best run"
+     used to push the button out of its own column and onto Sunday's dot, at a
+     different x on every row. Measured, because eyeballing it missed it twice. */
+  await fresh('habits')
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const mk = (id, name, since) => ({ id, space: 'personal', name, kind: 'break', frequency: 'daily', days: [false, false, false, false, false, false, false], history: [], quitSince: since })
+    s.habits = [...(s.habits ?? []), mk('q1', 'Doomscrolling', '2026-08-01'), mk('q2', 'Smoking', '2026-04-12'), mk('q3', 'Buying things I do not need', '2026-05-27')]
+    s.slips = [{ habitId: 'q1', day: '2026-07-30' }]
+    localStorage.setItem(K, JSON.stringify(s))
+  }, KEY)
+  await page.reload(); await page.waitForTimeout(800)
+  const rows = await page.evaluate(() => [...document.querySelectorAll('.habit-row')]
+    .filter((r) => r.querySelector('.quit-slip'))
+    .map((r) => {
+      const b = r.querySelector('.quit-slip').getBoundingClientRect()
+      const d = r.querySelector('.habit-days')?.getBoundingClientRect()
+      return { left: Math.round(b.left), clear: d ? Math.round(b.left - d.right) : 99 }
+    }))
+  if (rows.length < 3) throw new Error(`only ${rows.length} quitting rows rendered`)
+  const off = rows.find((r) => r.clear < 0)
+  if (off) throw new Error(`the slip button sits ${-off.clear}px over the day dots`)
+  if (new Set(rows.map((r) => r.left)).size !== 1) throw new Error(`the buttons do not line up: ${rows.map((r) => r.left).join(', ')}`)
+})
+
 await step('notes: brain dumps came across, and search reaches every folder', async () => {
   await fresh('notes')
   const bin = page.locator('.nt-folder', { hasText: 'Brain dumps' }).first()

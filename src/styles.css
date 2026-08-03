@@ -1695,42 +1695,55 @@ a.pron-src:hover { color: var(--accent); text-decoration: underline; }
 .goal-ms-item.done span:last-child { text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
 
 /* ---------- Notes ----------
-   Three full-height columns that scroll on their own, the way Apple Notes and
-   TickTick do it: folders, a NARROW list, and the note filling the rest. The
-   list being narrow is the whole point. Twice before it ran the full width of
-   the screen and twice it looked like a spreadsheet. */
+   Three columns, all of them draggable, the way TickTick and Apple Notes do it.
+   The note pane is a real editor with a visible toolbar, not a preview with a
+   textarea hiding behind it. */
 
 .nt-app {
+  position: relative;
   display: grid;
-  grid-template-columns: 232px 344px minmax(0, 1fr);
+  grid-template-columns: 236px 372px minmax(0, 1fr);
   /* The shell's sticky header is 104px; the rest of the viewport is the app. */
   height: calc(100dvh - 116px);
   min-height: 460px;
   margin: 0 calc(var(--gutter) * -1);
   border-top: 1px solid var(--hairline);
 }
-.nt-app > * { min-width: 0; overflow-y: auto; overscroll-behavior: contain; }
+.nt-app > * { min-width: 0; }
+.nt-side, .nt-list { overflow-y: auto; overscroll-behavior: contain; }
 .nt-app > * + * { border-left: 1px solid var(--hairline); }
+
+/* The grips sit ON the column edges rather than taking a track of their own,
+   so dragging one cannot shift the thing it is resizing. */
+.nt-grip { position: absolute; top: 0; bottom: 0; width: 11px; margin-left: -5px; cursor: col-resize; z-index: 6; }
+.nt-grip::after { content: ''; position: absolute; inset: 0 5px; background: transparent; transition: background 120ms var(--ease); }
+.nt-grip:hover::after, body.is-colresize .nt-grip::after { background: var(--accent); }
+body.is-colresize { cursor: col-resize; user-select: none; }
 
 /* ---- folders ---- */
 .nt-side { padding: var(--s4) var(--s3) var(--s8); display: flex; flex-direction: column; gap: var(--s4); }
 .nt-group { display: flex; flex-direction: column; gap: 1px; }
-.nt-folder-row { display: flex; align-items: center; }
+/* One shape for every row, open or not: the menu's slot is always reserved, so
+   clicking a folder cannot make the row jump sideways. */
+.nt-folder-row { display: flex; align-items: center; border-radius: var(--r-sm); }
+.nt-folder-row:hover { background: var(--accent-wash); }
+.nt-folder-row.on { background: var(--accent-wash); }
+.nt-folder-row.on .nt-folder { color: var(--accent); font-weight: 600; }
 .nt-folder {
   flex: 1; display: flex; align-items: center; gap: var(--s2); min-width: 0;
-  padding: 6px var(--s3); border-radius: var(--r-sm); text-align: left;
-  font-size: var(--text-sm); color: var(--muted); min-height: 32px;
+  padding: 7px var(--s3); text-align: left; font-size: var(--text-sm); color: var(--muted); min-height: 34px;
 }
 .nt-folder-top { font-family: var(--disp); font-weight: 600; color: var(--ink); font-size: 0.9375rem; }
 .nt-folder:not(.nt-folder-top) { padding-left: var(--s5); }
-.nt-folder:hover { background: var(--accent-wash); color: var(--accent); }
-.nt-folder.on { background: var(--accent-wash); color: var(--accent); font-weight: 600; }
 .nt-fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nt-count { margin-left: auto; font-size: 0.6875rem; opacity: .55; }
-.nt-fkebab { flex: none; }
+/* The slot is 28px whether or not anything is standing in it. */
+.nt-slot, .nt-fkebab { flex: none; width: 28px; }
+.nt-fkebab { visibility: hidden; }
+.nt-folder-row:hover .nt-fkebab, .nt-folder-row.on .nt-fkebab, .nt-fkebab:focus-within { visibility: visible; }
 .nt-addfolder { align-self: flex-start; padding: 5px var(--s3); font-size: 0.75rem; color: var(--faint); border-radius: var(--r-sm); }
 .nt-addfolder:hover { color: var(--accent); background: var(--accent-wash); }
-.nt-rename { margin: 2px 0 0 var(--s3); width: calc(100% - var(--s4)); font-size: var(--text-sm); padding: 5px var(--s2); }
+.nt-rename { margin: 2px 0 0 var(--s3); width: calc(100% - var(--s5)); font-size: var(--text-sm); padding: 5px var(--s2); }
 
 /* ---- the list ---- */
 .nt-list { display: flex; flex-direction: column; padding-bottom: var(--s8); }
@@ -1771,85 +1784,100 @@ a.pron-src:hover { color: var(--accent); text-decoration: underline; }
 .nt-rowtitle {
   display: flex; align-items: center; gap: 7px; min-width: 0;
   font-family: var(--disp); font-weight: 600; font-size: 0.9375rem; line-height: 1.3; color: var(--ink);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; overflow: hidden;
 }
 .nt-rowname { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .nt-pin { color: var(--accent); font-size: 0.625rem; flex: none; }
 .nt-swatch { flex: none; width: 7px; height: 7px; border-radius: 50%; border: 1px solid rgba(26,23,18,.16); }
-/* Date and preview on one line, the way a note list has always done it. */
 .nt-rowsub { display: flex; gap: 7px; min-width: 0; font-size: 0.8125rem; color: var(--muted); line-height: 1.35; }
 .nt-when { flex: none; color: var(--faint); font-size: 0.6875rem; padding-top: 1px; }
 .nt-rowsnip { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nt-rowtail { font-size: 0.6875rem; color: var(--faint); }
 .nt-flag { color: var(--alert); }
 .nt-none { font-size: var(--text-sm); color: var(--muted); padding: var(--s5) var(--s3); }
-mark { background: var(--accent-wash); color: var(--accent); font-weight: 600; border-radius: 2px; padding: 0 1px; }
 
 /* ---- the note ---- */
-.nt-pane { display: flex; flex-direction: column; }
+/* The pane does NOT scroll: its body does. A menu opening from the top bar was
+   being clipped by the pane's own overflow, which is why the kebab looked dead. */
+.nt-pane { display: flex; flex-direction: column; overflow: visible; min-height: 0; }
+.nt-panebody { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
 .nt-nothing { flex: 1; }
-.nt-topbar { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) var(--s4); position: sticky; top: 0; background: var(--bg); z-index: 2; }
+.nt-topbar { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) var(--s4); border-bottom: 1px solid var(--hairline); }
 .nt-back { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-size: var(--text-sm); font-weight: 600; padding: 8px 10px 8px 4px; border-radius: var(--r-sm); min-height: 44px; }
 .nt-back:hover { background: var(--accent-wash); }
+.nt-stamp { font-size: 0.6875rem; color: var(--faint); }
 .nt-kebab { margin-left: auto; }
 .nt-swatches { display: flex; gap: var(--s2); padding: var(--s2) var(--s3); }
 .note-swatch { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--hairline-strong); cursor: pointer; }
 .note-swatch.on { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); }
 
-/* No card, no border, no surface. Paper on paper, one measure, centred. */
-.nt-sheet { width: 100%; max-width: 68ch; margin: 0 auto; padding: 0 var(--s5) var(--s12); }
+/* The note fills its pane. How wide it reads is his to set, by dragging the
+   columns, rather than mine to cap at a measure he never asked for. */
+.nt-sheet { width: 100%; padding: var(--s5) var(--s6) var(--s12); }
 .nt-title {
-  width: 100%; border: none; background: none; padding: 0; margin-bottom: var(--s4); resize: none;
+  width: 100%; border: none; background: none; padding: 0; margin-bottom: var(--s3); resize: none;
   font-family: var(--disp); font-weight: 700; font-size: clamp(1.4rem, 1.1rem + .8vw, 1.75rem);
   line-height: 1.2; color: var(--ink);
 }
 .nt-title:focus { outline: none; }
 .nt-title::placeholder { color: var(--faint); }
-.nt-read { cursor: text; min-height: 260px; }
-.nt-blank { min-height: 260px; }
-/* Writing has to look like reading, or his formatted note turns into plumbing
-   the moment he touches it. */
-.nt-write {
-  width: 100%; border: none; background: none; padding: 0; resize: none;
-  font-family: var(--sans); font-size: var(--text-base); line-height: 1.62; color: var(--ink);
-}
-.nt-write:focus { outline: none; }
-.nt-stamp { margin-top: var(--s6); font-size: 0.6875rem; color: var(--faint); }
 
-/* ---- the marks, once they are read rather than typed ---- */
-.nt-body { font-size: var(--text-base); line-height: 1.62; color: var(--ink); }
-.nt-body p { margin: 0 0 2px; word-break: break-word; }
-.nt-body .nt-h { font-family: var(--disp); font-weight: 700; margin: var(--s5) 0 var(--s2); line-height: 1.25; }
-.nt-body h3.nt-h { font-size: 1.2rem; }
-.nt-body h4.nt-h { font-size: 1.05rem; }
-.nt-body h5.nt-h { font-size: 0.94rem; color: var(--muted); }
-.nt-body .nt-h:first-child { margin-top: 0; }
-.nt-body blockquote { border-left: 2px solid var(--hairline-strong); padding-left: var(--s3); color: var(--muted); margin: var(--s3) 0; }
-.nt-body .nt-li { padding-left: var(--s4); position: relative; }
-.nt-body .nt-li::before { content: '\00b7'; position: absolute; left: var(--s2); color: var(--muted); }
-.nt-body .nt-gap { height: var(--s4); }
-.nt-body code { font-family: var(--font-mono); font-size: 0.86em; background: var(--accent-wash); padding: 1px 5px; border-radius: 3px; }
-.nt-check { display: flex; align-items: flex-start; gap: var(--s3); min-height: 32px; padding: 2px 0; }
-/* The direct child only. Unscoped, this reached the #tag buttons inside the
-   item's own text and turned every one of them into a second empty checkbox. */
-.nt-check > button {
-  flex: none; width: 21px; height: 21px; margin-top: 3px; border-radius: 5px;
-  border: 1.5px solid var(--hairline-strong); display: grid; place-items: center; color: var(--bg);
+/* ---- the editor ---- */
+.nt-editwrap { display: flex; flex-direction: column; gap: var(--s2); }
+.nt-toolbar { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; padding-bottom: var(--s2); border-bottom: 1px solid var(--hairline); }
+.nt-tool {
+  min-width: 32px; height: 32px; padding: 0 8px; border-radius: var(--r-sm);
+  display: inline-grid; place-items: center; color: var(--muted); font-size: 0.9375rem; line-height: 1;
 }
-.nt-check.on > button { background: var(--progress); border-color: var(--progress); }
-.nt-check.on > span { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
-.nt-tag { color: var(--accent); font-weight: 600; }
-.nt-tag:hover { text-decoration: underline; }
+.nt-tool:hover { background: var(--accent-wash); color: var(--accent); }
+.nt-toolsep { width: 1px; height: 18px; background: var(--hairline-strong); margin: 0 var(--s2); }
+
+/* It has to LOOK like the place you type in, which the old read view did not. */
+.nt-editor {
+  min-height: 320px; padding: var(--s3) var(--s3) var(--s6); border-radius: var(--r-sm);
+  font-size: var(--text-base); line-height: 1.62; color: var(--ink); outline: none;
+  caret-color: var(--accent);
+}
+.nt-editor:focus { background: var(--surface); box-shadow: inset 0 0 0 1px var(--hairline-strong); }
+.nt-editor[data-empty]::before {
+  content: 'Write here. A dash makes a bullet.'; color: var(--faint); pointer-events: none;
+  display: block; height: 0;
+}
+/* Chrome starts some blocks as a div; it is the same paragraph to him. */
+.nt-editor p, .nt-editor > div { margin: 0 0 2px; word-break: break-word; min-height: 1.62em; }
+.nt-editor h3, .nt-editor h4, .nt-editor h5 { font-family: var(--disp); font-weight: 700; margin: var(--s4) 0 var(--s2); line-height: 1.25; }
+.nt-editor h3 { font-size: 1.2rem; }
+.nt-editor h4 { font-size: 1.05rem; }
+.nt-editor h5 { font-size: 0.94rem; color: var(--muted); }
+.nt-editor blockquote { border-left: 2px solid var(--hairline-strong); padding-left: var(--s3); color: var(--muted); margin: var(--s3) 0; }
+.nt-editor ul { list-style: none; margin: var(--s2) 0; padding: 0; }
+.nt-editor li { position: relative; padding-left: var(--s5); min-height: 1.62em; }
+.nt-editor ul:not(.todo) > li::before { content: '\2022'; position: absolute; left: 7px; color: var(--muted); }
+/* A checkbox drawn in the item's gutter. Pressing it is handled in notes.tsx. */
+.nt-editor li[data-done]::before {
+  content: ''; position: absolute; left: 0; top: 0.28em; width: 18px; height: 18px;
+  border: 1.5px solid var(--hairline-strong); border-radius: 5px; cursor: pointer;
+}
+.nt-editor li[data-done="1"]::before {
+  background: var(--progress); border-color: var(--progress);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'><path d='M4 12.5L9.5 18L20 6'/></svg>");
+  background-size: 13px 13px; background-repeat: no-repeat; background-position: center;
+}
+.nt-editor li[data-done="1"] { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
+.nt-editor code { font-family: var(--font-mono); font-size: 0.86em; background: var(--accent-wash); padding: 1px 5px; border-radius: 3px; }
+.nt-editor a { color: var(--accent); text-decoration: underline; }
+.nt-editor .tag { color: var(--accent); font-weight: 600; }
+mark { background: var(--accent-wash); color: var(--accent); font-weight: 600; border-radius: 2px; padding: 0 1px; }
 
 /* ---- a body that lost the merge, still on the note ---- */
-.nt-conflict { margin-bottom: var(--s5); border: 1px solid var(--alert); border-radius: 6px; padding: var(--s3) var(--s4); }
+.nt-conflict { margin-bottom: var(--s4); border: 1px solid var(--alert); border-radius: 6px; padding: var(--s3) var(--s4); }
 .nt-conflict-head { font-size: var(--text-sm); color: var(--alert); }
 .nt-conflict pre { margin: var(--s3) 0; font-family: var(--sans); font-size: var(--text-sm); white-space: pre-wrap; word-break: break-word; color: var(--muted); max-height: 240px; overflow: auto; }
 .nt-conflict-acts { display: flex; gap: var(--s2); flex-wrap: wrap; }
 
-/* ---- narrow: the folders fold into a strip, the note becomes a place ---- */
-@media (max-width: 1180px) {
-  .nt-app { grid-template-columns: 300px minmax(0, 1fr); }
+/* ---- narrow: the folders lie down ---- */
+@media (max-width: 1179px) {
+  .nt-app { grid-template-columns: 320px minmax(0, 1fr); }
   .nt-side {
     grid-column: 1 / -1; flex-direction: row; align-items: center; gap: var(--s4);
     overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
@@ -1859,8 +1887,12 @@ mark { background: var(--accent-wash); color: var(--accent); font-weight: 600; b
   .nt-app > .nt-side + * { border-left: none; }
   .nt-app > .nt-list + * { border-left: 1px solid var(--hairline); }
   .nt-group { flex-direction: row; align-items: center; gap: var(--s2); flex: none; }
-  .nt-folder { border: 1px solid var(--hairline-strong); border-radius: 999px; white-space: nowrap; flex: none; min-height: 34px; }
+  .nt-folder-row { border: 1px solid var(--hairline-strong); border-radius: 999px; flex: none; }
+  .nt-folder-row.on { border-color: var(--accent); }
+  .nt-folder { white-space: nowrap; }
   .nt-folder:not(.nt-folder-top) { padding-left: var(--s3); }
+  .nt-slot { display: none; }
+  .nt-fkebab { visibility: visible; width: 24px; }
   .nt-addfolder { flex: none; white-space: nowrap; }
   .nt-rename { margin: 0; width: 150px; flex: none; }
 }
@@ -1870,24 +1902,24 @@ mark { background: var(--accent-wash); color: var(--accent); font-weight: 600; b
     grid-template-columns: minmax(0, 1fr); height: auto; min-height: 0;
     border-top: none; margin: 0;
   }
-  .nt-app > * { overflow: visible; }
+  .nt-side, .nt-list { overflow: visible; }
+  .nt-panebody { overflow: visible; }
   .nt-app > * + * { border-left: none; }
   .nt-app > .nt-list + * { border-left: none; }
   .nt-listhead, .nt-search { position: static; }
-  .nt-listhead { padding-inline: 0; }
-  .nt-search { padding-inline: 0; }
+  .nt-listhead, .nt-search, .nt-tags, .nt-side { padding-inline: 0; }
   .nt-search input { font-size: 16px; padding: 11px var(--s3); }
-  .nt-tags { padding-inline: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .nt-tags { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .nt-tags::-webkit-scrollbar { display: none; }
   .nt-rows { padding: 0; }
   .nt-row { min-height: 68px; padding: var(--s3) var(--s2); }
-  .nt-side { padding-inline: 0; }
   /* One screen, one job: reading a note hides the folders and the list. */
   .nt-pane { display: none; }
   .nt-app.is-reading .nt-side, .nt-app.is-reading .nt-list { display: none; }
   .nt-app.is-reading .nt-pane { display: flex; }
   .nt-topbar { padding-inline: 0; }
-  .nt-sheet { max-width: none; padding-inline: 0; }
+  .nt-sheet { padding-inline: 0; }
+  .nt-editor { padding-inline: var(--s2); }
 }
 
 /* ============================================================

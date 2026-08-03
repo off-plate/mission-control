@@ -59,5 +59,25 @@ a preview.
 
 ---
 
+## 3. Full focus mode, button and mode
+
+Asked for on 2026-08-03, and explicitly parked the same breath: *"DO not do this
+until ill tell you more about it."*
+
+What is known so far, in his words: a button that puts him inside one specific
+task, where only the things that belong to that task are shown. Nothing else on
+the screen.
+
+What is NOT known and must come from him before a line is written: what counts
+as belonging to the task (its steps, its notes, its timer, its goal, all of
+these), whether it takes over the whole window or is its own route, how he
+leaves it, and whether it is tied to the focus timer that already exists or is
+its own thing.
+
+Do not design it, do not build a preview, do not fold it into another change.
+It waits for his brief.
+
+---
+
 _Anything finished moves out of this file and into the commit log, not into a
 "done" section here._

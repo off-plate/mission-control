@@ -18,7 +18,7 @@ export interface ParsedItem {
    or wanting-language. A bare "týden" does not - planning a week is a task. */
 const GOAL_HINTS = /\b(goals?|c[íi]le?|chci|cht[ěe]l bych|want to|i want|by the end|this (week|month|quarter|year))\b/i
 const DONE_HINTS = /\b(done|did|finished|completed|hotovo|ud[ěe]lal|dokon[čc]il|u[žz] jsem)\b/i
-const TASK_LEADS = /^(task|todo|to-do|[úu]kol)\b\s*[:\-]?\s*/i
+const TASK_LEADS = /^((p[řr]idej|p[řr]idat|add|create|new)\s+)?(task|todo|to-do|[úu]kol)\b\s*[:\-]?\s*/i
 const GOAL_LEADS = /^(goals?|c[íi]l)\b\s*[:\-]?\s*/i
 const DONE_LEADS = /^(done|hotovo)\b\s*[:\-]?\s*/i
 /* "na tento týden", "do konce měsíce", "this month" - the horizon phrase that

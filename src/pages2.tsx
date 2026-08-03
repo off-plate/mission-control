@@ -1022,7 +1022,9 @@ export function SettingsPage() {
               <span className={`status-dot ${s.status}`} />
               <span className="info">
                 <span className="name">{s.name}</span>
-                <span className="detail" style={{ display: 'block' }}>{s.detail}</span>
+                {/* The tag already says not-connected; the detail only speaks
+                    when it adds something. */}
+                {s.detail !== 'Not connected yet' && <span className="detail" style={{ display: 'block' }}>{s.detail}</span>}
               </span>
               {/* No switch: flipping one set the row to "connected" while its
                   own detail still said "Not connected yet", and Today's footer

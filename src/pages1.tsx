@@ -1078,7 +1078,11 @@ export function PlanPage() {
             {/* This head counts what the list below it shows. The whole pool's
                 "0 of 5 done" over "Nothing waiting" was two truths about two
                 different lists wearing one label. */}
-            <span className="col-tot mono">{backlogOpen.length} waiting · {fmtDuration(backlogOpen.reduce((a, t) => a + taskMinutes(t), 0))}</span>
+            <span className="col-tot mono">{(() => {
+              const mins = backlogOpen.reduce((a, t) => a + taskMinutes(t), 0)
+              // "4 waiting · 0m" read like a bug; no estimates, no duration.
+              return `${backlogOpen.length} waiting${mins > 0 ? ` · ${fmtDuration(mins)}` : ''}`
+            })()}</span>
           </div>
           {/* Add a task; breaking it down is an action on the task itself. */}
           <div className="formrow" style={{ marginBottom: 'var(--s2)' }}>

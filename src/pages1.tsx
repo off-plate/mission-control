@@ -1471,9 +1471,9 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
   todayIndex: number
   /** The workspace, spelled out, when another visible habit has the same name. */
   qualify?: string
-  /** "done today" / "paused", rendered in the foot column where words fit;
-   *  in the menu column they shoved the kebab out of the panel. */
-  stateTag?: React.ReactNode
+  /** "done today" / "paused". It goes in the foot column where words fit; in
+   *  the menu column it shoved the kebab out of the panel. */
+  stateTag?: string | null
   /** How many days back to show. Seven keeps the week of dots you can click. */
   days?: number
   actions?: React.ReactNode
@@ -1491,9 +1491,21 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
   const liveFocusMin = pomo.phase === 'focus' && pomo.running ? Math.max(0, Math.floor((pomo.blockMin * 60 - pomo.secondsLeft) / 60)) : 0
   const kept = h.days.filter(Boolean).length
   const target = habitTarget(h)
-  /* Once a week or once a month: the week strip is the wrong instrument, and
-     the fraction underneath it was arithmetic between two different units. */
+  /* Once a week or once a month: a row of weekdays is the wrong instrument
+     entirely, and the fraction underneath it was arithmetic between two
+     different units. These rows get a strip of PERIODS instead. */
   const periodic = h.frequency === 'weekly' || h.frequency === 'monthly'
+  const periodTf: GoalTf = h.frequency === 'monthly' ? 'monthly' : 'weekly'
+  const periodWord = h.frequency === 'monthly' ? 'months' : 'weeks'
+  const PERIOD_CELLS = 5
+  /* The last five of its own periods, oldest first, this one last. */
+  const periodCells = periodic
+    ? Array.from({ length: PERIOD_CELLS }, (_, i) => {
+      const key = shiftPeriodKey(periodTf, i - (PERIOD_CELLS - 1))
+      const r = goalPeriodRange(periodTf, key)
+      return { key, label: r.label, kept: keptDaysIn(habitLog, h.id, r.from, r.to).size > 0, now: i === PERIOD_CELLS - 1 }
+    })
+    : []
   /* Twice in a day is not the same as once. The log has held both since
      meditation started being fed by two routines; without this the card said
      the same thing either way. */
@@ -1505,7 +1517,9 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
   const weeks = h.history ?? []
   const hitWeeks = weeks.filter((n) => n >= target).length
   const avg = weeks.length ? weeks.reduce((a, n) => a + n, 0) / weeks.length : 0
-  const trend = weeks.length === 0
+  /* One week of history compares nothing, and "1 of the last 1 weeks" is not
+     a sentence. A periodic habit's own strip already carries this. */
+  const trend = weeks.length < 2 || periodic
     ? null
     : target <= 1
       ? `kept ${hitWeeks} of the last ${weeks.length} weeks`
@@ -1557,7 +1571,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
             )
           })}
         </div>
-        <div className="habit-foot">{stateTag}
+        <div className="habit-foot">{stateTag && <span className={`col-tot mono${stateTag === 'done today' ? ' val-pos' : ''}`}>{stateTag}</span>}
           <span className="habit-weeks">{kept7} of 7 this week</span>
           <button className="habit-auto" onClick={() => setPage('focus')}>Open Focus</button>
         </div>
@@ -1584,7 +1598,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
         <div className="count-bar" aria-hidden="true">
           <span style={{ width: `${Math.min(100, Math.round((have / target) * 100))}%` }} />
         </div>
-        <div className="habit-foot">{stateTag}
+        <div className="habit-foot">{stateTag && <span className={`col-tot mono${stateTag === 'done today' ? ' val-pos' : ''}`}>{stateTag}</span>}
           <span className="count-do">
             <button className="btn btn-primary count-add" onClick={() => logCount(h.id, 1)}>
               Did it
@@ -1631,7 +1645,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
             )
           })}
         </div>
-        <div className="habit-foot">{stateTag}
+        <div className="habit-foot">{stateTag && <span className={`col-tot mono${stateTag === 'done today' ? ' val-pos' : ''}`}>{stateTag}</span>}
           <button className="habit-auto" onClick={() => setPage('plan')}>Fills itself from your focus blocks</button>
           <span className="habit-weeks">{fmtDuration(weekMin)} this week</span>
         </div>
@@ -1665,7 +1679,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
             ))}
           </div>
         )}
-        <div className="habit-foot">{stateTag}
+        <div className="habit-foot">{stateTag && <span className={`col-tot mono${stateTag === 'done today' ? ' val-pos' : ''}`}>{stateTag}</span>}
           <button className="quit-slip" onClick={() => logSlip(h.id)}>I slipped today</button>
           <span className="habit-weeks">
             {h.quitSince ? `since ${fmtWhen(h.quitSince)}` : ''}
@@ -1690,15 +1704,31 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
             fraction. */}
         {window === 7 && (
           <span className="habit-count mono">
+            {/* A monthly habit is kept in a MONTH. Reading the week's cache
+                let the word say "not yet" over a filled month. */}
             {periodic
-              ? (kept >= target ? 'kept' : 'not yet')
+              ? (periodCells[periodCells.length - 1]?.kept ? 'kept' : 'not yet')
               : `${kept}/${target}`}
             {timesToday > 1 && <span className="habit-freq">{timesToday}x today</span>}
           </span>
         )}
       </div>
       <span className="habit-actions">{actions}</span>
-      {window > 7 ? <HabitTrail h={h} days={window} /> : (
+      {window > 7 ? <HabitTrail h={h} days={window} /> : periodic ? (
+        /* Five of its own periods. A once-a-month habit has no Mondays, and
+           printing it under M T W T F S S said it did. */
+        <div className="habit-days is-period">
+          <span className="period-unit mono">{periodWord}</span>
+          {periodCells.map((c) => (
+            <span
+              key={c.key}
+              className={`periodcell${c.kept ? ' kept' : ''}${c.now ? ' is-now' : ''}`}
+              title={`${c.label}${c.kept ? ', kept' : c.now ? ', not yet' : ', not kept'}`}
+              aria-label={`${c.label}${c.kept ? ', kept' : c.now ? ', not yet' : ', not kept'}`}
+            />
+          ))}
+        </div>
+      ) : (
       <div className="habit-days">
         {DAY_LABELS.map((d, i) => (
           <span className={`day-cell${i === todayIndex ? ' is-today' : ''}`} key={i}>
@@ -1729,18 +1759,18 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
           Feeding “{goal.name}”
         </button>
       )}
-      <div className="habit-foot">{stateTag}
-        {trend && <span className="habit-weeks">{trend}</span>}
-        {/* The row is already called after the routine. Saying "ticks itself
-            when you finish Before work routine" on a row named Before work
-            routine is the card restating its own title; the steps left today
-            are the only new fact, and the link is an action, not a sentence. */}
+      {/* One fact and one action, on one line. State, else the steps still
+          waiting, else the trend: three of them stacked into a 200px column
+          and the row read as three ragged lines. The row is already named
+          after its routine, so the link is an action, not a sentence. */}
+      <div className="habit-foot">
+        {stateTag
+          ? <span className={`col-tot mono${stateTag === 'done today' ? ' val-pos' : ''}`}>{stateTag}</span>
+          : progress && progress.total > 1 && progress.done > 0 && progress.done < progress.total
+            ? <span className="habit-weeks">{progress.done} of {progress.total} steps</span>
+            : trend ? <span className="habit-weeks">{trend}</span> : null}
         {drivenBy ? (
-          <button className="habit-auto" onClick={() => setPage('routines')}>
-            {progress && progress.total > 1 && progress.done < progress.total
-              ? `${progress.done} of ${progress.total} steps`
-              : 'Open the routine'}
-          </button>
+          <button className="habit-auto" onClick={() => setPage('routines')}>Open the routine</button>
         ) : null}
       </div>
     </div>
@@ -2044,12 +2074,7 @@ export function HabitsPage() {
             )}
             {c.list.map((h) => (
               <div className={`habit-line is-${h.kind ?? 'build'}${h.paused ? ' is-paused' : ''}`} key={h.id}>
-                <HabitRow h={h} todayIndex={todayIndex} days={days} qualify={qualifyOf(h)} drivenBy={drivenBy.get(h.id)} progress={progressFor.get(h.id)} goal={goalOn.get(h.id)} stateTag={
-                  <>
-                    {h.paused && <span className="col-tot mono">paused</span>}
-                    {!h.paused && h.days[todayIndex] && <span className="col-tot mono val-pos">done today</span>}
-                  </>
-                } actions={
+                <HabitRow h={h} todayIndex={todayIndex} days={days} qualify={qualifyOf(h)} drivenBy={drivenBy.get(h.id)} progress={progressFor.get(h.id)} goal={goalOn.get(h.id)} stateTag={h.paused ? 'paused' : h.days[todayIndex] ? 'done today' : null} actions={
                   <>
                   <Dropdown label={`Options for ${h.name}`} className="habit-kebab">
                     <button role="menuitem" onClick={() => setEditHabit(h)}>Edit this habit</button>

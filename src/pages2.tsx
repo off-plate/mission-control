@@ -241,7 +241,6 @@ export function ReviewPage() {
      down to look back at a month. */
   const habitSpace = new Map(habits.map((h) => [h.id, h.space]))
   const myTicks = habitLog.filter((t) => inRange(t.day, range) && inView(habitSpace.get(t.habitId)))
-  const keptTimes = myTicks.length
   const keptDays = new Set(myTicks.map((t) => `${t.habitId}|${t.day}`)).size
   const routineSpace = new Map(routines.map((r) => [r.id, r.space]))
   const routinesDone = routineLog.filter((r) => inRange(r.day, range) && inView(routineSpace.get(r.routineId))).length
@@ -348,7 +347,6 @@ export function ReviewPage() {
           <span className="microcap">Habits kept</span>
           <div className="kpi val-pos">{keptDays}</div>
           <div className="kpi-sub">
-            {keptTimes > keptDays ? `${keptTimes} times in all, ` : ''}
             {routinesDone} {routinesDone === 1 ? 'routine' : 'routines'} finished
           </div>
         </div>

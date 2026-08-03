@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from './store'
 import { FALLBACK_NEWS, PER_LANG, loadMorningNews, twistersForDay, type MorningNews } from './morning-data'
-import { TYPING_TARGET_WPM, type Routine } from './types'
+import { TYPING_TARGET_WPM, type PageId, type Routine } from './types'
 import { SpaceMark } from './pages1'
 
 /* The Morning routine as a guided, foldable accordion. Every step starts collapsed;
@@ -218,12 +218,16 @@ function Typing({ url, label, stepId, onLog }: {
 }
 
 /* Any step he wrote himself: his own words, and a link if he gave one. */
-function PlainStep({ note, link, linkLabel }: { note?: string; link?: string; linkLabel?: string }) {
+function PlainStep({ note, link, linkLabel, goto: page, gotoLabel }: { note?: string; link?: string; linkLabel?: string; goto?: PageId; gotoLabel?: string }) {
+  const { setPage } = useStore()
   return (
     <div className="mr-typing">
       {note && <p className="mr-lead">{note}</p>}
+      {/* The step's work lives on a page of this app, so the step opens it
+          rather than asking him to do the same thinking twice. */}
+      {page && <button className="btn btn-quiet" onClick={() => setPage(page)}>{gotoLabel ?? 'Open it'}</button>}
       {link && <a className="btn btn-quiet" href={link} target="_blank" rel="noreferrer">{linkLabel ?? 'Open'} ↗</a>}
-      {!note && !link && <p className="mr-lead">Mark it off when it is done.</p>}
+      {!note && !link && !page && <p className="mr-lead">Mark it off when it is done.</p>}
     </div>
   )
 }
@@ -283,7 +287,7 @@ export function MorningRoutine({ routine, onEdit, onShut }: { routine: Routine; 
         }}
       />
     )
-    return <PlainStep note={s.note} link={s.link} linkLabel={s.linkLabel} />
+    return <PlainStep note={s.note} link={s.link} linkLabel={s.linkLabel} goto={s.goto} gotoLabel={s.gotoLabel} />
   }
 
   const total = steps.length

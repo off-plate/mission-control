@@ -258,7 +258,7 @@ export const MOCK_ROUTINES: Routine[] = [
     doneStepIds: [],
     steps: [
       { id: 'wr1', title: 'Refill vitamins in the GymBeam box', kind: 'do' },
-      { id: 'wr2', title: 'Review last week: goals and what stayed undone', kind: 'do', note: 'The journal and Mission Control, both.' },
+      { id: 'wr2', title: 'Review last week: goals and what stayed undone', kind: 'do', note: 'The journal and Mission Control, both.', goto: 'review', gotoLabel: 'Open last week in Reflect' },
       { id: 'wr3', title: 'Plan next week’s goals', kind: 'do' },
       { id: 'wr4', title: 'Plan Monday’s tasks', kind: 'do' },
     ],
@@ -267,7 +267,7 @@ export const MOCK_ROUTINES: Routine[] = [
     id: 'r-monthly', space: 'personal', title: 'Monthly review', cadence: 'monthly', habitId: 'h-monthly',
     doneStepIds: [],
     steps: [
-      { id: 'mo0', title: 'Reflect the month', kind: 'do' },
+      { id: 'mo0', title: 'Reflect the month', kind: 'do', goto: 'review', gotoLabel: 'Open the month in Reflect' },
       { id: 'mo1', title: 'Review last month’s goals', kind: 'do' },
       { id: 'mo2', title: 'Plan next month’s goals', kind: 'do' },
       { id: 'mo3', title: 'Review the finances', kind: 'do', note: 'Savings, total spent, total received, debt update.' },

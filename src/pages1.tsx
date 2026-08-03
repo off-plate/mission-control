@@ -2479,6 +2479,12 @@ export function RoutinesPage() {
                         {s.note && <span className="h">{s.note}</span>}
                         {s.example && <span className="ex mono">{s.example}</span>}
                         {s.link && <a className="routine-link" href={s.link} target="_blank" rel="noreferrer">{s.linkLabel ?? 'Open'} ↗</a>}
+                        {/* A step whose work is a page of this app opens it,
+                            so "review last week" and Reflect stop being two
+                            places asking the same question. */}
+                        {s.goto && (
+                          <button className="routine-link" onClick={() => setPage(s.goto!)}>{s.gotoLabel ?? 'Open it'}</button>
+                        )}
                         {s.alts?.length ? (
                           <span className="alt-set">
                             {s.alts.map((a, i) => {

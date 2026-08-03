@@ -390,6 +390,21 @@ function loadPersisted(): PersistedState | null {
       }
     }
 
+    /* The two review steps learn to open Reflect. The step is his once it
+       exists, so the seed cannot reach it; this adds the pointer without
+       touching his words, and runs once. */
+    if (!p.removedSeeds.includes('fix:review-goto')) {
+      p.removedSeeds.push('fix:review-goto')
+      const GOTO: Record<string, { goto: 'review'; gotoLabel: string }> = {
+        wr2: { goto: 'review', gotoLabel: 'Open last week in Reflect' },
+        mo0: { goto: 'review', gotoLabel: 'Open the month in Reflect' },
+      }
+      p.routines = (p.routines ?? []).map((r) => (r.id !== 'r-weekly' && r.id !== 'r-monthly' ? r : {
+        ...r,
+        steps: r.steps.map((st) => (GOTO[st.id] && !st.goto ? { ...st, ...GOTO[st.id] } : st)),
+      }))
+    }
+
     /* Meditation drops from ten minutes to five, 2026-08-02. The step is his
        once it exists, so the seed cannot reach it; this rewrites the timer ONLY
        while it still holds the old seeded value, so a length he chose himself

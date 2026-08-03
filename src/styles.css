@@ -1694,35 +1694,148 @@ a.pron-src:hover { color: var(--accent); text-decoration: underline; }
 .goal-ms-item.done { color: var(--progress); }
 .goal-ms-item.done span:last-child { text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
 
-/* ---------- Brain Dump: sticky-note board ---------- */
-.note-composer-row { display: flex; align-items: center; gap: var(--s3); margin-top: var(--s3); flex-wrap: wrap; }
+/* ---------- Notes ----------
+   Folders on the left, the list beside them, the open note beside that. The
+   sticky-note wall this replaced worked at a dozen notes and stopped working at
+   eighty: a wall has no scanning order, and folders and search need one. */
 .note-swatches { display: flex; gap: var(--s2); }
 .note-swatch { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--hairline-strong); cursor: pointer; }
 .note-swatch.on { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ink); }
-
-.note-filter { display: flex; flex-wrap: wrap; gap: var(--s2); margin-bottom: var(--s4); }
 .note-chip { font-family: var(--font-mono); font-size: 0.75rem; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--hairline-strong); color: var(--muted); }
 .note-chip:hover { border-color: var(--accent); color: var(--accent); }
 .note-chip.on { background: var(--ink); border-color: var(--ink); color: var(--bg); }
 
-/* Composer + notes share one grid, so notes start beside the input, not below it.
-   Four wide notes per row, then wrap. */
-/* The board fills the screen. A hard 4 x 400px cap stopped it at roughly half
-   an ultrawide viewport and left the notes huddled in the top-left corner. */
-.bd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); gap: var(--s4); align-items: start; }
-@media (max-width: 940px) { .bd-grid { grid-template-columns: repeat(2, minmax(240px, 1fr)); } }
-@media (max-width: 600px) { .bd-grid { grid-template-columns: 1fr; } }
-.bd-composer { background: var(--surface); border: 1px solid var(--hairline-strong); border-radius: 8px; padding: var(--s4); display: flex; flex-direction: column; gap: var(--s3); }
-.bd-composer textarea { resize: vertical; }
-.sticky { border-radius: 3px; padding: var(--s4) var(--s4) var(--s3); border: 1px solid rgba(26,23,18,.08); box-shadow: 0 2px 8px rgba(26,23,18,.09); display: flex; flex-direction: column; }
-.note-text { font-size: var(--text-base); line-height: 1.5; color: #201d16; white-space: pre-wrap; word-break: break-word; }
-.note-tag { color: var(--accent); font-weight: 600; }
-.note-foot { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s3); }
-.note-when { font-size: 0.6875rem; color: rgba(26,23,18,.5); }
-.note-colors { margin-left: auto; display: flex; gap: 4px; opacity: 0; transition: opacity 140ms ease-out; }
-.sticky:hover .note-colors { opacity: 1; }
-.note-dot { width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(26,23,18,.2); cursor: pointer; }
-.note-dot.on { box-shadow: 0 0 0 1.5px #fff, 0 0 0 3px rgba(26,23,18,.55); }
+.nt-wrap { display: grid; grid-template-columns: 232px minmax(0, 1fr); gap: var(--s5); align-items: start; }
+.nt-wrap.with-note { grid-template-columns: 232px minmax(260px, 340px) minmax(0, 1fr); }
+/* Below this the three columns stop fitting, so the open note takes the list's
+   place rather than squeezing both into an unreadable pair. */
+@media (max-width: 1160px) {
+  .nt-wrap.with-note { grid-template-columns: 232px minmax(0, 1fr); }
+  .nt-wrap.with-note .nt-list { display: none; }
+}
+
+/* ---- the folder rail ---- */
+.nt-rail { display: flex; flex-direction: column; gap: var(--s4); position: sticky; top: 104px; }
+.nt-group { display: flex; flex-direction: column; gap: 1px; }
+.nt-folder-row { display: flex; align-items: center; }
+.nt-folder {
+  flex: 1; display: flex; align-items: center; gap: var(--s2); min-width: 0;
+  padding: 7px var(--s3); border-radius: var(--r-sm); text-align: left;
+  font-size: var(--text-sm); color: var(--muted); min-height: 34px;
+}
+.nt-folder.nt-top { font-family: var(--disp); font-weight: 600; color: var(--ink); font-size: var(--text-base); }
+.nt-folder:not(.nt-top) { padding-left: var(--s5); }
+.nt-folder:hover { background: var(--accent-wash); color: var(--accent); }
+.nt-folder.on { background: var(--ink); color: var(--bg); }
+.nt-folder.on .nt-count { color: var(--bg); opacity: .6; }
+.nt-fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nt-count { margin-left: auto; font-size: 0.6875rem; color: var(--muted-2, var(--muted)); }
+.nt-fkebab { opacity: 0; }
+.nt-folder-row:hover .nt-fkebab, .nt-fkebab:focus-within { opacity: 1; }
+.nt-addfolder { align-self: flex-start; padding: 6px var(--s3); font-size: 0.75rem; color: var(--muted); border-radius: var(--r-sm); }
+.nt-addfolder:hover { color: var(--accent); background: var(--accent-wash); }
+.nt-newfolder { margin: 2px 0 0 var(--s3); width: calc(100% - var(--s3)); }
+
+/* ---- search and the list ---- */
+.nt-list { display: flex; flex-direction: column; gap: var(--s3); min-width: 0; }
+.nt-search { display: flex; align-items: center; gap: var(--s2); }
+.nt-search svg { color: var(--muted); flex: none; }
+.nt-search input { flex: 1; min-width: 0; }
+.nt-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.nt-clear { flex: none; }
+.nt-tags { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
+.nt-tags .mono { opacity: .55; }
+.nt-renametag { font-size: 0.75rem; color: var(--accent); padding: 4px var(--s2); border-radius: var(--r-sm); }
+.nt-renametag:hover { background: var(--accent-wash); }
+.nt-scope { font-size: 0.75rem; color: var(--muted); font-family: var(--font-mono); }
+
+.nt-rows { list-style: none; display: flex; flex-direction: column; }
+.nt-rows > li + li { border-top: 1px solid var(--hairline); }
+.nt-row {
+  width: 100%; display: flex; align-items: flex-start; gap: var(--s3); text-align: left;
+  padding: var(--s3) var(--s2); border-radius: var(--r-sm); min-height: 56px;
+}
+.nt-row:hover { background: var(--accent-wash); }
+.nt-row.on { background: var(--ink); }
+.nt-row.on .nt-rowtitle, .nt-row.on .nt-rowsnip, .nt-row.on .nt-rowmeta { color: var(--bg); }
+.nt-swatch { flex: none; width: 9px; height: 9px; border-radius: 50%; margin-top: 5px; border: 1px solid rgba(26,23,18,.16); }
+.nt-rowmain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.nt-rowtitle { font-family: var(--disp); font-weight: 600; font-size: var(--text-base); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nt-pin { color: var(--accent); margin-right: 5px; font-size: 0.6875rem; }
+.nt-rowsnip { font-size: var(--text-sm); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nt-rowmeta { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-size: 0.6875rem; color: var(--muted); }
+.nt-rowfolder { font-size: 0.6875rem; color: var(--muted); }
+.nt-flag { color: var(--alert); }
+.nt-empty { font-size: var(--text-sm); color: var(--muted); padding: var(--s4) var(--s2); max-width: 52ch; }
+/* The wash on its own read as a smudge rather than an answer to "why did this
+   match", so the hit takes the accent and a weight with it. */
+mark { background: var(--accent-wash); color: var(--accent); font-weight: 600; border-radius: 2px; padding: 0 1px; }
+.nt-row.on mark { background: transparent; color: var(--bg); text-decoration: underline; }
+
+/* ---- the open note ---- */
+/* Capped: on an ultrawide the note ran to 1400px and left a paragraph hugging
+   the left edge of an empty field. */
+.nt-note { border: 1px solid var(--hairline-strong); border-radius: 8px; background: var(--surface); padding: var(--s4) var(--s5) var(--s5); min-width: 0; max-width: 900px; }
+.nt-notebar { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; padding-bottom: var(--s3); border-bottom: 1px solid var(--hairline); }
+.nt-notebar .nt-when { font-size: 0.6875rem; color: var(--muted); }
+.nt-notebar .nt-swatches { margin-left: auto; }
+.nt-read { margin-top: var(--s4); cursor: text; min-height: 220px; }
+.nt-placeholder { color: var(--muted); font-size: var(--text-sm); }
+.nt-edit { margin-top: var(--s4); display: flex; flex-direction: column; gap: var(--s3); align-items: flex-start; }
+.nt-edit textarea { width: 100%; resize: vertical; line-height: 1.62; }
+
+/* ---- the marks, once they are read rather than typed ---- */
+.nt-body { max-width: 68ch; font-size: var(--text-base); line-height: 1.62; color: var(--ink); }
+.nt-body p { margin: 0 0 2px; word-break: break-word; }
+.nt-body .nt-h { font-family: var(--disp); font-weight: 700; margin: var(--s4) 0 var(--s2); line-height: 1.25; }
+.nt-body h3.nt-h { font-size: 1.24rem; }
+.nt-body h4.nt-h { font-size: 1.06rem; }
+.nt-body h5.nt-h { font-size: 0.94rem; color: var(--muted); text-transform: none; }
+.nt-body .nt-h:first-child { margin-top: 0; }
+.nt-body blockquote { border-left: 2px solid var(--hairline-strong); padding-left: var(--s3); color: var(--muted); margin: var(--s2) 0; }
+.nt-body .nt-li { padding-left: var(--s4); position: relative; }
+.nt-body .nt-li::before { content: '·'; position: absolute; left: var(--s2); color: var(--muted); }
+.nt-body .nt-gap { height: var(--s3); }
+.nt-body code { font-family: var(--font-mono); font-size: 0.86em; background: var(--accent-wash); padding: 1px 5px; border-radius: 3px; }
+.nt-check { display: flex; align-items: flex-start; gap: var(--s2); padding: 2px 0; }
+/* The direct child only. Unscoped, this reached the #tag buttons inside the
+   item's own text and turned every one of them into a second, empty checkbox
+   stacked on top of the line. */
+.nt-check > button {
+  flex: none; width: 17px; height: 17px; margin-top: 3px; border-radius: 4px;
+  border: 1.5px solid var(--hairline-strong); display: grid; place-items: center; color: var(--bg);
+}
+.nt-check.on > button { background: var(--progress); border-color: var(--progress); }
+.nt-check.on > span { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
+.nt-tag { color: var(--accent); font-weight: 600; }
+.nt-tag:hover { text-decoration: underline; }
+
+/* ---- a body that lost the merge, still on the note ---- */
+.nt-conflict { margin-top: var(--s4); border: 1px solid var(--alert); border-radius: 6px; padding: var(--s3) var(--s4); }
+.nt-conflict-head { font-size: var(--text-sm); color: var(--alert); max-width: 62ch; }
+.nt-conflict pre { margin: var(--s3) 0; font-family: var(--sans); font-size: var(--text-sm); white-space: pre-wrap; word-break: break-word; color: var(--muted); max-height: 240px; overflow: auto; }
+.nt-conflict-acts { display: flex; gap: var(--s2); flex-wrap: wrap; }
+
+/* On a phone the rail lies down. Standing up, it was six hundred pixels of
+   folder names and New folder buttons before the first note, which put his own
+   writing below the fold on the one page whose whole job is showing it. */
+@media (max-width: 760px) {
+  .nt-wrap, .nt-wrap.with-note { grid-template-columns: minmax(0, 1fr); gap: var(--s4); }
+  .nt-wrap.with-note .nt-rail { display: none; }
+  .nt-rail {
+    flex-direction: row; align-items: center; gap: var(--s3); position: static;
+    overflow-x: auto; scrollbar-width: none; padding-bottom: 2px;
+  }
+  .nt-rail::-webkit-scrollbar { display: none; }
+  .nt-group { flex-direction: row; align-items: center; gap: var(--s2); flex: none; }
+  .nt-folder { border: 1px solid var(--hairline-strong); border-radius: 999px; white-space: nowrap; flex: none; }
+  .nt-folder:not(.nt-top) { padding-left: var(--s3); }
+  .nt-folder .nt-count { margin-left: var(--s2); }
+  .nt-fname { max-width: 22ch; }
+  .nt-addfolder { flex: none; white-space: nowrap; }
+  .nt-fkebab { opacity: 1; }
+  .nt-newfolder { margin: 0; width: 160px; flex: none; }
+}
 
 /* ============================================================
    DESIGN PASS (whole-site review)
@@ -1797,14 +1910,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .mr-head-main:hover .mr-chev { color: var(--accent); }
 .habit:hover .tick { border-color: var(--accent); }
 
-/* ---- Brain dump ---- */
-/* A hashtag inside a note is emphasis, not an action. The filter chip above
-   it is the clickable one, and they looked identical. */
-.note-tag { color: rgba(26, 23, 18, 0.55); font-weight: 700; }
-.note-colors { opacity: 0.35; }
-@media (hover: none) { .note-colors { opacity: 1; } }
-.note-dot.on { box-shadow: 0 0 0 1.5px var(--surface), 0 0 0 3px var(--ink); }
-
 /* ---- Money rows line up as columns ---- */
 .rowitem.wrap-row > .mono:not(.meta) { min-width: 9ch; text-align: right; }
 .rowitem.wrap-row .state-tag { flex: none; min-width: 13ch; text-align: center; }
@@ -1823,7 +1928,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
    region; .widget-title-btn is excluded because its ::after draws the chevron. */
 @media (pointer: coarse) {
   .routine-check, .mr-check, button.est-chip, .expand-btn,
-  .note-swatch, .note-dot, .goal-ms-check, .sub-tick, .radio,
+  .note-swatch, .goal-ms-check, .sub-tick, .radio,
   .goal-bump button, .goal-drop, .kebab, .exc-drop,
   .goal-nav-btn, .task-act, .habit-auto, .fold-all, .sub-tool,
   .toggle, .focus-step, .note-chip, .quit-slip,
@@ -1831,7 +1936,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
     position: relative;
   }
   .routine-check::after, .mr-check::after, button.est-chip::after, .expand-btn::after,
-  .note-swatch::after, .note-dot::after, .goal-ms-check::after, .sub-tick::after, .radio::after,
+  .note-swatch::after, .goal-ms-check::after, .sub-tick::after, .radio::after,
   .goal-bump button::after, .goal-drop::after, .kebab::after, .exc-drop::after,
   .goal-nav-btn::after, .task-act::after, .habit-auto::after, .fold-all::after, .sub-tool::after,
   .toggle::after, .focus-step::after, .note-chip::after, .quit-slip::after,
@@ -1932,11 +2037,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   border-radius: var(--r-sm); padding: var(--s2) var(--s3); margin-top: var(--s2);
 }
 
-/* Brain dump: note actions sit at the end of the footer. */
-.note-kebab { margin-left: auto; }
-.sticky .kebab { color: rgba(0, 0, 0, 0.45); }
-.sticky .kebab:hover { color: rgba(0, 0, 0, 0.8); }
-
 /* Pomodoro: blocks finished today. */
 .pomo-cycles { font-size: var(--text-xs); color: var(--faint); padding-right: 4px; }
 
@@ -2000,10 +2100,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   .coach-intake { max-width: none; margin-bottom: 0; }
 }
 
-/* 3. Brain dump reserved eight empty tracks with auto-fill. auto-fit collapses
-   them, and the notes stay a readable width instead of stretching. */
-.bd-grid { grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 460px)); justify-content: start; }
-
 /* 5. Phone Review: a wrapped goal name pushed its percentage onto the next line,
    below the hairline, so the number read as the NEXT goal's. Keep them together. */
 .rowitem { flex-wrap: nowrap; }
@@ -2028,15 +2124,11 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   .plan-cols .formrow > .textinput { flex: 1 1 100%; }
 }
 
-/* Brain dump: the composer is a left rail, notes flow beside it, so a sparse
-   board still reads as a workspace instead of two boxes in a corner. */
 @media (min-width: 1600px) {
-  .bd-grid { grid-template-columns: 420px repeat(auto-fit, minmax(320px, 420px)); }
   .coach-side .coach-starters { margin-top: 0; padding-top: 0; border-top: none; }
   .coach-side .coach-starter-row { flex-direction: column; align-items: stretch; }
   .coach-side .coach-starter { max-width: none; }
 }
-
 
 /* ---------- Shared add-sheet form ---------- */
 .sheet-inline { display: flex; align-items: center; gap: var(--s2); font-size: var(--text-sm); color: var(--muted); min-width: 0; }
@@ -2424,7 +2516,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .assist-go { margin-left: auto; }
 .assist-listening { font-size: var(--text-xs); color: var(--alert); }
 .assist-mic-note { margin-top: var(--s2); }
-
 
 /* Grown by script, so the manual grip has nothing left to do. */
 .autogrow { resize: none; }
@@ -2869,7 +2960,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .cal-marks { display: flex; gap: 2px; }
 .cal-marks i { width: 4px; height: 4px; border-radius: 50%; background: var(--progress); }
 .cal-day.is-picked .cal-marks i { background: var(--bg); }
-
 
 @media (max-width: 900px) {
   .cal-cols { grid-template-columns: 1fr; }

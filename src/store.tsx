@@ -25,6 +25,7 @@ import type {
   HabitTick,
   RoutineDone,
   StepEntry,
+  StepTick,
   RoutineCadence,
   AssistantEntry,
   CoachFacts,
@@ -99,6 +100,10 @@ interface PersistedState {
   slips?: HabitSlip[]
   /** Every number a routine step recorded, dated. `records` keeps only the best. */
   stepLog?: StepEntry[]
+  /** Every step ticked, dated. The routine's own doneStepIds is wiped at
+   *  rollover, so this is the only thing that can say a routine was HALF done
+   *  on a day that is no longer today. */
+  stepTicks?: StepTick[]
   /** The last day the rollover ran. Everything after it is unsealed. */
   lastRollDay?: string
   /** How many rows had no space and were filed as Personal on migration. */
@@ -260,6 +265,7 @@ interface Store extends PersistedState {
   /** Every dated slip, and every dated number a routine step recorded. */
   slips: HabitSlip[]
   stepLog: StepEntry[]
+  stepTicks: StepTick[]
 
   /* ---- Notes ----
      The folder is the note's address and its workspace both: move a note into
@@ -985,6 +991,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [routineLog, setRoutineLog] = useState<RoutineDone[]>(persisted?.routineLog ?? [])
   const [slips, setSlips] = useState<HabitSlip[]>(persisted?.slips ?? [])
   const [stepLog, setStepLog] = useState<StepEntry[]>(persisted?.stepLog ?? [])
+  const [stepTicks, setStepTicks] = useState<StepTick[]>(persisted?.stepTicks ?? [])
   /* What he deliberately deleted. Every collection is united across devices
      now, so a row missing here is only "not seen yet" unless something says
      otherwise: this is that something. Without it, deleting a task on the
@@ -1080,7 +1087,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       version: 3, spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
       notes, noteFolders,
       savedAt: Date.now(), weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
-      habitLog, routineLog, slips, stepLog, spaceGuessed, graveyard, lastRollDay: lastRollDay ?? localDateKey(),
+      habitLog, routineLog, slips, stepLog, stepTicks, spaceGuessed, graveyard, lastRollDay: lastRollDay ?? localDateKey(),
     }
     const json = JSON.stringify(state)
     latestJson.current = json
@@ -1094,7 +1101,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { void saveRemoteState(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, graveyard])
+  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, graveyard])
 
   /* ---- state that arrived from somewhere else ----
      Another tab of this browser, or this account on another device. Merged in,
@@ -1127,6 +1134,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (p.routineLog) setRoutineLog(p.routineLog)
     if (p.slips) setSlips(p.slips)
     if (p.stepLog) setStepLog(p.stepLog)
+    if (Array.isArray(p.stepTicks)) setStepTicks(p.stepTicks)
     if (p.coachSessions) setCoachSessions(p.coachSessions)
     if (p.assistantLog) setAssistantLog(p.assistantLog)
     if (p.spaces) setSpaces(p.spaces)
@@ -1448,12 +1456,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   /* Arming an undo replaces whatever was armed before: one step back, not a
      history. The window is generous because a delete you notice a beat late is
      exactly the one worth taking back. */
+  /* Every step he ticks leaves a dated row behind. The routine's own doneStepIds
+     is wiped at each rollover, so without this a routine he got halfway through
+     on Monday is indistinguishable on Tuesday from one he never opened, which is
+     exactly what he saw on Habits. Only TODAY is ever written or unwritten: a
+     past day is history, and history does not change because he opened the app.
+     Untick removes the row rather than writing a false one, so a mis-tap does
+     not leave a permanent half-day on the record. */
+  const markSteps = (routineId: string, stepIds: string[], on: boolean) => {
+    if (!stepIds.length) return
+    const day = todayKey()
+    setStepTicks((prev) => {
+      const rest = prev.filter((t) => !(t.routineId === routineId && t.day === day && stepIds.includes(t.stepId)))
+      return on ? [...rest, ...stepIds.map((stepId) => ({ routineId, stepId, day }))] : rest
+    })
+  }
+
   const armUndo = (label: string, restore: () => void) => setUndoable({ id: newId('u'), label, restore })
 
   const value: Store = {
     version: 3,
     spaces, tasks, habits, goals, ledger, social, sources, plan, review, routines, ideas,
-    focusSessions, habitLog, routineLog, slips, stepLog,
+    focusSessions, habitLog, routineLog, slips, stepLog, stepTicks,
     view, setView, inView,
     /* A finished block is recorded once, and everything that cares reads from
        here: measured habits fill from it, and the ledger gets it so focus time
@@ -1946,6 +1970,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const has = r.doneStepIds.includes(stepId)
       const doneStepIds = has ? r.doneStepIds.filter((x) => x !== stepId) : [...r.doneStepIds, stepId]
       applyRoutine(routineId, (x) => stamped({ ...x, doneStepIds }))
+      markSteps(routineId, [stepId], !has)
     },
     /* Picking one of a step's alternatives IS ticking that step. The choice is
        kept so the day record can say which way he went, and picking the same one
@@ -1960,6 +1985,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const doneStepIds = off
           ? r.doneStepIds.filter((x) => x !== stepId)
           : r.doneStepIds.includes(stepId) ? r.doneStepIds : [...r.doneStepIds, stepId]
+        markSteps(routineId, [stepId], !off)
         return stamped({ ...r, stepChoice, doneStepIds })
       })
     },
@@ -2068,7 +2094,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     /* Finishing the routine finishes what it needs. An optional step is not
        claimed on his behalf, because ticking "wash your face" for him would be
        the app putting words in his mouth, but one he has already ticked stays. */
-    setRoutineDone: (routineId, done) => applyRoutine(routineId, (r) => stamped({
+    setRoutineDone: (routineId, done) => applyRoutine(routineId, (r) => {
+      markSteps(routineId, requiredSteps(r).filter((st) => !stepLocked(r, st.id)).map((st) => st.id), done)
+      return stamped({
       ...r,
       doneStepIds: done
         ? [...new Set([
@@ -2076,8 +2104,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ...requiredSteps(r).filter((st) => !stepLocked(r, st.id)).map((st) => st.id),
         ])]
         : [],
-      stepChoice: done ? r.stepChoice : {},
-    })),
+        stepChoice: done ? r.stepChoice : {},
+      })
+    }),
 
     notes, noteFolders,
     addNote: (folderId, body = '') => {

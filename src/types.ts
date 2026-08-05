@@ -319,6 +319,17 @@ export function routineRunsOn(log: RoutineDone[], routineId: string, day: string
  * `records` only the all-time maximum, so every score between the first and the
  * best was thrown away and no progression could ever be drawn.
  */
+/** One step of one routine, ticked on one day. The routine's own doneStepIds is
+ *  wiped at every rollover, so without this a routine he got halfway through on
+ *  Monday is indistinguishable on Tuesday from one he never opened. Value-free:
+ *  StepEntry next door records NUMBERS a step produced, which is a different
+ *  question and must not be polluted with ones and zeroes. */
+export interface StepTick {
+  routineId: string
+  stepId: string
+  day: string
+}
+
 export interface StepEntry {
   routineId: string
   stepId: string

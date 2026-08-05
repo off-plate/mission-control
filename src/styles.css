@@ -2380,10 +2380,18 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   .habit-weeks { margin-left: 0; }
 }
 
-/* A multi-step routine part-done: today's dot fills to match, so a morning you
-   started but did not finish reads differently from one you never began. */
+/* A multi-step routine part-done: the dot fills to match, on any day, so a
+   morning you started but did not finish reads differently from one you never
+   began, on Monday as much as on today. */
 .daydot.partial {
+  /* The wash alone was invisible at two steps out of five, which defeats the
+     point of showing it. Fallback first for anything without color-mix. */
   background: linear-gradient(to top, var(--accent-wash) var(--fill, 0%), transparent var(--fill, 0%));
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--accent) 34%, transparent) var(--fill, 0%),
+    transparent var(--fill, 0%)
+  );
   border-color: var(--accent);
   border-style: solid;
 }

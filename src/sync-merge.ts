@@ -51,6 +51,7 @@ const LOG_KEYS: Record<string, (r: Row) => string> = {
   habitLog: (r) => `habitLog:${r.habitId}|${r.day}|${r.src ?? ''}`,
   routineLog: (r) => `routineLog:${r.routineId}|${r.periodKey}|${r.run ?? 0}|${r.day}`,
   stepLog: (r) => `stepLog:${r.routineId}|${r.stepId}|${r.at ?? r.day}`,
+  stepTicks: (r) => `stepTicks:${r.routineId}|${r.stepId}|${r.day}`,
   slips: (r) => `slips:${r.habitId}|${r.day}`,
 }
 

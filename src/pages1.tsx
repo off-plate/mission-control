@@ -7,7 +7,7 @@ import { usePomodoro } from './pomodoro'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
 import { Linkify } from './widgets'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, isCounted, COUNT_PERIODS, routineComplete, routineProgress, routineRunsOn, slotMinutes, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, isCounted, COUNT_PERIODS, requiredSteps, routineComplete, routineProgress, routineRunsOn, slotMinutes, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
 import { estimateFor } from './estimate'
 import { estimateTask } from './ai'
 import { goalPeriodKey, goalPeriodRange, habitPeriodRange, periodIsPast, periodKeyFor, periodLabel, shiftPeriodKey, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForMoment, taskMinutes, toMin } from './util'
@@ -1466,7 +1466,7 @@ function HabitTrail({ h, days }: { h: HabitDef; days: number }) {
   )
 }
 
-function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy, progress, goal, qualify }: {
+function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy, progress, partOn, goal, qualify }: {
   h: HabitDef
   todayIndex: number
   /** The workspace, spelled out, when another visible habit has the same name. */
@@ -1481,6 +1481,10 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
   drivenBy?: string
   /** Today's progress through the routine that drives this habit. */
   progress?: { done: number; total: number }
+  /** How far through its routine each PAST day got, 0 to 100, keyed by date.
+   *  Today's number comes from the live routine; every other day comes from the
+   *  dated step record, because the routine itself no longer remembers. */
+  partOn?: Map<string, number>
   /** A goal counting itself off this habit, if one exists. */
   goal?: Goal
 }) {
@@ -1529,6 +1533,13 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
   // but did not finish is visible here instead of reading as untouched.
   const pct = progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0
   const partial = !!progress && progress.done > 0 && progress.done < progress.total
+  /** How far through the routine that weekday got, 0 when it was not started or
+   *  was finished outright. A finished day already reads as a full dot. */
+  const partOf = (i: number): number => {
+    if (h.days[i]) return 0
+    if (i === todayIndex) return partial ? pct : 0
+    return partOn?.get(dayOfWeekKey(i)) ?? 0
+  }
 
   /* Measured: the dot is not yes/no, it is how far through the day's target you
      got. A morning that reached 40 of 60 minutes reads as most of the way there
@@ -1733,8 +1744,12 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
         {DAY_LABELS.map((d, i) => (
           <span className={`day-cell${i === todayIndex ? ' is-today' : ''}`} key={i}>
             <button
-              className={`daydot${expected(i) ? '' : ' off-day'}${drivenBy ? ' is-auto' : ''}${i === todayIndex && partial ? ' partial' : ''}${drivenBy && i === todayIndex ? ' is-locked' : ''}`}
-              style={i === todayIndex && partial ? ({ ['--fill' as string]: `${pct}%` } as React.CSSProperties) : undefined}
+              /* A part-done day is part-done whenever it was. Today's fraction
+                 comes off the live routine, every earlier one off the dated
+                 step record; a day already fully kept is never redrawn as
+                 partial. */
+              className={`daydot${expected(i) ? '' : ' off-day'}${drivenBy ? ' is-auto' : ''}${partOf(i) > 0 ? ' partial' : ''}${drivenBy && i === todayIndex ? ' is-locked' : ''}`}
+              style={partOf(i) > 0 ? ({ ['--fill' as string]: `${partOf(i)}%` } as React.CSSProperties) : undefined}
               role="checkbox"
               aria-checked={h.days[i]}
               /* TODAY belongs to the routine: ticking it by hand would
@@ -1979,7 +1994,7 @@ const HABIT_WINDOWS = [
 ]
 
 export function HabitsPage() {
-  const { habits, goals, space, deleteHabit, togglePauseHabit, routines, todayIndex, inView } = useStore()
+  const { habits, goals, space, deleteHabit, togglePauseHabit, routines, stepTicks, todayIndex, inView } = useStore()
   const [days, setDays] = useState(7)
   const [adding, setAdding] = useState(false)
   // Opening the goal sheet from a habit is the "set a goal on this" path.
@@ -1997,6 +2012,31 @@ export function HabitsPage() {
   const progressFor = new Map(routines.filter((r) => r.habitId && !r.archivedAt).map((r) => [
     r.habitId as string, routineProgress(r),
   ]))
+  /* And every earlier day's, off the dated step record. The routine only ever
+     remembers today, so a Monday he got two steps into used to read on Tuesday
+     exactly like a Monday he never opened. Capped at 99 because a day that
+     reached every step is a day that was KEPT, and that is a full dot. */
+  const partFor = new Map<string, Map<string, number>>()
+  for (const r of routines) {
+    if (!r.habitId || r.archivedAt) continue
+    const total = requiredSteps(r).length
+    if (!total) continue
+    const byDay = new Map<string, Set<string>>()
+    for (const t of stepTicks) {
+      if (t.routineId !== r.id) continue
+      const seen = byDay.get(t.day) ?? new Set<string>()
+      seen.add(t.stepId)
+      byDay.set(t.day, seen)
+    }
+    const pcts = partFor.get(r.habitId) ?? new Map<string, number>()
+    for (const [day, ids] of byDay) {
+      const pc = Math.min(99, Math.round((ids.size / total) * 100))
+      /* Two routines can feed one habit. The one that got furthest that day is
+         the honest answer, not whichever happened to be read last. */
+      if (pc > (pcts.get(day) ?? 0)) pcts.set(day, pc)
+    }
+    partFor.set(r.habitId, pcts)
+  }
   /* What the page opens with used to be kept-this-week over the sum of every
      habit's weekly target: 49 of 90, a number mixing dailies, weekdays and
      monthlies across four workspaces that he could not reconstruct from
@@ -2074,7 +2114,7 @@ export function HabitsPage() {
             )}
             {c.list.map((h) => (
               <div className={`habit-line is-${h.kind ?? 'build'}${h.paused ? ' is-paused' : ''}`} key={h.id}>
-                <HabitRow h={h} todayIndex={todayIndex} days={days} qualify={qualifyOf(h)} drivenBy={drivenBy.get(h.id)} progress={progressFor.get(h.id)} goal={goalOn.get(h.id)} stateTag={h.paused ? 'paused' : h.days[todayIndex] ? 'done today' : null} actions={
+                <HabitRow h={h} todayIndex={todayIndex} days={days} qualify={qualifyOf(h)} drivenBy={drivenBy.get(h.id)} progress={progressFor.get(h.id)} partOn={partFor.get(h.id)} goal={goalOn.get(h.id)} stateTag={h.paused ? 'paused' : h.days[todayIndex] ? 'done today' : null} actions={
                   <>
                   <Dropdown label={`Options for ${h.name}`} className="habit-kebab">
                     <button role="menuitem" onClick={() => setEditHabit(h)}>Edit this habit</button>

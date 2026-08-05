@@ -71,6 +71,10 @@ await step('routines: choice step ticks and starts the routine', async () => {
   const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
   const r = s.routines.find((x) => x.id === 'r-brainrot')
   if (!r.doneStepIds.includes('br1') || !r.startedAt) throw new Error('choice did not tick/start')
+  // and it leaves a DATED row, which is the only thing that survives rollover
+  if (!(s.stepTicks ?? []).some((t) => t.routineId === 'r-brainrot' && t.stepId === 'br1')) {
+    throw new Error('ticking a step left no dated row')
+  }
 })
 await step('goals: add with milestones, tick one on the card', async () => {
   await fresh('goals')
@@ -248,6 +252,35 @@ await step('habits: a quitting row keeps its slip button off the day dots', asyn
   const off = rows.find((r) => r.clear < 0)
   if (off) throw new Error(`the slip button sits ${-off.clear}px over the day dots`)
   if (new Set(rows.map((r) => r.left)).size !== 1) throw new Error(`the buttons do not line up: ${rows.map((r) => r.left).join(', ')}`)
+})
+
+await step('habits: a routine left half done still reads half done tomorrow', async () => {
+  /* His own report: partial routines only ever showed on today's dot, because
+     the routine's doneStepIds is wiped at rollover and nothing dated survived
+     it. Seed two of Morning Preparation's steps on an earlier weekday and the
+     dot for that day must fill. */
+  await fresh('habits')
+  const yday = await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const r = s.routines.find((x) => x.id === 'r-morning')
+    // an earlier day of THIS week, so it is on the seven-day strip
+    const d = new Date()
+    const back = d.getDay() === 1 ? 0 : 1
+    d.setDate(d.getDate() - back)
+    const z = (n) => String(n).padStart(2, '0')
+    const day = `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`
+    s.stepTicks = r.steps.slice(0, 2).map((st) => ({ routineId: 'r-morning', stepId: st.id, day }))
+    localStorage.setItem(K, JSON.stringify(s))
+    return day
+  }, KEY)
+  await page.reload(); await page.waitForTimeout(800)
+  const row = page.locator('.habit-line', { hasText: 'Morning Preparation' }).first()
+  const partials = await row.locator('.daydot.partial').count()
+  if (partials < 1) throw new Error(`no partial dot for ${yday}`)
+  // and the fill is a real fraction, not 0 and not full
+  const fill = await row.locator('.daydot.partial').first().evaluate((el) => el.style.getPropertyValue('--fill'))
+  const n = parseInt(fill, 10)
+  if (!(n > 0 && n < 100)) throw new Error(`fill reads ${fill}`)
 })
 
 await step('notes: brain dumps came across, and search reaches every folder', async () => {

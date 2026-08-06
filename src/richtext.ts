@@ -34,11 +34,24 @@ function inlineToHtml(text: string): string {
 export function mdToHtml(md: string): string {
   const lines = md.split('\n')
   const out: string[] = []
-  let list: 'ul' | 'todo' | null = null
-  const shut = () => { if (list) { out.push('</ul>'); list = null } }
+  /* One entry per open list level, and whether that level currently has an item
+     still open. A nested list must go INSIDE its parent's <li>, never beside
+     it: a <ul> loose in a <ul> is invalid, the browser reparents it, and every
+     nested item was being dropped on the way back to markdown. */
+  const open: { kind: 'ul' | 'todo' }[] = []
+  const hasLi: boolean[] = []
+  const closeTo = (d: number) => {
+    while (open.length > d) {
+      if (hasLi[open.length - 1]) out.push('</li>')
+      out.push('</ul>')
+      open.pop(); hasLi.pop()
+    }
+  }
+  const shut = () => closeTo(0)
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].replace(/\s+$/, '')
+
     /* A pipe table, GFM style. The separator row is what tells a table from a
        line that merely has pipes in it, so both rows have to be there. */
     if (/^\s*\|.*\|\s*$/.test(line) && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1] ?? '')) {
@@ -54,20 +67,34 @@ export function mdToHtml(md: string): string {
       out.push(`<table><thead><tr>${cellsOf(head, 'th')}</tr></thead><tbody>${rows.map((r) => `<tr>${cellsOf(r, 'td')}</tr>`).join('')}</tbody></table>`)
       continue
     }
-    /* Three dashes or more on their own line: a divider, his ask of 2026-08-03. */
+
+    /* Three dashes or more on their own line: a divider. */
     if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) { shut(); out.push('<hr>'); continue }
-    const todo = line.match(/^\s*[-*]\s+\[([ xX])\]\s?(.*)$/)
-    if (todo) {
-      if (list !== 'todo') { shut(); out.push('<ul class="todo">'); list = 'todo' }
-      out.push(`<li data-done="${todo[1] === ' ' ? '0' : '1'}">${inlineToHtml(todo[2])}</li>`)
+
+    /* Lists nest. Two spaces of indent is one level down, which is how markdown
+       writes it and what Tab in the editor produces. */
+    const item = line.match(/^(\s*)[-*]\s+(\[([ xX])\]\s?)?(.*)$/)
+    if (item) {
+      const d = Math.floor(item[1].replace(/\t/g, '  ').length / 2)
+      const todo = item[2] ? (item[3] === ' ' ? '0' : '1') : null
+      const kind: 'ul' | 'todo' = todo === null ? 'ul' : 'todo'
+      closeTo(d + 1)
+      /* A checklist under bullets is its own list, or its items would inherit
+         the wrong marker. */
+      if (open.length === d + 1 && open[d].kind !== kind) closeTo(d)
+      if (open.length === d + 1) {
+        if (hasLi[d]) { out.push('</li>'); hasLi[d] = false }
+      } else {
+        while (open.length < d + 1) {
+          out.push(`<ul${kind === 'todo' ? ' class="todo"' : ''}>`)
+          open.push({ kind }); hasLi.push(false)
+        }
+      }
+      out.push(`<li${todo === null ? '' : ` data-done="${todo}"`}>${inlineToHtml(item[4])}`)
+      hasLi[d] = true
       continue
     }
-    const bullet = line.match(/^\s*[-*]\s+(.*)$/)
-    if (bullet) {
-      if (list !== 'ul') { shut(); out.push('<ul>'); list = 'ul' }
-      out.push(`<li>${inlineToHtml(bullet[1])}</li>`)
-      continue
-    }
+
     shut()
     const h = line.match(/^(#{1,3})\s+(.*)$/)
     if (h) { out.push(`<h${h[1].length + 2}>${inlineToHtml(h[2])}</h${h[1].length + 2}>`); continue }
@@ -103,6 +130,27 @@ export function htmlToMd(root: HTMLElement): string {
   const out: string[] = []
   const push = (s: string) => out.push(...s.split('\n'))
 
+  /* A list, at whatever depth. Two spaces per level, and a nested list inside an
+     item is written after that item's own line rather than swallowed into it. */
+  const list = (ul: HTMLElement, depth: number) => {
+    for (const li of [...ul.children]) {
+      /* Chrome's own indent puts the nested list BESIDE the item rather than
+         inside it. Invalid, tolerated by the browser, and it used to make every
+         indented line vanish on the way back to markdown. Read it either way. */
+      if (li.tagName === 'UL' || li.tagName === 'OL') { list(li as HTMLElement, depth + 1); continue }
+      if (li.tagName !== 'LI') continue
+      const el = li as HTMLElement
+      const done = el.dataset.done
+      const mark = done === undefined ? '-' : `- [${done === '1' ? 'x' : ' '}]`
+      /* The item's OWN text, without the text of the lists nested inside it. */
+      const own = [...el.childNodes].filter((n) => !(n.nodeType === 1 && ((n as HTMLElement).tagName === 'UL' || (n as HTMLElement).tagName === 'OL')))
+      push(`${'  '.repeat(depth)}${mark} ${own.map(inlineToMd).join('').trim()}`)
+      for (const kid of [...el.children]) {
+        if (kid.tagName === 'UL' || kid.tagName === 'OL') list(kid as HTMLElement, depth + 1)
+      }
+    }
+  }
+
   const block = (el: HTMLElement) => {
     switch (el.tagName) {
       case 'H1': case 'H2': case 'H3': push(`# ${inlineToMd(el).trim()}`); return
@@ -121,14 +169,7 @@ export function htmlToMd(root: HTMLElement): string {
         for (const r of rows.slice(1)) push(`| ${pad(cellsOf(r)).join(' | ')} |`)
         return
       }
-      case 'UL': case 'OL': {
-        for (const li of [...el.children]) {
-          const done = (li as HTMLElement).dataset.done
-          const mark = done === undefined ? '-' : `- [${done === '1' ? 'x' : ' '}]`
-          push(`${mark} ${inlineToMd(li).trim()}`)
-        }
-        return
-      }
+      case 'UL': case 'OL': { list(el, 0); return }
       /* A bare <br> paragraph is a blank line he typed on purpose. */
       default: push(inlineToMd(el).replace(/ /g, ' ').replace(/\s+$/, ''))
     }

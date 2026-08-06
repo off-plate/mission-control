@@ -760,6 +760,26 @@ await step('notes: the editor formats as he types, and the marks survive a reloa
   await page.locator('.nt-folder', { hasText: 'Personal' }).first().click(); await page.waitForTimeout(400)
   await page.locator('.nt-row', { hasText: 'Formatting' }).first().click(); await page.waitForTimeout(400)
   if ((await page.locator('.nt-editor ul li').count()) < 3) throw new Error('the formatting did not come back after a reload')
+  /* Tab nests the item and Shift-Tab lifts it back, and the nesting has to
+     survive the round trip through markdown. Chrome's own indent leaves the
+     nested list BESIDE the item, which used to lose the line entirely. */
+  await page.evaluate(() => {
+    const items = document.querySelectorAll('.nt-editor li')
+    const last = items[items.length - 1]
+    const r = document.createRange(); r.selectNodeContents(last); r.collapse(false)
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r)
+    document.querySelector('.nt-editor').focus()
+  })
+  await page.keyboard.press('Enter'); await page.keyboard.type('parent')
+  await page.keyboard.press('Enter'); await page.keyboard.press('Tab'); await page.keyboard.type('child')
+  await page.waitForTimeout(500)
+  if (!(await page.locator('.nt-editor li > ul li').count())) throw new Error('Tab did not nest the item')
+  const nested = await page.evaluate((K) => (JSON.parse(localStorage.getItem(K)).notes ?? []).find((n) => n.title === 'Formatting')?.body ?? '', KEY)
+  if (!/\n {2}- .*child/.test(nested)) throw new Error(`the nested item was not stored indented: ${JSON.stringify(nested.split('\n').slice(-3))}`)
+  await page.reload(); await page.waitForTimeout(800)
+  await page.locator('.nt-folder', { hasText: 'Personal' }).first().click(); await page.waitForTimeout(400)
+  await page.locator('.nt-row', { hasText: 'Formatting' }).first().click(); await page.waitForTimeout(400)
+  if (!(await page.locator('.nt-editor li > ul li').count())) throw new Error('the nesting did not come back after a reload')
 })
 
 await step('notes: three dashes make a divider, and a table he sized himself', async () => {

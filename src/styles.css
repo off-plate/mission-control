@@ -1802,11 +1802,14 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 }
 .nt-sortkebab .kebab:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
 .nt-listhead .nt-new { margin-left: 0; }
+/* The same button as the one beside it. A circle next to a rounded square, both
+   30px, both outlined, reads as two unrelated controls that happened to land
+   together. */
 .nt-new {
-  margin-left: auto; flex: none; width: 34px; height: 34px; border-radius: var(--r-sm);
-  display: grid; place-items: center; color: var(--accent); border: 1px solid var(--hairline-strong);
+  flex: none; width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center; color: var(--muted); border: 1px solid var(--hairline-strong);
 }
-.nt-new:hover { background: var(--accent-wash); border-color: var(--accent); }
+.nt-new:hover { background: var(--accent-wash); border-color: var(--accent); color: var(--accent); }
 
 .nt-search { display: flex; align-items: center; gap: var(--s2); padding: 0 var(--s4) var(--s3); position: sticky; top: 62px; background: var(--bg); z-index: 3; }
 .nt-search svg { color: var(--faint); flex: none; }
@@ -1903,12 +1906,15 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 
 /* ---- the editor ---- */
 .nt-editwrap { display: flex; flex-direction: column; gap: var(--s2); }
-.nt-toolbar { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; padding-bottom: var(--s2); border-bottom: 1px solid var(--hairline); }
+/* Grouped into pills: marks, lists, inserts. A flat row of ten identical
+   buttons is ten things to read every time he wants one of them. */
+.nt-toolbar { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; padding-bottom: var(--s3); border-bottom: 1px solid var(--hairline); }
+.nt-toolgroup { display: inline-flex; align-items: center; gap: 1px; padding: 2px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 5%, transparent); }
 .nt-tool {
-  min-width: 32px; height: 32px; padding: 0 8px; border-radius: var(--r-sm);
+  min-width: 30px; height: 30px; padding: 0 8px; border-radius: 999px;
   display: inline-grid; place-items: center; color: var(--muted); font-size: 0.9375rem; line-height: 1;
 }
-.nt-tool:hover { background: var(--accent-wash); color: var(--accent); }
+.nt-tool:hover { background: var(--bg); color: var(--accent); box-shadow: 0 1px 3px -1px rgba(0,0,0,.18); }
 .nt-toolsep { width: 1px; height: 18px; background: var(--hairline-strong); margin: 0 var(--s2); }
 
 /* It has to LOOK like the place you type in, which the old read view did not. */
@@ -1932,6 +1938,11 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 .nt-editor ul { list-style: none; margin: var(--s2) 0; padding: 0; }
 .nt-editor li { position: relative; padding-left: var(--s5); min-height: 1.62em; }
 .nt-editor ul:not(.todo) > li::before { content: '\2022'; position: absolute; left: 7px; color: var(--muted); }
+/* A marker per level, so a nested item reads as nested and not as a bullet that
+   drifted right. */
+.nt-editor ul ul:not(.todo) > li::before { content: '\25e6'; }
+.nt-editor ul ul ul:not(.todo) > li::before { content: '\25aa'; }
+.nt-editor li > ul { margin: 2px 0 2px 0; }
 /* A checkbox drawn in the item's gutter. Pressing it is handled in notes.tsx. */
 .nt-editor li[data-done]::before {
   content: ''; position: absolute; left: 0; top: 0.28em; width: 18px; height: 18px;

@@ -5,6 +5,7 @@ import { GoalsPage, HabitsPage, PlanPage, RoutinesPage, TodayPage } from './page
 import { CoachPage, MoneyPage, ReviewPage, SettingsPage } from './pages2'
 import { AssistantPage } from './pages3'
 import { NotesPage } from './notes'
+import { DailyReview } from './daily'
 import { BrandPage } from './brand'
 import { DayPage } from './day'
 import { BoardPage } from './board'
@@ -105,7 +106,7 @@ function PageNav({
 }
 
 export default function App() {
-  const { space, view, setView, page, setPage, tasks, routines } = useStore()
+  const { space, view, setView, page, setPage, tasks, routines, openDaily } = useStore()
   // The dot follows the alerts: money and admin count from any profile.
   const exceptions = space === 'personal'
     ? exceptionsFor(space, { tasks, routines })
@@ -167,6 +168,15 @@ export default function App() {
             </svg>
             My Mind
           </a>
+          {/* Yesterday, on demand. It offers itself once a morning; after that
+              it is his to open, from any page, without hunting for a pill. */}
+          <button className="btn btn-ghost" onClick={openDaily} aria-label="Walk yesterday and today" title="Walk yesterday and today">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M3.5 9a9 9 0 1 0 2.3-3.7L3 8" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M3 4v4h4M12 7.5V12l3 2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Yesterday
+          </button>
           <button
             className={`btn btn-accent${page === 'assistant' ? ' is-on' : ''}`}
             onClick={() => setPage('assistant')}
@@ -200,6 +210,10 @@ export default function App() {
           Another device has saved a newer version of your data. Nothing here is being saved until this one is updated, so that version is not overwritten.
         </div>
       )}
+      {/* One mount for the whole app, so the header button reaches it from
+          anywhere rather than only from Today. */}
+      <DailyReview />
+
       <main id="main">
         <PageBoundary page={page}>
         {page === 'today' && <TodayPage />}

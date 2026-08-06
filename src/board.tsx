@@ -17,6 +17,8 @@
                 interpret. These are the only cards in a loud colour because
                 on a wall meant to be felt, they are the ones to be obeyed. */
 
+import { useLayoutEffect, useRef } from 'react'
+
 import { wallImage } from './wall-images'
 
 const TILT = [-2, 1.5, -1, 2, -1.5, 1, -2.5, 0.5]
@@ -127,10 +129,54 @@ export const WALL: Card[] = [
  *  asked for relative to that base and not from the domain root. */
 const BASE = (import.meta as unknown as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/'
 
-/* What the browser is told a wall column measures, so it can pick the right
- *  width off the srcset before layout. These mirror styles.css exactly: 420px
- *  columns above 1900, 160px on a phone, 300px in between. */
-const WALL_SIZES = '(min-width: 1900px) 420px, (max-width: 700px) 160px, 300px'
+/* What the browser is told a card measures, so it can pick the right file off
+ *  the srcset before layout. Expressed in vw rather than px because the grid
+ *  columns are 1fr and stretch: a px hint would be a lie at most widths.
+ *  A wide card covers two columns and a phone edge to edge, so it asks for
+ *  roughly double. */
+const SIZES_TALL = '(max-width: 700px) 50vw, (min-width: 1900px) 15vw, 25vw'
+const SIZES_WIDE = '(max-width: 700px) 100vw, (min-width: 1900px) 30vw, 50vw'
+
+/** Row height of the masonry grid, in px. Small enough that a card's real
+ *  height rounds up to something indistinguishable from the height itself. */
+const ROW = 4
+/** The gap under a card, in the same units the row span is counted in. */
+const GUTTER = 18
+
+/* Why the wall is a grid and not CSS columns any more: in a multi-column
+   layout an item spans one column or all of them, never two, so a landscape
+   photograph had no way to be wider than a line of text. It sat in a 300px
+   column as a strip. This is the ordinary fix: a grid with very short rows,
+   where each card measures itself and claims however many rows it needs, and
+   a wide photograph also claims two columns. Dense packing backfills the holes
+   that the two-wide cards leave behind. */
+function useMasonry(count: number) {
+  const ref = useRef<HTMLDivElement | null>(null)
+  useLayoutEffect(() => {
+    const wall = ref.current
+    if (!wall) return
+    const fit = () => {
+      for (const el of Array.from(wall.children) as HTMLElement[]) {
+        /* offsetHeight, not getBoundingClientRect: every card carries a rotate
+           and the rect is the turned bounding box, which is taller than the
+           space the card actually occupies. That gap compounded down the
+           column into a visible drift. */
+        const h = el.offsetHeight
+        if (h) el.style.gridRowEnd = `span ${Math.ceil((h + GUTTER) / ROW)}`
+      }
+    }
+    fit()
+    if (typeof ResizeObserver === 'undefined') return
+    /* One observer over all the cards: a photograph that arrives late, a font
+       that swaps, or a window that changes width all resize a card, and each
+       of those needs the span recomputed. */
+    const ro = new ResizeObserver(fit)
+    Array.from(wall.children).forEach((c) => ro.observe(c))
+    ro.observe(wall)
+    return () => ro.disconnect()
+  }, [count])
+  return ref
+}
 
 /** One photograph. Two WebP widths, its own height reserved up front, and the
  *  24px blur standing in until the file lands. Everything below the first
@@ -154,13 +200,13 @@ function Photo({
   const srcset = img.srcset.split(', ').map((part) => BASE + part).join(', ')
   return (
     <figure
-      className="bcard b-image"
+      className={`bcard b-image${img.wide ? ' is-wide' : ''}`}
       style={{ ...style, backgroundImage: `url("${img.lqip}")` }}
     >
       <img
         src={BASE + img.src}
         srcSet={srcset}
-        sizes={WALL_SIZES}
+        sizes={img.wide ? SIZES_WIDE : SIZES_TALL}
         width={img.w}
         height={img.h}
         alt={card.caption ?? ''}
@@ -178,12 +224,13 @@ export function BoardPage() {
      the second photograph waits for the scroll, which is what keeps a wall of
      photographs off the first paint. */
   let shown = 0
+  const wall = useMasonry(WALL.length)
   return (
     <div className="board-page">
       <header className="board-head">
         <h1>The wall</h1>
       </header>
-      <div className="board-wall">
+      <div className="board-wall" ref={wall}>
         {WALL.map((c, i) => {
           const tilt = TILT[i % TILT.length]
           const style = { ['--tilt' as string]: `${tilt}deg` } as React.CSSProperties

@@ -541,7 +541,7 @@ await step('notes: brain dumps came across, and search reaches every folder', as
   if (!mine.body.includes('Druhý řádek')) throw new Error('the body was not saved with the title')
   if (mine.folderId !== 'nf-braindump-personal') throw new Error(`landed in ${mine.folderId}`)
   // back to the list, stand somewhere else, then search without the accents
-  await page.locator('.nt-folder-top').first().click(); await page.waitForTimeout(200)
+  await page.locator('.nt-folder', { hasText: 'Personal' }).first().click(); await page.waitForTimeout(200)
   await page.locator('input[aria-label="Search notes"]').fill('ukol'); await page.waitForTimeout(400)
   if (!(await page.locator('.nt-row', { hasText: 'Zavolat' }).count())) throw new Error('accent-blind search missed it')
   await page.locator('input[aria-label="Search notes"]').fill(''); await page.waitForTimeout(200)
@@ -550,9 +550,59 @@ await step('notes: brain dumps came across, and search reaches every folder', as
   if (rows !== 1) throw new Error(`the tag filter showed ${rows} notes`)
 })
 
+await step('notes: All notes, date groups, and the folder on every row', async () => {
+  await fresh('notes')
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const z = (n) => String(n).padStart(2, '0')
+    const ago = (d) => { const x = new Date(); x.setDate(x.getDate() - d); return x }
+    const key = (d) => `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`
+    const mk = (id, folderId, space, title, back, pinned) => {
+      const d = ago(back)
+      return { id, space, folderId, title, body: title, color: 'amber', when: key(d), updatedAt: d.getTime(), pinned }
+    }
+    s.noteFolders = [{ id: 'nf-tax', space: 'personal', name: 'Taxes', parentId: 'nf-space-personal', order: 0 }]
+    s.notes = [
+      mk('p1', 'nf-tax', 'personal', 'Pinned one', 3, true),
+      mk('n1', 'nf-tax', 'personal', 'From today', 0),
+      mk('n2', 'nf-tax', 'personal', 'From yesterday', 1),
+      mk('n3', 'nf-space-offplate', 'offplate', 'From last month', 20),
+      mk('n4', 'nf-space-corner', 'corner', 'From last year', 400),
+    ]
+    localStorage.setItem(K, JSON.stringify(s))
+  }, KEY)
+  await page.reload(); await page.waitForTimeout(800)
+  // one row that gathers every workspace, above the folders
+  await page.locator('.nt-folder', { hasText: 'All notes' }).click(); await page.waitForTimeout(500)
+  /* Against the store rather than a hardcoded number: a fresh profile may carry
+     a seeded note of its own, and the point is that ALL of them are gathered. */
+  const stored = await page.evaluate((K) => (JSON.parse(localStorage.getItem(K)).notes ?? []).length, KEY)
+  const rows = await page.locator('.nt-row').count()
+  if (rows !== stored) throw new Error(`All notes shows ${rows} of ${stored}`)
+  const spaces = await page.evaluate((K) => [...new Set((JSON.parse(localStorage.getItem(K)).notes ?? []).map((n) => n.space))].length, KEY)
+  if (spaces < 3) throw new Error('the seed did not span enough workspaces to prove anything')
+  const heads = await page.locator('.nt-grouphead').allTextContents()
+  for (const want of ['Pinned', 'Today', 'Yesterday']) {
+    if (!heads.includes(want)) throw new Error(`no ${want} heading: ${heads.join(' | ')}`)
+  }
+  if (heads[0] !== 'Pinned') throw new Error(`pinned is not first: ${heads.join(' | ')}`)
+  // every row says which folder it is in, not only in a search
+  const tails = await page.locator('.nt-row .nt-rowtail').allTextContents()
+  if (tails.length !== rows || tails.some((t) => !t.trim())) throw new Error(`a row does not say its folder: ${tails.join(' | ')}`)
+  // and the count in the head is the count in the list
+  const head = (await page.locator('.nt-headcount').textContent()) ?? ''
+  if (!head.startsWith(`${rows} note`)) throw new Error(`the head says "${head}" over ${rows} rows`)
+  // sorting by title regroups by letter and is remembered
+  await page.locator('.nt-sortkebab .kebab').click(); await page.waitForTimeout(200)
+  await page.getByRole('menuitem', { name: 'Title' }).click(); await page.waitForTimeout(400)
+  await page.reload(); await page.waitForTimeout(800)
+  if (await page.evaluate(() => localStorage.getItem('mc:notes-sort')) !== 'title') throw new Error('the sort was not remembered')
+})
+
 await step('notes: a folder he made, and its notes surviving its deletion', async () => {
   await fresh('notes')
-  await page.locator('.nt-group').first().locator('.nt-addfolder').click()
+  // the first group is All notes now; the workspace groups start after it
+  await page.locator('.nt-group', { hasText: 'Personal' }).first().locator('.nt-addfolder').click()
   await page.locator('input[aria-label^="New folder in"]').fill('Taxes')
   await page.keyboard.press('Enter'); await page.waitForTimeout(400)
   await page.getByRole('button', { name: 'New note' }).click(); await page.waitForTimeout(300)
@@ -587,7 +637,7 @@ await step('notes: a body from another device is kept, never dropped', async () 
   await page.goto(`${URL}#/notes`); await page.reload(); await page.waitForTimeout(700)
   // An earlier step left the workspace switcher somewhere else, and the switcher
   // is what decides which folder opens. Stand in Personal first.
-  await page.locator('.nt-folder-top').first().click(); await page.waitForTimeout(200)
+  await page.locator('.nt-folder', { hasText: 'Personal' }).first().click(); await page.waitForTimeout(200)
   await page.locator('.nt-row', { hasText: 'Laptop version' }).first().click(); await page.waitForTimeout(200)
   if (!(await page.locator('.nt-conflict').count())) throw new Error('the other version was not shown')
   await page.getByRole('button', { name: 'Add it to this note' }).click(); await page.waitForTimeout(400)
@@ -624,7 +674,7 @@ await step('notes: the editor formats as he types, and the marks survive a reloa
      works, and a checkbox is something you click. All of it round-trips
      through markdown, which is what the sync and the search read. */
   await fresh('notes')
-  await page.locator('.nt-folder-top').first().click(); await page.waitForTimeout(300)
+  await page.locator('.nt-folder', { hasText: 'Personal' }).first().click(); await page.waitForTimeout(300)
   await page.getByRole('button', { name: 'New note' }).click(); await page.waitForTimeout(300)
   await page.locator('textarea[aria-label="Note title"]').fill('Formatting')
   await page.locator('.nt-editor').click()
@@ -644,14 +694,14 @@ await step('notes: the editor formats as he types, and the marks survive a reloa
     if (!md.includes(want)) throw new Error(`${want} is not in the stored note: ${JSON.stringify(md)}`)
   }
   await page.reload(); await page.waitForTimeout(800)
-  await page.locator('.nt-folder-top').first().click(); await page.waitForTimeout(400)
+  await page.locator('.nt-folder', { hasText: 'Personal' }).first().click(); await page.waitForTimeout(400)
   await page.locator('.nt-row', { hasText: 'Formatting' }).first().click(); await page.waitForTimeout(400)
   if ((await page.locator('.nt-editor ul li').count()) < 3) throw new Error('the formatting did not come back after a reload')
 })
 
 await step('notes: three dashes make a divider, and a table he sized himself', async () => {
   await fresh('notes')
-  await page.locator('.nt-folder-top').first().click(); await page.waitForTimeout(300)
+  await page.locator('.nt-folder', { hasText: 'Personal' }).first().click(); await page.waitForTimeout(300)
   await page.getByRole('button', { name: 'New note' }).click(); await page.waitForTimeout(300)
   await page.locator('textarea[aria-label="Note title"]').fill('Divider and table')
   await page.locator('.nt-editor').click()
@@ -678,7 +728,7 @@ await step('notes: three dashes make a divider, and a table he sized himself', a
   if (!md.includes('---')) throw new Error(`no divider stored: ${JSON.stringify(md)}`)
   if (!/\| Věřitel \|/.test(md)) throw new Error(`the cell text was not stored: ${JSON.stringify(md)}`)
   await page.reload(); await page.waitForTimeout(800)
-  await page.locator('.nt-folder-top').first().click(); await page.waitForTimeout(300)
+  await page.locator('.nt-folder', { hasText: 'Personal' }).first().click(); await page.waitForTimeout(300)
   await page.locator('.nt-row', { hasText: 'Divider and table' }).first().click(); await page.waitForTimeout(400)
   if (!(await page.locator('.nt-editor hr').count())) throw new Error('the divider did not come back')
   if ((await page.locator('.nt-editor table tr').count()) < 4) throw new Error('the table did not come back whole')
@@ -721,7 +771,7 @@ await step('notes: the note menu opens where it can be reached', async () => {
   await fresh('notes')
   // An earlier step left the workspace switcher elsewhere; stand where the
   // seeded note actually is, or there is no open note to have a menu.
-  await page.locator('.nt-folder-top').first().click(); await page.waitForTimeout(400)
+  await page.locator('.nt-folder', { hasText: 'Personal' }).first().click(); await page.waitForTimeout(400)
   await page.locator('.nt-pane').getByRole('button', { name: 'Note options' }).click(); await page.waitForTimeout(300)
   if (!(await page.locator('.nt-pane .kebab-menu').count())) throw new Error('the menu did not open')
   const m = await page.locator('.nt-pane .kebab-menu').boundingBox()

@@ -16,7 +16,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AutoTextarea, Dropdown } from './pages1'
 import { useStore } from './store'
 import { SPACE_LABELS } from './mock'
-import { fmtWhen } from './util'
+import { fmtWhen, localDateKey } from './util'
 import { htmlToMd, mdToHtml } from './richtext'
 import { SPACES, spaceFolderId, type Note, type SpaceId } from './types'
 
@@ -28,6 +28,16 @@ const NOTE_COLORS: { id: string; bg: string; label: string }[] = [
   { id: 'clay', bg: '#e4d8cb', label: 'Clay' },
   { id: 'paper', bg: '#fbf8f1', label: 'Paper' },
 ]
+/** The folder mark, filled when it is the one he is standing in. */
+function FolderIcon({ open, small }: { open?: boolean; small?: boolean }) {
+  const n = small ? 11 : 14
+  return (
+    <svg className={`nt-ficon${open ? ' on' : ''}`} width={n} height={n} viewBox="0 0 24 24" fill={open ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <path d="M3 7.5A2 2 0 0 1 5 5.5h3.6a2 2 0 0 1 1.5.7l1 1.2H19a2 2 0 0 1 2 2v7.1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 const colorBg = (id: string) => NOTE_COLORS.find((c) => c.id === id)?.bg ?? '#fbf8f1'
 
 const TAG_RE = /#[\p{L}\d_/-]+/gu
@@ -323,6 +333,28 @@ function TablePicker({ onPick }: { onPick: (rows: number, cols: number) => void 
 
 /* ---- the page ------------------------------------------------------------ */
 
+/** Everything, everywhere, the way All iCloud sits above the folders. */
+const ALL = 'nf-all'
+const SORT_KEY = 'mc:notes-sort'
+type Sort = 'edited' | 'created' | 'title'
+const SORT_LABEL: Record<Sort, string> = { edited: 'Date edited', created: 'Date created', title: 'Title' }
+
+/** Which heading a note falls under: Today, Yesterday, the last week, the last
+ *  month, then a heading per month this year and per year before that. */
+function bucketOf(day: string): string {
+  const now = new Date()
+  const today = localDateKey(now)
+  if (day >= today) return 'Today'
+  const d = new Date(`${day}T12:00:00`)
+  const ref = new Date(`${today}T12:00:00`)
+  const days = Math.round((ref.getTime() - d.getTime()) / 864e5)
+  if (days === 1) return 'Yesterday'
+  if (days <= 7) return 'Previous 7 days'
+  if (days <= 30) return 'Previous 30 days'
+  if (d.getFullYear() === now.getFullYear()) return d.toLocaleDateString('en-GB', { month: 'long' })
+  return String(d.getFullYear())
+}
+
 const COLS_KEY = 'mc:notes-cols'
 const readCols = (): { side: number; list: number } => {
   try {
@@ -347,6 +379,11 @@ export function NotesPage() {
   const [searching, setSearching] = useState(false)
   const [fresh, setFresh] = useState<string | null>(null)
   const [naming, setNaming] = useState<{ space?: SpaceId; folder?: string; value: string } | null>(null)
+  const [sort, setSort] = useState<Sort>(() => {
+    try { const v = localStorage.getItem(SORT_KEY); if (v === 'edited' || v === 'created' || v === 'title') return v } catch { /* first run */ }
+    return 'edited'
+  })
+  useEffect(() => { try { localStorage.setItem(SORT_KEY, sort) } catch { /* quota */ } }, [sort])
   const [cols, setCols] = useState(readCols)
   const [vw, setVw] = useState(() => window.innerWidth)
   useEffect(() => {
@@ -363,10 +400,12 @@ export function NotesPage() {
   const finding = query.trim().length > 0 || tag !== null
   const spaceOf = (id: string) => id.match(/^nf-space-(.+)$/)?.[1] as SpaceId | undefined
   const nameOf = (id: string) => {
+    if (id === ALL) return 'All notes'
     const s = spaceOf(id)
     return s ? (SPACE_LABELS[s] ?? 'Notes') : (noteFolders.find((f) => f.id === id)?.name ?? 'Notes')
   }
   const inFolder = (n: Note, id: string) => {
+    if (id === ALL) return true
     const s = spaceOf(id)
     return s ? n.space === s : n.folderId === id
   }
@@ -382,9 +421,30 @@ export function NotesPage() {
     const rows = finding
       ? notes.filter((n) => (!tag || tagsOf(n.body).includes(tag)) && (!q || flat(n.body).includes(flat(q))))
       : notes.filter((n) => inFolder(n, openFolder))
-    return rows.sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || b.updatedAt - a.updatedAt)
+    const by = sort === 'title'
+      ? (a: Note, b: Note) => (headOf(a.body) || 'Untitled').localeCompare(headOf(b.body) || 'Untitled')
+      : sort === 'created'
+        ? (a: Note, b: Note) => (b.when > a.when ? 1 : b.when < a.when ? -1 : 0)
+        : (a: Note, b: Note) => b.updatedAt - a.updatedAt
+    return rows.sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || by(a, b))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notes, finding, tag, query, openFolder, noteFolders])
+  }, [notes, finding, tag, query, openFolder, noteFolders, sort])
+
+  /* Grouped the way a notes list has always been grouped: pinned first, then by
+     date under real headings. A flat run of eighty rows has no shape and gives
+     the scroll nothing to land on. */
+  const groups = useMemo(() => {
+    const out: { head: string; rows: Note[] }[] = []
+    for (const n of shown) {
+      const head = n.pinned ? 'Pinned'
+        : sort === 'title' ? (headOf(n.body) || 'U').slice(0, 1).toUpperCase()
+          : bucketOf(sort === 'created' ? n.when : localDateKey(new Date(n.updatedAt)))
+      const last = out[out.length - 1]
+      if (last && last.head === head) last.rows.push(n)
+      else out.push({ head, rows: [n] })
+    }
+    return out
+  }, [shown, sort])
 
   /* On a desktop the pane is never empty while there is something to read: the
      first note of the folder opens itself, the way Notes and TickTick do it. */
@@ -468,6 +528,18 @@ export function NotesPage() {
     >
       {/* ---- folders ---- */}
       <aside className="nt-side" aria-label="Folders">
+        {/* Everything, everywhere, above the workspaces. The one row that
+            answers "where did I put it" without him having to remember. */}
+        <div className="nt-group">
+          <div className={`nt-folder-row${!finding && openFolder === ALL ? ' on' : ''}`}>
+            <button className="nt-folder nt-folder-top" aria-current={!finding && openFolder === ALL ? 'true' : undefined} onClick={() => goFolder(ALL)}>
+              <FolderIcon open={!finding && openFolder === ALL} />
+              <span className="nt-fname">All notes</span>
+              <span className="nt-count mono">{notes.length || ''}</span>
+            </button>
+            <span className="nt-slot" aria-hidden="true" />
+          </div>
+        </div>
         {SPACES.map((s) => {
           const wid = spaceFolderId(s)
           const own = noteFolders.filter((f) => f.space === s).sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name))
@@ -479,6 +551,7 @@ export function NotesPage() {
                   the menu slot is always there, so nothing shifts when clicked. */}
               <div className={`nt-folder-row${at(wid) ? ' on' : ''}`}>
                 <button className="nt-folder nt-folder-top" aria-current={at(wid) ? 'true' : undefined} onClick={() => goFolder(wid)}>
+                  <FolderIcon open={at(wid)} />
                   <span className="nt-fname">{SPACE_LABELS[s]}</span>
                   <span className="nt-count mono">{count(wid) || ''}</span>
                 </button>
@@ -494,6 +567,7 @@ export function NotesPage() {
               ) : (
                 <div className={`nt-folder-row${at(f.id) ? ' on' : ''}`} key={f.id}>
                   <button className="nt-folder" aria-current={at(f.id) ? 'true' : undefined} onClick={() => goFolder(f.id)}>
+                    <FolderIcon open={at(f.id)} />
                     <span className="nt-fname">{f.name}</span>
                     <span className="nt-count mono">{count(f.id) || ''}</span>
                   </button>
@@ -522,7 +596,18 @@ export function NotesPage() {
       {/* ---- the list ---- */}
       <div className="nt-list">
         <div className="nt-listhead">
-          <h1>{finding ? 'Everything' : nameOf(openFolder)}</h1>
+          <div className="nt-headmain">
+            <h1>{finding ? 'Everything' : nameOf(openFolder)}</h1>
+            {/* A count, not a caption: it is the one thing the folder name does
+                not already tell him. */}
+            <span className="nt-headcount mono">{shown.length} {shown.length === 1 ? 'note' : 'notes'}</span>
+          </div>
+          <Dropdown label="List options" className="nt-sortkebab">
+            <span className="kebab-head">Sort by</span>
+            {(['edited', 'created', 'title'] as Sort[]).map((k) => (
+              <button key={k} role="menuitem" aria-checked={sort === k} onClick={() => setSort(k)}>{SORT_LABEL[k]}</button>
+            ))}
+          </Dropdown>
           <button className="nt-new" onClick={create} aria-label="New note" title="New note">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <path d="M12 5v14M5 12h14" strokeLinecap="round" />
@@ -564,29 +649,37 @@ export function NotesPage() {
         )}
 
         <ul className="nt-rows">
-          {shown.map((n) => (
-            <li key={n.id}>
-              <button
-                className={`nt-row${n.id === openId ? ' on' : ''}`}
-                aria-current={n.id === openId ? 'true' : undefined}
-                onClick={() => { setOpenId(n.id); if (phone) window.scrollTo({ top: 0 }) }}
-              >
-                <span className="nt-rowtitle">
-                  {n.pinned && <span className="nt-pin" aria-hidden="true">◆</span>}
-                  <span className="nt-swatch" style={{ background: colorBg(n.color) }} aria-hidden="true" />
-                  <span className="nt-rowname">{headOf(n.body) || 'Untitled'}</span>
-                </span>
-                <span className="nt-rowsub">
-                  <span className="nt-when mono">{fmtWhen(n.when)}</span>
-                  {snippet(n, query) && <span className="nt-rowsnip">{snippet(n, query)}</span>}
-                </span>
-                {(finding || n.conflict) && (
-                  <span className="nt-rowtail">
-                    {finding && nameOf(n.folderId)}
-                    {n.conflict && <span className="nt-flag"> two versions</span>}
-                  </span>
-                )}
-              </button>
+          {groups.map((g) => (
+            <li key={g.head} className="nt-groupblock">
+              <p className="nt-grouphead">{g.head}</p>
+              <ul>
+                {g.rows.map((n) => (
+                  <li key={n.id}>
+                    <button
+                      className={`nt-row${n.id === openId ? ' on' : ''}`}
+                      aria-current={n.id === openId ? 'true' : undefined}
+                      onClick={() => { setOpenId(n.id); if (phone) window.scrollTo({ top: 0 }) }}
+                    >
+                      <span className="nt-rowtitle">
+                        <span className="nt-swatch" style={{ background: colorBg(n.color) }} aria-hidden="true" />
+                        <span className="nt-rowname">{headOf(n.body) || 'Untitled'}</span>
+                      </span>
+                      <span className="nt-rowsub">
+                        <span className="nt-when mono">{fmtWhen(sort === 'created' ? n.when : localDateKey(new Date(n.updatedAt)))}</span>
+                        {snippet(n, query) && <span className="nt-rowsnip">{snippet(n, query)}</span>}
+                      </span>
+                      {/* Which folder it lives in, on every row, not only in a
+                          search. In All notes that is the whole point of the
+                          row, and everywhere else it costs one quiet line. */}
+                      <span className="nt-rowtail">
+                        <FolderIcon small />
+                        {nameOf(n.folderId)}
+                        {n.conflict && <span className="nt-flag"> · two versions</span>}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </li>
           ))}
           {shown.length === 0 && <li className="nt-none">{finding ? 'Nothing matches.' : 'No notes here yet.'}</li>}
@@ -607,12 +700,19 @@ export function NotesPage() {
                   {nameOf(open.folderId)}
                 </button>
               )}
-              <span className="nt-stamp mono">edited {fmtWhen(open.when)}</span>
+              <span className="nt-stamp mono">{open.pinned ? 'Pinned' : ''}</span>
               {kebab(open)}
             </div>
 
             <div className="nt-panebody">
               <article className="nt-sheet">
+                {/* The moment it was last touched, over the note rather than
+                    tucked in a corner of the toolbar. */}
+                <p className="nt-when-full mono">
+                  {new Date(open.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  {' at '}
+                  {new Date(open.updatedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                </p>
                 <AutoTextarea
                   className="nt-title" minRows={1} maxRows={12} value={headOf(open.body)}
                   placeholder="Untitled" aria-label="Note title" autoFocus={open.id === fresh}

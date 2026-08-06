@@ -1,8 +1,14 @@
 {
   "images": {
     "late-desk": {
-      "w": 900,
-      "h": 675,
+      "w": 1800,
+      "h": 1350,
+      "widths": [
+        600,
+        900,
+        1400,
+        1800
+      ],
       "lqip": "data:image/webp;base64,UklGRowAAABXRUJQVlA4IIAAAAAwBACdASoYABIAPu1krE+ppSQiMBgIATAdiWMAVwsDVHzeCzkjuPMnlsAA/tzUpyDP03knbwl1v+/9x+WlxDBO7zLEL6xFJIYIN/fPfQ8b39jW7eLY2/Lg3p/Pl71vspM8LGUANSuwy0MTGDV/Y1HsKO5RKws9H2LLJeOdsygAAA==",
       "credit": "i.pinimg.com",
       "license": "",
@@ -13,8 +19,14 @@
       "original": "3264x2448"
     },
     "amg-gtr": {
-      "w": 900,
-      "h": 563,
+      "w": 1800,
+      "h": 1125,
+      "widths": [
+        600,
+        900,
+        1400,
+        1800
+      ],
       "lqip": "data:image/webp;base64,UklGRpgAAABXRUJQVlA4IIwAAAAQBACdASoYAA4APu1iqU2ppaOiMAgBMB2JZwCo9dwA3FSmH3lO1tSFgAD9nW8/Ol0dKB2J0eWkDKqVN+yFpf6FrStNKxrvDlDuBkNBre4Ys24g/etZ/yUB/KtYlXHxAcMI9jg9crvmXW4XBWSneH7uIypN57mYrkivbgNH9tQZpES6NEN65dbG0T9UAA==",
       "credit": "wallpapercave.com",
       "license": "",
@@ -25,8 +37,14 @@
       "original": "4096x2304"
     },
     "aventador-sv": {
-      "w": 900,
-      "h": 600,
+      "w": 1800,
+      "h": 1200,
+      "widths": [
+        600,
+        900,
+        1400,
+        1800
+      ],
       "lqip": "data:image/webp;base64,UklGRpQAAABXRUJQVlA4IIgAAAAQBACdASoYABAAPu1iqU2ppaOiMAgBMB2JYgDDNCLDCUjZ2yKnESXhwADN7XdjthDSRWjA7WeqVyhqqB4+CnN/daour2FlxA56OSTVgOjZjZxv+Z0dL+hiwBUuoYisegX4ESlhGCeesCBvszaIjemR/V8nq4+H9Y+TP/Edswds6C6McftiC1AA",
       "credit": "s1.cdn.autoevolution.com",
       "license": "",
@@ -37,8 +55,14 @@
       "original": "4096x2731"
     },
     "gle63s": {
-      "w": 900,
-      "h": 600,
+      "w": 1800,
+      "h": 1200,
+      "widths": [
+        600,
+        900,
+        1400,
+        1800
+      ],
       "lqip": "data:image/webp;base64,UklGRqoAAABXRUJQVlA4IJ4AAAAQBACdASoYABAAPu1iqU2ppaOiMAgBMB2JZwDE2CICUWrqJ1RXqFEEqADypF+s2eknDQrQwjIgsqkzGxurlhZQXQph9FLv8qF0d6BCJARmYKwqVDBKc6cLI5T2XCbgOZAyq3wXk+wFcfGX8rv3+dvx67GPoMw/tew6fXMO35mTEIWJ4MOCkenakYrF5ILozUPMU16Eb/HpfS2T8AAAAA==",
       "credit": "autodrift.ae",
       "license": "",
@@ -97,8 +121,14 @@
       "original": "3024x3024"
     },
     "villa": {
-      "w": 900,
-      "h": 563,
+      "w": 1800,
+      "h": 1125,
+      "widths": [
+        600,
+        900,
+        1400,
+        1800
+      ],
       "lqip": "data:image/webp;base64,UklGRrYAAABXRUJQVlA4IKoAAACQBACdASoYAA4APu1iqU2ppaOiMAgBMB2JYgCdIExCucuKXT864sB/t3Uv5kAA4V0+vc3kx8KbanmEWf8pYC675ZWibPED9D/3C4M2KErgqI+h2Fhwp+5/WUhZPDTSd4fhgUceZ0pCngy+qFc6dG8n7919sAPUUpjfN+PjNQo8WF5zWNwP+jeXFZKjQPPb4l6LZMl5EAcXE1nQfbuET0CRnihWqJTR8h0AAA==",
       "credit": "i.pinimg.com",
       "license": "",
@@ -121,8 +151,14 @@
       "original": "2720x4280"
     },
     "one-light": {
-      "w": 900,
-      "h": 600,
+      "w": 1800,
+      "h": 1200,
+      "widths": [
+        600,
+        900,
+        1400,
+        1800
+      ],
       "lqip": "data:image/webp;base64,UklGRkQAAABXRUJQVlA4IDgAAAAwAwCdASoYABAAPu1orU6ppiSiMAgBMB2JZwABQ7NywaAAAP764bWqBkLHo6TXxPqIqLGWgIAAAA==",
       "credit": "images.unsplash.com",
       "license": "",

@@ -90,16 +90,17 @@ const SHOW_AT_ONCE = 8
 export function DailyReview() {
   const {
     tasks, habits, habitLog, routines, routineLog, stepTicks, slips, focusSessions,
-    goals, plan, dailyDone, dailySkipped, closeDaily, markHabitOn, assertRoutineOn, logSlipOn,
+    goals, plan, dailyDone, dailySkipped, dailyOpen, openDaily, closeDaily, markHabitOn, assertRoutineOn, logSlipOn,
     moveTasksToToday, deleteTask, setPage,
   } = useStore()
 
   const today = localDateKey()
   const yday = yesterdayKey()
   const [stage, setStage] = useState<Stage>('ask')
-  const [open, setOpen] = useState(false)
+  /* Open-ness lives in the store: the header button reopens it from any page,
+     so this component cannot be the one holding the switch. */
+  const open = dailyOpen
   const [fixed, setFixed] = useState<Map<string, string>>(new Map())
-  const [slipsOpen, setSlipsOpen] = useState(false)
   const [showAll, setShowAll] = useState(false)
 
   /* ---- what yesterday was ----
@@ -199,6 +200,21 @@ export function DailyReview() {
     [goals, today],
   )
 
+  /* A reopen is a NEW walk. This never unmounts on close, so everything frozen
+     for the last one survived into the next: the leftover headline said two
+     over a list showing one, because the count came off a list frozen before he
+     acted on it. Declared before the freeze below, so on the commit where it
+     opens the clear happens first and the freeze then takes today's lists. */
+  const was = useRef(false)
+  useEffect(() => {
+    if (dailyOpen && !was.current) {
+      setRows(null); setLeft(null); setWalk(null)
+      setFixed(new Map()); setShowAll(false); setStage('ask')
+    }
+    was.current = dailyOpen
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dailyOpen])
+
   /* Frozen when the stage opens: rule 4. */
   const [rows, setRows] = useState<{ un: HabitDef[]; half: Half[]; quit: HabitDef[] } | null>(null)
   const [left, setLeft] = useState<Task[] | null>(null)
@@ -227,17 +243,24 @@ export function DailyReview() {
 
   const everLogged = habitLog.length + routineLog.length + focusSessions.length > 0
   const owed = everLogged && dailyDone !== today && dailySkipped !== today
-  useEffect(() => { if (owed) setOpen(true) }, [owed])
+  /* Offered once a day, on its own. After that it is his to open. */
+  const asked = useRef(false)
+  useEffect(() => {
+    if (!owed || asked.current) return
+    asked.current = true
+    openDaily()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [owed])
   useEffect(() => { if (open && !walk) setWalk(live) }, [open, walk, live])
 
-  const leave = (walked: boolean) => { closeDaily(walked); setOpen(false) }
+  const leave = (walked: boolean) => closeDaily(walked)
 
   /* Escape, the browser back button and the phone's back gesture all get out,
      and the page behind is frozen while a full screen is over it. */
   useEffect(() => {
     if (!open) return
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') leave(false) }
-    const pop = () => { closeDaily(false); setOpen(false) }
+    const pop = () => closeDaily(false)
     document.addEventListener('keydown', esc)
     window.addEventListener('popstate', pop)
     history.pushState({ dr: 1 }, '')
@@ -261,19 +284,7 @@ export function DailyReview() {
   }
   const back = () => { const p = stages[at - 1]; if (p) setStage(p) }
 
-  if (!open) {
-    if (!everLogged || dailyDone === today) return null
-    /* A reopen is a NEW walk. The component never unmounts on close, so
-       everything frozen for the last one survived into the next: the leftover
-       headline still said two over a list showing one, because the count came
-       off a list frozen before he acted on it. */
-    const again = () => {
-      setRows(null); setLeft(null); setWalk(null)
-      setFixed(new Map()); setSlipsOpen(false); setShowAll(false)
-      setStage('ask'); setOpen(true)
-    }
-    return <button className="dr-reopen" onClick={again}>Walk yesterday and today</button>
-  }
+  if (!open) return null
 
   const fix = (key: string, said: string, run: () => void) => {
     run()
@@ -456,28 +467,31 @@ export function DailyReview() {
                 </li>
               )}
               {quit.length > 0 && (
+                /* The names ARE the buttons. A single "I slipped" control beside
+                   "4 being quit" read as though it would mark all four, which is
+                   what he thought it did, and a control that looks like it might
+                   do that is not one you press to find out. Each name marks only
+                   itself, and the undo bar takes it straight back. */
                 <li className="dr-row dr-slips">
-                  {slipsOpen ? (
-                    <span className="dr-rowmain">
-                      <span className="dr-rowname">Which one?</span>
-                      <span className="dr-slipwrap">
-                        {quit.map((h) => {
-                          const k = `s:${h.id}`
-                          return fixed.has(k)
-                            ? <span key={k} className="dr-said mono">{h.name}, logged</span>
-                            : <button key={k} className="dr-tick is-slip" onClick={() => fix(k, 'logged', () => logSlipOn(h.id, yday))}>{h.name}</button>
-                        })}
-                      </span>
+                  <span className="dr-rowmain">
+                    <span className="dr-rowname">Slipped on any of these yesterday?</span>
+                    <span className="dr-slipwrap">
+                      {quit.map((h) => {
+                        const k = `s:${h.id}`
+                        return fixed.has(k)
+                          ? <span key={k} className="dr-said mono">{h.name}, logged</span>
+                          : (
+                            <button
+                              key={k} className="dr-tick is-slip"
+                              aria-label={`I slipped on ${h.name} yesterday`}
+                              onClick={() => fix(k, 'logged', () => logSlipOn(h.id, yday))}
+                            >
+                              {h.name}
+                            </button>
+                          )
+                      })}
                     </span>
-                  ) : (
-                    <>
-                      <span className="dr-rowmain">
-                        <span className="dr-rowname">Yesterday counts as clean</span>
-                        <span className="dr-rowsub mono">{quit.length} being quit</span>
-                      </span>
-                      <button className="dr-tick is-slip" onClick={() => setSlipsOpen(true)}>I slipped</button>
-                    </>
-                  )}
+                  </span>
                 </li>
               )}
             </ul>
@@ -598,7 +612,7 @@ export function DailyReview() {
         <div className="dr-footacts">
           {stage === 'ask' && <button className="dr-skip" onClick={() => leave(false)}>Not today</button>}
           {stage === 'today' && (
-            <button className="dr-skip" onClick={() => { closeDaily(true); setOpen(false); setPage('plan') }}>Open the plan</button>
+            <button className="dr-skip" onClick={() => { closeDaily(true); setPage('plan') }}>Open the plan</button>
           )}
           <button className="btn btn-primary dr-go" onClick={primary.run}>{primary.label}</button>
         </div>

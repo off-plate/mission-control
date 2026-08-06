@@ -305,7 +305,11 @@ await step('daily review: offered once, fixes yesterday, and stays shut', async 
   }
   await page.reload(); await page.waitForTimeout(900)
   if (await page.locator('.dr-screen').count()) throw new Error('it came back the same day')
-  if (await page.locator('.dr-reopen').count()) throw new Error('a walked review still offers to be reopened')
+  // and the header button reopens it, from any page, after it has been walked
+  await page.goto(`${URL}#/habits`); await page.waitForTimeout(600)
+  await page.getByRole('button', { name: /Walk yesterday/ }).click(); await page.waitForTimeout(600)
+  if (!(await page.locator('.dr-screen').count())) throw new Error('the header button did not reopen it')
+  await page.keyboard.press('Escape')
 })
 
 await step('daily review: the close screen cannot claim a clean slate it does not have', async () => {
@@ -406,13 +410,46 @@ await step('daily review: reopening it starts a new walk, not the old one', asyn
   await page.locator('.dr-rowacts .dr-tick').first().click(); await page.waitForTimeout(400)
   // close, then reopen from the pill
   await page.locator('.dr-foot .dr-skip').first().click(); await page.waitForTimeout(500)
-  await page.locator('.dr-reopen').click(); await page.waitForTimeout(600)
+  await page.getByRole('button', { name: /Walk yesterday/ }).click(); await page.waitForTimeout(600)
   const second = await toLeft()
   if (!/One thing/.test(second)) throw new Error(`the reopened walk still counted the one he put back: ${second}`)
   // and clearing the last one must not read "0 things did not get done."
   await page.locator('.dr-rowacts .dr-tick').first().click(); await page.waitForTimeout(400)
   const zero = ((await page.locator('.dr-stage h1').first().textContent()) ?? '').trim()
   if (/^0 /.test(zero)) throw new Error(`the headline counted down to: ${zero}`)
+})
+
+await step('daily review: a slip marks one habit, never the set', async () => {
+  /* His own reaction: a single "I slipped" button beside "4 being quit" read as
+     though it would mark all four. The names ARE the buttons now. */
+  await fresh('today')
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const z = (n) => String(n).padStart(2, '0')
+    const d = new Date(); d.setDate(d.getDate() - 1)
+    const y = `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`
+    const mk = (id, name) => ({ id, space: 'personal', name, kind: 'break', frequency: 'daily', days: [0,0,0,0,0,0,0].map(() => false), history: [], quitSince: '2026-07-01' })
+    s.habits = [...s.habits, mk('q1', 'Doomscrolling'), mk('q2', 'Smoking'), mk('q3', 'Energy drinks'), mk('q4', 'Late snacks')]
+    s.habitLog = [{ habitId: 'h-meditation', day: y }]
+    s.focusSessions = [{ id: 'f1', day: y, minutes: 30, space: 'personal', label: 'Gate' }]
+    s.slips = []
+    delete s.dailyDone; delete s.dailySkipped
+    localStorage.setItem(K, JSON.stringify(s))
+  }, KEY)
+  await page.reload(); await page.waitForTimeout(900)
+  for (let i = 0; i < 4; i++) {
+    if (await page.locator('.dr-slips').count()) break
+    await page.locator('.dr-foot .btn-primary').click(); await page.waitForTimeout(400)
+  }
+  const slipRow = page.locator('.dr-slips')
+  if (!(await slipRow.count())) throw new Error('the quit habits were never offered')
+  const names = await slipRow.locator('.dr-tick').count()
+  if (names !== 4) throw new Error(`expected one control per quit habit, found ${names}`)
+  await slipRow.locator('.dr-tick', { hasText: 'Smoking' }).click(); await page.waitForTimeout(500)
+  const s2 = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
+  const logged = (s2.slips ?? [])
+  if (logged.length !== 1) throw new Error(`one press logged ${logged.length} slips`)
+  if (logged[0].habitId !== 'q2') throw new Error(`it logged ${logged[0].habitId} instead of the one pressed`)
 })
 
 await step('daily review: a first morning with no history is not asked anything', async () => {

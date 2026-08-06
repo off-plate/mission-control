@@ -3390,15 +3390,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .dr-back:hover, .dr-skip:hover { color: var(--accent); }
 .dr-go { padding: 12px 22px; font-size: var(--text-base); }
 
-/* Waved off, not gone. Solid, because a dashed border reads as an empty drop
-   zone or an unfinished skeleton in every UI language there is. */
-.dr-reopen {
-  display: inline-flex; align-items: center; margin-bottom: var(--s4);
-  padding: 9px var(--s4); border-radius: 999px; border: 1px solid var(--hairline-strong);
-  font-size: var(--text-sm); color: var(--muted); min-height: 40px;
-}
-.dr-reopen:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
-
 @media (max-width: 640px) {
   .dr-body { padding-top: var(--s4); }
   .dr-rail { margin-bottom: var(--s4); }

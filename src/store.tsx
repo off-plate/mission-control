@@ -185,6 +185,10 @@ interface Store extends PersistedState {
   dailyDone?: string
   dailySkipped?: string
   closeDaily: (walked: boolean) => void
+  /** Is the daily review on screen? Held here rather than inside it, so the
+   *  header can open it from any page and not only Today. */
+  dailyOpen: boolean
+  openDaily: () => void
   toggleHabitDay: (id: string, day: number) => void
   /** Mark a habit kept, or not kept, on a NAMED day. The index version above is
    *  a position in this week and cannot address last Sunday. */
@@ -1012,6 +1016,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
      now, so a row missing here is only "not seen yet" unless something says
      otherwise: this is that something. Without it, deleting a task on the
      laptop lets any phone that still holds the row put it back. */
+  const [dailyOpen, setDailyOpen] = useState(false)
   const [dailyDone, setDailyDone] = useState<string | undefined>(persisted?.dailyDone)
   const [dailySkipped, setDailySkipped] = useState<string | undefined>(persisted?.dailySkipped)
   const [graveyard, setGraveyard] = useState<Tomb[]>(persisted?.graveyard ?? [])
@@ -1751,7 +1756,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     markHabitDay: (id, day, value) => markDay(id, day, value),
     dailyDone,
     dailySkipped,
-    closeDaily: (walked) => (walked ? setDailyDone(todayKey()) : setDailySkipped(todayKey())),
+    dailyOpen,
+    openDaily: () => setDailyOpen(true),
+    closeDaily: (walked) => {
+      setDailyOpen(false)
+      if (walked) setDailyDone(todayKey()); else setDailySkipped(todayKey())
+    },
     markHabitOn: (id, day, value) => markDayOn(id, day, value),
     assertRoutineOn,
     /* A slip on a day he is only now admitting to. Same rules as today's: one

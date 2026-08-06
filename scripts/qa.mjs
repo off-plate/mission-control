@@ -599,10 +599,33 @@ await step('notes: All notes, date groups, and the folder on every row', async (
   if (await page.evaluate(() => localStorage.getItem('mc:notes-sort')) !== 'title') throw new Error('the sort was not remembered')
 })
 
+await step('notes: the folder panel is one list at one size', async () => {
+  /* Apple's sidebar, on his instruction: every folder row the same height and
+     the same type, and ONE New folder control rather than one per workspace. */
+  await fresh('notes')
+  const m = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('.nt-folder')]
+    return {
+      rows: rows.length,
+      heights: [...new Set(rows.map((r) => Math.round(r.getBoundingClientRect().height)))],
+      sizes: [...new Set(rows.map((r) => getComputedStyle(r).fontSize))],
+      families: [...new Set(rows.map((r) => getComputedStyle(r).fontFamily))],
+      adders: document.querySelectorAll('.nt-newfolder').length,
+    }
+  })
+  if (m.rows < 5) throw new Error('the folder panel did not render')
+  if (m.heights.length !== 1) throw new Error(`folder rows are ${m.heights.join(', ')}px tall`)
+  if (m.heights[0] < 38) throw new Error(`folder rows are only ${m.heights[0]}px tall`)
+  if (m.sizes.length !== 1 || m.families.length !== 1) throw new Error(`mixed type in the folder list: ${m.sizes.join(', ')} / ${m.families.join(' | ')}`)
+  if (m.adders !== 1) throw new Error(`${m.adders} New folder controls`)
+})
+
 await step('notes: a folder he made, and its notes surviving its deletion', async () => {
   await fresh('notes')
   // the first group is All notes now; the workspace groups start after it
-  await page.locator('.nt-group', { hasText: 'Personal' }).first().locator('.nt-addfolder').click()
+  // one New folder control at the foot; it lands in the workspace he is in
+  await page.locator('.nt-folder', { hasText: 'Personal' }).first().click(); await page.waitForTimeout(300)
+  await page.locator('.nt-newfolder').click()
   await page.locator('input[aria-label^="New folder in"]').fill('Taxes')
   await page.keyboard.press('Enter'); await page.waitForTimeout(400)
   await page.getByRole('button', { name: 'New note' }).click(); await page.waitForTimeout(300)

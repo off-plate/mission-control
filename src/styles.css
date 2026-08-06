@@ -1742,30 +1742,43 @@ a.pron-src:hover { color: var(--accent); text-decoration: underline; }
 .nt-grip:hover::after, body.is-colresize .nt-grip::after { background: var(--accent); }
 body.is-colresize { cursor: col-resize; user-select: none; }
 
-/* ---- folders ---- */
-.nt-side { padding: var(--s4) var(--s3) var(--s8); display: flex; flex-direction: column; gap: var(--s4); }
+/* ---- folders ----
+   Shaped after the Notes sidebar: one size for every row, generous height, the
+   count right-aligned and quiet, the folder mark filled and in the accent on the
+   selected one, and one New folder control at the foot rather than four down
+   the panel. */
+.nt-side { display: flex; flex-direction: column; padding: var(--s3) var(--s2) 0; }
+.nt-fscroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: var(--s4); padding-bottom: var(--s4); }
 .nt-group { display: flex; flex-direction: column; gap: 1px; }
-/* One shape for every row, open or not: the menu's slot is always reserved, so
-   clicking a folder cannot make the row jump sideways. */
-.nt-folder-row { display: flex; align-items: center; border-radius: var(--r-sm); }
+.nt-folder-row { display: flex; align-items: center; border-radius: 7px; }
 .nt-folder-row:hover { background: var(--accent-wash); }
 .nt-folder-row.on { background: var(--accent-wash); }
 .nt-folder-row.on .nt-folder { color: var(--accent); font-weight: 600; }
 .nt-folder {
   flex: 1; display: flex; align-items: center; gap: var(--s3); min-width: 0;
-  padding: 7px var(--s3); text-align: left; font-size: var(--text-sm); color: var(--muted); min-height: 34px;
+  /* 40px, not 32. The Notes sidebar is a comfortable target, not a dense tree. */
+  padding: 9px var(--s3); text-align: left; min-height: 40px;
+  font-size: 0.9375rem; color: var(--ink);
 }
-.nt-folder-top { font-family: var(--disp); font-weight: 600; color: var(--ink); font-size: 0.9375rem; }
-.nt-folder:not(.nt-folder-top) { padding-left: var(--s5); }
+/* Sub-folders indent under their workspace; nothing else changes about them,
+   because in Notes every folder row is the same row. */
+.nt-folder-row.is-sub .nt-folder { padding-left: var(--s6); }
 .nt-fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nt-count { margin-left: auto; font-size: 0.6875rem; opacity: .55; }
-/* The slot is 28px whether or not anything is standing in it. */
+.nt-count { margin-left: auto; font-size: 0.8125rem; color: var(--faint); font-weight: 400; }
+.nt-folder-row.on .nt-count { color: var(--accent); opacity: .7; }
 .nt-slot, .nt-fkebab { flex: none; width: 28px; }
 .nt-fkebab { visibility: hidden; }
 .nt-folder-row:hover .nt-fkebab, .nt-folder-row.on .nt-fkebab, .nt-fkebab:focus-within { visibility: visible; }
-.nt-addfolder { align-self: flex-start; padding: 5px var(--s3); font-size: 0.75rem; color: var(--faint); border-radius: var(--r-sm); }
-.nt-addfolder:hover { color: var(--accent); background: var(--accent-wash); }
-.nt-rename { margin: 2px 0 0 var(--s3); width: calc(100% - var(--s5)); font-size: var(--text-sm); padding: 5px var(--s2); }
+.nt-rename { margin: 2px 0 0 var(--s5); width: calc(100% - var(--s6)); font-size: 0.9375rem; padding: 8px var(--s3); }
+
+.nt-newfolder {
+  flex: none; display: flex; align-items: center; gap: var(--s3); width: 100%;
+  padding: 10px var(--s3); margin-top: auto; border-top: 1px solid var(--hairline);
+  font-size: var(--text-sm); color: var(--muted); min-height: 44px; border-radius: 0;
+}
+.nt-newfolder:hover { color: var(--accent); }
+.nt-newwhere { margin-left: auto; font-size: 0.6875rem; color: var(--faint); }
+.nt-newfolder:hover .nt-newwhere { color: var(--accent); opacity: .7; }
 
 /* ---- the list ---- */
 .nt-list { display: flex; flex-direction: column; padding-bottom: var(--s8); }
@@ -1943,12 +1956,15 @@ mark { background: var(--accent-wash); color: var(--accent); font-weight: 600; b
   .nt-app > .nt-list + * { border-left: 1px solid var(--hairline); }
   .nt-group { flex-direction: row; align-items: center; gap: var(--s2); flex: none; }
   .nt-folder-row { border: 1px solid var(--hairline-strong); border-radius: 999px; flex: none; }
+  .nt-folder { min-height: 34px; padding: 6px var(--s3); }
+  .nt-folder-row.is-sub .nt-folder { padding-left: var(--s3); }
   .nt-folder-row.on { border-color: var(--accent); }
   .nt-folder { white-space: nowrap; }
-  .nt-folder:not(.nt-folder-top) { padding-left: var(--s3); }
   .nt-slot { display: none; }
   .nt-fkebab { visibility: visible; width: 24px; }
-  .nt-addfolder { flex: none; white-space: nowrap; }
+  .nt-fscroll { flex-direction: row; align-items: center; gap: var(--s4); overflow-x: auto; overflow-y: hidden; padding-bottom: 0; }
+  .nt-newfolder { width: auto; flex: none; margin: 0; padding: 8px var(--s3); border-top: none; min-height: 38px; white-space: nowrap; }
+  .nt-newwhere { display: none; }
   .nt-rename { margin: 0; width: 150px; flex: none; }
 }
 

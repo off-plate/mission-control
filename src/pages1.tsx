@@ -73,7 +73,13 @@ export function Dropdown({ label, children, className = '' }: { label: string; c
 
   return (
     <span className={`kebab-wrap ${className}`} ref={ref}>
-      <button className="kebab" aria-label={label} aria-expanded={open} onClick={() => setOpen((v) => !v)}>⋯</button>
+      {/* Drawn, not typed. The midline-ellipsis character sits wherever the
+          font puts it, which is why it never looked centred in a circle. */}
+      <button className="kebab" aria-label={label} aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <circle cx="5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="19" cy="12" r="1.7" />
+        </svg>
+      </button>
       {open && (
         <div className={`kebab-menu${up ? ' opens-up' : ''}`} role="menu" onClick={() => setOpen(false)}>
           {children}

@@ -1265,7 +1265,7 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 
 /* kebab fallback for touch (no 4-button row) */
 .kebab-wrap { position: relative; flex: none; }
-.kebab { color: var(--faint); font-weight: 700; line-height: 1; padding: 0 var(--s2); min-height: 32px; }
+.kebab { color: var(--faint); line-height: 1; padding: 0 var(--s2); min-height: 32px; display: inline-grid; place-items: center; }
 .kebab:hover { color: var(--ink); }
 .kebab-menu {
   position: absolute; top: 100%; right: 0; z-index: 40; margin-top: 2px;
@@ -1796,11 +1796,13 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 /* A count, not a caption: the one thing the folder name does not already say. */
 .nt-headcount { font-size: 0.6875rem; color: var(--faint); }
 .nt-sortkebab { flex: none; margin-left: auto; }
-.nt-sortkebab .kebab {
-  width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+.nt-sortkebab .kebab, .nt-kebab .kebab {
+  /* min-height as well as height: the shared .kebab floor of 32px was making a
+     30px circle 30 wide and 32 tall, which is why the dots never sat centred. */
+  width: 30px; height: 30px; min-height: 30px; border-radius: 50%; padding: 0;
   border: 1px solid var(--hairline-strong); color: var(--muted);
 }
-.nt-sortkebab .kebab:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
+.nt-sortkebab .kebab:hover, .nt-kebab .kebab:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
 .nt-listhead .nt-new { margin-left: 0; }
 /* The same button as the one beside it. A circle next to a rounded square, both
    30px, both outlined, reads as two unrelated controls that happened to land
@@ -1882,7 +1884,12 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 .nt-pane { display: flex; flex-direction: column; overflow: visible; min-height: 0; }
 .nt-panebody { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
 .nt-nothing { flex: 1; }
+/* The pane's one bar: how to write on the left, the note's own menu at the end.
+   It scrolls sideways rather than wrapping, so the kebab never drops onto a
+   second line and the bar keeps one height at every width. */
 .nt-topbar { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) var(--s4); border-bottom: 1px solid var(--hairline); }
+.nt-topbar .nt-toolbar { flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; border-bottom: none; padding-bottom: 0; flex-wrap: nowrap; }
+.nt-topbar .nt-toolbar::-webkit-scrollbar { display: none; }
 .nt-back { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-size: var(--text-sm); font-weight: 600; padding: 8px 10px 8px 4px; border-radius: var(--r-sm); min-height: 44px; }
 .nt-back:hover { background: var(--accent-wash); }
 .nt-stamp { font-size: 0.6875rem; color: var(--faint); }
@@ -1894,8 +1901,10 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 /* The note fills its pane. How wide it reads is his to set, by dragging the
    columns, rather than mine to cap at a measure he never asked for. */
 .nt-sheet { width: 100%; padding: var(--s5) var(--s6) var(--s12); }
-/* When it was last touched, over the note rather than in a corner. */
-.nt-when-full { font-size: 0.6875rem; color: var(--faint); text-align: center; margin-bottom: var(--s4); }
+/* On the title's own margin. Centred over a left-aligned note it read as a
+   stray line floating above somebody else's paragraph. */
+.nt-when-full { font-size: 0.6875rem; color: var(--faint); margin-bottom: var(--s3); }
+.nt-pinned { color: var(--accent); }
 .nt-title {
   width: 100%; border: none; background: none; padding: 0; margin-bottom: var(--s3); resize: none;
   font-family: var(--disp); font-weight: 700; font-size: clamp(1.4rem, 1.1rem + .8vw, 1.75rem);
@@ -1906,6 +1915,9 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 
 /* ---- the editor ---- */
 .nt-editwrap { display: flex; flex-direction: column; gap: var(--s2); }
+/* No rule under the editor's own top edge any more: the bar above the note
+   carries it, and two lines across the pane is one too many. */
+.nt-sheet .nt-editor { margin-top: var(--s2); }
 /* Grouped into pills: marks, lists, inserts. A flat row of ten identical
    buttons is ten things to read every time he wants one of them. */
 .nt-toolbar { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; padding-bottom: var(--s3); border-bottom: 1px solid var(--hairline); }

@@ -73,7 +73,16 @@ function blockAt(root: HTMLElement): HTMLElement | null {
   return n && n.nodeType === 1 ? (n as HTMLElement) : null
 }
 
-function Editor({ note, onChange }: { note: Note; onChange: (md: string) => void }) {
+function Editor({ note, onChange, lead, trail, children }: {
+  note: Note
+  onChange: (md: string) => void
+  /** Sits at the start of the pane's own bar, before the formatting. */
+  lead?: React.ReactNode
+  /** And at the end of it: the note's own menu. */
+  trail?: React.ReactNode
+  /** The stamp, the title and anything else above the writing surface. */
+  children?: React.ReactNode
+}) {
   const ref = useRef<HTMLDivElement>(null)
   /* The markdown this editor last produced. Without it, every keystroke would
      come back through props and rewrite the DOM under his caret. */
@@ -249,11 +258,14 @@ function Editor({ note, onChange }: { note: Note; onChange: (md: string) => void
   )
 
   return (
-    <div className="nt-editwrap">
-      {/* Grouped, the way a note toolbar groups: what marks the text, what
-          makes a list, what gets inserted. Ten identical buttons in a row is a
-          row of ten things he has to read every time. */}
-      <div className="nt-toolbar" role="toolbar" aria-label="Formatting">
+    <>
+      {/* The pane's one bar: how to write, then the note's own menu at the end.
+          The formatting used to sit BETWEEN the title and the body, which put a
+          row of controls through the middle of his note and left the bar above
+          holding nothing but a lone kebab. */}
+      <div className="nt-topbar">
+        {lead}
+        <div className="nt-toolbar" role="toolbar" aria-label="Formatting">
         <span className="nt-toolgroup">
         <T label="Bold" on={() => cmd('bold')}><b>B</b></T>
         <T label="Italic" on={() => cmd('italic')}><i>I</i></T>
@@ -298,10 +310,16 @@ function Editor({ note, onChange }: { note: Note; onChange: (md: string) => void
           </svg>
         </T>
         </span>
+        </div>
+        {trail}
       </div>
-      <div
-        ref={ref}
-        className="nt-editor"
+
+      <div className="nt-panebody">
+        <article className="nt-sheet">
+          {children}
+          <div
+            ref={ref}
+            className="nt-editor"
         contentEditable
         suppressContentEditableWarning
         role="textbox"
@@ -311,21 +329,22 @@ function Editor({ note, onChange }: { note: Note; onChange: (md: string) => void
         onInput={() => { autoformat(); emit() }}
         onBlur={emit}
         onMouseDown={onMouseDown}
-        onKeyDown={(e) => {
-          /* Tab nests the item, Shift-Tab lifts it, which is what every notes
-             app does and what his own list needed two levels of. Outside a
-             list Tab still leaves the editor, so it is not a keyboard trap. */
-          if (e.key !== 'Tab') return
-          const sel = window.getSelection()
-          const from = sel?.focusNode
-          const li = from ? ((from.nodeType === 3 ? from.parentElement : from as HTMLElement)?.closest('li')) : null
-          if (!li) return
-          e.preventDefault()
-          document.execCommand(e.shiftKey ? 'outdent' : 'indent')
-          emit()
-        }}
-      />
-    </div>
+            onKeyDown={(e) => {
+              /* Tab nests the item, Shift-Tab lifts it. Outside a list Tab still
+                 leaves the editor, so it is not a keyboard trap. */
+              if (e.key !== 'Tab') return
+              const sel = window.getSelection()
+              const from = sel?.focusNode
+              const li = from ? ((from.nodeType === 3 ? from.parentElement : from as HTMLElement)?.closest('li')) : null
+              if (!li) return
+              e.preventDefault()
+              document.execCommand(e.shiftKey ? 'outdent' : 'indent')
+              emit()
+            }}
+          />
+        </article>
+      </div>
+    </>
   )
 }
 
@@ -767,52 +786,46 @@ export function NotesPage() {
       {/* ---- the note ---- */}
       <section className="nt-pane" aria-label="Note">
         {open ? (
-          <>
-            {/* Outside the scrolling body, so the menu is not clipped by it. */}
-            <div className="nt-topbar">
-              {phone && (
-                <button className="nt-back" onClick={() => setOpenId(null)}>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
-                    <path d="M15 5l-7 7 7 7" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  {nameOf(open.folderId)}
-                </button>
-              )}
-              <span className="nt-stamp mono">{open.pinned ? 'Pinned' : ''}</span>
-              {kebab(open)}
-            </div>
+          <Editor
+            note={open}
+            onChange={(md) => updateNote(open.id, { body: join(headOf(open.body), md) })}
+            lead={phone ? (
+              <button className="nt-back" onClick={() => setOpenId(null)}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+                  <path d="M15 5l-7 7 7 7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                {nameOf(open.folderId)}
+              </button>
+            ) : undefined}
+            trail={kebab(open)}
+          >
+            {/* When it was last touched, on the same margin as the title. Centred
+                over a left-aligned note it read as a stray line floating above
+                somebody else's paragraph. */}
+            <p className="nt-when-full mono">
+              {new Date(open.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+              {' at '}
+              {new Date(open.updatedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+              {open.pinned && <span className="nt-pinned"> · Pinned</span>}
+            </p>
+            <AutoTextarea
+              className="nt-title" minRows={1} maxRows={12} value={headOf(open.body)}
+              placeholder="Untitled" aria-label="Note title" autoFocus={open.id === fresh}
+              onChange={(e) => updateNote(open.id, { body: join(e.target.value.replace(/\n/g, ' '), restOf(open.body)) })}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault() }}
+            />
 
-            <div className="nt-panebody">
-              <article className="nt-sheet">
-                {/* The moment it was last touched, over the note rather than
-                    tucked in a corner of the toolbar. */}
-                <p className="nt-when-full mono">
-                  {new Date(open.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
-                  {' at '}
-                  {new Date(open.updatedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-                </p>
-                <AutoTextarea
-                  className="nt-title" minRows={1} maxRows={12} value={headOf(open.body)}
-                  placeholder="Untitled" aria-label="Note title" autoFocus={open.id === fresh}
-                  onChange={(e) => updateNote(open.id, { body: join(e.target.value.replace(/\n/g, ' '), restOf(open.body)) })}
-                  onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault() }}
-                />
-
-                {open.conflict && (
-                  <div className="nt-conflict">
-                    <p className="nt-conflict-head">Another device had a different version of this note. It is kept here until you say what happens to it.</p>
-                    <pre>{open.conflict.body}</pre>
-                    <div className="nt-conflict-acts">
-                      <button className="btn btn-primary" onClick={() => keepNoteConflict(open.id)}>Add it to this note</button>
-                      <button className="btn btn-ghost" onClick={() => dropNoteConflict(open.id)}>Discard it</button>
-                    </div>
-                  </div>
-                )}
-
-                <Editor note={open} onChange={(md) => updateNote(open.id, { body: join(headOf(open.body), md) })} />
-              </article>
-            </div>
-          </>
+            {open.conflict && (
+              <div className="nt-conflict">
+                <p className="nt-conflict-head">Another device had a different version of this note. It is kept here until you say what happens to it.</p>
+                <pre>{open.conflict.body}</pre>
+                <div className="nt-conflict-acts">
+                  <button className="btn btn-primary" onClick={() => keepNoteConflict(open.id)}>Add it to this note</button>
+                  <button className="btn btn-ghost" onClick={() => dropNoteConflict(open.id)}>Discard it</button>
+                </div>
+              </div>
+            )}
+          </Editor>
         ) : (
           <div className="nt-nothing" />
         )}

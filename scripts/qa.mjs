@@ -860,7 +860,25 @@ await step('notes: the note menu opens where it can be reached', async () => {
   const m = await page.locator('.nt-pane .kebab-menu').boundingBox()
   if (m.x + m.width > 1502) throw new Error('the menu runs off the right edge')
   if (!(await page.getByRole('menuitem', { name: 'Make it a task' }).isVisible())) throw new Error('its items are not visible')
-  await page.keyboard.press('Escape')
+  await page.keyboard.press('Escape'); await page.waitForTimeout(200)
+  /* One bar in the pane, holding the formatting and the note's menu, and the
+     two round menu buttons are actually round. The formatting used to sit
+     between the title and the body with a lone kebab in the bar above it. */
+  const bar = await page.evaluate(() => {
+    const inBar = document.querySelectorAll('.nt-topbar .nt-toolbar').length
+    const stray = document.querySelectorAll('.nt-sheet .nt-toolbar').length
+    const round = [...document.querySelectorAll('.nt-kebab .kebab, .nt-sortkebab .kebab')].map((el) => {
+      const r = el.getBoundingClientRect()
+      return Math.round(r.width) === Math.round(r.height)
+    })
+    const stamp = document.querySelector('.nt-when-full')?.getBoundingClientRect()
+    const title = document.querySelector('.nt-title')?.getBoundingClientRect()
+    return { inBar, stray, round, offset: stamp && title ? Math.round(stamp.left - title.left) : 99 }
+  })
+  if (bar.inBar !== 1) throw new Error('the formatting is not in the pane bar')
+  if (bar.stray) throw new Error('there is still a toolbar between the title and the body')
+  if (bar.round.some((r) => !r)) throw new Error('a menu button is not a circle')
+  if (Math.abs(bar.offset) > 1) throw new Error(`the date sits ${bar.offset}px off the title's margin`)
 })
 
 await b.close(); server.close()

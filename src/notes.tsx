@@ -88,9 +88,20 @@ function Editor({ note, onChange }: { note: Note; onChange: (md: string) => void
     mine.current = md
   }, [note.id, note.body])
 
+  /* Chrome's indent leaves the nested list as a SIBLING of the item it belongs
+     to, which is invalid and makes the markdown ambiguous. Put it back inside
+     the item before anything reads it. */
+  const tidy = (root: HTMLElement) => {
+    for (const ul of [...root.querySelectorAll('ul, ol')]) {
+      const prev = ul.previousElementSibling
+      if (ul.parentElement && /^(UL|OL)$/.test(ul.parentElement.tagName) && prev?.tagName === 'LI') prev.append(ul)
+    }
+  }
+
   const emit = () => {
     const el = ref.current
     if (!el) return
+    tidy(el)
     const md = htmlToMd(el)
     mine.current = md
     onChange(md)
@@ -239,11 +250,16 @@ function Editor({ note, onChange }: { note: Note; onChange: (md: string) => void
 
   return (
     <div className="nt-editwrap">
+      {/* Grouped, the way a note toolbar groups: what marks the text, what
+          makes a list, what gets inserted. Ten identical buttons in a row is a
+          row of ten things he has to read every time. */}
       <div className="nt-toolbar" role="toolbar" aria-label="Formatting">
+        <span className="nt-toolgroup">
         <T label="Bold" on={() => cmd('bold')}><b>B</b></T>
         <T label="Italic" on={() => cmd('italic')}><i>I</i></T>
         <T label="Heading" on={() => toggleBlock('h3')}>H</T>
-        <span className="nt-toolsep" aria-hidden="true" />
+        </span>
+        <span className="nt-toolgroup">
         <T label="Bullet list" on={() => cmd('insertUnorderedList')}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <circle cx="5" cy="7" r="1.4" fill="currentColor" /><circle cx="5" cy="17" r="1.4" fill="currentColor" />
@@ -256,7 +272,8 @@ function Editor({ note, onChange }: { note: Note; onChange: (md: string) => void
           </svg>
         </T>
         <T label="Quote" on={() => toggleBlock('blockquote')}>&rdquo;</T>
-        <span className="nt-toolsep" aria-hidden="true" />
+        </span>
+        <span className="nt-toolgroup">
         <T label="Divider" on={divider}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path d="M3 12h18" strokeLinecap="round" />
@@ -273,12 +290,14 @@ function Editor({ note, onChange }: { note: Note; onChange: (md: string) => void
             <rect x="4" y="3" width="8" height="18" rx="1.6" /><path d="M18 9v6M15 12h6" strokeLinecap="round" />
           </svg>
         </T>
-        <span className="nt-toolsep" aria-hidden="true" />
+        </span>
+        <span className="nt-toolgroup">
         <T label="Clear formatting" on={() => cmd('removeFormat')}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path d="M6 5h13M9.5 5L7 19M14 12l6 7M20 12l-6 7" strokeLinecap="round" />
           </svg>
         </T>
+        </span>
       </div>
       <div
         ref={ref}
@@ -292,6 +311,19 @@ function Editor({ note, onChange }: { note: Note; onChange: (md: string) => void
         onInput={() => { autoformat(); emit() }}
         onBlur={emit}
         onMouseDown={onMouseDown}
+        onKeyDown={(e) => {
+          /* Tab nests the item, Shift-Tab lifts it, which is what every notes
+             app does and what his own list needed two levels of. Outside a
+             list Tab still leaves the editor, so it is not a keyboard trap. */
+          if (e.key !== 'Tab') return
+          const sel = window.getSelection()
+          const from = sel?.focusNode
+          const li = from ? ((from.nodeType === 3 ? from.parentElement : from as HTMLElement)?.closest('li')) : null
+          if (!li) return
+          e.preventDefault()
+          document.execCommand(e.shiftKey ? 'outdent' : 'indent')
+          emit()
+        }}
       />
     </div>
   )
@@ -644,7 +676,7 @@ export function NotesPage() {
             ))}
           </Dropdown>
           <button className="nt-new" onClick={create} aria-label="New note" title="New note">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" aria-hidden="true">
               <path d="M12 5v14M5 12h14" strokeLinecap="round" />
             </svg>
           </button>

@@ -254,6 +254,179 @@ await step('habits: a quitting row keeps its slip button off the day dots', asyn
   if (new Set(rows.map((r) => r.left)).size !== 1) throw new Error(`the buttons do not line up: ${rows.map((r) => r.left).join(', ')}`)
 })
 
+await step('daily review: offered once, fixes yesterday, and stays shut', async () => {
+  /* The whole point of it: what he marks here has to land in the record for
+     YESTERDAY, and it must not ask again the same day. */
+  await fresh('today')
+  const y = await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const z = (n) => String(n).padStart(2, '0')
+    const key = (b) => { const d = new Date(); d.setDate(d.getDate() - b); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}` }
+    const yd = key(1)
+    s.habitLog = [{ habitId: 'h-meditation', day: yd }]
+    s.focusSessions = [{ id: 'f1', day: yd, minutes: 40, space: 'personal', label: 'Gate' }]
+    s.tasks = [{ id: 'tx', title: 'Left from yesterday', source: 'mc', estimateMin: 20, done: false, space: 'personal', list: 'today', category: 'admin', plannedOn: yd }]
+    delete s.dailyDone; delete s.dailySkipped
+    localStorage.setItem(K, JSON.stringify(s))
+    return yd
+  }, KEY)
+  await page.reload(); await page.waitForTimeout(900)
+  if (!(await page.locator('.dr-screen').count())) throw new Error('the review was not offered')
+  const seen = []
+  const forward = async () => {
+    if (!(await page.locator('.dr-stage h1').count())) return false
+    seen.push(((await page.locator('.dr-stage h1').first().textContent()) ?? '').trim())
+    const go = page.locator('.dr-foot .btn-primary')
+    if (!(await go.count())) return false
+    await go.click(); await page.waitForTimeout(450)
+    return true
+  }
+  await forward()
+  // walk to the unmarked stage and put one habit right
+  while (await page.locator('.dr-tick').count() === 0) {
+    if (!(await forward())) break
+  }
+  const tick = page.locator('.dr-tick').first()
+  if (!(await tick.count())) throw new Error('nothing was offered to put right')
+  await tick.click(); await page.waitForTimeout(500)
+  const after = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
+  const wroteYesterday = (after.habitLog ?? []).some((t) => t.day === y && t.habitId !== 'h-meditation')
+  const wroteToday = (after.habitLog ?? []).some((t) => t.day > y && t.habitId !== 'h-meditation')
+  if (!wroteYesterday) throw new Error('the mark did not land on yesterday')
+  if (wroteToday) throw new Error('the mark landed on the wrong day')
+  // the row it just marked must STAY, say so, and not resort the list
+  if (!(await page.locator('.dr-row.is-fixed').count())) throw new Error('the marked row vanished instead of settling')
+  if (!(await page.locator('.dr-said').count())) throw new Error('the marked row never said so')
+  // walk out, and the stage for yesterday's unfinished work must have appeared
+  for (let i = 0; i < 6; i++) { if (!(await forward())) break }
+  if (await page.locator('.dr-screen').count()) throw new Error('it did not close at the end')
+  if (!seen.some((h) => /did not get done/.test(h))) {
+    throw new Error(`the leftover stage never rendered: ${seen.join(' | ')}`)
+  }
+  await page.reload(); await page.waitForTimeout(900)
+  if (await page.locator('.dr-screen').count()) throw new Error('it came back the same day')
+  if (await page.locator('.dr-reopen').count()) throw new Error('a walked review still offers to be reopened')
+})
+
+await step('daily review: the close screen cannot claim a clean slate it does not have', async () => {
+  /* Walk past everything without answering. Eight unticked habits were on the
+     screen one step earlier; the last screen used to say "Nothing was hanging". */
+  await fresh('today')
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const z = (n) => String(n).padStart(2, '0')
+    const d = new Date(); d.setDate(d.getDate() - 1)
+    const y = `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`
+    s.habitLog = [{ habitId: 'h-meditation', day: y }]
+    s.focusSessions = [{ id: 'f1', day: y, minutes: 95, space: 'personal', label: 'Gate' }]
+    s.tasks = []
+    delete s.dailyDone; delete s.dailySkipped
+    localStorage.setItem(K, JSON.stringify(s))
+  }, KEY)
+  await page.reload(); await page.waitForTimeout(900)
+  let shown = 0
+  for (let i = 0; i < 8; i++) {
+    if (!(await page.locator('.dr-stage h1').count())) break
+    const h1 = ((await page.locator('.dr-stage h1').first().textContent()) ?? '').trim()
+    if (/did not tick/.test(h1)) shown = await page.locator('.dr-row').count()
+    if (/still waiting|record is straight|Nothing was hanging/.test(h1)) {
+      if (shown > 0 && /Nothing was hanging/.test(h1)) throw new Error(`it listed ${shown} rows and then claimed nothing was hanging`)
+      if (!/still waiting/.test(h1)) throw new Error(`unanswered rows but the close said: ${h1}`)
+      break
+    }
+    const go = page.locator('.dr-foot .btn-primary')
+    if (!(await go.count())) break
+    await go.click(); await page.waitForTimeout(400)
+  }
+  if (!shown) throw new Error('nothing was offered to answer, so the case was not exercised')
+})
+
+await step('daily review: answering everything moves forward, it does not loop', async () => {
+  await fresh('today')
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const z = (n) => String(n).padStart(2, '0')
+    const d = new Date(); d.setDate(d.getDate() - 1)
+    const y = `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`
+    s.habitLog = [{ habitId: 'h-meditation', day: y }]
+    s.focusSessions = [{ id: 'f1', day: y, minutes: 30, space: 'personal', label: 'Gate' }]
+    s.tasks = []
+    delete s.dailyDone; delete s.dailySkipped
+    localStorage.setItem(K, JSON.stringify(s))
+  }, KEY)
+  await page.reload(); await page.waitForTimeout(900)
+  // reach the unmarked stage
+  for (let i = 0; i < 4; i++) {
+    if (await page.locator('.dr-tick').count()) break
+    await page.locator('.dr-foot .btn-primary').click(); await page.waitForTimeout(400)
+  }
+  // answer every single row
+  for (let i = 0; i < 40; i++) {
+    const t = page.locator('.dr-tick:not(.is-slip)').first()
+    if (!(await t.count())) break
+    await t.click(); await page.waitForTimeout(180)
+  }
+  await page.locator('.dr-foot .btn-primary').click(); await page.waitForTimeout(500)
+  const h1 = ((await page.locator('.dr-stage h1').first().textContent()) ?? '').trim()
+  if (/Two minutes on yesterday/.test(h1)) throw new Error('clearing the whole list threw him back to the start')
+})
+
+await step('daily review: reopening it starts a new walk, not the old one', async () => {
+  /* The component does not unmount on close, so everything frozen for the last
+     walk used to survive into the next: the headline said two over a list
+     showing one already back on today. */
+  await fresh('today')
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const z = (n) => String(n).padStart(2, '0')
+    const d = new Date(); d.setDate(d.getDate() - 1)
+    const y = `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`
+    s.habitLog = [{ habitId: 'h-meditation', day: y }]
+    s.focusSessions = [{ id: 'f1', day: y, minutes: 30, space: 'personal', label: 'Gate' }]
+    s.tasks = [
+      { id: 'ta', title: 'Task A left over', source: 'mc', estimateMin: 20, done: false, space: 'personal', list: 'today', category: 'admin', plannedOn: y },
+      { id: 'tb', title: 'Task B left over', source: 'mc', estimateMin: 20, done: false, space: 'personal', list: 'today', category: 'admin', plannedOn: y },
+    ]
+    delete s.dailyDone; delete s.dailySkipped
+    localStorage.setItem(K, JSON.stringify(s))
+  }, KEY)
+  await page.reload(); await page.waitForTimeout(900)
+  const toLeft = async () => {
+    for (let i = 0; i < 6; i++) {
+      const h1 = ((await page.locator('.dr-stage h1').first().textContent()) ?? '').trim()
+      if (/did not get done/.test(h1)) return h1
+      const go = page.locator('.dr-foot .btn-primary')
+      if (!(await go.count())) return ''
+      await go.click(); await page.waitForTimeout(400)
+    }
+    return ''
+  }
+  const first = await toLeft()
+  if (!/2 things/.test(first)) throw new Error(`expected two leftovers, got: ${first}`)
+  await page.locator('.dr-rowacts .dr-tick').first().click(); await page.waitForTimeout(400)
+  // close, then reopen from the pill
+  await page.locator('.dr-foot .dr-skip').first().click(); await page.waitForTimeout(500)
+  await page.locator('.dr-reopen').click(); await page.waitForTimeout(600)
+  const second = await toLeft()
+  if (!/One thing/.test(second)) throw new Error(`the reopened walk still counted the one he put back: ${second}`)
+  // and clearing the last one must not read "0 things did not get done."
+  await page.locator('.dr-rowacts .dr-tick').first().click(); await page.waitForTimeout(400)
+  const zero = ((await page.locator('.dr-stage h1').first().textContent()) ?? '').trim()
+  if (/^0 /.test(zero)) throw new Error(`the headline counted down to: ${zero}`)
+})
+
+await step('daily review: a first morning with no history is not asked anything', async () => {
+  await fresh('today')
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    s.habitLog = []; s.routineLog = []; s.focusSessions = []; s.tasks = []
+    delete s.dailyDone; delete s.dailySkipped
+    localStorage.setItem(K, JSON.stringify(s))
+  }, KEY)
+  await page.reload(); await page.waitForTimeout(900)
+  if (await page.locator('.dr-screen').count()) throw new Error('it interrupted a profile with nothing to review')
+})
+
 await step('habits: a routine left half done still reads half done tomorrow', async () => {
   /* His own report: partial routines only ever showed on today's dot, because
      the routine's doneStepIds is wiped at rollover and nothing dated survived

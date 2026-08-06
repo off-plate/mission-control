@@ -2696,8 +2696,10 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .habit-row.is-measured .habit-count { white-space: nowrap; }
 
 /* ---------- undo ---------- */
+/* Above the daily review (200): a Drop it inside a full screen whose undo
+   renders behind it is not an undo at all. */
 .undo-bar {
-  position: fixed; left: 20px; bottom: 20px; z-index: 70;
+  position: fixed; left: 20px; bottom: 20px; z-index: 260;
   display: flex; align-items: center; gap: var(--s2);
   background: var(--ink); color: var(--bg);
   border-radius: 999px; padding: 8px 8px 8px 16px; box-shadow: var(--shadow-pop);
@@ -3278,4 +3280,138 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .rf-why:hover .rf-why-text { color: var(--accent); }
 @media (max-width: 700px) {
   .rf-bar { flex: 0 0 60px; }
+}
+
+/* ============================================================
+   THE DAILY REVIEW
+   A full screen, offered once a day, that walks yesterday and then today.
+   Motion vocabulary, deliberately this short: one entry curve, one stagger for
+   the scoreboard, one count-up, one green settle when a row is put right.
+   Nothing else moves, and none of it moves under reduced motion.
+   ============================================================ */
+
+.dr-screen {
+  position: fixed; inset: 0; z-index: 200; background: var(--bg);
+  display: flex; flex-direction: column; align-items: center;
+  animation: dr-open 220ms var(--ease) both;
+}
+@keyframes dr-open { from { opacity: 0 } to { opacity: 1 } }
+
+/* The body scrolls, the foot does not, so the forward action is reachable at
+   any list length and on a landscape phone. */
+.dr-body {
+  flex: 1; min-height: 0; width: 100%; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; align-items: center;
+  /* Top aligned, with a real offset. Centred, a four-tile scoreboard floated in
+     a void and read as unplaced; let the whitespace fall below it instead. */
+  justify-content: flex-start;
+  padding: clamp(var(--s6), 7vh, var(--s12)) var(--gutter) var(--s6);
+}
+.dr-stage {
+  /* Scales with the screen instead of sitting as a 680px stamp in the middle of
+     an ultrawide with 1380px of cream either side. */
+  width: min(920px, 100%); animation: dr-rise 200ms var(--ease) both;
+}
+.dr-rail { display: flex; gap: 5px; width: min(920px, 100%); margin-bottom: var(--s6); flex: none; }
+.dr-seg { flex: 1; height: 3px; border-radius: 2px; background: var(--hairline-strong); transition: background 260ms var(--ease); }
+.dr-seg.on { background: var(--accent); }
+@keyframes dr-rise { from { opacity: 0; transform: translateY(14px) } to { opacity: 1; transform: none } }
+
+.dr-stage h1 {
+  font-family: var(--disp); font-weight: 700; line-height: 1.1; color: var(--ink);
+  font-size: clamp(1.9rem, 1.3rem + 2.2vw, 3.1rem); margin-bottom: var(--s3);
+  max-width: 18ch;
+}
+/* Not a subtitle: a count, off the log, that appears nowhere else. */
+.dr-fact { font-size: 0.8125rem; color: var(--muted); }
+
+/* The scoreboard. Each tile draws itself in turn and its number counts up once
+   it is actually visible. This is the one celebration in here, and it is his
+   own week arriving rather than confetti. */
+.dr-score { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--s6) var(--s5); margin: var(--s6) 0 var(--s5); }
+.dr-tile { display: flex; flex-direction: column; gap: 2px; animation: dr-pop 340ms var(--ease) both; }
+@keyframes dr-pop { from { opacity: 0; transform: translateY(10px) scale(.96) } to { opacity: 1; transform: none } }
+.dr-num { font-family: var(--disp); font-weight: 700; font-size: clamp(2.2rem, 1.6rem + 2vw, 3.4rem); line-height: 1; color: var(--accent); }
+.dr-lab { font-size: var(--text-sm); color: var(--muted); }
+
+.dr-list { list-style: none; display: flex; flex-direction: column; gap: var(--s2); margin-top: var(--s4); }
+.dr-list li { display: flex; align-items: center; gap: var(--s3); font-size: var(--text-base); color: var(--ink); animation: dr-rise 260ms var(--ease) both; }
+.dr-plain li { color: var(--muted); }
+.dr-at { font-size: 0.75rem; color: var(--faint); }
+.dr-more { color: var(--faint); font-size: var(--text-sm); }
+/* A tick, and no strikethrough. This screen exists to show him what held;
+   crossing his own wins out is the wrong signal on it. */
+.dr-check { flex: none; width: 19px; height: 19px; border-radius: 5px; display: grid; place-items: center; background: var(--progress); color: #fff; }
+
+/* Six names on a landscape phone pushed the stage past the screen. Scrolls in
+   place rather than shortening the list, which would make the count under it
+   wrong. */
+.dr-waiting { max-height: 34vh; overflow-y: auto; }
+.dr-fix { list-style: none; display: flex; flex-direction: column; margin-top: var(--s5); }
+.dr-row { display: flex; align-items: center; gap: var(--s4); padding: var(--s3) 0; border-top: 1px solid var(--hairline); min-height: 62px; }
+.dr-row:first-child { border-top: none; }
+.dr-rowmain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dr-rowname { font-family: var(--disp); font-weight: 600; font-size: 1.0625rem; color: var(--ink); }
+.dr-rowsub { font-size: 0.6875rem; color: var(--faint); }
+.dr-rowacts { display: flex; gap: var(--s2); flex: none; }
+.dr-tick, .dr-drop, .dr-more-btn {
+  flex: none; min-height: 42px; padding: 9px 16px; border-radius: 999px;
+  border: 1px solid var(--hairline-strong); font-size: var(--text-sm); color: var(--ink); white-space: nowrap;
+}
+.dr-tick:hover, .dr-more-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
+.dr-tick.is-slip:hover, .dr-drop:hover { border-color: var(--alert); color: var(--alert); background: var(--alert-wash); }
+/* Less weight than Today, but still visibly a control. With no border at all it
+   stopped reading as tappable and the row looked like one button and a caption.
+   A hairline, muted text, and it never takes half the row on a phone. */
+.dr-drop { color: var(--muted); border-color: var(--hairline); padding-inline: var(--s3); }
+.dr-drop:hover { border-color: var(--alert); }
+.dr-rest { justify-content: center; }
+.dr-more-btn { color: var(--muted); }
+.dr-said { font-size: 0.6875rem; color: var(--progress); flex: none; animation: dr-said 320ms var(--ease) both; }
+@keyframes dr-said { from { opacity: 0; transform: translateX(8px) } to { opacity: 1; transform: none } }
+/* The signature: a row he has just settled fills green and stays put. It stays
+   in the list rather than vanishing, which is what made the list jump. */
+.dr-row.is-fixed { animation: dr-settle 460ms var(--ease) both; }
+@keyframes dr-settle {
+  0% { background: color-mix(in srgb, var(--progress) 20%, transparent) }
+  100% { background: transparent }
+}
+.dr-row.is-fixed .dr-rowname { color: var(--muted); }
+.dr-slips { flex-wrap: wrap; }
+.dr-slipwrap { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s2); }
+
+.dr-foot {
+  flex: none; width: min(920px, 100%); display: flex; align-items: center; gap: var(--s4);
+  padding: var(--s4) var(--gutter) var(--s5); border-top: 1px solid var(--hairline); background: var(--bg);
+}
+.dr-footleft { display: flex; align-items: center; gap: var(--s4); }
+.dr-footacts { margin-left: auto; display: flex; align-items: center; gap: var(--s4); }
+.dr-back, .dr-skip { font-size: var(--text-sm); color: var(--faint); padding: 10px 6px; min-height: 44px; }
+.dr-back:hover, .dr-skip:hover { color: var(--accent); }
+.dr-go { padding: 12px 22px; font-size: var(--text-base); }
+
+/* Waved off, not gone. Solid, because a dashed border reads as an empty drop
+   zone or an unfinished skeleton in every UI language there is. */
+.dr-reopen {
+  display: inline-flex; align-items: center; margin-bottom: var(--s4);
+  padding: 9px var(--s4); border-radius: 999px; border: 1px solid var(--hairline-strong);
+  font-size: var(--text-sm); color: var(--muted); min-height: 40px;
+}
+.dr-reopen:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
+
+@media (max-width: 640px) {
+  .dr-body { padding-top: var(--s4); }
+  .dr-rail { margin-bottom: var(--s4); }
+  .dr-row { flex-wrap: wrap; }
+  /* Only the two-button task rows split the width. On a single-button habit row
+     this gave a 420px pill next to a name squeezed onto two lines. */
+  .dr-rowacts { width: 100%; }
+  .dr-rowacts .dr-tick { flex: 1; text-align: center; }
+  .dr-rowacts .dr-drop { flex: none; }
+  .dr-footacts { gap: var(--s2); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dr-screen, .dr-stage, .dr-tile, .dr-list li, .dr-said, .dr-row.is-fixed { animation: none !important; }
+  .dr-seg { transition: none; }
 }

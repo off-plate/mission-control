@@ -1133,6 +1133,28 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 .step-item .grow { flex: 1; }
 .step-item .why { display: block; color: var(--muted); font-size: var(--text-xs); margin-top: 2px; }
 
+/* His own steps, typed here. Same rhythm as the read-only rows above so the
+   list does not change shape when he switches to Mine. */
+.step-edit { display: flex; gap: var(--s2); align-items: center; padding: 5px 0; border-bottom: 1px solid var(--hairline); }
+.step-edit .n { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--faint); min-width: 2ch; flex: none; }
+.step-edit .grow { flex: 1; min-width: 0; padding: 8px var(--s3); font-size: var(--text-sm); }
+.step-edit .grow, .step-min input { min-width: 0; }
+.step-min { display: inline-flex; align-items: center; gap: 3px; flex: none; }
+/* min-width AND flex, or the shared .textinput floor of 180px wins and the
+   minutes box is three times the size of the number in it. */
+.step-min input { width: 74px; min-width: 0; flex: none; padding: 8px var(--s2); font-size: var(--text-sm); text-align: right; }
+.step-min .mono { font-size: 0.6875rem; color: var(--faint); }
+.step-drop { flex: none; width: 30px; height: 30px; border-radius: var(--r-sm); color: var(--faint); font-size: 1.05rem; line-height: 1; }
+.step-drop:hover { color: var(--alert); background: var(--alert-wash); }
+.step-add { margin-top: var(--s3); }
+@media (max-width: 560px) {
+  .step-edit { flex-wrap: wrap; }
+  .step-edit .grow { flex: 1 1 100%; order: 1; }
+  .step-edit .n { order: 0; }
+  .step-min { order: 2; margin-left: auto; }
+  .step-drop { order: 3; }
+}
+
 .total-line { display: flex; align-items: baseline; gap: var(--s4); padding-top: var(--s4); font-size: var(--text-sm); flex-wrap: wrap; }
 .total-line .mono { font-weight: 600; }
 

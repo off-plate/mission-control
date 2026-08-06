@@ -53,6 +53,37 @@ await step('plan: add, estimate visible, complete via chips', async () => {
   const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
   if (!s.tasks.find((t) => t.title === 'Gate task')?.done) throw new Error('not completed')
 })
+await step('breakdown: his own steps, his own minutes', async () => {
+  await fresh('plan')
+  await page.locator('input[placeholder="Add something to the list"]').fill('Gate breakdown task')
+  await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(400)
+  await page.locator('.todo-row', { hasText: 'Gate breakdown' }).first().getByRole('button', { name: /Options/ }).click()
+  await page.getByRole('menuitem', { name: /Break it down/i }).click(); await page.waitForTimeout(2200)
+  // the line naming the service that wrote them is gone
+  if (await page.locator('.demo-note', { hasText: /Groq, using the key/ }).count()) {
+    throw new Error('the model footnote is still there')
+  }
+  await page.getByRole('button', { name: 'Mine', exact: true }).click(); await page.waitForTimeout(500)
+  const rows = await page.locator('.step-edit').count()
+  if (!rows) throw new Error('Mine opened with no rows to edit')
+  // his own wording and his own number
+  await page.locator('.step-edit .grow').first().fill('Zavolat, ne mailem')
+  await page.locator('.step-min input').first().fill('35')
+  await page.getByRole('button', { name: 'Add a step' }).click(); await page.waitForTimeout(300)
+  await page.keyboard.type('Založit potvrzení')
+  await page.waitForTimeout(300)
+  // and the minutes box is a minutes box, not a 180px field with a 2 in it
+  const w = (await page.locator('.step-min input').first().boundingBox()).width
+  if (w > 110) throw new Error(`the minutes field is ${Math.round(w)}px wide`)
+  await page.locator('.sheet-actions .btn-primary').click(); await page.waitForTimeout(600)
+  const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
+  const t = (s.tasks ?? []).find((x) => x.title === 'Gate breakdown task')
+  if (!t?.subtasks?.length) throw new Error('no subtasks were saved')
+  if (t.subtasks[0].title !== 'Zavolat, ne mailem') throw new Error(`first step saved as ${t.subtasks[0].title}`)
+  if (t.subtasks[0].estimateMin !== 35) throw new Error(`his 35 minutes were saved as ${t.subtasks[0].estimateMin}`)
+  if (!t.subtasks.some((x) => x.title === 'Založit potvrzení')) throw new Error('the step he added is missing')
+})
+
 await step('habits: tick a build habit and persist', async () => {
   await fresh('habits')
   const dot = page.locator('.habit-line', { hasText: 'Meditation' }).first().locator('.daydot:not([disabled])').last()

@@ -37,19 +37,28 @@ export function Sheet({ title, onClose, children, note, steady }: {
 /* Breaking down happens ON a task now, not in a box you retype the task into.
    The sheet reads the task you clicked, proposes steps, and attaches them as
    subtasks when you accept. */
+type Mode = Detail | 'custom'
+
 export function BreakdownSheet({ task, onClose }: { task: Task; onClose: () => void }) {
   const { setSubtasks } = useStore()
   const [busy, setBusy] = useState(true)
   const [steps, setSteps] = useState<DecomposedStep[] | null>(null)
   const [source, setSource] = useState<'model' | 'local'>('local')
   const [why, setWhy] = useState<string>('')
-  const [detail, setDetail] = useState<Detail>('normal')
+  const [mode, setMode] = useState<Mode>('normal')
+  /* His own steps. Seeded from whatever was on screen when he switched, so
+     Custom is also "these, but corrected", which is the more common want than
+     starting from an empty list. */
+  const [mine, setMine] = useState<DecomposedStep[]>([])
+  const lastRow = useRef<HTMLInputElement>(null)
+  const [focusLast, setFocusLast] = useState(false)
 
   useEffect(() => {
+    if (mode === 'custom') return
     let live = true
     setBusy(true)
     void (async () => {
-      const r = await breakdownTask(task.title, task.category, detail)
+      const r = await breakdownTask(task.title, task.category, mode)
       if (!live) return
       if (r.ok) {
         setSource('model')
@@ -66,17 +75,35 @@ export function BreakdownSheet({ task, onClose }: { task: Task; onClose: () => v
       setBusy(false)
     })()
     return () => { live = false }
-  }, [task.title, task.category, detail])
+  }, [task.title, task.category, mode])
 
-  const total = steps?.reduce((a, s) => a + s.estimateMin, 0) ?? 0
+  useEffect(() => {
+    if (focusLast) { lastRow.current?.focus(); setFocusLast(false) }
+  }, [focusLast, mine.length])
+
+  const toCustom = () => {
+    setMine((prev) => (prev.length ? prev : (steps?.map((s) => ({ title: s.title, estimateMin: s.estimateMin })) ?? [{ title: '', estimateMin: 15 }])))
+    setMode('custom')
+    setBusy(false)
+  }
+  const own = mode === 'custom'
+  const rows = own ? mine : (steps ?? [])
+  const keep = rows.filter((s) => s.title.trim())
+  const total = keep.reduce((a, s) => a + s.estimateMin, 0)
+  const editRow = (i: number, patch: Partial<DecomposedStep>) =>
+    setMine((prev) => prev.map((s, k) => (k === i ? { ...s, ...patch } : s)))
+  const addRow = () => { setMine((prev) => [...prev, { title: '', estimateMin: 15 }]); setFocusLast(true) }
+  const dropRow = (i: number) => setMine((prev) => prev.filter((_, k) => k !== i))
 
   return (
     <Sheet
       title="Break it down"
       onClose={onClose}
-      note={source === 'model'
-        ? 'Written for this task by Groq, using the key saved on this device. Nothing about it is in the code.'
-        : `${why} These steps came from a local pattern library instead, so treat them as a starting point.`}
+      /* No note when the model wrote them: the step list is the point, and a
+         line about which service produced it is not something he needs under
+         every breakdown. When it FAILED he still needs to know why, and what
+         to do about it, so that one stays. */
+      note={own || source === 'model' ? undefined : why}
     >
       <p className="sheet-task">{task.title}</p>
 
@@ -84,15 +111,47 @@ export function BreakdownSheet({ task, onClose }: { task: Task; onClose: () => v
           need every single move spelled out. */}
       <div className="seg detail-seg" role="group" aria-label="How detailed">
         {(['light', 'normal', 'deep'] as Detail[]).map((d) => (
-          <button key={d} aria-pressed={detail === d} onClick={() => setDetail(d)}>
+          <button key={d} aria-pressed={mode === d} onClick={() => setMode(d)}>
             {d === 'light' ? 'Just the shape' : d === 'normal' ? 'Normal' : 'Every move'}
           </button>
         ))}
+        {/* His own list. Nothing is asked of a model in this mode. */}
+        <button aria-pressed={own} onClick={toCustom}>Mine</button>
       </div>
 
-      {busy && <div className="empty" style={{ paddingTop: 24 }} aria-live="polite">Reading this task and working out the steps.</div>}
+      {busy && !own && <div className="empty" style={{ paddingTop: 24 }} aria-live="polite">Reading this task and working out the steps.</div>}
 
-      {steps && (
+      {own && (
+        <div style={{ marginTop: 12 }}>
+          {mine.map((s, i) => (
+            <div className="step-edit" key={i}>
+              <span className="n">{i + 1}</span>
+              <input
+                ref={i === mine.length - 1 ? lastRow : undefined}
+                className="textinput grow" value={s.title} placeholder="What happens in this step"
+                aria-label={`Step ${i + 1}`}
+                onChange={(e) => editRow(i, { title: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); if (i === mine.length - 1) addRow(); }
+                  if (e.key === 'Backspace' && !s.title && mine.length > 1) { e.preventDefault(); dropRow(i) }
+                }}
+              />
+              <span className="step-min">
+                <input
+                  className="textinput" type="number" min={1} max={600} value={s.estimateMin}
+                  aria-label={`Minutes for step ${i + 1}`}
+                  onChange={(e) => editRow(i, { estimateMin: Math.max(1, Math.min(600, Number(e.target.value) || 1)) })}
+                />
+                <span className="mono">m</span>
+              </span>
+              <button className="step-drop" aria-label={`Remove step ${i + 1}`} onClick={() => dropRow(i)}>×</button>
+            </div>
+          ))}
+          <button className="btn btn-quiet step-add" onClick={addRow}>Add a step</button>
+        </div>
+      )}
+
+      {!own && steps && (
         <div style={{ marginTop: 12 }}>
           {steps.map((s, i) => (
             <div className="step-item" key={i} style={{ animationDelay: `${i * 60}ms` }}>
@@ -107,17 +166,29 @@ export function BreakdownSheet({ task, onClose }: { task: Task; onClose: () => v
           {source === 'local' && (
             <p className="sheet-warn">Not a model. A local pattern library matched this task, so read the steps before you accept them.</p>
           )}
+        </div>
+      )}
+
+      {(own || steps) && (
+        <>
           <div className="total-line">
             <span>Planned <span className="mono">{total}m</span></span>
-            <span style={{ color: 'var(--muted)' }}>{source === 'model' ? 'Estimated per step by the model. This is the number that gets saved.' : `Every step carries the ${BUFFER}x buffer, so this is the number that gets saved.`}</span>
+            <span style={{ color: 'var(--muted)' }}>
+              {own ? 'Your steps, your minutes. This is the number that gets saved.'
+                : source === 'model' ? 'Estimated per step by the model. This is the number that gets saved.'
+                  : `Every step carries the ${BUFFER}x buffer, so this is the number that gets saved.`}
+            </span>
           </div>
           <div className="sheet-actions">
             <button className="btn btn-quiet" onClick={onClose}>Cancel</button>
-            <button className="btn btn-primary" onClick={() => { setSubtasks(task.id, steps.map((s) => ({ title: s.title, estimateMin: s.estimateMin }))); onClose() }}>
-              Add {steps.length} steps to this task
+            <button
+              className="btn btn-primary" disabled={!keep.length}
+              onClick={() => { setSubtasks(task.id, keep.map((s) => ({ title: s.title.trim(), estimateMin: s.estimateMin }))); onClose() }}
+            >
+              {keep.length ? `Add ${keep.length} ${keep.length === 1 ? 'step' : 'steps'} to this task` : 'Write a step first'}
             </button>
           </div>
-        </div>
+        </>
       )}
     </Sheet>
   )

@@ -612,7 +612,28 @@ await step('notes: All notes, date groups, and the folder on every row', async (
   const head = (await page.locator('.nt-headcount').textContent()) ?? ''
   if (!head.startsWith(`${rows} note`)) throw new Error(`the head says "${head}" over ${rows} rows`)
   // sorting by title regroups by letter and is remembered
-  await page.locator('.nt-sortkebab .kebab').click(); await page.waitForTimeout(200)
+  await page.locator('.nt-sortkebab .kebab').click(); await page.waitForTimeout(250)
+  /* EVERY item, not just the one the test happens to click. The sticky search
+     row painted over the top half of this menu and the gate passed anyway,
+     because Title was the one option still uncovered. */
+  const menu = await page.evaluate(() => {
+    const m = document.querySelector('.nt-sortkebab .kebab-menu')
+    if (!m) return { missing: true, covered: [], out: false }
+    const r = m.getBoundingClientRect()
+    return {
+      missing: false,
+      out: r.right > innerWidth + 1 || r.bottom > innerHeight + 1 || r.left < -1 || r.top < -1,
+      covered: [...m.querySelectorAll('button, .kebab-head')]
+        .filter((el) => {
+          const b = el.getBoundingClientRect()
+          return !m.contains(document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2))
+        })
+        .map((el) => (el.textContent || '').trim()),
+    }
+  })
+  if (menu.missing) throw new Error('the sort menu did not open')
+  if (menu.out) throw new Error('the sort menu opens off-screen')
+  if (menu.covered.length) throw new Error(`covered menu items: ${menu.covered.join(', ')}`)
   await page.getByRole('menuitem', { name: 'Title' }).click(); await page.waitForTimeout(400)
   await page.reload(); await page.waitForTimeout(800)
   if (await page.evaluate(() => localStorage.getItem('mc:notes-sort')) !== 'title') throw new Error('the sort was not remembered')

@@ -1787,10 +1787,15 @@ body.is-colresize { cursor: col-resize; user-select: none; }
   padding: var(--s4) var(--s4) var(--s3); position: sticky; top: 0; background: var(--bg); z-index: 2;
 }
 .nt-headmain { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.nt-listhead h1 { font-family: var(--disp); font-weight: 700; font-size: 1.375rem; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nt-listhead h1 { font-family: var(--disp); font-weight: 700; font-size: 1.1875rem; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* A count, not a caption: the one thing the folder name does not already say. */
 .nt-headcount { font-size: 0.6875rem; color: var(--faint); }
 .nt-sortkebab { flex: none; margin-left: auto; }
+.nt-sortkebab .kebab {
+  width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+  border: 1px solid var(--hairline-strong); color: var(--muted);
+}
+.nt-sortkebab .kebab:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
 .nt-listhead .nt-new { margin-left: 0; }
 .nt-new {
   margin-left: auto; flex: none; width: 34px; height: 34px; border-radius: var(--r-sm);
@@ -1815,20 +1820,34 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 
 .nt-rows { list-style: none; padding: 0 var(--s2) var(--s6); }
 .nt-groupblock > ul { list-style: none; }
-/* Pinned, Today, Yesterday, then months and years. Eighty rows in a flat run
-   have no shape; these are what the scroll lands on. */
+/* Pinned, Today, Yesterday, then months and years, at the weight of a real
+   heading rather than a caption, each with a rule under it. This is the thing
+   that gives a long list its shape. */
 .nt-grouphead {
-  font-family: var(--disp); font-weight: 700; font-size: 0.8125rem; color: var(--ink);
-  padding: var(--s4) var(--s3) var(--s2); position: sticky; top: 104px; background: var(--bg); z-index: 1;
+  display: flex; align-items: center; width: 100%;
+  font-family: var(--disp); font-weight: 700; font-size: 1.0625rem; color: var(--ink);
+  padding: var(--s5) var(--s3) var(--s2);
+  border-bottom: 1px solid var(--hairline);
+  margin-bottom: 2px;
 }
 .nt-groupblock:first-child .nt-grouphead { padding-top: var(--s2); }
+/* Pinned folds. The chevron turns, and where it points is the state. */
+.nt-groupfold { cursor: pointer; }
+.nt-groupfold:hover { color: var(--accent); }
+.nt-chev { margin-left: auto; color: var(--faint); transition: transform 160ms var(--ease); }
+.nt-chev.open { transform: rotate(90deg); }
+.nt-groupfold:hover .nt-chev { color: var(--accent); }
 .nt-row {
-  width: 100%; display: flex; flex-direction: column; gap: 3px; text-align: left;
-  padding: var(--s3); border-radius: var(--r-sm); min-height: 62px;
+  width: 100%; display: flex; flex-direction: column; gap: 4px; text-align: left;
+  padding: var(--s3); border-radius: 7px; min-height: 72px;
 }
-.nt-row:hover { background: var(--accent-wash); }
-.nt-row.on { background: var(--accent-wash); }
-.nt-row.on .nt-rowtitle { color: var(--accent); }
+/* A hairline between rows inside a group, not around them. */
+.nt-groupblock > ul > li + li .nt-row { box-shadow: inset 0 1px 0 var(--hairline); }
+.nt-row:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+/* Selected fills the row and leaves the title alone, the way a note list does:
+   the fill IS the selection, and recolouring the title as well says it twice. */
+.nt-row.on, .nt-groupblock > ul > li + li .nt-row.on { background: color-mix(in srgb, var(--accent) 15%, transparent); box-shadow: none; }
+.nt-groupblock > ul > li + li .nt-row.on + * { box-shadow: none; }
 .nt-rowtitle {
   display: flex; align-items: center; gap: 7px; min-width: 0;
   font-family: var(--disp); font-weight: 600; font-size: 0.9375rem; line-height: 1.3; color: var(--ink);
@@ -1837,8 +1856,9 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 .nt-rowname { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .nt-pin { color: var(--accent); font-size: 0.625rem; flex: none; }
 .nt-swatch { flex: none; width: 7px; height: 7px; border-radius: 50%; border: 1px solid rgba(26,23,18,.16); }
-.nt-rowsub { display: flex; gap: 7px; min-width: 0; font-size: 0.8125rem; color: var(--muted); line-height: 1.35; }
-.nt-when { flex: none; color: var(--faint); font-size: 0.6875rem; padding-top: 1px; }
+.nt-rowsub { display: flex; gap: 8px; min-width: 0; font-size: 0.8125rem; color: var(--muted); line-height: 1.35; }
+/* The date reads as part of the line, not as a data field bolted to the front. */
+.nt-when { flex: none; color: var(--ink); }
 .nt-rowsnip { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Which folder it lives in, on every row. */
 .nt-rowtail { display: flex; align-items: center; gap: 5px; font-size: 0.6875rem; color: var(--faint); }

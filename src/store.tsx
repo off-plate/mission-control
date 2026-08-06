@@ -106,6 +106,11 @@ interface PersistedState {
   stepTicks?: StepTick[]
   /** The last day the rollover ran. Everything after it is unsealed. */
   lastRollDay?: string
+  /** The last day the daily review was walked, and the last day it was waved
+   *  off. Two fields rather than one, so "not today" is remembered as a choice
+   *  and does not read on the next open as though he had done it. */
+  dailyDone?: string
+  dailySkipped?: string
   /** How many rows had no space and were filed as Personal on migration. */
   spaceGuessed?: number
   /** Keys of rows deliberately deleted, so a merge cannot resurrect them. */
@@ -176,7 +181,18 @@ interface Store extends PersistedState {
   /** Set a task's own estimate (used by the per-task estimate action). */
   setEstimate: (taskId: string, minutes: number) => void
 
+  /** The last day the daily review was walked, and the last day it was skipped. */
+  dailyDone?: string
+  dailySkipped?: string
+  closeDaily: (walked: boolean) => void
   toggleHabitDay: (id: string, day: number) => void
+  /** Mark a habit kept, or not kept, on a NAMED day. The index version above is
+   *  a position in this week and cannot address last Sunday. */
+  markHabitOn: (id: string, day: string, value: boolean) => void
+  /** Record that a routine-kept habit was in fact done on a past day. */
+  assertRoutineOn: (habitId: string, day: string, force?: boolean) => void
+  /** A slip he is admitting to after the fact, on the day it happened. */
+  logSlipOn: (id: string, day: string) => void
   /** Assert or retract a PAST day of a routine-driven habit by hand. The
    *  routine owns today; the record of a day already gone is his to correct,
    *  because a lost write must never be a permanent lie. */
@@ -996,6 +1012,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
      now, so a row missing here is only "not seen yet" unless something says
      otherwise: this is that something. Without it, deleting a task on the
      laptop lets any phone that still holds the row put it back. */
+  const [dailyDone, setDailyDone] = useState<string | undefined>(persisted?.dailyDone)
+  const [dailySkipped, setDailySkipped] = useState<string | undefined>(persisted?.dailySkipped)
   const [graveyard, setGraveyard] = useState<Tomb[]>(persisted?.graveyard ?? [])
   const bury = (...keys: string[]) =>
     setGraveyard((g) => [...g.filter((t) => !keys.includes(t.k)), ...keys.map((k) => ({ k, at: Date.now() }))].slice(-900))
@@ -1087,7 +1105,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       version: 3, spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
       notes, noteFolders,
       savedAt: Date.now(), weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
-      habitLog, routineLog, slips, stepLog, stepTicks, spaceGuessed, graveyard, lastRollDay: lastRollDay ?? localDateKey(),
+      habitLog, routineLog, slips, stepLog, stepTicks, dailyDone, dailySkipped, spaceGuessed, graveyard, lastRollDay: lastRollDay ?? localDateKey(),
     }
     const json = JSON.stringify(state)
     latestJson.current = json
@@ -1101,7 +1119,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { void saveRemoteState(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, graveyard])
+  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dailyDone, dailySkipped, graveyard])
 
   /* ---- state that arrived from somewhere else ----
      Another tab of this browser, or this account on another device. Merged in,
@@ -1135,6 +1153,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (p.slips) setSlips(p.slips)
     if (p.stepLog) setStepLog(p.stepLog)
     if (Array.isArray(p.stepTicks)) setStepTicks(p.stepTicks)
+    /* The latest day either way: a review walked on the phone must not be
+       re-offered on the laptop, and a skip must not undo a walk. */
+    if (p.dailyDone && (!dailyDone || p.dailyDone > dailyDone)) setDailyDone(p.dailyDone)
+    if (p.dailySkipped && (!dailySkipped || p.dailySkipped > dailySkipped)) setDailySkipped(p.dailySkipped)
     if (p.coachSessions) setCoachSessions(p.coachSessions)
     if (p.assistantLog) setAssistantLog(p.assistantLog)
     if (p.spaces) setSpaces(p.spaces)
@@ -1309,12 +1331,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   /* The hand-correction path for a routine-kept day. Writes BOTH records, the
      habit row and the routine's own finish, so the calendar, the goals and the
      day page agree with the dot. */
-  const assertRoutineDay = (habitId: string, dayIndex: number) => {
-    const day = dayOfWeekKey(dayIndex)
+  /* `force` asserts rather than toggles. The habit strip WANTS a toggle: a dot
+     he ticked by mistake has to be untickable. A screen whose button says "I
+     did it" must never be able to unmark anything, in any state, and the daily
+     review found exactly that: a routine part-done but already ticked by hand
+     had one button, and it deleted the day off his streak. */
+  const assertRoutineOn = (habitId: string, day: string, force = false) => {
     if (day >= todayKey()) return
     const r = routines.find((x) => x.habitId === habitId && !x.archivedAt)
     const has = habitLog.some((t) => t.habitId === habitId && t.day === day)
-    markDay(habitId, dayIndex, !has)
+    if (has && force) return
+    markDayOn(habitId, day, !has)
     if (!r) return
     const pk = r.cadence === 'weekly' ? isoWeekKey(new Date(`${day}T12:00:00`))
       : r.cadence === 'monthly' ? day.slice(0, 7) : day
@@ -1322,6 +1349,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ? prev.filter((x) => !(x.routineId === r.id && x.day === day))
       : [...prev, { routineId: r.id, day, periodKey: pk, run: 0 }]))
   }
+
+  const assertRoutineDay = (habitId: string, dayIndex: number) => assertRoutineOn(habitId, dayOfWeekKey(dayIndex))
 
   /* "I have been keeping this since June" is a claim about days, so it is
      written as days: every day from the start to YESTERDAY is marked kept, in
@@ -1355,16 +1384,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }
 
   /** Tick or untick one day of one habit, in the log and in the week cache. */
-  const markDay = (habitId: string, dayIndex: number, value: boolean) => {
-    const day = dayOfWeekKey(dayIndex)
+  /* By DATE, not by weekday index. The index is a position in THIS week, so on
+     a Monday "yesterday" is index 6 and marking it wrote the Sunday that has
+     not happened yet. Anything that talks about a specific day goes through
+     here; the index version below is a thin wrapper for the week strip. */
+  const markDayOn = (habitId: string, day: string, value: boolean) => {
     setHabitLog((prev) => {
       const without = prev.filter((t) => !(t.habitId === habitId && t.day === day))
       return value ? [...without, { habitId, day, at: day === todayKey() ? new Date().toISOString() : undefined }] : without
     })
+    /* days[] is a cache of THIS week only. A day outside it has no cell, and
+       writing one would put the mark on the wrong square. */
+    if (dayOfWeekKey(dayIndexOf(day)) !== day) return
+    const i = dayIndexOf(day)
     setHabits((prev) => prev.map((h) => (h.id === habitId
-      ? { ...h, days: h.days.map((d, i) => (i === dayIndex ? value : d)) }
+      ? { ...h, days: h.days.map((d, k) => (k === i ? value : d)) }
       : h)))
   }
+
+  const markDay = (habitId: string, dayIndex: number, value: boolean) =>
+    markDayOn(habitId, dayOfWeekKey(dayIndex), value)
 
   /* A habit kept by a routine STEP rather than by a whole routine. Each step
      writes its own row for the day, so meditating in the morning routine and
@@ -1710,6 +1749,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       markDay(id, day, !h.days[day])
     },
     markHabitDay: (id, day, value) => markDay(id, day, value),
+    dailyDone,
+    dailySkipped,
+    closeDaily: (walked) => (walked ? setDailyDone(todayKey()) : setDailySkipped(todayKey())),
+    markHabitOn: (id, day, value) => markDayOn(id, day, value),
+    assertRoutineOn,
+    /* A slip on a day he is only now admitting to. Same rules as today's: one
+       row per day, and takeable back, because saying it out loud is hard enough
+       without it also being irreversible. */
+    logSlipOn: (id, day) => {
+      if (slips.some((s) => s.habitId === id && s.day === day)) return
+      const before = slips
+      setSlips((prev) => [...prev, { habitId: id, day }])
+      armUndo('Slip logged', () => setSlips(before))
+    },
     addHabit: (input) => {
       const id = newId('h')
       setHabits((prev) => [...prev, {

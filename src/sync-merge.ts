@@ -181,6 +181,17 @@ export function mergeStates(a: string, b: string): string {
       if (typeof v === 'number' && typeof records[k] === 'number') records[k] = Math.max(records[k], v)
     }
     out.records = records
+
+    /* The daily review's two once-a-day flags are dates, and the later date is
+       the true one whichever side is carrying it. Letting them follow the newer
+       blob meant a laptop that had been open since yesterday could save at nine
+       and re-offer a review he had already walked on his phone at eight. */
+    for (const k of ['dailyDone', 'dailySkipped'] as const) {
+      const a2 = typeof older[k] === 'string' ? (older[k] as string) : ''
+      const b2 = typeof newer[k] === 'string' ? (newer[k] as string) : ''
+      const best = a2 > b2 ? a2 : b2
+      if (best) out[k] = best
+    }
     return JSON.stringify(out)
   } catch {
     return a

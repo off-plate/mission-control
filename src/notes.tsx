@@ -336,6 +336,7 @@ function TablePicker({ onPick }: { onPick: (rows: number, cols: number) => void 
 /** Everything, everywhere, the way All iCloud sits above the folders. */
 const ALL = 'nf-all'
 const SORT_KEY = 'mc:notes-sort'
+const PIN_KEY = 'mc:notes-pinshut'
 type Sort = 'edited' | 'created' | 'title'
 const SORT_LABEL: Record<Sort, string> = { edited: 'Date edited', created: 'Date created', title: 'Title' }
 
@@ -379,6 +380,10 @@ export function NotesPage() {
   const [searching, setSearching] = useState(false)
   const [fresh, setFresh] = useState<string | null>(null)
   const [naming, setNaming] = useState<{ space?: SpaceId; folder?: string; value: string } | null>(null)
+  const [pinShut, setPinShut] = useState(() => {
+    try { return localStorage.getItem(PIN_KEY) === '1' } catch { return false }
+  })
+  useEffect(() => { try { localStorage.setItem(PIN_KEY, pinShut ? '1' : '0') } catch { /* quota */ } }, [pinShut])
   const [sort, setSort] = useState<Sort>(() => {
     try { const v = localStorage.getItem(SORT_KEY); if (v === 'edited' || v === 'created' || v === 'title') return v } catch { /* first run */ }
     return 'edited'
@@ -680,9 +685,20 @@ export function NotesPage() {
 
         <ul className="nt-rows">
           {groups.map((g) => (
-            <li key={g.head} className="nt-groupblock">
-              <p className="nt-grouphead">{g.head}</p>
-              <ul>
+            <li key={g.head} className={`nt-groupblock${g.head === 'Pinned' ? ' is-pinned' : ''}`}>
+              {/* Pinned folds away, the way it does in Notes; the date headings
+                  are plain, because there is nothing to fold about March. */}
+              {g.head === 'Pinned' ? (
+                <button className="nt-grouphead nt-groupfold" aria-expanded={!pinShut} onClick={() => setPinShut((v) => !v)}>
+                  Pinned
+                  <svg className={`nt-chev${pinShut ? '' : ' open'}`} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+                    <path d="M9 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              ) : (
+                <p className="nt-grouphead">{g.head}</p>
+              )}
+              <ul hidden={g.head === 'Pinned' && pinShut}>
                 {g.rows.map((n) => (
                   <li key={n.id}>
                     <button
@@ -695,7 +711,7 @@ export function NotesPage() {
                         <span className="nt-rowname">{headOf(n.body) || 'Untitled'}</span>
                       </span>
                       <span className="nt-rowsub">
-                        <span className="nt-when mono">{fmtWhen(sort === 'created' ? n.when : localDateKey(new Date(n.updatedAt)))}</span>
+                        <span className="nt-when">{fmtWhen(sort === 'created' ? n.when : localDateKey(new Date(n.updatedAt)))}</span>
                         {snippet(n, query) && <span className="nt-rowsnip">{snippet(n, query)}</span>}
                       </span>
                       {/* Which folder it lives in, on every row, not only in a

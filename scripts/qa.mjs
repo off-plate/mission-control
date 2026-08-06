@@ -585,7 +585,26 @@ await step('notes: All notes, date groups, and the folder on every row', async (
   for (const want of ['Pinned', 'Today', 'Yesterday']) {
     if (!heads.includes(want)) throw new Error(`no ${want} heading: ${heads.join(' | ')}`)
   }
-  if (heads[0] !== 'Pinned') throw new Error(`pinned is not first: ${heads.join(' | ')}`)
+  if (heads[0].trim() !== 'Pinned') throw new Error(`pinned is not first: ${heads.join(' | ')}`)
+  // Pinned folds, and stays folded
+  const all = await page.locator('.nt-row').count()
+  await page.locator('.nt-groupfold').click(); await page.waitForTimeout(400)
+  if ((await page.locator('.nt-row:visible').count()) >= all) throw new Error('Pinned did not fold')
+  await page.reload(); await page.waitForTimeout(800)
+  if (await page.evaluate(() => localStorage.getItem('mc:notes-pinshut')) !== '1') throw new Error('the fold was not remembered')
+  /* A reload puts him back in his own workspace, so the rest of this step has
+     to walk back to All notes before it measures anything. */
+  await page.evaluate(() => localStorage.removeItem('mc:notes-pinshut'))
+  await page.reload(); await page.waitForTimeout(800)
+  await page.locator('.nt-folder', { hasText: 'All notes' }).click(); await page.waitForTimeout(400)
+  // the headings are headings, not captions, and each carries its own rule
+  const g = await page.evaluate(() => {
+    const h = document.querySelector('.nt-grouphead')
+    const cs = getComputedStyle(h)
+    return { size: parseFloat(cs.fontSize), rule: cs.borderBottomWidth }
+  })
+  if (g.size < 15) throw new Error(`group headings are ${g.size}px`)
+  if (g.rule === '0px') throw new Error('no rule under the group heading')
   // every row says which folder it is in, not only in a search
   const tails = await page.locator('.nt-row .nt-rowtail').allTextContents()
   if (tails.length !== rows || tails.some((t) => !t.trim())) throw new Error(`a row does not say its folder: ${tails.join(' | ')}`)

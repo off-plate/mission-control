@@ -1784,7 +1784,12 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 .nt-list { display: flex; flex-direction: column; padding-bottom: var(--s8); }
 .nt-listhead {
   display: flex; align-items: center; gap: var(--s3);
-  padding: var(--s4) var(--s4) var(--s3); position: sticky; top: 0; background: var(--bg); z-index: 2;
+  /* Above the search row, which is sticky at the same level and comes after it
+     in the DOM. Equal z-index plus later in source meant the search field
+     painted over the top half of this head's own dropdown, hiding "Sort by"
+     and the first option behind it. A sticky element is a stacking context, so
+     the menu's own z-index could never win from inside. */
+  padding: var(--s4) var(--s4) var(--s3); position: sticky; top: 0; background: var(--bg); z-index: 4;
 }
 .nt-headmain { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .nt-listhead h1 { font-family: var(--disp); font-weight: 700; font-size: 1.1875rem; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1803,7 +1808,7 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 }
 .nt-new:hover { background: var(--accent-wash); border-color: var(--accent); }
 
-.nt-search { display: flex; align-items: center; gap: var(--s2); padding: 0 var(--s4) var(--s3); position: sticky; top: 62px; background: var(--bg); z-index: 2; }
+.nt-search { display: flex; align-items: center; gap: var(--s2); padding: 0 var(--s4) var(--s3); position: sticky; top: 62px; background: var(--bg); z-index: 3; }
 .nt-search svg { color: var(--faint); flex: none; }
 .nt-search input { flex: 1; min-width: 0; font-size: var(--text-sm); padding: 8px var(--s3); }
 .nt-search input::-webkit-search-cancel-button { -webkit-appearance: none; }

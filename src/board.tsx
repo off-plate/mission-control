@@ -134,8 +134,13 @@ const BASE = (import.meta as unknown as { env?: { BASE_URL?: string } }).env?.BA
  *  columns are 1fr and stretch: a px hint would be a lie at most widths.
  *  A wide card covers two columns and a phone edge to edge, so it asks for
  *  roughly double. */
-const SIZES_TALL = '(max-width: 700px) 50vw, (min-width: 1900px) 15vw, 25vw'
-const SIZES_WIDE = '(max-width: 700px) 100vw, (min-width: 1900px) 30vw, 50vw'
+/*  Measured, not guessed. At 390 the wall is 2 columns and a card renders 180
+ *  wide, 366 for a wide one; at 1440 it is 4 columns, 344 and 694; at 2560 it
+ *  is 5 columns, 491 and 986. The percentages below are those numbers. A hint
+ *  that reads low makes the browser fetch a file smaller than the space it
+ *  fills, which is the one way this change could end up looking worse. */
+const SIZES_TALL = '(max-width: 700px) 46vw, (min-width: 1900px) 20vw, 25vw'
+const SIZES_WIDE = '(max-width: 700px) 94vw, (min-width: 1900px) 40vw, 50vw'
 
 /** Row height of the masonry grid, in px. Small enough that a card's real
  *  height rounds up to something indistinguishable from the height itself. */

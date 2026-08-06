@@ -3229,18 +3229,36 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
    the wall started hard against the nav. */
 .board-head { margin: 0 0 var(--s10); }
 .board-head h1 { font-size: clamp(2.6rem, 6vw, 5rem); line-height: 0.95; letter-spacing: -0.02em; }
-/* Column WIDTH, not a column count: the wall takes as many columns as the
-   screen can hold, so an ultrawide fills and a laptop does not go spindly. */
-.board-wall { columns: 300px; column-gap: 18px; }
+/* A grid, not CSS columns. A multi-column layout gives an item one column or
+   all of them and nothing in between, so a landscape photograph had no way to
+   be wider than a line of text and sat in a 300px lane as a strip. Rows are
+   4px, small enough that a card's measured height rounds up to effectively
+   itself; board.tsx sets the span per card. Dense flow backfills the holes the
+   two-wide cards leave behind. */
+.board-wall {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--bp-col, 300px), 1fr));
+  grid-auto-rows: 4px;
+  grid-auto-flow: row dense;
+  column-gap: 18px;
+}
 /* On an ultrawide, 300px columns turn the wall into eight thin strips with a
    ragged empty corner. Wider columns, fewer of them: the words get bigger and
    the wall still ends where the screen does. */
-@media (min-width: 1900px) { .board-wall { columns: 420px; column-gap: 22px; } }
+@media (min-width: 1900px) { .board-wall { --bp-col: 420px; column-gap: 22px; } }
 .bcard {
-  break-inside: avoid; margin: 0 0 18px; border-radius: 10px; overflow: hidden;
+  margin: 0; border-radius: 10px; overflow: hidden;
   transform: rotate(var(--tilt, 0deg));
   transition: transform 180ms ease-out;
+  /* Not stretched to the grid area: the row span is computed from the card's
+     own height, and a stretched card would chase its own measurement. */
+  align-self: start;
 }
+/* Two columns for a landscape photograph, which is the whole point of the grid.
+   Nothing is stretched: the image keeps width 100% and height auto, so a wider
+   card is the same picture at a bigger size. On a phone the wall is two narrow
+   columns, so two columns there means edge to edge. */
+.b-image.is-wide { grid-column: span 2; }
 .bcard:hover { transform: rotate(0deg) scale(1.015); }
 .b-statement { background: var(--bp-ink); color: var(--bp-bg); padding: 26px 24px 30px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.05; }
 .b-statement.s-xl { font-size: clamp(1.8rem, 3.2vw, 2.6rem); }
@@ -3267,7 +3285,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   background: linear-gradient(transparent, rgba(0,0,0,0.65));
 }
 @media (max-width: 700px) {
-  .board-wall { columns: 160px; }
+  .board-wall { --bp-col: 160px; column-gap: 12px; }
   .board-page { padding: var(--s6) var(--s4) var(--s10); }
   .board-head { margin-bottom: var(--s6); }
 }

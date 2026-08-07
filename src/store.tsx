@@ -907,7 +907,7 @@ function routeFromHash(): { page: PageId; day: string | null } {
   if (m) return { page: 'day', day: m[1] }
   // The board's old address still resolves: a bookmark lands on its successor.
   if (h === 'braindump') return { page: 'notes', day: null }
-  const pages: PageId[] = ['today', 'plan', 'habits', 'routines', 'goals', 'money', 'review', 'stats', 'settings', 'brand', 'notes', 'focus', 'board']
+  const pages: PageId[] = ['today', 'plan', 'habits', 'routines', 'goals', 'achievements', 'money', 'review', 'stats', 'settings', 'brand', 'notes', 'focus', 'board']
   return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
 }
 
@@ -2171,8 +2171,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         updatedAt: Date.now(),
       }
     })),
+    /* Filing a note keeps the note where it was written. It used to adopt the
+       folder's workspace, which is how a note moved into a folder made in
+       Michael's Corner quietly became a Corner note. Folders are folders now:
+       they hold notes, they do not reassign them. */
     moveNote: (id, folderId) => setNotes((prev) => prev.map((n) => (n.id === id
-      ? { ...n, folderId, space: spaceOfFolder(folderId, noteFolders) ?? n.space, updatedAt: Date.now() }
+      ? { ...n, folderId, updatedAt: Date.now() }
       : n))),
     deleteNote: (id) => {
       const before = notes

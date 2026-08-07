@@ -15,10 +15,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AutoTextarea, Dropdown } from './pages1'
 import { useStore } from './store'
-import { SPACE_LABELS } from './mock'
 import { fmtWhen, localDateKey } from './util'
 import { htmlToMd, mdToHtml } from './richtext'
-import { SPACES, spaceFolderId, type Note, type SpaceId } from './types'
+import { spaceFolderId, type Note, type SpaceId } from './types'
 
 const NOTE_COLORS: { id: string; bg: string; label: string }[] = [
   { id: 'amber', bg: '#f6ead0', label: 'Amber' },
@@ -423,8 +422,11 @@ export function NotesPage() {
     keepNoteConflict, dropNoteConflict, addTask, setPage,
   } = useStore()
 
-  const home = spaceFolderId(view === 'all' ? space : view)
-  const [openFolder, setOpenFolder] = useState<string>(home)
+  /* Notes are not filed by workspace any more, on his instruction: folders are
+     just folders, and the app opens on all of them. A note still carries the
+     space it was written in, because other pages read it, but nothing here is
+     decided by which workspace he happens to be standing in. */
+  const [openFolder, setOpenFolder] = useState<string>(ALL)
   const [openId, setOpenId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [tag, setTag] = useState<string | null>(null)
@@ -451,14 +453,15 @@ export function NotesPage() {
   const phone = vw < 1000
   const wide = vw >= 1180
 
-  useEffect(() => { setOpenFolder(home); setOpenId(null) }, [home])
-
   const finding = query.trim().length > 0 || tag !== null
   const spaceOf = (id: string) => id.match(/^nf-space-(.+)$/)?.[1] as SpaceId | undefined
+  /* A note that is in no folder of his own says so. It used to say the name of
+     the workspace it happened to be written in, which is exactly the filing he
+     asked to be rid of. */
   const nameOf = (id: string) => {
     if (id === ALL) return 'All notes'
-    const s = spaceOf(id)
-    return s ? (SPACE_LABELS[s] ?? 'Notes') : (noteFolders.find((f) => f.id === id)?.name ?? 'Notes')
+    if (spaceOf(id)) return 'No folder'
+    return noteFolders.find((f) => f.id === id)?.name ?? 'No folder'
   }
   const inFolder = (n: Note, id: string) => {
     if (id === ALL) return true
@@ -513,21 +516,23 @@ export function NotesPage() {
   const open = notes.find((n) => n.id === openId) ?? null
 
   const create = () => {
-    const id = addNote(finding ? home : openFolder)
+    const id = addNote(finding || openFolder === ALL ? spaceFolderId(space) : openFolder)
     setOpenId(id)
     setFresh(id)
     window.scrollTo({ top: 0 })
   }
-  /* Where a new folder lands: the workspace of whatever is selected, and the
-     one he is writing into when All notes is. Named on the button, so it is
-     never a guess. */
-  const newFolderIn: SpaceId = (() => {
-    if (openFolder === ALL) return space
-    const s2 = spaceOf(openFolder)
-    if (s2) return s2
-    return noteFolders.find((f) => f.id === openFolder)?.space ?? space
-  })()
+  /* A folder still records a space, because the stored shape has one and a
+     migration would risk his notes for nothing. It is no longer shown, chosen
+     or meaningful in this page: every folder is listed in one flat rail. */
+  const newFolderIn: SpaceId = space
   const goFolder = (id: string) => { setOpenFolder(id); setOpenId(null); setQuery(''); setTag(null) }
+
+  /* Every folder he made, in one list. Sorted by the order he dragged them
+     into, then by name, and never by which workspace they were created in. */
+  const folderList = useMemo(
+    () => [...noteFolders].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name)),
+    [noteFolders],
+  )
 
   const submitName = () => {
     if (!naming) return
@@ -566,12 +571,11 @@ export function NotesPage() {
         setPage('plan')
       }}>Make it a task</button>
       <span className="kebab-head">Move to</span>
-      {SPACES.flatMap((s) => [
-        { id: spaceFolderId(s), name: SPACE_LABELS[s] },
-        ...noteFolders.filter((f) => f.space === s).map((f) => ({ id: f.id, name: `${SPACE_LABELS[s]} / ${f.name}` })),
-      ]).filter((f) => f.id !== n.folderId).map((f) => (
-        <button key={f.id} role="menuitem" onClick={() => moveNote(n.id, f.id)}>{f.name}</button>
-      ))}
+      {[{ id: spaceFolderId(n.space), name: 'No folder' }, ...folderList]
+        .filter((f) => f.id !== (n.folderId ?? spaceFolderId(n.space)))
+        .map((f) => (
+          <button key={f.id} role="menuitem" onClick={() => moveNote(n.id, f.id)}>{f.name}</button>
+        ))}
       <span className="kebab-head">Colour</span>
       <div className="nt-swatches" role="radiogroup" aria-label="Note colour">
         {NOTE_COLORS.map((c) => (
@@ -611,63 +615,45 @@ export function NotesPage() {
               <span className="nt-slot" aria-hidden="true" />
             </div>
           </div>
-          {SPACES.map((s) => {
-            const wid = spaceFolderId(s)
-            const own = noteFolders.filter((f) => f.space === s).sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name))
-            const at = (id: string) => !finding && openFolder === id
-            const count = (id: string) => notes.filter((n) => inFolder(n, id)).length
-            return (
-              <div className="nt-group" key={s}>
-                {/* Every row is the same shape whether or not it is the open
-                    one: the menu slot is always there, so nothing shifts when
-                    it is clicked. */}
-                <div className={`nt-folder-row${at(wid) ? ' on' : ''}`}>
-                  <button className="nt-folder" aria-current={at(wid) ? 'true' : undefined} onClick={() => goFolder(wid)}>
-                    <FolderIcon open={at(wid)} />
-                    <span className="nt-fname">{SPACE_LABELS[s]}</span>
-                    <span className="nt-count mono">{count(wid) || ''}</span>
-                  </button>
-                  <span className="nt-slot" aria-hidden="true" />
-                </div>
-                {own.map((f) => (naming?.folder === f.id ? (
-                  <input
-                    key={f.id} className="nt-rename textinput" autoFocus value={naming.value} aria-label={`Rename ${f.name}`}
-                    onChange={(e) => setNaming({ ...naming, value: e.target.value })}
-                    onBlur={submitName}
-                    onKeyDown={(e) => { if (e.key === 'Enter') submitName(); if (e.key === 'Escape') setNaming(null) }}
-                  />
-                ) : (
-                  <div className={`nt-folder-row is-sub${at(f.id) ? ' on' : ''}`} key={f.id}>
-                    <button className="nt-folder" aria-current={at(f.id) ? 'true' : undefined} onClick={() => goFolder(f.id)}>
-                      <FolderIcon open={at(f.id)} />
-                      <span className="nt-fname">{f.name}</span>
-                      <span className="nt-count mono">{count(f.id) || ''}</span>
-                    </button>
-                    <Dropdown label={`${f.name} options`} className="nt-fkebab">
-                      <button role="menuitem" onClick={() => setNaming({ folder: f.id, value: f.name })}>Rename</button>
-                      <button role="menuitem" className="danger" onClick={() => deleteNoteFolder(f.id)}>Delete folder, keep the notes</button>
-                    </Dropdown>
-                  </div>
-                )))}
-                {naming?.space === s && (
-                  <input
-                    className="nt-rename textinput" autoFocus value={naming.value} placeholder="Folder name"
-                    aria-label={`New folder in ${SPACE_LABELS[s]}`}
-                    onChange={(e) => setNaming({ ...naming, value: e.target.value })}
-                    onBlur={submitName}
-                    onKeyDown={(e) => { if (e.key === 'Enter') submitName(); if (e.key === 'Escape') setNaming(null) }}
-                  />
-                )}
-              </div>
-            )
-          })}
+          {/* One flat list. It used to be four workspace sections with their own
+              folders nested inside, which meant a note's home depended on which
+              workspace was selected when he wrote it. He asked for that gone. */}
+          {folderList.map((f) => (naming?.folder === f.id ? (
+            <input
+              key={f.id} className="nt-rename textinput" autoFocus value={naming.value} aria-label={`Rename ${f.name}`}
+              onChange={(e) => setNaming({ ...naming, value: e.target.value })}
+              onBlur={submitName}
+              onKeyDown={(e) => { if (e.key === 'Enter') submitName(); if (e.key === 'Escape') setNaming(null) }}
+            />
+          ) : (
+            <div className={`nt-folder-row${!finding && openFolder === f.id ? ' on' : ''}`} key={f.id}>
+              <button className="nt-folder" aria-current={!finding && openFolder === f.id ? 'true' : undefined} onClick={() => goFolder(f.id)}>
+                <FolderIcon open={!finding && openFolder === f.id} />
+                <span className="nt-fname">{f.name}</span>
+                <span className="nt-count mono">{notes.filter((n) => inFolder(n, f.id)).length || ''}</span>
+              </button>
+              <Dropdown label={`${f.name} options`} className="nt-fkebab">
+                <button role="menuitem" onClick={() => setNaming({ folder: f.id, value: f.name })}>Rename</button>
+                <button role="menuitem" className="danger" onClick={() => deleteNoteFolder(f.id)}>Delete folder, keep the notes</button>
+              </Dropdown>
+            </div>
+          )))}
+          {naming?.space && (
+            <input
+              className="nt-rename textinput" autoFocus value={naming.value} placeholder="Folder name"
+              aria-label="New folder"
+              onChange={(e) => setNaming({ ...naming, value: e.target.value })}
+              onBlur={submitName}
+              onKeyDown={(e) => { if (e.key === 'Enter') submitName(); if (e.key === 'Escape') setNaming(null) }}
+            />
+          )}
         </div>
 
         {/* One button, at the foot, naming where the folder will land. Four of
             them down the panel was four times the noise for a monthly act. */}
         <button
           className="nt-newfolder"
-          title={`New folder in ${SPACE_LABELS[newFolderIn]}`}
+          title="New folder"
           onClick={() => setNaming({ space: newFolderIn, value: '' })}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
@@ -675,7 +661,6 @@ export function NotesPage() {
             <path d="M12 11.4v4.6M9.7 13.7h4.6" strokeLinecap="round" />
           </svg>
           New folder
-          <span className="nt-newwhere">{SPACE_LABELS[newFolderIn]}</span>
         </button>
       </aside>
 

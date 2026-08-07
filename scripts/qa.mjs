@@ -124,19 +124,108 @@ await step('focus: timer start writes state', async () => {
   if (p.phase !== 'focus') throw new Error(`phase ${p.phase}`)
   await page.locator('.focus-live').getByRole('button', { name: 'Stop' }).click()
 })
-await step('the dropped pages are gone, and their old addresses land on Today', async () => {
+await step('the menu is six tabs, and what left it is reachable from the header', async () => {
   await fresh('today')
   const tabs = await page.locator('.nav-tab').allInnerTexts()
-  for (const gone of ['Calendar', 'Avoidance', 'Assistant']) {
+  if (tabs.length !== 6) throw new Error(`${tabs.length} tabs: ${tabs.join(', ')}`)
+  for (const gone of ['Calendar', 'Avoidance', 'Assistant', 'Notes', 'Focus', 'Money', 'Reflect']) {
     if (tabs.includes(gone)) throw new Error(`${gone} is still a tab`)
   }
-  // A bookmark must not land on a blank screen with no tab lit.
-  for (const route of ['calendar', 'coach', 'assistant']) {
+  for (const name of ['Note', 'Achievements', 'My Mind']) {
+    if (!(await page.getByRole('button', { name, exact: true }).count()) && !(await page.getByRole('link', { name }).count())) {
+      throw new Error(`no ${name} in the header`)
+    }
+  }
+  // Every old address still lands somewhere real.
+  for (const [route, heading] of [['calendar', 'Today'], ['coach', 'Today'], ['assistant', 'Today'], ['money', 'Money'], ['review', 'Reflect']]) {
     await page.goto(`${URL}#/${route}`); await page.reload(); await page.waitForTimeout(500)
     const h1 = await page.locator('h1').first().innerText()
-    if (h1 !== 'Today') throw new Error(`#/${route} landed on ${h1}, not Today`)
+    if (h1 !== heading) throw new Error(`#/${route} landed on ${h1}, not ${heading}`)
   }
-  if (await page.getByRole('button', { name: 'Assistant' }).count()) throw new Error('the header still has an Assistant button')
+})
+await step('the header opens Notes, and the pill opens Focus', async () => {
+  await fresh('today')
+  await page.getByRole('button', { name: 'Note', exact: true }).click(); await page.waitForTimeout(600)
+  if (!(await page.locator('.nt-app').count())) throw new Error('the Note button did not open Notes')
+  // The pill is the only door to Focus now, and it is on every page.
+  await page.getByRole('button', { name: 'Open the focus history' }).click(); await page.waitForTimeout(600)
+  const h1 = await page.locator('h1').first().innerText()
+  if (h1 !== 'Focus') throw new Error(`the pill went to ${h1}`)
+})
+await step('achievements: three faces, and every milestone is earned by the log', async () => {
+  await fresh('achievements')
+  const segs = await page.locator('.achtab').allInnerTexts()
+  if (segs.join(',') !== 'Milestones,Money,Reflect') throw new Error(`segments are ${segs.join(', ')}`)
+  if ((await page.locator('.ms-card').count()) < 8) throw new Error('the milestone list is short')
+  // Nothing is earned on an empty install: a badge for opening the app is the
+  // exact thing this page must not do.
+  if (await page.locator('.ms-card.is-earned').count()) throw new Error('something was earned with no record behind it')
+  await page.getByRole('tab', { name: 'Money' }).click(); await page.waitForTimeout(400)
+  if ((await page.locator('h1').first().innerText()) !== 'Money') throw new Error('the Money face did not open')
+  await page.getByRole('tab', { name: 'Reflect' }).click(); await page.waitForTimeout(400)
+  if ((await page.locator('h1').first().innerText()) !== 'Reflect') throw new Error('the Reflect face did not open')
+})
+await step('achievements: a real record earns its milestone, and says so once', async () => {
+  await fresh('achievements')
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const key = (x) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+    s.focusSessions = Array.from({ length: 20 }, (_, i) => {
+      const d = new Date(); d.setDate(d.getDate() - i)
+      return { id: `af${i}`, day: key(d), minutes: 35, space: 'personal', label: 'Deep work' }
+    })
+    localStorage.setItem(K, JSON.stringify(s))
+    localStorage.removeItem('mc:earned')
+  }, KEY)
+  await page.reload(); await page.waitForTimeout(800)
+  // Twenty days of history makes the morning review offer itself over the top
+  // of the page. Answer it first; it is not what this step is about.
+  const notNow = page.getByRole('button', { name: 'Not today' })
+  if (await notNow.count()) { await notNow.first().click(); await page.waitForTimeout(400) }
+  // 20 blocks of 35 minutes is 11 hours, which clears the ten hour line and
+  // nothing else.
+  const earned = await page.locator('.ms-card.is-earned').allInnerTexts()
+  if (earned.length !== 1) throw new Error(`${earned.length} earned, expected 1: ${earned.join(' | ')}`)
+  if (!/Ten hours/.test(earned[0])) throw new Error(`the wrong one was earned: ${earned[0]}`)
+  if (!(await page.locator('.ms-landed').count())) throw new Error('nothing celebrated a milestone that just landed')
+  await page.getByRole('button', { name: 'Good' }).click(); await page.waitForTimeout(300)
+  if (await page.locator('.ms-landed').count()) throw new Error('the celebration did not stand down')
+  await page.reload(); await page.waitForTimeout(700)
+  const again = page.getByRole('button', { name: 'Not today' })
+  if (await again.count()) { await again.first().click(); await page.waitForTimeout(300) }
+  if (await page.locator('.ms-landed').count()) throw new Error('it celebrated the same milestone twice')
+})
+await step('notes: folders are folders, with no workspace above them', async () => {
+  await fresh('notes')
+  const names = await page.locator('.nt-side .nt-fname').allInnerTexts()
+  if (names[0] !== 'All notes') throw new Error(`the rail opens with ${names[0]}`)
+  for (const space of ['Personal', 'Big Time', 'Off-Plate', 'Michael’s Corner']) {
+    if (names.includes(space)) throw new Error(`${space} is still a row in the folder rail`)
+  }
+  if (!names.includes('Brain dumps')) throw new Error('his own folders are missing from the flat rail')
+  // The list opens on everything, not on the workspace he happens to be in.
+  if ((await page.locator('.nt-listhead h1').innerText()) !== 'All notes') throw new Error('notes did not open on All notes')
+  // A folder he makes lands in the same flat list.
+  await page.getByRole('button', { name: /New folder/ }).click()
+  await page.locator('.nt-rename').fill('Gate folder')
+  await page.keyboard.press('Enter'); await page.waitForTimeout(500)
+  const after = await page.locator('.nt-side .nt-fname').allInnerTexts()
+  if (!after.includes('Gate folder')) throw new Error('the folder he made is not in the rail')
+
+  /* Filing must not move a note between workspaces. It used to: a note adopted
+     its folder's space, so a folder made while standing in one workspace
+     quietly reassigned everything dropped into it. */
+  await page.getByRole('button', { name: 'New note' }).click(); await page.waitForTimeout(300)
+  await page.locator('textarea[aria-label="Note title"]').fill('Gate filing'); await page.waitForTimeout(400)
+  const readNote = async () => (await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)).notes.find((n) => n.title === 'Gate filing')
+  const was = (await readNote()).space
+  /* It was written inside Gate folder, so the move that proves the point is
+     the one out of it. */
+  await page.locator('.nt-kebab button').first().click(); await page.waitForTimeout(200)
+  await page.getByRole('menuitem', { name: 'No folder' }).click(); await page.waitForTimeout(500)
+  const now = await readNote()
+  if (!now) throw new Error('the note vanished when it was filed')
+  if (now.space !== was) throw new Error(`filing moved the note from ${was} to ${now.space}`)
 })
 await step('today: the clock is a widget in the grid, and it says the real minute', async () => {
   await fresh('today')
@@ -386,7 +475,7 @@ await step('focus: stopping mid-block banks the elapsed minutes', async () => {
   await cp.goto(`${URL}#/focus`); await cp.reload(); await cp.waitForTimeout(600)
   await cp.locator('.pomo-start').click(); await cp.waitForTimeout(300)
   await cp.clock.fastForward('20:00'); await cp.waitForTimeout(600)
-  await cp.locator('.pomo-badge button[aria-label="Stop"]').click(); await cp.waitForTimeout(500)
+  await cp.locator('.pomo-badge button[aria-label="Stop this block"]').click(); await cp.waitForTimeout(500)
   const s = await cp.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
   const total = (s.focusSessions ?? []).reduce((a, f) => a + f.minutes, 0)
   if (total < 19 || total > 21) throw new Error(`banked ${total}m of a stopped 20m block`)
@@ -707,7 +796,7 @@ await step('notes: brain dumps came across, and search reaches every folder', as
   if (!mine.body.includes('Druhý řádek')) throw new Error('the body was not saved with the title')
   if (mine.folderId !== 'nf-braindump-personal') throw new Error(`landed in ${mine.folderId}`)
   // back to the list, stand somewhere else, then search without the accents
-  await page.locator('.nt-folder', { hasText: 'Personal' }).first().click(); await page.waitForTimeout(200)
+  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(200)
   await page.locator('input[aria-label="Search notes"]').fill('ukol'); await page.waitForTimeout(400)
   if (!(await page.locator('.nt-row', { hasText: 'Zavolat' }).count())) throw new Error('accent-blind search missed it')
   await page.locator('input[aria-label="Search notes"]').fill(''); await page.waitForTimeout(200)
@@ -819,7 +908,7 @@ await step('notes: the folder panel is one list at one size', async () => {
       adders: document.querySelectorAll('.nt-newfolder').length,
     }
   })
-  if (m.rows < 5) throw new Error('the folder panel did not render')
+  if (m.rows < 2) throw new Error('the folder panel did not render')
   if (m.heights.length !== 1) throw new Error(`folder rows are ${m.heights.join(', ')}px tall`)
   if (m.heights[0] < 38) throw new Error(`folder rows are only ${m.heights[0]}px tall`)
   if (m.sizes.length !== 1 || m.families.length !== 1) throw new Error(`mixed type in the folder list: ${m.sizes.join(', ')} / ${m.families.join(' | ')}`)
@@ -828,20 +917,22 @@ await step('notes: the folder panel is one list at one size', async () => {
 
 await step('notes: a folder he made, and its notes surviving its deletion', async () => {
   await fresh('notes')
-  // the first group is All notes now; the workspace groups start after it
-  // one New folder control at the foot; it lands in the workspace he is in
-  await page.locator('.nt-folder', { hasText: 'Personal' }).first().click(); await page.waitForTimeout(300)
+  // One flat rail: All notes at the top, then every folder he made. One New
+  // folder control at the foot, and it no longer names a workspace.
+  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(300)
   await page.locator('.nt-newfolder').click()
-  await page.locator('input[aria-label^="New folder in"]').fill('Taxes')
+  await page.locator('input[aria-label="New folder"]').fill('Taxes')
   await page.keyboard.press('Enter'); await page.waitForTimeout(400)
   await page.getByRole('button', { name: 'New note' }).click(); await page.waitForTimeout(300)
   await page.locator('textarea[aria-label="Note title"]').fill('Do not lose me'); await page.waitForTimeout(400)
   let s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
   const f = (s.noteFolders ?? []).find((x) => x.name === 'Taxes')
   if (!f) throw new Error('the folder was not created')
-  if (f.parentId !== 'nf-space-personal') throw new Error(`nested under ${f.parentId}`)
   const wrote = (s.notes ?? []).find((n) => n.title === 'Do not lose me')
   if (wrote?.folderId !== f.id) throw new Error('the note did not land in the new folder')
+  // Filing must not move a note between workspaces. It used to: the note
+  // adopted its folder's space, so a folder made in one workspace reassigned
+  // everything dropped into it.
   // deleting the shelf must not burn the books
   await page.locator('.nt-folder-row', { hasText: 'Taxes' }).getByRole('button', { name: /options/i }).click()
   await page.getByRole('menuitem', { name: /Delete folder/ }).click(); await page.waitForTimeout(500)
@@ -849,7 +940,10 @@ await step('notes: a folder he made, and its notes surviving its deletion', asyn
   if ((s.noteFolders ?? []).some((x) => x.id === f.id)) throw new Error('the folder is still there')
   const after = (s.notes ?? []).find((n) => n.title === 'Do not lose me')
   if (!after) throw new Error('the note went with the folder')
-  if (after.folderId !== 'nf-space-personal') throw new Error(`the note ended up in ${after.folderId}`)
+  // Out of the deleted folder and into no folder, which is the note's own
+  // space marker. Which space that is depends on where he was standing when he
+  // wrote it, and is no longer visible anywhere in the page.
+  if (!/^nf-space-/.test(after.folderId ?? '')) throw new Error(`the note ended up in ${after.folderId}`)
 })
 
 await step('notes: a body from another device is kept, never dropped', async () => {
@@ -866,7 +960,7 @@ await step('notes: a body from another device is kept, never dropped', async () 
   await page.goto(`${URL}#/notes`); await page.reload(); await page.waitForTimeout(700)
   // An earlier step left the workspace switcher somewhere else, and the switcher
   // is what decides which folder opens. Stand in Personal first.
-  await page.locator('.nt-folder', { hasText: 'Personal' }).first().click(); await page.waitForTimeout(200)
+  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(200)
   await page.locator('.nt-row', { hasText: 'Laptop version' }).first().click(); await page.waitForTimeout(200)
   if (!(await page.locator('.nt-conflict').count())) throw new Error('the other version was not shown')
   await page.getByRole('button', { name: 'Add it to this note' }).click(); await page.waitForTimeout(400)
@@ -903,7 +997,7 @@ await step('notes: the editor formats as he types, and the marks survive a reloa
      works, and a checkbox is something you click. All of it round-trips
      through markdown, which is what the sync and the search read. */
   await fresh('notes')
-  await page.locator('.nt-folder', { hasText: 'Personal' }).first().click(); await page.waitForTimeout(300)
+  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(300)
   await page.getByRole('button', { name: 'New note' }).click(); await page.waitForTimeout(300)
   await page.locator('textarea[aria-label="Note title"]').fill('Formatting')
   await page.locator('.nt-editor').click()
@@ -923,7 +1017,7 @@ await step('notes: the editor formats as he types, and the marks survive a reloa
     if (!md.includes(want)) throw new Error(`${want} is not in the stored note: ${JSON.stringify(md)}`)
   }
   await page.reload(); await page.waitForTimeout(800)
-  await page.locator('.nt-folder', { hasText: 'Personal' }).first().click(); await page.waitForTimeout(400)
+  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(400)
   await page.locator('.nt-row', { hasText: 'Formatting' }).first().click(); await page.waitForTimeout(400)
   if ((await page.locator('.nt-editor ul li').count()) < 3) throw new Error('the formatting did not come back after a reload')
   /* Tab nests the item and Shift-Tab lifts it back, and the nesting has to
@@ -943,14 +1037,14 @@ await step('notes: the editor formats as he types, and the marks survive a reloa
   const nested = await page.evaluate((K) => (JSON.parse(localStorage.getItem(K)).notes ?? []).find((n) => n.title === 'Formatting')?.body ?? '', KEY)
   if (!/\n {2}- .*child/.test(nested)) throw new Error(`the nested item was not stored indented: ${JSON.stringify(nested.split('\n').slice(-3))}`)
   await page.reload(); await page.waitForTimeout(800)
-  await page.locator('.nt-folder', { hasText: 'Personal' }).first().click(); await page.waitForTimeout(400)
+  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(400)
   await page.locator('.nt-row', { hasText: 'Formatting' }).first().click(); await page.waitForTimeout(400)
   if (!(await page.locator('.nt-editor li > ul li').count())) throw new Error('the nesting did not come back after a reload')
 })
 
 await step('notes: three dashes make a divider, and a table he sized himself', async () => {
   await fresh('notes')
-  await page.locator('.nt-folder', { hasText: 'Personal' }).first().click(); await page.waitForTimeout(300)
+  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(300)
   await page.getByRole('button', { name: 'New note' }).click(); await page.waitForTimeout(300)
   await page.locator('textarea[aria-label="Note title"]').fill('Divider and table')
   await page.locator('.nt-editor').click()
@@ -977,7 +1071,7 @@ await step('notes: three dashes make a divider, and a table he sized himself', a
   if (!md.includes('---')) throw new Error(`no divider stored: ${JSON.stringify(md)}`)
   if (!/\| Věřitel \|/.test(md)) throw new Error(`the cell text was not stored: ${JSON.stringify(md)}`)
   await page.reload(); await page.waitForTimeout(800)
-  await page.locator('.nt-folder', { hasText: 'Personal' }).first().click(); await page.waitForTimeout(300)
+  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(300)
   await page.locator('.nt-row', { hasText: 'Divider and table' }).first().click(); await page.waitForTimeout(400)
   if (!(await page.locator('.nt-editor hr').count())) throw new Error('the divider did not come back')
   if ((await page.locator('.nt-editor table tr').count()) < 4) throw new Error('the table did not come back whole')
@@ -1020,7 +1114,7 @@ await step('notes: the note menu opens where it can be reached', async () => {
   await fresh('notes')
   // An earlier step left the workspace switcher elsewhere; stand where the
   // seeded note actually is, or there is no open note to have a menu.
-  await page.locator('.nt-folder', { hasText: 'Personal' }).first().click(); await page.waitForTimeout(400)
+  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(400)
   await page.locator('.nt-pane').getByRole('button', { name: 'Note options' }).click(); await page.waitForTimeout(300)
   if (!(await page.locator('.nt-pane .kebab-menu').count())) throw new Error('the menu did not open')
   const m = await page.locator('.nt-pane .kebab-menu').boundingBox()

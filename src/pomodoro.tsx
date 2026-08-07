@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { useStore } from './store'
-import { taskMinutes } from './util'
+import { fmtDuration, taskMinutes } from './util'
 
 /* A global Pomodoro that lives above the whole app: a bottom-right badge you
    see on every tab, a corner ambient glow that shows the state at a glance,
@@ -302,9 +302,32 @@ function Stepper({ label, value, set, min, max }: { label: string; value: number
   )
 }
 
+/* Focus left the menu, so this badge is now the only door to its page as well
+   as the timer's controls. Everything it does is one press: start, pause, take
+   the break, stop, and open the history. The glyph buttons it used to carry
+   (❚❚ ▸ ⤼ ✕) were characters at whatever size the font felt like; these are
+   drawn, and they hit a 30px target. */
 function PomodoroBadge() {
   const p = usePomodoro()
+  const { setPage, page, focusSessions } = useStore()
   const [setupOpen, setSetupOpen] = useState(false)
+
+  const today = focusSessions
+    .filter((f) => f.day === new Date().toLocaleDateString('en-CA'))
+    .reduce((a, f) => a + f.minutes, 0)
+
+  const open = (
+    <button
+      className={`pomo-icon${page === 'focus' ? ' is-on' : ''}`}
+      onClick={() => setPage('focus')}
+      aria-label="Open the focus history"
+      title="Open Focus"
+    >
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+        <path d="M4 19.5h16M6.5 19.5V12M11 19.5V6.5M15.5 19.5v-5M20 19.5V9" strokeLinecap="round" />
+      </svg>
+    </button>
+  )
 
   if (p.phase === 'idle') {
     return (
@@ -318,8 +341,16 @@ function PomodoroBadge() {
         <button className="pomo-start" onClick={() => p.startFocus()} aria-label={`Start a ${p.focusMin} minute focus`}>
           <ClockIcon /> Focus {p.focusMin}m
         </button>
-        {p.cyclesDone > 0 && <span className="pomo-cycles mono" title="Focus blocks finished today">{p.cyclesDone} today</span>}
-        <button className="pomo-icon" aria-label="Timer settings" aria-expanded={setupOpen} onClick={() => setSetupOpen((v) => !v)}>⚙</button>
+        {/* Minutes, not blocks: he asked what today amounts to, and three
+            blocks says nothing about whether they were ten minutes or fifty. */}
+        {today > 0 && <span className="pomo-cycles mono" title="Focused today">{fmtDuration(today)} today</span>}
+        <button className="pomo-icon" aria-label="Timer settings" aria-expanded={setupOpen} onClick={() => setSetupOpen((v) => !v)}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1" strokeLinecap="round" />
+          </svg>
+        </button>
+        {open}
       </div>
     )
   }
@@ -331,9 +362,20 @@ function PomodoroBadge() {
         {p.phase === 'focus' ? (p.focusLabel ?? (p.running ? 'Focus' : 'Paused')) : p.phase === 'await' ? 'Focus finished' : 'Break'}
       </span>
       <span className="pomo-clock mono">{p.phase === 'await' ? 'done' : mmss(p.secondsLeft)}</span>
-      <button className="pomo-icon" onClick={p.toggle} aria-label={p.running ? 'Pause' : 'Resume'}>{p.running ? '❚❚' : '▸'}</button>
-      <button className="pomo-icon" onClick={p.skip} aria-label={p.phase === 'focus' ? 'Skip to break' : 'End break'}>⤼</button>
-      <button className="pomo-icon" onClick={p.stop} aria-label="Stop">✕</button>
+      <button className="pomo-icon" onClick={p.toggle} aria-label={p.running ? 'Pause' : 'Resume'}>
+        {p.running ? (
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="7" y="5" width="3.6" height="14" rx="1" /><rect x="13.4" y="5" width="3.6" height="14" rx="1" /></svg>
+        ) : (
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5l11 6.5-11 6.5z" /></svg>
+        )}
+      </button>
+      <button className="pomo-icon" onClick={p.skip} aria-label={p.phase === 'focus' ? 'Skip to the break' : 'End the break'}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5.5l9 6.5-9 6.5z" /><rect x="16" y="5" width="2.8" height="14" rx="1" /></svg>
+      </button>
+      <button className="pomo-icon" onClick={p.stop} aria-label="Stop this block">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" /></svg>
+      </button>
+      {open}
     </div>
   )
 }

@@ -124,11 +124,74 @@ await step('focus: timer start writes state', async () => {
   if (p.phase !== 'focus') throw new Error(`phase ${p.phase}`)
   await page.locator('.focus-live').getByRole('button', { name: 'Stop' }).click()
 })
-await step('calendar: month nav and day pick', async () => {
-  await fresh('calendar')
-  await page.getByRole('button', { name: 'Next month' }).click()
-  await page.getByRole('button', { name: 'Now' }).click()
-  await page.locator('.cal-day').first().click()
+await step('the dropped pages are gone, and their old addresses land on Today', async () => {
+  await fresh('today')
+  const tabs = await page.locator('.nav-tab').allInnerTexts()
+  for (const gone of ['Calendar', 'Avoidance', 'Assistant']) {
+    if (tabs.includes(gone)) throw new Error(`${gone} is still a tab`)
+  }
+  // A bookmark must not land on a blank screen with no tab lit.
+  for (const route of ['calendar', 'coach', 'assistant']) {
+    await page.goto(`${URL}#/${route}`); await page.reload(); await page.waitForTimeout(500)
+    const h1 = await page.locator('h1').first().innerText()
+    if (h1 !== 'Today') throw new Error(`#/${route} landed on ${h1}, not Today`)
+  }
+  if (await page.getByRole('button', { name: 'Assistant' }).count()) throw new Error('the header still has an Assistant button')
+})
+await step('today: the clock says the real minute, and the real date', async () => {
+  await fresh('today')
+  const shown = await page.evaluate(() => {
+    const m = [...document.querySelectorAll('.band-metric')].map((el) => ({
+      v: el.querySelector('.v')?.textContent ?? '', k: el.querySelector('.k')?.textContent ?? '',
+    }))
+    const d = new Date()
+    return {
+      m,
+      time: d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+      date: d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }),
+    }
+  })
+  const clock = shown.m.find((x) => /^\d{2}:\d{2}$/.test(x.v))
+  if (!clock) throw new Error(`no clock in the band: ${JSON.stringify(shown.m)}`)
+  if (clock.v !== shown.time) throw new Error(`clock reads ${clock.v}, the browser says ${shown.time}`)
+  if (clock.k !== shown.date) throw new Error(`date reads ${clock.k}, the browser says ${shown.date}`)
+})
+await step('today: the assistant rail is already open, and files what he says', async () => {
+  await fresh('today')
+  const rail = page.locator('.assist-rail')
+  if (!(await rail.isVisible())) throw new Error('the rail is not on Today')
+  // Beside the day, not under it: the rail's top must sit level with the page.
+  const box = await page.evaluate(() => {
+    const r = document.querySelector('.assist-rail')?.getBoundingClientRect()
+    const m = document.querySelector('.today-main')?.getBoundingClientRect()
+    return r && m ? { railLeft: Math.round(r.left), mainRight: Math.round(m.right), sameRow: Math.abs(r.top - m.top) < 40 } : null
+  })
+  if (!box) throw new Error('no rail geometry')
+  if (!box.sameRow || box.railLeft < box.mainRight) throw new Error('the rail is not beside the day at 1500px')
+  await rail.locator('textarea').fill('Call the bank about the plan 20 min')
+  await rail.getByRole('button', { name: 'Understand' }).click(); await page.waitForTimeout(500)
+  await rail.getByRole('button', { name: /^File 1 item$/ }).click(); await page.waitForTimeout(500)
+  const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
+  const t = s.tasks.find((x) => /Call the bank about the plan/.test(x.title))
+  if (!t) throw new Error('nothing was filed')
+  if (t.estimateMin !== 20) throw new Error(`filed with ${t.estimateMin} minutes, not 20`)
+  if (!(await rail.getByText('Just filed').count())) throw new Error('the rail does not show what it filed')
+})
+await step('today: nothing to upload, and no camera left on the page', async () => {
+  await fresh('today')
+  const n = await page.locator('input[type="file"]').count()
+  if (n) throw new Error(`${n} file inputs are still in the app`)
+})
+await step('money: reads Compass, and invents nothing when it cannot', async () => {
+  await fresh('money')
+  // The gate runs ?noremote, so Compass is unreachable by design. Every figure
+  // must be a dash: a zero here would read as "you owe nothing".
+  const kpis = await page.locator('.kpi').allInnerTexts()
+  if (!kpis.length) throw new Error('no figures on the page at all')
+  for (const k of kpis) {
+    if (/\d/.test(k)) throw new Error(`a number appeared with no Compass behind it: ${k}`)
+  }
+  if (!(await page.getByText('Open Compass').count())) throw new Error('no way through to Compass')
 })
 await step('workspaces: write a task into Michael’s Corner', async () => {
   await fresh('plan')

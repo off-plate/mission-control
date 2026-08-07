@@ -12,20 +12,11 @@ export function momentum(ctx: {
   tasks: Task[]
   routines: Routine[]
   habits: { id: string; name: string; days: boolean[]; history?: number[]; space: SpaceId }[]
-  coachSessions: { didIt?: boolean; felt?: string; status: string }[]
 }): string[] {
   const out: string[] = []
 
   const paid = ctx.tasks.filter((t) => t.done && /^Send: /.test(t.title)).length
   if (paid > 0) out.push(`${paid} ${paid === 1 ? 'payment' : 'payments'} sent from here.`)
-
-  const faced = ctx.coachSessions.filter((s) => s.didIt).length
-  const easier = ctx.coachSessions.filter((s) => s.didIt && s.felt === 'easier').length
-  if (faced > 0) {
-    out.push(easier > 0
-      ? `${faced} ${faced === 1 ? 'thing' : 'things'} faced in Avoidance, ${easier} ${easier === 1 ? 'was' : 'were'} easier than you feared.`
-      : `${faced} ${faced === 1 ? 'thing' : 'things'} faced instead of avoided.`)
-  }
 
   // Longest run of weeks a habit was kept at least four days, from its history.
   const best = ctx.habits
@@ -73,11 +64,8 @@ export interface ExceptionItem {
   id: string
   text: string
   when: string
-  action?: 'coach' | 'add-task' | 'open-goals' | 'open-plan'
-  coachId?: string
-  /** Free text handed to Coach's analyser (used by the ageing alerts). */
-  coachSeed?: string
-  /** The task this alert is about, so Today can offer to drop it. */
+  action?: 'do-today' | 'add-task' | 'open-goals' | 'open-plan'
+  /** The task this alert is about, so Today can move it or drop it. */
   taskId?: string
   actionLabel?: string
   task?: { title: string; estimateMin: number }
@@ -175,9 +163,8 @@ export function exceptionsFor(space: SpaceId, ctx: { tasks: Task[]; routines: Ro
       id: `x-stale-${t.id}`,
       text: `“${t.title}” has been on your list ${d} days.`,
       when: `${d} days`,
-      action: 'coach',
-      coachSeed: t.title,
-      actionLabel: 'Face it',
+      action: 'do-today',
+      actionLabel: 'Do it today',
       taskId: t.id,
     })
   }

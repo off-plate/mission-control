@@ -221,7 +221,7 @@ function MilestonesPage() {
         if (!list.length) return null
         return (
           <section className="ms-group" key={g.id}>
-            <div className="section-head">
+            <div className="sechead">
               <span className="microcap">{g.label}</span>
               <span className="section-count mono">{list.filter(earnedNow).length} of {list.length}</span>
             </div>

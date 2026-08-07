@@ -764,7 +764,7 @@ export function NotesPage() {
               </ul>
             </li>
           ))}
-          {shown.length === 0 && <li className="nt-none">{finding ? 'Nothing matches.' : 'No notes here yet.'}</li>}
+          {shown.length === 0 && <li className="empty is-boxed">{finding ? 'Nothing matches.' : 'No notes here yet.'}</li>}
         </ul>
       </div>
 

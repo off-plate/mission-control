@@ -171,7 +171,7 @@ const TasksBody = memo(function TasksBody({ space, size }: { space: SpaceId; siz
               </span>
             )}
             <button
-              className="est-chip"
+              className="chip tone-info"
               onClick={() => setLogOpen(logOpen === t.id ? null : t.id)}
               aria-expanded={logOpen === t.id}
               aria-label={`Log time for ${t.title}, estimated ${t.estimateMin} minutes`}
@@ -180,7 +180,7 @@ const TasksBody = memo(function TasksBody({ space, size }: { space: SpaceId; siz
             </button>
             {/* A source tag earns its place only when the source is somewhere
                 else. Seven grey "here" chips were noise dressed as links. */}
-            {t.source !== 'mc' && <span className="src-tag">{t.source}</span>}
+            {t.source !== 'mc' && <span className="chip tone-info is-src">{t.source}</span>}
           </div>
         ))}
         {open.length === 0 && list.length > 0 && (

@@ -20,13 +20,17 @@
      fill, border and mark keeps --accent. Measured: 5.19:1 on the page. */
   --accent-text: #b03d1c;
   --accent-hover: #b8431f;
+  /* Every wash is mixed from its own base, so a colour has ONE hex in this file
+     and changing it recolours its tint, its per-space override and every chip
+     wearing it. They used to be five hand-written rgba triples that had to be
+     kept in agreement by hand. */
   --accent-ink: #ffffff;
-  --accent-wash: rgba(209, 80, 42, 0.10);
+  --accent-wash: color-mix(in srgb, var(--accent) 10%, transparent);
 
   --alert: #9e2b12;
-  --alert-wash: rgba(158, 43, 18, 0.10);
+  --alert-wash: color-mix(in srgb, var(--alert) 12%, transparent);
   --progress: #3f6b46;
-  --progress-wash: rgba(63, 107, 70, 0.12);
+  --progress-wash: color-mix(in srgb, var(--progress) 12%, transparent);
 
   /* Semantic layer. Meaning, not decoration:
      accent  = interactive (you can act; also the active space's identity)
@@ -35,9 +39,9 @@
      info    = plain data (a calm cool tint so information reads as information,
                distinct from both action-accent and warm page chrome) */
   --info: #55606e;
-  --info-wash: rgba(85, 96, 110, 0.10);
+  --info-wash: color-mix(in srgb, var(--info) 12%, transparent);
   --warn: #b06612;
-  --warn-wash: rgba(176, 102, 18, 0.12);
+  --warn-wash: color-mix(in srgb, var(--warn) 14%, transparent);
 
   /* Categorical layer: muted identity hues, dots only, never fills.
      Deliberately below the accent's saturation and never green. */
@@ -50,10 +54,11 @@
 
   --font-display: 'Bricolage Grotesque', 'Avenir Next', sans-serif;
   --font-body: 'Instrument Sans', 'Helvetica Neue', sans-serif;
-  /* A real mono, at last. This token was resolving to Instrument Sans, which
-     meant roughly forty call sites marked `mono` (clock, figures, counts, times)
-     were only claiming to be data. Loaded with the other two faces, 400 and 600. */
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* The machine's own mono. Nothing is downloaded and no typeface is imposed:
+     what this token has to deliver is figures of equal width, which the system
+     face already does. It used to resolve to Instrument Sans, so forty call
+     sites marked `mono` were only claiming to be data. */
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 
   --text-xs: 0.8125rem;
   --text-sm: 0.9375rem;
@@ -91,13 +96,13 @@ html { font-size: 16px; }
    --progress (#3f6b46), so in the Work space "you can click this" and "this
    is done" were the same colour. One meaning per hue. */
 [data-space="work"] {
-  --accent: #1d4e79; --accent-text: #1d4e79; --accent-hover: #163c5d; --accent-wash: rgba(29, 78, 121, 0.10);
+  --accent: #1d4e79; --accent-text: #1d4e79; --accent-hover: #163c5d;
 }
 [data-space="offplate"] {
-  --accent: #8a6410; --accent-text: #8a6410; --accent-hover: #6f5009; --accent-wash: rgba(138, 100, 16, 0.11);
+  --accent: #8a6410; --accent-text: #8a6410; --accent-hover: #6f5009;
 }
 [data-space="corner"] {
-  --accent: #1E5244; --accent-text: #1E5244; --accent-hover: #163f34; --accent-wash: rgba(30, 82, 68, 0.10);
+  --accent: #1E5244; --accent-text: #1E5244; --accent-hover: #163f34;
 }
 
 /* ---------- base ---------- */
@@ -339,10 +344,6 @@ main { padding-inline: var(--gutter); }
 .assist-log:last-child { border-bottom: none; }
 .assist-log-item { display: flex; align-items: center; gap: var(--s2); padding: var(--s1) 0; font-size: var(--text-sm); }
 .assist-log-item .grow { flex: 1; min-width: 0; }
-.assist-tag { font-family: var(--font-mono); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; border-radius: 3px; padding: 1px 6px; }
-.assist-tag.k-task { color: var(--accent-text); background: var(--accent-wash); }
-.assist-tag.k-goal { color: var(--warn); background: var(--warn-wash); }
-.assist-tag.k-done { color: var(--progress); background: var(--progress-wash); }
 .assist-goto { font-family: var(--font-mono); font-size: 0.6875rem; color: var(--info); white-space: nowrap; }
 .assist-goto:hover { color: var(--accent-text); text-decoration: underline; }
 
@@ -356,9 +357,9 @@ main { padding-inline: var(--gutter); }
 @media (max-width: 719px) { .checkup-cols { grid-template-columns: 1fr; } }
 
 /* ---------- Review section headers ---------- */
-.review-sec { display: flex; align-items: baseline; gap: var(--s3); margin: var(--s6) 0 var(--s3); padding-bottom: var(--s2); border-bottom: 1px solid var(--hairline); }
-.review-sec:first-of-type { margin-top: var(--s4); }
-/* No .review-sec-note. Section headings carry no explanatory subtitle. */
+.sechead { display: flex; align-items: baseline; gap: var(--s3); margin: var(--s6) 0 var(--s3); padding-bottom: var(--s2); border-bottom: 1px solid var(--hairline); }
+.sechead:first-of-type { margin-top: var(--s4); }
+/* No .sechead-note. Section headings carry no explanatory subtitle. */
 
 /* ---------- Break it down: pull the eye with the icon ---------- */
 .btn-breakdown svg { opacity: 0.9; }
@@ -398,23 +399,6 @@ main { padding-inline: var(--gutter); }
   margin-left: 6px;
   vertical-align: 2px;
 }
-
-/* ---------- chips & buttons ---------- */
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s2);
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--r-md);
-  padding: var(--s1) var(--s3);
-  font-size: var(--text-sm);
-  min-height: 38px;
-  color: var(--ink);
-  background: var(--surface);
-}
-.chip:hover { border-color: var(--accent-text); }
-.chip .mono { font-weight: 600; }
-.chip-label { color: var(--muted); font-size: var(--text-xs); }
 
 .btn {
   display: inline-flex;
@@ -501,7 +485,7 @@ main { padding-inline: var(--gutter); }
 }
 .firstmove .fm-label { color: var(--accent-text); }
 .firstmove .fm-title { font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); min-width: 0; }
-.firstmove .est-chip { font-size: 0.8125rem; }
+.firstmove .chip { font-size: 0.8125rem; }
 
 /* quiet periphery: one mono line for the tier-3 numbers */
 .status-strip {
@@ -692,31 +676,7 @@ main { padding-inline: var(--gutter); }
 .rowitem .meta { color: var(--info); font-size: var(--text-xs); white-space: nowrap; }
 .rowitem .mono { white-space: nowrap; }
 .rowitem.done .grow { text-decoration: line-through; color: var(--faint); }
-
-.src-tag {
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  letter-spacing: 0.04em;
-  color: var(--info);
-  background: var(--info-wash);
-  border-radius: 3px;
-  padding: 1px 6px;
-  white-space: nowrap;
-}
-
-/* Estimates are informative data: cool info tint, never the action accent. */
-.est-chip {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--info);
-  background: var(--info-wash);
-  border: none;
-  border-radius: 3px;
-  padding: 2px 6px;
-  white-space: nowrap;
-}
-button.est-chip:hover { color: var(--accent-text); background: var(--accent-wash); }
+button.chip:hover { color: var(--accent-text); background: var(--accent-wash); }
 
 .checkbox {
   width: 22px; height: 22px;
@@ -862,7 +822,19 @@ button.est-chip:hover { color: var(--accent-text); background: var(--accent-wash
 
 select.textinput { flex: 0 0 auto; min-width: 110px; }
 
+/* Segmented control: pick exactly one. Absorbed .detail-seg, .focus-step(s),
+   .kindpick and Plan's day switch; the achievements tablist styles from the
+   same base. Two sizes, and one variant for choices that carry a description. */
 .seg { display: inline-flex; border: 1px solid var(--hairline-strong); border-radius: var(--r-md); padding: 2px; gap: 2px; }
+.seg.has-hints { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: var(--s2); border: none; padding: 0; }
+.seg.has-hints button { flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: var(--s3); border: 1px solid var(--hairline-strong); border-radius: var(--r-sm); min-height: 0; }
+.seg.has-hints button b { font-size: var(--text-sm); font-weight: 600; color: var(--ink); }
+.seg.has-hints button span { font-size: var(--text-xs); color: var(--muted); font-weight: 400; }
+.seg.has-hints button[aria-pressed="true"] { border-color: var(--accent-text); background: var(--accent-wash); color: var(--ink); }
+.seg.has-hints button[aria-pressed="true"] b { color: var(--accent-text); }
+.seg.has-hints button:hover:not(:disabled) { border-color: var(--accent-text); }
+.seg button:disabled { opacity: 0.5; cursor: not-allowed; }
+.seg-sm button { font-family: var(--font-mono); font-size: 0.75rem; min-height: 30px; padding: 2px 10px; }
 .seg button {
   padding: var(--s1) var(--s3);
   border-radius: calc(var(--r-md) - 2px);
@@ -902,7 +874,6 @@ select.textinput { flex: 0 0 auto; min-width: 110px; }
 .habit-start { min-height: 30px; font-size: var(--text-xs); padding-inline: var(--s3); }
 .habit-count { margin-left: auto; font-size: 0.75rem; color: var(--info); }
 .routine-preview { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s2); }
-.routine-chip { font-size: 0.6875rem; color: var(--muted); background: var(--surface-2); border-radius: 3px; padding: 2px 7px; white-space: nowrap; }
 .habit-days { display: flex; gap: var(--s3); align-items: flex-end; margin-top: var(--s3); flex-wrap: wrap; }
 .day-cell { display: grid; justify-items: center; gap: 4px; }
 .day-lab { font-family: var(--font-mono); font-size: 0.625rem; color: var(--faint); }
@@ -936,16 +907,6 @@ select.textinput { flex: 0 0 auto; min-width: 110px; }
 .oblig-line { display: flex; align-items: baseline; gap: var(--s2) var(--s3); flex-wrap: wrap; }
 .oblig-line .name { font-weight: 600; font-size: var(--text-base); flex: 1 1 100%; }
 .oblig-line .monthly { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); }
-.state-tag {
-  font-family: var(--font-mono); font-size: 0.6875rem; font-weight: 600;
-  letter-spacing: 0.08em; text-transform: uppercase;
-  border-radius: 3px; padding: 2px 7px;
-  white-space: nowrap;
-}
-.state-tag.agreed { color: var(--progress); background: var(--progress-wash); }
-.state-tag.waiting, .state-tag.pending { color: var(--warn); background: var(--warn-wash); }
-.state-tag.scheduled { color: var(--info); background: var(--info-wash); }
-.state-tag.action { color: var(--alert); background: var(--alert-wash); }
 .oblig .bar { margin-top: var(--s3); }
 .oblig .next { margin-top: var(--s2); font-size: var(--text-xs); color: var(--muted); }
 .coach-nav { display: flex; gap: var(--s3); margin-top: var(--s4); align-items: center; }
@@ -981,8 +942,8 @@ select.textinput { flex: 0 0 auto; min-width: 110px; }
 @media (hover: hover) {
   .rowitem:hover .actual-chips, .rowitem:focus-within .actual-chips { display: flex; }
 }
-button.est-chip { cursor: pointer; }
-button.est-chip:hover { border-color: var(--accent-text); color: var(--accent-text); }
+button.chip { cursor: pointer; }
+button.chip:hover { border-color: var(--accent-text); color: var(--accent-text); }
 .actual-chips button {
   font-family: var(--font-mono);
   font-size: 0.75rem;
@@ -1268,7 +1229,8 @@ button.est-chip:hover { border-color: var(--accent-text); color: var(--accent-te
 .bucket-name { font-family: var(--font-display); font-weight: 700; font-size: var(--text-base); }
 .bucket-head .tot { margin-left: auto; font-family: var(--font-mono); font-size: 0.6875rem; color: var(--info); }
 .bucket.drop-zone { min-height: 56px; }
-.bucket-empty { font-size: var(--text-xs); color: var(--faint); padding: var(--s3); border: 1px dashed var(--hairline-strong); border-radius: var(--r-sm); text-align: center; }
+.empty.is-boxed { font-size: var(--text-xs); color: var(--faint); padding: var(--s3); border: 1px dashed var(--hairline-strong); border-radius: var(--r-sm); text-align: center; }
+/* composes .row: see the primitive above */
 .today-task { display: flex; align-items: center; flex-wrap: wrap; row-gap: var(--s1); gap: var(--s2); padding: var(--s2) 0; border-bottom: 1px solid var(--hairline); font-size: var(--text-sm); min-height: 42px; }
 .today-item:last-child .today-task { border-bottom: none; }
 .today-task:last-child { border-bottom: none; }
@@ -1346,6 +1308,47 @@ button.est-chip:hover { border-color: var(--accent-text); color: var(--accent-te
 .movebar .movebar-clear:hover { border-color: var(--bg); }
 
 /* empty state */
+/* ---------- primitives: see ui.tsx. One class each, modifiers not clones ---------- */
+
+/* Row: a line in a list. Title grows, chips and actions trail, a hairline
+   between. Eight lists wrote these four declarations out separately, so a
+   change to list rhythm meant eight edits and usually got seven. */
+.row {
+  display: flex; align-items: center; gap: var(--s2);
+  min-height: 42px; font-size: var(--text-sm);
+}
+.row > .grow { flex: 1; min-width: 0; }
+.row.is-wrapping { flex-wrap: wrap; row-gap: var(--s1); }
+.row.is-ruled + .row.is-ruled { border-top: 1px solid var(--hairline); }
+
+/* Chip: a small mono label on a wash. Absorbed .est-chip, .src-tag, .assist-tag. */
+.chip {
+  display: inline-flex; align-items: center; gap: 4px; flex: none;
+  font-family: var(--font-mono); font-size: 0.75rem; font-weight: 600;
+  border-radius: 4px; padding: 1px 6px; white-space: nowrap;
+  border: none;
+}
+.chip.tone-info { color: var(--info); background: var(--info-wash); }
+.chip.tone-progress { color: var(--progress); background: var(--progress-wash); }
+.chip.tone-warn { color: var(--warn); background: var(--warn-wash); }
+.chip.tone-alert { color: var(--alert); background: var(--alert-wash); }
+.chip.tone-accent { color: var(--accent-text); background: var(--accent-wash); }
+.chip.tone-quiet { color: var(--muted); background: var(--surface-2); }
+/* A chip that is a button keeps the pointer and the hover it earns. */
+button.chip { cursor: pointer; }
+button.chip:hover { filter: brightness(0.96); }
+.chip.is-src { font-size: 0.6875rem; letter-spacing: 0.04em; font-weight: 500; }
+.chip.is-none { color: var(--faint); background: transparent; border: 1px dashed var(--hairline-strong); }
+
+/* Section heading: label, and one fact that appears nowhere else. */
+.sechead {
+  display: flex; align-items: baseline; gap: var(--s3);
+  padding-bottom: var(--s2); margin-bottom: var(--s3);
+  border-bottom: 1px solid var(--hairline-strong);
+}
+.sechead-fact { margin-left: auto; font-size: var(--text-xs); color: var(--muted); }
+
+/* Empty state. Absorbed .empty.is-boxed and .empty.is-boxed. */
 .empty {
   display: flex;
   flex-direction: column;
@@ -1354,6 +1357,11 @@ button.est-chip:hover { border-color: var(--accent-text); color: var(--accent-te
   color: var(--muted);
   font-size: var(--text-sm);
   padding: var(--s4) 0;
+}
+.empty.is-boxed {
+  align-items: center; text-align: center;
+  font-size: var(--text-xs); color: var(--faint);
+  padding: var(--s3); border: 1px dashed var(--hairline-strong); border-radius: var(--r-sm);
 }
 
 /* review flow success */
@@ -1829,7 +1837,7 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 .nt-folder .nt-ficon { color: var(--muted); }
 .nt-folder-row.on .nt-ficon, .nt-ficon.on { color: var(--accent-text); }
 .nt-flag { color: var(--alert); }
-.nt-none { font-size: var(--text-sm); color: var(--muted); padding: var(--s5) var(--s3); }
+.empty.is-boxed { font-size: var(--text-sm); color: var(--muted); padding: var(--s5) var(--s3); }
 
 /* ---- the note ---- */
 /* The pane does NOT scroll: its body does. A menu opening from the top bar was
@@ -2035,7 +2043,7 @@ mark { background: var(--accent-wash); color: var(--accent-text); font-weight: 6
 .vev .rng { flex: none; }
 
 /* ---- Affordances: bordered means pressable, filled means data ---- */
-button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
+button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .expand-btn { border: 1px solid var(--hairline-strong); border-radius: 3px; padding: 1px 6px; }
 .exception-row button { text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px; }
 .exception-row button:hover { color: var(--accent-hover); text-decoration-color: currentColor; }
@@ -2060,14 +2068,10 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 
 /* ---- Money rows line up as columns ---- */
 .rowitem.wrap-row > .mono:not(.meta) { min-width: 9ch; text-align: right; }
-.rowitem.wrap-row .state-tag { flex: none; min-width: 13ch; text-align: center; }
 
 /* ---- Habits: missed days stay genuinely quiet ---- */
 .habit-history i { background: transparent; box-shadow: none; border-bottom: 1px solid var(--hairline); }
 .habit-history i.hi { background: var(--progress); border-bottom-color: var(--progress); }
-
-/* ---- Category labels stop borrowing semantic colours ---- */
-.assist-tag.k-goal { color: var(--cat-admin); background: var(--info-wash); }
 .status-dot.manual { background: var(--warn); }
 
 /* ---- Touch: small controls get a 44px hit area without growing visually ----
@@ -2075,19 +2079,19 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
    were 17-26px targets. The ::after is invisible and only extends the tap
    region; .widget-title-btn is excluded because its ::after draws the chevron. */
 @media (pointer: coarse) {
-  .routine-check, .mr-check, button.est-chip, .expand-btn,
+  .routine-check, .mr-check, button.chip, .expand-btn,
   .note-swatch, .goal-ms-check, .sub-tick, .radio,
   .goal-bump button, .goal-drop, .kebab, .exc-drop,
   .goal-nav-btn, .task-act, .habit-auto, .fold-all, .sub-tool,
-  .toggle, .focus-step, .note-chip, .quit-slip,
+  .toggle, .seg-sm button, .quit-slip,
   .day-switch .microcap, .linkish {
     position: relative;
   }
-  .routine-check::after, .mr-check::after, button.est-chip::after, .expand-btn::after,
+  .routine-check::after, .mr-check::after, button.chip::after, .expand-btn::after,
   .note-swatch::after, .goal-ms-check::after, .sub-tick::after, .radio::after,
   .goal-bump button::after, .goal-drop::after, .kebab::after, .exc-drop::after,
   .goal-nav-btn::after, .task-act::after, .habit-auto::after, .fold-all::after, .sub-tool::after,
-  .toggle::after, .focus-step::after, .note-chip::after, .quit-slip::after,
+  .toggle::after, .seg-sm button::after, .quit-slip::after,
   .day-switch .microcap::after, .linkish::after {
     content: '';
     position: absolute;
@@ -2146,7 +2150,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .routine-card-title { color: var(--accent-text); }
 
 /* Drop zones are full-width targets, not prose (override the global p measure). */
-.bucket-empty { max-width: none; width: 100%; }
+.empty.is-boxed { max-width: none; width: 100%; }
 
 /* ---------- Controls added in the functional pass ---------- */
 
@@ -2201,8 +2205,8 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .done-group .today-task { margin-top: 4px; }
 /* Task rows keep their controls on one line; the title wraps under them. */
 .today-task > .grow, .todo-row > .grow { min-width: 0; overflow-wrap: anywhere; }
-.today-task .kebab-wrap, .today-task .est-chip, .today-task .expand-btn,
-.todo-row .kebab-wrap, .todo-row .est-chip, .todo-row .expand-btn { flex: none; }
+.today-task .kebab-wrap, .today-task .chip, .today-task .expand-btn,
+.todo-row .kebab-wrap, .todo-row .chip, .todo-row .expand-btn { flex: none; }
 
 /* ---------- Ideology pass: cross-space alerts and momentum ---------- */
 
@@ -2239,7 +2243,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
    below the hairline, so the number read as the NEXT goal's. Keep them together. */
 .rowitem { flex-wrap: nowrap; }
 .rowitem > .grow { min-width: 0; overflow-wrap: anywhere; }
-.rowitem > .drift, .rowitem > .est-chip, .rowitem > .src-tag, .rowitem > .state-tag { flex: none; }
+.rowitem > .drift, .rowitem > .chip { flex: none; }
 
 /* 11/13. Wide rows: pin the action to a rail so a 3440 band does not carry
    2000px of empty tint between a sentence and its button. */
@@ -2370,7 +2374,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   .habit-list.w7 .habit-days { justify-content: flex-start; gap: var(--s2); }
   .habit-list .habit-days.is-legend { display: none; }
 }
-.section-head {
+.sechead {
   display: flex; align-items: baseline; gap: var(--s3);
   padding-bottom: var(--s2); margin-bottom: var(--s3);
   border-bottom: 1px solid var(--hairline-strong);
@@ -2477,7 +2481,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
    buttons wrapped into a ragged block beside it. */
 .subtask-wrap > .actual-log { flex: 1 0 100%; padding: var(--s1) 0 var(--s2) 16px; }
 .sub-focus { width: 26px; height: 26px; flex: none; }
-.est-chip.is-none { color: var(--faint); background: transparent; border: 1px dashed var(--hairline-strong); }
 /* The now line on the day column. */
 .vnow { position: absolute; left: 0; right: 0; border-top: 1px solid var(--accent); z-index: 3; pointer-events: none; }
 .vnow-dot { position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
@@ -2525,8 +2528,8 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .today-task, .todo-row { align-items: flex-start; }
 .today-task > .checkbox, .today-task > .drag-grip, .today-task > .cat-dot,
 .todo-row > .checkbox, .todo-row > .drag-grip, .todo-row > .cat-dot { margin-top: 3px; }
-.today-task .task-actions, .today-task > .kebab-wrap, .today-task > .est-chip, .today-task > .est-vs-actual,
-.todo-row .task-actions, .todo-row > .kebab-wrap, .todo-row > .est-chip, .todo-row > .expand-btn { margin-top: 1px; }
+.today-task .task-actions, .today-task > .kebab-wrap, .today-task > .chip, .today-task > .est-vs-actual,
+.todo-row .task-actions, .todo-row > .kebab-wrap, .todo-row > .chip, .todo-row > .expand-btn { margin-top: 1px; }
 
 /* How deep to break a task down. */
 .detail-seg { margin-bottom: var(--s4); }
@@ -2748,32 +2751,15 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
    pushing its first section down. */
 .rangepick { min-width: 190px; padding: 7px 12px; font-size: var(--text-sm); }
 .drag-grip.is-blank { visibility: hidden; }
-
-/* A choice made of two real options, not a dropdown pretending to be one. */
-.kindpick { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); }
-.kindpick button {
-  text-align: left; padding: 10px 12px; border: 1px solid var(--hairline-strong);
-  border-radius: var(--r-sm); background: var(--bg); cursor: pointer;
-  display: flex; flex-direction: column; gap: 2px;
-}
-.kindpick button b { font-size: var(--text-sm); font-weight: 600; color: var(--ink); }
-.kindpick button span { font-size: var(--text-xs); color: var(--muted); }
-.kindpick button:hover:not(:disabled) { border-color: var(--accent-text); }
-.kindpick button.on { border-color: var(--accent-text); background: var(--accent-wash); }
-.kindpick button.on b { color: var(--accent-text); }
-.kindpick button:disabled { opacity: 0.5; cursor: not-allowed; }
-@media (max-width: 519px) { .kindpick { grid-template-columns: 1fr; } }
-
-/* Three kinds side by side, so no label has to wrap to a second line. */
-.kindpick.three { grid-template-columns: repeat(3, 1fr); }
-@media (max-width: 519px) { .kindpick.three { grid-template-columns: 1fr; } }
+/* Below 520px a description beside a description is two words per line. */
+@media (max-width: 519px) { .seg.has-hints { grid-template-columns: 1fr; } }
 /* The sheet keeps one height across every kind: switching between them should
    change the questions, not the size of the window asking them. */
 .sheet { width: min(660px, 100%); }
 .sheet-body.is-steady { min-height: 320px; }
 /* Sections need air between them; the checkup was landing hard against the
    panel above it. */
-.panel + .review-sec, .grid-2 + .review-sec, .grid-4 + .review-sec { margin-top: var(--s6); }
+.panel + .sechead, .grid-2 + .sechead, .grid-4 + .sechead { margin-top: var(--s6); }
 .lastweek + .checkup-panel { margin-top: var(--s3); }
 
 /* A window picked by hand, named above it by the same heading as any other. */
@@ -2830,7 +2816,9 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
 /* All is a view across the three rooms, so it borrows no room's accent. */
-[data-space="all"] { --accent: #15130f; --accent-hover: #000; --accent-wash: rgba(21, 19, 15, 0.07); }
+/* All: the ink itself is the accent, so nothing borrows one profile's colour
+   while every profile is on screen. */
+[data-space="all"] { --accent: #15130f; --accent-text: #15130f; --accent-hover: #000; --accent-wash: color-mix(in srgb, var(--accent) 7%, transparent); }
 .writeto { padding: 7px 10px; font-size: var(--text-sm); min-width: 110px; }
 
 /* What came back to the list overnight. A fact and a way back, not a scolding. */
@@ -2924,7 +2912,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 /* A step already finished reads as finished wherever it appears. */
 .subtask-row.is-done .grow { text-decoration: line-through; color: var(--faint); }
 .subtask-row.is-done .sub-tick { background: var(--progress); border-color: var(--progress); }
-.subtask-row.is-done .est-chip { color: var(--progress); }
+.subtask-row.is-done .chip { color: var(--progress); }
 
 /* ---------- the finished-focus popup ---------- */
 .pomo-done-veil {
@@ -2952,13 +2940,15 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   max-width: 100%; overflow-x: auto; scrollbar-width: none;
 }
 .achnav::-webkit-scrollbar { display: none; }
+/* The tablist is a segmented control that also changes the address, so it
+   wears the same clothes and only the shape of the ends differs. */
 .achtab {
   font-size: var(--text-sm); font-weight: 600; color: var(--muted);
   padding: var(--s2) var(--s4); min-height: 34px; border-radius: 999px;
   border: 1px solid var(--hairline-strong); background: transparent; cursor: pointer; white-space: nowrap;
 }
 .achtab:hover { color: var(--ink); border-color: var(--ink); }
-.achtab.on { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.achtab.on, .achtab[aria-selected="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
 .achnav + .page { padding-top: var(--s4); }
 
 /* One thing crossed its line. The only celebration in the app, and it is
@@ -3163,13 +3153,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 }
 /* The break length, as a row of choices rather than a box to type in. */
 .focus-settings { display: flex; align-items: center; gap: var(--s3); margin: var(--s4) 0 var(--s5); flex-wrap: wrap; }
-.focus-steps { display: flex; gap: var(--s2); }
-.focus-step {
-  font-family: var(--font-mono); font-size: 0.75rem; min-height: 30px; padding: 2px 10px;
-  border: 1px solid var(--hairline-strong); border-radius: 4px; color: var(--muted);
-}
-.focus-step:hover { border-color: var(--accent-text); color: var(--accent-text); }
-.focus-step.on { border-color: var(--ink); background: var(--ink); color: var(--bg); }
 
 /* ---------- the day column on Plan ---------- */
 /* Two columns: the list, and the day beside it. */

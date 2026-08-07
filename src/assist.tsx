@@ -103,7 +103,7 @@ export function AssistantRail() {
           <div className="assist-proposed">
             <span className="microcap" style={{ display: 'block', marginBottom: 'var(--s2)' }}>It will file these</span>
             {fellBack && <p className="sheet-warn" style={{ marginTop: 0, marginBottom: 'var(--s2)' }}>{fellBack}</p>}
-            {parsed.length === 0 && <p className="bucket-empty">Nothing to file. Try naming a task, a goal, or something you finished.</p>}
+            {parsed.length === 0 && <p className="empty is-boxed">Nothing to file. Try naming a task, a goal, or something you finished.</p>}
             {parsed.map((p, i) => (
               <div className="assist-row" key={i}>
                 <select className="assist-kind" value={p.kind} onChange={(e) => setKind(i, e.target.value as ParsedItem['kind'])} aria-label="Item type">
@@ -112,7 +112,7 @@ export function AssistantRail() {
                   <option value="done">done</option>
                 </select>
                 <span className="grow"><Linkify text={p.text} /></span>
-                {p.estimateMin != null && <span className="est-chip">{fmtDuration(p.estimateMin)}</span>}
+                {p.estimateMin != null && <span className="chip tone-info">{fmtDuration(p.estimateMin)}</span>}
                 <span className="assist-dest mono">→ {TAB_FOR[p.kind]}</span>
               </div>
             ))}
@@ -133,7 +133,7 @@ export function AssistantRail() {
             <div className="assist-log" key={entry.id}>
               {entry.items.map((it) => (
                 <div className="assist-log-item" key={it.id}>
-                  <span className={`assist-tag k-${it.kind}`}>{it.kind}</span>
+                  <span className={`chip ${it.kind === 'done' ? 'tone-progress' : it.kind === 'goal' ? 'tone-info' : 'tone-accent'}`}>{it.kind}</span>
                   <span className="grow">{it.label}</span>
                   <button className="assist-goto" onClick={() => setPage(it.tab)} aria-label={`Open ${it.tab}`}>{it.tab} ↗</button>
                   <button className="assist-undo" onClick={() => revertAssistantItem(entry.id, it.id)} aria-label={`Undo ${it.label}`}>undo</button>

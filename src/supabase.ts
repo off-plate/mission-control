@@ -141,6 +141,18 @@ export async function saveRemoteState(json: string): Promise<void> {
   }
 }
 
+/** Read rows from another app's tables in this same project (Compass). Returns
+ *  null when signed out or unconfigured, which every caller must handle as
+ *  "no data", never as zero. */
+export async function readRows<T>(table: string, columns: string): Promise<T[] | null> {
+  const c = db()
+  const me = await currentAccount()
+  if (!c || !me) return null
+  const { data, error } = await c.from(table).select(columns)
+  if (error) throw new Error(error.message)
+  return (data ?? []) as T[]
+}
+
 /** Clear the saved state (used by Reset). */
 export async function deleteRemoteState(): Promise<void> {
   const c = db()

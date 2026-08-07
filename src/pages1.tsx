@@ -8,6 +8,7 @@ import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
 import { Linkify } from './widgets'
 import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, isCounted, COUNT_PERIODS, requiredSteps, routineComplete, routineProgress, routineRunsOn, slotMinutes, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
+import { AssistantRail } from './assist'
 import { estimateFor } from './estimate'
 import { estimateTask } from './ai'
 import { goalPeriodKey, goalPeriodRange, habitPeriodRange, periodIsPast, periodKeyFor, periodLabel, shiftPeriodKey, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForMoment, taskMinutes, toMin } from './util'
@@ -161,6 +162,31 @@ export function Band({
   )
 }
 
+/* The date and the clock. Calendar is gone; this is the one thing he wanted
+   kept out of it, so it sits where he already looks. State only changes when
+   the minute does, so the page is not re-rendering every tick. */
+function nowStamp() {
+  const d = new Date()
+  return {
+    time: d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+    date: d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }),
+  }
+}
+
+function useClock(): { time: string; date: string } {
+  const [now, setNow] = useState(nowStamp)
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      setNow((prev) => {
+        const next = nowStamp()
+        return next.time === prev.time && next.date === prev.date ? prev : next
+      })
+    }, 10_000)
+    return () => window.clearInterval(t)
+  }, [])
+  return now
+}
+
 function useNextEvent(space: string): { v: string; k: string } {
   const [, tick] = useState(0)
   useEffect(() => {
@@ -205,8 +231,9 @@ const shortDay = (key: string): string => {
 /* ---------------- TODAY ---------------- */
 
 export function TodayPage() {
-  const { space, tasks, routines, habits, coachSessions, plan, editing, setEditing, setPage, savedMin, todayIndex, review, addTask, deleteTask, setCoachOpen, setFocusTaskId, sources, inView } = useStore()
+  const { space, tasks, routines, habits, plan, editing, setEditing, setPage, savedMin, todayIndex, review, addTask, deleteTask, moveTaskList, setFocusTaskId, sources, inView } = useStore()
   const pomo = usePomodoro()
+  const clock = useClock()
   const nextEvent = useNextEvent(space)
   const exceptions = exceptionsFor(space, { tasks, routines })
   /* Money and official post follow you into Work and Off-Plate. Sitting in the
@@ -226,13 +253,14 @@ export function TodayPage() {
   const reviewDue = todayIndex === 6 && review.lastDoneDate !== localDateKey()
   // Next payment badge derives from the money schedule instead of a hardcoded string.
   const nextPay = MOCK_MONEY?.schedule.find((r) => r.state === 'not sent' || r.state === 'action needed')
-  const wins = momentum({ tasks: tasks.filter((t) => inView(t.space)), routines, habits: habits.filter((h) => inView(h.space) && !h.archivedAt), coachSessions })
+  const wins = momentum({ tasks: tasks.filter((t) => inView(t.space)), routines, habits: habits.filter((h) => inView(h.space) && !h.archivedAt) })
 
   return (
     <div className="page">
       <Band
         title="Today"
         metrics={[
+          { v: clock.time, k: clock.date },
           { v: nextEvent.v, k: nextEvent.k, tone: 'info' as const },
           { v: String(open.length), k: 'tasks open' },
           ...(space === 'personal' && nextPay
@@ -251,6 +279,11 @@ export function TodayPage() {
         }
       />
 
+      {/* Today is the one page with a rail: the assistant is always open beside
+          the day rather than a tab you have to remember to visit. Below 1100px
+          it falls under the grid instead of squeezing both. */}
+      <div className="today-shell">
+      <div className="today-main">
       {shownExceptions.length > 0 ? (
         <div className="exceptions" role="alert" aria-label="Needs attention">
           {shownExceptions.map((x) => {
@@ -278,13 +311,13 @@ export function TodayPage() {
                 {x.action === 'open-plan' && (
                   <button onClick={() => setPage('plan')}>{x.actionLabel ?? 'Open the plan'}</button>
                 )}
-                {x.action === 'coach' && (
+                {x.action === 'do-today' && x.taskId && (
                   <>
-                    <button onClick={() => { setCoachOpen(x.coachId ?? x.coachSeed ?? null); setPage('coach') }}>
-                      {x.actionLabel ?? 'Walk me through it'}
-                    </button>
-                    {/* An old task deserves an honest second option: face it or let it go. */}
-                    {x.taskId && <button className="exc-drop" onClick={() => deleteTask(x.taskId!)}>Drop it</button>}
+                    {/* An old task deserves an honest pair of answers: do it
+                        today, or let it go. Nothing in between, and nothing
+                        that only navigates. */}
+                    <button onClick={() => moveTaskList(x.taskId!, 'today')}>{x.actionLabel ?? 'Do it today'}</button>
+                    <button className="exc-drop" onClick={() => deleteTask(x.taskId!)}>Drop it</button>
                   </>
                 )}
               </div>
@@ -340,8 +373,13 @@ export function TodayPage() {
 
       <SpaceGrid />
 
-      {/* Only drawn when the space actually has a line; otherwise it left a
-          stray hairline under the grid in Work. */}
+      </div>
+      <AssistantRail />
+      </div>
+
+      {/* The footer belongs to the page, not to the left column: full width
+          under both, and on a phone it comes after the rail rather than
+          stranding the assistant below it. */}
       <div className={`status-strip${space === 'work' ? ' is-empty' : ''}`} aria-label="Background numbers">
         {space === 'personal' && (
           <button onClick={() => setPage('settings')}><span className="k">sync</span> {sources.filter((x) => x.status === 'connected').length} of {sources.filter((x) => x.status !== 'manual').length} live{sources.some((x) => x.status === 'off') ? `, ${sources.filter((x) => x.status === 'off').map((x) => x.name).join(', ')} paused` : ''}</button>

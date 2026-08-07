@@ -140,8 +140,6 @@ interface Store extends PersistedState {
   setEditing: (v: boolean) => void
   focusTaskId: string | null
   setFocusTaskId: (id: string | null) => void
-  coachOpen: string | null
-  setCoachOpen: (id: string | null) => void
 
   reorderSpace: (space: SpaceId, order: string[]) => void
   resizeWidget: (space: SpaceId, id: string, size: SizeKey) => void
@@ -228,10 +226,10 @@ interface Store extends PersistedState {
   applyDictation: (text: string, items: { kind: 'task' | 'goal' | 'done'; text: string; estimateMin?: number }[]) => void
   revertAssistantItem: (entryId: string, itemId: string) => void
 
+  /* Avoidance, the page, is gone. These sessions are not: they are dated
+     records of things he faced, so they keep loading, keep syncing and keep
+     showing on a day page. Nothing new writes to them. */
   coachSessions: CoachSession[]
-  startCoachSession: (input: { title: string; facts: CoachFacts; firstStep: string; firstStepMin: number; category: TaskCategory }) => void
-  reflectCoachSession: (id: string, didIt: boolean, felt: CoachSession['felt'], reflection: string) => void
-  deleteCoachSession: (id: string) => void
 
   routines: Routine[]
   toggleRoutineStep: (routineId: string, stepId: string) => void
@@ -893,7 +891,7 @@ function routeFromHash(): { page: PageId; day: string | null } {
   if (m) return { page: 'day', day: m[1] }
   // The board's old address still resolves: a bookmark lands on its successor.
   if (h === 'braindump') return { page: 'notes', day: null }
-  const pages: PageId[] = ['today', 'plan', 'assistant', 'habits', 'routines', 'goals', 'money', 'review', 'coach', 'stats', 'settings', 'brand', 'notes', 'focus', 'calendar', 'board']
+  const pages: PageId[] = ['today', 'plan', 'habits', 'routines', 'goals', 'money', 'review', 'stats', 'settings', 'brand', 'notes', 'focus', 'board']
   return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
 }
 
@@ -1062,7 +1060,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const setPageState = (p: PageId) => setRoute({ page: p, day: null })
   const [editing, setEditing] = useState(false)
   const [focusTaskId, setFocusTaskId] = useState<string | null>(null)
-  const [coachOpen, setCoachOpen] = useState<string | null>(null)
 
   useEffect(() => {
     document.documentElement.setAttribute('data-space', view)
@@ -1560,7 +1557,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     page, setPage, dayKey, openDay,
     editing, setEditing,
     focusTaskId, setFocusTaskId,
-    coachOpen, setCoachOpen,
 
     reorderSpace: (sp, order) =>
       setSpaces((prev) => {
@@ -1986,41 +1982,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
 
     coachSessions,
-    startCoachSession: (input) => {
-      const taskId = newId('t')
-      setTasks((prev) => [
-        { id: taskId, title: input.firstStep, source: 'mc', estimateMin: input.firstStepMin, done: false, createdAt: todayKey(), plannedOn: todayKey(), space, list: 'today', category: input.category },
-        ...prev,
-      ])
-      setCoachSessions((prev) => [
-        { id: newId('cs'), space, title: input.title, facts: input.facts, firstStep: input.firstStep, taskId, when: todayKey(), status: 'open' },
-        ...prev,
-      ])
-    },
-    /* Saying you did it also ticks the task off Today (with its estimate logged),
-       so the loop closes in one place instead of two. Saying "not yet" leaves the
-       loop OPEN on purpose: an unfaced thing should keep showing up. */
-    reflectCoachSession: (id, didIt, felt, reflection) => {
-      const s = coachSessions.find((x) => x.id === id)
-      setCoachSessions((prev) =>
-        prev.map((x) => (x.id === id ? { ...x, status: didIt ? 'closed' : 'open', didIt, felt: didIt ? felt : undefined, reflection } : x)),
-      )
-      if (didIt && s?.taskId) {
-        const t = tasks.find((x) => x.id === s.taskId)
-        if (t && !t.done) value.logActual(t.id, t.estimateMin)
-      }
-    },
-    /* Dropping an OPEN loop removes the task it queued. A closed one only clears
-       the history record: the work is already done, deleting it would rewrite it. */
-    deleteCoachSession: (id) => {
-      const s = coachSessions.find((x) => x.id === id)
-      if (s?.taskId && s.status === 'open') {
-        const t = tasks.find((x) => x.id === s.taskId)
-        if (t && !t.done) setTasks((prev) => prev.filter((x) => x.id !== s.taskId))
-      }
-      setCoachSessions((prev) => prev.filter((x) => x.id !== id))
-    },
-
     /* Every path that can change whether a routine is complete goes through
        this, so the habit can never disagree with the routine. Adding, deleting
        or reordering a step changes completeness just as ticking one does, and

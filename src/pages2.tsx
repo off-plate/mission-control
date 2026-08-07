@@ -1,41 +1,56 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { COACH_SCENARIOS, MOCK_MONEY, MOCK_STATS, SPACE_LABELS } from './mock'
+import { MOCK_STATS, SPACE_LABELS } from './mock'
+import { useCompass, type CompassState } from './compass'
 import { AutoTextarea, Band, SpaceMark } from './pages1'
 import { useStore } from './store'
 import { Spark, SparkBox } from './widgets'
 import { RANGE_OPTIONS, allTimeRange, customRange, fmtDuration, fmtNum, fmtSigned, fmtWhen, goalPace, goalPeriodRange, inRange, isoWeekKey, localDateKey, monthName, monthRange, monthsWithData, rangeFor, taskMinutes, type GoalTf, type RangeId } from './util'
-import { analyzeAvoidance, fallbackRead } from './coach'
 import { WALL } from './board'
-import { getAiKey, hasAiKey, readAvoidance, setAiKey, type AvoidanceRead } from './ai'
+import { getAiKey, hasAiKey, setAiKey } from './ai'
 import { paymentTaskTitle } from './exceptions'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange, sendSignInCode, signInWithCode, signOutAccount, type Account } from './supabase'
-import { goalCurrent, ON_TRACK_PCT, STEP_UNITS, stepSeries, type StepEntry, type CoachFacts, type CoachSession, type TaskCategory } from './types'
+import { goalCurrent, ON_TRACK_PCT, STEP_UNITS, stepSeries, type StepEntry, type TaskCategory } from './types'
 
 /* ---------------- MONEY ---------------- */
 
-/* Money is one pool — his real finances do not split by profile — so this page
-   is identical in every space instead of dead-ending outside Personal. */
-/** Kč written as a number, so paid amounts can be added up. */
-const kc = (s: string) => Number(s.replace(/[^\d]/g, '')) || 0
+/* Money is one pool: his real finances do not split by profile, so this page is
+   identical in every space instead of dead-ending outside Personal.
 
-/* The sections stay; only the numbers are gone. An empty section that names
-   what belongs there is a place for real data to land. An invented number is
-   not. */
+   Every figure is read from Compass at runtime, over his own session. There is
+   no fallback number and no cached copy in this bundle, because this repo is
+   public and a stale or invented balance is worse than an empty panel. */
+
 function NoData({ label }: { label: string }) {
   return <div className="kpi nodata">&mdash;<span className="unit">{label}</span></div>
 }
 
-function CompassCard({ f }: { f: unknown }) {
+/** Kč, grouped, no decimals. Compass stores whole crowns. */
+const kc = (n: number) => `${fmtNum(Math.round(n))} Kč`
+
+function CompassCard({ state, onReload }: { state: CompassState; onReload: () => void }) {
+  const label =
+    state.status === 'ok' ? 'Read from Compass'
+    : state.status === 'loading' ? 'Reading Compass'
+    : state.status === 'signed-out' ? 'Sign in to read Compass'
+    : state.status === 'empty' ? 'Compass has no debts in it'
+    : state.status === 'error' ? 'Compass could not be read'
+    : 'Not connected in this build'
+  const body =
+    state.status === 'ok' ? 'Debts, budget, goals and the five-year plan are managed in Compass. This page is the readout, and it never writes back.'
+    : state.status === 'loading' ? 'Reading your debts and payments.'
+    : state.status === 'signed-out' ? 'Compass shares this database, so the same sign-in reads it. Sign in from Settings and the figures appear here.'
+    : state.status === 'empty' ? 'Nothing to read yet. Add your debts in Compass and they show up here.'
+    : state.status === 'error' ? state.message
+    : 'Sync is off in this build, so there is nothing to read.'
   return (
-    <div className="panel money-compass" style={{ marginTop: f ? 'var(--s5)' : 0, marginBottom: f ? 0 : 'var(--s5)' }}>
+    <div className="panel money-compass">
       <div className="money-compass-copy">
-        <span className="microcap">{f ? 'The full picture lives in Compass' : 'Not connected yet'}</span>
-        <p>
-          {f
-            ? 'Debts, budget, goals and the five-year plan are managed in Compass. This page is the at-a-glance readout.'
-            : 'Your debts, budget and payment plans live in Compass. These panels stay empty until that link exists, because a number here that is not yours is worse than none.'}
-        </p>
+        <span className="microcap">{label}</span>
+        <p>{body}</p>
       </div>
+      {state.status === 'error' && (
+        <button className="btn btn-ghost" onClick={onReload}>Try again</button>
+      )}
       <a className="btn btn-primary money-compass-btn" href="https://compass-money.netlify.app" target="_blank" rel="noreferrer">
         Open Compass
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M7 17L17 7M17 7H8M17 7v9" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -45,22 +60,30 @@ function CompassCard({ f }: { f: unknown }) {
 }
 
 export function MoneyPage() {
-  const f = MOCK_MONEY
+  const { state, reload } = useCompass()
+  const m = state.status === 'ok' ? state.money : null
 
   return (
     <div className="page">
-      <Band title="Money" />
-      {/* Unlinked, the one thing he can DO on this page comes first instead of
-          hiding under three empty scaffolds. */}
-      {!f && <CompassCard f={f} />}
+      <Band
+        title="Money"
+        metrics={m ? [
+          { v: kc(m.owed), k: 'still owed', tone: 'urgent' as const },
+          { v: `${m.pct}%`, k: 'of it paid off', tone: 'pos' as const },
+        ] : []}
+        actions={m ? <button className="btn btn-quiet" onClick={reload}>Refresh</button> : undefined}
+      />
+      {/* With no figures, the one thing he can DO comes first instead of hiding
+          under three empty scaffolds. */}
+      {!m && <CompassCard state={state} onReload={reload} />}
       <div className="grid-3">
         <div className="panel">
           <span className="microcap">Debt payoff</span>
-          {f ? (
+          {m ? (
             <>
-              <div className="kpi">{fmtNum(kc(f.debt.remaining))} Kč<span className="unit">left</span></div>
-              <div className="bar debt" style={{ marginTop: 12 }}><i style={{ width: `${f.debt.pct}%` }} /></div>
-              <div className="kpi-sub"><span className="val-pos">{f.debt.paid} paid</span> of {f.debt.original}</div>
+              <div className="kpi">{kc(m.owed)}<span className="unit">left</span></div>
+              <div className="bar debt" style={{ marginTop: 12 }}><i style={{ width: `${m.pct}%` }} /></div>
+              <div className="kpi-sub"><span className="val-pos">{kc(m.paidOff)} paid</span> of {kc(m.baseline)}</div>
             </>
           ) : (
             <>
@@ -72,10 +95,10 @@ export function MoneyPage() {
 
         <div className="panel">
           <span className="microcap">Monthly payments</span>
-          {f ? (
+          {m ? (
             <>
-              <div className="kpi">{f.debt.monthly}<span className="unit">/ month</span></div>
-              <div className="kpi-sub">across your payment plans</div>
+              <div className="kpi">{kc(m.monthly)}<span className="unit">/ month</span></div>
+              <div className="kpi-sub">across {m.openDebts} {m.openDebts === 1 ? 'debt' : 'debts'} still open</div>
             </>
           ) : (
             <>
@@ -86,21 +109,19 @@ export function MoneyPage() {
         </div>
 
         <div className="panel">
-          <span className="microcap">Monthly savings</span>
-          {f ? (
+          <span className="microcap">Saved this month</span>
+          {m ? (
             <>
-              <div className="kpi val-pos">{f.savings.thisMonth}</div>
-              <div className="kpi-sub">set aside this month</div>
+              <div className={m.savedThisMonth > 0 ? 'kpi val-pos' : 'kpi'}>{kc(m.savedThisMonth)}</div>
+              <div className="kpi-sub">{m.savedThisMonth > 0 ? 'set aside this month' : 'nothing set aside yet this month'}</div>
             </>
           ) : (
-            <>
-              <NoData label="this month" />
-            </>
+            <NoData label="this month" />
           )}
         </div>
       </div>
 
-      {f && <CompassCard f={f} />}
+      {m && <CompassCard state={state} onReload={reload} />}
     </div>
   )
 }
@@ -732,376 +753,6 @@ export function ReviewPage() {
           </div>
         </div>
       </div>
-    </div>
-  )
-}
-
-/* ---------------- COACH ----------------
-   Coach is for a thing you are avoiding. You give it the thing in plain
-   words; it breaks the thing down factually (what it is, the steps, the
-   cost of stalling) and hands you an easy first step. You do the step, then
-   tell it how it actually felt. That last part is the point: it trains the
-   fear back down. You never fill in the analysis, Coach does. */
-
-type CoachStage = 'home' | 'review' | 'saved'
-const EMPTY_FACTS: CoachFacts = { avoiding: '', steps: '', cost: '' }
-
-const FELT_OPTS: { key: NonNullable<CoachSession['felt']>; label: string }[] = [
-  { key: 'easier', label: 'Easier than I feared' },
-  { key: 'as-feared', label: 'About what I expected' },
-  { key: 'harder', label: 'Harder than I feared' },
-]
-const FELT_TAG: Record<NonNullable<CoachSession['felt']>, string> = {
-  easier: 'easier than feared', 'as-feared': 'about as expected', harder: 'harder than feared',
-}
-
-function ReflectForm({ onSubmit, onCancel }: { onSubmit: (didIt: boolean, felt: CoachSession['felt'], text: string) => void; onCancel: () => void }) {
-  const [didIt, setDidIt] = useState(true)
-  const [felt, setFelt] = useState<NonNullable<CoachSession['felt']>>('easier')
-  const [text, setText] = useState('')
-  return (
-    <div className="coach-reflect">
-      <span className="coach-field-q">Did you do it?</span>
-      <div className="coach-choice">
-        <button className={didIt ? 'on' : ''} onClick={() => setDidIt(true)}>Yes</button>
-        <button className={!didIt ? 'on' : ''} onClick={() => setDidIt(false)}>Not yet</button>
-      </div>
-      {/* "How did it feel" only makes sense once you have actually done it. */}
-      {didIt && (
-        <>
-          <span className="coach-field-q">How did it actually feel?</span>
-          <div className="coach-choice wrap">
-            {FELT_OPTS.map((o) => (
-              <button key={o.key} className={felt === o.key ? 'on' : ''} onClick={() => setFelt(o.key)}>{o.label}</button>
-            ))}
-          </div>
-        </>
-      )}
-      <AutoTextarea className="textinput" minRows={2} style={{ width: '100%', marginTop: 'var(--s2)' }}
-        placeholder={didIt ? 'What did it feel like? One honest line.' : 'What is actually in the way? One honest line.'}
-        value={text} onChange={(e) => setText(e.target.value)} aria-label={didIt ? 'How it felt' : 'What is in the way'} />
-      {!didIt && <p className="assist-note" style={{ marginTop: 'var(--s2)' }}>This stays open. An unfaced thing should keep showing up.</p>}
-      <div className="coach-nav">
-        <button className="btn btn-quiet" onClick={onCancel}>Cancel</button>
-        <button className="btn btn-primary" onClick={() => onSubmit(didIt, felt, text.trim())}>
-          {didIt ? 'Close the loop' : 'Save the note'}
-        </button>
-      </div>
-    </div>
-  )
-}
-
-export function CoachPage() {
-  const { space, tasks, setPage, coachOpen, setCoachOpen, coachSessions, startCoachSession, reflectCoachSession, deleteCoachSession, inView } = useStore()
-  const [stage, setStage] = useState<CoachStage>('home')
-  const [thing, setThing] = useState('')
-  const [title, setTitle] = useState('')
-  const [facts, setFacts] = useState<CoachFacts>(EMPTY_FACTS)
-  const [firstStep, setFirstStep] = useState('')
-  const [meta, setMeta] = useState<{ firstStepMin: number; category: TaskCategory }>({ firstStepMin: 10, category: 'admin' })
-  const [read, setRead] = useState<AvoidanceRead | null>(null)
-  const [fromModel, setFromModel] = useState(false)
-  const [why, setWhy] = useState('')
-  const [thinking, setThinking] = useState(false)
-  const [reflectId, setReflectId] = useState<string | null>(null)
-
-  /* His own eight-beat approach, applied by the model to what he actually
-     wrote. Without a key it falls back to the template library and says so. */
-  const analyze = async (input: string) => {
-    setTitle(input.trim())
-    setThinking(true)
-    setStage('review')
-    const r = await readAvoidance(input)
-    if (r.ok) {
-      setRead(r.read)
-      setFromModel(true)
-      setFirstStep(r.read.firstStep)
-      setMeta({ firstStepMin: r.read.firstStepMin, category: r.read.category })
-      setFacts({ avoiding: r.read.naming, steps: r.read.nextPiece, cost: r.read.document })
-    } else {
-      const a = analyzeAvoidance(input)
-      // Same eight beats either way. Generic content is honest; a different page
-      // shape for the same feature is not.
-      setRead(fallbackRead(input))
-      setFromModel(false)
-      setWhy(
-        r.reason === 'no-key' ? 'No Groq key yet.'
-        : r.reason === 'bad-key' ? 'That Groq key was rejected.'
-        : r.reason === 'rate-limit' ? 'Groq is rate limiting right now.'
-        : 'Groq could not be reached.')
-      setFacts({ avoiding: a.avoiding, steps: a.steps, cost: a.cost })
-      setFirstStep(a.firstStep)
-      setMeta({ firstStepMin: a.firstStepMin, category: a.category })
-    }
-    setThinking(false)
-  }
-
-  /* Today deep-links here two ways: a known scenario id, or the raw title of a
-     task that has been sitting too long. Either way Coach starts from something
-     real instead of an empty box. */
-  useEffect(() => {
-    if (!coachOpen) return
-    const s = COACH_SCENARIOS.find((x) => x.id === coachOpen)
-    const seed = s ? s.title : coachOpen
-    setThing(seed)
-    void analyze(seed)
-    setCoachOpen(null)
-  }, [coachOpen])
-
-  const reset = () => { setStage('home'); setThing(''); setTitle(''); setFacts(EMPTY_FACTS); setFirstStep(''); setRead(null); setFromModel(false); setWhy('') }
-  const setFact = (k: keyof CoachFacts, v: string) => setFacts((f) => ({ ...f, [k]: v }))
-  const save = () => {
-    startCoachSession({ title: title.trim() || thing.trim(), facts, firstStep: firstStep.trim(), firstStepMin: meta.firstStepMin, category: meta.category })
-    setStage('saved')
-  }
-
-  // Loops belong to the profile they were opened in (older ones show everywhere).
-  const mine = coachSessions.filter((s) => inView(s.space))
-  const open = mine.filter((s) => s.status === 'open')
-  const closed = mine.filter((s) => s.status === 'closed')
-  const easedCount = closed.filter((s) => s.didIt && s.felt === 'easier').length
-  /* The starters are what he has NOT planned. A task he has put on today is a
-     task he has decided to do; leaving it on the list is the avoidance, which
-     is his own definition, so moving something to today takes it off this page
-     and moving it back puts it here again. Ranked by what keeps coming back
-     first, then by what has waited longest. Canned scenarios only appear when
-     there is nothing of his own, because the point of the page is his things. */
-  const oldest = tasks
-    .filter((t) => !t.done && t.list !== 'today' && inView(t.space))
-    .sort((a, b) => (b.carried ?? 0) - (a.carried ?? 0)
-      || ((a.createdAt ?? '9999') < (b.createdAt ?? '9999') ? -1 : 1))
-
-  /* ---- review the breakdown Coach drafted, then commit ---- */
-  if (stage === 'review') {
-    return (
-      <div className="page">
-        <Band title={title || 'Avoidance'} />
-        <div className="panel coach-facts">
-          <div className="coach-drafted">
-            <span className="microcap">{fromModel ? 'Read through the eight beats' : 'Generic, not read'}</span>
-            <span className="assist-note">
-              {fromModel
-                ? 'Your own approach, applied to what you wrote. Change anything that is off, then send the first step to Today.'
-                : `${why} These beats came from a pattern library, so they are generic and do not know what you wrote.`}
-            </span>
-            {!fromModel && (
-              <button className="btn btn-primary" style={{ marginTop: 'var(--s2)', alignSelf: 'flex-start' }} onClick={() => setPage('settings')}>
-                Add a key so it reads it
-              </button>
-            )}
-          </div>
-
-          {thinking && <div className="empty" style={{ paddingTop: 20 }}>Reading what you wrote.</div>}
-
-          {/* His eight beats, in his order, all eight present. Rendering only the
-              ones the model filled left holes at 4 and 7, and a two-column grid
-              turned 1..8 into a zigzag, so the sequence he wrote was unreadable. */}
-          {!thinking && read && (
-            <ol className="beats">
-              <li className="beat">
-                <span className="beat-n">1</span>
-                <div className="beat-body">
-                  <span className="beat-h">Name it out loud</span>
-                  <p>{read.naming}</p>
-                  {read.absolutes.length > 0 && (
-                    <p className="beat-abs">The spiral talks in absolutes. You used: {read.absolutes.map((a) => `“${a}”`).join(', ')}</p>
-                  )}
-                </div>
-              </li>
-
-              <li className="beat">
-                <span className="beat-n">2</span>
-                <div className="beat-body">
-                  <span className="beat-h">Separate the feeling from the verdict</span>
-                  <p className="beat-feel"><b>Feel this:</b> {read.feeling}</p>
-                  <p className="beat-verdict"><b>Do not sign this:</b> {read.verdict}</p>
-                </div>
-              </li>
-
-              <li className="beat">
-                <span className="beat-n">3</span>
-                <div className="beat-body">
-                  <span className="beat-h">Open the actual document</span>
-                  <p>{read.document}</p>
-                </div>
-              </li>
-
-              <li className="beat beat-action">
-                <span className="beat-n">4</span>
-                <div className="beat-body" style={{ width: '100%' }}>
-                  <span className="beat-h">Shrink it to the first physical action</span>
-                  <input className="textinput" style={{ width: '100%', marginTop: 6 }} value={firstStep}
-                    onChange={(e) => setFirstStep(e.target.value)} aria-label="First step" />
-                  <div className="coach-field-inline" style={{ marginTop: 'var(--s2)' }}>
-                    <span>Give it</span>
-                    <input className="textinput" type="number" min={1} max={120} style={{ width: 72 }} value={meta.firstStepMin}
-                      onChange={(e) => setMeta((m) => ({ ...m, firstStepMin: Math.max(1, Number(e.target.value) || 1) }))} aria-label="Minutes" />
-                    <span>min ·</span>
-                    <select className="textinput" value={meta.category} onChange={(e) => setMeta((m) => ({ ...m, category: e.target.value as TaskCategory }))} aria-label="Category">
-                      <option value="call">call</option><option value="admin">admin</option><option value="deep">deep</option><option value="quick">quick</option>
-                    </select>
-                  </div>
-                </div>
-              </li>
-
-              <li className="beat">
-                <span className="beat-n">5</span>
-                <div className="beat-body">
-                  <span className="beat-h">Take it on your terms</span>
-                  <p>{read.onYourTerms}</p>
-                </div>
-              </li>
-
-              <li className="beat">
-                <span className="beat-n">6</span>
-                <div className="beat-body">
-                  <span className="beat-h">One piece, never the stack</span>
-                  <p>{read.nextPiece}</p>
-                </div>
-              </li>
-
-              <li className="beat">
-                <span className="beat-n">7</span>
-                <div className="beat-body">
-                  <span className="beat-h">Do not decide big things from the bottom</span>
-                  <p>{read.defer || 'Nothing here is a decision of that size. If one shows up, it waits for a clear-headed day.'}</p>
-                </div>
-              </li>
-
-              <li className="beat">
-                <span className="beat-n">8</span>
-                <div className="beat-body">
-                  <span className="beat-h">Do not carry it fully alone</span>
-                  <p>{read.who || 'Say it out loud to one person who knows the terrain. Not for rescue, just so it is not only in your head.'}</p>
-                </div>
-              </li>
-            </ol>
-          )}
-
-          {!thinking && (
-            <div className="coach-nav">
-              <button className="btn btn-quiet" onClick={reset}>Back</button>
-              <button className="btn btn-primary" disabled={!firstStep.trim()} onClick={save}>Put first step on Today</button>
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  if (stage === 'saved') {
-    return (
-      <div className="page">
-        <Band title={title || 'Avoidance'} />
-        <div className="panel coach-facts">
-          <div className="allclear" style={{ borderColor: 'var(--progress)', marginTop: 0 }}>
-            <span className="dot" aria-hidden="true" />
-            First step is on Today: {firstStep}
-          </div>
-          <p className="coach-body">This is an open loop now. Once you have done it, come back and tell Coach how it actually felt. That reflection is what trains the dread down over time.</p>
-          <div className="coach-nav">
-            <button className="btn btn-ghost" onClick={() => setPage('today')}>Open Today</button>
-            <button className="btn btn-primary" onClick={reset}>Done</button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  /* ---- home: name the thing, Coach breaks it down ---- */
-  return (
-    <div className="page">
-      <Band title="Avoidance" />
-
-      {/* Two columns above 1600px: the box on the left, everything you can act
-          on to its right, so an ultrawide screen is not two thirds empty. */}
-      <div className="coach-two">
-      <div className="panel coach-intake">
-        <span className="microcap">What are you avoiding?</span>
-        <AutoTextarea
-          className="textinput" minRows={3} style={{ width: '100%', marginTop: 'var(--s2)' }}
-          value={thing} onChange={(e) => setThing(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && thing.trim()) void analyze(thing) }}
-          placeholder="Say it plainly. e.g. Call VZP to confirm the payment plan, or Reply to the tax office letter"
-          aria-label="What you are avoiding"
-        />
-        <div className="coach-intake-row">
-          <button className="btn btn-primary" disabled={!thing.trim()} onClick={() => void analyze(thing)}>Face it</button>
-          <span className="assist-note">Coach looks at it factually and hands you an easy first step. You do not fill in the analysis, it does.</span>
-        </div>
-
-      </div>
-
-      <div className="coach-side">
-        {/* Naming the thing is the step an avoider cannot do cold, so the page
-            points at his own oldest waiting tasks. With nothing waiting the
-            whole block stays home: a header over zero items reads as broken. */}
-        {oldest.length > 0 && (
-          <div className="coach-starters">
-            <span className="microcap">Or start from one of these</span>
-            <div className="coach-starter-row">
-              {oldest.slice(0, 5).map((t) => (
-                <button key={t.id} className="coach-starter is-yours" onClick={() => { setThing(t.title); void analyze(t.title) }}>
-                  {t.title}
-                  <span className="cs-age">{(t.carried ?? 0) > 0 ? `came back ${t.carried}x` : t.createdAt ? `since ${fmtWhen(t.createdAt)}` : 'on your list'}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-      {open.length > 0 && (
-        <>
-          <SecHead label="Open loops" />
-          <div className="coach-loops">
-            {open.map((s) => (
-              <div className="panel coach-loop" key={s.id}>
-                <div className="coach-loop-head">
-                  <span className="grow">{s.title}</span>
-                  <span className="mono meta">{fmtWhen(s.when)}</span>
-                </div>
-                <div className="coach-loop-step">First step: {s.firstStep}</div>
-                {s.didIt === false && s.reflection && (
-                  <div className="coach-loop-blocked">In the way: {s.reflection}</div>
-                )}
-                {reflectId === s.id ? (
-                  <ReflectForm
-                    onCancel={() => setReflectId(null)}
-                    onSubmit={(didIt, felt, text) => { reflectCoachSession(s.id, didIt, felt, text); setReflectId(null) }}
-                  />
-                ) : (
-                  <div className="coach-loop-actions">
-                    <button className="btn btn-primary" onClick={() => setReflectId(s.id)}>Check in</button>
-                    <button className="btn btn-ghost" onClick={() => deleteCoachSession(s.id)}>Drop</button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      {closed.length > 0 && (
-        <>
-          <SecHead label="What you faced" />
-          <div className="coach-history">
-            {closed.map((s) => (
-              <div className="coach-closed" key={s.id}>
-                {s.felt && <span className={`coach-felt-tag felt-${s.felt}`}>{FELT_TAG[s.felt]}</span>}
-                {!s.didIt && <span className="coach-felt-tag felt-open">not done</span>}
-                <span className="grow">
-                  <strong>{s.title}</strong>
-                  {s.reflection && <span className="coach-closed-note">{s.reflection}</span>}
-                </span>
-                <button className="assist-goto" onClick={() => deleteCoachSession(s.id)} aria-label="Remove">remove</button>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-      </div>
-      </div>
-
     </div>
   )
 }

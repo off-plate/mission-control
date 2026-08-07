@@ -2,14 +2,12 @@ import { Component, useEffect, useRef, useState, type ReactNode } from 'react'
 import { exceptionsFor, globalExceptions } from './exceptions'
 import { SPACE_LABELS } from './mock'
 import { GoalsPage, HabitsPage, PlanPage, RoutinesPage, TodayPage } from './pages1'
-import { CoachPage, MoneyPage, ReviewPage, SettingsPage } from './pages2'
-import { AssistantPage } from './pages3'
+import { MoneyPage, ReviewPage, SettingsPage } from './pages2'
 import { NotesPage } from './notes'
 import { DailyReview } from './daily'
 import { BrandPage } from './brand'
 import { DayPage } from './day'
 import { BoardPage } from './board'
-import { CalendarPage } from './calendar'
 import { FocusPage } from './focus'
 import { useStore } from './store'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange } from './supabase'
@@ -57,7 +55,6 @@ function Logo() {
 const NAV: { id: PageId; label: string }[] = [
   { id: 'today', label: 'Today' },
   { id: 'plan', label: 'Plan' },
-  { id: 'calendar', label: 'Calendar' },
   { id: 'habits', label: 'Habits' },
   { id: 'routines', label: 'Routines' },
   { id: 'goals', label: 'Goals' },
@@ -65,7 +62,6 @@ const NAV: { id: PageId; label: string }[] = [
   { id: 'review', label: 'Reflect' },
   { id: 'focus', label: 'Focus' },
   { id: 'notes', label: 'Notes' },
-  { id: 'coach', label: 'Avoidance' },
   { id: 'board', label: 'Why’s' },
 ]
 
@@ -178,16 +174,6 @@ export default function App() {
             Yesterday
           </button>
           <button
-            className={`btn btn-accent${page === 'assistant' ? ' is-on' : ''}`}
-            onClick={() => setPage('assistant')}
-            aria-pressed={page === 'assistant'}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3z" strokeLinejoin="round" />
-            </svg>
-            Assistant
-          </button>
-          <button
             className={`btn btn-ghost${page === 'settings' ? ' is-on' : ''}${needsSignIn ? ' has-dot' : ''}`}
             onClick={() => setPage('settings')}
             aria-label={needsSignIn ? 'Settings, sync is off' : 'Settings'}
@@ -218,14 +204,11 @@ export default function App() {
         <PageBoundary page={page}>
         {page === 'today' && <TodayPage />}
         {page === 'plan' && <PlanPage />}
-        {page === 'calendar' && <CalendarPage />}
-        {page === 'assistant' && <AssistantPage />}
         {page === 'habits' && <HabitsPage />}
         {page === 'routines' && <RoutinesPage />}
         {page === 'goals' && <GoalsPage />}
         {page === 'money' && moneyOk && <MoneyPage />}
         {(page === 'review' || page === 'stats') && <ReviewPage />}
-        {page === 'coach' && <CoachPage />}
         {page === 'focus' && <FocusPage />}
         {page === 'board' && <BoardPage />}
         {page === 'notes' && <NotesPage />}

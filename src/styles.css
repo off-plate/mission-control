@@ -314,8 +314,6 @@ main { padding-inline: var(--gutter); }
 
 .assist-log { padding: var(--s3) 0; border-bottom: 1px solid var(--hairline); }
 .assist-log:last-child { border-bottom: none; }
-.assist-log-head { display: flex; gap: var(--s3); align-items: baseline; margin-bottom: var(--s2); }
-.assist-log-head .grow { flex: 1; min-width: 0; font-style: italic; color: var(--muted); }
 .assist-log-item { display: flex; align-items: center; gap: var(--s2); padding: var(--s1) 0; font-size: var(--text-sm); }
 .assist-log-item .grow { flex: 1; min-width: 0; }
 .assist-tag { font-family: var(--font-mono); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; border-radius: 3px; padding: 1px 6px; }
@@ -924,71 +922,8 @@ select.textinput { flex: 0 0 auto; min-width: 110px; }
 .state-tag.action { color: var(--alert); background: var(--alert-wash); }
 .oblig .bar { margin-top: var(--s3); }
 .oblig .next { margin-top: var(--s2); font-size: var(--text-xs); color: var(--muted); }
-
-/* coach */
-/* ---------- Coach: face an avoided thing, ease in, check how it felt ---------- */
-.coach-intake { margin-bottom: var(--s5); }
-.coach-intake-row { display: flex; align-items: center; gap: var(--s3); margin-top: var(--s3); flex-wrap: wrap; }
-.coach-quick { margin-top: var(--s5); padding-top: var(--s4); border-top: 1px solid var(--hairline); }
-.coach-chips { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s3); }
-.coach-chip { display: flex; flex-direction: column; gap: 1px; text-align: left; padding: var(--s2) var(--s3); border: 1px solid var(--hairline-strong); border-radius: var(--r-md); background: var(--surface); }
-.coach-chip:hover { border-color: var(--accent); }
-.coach-chip .l { font-weight: 600; font-size: var(--text-sm); }
-.coach-chip .h { font-family: var(--font-mono); font-size: 0.625rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--faint); }
-
-/* the guided flow: a slim rail + one panel */
-.coach-flow { display: grid; grid-template-columns: 200px 1fr; gap: var(--s5); align-items: start; }
-.coach-flow-rail { list-style: none; position: sticky; top: 104px; display: flex; flex-direction: column; gap: 2px; }
-.coach-flow-rail li { display: flex; align-items: center; gap: var(--s3); padding: var(--s2) var(--s3); border-radius: var(--r-md); color: var(--faint); font-size: var(--text-sm); }
-.coach-flow-rail li.current { color: var(--ink); background: var(--accent-wash); font-weight: 600; }
-.coach-flow-rail li.done { color: var(--muted); }
-.coach-flow-rail .d { width: 22px; height: 22px; flex: none; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--hairline-strong); font-family: var(--font-mono); font-size: 0.6875rem; }
-.coach-flow-rail li.current .d { background: var(--accent); border-color: var(--accent); color: var(--bg); }
-.coach-flow-rail li.done .d { border-color: var(--progress); color: var(--progress); }
-
-.coach-facts { display: flex; flex-direction: column; max-width: 760px; }
-.coach-drafted { display: flex; flex-direction: column; gap: 2px; margin-bottom: var(--s4); padding-bottom: var(--s3); border-bottom: 1px solid var(--hairline); }
-.coach-firststep { padding: var(--s3); background: var(--accent-wash); border-radius: var(--r-md); }
-.coach-ta { width: 100%; line-height: 1.5; resize: vertical; }
-.coach-field { display: block; margin-bottom: var(--s4); }
-.coach-field-q { display: block; font-weight: 600; font-size: var(--text-base); margin-bottom: var(--s2); }
-.coach-field-hint { display: block; font-size: var(--text-xs); color: var(--muted); margin: -4px 0 var(--s2); }
-.coach-field-inline { display: flex; align-items: center; gap: var(--s2); font-size: var(--text-sm); color: var(--muted); margin-bottom: var(--s4); flex-wrap: wrap; }
-.coach-field-inline input[type="number"] { flex: 0 0 76px; width: 76px; }
-.coach-field-inline select { flex: 0 0 auto; width: auto; }
-.coach-body { font-size: var(--text-sm); color: var(--muted); margin-bottom: var(--s4); max-width: 62ch; }
 .coach-nav { display: flex; gap: var(--s3); margin-top: var(--s4); align-items: center; }
 .coach-nav .btn-primary { margin-left: auto; }
-
-/* open loops awaiting a check-back */
-.coach-loops { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); gap: var(--s4); }
-.coach-loop-head { display: flex; align-items: baseline; gap: var(--s3); }
-.coach-loop-head .grow { flex: 1; min-width: 0; font-weight: 600; }
-.coach-loop-step { font-size: var(--text-sm); color: var(--muted); margin: var(--s2) 0 var(--s3); }
-.coach-loop-actions { display: flex; gap: var(--s2); }
-
-.coach-reflect { border-top: 1px solid var(--hairline); padding-top: var(--s3); margin-top: var(--s1); }
-.coach-choice { display: flex; gap: var(--s2); margin: var(--s2) 0 var(--s3); }
-.coach-choice.wrap { flex-wrap: wrap; }
-.coach-choice button { padding: 6px var(--s3); border: 1px solid var(--hairline-strong); border-radius: var(--r-md); font-size: var(--text-sm); color: var(--muted); }
-.coach-choice button.on { border-color: var(--accent); background: var(--accent-wash); color: var(--ink); font-weight: 600; }
-
-/* what you faced: closed loops with how it felt */
-.coach-history { display: flex; flex-direction: column; }
-.coach-closed { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) 0; border-bottom: 1px solid var(--hairline); font-size: var(--text-sm); }
-.coach-closed:last-child { border-bottom: none; }
-.coach-closed .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.coach-closed-note { color: var(--muted); font-style: italic; }
-.coach-felt-tag { flex: none; font-family: var(--font-mono); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; border-radius: 3px; padding: 2px 7px; }
-.coach-felt-tag.felt-easier { color: var(--progress); background: var(--progress-wash); }
-.coach-felt-tag.felt-as-feared { color: var(--info); background: var(--info-wash); }
-.coach-felt-tag.felt-harder { color: var(--warn); background: var(--warn-wash); }
-.coach-felt-tag.felt-open { color: var(--muted); background: var(--surface-2); }
-
-@media (max-width: 719px) {
-  .coach-flow { grid-template-columns: 1fr; }
-  .coach-flow-rail { position: static; flex-direction: row; overflow-x: auto; }
-}
 
 /* stats */
 .ledger-row { display: flex; gap: var(--s3); align-items: baseline; padding: var(--s2) 0; border-bottom: 1px solid var(--hairline); font-size: var(--text-sm); }
@@ -1032,11 +967,6 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
   color: var(--muted);
 }
 .actual-chips button:hover { border-color: var(--accent); color: var(--accent); }
-
-.caltable { width: 100%; border-collapse: collapse; }
-.caltable td { padding: var(--s3) var(--s2); border-top: 1px solid var(--hairline); font-size: var(--text-sm); }
-.caltable td.f { font-family: var(--font-mono); font-weight: 600; text-align: right; }
-.caltable td.n { color: var(--muted); font-size: var(--text-xs); }
 
 .rowitem.wrap-row { flex-wrap: wrap; row-gap: var(--s1); min-height: 0; padding-block: var(--s3); }
 .wrap-row .grow { white-space: normal; overflow: visible; text-overflow: clip; min-width: 16ch; }
@@ -1231,9 +1161,6 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 .vev .t { font-size: 0.6875rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
 .vev .rng { font-family: var(--font-mono); font-size: 0.5625rem; color: var(--info); white-space: nowrap; }
 .vev-cal .rng { color: var(--info); }
-
-.cal-link { font-family: var(--font-body); font-size: 0.6875rem; font-weight: 600; color: var(--accent); white-space: nowrap; }
-.cal-link:hover { text-decoration: underline; }
 
 /* The task name IS the link, so it carries a resting hairline underline.
    Previously it was plain dark text and the page needed a caption telling
@@ -2067,16 +1994,6 @@ mark { background: var(--accent-wash); color: var(--accent); font-weight: 600; b
 }
 /* Content caps in rem so they grow with the root-font ramp on big monitors. */
 .textinput { max-width: 44rem; }
-.coach-facts { max-width: 48rem; }
-/* Coach is a real content column, not a 680px field in a 3300px card. */
-.coach-intake { max-width: min(100%, 60rem); }
-.coach-intake .textinput { max-width: none; }
-.coach-intake > .microcap {
-  font-family: var(--font-display); font-size: var(--text-lg); font-weight: 700;
-  letter-spacing: -0.01em; text-transform: none; color: var(--ink);
-}
-/* One open loop grows to a sane width instead of hugging a 9-column skeleton. */
-.coach-loops { grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 460px)); justify-content: start; }
 /* Calendar blocks keep their label on one baseline instead of being sliced. */
 .vev { padding: 3px 6px; display: flex; align-items: baseline; gap: 6px; }
 /* A planned task has no length yet, so it gets a readable box. A block that
@@ -2163,7 +2080,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 /* Only real cards get the card shadow. Sections that live INSIDE a card
    (.bucket, .habit-group) must never cast one: a shadow with no surface
    behind it reads as a ghost box nested in the real card. */
-.panel, .card, .routine-card, .mr-card, .goal-col, .coach-loop, .scenario,
+.panel, .card, .routine-card, .mr-card, .goal-col, .scenario,
 .widget, .firstmove, .bd-composer {
   box-shadow: 0 1px 2px rgba(26, 23, 18, 0.05), 0 12px 34px -22px rgba(26, 23, 18, 0.34);
 }
@@ -2235,12 +2152,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .lastweek-list li { font-size: var(--text-sm); color: var(--muted); padding-left: var(--s3); position: relative; }
 .lastweek-list li::before { content: ''; position: absolute; left: 0; top: 0.6em; width: 4px; height: 4px; border-radius: 50%; background: var(--hairline-strong); }
 
-/* Coach: what is blocking an open loop you have not done yet. */
-.coach-loop-blocked {
-  font-size: var(--text-sm); color: var(--warn); background: var(--warn-wash);
-  border-radius: var(--r-sm); padding: var(--s2) var(--s3); margin-top: var(--s2);
-}
-
 /* Pomodoro: blocks finished today. */
 .pomo-cycles { font-size: var(--text-xs); color: var(--faint); padding-right: 4px; }
 
@@ -2255,7 +2166,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .today-task .kebab-wrap, .today-task .est-chip, .today-task .expand-btn,
 .todo-row .kebab-wrap, .todo-row .est-chip, .todo-row .expand-btn { flex: none; }
 
-/* ---------- Ideology pass: cross-space alerts, momentum, coach starters ---------- */
+/* ---------- Ideology pass: cross-space alerts and momentum ---------- */
 
 /* An alert raised in Personal but shown while you are in Work or Off-Plate. */
 .exception-row.from-other { opacity: 0.92; }
@@ -2275,17 +2186,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 }
 .momentum-item { font-size: var(--text-sm); color: var(--progress); }
 .momentum-item + .momentum-item { padding-left: var(--s3); border-left: 1px solid var(--hairline); }
-
-/* Coach: things to point at instead of a blank box. */
-.coach-starters { margin-top: var(--s5); padding-top: var(--s4); border-top: 1px solid var(--hairline); }
-.coach-starter-row { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s2); }
-.coach-starter {
-  text-align: left; border: 1px solid var(--hairline-strong); border-radius: var(--r-sm);
-  padding: var(--s2) var(--s3); font-size: var(--text-sm); color: var(--ink); cursor: pointer;
-  display: flex; flex-direction: column; gap: 2px; max-width: 320px;
-}
-.coach-starter:hover { border-color: var(--accent); color: var(--accent); }
-.coach-starter.is-yours { border-color: var(--accent-wash); background: var(--accent-wash); }
 .cs-age { font-family: var(--font-mono); font-size: 0.625rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); }
 
 /* Savings sparkline endpoints, so five numbers about his money are readable. */
@@ -2296,13 +2196,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 /* 23. Short pages left the footer stranded mid-viewport with empty space below. */
 .shell { display: flex; flex-direction: column; min-height: 100dvh; }
 .shell > main { flex: 1 0 auto; }
-
-/* 3. Ultrawide: Coach put one 60rem panel in the left third of a 3440 screen.
-   Above 1600px the intake and everything you can act on sit side by side. */
-@media (min-width: 1600px) {
-  .coach-two { display: grid; grid-template-columns: minmax(0, 60rem) minmax(0, 1fr); gap: var(--s5); align-items: start; }
-  .coach-intake { max-width: none; margin-bottom: 0; }
-}
 
 /* 5. Phone Review: a wrapped goal name pushed its percentage onto the next line,
    below the hairline, so the number read as the NEXT goal's. Keep them together. */
@@ -2323,15 +2216,8 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 
 /* 19/20. Phone: full-width starter chips and a stacked break-down row. */
 @media (max-width: 639px) {
-  .coach-starter { max-width: none; width: 100%; }
   .plan-cols .formrow { flex-wrap: wrap; }
   .plan-cols .formrow > .textinput { flex: 1 1 100%; }
-}
-
-@media (min-width: 1600px) {
-  .coach-side .coach-starters { margin-top: 0; padding-top: 0; border-top: none; }
-  .coach-side .coach-starter-row { flex-direction: column; align-items: stretch; }
-  .coach-side .coach-starter { max-width: none; }
 }
 
 /* ---------- Shared add-sheet form ---------- */
@@ -2366,9 +2252,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .habit-auto:hover { text-decoration: underline; }
 .habit-weeks { font-size: var(--text-xs); color: var(--muted); margin-left: auto; }
 
-/* ---------- Habits: a band per part of the day ---------- */
-/* Heading, rule, then that group's habits side by side across the full width.
-   Groups stack down the page, so a busy morning never strands a short evening. */
 /* ---------- Habits, as a list ----------
    Sixteen identical bordered cards in a grid gave the page no rank, left two
    thirds of every card empty and stranded the last card of each group. One
@@ -2627,86 +2510,30 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   background: var(--bg); color: var(--ink);
 }
 
-/* ---------- Journal reader ---------- */
-.journal { margin-bottom: var(--s5); }
-.journal-drop { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; margin-top: var(--s3); }
-.journal-work { display: grid; gap: var(--s4); margin-top: var(--s4); grid-template-columns: 1fr; }
-@media (min-width: 900px) { .journal-work { grid-template-columns: minmax(0, 320px) minmax(0, 1fr); } }
-.journal-shot { display: flex; flex-direction: column; gap: var(--s2); align-items: flex-start; }
-.journal-shot img {
-  width: 100%; border-radius: var(--r-sm); border: 1px solid var(--hairline-strong);
-  max-height: 420px; object-fit: contain; background: var(--bg);
-}
-.journal-area { width: 100%; font-size: var(--text-sm); line-height: 1.5; }
-.journal-items { margin-top: var(--s4); border-top: 1px solid var(--hairline); padding-top: var(--s3); }
-.journal-item {
-  display: flex; align-items: center; gap: var(--s2); padding: var(--s2) 0;
-  border-bottom: 1px solid var(--hairline); cursor: pointer; font-size: var(--text-sm);
-}
-.journal-item:last-of-type { border-bottom: none; }
-.journal-item:not(.on) { opacity: 0.5; }
-.journal-item input { width: 17px; height: 17px; accent-color: var(--accent); flex: none; }
-
-.journal-readers { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; margin-top: var(--s2); }
-.journal-readers .assist-note { flex: 1 1 auto; }
-
-/* ---------- Avoidance: the eight beats ---------- */
-/* A sequence, read top to bottom, with a rule down its left so eight steps
-   read as one run rather than eight loose paragraphs. */
-.beats { display: flex; flex-direction: column; gap: 0; margin: var(--s4) 0; list-style: none; }
-.beat {
-  display: flex; gap: var(--s3); align-items: flex-start;
-  padding: var(--s4) 0 var(--s4) var(--s3);
-  border-left: 1px solid var(--hairline);
-}
-.beat:first-child { padding-top: var(--s2); }
-.beat:last-child { padding-bottom: var(--s2); }
-/* The one beat you do something in, rather than read. */
-.beat-action {
-  background: var(--accent-wash); border-left-color: var(--accent);
-  border-radius: 0 var(--r-md) var(--r-md) 0; padding-right: var(--s4);
-}
-.beat-action .beat-n { border-color: var(--accent); color: var(--accent); }
-.beat-action .beat-h { color: var(--accent); }
-.beat-n {
-  flex: none; width: 26px; height: 26px; border-radius: 50%;
-  border: 1px solid var(--hairline-strong); color: var(--faint);
-  display: inline-flex; align-items: center; justify-content: center;
-  font-family: var(--font-mono); font-size: 0.6875rem; font-weight: 600; margin-top: 1px;
-}
-.beat-body { min-width: 0; }
-.beat-h {
-  display: block; font-family: var(--font-mono); font-size: 0.5625rem;
-  letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); margin-bottom: 4px;
-}
-.beat-body p { font-size: var(--text-sm); line-height: 1.55; color: var(--ink); max-width: 68ch; }
-.beat-body p + p { margin-top: 6px; }
-.beat-abs { color: var(--muted) !important; font-size: var(--text-xs) !important; }
-.beat-feel b, .beat-verdict b { font-weight: 600; }
-.beat-verdict { color: var(--muted) !important; }
-
-/* Beat four is the one you act on, so it carries the accent and the controls. */
-.beat-first {
-  display: flex; gap: var(--s3); align-items: flex-start;
-  background: var(--accent-wash); border-radius: var(--r-md);
-  padding: var(--s4); margin-top: var(--s4);
-}
-.beat-first .beat-n { border-color: var(--accent); color: var(--accent); }
-.beat-first .coach-field-q { display: block; font-family: var(--font-display); font-weight: 700; font-size: var(--text-base); margin-bottom: 2px; }
-.beat-first .coach-field-hint { display: block; font-size: var(--text-xs); color: var(--muted); margin-bottom: var(--s2); }
-
 /* Each Plan column sizes to its own content. The schedule was being stretched to
    match the Today column, so one long broken-down task left it hours of blank. */
 .plan-cols { align-items: start; }
 
 /* Assistant: the two ways in sit side by side, and what they filed runs under
    both, because the history belongs to neither one on its own. */
-.assist-cols { display: grid; gap: var(--s4); grid-template-columns: minmax(0, 1fr); align-items: stretch; }
-@media (min-width: 1100px) { .assist-cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
-.assist-cols > * { min-width: 0; margin-bottom: 0 !important; }
-.assist-say { display: flex; flex-direction: column; }
-.assist-history { margin-top: var(--s4); }
-.journal { margin-bottom: 0; }
+/* ---------- Today's assistant rail ----------
+   One column beside the day, always open. Below 1100px there is not room for
+   both, so it falls under the grid rather than squeezing the day into a
+   gutter. The rail sticks while the day scrolls past it. */
+.today-shell { display: grid; gap: var(--s5); grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1100px) { .today-shell { grid-template-columns: minmax(0, 1fr) 340px; } }
+.today-main { min-width: 0; }
+.assist-rail { min-width: 0; display: flex; flex-direction: column; gap: var(--s4); }
+@media (min-width: 1100px) { .assist-rail { position: sticky; top: var(--s4); } }
+.assist-rail .panel { margin-bottom: 0; }
+.assist-rail .assist-textarea { min-height: 4.5rem; }
+.assist-rail-log { max-height: 320px; overflow-y: auto; }
+/* The log rows are tight here, so undo is a word, not a red block. */
+.assist-undo {
+  flex: none; font-size: var(--text-xs); color: var(--alert);
+  padding: 2px 4px; border-radius: 4px; cursor: pointer;
+}
+.assist-undo:hover { background: var(--alert-wash); text-decoration: underline; }
 
 /* A habit feeding a goal says so on the card, and opens it. */
 .habit-goal {
@@ -2714,15 +2541,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   padding: 0; margin-top: 6px; cursor: pointer;
 }
 .habit-goal:hover { text-decoration: underline; }
-
-/* The Assistant is a place you go, so it wears the profile's accent rather than
-   dissolving into the header. */
-.btn-accent {
-  color: var(--accent); border: 1px solid var(--accent);
-  background: var(--accent-wash);
-}
-.btn-accent:hover { background: var(--accent); color: var(--bg); }
-.btn-accent.is-on { background: var(--accent); color: var(--bg); }
 
 /* The dictation box is one block: the field, then the mic and the button on the
    row beneath it, inside the same frame. The mic was floating off on its own and
@@ -2738,7 +2556,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .assist-tools { display: flex; align-items: center; gap: var(--s2); }
 .assist-go { margin-left: auto; }
 .assist-listening { font-size: var(--text-xs); color: var(--alert); }
-.assist-mic-note { margin-top: var(--s2); }
 
 /* Grown by script, so the manual grip has nothing left to do. */
 .autogrow { resize: none; }
@@ -2920,11 +2737,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .panel + .review-sec, .grid-2 + .review-sec, .grid-4 + .review-sec { margin-top: var(--s6); }
 .lastweek + .checkup-panel { margin-top: var(--s3); }
 
-/* The eight beats on a wide screen: two reading columns rather than one narrow
-   strip with two thirds of the page empty beside it. The first-action card and
-   the buttons stay full width underneath, where the decision belongs. */
-@media (min-width: 1500px) { .coach-facts { max-width: 68rem; } }
-
 /* A window picked by hand, named above it by the same heading as any other. */
 .daterange { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s4); flex-wrap: wrap; }
 .daterange label { font-size: var(--text-sm); color: var(--muted); }
@@ -3020,12 +2832,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 /* Everything on the page shares the cap and the centre, so no stray child
    (settings row, empty state) is left hugging the gutter. */
 .day-page > * { max-width: 940px; margin-inline: auto; }
-/* A number a routine step recorded, over the reviewed window. */
-/* On a phone the label, the line and the figures cannot share one row without
-   the label wrapping to two lines against a squeezed chart. The chart drops
-   to its own line instead. */
-@media (max-width: 560px) {
-}
 
 /* ---------- a measured number over time ---------- */
 /* A chart, not a sparkline: dated axis, real spread, and the target drawn as a
@@ -3140,12 +2946,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 /* ---------- calendar ---------- */
 /* Two columns of plan now that the schedule lives on Calendar. */
 .plan-two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-.cal-cols { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); align-items: start; }
-.cal-wide { min-width: 0; }
-.cal-nav { display: flex; gap: var(--s1); }
-/* Every hour visible at once: the day is the content here, and a scrollbar was
-   hiding two thirds of it. */
-.cal-sched { max-height: none; overflow: visible; }
 /* the record, drawn on the clock */
 .vev-done { border-left: 3px solid var(--progress); background: var(--progress-wash); }
 .vev-done.k-focus { border-left-color: var(--info); }
@@ -3157,53 +2957,10 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   font-size: var(--text-xs); color: var(--muted); background: var(--bg);
   padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 85%;
 }
-.cal-months { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s4); }
-/* One month, generous cells; the arrows do the travelling. */
-.cal-months.one { grid-template-columns: 1fr; }
-/* The month takes the room it is given: two thirds of the page is exactly the
-   canvas a month deserves, not a strip in its corner. */
-.cal-months.one .cal-month { max-width: none; width: 100%; }
-.cal-months.one .cal-grid { gap: 6px; }
-.cal-months.one .cal-day { aspect-ratio: auto; min-height: 108px; align-items: flex-start; justify-content: flex-start; padding: 10px; border-color: var(--hairline); }
-.cal-months.one .cal-day:hover { border-color: var(--hairline-strong); }
-.cal-months.one .cal-num { font-size: var(--text-sm); }
-.cal-months.one .cal-marks { margin-top: auto; }
-.cal-months.one .cal-marks i { width: 6px; height: 6px; }
-.cal-month-name { margin-bottom: var(--s2); }
-.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
-.cal-dow { font-size: 0.625rem; color: var(--faint); text-align: center; padding-bottom: 2px; }
-.cal-day {
-  position: relative; aspect-ratio: 1; border: 1px solid transparent; border-radius: 4px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-}
-.cal-day:hover { border-color: var(--hairline-strong); }
-.cal-num { font-size: var(--text-xs); color: var(--muted); }
-.cal-day.has-any .cal-num { color: var(--ink); font-weight: 600; }
-.cal-day.is-today { border-color: var(--accent); }
-.cal-day.is-picked { background: var(--ink); }
-.cal-day.is-picked .cal-num { color: var(--bg); }
-.cal-marks { display: flex; gap: 2px; }
-.cal-marks i { width: 4px; height: 4px; border-radius: 50%; background: var(--progress); }
-.cal-day.is-picked .cal-marks i { background: var(--bg); }
 
 @media (max-width: 900px) {
-  .cal-cols { grid-template-columns: 1fr; }
-  .cal-months { grid-template-columns: 1fr; }
   .plan-two { grid-template-columns: 1fr; }
-  /* The month is what a phone comes for; a thousand pixels of empty hour rail
-     before it buried the calendar under its own schedule. */
-  .cal-cols > .panel { order: 2; }
-  .cal-cols > .cal-wide { order: 1; }
 }
-/* things that happened on a day but carry no clock time */
-.cal-untimed { display: flex; flex-wrap: wrap; gap: var(--s2); margin-bottom: var(--s3); }
-.cal-chip {
-  display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); color: var(--muted);
-  border: 1px solid var(--hairline); border-radius: 4px; padding: 3px 8px;
-}
-.cal-chip i { width: 6px; height: 6px; border-radius: 50%; background: var(--progress); }
-.cal-chip.k-routine i { background: var(--accent); }
-.cal-chip.k-focus i { background: var(--info); }
 /* a pasted URL, shortened to its address and made clickable */
 .txt-link { color: var(--accent); text-decoration: underline; text-decoration-color: var(--hairline-strong); text-underline-offset: 2px; word-break: keep-all; }
 .txt-link:hover { text-decoration-color: var(--accent); }
@@ -3273,7 +3030,6 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
    already is: no banner, no red card, just the number telling the truth. */
 .tot.is-over { color: var(--alert); display: inline-flex; align-items: baseline; gap: 6px; }
 .tot.is-over b { font-weight: 600; font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.05em; }
-.cal-untimed-cap { flex: 1 0 100%; font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); }
 
 /* ---------- the vision board: the one page off the house style ---------- */
 /* Edge to edge, on any screen. main carries a --gutter, and the old rule only

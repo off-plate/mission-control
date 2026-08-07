@@ -114,6 +114,7 @@ export default function App() {
 
   return (
     <div className="shell">
+      <a className="skiplink" href="#main">Skip to the page</a>
       <div className="topstick">
       <header className="topbar">
         <div className="brand">
@@ -144,12 +145,13 @@ export default function App() {
             target="_blank"
             rel="noreferrer"
             title="Open My Mind in a new tab"
+            aria-label="My Mind"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <rect x="3" y="6" width="11" height="14" rx="2" />
               <path d="M8 3h11a2 2 0 0 1 2 2v11" strokeLinecap="round" />
             </svg>
-            My Mind
+            <span className="btn-label">My Mind</span>
           </a>
           {/* Notes, one click from any screen. It left the menu because he
               reaches for it mid-thought, not by navigating to it. */}
@@ -158,12 +160,13 @@ export default function App() {
             onClick={() => setPage('notes')}
             aria-pressed={page === 'notes'}
             title="Notes"
+            aria-label="Note"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <path d="M5 3.5h9.5L19 8v12.5H5z" strokeLinejoin="round" />
               <path d="M14 3.5V8h5M8.5 12.5h7M8.5 16h4.5" strokeLinecap="round" />
             </svg>
-            Note
+            <span className="btn-label">Note</span>
           </button>
           {/* Money and Reflect, merged. Both are about looking back at what
               moved, so they are one destination and it lives up here. */}
@@ -172,22 +175,23 @@ export default function App() {
             onClick={() => setPage('achievements')}
             aria-pressed={['achievements', 'money', 'review', 'stats'].includes(page)}
             title="Achievements, money and reflection"
+            aria-label="Achievements"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <path d="M7 3.5h10v5a5 5 0 0 1-10 0z" strokeLinejoin="round" />
               <path d="M7 5H4.5v1.5A3.5 3.5 0 0 0 8 10M17 5h2.5v1.5A3.5 3.5 0 0 1 16 10" strokeLinecap="round" />
               <path d="M12 13.5v3.5M9 20.5h6" strokeLinecap="round" />
             </svg>
-            Achievements
+            <span className="btn-label">Achievements</span>
           </button>
           {/* Yesterday, on demand. It offers itself once a morning; after that
               it is his to open, from any page, without hunting for a pill. */}
-          <button className="btn btn-ghost" onClick={openDaily} aria-label="Walk yesterday and today" title="Walk yesterday and today">
+          <button className="btn btn-ghost" onClick={openDaily} aria-label="Yesterday" title="Walk yesterday and today">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <path d="M3.5 9a9 9 0 1 0 2.3-3.7L3 8" strokeLinecap="round" strokeLinejoin="round" />
               <path d="M3 4v4h4M12 7.5V12l3 2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            Yesterday
+            <span className="btn-label">Yesterday</span>
           </button>
           <button
             className={`btn btn-ghost${page === 'settings' ? ' is-on' : ''}${needsSignIn ? ' has-dot' : ''}`}
@@ -207,7 +211,7 @@ export default function App() {
       </div>
 
       {isReadOnly() && (
-        <div className="allclear" style={{ borderColor: 'var(--alert)', margin: 'var(--s4) var(--s5) 0' }}>
+        <div className="allclear" role="status" aria-live="polite" style={{ borderColor: 'var(--alert)', margin: 'var(--s4) var(--s5) 0' }}>
           <span className="dot" aria-hidden="true" />
           Another device has saved a newer version of your data. Nothing here is being saved until this one is updated, so that version is not overwritten.
         </div>
@@ -216,7 +220,7 @@ export default function App() {
           anywhere rather than only from Today. */}
       <DailyReview />
 
-      <main id="main">
+      <main id="main" tabIndex={-1}>
         <PageBoundary page={page}>
         {page === 'today' && <TodayPage />}
         {page === 'plan' && <PlanPage />}

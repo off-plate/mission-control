@@ -386,7 +386,6 @@ function AddWidgetInline({ onClose }: { onClose: () => void }) {
     <Sheet
       title="Add a widget"
       onClose={onClose}
-      note="The real app also gets a generic source widget: point it at any API or MCP connection and template the result."
     >
       <div className="addw-grid">
         {Object.values(WIDGET_DEFS_LIST).map((d) => (
@@ -564,10 +563,10 @@ function SubtaskRow({ taskId, sub }: { taskId: string; sub: SubTask }) {
   if (editing) {
     return (
       <div className="subtask-row is-editing">
-        <input className="textinput sub-edit-title" value={title} autoFocus
+        <input className="textinput sub-edit-title" value={title} autoFocus aria-label="Step name" autoComplete="off"
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { setTitle(sub.title); setMins(String(sub.estimateMin)); setEditing(false) } }} />
-        <input className="textinput sub-edit-min mono" type="number" min={1} max={480} value={mins}
+        <input className="textinput sub-edit-min mono" type="number" inputMode="numeric" min={1} max={480} value={mins} aria-label="Minutes for this step"
           onChange={(e) => setMins(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') save() }} />
         <button className="btn btn-primary sub-btn" onClick={save}>Save</button>
@@ -1091,7 +1090,7 @@ export function PlanPage() {
 
       {/* The hourly schedule lives on Calendar now; Plan is the list and the day. */}
       <div className="grid-3 plan-cols plan-two">
-        {/* 1 — To-do list: everything you added, any day. Drag out to plan it,
+        {/* 1. To-do list: everything you added, any day. Drag out to plan it,
             drag back to take it off today. */}
         <div
           className={`panel todo-col${listDropOver ? ' drop-over' : ''}`}
@@ -1116,7 +1115,7 @@ export function PlanPage() {
           <div className="formrow" style={{ marginBottom: 'var(--s2)' }}>
             <input
               className="textinput"
-              placeholder="Add something to the list"
+              placeholder="Add something to the list…"
               value={quick}
               onChange={(e) => setQuick(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && quick.trim()) { addTask({ title: quick.trim(), source: 'mc', estimateMin: 0, space, list: 'backlog', category: 'quick' }); setQuick('') } }}
@@ -1179,7 +1178,7 @@ export function PlanPage() {
           {backlogOpen.length === 0 && <div className="empty">Nothing waiting. Add the first task above.</div>}
         </div>
 
-        {/* 2 — The day: drag tasks from Unsorted into a time of day */}
+        {/* 2. The day: drag tasks from Unsorted into a time of day */}
         <div className="panel">
           <div className="col-head">
             {/* Which day this column lays out. Two days is the whole range: the
@@ -1881,10 +1880,15 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
       steady
       title={habit ? 'Edit this habit' : 'Add a habit'}
       onClose={onClose}
-      note={locked
-        ? `This habit is kept by the ${drivenBy} routine, so its name and frequency follow that routine. You can still move it to a different part of the day.`
-        : 'Habits are the small things you repeat. Multi-step rituals belong on Routines.'}
     >
+      {/* Only when it is locked, and only because the form is about to refuse
+          him: the fields are disabled and nothing else on screen says why. The
+          other half of this was a definition of the word "habit". */}
+      {locked && (
+        <p className="sheet-warn" style={{ marginTop: 0 }}>
+          The {drivenBy} routine keeps this habit, so its name and frequency follow that routine. You can still move it to a different part of the day.
+        </p>
+      )}
       <span className="field-label">Which kind is this?</span>
       <div className="kindpick three">
         <button type="button" className={kind === 'build' ? 'on' : ''} disabled={locked} onClick={() => setKind('build')}>
@@ -2213,7 +2217,7 @@ function StepEditor({ routine }: { routine: Routine }) {
           <span className="step-edit-fields">
             <input className="textinput" value={s.title} aria-label={`Step ${i + 1} title`}
               onChange={(e) => updateRoutineStep(routine.id, s.id, { title: e.target.value })} />
-            <input className="textinput step-note" value={s.note ?? ''} placeholder="What it involves, if it needs saying"
+            <input className="textinput step-note" value={s.note ?? ''} placeholder="What it involves, if it needs saying…"
               aria-label={`Step ${i + 1} note`}
               onChange={(e) => updateRoutineStep(routine.id, s.id, { note: e.target.value })} />
           </span>
@@ -2222,10 +2226,10 @@ function StepEditor({ routine }: { routine: Routine }) {
       ))}
 
       <div className="step-add">
-        <input className="textinput" placeholder="Add a step" value={title}
+        <input className="textinput" placeholder="Add a step…" value={title}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') add() }} aria-label="New step" />
-        <input className="textinput step-note" placeholder="Note, optional" value={note}
+        <input className="textinput step-note" placeholder="Note, optional…" value={note}
           onChange={(e) => setNote(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') add() }} aria-label="New step note" />
         <button className="btn btn-primary" disabled={!title.trim()} onClick={add}>Add</button>
@@ -2247,9 +2251,12 @@ function AddRoutineSheet({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Sheet title="Add a routine" onClose={onClose} note="A routine is a set of steps you run on a rhythm. Finishing all of them checks off a habit of the same name, created with it.">
+    <Sheet title="Add a routine" onClose={onClose}>
       <label className="field-label" htmlFor="rtitle">What is the routine?</label>
-      <input id="rtitle" className="textinput" style={{ width: '100%' }} autoFocus placeholder="e.g. Evening shutdown"
+      {/* Not a description of the sheet: the one thing that happens which he
+          cannot see from this form. A habit appears, with this name. */}
+      <p className="field-hint">Finishing every step checks off a habit of the same name, created with it.</p>
+      <input id="rtitle" className="textinput" style={{ width: '100%' }} autoFocus placeholder="e.g. Evening shutdown…"
         value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
 
       <div className="sheet-grid" style={{ marginTop: 'var(--s4)' }}>
@@ -2696,7 +2703,7 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals, periodOffsets 
   const [namedByHand, setNamedByHand] = useState(Boolean(goal?.name))
 
   return (
-    <Sheet title={goal ? 'Edit this goal' : 'Add a goal'} onClose={onClose} note="A goal is an outcome you can check off, with a date on it.">
+    <Sheet title={goal ? 'Edit this goal' : 'Add a goal'} onClose={onClose}>
       {/* The first decision, not a dropdown three fields down: is this a goal you
           log yourself, or one of your habits counting itself? Asking it last is
           why it kept reading as "there is no way to pick a habit". */}
@@ -2740,13 +2747,13 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals, periodOffsets 
 
       <label className="field-label" style={{ marginTop: 'var(--s4)' }} htmlFor="gname">What is the outcome?</label>
       <input id="gname" className="textinput" style={{ width: '100%' }} autoFocus
-        placeholder="e.g. Twelve gym sessions" value={d.name}
+        placeholder="e.g. Twelve gym sessions…" value={d.name}
         onChange={(e) => { setNamedByHand(true); setD({ ...d, name: e.target.value }) }}
         onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
 
       <label className="field-label" style={{ marginTop: 'var(--s4)' }} htmlFor="gwhy">Why does it matter?</label>
       <input id="gwhy" className="textinput" style={{ width: '100%' }}
-        placeholder="The thing that keeps it alive when you do not feel like it"
+        placeholder="The thing that keeps it alive when you do not feel like it…"
         value={d.why} onChange={(e) => setD({ ...d, why: e.target.value })} />
 
       {/* No area-of-life question. The category survives on the row only as a
@@ -2767,13 +2774,13 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals, periodOffsets 
               onChange={(e) => setD({ ...d, target: Math.max(1, Number(e.target.value) || 1) })} />
             {d.habitId
               ? <span className="sheet-unit">{linked && isTimeFed(linked) ? 'hours of focus' : 'checkoffs'}</span>
-              : <input className="textinput" placeholder="unit, e.g. sessions" value={d.unit}
+              : <input className="textinput" placeholder="unit, e.g. sessions…" value={d.unit}
                   onChange={(e) => setD({ ...d, unit: e.target.value })} aria-label="Unit" />}
           </div>
         </div>
         <div>
           <label className="field-label" htmlFor="gdl">By when</label>
-          <input id="gdl" className="textinput" style={{ width: '100%' }} placeholder="e.g. End of July"
+          <input id="gdl" className="textinput" style={{ width: '100%' }} placeholder="e.g. End of July…"
             value={d.deadline} onChange={(e) => setD({ ...d, deadline: e.target.value })} />
         </div>
       </div>
@@ -2794,7 +2801,7 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals, periodOffsets 
             </div>
           )}
           <div className="formrow">
-            <input id="gms" className="textinput" style={{ flex: 1 }} placeholder="e.g. Outline written"
+            <input id="gms" className="textinput" style={{ flex: 1 }} placeholder="e.g. Outline written…"
               value={msDraft} onChange={(e) => setMsDraft(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addMs() } }} />
             <button className="btn btn-quiet" disabled={!msDraft.trim()} onClick={addMs}>Add</button>
@@ -2911,7 +2918,7 @@ function PeriodTasks({ tf, periodKey }: { tf: GoalTimeframe; periodKey: string }
           <input
             className="textinput"
             autoFocus
-            placeholder="Find a task, or write a new one"
+            placeholder="Find a task, or write a new one…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => {

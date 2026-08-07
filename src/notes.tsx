@@ -372,8 +372,8 @@ function TablePicker({ onPick }: { onPick: (rows: number, cols: number) => void 
       </button>
       {open && (
         <div className="nt-tablemenu">
-          <label>Rows<input className="textinput" type="number" min={1} max={20} value={rows} onChange={(e) => setRows(Number(e.target.value))} /></label>
-          <label>Columns<input className="textinput" type="number" min={1} max={10} value={cols} onChange={(e) => setCols(Number(e.target.value))} /></label>
+          <label>Rows<input className="textinput" type="number" inputMode="numeric" min={1} max={20} value={rows} onChange={(e) => setRows(Number(e.target.value))} /></label>
+          <label>Columns<input className="textinput" type="number" inputMode="numeric" min={1} max={10} value={cols} onChange={(e) => setCols(Number(e.target.value))} /></label>
           <button className="btn btn-primary" onClick={go}>Insert</button>
         </div>
       )}
@@ -640,7 +640,7 @@ export function NotesPage() {
           )))}
           {naming?.space && (
             <input
-              className="nt-rename textinput" autoFocus value={naming.value} placeholder="Folder name"
+              className="nt-rename textinput" autoFocus value={naming.value} placeholder="Folder name…"
               aria-label="New folder"
               onChange={(e) => setNaming({ ...naming, value: e.target.value })}
               onBlur={submitName}
@@ -691,7 +691,7 @@ export function NotesPage() {
             <circle cx="11" cy="11" r="7" /><path d="M20 20l-3.6-3.6" strokeLinecap="round" />
           </svg>
           <input
-            className="textinput" type="search" value={query} placeholder="Search"
+            className="textinput" type="search" value={query} placeholder="Search…"
             aria-label="Search notes"
             onFocus={() => setSearching(true)}
             onBlur={() => window.setTimeout(() => setSearching(false), 180)}

@@ -11,11 +11,14 @@
   --surface-2: #ece6d8;
   --ink: #1a1712;
   --muted: #565040;
-  --faint: #78705f;
+  --faint: #6b6353;
   --hairline: rgba(26, 23, 18, 0.12);
   --hairline-strong: rgba(26, 23, 18, 0.44);
 
   --accent: #d1502a;
+  /* Same orange, dark enough to read. Every `color:` rule uses this; every
+     fill, border and mark keeps --accent. Measured: 5.19:1 on the page. */
+  --accent-text: #b03d1c;
   --accent-hover: #b8431f;
   --accent-ink: #ffffff;
   --accent-wash: rgba(209, 80, 42, 0.10);
@@ -47,7 +50,10 @@
 
   --font-display: 'Bricolage Grotesque', 'Avenir Next', sans-serif;
   --font-body: 'Instrument Sans', 'Helvetica Neue', sans-serif;
-  --font-mono: 'Instrument Sans', 'Helvetica Neue', sans-serif;
+  /* A real mono, at last. This token was resolving to Instrument Sans, which
+     meant roughly forty call sites marked `mono` (clock, figures, counts, times)
+     were only claiming to be data. Loaded with the other two faces, 400 and 600. */
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --text-xs: 0.8125rem;
   --text-sm: 0.9375rem;
@@ -85,13 +91,13 @@ html { font-size: 16px; }
    --progress (#3f6b46), so in the Work space "you can click this" and "this
    is done" were the same colour. One meaning per hue. */
 [data-space="work"] {
-  --accent: #1d4e79; --accent-hover: #163c5d; --accent-wash: rgba(29, 78, 121, 0.10);
+  --accent: #1d4e79; --accent-text: #1d4e79; --accent-hover: #163c5d; --accent-wash: rgba(29, 78, 121, 0.10);
 }
 [data-space="offplate"] {
-  --accent: #8a6410; --accent-hover: #6f5009; --accent-wash: rgba(138, 100, 16, 0.11);
+  --accent: #8a6410; --accent-text: #8a6410; --accent-hover: #6f5009; --accent-wash: rgba(138, 100, 16, 0.11);
 }
 [data-space="corner"] {
-  --accent: #1E5244; --accent-hover: #163f34; --accent-wash: rgba(30, 82, 68, 0.10);
+  --accent: #1E5244; --accent-text: #1E5244; --accent-hover: #163f34; --accent-wash: rgba(30, 82, 68, 0.10);
 }
 
 /* ---------- base ---------- */
@@ -121,7 +127,24 @@ h1, h2, h3 { line-height: 1.1; text-wrap: balance; }
 p { text-wrap: pretty; max-width: 68ch; }
 
 ::selection { background: var(--accent-wash); }
+
+/* Pressed things: no 300ms double-tap delay, and no grey flash the brand did
+   not choose. */
+button, a, [role='button'], summary, label, input, select, textarea {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-sm); }
+
+/* Off-screen until it is tabbed to: the first stop for a keyboard, straight
+   past the header and the space switcher. */
+.skiplink {
+  position: absolute; left: var(--s4); top: -60px; z-index: 300;
+  background: var(--ink); color: var(--bg); padding: var(--s2) var(--s4);
+  border-radius: var(--r-sm); font-size: var(--text-sm); font-weight: 600;
+  transition: top 140ms var(--ease);
+}
+.skiplink:focus { top: var(--s3); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -170,10 +193,10 @@ main { padding-inline: var(--gutter); }
   padding-inline: var(--gutter);
   flex-wrap: wrap;
 }
-.btn-ghost.is-on { color: var(--accent); border-color: var(--accent); }
+.btn-ghost.is-on { color: var(--accent-text); border-color: var(--accent-text); }
 
 .brand { display: flex; align-items: center; gap: var(--s3); color: var(--ink); }
-.brand svg { color: var(--accent); }
+.brand svg { color: var(--accent-text); }
 .brand-name {
   font-family: var(--font-display);
   font-weight: 800;
@@ -261,20 +284,20 @@ main { padding-inline: var(--gutter); }
   background: var(--surface); border: 1px solid var(--hairline-strong);
   border-radius: 999px; padding: 5px 7px 5px 12px; box-shadow: var(--shadow-pop);
 }
-.pomo-badge.active.focus { border-color: var(--accent); }
+.pomo-badge.active.focus { border-color: var(--accent-text); }
 .pomo-badge.active.break { border-color: var(--progress); }
 .pomo-badge.active.paused { border-color: var(--warn); }
 .pomo-phase {
   font-family: var(--font-body); font-weight: 600; font-size: 0.6875rem;
   text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-right: 2px;
 }
-.pomo-badge.active.focus .pomo-phase { color: var(--accent); }
+.pomo-badge.active.focus .pomo-phase { color: var(--accent-text); }
 .pomo-badge.active.break .pomo-phase { color: var(--progress); }
 .pomo-badge.active.paused .pomo-phase { color: var(--warn); }
 .pomo-clock { font-family: var(--font-display); font-weight: 800; font-size: 1.3rem; letter-spacing: -0.01em; min-width: 4.2ch; text-align: center; }
 .pomo-icon { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); font-size: 0.8rem; }
 .pomo-icon:hover { color: var(--ink); background: var(--surface-2); }
-.pomo-start { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: var(--text-sm); color: var(--accent); padding: 4px 6px; }
+.pomo-start { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: var(--text-sm); color: var(--accent-text); padding: 4px 6px; }
 .pomo-start:hover { color: var(--accent-hover); }
 .pomo-setup {
   position: absolute; bottom: calc(100% + 10px); right: 0;
@@ -284,7 +307,7 @@ main { padding-inline: var(--gutter); }
 .pomo-step { display: flex; align-items: center; gap: var(--s2); }
 .pomo-step-label { font-size: var(--text-xs); color: var(--muted); min-width: 4ch; }
 .pomo-step button { width: 26px; height: 26px; border: 1px solid var(--hairline-strong); border-radius: 6px; color: var(--ink); }
-.pomo-step button:hover { border-color: var(--accent); color: var(--accent); }
+.pomo-step button:hover { border-color: var(--accent-text); color: var(--accent-text); }
 .pomo-step-val { min-width: 3.5ch; text-align: center; font-weight: 600; }
 @media (max-width: 639px) {
   .pomo-badge { bottom: max(12px, env(safe-area-inset-bottom)); right: 12px; }
@@ -302,7 +325,7 @@ main { padding-inline: var(--gutter); }
   border: 1px solid var(--hairline-strong); color: var(--muted); display: grid; place-items: center;
   cursor: pointer;
 }
-.assist-mic:hover { border-color: var(--accent); color: var(--accent); }
+.assist-mic:hover { border-color: var(--accent-text); color: var(--accent-text); }
 .assist-mic.on { background: var(--alert); border-color: var(--alert); color: var(--bg); animation: pomo-pulse 1.4s ease-in-out infinite; }
 .assist-note { font-size: var(--text-xs); color: var(--faint); }
 .assist-proposed { margin-top: var(--s4); border-top: 1px solid var(--hairline); padding-top: var(--s4); }
@@ -317,11 +340,11 @@ main { padding-inline: var(--gutter); }
 .assist-log-item { display: flex; align-items: center; gap: var(--s2); padding: var(--s1) 0; font-size: var(--text-sm); }
 .assist-log-item .grow { flex: 1; min-width: 0; }
 .assist-tag { font-family: var(--font-mono); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; border-radius: 3px; padding: 1px 6px; }
-.assist-tag.k-task { color: var(--accent); background: var(--accent-wash); }
+.assist-tag.k-task { color: var(--accent-text); background: var(--accent-wash); }
 .assist-tag.k-goal { color: var(--warn); background: var(--warn-wash); }
 .assist-tag.k-done { color: var(--progress); background: var(--progress-wash); }
 .assist-goto { font-family: var(--font-mono); font-size: 0.6875rem; color: var(--info); white-space: nowrap; }
-.assist-goto:hover { color: var(--accent); text-decoration: underline; }
+.assist-goto:hover { color: var(--accent-text); text-decoration: underline; }
 
 /* ---------- Review checkup: fills the width like every other panel ----------
    No max-width cap: a capped card on a 3440 screen strands itself in the left
@@ -365,7 +388,7 @@ main { padding-inline: var(--gutter); }
   white-space: nowrap;
 }
 .nav-tab:hover { color: var(--ink); }
-.nav-tab[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent); }
+.nav-tab[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent-text); }
 .nav-tab.attention::after {
   content: '';
   display: inline-block;
@@ -389,7 +412,7 @@ main { padding-inline: var(--gutter); }
   color: var(--ink);
   background: var(--surface);
 }
-.chip:hover { border-color: var(--accent); }
+.chip:hover { border-color: var(--accent-text); }
 .chip .mono { font-weight: 600; }
 .chip-label { color: var(--muted); font-size: var(--text-xs); }
 
@@ -419,11 +442,11 @@ main { padding-inline: var(--gutter); }
 }
 .btn-quiet { color: var(--ink); border: 1px solid var(--hairline-strong); background: none; }
 .btn-quiet:hover { border-color: var(--ink); }
-.btn-quiet[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: var(--accent-wash); }
+.btn-quiet[aria-pressed="true"] { color: var(--accent-text); border-color: var(--accent-text); background: var(--accent-wash); }
 /* Ghost buttons are real actions ("Add to today", "Reset", "→ backlog").
    They carry the accent at rest so they never read as static labels. */
 .btn-ghost { color: var(--ink); border: 1px solid var(--hairline); background: none; }
-.btn-ghost:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-wash); }
+.btn-ghost:hover { color: var(--accent-text); border-color: var(--accent-text); background: var(--accent-wash); }
 .btn-danger { color: var(--alert); border: 1px solid transparent; }
 .btn-danger:hover { border-color: var(--alert); background: var(--alert-wash); }
 
@@ -476,7 +499,7 @@ main { padding-inline: var(--gutter); }
   min-width: 0;
   flex-wrap: wrap;
 }
-.firstmove .fm-label { color: var(--accent); }
+.firstmove .fm-label { color: var(--accent-text); }
 .firstmove .fm-title { font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); min-width: 0; }
 .firstmove .est-chip { font-size: 0.8125rem; }
 
@@ -498,7 +521,7 @@ main { padding-inline: var(--gutter); }
   text-align: left;
   padding: var(--s1) 0;
 }
-.status-strip button:hover { color: var(--accent); }
+.status-strip button:hover { color: var(--accent-text); }
 .status-strip .k { color: var(--faint); }
 
 /* exceptions */
@@ -529,7 +552,7 @@ main { padding-inline: var(--gutter); }
   color: var(--alert); font-size: var(--text-xs); white-space: nowrap; font-family: var(--font-mono);
   font-weight: 600; border: none; background: var(--alert-wash); border-radius: 3px; padding: 1px 6px;
 }
-.exception-row button { margin-left: var(--s2); color: var(--accent); font-weight: 600; font-size: var(--text-sm); white-space: nowrap; }
+.exception-row button { margin-left: var(--s2); color: var(--accent-text); font-weight: 600; font-size: var(--text-sm); white-space: nowrap; }
 
 .allclear {
   margin-bottom: var(--s4);
@@ -575,7 +598,7 @@ main { padding-inline: var(--gutter); }
   display: flex; align-items: center; gap: var(--s2);
   min-width: 0; padding: 0; text-align: left;
 }
-.widget-title-btn:hover .widget-title { color: var(--accent); }
+.widget-title-btn:hover .widget-title { color: var(--accent-text); }
 .widget-title {
   font-family: var(--font-body);
   font-size: 0.75rem;
@@ -693,7 +716,7 @@ main { padding-inline: var(--gutter); }
   padding: 2px 6px;
   white-space: nowrap;
 }
-button.est-chip:hover { color: var(--accent); background: var(--accent-wash); }
+button.est-chip:hover { color: var(--accent-text); background: var(--accent-wash); }
 
 .checkbox {
   width: 22px; height: 22px;
@@ -708,7 +731,7 @@ button.est-chip:hover { color: var(--accent); background: var(--accent-wash); }
 }
 /* invisible 44px hit area on the most-used controls */
 .checkbox::after, .daydot::after { content: ''; position: absolute; inset: -11px; }
-.checkbox:hover { border-color: var(--accent); }
+.checkbox:hover { border-color: var(--accent-text); }
 .checkbox[aria-checked="true"] { background: var(--progress); border-color: var(--progress); color: var(--bg); }
 
 .bar { height: 7px; border-radius: 4px; background: var(--surface-2); border: 1px solid var(--hairline-strong); overflow: hidden; }
@@ -831,7 +854,10 @@ button.est-chip:hover { color: var(--accent); background: var(--accent-wash); }
   .textinput, .numinput, select.textinput, textarea { font-size: 1rem; }
 }
 .numinput { width: 90px; font-family: var(--font-mono); }
-.textinput:focus, .numinput:focus { outline: none; border-color: var(--accent); }
+.textinput:focus, .numinput:focus { outline: none; border-color: var(--accent-text); }
+/* Removing the outline is only allowed with a replacement. Keyboard focus gets
+   a ring; a mouse click keeps the quiet border change. */
+.textinput:focus-visible, .numinput:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .textinput::placeholder { color: var(--faint); }
 
 select.textinput { flex: 0 0 auto; min-width: 110px; }
@@ -887,7 +913,7 @@ select.textinput { flex: 0 0 auto; min-width: 110px; }
 
 /* routine runner timer */
 .routine-timer { text-align: center; margin: var(--s4) 0; }
-.timer-clock { font-family: var(--font-display); font-weight: 800; font-size: clamp(3rem, 2rem + 6vw, 4.5rem); letter-spacing: -0.02em; line-height: 1; color: var(--accent); }
+.timer-clock { font-family: var(--font-display); font-weight: 800; font-size: clamp(3rem, 2rem + 6vw, 4.5rem); letter-spacing: -0.02em; line-height: 1; color: var(--accent-text); }
 .timer-clock.done { color: var(--progress); }
 .timer-controls { display: flex; gap: var(--s3); justify-content: center; margin-top: var(--s4); }
 .daydot {
@@ -956,7 +982,7 @@ select.textinput { flex: 0 0 auto; min-width: 110px; }
   .rowitem:hover .actual-chips, .rowitem:focus-within .actual-chips { display: flex; }
 }
 button.est-chip { cursor: pointer; }
-button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
+button.est-chip:hover { border-color: var(--accent-text); color: var(--accent-text); }
 .actual-chips button {
   font-family: var(--font-mono);
   font-size: 0.75rem;
@@ -966,7 +992,7 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
   padding: 2px 8px;
   color: var(--muted);
 }
-.actual-chips button:hover { border-color: var(--accent); color: var(--accent); }
+.actual-chips button:hover { border-color: var(--accent-text); color: var(--accent-text); }
 
 .rowitem.wrap-row { flex-wrap: wrap; row-gap: var(--s1); min-height: 0; padding-block: var(--s3); }
 .wrap-row .grow { white-space: normal; overflow: visible; text-overflow: clip; min-width: 16ch; }
@@ -1027,6 +1053,7 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 .sheet {
   width: min(600px, 100%);
   max-height: min(86dvh, 760px);
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   background: var(--surface);
@@ -1088,12 +1115,9 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 .total-line { display: flex; align-items: baseline; gap: var(--s4); padding-top: var(--s4); font-size: var(--text-sm); flex-wrap: wrap; }
 .total-line .mono { font-weight: 600; }
 
-.demo-note {
-  font-size: var(--text-xs);
-  color: var(--faint);
-  border-top: 1px solid var(--hairline);
-  padding: var(--s3) var(--s5);
-}
+/* The sheet's subtitle slot is gone: a title does not get one, and the two
+   notes worth keeping are lines inside the body where the reader already is. */
+.field-hint { font-size: var(--text-xs); color: var(--muted); margin: 4px 0 var(--s3); }
 
 /* add widget */
 .addw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--s2); }
@@ -1106,7 +1130,7 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
   font-weight: 600;
   color: var(--ink);
 }
-.addw-item:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-wash); }
+.addw-item:hover:not(:disabled) { border-color: var(--accent-text); background: var(--accent-wash); }
 .addw-item:disabled { opacity: 0.4; cursor: default; }
 .addw-item .d { display: block; color: var(--muted); font-size: var(--text-xs); font-weight: 400; margin-top: 2px; }
 
@@ -1136,7 +1160,7 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 .timeline { position: relative; height: 44px; border: 1px solid var(--hairline); border-radius: var(--r-sm); background: var(--bg); margin-block: var(--s3); }
 .timeline .ev { position: absolute; top: 4px; bottom: 4px; background: var(--accent-wash); border: 1px solid var(--accent); border-radius: 3px; }
 .timeline .ev { overflow: hidden; }
-.timeline .ev span { font-family: var(--font-mono); font-size: 0.625rem; color: var(--accent); padding: 2px 4px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.timeline .ev span { font-family: var(--font-mono); font-size: 0.625rem; color: var(--accent-text); padding: 2px 4px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .timeline .tick { position: absolute; top: 100%; font-family: var(--font-mono); font-size: 0.625rem; color: var(--faint); transform: translateX(-50%); padding-top: 2px; }
 
 /* ---------- Plan page ---------- */
@@ -1172,7 +1196,7 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
 }
-.task-link:hover { color: var(--accent); text-decoration-color: currentColor; }
+.task-link:hover { color: var(--accent-text); text-decoration-color: currentColor; }
 .vev .task-link { color: var(--ink); }
 
 /* to-do progress: done vs time left */
@@ -1180,7 +1204,7 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 .todo-progress-label { display: block; margin-top: var(--s2); font-size: var(--text-xs); color: var(--muted); }
 .on-today-tag {
   font-family: var(--font-mono); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
-  color: var(--accent); background: var(--accent-wash); border-radius: 3px; padding: 1px 5px; white-space: nowrap;
+  color: var(--accent-text); background: var(--accent-wash); border-radius: 3px; padding: 1px 5px; white-space: nowrap;
 }
 
 /* drag-and-drop between time buckets */
@@ -1200,8 +1224,8 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
   box-shadow: var(--shadow-pop); padding: var(--s2); display: flex; flex-direction: column; min-width: 210px; max-width: 280px;
 }
 .kebab-menu button { text-align: left; padding: var(--s2) var(--s3); border-radius: var(--r-sm); font-size: var(--text-sm); color: var(--ink); white-space: nowrap; min-height: 34px; }
-.kebab-menu button:hover { background: var(--accent-wash); color: var(--accent); }
-.kebab-menu button[aria-checked="true"] { color: var(--accent); font-weight: 600; }
+.kebab-menu button:hover { background: var(--accent-wash); color: var(--accent-text); }
+.kebab-menu button[aria-checked="true"] { color: var(--accent-text); font-weight: 600; }
 
 /* today buckets */
 .bucket { margin-top: var(--s4); padding-top: var(--s4); border-top: 1px solid var(--hairline); }
@@ -1218,7 +1242,7 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
   transform: rotate(45deg); transition: transform 140ms var(--ease);
 }
 .bucket.is-shut .fold-caret { transform: rotate(-45deg); }
-.bucket-head:hover .fold-caret { border-color: var(--accent); }
+.bucket-head:hover .fold-caret { border-color: var(--accent-text); }
 .bucket-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
 .bucket-left { font-size: 0.6875rem; color: var(--faint); margin-left: auto; }
 .bucket-left + .tot { margin-left: var(--s2); }
@@ -1240,7 +1264,7 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
   margin-left: auto; font-family: var(--font-mono); font-size: 0.6875rem;
   color: var(--info); border: 1px solid var(--hairline-strong); border-radius: 3px; padding: 1px 6px;
 }
-.fold-all:hover { color: var(--accent); border-color: var(--accent); }
+.fold-all:hover { color: var(--accent-text); border-color: var(--accent-text); }
 .bucket-name { font-family: var(--font-display); font-weight: 700; font-size: var(--text-base); }
 .bucket-head .tot { margin-left: auto; font-family: var(--font-mono); font-size: 0.6875rem; color: var(--info); }
 .bucket.drop-zone { min-height: 56px; }
@@ -1257,8 +1281,8 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
   width: 24px; height: 24px; border: 1px solid var(--hairline-strong); border-radius: var(--r-sm);
   font-family: var(--font-mono); font-size: 0.6875rem; font-weight: 600; color: var(--muted); padding: 0;
 }
-.slot-pick button:hover { border-color: var(--accent); color: var(--accent); }
-.slot-pick button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.slot-pick button:hover { border-color: var(--accent-text); color: var(--accent-text); }
+.slot-pick button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-text); }
 
 /* to-do builder */
 .todo-item { border-bottom: 1px solid var(--hairline); }
@@ -1270,10 +1294,10 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
   display: grid; place-items: center; color: transparent; padding: 0; position: relative;
 }
 .select-box::after { content: ''; position: absolute; inset: -11px; }
-.select-box:hover { border-color: var(--accent); }
-.select-box.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.select-box:hover { border-color: var(--accent-text); }
+.select-box.on { background: var(--accent); border-color: var(--accent-text); color: var(--accent-ink); }
 .expand-btn { font-family: var(--font-mono); font-size: 0.6875rem; color: var(--info); white-space: nowrap; padding: 0 var(--s1); flex: none; }
-.expand-btn:hover { color: var(--accent); }
+.expand-btn:hover { color: var(--accent-text); }
 .subtask-list { margin: 0 0 var(--s2) 34px; }
 .subtask { display: flex; align-items: center; gap: var(--s2); width: 100%; padding: var(--s1) 0; font-size: var(--text-sm); text-align: left; color: var(--ink); }
 /* Inside a wrap the row shares its line with the estimate chip and the focus
@@ -1299,13 +1323,14 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
   font-family: var(--font-mono); font-size: 0.75rem; font-weight: 600;
   border: 1px solid var(--hairline-strong); border-radius: 4px; padding: 3px 9px; color: var(--ink); min-height: 32px;
 }
-.actual-chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
+.actual-chip:hover { border-color: var(--accent-text); color: var(--accent-text); background: var(--accent-wash); }
 /* What the timer clocked, offered ahead of the guesses. */
 .actual-chip.is-tracked { border-color: var(--info); color: var(--info); background: var(--info-wash); }
 .actual-chip.is-tracked .mono { font-size: 0.625rem; opacity: 0.8; margin-left: 3px; }
 .actual-skip { color: var(--muted); font-family: var(--font-body); font-weight: 500; }
 .actual-input { width: 64px; min-height: 32px; border: 1px solid var(--hairline-strong); border-radius: 4px; background: var(--bg); padding: 2px 8px; font-family: var(--font-mono); font-size: 0.75rem; }
-.actual-input:focus { outline: none; border-color: var(--accent); }
+.actual-input:focus { outline: none; border-color: var(--accent-text); }
+.actual-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* move-to-today action bar */
 .movebar {
@@ -1441,7 +1466,7 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
   transform: rotate(-45deg); transition: transform 140ms var(--ease);
 }
 .routine-open.is-open::before { transform: rotate(45deg); }
-.routine-open:hover::before { border-color: var(--accent); }
+.routine-open:hover::before { border-color: var(--accent-text); }
 .routine-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
 .routine-open .spacemark { align-self: center; }
 .routine-tag .routine-card-title { flex: 1 1 auto; min-width: 0; }
@@ -1495,7 +1520,7 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
   border: 1.5px solid var(--hairline-strong); color: transparent; display: grid; place-items: center;
   transition: background 140ms ease-out, border-color 140ms ease-out, color 140ms ease-out;
 }
-.routine-check:hover { border-color: var(--accent); }
+.routine-check:hover { border-color: var(--accent-text); }
 /* Done is green everywhere, including here. This tick was the one checkbox in
    the app that turned orange when completed. */
 .routine-step.checked .routine-check { background: var(--progress); border-color: var(--progress); color: var(--bg); }
@@ -1518,7 +1543,7 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
   padding: var(--s2) var(--s3); border: 1px solid var(--hairline); border-radius: 4px;
   transition: border-color 140ms ease-out, background 140ms ease-out;
 }
-.alt-opt:hover { border-color: var(--accent); }
+.alt-opt:hover { border-color: var(--accent-text); }
 .alt-tick { flex: none; width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; border: 1.5px solid var(--faint); }
 .alt-opt.picked { border-color: var(--progress); background: var(--progress-wash); }
 .alt-opt.picked .alt-tick { background: var(--progress); border-color: var(--progress); }
@@ -1539,7 +1564,7 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
   font-weight: 500; border: 1px solid var(--hairline); border-radius: 3px; padding: 1px 5px;
 }
 .routine-step.checked .step-optional { text-decoration: none; }
-.routine-link { font-size: var(--text-sm); color: var(--accent); align-self: flex-start; }
+.routine-link { font-size: var(--text-sm); color: var(--accent-text); align-self: flex-start; }
 .routine-link:hover { text-decoration: underline; }
 .routine-card-foot { display: flex; align-items: center; gap: var(--s3); margin-top: auto; padding-top: var(--s3); }
 .routine-card-foot .assist-note { flex: 1; min-width: 0; }
@@ -1552,11 +1577,11 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 .mr-check { flex: none; }
 .mr-step.done .mr-check { background: var(--progress); border-color: var(--progress); color: var(--bg); }
 .mr-head-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--s3); text-align: left; color: var(--ink); }
-.mr-head-main:hover { color: var(--accent); }
+.mr-head-main:hover { color: var(--accent-text); }
 .mr-title { flex: 1; min-width: 0; font-family: var(--font-display); font-weight: 700; font-size: var(--text-base); }
 .mr-step.done .mr-title { color: var(--muted); }
 .mr-status { font-family: var(--font-mono); font-size: 0.6875rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
-.mr-step.open .mr-status { color: var(--accent); }
+.mr-step.open .mr-status { color: var(--accent-text); }
 .mr-chev { color: var(--faint); transition: transform 180ms var(--ease); }
 .mr-step.open .mr-chev { transform: rotate(180deg); }
 .mr-body { padding: 0 var(--s1) var(--s5); }
@@ -1571,7 +1596,7 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 .med-stage.phase-run { background: var(--accent-wash); }
 .med-stage.phase-ended { background: var(--progress-wash); }
 .med-phase { font-family: var(--font-mono); font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
-.med-stage.phase-run .med-phase { color: var(--accent); }
+.med-stage.phase-run .med-phase { color: var(--accent-text); }
 .med-stage.phase-ended .med-phase { color: var(--progress); }
 .med-clock { font-family: var(--font-display); font-weight: 700; font-size: clamp(2.75rem, 2rem + 3vw, 4rem); line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
 .med-hint { font-size: var(--text-sm); color: var(--muted); max-width: 46ch; min-height: 2.6em; }
@@ -1579,16 +1604,16 @@ button.est-chip:hover { border-color: var(--accent); color: var(--accent); }
 
 /* pronunciation */
 .pron-para { border-left: 2px solid var(--hairline-strong); padding-left: var(--s4); margin-bottom: var(--s4); }
-.pron-lang { font-family: var(--font-mono); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.08em; color: var(--accent); display: block; margin-bottom: var(--s1); }
+.pron-lang { font-family: var(--font-mono); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.08em; color: var(--accent-text); display: block; margin-bottom: var(--s1); }
 .pron-para p { font-size: var(--text-base); line-height: 1.65; max-width: 62ch; }
 .pron-src { display: inline-block; margin-top: var(--s2); font-family: var(--font-mono); font-size: 0.6875rem; color: var(--info); }
-a.pron-src:hover { color: var(--accent); text-decoration: underline; }
+a.pron-src:hover { color: var(--accent-text); text-decoration: underline; }
 
 /* mouth stretch */
 .stretch-list { list-style: none; display: flex; flex-direction: column; gap: var(--s3); }
 .stretch-item { display: flex; gap: var(--s3); align-items: baseline; }
 .stretch-tag { flex: none; font-family: var(--font-mono); font-size: 0.625rem; font-weight: 600; border-radius: 3px; padding: 2px 6px; }
-.stretch-tag.lang-cs { color: var(--accent); background: var(--accent-wash); }
+.stretch-tag.lang-cs { color: var(--accent-text); background: var(--accent-wash); }
 .stretch-tag.lang-en { color: var(--info); background: var(--info-wash); }
 .stretch-text { font-size: var(--text-base); line-height: 1.55; }
 
@@ -1638,7 +1663,7 @@ a.pron-src:hover { color: var(--accent); text-decoration: underline; }
   display: inline-flex; align-items: center; justify-content: center;
   cursor: pointer; transition: background 140ms ease-out, border-color 140ms ease-out;
 }
-.goal-ms-check:hover { border-color: var(--accent); }
+.goal-ms-check:hover { border-color: var(--accent-text); }
 .goal-ms-item.done .goal-ms-check { background: var(--progress); border-color: var(--progress); color: var(--bg); }
 .goal-ms-item.done { color: var(--progress); }
 .goal-ms-item.done span:last-child { text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
@@ -1680,7 +1705,7 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 .nt-folder-row { display: flex; align-items: center; border-radius: 7px; }
 .nt-folder-row:hover { background: var(--accent-wash); }
 .nt-folder-row.on { background: var(--accent-wash); }
-.nt-folder-row.on .nt-folder { color: var(--accent); font-weight: 600; }
+.nt-folder-row.on .nt-folder { color: var(--accent-text); font-weight: 600; }
 .nt-folder {
   flex: 1; display: flex; align-items: center; gap: var(--s3); min-width: 0;
   /* 40px, not 32. The Notes sidebar is a comfortable target, not a dense tree. */
@@ -1692,7 +1717,7 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 .nt-folder-row.is-sub .nt-folder { padding-left: var(--s6); }
 .nt-fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nt-count { margin-left: auto; font-size: 0.8125rem; color: var(--faint); font-weight: 400; }
-.nt-folder-row.on .nt-count { color: var(--accent); opacity: .7; }
+.nt-folder-row.on .nt-count { color: var(--accent-text); opacity: .7; }
 .nt-slot, .nt-fkebab { flex: none; width: 28px; }
 .nt-fkebab { visibility: hidden; }
 .nt-folder-row:hover .nt-fkebab, .nt-folder-row.on .nt-fkebab, .nt-fkebab:focus-within { visibility: visible; }
@@ -1703,9 +1728,9 @@ body.is-colresize { cursor: col-resize; user-select: none; }
   padding: 10px var(--s3); margin-top: auto; border-top: 1px solid var(--hairline);
   font-size: var(--text-sm); color: var(--muted); min-height: 44px; border-radius: 0;
 }
-.nt-newfolder:hover { color: var(--accent); }
+.nt-newfolder:hover { color: var(--accent-text); }
 .nt-newwhere { margin-left: auto; font-size: 0.6875rem; color: var(--faint); }
-.nt-newfolder:hover .nt-newwhere { color: var(--accent); opacity: .7; }
+.nt-newfolder:hover .nt-newwhere { color: var(--accent-text); opacity: .7; }
 
 /* ---- the list ---- */
 .nt-list { display: flex; flex-direction: column; padding-bottom: var(--s8); }
@@ -1729,7 +1754,7 @@ body.is-colresize { cursor: col-resize; user-select: none; }
   width: 30px; height: 30px; min-height: 30px; border-radius: 50%; padding: 0;
   border: 1px solid var(--hairline-strong); color: var(--muted);
 }
-.nt-sortkebab .kebab:hover, .nt-kebab .kebab:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
+.nt-sortkebab .kebab:hover, .nt-kebab .kebab:hover { border-color: var(--accent-text); color: var(--accent-text); background: var(--accent-wash); }
 .nt-listhead .nt-new { margin-left: 0; }
 /* The same button as the one beside it. A circle next to a rounded square, both
    30px, both outlined, reads as two unrelated controls that happened to land
@@ -1738,22 +1763,22 @@ body.is-colresize { cursor: col-resize; user-select: none; }
   flex: none; width: 30px; height: 30px; border-radius: 50%;
   display: grid; place-items: center; color: var(--muted); border: 1px solid var(--hairline-strong);
 }
-.nt-new:hover { background: var(--accent-wash); border-color: var(--accent); color: var(--accent); }
+.nt-new:hover { background: var(--accent-wash); border-color: var(--accent-text); color: var(--accent-text); }
 
 .nt-search { display: flex; align-items: center; gap: var(--s2); padding: 0 var(--s4) var(--s3); position: sticky; top: 62px; background: var(--bg); z-index: 3; }
 .nt-search svg { color: var(--faint); flex: none; }
 .nt-search input { flex: 1; min-width: 0; font-size: var(--text-sm); padding: 8px var(--s3); }
 .nt-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
-.nt-clear { flex: none; font-size: 0.75rem; color: var(--accent); padding: 6px 4px; }
+.nt-clear { flex: none; font-size: 0.75rem; color: var(--accent-text); padding: 6px 4px; }
 .nt-tags { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 var(--s4) var(--s3); }
 .nt-chip-tag {
   font-family: var(--font-mono); font-size: 0.6875rem; padding: 4px 9px; border-radius: 999px;
   border: 1px solid var(--hairline-strong); color: var(--muted); min-height: 26px;
 }
 .nt-chip-tag i { font-style: normal; opacity: .5; margin-left: 4px; }
-.nt-chip-tag:hover { border-color: var(--accent); color: var(--accent); }
-.nt-chip-tag.on { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
-.nt-linkish { font-size: 0.6875rem; color: var(--accent); padding: 4px 6px; }
+.nt-chip-tag:hover { border-color: var(--accent-text); color: var(--accent-text); }
+.nt-chip-tag.on { border-color: var(--accent-text); color: var(--accent-text); background: var(--accent-wash); }
+.nt-linkish { font-size: 0.6875rem; color: var(--accent-text); padding: 4px 6px; }
 
 .nt-rows { list-style: none; padding: 0 var(--s2) var(--s6); }
 .nt-groupblock > ul { list-style: none; }
@@ -1770,13 +1795,14 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 .nt-groupblock:first-child .nt-grouphead { padding-top: var(--s2); }
 /* Pinned folds. The chevron turns, and where it points is the state. */
 .nt-groupfold { cursor: pointer; }
-.nt-groupfold:hover { color: var(--accent); }
+.nt-groupfold:hover { color: var(--accent-text); }
 .nt-chev { margin-left: auto; color: var(--faint); transition: transform 160ms var(--ease); }
 .nt-chev.open { transform: rotate(90deg); }
-.nt-groupfold:hover .nt-chev { color: var(--accent); }
+.nt-groupfold:hover .nt-chev { color: var(--accent-text); }
 .nt-row {
   width: 100%; display: flex; flex-direction: column; gap: 4px; text-align: left;
   padding: var(--s3); border-radius: 7px; min-height: 72px;
+  content-visibility: auto; contain-intrinsic-size: auto 72px;
 }
 /* A hairline between rows inside a group, not around them. */
 .nt-groupblock > ul > li + li .nt-row { box-shadow: inset 0 1px 0 var(--hairline); }
@@ -1791,7 +1817,7 @@ body.is-colresize { cursor: col-resize; user-select: none; }
   white-space: nowrap; overflow: hidden;
 }
 .nt-rowname { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.nt-pin { color: var(--accent); font-size: 0.625rem; flex: none; }
+.nt-pin { color: var(--accent-text); font-size: 0.625rem; flex: none; }
 .nt-swatch { flex: none; width: 7px; height: 7px; border-radius: 50%; border: 1px solid rgba(26,23,18,.16); }
 .nt-rowsub { display: flex; gap: 8px; min-width: 0; font-size: 0.8125rem; color: var(--muted); line-height: 1.35; }
 /* The date reads as part of the line, not as a data field bolted to the front. */
@@ -1801,7 +1827,7 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 .nt-rowtail { display: flex; align-items: center; gap: 5px; font-size: 0.6875rem; color: var(--faint); }
 .nt-ficon { flex: none; color: var(--faint); }
 .nt-folder .nt-ficon { color: var(--muted); }
-.nt-folder-row.on .nt-ficon, .nt-ficon.on { color: var(--accent); }
+.nt-folder-row.on .nt-ficon, .nt-ficon.on { color: var(--accent-text); }
 .nt-flag { color: var(--alert); }
 .nt-none { font-size: var(--text-sm); color: var(--muted); padding: var(--s5) var(--s3); }
 
@@ -1817,7 +1843,7 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 .nt-topbar { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) var(--s4); border-bottom: 1px solid var(--hairline); }
 .nt-topbar .nt-toolbar { flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; border-bottom: none; padding-bottom: 0; flex-wrap: nowrap; }
 .nt-topbar .nt-toolbar::-webkit-scrollbar { display: none; }
-.nt-back { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-size: var(--text-sm); font-weight: 600; padding: 8px 10px 8px 4px; border-radius: var(--r-sm); min-height: 44px; }
+.nt-back { display: inline-flex; align-items: center; gap: 5px; color: var(--accent-text); font-size: var(--text-sm); font-weight: 600; padding: 8px 10px 8px 4px; border-radius: var(--r-sm); min-height: 44px; }
 .nt-back:hover { background: var(--accent-wash); }
 .nt-stamp { font-size: 0.6875rem; color: var(--faint); }
 .nt-kebab { margin-left: auto; }
@@ -1831,13 +1857,14 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 /* On the title's own margin. Centred over a left-aligned note it read as a
    stray line floating above somebody else's paragraph. */
 .nt-when-full { font-size: 0.6875rem; color: var(--faint); margin-bottom: var(--s3); }
-.nt-pinned { color: var(--accent); }
+.nt-pinned { color: var(--accent-text); }
 .nt-title {
   width: 100%; border: none; background: none; padding: 0; margin-bottom: var(--s3); resize: none;
   font-family: var(--disp); font-weight: 700; font-size: clamp(1.4rem, 1.1rem + .8vw, 1.75rem);
   line-height: 1.2; color: var(--ink);
 }
 .nt-title:focus { outline: none; }
+.nt-title:focus-visible { outline: none; box-shadow: -6px 0 0 -4px var(--accent); }
 .nt-title::placeholder { color: var(--faint); }
 
 /* ---- the editor ---- */
@@ -1853,14 +1880,14 @@ body.is-colresize { cursor: col-resize; user-select: none; }
   min-width: 30px; height: 30px; padding: 0 8px; border-radius: 999px;
   display: inline-grid; place-items: center; color: var(--muted); font-size: 0.9375rem; line-height: 1;
 }
-.nt-tool:hover { background: var(--bg); color: var(--accent); box-shadow: 0 1px 3px -1px rgba(0,0,0,.18); }
+.nt-tool:hover { background: var(--bg); color: var(--accent-text); box-shadow: 0 1px 3px -1px rgba(0,0,0,.18); }
 .nt-toolsep { width: 1px; height: 18px; background: var(--hairline-strong); margin: 0 var(--s2); }
 
 /* It has to LOOK like the place you type in, which the old read view did not. */
 .nt-editor {
   min-height: 320px; padding: var(--s3) var(--s3) var(--s6); border-radius: var(--r-sm);
   font-size: var(--text-base); line-height: 1.62; color: var(--ink); outline: none;
-  caret-color: var(--accent);
+  caret-color: var(--accent-text);
 }
 .nt-editor:focus { background: var(--surface); box-shadow: inset 0 0 0 1px var(--hairline-strong); }
 .nt-editor[data-empty]::before {
@@ -1908,9 +1935,9 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 .nt-tablemenu label { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); font-size: var(--text-sm); color: var(--muted); }
 .nt-tablemenu input { width: 68px; padding: 5px var(--s2); font-size: var(--text-sm); }
 .nt-editor code { font-family: var(--font-mono); font-size: 0.86em; background: var(--accent-wash); padding: 1px 5px; border-radius: 3px; }
-.nt-editor a { color: var(--accent); text-decoration: underline; }
-.nt-editor .tag { color: var(--accent); font-weight: 600; }
-mark { background: var(--accent-wash); color: var(--accent); font-weight: 600; border-radius: 2px; padding: 0 1px; }
+.nt-editor a { color: var(--accent-text); text-decoration: underline; }
+.nt-editor .tag { color: var(--accent-text); font-weight: 600; }
+mark { background: var(--accent-wash); color: var(--accent-text); font-weight: 600; border-radius: 2px; padding: 0 1px; }
 
 /* ---- a body that lost the merge, still on the note ---- */
 .nt-conflict { margin-bottom: var(--s4); border: 1px solid var(--alert); border-radius: 6px; padding: var(--s3) var(--s4); }
@@ -1933,7 +1960,7 @@ mark { background: var(--accent-wash); color: var(--accent); font-weight: 600; b
   .nt-folder-row { border: 1px solid var(--hairline-strong); border-radius: 999px; flex: none; }
   .nt-folder { min-height: 34px; padding: 6px var(--s3); }
   .nt-folder-row.is-sub .nt-folder { padding-left: var(--s3); }
-  .nt-folder-row.on { border-color: var(--accent); }
+  .nt-folder-row.on { border-color: var(--accent-text); }
   .nt-folder { white-space: nowrap; }
   .nt-slot { display: none; }
   .nt-fkebab { visibility: visible; width: 24px; }
@@ -2013,10 +2040,10 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .exception-row button { text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px; }
 .exception-row button:hover { color: var(--accent-hover); text-decoration-color: currentColor; }
 .status-strip button { border-bottom: 1px dotted var(--hairline-strong); }
-.status-strip button:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.status-strip button:hover { color: var(--accent-text); border-bottom-color: var(--accent-text); }
 /* Widget titles navigate, so they get a resting cue. */
 .widget-title-btn::after { content: '\203A'; font-size: 0.95rem; line-height: 1; color: var(--faint); margin-left: 2px; }
-.widget-title-btn:hover::after { color: var(--accent); }
+.widget-title-btn:hover::after { color: var(--accent-text); }
 /* The inert marker is a solid bullet; only the ring shape means checkable. */
 .subtask-row .sub-tick { width: 5px; height: 5px; border-radius: 50%; background: var(--faint); border: none; flex: none; }
 /* Quick-log chips hold their space so rows do not jump on hover. */
@@ -2028,8 +2055,8 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .mr-head-main { border-radius: var(--r-sm); }
 .mr-head-main:hover { background: var(--accent-wash); }
 .mr-chev { color: var(--muted); }
-.mr-head-main:hover .mr-chev { color: var(--accent); }
-.habit:hover .tick { border-color: var(--accent); }
+.mr-head-main:hover .mr-chev { color: var(--accent-text); }
+.habit:hover .tick { border-color: var(--accent-text); }
 
 /* ---- Money rows line up as columns ---- */
 .rowitem.wrap-row > .mono:not(.meta) { min-width: 9ch; text-align: right; }
@@ -2069,6 +2096,17 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   .widget-title-btn { padding-block: var(--s3); }
 }
 
+/* ---- Phone: the header is a header, not a quarter of the screen ----
+   Measured at 390px: brand, four labelled buttons and the space switcher stacked
+   to 247px before a single line of the page. The icons carry the meaning on a
+   phone; each button keeps its aria-label, so nothing is lost to a screen
+   reader either. */
+@media (max-width: 639px) {
+  .topbar-right .btn-label { display: none; }
+  .brand-name { display: none; }
+  .topbar-right .btn { padding-inline: var(--s3); }
+}
+
 /* ---- Phone: metrics grid instead of a stretched row ---- */
 @media (max-width: 639px) {
   .band-status { margin-left: 0; width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s3) var(--s4); }
@@ -2088,24 +2126,24 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 /* Restore the drop-target highlight only while a task is actually over it. */
 .bucket.drop-zone.drop-over { border-radius: var(--r-md); }
 /* Cadence label pops in the accent so each routine reads as a titled thing. */
-.routine-tag .microcap { color: var(--accent); }
+.routine-tag .microcap { color: var(--accent-text); }
 .routine-progress { color: var(--muted); font-weight: 600; }
 /* "done today" and positive counts go green. */
 .col-tot.val-pos { color: var(--progress); font-weight: 600; }
 /* Checkboxes read as tappable: heavier border, accent on hover. */
 .routine-check, .mr-check { border-width: 2px; }
-.routine-check:hover, .mr-check:hover { background: var(--accent-wash); border-color: var(--accent); }
+.routine-check:hover, .mr-check:hover { background: var(--accent-wash); border-color: var(--accent-text); }
 /* Status labels legible, not faint mono. */
 .mr-status { font-family: var(--font-body); font-weight: 600; color: var(--muted); letter-spacing: 0.03em; }
-.mr-step.open .mr-status { color: var(--accent); }
+.mr-step.open .mr-status { color: var(--accent-text); }
 /* The active routine step is unmistakable: accent number, accent left edge. */
-.mr-step.open .mr-num { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
+.mr-step.open .mr-num { border-color: var(--accent-text); color: var(--accent-text); background: var(--accent-wash); }
 /* Goal status chips carry more weight. */
 .goal-status { font-weight: 700; }
 
 /* Titles carry the colour; redundant eyebrow subtitles removed. */
-.band h1 { color: var(--accent); }
-.routine-card-title { color: var(--accent); }
+.band h1 { color: var(--accent-text); }
+.routine-card-title { color: var(--accent-text); }
 
 /* Drop zones are full-width targets, not prose (override the global p measure). */
 .bucket-empty { max-width: none; width: 100%; }
@@ -2128,7 +2166,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   width: 26px; height: 26px; border-radius: var(--r-sm); border: 1px solid var(--hairline-strong);
   color: var(--ink); font-size: var(--text-sm); line-height: 1; cursor: pointer;
 }
-.goal-bump button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.goal-bump button:hover:not(:disabled) { border-color: var(--accent-text); color: var(--accent-text); }
 .goal-bump button:disabled { opacity: 0.35; cursor: default; }
 .goal-bump .mono { font-size: 0.625rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); }
 .goal-drop { margin-left: auto; font-size: var(--text-xs); color: var(--faint); padding: 2px 6px; border-radius: var(--r-sm); }
@@ -2138,7 +2176,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 
 /* Morning routine: a running meditation stays visible when its panel is closed. */
 .mr-running {
-  font-size: var(--text-xs); color: var(--accent); background: var(--accent-wash);
+  font-size: var(--text-xs); color: var(--accent-text); background: var(--accent-wash);
   border-radius: 999px; padding: 2px 10px; cursor: pointer;
 }
 .mr-running:hover { background: var(--accent-wash); text-decoration: underline; }
@@ -2247,7 +2285,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .daydot.is-auto:not([aria-checked="true"]) { border-style: dashed; }
 .habit-foot { display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap; margin-top: 6px; }
 .habit-auto {
-  font-size: var(--text-xs); color: var(--accent); padding: 0; text-align: left; cursor: pointer;
+  font-size: var(--text-xs); color: var(--accent-text); padding: 0; text-align: left; cursor: pointer;
 }
 .habit-auto:hover { text-decoration: underline; }
 .habit-weeks { font-size: var(--text-xs); color: var(--muted); margin-left: auto; }
@@ -2380,7 +2418,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
     color-mix(in srgb, var(--accent) 34%, transparent) var(--fill, 0%),
     transparent var(--fill, 0%)
   );
-  border-color: var(--accent);
+  border-color: var(--accent-text);
   border-style: solid;
 }
 
@@ -2421,7 +2459,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   width: 28px; height: 28px; border-radius: var(--r-sm);
   color: var(--faint); cursor: pointer;
 }
-.task-act:hover:not(:disabled) { color: var(--accent); background: var(--accent-wash); }
+.task-act:hover:not(:disabled) { color: var(--accent-text); background: var(--accent-wash); }
 .task-act:disabled { opacity: 0.3; cursor: default; }
 .task-flash { font-size: var(--text-xs); color: var(--progress); margin-right: 4px; }
 .sheet-task {
@@ -2431,7 +2469,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 @media (pointer: coarse) { .task-act { width: 40px; height: 40px; } }
 
 /* Start a focus block on a task or a single step, for its own estimate. */
-.task-focus:not(:disabled) { color: var(--accent); }
+.task-focus:not(:disabled) { color: var(--accent-text); }
 .subtask-wrap { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; }
 .subtask-wrap > .subtask { flex: 1 1 auto; min-width: 0; }
 /* Asking how long a step took gets its own line. Inside the row it competed
@@ -2443,7 +2481,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 /* The now line on the day column. */
 .vnow { position: absolute; left: 0; right: 0; border-top: 1px solid var(--accent); z-index: 3; pointer-events: none; }
 .vnow-dot { position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
-.vnow-label { position: absolute; right: 2px; top: -8px; font-size: 0.5625rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); background: var(--bg); padding: 0 3px; }
+.vnow-label { position: absolute; right: 2px; top: -8px; font-size: 0.5625rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent-text); background: var(--bg); padding: 0 3px; }
 
 .sheet-warn { font-size: var(--text-xs); color: var(--warn); background: var(--warn-wash); border-radius: var(--r-sm); padding: var(--s2) var(--s3); margin-top: var(--s3); }
 
@@ -2503,7 +2541,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 
 /* An estimate you can type over. */
 .est-edit { cursor: pointer; }
-.est-edit:hover { border-color: var(--accent); color: var(--accent); }
+.est-edit:hover { border-color: var(--accent-text); color: var(--accent-text); }
 .est-input {
   flex: none; width: 68px; padding: 2px 6px; font-family: var(--font-mono);
   font-size: var(--text-xs); border: 1px solid var(--accent); border-radius: var(--r-sm);
@@ -2550,9 +2588,10 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   border: 1px solid var(--hairline-strong); border-radius: var(--r-md);
   background: var(--bg); padding: var(--s3); margin-top: var(--s3);
 }
-.assist-input:focus-within { border-color: var(--accent); }
+.assist-input:focus-within { border-color: var(--accent-text); }
 .assist-textarea { border: none; background: transparent; padding: 0; min-height: 5.5rem; flex: none; }
 .assist-textarea:focus { outline: none; box-shadow: none; }
+.assist-textarea:focus-visible { outline: none; }
 .assist-tools { display: flex; align-items: center; gap: var(--s2); }
 .assist-go { margin-left: auto; }
 .assist-listening { font-size: var(--text-xs); color: var(--alert); }
@@ -2571,7 +2610,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   width: 22px; height: 18px; border-radius: 3px; border: 1px solid var(--hairline-strong);
   color: var(--faint); font-size: 0.625rem; line-height: 1; cursor: pointer;
 }
-.step-order button:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+.step-order button:hover:not(:disabled) { color: var(--accent-text); border-color: var(--accent-text); }
 .step-order button:disabled { opacity: 0.3; cursor: default; }
 .step-edit-fields { display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; min-width: 0; }
 .step-note { font-size: var(--text-xs); color: var(--muted); }
@@ -2587,7 +2626,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .step-add > .textinput { flex: 1 1 auto; min-width: 0; }
 .step-add > .btn { flex: none; }
 .mr-edit { font-size: var(--text-xs); color: var(--faint); padding: 2px 6px; border-radius: var(--r-sm); cursor: pointer; }
-.mr-edit:hover { color: var(--accent); background: var(--accent-wash); }
+.mr-edit:hover { color: var(--accent-text); background: var(--accent-wash); }
 
 /* ---------- A routine standing on the day's list ---------- */
 /* It is a task row. The only mark of difference is the tag, because two layouts
@@ -2598,7 +2637,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   border-radius: 3px; padding: 1px 5px;
 }
 .rod-empty { font-size: var(--text-xs); color: var(--faint); padding: 4px 0 0 26px; }
-.rod-link { color: var(--accent); text-decoration: underline; cursor: pointer; padding: 0; }
+.rod-link { color: var(--accent-text); text-decoration: underline; cursor: pointer; padding: 0; }
 .rod-done { font-size: var(--text-xs); color: var(--progress); padding: 4px 0 0 26px; }
 .rod-bucket { border-bottom: 1px solid var(--hairline); padding-bottom: var(--s3); margin-bottom: var(--s3); }
 
@@ -2648,7 +2687,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 
 /* An inline action inside a sentence, not a button sitting next to one. */
 .linkish {
-  color: var(--accent); text-decoration: underline; text-underline-offset: 2px;
+  color: var(--accent-text); text-decoration: underline; text-underline-offset: 2px;
   cursor: pointer; font-size: inherit; font-family: inherit;
 }
 
@@ -2683,7 +2722,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 }
 .signin-h {
   font-size: clamp(3rem, 5.5vw, 4.75rem); line-height: 0.98; letter-spacing: -0.02em;
-  margin: var(--s3) 0 var(--s5); color: var(--accent);
+  margin: var(--s3) 0 var(--s5); color: var(--accent-text);
 }
 .signin-label {
   display: block; font-size: var(--text-sm); color: var(--muted); margin-bottom: 8px;
@@ -2719,9 +2758,9 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 }
 .kindpick button b { font-size: var(--text-sm); font-weight: 600; color: var(--ink); }
 .kindpick button span { font-size: var(--text-xs); color: var(--muted); }
-.kindpick button:hover:not(:disabled) { border-color: var(--accent); }
-.kindpick button.on { border-color: var(--accent); background: var(--accent-wash); }
-.kindpick button.on b { color: var(--accent); }
+.kindpick button:hover:not(:disabled) { border-color: var(--accent-text); }
+.kindpick button.on { border-color: var(--accent-text); background: var(--accent-wash); }
+.kindpick button.on b { color: var(--accent-text); }
 .kindpick button:disabled { opacity: 0.5; cursor: not-allowed; }
 @media (max-width: 519px) { .kindpick { grid-template-columns: 1fr; } }
 
@@ -2755,7 +2794,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .trail-day.kept { background: var(--progress); }
 /* Before the habit existed. Not a missed day, so not drawn as one. */
 .trail-day.before-start { background: transparent; box-shadow: inset 0 0 0 1px var(--hairline); }
-.trail-day.is-today { border-color: var(--accent); }
+.trail-day.is-today { border-color: var(--accent-text); }
 .habit-trail.w30 .trail-day { border-radius: 3px; }
 /* A slip is a fact, drawn as one. Not red: it is a day on the record, not an
    alarm, and the run either side of it is the thing worth reading. */
@@ -2825,7 +2864,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .day-foot { margin-top: var(--s4); font-size: var(--text-xs); color: var(--faint); }
 /* A trail square is a link to the day it stands for. */
 .trail-day { padding: 0; font: inherit; color: inherit; cursor: pointer; }
-.trail-day:hover { border-color: var(--accent); }
+.trail-day:hover { border-color: var(--accent-text); }
 .trail-day:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* A record is a column of short rows, so it gets a rail. Left to fill 2560px the
    title sat at one edge and its number at the other, half a metre apart. */
@@ -2875,7 +2914,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 /* ---------- editing a generated step ---------- */
 .sub-tools { display: flex; gap: var(--s2); flex: none; }
 .sub-tool { font-size: var(--text-xs); color: var(--muted); }
-.sub-tool:hover { color: var(--accent); text-decoration: underline; }
+.sub-tool:hover { color: var(--accent-text); text-decoration: underline; }
 .subtask-row.is-editing { gap: var(--s2); }
 .sub-edit-title { flex: 1; min-width: 0; min-height: 32px; font-size: var(--text-sm); }
 .sub-edit-min { width: 64px; min-height: 32px; font-size: var(--text-sm); }
@@ -2897,7 +2936,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   padding: var(--s5) var(--s6); max-width: 420px; width: calc(100vw - 48px);
   display: flex; flex-direction: column; gap: var(--s2);
 }
-.pomo-done-kicker { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--progress); }
+
 .pomo-done h2 { font-size: var(--text-lg); line-height: 1.3; }
 .pomo-done p { color: var(--muted); font-size: var(--text-sm); }
 .pomo-done-actions { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s3); }
@@ -2959,7 +2998,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 }
 .ms-card.is-earned { border-color: var(--progress); background: var(--progress-wash); }
 .ms-card.is-unknown { opacity: 0.6; }
-.ms-mark { flex: none; width: 36px; height: 36px; display: grid; place-items: center; color: var(--accent); }
+.ms-mark { flex: none; width: 36px; height: 36px; display: grid; place-items: center; color: var(--accent-text); }
 .ms-card.is-earned .ms-mark { color: var(--progress); }
 .ms-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .ms-title { font-size: var(--text-sm); font-weight: 600; }
@@ -3013,7 +3052,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 }
 .dayline-legend { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); margin-top: var(--s3); }
 .dayline-legend-item { display: flex; gap: var(--s2); font-size: var(--text-xs); color: var(--muted); }
-.dayline-legend-item .mono { color: var(--accent); }
+.dayline-legend-item .mono { color: var(--accent-text); }
 .dayline-legend-more { font-size: var(--text-xs); color: var(--faint); }
 
 /* Four numbers, divided by rules rather than boxed in four cards. */
@@ -3046,7 +3085,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-md);
   cursor: pointer;
 }
-.weekday:hover { border-color: var(--accent); }
+.weekday:hover { border-color: var(--accent-text); }
 .weekday.is-today { border-color: var(--ink); }
 .weekday.is-empty { background: transparent; }
 .weekday-head { display: flex; align-items: baseline; gap: var(--s2); min-width: 0; }
@@ -3129,7 +3168,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   font-family: var(--font-mono); font-size: 0.75rem; min-height: 30px; padding: 2px 10px;
   border: 1px solid var(--hairline-strong); border-radius: 4px; color: var(--muted);
 }
-.focus-step:hover { border-color: var(--accent); color: var(--accent); }
+.focus-step:hover { border-color: var(--accent-text); color: var(--accent-text); }
 .focus-step.on { border-color: var(--ink); background: var(--ink); color: var(--bg); }
 
 /* ---------- the day column on Plan ---------- */
@@ -3151,8 +3190,8 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   .plan-two { grid-template-columns: 1fr; }
 }
 /* a pasted URL, shortened to its address and made clickable */
-.txt-link { color: var(--accent); text-decoration: underline; text-decoration-color: var(--hairline-strong); text-underline-offset: 2px; word-break: keep-all; }
-.txt-link:hover { text-decoration-color: var(--accent); }
+.txt-link { color: var(--accent-text); text-decoration: underline; text-decoration-color: var(--hairline-strong); text-underline-offset: 2px; word-break: keep-all; }
+.txt-link:hover { text-decoration-color: var(--accent-text); }
 .today-task.done .txt-link, .subtask.done .txt-link { color: var(--faint); }
 /* travelling between goal periods */
 .goal-nav { display: flex; gap: 2px; margin-left: var(--s2); }
@@ -3200,7 +3239,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   border-top: 1px solid var(--hairline);
 }
 .ptask-offer-row:first-child { border-top: none; }
-.ptask-offer-row:hover { background: var(--accent-wash); color: var(--accent); }
+.ptask-offer-row:hover { background: var(--accent-wash); color: var(--accent-text); }
 .ptask-offer-row .meta { font-size: 0.6875rem; color: var(--faint); flex: none; }
 .ptask-new { align-self: flex-start; }
 /* Touch has no hover, so the way off a period must be there without one. */
@@ -3211,7 +3250,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .goal-nav-btn:hover { border-color: var(--hairline-strong); color: var(--ink); }
 .goal-nav-btn.now { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.03em; padding: 0 6px; }
 /* the clock button while the model is thinking */
-.est-thinking { width: 13px; height: 13px; border: 2px solid var(--hairline-strong); border-top-color: var(--accent); border-radius: 50%; display: inline-block; animation: est-spin 0.7s linear infinite; }
+.est-thinking { width: 13px; height: 13px; border: 2px solid var(--hairline-strong); border-top-color: var(--accent-text); border-radius: 50%; display: inline-block; animation: est-spin 0.7s linear infinite; }
 @keyframes est-spin { to { transform: rotate(360deg); } }
 /* which hours a part of the day means */
 .bucket-hours { font-size: 0.6875rem; color: var(--faint); margin-left: var(--s2); }
@@ -3345,7 +3384,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .rf-why { display: block; width: 100%; text-align: left; padding: var(--s6) var(--s5); }
 .rf-why-text { display: block; font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); line-height: 1.25; max-width: 46ch; }
 .rf-why-by { display: block; margin-top: var(--s3); font-family: var(--font-mono); font-size: 0.6875rem; color: var(--faint); }
-.rf-why:hover .rf-why-text { color: var(--accent); }
+.rf-why:hover .rf-why-text { color: var(--accent-text); }
 @media (max-width: 700px) {
   .rf-bar { flex: 0 0 60px; }
 }
@@ -3399,7 +3438,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .dr-score { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--s6) var(--s5); margin: var(--s6) 0 var(--s5); }
 .dr-tile { display: flex; flex-direction: column; gap: 2px; animation: dr-pop 340ms var(--ease) both; }
 @keyframes dr-pop { from { opacity: 0; transform: translateY(10px) scale(.96) } to { opacity: 1; transform: none } }
-.dr-num { font-family: var(--disp); font-weight: 700; font-size: clamp(2.2rem, 1.6rem + 2vw, 3.4rem); line-height: 1; color: var(--accent); }
+.dr-num { font-family: var(--disp); font-weight: 700; font-size: clamp(2.2rem, 1.6rem + 2vw, 3.4rem); line-height: 1; color: var(--accent-text); }
 .dr-lab { font-size: var(--text-sm); color: var(--muted); }
 
 .dr-list { list-style: none; display: flex; flex-direction: column; gap: var(--s2); margin-top: var(--s4); }
@@ -3426,7 +3465,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   flex: none; min-height: 42px; padding: 9px 16px; border-radius: 999px;
   border: 1px solid var(--hairline-strong); font-size: var(--text-sm); color: var(--ink); white-space: nowrap;
 }
-.dr-tick:hover, .dr-more-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
+.dr-tick:hover, .dr-more-btn:hover { border-color: var(--accent-text); color: var(--accent-text); background: var(--accent-wash); }
 .dr-tick.is-slip:hover, .dr-drop:hover { border-color: var(--alert); color: var(--alert); background: var(--alert-wash); }
 /* Less weight than Today, but still visibly a control. With no border at all it
    stopped reading as tappable and the row looked like one button and a caption.
@@ -3455,7 +3494,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .dr-footleft { display: flex; align-items: center; gap: var(--s4); }
 .dr-footacts { margin-left: auto; display: flex; align-items: center; gap: var(--s4); }
 .dr-back, .dr-skip { font-size: var(--text-sm); color: var(--faint); padding: 10px 6px; min-height: 44px; }
-.dr-back:hover, .dr-skip:hover { color: var(--accent); }
+.dr-back:hover, .dr-skip:hover { color: var(--accent-text); }
 .dr-go { padding: 12px 22px; font-size: var(--text-base); }
 
 @media (max-width: 640px) {

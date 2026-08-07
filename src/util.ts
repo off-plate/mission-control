@@ -2,7 +2,7 @@ import type { RoutineCadence, Task, TimeSlot } from './types'
 
 /* ---------- dates & periods ---------- */
 
-/** Local (Prague) calendar date as 'YYYY-MM-DD'. Never UTC — the day must flip at his midnight. */
+/** Local (Prague) calendar date as 'YYYY-MM-DD'. Never UTC: the day must flip at his midnight. */
 export function localDateKey(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }

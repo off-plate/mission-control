@@ -43,7 +43,7 @@ const fresh = async (route = '') => {
 
 await step('plan: add, estimate visible, complete via chips', async () => {
   await fresh('plan')
-  await page.locator('input[placeholder="Add something to the list"]').fill('Gate task')
+  await page.getByRole('textbox', { name: 'New task' }).fill('Gate task')
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await page.locator('.todo-row', { hasText: 'Gate task' }).first().getByRole('button', { name: /Options/ }).click()
   await page.getByRole('menuitem', { name: 'Move to today' }).click()
@@ -55,7 +55,7 @@ await step('plan: add, estimate visible, complete via chips', async () => {
 })
 await step('breakdown: his own steps, his own minutes', async () => {
   await fresh('plan')
-  await page.locator('input[placeholder="Add something to the list"]').fill('Gate breakdown task')
+  await page.getByRole('textbox', { name: 'New task' }).fill('Gate breakdown task')
   await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(400)
   await page.locator('.todo-row', { hasText: 'Gate breakdown' }).first().getByRole('button', { name: /Options/ }).click()
   await page.getByRole('menuitem', { name: /Break it down/i }).click(); await page.waitForTimeout(2200)
@@ -388,7 +388,7 @@ await step('money: reads Compass, and invents nothing when it cannot', async () 
 await step('workspaces: write a task into Michael’s Corner', async () => {
   await fresh('plan')
   await page.locator('button', { hasText: 'Michael' }).first().click(); await page.waitForTimeout(400)
-  await page.locator('input[placeholder="Add something to the list"]').fill('Corner gate')
+  await page.getByRole('textbox', { name: 'New task' }).fill('Corner gate')
   await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(400)
   const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
   if (s.tasks.find((t) => t.title === 'Corner gate')?.space !== 'corner') throw new Error('wrong space')
@@ -400,7 +400,7 @@ await step('vision + day record render', async () => {
 })
 await step('plan: tomorrow holds its own day', async () => {
   await fresh('plan')
-  await page.locator('input[placeholder="Add something to the list"]').fill('Gate tomorrow task')
+  await page.getByRole('textbox', { name: 'New task' }).fill('Gate tomorrow task')
   await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(300)
   await page.locator('.todo-row', { hasText: 'Gate tomorrow' }).getByRole('button', { name: /Options/ }).click()
   await page.getByRole('menuitem', { name: 'Move to tomorrow' }).click(); await page.waitForTimeout(400)
@@ -414,7 +414,7 @@ await step('plan: tomorrow holds its own day', async () => {
 })
 await step('goals: a promised task ticks from the plan', async () => {
   await fresh('plan')
-  await page.locator('input[placeholder="Add something to the list"]').fill('Gate promise')
+  await page.getByRole('textbox', { name: 'New task' }).fill('Gate promise')
   await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(300)
   await page.goto(`${URL}#/goals`); await page.waitForTimeout(500)
   const col = page.locator('.goal-col', { hasText: 'This month' }).first()
@@ -449,7 +449,7 @@ await step('phone: plan is usable at 390', async () => {
   await mp.goto(URL); await mp.waitForTimeout(300)
   await mp.evaluate((K) => localStorage.removeItem(K), KEY)
   await mp.goto(`${URL}#/plan`); await mp.reload(); await mp.waitForTimeout(700)
-  await mp.locator('input[placeholder="Add something to the list"]').fill('Phone gate task with a long name')
+  await mp.getByRole('textbox', { name: 'New task' }).fill('Phone gate task with a long name')
   await mp.getByRole('button', { name: 'Add', exact: true }).click(); await mp.waitForTimeout(300)
   const row = mp.locator('.todo-row', { hasText: 'Phone gate' }).first()
   const grow = row.locator('.grow')
@@ -490,7 +490,7 @@ await step('sync: two tabs both keep what they added', async () => {
   const add = async (page, title) => {
     await page.bringToFront()
     if (!/#\/plan/.test(page.url())) { await page.goto(`${URL}#/plan`); await page.waitForTimeout(600) }
-    await page.locator('input[placeholder="Add something to the list"]').fill(title)
+    await page.getByRole('textbox', { name: 'New task' }).fill(title)
     await page.getByRole('button', { name: 'Add', exact: true }).click()
     await page.waitForTimeout(500)
   }
@@ -593,7 +593,7 @@ await step('daily review: offered once, fixes yesterday, and stays shut', async 
   if (await page.locator('.dr-screen').count()) throw new Error('it came back the same day')
   // and the header button reopens it, from any page, after it has been walked
   await page.goto(`${URL}#/habits`); await page.waitForTimeout(600)
-  await page.getByRole('button', { name: /Walk yesterday/ }).click(); await page.waitForTimeout(600)
+  await page.getByRole('button', { name: 'Yesterday', exact: true }).click(); await page.waitForTimeout(600)
   if (!(await page.locator('.dr-screen').count())) throw new Error('the header button did not reopen it')
   await page.keyboard.press('Escape')
 })
@@ -696,7 +696,7 @@ await step('daily review: reopening it starts a new walk, not the old one', asyn
   await page.locator('.dr-rowacts .dr-tick').first().click(); await page.waitForTimeout(400)
   // close, then reopen from the pill
   await page.locator('.dr-foot .dr-skip').first().click(); await page.waitForTimeout(500)
-  await page.getByRole('button', { name: /Walk yesterday/ }).click(); await page.waitForTimeout(600)
+  await page.getByRole('button', { name: 'Yesterday', exact: true }).click(); await page.waitForTimeout(600)
   const second = await toLeft()
   if (!/One thing/.test(second)) throw new Error(`the reopened walk still counted the one he put back: ${second}`)
   // and clearing the last one must not read "0 things did not get done."

@@ -240,33 +240,49 @@ function MilestonesPage() {
 }
 
 export function AchievementsPage() {
-  /* The old addresses still mean what they said: #/money opens on Money and
-     #/review on Reflect. Only #/achievements opens on the milestones. */
-  const { page } = useStore()
-  const [tab, setTab] = useState<Tab>(page === 'money' ? 'money' : page === 'review' || page === 'stats' ? 'reflect' : 'wins')
-  const tabs: { id: Tab; label: string }[] = [
-    { id: 'wins', label: 'Milestones' },
-    { id: 'money', label: 'Money' },
-    { id: 'reflect', label: 'Reflect' },
+  /* The tab IS the address. #/money opens on Money, #/review on Reflect,
+     #/achievements on the milestones, and switching tabs writes the route, so
+     back goes back, a link can be shared and a reload lands where he was. No
+     second copy of this state exists to drift. */
+  const { page, setPage } = useStore()
+  const tab: Tab = page === 'money' ? 'money' : page === 'review' || page === 'stats' ? 'reflect' : 'wins'
+  const tabs: { id: Tab; label: string; page: 'achievements' | 'money' | 'review' }[] = [
+    { id: 'wins', label: 'Milestones', page: 'achievements' },
+    { id: 'money', label: 'Money', page: 'money' },
+    { id: 'reflect', label: 'Reflect', page: 'review' },
   ]
+
+  /* Left and right move between tabs, which is what a tablist is expected to
+     do and what a keyboard reaches for. */
+  const onKey = (e: React.KeyboardEvent) => {
+    const i = tabs.findIndex((t) => t.id === tab)
+    if (e.key === 'ArrowRight') { e.preventDefault(); setPage(tabs[(i + 1) % tabs.length].page) }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); setPage(tabs[(i - 1 + tabs.length) % tabs.length].page) }
+  }
+
   return (
     <>
-      <div className="achnav" role="tablist" aria-label="Achievements">
+      <div className="achnav" role="tablist" aria-label="Achievements" onKeyDown={onKey}>
         {tabs.map((t) => (
           <button
             key={t.id}
             role="tab"
+            id={`achtab-${t.id}`}
+            aria-controls="achpanel"
             className={`achtab${tab === t.id ? ' on' : ''}`}
             aria-selected={tab === t.id}
-            onClick={() => setTab(t.id)}
+            tabIndex={tab === t.id ? 0 : -1}
+            onClick={() => setPage(t.page)}
           >
             {t.label}
           </button>
         ))}
       </div>
-      {tab === 'wins' && <MilestonesPage />}
-      {tab === 'money' && <MoneyPage />}
-      {tab === 'reflect' && <ReviewPage />}
+      <div id="achpanel" role="tabpanel" aria-labelledby={`achtab-${tab}`}>
+        {tab === 'wins' && <MilestonesPage />}
+        {tab === 'money' && <MoneyPage />}
+        {tab === 'reflect' && <ReviewPage />}
+      </div>
     </>
   )
 }

@@ -78,7 +78,7 @@ export function AssistantRail() {
           <AutoTextarea
             className="textinput assist-textarea"
             minRows={3}
-            placeholder="Call the bank about the plan, 20 min"
+            placeholder="Call the bank about the plan, 20 min…"
             value={text}
             onChange={(e) => { setText(e.target.value); setParsed(null) }}
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && text.trim()) void understand() }}

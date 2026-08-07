@@ -2905,6 +2905,102 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 @keyframes pomo-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
 .pomo-badge.await .pomo-phase { color: var(--progress); }
 
+/* ---------- Today: the face of the day ----------
+   Taken from a dashboard he sent: a band across the top, big numbers under it,
+   a calendar strip. What that mockup fills them with is a purple gradient, a
+   soft shadow on everything and invented data. Here: hairlines, one accent per
+   mark, and only figures the app can prove. */
+
+.dayline { margin-bottom: var(--s4); }
+.dayline-head { display: flex; align-items: baseline; gap: var(--s3); margin-bottom: var(--s3); }
+.dayline-sum { margin-left: auto; font-size: var(--text-xs); color: var(--faint); }
+
+/* The 24 hours, as one line. Nothing is centred and nothing is decorative: a
+   mark's position IS its time. */
+.dayline-track {
+  position: relative; height: 54px;
+  background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-md);
+}
+.dayline-tick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--hairline); }
+.dayline-tick:first-child { background: transparent; }
+.dayline-tick .mono {
+  position: absolute; bottom: 3px; left: 4px;
+  font-size: 0.625rem; color: var(--faint); line-height: 1;
+}
+/* A block he actually ran. Green is the app's word for progress, so it is the
+   right word here. */
+.dayline-block {
+  position: absolute; top: 8px; height: 22px; border-radius: 2px;
+  background: var(--progress); opacity: 0.9;
+}
+.dayline-block:hover { opacity: 1; }
+/* A task he pinned to a clock time: ahead of him, so it is a mark rather than
+   a filled span. */
+.dayline-pin { position: absolute; top: 6px; bottom: 18px; width: 1px; background: var(--accent); }
+.dayline-pin-dot {
+  position: absolute; top: -3px; left: -2.5px; width: 6px; height: 6px;
+  border-radius: 50%; background: var(--accent);
+}
+/* Now. The strongest mark on the line, because it is the only one that moves. */
+.dayline-now { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); }
+.dayline-now-dot {
+  position: absolute; top: -4px; left: -2px; width: 6px; height: 6px;
+  border-radius: 50%; background: var(--ink);
+}
+.dayline-legend { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); margin-top: var(--s3); }
+.dayline-legend-item { display: flex; gap: var(--s2); font-size: var(--text-xs); color: var(--muted); }
+.dayline-legend-item .mono { color: var(--accent); }
+.dayline-legend-more { font-size: var(--text-xs); color: var(--faint); }
+
+/* Four numbers, divided by rules rather than boxed in four cards. */
+.daynums {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline);
+  margin-bottom: var(--s5);
+}
+.daynum { display: flex; flex-direction: column; gap: 2px; padding: var(--s4) var(--s5); min-width: 0; }
+.daynum + .daynum { border-left: 1px solid var(--hairline); }
+.daynum .v {
+  font-size: clamp(1.5rem, 2.4vw, 2rem); font-weight: 700; line-height: 1.05;
+  letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
+}
+.daynum .v .of { font-size: 0.55em; font-weight: 600; color: var(--faint); }
+.daynum .k { font-size: var(--text-xs); color: var(--muted); }
+@media (max-width: 760px) {
+  .daynums { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .daynum:nth-child(3) { border-left: none; }
+  .daynum:nth-child(n+3) { border-top: 1px solid var(--hairline); }
+}
+
+/* The week behind him, each day a way into that day's record. */
+.weekstrip { margin-top: var(--s5); }
+.weekstrip-head { margin-bottom: var(--s3); }
+.weekstrip-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--s3); }
+.weekday {
+  display: flex; flex-direction: column; gap: var(--s2); min-width: 0; text-align: left;
+  padding: var(--s3) var(--s3) var(--s3);
+  background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-md);
+  cursor: pointer;
+}
+.weekday:hover { border-color: var(--accent); }
+.weekday.is-today { border-color: var(--ink); }
+.weekday.is-empty { background: transparent; }
+.weekday-head { display: flex; align-items: baseline; gap: var(--s2); min-width: 0; }
+.weekday-name { font-size: var(--text-xs); color: var(--muted); text-transform: lowercase; }
+.weekday-num { font-size: var(--text-base); font-weight: 700; margin-left: auto; font-variant-numeric: tabular-nums; }
+.weekday.is-today .weekday-name { color: var(--ink); font-weight: 600; }
+.weekday-bar { display: block; height: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
+.weekday-bar i { display: block; height: 100%; background: var(--progress); }
+.weekday-facts { display: flex; flex-wrap: wrap; gap: 2px var(--s2); font-size: 0.625rem; color: var(--muted); }
+.weekday-facts .none { color: var(--faint); }
+.weekday-facts .focus { color: var(--progress); }
+@media (max-width: 900px) {
+  .weekstrip-days { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  .weekstrip-days { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 /* ---------- the clock widget ----------
    The time carries the widget, so it is set at display size with tabular
    figures; nothing under it repeats what it already says. */

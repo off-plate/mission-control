@@ -7,8 +7,9 @@ import { usePomodoro } from './pomodoro'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
 import { Linkify } from './widgets'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, isCounted, COUNT_PERIODS, requiredSteps, routineComplete, routineProgress, routineRunsOn, slotMinutes, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, dueOn, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, isCounted, COUNT_PERIODS, requiredSteps, routineComplete, routineProgress, routineRunsOn, slotMinutes, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
 import { AssistantRail } from './assist'
+import { DayLine, DayNumbers, WeekStrip } from './dayface'
 import { estimateFor } from './estimate'
 import { estimateTask } from './ai'
 import { goalPeriodKey, goalPeriodRange, habitPeriodRange, periodIsPast, periodKeyFor, periodLabel, shiftPeriodKey, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForMoment, taskMinutes, toMin } from './util'
@@ -236,9 +237,12 @@ export function TodayPage() {
         metrics={[
           { v: nextEvent.v, k: nextEvent.k, tone: 'info' as const },
           { v: String(open.length), k: 'tasks open' },
+          /* The estimate figure moved into the day's numbers below, where it
+             sits beside the other three instead of competing with the payment
+             warning for the same slot. */
           ...(space === 'personal' && nextPay
             ? [{ v: `${nextPay.amount} ${nextPay.date.split(' ')[0]}`, k: 'next payment', tone: 'urgent' as const }]
-            : savedMin !== 0 ? [{ v: savedMin > 0 ? fmtSigned(savedMin) : fmtDuration(-savedMin), k: savedMin > 0 ? 'under estimate' : 'over your estimates', tone: (savedMin > 0 ? 'pos' : 'urgent') as 'pos' | 'urgent' }] : []),
+            : []),
         ]}
         actions={
           <>
@@ -251,6 +255,11 @@ export function TodayPage() {
           </>
         }
       />
+
+      {/* The day itself, before anything about it: what has been on the clock,
+          then the four numbers the day is actually judged by. */}
+      <DayLine />
+      <DayNumbers savedMin={savedMin} />
 
       {/* Today is the one page with a rail: the assistant is always open beside
           the day rather than a tab you have to remember to visit. Below 1100px
@@ -345,6 +354,8 @@ export function TodayPage() {
       )}
 
       <SpaceGrid />
+
+      <WeekStrip />
 
       </div>
       <AssistantRail />
@@ -2059,13 +2070,7 @@ export function HabitsPage() {
      monthlies across four workspaces that he could not reconstruct from
      anything on screen. What he wants on a Sunday morning is what is still
      open TODAY. */
-  const dueToday = spaceHabits.filter((h) => {
-    if (h.paused || h.kind === 'break') return false
-    if (h.frequency === 'weekdays' && todayIndex >= 5) return false
-    // Once a week or once a month, and already kept: nothing is due.
-    if ((h.frequency === 'weekly' || h.frequency === 'monthly') && h.days.some(Boolean)) return false
-    return true
-  })
+  const dueToday = spaceHabits.filter((h) => dueOn(h, todayIndex))
   const doneToday = dueToday.filter((h) => h.days[todayIndex]).length
 
   /* Grouped by who keeps it, and inside a group what is still open comes

@@ -21,6 +21,10 @@ import { fmtDayShort, lastBusinessDayOfMonth, nextDow } from './util'
    no real balances, no real creditors. The real app reads Supabase. */
 
 export const WIDGET_DEFS: Record<WidgetType, WidgetDef> = {
+  clock: {
+    type: 'clock', title: 'Now', description: 'The date and the time, on the page you start from',
+    supportedSizes: ['S', 'M'], defaultSize: 'S', freshMinutes: null, staleAfter: Infinity, page: 'today',
+  },
   agenda: {
     type: 'agenda', title: 'Agenda', description: 'Next events from Google Calendar',
     supportedSizes: ['M', 'T', 'L'], defaultSize: 'T', freshMinutes: 4, staleAfter: 60, page: 'plan',
@@ -80,19 +84,23 @@ const wid = (t: WidgetType) => `${t}-${++n}`
    once their integration exists, rather than sitting on the page showing nothing. */
 export const DEFAULT_SPACES: Record<SpaceId, WidgetInstance[]> = {
   personal: [
+    { id: wid('clock'), type: 'clock', size: 'S' },
     { id: wid('tasks'), type: 'tasks', size: 'L' },
     { id: wid('habits'), type: 'habits', size: 'M' },
     { id: wid('goals'), type: 'goals', size: 'L' },
   ],
   work: [
+    { id: wid('clock'), type: 'clock', size: 'S' },
     { id: wid('tasks'), type: 'tasks', size: 'L' },
     { id: wid('goals'), type: 'goals', size: 'M' },
   ],
   offplate: [
+    { id: wid('clock'), type: 'clock', size: 'S' },
     { id: wid('tasks'), type: 'tasks', size: 'L' },
     { id: wid('goals'), type: 'goals', size: 'M' },
   ],
   corner: [
+    { id: wid('clock'), type: 'clock', size: 'S' },
     { id: wid('tasks'), type: 'tasks', size: 'L' },
     { id: wid('goals'), type: 'goals', size: 'M' },
   ],

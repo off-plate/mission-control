@@ -109,6 +109,7 @@ export function FocusPage() {
 
       {days.length === 0 && <div className="empty">No focus blocks yet. Start one from a task and it lands here.</div>}
 
+      <div className="focus-days">
       {days.map((d) => {
         const list = mine.filter((f) => f.day === d)
         const total = list.reduce((a, f) => a + f.minutes, 0)
@@ -124,6 +125,7 @@ export function FocusPage() {
           </section>
         )
       })}
+      </div>
     </div>
   )
 }

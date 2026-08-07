@@ -162,31 +162,6 @@ export function Band({
   )
 }
 
-/* The date and the clock. Calendar is gone; this is the one thing he wanted
-   kept out of it, so it sits where he already looks. State only changes when
-   the minute does, so the page is not re-rendering every tick. */
-function nowStamp() {
-  const d = new Date()
-  return {
-    time: d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
-    date: d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }),
-  }
-}
-
-function useClock(): { time: string; date: string } {
-  const [now, setNow] = useState(nowStamp)
-  useEffect(() => {
-    const t = window.setInterval(() => {
-      setNow((prev) => {
-        const next = nowStamp()
-        return next.time === prev.time && next.date === prev.date ? prev : next
-      })
-    }, 10_000)
-    return () => window.clearInterval(t)
-  }, [])
-  return now
-}
-
 function useNextEvent(space: string): { v: string; k: string } {
   const [, tick] = useState(0)
   useEffect(() => {
@@ -233,7 +208,6 @@ const shortDay = (key: string): string => {
 export function TodayPage() {
   const { space, tasks, routines, habits, plan, editing, setEditing, setPage, savedMin, todayIndex, review, addTask, deleteTask, moveTaskList, setFocusTaskId, sources, inView } = useStore()
   const pomo = usePomodoro()
-  const clock = useClock()
   const nextEvent = useNextEvent(space)
   const exceptions = exceptionsFor(space, { tasks, routines })
   /* Money and official post follow you into Work and Off-Plate. Sitting in the
@@ -260,7 +234,6 @@ export function TodayPage() {
       <Band
         title="Today"
         metrics={[
-          { v: clock.time, k: clock.date },
           { v: nextEvent.v, k: nextEvent.k, tone: 'info' as const },
           { v: String(open.length), k: 'tasks open' },
           ...(space === 'personal' && nextPay

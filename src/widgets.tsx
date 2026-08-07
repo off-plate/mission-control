@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import {
   MOCK_AGENDA,
   MOCK_CLAUDE,
@@ -10,7 +10,7 @@ import {
 } from './mock'
 import { useStore } from './store'
 import { goalCurrent, ON_TRACK_PCT, type SizeKey, type SpaceId, type WidgetType } from './types'
-import { fmtDuration, fmtNum, fmtTimeShort, goalPace, localDateKey } from './util'
+import { fmtDuration, fmtNum, fmtTimeShort, goalPace, isoWeekKey, localDateKey } from './util'
 
 /** `fluid` makes the line span its container, so label rows underneath line up. */
 /* A pasted URL is an address, not prose: shown raw it swallowed two lines of a
@@ -192,6 +192,43 @@ const TasksBody = memo(function TasksBody({ space, size }: { space: SpaceId; siz
   )
 })
 
+/* The date and the time, as a thing on the page rather than a line in the
+   header. It reads the machine's own clock, so it is right by definition, and
+   it re-renders only when a shown value changes: a widget that repainted every
+   second next to a drag-and-drop grid is a cost with nothing to show for it. */
+function stamp() {
+  const d = new Date()
+  return {
+    time: d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+    day: d.toLocaleDateString('en-GB', { weekday: 'long' }),
+    date: d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }),
+    week: isoWeekKey().split('-W')[1],
+  }
+}
+
+const ClockBody = memo(function ClockBody() {
+  const [now, setNow] = useState(stamp)
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      setNow((prev) => {
+        const next = stamp()
+        return next.time === prev.time && next.date === prev.date ? prev : next
+      })
+    }, 1000)
+    return () => window.clearInterval(t)
+  }, [])
+  return (
+    <div className="clockw">
+      <span className="clockw-time">{now.time}</span>
+      <span className="clockw-day">{now.day}</span>
+      <span className="clockw-date">
+        {now.date}
+        <span className="clockw-week mono">week {now.week}</span>
+      </span>
+    </div>
+  )
+})
+
 const MailBody = memo(function MailBody() {
   return <div className="empty">Not connected yet. Gmail will feed this.</div>
 })
@@ -307,6 +344,7 @@ const SourcesBody = memo(function SourcesBody({ size }: { size: SizeKey }) {
 
 export function WidgetBody({ type, space, size }: { type: WidgetType; space: SpaceId; size: SizeKey }) {
   switch (type) {
+    case 'clock': return <ClockBody />
     case 'agenda': return <AgendaBody space={space} size={size} />
     case 'tasks': return <TasksBody space={space} size={size} />
     case 'mail': return <MailBody />

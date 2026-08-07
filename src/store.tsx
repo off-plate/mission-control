@@ -347,6 +347,22 @@ function loadPersisted(): PersistedState | null {
        the spaces that existed then, so a new one is filled from the defaults
        while every space he has arranged himself is handed back untouched. */
     if (p.spaces) p.spaces = { ...DEFAULT_SPACES, ...p.spaces }
+    /* The clock, asked for on 2026-08-07 as a widget in the grid rather than a
+       line in the header. His saved arrangement predates the widget, so it is
+       added once, first in every space, which is where he asked for it. If he
+       removes it later it stays removed: this runs once and never again. */
+    p.removedSeeds = p.removedSeeds ?? []
+    if (!p.removedSeeds.includes('fix:clock-widget')) {
+      p.removedSeeds.push('fix:clock-widget')
+      if (p.spaces) {
+        for (const key of Object.keys(p.spaces)) {
+          const list = p.spaces[key as SpaceId] ?? []
+          if (list.some((w) => w.type === 'clock')) continue
+          p.spaces[key as SpaceId] = [{ id: `clock-${key}`, type: 'clock' as const, size: 'S' as const }, ...list]
+        }
+      }
+    }
+
     /* One-time repair of focus blocks logged at the wrong length. While the
        timer read its length from the SETTING, a block started from a task was
        recorded at the setting's minutes, not the task's. The truth is still in

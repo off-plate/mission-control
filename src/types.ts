@@ -38,6 +38,7 @@ export type PageId =
   | 'day'
 
 export type WidgetType =
+  | 'clock'
   | 'agenda'
   | 'tasks'
   | 'mail'

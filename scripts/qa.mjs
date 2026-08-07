@@ -163,6 +163,81 @@ await step('today: the clock is a widget in the grid, and it says the real minut
   if (c.day !== c.realDay) throw new Error(`the widget reads ${c.day}, the browser says ${c.realDay}`)
   if (c.bandHasClock) throw new Error('the clock is still in the band as well')
 })
+await step('today: the day line, the numbers and the week are his own', async () => {
+  await fresh('today')
+  // Two blocks with known stamps, one task finished today, one pinned ahead.
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const d = new Date()
+    const key = (x) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+    const today = key(d)
+    const at = (h, m) => { const x = new Date(); x.setHours(h, m, 0, 0); return x.toISOString() }
+    s.focusSessions = [
+      { id: 'gate-f1', day: today, minutes: 30, space: 'personal', label: 'Gate block one', at: at(9, 30) },
+      { id: 'gate-f2', day: today, minutes: 45, space: 'personal', label: 'Gate block two', at: at(14, 45) },
+    ]
+    s.tasks = [
+      { id: 'gate-t1', title: 'Gate finished thing', source: 'mc', estimateMin: 20, done: true, doneAt: new Date().toISOString(), space: 'personal', list: 'today', category: 'admin', createdAt: today, plannedOn: today },
+      { id: 'gate-t2', title: 'Gate pinned thing', source: 'mc', estimateMin: 20, done: false, space: 'personal', list: 'today', category: 'admin', createdAt: today, plannedOn: today, at: '18:00' },
+    ]
+    localStorage.setItem(K, JSON.stringify(s))
+  }, KEY)
+  await page.reload(); await page.waitForTimeout(700)
+
+  const face = await page.evaluate(() => {
+    const track = document.querySelector('.dayline-track')?.getBoundingClientRect()
+    const blocks = [...document.querySelectorAll('.dayline-block')].map((el) => {
+      const r = el.getBoundingClientRect()
+      return { startMin: Math.round(((r.left - track.left) / track.width) * 1440), min: Math.round((r.width / track.width) * 1440) }
+    })
+    const nowEl = document.querySelector('.dayline-now')?.getBoundingClientRect()
+    const nums = [...document.querySelectorAll('.daynum')].map((el) => ({
+      v: el.querySelector('.v')?.textContent ?? '', k: el.querySelector('.k')?.textContent ?? '',
+    }))
+    const d = new Date()
+    return {
+      blocks,
+      nowMin: nowEl ? Math.round(((nowEl.left - track.left) / track.width) * 1440) : -1,
+      realNow: d.getHours() * 60 + d.getMinutes(),
+      sum: document.querySelector('.dayline-sum')?.textContent ?? '',
+      pins: document.querySelectorAll('.dayline-pin').length,
+      legend: document.querySelector('.dayline-legend')?.textContent ?? '',
+      nums,
+      days: [...document.querySelectorAll('.weekday')].map((el) => ({
+        label: el.querySelector('.weekday-num')?.textContent ?? '', today: el.classList.contains('is-today'),
+      })),
+      noClockLabel: !document.querySelector('.dayline-now-t'),
+    }
+  })
+
+  if (face.blocks.length !== 2) throw new Error(`${face.blocks.length} blocks drawn, not 2`)
+  // 09:30 finish less 30 minutes starts at 09:00 = minute 540; 14:45 less 45 = 14:00 = 840.
+  const starts = face.blocks.map((b) => b.startMin).sort((a, b) => a - b)
+  if (Math.abs(starts[0] - 540) > 12) throw new Error(`first block starts at minute ${starts[0]}, not 540`)
+  if (Math.abs(starts[1] - 840) > 12) throw new Error(`second block starts at minute ${starts[1]}, not 840`)
+  if (Math.abs(face.nowMin - face.realNow) > 12) throw new Error(`the now marker is at ${face.nowMin}, the clock says ${face.realNow}`)
+  if (!/1h 15m in 2 blocks/.test(face.sum)) throw new Error(`the line says "${face.sum}"`)
+  if (face.pins !== 1) throw new Error(`${face.pins} pins for one pinned task`)
+  if (!/18:00/.test(face.legend) || !/Gate pinned thing/.test(face.legend)) throw new Error('the pinned task is not named under the line')
+  if (!face.noClockLabel) throw new Error('the now marker prints a time the clock tile already shows')
+
+  if (face.nums.length !== 4) throw new Error(`${face.nums.length} numbers, not 4`)
+  if (face.nums[0].v !== '1h 15m') throw new Error(`focused reads ${face.nums[0].v}, not 1h 15m`)
+  if (!/^\d+\/\d+$/.test(face.nums[1].v)) throw new Error(`habits kept reads ${face.nums[1].v}`)
+  if (face.nums[2].v !== '1') throw new Error(`finished reads ${face.nums[2].v}, not 1`)
+
+  if (face.days.length !== 7) throw new Error(`${face.days.length} days in the week strip`)
+  if (!face.days[6].today) throw new Error('the last card in the strip is not today')
+  if (face.days.filter((d) => d.today).length !== 1) throw new Error('more than one day is marked today')
+
+  // A day card is a way into that day's record. The morning review offers
+  // itself over the top of the page, so it is answered first rather than
+  // swallowing the click.
+  const notNow = page.getByRole('button', { name: 'Not today' })
+  if (await notNow.count()) { await notNow.first().click(); await page.waitForTimeout(400) }
+  await page.locator('.weekday').first().click({ timeout: 5000 }); await page.waitForTimeout(500)
+  if (!/#\/day\/\d{4}-\d{2}-\d{2}/.test(page.url())) throw new Error(`a day card went to ${page.url()}`)
+})
 await step('today: the assistant rail is already open, and files what he says', async () => {
   await fresh('today')
   const rail = page.locator('.assist-rail')

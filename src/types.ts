@@ -440,6 +440,17 @@ function fmtMins(min: number): string {
 
 /** Days a week this habit is actually aiming for. The X/7 was a lie for
  *  anything that was never meant to happen seven days a week. */
+/** Does this habit ask anything of the given weekday (0 = Monday)? The Habits
+ *  page opens with this count and so does Today, so it lives in one place: two
+ *  copies of the rule is two answers to "what is still open today". */
+export function dueOn(h: HabitDef, weekdayIndex: number): boolean {
+  if (h.paused || h.kind === 'break') return false
+  if (h.frequency === 'weekdays' && weekdayIndex >= 5) return false
+  // Once a week or once a month, and already kept: nothing is due.
+  if ((h.frequency === 'weekly' || h.frequency === 'monthly') && h.days.some(Boolean)) return false
+  return true
+}
+
 export function habitTarget(h: HabitDef): number {
   if (h.frequency === 'weekdays') return 5
   if (h.frequency === 'weekly' || h.frequency === 'monthly') return 1

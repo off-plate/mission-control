@@ -2,7 +2,8 @@ import { Component, useEffect, useRef, useState, type ReactNode } from 'react'
 import { exceptionsFor, globalExceptions } from './exceptions'
 import { SPACE_LABELS } from './mock'
 import { GoalsPage, HabitsPage, PlanPage, RoutinesPage, TodayPage } from './pages1'
-import { MoneyPage, ReviewPage, SettingsPage } from './pages2'
+import { SettingsPage } from './pages2'
+import { AchievementsPage } from './achievements'
 import { NotesPage } from './notes'
 import { DailyReview } from './daily'
 import { BrandPage } from './brand'
@@ -58,19 +59,8 @@ const NAV: { id: PageId; label: string }[] = [
   { id: 'habits', label: 'Habits' },
   { id: 'routines', label: 'Routines' },
   { id: 'goals', label: 'Goals' },
-  { id: 'money', label: 'Money' },
-  { id: 'review', label: 'Reflect' },
-  { id: 'focus', label: 'Focus' },
-  { id: 'notes', label: 'Notes' },
   { id: 'board', label: 'Why’s' },
 ]
-
-/* Money is the one page that is not about the space you are standing in: it is
-   his debt, his ledger, his household. On a Big Time or Off-Plate screen it is
-   somebody else's business, so the tab is Personal and All only. Nothing is
-   lost by hiding it: money alerts still reach every space through
-   globalExceptions. */
-const PERSONAL_ONLY: PageId[] = ['money']
 
 function PageNav({
   tabs, page, setPage, attention,
@@ -108,13 +98,10 @@ export default function App() {
     ? exceptionsFor(space, { tasks, routines })
     : [...globalExceptions({ tasks, routines }), ...exceptionsFor(space, { tasks, routines })]
 
-  const moneyOk = view === 'personal' || view === 'all'
-  const tabs = moneyOk ? NAV : NAV.filter((t) => !PERSONAL_ONLY.includes(t.id))
-  /* Standing on a page that this space does not have leaves a blank screen and
-     no lit tab. Walk back to Today instead. */
-  useEffect(() => {
-    if (!moneyOk && PERSONAL_ONLY.includes(page)) setPage('today')
-  }, [moneyOk, page])
+  /* Every space now has every tab: Money left the menu for Achievements, which
+     is reached from the header and is his regardless of which space he happens
+     to be standing in. */
+  const tabs = NAV
 
   /* Signed out, nothing is backed up and the phone shows a different day. That is
      worth a mark on the gear rather than a banner across the top. */
@@ -164,6 +151,35 @@ export default function App() {
             </svg>
             My Mind
           </a>
+          {/* Notes, one click from any screen. It left the menu because he
+              reaches for it mid-thought, not by navigating to it. */}
+          <button
+            className={`btn btn-ghost${page === 'notes' ? ' is-on' : ''}`}
+            onClick={() => setPage('notes')}
+            aria-pressed={page === 'notes'}
+            title="Notes"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M5 3.5h9.5L19 8v12.5H5z" strokeLinejoin="round" />
+              <path d="M14 3.5V8h5M8.5 12.5h7M8.5 16h4.5" strokeLinecap="round" />
+            </svg>
+            Note
+          </button>
+          {/* Money and Reflect, merged. Both are about looking back at what
+              moved, so they are one destination and it lives up here. */}
+          <button
+            className={`btn btn-ghost${['achievements', 'money', 'review', 'stats'].includes(page) ? ' is-on' : ''}`}
+            onClick={() => setPage('achievements')}
+            aria-pressed={['achievements', 'money', 'review', 'stats'].includes(page)}
+            title="Achievements, money and reflection"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M7 3.5h10v5a5 5 0 0 1-10 0z" strokeLinejoin="round" />
+              <path d="M7 5H4.5v1.5A3.5 3.5 0 0 0 8 10M17 5h2.5v1.5A3.5 3.5 0 0 1 16 10" strokeLinecap="round" />
+              <path d="M12 13.5v3.5M9 20.5h6" strokeLinecap="round" />
+            </svg>
+            Achievements
+          </button>
           {/* Yesterday, on demand. It offers itself once a morning; after that
               it is his to open, from any page, without hunting for a pill. */}
           <button className="btn btn-ghost" onClick={openDaily} aria-label="Walk yesterday and today" title="Walk yesterday and today">
@@ -207,8 +223,10 @@ export default function App() {
         {page === 'habits' && <HabitsPage />}
         {page === 'routines' && <RoutinesPage />}
         {page === 'goals' && <GoalsPage />}
-        {page === 'money' && moneyOk && <MoneyPage />}
-        {(page === 'review' || page === 'stats') && <ReviewPage />}
+        {/* Money and Reflect are faces of Achievements now. Their old
+            addresses still resolve, so a bookmark lands on the merged page
+            rather than on nothing. */}
+        {(page === 'achievements' || page === 'money' || page === 'review' || page === 'stats') && <AchievementsPage />}
         {page === 'focus' && <FocusPage />}
         {page === 'board' && <BoardPage />}
         {page === 'notes' && <NotesPage />}

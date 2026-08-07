@@ -14,15 +14,14 @@ export function isSpace(v: ViewId): v is SpaceId {
 export const ON_TRACK_PCT = 50
 
 export type PageId =
+  | 'achievements'
   | 'today'
   | 'plan'
-  | 'assistant'
   | 'habits'
   | 'routines'
   | 'goals'
   | 'money'
   | 'review'
-  | 'coach'
   | 'stats'
   | 'settings'
   | 'brand'
@@ -30,7 +29,6 @@ export type PageId =
   /** The old address of the Brain Dump board. Kept so a bookmark still lands
    *  somewhere real: the route walks it to Notes. */
   | 'braindump'
-  | 'calendar'
   | 'board'
   /** Focus blocks: the history, and the ones he wants to fix. */
   | 'focus'

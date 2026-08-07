@@ -2905,6 +2905,70 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 @keyframes pomo-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
 .pomo-badge.await .pomo-phase { color: var(--progress); }
 
+/* ---------- Achievements: milestones, money and reflection in one place ----------
+   The segmented bar sits above the page it switches, so all three faces keep
+   their own band and nothing had to be rebuilt to merge them. */
+.achnav {
+  display: flex; gap: var(--s2); padding: var(--s4) var(--s5) 0;
+  max-width: 100%; overflow-x: auto; scrollbar-width: none;
+}
+.achnav::-webkit-scrollbar { display: none; }
+.achtab {
+  font-size: var(--text-sm); font-weight: 600; color: var(--muted);
+  padding: var(--s2) var(--s4); min-height: 34px; border-radius: 999px;
+  border: 1px solid var(--hairline-strong); background: transparent; cursor: pointer; white-space: nowrap;
+}
+.achtab:hover { color: var(--ink); border-color: var(--ink); }
+.achtab.on { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.achnav + .page { padding-top: var(--s4); }
+
+/* One thing crossed its line. The only celebration in the app, and it is
+   earned: it names the milestone and what did it. */
+.ms-landed {
+  display: flex; align-items: center; gap: var(--s4); margin-bottom: var(--s5);
+  padding: var(--s4) var(--s5);
+  border: 1px solid var(--progress); border-radius: var(--r-md);
+  background: var(--progress-wash);
+  animation: ms-land 260ms var(--ease) both;
+}
+@keyframes ms-land {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+.ms-landed-mark {
+  flex: none; width: 42px; height: 42px; border-radius: 50%;
+  display: grid; place-items: center; color: var(--bg); background: var(--progress);
+}
+.ms-landed-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ms-landed-copy strong { font-size: var(--text-base); }
+@media (prefers-reduced-motion: reduce) { .ms-landed { animation: none; } }
+
+.ms-next { margin-bottom: var(--s5); }
+.ms-next-row { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s5); margin-top: var(--s2); }
+.ms-next-item { display: flex; align-items: baseline; gap: var(--s2); font-size: var(--text-sm); }
+.ms-next-item .mono { color: var(--faint); font-size: var(--text-xs); }
+
+.ms-group { margin-bottom: var(--s5); }
+.ms-cards { display: grid; gap: var(--s3); grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .ms-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1600px) { .ms-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.ms-card {
+  display: flex; align-items: center; gap: var(--s3); min-width: 0;
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--hairline); border-radius: var(--r-md); background: var(--surface);
+}
+.ms-card.is-earned { border-color: var(--progress); background: var(--progress-wash); }
+.ms-card.is-unknown { opacity: 0.6; }
+.ms-mark { flex: none; width: 36px; height: 36px; display: grid; place-items: center; color: var(--accent); }
+.ms-card.is-earned .ms-mark { color: var(--progress); }
+.ms-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.ms-title { font-size: var(--text-sm); font-weight: 600; }
+.ms-hint { font-size: var(--text-xs); color: var(--muted); }
+.ms-fig { flex: none; font-size: var(--text-xs); color: var(--faint); white-space: nowrap; }
+.ms-card.is-earned .ms-fig { color: var(--progress); font-weight: 600; }
+.ms-unit { color: var(--faint); }
+.ms-foot { font-size: var(--text-xs); color: var(--faint); margin-top: var(--s5); }
+
 /* ---------- Today: the face of the day ----------
    Taken from a dashboard he sent: a band across the top, big numbers under it,
    a calendar strip. What that mockup fills them with is a purple gradient, a

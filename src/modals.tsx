@@ -6,11 +6,10 @@ import { breakdownTask, type Detail } from './ai'
 import { useStore } from './store'
 import { fmtDuration } from './util'
 
-export function Sheet({ title, onClose, children, note, steady }: {
+export function Sheet({ title, onClose, children, steady }: {
   title: string
   onClose: () => void
   children: ReactNode
-  note?: string
   /** Hold one height across every state of the form, so switching between kinds
    *  changes the questions rather than the size of the window asking them. */
   steady?: boolean
@@ -28,7 +27,6 @@ export function Sheet({ title, onClose, children, note, steady }: {
           <button className="close" onClick={onClose} aria-label="Close">×</button>
         </div>
         <div className={`sheet-body${steady ? ' is-steady' : ''}`}>{children}</div>
-        {note && <div className="demo-note">{note}</div>}
       </div>
     </div>
   )
@@ -96,16 +94,12 @@ export function BreakdownSheet({ task, onClose }: { task: Task; onClose: () => v
   const dropRow = (i: number) => setMine((prev) => prev.filter((_, k) => k !== i))
 
   return (
-    <Sheet
-      title="Break it down"
-      onClose={onClose}
-      /* No note when the model wrote them: the step list is the point, and a
-         line about which service produced it is not something he needs under
-         every breakdown. When it FAILED he still needs to know why, and what
-         to do about it, so that one stays. */
-      note={own || source === 'model' ? undefined : why}
-    >
+    <Sheet title="Break it down" onClose={onClose}>
       <p className="sheet-task">{task.title}</p>
+      {/* Only when it FAILED. A line naming the service that succeeded is not
+          something he needs under every breakdown; a line saying why these
+          steps are generic, and what to do about it, he does. */}
+      {!own && source !== 'model' && why && <p className="sheet-warn">{why}</p>}
 
       {/* How far down to break it. Some days the shape is enough; some days you
           need every single move spelled out. */}
@@ -128,7 +122,7 @@ export function BreakdownSheet({ task, onClose }: { task: Task; onClose: () => v
               <span className="n">{i + 1}</span>
               <input
                 ref={i === mine.length - 1 ? lastRow : undefined}
-                className="textinput grow" value={s.title} placeholder="What happens in this step"
+                className="textinput grow" value={s.title} placeholder="What happens in this step…"
                 aria-label={`Step ${i + 1}`}
                 onChange={(e) => editRow(i, { title: e.target.value })}
                 onKeyDown={(e) => {

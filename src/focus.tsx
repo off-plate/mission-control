@@ -32,10 +32,12 @@ function Row({ f }: { f: FocusSession }) {
   if (editing) {
     return (
       <div className="focus-row is-editing">
-        <input className="textinput focus-label" value={label} placeholder="What was it for?" autoFocus
+        <input className="textinput focus-label" value={label} placeholder="What was it for…" autoFocus
+          aria-label="What this block was for" autoComplete="off"
           onChange={(e) => setLabel(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }} />
-        <input className="textinput focus-min mono" type="number" min={1} max={600} value={mins}
+        <input className="textinput focus-min mono" type="number" inputMode="numeric" min={1} max={600} value={mins}
+          aria-label="How many minutes it ran"
           onChange={(e) => setMins(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') save() }} />
         <button className="btn btn-primary focus-btn" onClick={save}>Save</button>

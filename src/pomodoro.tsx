@@ -278,9 +278,10 @@ function FocusDoneModal() {
   return (
     <div className="pomo-done-veil" role="dialog" aria-modal="true" aria-label="Focus finished">
       <div className="pomo-done">
-        <span className="pomo-done-kicker mono">focus finished</span>
-        <h2>{p.focusLabel ?? 'Focus block'}</h2>
-        <p>{p.blockMin} minutes, banked. What now?</p>
+        {/* The event is the heading. It used to be an eyebrow over the task
+            name, which is the one shape the house rules forbid outright. */}
+        <h2>Focus finished</h2>
+        <p>{p.focusLabel ? `${p.focusLabel}, ` : ''}{p.blockMin} minutes, banked. What now?</p>
         <div className="pomo-done-actions">
           <button className="btn btn-primary" onClick={p.startBreak}>Take the {p.breakMin}m break</button>
           <button className="btn btn-ghost" onClick={() => p.extend(10)}>10 more minutes</button>

@@ -729,7 +729,7 @@ export function ReviewPage() {
               <input key={i} className="textinput" style={{ marginBottom: 8, width: '100%' }} placeholder={`Win ${i + 1}`} value={w} onChange={(e) => setW(i, e.target.value)} aria-label={`Win ${i + 1}`} />
             ))}
             <h4 className="checkup-q">{spanDays > 60 ? 'Is this still what you want?' : spanDays > 10 ? 'What do you stop doing?' : 'What got in the way?'}</h4>
-            <input className="textinput" style={{ width: '100%' }} placeholder="One honest note" value={changed} onChange={(e) => setChanged(e.target.value)} aria-label="What to change" />
+            <input className="textinput" style={{ width: '100%' }} placeholder="One honest note…" value={changed} onChange={(e) => setChanged(e.target.value)} aria-label="What to change" />
           </div>
           <div className="checkup-col">
             <h4 className="checkup-q">Three outcomes for next time</h4>
@@ -879,7 +879,7 @@ function AiKeyField() {
       </div>
       <div className="formrow" style={{ marginTop: 'var(--s2)', marginBottom: 0 }}>
         <input
-          className="textinput grow" type="password" placeholder="gsk_..." value={key}
+          className="textinput grow" type="password" placeholder="gsk_…" value={key}
           onChange={(e) => { setKey(e.target.value); setSaved(false) }}
           aria-label="Groq API key"
         />

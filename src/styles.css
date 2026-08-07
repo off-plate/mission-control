@@ -2905,6 +2905,27 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 @keyframes pomo-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
 .pomo-badge.await .pomo-phase { color: var(--progress); }
 
+/* ---------- the clock widget ----------
+   The time carries the widget, so it is set at display size with tabular
+   figures; nothing under it repeats what it already says. */
+/* The shelf sets one height for every tile on its row, so a one-cell clock
+   beside a two-cell list is a tall box. The time sits in the middle of it on
+   purpose rather than clinging to the top with 200px of nothing below. */
+.clockw { display: flex; flex-direction: column; gap: 2px; height: 100%; justify-content: center; }
+.clockw-time {
+  font-size: clamp(2.25rem, 4.5vw, 3rem); font-weight: 700; line-height: 1;
+  letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--ink);
+}
+.clockw-day { font-size: var(--text-base); font-weight: 600; color: var(--ink); margin-top: var(--s2); }
+.clockw-date {
+  display: flex; align-items: baseline; gap: var(--s2); flex-wrap: wrap;
+  font-size: var(--text-sm); color: var(--muted);
+}
+.clockw-week {
+  font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint);
+  border-left: 1px solid var(--hairline-strong); padding-left: var(--s2);
+}
+
 /* ---------- focus history ---------- */
 .focus-row { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) 0; border-top: 1px solid var(--hairline); }
 .focus-row:first-child { border-top: none; }
@@ -2916,9 +2937,17 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .focus-min { flex: 0 0 76px; width: 76px; min-height: 34px; }
 .focus-day { flex: 0 0 160px; width: 160px; min-height: 34px; }
 .focus-btn { min-height: 34px; font-size: var(--text-xs); }
-/* A list of one-line rows is a reading column, not a dashboard: it stops where
-   the eye stops rather than running the width of a 27 inch screen. */
-.focus-page > * { max-width: 940px; margin-inline: auto; }
+/* The page takes the whole width it is given. What keeps the rows readable is
+   the column count, not a 940px cap on the page: past 1100px the days lay out
+   as cards side by side, so a 27 inch screen shows a week at once instead of
+   one narrow strip down the middle. */
+.focus-days > * { min-width: 0; }
+@media (min-width: 1100px) {
+  /* Columns, not a grid: days are different heights, and a grid leaves a hole
+     under every short one. Multi-column flows them so the columns end level. */
+  .focus-days { columns: 460px; column-gap: var(--s5); }
+  .focus-days > * { break-inside: avoid; margin-bottom: var(--s5); }
+}
 .focus-live { display: flex; align-items: center; gap: var(--s3); border-color: var(--progress); background: var(--progress-wash); }
 .focus-live.is-break { border-color: var(--info); background: var(--info-wash); }
 .focus-live.is-paused { border-color: var(--hairline-strong); background: var(--surface-2); }
@@ -2934,7 +2963,7 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
   .focus-live-what { flex: 1 0 100%; }
 }
 /* The break length, as a row of choices rather than a box to type in. */
-.focus-settings { display: flex; align-items: center; gap: var(--s3); max-width: 940px; margin: var(--s4) auto var(--s5); flex-wrap: wrap; }
+.focus-settings { display: flex; align-items: center; gap: var(--s3); margin: var(--s4) 0 var(--s5); flex-wrap: wrap; }
 .focus-steps { display: flex; gap: var(--s2); }
 .focus-step {
   font-family: var(--font-mono); font-size: 0.75rem; min-height: 30px; padding: 2px 10px;
@@ -2943,8 +2972,8 @@ button.est-chip { background: none; border: 1px solid var(--hairline-strong); }
 .focus-step:hover { border-color: var(--accent); color: var(--accent); }
 .focus-step.on { border-color: var(--ink); background: var(--ink); color: var(--bg); }
 
-/* ---------- calendar ---------- */
-/* Two columns of plan now that the schedule lives on Calendar. */
+/* ---------- the day column on Plan ---------- */
+/* Two columns: the list, and the day beside it. */
 .plan-two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 /* the record, drawn on the clock */
 .vev-done { border-left: 3px solid var(--progress); background: var(--progress-wash); }

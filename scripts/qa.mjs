@@ -138,23 +138,30 @@ await step('the dropped pages are gone, and their old addresses land on Today', 
   }
   if (await page.getByRole('button', { name: 'Assistant' }).count()) throw new Error('the header still has an Assistant button')
 })
-await step('today: the clock says the real minute, and the real date', async () => {
+await step('today: the clock is a widget in the grid, and it says the real minute', async () => {
   await fresh('today')
-  const shown = await page.evaluate(() => {
-    const m = [...document.querySelectorAll('.band-metric')].map((el) => ({
-      v: el.querySelector('.v')?.textContent ?? '', k: el.querySelector('.k')?.textContent ?? '',
-    }))
+  const c = await page.evaluate(() => {
+    const w = document.querySelector('.clockw')
+    if (!w) return null
+    const frame = w.closest('.widget')?.getBoundingClientRect()
+    const grid = document.querySelector('.react-grid-layout')?.getBoundingClientRect()
     const d = new Date()
     return {
-      m,
-      time: d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
-      date: d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }),
+      time: w.querySelector('.clockw-time')?.textContent ?? '',
+      day: w.querySelector('.clockw-day')?.textContent ?? '',
+      inGrid: !!frame && !!grid && frame.top >= grid.top - 1,
+      leftmost: !!frame && !!grid && Math.round(frame.left - grid.left) < 8,
+      realTime: d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+      realDay: d.toLocaleDateString('en-GB', { weekday: 'long' }),
+      bandHasClock: [...document.querySelectorAll('.band-metric .v')].some((el) => /^\d{2}:\d{2}$/.test(el.textContent ?? '')),
     }
   })
-  const clock = shown.m.find((x) => /^\d{2}:\d{2}$/.test(x.v))
-  if (!clock) throw new Error(`no clock in the band: ${JSON.stringify(shown.m)}`)
-  if (clock.v !== shown.time) throw new Error(`clock reads ${clock.v}, the browser says ${shown.time}`)
-  if (clock.k !== shown.date) throw new Error(`date reads ${clock.k}, the browser says ${shown.date}`)
+  if (!c) throw new Error('there is no clock widget on Today')
+  if (!c.inGrid) throw new Error('the clock is not inside the widget grid')
+  if (!c.leftmost) throw new Error('the clock is not at the left of the grid')
+  if (c.time !== c.realTime) throw new Error(`the widget reads ${c.time}, the browser says ${c.realTime}`)
+  if (c.day !== c.realDay) throw new Error(`the widget reads ${c.day}, the browser says ${c.realDay}`)
+  if (c.bandHasClock) throw new Error('the clock is still in the band as well')
 })
 await step('today: the assistant rail is already open, and files what he says', async () => {
   await fresh('today')
@@ -176,6 +183,27 @@ await step('today: the assistant rail is already open, and files what he says', 
   if (!t) throw new Error('nothing was filed')
   if (t.estimateMin !== 20) throw new Error(`filed with ${t.estimateMin} minutes, not 20`)
   if (!(await rail.getByText('Just filed').count())) throw new Error('the rail does not show what it filed')
+})
+await step('focus: the page takes the width it is given', async () => {
+  // Self-calibrating: Plan is an ordinary full-width page at this viewport, so
+  // its box is what "full width" means here. No magic pixel count.
+  await fresh('plan')
+  const ref = await page.evaluate(() => {
+    const r = document.querySelector('.page')?.getBoundingClientRect()
+    return r ? { w: Math.round(r.width), l: Math.round(r.left) } : null
+  })
+  await fresh('focus')
+  const got = await page.evaluate(() => {
+    const p = document.querySelector('.focus-page')?.getBoundingClientRect()
+    const s = document.querySelector('.focus-settings')?.getBoundingClientRect()
+    const d = document.querySelector('.focus-days')?.getBoundingClientRect()
+    return p ? { w: Math.round(p.width), l: Math.round(p.left), sl: s ? Math.round(s.left - p.left) : 99, dw: d ? Math.round(d.width) : 0 } : null
+  })
+  if (!ref || !got) throw new Error('no geometry to compare')
+  if (Math.abs(got.w - ref.w) > 1) throw new Error(`focus is ${ref.w - got.w}px narrower than a normal page`)
+  if (Math.abs(got.l - ref.l) > 1) throw new Error('focus is indented from where a page starts')
+  if (got.sl > 2) throw new Error(`the break row starts ${got.sl}px in from the page edge`)
+  if (got.dw && Math.abs(got.dw - got.w) > 1) throw new Error('the day list does not use the page width')
 })
 await step('today: nothing to upload, and no camera left on the page', async () => {
   await fresh('today')

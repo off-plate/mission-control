@@ -14,155 +14,14 @@ import { estimateFor } from './estimate'
 import { estimateTask } from './ai'
 import { goalPeriodKey, goalPeriodRange, habitPeriodRange, periodIsPast, periodKeyFor, periodLabel, shiftPeriodKey, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForMoment, taskMinutes, toMin } from './util'
 
-/* ---------------- shared bits ---------------- */
+/* The shared primitives live in ui.tsx now, the app's one component location.
+   Imported and re-exported here so older call sites keep working while they are
+   moved over; new code imports from './ui'. */
+import { AutoTextarea, Band, Chip, Dropdown, Empty, SectionHead, Segmented, SpaceMark, WriteTo } from './ui'
+export { AutoTextarea, Band, Dropdown, SpaceMark, WriteTo }
 
-/* A field that grows with what you type, up to a ceiling, then scrolls. Dragging
-   a resize grip to see your own sentence is not a thing anyone should be doing. */
-export function AutoTextarea({
-  value, minRows = 3, maxRows = 18, className = '', onChange, ...rest
-}: Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'rows'> & {
-  value: string
-  minRows?: number
-  maxRows?: number
-}) {
-  const ref = useRef<HTMLTextAreaElement>(null)
-
-  useLayoutEffect(() => {
-    const el = ref.current
-    if (!el) return
-    el.style.height = 'auto'
-    const cs = getComputedStyle(el)
-    const line = parseFloat(cs.lineHeight) || 20
-    const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
-    const max = line * maxRows + pad
-    el.style.height = `${Math.min(el.scrollHeight, max)}px`
-    el.style.overflowY = el.scrollHeight > max ? 'auto' : 'hidden'
-  }, [value, maxRows])
-
-  return (
-    <textarea
-      {...rest}
-      ref={ref}
-      className={`autogrow ${className}`.trim()}
-      rows={minRows}
-      value={value}
-      onChange={onChange}
-    />
-  )
-}
-
-/* A dropdown that opens upward when there is no room below it. Menus near the
-   bottom of the page were opening off-screen with no way to reach the items. */
-export function Dropdown({ label, children, className = '' }: { label: string; children: React.ReactNode; className?: string }) {
-  const [open, setOpen] = useState(false)
-  const [up, setUp] = useState(false)
-  const ref = useRef<HTMLSpanElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const btn = ref.current?.getBoundingClientRect()
-    const menu = ref.current?.querySelector('.kebab-menu') as HTMLElement | null
-    if (btn && menu) {
-      const need = menu.offsetHeight + 12
-      setUp(btn.bottom + need > window.innerHeight && btn.top > need)
-    }
-    const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
-    document.addEventListener('mousedown', close)
-    document.addEventListener('keydown', esc)
-    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc) }
-  }, [open])
-
-  return (
-    <span className={`kebab-wrap ${className}`} ref={ref}>
-      {/* Drawn, not typed. The midline-ellipsis character sits wherever the
-          font puts it, which is why it never looked centred in a circle. */}
-      <button className="kebab" aria-label={label} aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <circle cx="5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="19" cy="12" r="1.7" />
-        </svg>
-      </button>
-      {open && (
-        <div className={`kebab-menu${up ? ' opens-up' : ''}`} role="menu" onClick={() => setOpen(false)}>
-          {children}
-        </div>
-      )}
-    </span>
-  )
-}
-
-/* No `sub`. A page title does not get a subtitle restating it.
-   See DESIGN.md, "No subtitles". */
-
-/* WHICH ROOM THIS CAME FROM.
-   Only shown in All, where a row could be from any of the three. Two channels,
-   because one of them cannot carry it alone: the three space hues measure
-   between 3.7:1 and 4.4:1 on these surfaces, under the 4.5:1 a coloured word
-   would need, so the hue is a 3px rule (which needs 3:1, and all three clear it)
-   and the letter beside it is neutral --muted at 7.5:1. Colour is never the only
-   thing saying it. The rule runs the full height of its row, so three Work rows
-   in a row read as one navy stripe rather than three ticks. */
-/** In All, a new thing has to land somewhere. This says where, next to the
- *  button that commits it, rather than as a field somewhere else on the page. */
-export function WriteTo() {
-  const { view, space, setSpace } = useStore()
-  if (view !== 'all') return null
-  return (
-    <select
-      className="textinput writeto" value={space} aria-label="Which profile this goes to"
-      onChange={(e) => setSpace(e.target.value as SpaceId)}
-    >
-      {/* It sits where a filter sits and it is not one: it decides where a NEW
-          thing gets written. Saying so in the option is cheaper than teaching
-          him that "All" up top and "Personal" here are not contradicting each
-          other. */}
-      {(Object.keys(SPACE_LABELS) as SpaceId[]).map((s) => (
-        <option key={s} value={s}>Add to {SPACE_LABELS[s]}</option>
-      ))}
-    </select>
-  )
-}
-
-/** `always` is for a page that mixes workspaces even inside one workspace, like
- *  Routines: there the colour and the letter are the only thing telling two
- *  cards apart, so they cannot be tied to the All view. */
-export function SpaceMark({ space, always }: { space?: SpaceId; always?: boolean }) {
-  const { view } = useStore()
-  if ((view !== 'all' && !always) || !space) return null
-  return (
-    <span className={`spacemark s-${space}`}>
-      <i aria-hidden="true" />
-      <b aria-hidden="true">{SPACE_LABELS[space][0]}</b>
-      <span className="visually-hidden">{SPACE_LABELS[space]}</span>
-    </span>
-  )
-}
-
-export function Band({
-  title, metrics, actions,
-}: {
-  title: string
-  metrics?: { v: string; k: string; tone?: 'pos' | 'urgent' | 'info' }[]
-  actions?: React.ReactNode
-}) {
-  return (
-    <div className="band">
-      <div className="band-day">
-        <h1>{title}</h1>
-      </div>
-      <div className="band-status">
-        {metrics?.map((m) => (
-          <div className="band-metric" key={m.k}>
-            <span className={`v${m.tone ? ' val-' + m.tone : ''}`}>{m.v}</span>
-            <span className="k">{m.k}</span>
-          </div>
-        ))}
-        {actions && <div className="band-actions">{actions}</div>}
-      </div>
-    </div>
-  )
-}
-
+/* Page helpers, not primitives: these read the mock agenda and this app's own
+   idea of what "yesterday" means, so they belong to the pages that ask. */
 function useNextEvent(space: string): { v: string; k: string } {
   const [, tick] = useState(0)
   useEffect(() => {
@@ -203,6 +62,7 @@ const shortDay = (key: string): string => {
   const [y, m, d] = key.split('-').map(Number)
   return new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
 }
+
 
 /* ---------------- TODAY ---------------- */
 
@@ -327,7 +187,7 @@ export function TodayPage() {
             <div className="firstmove">
               <span className="microcap fm-label">First move</span>
               <span className="fm-title">{firstMove.title}</span>
-              {isEstimated(firstMove) && firstMove.estimateMin > 0 && <span className="est-chip">{fmtDuration(firstMove.estimateMin)}</span>}
+              {isEstimated(firstMove) && firstMove.estimateMin > 0 && <span className="chip tone-info">{fmtDuration(firstMove.estimateMin)}</span>}
               {/* Start means start: the clock begins on this task for its own
                   estimate, and Plan opens with it highlighted. A button that
                   said Start and only navigated was the first lie of the day. */}
@@ -580,7 +440,7 @@ function SubtaskRow({ taskId, sub }: { taskId: string; sub: SubTask }) {
     <div className={`subtask-row${sub.done ? ' is-done' : ''}`}>
       <span className="sub-tick" aria-hidden="true" />
       <span className="grow" style={{ fontSize: 'var(--text-sm)' }}><Linkify text={sub.title} /></span>
-      <span className="est-chip">{sub.done && sub.actualMin != null ? `${fmtDuration(sub.actualMin)} taken` : fmtDuration(sub.estimateMin)}</span>
+      <span className="chip tone-info">{sub.done && sub.actualMin != null ? `${fmtDuration(sub.actualMin)} taken` : fmtDuration(sub.estimateMin)}</span>
       <span className="sub-tools">
         <button className="sub-tool" aria-label={`Edit step: ${sub.title}`} onClick={() => setEditing(true)}>Edit</button>
         <button className="sub-tool" aria-label={`Remove step: ${sub.title}`} onClick={() => deleteSubtask(taskId, sub.id)}>Remove</button>
@@ -671,10 +531,10 @@ function EstimateChip({ task }: { task: Task }) {
       />
     )
   }
-  if (fromSteps) return <span className="est-chip" title="Comes from the steps">{fmtDuration(mins)}</span>
+  if (fromSteps) return <span className="chip tone-info" title="Comes from the steps">{fmtDuration(mins)}</span>
   return (
     <button
-      className={`est-chip est-edit${isEstimated(task) ? '' : ' is-none'}`}
+      className={`chip tone-info est-edit${isEstimated(task) ? '' : ' is-none'}`}
       title="Click to set the minutes yourself"
       aria-label={isEstimated(task) ? `${mins} minutes, click to change` : `No estimate, click to set one`}
       onClick={() => { setVal(isEstimated(task) ? String(mins) : ''); setEditing(true) }}
@@ -1262,7 +1122,7 @@ export function PlanPage() {
                     : <span className="tot mono">{fmtDuration(tot)}</span>)}
                 </button>
                 {shut ? null : items.length === 0 ? (
-                  <p className="bucket-empty">Drop a task here.</p>
+                  <p className="empty is-boxed">Drop a task here.</p>
                 ) : (
                   items.map((it) => {
                     if (it.kind === 'repeat') {
@@ -1358,7 +1218,7 @@ export function PlanPage() {
                                   {s.done && s.actualMin != null ? (
                                     <span className="est-vs-actual mono">{fmtDuration(s.estimateMin)} → {fmtDuration(s.actualMin)} <b className={s.estimateMin - s.actualMin >= 0 ? 'val-pos' : 'val-urgent'}>{s.estimateMin - s.actualMin >= 0 ? '+' : ''}{s.estimateMin - s.actualMin}m</b></span>
                                   ) : (
-                                    <span className="est-chip">{fmtDuration(s.estimateMin)}</span>
+                                    <span className="chip tone-info">{fmtDuration(s.estimateMin)}</span>
                                   )}
                                 </button>
                                 {!s.done && (
@@ -1411,8 +1271,8 @@ export function PlanPage() {
                   {t.actualMin != null
                     ? <span className="est-vs-actual mono">{fmtDuration(taskMinutes(t))} → {fmtDuration(t.actualMin)}</span>
                     : isEstimated(t)
-                      ? <span className="est-chip">{fmtDuration(taskMinutes(t))}</span>
-                      : <span className="est-chip is-none">no estimate</span>}
+                      ? <span className="chip tone-info">{fmtDuration(taskMinutes(t))}</span>
+                      : <span className="chip tone-info is-none">no estimate</span>}
                 </div>
               ))}
             </div>
@@ -1890,17 +1750,16 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
         </p>
       )}
       <span className="field-label">Which kind is this?</span>
-      <div className="kindpick three">
-        <button type="button" className={kind === 'build' ? 'on' : ''} disabled={locked} onClick={() => setKind('build')}>
-          <b>Keep</b><span>Something you want to do</span>
-        </button>
-        <button type="button" className={kind === 'break' ? 'on' : ''} disabled={locked} onClick={() => setKind('break')}>
-          <b>Quit</b><span>Something you want to stop</span>
-        </button>
-        <button type="button" className={kind === 'measured' ? 'on' : ''} disabled={locked} onClick={() => setKind('measured')}>
-          <b>Amount</b><span>A number to hit, in times or minutes</span>
-        </button>
-      </div>
+      <Segmented
+        label="Which kind is this?"
+        value={kind}
+        options={[
+          { id: 'build', label: 'Keep', hint: 'Something you want to do', disabled: locked },
+          { id: 'break', label: 'Quit', hint: 'Something you want to stop', disabled: locked },
+          { id: 'measured', label: 'Amount', hint: 'A number to hit, in times or minutes', disabled: locked },
+        ]}
+        onPick={(id) => setKind(id as HabitKind)}
+      />
 
       <label className="field-label" style={{ marginTop: 'var(--s4)' }} htmlFor="hname">
         {quitting ? 'What are you quitting?' : measured ? 'What are you measuring?' : 'What is the habit?'}
@@ -3071,7 +2930,7 @@ export function GoalsPage() {
                   </div>
                 )
               })}
-              {inTf.length === 0 && <p className="bucket-empty">No goals here yet.</p>}
+              {inTf.length === 0 && <p className="empty is-boxed">No goals here yet.</p>}
               <PeriodTasks tf={tfr.id} periodKey={shownKey} />
             </div>
           )
@@ -3082,7 +2941,7 @@ export function GoalsPage() {
           any of them can be set again for the period we are in now. */}
       {past.length > 0 && (
         <>
-          <div className="section-head" style={{ marginTop: 'var(--s6)' }}>
+          <div className="sechead" style={{ marginTop: 'var(--s6)' }}>
             <span className="microcap">Finished periods</span>
             <span className="section-count mono">{past.length}</span>
           </div>

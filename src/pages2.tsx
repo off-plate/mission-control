@@ -132,7 +132,7 @@ export function MoneyPage() {
    label and added nothing you could act on. See DESIGN.md, "No subtitles". */
 function SecHead({ label }: { label: string }) {
   return (
-    <div className="review-sec">
+    <div className="sechead">
       <span className="microcap">{label}</span>
     </div>
   )
@@ -664,7 +664,7 @@ export function ReviewPage() {
                 <SpaceMark space={e.space} />
                 <span className="mono" style={{ color: 'var(--faint)', fontSize: 'var(--text-xs)', minWidth: '3ch' }}>{fmtWhen(e.when)}</span>
                 <span className="ledger-title">{e.title}</span>
-                <span className="src-tag">{e.category}</span>
+                <span className="chip tone-info is-src">{e.category}</span>
                 <span className="mono" style={{ color: 'var(--muted)', fontSize: 'var(--text-xs)' }}>{fmtDuration(e.estimateMin)} → {fmtDuration(e.actualMin)}</span>
                 <span className={`delta ${d >= 0 ? 'saved' : 'over'}`}>{d >= 0 ? `+${d}m` : `${-d}m over`}</span>
               </div>
@@ -914,8 +914,8 @@ export function SettingsPage() {
                   started counting a fantasy as "1 of 6 live". A source becomes
                   a switch the day a real connect flow exists behind it. */}
               {s.status === 'manual'
-                ? <span className="src-tag">manual</span>
-                : <span className="src-tag">{s.status === 'connected' ? 'live' : 'not connected'}</span>}
+                ? <span className="chip tone-info is-src">manual</span>
+                : <span className="chip tone-info is-src">{s.status === 'connected' ? 'live' : 'not connected'}</span>}
             </div>
           ))}
 

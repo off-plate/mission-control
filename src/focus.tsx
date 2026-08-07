@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
-import { Band } from './pages1'
+import { Band, Segmented } from './ui'
 import { Linkify } from './widgets'
 import { fmtDuration, fmtWhen, localDateKey } from './util'
 import type { FocusSession } from './types'
@@ -48,7 +48,7 @@ function Row({ f }: { f: FocusSession }) {
     <div className="focus-row">
       <span className="grow"><Linkify text={f.label ?? 'Focus block'} /></span>
       {clock(f.at) && <span className="focus-at mono">{clock(f.at)}</span>}
-      <span className="est-chip">{fmtDuration(f.minutes)}</span>
+      <span className="chip tone-info">{fmtDuration(f.minutes)}</span>
       <span className="sub-tools">
         <button className="sub-tool" onClick={() => setEditing(true)} aria-label={`Edit this ${f.minutes} minute block`}>Edit</button>
         <button className="sub-tool" onClick={() => deleteFocus(f.id)} aria-label={`Remove this ${f.minutes} minute block`}>Remove</button>
@@ -99,14 +99,13 @@ export function FocusPage() {
       {/* The one number no task can supply. */}
       <div className="focus-settings">
         <span className="microcap">Break after each block</span>
-        <span className="focus-steps">
-          {[3, 5, 10, 15, 20].map((n) => (
-            <button key={n} className={`focus-step${pomo.breakMin === n ? ' on' : ''}`}
-              aria-pressed={pomo.breakMin === n} onClick={() => pomo.setBreakMin(n)}>
-              {n}m
-            </button>
-          ))}
-        </span>
+        <Segmented
+          label="Break after each block"
+          size="sm"
+          value={String(pomo.breakMin)}
+          options={[3, 5, 10, 15, 20].map((n) => ({ id: String(n), label: `${n}m` }))}
+          onPick={(id) => pomo.setBreakMin(Number(id))}
+        />
       </div>
 
       {days.length === 0 && <div className="empty">No focus blocks yet. Start one from a task and it lands here.</div>}
@@ -117,7 +116,7 @@ export function FocusPage() {
         const total = list.reduce((a, f) => a + f.minutes, 0)
         return (
           <section className="habit-section" key={d}>
-            <div className="section-head">
+            <div className="sechead">
               <span className="microcap">{fmtWhen(d)}</span>
               <span className="section-count mono">{fmtDuration(total)}</span>
             </div>

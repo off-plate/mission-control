@@ -1,3 +1,4 @@
+import { Segmented } from './ui'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { fakeDecompose, type DecomposedStep } from './mock'
 import { BUFFER } from './estimate'
@@ -103,15 +104,19 @@ export function BreakdownSheet({ task, onClose }: { task: Task; onClose: () => v
 
       {/* How far down to break it. Some days the shape is enough; some days you
           need every single move spelled out. */}
-      <div className="seg detail-seg" role="group" aria-label="How detailed">
-        {(['light', 'normal', 'deep'] as Detail[]).map((d) => (
-          <button key={d} aria-pressed={mode === d} onClick={() => setMode(d)}>
-            {d === 'light' ? 'Just the shape' : d === 'normal' ? 'Normal' : 'Every move'}
-          </button>
-        ))}
-        {/* His own list. Nothing is asked of a model in this mode. */}
-        <button aria-pressed={own} onClick={toCustom}>Mine</button>
-      </div>
+      {/* "Mine" is his own list: nothing is asked of a model in that mode. */}
+      <Segmented
+        label="How detailed"
+        className="detail-seg"
+        value={own ? 'own' : mode}
+        options={[
+          { id: 'light', label: 'Just the shape' },
+          { id: 'normal', label: 'Normal' },
+          { id: 'deep', label: 'Every move' },
+          { id: 'own', label: 'Mine' },
+        ]}
+        onPick={(id: string) => (id === 'own' ? toCustom() : setMode(id as Detail))}
+      />
 
       {busy && !own && <div className="empty" style={{ paddingTop: 24 }} aria-live="polite">Reading this task and working out the steps.</div>}
 
@@ -154,7 +159,7 @@ export function BreakdownSheet({ task, onClose }: { task: Task; onClose: () => v
                 {s.title}
                 {s.why && <span className="why">{s.why}</span>}
               </span>
-              <span className="est-chip">{fmtDuration(s.estimateMin)}</span>
+              <span className="chip tone-info">{fmtDuration(s.estimateMin)}</span>
             </div>
           ))}
           {source === 'local' && (

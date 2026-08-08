@@ -1,16 +1,19 @@
-/* THE ZONE. Full screen, header still reachable above it, for the one thing
-   you are doing right now and nothing else that lives in the rest of the app.
+/* THE ZONE. Full screen, header still reachable above it: a dashboard for the
+   one thing running right now, built out of the same widget he already
+   knows from Today rather than a bespoke "calm room" look of its own. His
+   words, after the first version: "I told you to create widgets. Inspire
+   yourself by today's section... it's supposed to be full screen dashboard."
 
-   Four pieces, all fed by things the app already tracks: what is running (the
-   same pomodoro state Today and Focus read), the date and time (the same
-   clock the widget shows), a note with nowhere to file it but forward, and
-   Mundi Opus playing underneath. First pass, on his own words: "let's start
-   with that and see what you can do." */
+   Four tiles, all fed by things the app already tracks: what is running (the
+   same pomodoro state Today and Focus read), the date and time (literally
+   the same ClockBody widget Today renders, not a smaller copy of it), a note
+   with nowhere to file it but forward, and Mundi Opus playing underneath. */
 
-import { useEffect, useRef, useState } from 'react'
-import { AutoTextarea, useClockStamp, useFirstMove } from './ui'
+import { useEffect, useState, type ReactNode } from 'react'
+import { AutoTextarea, useFirstMove } from './ui'
 import { usePomodoro } from './pomodoro'
 import { ZonePlayer } from './zoneplayer'
+import { ClockBody } from './widgets'
 import { useStore } from './store'
 import { fmtDuration, isEstimated, taskMinutes } from './util'
 import { SPACE_LABELS } from './mock'
@@ -18,13 +21,15 @@ import { spaceFolderId } from './types'
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`
 
-function ZoneClock() {
-  const now = useClockStamp()
+/* The same tile chrome every widget on Today wears: surface fill, hairline
+   border, a title row. Reused directly, not reinvented, so the room reads as
+   one system with the rest of the app instead of its own separate style. */
+function ZoneTile({ title, className = '', children }: { title: string; className?: string; children: ReactNode }) {
   return (
-    <div className="zclock">
-      <span className="zclock-time">{now.time}</span>
-      <span className="zclock-date">{now.day}, {now.date}</span>
-    </div>
+    <section className={`widget zw-tile ${className}`}>
+      <header className="widget-head"><span className="widget-title">{title}</span></header>
+      <div className="widget-body zw-body">{children}</div>
+    </section>
   )
 }
 
@@ -104,21 +109,19 @@ function ZoneNote() {
 
   const [noteId, setNoteId] = useState<string | null>(null)
   const [body, setBody] = useState('')
-  const taRef = useRef<HTMLTextAreaElement>(null)
 
   const onChange = (v: string) => {
     setBody(v)
     if (noteId) { updateNote(noteId, { body: v }); return }
     if (v.trim()) setNoteId(addNote(folderId, v))
   }
-  const fresh = () => { setNoteId(null); setBody(''); taRef.current?.focus() }
+  const fresh = () => { setNoteId(null); setBody('') }
 
   return (
     <div className="znote">
       <div className="znote-head">
-        <span className="microcap">Note</span>
         <select
-          className="znote-folder"
+          className="textinput znote-folder"
           value={folderId}
           onChange={(e) => { setFolderId(e.target.value); fresh() }}
           aria-label="Folder this note is saved to"
@@ -132,7 +135,7 @@ function ZoneNote() {
         value={body}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Whatever is worth keeping from this block…"
-        minRows={6}
+        minRows={4}
         maxRows={40}
         aria-label="Zone note"
       />
@@ -142,21 +145,11 @@ function ZoneNote() {
 
 export function ZonePage() {
   return (
-    <div className="zonepage">
-      {/* The one dominant object in the room, actually centered in whatever
-          screen it is given rather than stranded in a corner of it. The clock
-          sits apart from it on purpose: ambient context, not a second number
-          competing with the countdown for the same glance. */}
-      <div className="zone-hero">
-        <ZoneTask />
-      </div>
-      <ZoneClock />
-      {/* A bare dock along the bottom edge, not a pair of cards: nothing here
-          is trying to look like a panel from the rest of the app. */}
-      <div className="zone-dock">
-        <ZoneNote />
-        <ZonePlayer />
-      </div>
+    <div className="zonepage zw-grid">
+      <ZoneTile title="Now" className="zw-now"><ZoneTask /></ZoneTile>
+      <ZoneTile title="Clock" className="zw-clock"><ClockBody /></ZoneTile>
+      <ZoneTile title="Note" className="zw-note-tile"><ZoneNote /></ZoneTile>
+      <ZoneTile title="Mundi Opus" className="zw-player-tile"><ZonePlayer /></ZoneTile>
     </div>
   )
 }

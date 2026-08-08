@@ -377,23 +377,45 @@ export function goalPace(
   target: number,
   timeframe: 'weekly' | 'monthly' | 'quarter' | 'half' = 'quarter',
   now = new Date(),
+  /** True for a goal that counts DAYS (kept, clean, checked in) rather than a
+   *  continuous amount: it can never gain more than one a day, no matter how
+   *  hard the day is worked. "No lust", 28 of them needed with 23 days left
+   *  in the month, read as on pace, because the ratio test below assumes any
+   *  goal can be caught up by trying harder on a single day. A day-count goal
+   *  cannot: there is a hard ceiling on how many are even left to earn. */
+  dailyCap = false,
 ): 'done' | 'ontrack' | 'behind' {
   if (target <= 0 || current >= target) return current >= target ? 'done' : 'ontrack'
-  const elapsed = (() => {
-    if (timeframe === 'weekly') return (((now.getDay() + 6) % 7) + 1) / 7
-    if (timeframe === 'monthly') {
-      const days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-      return now.getDate() / days
-    }
-    if (timeframe === 'quarter') {
-      const qStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1)
-      const qEnd = new Date(qStart.getFullYear(), qStart.getMonth() + 3, 0)
-      return (now.getTime() - qStart.getTime()) / (qEnd.getTime() - qStart.getTime())
-    }
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const daysUntil = (end: Date) => Math.round((startOfDay(end).getTime() - startOfDay(now).getTime()) / 86400000) + 1
+
+  let elapsed: number
+  let daysLeft: number
+  if (timeframe === 'weekly') {
+    const dayIdx = (now.getDay() + 6) % 7
+    elapsed = (dayIdx + 1) / 7
+    daysLeft = 7 - dayIdx
+  } else if (timeframe === 'monthly') {
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+    elapsed = now.getDate() / daysInMonth
+    daysLeft = daysInMonth - now.getDate() + 1
+  } else if (timeframe === 'quarter') {
+    const qStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1)
+    const qEnd = new Date(qStart.getFullYear(), qStart.getMonth() + 3, 0)
+    elapsed = (now.getTime() - qStart.getTime()) / (qEnd.getTime() - qStart.getTime())
+    daysLeft = daysUntil(qEnd)
+  } else {
     const hStart = new Date(now.getFullYear(), now.getMonth() < 6 ? 0 : 6, 1)
     const hEnd = new Date(hStart.getFullYear(), hStart.getMonth() + 6, 0)
-    return (now.getTime() - hStart.getTime()) / (hEnd.getTime() - hStart.getTime())
-  })()
+    elapsed = (now.getTime() - hStart.getTime()) / (hEnd.getTime() - hStart.getTime())
+    daysLeft = daysUntil(hEnd)
+  }
+
+  /* Ruled out first, unconditionally: if what is left of the target is more
+     than the days actually left, no pace at all closes that gap, whatever the
+     ratio below says. */
+  if (dailyCap && target - current > daysLeft) return 'behind'
+
   const done = current / target
   /* Behind means the pace now REQUIRED is at least double the pace signed up
      for, i.e. what is left no longer fits the time left without working twice

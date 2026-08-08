@@ -779,6 +779,51 @@ await step('habits: a routine left half done still reads half done tomorrow', as
   if (!(n > 0 && n < 100)) throw new Error(`fill reads ${fill}`)
 })
 
+await step('goals: a day-counted goal reads impossible before behind, not on pace', async () => {
+  /* His own report: "No lust" needed 28 more day-checkoffs with 23 days left
+     in the month and still read "on pace". goalPace's ratio test assumes any
+     goal can be caught up by working harder on a single day; a goal that
+     counts CLEAN DAYS cannot, since a day can only ever be earned once. Seed
+     a target that literally cannot fit in the days left and one that can. */
+  await fresh('goals')
+  await page.evaluate(() => { localStorage.setItem('mc-view', 'personal'); localStorage.setItem('mc-space', 'personal') })
+  const seeded = await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const now = new Date()
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+    const daysLeft = daysInMonth - now.getDate() + 1
+    const mk = (id, name, target) => ({
+      id, space: 'personal', name, current: 0, target, unit: 'checkoffs', note: '',
+      why: '', timeframe: 'monthly', category: 'health', milestones: [], habitId: `h-${id}`,
+    })
+    s.goals = [mk('gate-imp', 'Gate impossible', daysLeft + 5), mk('gate-ok', 'Gate reachable', Math.max(1, daysLeft - 5))]
+    s.habits = [
+      { id: 'h-gate-imp', space: 'personal', name: 'Gate impossible', frequency: 'monthly', paused: false, kind: 'break', days: [false,false,false,false,false,false,false], history: [] },
+      { id: 'h-gate-ok', space: 'personal', name: 'Gate reachable', frequency: 'monthly', paused: false, kind: 'break', days: [false,false,false,false,false,false,false], history: [] },
+    ]
+    s.slips = []
+    localStorage.setItem(K, JSON.stringify(s))
+    return { daysLeft }
+  }, KEY)
+  await page.reload()
+  // Wait for the actual cards, not a fixed delay: a full-suite run carries
+  // more background state than a lone run of this step, and a flat 900ms
+  // that was plenty in isolation read the page before it had them.
+  await page.getByText('Gate impossible').first().waitFor({ timeout: 8000 })
+  await page.getByText('Gate reachable').first().waitFor({ timeout: 8000 })
+  const text = await page.evaluate(() => document.body.innerText)
+  const cardStatus = (name) => {
+    const i = text.indexOf(name)
+    if (i < 0) throw new Error(`no card for "${name}"`)
+    return text.slice(i, i + 200)
+  }
+  if (!/needs a push/i.test(cardStatus('Gate impossible'))) {
+    throw new Error(`with ${seeded.daysLeft} days left, an unreachable target still reads on pace: ${JSON.stringify(cardStatus('Gate impossible'))}`)
+  }
+  if (!/on pace/i.test(cardStatus('Gate reachable'))) {
+    throw new Error(`a comfortably reachable target got flagged as needing a push: ${JSON.stringify(cardStatus('Gate reachable'))}`)
+  }
+})
 await step('habits: a monthly review done last week does not read as done today', async () => {
   /* His own report: the Monthly review routine, finished a week ago, showed as
      kept "today" every day since. Root cause: the driven-habit mirror in

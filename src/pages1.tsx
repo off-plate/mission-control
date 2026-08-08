@@ -2869,7 +2869,10 @@ export function GoalsPage() {
                 const current = nowOf(g)
                 const fromHabit = habits.find((h) => h.id === g.habitId)
                 const pct = Math.min(100, Math.round((current / g.target) * 100))
-                const status = goalPace(current, g.target, g.timeframe ?? 'quarter')
+                // A habit-linked goal that is not fed by hours counts DAYS,
+                // and a day can only ever be earned once.
+                const dailyCap = !!fromHabit && !isTimeFed(fromHabit)
+                const status = goalPace(current, g.target, g.timeframe ?? 'quarter', new Date(), dailyCap)
                 const milestoneDriven = !!g.milestones?.length && g.target === g.milestones.length
                 /* A future period has no pace to be behind on, and a closed one
                    is a result, not a race. Only the running period gets judged. */

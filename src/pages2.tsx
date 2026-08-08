@@ -4,12 +4,12 @@ import { useCompass, type CompassState } from './compass'
 import { AutoTextarea, Band, SpaceMark } from './pages1'
 import { useStore } from './store'
 import { Spark, SparkBox } from './widgets'
-import { RANGE_OPTIONS, allTimeRange, customRange, fmtDuration, fmtNum, fmtSigned, fmtWhen, goalPace, goalPeriodRange, inRange, isoWeekKey, localDateKey, monthName, monthRange, monthsWithData, rangeFor, taskMinutes, type GoalTf, type RangeId } from './util'
+import { RANGE_OPTIONS, allTimeRange, customRange, fmtDuration, fmtNum, fmtSigned, fmtWhen, goalPace, goalPeriodKey, goalPeriodRange, inRange, isoWeekKey, localDateKey, monthName, monthRange, monthsWithData, rangeFor, taskMinutes, type GoalTf, type RangeId } from './util'
 import { WALL } from './board'
 import { getAiKey, hasAiKey, setAiKey } from './ai'
 import { paymentTaskTitle } from './exceptions'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange, sendSignInCode, signInWithCode, signOutAccount, type Account } from './supabase'
-import { goalCurrent, ON_TRACK_PCT, STEP_UNITS, stepSeries, type StepEntry, type TaskCategory } from './types'
+import { goalCurrent, isTimeFed, ON_TRACK_PCT, STEP_UNITS, stepSeries, type StepEntry, type TaskCategory } from './types'
 
 /* ---------------- MONEY ---------------- */
 
@@ -254,7 +254,7 @@ function Delta({ now, before, unit = '' }: { now: number; before: number; unit?:
 }
 
 export function ReviewPage() {
-  const { space, tasks, habits, goals, closeReview, review, ledger, focusSessions, habitLog, routineLog, stepLog, routines, records, coachSessions, setPage, inView } = useStore()
+  const { space, tasks, habits, goals, closeReview, review, ledger, focusSessions, habitLog, routineLog, stepLog, routines, records, coachSessions, slips, setPage, inView } = useStore()
   const [rangeId, setRangeId] = useState<string>('this-week')
   const [from, setFrom] = useState(localDateKey())
   const [to, setTo] = useState(localDateKey())
@@ -354,7 +354,18 @@ export function ReviewPage() {
 
   const activeHabits = habits.filter((h) => !h.paused && !h.archivedAt && inView(h.space))
   const spaceGoals = goals.filter((g) => inView(g.space))
-  const goalsOnTrack = spaceGoals.filter((g) => goalPace(goalCurrent(g, habits), g.target, g.timeframe ?? 'quarter') !== 'behind').length
+  /* The same accurate, period-aware read GoalsPage uses: a habit-linked
+     goal's current count comes from the dated log inside its OWN window, not
+     from the seven-day cache, and a day-counted goal cannot out-pace its own
+     remaining days no matter the ratio. */
+  const goalsOnTrack = spaceGoals.filter((g) => {
+    const tf = (g.timeframe ?? 'quarter') as GoalTf
+    const range = goalPeriodRange(tf, g.periodKey ?? goalPeriodKey(tf))
+    const current = goalCurrent(g, habits, habitLog, range, slips, focusSessions)
+    const fromHabit = habits.find((h) => h.id === g.habitId)
+    const dailyCap = !!fromHabit && !isTimeFed(fromHabit)
+    return goalPace(current, g.target, tf, new Date(), dailyCap) !== 'behind'
+  }).length
 
   /* One row per step that has ever recorded a number, holding the runs inside
      this window. The best is all-time on purpose: a personal best does not stop
@@ -475,7 +486,9 @@ export function ReviewPage() {
           <div className="kpi">{goalsOnTrack}<span className="unit">of {spaceGoals.length}</span></div>
           <div className="rowlist" style={{ marginTop: 8 }}>
             {spaceGoals.slice(0, 5).map((g) => {
-              const pct = Math.min(100, Math.round((goalCurrent(g, habits) / g.target) * 100))
+              const gtf = (g.timeframe ?? 'quarter') as GoalTf
+              const grange = goalPeriodRange(gtf, g.periodKey ?? goalPeriodKey(gtf))
+              const pct = Math.min(100, Math.round((goalCurrent(g, habits, habitLog, grange, slips, focusSessions) / g.target) * 100))
               return (
                 <div className="rowitem" key={g.id} style={{ minHeight: 30 }}>
                   <span className="grow">{g.name}</span>

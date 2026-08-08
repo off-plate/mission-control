@@ -13,8 +13,10 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { SPACE_LABELS } from './mock'
+import { exceptionsFor } from './exceptions'
 import { useStore } from './store'
-import type { SpaceId } from './types'
+import { isoWeekKey, localDateKey } from './util'
+import type { SpaceId, Task } from './types'
 
 
 /* A field that grows with what you type, up to a ceiling, then scrolls. Dragging
@@ -247,4 +249,51 @@ export function Segmented<T extends string>({ value, options, onPick, size = 'md
       ))}
     </div>
   )
+}
+
+
+/* The one thing to do next, on Today and in the Zone. Alerts first (a debt
+   deadline beats everything), then whatever he pinned by hand, then the least
+   dreaded of what is left. One derivation, so the two pages can never point
+   at different tasks. */
+export function useFirstMove(): Task | undefined {
+  const { space, tasks, routines, plan, inView } = useStore()
+  const exceptions = exceptionsFor(space, { tasks, routines })
+  const open = tasks.filter((t) => inView(t.space) && t.list === 'today' && !t.done && (t.plannedOn ?? localDateKey()) === localDateKey())
+  const DREAD_RANK = { admin: 0, call: 1, deep: 2, quick: 3 }
+  const alertTaskTitles = new Set(exceptions.map((x) => x.task?.title).filter(Boolean) as string[])
+  const alertRank = (t: Task) => (alertTaskTitles.has(t.title) ? 0 : 1)
+  return (
+    open.find((t) => alertTaskTitles.has(t.title)) ??
+    tasks.find((t) => t.id === plan.firstMoveId && !t.done && inView(t.space)) ??
+    [...open].sort((a, b) => alertRank(a) - alertRank(b) || DREAD_RANK[a.category] - DREAD_RANK[b.category])[0]
+  )
+}
+
+
+/* The date and time, read once and re-rendered only when a shown value
+   changes. Used by the clock widget and by the Zone's big centrepiece:
+   one clock, so the two can never show a different minute. */
+export interface ClockStamp { time: string; day: string; date: string; week: string }
+function clockStamp(): ClockStamp {
+  const d = new Date()
+  return {
+    time: d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+    day: d.toLocaleDateString('en-GB', { weekday: 'long' }),
+    date: d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }),
+    week: isoWeekKey().split('-W')[1],
+  }
+}
+export function useClockStamp(): ClockStamp {
+  const [now, setNow] = useState(clockStamp)
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      setNow((prev) => {
+        const next = clockStamp()
+        return next.time === prev.time && next.date === prev.date ? prev : next
+      })
+    }, 1000)
+    return () => window.clearInterval(t)
+  }, [])
+  return now
 }

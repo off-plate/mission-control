@@ -152,6 +152,60 @@ await step('the header opens Notes, and the pill opens Focus', async () => {
   const h1 = await page.locator('h1').first().innerText()
   if (h1 !== 'Focus') throw new Error(`the pill went to ${h1}`)
 })
+await step('the zone: header stays, first move starts it, and the note lands in its folder', async () => {
+  await fresh('today')
+  await page.evaluate(() => { localStorage.setItem('mc-view', 'personal'); localStorage.setItem('mc-space', 'personal') })
+  // A real task on today's list, so the empty-state message is not the one
+  // under test here.
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const today = new Date()
+    const key = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    s.tasks = [{ id: 'zone-gate-t1', title: 'Zone gate task', source: 'mc', estimateMin: 25, estimated: true, done: false, space: 'personal', list: 'today', category: 'deep', createdAt: key, plannedOn: key }]
+    localStorage.setItem(K, JSON.stringify(s))
+  }, KEY)
+  await page.goto(`${URL}#/zone`); await page.reload(); await page.waitForTimeout(800)
+  const skip = page.getByRole('button', { name: 'Not today' })
+  if (await skip.count()) { await skip.first().click(); await page.waitForTimeout(400) }
+
+  // The header (brand, spaces, the six-tab nav) is still on screen, and the
+  // zone content starts right where it ends, not under it and not replacing it.
+  const geo = await page.evaluate(() => {
+    const header = document.querySelector('.topstick')
+    const zone = document.querySelector('.zonepage')
+    return {
+      headerVisible: !!header && header.getBoundingClientRect().height > 20,
+      headerBottom: header ? Math.round(header.getBoundingClientRect().bottom) : -1,
+      zoneTop: zone ? Math.round(zone.getBoundingClientRect().top) : -1,
+    }
+  })
+  if (!geo.headerVisible) throw new Error('the header is gone in the zone')
+  if (Math.abs(geo.headerBottom - geo.zoneTop) > 2) throw new Error(`the zone starts at ${geo.zoneTop}, the header ends at ${geo.headerBottom}`)
+
+  if (!(await page.getByText('Zone gate task').count())) throw new Error('the first-move task did not appear in the zone')
+  await page.locator('.znow-start').click(); await page.waitForTimeout(500)
+  const running = await page.locator('.znow.is-running .znow-title').innerText()
+  if (running !== 'Zone gate task') throw new Error(`the zone started "${running}", not the task clicked`)
+  if (!(await page.locator('.znow-clock').innerText()).match(/^\d{1,2}:\d{2}$/)) throw new Error('the countdown is not a clock')
+
+  // The note saves into the folder shown, with no way to create a new one.
+  if (await page.locator('.znote button', { hasText: 'New folder' }).count()) throw new Error('the zone note can create folders')
+  await page.locator('.znote-area').fill('Zone gate note')
+  await page.waitForTimeout(400)
+  const saved = await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    return s.notes.find((n) => n.body === 'Zone gate note')
+  }, KEY)
+  if (!saved) throw new Error('typing in the zone note did not save a note')
+  if (saved.folderId !== 'nf-space-personal') throw new Error(`the note landed in ${saved.folderId}, not the shown folder`)
+
+  // The player: a real Mundi Opus video mounted, and next moves the queue.
+  await page.waitForSelector('.zplayer-art iframe', { timeout: 15000 })
+  const before = await page.locator('.zplayer-title').innerText()
+  await page.locator('.zplayer-btn').nth(2).click(); await page.waitForTimeout(300)
+  const after = await page.locator('.zplayer-title').innerText()
+  if (before === after) throw new Error('next did not change the track')
+})
 await step('achievements: three faces, and every milestone is earned by the log', async () => {
   await fresh('achievements')
   const segs = await page.locator('.achtab').allInnerTexts()

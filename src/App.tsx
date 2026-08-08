@@ -10,6 +10,7 @@ import { BrandPage } from './brand'
 import { DayPage } from './day'
 import { BoardPage } from './board'
 import { FocusPage } from './focus'
+import { ZonePage } from './zone'
 import { useStore } from './store'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange } from './supabase'
 import { isReadOnly } from './store'
@@ -153,6 +154,20 @@ export default function App() {
             </svg>
             <span className="btn-label">My Mind</span>
           </a>
+          {/* The one thing running, full screen. Filled with the accent so it
+              reads as the button that starts something, not a place he browses. */}
+          <button
+            className={`btn btn-primary${page === 'zone' ? ' is-on' : ''}`}
+            onClick={() => setPage('zone')}
+            aria-pressed={page === 'zone'}
+            title="The Zone"
+            aria-label="The Zone"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M12 3l2.6 6.2L21 11l-6.4 1.8L12 21l-2.6-8.2L3 11l6.4-1.8z" strokeLinejoin="round" />
+            </svg>
+            <span className="btn-label">The Zone</span>
+          </button>
           {/* Notes, one click from any screen. It left the menu because he
               reaches for it mid-thought, not by navigating to it. */}
           <button
@@ -237,6 +252,7 @@ export default function App() {
         {page === 'settings' && <SettingsPage />}
         {page === 'brand' && <BrandPage />}
         {page === 'day' && <DayPage />}
+        {page === 'zone' && <ZonePage />}
         </PageBoundary>
       </main>
 

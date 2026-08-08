@@ -10,6 +10,7 @@ import { Linkify } from './widgets'
 import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, dueOn, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, isCounted, COUNT_PERIODS, requiredSteps, routineComplete, routineProgress, routineRunsOn, slotMinutes, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
 import { AssistantRail } from './assist'
 import { DayLine, DayNumbers, WeekStrip } from './dayface'
+import { useFirstMove } from './ui'
 import { estimateFor } from './estimate'
 import { estimateTask } from './ai'
 import { goalPeriodKey, goalPeriodRange, habitPeriodRange, periodIsPast, periodKeyFor, periodLabel, shiftPeriodKey, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForMoment, taskMinutes, toMin } from './util'
@@ -77,13 +78,7 @@ export function TodayPage() {
     ? exceptions
     : [...globalExceptions({ tasks, routines }), ...exceptions]
   const open = tasks.filter((t) => inView(t.space) && t.list === 'today' && !t.done && (t.plannedOn ?? localDateKey()) === localDateKey())
-  const DREAD_RANK = { admin: 0, call: 1, deep: 2, quick: 3 }
-  const alertTaskTitles = new Set(exceptions.map((x) => x.task?.title).filter(Boolean) as string[])
-  const alertRank = (t: Task) => (alertTaskTitles.has(t.title) ? 0 : 1)
-  const firstMove =
-    open.find((t) => alertTaskTitles.has(t.title)) ??
-    tasks.find((t) => t.id === plan.firstMoveId && !t.done && inView(t.space)) ??
-    [...open].sort((a, b) => alertRank(a) - alertRank(b) || DREAD_RANK[a.category] - DREAD_RANK[b.category])[0]
+  const firstMove = useFirstMove()
   const [addOpen, setAddOpen] = useState(false)
   const reviewDue = todayIndex === 6 && review.lastDoneDate !== localDateKey()
   // Next payment badge derives from the money schedule instead of a hardcoded string.

@@ -3115,6 +3115,77 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
   border-left: 1px solid var(--hairline-strong); padding-left: var(--s2);
 }
 
+/* ---------- The Zone: full screen, header still above it ---------- */
+/* Not `.page`: no padding-bottom fighting the footer, no reading-column cap.
+   Two columns that fill whatever height main gives them. */
+.zonepage {
+  display: grid; gap: var(--s6); grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  align-items: start; min-height: calc(100dvh - 160px); padding: var(--s6) var(--s5);
+}
+.zone-col { display: flex; flex-direction: column; gap: var(--s5); min-width: 0; }
+.zone-col-main { align-items: center; justify-content: center; text-align: center; padding-top: var(--s6); }
+
+/* What is running. One state at a time, the block's own tone carried through
+   from the pomodoro badge's palette so the two never disagree about what
+   "paused" or "break" mean. */
+.znow { display: flex; flex-direction: column; align-items: center; gap: var(--s2); }
+.znow-label { font-size: var(--text-sm); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.znow.is-running .znow-label { color: var(--progress); }
+.znow.is-paused .znow-label { color: var(--warn); }
+.znow.is-await .znow-label { color: var(--accent-text); }
+.znow.is-break .znow-label { color: var(--info); }
+.znow-title {
+  font-family: var(--font-display); font-weight: 800; font-size: clamp(1.75rem, 4vw, 3rem);
+  line-height: 1.05; letter-spacing: -0.01em; max-width: 26ch;
+}
+.znow-clock {
+  font-size: clamp(3.5rem, 9vw, 7rem); font-weight: 700; line-height: 1;
+  letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin-top: var(--s3);
+}
+.znow-est { color: var(--muted); font-size: var(--text-sm); }
+.znow-controls { display: flex; gap: var(--s3); margin-top: var(--s3); }
+.znow-start { margin-top: var(--s4); font-size: var(--text-base); padding-inline: var(--s6); min-height: 48px; }
+.znow.is-empty .znow-title { color: var(--muted); font-weight: 500; font-size: var(--text-lg); }
+
+.zclock { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: var(--s6); opacity: 0.8; }
+.zclock-time { font-size: clamp(1.5rem, 2.5vw, 2rem); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.zclock-date { font-size: var(--text-sm); color: var(--muted); }
+
+/* The note. One folder, chosen once; no way to make another from in here. */
+.znote { display: flex; flex-direction: column; gap: var(--s2); background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-md); padding: var(--s4); flex: 1; min-height: 220px; }
+.znote-head { display: flex; align-items: center; gap: var(--s3); }
+.znote-folder { margin-left: auto; font-size: var(--text-xs); max-width: 40%; }
+.znote-new { min-height: 30px; font-size: var(--text-xs); padding: 0 var(--s3); }
+.znote-area { flex: 1; border: none; background: transparent; padding: 0; resize: none; font-size: var(--text-sm); line-height: 1.6; }
+.znote-area:focus { outline: none; box-shadow: none; }
+
+/* The player. A small MP3 hub: a thumbnail the size of album art, a title
+   that can only ever be one line, a scrub rail with no seek handle (this is a
+   queue, not a track you scrub through), and three round transport buttons. */
+.zplayer { display: flex; gap: var(--s3); align-items: center; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-md); padding: var(--s3); }
+.zplayer-art { flex: none; width: 64px; height: 64px; border-radius: var(--r-sm); overflow: hidden; background: var(--ink); }
+.zplayer-art > div, .zplayer-art iframe { width: 100%; height: 100%; }
+.zplayer-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.zplayer-source { font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); }
+.zplayer-title { font-size: var(--text-sm); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.zplayer-scrub { height: 3px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
+.zplayer-scrub i { display: block; height: 100%; background: var(--accent); }
+.zplayer-time { display: flex; justify-content: space-between; font-size: 0.625rem; color: var(--faint); }
+.zplayer-controls { display: flex; align-items: center; gap: var(--s2); margin-top: 2px; }
+.zplayer-btn {
+  flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+  border: 1px solid var(--hairline-strong); color: var(--ink); background: var(--bg);
+}
+.zplayer-btn:hover:not(:disabled) { border-color: var(--accent-text); color: var(--accent-text); }
+.zplayer-btn:disabled { opacity: 0.4; }
+.zplayer-play { width: 36px; height: 36px; background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.zplayer-play:hover:not(:disabled) { background: var(--accent-text); border-color: var(--accent-text); color: var(--bg); }
+
+@media (max-width: 900px) {
+  .zonepage { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+  .zone-col-main { padding-top: var(--s4); }
+}
+
 /* ---------- focus history ---------- */
 .focus-row { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) 0; border-top: 1px solid var(--hairline); }
 .focus-row:first-child { border-top: none; }

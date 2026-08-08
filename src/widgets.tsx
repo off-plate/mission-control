@@ -9,7 +9,7 @@ import {
   SPACE_LABELS,
 } from './mock'
 import { useStore } from './store'
-import { goalCurrent, ON_TRACK_PCT, type SizeKey, type SpaceId, type WidgetType } from './types'
+import { goalCurrent, keptThisPeriod, ON_TRACK_PCT, type SizeKey, type SpaceId, type WidgetType } from './types'
 import { fmtDuration, fmtNum, fmtTimeShort, goalPace, isoWeekKey, localDateKey } from './util'
 
 /** `fluid` makes the line span its container, so label rows underneath line up. */
@@ -238,7 +238,7 @@ const FinanceBody = memo(function FinanceBody() {
 })
 
 const HabitsBody = memo(function HabitsBody({ space }: { space: SpaceId }) {
-  const { habits, routines, toggleHabitDay, setPage, todayIndex, inView } = useStore()
+  const { habits, routines, toggleHabitDay, setPage, todayIndex, habitLog, inView } = useStore()
   const active = habits.filter((h) => inView(h.space) && !h.paused && !h.archivedAt)
   /* A habit a routine drives is a read-out here too. Ticking it by hand looked
      like it worked and was reverted on the next load. */
@@ -253,7 +253,11 @@ const HabitsBody = memo(function HabitsBody({ space }: { space: SpaceId }) {
         <button
           key={h.id}
           className={`habit${driven.has(h.id) ? ' is-auto' : ''}`}
-          aria-pressed={h.days[todayIndex]}
+          /* A weekly/monthly habit is pressed once it is kept for its whole
+             period, not once today's slot happens to be true: a monthly review
+             finished three weeks ago is still kept, and today's slot alone
+             cannot say so. */
+          aria-pressed={h.frequency === 'weekly' || h.frequency === 'monthly' ? keptThisPeriod(h, habitLog) : h.days[todayIndex]}
           title={driven.has(h.id) ? `Ticks itself when you finish “${driven.get(h.id)}”` : undefined}
           onClick={() => (driven.has(h.id) ? setPage('routines') : toggleHabitDay(h.id, todayIndex))}
         >

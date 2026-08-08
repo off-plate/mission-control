@@ -874,8 +874,14 @@ function loadPersisted(): PersistedState | null {
       const idx = d.on && isoWeekKey(new Date(d.on)) === thisWeek ? dayIndexOf(d.on) : null
       const days = h.days.map((day, i) => {
         if (!d.complete) return seededPastCleared >= 1 && i !== todayIdx ? day : false
-        if (idx !== null) return i === idx
-        return i === todayIdx
+        /* The real completion day may not be in THIS week at all: a monthly
+           routine finished early in the month stays complete for weeks after,
+           and there is no day in a 7-slot week to honestly place that on.
+           Forcing today's dot here used to be the fallback, which is why a
+           monthly review read as "done today" on every day it was reopened.
+           keptThisPeriod (types.ts) is what now tells weekly/monthly consumers
+           it is kept; this array only ever states a real day. */
+        return idx !== null ? i === idx : day
       })
       return { ...h, days }
     })

@@ -1,3 +1,5 @@
+import { goalPeriodKey, goalPeriodRange } from './util'
+
 export type SpaceId = 'personal' | 'work' | 'offplate' | 'corner'
 
 /** What you are looking at. 'all' is not a space anything can belong to: it is a
@@ -441,11 +443,26 @@ function fmtMins(min: number): string {
 /** Does this habit ask anything of the given weekday (0 = Monday)? The Habits
  *  page opens with this count and so does Today, so it lives in one place: two
  *  copies of the rule is two answers to "what is still open today". */
-export function dueOn(h: HabitDef, weekdayIndex: number): boolean {
+/** A weekly or monthly habit is kept for its period the moment the dated log has
+ *  an entry inside that period's own date range, read straight off the log
+ *  rather than off the 7-slot day-of-week cache. The cache only ever holds ONE
+ *  week; a month is four or five of those, so "was it done this week" and "was
+ *  it done this month" are different questions, and the cache can only answer
+ *  the first one. Conflating them is what made a monthly review read as done
+ *  on whichever day you happened to be looking, days after it actually was. */
+export function keptThisPeriod(h: HabitDef, log: HabitTick[], now = new Date()): boolean {
+  if (h.frequency !== 'weekly' && h.frequency !== 'monthly') return false
+  const tf = h.frequency === 'monthly' ? 'monthly' : 'weekly'
+  const key = goalPeriodKey(tf, now)
+  const range = goalPeriodRange(tf, key)
+  return keptDaysIn(log, h.id, range.from, range.to).size > 0
+}
+
+export function dueOn(h: HabitDef, weekdayIndex: number, log: HabitTick[]): boolean {
   if (h.paused || h.kind === 'break') return false
   if (h.frequency === 'weekdays' && weekdayIndex >= 5) return false
   // Once a week or once a month, and already kept: nothing is due.
-  if ((h.frequency === 'weekly' || h.frequency === 'monthly') && h.days.some(Boolean)) return false
+  if ((h.frequency === 'weekly' || h.frequency === 'monthly') && keptThisPeriod(h, log)) return false
   return true
 }
 

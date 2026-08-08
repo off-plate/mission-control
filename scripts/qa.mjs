@@ -779,6 +779,58 @@ await step('habits: a routine left half done still reads half done tomorrow', as
   if (!(n > 0 && n < 100)) throw new Error(`fill reads ${fill}`)
 })
 
+await step('habits: a monthly review done last week does not read as done today', async () => {
+  /* His own report: the Monthly review routine, finished a week ago, showed as
+     kept "today" every day since. Root cause: the driven-habit mirror in
+     store.tsx used to fall back to marking TODAY's dot whenever the real
+     completion date fell outside the current ISO week, which any monthly
+     completion older than a few days always does. Reproduce a real completion
+     from a week ago and check nothing claims it happened today. */
+  await fresh('today')
+  // An earlier step may have switched workspace; that choice lives outside
+  // the state blob fresh() clears, and would filter the personal-space
+  // monthly review chip right out of the widget.
+  await page.evaluate(() => { localStorage.setItem('mc-view', 'personal'); localStorage.setItem('mc-space', 'personal') })
+  await page.reload(); await page.waitForTimeout(500)
+  const seeded = await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const today = new Date()
+    const key = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7)
+    const monthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
+    const r = s.routines.find((x) => x.id === 'r-monthly')
+    r.doneStepIds = r.steps.map((x) => x.id)
+    r.periodKey = monthKey
+    r.completedOn = key(weekAgo)
+    r.startedAt = weekAgo.toISOString()
+    s.habitLog = (s.habitLog ?? []).filter((t) => t.habitId !== 'h-monthly')
+    s.habitLog.push({ habitId: 'h-monthly', day: key(weekAgo) })
+    localStorage.setItem(K, JSON.stringify(s))
+    return { todayIdx: (today.getDay() + 6) % 7 }
+  }, KEY)
+  await page.reload(); await page.waitForTimeout(800)
+
+  const days = await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    return s.habits.find((x) => x.id === 'h-monthly').days
+  }, KEY)
+  if (days[seeded.todayIdx]) throw new Error(`today's slot is true for a completion from a week ago: ${JSON.stringify(days)}`)
+
+  const skip = page.getByRole('button', { name: 'Not today' })
+  if (await skip.count()) { await skip.first().click(); await page.waitForTimeout(400) }
+  const chip = await page.locator('.habit', { hasText: 'Monthly review' }).first()
+  if ((await chip.getAttribute('aria-pressed')) !== 'true') throw new Error('the chip does not read as kept for the month')
+
+  await page.goto(`${URL}#/habits`); await page.reload(); await page.waitForTimeout(800)
+  const band = await page.locator('.band-metric .v').first().innerText()
+  // "done today / due today": the numerator must be 0, since nothing was
+  // actually done today, and the monthly review must not be in the
+  // denominator either, since it is already kept for the month.
+  const m = band.match(/^(\d+)\/(\d+)$/)
+  if (!m) throw new Error(`"done today" reads "${band}", not a done/due pair`)
+  if (m[1] !== '0') throw new Error(`"done today" reads ${band}: the monthly review counted as done today`)
+})
+
 await step('notes: brain dumps came across, and search reaches every folder', async () => {
   await fresh('notes')
   const bin = page.locator('.nt-folder', { hasText: 'Brain dumps' }).first()

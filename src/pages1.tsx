@@ -1885,7 +1885,7 @@ const HABIT_WINDOWS = [
 ]
 
 export function HabitsPage() {
-  const { habits, goals, space, deleteHabit, togglePauseHabit, routines, stepTicks, todayIndex, inView } = useStore()
+  const { habits, goals, space, deleteHabit, togglePauseHabit, routines, stepTicks, habitLog, todayIndex, inView } = useStore()
   const [days, setDays] = useState(7)
   const [adding, setAdding] = useState(false)
   // Opening the goal sheet from a habit is the "set a goal on this" path.
@@ -1933,7 +1933,7 @@ export function HabitsPage() {
      monthlies across four workspaces that he could not reconstruct from
      anything on screen. What he wants on a Sunday morning is what is still
      open TODAY. */
-  const dueToday = spaceHabits.filter((h) => dueOn(h, todayIndex))
+  const dueToday = spaceHabits.filter((h) => dueOn(h, todayIndex, habitLog))
   const doneToday = dueToday.filter((h) => h.days[todayIndex]).length
 
   /* Grouped by who keeps it, and inside a group what is still open comes

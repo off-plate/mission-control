@@ -125,13 +125,13 @@ export function DayLine() {
 /* ---------------- four numbers, all of them his ---------------- */
 
 export function DayNumbers({ savedMin }: { savedMin: number }) {
-  const { focusSessions, habits, tasks, todayIndex, inView } = useStore()
+  const { focusSessions, habits, habitLog, tasks, todayIndex, inView } = useStore()
   const day = localDateKey()
 
   const focused = focusSessions.filter((f) => f.day === day && inView(f.space)).reduce((a, f) => a + f.minutes, 0)
   /* The same rule the Habits page opens with, imported rather than rewritten,
      so the two can never disagree about what today asked of him. */
-  const due = habits.filter((h: HabitDef) => inView(h.space) && !h.archivedAt && dueOn(h, todayIndex))
+  const due = habits.filter((h: HabitDef) => inView(h.space) && !h.archivedAt && dueOn(h, todayIndex, habitLog))
   const kept = due.filter((h) => h.days[todayIndex]).length
   /* Ticked today, by its own stamp. Not the ledger: a ledger row is only
      written when he gives the task an actual, so counting rows would quietly

@@ -197,7 +197,7 @@ const TasksBody = memo(function TasksBody({ space, size }: { space: SpaceId; siz
    header. It reads the machine's own clock, so it is right by definition, and
    it re-renders only when a shown value changes: a widget that repainted every
    second next to a drag-and-drop grid is a cost with nothing to show for it. */
-const ClockBody = memo(function ClockBody() {
+export const ClockBody = memo(function ClockBody() {
   const now = useClockStamp()
   return (
     <div className="clockw">

@@ -96,6 +96,9 @@ export function ZonePlayer() {
 
   return (
     <div className="zplayer">
+      {/* A real 16:9 frame, not a square a rectangular video gets squashed
+         into: the YT iframe is sized to fill it and cropped with object-fit,
+         never stretched off its own proportions. */}
       <div className="zplayer-art">
         <div ref={mountRef} />
       </div>
@@ -106,21 +109,21 @@ export function ZonePlayer() {
         <div className="zplayer-time mono">
           <span>{mmss(pos)}</span><span>{dur ? mmss(dur) : '·:·'}</span>
         </div>
-        <div className="zplayer-controls">
-          <button className="zplayer-btn" onClick={() => go(-1)} aria-label="Previous track" disabled={!ready}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h2.5v14H6zM19 5v14L9 12z" /></svg>
-          </button>
-          <button className="zplayer-btn zplayer-play" onClick={toggle} aria-label={playing ? 'Pause' : 'Play'} disabled={!ready}>
-            {playing ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4.5" height="14" rx="1" /><rect x="13.5" y="5" width="4.5" height="14" rx="1" /></svg>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5.5l13 6.5-13 6.5z" /></svg>
-            )}
-          </button>
-          <button className="zplayer-btn" onClick={() => go(1)} aria-label="Next track" disabled={!ready}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 5h2.5v14H16zM5 5v14l10-7z" /></svg>
-          </button>
-        </div>
+      </div>
+      <div className="zplayer-controls">
+        <button className="zplayer-btn" onClick={() => go(-1)} aria-label="Previous track" disabled={!ready}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h2.5v14H6zM19 5v14L9 12z" /></svg>
+        </button>
+        <button className="zplayer-btn zplayer-play" onClick={toggle} aria-label={playing ? 'Pause' : 'Play'} disabled={!ready}>
+          {playing ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4.5" height="14" rx="1" /><rect x="13.5" y="5" width="4.5" height="14" rx="1" /></svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5.5l13 6.5-13 6.5z" /></svg>
+          )}
+        </button>
+        <button className="zplayer-btn" onClick={() => go(1)} aria-label="Next track" disabled={!ready}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 5h2.5v14H16zM5 5v14l10-7z" /></svg>
+        </button>
       </div>
     </div>
   )

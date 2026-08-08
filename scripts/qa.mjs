@@ -191,6 +191,20 @@ await step('the zone: header stays, first move starts it, and the note lands in 
   if (geo.spacesPresent) throw new Error('the workspace switcher is still showing in the zone')
   if (geo.badgePresent) throw new Error('the floating focus pill is still showing in the zone, doubling the countdown')
 
+  // Built from the same widget Today's own grid renders, on his explicit
+  // instruction, not a bespoke "calm room" look: four real tiles, the app's
+  // actual .widget chrome, not four floating pieces with no edge to them.
+  const tiles = await page.evaluate(() => [...document.querySelectorAll('.zw-tile')].map((t) => ({
+    title: t.querySelector('.widget-title')?.textContent,
+    hasChrome: getComputedStyle(t).borderStyle === 'solid' && getComputedStyle(t).backgroundColor !== 'rgba(0, 0, 0, 0)',
+  })))
+  const wantTitles = ['Now', 'Clock', 'Note', 'Mundi Opus']
+  if (tiles.length !== 4) throw new Error(`${tiles.length} widget tiles in the zone, not 4`)
+  for (const want of wantTitles) {
+    if (!tiles.some((t) => t.title === want)) throw new Error(`no "${want}" tile in the zone`)
+  }
+  if (tiles.some((t) => !t.hasChrome)) throw new Error('a zone tile has no widget border or fill')
+
   if (!(await page.getByText('Zone gate task').count())) throw new Error('the first-move task did not appear in the zone')
   await page.locator('.znow-start').click(); await page.waitForTimeout(500)
   const running = await page.locator('.znow.is-running .znow-title').innerText()
@@ -232,6 +246,15 @@ await step('the zone: header stays, first move starts it, and the note lands in 
   await page.locator('.zplayer-btn').nth(2).click(); await page.waitForTimeout(300)
   const after = await page.locator('.zplayer-title').innerText()
   if (before === after) throw new Error('next did not change the track')
+  // The embedded video fills its frame exactly, at the frame's own 16:9,
+  // rather than a square box squashing a rectangular video into it.
+  const frame = await page.evaluate(() => {
+    const art = document.querySelector('.zplayer-art').getBoundingClientRect()
+    const iframe = document.querySelector('.zplayer-art iframe').getBoundingClientRect()
+    return { artRatio: art.width / art.height, matches: Math.abs(iframe.width - art.width) < 2 && Math.abs(iframe.height - art.height) < 2 }
+  })
+  if (Math.abs(frame.artRatio - 16 / 9) > 0.05) throw new Error(`the player frame is ${frame.artRatio.toFixed(2)}:1, not 16:9`)
+  if (!frame.matches) throw new Error('the video does not fill its own frame')
 })
 await step('achievements: three faces, and every milestone is earned by the log', async () => {
   await fresh('achievements')

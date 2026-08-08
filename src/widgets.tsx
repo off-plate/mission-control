@@ -9,8 +9,8 @@ import {
   SPACE_LABELS,
 } from './mock'
 import { useStore } from './store'
-import { goalCurrent, keptThisPeriod, ON_TRACK_PCT, type SizeKey, type SpaceId, type WidgetType } from './types'
-import { fmtDuration, fmtNum, fmtTimeShort, goalPace, isoWeekKey, localDateKey } from './util'
+import { goalCurrent, isTimeFed, keptThisPeriod, ON_TRACK_PCT, type SizeKey, type SpaceId, type WidgetType } from './types'
+import { fmtDuration, fmtNum, fmtTimeShort, goalPace, goalPeriodKey, goalPeriodRange, isoWeekKey, localDateKey, type GoalTf } from './util'
 
 /** `fluid` makes the line span its container, so label rows underneath line up. */
 /* A pasted URL is an address, not prose: shown raw it swallowed two lines of a
@@ -276,15 +276,24 @@ const TrainingBody = memo(function TrainingBody() {
 })
 
 const GoalsBody = memo(function GoalsBody({ space }: { space: SpaceId }) {
-  const { goals, habits, todayIndex, inView } = useStore()
+  const { goals, habits, habitLog, slips, focusSessions, todayIndex, inView } = useStore()
   const list = goals.filter((g) => inView(g.space))
   return (
     <div>
       {list.map((g) => {
-        const cur = goalCurrent(g, habits)
+        /* The same accurate read GoalsPage uses: a habit-linked goal's current
+           count comes from the dated log inside its OWN period, not the
+           seven-day cache, and `g.current` below was never that goal's
+           current at all for a habit-linked one; it was whatever number
+           happened to be stored on the row, stale the moment a day passed. */
+        const tf = (g.timeframe ?? 'quarter') as GoalTf
+        const range = goalPeriodRange(tf, g.periodKey ?? goalPeriodKey(tf))
+        const cur = goalCurrent(g, habits, habitLog, range, slips, focusSessions)
         const pct = Math.round((cur / g.target) * 100)
+        const fromHabit = habits.find((h) => h.id === g.habitId)
+        const dailyCap = !!fromHabit && !isTimeFed(fromHabit)
         // Judged against elapsed time, not a flat percentage.
-        const off = goalPace(g.current, g.target, g.timeframe ?? 'quarter') === 'behind'
+        const off = goalPace(cur, g.target, tf, new Date(), dailyCap) === 'behind'
         return (
           <div className="goal-row" key={g.id}>
             <div className="goal-line">

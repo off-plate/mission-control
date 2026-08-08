@@ -36,6 +36,8 @@ export type PageId =
   | 'focus'
   /** One day of the record, read-only. Carries a date in the route. */
   | 'day'
+  /** Full-screen focus room. Reached from the header only, never a nav tab. */
+  | 'zone'
 
 export type WidgetType =
   | 'clock'

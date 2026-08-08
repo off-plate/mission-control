@@ -10,6 +10,7 @@ import {
 } from './mock'
 import { useStore } from './store'
 import { goalCurrent, isTimeFed, keptThisPeriod, ON_TRACK_PCT, type SizeKey, type SpaceId, type WidgetType } from './types'
+import { useClockStamp } from './ui'
 import { fmtDuration, fmtNum, fmtTimeShort, goalPace, goalPeriodKey, goalPeriodRange, isoWeekKey, localDateKey, type GoalTf } from './util'
 
 /** `fluid` makes the line span its container, so label rows underneath line up. */
@@ -196,27 +197,8 @@ const TasksBody = memo(function TasksBody({ space, size }: { space: SpaceId; siz
    header. It reads the machine's own clock, so it is right by definition, and
    it re-renders only when a shown value changes: a widget that repainted every
    second next to a drag-and-drop grid is a cost with nothing to show for it. */
-function stamp() {
-  const d = new Date()
-  return {
-    time: d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
-    day: d.toLocaleDateString('en-GB', { weekday: 'long' }),
-    date: d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }),
-    week: isoWeekKey().split('-W')[1],
-  }
-}
-
 const ClockBody = memo(function ClockBody() {
-  const [now, setNow] = useState(stamp)
-  useEffect(() => {
-    const t = window.setInterval(() => {
-      setNow((prev) => {
-        const next = stamp()
-        return next.time === prev.time && next.date === prev.date ? prev : next
-      })
-    }, 1000)
-    return () => window.clearInterval(t)
-  }, [])
+  const now = useClockStamp()
   return (
     <div className="clockw">
       <span className="clockw-time">{now.time}</span>

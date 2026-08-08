@@ -135,8 +135,15 @@ export function DayNumbers({ savedMin }: { savedMin: number }) {
   const kept = due.filter((h) => h.days[todayIndex]).length
   /* Ticked today, by its own stamp. Not the ledger: a ledger row is only
      written when he gives the task an actual, so counting rows would quietly
-     drop everything he ticked and moved on from. */
-  const finished = tasks.filter((t) => t.done && inView(t.space) && (t.doneAt ?? '').slice(0, 10) === day).length
+     drop everything he ticked and moved on from.
+
+     doneAt is a UTC instant; slicing its first ten characters reads its UTC
+     calendar date, which is a day behind his own for the two hours after
+     midnight in Prague (UTC+1/+2). A task finished at 00:20 read as finished
+     "yesterday" and vanished from today's count for exactly the two hours
+     he is most likely to be finishing a late block. Read through the same
+     local-date key `day` itself is, so the two can never disagree. */
+  const finished = tasks.filter((t) => t.done && inView(t.space) && t.doneAt && localDateKey(new Date(t.doneAt)) === day).length
 
   return (
     <div className="daynums">

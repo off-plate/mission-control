@@ -119,8 +119,13 @@ export function DailyReview() {
     return routines.filter((r) => ids.has(r.id))
   }, [routineLog, routines, yday])
 
+  /* doneAt is a UTC instant. Slicing its first ten characters reads its UTC
+     calendar date, a day behind his own for the two hours after midnight in
+     Prague, so a task finished at 00:20 read as finished the day before that
+     and dropped out of "what you did yesterday" entirely the one morning it
+     mattered most. Read it through the same local-date key `yday` is. */
   const doneYesterday = useMemo(
-    () => tasks.filter((t) => t.done && (t.doneAt ?? '').slice(0, 10) === yday),
+    () => tasks.filter((t) => t.done && t.doneAt && localDateKey(new Date(t.doneAt)) === yday),
     [tasks, yday],
   )
 

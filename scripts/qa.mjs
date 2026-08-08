@@ -408,6 +408,34 @@ await step('today: the day line, the numbers and the week are his own', async ()
   await page.locator('.weekday').first().click({ timeout: 5000 }); await page.waitForTimeout(500)
   if (!/#\/day\/\d{4}-\d{2}-\d{2}/.test(page.url())) throw new Error(`a day card went to ${page.url()}`)
 })
+await step('today: a task finished right after midnight still counts as finished today', async () => {
+  /* His own report, indirectly: the app is in Prague (UTC+1/+2), and doneAt
+     was being read by slicing toISOString's first ten characters, which is
+     the UTC calendar date. For the two hours after local midnight, UTC has
+     not turned over yet, so a task finished at 00:20 local read as finished
+     "yesterday" and dropped out of today's count, every single night, in the
+     exact window he is most likely to be closing out a late block. Seeded
+     with an explicit local 00:20 stamp so this catches the bug regardless of
+     what time the gate itself happens to run. */
+  await fresh('today')
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const now = new Date()
+    const midnightish = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 20, 0)
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    s.tasks = [{
+      id: 'gate-midnight', title: 'Gate midnight task', source: 'mc', estimateMin: 15,
+      done: true, doneAt: midnightish.toISOString(),
+      space: 'personal', list: 'today', category: 'admin', createdAt: today, plannedOn: today,
+    }]
+    localStorage.setItem(K, JSON.stringify(s))
+  }, KEY)
+  await page.reload(); await page.waitForTimeout(700)
+  const skip = page.getByRole('button', { name: 'Not today' })
+  if (await skip.count()) { await skip.first().click(); await page.waitForTimeout(400) }
+  const finished = await page.locator('.daynum').nth(2).locator('.v').innerText()
+  if (finished !== '1') throw new Error(`finished reads "${finished}" for a task closed at 00:20 local, not 1`)
+})
 await step('today: the assistant rail is already open, and files what he says', async () => {
   await fresh('today')
   const rail = page.locator('.assist-rail')

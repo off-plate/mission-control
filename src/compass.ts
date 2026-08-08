@@ -70,7 +70,12 @@ export function summarise(debts: CompassDebt[], tx: CompassTx[]): CompassMoney {
   const paidOff = Math.max(0, baseline - owed)
   const open = active.filter((d) => remainingOf(d) > 0)
 
-  const month = new Date().toISOString().slice(0, 7)
+  /* Local month, not UTC: toISOString reads the UTC clock, a calendar day
+     behind Prague's for the two hours after midnight, which only bites on
+     the night the month actually turns over but would silently zero out
+     "saved this month" for those two hours if it did. */
+  const now = new Date()
+  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   const savedThisMonth = tx
     .filter((t) => t.kind === 'saving' && t.occurred_on.slice(0, 7) === month)
     .reduce((s, t) => s + t.amount, 0)

@@ -143,11 +143,17 @@ function ZoneNote() {
 export function ZonePage() {
   return (
     <div className="zonepage">
-      <div className="zone-col zone-col-main">
+      {/* The one dominant object in the room, actually centered in whatever
+          screen it is given rather than stranded in a corner of it. The clock
+          sits apart from it on purpose: ambient context, not a second number
+          competing with the countdown for the same glance. */}
+      <div className="zone-hero">
         <ZoneTask />
-        <ZoneClock />
       </div>
-      <div className="zone-col zone-col-side">
+      <ZoneClock />
+      {/* A bare dock along the bottom edge, not a pair of cards: nothing here
+          is trying to look like a panel from the rest of the app. */}
+      <div className="zone-dock">
         <ZoneNote />
         <ZonePlayer />
       </div>

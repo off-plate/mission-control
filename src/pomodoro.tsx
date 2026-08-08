@@ -313,6 +313,12 @@ function PomodoroBadge() {
   const { setPage, page, focusSessions } = useStore()
   const [setupOpen, setSetupOpen] = useState(false)
 
+  /* The room already shows the running block, the countdown and the
+     transport controls at full size. A second, smaller copy of the same
+     three facts in the corner is not a safety net, it is noise competing
+     with the one thing the room exists to make dominant. */
+  if (page === 'zone') return null
+
   const today = focusSessions
     .filter((f) => f.day === new Date().toLocaleDateString('en-CA'))
     .reduce((a, f) => a + f.minutes, 0)

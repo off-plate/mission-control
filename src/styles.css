@@ -2108,7 +2108,10 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 @media (max-width: 639px) {
   .topbar-right .btn-label { display: none; }
   .brand-name { display: none; }
-  .topbar-right .btn { padding-inline: var(--s3); }
+  /* Icon-only now: width has to clear the 44px floor on its own, the same
+     one the height already meets, or a narrow icon glyph with slim padding
+     quietly ships a target a few pixels short of it. */
+  .topbar-right .btn { padding-inline: var(--s3); min-width: 44px; }
 }
 
 /* ---- Phone: metrics grid instead of a stretched row ---- */
@@ -3115,46 +3118,80 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
   border-left: 1px solid var(--hairline-strong); padding-left: var(--s2);
 }
 
-/* ---------- The Zone: full screen, header still above it ---------- */
-/* Not `.page`: no padding-bottom fighting the footer, no reading-column cap.
-   Two columns that fill whatever height main gives them. */
+/* ---------- The Zone: a room, not a page ----------
+   Redesigned 2026-08-08 after his own critic pass: the first version kept
+   the app's full chrome, stacked two equal cards in a corner and left most
+   of an ultrawide screen empty. The room now has one dominant object (the
+   task and its countdown, genuinely centered), the clock demoted to a quiet
+   corner instead of a second competing number, and the note and player
+   moved into a bare dock along the bottom edge instead of looking like two
+   more panels borrowed from the rest of the app. */
 .zonepage {
-  display: grid; gap: var(--s6); grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
-  align-items: start; min-height: calc(100dvh - 160px); padding: var(--s6) var(--s5);
+  /* Percentage heights need a parent with a genuinely definite height, and
+     that did not hold up through the app's shell/main flex chain in testing
+     even though it should have in theory: the hero collapsed to content size
+     instead of filling the screen. 88px covers the header's measured height
+     at both the widest and narrowest tested viewports (71px, 60px) with a
+     small margin, same shape as every other page-height calc in this file. */
+  position: relative; display: flex; flex-direction: column;
+  min-height: calc(100dvh - 88px);
 }
-.zone-col { display: flex; flex-direction: column; gap: var(--s5); min-width: 0; }
-.zone-col-main { align-items: center; justify-content: center; text-align: center; padding-top: var(--s6); }
+.zone-hero {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: var(--s6) var(--s5);
+}
 
 /* What is running. One state at a time, the block's own tone carried through
    from the pomodoro badge's palette so the two never disagree about what
    "paused" or "break" mean. */
 .znow { display: flex; flex-direction: column; align-items: center; gap: var(--s2); }
-.znow-label { font-size: var(--text-sm); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.znow-label { font-size: var(--text-sm); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .znow.is-running .znow-label { color: var(--progress); }
 .znow.is-paused .znow-label { color: var(--warn); }
 .znow.is-await .znow-label { color: var(--accent-text); }
 .znow.is-break .znow-label { color: var(--info); }
 .znow-title {
-  font-family: var(--font-display); font-weight: 800; font-size: clamp(1.75rem, 4vw, 3rem);
-  line-height: 1.05; letter-spacing: -0.01em; max-width: 26ch;
+  font-family: var(--font-display); font-weight: 800; font-size: clamp(1.5rem, 3vw, 2.25rem);
+  line-height: 1.1; letter-spacing: -0.01em; max-width: 26ch; margin-top: var(--s2);
 }
+/* The one dominant object in the room. Big enough on an ultrawide screen to
+   be the reason the screen is not empty; the clamp floor keeps it a real
+   headline rather than a stat on a 390px phone. */
 .znow-clock {
-  font-size: clamp(3.5rem, 9vw, 7rem); font-weight: 700; line-height: 1;
-  letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin-top: var(--s3);
+  font-family: var(--font-mono); font-size: clamp(4.5rem, 15vw, 13rem); font-weight: 700; line-height: 0.95;
+  letter-spacing: -0.03em; font-variant-numeric: tabular-nums; margin-top: var(--s4);
 }
-.znow-est { color: var(--muted); font-size: var(--text-sm); }
-.znow-controls { display: flex; gap: var(--s3); margin-top: var(--s3); }
-.znow-start { margin-top: var(--s4); font-size: var(--text-base); padding-inline: var(--s6); min-height: 48px; }
-.znow.is-empty .znow-title { color: var(--muted); font-weight: 500; font-size: var(--text-lg); }
+.znow-est { font-family: var(--font-mono); color: var(--muted); font-size: var(--text-sm); margin-top: var(--s1); }
+.znow-controls { display: flex; gap: var(--s3); margin-top: var(--s5); }
+.znow-controls .btn { min-height: 44px; padding-inline: var(--s5); }
+.znow-start { margin-top: var(--s5); font-size: var(--text-base); padding-inline: var(--s6); min-height: 52px; }
+.znow.is-empty .znow-title { color: var(--muted); font-weight: 500; font-size: var(--text-lg); margin-top: var(--s2); }
 
-.zclock { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: var(--s6); opacity: 0.8; }
-.zclock-time { font-size: clamp(1.5rem, 2.5vw, 2rem); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
-.zclock-date { font-size: var(--text-sm); color: var(--muted); }
+/* The clock. Ambient context in a fixed corner, deliberately smaller and
+   quieter than the countdown so the two are never mistaken for each other. */
+.zclock {
+  position: absolute; left: var(--s5); bottom: var(--s5);
+  display: flex; flex-direction: column; gap: 2px; color: var(--faint);
+}
+.zclock-time { font-family: var(--font-mono); font-size: var(--text-lg); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; color: var(--muted); }
+.zclock-date { font-size: var(--text-xs); }
+
+/* The dock: one hairline above it, no fill, no border of its own. Note takes
+   the room it needs to write in; the player is a fixed-width hub beside it.
+   Capped and centered rather than spanning the full width: on an ultrawide
+   screen a full-bleed row put a note box on the far left, a player on the
+   far right and 1400px of nothing between them, the exact "control row
+   with a canyon in the middle" DESIGN.md's ultrawide rule warns against. */
+.zone-dock {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 360px); gap: var(--s5);
+  border-top: 1px solid var(--hairline); padding: var(--s4) var(--s5) var(--s5);
+  max-width: 920px; margin-inline: auto; width: 100%;
+}
 
 /* The note. One folder, chosen once; no way to make another from in here. */
-.znote { display: flex; flex-direction: column; gap: var(--s2); background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-md); padding: var(--s4); flex: 1; min-height: 220px; }
+.znote { display: flex; flex-direction: column; gap: var(--s2); min-height: 120px; }
 .znote-head { display: flex; align-items: center; gap: var(--s3); }
-.znote-folder { margin-left: auto; font-size: var(--text-xs); max-width: 40%; }
+.znote-folder { margin-left: auto; font-size: var(--text-xs); max-width: 40%; background: transparent; border-color: var(--hairline-strong); }
 .znote-new { min-height: 30px; font-size: var(--text-xs); padding: 0 var(--s3); }
 .znote-area { flex: 1; border: none; background: transparent; padding: 0; resize: none; font-size: var(--text-sm); line-height: 1.6; }
 .znote-area:focus { outline: none; box-shadow: none; }
@@ -3162,8 +3199,8 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 /* The player. A small MP3 hub: a thumbnail the size of album art, a title
    that can only ever be one line, a scrub rail with no seek handle (this is a
    queue, not a track you scrub through), and three round transport buttons. */
-.zplayer { display: flex; gap: var(--s3); align-items: center; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-md); padding: var(--s3); }
-.zplayer-art { flex: none; width: 64px; height: 64px; border-radius: var(--r-sm); overflow: hidden; background: var(--ink); }
+.zplayer { display: flex; gap: var(--s3); align-items: center; }
+.zplayer-art { flex: none; width: 56px; height: 56px; border-radius: var(--r-sm); overflow: hidden; background: var(--ink); }
 .zplayer-art > div, .zplayer-art iframe { width: 100%; height: 100%; }
 .zplayer-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .zplayer-source { font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); }
@@ -3171,19 +3208,31 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .zplayer-scrub { height: 3px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
 .zplayer-scrub i { display: block; height: 100%; background: var(--accent); }
 .zplayer-time { display: flex; justify-content: space-between; font-size: 0.625rem; color: var(--faint); }
-.zplayer-controls { display: flex; align-items: center; gap: var(--s2); margin-top: 2px; }
+.zplayer-controls { display: flex; align-items: center; gap: var(--s3); margin-top: var(--s2); }
+/* 44px minimum, met by the visible circle itself rather than an invisible
+   hitbox: a slower, more deliberate control fits a page built to be tapped
+   without hurrying. */
 .zplayer-btn {
-  flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+  flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
   border: 1px solid var(--hairline-strong); color: var(--ink); background: var(--bg);
 }
 .zplayer-btn:hover:not(:disabled) { border-color: var(--accent-text); color: var(--accent-text); }
 .zplayer-btn:disabled { opacity: 0.4; }
-.zplayer-play { width: 36px; height: 36px; background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.zplayer-play { width: 52px; height: 52px; background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .zplayer-play:hover:not(:disabled) { background: var(--accent-text); border-color: var(--accent-text); color: var(--bg); }
 
 @media (max-width: 900px) {
-  .zonepage { grid-template-columns: minmax(0, 1fr); min-height: 0; }
-  .zone-col-main { padding-top: var(--s4); }
+  .zone-dock { grid-template-columns: minmax(0, 1fr); }
+  /* A fixed corner risks the running countdown, which is genuinely the
+     tallest thing on the page at this width, growing straight through it.
+     Its own thin strip between hero and dock, hairlines on both sides,
+     reads as independent page furniture without needing to predict how
+     tall the hero gets. */
+  .zclock {
+    position: static; flex-direction: row; align-items: baseline; justify-content: center; gap: var(--s3);
+    color: var(--faint); border-top: 1px solid var(--hairline); padding: var(--s3) var(--s4);
+  }
+  .zone-hero { padding: var(--s5) var(--s4) var(--s3); }
 }
 
 /* ---------- focus history ---------- */

@@ -168,8 +168,11 @@ await step('the zone: header stays, first move starts it, and the note lands in 
   const skip = page.getByRole('button', { name: 'Not today' })
   if (await skip.count()) { await skip.first().click(); await page.waitForTimeout(400) }
 
-  // The header (brand, spaces, the six-tab nav) is still on screen, and the
-  // zone content starts right where it ends, not under it and not replacing it.
+  // The header itself (brand, the right-side buttons) is still on screen and
+  // the zone content starts right where it ends, but the workspace switcher
+  // and the six-tab nav are gone: neither one means anything once he has
+  // actually walked into the room, and leaving them lit was the exact
+  // "still just a dashboard page" problem the room exists to not be.
   const geo = await page.evaluate(() => {
     const header = document.querySelector('.topstick')
     const zone = document.querySelector('.zonepage')
@@ -177,16 +180,40 @@ await step('the zone: header stays, first move starts it, and the note lands in 
       headerVisible: !!header && header.getBoundingClientRect().height > 20,
       headerBottom: header ? Math.round(header.getBoundingClientRect().bottom) : -1,
       zoneTop: zone ? Math.round(zone.getBoundingClientRect().top) : -1,
+      navPresent: !!document.querySelector('.nav'),
+      spacesPresent: !!document.querySelector('.spaces'),
+      badgePresent: !!document.querySelector('.pomo-badge'),
     }
   })
   if (!geo.headerVisible) throw new Error('the header is gone in the zone')
   if (Math.abs(geo.headerBottom - geo.zoneTop) > 2) throw new Error(`the zone starts at ${geo.zoneTop}, the header ends at ${geo.headerBottom}`)
+  if (geo.navPresent) throw new Error('the six-tab nav is still showing in the zone')
+  if (geo.spacesPresent) throw new Error('the workspace switcher is still showing in the zone')
+  if (geo.badgePresent) throw new Error('the floating focus pill is still showing in the zone, doubling the countdown')
 
   if (!(await page.getByText('Zone gate task').count())) throw new Error('the first-move task did not appear in the zone')
   await page.locator('.znow-start').click(); await page.waitForTimeout(500)
   const running = await page.locator('.znow.is-running .znow-title').innerText()
   if (running !== 'Zone gate task') throw new Error(`the zone started "${running}", not the task clicked`)
   if (!(await page.locator('.znow-clock').innerText()).match(/^\d{1,2}:\d{2}$/)) throw new Error('the countdown is not a clock')
+  // The countdown is the one dominant object in the room: it must actually
+  // read larger than the task title above it, not merely be present.
+  const sizes = await page.evaluate(() => ({
+    clock: parseFloat(getComputedStyle(document.querySelector('.znow-clock')).fontSize),
+    title: parseFloat(getComputedStyle(document.querySelector('.znow-title')).fontSize),
+  }))
+  if (sizes.clock <= sizes.title * 2) throw new Error(`countdown is ${sizes.clock}px against a ${sizes.title}px title, not dominant`)
+  // Running reads in the app's own "progress" tone, and the same tone on the
+  // narrowest and widest widths the gate covers, not a colour that only
+  // shows up at one size.
+  const labelColor = await page.evaluate(() => getComputedStyle(document.querySelector('.znow-label')).color)
+  if (labelColor !== 'rgb(63, 107, 70)') throw new Error(`the running label reads ${labelColor}, not the progress tone`)
+
+  // Leaving the zone brings the nav and the switcher straight back.
+  await page.goto(`${URL}#/today`); await page.waitForTimeout(500)
+  if (!(await page.locator('.nav').count())) throw new Error('the nav did not come back on Today')
+  if (!(await page.locator('.spaces').count())) throw new Error('the workspace switcher did not come back on Today')
+  await page.goto(`${URL}#/zone`); await page.waitForTimeout(500)
 
   // The note saves into the folder shown, with no way to create a new one.
   if (await page.locator('.znote button', { hasText: 'New folder' }).count()) throw new Error('the zone note can create folders')

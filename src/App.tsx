@@ -122,18 +122,23 @@ export default function App() {
           <Logo />
           <span className="brand-name">Mission Control</span>
         </div>
-        <nav className="spaces" aria-label="Spaces">
-          {(['all', ...Object.keys(SPACE_LABELS)] as ViewId[]).map((s) => (
-            <button
-              key={s}
-              className="space-btn"
-              aria-pressed={view === s}
-              onClick={() => setView(s)}
-            >
-              {s === 'all' ? 'All' : SPACE_LABELS[s as SpaceId]}
-            </button>
-          ))}
-        </nav>
+        {/* The Zone is a room, not a tab: which workspace you were standing in
+            when you walked in has nothing to do with the one thing running
+            now, so the switcher goes quiet rather than sitting there unused. */}
+        {page !== 'zone' && (
+          <nav className="spaces" aria-label="Spaces">
+            {(['all', ...Object.keys(SPACE_LABELS)] as ViewId[]).map((s) => (
+              <button
+                key={s}
+                className="space-btn"
+                aria-pressed={view === s}
+                onClick={() => setView(s)}
+              >
+                {s === 'all' ? 'All' : SPACE_LABELS[s as SpaceId]}
+              </button>
+            ))}
+          </nav>
+        )}
         <div className="topbar-right">
           {/* mymind cannot be embedded: it answers with frame-ancestors 'none',
               which forbids every iframe anywhere, so a panel inside this page is
@@ -222,7 +227,11 @@ export default function App() {
         </div>
       </header>
 
-      <PageNav tabs={tabs} page={page} setPage={setPage} attention={exceptions.length > 0} />
+      {/* Today, Plan, Habits… none of them apply once he has actually walked
+          into the room. Keeping them lit alongside a running countdown was
+          the exact "still just a dashboard page" problem the room exists to
+          not be. */}
+      {page !== 'zone' && <PageNav tabs={tabs} page={page} setPage={setPage} attention={exceptions.length > 0} />}
       </div>
 
       {isReadOnly() && (

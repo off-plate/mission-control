@@ -262,6 +262,48 @@ await step('the zone: header stays, first move starts it, and the note lands in 
   if (Math.abs(frame.artRatio - 1) > 0.05) throw new Error(`the player art is ${frame.artRatio.toFixed(2)}:1, not square`)
   if (!frame.matches) throw new Error('the video does not fill its own frame')
 })
+await step('the zone: with more than one task open, he can choose which one to focus on', async () => {
+  await fresh('today')
+  // The Zone step before this one starts a real focus block and never
+  // stops it; mc-pomodoro is its own key and fresh() does not touch it, so
+  // without this the room opens here already "running" from that block and
+  // the idle-only picker icon never renders.
+  await page.evaluate(() => {
+    localStorage.setItem('mc-view', 'personal'); localStorage.setItem('mc-space', 'personal')
+    localStorage.removeItem('mc-pomodoro')
+  })
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const today = new Date()
+    const key = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    s.tasks = [
+      { id: 'pick-t1', title: 'Auto pick task', source: 'mc', estimateMin: 25, estimated: true, done: false, space: 'personal', list: 'today', category: 'deep', createdAt: key, plannedOn: key },
+      { id: 'pick-t2', title: 'Hand picked task', source: 'mc', estimateMin: 15, estimated: true, done: false, space: 'personal', list: 'today', category: 'admin', createdAt: key, plannedOn: key },
+    ]
+    localStorage.setItem(K, JSON.stringify(s))
+  }, KEY)
+  await page.goto(`${URL}#/zone`); await page.reload(); await page.waitForTimeout(800)
+  const skip = page.getByRole('button', { name: 'Not today' })
+  if (await skip.count()) { await skip.first().click(); await page.waitForTimeout(400) }
+  await page.waitForSelector('.zw-tile', { timeout: 10000 })
+
+  const picker = page.locator('.znow-icon[aria-label="Choose what to focus on"]')
+  if (!(await picker.count())) throw new Error('two open tasks, but no way to choose between them')
+  await picker.click(); await page.waitForTimeout(300)
+  const rows = await page.locator('.znow-picker-list .znow-settings-row').allInnerTexts()
+  if (!rows[0].startsWith('Auto pick')) throw new Error(`picker's first row is "${rows[0]}", not the auto-pick option`)
+  if (!rows.some((r) => r.includes('Hand picked task'))) throw new Error('the second open task is missing from the picker')
+
+  await page.getByRole('button', { name: /Hand picked task/ }).click(); await page.waitForTimeout(300)
+  if ((await page.locator('.znow-title').innerText()) !== 'Hand picked task') throw new Error('choosing a task did not change what the room shows')
+  // The about-to-start countdown has to reflect the chosen task's own
+  // estimate (15m), not the auto pick's (25m) or the default focus length.
+  if ((await page.locator('.znow-clock').innerText()) !== '15:00') throw new Error('the idle countdown did not pick up the chosen task\'s own estimate')
+
+  await page.locator('.znow-pill').click(); await page.waitForTimeout(500)
+  const running = await page.locator('.znow.zn-running .znow-title').innerText()
+  if (running !== 'Hand picked task') throw new Error(`starting ran "${running}", not the task he chose`)
+})
 await step('achievements: three faces, and every milestone is earned by the log', async () => {
   await fresh('achievements')
   const segs = await page.locator('.achtab').allInnerTexts()

@@ -3255,6 +3255,12 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
   background: none; color: var(--bg); font-size: var(--text-base); text-align: left;
 }
 .znow-settings-row:hover { color: var(--focus); }
+.znow-settings-row svg { flex: none; color: var(--focus); }
+.znow-settings-row span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: var(--s3); }
+/* The picker's task list is the one thing in this card that can genuinely
+   run longer than the card is tall (a full day's open list), so it scrolls
+   inside the card instead of pushing the card's own height around. */
+.znow-picker-list { flex: 1; min-height: 0; overflow-y: auto; }
 /* flex: 1 claims the settings panel's remaining height so the stepper
    centres in it, rather than sitting pinned under the header with a slab of
    empty card below it. */

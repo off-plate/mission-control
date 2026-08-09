@@ -230,7 +230,8 @@ await step('the zone: header stays, first move starts it, and the note lands in 
 
   // The note saves into the folder shown, with no way to create a new one.
   if (await page.locator('.znote button', { hasText: 'New folder' }).count()) throw new Error('the zone note can create folders')
-  await page.locator('.znote-area').fill('Zone gate note')
+  await page.locator('.znote-rich .nt-editor').click()
+  await page.keyboard.insertText('Zone gate note')
   await page.waitForTimeout(400)
   const saved = await page.evaluate((K) => {
     const s = JSON.parse(localStorage.getItem(K))
@@ -239,28 +240,40 @@ await step('the zone: header stays, first move starts it, and the note lands in 
   if (!saved) throw new Error('typing in the zone note did not save a note')
   if (saved.folderId !== 'nf-space-personal') throw new Error(`the note landed in ${saved.folderId}, not the shown folder`)
 
-  // The player: a real Mundi Opus video mounted, and next moves the queue.
-  // Buttons in order: repeat, prev, play, next, shuffle.
-  await page.waitForSelector('.zplayer-art iframe', { timeout: 15000 })
+  // The player: a real Mundi Opus video mounted (off-screen, in mundiplayer's
+  // own permanent host, never inside the Zone tile), and next moves the
+  // queue. Buttons in order: repeat, prev, play, next, shuffle.
+  await page.waitForSelector('.mo-host iframe', { timeout: 15000 })
   const before = await page.locator('.zplayer-title').innerText()
   await page.locator('.zplayer-btn').nth(3).click(); await page.waitForTimeout(300)
   const after = await page.locator('.zplayer-title').innerText()
   if (before === after) throw new Error('next did not change the track')
+  // The art is the track's own real thumbnail, a genuine still of what is
+  // actually playing, and a square crop of it rather than stretched.
+  const art = await page.evaluate(() => {
+    const img = document.querySelector('.zplayer-art')
+    const r = img.getBoundingClientRect()
+    return { src: img.getAttribute('src'), ratio: r.width / r.height }
+  })
+  if (!/^https:\/\/i\.ytimg\.com\/vi\/.+\/hqdefault\.jpg$/.test(art.src)) throw new Error(`the player art src is "${art.src}", not a real YouTube thumbnail`)
+  if (Math.abs(art.ratio - 1) > 0.05) throw new Error(`the player art is ${art.ratio.toFixed(2)}:1, not square`)
   // Repeat and shuffle are real toggles, not icons for show: pressing one
   // marks it pressed.
   const repeat = page.locator('.zplayer-tog').first()
   await repeat.click(); await page.waitForTimeout(150)
   if ((await repeat.getAttribute('aria-pressed')) !== 'true') throw new Error('repeat did not toggle on')
   await repeat.click(); await page.waitForTimeout(150)
-  // The embedded video fills its frame exactly, cropped to a real square as
-  // its own album art, rather than stretched off its own proportions.
-  const frame = await page.evaluate(() => {
-    const art = document.querySelector('.zplayer-art').getBoundingClientRect()
-    const iframe = document.querySelector('.zplayer-art iframe').getBoundingClientRect()
-    return { artRatio: art.width / art.height, matches: Math.abs(iframe.width - art.width) < 2 && Math.abs(iframe.height - art.height) < 2 }
-  })
-  if (Math.abs(frame.artRatio - 1) > 0.05) throw new Error(`the player art is ${frame.artRatio.toFixed(2)}:1, not square`)
-  if (!frame.matches) throw new Error('the video does not fill its own frame')
+  // The scrub bar is a real seek control, not a decoration: clicking near
+  // its far end has to move playback forward, not just redraw the fill.
+  await page.waitForTimeout(1500) // let the video's real duration load
+  const scrub = page.locator('.zplayer-scrub')
+  const box = await scrub.boundingBox()
+  if (!box) throw new Error('no scrub bar to seek on')
+  const beforeSeek = await page.locator('.zplayer-time span').first().innerText()
+  await page.mouse.click(box.x + box.width * 0.8, box.y + box.height / 2)
+  await page.waitForTimeout(400)
+  const afterSeek = await page.locator('.zplayer-time span').first().innerText()
+  if (beforeSeek === afterSeek) throw new Error(`clicking the scrub bar at 80% did not move playback (stuck at ${afterSeek})`)
 })
 await step('the zone: with more than one task open, he can choose which one to focus on', async () => {
   await fresh('today')
@@ -303,6 +316,84 @@ await step('the zone: with more than one task open, he can choose which one to f
   await page.locator('.znow-pill').click(); await page.waitForTimeout(500)
   const running = await page.locator('.znow.zn-running .znow-title').innerText()
   if (running !== 'Hand picked task') throw new Error(`starting ran "${running}", not the task he chose`)
+})
+await step('mundi opus: leaving the zone does not stop the music, and the corner picks it up', async () => {
+  await fresh('zone')
+  const skip = page.getByRole('button', { name: 'Not today' })
+  if (await skip.count()) { await skip.first().click(); await page.waitForTimeout(400) }
+  await page.waitForSelector('.zw-tile', { timeout: 10000 })
+  await page.waitForSelector('.mo-host iframe', { timeout: 15000 })
+  // Nothing has been pressed yet: the corner has nothing to say about a
+  // player he has not touched.
+  await page.goto(`${URL}#/today`); await page.waitForTimeout(500)
+  if (await page.locator('.pomo-media').count()) throw new Error('the corner shows media controls before he ever pressed play')
+
+  await page.goto(`${URL}#/zone`); await page.waitForTimeout(600)
+  const trackBefore = await page.locator('.zplayer-title').innerText()
+  await page.locator('.zplayer-play').click(); await page.waitForTimeout(2500)
+
+  // Leaving the room: the same play state has to survive, not reset because
+  // the tile that used to own the iframe is gone.
+  await page.goto(`${URL}#/today`); await page.waitForTimeout(600)
+  const media = page.locator('.pomo-media')
+  if (!(await media.count())) throw new Error('the corner never picked up the player once he pressed play')
+  if ((await media.locator('.pomo-media-title').innerText()) !== trackBefore) throw new Error('the corner is not showing the track that was actually playing')
+  const pausePresent = await media.getByRole('button', { name: 'Pause' }).count()
+  if (!pausePresent) throw new Error('the music stopped when the zone tile unmounted (corner still shows Play, not Pause)')
+
+  // The corner's own next button moves the SAME queue Zone reads, not a
+  // second independent player.
+  await media.getByRole('button', { name: 'Next track' }).click(); await page.waitForTimeout(400)
+  const trackAfterCornerSkip = await media.locator('.pomo-media-title').innerText()
+  if (trackAfterCornerSkip === trackBefore) throw new Error('the corner\'s next button did not change the track')
+  await page.goto(`${URL}#/zone`); await page.waitForTimeout(600)
+  if ((await page.locator('.zplayer-title').innerText()) !== trackAfterCornerSkip) throw new Error('the zone and the corner disagree about what is playing')
+})
+await step('the zone: the note takes real formatting, not a plain textarea', async () => {
+  await fresh('zone')
+  const skip = page.getByRole('button', { name: 'Not today' })
+  if (await skip.count()) { await skip.first().click(); await page.waitForTimeout(400) }
+  await page.waitForSelector('.zw-tile', { timeout: 10000 })
+
+  const editor = page.locator('.znote-rich .nt-editor')
+  await editor.click()
+  await page.keyboard.insertText('gate note')
+  await page.waitForTimeout(400)
+  // Bold and italic are real marks on real selected text, not styled UI
+  // with nothing behind it.
+  await editor.selectText()
+  await page.locator('.znote-rich').getByRole('button', { name: 'Bold' }).click()
+  await page.locator('.znote-rich').getByRole('button', { name: 'Italic' }).click()
+  await page.waitForTimeout(300)
+  const marked = await editor.evaluate((el) => !!el.querySelector('b, strong') && !!el.querySelector('i, em'))
+  if (!marked) throw new Error('bold and italic did not mark the text')
+  // The whole point of a dash-in-hand-becomes-a-bullet editor is that a
+  // literal "- " typed at the start of a line makes a real list. The Bold
+  // and Italic marks just applied leave the WHOLE line selected (execCommand
+  // does not collapse it), and a synthetic End keypress on that selection
+  // did not collapse it either: Enter then overwrote the selected text
+  // instead of starting a new line. Collapse to the end explicitly first.
+  await editor.evaluate((el) => {
+    const r = document.createRange()
+    r.selectNodeContents(el)
+    r.collapse(false)
+    const sel = window.getSelection()
+    sel.removeAllRanges()
+    sel.addRange(r)
+  })
+  await page.keyboard.press('Enter')
+  await page.keyboard.insertText('- a bullet point')
+  await page.waitForTimeout(300)
+  if (!(await editor.evaluate((el) => !!el.querySelector('ul li')))) throw new Error('typing "- " did not make a bullet')
+  // It survives, in the saved note, as markdown, the same way every other
+  // note on the app does: this is the real editor, not a second one.
+  const saved = await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    return s.notes.find((n) => /a bullet point/.test(n.body))
+  }, KEY)
+  if (!saved) throw new Error('the formatted note did not save')
+  if (!/\*\*[^*]+\*\*/.test(saved.body)) throw new Error(`bold did not round-trip to markdown: ${saved.body}`)
+  if (!/^-\s/m.test(saved.body)) throw new Error(`the bullet did not round-trip to markdown: ${saved.body}`)
 })
 await step('achievements: three faces, and every milestone is earned by the log', async () => {
   await fresh('achievements')

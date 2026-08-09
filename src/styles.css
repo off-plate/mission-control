@@ -292,12 +292,26 @@ main { padding-inline: var(--gutter); }
 @keyframes pomo-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.85; } }
 @media (prefers-reduced-motion: reduce) { .pomo-ambient { animation: none; } }
 
+/* The dock holds the screen-fixed position; the badge and the media pill
+   inside it are ordinary flow children, stacked bottom-up. .pomo-setup
+   below still anchors off .pomo-badge itself (position: relative is enough
+   for that), not off the dock, so it stays pinned to the timer pill even
+   with a media pill above it changing the dock's own height. */
+.pomo-dock { position: fixed; right: 20px; bottom: 20px; z-index: 60; display: flex; flex-direction: column; align-items: flex-end; gap: var(--s2); }
 .pomo-badge {
-  position: fixed; right: 20px; bottom: 20px; z-index: 60;
+  position: relative;
   display: flex; align-items: center; gap: var(--s1);
   background: var(--surface); border: 1px solid var(--hairline-strong);
   border-radius: 999px; padding: 5px 7px 5px 12px; box-shadow: var(--shadow-pop);
 }
+.pomo-media {
+  position: relative; max-width: min(340px, 60vw);
+  display: flex; align-items: center; gap: var(--s1);
+  background: var(--surface); border: 1px solid var(--hairline-strong);
+  border-radius: 999px; padding: 5px 7px 5px 6px; box-shadow: var(--shadow-pop);
+}
+.pomo-media-art { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; flex: none; }
+.pomo-media-title { font-size: var(--text-xs); font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; margin: 0 2px; }
 .pomo-badge.active.focus { border-color: var(--accent-text); }
 .pomo-badge.active.break { border-color: var(--progress); }
 .pomo-badge.active.paused { border-color: var(--warn); }
@@ -324,8 +338,9 @@ main { padding-inline: var(--gutter); }
 .pomo-step button:hover { border-color: var(--accent-text); color: var(--accent-text); }
 .pomo-step-val { min-width: 3.5ch; text-align: center; font-weight: 600; }
 @media (max-width: 639px) {
-  .pomo-badge { bottom: max(12px, env(safe-area-inset-bottom)); right: 12px; }
-  /* The pill is fixed, so the page needs room at the end: without this it
+  .pomo-dock { bottom: max(12px, env(safe-area-inset-bottom)); right: 12px; }
+  .pomo-media { max-width: 74vw; }
+  /* The dock is fixed, so the page needs room at the end: without this it
      permanently sat on the last rows' checkboxes and kebabs. */
   #main { padding-bottom: 128px; }
 }
@@ -3305,15 +3320,27 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
   background: var(--surface-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236b6353' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center / 9px;
   border: 1px solid var(--hairline); border-radius: 999px; padding: 6px 26px 6px 12px; color: var(--ink);
 }
-.znote-area {
-  /* .textinput caps at max-width:680px for an ordinary field in a row of
-     text; a note filling its own tile needs the tile's actual width, which
-     is what was leaving a few hundred empty pixels to its right. The card's
-     own edge is the field's edge, so the box border the reference doesn't
-     draw is dropped here too. */
-  flex: 1; width: 100%; max-width: none; resize: none; font-size: var(--text-base); line-height: 1.6;
-  background: none; border: none; padding: var(--s1) 0;
-}
+/* The real Notes editor (notes.tsx), not a second formatting engine: Bold,
+   Italic and a bullet list are the three tools he asked for, so tools=
+   narrows the full bar down to those three rather than the whole Notes
+   toolbar landing in a tile that was asked to stay simple. plain skips the
+   Notes page's own "first line is the title" convention, since this note
+   has no title field of its own to hold one. The full-width, borderless
+   field this replaces is still the shape here: the toolbar loses its
+   pill background and hairline rule, and the sheet loses the wide page
+   padding, so it reads as this tile's own writing area, not an editor
+   pasted into it. */
+.znote-rich { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.znote-rich .nt-topbar { padding: 0 0 var(--s2); border-bottom: none; }
+.znote-rich .nt-toolbar { padding-bottom: 0; border-bottom: none; gap: var(--s2); }
+.znote-rich .nt-toolgroup { background: none; padding: 0; gap: 2px; }
+.znote-rich .nt-tool { min-width: 26px; height: 26px; border-radius: 6px; color: var(--muted); }
+.znote-rich .nt-tool:hover { background: var(--surface-2); box-shadow: none; color: var(--accent-text); }
+.znote-rich .nt-panebody { flex: 1; min-height: 0; overflow-y: auto; }
+.znote-rich .nt-sheet { padding: 0; }
+.znote-rich .nt-editor { min-height: 100%; margin-top: 0; padding: var(--s1) 0; border-radius: 0; font-size: var(--text-base); line-height: 1.6; }
+.znote-rich .nt-editor:focus { background: none; box-shadow: none; }
+.znote-rich .nt-editor[data-empty]::before { content: 'Whatever is worth keeping from this block…'; }
 .znote-foot { display: flex; align-items: center; justify-content: space-between; padding-top: var(--s3); border-top: 1px solid var(--hairline); }
 .znote-status { font-size: var(--text-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); }
 .znote-status.is-saved { color: var(--progress); }
@@ -3333,20 +3360,28 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
    bottom with an empty slab of card between them. */
 .zplayer { display: flex; flex-direction: column; justify-content: center; gap: var(--s4); width: 100%; height: 100%; }
 .zplayer-row { display: flex; align-items: center; gap: var(--s3); }
+/* The track's own real thumbnail, from YouTube's public thumbnail CDN by
+   video id: a genuine still of what is actually playing, not a fabricated
+   image. The live embed plays from a permanently off-screen host
+   (mundiplayer.tsx) so it survives leaving the Zone; showing a still here
+   instead of the iframe is what makes that possible without a portal
+   fighting two very differently sized places to render the same one embed. */
 .zplayer-art {
-  flex: none; width: clamp(56px, 16vw, 84px); aspect-ratio: 1; border-radius: var(--r-sm); overflow: hidden;
-  background: var(--ink); position: relative;
+  flex: none; width: clamp(56px, 16vw, 84px); aspect-ratio: 1; border-radius: var(--r-sm);
+  background: var(--ink); object-fit: cover; display: block;
 }
-.zplayer-art > div { position: absolute; inset: 0; }
-/* object-fit crops the embed to a clean square; a fixed 100%/100% on the
-   iframe with no object-fit stretched the video off its own proportions. */
-.zplayer-art iframe { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .zplayer-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 .zplayer-source { font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); }
 .zplayer-title { display: block; font-size: var(--text-base); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
-.zplayer-scrub { position: relative; height: 3px; border-radius: 2px; background: var(--surface-2); }
-.zplayer-scrub i { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
-.zplayer-scrub b { position: absolute; top: 50%; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); transform: translate(-50%, -50%); }
+/* The visible rail stays a hairline; the actual grab target is taller
+   (padding, not the rail's own height) so a real drag has room to land. */
+.zplayer-scrub {
+  position: relative; height: 3px; border-radius: 2px; background: var(--surface-2);
+  margin-block: var(--s2); cursor: pointer; touch-action: none;
+}
+.zplayer-scrub::before { content: ''; position: absolute; inset: -10px 0; }
+.zplayer-scrub i { display: block; height: 100%; border-radius: 2px; background: var(--accent); pointer-events: none; }
+.zplayer-scrub b { position: absolute; top: 50%; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); transform: translate(-50%, -50%); pointer-events: none; }
 .zplayer-time { display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--faint); margin-top: 2px; }
 .zplayer-controls { display: flex; align-items: center; justify-content: center; gap: var(--s2); margin-top: var(--s2); }
 /* 44px minimum, met by the visible circle itself rather than an invisible
@@ -3366,6 +3401,12 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
    smaller hit area. */
 .zplayer-tog { border-color: transparent; }
 .zplayer-tog.is-on { background: var(--accent-wash); border-color: var(--accent-text); color: var(--accent-text); }
+
+/* Off-canvas, not hidden: some browsers throttle or pause media inside a
+   display:none or visibility:hidden frame, so this stays laid out and
+   painted, just parked where nothing is ever pointed at it. */
+.mo-host { position: fixed; left: -9999px; top: -9999px; width: 160px; height: 90px; overflow: hidden; }
+.mo-host > div { width: 100%; height: 100%; }
 
 @media (max-width: 900px) {
   .zw-grid {

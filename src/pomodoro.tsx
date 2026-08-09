@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { useStore } from './store'
 import { fmtDuration, taskMinutes } from './util'
+import { thumbUrl, useMundiOpus } from './mundiplayer'
+import { MUNDI_OPUS_QUEUE } from './mundiopus'
 
 /* A global Pomodoro that lives above the whole app: a bottom-right badge you
    see on every tab, a corner ambient glow that shows the state at a glance,
@@ -259,7 +261,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
       {children}
       <PomodoroAmbient />
       {phase === 'await' && <FocusDoneModal />}
-      <PomodoroBadge />
+      <PomodoroDock />
     </Ctx.Provider>
   )
 }
@@ -303,6 +305,54 @@ function Stepper({ label, value, set, min, max }: { label: string; value: number
   )
 }
 
+/* The corner as a whole: the timer badge, and above it, Mundi Opus if he has
+   actually touched it this session. "It should keep going and be an
+   extension of the floating focus badge with media controls," his words
+   after the music stopped dead the moment he left the Zone tile that used
+   to own the only iframe. The player itself lives in mundiplayer.tsx now,
+   so leaving the Zone no longer touches it; this is just where it surfaces
+   when he is not looking at the big version. */
+function PomodoroDock() {
+  const { page } = useStore()
+  /* The room already shows the timer and the player at full size. A second,
+     smaller copy of the same facts in the corner is not a safety net, it is
+     noise competing with the one thing the room exists to make dominant. */
+  if (page === 'zone') return null
+  return (
+    <div className="pomo-dock">
+      <MediaBadge />
+      <PomodoroBadge />
+    </div>
+  )
+}
+
+function MediaBadge() {
+  const mo = useMundiOpus()
+  /* Nothing shows until he has actually pressed play once: a player he has
+     never touched has nothing to say in a corner he looks at constantly. */
+  if (!mo.started) return null
+  const current = MUNDI_OPUS_QUEUE[mo.track]
+  return (
+    <div className="pomo-media">
+      <img className="pomo-media-art" src={thumbUrl(current.id)} alt="" />
+      <span className="pomo-media-title" title={current.title}>{current.title}</span>
+      <button className="pomo-icon" onClick={() => mo.go(-1)} aria-label="Previous track">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h2.5v14H6zM19 5v14L9 12z" /></svg>
+      </button>
+      <button className="pomo-icon" onClick={mo.toggle} aria-label={mo.playing ? 'Pause' : 'Play'}>
+        {mo.playing ? (
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4.5" height="14" rx="1" /><rect x="13.5" y="5" width="4.5" height="14" rx="1" /></svg>
+        ) : (
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5.5l13 6.5-13 6.5z" /></svg>
+        )}
+      </button>
+      <button className="pomo-icon" onClick={() => mo.go(1)} aria-label="Next track">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 5h2.5v14H16zM5 5v14l10-7z" /></svg>
+      </button>
+    </div>
+  )
+}
+
 /* Focus left the menu, so this badge is now the only door to its page as well
    as the timer's controls. Everything it does is one press: start, pause, take
    the break, stop, and open the history. The glyph buttons it used to carry
@@ -312,12 +362,6 @@ function PomodoroBadge() {
   const p = usePomodoro()
   const { setPage, page, focusSessions } = useStore()
   const [setupOpen, setSetupOpen] = useState(false)
-
-  /* The room already shows the running block, the countdown and the
-     transport controls at full size. A second, smaller copy of the same
-     three facts in the corner is not a safety net, it is noise competing
-     with the one thing the room exists to make dominant. */
-  if (page === 'zone') return null
 
   const today = focusSessions
     .filter((f) => f.day === new Date().toLocaleDateString('en-CA'))

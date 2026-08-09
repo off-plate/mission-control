@@ -15,7 +15,7 @@
    it) was left out rather than faked. */
 
 import { useEffect, useState, type ReactNode } from 'react'
-import { AutoTextarea, useClockStamp, useFirstMove } from './ui'
+import { AutoTextarea, useClockStamp, useFirstMove, useOpenToday } from './ui'
 import { usePomodoro } from './pomodoro'
 import { ZonePlayer } from './zoneplayer'
 import { useStore } from './store'
@@ -93,6 +93,19 @@ function BackIcon() {
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M14.5 5l-7 7 7 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
   )
 }
+function ListIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path d="M9 6h12M9 12h12M9 18h12" strokeLinecap="round" />
+      <path d="M4 6h.01M4 12h.01M4 18h.01" strokeLinecap="round" strokeWidth="2.6" />
+    </svg>
+  )
+}
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+  )
+}
 
 type PhaseState = 'running' | 'paused' | 'break' | 'done' | 'idle'
 
@@ -107,8 +120,16 @@ function ZoneTask() {
   const pomo = usePomodoro()
   const { setFocusTaskId } = useStore()
   const firstMove = useFirstMove()
+  const openToday = useOpenToday()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [editing, setEditing] = useState<'focus' | 'break' | null>(null)
+  // A hand pick overrides the auto first-move; it clears itself the moment
+  // that task leaves today's open list (finished, or dropped from today),
+  // rather than pointing at something that no longer exists.
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [chosenId, setChosenId] = useState<string | null>(null)
+  const chosenTask = chosenId ? openToday.find((t) => t.id === chosenId) : undefined
+  const activeTask = chosenTask ?? firstMove
 
   const phaseState: PhaseState =
     pomo.phase === 'await' ? 'done' :
@@ -121,17 +142,17 @@ function ZoneTask() {
     pomo.phase === 'break' ? 1 - pomo.secondsLeft / Math.max(1, pomo.breakMin * 60) :
     pomo.phase === 'await' ? 1 : 0
 
-  const label = { running: 'Focus', paused: 'Paused', break: 'Break', done: 'Done', idle: firstMove ? 'Ready' : 'Nothing lined up' }[phaseState]
+  const label = { running: 'Focus', paused: 'Paused', break: 'Break', done: 'Done', idle: activeTask ? 'Ready' : 'Nothing lined up' }[phaseState]
 
   const title =
     pomo.phase === 'focus' || pomo.phase === 'await' ? (pomo.focusLabel ?? 'Focus block') :
     pomo.phase === 'break' ? 'Short break' :
-    firstMove ? firstMove.title : 'Plan has nothing on today’s list yet.'
+    activeTask ? activeTask.title : 'Plan has nothing on today’s list yet.'
 
   // The about-to-start duration shown while idle has to match what pressing
   // Start actually does: the task's own estimate when it has one, the
   // default setting when it doesn't. Never a number Start then contradicts.
-  const idleMin = firstMove && isEstimated(firstMove) && firstMove.estimateMin > 0 ? taskMinutes(firstMove) : pomo.focusMin
+  const idleMin = activeTask && isEstimated(activeTask) && activeTask.estimateMin > 0 ? taskMinutes(activeTask) : pomo.focusMin
   const clockText = phaseState === 'done' ? 'done' : phaseState === 'idle' ? mmss(idleMin * 60) : mmss(pomo.secondsLeft)
 
   const filledDots = pomo.cyclesDone % 4 === 0 && pomo.cyclesDone > 0 ? 4 : pomo.cyclesDone % 4
@@ -139,9 +160,9 @@ function ZoneTask() {
   const c = 2 * Math.PI * r
 
   const start = () => {
-    if (firstMove) {
-      pomo.startFocus(isEstimated(firstMove) && firstMove.estimateMin > 0 ? taskMinutes(firstMove) : undefined, firstMove.title)
-      setFocusTaskId(firstMove.id)
+    if (activeTask) {
+      pomo.startFocus(isEstimated(activeTask) && activeTask.estimateMin > 0 ? taskMinutes(activeTask) : undefined, activeTask.title)
+      setFocusTaskId(activeTask.id)
     } else {
       pomo.startFocus()
     }
@@ -175,6 +196,17 @@ function ZoneTask() {
         {(phaseState === 'running' || phaseState === 'paused' || phaseState === 'break') && (
           <button className="znow-icon" onClick={pomo.stop} aria-label="Stop this block"><StopIcon /></button>
         )}
+        {/* Choosing only makes sense before a block starts, and only when
+           there is more than the one task the auto pick would offer
+           anyway: nothing to choose between otherwise. */}
+        {phaseState === 'idle' && openToday.length > 1 && (
+          <button
+            className="znow-icon" aria-expanded={pickerOpen} aria-label="Choose what to focus on"
+            onClick={() => { setPickerOpen((v) => !v); setSettingsOpen(false) }}
+          >
+            <ListIcon />
+          </button>
+        )}
         {phaseState === 'idle' && (
           <button className="znow-pill" onClick={start}>Start</button>
         )}
@@ -184,11 +216,31 @@ function ZoneTask() {
         {phaseState === 'done' && <span className="znow-pill is-done">Banked</span>}
         <button
           className="znow-icon" aria-expanded={settingsOpen} aria-label="Timer settings"
-          onClick={() => { setSettingsOpen((v) => !v); setEditing(null) }}
+          onClick={() => { setSettingsOpen((v) => !v); setEditing(null); setPickerOpen(false) }}
         >
           <GearIcon />
         </button>
       </div>
+      {pickerOpen && (
+        <div className="znow-settings" role="dialog" aria-label="Choose what to focus on">
+          <div className="znow-settings-head">
+            <span>Choose a task</span>
+            <button className="znow-icon" onClick={() => setPickerOpen(false)} aria-label="Close"><CloseIcon /></button>
+          </div>
+          <div className="znow-picker-list">
+            <button className="znow-settings-row" onClick={() => { setChosenId(null); setPickerOpen(false) }}>
+              <span>Auto pick (first move)</span>
+              {!chosenTask && <CheckIcon />}
+            </button>
+            {openToday.map((t) => (
+              <button key={t.id} className="znow-settings-row" onClick={() => { setChosenId(t.id); setPickerOpen(false) }}>
+                <span>{t.title}</span>
+                {chosenTask?.id === t.id ? <CheckIcon /> : isEstimated(t) && t.estimateMin > 0 ? <span className="mono">{taskMinutes(t)}m</span> : null}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {settingsOpen && (
         <div className="znow-settings" role="dialog" aria-label="Timer settings">
           {editing === null ? (

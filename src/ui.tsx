@@ -252,6 +252,14 @@ export function Segmented<T extends string>({ value, options, onPick, size = 'md
 }
 
 
+/* Today's open list, the raw material both the auto pick below and the
+   Zone's own "choose a task" picker draw from, so the two can never
+   disagree about what is actually on today's list. */
+export function useOpenToday(): Task[] {
+  const { tasks, inView } = useStore()
+  return tasks.filter((t) => inView(t.space) && t.list === 'today' && !t.done && (t.plannedOn ?? localDateKey()) === localDateKey())
+}
+
 /* The one thing to do next, on Today and in the Zone. Alerts first (a debt
    deadline beats everything), then whatever he pinned by hand, then the least
    dreaded of what is left. One derivation, so the two pages can never point
@@ -259,7 +267,7 @@ export function Segmented<T extends string>({ value, options, onPick, size = 'md
 export function useFirstMove(): Task | undefined {
   const { space, tasks, routines, plan, inView } = useStore()
   const exceptions = exceptionsFor(space, { tasks, routines })
-  const open = tasks.filter((t) => inView(t.space) && t.list === 'today' && !t.done && (t.plannedOn ?? localDateKey()) === localDateKey())
+  const open = useOpenToday()
   const DREAD_RANK = { admin: 0, call: 1, deep: 2, quick: 3 }
   const alertTaskTitles = new Set(exceptions.map((x) => x.task?.title).filter(Boolean) as string[])
   const alertRank = (t: Task) => (alertTaskTitles.has(t.title) ? 0 : 1)

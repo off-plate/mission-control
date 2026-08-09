@@ -27,6 +27,15 @@
   --accent-ink: #ffffff;
   --accent-wash: color-mix(in srgb, var(--accent) 10%, transparent);
 
+  /* Deliberately NOT --accent: every other space override below recolours
+     --accent, and "all" sets it to near-black, which is fine on light
+     surfaces but would make a running Zone ring or its Start pill vanish
+     against the ring card's own always-dark background. Focus is one fixed
+     colour regardless of which space you're standing in when you press
+     Start, the same way a kitchen timer doesn't change colour by room. */
+  --focus: #d1502a;
+  --focus-text: #b03d1c;
+
   --alert: #9e2b12;
   --alert-wash: color-mix(in srgb, var(--alert) 12%, transparent);
   --progress: #3f6b46;
@@ -3137,7 +3146,10 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .zw-grid {
   display: grid; height: 100%; padding: var(--s5); gap: var(--s5);
   grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr);
-  grid-template-rows: minmax(300px, 1fr) minmax(340px, 1.15fr);
+  /* Note and Mundi Opus don't have as much to fill as a wide monitor gives
+     them: the row carrying the ring and the clock, the two tiles that
+     actually scale to use extra room, gets the larger share now. */
+  grid-template-rows: minmax(320px, 1.15fr) minmax(260px, 0.85fr);
   grid-template-areas: "now clock" "note player";
 }
 .zw-now { grid-area: now; }
@@ -3165,20 +3177,31 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .znow {
   display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%;
   padding: var(--s5) var(--s4); background: var(--ink); color: var(--bg); position: relative;
+  /* A query container so the ring can scale off the card's own box (below),
+     not a flat pixel cap that left it a small island on a wide monitor. */
+  container-type: size;
 }
 .znow-title {
   font-family: var(--font-display); font-weight: 700; font-size: clamp(1rem, 1.8vw, 1.25rem);
   line-height: 1.25; letter-spacing: -0.01em; max-width: 28ch; text-align: center;
   color: color-mix(in srgb, var(--bg) 88%, transparent);
 }
-.znow-face { position: relative; flex: 1; width: min(280px, 78%); aspect-ratio: 1; margin: var(--s3) auto; --ring: var(--accent); }
+/* flex: 1 lives on the WRAP, a plain flex box with no aspect-ratio of its
+   own, so it can claim the remaining vertical space with no fight over
+   what "definite size" means. The face inside it is sized off the card's
+   own width and height (cqw/cqh) and aspect-ratio can size its height from
+   that cleanly, since nothing else on the face is already definite. A flat
+   280px cap was leaving the ring stranded in a lot of dead space on a wide,
+   short card; 460px keeps this from ballooning on a very large tile. */
+.znow-face-wrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.znow-face { position: relative; width: min(58cqw, 62cqh, 460px); aspect-ratio: 1; --ring: var(--focus); }
 .zring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
 .zring-track { fill: none; stroke: color-mix(in srgb, var(--bg) 16%, transparent); stroke-width: 5; }
 .zring-fill {
   fill: none; stroke: var(--ring); stroke-width: 5; stroke-linecap: round;
   transition: stroke-dashoffset 0.4s ease-out, stroke 0.3s ease-out;
 }
-.zn-running .znow-face { --ring: var(--accent); }
+.zn-running .znow-face { --ring: var(--focus); }
 .zn-paused .znow-face { --ring: var(--warn); }
 .zn-break .znow-face { --ring: var(--info); }
 .zn-done .znow-face { --ring: var(--progress); }
@@ -3199,17 +3222,17 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
   flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
   border: 1px solid color-mix(in srgb, var(--bg) 22%, transparent); color: var(--bg); background: none;
 }
-.znow-icon:hover { border-color: var(--accent); color: var(--accent); }
+.znow-icon:hover { border-color: var(--focus); color: var(--focus); }
 .znow-pill {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 140px; min-height: 44px; padding-inline: var(--s6); border-radius: 999px; font-weight: 700;
-  /* --accent alone measures 4.29:1 for white text at this weight/size, short
-     of AA's 4.5:1; --accent-text is the token the rest of the app already
-     uses to clear that bar (5.19:1, documented above) and reads fine as a
-     fill, not just as text-on-light. */
-  font-size: var(--text-base); background: var(--accent-text); color: var(--accent-ink); border: none;
+  /* --focus-text over white measures 5.19:1 (documented on --accent-text,
+     the same hex). --accent-text would have done here on every space but
+     "all", where it collides with the ring card's own near-black
+     background; --focus-text is fixed so it can't. */
+  font-size: var(--text-base); background: var(--focus-text); color: var(--accent-ink); border: none;
 }
-.znow-pill:hover { background: var(--accent-hover); }
+.znow-pill:hover { background: var(--focus); }
 .znow-pill.is-done { background: none; border: 1px solid color-mix(in srgb, var(--bg) 22%, transparent); color: var(--bg); }
 /* The settings screen: a real second face for the card, opaque like the
    reference's own settings screen rather than a translucent sheet over it. */
@@ -3231,7 +3254,7 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
   padding: var(--s4) 0; border-bottom: 1px solid color-mix(in srgb, var(--bg) 10%, transparent);
   background: none; color: var(--bg); font-size: var(--text-base); text-align: left;
 }
-.znow-settings-row:hover { color: var(--accent); }
+.znow-settings-row:hover { color: var(--focus); }
 /* flex: 1 claims the settings panel's remaining height so the stepper
    centres in it, rather than sitting pinned under the header with a slab of
    empty card below it. */
@@ -3240,7 +3263,7 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
   width: 44px; height: 44px; border-radius: 50%; font-size: 1.5rem; line-height: 1;
   border: 1px solid color-mix(in srgb, var(--bg) 22%, transparent); color: var(--bg); background: none;
 }
-.znow-stepper button:hover { border-color: var(--accent); color: var(--accent); }
+.znow-stepper button:hover { border-color: var(--focus); color: var(--focus); }
 .znow-stepper span { font-size: clamp(2rem, 6vw, 3rem); font-weight: 700; min-width: 3ch; text-align: center; }
 .znow-stepper small { display: block; font-size: var(--text-xs); font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: color-mix(in srgb, var(--bg) 60%, transparent); }
 

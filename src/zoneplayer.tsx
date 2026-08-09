@@ -35,6 +35,15 @@ function loadYouTubeApi(): Promise<void> {
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`
 
+function nextIndex(cur: number, shuffled: boolean): number {
+  if (shuffled && MUNDI_OPUS_QUEUE.length > 1) {
+    let i = cur
+    while (i === cur) i = Math.floor(Math.random() * MUNDI_OPUS_QUEUE.length)
+    return i
+  }
+  return (cur + 1) % MUNDI_OPUS_QUEUE.length
+}
+
 export function ZonePlayer() {
   const mountRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<any>(null)
@@ -43,6 +52,15 @@ export function ZonePlayer() {
   const [playing, setPlaying] = useState(false)
   const [pos, setPos] = useState(0)
   const [dur, setDur] = useState(0)
+  const [loop, setLoop] = useState(false)
+  const [shuffle, setShuffle] = useState(false)
+  // Read inside the player's onStateChange, a callback wired once at mount:
+  // without refs it would keep closing over the loop/shuffle values from
+  // that first render forever, deaf to either toggle.
+  const loopRef = useRef(loop)
+  const shuffleRef = useRef(shuffle)
+  useEffect(() => { loopRef.current = loop }, [loop])
+  useEffect(() => { shuffleRef.current = shuffle }, [shuffle])
 
   useEffect(() => {
     let alive = true
@@ -55,8 +73,15 @@ export function ZonePlayer() {
           onReady: () => setReady(true),
           onStateChange: (e: any) => {
             setPlaying(e.data === 1)
-            // ENDED: move to the next track myself, never YouTube's own pick.
-            if (e.data === 0) setTrack((i) => (i + 1) % MUNDI_OPUS_QUEUE.length)
+            if (e.data !== 0) return
+            // ENDED: repeat replays what just finished, otherwise move on
+            // myself, shuffled or not. Never YouTube's own next pick.
+            if (loopRef.current) {
+              playerRef.current?.seekTo(0, true)
+              playerRef.current?.playVideo()
+            } else {
+              setTrack((i) => nextIndex(i, shuffleRef.current))
+            }
           },
         },
       })
@@ -91,26 +116,42 @@ export function ZonePlayer() {
     if (!p) return
     playing ? p.pauseVideo() : p.playVideo()
   }
+  // Manual skips stay literal and predictable; shuffle only decides what
+  // plays next on its own, at the end of a track.
   const go = (by: 1 | -1) => setTrack((i) => (i + by + MUNDI_OPUS_QUEUE.length) % MUNDI_OPUS_QUEUE.length)
   const pct = dur > 0 ? Math.min(100, (pos / dur) * 100) : 0
+  const remaining = dur > 0 ? mmss(Math.max(0, dur - pos)) : '·:··'
 
   return (
     <div className="zplayer">
-      {/* A real 16:9 frame, not a square a rectangular video gets squashed
-         into: the YT iframe is sized to fill it and cropped with object-fit,
-         never stretched off its own proportions. */}
-      <div className="zplayer-art">
-        <div ref={mountRef} />
-      </div>
-      <div className="zplayer-body">
-        <span className="zplayer-source">Mundi Opus</span>
-        <span className="zplayer-title" title={MUNDI_OPUS_QUEUE[track].title}>{MUNDI_OPUS_QUEUE[track].title}</span>
-        <div className="zplayer-scrub" aria-hidden="true"><i style={{ width: `${pct}%` }} /></div>
-        <div className="zplayer-time mono">
-          <span>{mmss(pos)}</span><span>{dur ? mmss(dur) : '·:·'}</span>
+      <div className="zplayer-row">
+        {/* A real video, cropped square as its own album art rather than a
+           separate fetched thumbnail: what plays is what you see. */}
+        <div className="zplayer-art"><div ref={mountRef} /></div>
+        <div className="zplayer-meta">
+          <span className="zplayer-source">Mundi Opus</span>
+          <span className="zplayer-title" title={MUNDI_OPUS_QUEUE[track].title}>{MUNDI_OPUS_QUEUE[track].title}</span>
         </div>
       </div>
+      <div className="zplayer-scrub" aria-hidden="true">
+        <i style={{ width: `${pct}%` }} />
+        <b style={{ left: `${pct}%` }} />
+      </div>
+      <div className="zplayer-time mono">
+        <span>{mmss(pos)}</span><span>−{remaining}</span>
+      </div>
       <div className="zplayer-controls">
+        <button
+          className={`zplayer-btn zplayer-tog${loop ? ' is-on' : ''}`}
+          onClick={() => setLoop((v) => !v)}
+          aria-pressed={loop}
+          aria-label={loop ? 'Repeat this track: on' : 'Repeat this track: off'}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <path d="M4 7h13a3 3 0 0 1 3 3v2M20 17H7a3 3 0 0 1-3-3v-2" strokeLinecap="round" />
+            <path d="M14 4l3 3-3 3M10 20l-3-3 3-3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
         <button className="zplayer-btn" onClick={() => go(-1)} aria-label="Previous track" disabled={!ready}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h2.5v14H6zM19 5v14L9 12z" /></svg>
         </button>
@@ -123,6 +164,17 @@ export function ZonePlayer() {
         </button>
         <button className="zplayer-btn" onClick={() => go(1)} aria-label="Next track" disabled={!ready}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 5h2.5v14H16zM5 5v14l10-7z" /></svg>
+        </button>
+        <button
+          className={`zplayer-btn zplayer-tog${shuffle ? ' is-on' : ''}`}
+          onClick={() => setShuffle((v) => !v)}
+          aria-pressed={shuffle}
+          aria-label={shuffle ? 'Shuffle: on' : 'Shuffle: off'}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <path d="M4 7h3.5l9 10H20M4 17h3.5l3-3.3" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M17 4l3 3-3 3M17 14l3 3-3 3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </button>
       </div>
     </div>

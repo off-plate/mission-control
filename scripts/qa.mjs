@@ -206,22 +206,21 @@ await step('the zone: header stays, first move starts it, and the note lands in 
   if (tiles.some((t) => !t.hasChrome)) throw new Error('a zone tile has no widget border or fill')
 
   if (!(await page.getByText('Zone gate task').count())) throw new Error('the first-move task did not appear in the zone')
-  await page.locator('.znow-start').click(); await page.waitForTimeout(500)
-  const running = await page.locator('.znow.is-running .znow-title').innerText()
+  await page.locator('.znow-pill').click(); await page.waitForTimeout(500)
+  const running = await page.locator('.znow.zn-running .znow-title').innerText()
   if (running !== 'Zone gate task') throw new Error(`the zone started "${running}", not the task clicked`)
   if (!(await page.locator('.znow-clock').innerText()).match(/^\d{1,2}:\d{2}$/)) throw new Error('the countdown is not a clock')
-  // The countdown is the one dominant object in the room: it must actually
-  // read larger than the task title above it, not merely be present.
+  // The countdown sits inside the ring, still the one dominant number in the
+  // room, and must read larger than the task title above it.
   const sizes = await page.evaluate(() => ({
     clock: parseFloat(getComputedStyle(document.querySelector('.znow-clock')).fontSize),
     title: parseFloat(getComputedStyle(document.querySelector('.znow-title')).fontSize),
   }))
-  if (sizes.clock <= sizes.title * 2) throw new Error(`countdown is ${sizes.clock}px against a ${sizes.title}px title, not dominant`)
-  // Running reads in the app's own "progress" tone, and the same tone on the
-  // narrowest and widest widths the gate covers, not a colour that only
-  // shows up at one size.
-  const labelColor = await page.evaluate(() => getComputedStyle(document.querySelector('.znow-label')).color)
-  if (labelColor !== 'rgb(63, 107, 70)') throw new Error(`the running label reads ${labelColor}, not the progress tone`)
+  if (sizes.clock <= sizes.title) throw new Error(`countdown is ${sizes.clock}px against a ${sizes.title}px title, not dominant`)
+  // The state reads through the ring's own colour (the app's "progress"
+  // tone while running), not through text that changes shade by state.
+  const ringColor = await page.evaluate(() => getComputedStyle(document.querySelector('.zring-fill')).stroke)
+  if (ringColor !== 'rgb(209, 80, 42)') throw new Error(`the running ring reads ${ringColor}, not the accent tone`)
 
   // Leaving the zone brings the nav and the switcher straight back.
   await page.goto(`${URL}#/today`); await page.waitForTimeout(500)
@@ -241,19 +240,26 @@ await step('the zone: header stays, first move starts it, and the note lands in 
   if (saved.folderId !== 'nf-space-personal') throw new Error(`the note landed in ${saved.folderId}, not the shown folder`)
 
   // The player: a real Mundi Opus video mounted, and next moves the queue.
+  // Buttons in order: repeat, prev, play, next, shuffle.
   await page.waitForSelector('.zplayer-art iframe', { timeout: 15000 })
   const before = await page.locator('.zplayer-title').innerText()
-  await page.locator('.zplayer-btn').nth(2).click(); await page.waitForTimeout(300)
+  await page.locator('.zplayer-btn').nth(3).click(); await page.waitForTimeout(300)
   const after = await page.locator('.zplayer-title').innerText()
   if (before === after) throw new Error('next did not change the track')
-  // The embedded video fills its frame exactly, at the frame's own 16:9,
-  // rather than a square box squashing a rectangular video into it.
+  // Repeat and shuffle are real toggles, not icons for show: pressing one
+  // marks it pressed.
+  const repeat = page.locator('.zplayer-tog').first()
+  await repeat.click(); await page.waitForTimeout(150)
+  if ((await repeat.getAttribute('aria-pressed')) !== 'true') throw new Error('repeat did not toggle on')
+  await repeat.click(); await page.waitForTimeout(150)
+  // The embedded video fills its frame exactly, cropped to a real square as
+  // its own album art, rather than stretched off its own proportions.
   const frame = await page.evaluate(() => {
     const art = document.querySelector('.zplayer-art').getBoundingClientRect()
     const iframe = document.querySelector('.zplayer-art iframe').getBoundingClientRect()
     return { artRatio: art.width / art.height, matches: Math.abs(iframe.width - art.width) < 2 && Math.abs(iframe.height - art.height) < 2 }
   })
-  if (Math.abs(frame.artRatio - 16 / 9) > 0.05) throw new Error(`the player frame is ${frame.artRatio.toFixed(2)}:1, not 16:9`)
+  if (Math.abs(frame.artRatio - 1) > 0.05) throw new Error(`the player art is ${frame.artRatio.toFixed(2)}:1, not square`)
   if (!frame.matches) throw new Error('the video does not fill its own frame')
 })
 await step('achievements: three faces, and every milestone is earned by the log', async () => {

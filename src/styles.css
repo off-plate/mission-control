@@ -3340,7 +3340,7 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .znote-rich .nt-sheet { padding: 0; }
 .znote-rich .nt-editor { min-height: 100%; margin-top: 0; padding: var(--s1) 0; border-radius: 0; font-size: var(--text-base); line-height: 1.6; }
 .znote-rich .nt-editor:focus { background: none; box-shadow: none; }
-.znote-rich .nt-editor[data-empty]::before { content: 'Whatever is worth keeping from this block…'; }
+.znote-rich .nt-editor[data-empty]::before { content: none; }
 .znote-foot { display: flex; align-items: center; justify-content: space-between; padding-top: var(--s3); border-top: 1px solid var(--hairline); }
 .znote-status { font-size: var(--text-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); }
 .znote-status.is-saved { color: var(--progress); }

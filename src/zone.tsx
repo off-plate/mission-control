@@ -14,14 +14,15 @@
    step notes already autosave past, a "liked" badge with nothing backing
    it) was left out rather than faked. */
 
-import { useEffect, useState, type ReactNode } from 'react'
-import { AutoTextarea, useClockStamp, useFirstMove, useOpenToday } from './ui'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useClockStamp, useFirstMove, useOpenToday } from './ui'
 import { usePomodoro } from './pomodoro'
 import { ZonePlayer } from './zoneplayer'
 import { useStore } from './store'
 import { isEstimated, taskMinutes } from './util'
 import { SPACE_LABELS } from './mock'
 import { spaceFolderId } from './types'
+import { Editor } from './notes'
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`
 
@@ -339,7 +340,7 @@ function PlusIcon() {
 }
 
 function ZoneNote() {
-  const { space, noteFolders, addNote, updateNote } = useStore()
+  const { space, noteFolders, notes, addNote, updateNote } = useStore()
   const options = [
     ...(['personal', 'work', 'offplate', 'corner'] as const).map((s) => ({ id: spaceFolderId(s), name: SPACE_LABELS[s] })),
     ...noteFolders.map((f) => ({ id: f.id, name: f.name })),
@@ -350,15 +351,34 @@ function ZoneNote() {
   useEffect(() => { try { localStorage.setItem(FOLDER_KEY, folderId) } catch { /* quota */ } }, [folderId])
 
   const [noteId, setNoteId] = useState<string | null>(null)
-  const [body, setBody] = useState('')
+  // Before the first character, there is no note to hold the draft yet: it
+  // lives in a ref so a keystroke does not fight the store for who owns it.
+  const draft = useRef('')
+  /* Typing fast enough (a real fast typist, or any programmatic input) can
+     fire several keystrokes before React commits the state update from the
+     one that just created the note. Reading noteId itself for that decision
+     raced: two or three keystrokes in a row each still saw it as null and
+     each created their OWN note, splitting one note into several. The ref
+     is written the instant the note exists, no render required to see it. */
+  const noteIdRef = useRef<string | null>(null)
+  const active = noteId ? notes.find((n) => n.id === noteId) : undefined
+  // A note this pointed at was deleted out from under it (folder removed,
+  // a sync merge). Fall back to a fresh draft rather than a dead id.
+  useEffect(() => { if (noteId && !active) { noteIdRef.current = null; setNoteId(null) } }, [noteId, active])
+  const note = active ?? { id: 'draft', body: draft.current }
 
-  const onChange = (v: string) => {
-    setBody(v)
-    if (noteId) { updateNote(noteId, { body: v }); return }
-    if (v.trim()) setNoteId(addNote(folderId, v))
+  const onChange = (md: string) => {
+    if (noteIdRef.current) { updateNote(noteIdRef.current, { body: md }); return }
+    draft.current = md
+    if (md.trim()) {
+      const id = addNote(folderId, md)
+      noteIdRef.current = id
+      setNoteId(id)
+    }
   }
-  const fresh = () => { setNoteId(null); setBody('') }
+  const fresh = () => { noteIdRef.current = null; setNoteId(null); draft.current = '' }
   const folderName = options.find((o) => o.id === folderId)?.name ?? 'Notes'
+  const hasBody = (active?.body ?? draft.current).trim().length > 0
 
   return (
     <div className="znote">
@@ -372,17 +392,11 @@ function ZoneNote() {
           {options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
         </select>
       </div>
-      <AutoTextarea
-        className="textinput znote-area"
-        value={body}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="Whatever is worth keeping from this block…"
-        minRows={4}
-        maxRows={40}
-        aria-label={`Zone note, saved to ${folderName}`}
-      />
+      <div className="znote-rich" aria-label={`Zone note, saved to ${folderName}`}>
+        <Editor note={note} onChange={onChange} tools={['bold', 'italic', 'bullet']} plain />
+      </div>
       <div className="znote-foot">
-        <span className={`znote-status${body.trim() ? ' is-saved' : ''}`}>{body.trim() ? 'Saved' : 'Empty'}</span>
+        <span className={`znote-status${hasBody ? ' is-saved' : ''}`}>{hasBody ? 'Saved' : 'Empty'}</span>
         <button className="znote-add" onClick={fresh} aria-label="New note" title="New note"><PlusIcon /></button>
       </div>
     </div>

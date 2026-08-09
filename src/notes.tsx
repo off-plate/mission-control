@@ -72,8 +72,11 @@ function blockAt(root: HTMLElement): HTMLElement | null {
   return n && n.nodeType === 1 ? (n as HTMLElement) : null
 }
 
-function Editor({ note, onChange, lead, trail, children }: {
-  note: Note
+export type EditorTool = 'bold' | 'italic' | 'heading' | 'bullet' | 'checklist' | 'quote' | 'divider' | 'table' | 'clear'
+const ALL_TOOLS: EditorTool[] = ['bold', 'italic', 'heading', 'bullet', 'checklist', 'quote', 'divider', 'table', 'clear']
+
+export function Editor({ note, onChange, lead, trail, children, tools, plain }: {
+  note: Pick<Note, 'id' | 'body'>
   onChange: (md: string) => void
   /** Sits at the start of the pane's own bar, before the formatting. */
   lead?: React.ReactNode
@@ -81,8 +84,17 @@ function Editor({ note, onChange, lead, trail, children }: {
   trail?: React.ReactNode
   /** The stamp, the title and anything else above the writing surface. */
   children?: React.ReactNode
+  /** Which formatting buttons to show. Unset shows all of them, the full
+   *  Notes page bar; a caller with a narrower brief (the Zone's "just a
+   *  place to take notes") names only the ones it actually wants. */
+  tools?: EditorTool[]
+  /** The Notes page's own body convention is "first line is the title, the
+   *  rest is markdown" (headOf/restOf below). A caller with no title field
+   *  of its own passes plain: the whole body is the markdown, full stop. */
+  plain?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
+  const show = (t: EditorTool) => (tools ?? ALL_TOOLS).includes(t)
   /* The markdown this editor last produced. Without it, every keystroke would
      come back through props and rewrite the DOM under his caret. */
   const mine = useRef<string | null>(null)
@@ -90,11 +102,11 @@ function Editor({ note, onChange, lead, trail, children }: {
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    const md = restOf(note.body)
+    const md = plain ? note.body : restOf(note.body)
     if (md === mine.current) return
     el.innerHTML = mdToHtml(md)
     mine.current = md
-  }, [note.id, note.body])
+  }, [note.id, note.body, plain])
 
   /* Chrome's indent leaves the nested list as a SIBLING of the item it belongs
      to, which is invalid and makes the markdown ambiguous. Put it back inside
@@ -265,31 +277,44 @@ function Editor({ note, onChange, lead, trail, children }: {
       <div className="nt-topbar">
         {lead}
         <div className="nt-toolbar" role="toolbar" aria-label="Formatting">
+        {(show('bold') || show('italic') || show('heading')) && (
         <span className="nt-toolgroup">
-        <T label="Bold" on={() => cmd('bold')}><b>B</b></T>
-        <T label="Italic" on={() => cmd('italic')}><i>I</i></T>
-        <T label="Heading" on={() => toggleBlock('h3')}>H</T>
+        {show('bold') && <T label="Bold" on={() => cmd('bold')}><b>B</b></T>}
+        {show('italic') && <T label="Italic" on={() => cmd('italic')}><i>I</i></T>}
+        {show('heading') && <T label="Heading" on={() => toggleBlock('h3')}>H</T>}
         </span>
+        )}
+        {(show('bullet') || show('checklist') || show('quote')) && (
         <span className="nt-toolgroup">
+        {show('bullet') && (
         <T label="Bullet list" on={() => cmd('insertUnorderedList')}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <circle cx="5" cy="7" r="1.4" fill="currentColor" /><circle cx="5" cy="17" r="1.4" fill="currentColor" />
             <path d="M10 7h10M10 17h10" strokeLinecap="round" />
           </svg>
         </T>
+        )}
+        {show('checklist') && (
         <T label="Checklist" on={checklist}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <rect x="3" y="4" width="7" height="7" rx="1.6" /><path d="M4.5 17.5l2 2 4-4M14 7.5h7M14 17.5h7" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </T>
-        <T label="Quote" on={() => toggleBlock('blockquote')}>&rdquo;</T>
+        )}
+        {show('quote') && <T label="Quote" on={() => toggleBlock('blockquote')}>&rdquo;</T>}
         </span>
+        )}
+        {(show('divider') || show('table')) && (
         <span className="nt-toolgroup">
+        {show('divider') && (
         <T label="Divider" on={divider}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path d="M3 12h18" strokeLinecap="round" />
           </svg>
         </T>
+        )}
+        {show('table') && (
+        <>
         <TablePicker onPick={insertTable} />
         <T label="Add a row" on={() => grow('row')}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -301,7 +326,11 @@ function Editor({ note, onChange, lead, trail, children }: {
             <rect x="4" y="3" width="8" height="18" rx="1.6" /><path d="M18 9v6M15 12h6" strokeLinecap="round" />
           </svg>
         </T>
+        </>
+        )}
         </span>
+        )}
+        {show('clear') && (
         <span className="nt-toolgroup">
         <T label="Clear formatting" on={() => cmd('removeFormat')}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -309,6 +338,7 @@ function Editor({ note, onChange, lead, trail, children }: {
           </svg>
         </T>
         </span>
+        )}
         </div>
         {trail}
       </div>

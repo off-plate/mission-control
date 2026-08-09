@@ -5,6 +5,7 @@ import './styles.css'
 import App from './App'
 import { StoreProvider, STORAGE_KEY } from './store'
 import { PomodoroProvider } from './pomodoro'
+import { MundiOpusProvider } from './mundiplayer'
 import { SUPABASE_ENABLED, clearAuthFragment, currentAccount, loadRemoteState, onAccountChange } from './supabase'
 import { mergeStates } from './sync-merge'
 import { LOCAL_ONLY_KEY, SignIn } from './signin'
@@ -18,9 +19,11 @@ function render() {
   root().render(
     <StrictMode>
       <StoreProvider>
-        <PomodoroProvider>
-          <App />
-        </PomodoroProvider>
+        <MundiOpusProvider>
+          <PomodoroProvider>
+            <App />
+          </PomodoroProvider>
+        </MundiOpusProvider>
       </StoreProvider>
     </StrictMode>,
   )

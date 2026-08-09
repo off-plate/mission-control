@@ -150,23 +150,25 @@ function ZoneTask() {
   return (
     <div className={`znow zn-${phaseState}`}>
       <span className="znow-title">{title}</span>
-      <div className="znow-face">
-        <svg className="zring" viewBox="0 0 100 100" aria-hidden="true">
-          <circle className="zring-track" cx="50" cy="50" r={r} />
-          {phaseState !== 'idle' && (
-            <circle
-              className="zring-fill" cx="50" cy="50" r={r}
-              style={{ strokeDasharray: c, strokeDashoffset: c * (1 - Math.min(1, Math.max(0, pct))) }}
-            />
-          )}
-        </svg>
-        <div className="znow-center">
-          <PhaseIcon state={phaseState} />
-          <span className="znow-clock mono">{clockText}</span>
-          <div className="znow-dots" aria-hidden="true">
-            {[0, 1, 2, 3].map((i) => <i key={i} className={i < filledDots ? 'is-on' : ''} />)}
+      <div className="znow-face-wrap">
+        <div className="znow-face">
+          <svg className="zring" viewBox="0 0 100 100" aria-hidden="true">
+            <circle className="zring-track" cx="50" cy="50" r={r} />
+            {phaseState !== 'idle' && (
+              <circle
+                className="zring-fill" cx="50" cy="50" r={r}
+                style={{ strokeDasharray: c, strokeDashoffset: c * (1 - Math.min(1, Math.max(0, pct))) }}
+              />
+            )}
+          </svg>
+          <div className="znow-center">
+            <PhaseIcon state={phaseState} />
+            <span className="znow-clock mono">{clockText}</span>
+            <div className="znow-dots" aria-hidden="true">
+              {[0, 1, 2, 3].map((i) => <i key={i} className={i < filledDots ? 'is-on' : ''} />)}
+            </div>
+            <span className="znow-label">{label}</span>
           </div>
-          <span className="znow-label">{label}</span>
         </div>
       </div>
       <div className="znow-actions">

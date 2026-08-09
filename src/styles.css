@@ -3149,78 +3149,181 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .zw-now .zw-body, .zw-clock .zw-body { text-align: center; }
 .zw-note-tile .zw-body, .zw-player-tile .zw-body { align-items: stretch; justify-content: flex-start; }
 
-/* What is running. One state at a time, the block's own tone carried through
-   from the pomodoro badge's palette so the two never disagree about what
-   "paused" or "break" mean. */
-.znow { display: flex; flex-direction: column; align-items: center; gap: var(--s2); width: 100%; }
-.znow-label { font-size: var(--text-sm); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
-.znow.is-running .znow-label { color: var(--progress); }
-.znow.is-paused .znow-label { color: var(--warn); }
-.znow.is-await .znow-label { color: var(--accent-text); }
-.znow.is-break .znow-label { color: var(--info); }
+/* Fourth pass. Four reference screenshots, one per tile: a ring pomodoro, a
+   notes card, a prayer-times clock, a glass media hub. Each tile below wears
+   its reference's shape; every number inside it is still a real one this
+   app already tracks. Nothing here is decoration standing in for data. */
+/* padding: 0 lets the ring card and the gradient clock fill their tile edge
+   to edge; the mask-image is the app's overflow-dissolve for scrolling
+   lists, and had nothing to dissolve here, just a false fade at the bottom
+   of an opaque card that was never going to overflow. */
+.zw-now .widget-body, .zw-clock .widget-body { padding: 0; mask-image: none; -webkit-mask-image: none; }
+
+/* ---- Now: a ring, not a bare countdown. Icon and colour both name the
+   phase (eye/focus, cup/break, check/done), the dots are the real cycle
+   count, and the ring itself is the block's real elapsed share. ---- */
+.znow {
+  display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%;
+  padding: var(--s5) var(--s4); background: var(--ink); color: var(--bg); position: relative;
+}
 .znow-title {
-  font-family: var(--font-display); font-weight: 800; font-size: clamp(1.5rem, 2.6vw, 2.25rem);
-  line-height: 1.1; letter-spacing: -0.01em; max-width: 26ch; margin-top: var(--s2);
+  font-family: var(--font-display); font-weight: 700; font-size: clamp(1rem, 1.8vw, 1.25rem);
+  line-height: 1.25; letter-spacing: -0.01em; max-width: 28ch; text-align: center;
+  color: color-mix(in srgb, var(--bg) 88%, transparent);
 }
-/* The one dominant number in the room, still huge, now anchored inside a
-   tile with a real edge instead of floating free in open space, which is
-   what made it read as randomly placed rather than deliberately centred. */
+.znow-face { position: relative; flex: 1; width: min(280px, 78%); aspect-ratio: 1; margin: var(--s3) auto; --ring: var(--accent); }
+.zring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.zring-track { fill: none; stroke: color-mix(in srgb, var(--bg) 16%, transparent); stroke-width: 5; }
+.zring-fill {
+  fill: none; stroke: var(--ring); stroke-width: 5; stroke-linecap: round;
+  transition: stroke-dashoffset 0.4s ease-out, stroke 0.3s ease-out;
+}
+.zn-running .znow-face { --ring: var(--accent); }
+.zn-paused .znow-face { --ring: var(--warn); }
+.zn-break .znow-face { --ring: var(--info); }
+.zn-done .znow-face { --ring: var(--progress); }
+.znow-center {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: var(--s1); color: var(--bg);
+}
 .znow-clock {
-  font-family: var(--font-mono); font-size: clamp(4rem, 11vw, 9rem); font-weight: 700; line-height: 0.95;
-  letter-spacing: -0.03em; font-variant-numeric: tabular-nums; margin-top: var(--s4);
+  font-family: var(--font-mono); font-size: clamp(2.25rem, 6.5vw, 3.5rem); font-weight: 700; line-height: 1;
+  letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin-top: var(--s2);
 }
-.znow-est { font-family: var(--font-mono); color: var(--muted); font-size: var(--text-base); margin-top: var(--s2); }
-.znow-controls { display: flex; gap: var(--s3); margin-top: var(--s6); }
-.znow-controls .btn { min-height: 48px; padding-inline: var(--s6); font-size: var(--text-base); }
-/* The idle state has less to say than a running countdown ever will, so it
-   is given more room per word rather than left to look sparse in the same
-   box: a bigger task name, a bigger button, more air around both. */
-.znow-start { margin-top: var(--s6); font-size: var(--text-lg); padding-inline: var(--s8); min-height: 60px; }
-.znow.is-idle .znow-title, .znow.is-empty .znow-title { font-size: clamp(1.75rem, 3.2vw, 2.75rem); }
-.znow.is-empty .znow-title { color: var(--muted); font-weight: 500; margin-top: var(--s2); }
+.znow-dots { display: flex; gap: 6px; margin-top: var(--s2); }
+.znow-dots i { display: block; width: 6px; height: 6px; border-radius: 50%; background: color-mix(in srgb, var(--bg) 22%, transparent); }
+.znow-dots i.is-on { background: var(--ring); }
+.znow-label { font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: color-mix(in srgb, var(--bg) 60%, transparent); }
+.znow-actions { display: flex; align-items: center; justify-content: center; gap: var(--s3); margin-top: auto; padding-top: var(--s4); }
+.znow-icon {
+  flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+  border: 1px solid color-mix(in srgb, var(--bg) 22%, transparent); color: var(--bg); background: none;
+}
+.znow-icon:hover { border-color: var(--accent); color: var(--accent); }
+.znow-pill {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 140px; min-height: 44px; padding-inline: var(--s6); border-radius: 999px; font-weight: 700;
+  /* --accent alone measures 4.29:1 for white text at this weight/size, short
+     of AA's 4.5:1; --accent-text is the token the rest of the app already
+     uses to clear that bar (5.19:1, documented above) and reads fine as a
+     fill, not just as text-on-light. */
+  font-size: var(--text-base); background: var(--accent-text); color: var(--accent-ink); border: none;
+}
+.znow-pill:hover { background: var(--accent-hover); }
+.znow-pill.is-done { background: none; border: 1px solid color-mix(in srgb, var(--bg) 22%, transparent); color: var(--bg); }
+/* The settings screen: a real second face for the card, opaque like the
+   reference's own settings screen rather than a translucent sheet over it. */
+.znow-settings {
+  position: absolute; inset: 0; background: var(--ink); color: var(--bg); z-index: 2;
+  display: flex; flex-direction: column; gap: var(--s2); padding: var(--s5) var(--s4);
+}
+.znow-settings-head {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s3);
+  font-weight: 700; font-size: var(--text-base); padding-bottom: var(--s3);
+  border-bottom: 1px solid color-mix(in srgb, var(--bg) 14%, transparent);
+}
+/* The settings list trails with its close button (space-between spreads
+   the two to opposite edges); the stepper screen leads with its back
+   button, which wants to sit right next to its title instead. */
+.znow-settings-head:has(> .znow-icon:first-child) { justify-content: flex-start; }
+.znow-settings-row {
+  display: flex; align-items: center; justify-content: space-between; width: 100%;
+  padding: var(--s4) 0; border-bottom: 1px solid color-mix(in srgb, var(--bg) 10%, transparent);
+  background: none; color: var(--bg); font-size: var(--text-base); text-align: left;
+}
+.znow-settings-row:hover { color: var(--accent); }
+/* flex: 1 claims the settings panel's remaining height so the stepper
+   centres in it, rather than sitting pinned under the header with a slab of
+   empty card below it. */
+.znow-stepper { flex: 1; display: flex; align-items: center; justify-content: center; gap: var(--s6); }
+.znow-stepper button {
+  width: 44px; height: 44px; border-radius: 50%; font-size: 1.5rem; line-height: 1;
+  border: 1px solid color-mix(in srgb, var(--bg) 22%, transparent); color: var(--bg); background: none;
+}
+.znow-stepper button:hover { border-color: var(--accent); color: var(--accent); }
+.znow-stepper span { font-size: clamp(2rem, 6vw, 3rem); font-weight: 700; min-width: 3ch; text-align: center; }
+.znow-stepper small { display: block; font-size: var(--text-xs); font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: color-mix(in srgb, var(--bg) 60%, transparent); }
 
-/* The clock tile: ClockBody, the exact component Today's grid renders,
-   sized up to fill a tile of its own instead of a corner-sized copy. */
-.zw-clock .clockw-time { font-size: clamp(4rem, 8vw, 6.5rem); }
-.zw-clock .clockw-day { font-size: var(--text-xl); margin-top: var(--s4); }
-.zw-clock .clockw-date { font-size: var(--text-lg); justify-content: center; margin-top: var(--s2); }
-.zw-clock .clockw-week { font-size: var(--text-sm); padding-left: var(--s3); }
+/* ---- Clock: the daypart arc is real (the machine's own hour), the
+   gradient is one accent mixed against ink/cream at different ratios, not
+   a second colour smuggled in. ---- */
+.zclock {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 100%; height: 100%; padding: var(--s5); text-align: center;
+}
+.zclock-morning { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 22%, var(--bg)) 0%, var(--bg) 72%); color: var(--ink); }
+.zclock-day { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 40%, var(--bg)) 0%, color-mix(in srgb, var(--accent) 10%, var(--bg)) 78%); color: var(--ink); }
+.zclock-evening { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 55%, var(--ink)) 0%, var(--ink) 82%); color: var(--bg); }
+.zclock-night { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 16%, var(--ink)) 0%, var(--ink) 62%); color: var(--bg); }
+.zclock-arc { position: relative; width: 100%; max-width: 260px; height: 36px; margin-bottom: var(--s3); }
+.zclock-arc svg { width: 100%; height: 100%; overflow: visible; }
+.zclock-arc path { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-dasharray: 1 6; stroke-linecap: round; opacity: 0.4; }
+.zclock-marks { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: space-between; padding: 0 4px; }
+.zclock-marks span { display: block; width: 7px; height: 7px; border-radius: 50%; background: color-mix(in srgb, currentColor 30%, transparent); }
+.zclock-marks span.is-now { background: var(--accent); outline: 3px solid color-mix(in srgb, var(--accent) 35%, transparent); outline-offset: 2px; }
+.zclock-part { font-size: var(--text-sm); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.75; }
+.zclock-time { font-size: clamp(3.25rem, 8.5vw, 5.5rem); font-weight: 800; line-height: 1; letter-spacing: -0.02em; margin-top: var(--s2); font-variant-numeric: tabular-nums; }
+.zclock-date { font-size: var(--text-lg); opacity: 0.85; margin-top: var(--s3); }
 
-/* The note. One folder, chosen once; no way to make another from in here. */
+/* ---- Note: one folder as a pill instead of a raw select box, fields with
+   no boxed border (the card itself is the edge), a real save state instead
+   of an inert "Publish". ---- */
 .znote { display: flex; flex-direction: column; gap: var(--s3); width: 100%; height: 100%; }
-.znote-head { display: flex; align-items: center; gap: var(--s3); }
-.znote-folder { margin-left: auto; font-size: var(--text-xs); max-width: 55%; }
-.znote-new { min-height: 30px; font-size: var(--text-xs); padding: 0 var(--s3); flex: none; }
+.znote-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
+.znote-heading { display: flex; align-items: center; gap: var(--s2); font-weight: 700; font-size: var(--text-sm); color: var(--ink); }
+.znote-folder {
+  appearance: none; -webkit-appearance: none; max-width: 60%; font-size: var(--text-xs); font-weight: 600;
+  background: var(--surface-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236b6353' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center / 9px;
+  border: 1px solid var(--hairline); border-radius: 999px; padding: 6px 26px 6px 12px; color: var(--ink);
+}
 .znote-area {
   /* .textinput caps at max-width:680px for an ordinary field in a row of
      text; a note filling its own tile needs the tile's actual width, which
-     is what was leaving a few hundred empty pixels to its right. */
+     is what was leaving a few hundred empty pixels to its right. The card's
+     own edge is the field's edge, so the box border the reference doesn't
+     draw is dropped here too. */
   flex: 1; width: 100%; max-width: none; resize: none; font-size: var(--text-base); line-height: 1.6;
-  background: var(--bg); border-color: var(--hairline-strong);
+  background: none; border: none; padding: var(--s1) 0;
 }
+.znote-foot { display: flex; align-items: center; justify-content: space-between; padding-top: var(--s3); border-top: 1px solid var(--hairline); }
+.znote-status { font-size: var(--text-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); }
+.znote-status.is-saved { color: var(--progress); }
+.znote-add {
+  flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--accent); color: var(--accent-ink); border: none;
+}
+.znote-add:hover { background: var(--accent-hover); }
 
-/* The player. A media card: a real 16:9 frame, a title that can only ever be
-   one line, a scrub rail with no seek handle (this is a queue, not a track
-   you scrub through), and three round transport buttons. */
-.zplayer { display: flex; flex-direction: column; gap: var(--s3); width: 100%; }
+/* ---- Player: the video itself, cropped square, is the album art; repeat
+   and shuffle are real toggles wired to real queue behaviour, not icons for
+   show. A blurred glass sheet over live content is the one shape of the
+   reference the house rules forbid outright (slop-lint: glassmorphism), so
+   the "hub" feel comes from the square-art + scrub-thumb layout instead. ---- */
+/* The whole hub centres as one cluster in whatever height the tile has,
+   rather than the art pinned to the top and the transport pinned to the
+   bottom with an empty slab of card between them. */
+.zplayer { display: flex; flex-direction: column; justify-content: center; gap: var(--s4); width: 100%; height: 100%; }
+.zplayer-row { display: flex; align-items: center; gap: var(--s3); }
 .zplayer-art {
-  width: 100%; aspect-ratio: 16 / 9; border-radius: var(--r-sm); overflow: hidden;
+  flex: none; width: clamp(56px, 16vw, 84px); aspect-ratio: 1; border-radius: var(--r-sm); overflow: hidden;
   background: var(--ink); position: relative;
 }
 .zplayer-art > div { position: absolute; inset: 0; }
-/* object-fit crops a too-wide-or-tall embed to fill the frame cleanly; the
-   old fixed 100%/100% on a square box stretched a 16:9 video into a square
-   and it visibly warped. */
+/* object-fit crops the embed to a clean square; a fixed 100%/100% on the
+   iframe with no object-fit stretched the video off its own proportions. */
 .zplayer-art iframe { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.zplayer-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 .zplayer-source { font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); }
 .zplayer-title { display: block; font-size: var(--text-base); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
-.zplayer-scrub { height: 3px; border-radius: 2px; background: var(--surface-2); overflow: hidden; margin-top: var(--s3); }
-.zplayer-scrub i { display: block; height: 100%; background: var(--accent); }
+.zplayer-scrub { position: relative; height: 3px; border-radius: 2px; background: var(--surface-2); }
+.zplayer-scrub i { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
+.zplayer-scrub b { position: absolute; top: 50%; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); transform: translate(-50%, -50%); }
 .zplayer-time { display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--faint); margin-top: 2px; }
-.zplayer-controls { display: flex; align-items: center; justify-content: center; gap: var(--s3); margin-top: auto; }
+.zplayer-controls { display: flex; align-items: center; justify-content: center; gap: var(--s2); margin-top: var(--s2); }
 /* 44px minimum, met by the visible circle itself rather than an invisible
    hitbox: a slower, more deliberate control fits a page built to be tapped
-   without hurrying. */
+   without hurrying. Repeat/shuffle are secondary, so they sit a touch
+   smaller than the three transport buttons they flank. */
 .zplayer-btn {
   flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
   border: 1px solid var(--hairline-strong); color: var(--ink); background: var(--bg);
@@ -3229,13 +3332,19 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .zplayer-btn:disabled { opacity: 0.4; }
 .zplayer-play { width: 52px; height: 52px; background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .zplayer-play:hover:not(:disabled) { background: var(--accent-text); border-color: var(--accent-text); color: var(--bg); }
+/* Secondary controls, but the house 44px touch-target floor has no carve-out
+   for "secondary": the smaller look comes from a lighter border, not a
+   smaller hit area. */
+.zplayer-tog { border-color: transparent; }
+.zplayer-tog.is-on { background: var(--accent-wash); border-color: var(--accent-text); color: var(--accent-text); }
 
 @media (max-width: 900px) {
   .zw-grid {
     grid-template-columns: minmax(0, 1fr); grid-template-rows: none;
     grid-template-areas: "now" "clock" "note" "player";
   }
-  .zw-now .widget-body { min-height: 320px; }
+  .zw-now .widget-body { min-height: 360px; }
+  .zw-clock .widget-body { min-height: 220px; }
 }
 
 /* ---------- focus history ---------- */

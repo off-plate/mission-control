@@ -18,6 +18,7 @@ import { useStore } from './store'
 import { fmtWhen, localDateKey } from './util'
 import { htmlToMd, mdToHtml } from './richtext'
 import { spaceFolderId, type Note, type SpaceId } from './types'
+import { helpWithNote, type HelpResult } from './notesai'
 
 const NOTE_COLORS: { id: string; bg: string; label: string }[] = [
   { id: 'amber', bg: '#f6ead0', label: 'Amber' },
@@ -62,6 +63,15 @@ function caretToEnd(node: Node) {
   sel.addRange(r)
 }
 
+/* Matches the wording Settings and Break It Down already use for the same
+   three failure shapes, so a key problem reads the same everywhere it shows. */
+const HELP_ERROR: Record<Exclude<HelpResult, { ok: true }>['reason'], string> = {
+  'no-key': 'No Groq key yet. Add one in Settings and /help can actually answer.',
+  'bad-key': 'That Groq key was rejected. Check it in Settings.',
+  'rate-limit': 'Groq is rate-limited right now. Try again in a moment.',
+  'failed': 'That did not go through. Try again.',
+}
+
 /** The block the caret sits in, as a direct child of the editor. */
 function blockAt(root: HTMLElement): HTMLElement | null {
   const sel = window.getSelection()
@@ -75,7 +85,7 @@ function blockAt(root: HTMLElement): HTMLElement | null {
 export type EditorTool = 'bold' | 'italic' | 'heading' | 'bullet' | 'checklist' | 'quote' | 'divider' | 'table' | 'clear'
 const ALL_TOOLS: EditorTool[] = ['bold', 'italic', 'heading', 'bullet', 'checklist', 'quote', 'divider', 'table', 'clear']
 
-export function Editor({ note, onChange, lead, trail, children, tools, plain }: {
+export function Editor({ note, onChange, lead, trail, children, tools, plain, slashHelp }: {
   note: Pick<Note, 'id' | 'body'>
   onChange: (md: string) => void
   /** Sits at the start of the pane's own bar, before the formatting. */
@@ -92,6 +102,10 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain }: 
    *  rest is markdown" (headOf/restOf below). A caller with no title field
    *  of its own passes plain: the whole body is the markdown, full stop. */
   plain?: boolean
+  /** "/help <request>" on its own line, Enter to send: Groq drafts, tightens
+   *  or looks something up in its place. Notes page only, on his word ("the
+   *  page itself, not the Zone section"). Off unless a caller opts in. */
+  slashHelp?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const show = (t: EditorTool) => (tools ?? ALL_TOOLS).includes(t)
@@ -125,6 +139,36 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain }: 
     const md = htmlToMd(el)
     mine.current = md
     onChange(md)
+  }
+
+  /* "/help <request>" on its own line, Enter to send. The line becomes a
+     "Thinking…" placeholder, Groq answers in its place, and on failure the
+     line comes back exactly as typed plus one honest sentence about why:
+     nothing he wrote is ever lost to a request that did not go through. */
+  const runHelp = async (block: HTMLElement, instruction: string) => {
+    const root = ref.current
+    if (!root) return
+    const placeholder = document.createElement('p')
+    placeholder.className = 'nt-help-pending'
+    placeholder.textContent = 'Thinking…'
+    block.replaceWith(placeholder)
+    const noteSoFar = htmlToMd(root)
+    const result: HelpResult = await helpWithNote(instruction, noteSoFar)
+    if (!ref.current) return // the note (or the page) moved on while this was in flight
+    if (result.ok) {
+      const tmp = document.createElement('div')
+      tmp.innerHTML = mdToHtml(result.text)
+      const nodes = [...tmp.childNodes]
+      placeholder.replaceWith(...(nodes.length ? nodes : [Object.assign(document.createElement('p'), { innerHTML: '<br>' })]))
+    } else {
+      const said = document.createElement('p')
+      said.textContent = `/help ${instruction}`
+      const err = document.createElement('p')
+      err.className = 'nt-help-error'
+      err.textContent = HELP_ERROR[result.reason]
+      placeholder.replaceWith(said, err)
+    }
+    emit()
   }
 
   /* Typing a markdown lead at the start of a line turns the line into the thing
@@ -359,6 +403,16 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain }: 
         onBlur={emit}
         onMouseDown={onMouseDown}
             onKeyDown={(e) => {
+              if (slashHelp && e.key === 'Enter' && !e.shiftKey) {
+                const root = ref.current
+                const block = root && blockAt(root)
+                const m = (block?.textContent ?? '').match(/^\/help\s+(.+)/i)
+                if (block && m) {
+                  e.preventDefault()
+                  void runHelp(block, m[1].trim())
+                  return
+                }
+              }
               /* Tab nests the item, Shift-Tab lifts it. Outside a list Tab still
                  leaves the editor, so it is not a keyboard trap. */
               if (e.key !== 'Tab') return
@@ -804,6 +858,7 @@ export function NotesPage() {
           <Editor
             note={open}
             onChange={(md) => updateNote(open.id, { body: join(headOf(open.body), md) })}
+            slashHelp
             lead={phone ? (
               <button className="nt-back" onClick={() => setOpenId(null)}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">

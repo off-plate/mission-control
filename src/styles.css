@@ -1971,6 +1971,14 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 .nt-editor .tag { color: var(--accent-text); font-weight: 600; }
 mark { background: var(--accent-wash); color: var(--accent-text); font-weight: 600; border-radius: 2px; padding: 0 1px; }
 
+/* /help, in flight and when it fails. Both are transient by nature: the
+   pending line is gone the moment an answer lands, and the error line is
+   just his own request handed back so nothing he typed is lost. */
+@keyframes nt-help-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.85; } }
+.nt-editor .nt-help-pending { color: var(--faint); font-style: italic; animation: nt-help-pulse 1.1s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .nt-editor .nt-help-pending { animation: none; } }
+.nt-editor .nt-help-error { color: var(--alert); font-size: var(--text-sm); }
+
 /* ---- a body that lost the merge, still on the note ---- */
 .nt-conflict { margin-bottom: var(--s4); border: 1px solid var(--alert); border-radius: 6px; padding: var(--s3) var(--s4); }
 .nt-conflict-head { font-size: var(--text-sm); color: var(--alert); }

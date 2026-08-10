@@ -1,4 +1,5 @@
-/* Real task breakdown, through Groq.
+/* Real task breakdown, through Groq. notesai.ts's /help in Notes reads the
+   same key and the groq()/stripReasoning() helpers below.
 
    Where the key lives, and why: this repo is public, so nothing goes in the
    bundle. Compass keeps its Groq key in the synced Supabase row, but this app's
@@ -81,7 +82,7 @@ export function detectLang(text: string): 'cs' | 'en' {
    runs out mid-thought the block is never even closed, so the answer is lost
    inside it. Groq is asked to hide the reasoning, and this strips whatever still
    gets through, including an unterminated block. */
-function stripReasoning(raw: string): string {
+export function stripReasoning(raw: string): string {
   // Closed blocks first.
   let s = raw.replace(/<think>[\s\S]*?<\/think>/gi, '')
   /* Then any block still open: the budget ran out mid-thought, so everything
@@ -94,7 +95,7 @@ function stripReasoning(raw: string): string {
 
 /** Groq rejects unknown params on some models, so the reasoning flags are sent
  *  first and dropped on a 400 rather than failing the whole call. */
-async function groq(body: Record<string, unknown>, key: string): Promise<Response> {
+export async function groq(body: Record<string, unknown>, key: string): Promise<Response> {
   const send = (b: Record<string, unknown>) => fetch(ENDPOINT, {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },

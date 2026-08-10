@@ -883,9 +883,9 @@ function AiKeyField() {
       <div className="source-row">
         <span className={`status-dot ${live ? 'connected' : 'off'}`} />
         <span className="info">
-          <span className="name">Groq, for breaking tasks down</span>
+          <span className="name">Groq, for breaking tasks down and /help in Notes</span>
           <span className="detail" style={{ display: 'block' }}>
-            {live ? 'Connected. Break it down reads the actual task.' : 'Not set. Break it down falls back to a pattern library.'}
+            {live ? 'Connected. Break it down reads the actual task, and /help works in Notes.' : 'Not set. Break it down falls back to a pattern library, and /help in Notes does nothing.'}
           </span>
         </span>
         <a className="btn btn-quiet" href="https://console.groq.com/keys" target="_blank" rel="noreferrer">Get a free key ↗</a>

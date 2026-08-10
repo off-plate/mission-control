@@ -1922,8 +1922,13 @@ body.is-colresize { cursor: col-resize; user-select: none; }
   caret-color: var(--accent-text);
 }
 .nt-editor:focus { background: var(--surface); box-shadow: inset 0 0 0 1px var(--hairline-strong); }
+/* Where the /help reminder lives, so he does not have to remember it is
+   there: in the writing surface, on the spot where it gets typed, gone the
+   moment there is anything to read. The Zone's note blanks this and should,
+   since /help is the Notes page only. */
 .nt-editor[data-empty]::before {
-  content: 'Write here. A dash makes a bullet.'; color: var(--faint); pointer-events: none;
+  content: 'Write here. A dash makes a bullet, and /help drafts, polishes or looks something up.';
+  color: var(--faint); pointer-events: none;
   display: block; height: 0;
 }
 /* Chrome starts some blocks as a div; it is the same paragraph to him. */

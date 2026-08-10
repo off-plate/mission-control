@@ -10,7 +10,7 @@ import { BrandPage } from './brand'
 import { DayPage } from './day'
 import { BoardPage } from './board'
 import { FocusPage } from './focus'
-import { ZonePage } from './zone'
+import { ZonePage, useZoneDepth } from './zone'
 import { useStore } from './store'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange } from './supabase'
 import { isReadOnly } from './store'
@@ -112,9 +112,20 @@ export default function App() {
     void currentAccount().then((a) => setNeedsSignIn(!a))
     return onAccountChange((a) => setNeedsSignIn(!a))
   }, [])
+  /* How far into the running block he is, for the Zone's water. Read here
+     rather than inside the room because the shell is what paints it. */
+  const zoneDepth = useZoneDepth()
 
   return (
-    <div className="shell">
+    /* The Zone is a room, not a dark card: the shell carries the class so the
+       header goes under the water with everything else, instead of leaving a
+       warm-paper bar sitting on top of it. --depth rides along here too,
+       because this is the element that paints the water; set any lower down
+       it could never reach this rule, and the room never deepened at all. */
+    <div
+      className={`shell${page === 'zone' ? ' in-zone' : ''}`}
+      style={page === 'zone' ? ({ '--depth': zoneDepth } as React.CSSProperties) : undefined}
+    >
       <a className="skiplink" href="#main">Skip to the page</a>
       <div className="topstick">
       <header className="topbar">

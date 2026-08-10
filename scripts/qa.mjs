@@ -29,15 +29,17 @@ let pass = 0, fail = 0
 const errors = []
 const b = await chromium.launch()
 const page = await b.newPage({ viewport: { width: 1500, height: 1200 } })
-/* The Mundi Opus player embeds YouTube, and YouTube fires its own analytics
-   and ad pings from inside that iframe. They abort when the page tears down
-   between steps, which logs an error we neither caused nor can fix, and only
-   sometimes, so left in it made this gate randomly red. Verified by URL
-   before being listed here: /api/stats/* and /ptracking are YouTube's
-   playback telemetry, the rest are ad hosts. Deliberately paths, not the
-   whole youtube.com host, so a real failure to load the player or the
-   IFrame API still fails the gate. */
-const THIRD_PARTY_NOISE = /youtube\.com\/(api\/stats|ptracking)|doubleclick\.net|googleads|google-analytics\.com|googlesyndication/
+/* The Mundi Opus player embeds YouTube, and YouTube's own scripts complain
+   from inside that iframe about things this page neither caused nor can fix:
+   analytics and ad pings that abort when the page tears down between steps,
+   and the player asking for a compute-pressure permission a static host
+   cannot delegate at frame-creation time. Both are intermittent, so left in
+   they made this gate randomly red. Verified by URL before being listed:
+   /api/stats/* and /ptracking are playback telemetry, /s/player is the
+   player bundle, the rest are ad hosts. Deliberately paths, not the whole
+   youtube.com host, so a real failure to load the player or the IFrame API
+   still fails the gate. */
+const THIRD_PARTY_NOISE = /youtube\.com\/(api\/stats|ptracking|s\/player)|doubleclick\.net|googleads|google-analytics\.com|googlesyndication/
 /* Console errors carry the failing URL in location(), not always in the text:
    a bare "Failed to load resource: net::ERR_FAILED" says nothing on its own,
    so the URL is matched against the list above AND kept in what gets
@@ -192,7 +194,7 @@ await step('the zone: header stays, first move starts it, and the note lands in 
   // "still just a dashboard page" problem the room exists to not be.
   const geo = await page.evaluate(() => {
     const header = document.querySelector('.topstick')
-    const zone = document.querySelector('.zonepage')
+    const zone = document.querySelector('.zroom')
     return {
       headerVisible: !!header && header.getBoundingClientRect().height > 20,
       headerBottom: header ? Math.round(header.getBoundingClientRect().bottom) : -1,
@@ -208,19 +210,30 @@ await step('the zone: header stays, first move starts it, and the note lands in 
   if (geo.spacesPresent) throw new Error('the workspace switcher is still showing in the zone')
   if (geo.badgePresent) throw new Error('the floating focus pill is still showing in the zone, doubling the countdown')
 
-  // Built from the same widget Today's own grid renders, on his explicit
-  // instruction, not a bespoke "calm room" look: four real tiles, the app's
-  // actual .widget chrome, not four floating pieces with no edge to them.
-  const tiles = await page.evaluate(() => [...document.querySelectorAll('.zw-tile')].map((t) => ({
-    title: t.querySelector('.widget-title')?.textContent,
-    hasChrome: getComputedStyle(t).borderStyle === 'solid' && getComputedStyle(t).backgroundColor !== 'rgba(0, 0, 0, 0)',
-  })))
-  const wantTitles = ['Now', 'Clock', 'Note', 'Mundi Opus']
-  if (tiles.length !== 4) throw new Error(`${tiles.length} widget tiles in the zone, not 4`)
-  for (const want of wantTitles) {
-    if (!tiles.some((t) => t.title === want)) throw new Error(`no "${want}" tile in the zone`)
+  /* This used to assert four bordered .widget tiles, which was his
+     instruction at the time. He has since superseded it outright: "it's sort
+     of very plain... completely different... it really has to be THE ZONE."
+     So the room is one field now, and the assertions are the new truths:
+     no card chrome anywhere, the four things still all present, and the
+     whole room fitting one screen instead of scrolling. */
+  const room = await page.evaluate(() => {
+    const el = document.querySelector('.zroom')
+    return {
+      exists: !!el,
+      cards: document.querySelectorAll('.zroom .widget').length,
+      hasTask: !!document.querySelector('.znow-title'),
+      hasClock: !!document.querySelector('.zclock-time'),
+      hasNote: !!document.querySelector('.znote-rich .nt-editor'),
+      hasPlayer: !!document.querySelector('.zplayer'),
+      vOverflow: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+    }
+  })
+  if (!room.exists) throw new Error('the zone room did not render')
+  if (room.cards) throw new Error(`${room.cards} bordered widget cards are still in the room; it is meant to be one field`)
+  for (const [what, ok] of [['task', room.hasTask], ['clock', room.hasClock], ['note', room.hasNote], ['player', room.hasPlayer]]) {
+    if (!ok) throw new Error(`the ${what} is missing from the room`)
   }
-  if (tiles.some((t) => !t.hasChrome)) throw new Error('a zone tile has no widget border or fill')
+  if (room.vOverflow > 2) throw new Error(`the room scrolls by ${room.vOverflow}px; it is meant to be one screen`)
 
   if (!(await page.getByText('Zone gate task').count())) throw new Error('the first-move task did not appear in the zone')
   await page.locator('.znow-pill').click(); await page.waitForTimeout(500)
@@ -234,10 +247,10 @@ await step('the zone: header stays, first move starts it, and the note lands in 
     title: parseFloat(getComputedStyle(document.querySelector('.znow-title')).fontSize),
   }))
   if (sizes.clock <= sizes.title) throw new Error(`countdown is ${sizes.clock}px against a ${sizes.title}px title, not dominant`)
-  // The state reads through the ring's own colour (the app's "progress"
-  // tone while running), not through text that changes shade by state.
+  // The state reads through the ring's own colour: ice while running, which
+  // is the room's one interactive accent, not text that changes shade.
   const ringColor = await page.evaluate(() => getComputedStyle(document.querySelector('.zring-fill')).stroke)
-  if (ringColor !== 'rgb(209, 80, 42)') throw new Error(`the running ring reads ${ringColor}, not the accent tone`)
+  if (ringColor !== 'rgb(123, 213, 234)') throw new Error(`the running ring reads ${ringColor}, not the ice accent`)
 
   // Leaving the zone brings the nav and the switcher straight back.
   await page.goto(`${URL}#/today`); await page.waitForTimeout(500)
@@ -292,6 +305,43 @@ await step('the zone: header stays, first move starts it, and the note lands in 
   const afterSeek = await page.locator('.zplayer-time span').first().innerText()
   if (beforeSeek === afterSeek) throw new Error(`clicking the scrub bar at 80% did not move playback (stuck at ${afterSeek})`)
 })
+await step('the zone: the water deepens the further into the block he is', async () => {
+  /* The room's signature. Measured end to end against two real states, not
+     by forcing the variable: --depth is React-owned and reset every tick, and
+     the ground carries a 900ms transition, so a value poked in and read back
+     immediately returns the colour it was still animating away from. That is
+     how this passed while the feature was in fact dead: the property lived on
+     the room rather than on the shell that paints it, and custom properties
+     only inherit downward. */
+  const groundNow = async () => page.evaluate(() => {
+    const sh = document.querySelector('.shell')
+    const m = getComputedStyle(sh).backgroundColor.match(/oklab\(([\d.]+)/)
+    return { raw: getComputedStyle(sh).backgroundColor, L: m ? parseFloat(m[1]) : null, inZone: sh.classList.contains('in-zone') }
+  })
+  await fresh('zone')
+  const skip = page.getByRole('button', { name: 'Not today' })
+  if (await skip.count()) { await skip.first().click(); await page.waitForTimeout(400) }
+  await page.waitForSelector('.zroom', { timeout: 10000 }); await page.waitForTimeout(1200)
+  const surface = await groundNow()
+  if (!surface.inZone) throw new Error('the shell is not wearing the room')
+  if (surface.L === null) throw new Error(`the ground is not a mixed colour: ${surface.raw}`)
+
+  // The same room, with a block already 80% run.
+  await page.evaluate(() => localStorage.setItem('mc-pomodoro', JSON.stringify({
+    focusMin: 50, blockMin: 50, breakMin: 5, cyclesDone: 1, cyclesDay: new Date().toDateString(),
+    phase: 'focus', endsAt: Date.now() + 10 * 60 * 1000, pausedLeft: null,
+    focusLabel: 'Deep gate block', startedAt: Date.now() - 40 * 60 * 1000,
+  })))
+  await page.reload(); await page.waitForTimeout(1500)
+  const skip2 = page.getByRole('button', { name: 'Not today' })
+  if (await skip2.count()) { await skip2.first().click(); await page.waitForTimeout(400) }
+  await page.waitForSelector('.zroom', { timeout: 10000 }); await page.waitForTimeout(1400)
+  const deep = await groundNow()
+  if (deep.L === null) throw new Error(`the deep ground is not a mixed colour: ${deep.raw}`)
+  if (!(deep.L < surface.L - 0.02)) {
+    throw new Error(`the room does not deepen: L ${surface.L} at the surface against ${deep.L} at 80% in`)
+  }
+})
 await step('the zone: with more than one task open, he can choose which one to focus on', async () => {
   await fresh('today')
   // The Zone step before this one starts a real focus block and never
@@ -315,7 +365,7 @@ await step('the zone: with more than one task open, he can choose which one to f
   await page.goto(`${URL}#/zone`); await page.reload(); await page.waitForTimeout(800)
   const skip = page.getByRole('button', { name: 'Not today' })
   if (await skip.count()) { await skip.first().click(); await page.waitForTimeout(400) }
-  await page.waitForSelector('.zw-tile', { timeout: 10000 })
+  await page.waitForSelector('.zroom', { timeout: 10000 })
 
   const picker = page.locator('.znow-icon[aria-label="Choose what to focus on"]')
   if (!(await picker.count())) throw new Error('two open tasks, but no way to choose between them')
@@ -338,7 +388,7 @@ await step('mundi opus: leaving the zone does not stop the music, and the corner
   await fresh('zone')
   const skip = page.getByRole('button', { name: 'Not today' })
   if (await skip.count()) { await skip.first().click(); await page.waitForTimeout(400) }
-  await page.waitForSelector('.zw-tile', { timeout: 10000 })
+  await page.waitForSelector('.zroom', { timeout: 10000 })
   await page.waitForSelector('.mo-host iframe', { timeout: 15000 })
   // Nothing has been pressed yet: the corner has nothing to say about a
   // player he has not touched.
@@ -377,7 +427,7 @@ await step('the zone: the note takes real formatting, not a plain textarea', asy
   await fresh('zone')
   const skip = page.getByRole('button', { name: 'Not today' })
   if (await skip.count()) { await skip.first().click(); await page.waitForTimeout(400) }
-  await page.waitForSelector('.zw-tile', { timeout: 10000 })
+  await page.waitForSelector('.zroom', { timeout: 10000 })
 
   const editor = page.locator('.znote-rich .nt-editor')
   await editor.click()

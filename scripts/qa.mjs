@@ -29,8 +29,25 @@ let pass = 0, fail = 0
 const errors = []
 const b = await chromium.launch()
 const page = await b.newPage({ viewport: { width: 1500, height: 1200 } })
-page.on('pageerror', (e) => errors.push(e.message.slice(0, 120)))
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 120)) })
+/* The Mundi Opus player embeds YouTube, and YouTube fires its own analytics
+   and ad pings from inside that iframe. They abort when the page tears down
+   between steps, which logs an error we neither caused nor can fix, and only
+   sometimes, so left in it made this gate randomly red. Verified by URL
+   before being listed here: /api/stats/* and /ptracking are YouTube's
+   playback telemetry, the rest are ad hosts. Deliberately paths, not the
+   whole youtube.com host, so a real failure to load the player or the
+   IFrame API still fails the gate. */
+const THIRD_PARTY_NOISE = /youtube\.com\/(api\/stats|ptracking)|doubleclick\.net|googleads|google-analytics\.com|googlesyndication/
+/* Console errors carry the failing URL in location(), not always in the text:
+   a bare "Failed to load resource: net::ERR_FAILED" says nothing on its own,
+   so the URL is matched against the list above AND kept in what gets
+   reported, so the next one of these is diagnosable without a repro run. */
+const noteError = (text, url = '') => {
+  if (THIRD_PARTY_NOISE.test(text) || (url && THIRD_PARTY_NOISE.test(url))) return
+  errors.push(`${text.slice(0, 120)}${url ? ` [${url.slice(0, 100)}]` : ''}`)
+}
+page.on('pageerror', (e) => noteError(e.message))
+page.on('console', (m) => { if (m.type() === 'error') noteError(m.text(), m.location()?.url ?? '') })
 const step = async (name, fn) => {
   try { await fn(); pass++; console.log(`PASS ${name}`) }
   catch (e) { fail++; console.log(`FAIL ${name}: ${String(e).split('\n')[0]}`) }
@@ -330,7 +347,14 @@ await step('mundi opus: leaving the zone does not stop the music, and the corner
 
   await page.goto(`${URL}#/zone`); await page.waitForTimeout(600)
   const trackBefore = await page.locator('.zplayer-title').innerText()
-  await page.locator('.zplayer-play').click(); await page.waitForTimeout(2500)
+  /* Wait for playback to ACTUALLY start, not for an arbitrary duration. This
+     is a live YouTube embed, so how long it takes to get going depends on
+     the network; a fixed timeout made the claim below ("navigating did not
+     stop it") randomly report itself as a stop when the truth was that it
+     had not started yet. The Pause label is the player's own word for
+     playing, so waiting on it separates the two failures cleanly. */
+  await page.locator('.zplayer-play').click()
+  await page.waitForSelector('.zplayer-play[aria-label="Pause"]', { timeout: 20000 })
 
   // Leaving the room: the same play state has to survive, not reset because
   // the tile that used to own the iframe is gone.
@@ -1036,7 +1060,18 @@ await step('habits: a routine left half done still reads half done tomorrow', as
     d.setDate(d.getDate() - back)
     const z = (n) => String(n).padStart(2, '0')
     const day = `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`
-    s.stepTicks = r.steps.slice(0, 2).map((st) => ({ routineId: 'r-morning', stepId: st.id, day }))
+    const ticked = r.steps.slice(0, 2)
+    s.stepTicks = ticked.map((st) => ({ routineId: 'r-morning', stepId: st.id, day }))
+    /* The strip is Mon-Sun of THIS week, so on a Monday there is no earlier
+       day to seed and `back` lands on today. Today's dot is the one index
+       that reads the routine's LIVE doneStepIds rather than the dated
+       stepTicks above, so seeding only the dated half left the dot empty
+       and this failed every Monday. Real ticking writes both halves
+       (store.tsx toggleRoutineStep), so the seed does too. */
+    if (back === 0) {
+      r.doneStepIds = ticked.map((st) => st.id)
+      r.periodKey = day
+    }
     localStorage.setItem(K, JSON.stringify(s))
     return day
   }, KEY)
@@ -1408,6 +1443,48 @@ await step('notes: the editor formats as he types, and the marks survive a reloa
   await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(400)
   await page.locator('.nt-row', { hasText: 'Formatting' }).first().click(); await page.waitForTimeout(400)
   if (!(await page.locator('.nt-editor li > ul li').count())) throw new Error('the nesting did not come back after a reload')
+})
+await step('notes: /help with no key hands his request back rather than losing it', async () => {
+  await fresh('notes')
+  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(300)
+  await page.getByRole('button', { name: 'New note' }).click(); await page.waitForTimeout(300)
+  await page.locator('textarea[aria-label="Note title"]').fill('Help gate')
+  await page.locator('.nt-editor').click()
+  await page.keyboard.insertText('/help write a one-line note about oat milk')
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(300)
+  const err = await page.locator('.nt-help-error').innerText()
+  if (!/Settings/.test(err)) throw new Error(`no-key error does not point at Settings: "${err}"`)
+  const restored = await page.locator('.nt-editor p').first().innerText()
+  if (restored !== '/help write a one-line note about oat milk') throw new Error(`his request was not handed back verbatim: "${restored}"`)
+})
+await step('notes: /help drafts through Groq, and cites what it actually searched', async () => {
+  await fresh('notes')
+  await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
+  let sawGroqRequest = false
+  await page.route('https://api.groq.com/**', async (route) => {
+    sawGroqRequest = true
+    const req = route.request().postDataJSON()
+    if (req.model !== 'groq/compound-mini') { await route.fulfill({ status: 400, body: '{}' }); return }
+    await route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ choices: [{ message: { content: 'Oat milk foams well and works in coffee.\n\nSources:\nOat milk basics: https://example.com/oat-milk' } }] }),
+    })
+  })
+  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(300)
+  await page.getByRole('button', { name: 'New note' }).click(); await page.waitForTimeout(300)
+  await page.locator('textarea[aria-label="Note title"]').fill('Help gate 2')
+  await page.locator('.nt-editor').click()
+  await page.keyboard.insertText('/help look up whether oat milk foams well')
+  await page.keyboard.press('Enter')
+  await page.waitForSelector('.nt-help-pending', { timeout: 3000 }).catch(() => {})
+  await page.waitForSelector('.nt-editor a[href="https://example.com/oat-milk"]', { timeout: 5000 })
+  if (!sawGroqRequest) throw new Error('/help never actually called Groq')
+  const body = await page.locator('.nt-editor').innerText()
+  if (!/Oat milk foams well/.test(body)) throw new Error(`the drafted text is not in the note: ${JSON.stringify(body)}`)
+  if (/\/help/i.test(body)) throw new Error('the /help instruction line is still in the note after it answered')
+  const saved = await page.evaluate((K) => (JSON.parse(localStorage.getItem(K)).notes ?? []).find((n) => n.title === 'Help gate 2')?.body ?? '', KEY)
+  if (!/example\.com\/oat-milk/.test(saved)) throw new Error(`the source link did not save into the note: ${JSON.stringify(saved)}`)
 })
 
 await step('notes: three dashes make a divider, and a table he sized himself', async () => {

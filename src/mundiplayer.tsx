@@ -101,19 +101,16 @@ export function MundiOpusProvider({ children }: { children: ReactNode }) {
         videoId: MUNDI_OPUS_QUEUE[0].id,
         playerVars: { rel: 0, modestbranding: 1, iv_load_policy: 3, playsinline: 1 },
         events: {
-          onReady: () => {
-            setReady(true)
-            /* The API builds this iframe's own `allow` list without
-               compute-pressure, which the embed queries once playback
-               starts anyway; granting it here is the real fix for the
-               permissions-policy console warning that follows, not a
-               suppression of it. */
-            try {
-              const frame = playerRef.current?.getIframe?.() as HTMLIFrameElement | undefined
-              const allow = frame?.getAttribute('allow')
-              if (frame && allow && !allow.includes('compute-pressure')) frame.setAttribute('allow', `${allow}; compute-pressure`)
-            } catch { /* best effort */ }
-          },
+          /* No compute-pressure grant here any more. There was one, setting
+             the iframe's `allow` on ready, and it never worked: permissions
+             policy is evaluated when the frame navigates, and onReady fires
+             long after that. YouTube's own player script asks for the
+             feature, our static host cannot delegate it at frame-creation
+             time through the IFrame API, and nothing about playback depends
+             on it. The gate treats the resulting console line as the
+             third-party noise it is, rather than keeping code that looks
+             like a fix and is not one. */
+          onReady: () => setReady(true),
           onStateChange: (e: any) => {
             setPlaying(e.data === 1)
             if (e.data !== 0) return

@@ -1,20 +1,26 @@
-/* THE ZONE. Full screen, header still reachable above it: a dashboard for the
-   one thing running right now, built out of the same widget he already
-   knows from Today rather than a bespoke "calm room" look of its own. His
-   words, after the first version: "I told you to create widgets. Inspire
-   yourself by today's section... it's supposed to be full screen dashboard."
+/* THE ZONE, fifth pass: deep water.
 
-   Fourth pass: he sent four reference screenshots (a ring pomodoro app, a
-   notes card, a prayer-times clock, a glass media player) and asked each
-   tile to look like its reference, adapted to what this app actually does.
-   Nothing here is decoration borrowed wholesale: the ring reads real
-   progress, the dots read real cycle count, the settings panel edits real
-   minutes, the daypart arc reads the real clock, repeat and shuffle are
-   real toggles. What has no real data behind it in this app (a "publish"
-   step notes already autosave past, a "liked" badge with nothing backing
-   it) was left out rather than faked. */
+   The four bordered tiles are gone. His words: "it's sort of very plain...
+   I want this page to be completely different... it really has to be THE
+   ZONE." The four-card grid was the plain part, because a dashboard is what
+   you look AT and this is a room you are meant to be IN. So: one field, no
+   card chrome, the countdown as the only object with real presence, and the
+   note and the player as quiet surfaces sitting directly on the water.
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+   The colour is not decoration either. `--depth` (below) is the real
+   elapsed share of the running block, and the room's ground is mixed from
+   it, so twenty minutes in is visibly deeper water than the moment he sat
+   down. Nothing fades that he has to read: bone on darker water gains
+   contrast as it deepens, it never loses it.
+
+   Type is Array for the countdown alone, a dot-matrix face that turns the
+   number into an instrument rather than a label, over Technor for
+   everything around it. Both checked against design-log.md first: the
+   near-black-plus-orange this replaces was simultaneously one of the three
+   named 2026 AI defaults and next door to a row already spent on a client
+   site, which is exactly why it read like every other focus timer. */
+
+import { useEffect, useRef, useState } from 'react'
 import { useClockStamp, useFirstMove, useOpenToday } from './ui'
 import { usePomodoro } from './pomodoro'
 import { ZonePlayer } from './zoneplayer'
@@ -24,19 +30,11 @@ import { SPACE_LABELS } from './mock'
 import { spaceFolderId } from './types'
 import { Editor } from './notes'
 
-const mmss = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`
-
-/* The same tile chrome every widget on Today wears: surface fill, hairline
-   border, a title row. Reused directly, not reinvented, so the room reads as
-   one system with the rest of the app instead of its own separate style. */
-function ZoneTile({ title, className = '', children }: { title: string; className?: string; children: ReactNode }) {
-  return (
-    <section className={`widget zw-tile ${className}`}>
-      <header className="widget-head"><span className="widget-title">{title}</span></header>
-      <div className="widget-body zw-body">{children}</div>
-    </section>
-  )
-}
+/* Minutes padded to two digits, unlike everywhere else in the app: this one
+   is a read-out on a dial, and a departure board never drops a digit. Without
+   the pad the instrument physically shrank from five glyphs to four as the
+   block passed ten minutes left. */
+const mmss = (s: number) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${Math.floor(s % 60).toString().padStart(2, '0')}`
 
 function EyeIcon() {
   return (
@@ -171,7 +169,25 @@ function ZoneTask() {
 
   return (
     <div className={`znow zn-${phaseState}`}>
-      <span className="znow-title">{title}</span>
+      {/* The band: what he is on, and the real hour, set as type on the field
+          rather than boxed. The hour earns its place here because the whole
+          point of this room is losing track of it. */}
+      <header className="znow-band">
+        <div className="znow-what">
+          {/* The phase glyph sits INSIDE the title line, not as an all-caps
+              tracked word above it. That eyebrow was the one shape the house
+              rules forbid outright, and it carried nothing: the ring's colour
+              and the button's verb already say the state, and in the empty
+              case it read "Nothing lined up" directly above a title saying
+              the same sentence again. */}
+          <h1 className="znow-title">
+            <PhaseIcon state={phaseState} />
+            <span>{title}</span>
+          </h1>
+        </div>
+        <ZoneClock />
+      </header>
+
       <div className="znow-face-wrap">
         <div className="znow-face">
           <svg className="zring" viewBox="0 0 100 100" aria-hidden="true">
@@ -184,12 +200,10 @@ function ZoneTask() {
             )}
           </svg>
           <div className="znow-center">
-            <PhaseIcon state={phaseState} />
-            <span className="znow-clock mono">{clockText}</span>
-            <div className="znow-dots" aria-hidden="true">
+            <span className="znow-clock">{clockText}</span>
+            <div className="znow-dots" title={`${filledDots} of 4 blocks done today`} aria-label={`${filledDots} of 4 blocks done today`}>
               {[0, 1, 2, 3].map((i) => <i key={i} className={i < filledDots ? 'is-on' : ''} />)}
             </div>
-            <span className="znow-label">{label}</span>
           </div>
         </div>
       </div>
@@ -308,17 +322,13 @@ function ZoneClock() {
     const t = window.setInterval(() => setPart(daypart(new Date().getHours())), 60000)
     return () => window.clearInterval(t)
   }, [])
+  /* Type on the field, no card. The gradient card this replaces was one of
+     the four tiles that made the room read as a dashboard; the daypart it
+     was drawing is kept as a word, which says the same thing in less. */
   return (
-    <div className={`zclock zclock-${part}`}>
-      <div className="zclock-arc" aria-hidden="true">
-        <svg viewBox="0 0 200 40" preserveAspectRatio="none"><path d="M4 36 Q100 -12 196 36" /></svg>
-        <div className="zclock-marks">
-          {(['morning', 'day', 'evening', 'night'] as const).map((p) => <span key={p} className={p === part ? 'is-now' : ''} />)}
-        </div>
-      </div>
-      <span className="zclock-part">{DAYPART_LABEL[part]}</span>
-      <span className="zclock-time mono">{now.time}</span>
-      <span className="zclock-date">{now.day}, {now.date}</span>
+    <div className="zclock">
+      <span className="zclock-time">{now.time}</span>
+      <span className="zclock-date">{now.day} {now.date}<i>{DAYPART_LABEL[part]}</i></span>
     </div>
   )
 }
@@ -403,13 +413,30 @@ function ZoneNote() {
   )
 }
 
+/* How deep into the block he is, 0 to 1. The room's ground colour is mixed
+   from this, so twenty minutes in is visibly deeper water than the moment he
+   sat down. Real elapsed minutes, nothing decorative: idle and break leave
+   the room at the surface, because neither is being deep in anything.
+
+   App.tsx reads this and puts it on the shell, not on the room: the shell is
+   the element that paints the water AND holds the header, and a custom
+   property set on the room could never have reached it, since they only
+   inherit downward. Set here first, it did nothing at all. */
+export function useZoneDepth(): number {
+  const pomo = usePomodoro()
+  if (pomo.phase !== 'focus') return 0
+  const elapsed = pomo.blockMin * 60 - pomo.secondsLeft
+  return Math.min(1, Math.max(0, elapsed / Math.max(1, pomo.blockMin * 60)))
+}
+
 export function ZonePage() {
   return (
-    <div className="zonepage zw-grid">
-      <ZoneTile title="Now" className="zw-now"><ZoneTask /></ZoneTile>
-      <ZoneTile title="Clock" className="zw-clock"><ZoneClock /></ZoneTile>
-      <ZoneTile title="Note" className="zw-note-tile"><ZoneNote /></ZoneTile>
-      <ZoneTile title="Mundi Opus" className="zw-player-tile"><ZonePlayer /></ZoneTile>
+    <div className="zroom">
+      <ZoneTask />
+      <div className="zroom-rail">
+        <section className="zpanel zpanel-note" aria-label="Note"><ZoneNote /></section>
+        <section className="zpanel zpanel-player" aria-label="Mundi Opus"><ZonePlayer /></section>
+      </div>
     </div>
   )
 }

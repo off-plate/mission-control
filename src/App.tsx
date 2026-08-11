@@ -1,7 +1,7 @@
 import { Component, useEffect, useRef, useState, type ReactNode } from 'react'
 import { exceptionsFor, globalExceptions } from './exceptions'
 import { SPACE_LABELS } from './mock'
-import { GoalsPage, HabitsPage, PlanPage, RoutinesPage, TodayPage } from './pages1'
+import { GoalsPage, HabitsPage, PlanPage, TodayPage } from './pages1'
 import { SettingsPage } from './pages2'
 import { AchievementsPage } from './achievements'
 import { NotesPage } from './notes'
@@ -58,7 +58,9 @@ const NAV: { id: PageId; label: string }[] = [
   { id: 'today', label: 'Today' },
   { id: 'plan', label: 'Plan' },
   { id: 'habits', label: 'Habits' },
-  { id: 'routines', label: 'Routines' },
+  /* Routines left the menu when it became a folder inside Habits. The address
+     still resolves so a bookmark or an old link lands on Habits rather than on
+     nothing: see the redirect where the pages are chosen. */
   { id: 'goals', label: 'Goals' },
   { id: 'board', label: 'Why’s' },
 ]
@@ -89,6 +91,64 @@ function PageNav({
         </button>
       ))}
     </nav>
+  )
+}
+
+/* Phone chrome, on his design: "on mobile this could be one left dropdown
+   where I choose which workspace I'm in, and on the right a hamburger menu,
+   again with a dropdown, where I choose today, plan, habits, goals, why's.
+   And by default, not on scroll."
+
+   So neither strip scrolls on a phone any more: the workspace is a real
+   select (the OS picker, which is the one control a thumb is always good at)
+   and the pages are a menu behind a hamburger. Both are hidden on a desktop,
+   where the strips are better. */
+function PhonePages({ tabs, page, setPage }: {
+  tabs: { id: PageId; label: string }[]
+  page: PageId
+  setPage: (p: PageId) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', esc)
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc) }
+  }, [open])
+  const here = tabs.find((t) => t.id === page)
+  return (
+    <span className="kebab-wrap phone-pages" ref={ref}>
+      <button
+        className="btn btn-ghost phone-burger"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label={`Pages, currently ${here?.label ?? 'Today'}`}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
+        </svg>
+        <span className="btn-label">{here?.label ?? 'Pages'}</span>
+      </button>
+      {open && (
+        <div className="kebab-menu" role="menu" onClick={() => setOpen(false)}>
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              role="menuitem"
+              aria-current={page === t.id ? 'page' : undefined}
+              className={page === t.id ? 'is-on' : ''}
+              onClick={() => setPage(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </span>
   )
 }
 
@@ -149,6 +209,20 @@ export default function App() {
         {/* The Zone is a room, not a tab: which workspace you were standing in
             when you walked in has nothing to do with the one thing running
             now, so the switcher goes quiet rather than sitting there unused. */}
+        {page !== 'zone' && (
+          <label className="phone-space">
+            <span className="visually-hidden">Workspace</span>
+            <select
+              className="textinput"
+              value={view}
+              onChange={(e) => setView(e.target.value as ViewId)}
+            >
+              {(['all', ...Object.keys(SPACE_LABELS)] as ViewId[]).map((s2) => (
+                <option key={s2} value={s2}>{s2 === 'all' ? 'All' : SPACE_LABELS[s2 as SpaceId]}</option>
+              ))}
+            </select>
+          </label>
+        )}
         {page !== 'zone' && (
           <nav className="spaces" aria-label="Spaces">
             {(['all', ...Object.keys(SPACE_LABELS)] as ViewId[]).map((s) => (
@@ -240,6 +314,7 @@ export default function App() {
             </svg>
             <span className="btn-label">Yesterday</span>
           </button>
+          {page !== 'zone' && <PhonePages tabs={tabs} page={page} setPage={setPage} />}
           <button
             className={`btn btn-ghost${page === 'settings' ? ' is-on' : ''}${needsSignIn ? ' has-dot' : ''}`}
             onClick={() => setPage('settings')}
@@ -275,8 +350,7 @@ export default function App() {
         <PageBoundary page={page}>
         {page === 'today' && <TodayPage />}
         {page === 'plan' && <PlanPage />}
-        {page === 'habits' && <HabitsPage />}
-        {page === 'routines' && <RoutinesPage />}
+        {(page === 'habits' || page === 'routines') && <HabitsPage />}
         {page === 'goals' && <GoalsPage />}
         {/* Money and Reflect are faces of Achievements now. Their old
             addresses still resolve, so a bookmark lands on the merged page

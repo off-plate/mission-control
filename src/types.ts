@@ -421,6 +421,42 @@ export interface HabitDef {
   auto?: AutoRule
   /** What fills it, when it fills itself. */
   source?: HabitSource
+
+  /* ---- a habit inside a folder ----
+     His model, 2026-08-11: "routines are just a folder of different habits.
+     Together in the folder they make a routine. If a habit doesn't have a
+     folder it is just a habit." So a routine IS a folder (the Routine row
+     carries its id, title, space and cadence), and what used to be its STEPS
+     are habits pointing back at it. Everything below is what a step carried
+     and a habit did not, kept because he asked for it by name: "it should
+     still consist of short description if it was previously... there is
+     links for typing tests, so there should be link to that still. The video
+     doesn't have to be video, it has to be a link to that video." */
+  /** The folder (routine) this habit belongs to. Absent = a loose habit. */
+  folderId?: string
+  /** Its order inside the folder, so a routine keeps the sequence he wrote. */
+  folderOrder?: number
+  /** The step's short description. */
+  note?: string
+  /** e.g. a tongue-twister to read aloud. */
+  example?: string
+  /** An external tool the step opened: the typing test, a video. */
+  link?: string
+  linkLabel?: string
+  /** A page of this app the step opened, when the work IS a page here. */
+  goto?: PageId
+  gotoLabel?: string
+  /** Worth doing, not required: it never holds its folder open. */
+  optional?: boolean
+  /** Two ways to answer one habit ("move or caffeine"). Doing either keeps it.
+   *  One habit, not two, because it is one either-or and not two streaks. */
+  alts?: RoutineAlt[]
+  /** A timer step's length, so the countdown survives the move to a habit. */
+  seconds?: number
+  /** Cannot be ticked by hand until something is true elsewhere (the typing
+   *  test is earned at 75 WPM). Without this it becomes a box he can just
+   *  tick, which is not what the step meant. */
+  gatedBy?: 'typing-wpm'
 }
 
 /** Minutes of focus logged on a given day, in this habit's profile. */

@@ -68,6 +68,8 @@ interface MundiOpus {
   seekBy: (delta: number) => void
   setLoop: (v: boolean) => void
   setShuffle: (v: boolean) => void
+  /** Build the player now. Called when the Zone opens, or on first play. */
+  ensure: () => void
 }
 
 const Ctx = createContext<MundiOpus | null>(null)
@@ -93,7 +95,14 @@ export function MundiOpusProvider({ children }: { children: ReactNode }) {
   useEffect(() => { loopRef.current = loop }, [loop])
   useEffect(() => { shuffleRef.current = shuffle }, [shuffle])
 
+  /* Nothing is loaded until something asks for it. The provider sits above the
+     whole app, so building the player on mount pulled a YouTube embed into
+     every single page view, for a player he may never open, and left one
+     polling per open tab. ZonePlayer calls ensure() when the room opens, and
+     toggle() calls it if he presses play from anywhere else. */
+  const [wanted, setWanted] = useState(false)
   useEffect(() => {
+    if (!wanted) return
     let alive = true
     void loadYouTubeApi().then(() => {
       if (!alive || !mountRef.current) return
@@ -127,7 +136,7 @@ export function MundiOpusProvider({ children }: { children: ReactNode }) {
       })
     })
     return () => { alive = false; playerRef.current?.destroy?.() }
-  }, [])
+  }, [wanted])
 
   const first = useRef(true)
   useEffect(() => {
@@ -152,7 +161,7 @@ export function MundiOpusProvider({ children }: { children: ReactNode }) {
 
   const toggle = () => {
     const p = playerRef.current
-    if (!p) return
+    if (!p) { setWanted(true); setStarted(true); return }
     /* Set the instant he asks for it, not on the iframe's own confirmation
        that it actually started: that is a network round trip to YouTube,
        and the corner badge showing up should not wait on it. */
@@ -168,7 +177,7 @@ export function MundiOpusProvider({ children }: { children: ReactNode }) {
   }
   const seekBy = (delta: number) => seekTo(pos + delta)
 
-  const value: MundiOpus = { ready, started, track, playing, pos, dur, loop, shuffle, toggle, go, seekTo, seekBy, setLoop, setShuffle }
+  const value: MundiOpus = { ready, started, track, playing, pos, dur, loop, shuffle, toggle, go, seekTo, seekBy, setLoop, setShuffle, ensure: () => setWanted(true) }
   return (
     <Ctx.Provider value={value}>
       {children}

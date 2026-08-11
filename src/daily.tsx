@@ -144,6 +144,11 @@ export function DailyReview() {
      weekly review with one step ticked has not missed a day. And never one
      whose habit is already marked kept, or the only button on the row would be
      one that takes the day back off him. */
+  /* Counted from the folder's HABITS now, not from steps. Since routines
+     became folders of habits, a morning he got three quarters through was
+     landing in this review as four separate unticked rows with no sign they
+     belonged together, and the count above them read the raw habit total. One
+     row per folder, the way it read when a routine was a routine. */
   const halfDone = useMemo<Half[]>(() => {
     const kept = new Set(habitLog.filter((t) => t.day === yday).map((t) => t.habitId))
     const out: Half[] = []
@@ -152,19 +157,28 @@ export function DailyReview() {
       if (r.cadence !== 'daily' && r.cadence !== 'prework') continue
       if (r.habitId && kept.has(r.habitId)) continue
       if (routineLog.some((x) => x.routineId === r.id && x.day === yday)) continue
-      const total = r.steps.filter((s) => !s.optional).length
+      const mine = habits.filter((h) => h.folderId === r.id && !h.optional && !h.paused)
+      const total = mine.length
       if (!total) continue
-      const done = new Set(stepTicks.filter((t) => t.routineId === r.id && t.day === yday).map((t) => t.stepId)).size
-      if (done > 0) out.push({ r, done, total })
+      const done = mine.filter((h) => kept.has(h.id)).length
+      /* Every folder that is not finished, not only the ones he started. A
+         folder he never opened is exactly the thing this review exists to
+         ask about, and as raw habits it used to arrive as five loose rows. */
+      if (done < total) out.push({ r, done, total })
     }
     return out
-  }, [routines, routineLog, stepTicks, habitLog, yday])
+  }, [routines, routineLog, habits, habitLog, yday])
 
   const unmarked = useMemo(() => {
     const kept = new Set(habitLog.filter((t) => t.day === yday).map((t) => t.habitId))
     const asRoutine = new Set(halfDone.map((x) => x.r.habitId).filter(Boolean) as string[])
+    /* A habit inside a folder is asked about as part of its folder, above.
+       Left in here too it was both a row of its own AND a member of a
+       folder's count, so answering one did not clear the other. */
+    const inFolder = new Set(halfDone.flatMap((x) => habits.filter((h) => h.folderId === x.r.id).map((h) => h.id)))
     return habits.filter((h) => (
-      !asRoutine.has(h.id) && h.kind !== 'break' && !h.auto && !isCounted(h)
+      !asRoutine.has(h.id) && !h.folderId && !inFolder.has(h.id)
+      && h.kind !== 'break' && !h.auto && !isCounted(h)
       && !kept.has(h.id) && dueOn(h, yday)
     ))
   }, [habits, habitLog, halfDone, yday])
@@ -427,12 +441,27 @@ export function DailyReview() {
                     <span className="dr-rowmain">
                       <span className="dr-rowname">{r.title}</span>
                       <span className="dr-rowsub mono">
-                        {done} of {total} steps{r.space !== 'personal' && ` · ${SPACE_LABELS[r.space]}`}
+                        {done} of {total}{r.space !== 'personal' && ` · ${SPACE_LABELS[r.space]}`}
                       </span>
                     </span>
                     {fixed.has(k)
                       ? <span className="dr-said mono">{fixed.get(k)}</span>
-                      : <button className="dr-tick" onClick={() => fix(k, 'marked', () => r.habitId && assertRoutineOn(r.habitId, yday, true))}>I finished it</button>}
+                      : (
+                        <button
+                          className="dr-tick"
+                          onClick={() => fix(k, 'marked', () => {
+                            /* Marks the folder's own habits for that day, and
+                               the folder's aggregate habit with them, so the
+                               streak and the rows agree afterwards. */
+                            for (const h of habits.filter((x) => x.folderId === r.id && !x.optional && !x.paused)) {
+                              markHabitOn(h.id, yday, true)
+                            }
+                            if (r.habitId) assertRoutineOn(r.habitId, yday, true)
+                          })}
+                        >
+                          I finished it
+                        </button>
+                      )}
                   </li>
                 )
               })}

@@ -3,7 +3,7 @@
    five-button transport. The player itself lives above this component now,
    so leaving the Zone does not stop the music; this file only draws it. */
 
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { MUNDI_OPUS_QUEUE } from './mundiopus'
 import { thumbUrl, useMundiOpus } from './mundiplayer'
 
@@ -12,6 +12,8 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString
 export function ZonePlayer() {
   const p = useMundiOpus()
   const scrubRef = useRef<HTMLDivElement>(null)
+  // Opening the room is what asks for the player; nothing else loads it.
+  useEffect(() => { p.ensure() }, [p])
   const current = MUNDI_OPUS_QUEUE[p.track]
   const pct = p.dur > 0 ? Math.min(100, (p.pos / p.dur) * 100) : 0
   const remaining = p.dur > 0 ? mmss(Math.max(0, p.dur - p.pos)) : '·:··'

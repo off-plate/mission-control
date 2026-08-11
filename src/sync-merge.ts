@@ -28,6 +28,31 @@
 
 type Row = Record<string, unknown>
 
+/** How many past bodies a note remembers. One entry per keystroke, so this is
+ *  a few seconds of fast typing, not a few edits. It is a backstop now rather
+ *  than the main defence: see the device check in resolveNote. */
+export const HIST = 60
+
+/** This install, so a note can tell its own earlier self from another device.
+ *  Stable for the life of the browser profile; a fresh profile is genuinely a
+ *  different device and should be treated as one. */
+const DEVICE_KEY = 'mc-device'
+let cachedDevice: string | null = null
+export function deviceId(): string {
+  if (cachedDevice) return cachedDevice
+  try {
+    const found = localStorage.getItem(DEVICE_KEY)
+    if (found) return (cachedDevice = found)
+    const made = `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
+    localStorage.setItem(DEVICE_KEY, made)
+    return (cachedDevice = made)
+  } catch {
+    // Private mode with no storage: one id for this session is still better
+    // than none, since it is stable for as long as the tab is open.
+    return (cachedDevice = 'd-session')
+  }
+}
+
 /** What happened to a key, and when. `undone` is an un-delete: a tombstone can
  *  only ever be ADDED across devices, so without a dated opposite an undo on
  *  this device is overturned the moment another device that still holds the
@@ -97,15 +122,34 @@ function resolveNote(a: Row, b: Row): Row {
   const [win, lose] = at(b) > at(a) ? [b, a] : [a, b]
   const wb = String(win.body ?? '')
   const lb = String(lose.body ?? '')
-  const hist = [...new Set([...(lose.hist as string[] ?? []), ...(win.hist as string[] ?? [])])].slice(-40)
+  const hist = [...new Set([...(lose.hist as string[] ?? []), ...(win.hist as string[] ?? [])])].slice(-HIST)
   const out: Row = { ...win, hist }
   /* A conflict already on either side outlives this merge: it is unanswered
      work, and only he closes it. */
   const kept = (win.conflict ?? lose.conflict) as { body: string; at: number } | undefined
   if (kept) out.conflict = kept
   if (wb === lb || !lb) return out
+
+  /* The banner says "another device". So one device can never conflict with
+     ITSELF, and this is the check that makes that true.
+
+     It was reported as a note raising the banner seconds after it was first
+     typed, on a note that had never been opened anywhere else, and it was
+     real. Every save pushes to Supabase, and every push merges the pushed
+     copy against the remote head, which on a single device is that same
+     device's own push from a moment ago. The ancestor test below should have
+     recognised it, but `hist` records one entry per KEYSTROKE and is capped,
+     so typing a sentence between two pushes rolls the older body off the end
+     of its own history. The merge then sees an unfamiliar body and calls it
+     divergence. */
+  if (win.dev && lose.dev && win.dev === lose.dev) return out
+
   // The loser is an ancestor of the winner: ordinary propagation, nothing lost.
   if (hist.includes(bodyHash(lb))) return out
+  /* Or it is one, without the hash to prove it: pure appending, which is what
+     writing a note IS. Covers notes written before devices were stamped, and
+     any history that has rolled over. */
+  if (wb.startsWith(lb)) return out
   // Two lineages. Keep the newer text as the note and the older text beside it.
   if (!kept || kept.body !== lb) out.conflict = { body: lb, at: at(lose) }
   return out

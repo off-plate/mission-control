@@ -672,26 +672,21 @@ await step('today: a task finished right after midnight still counts as finished
   const finished = await page.locator('.daynum').nth(2).locator('.v').innerText()
   if (finished !== '1') throw new Error(`finished reads "${finished}" for a task closed at 00:20 local, not 1`)
 })
-await step('today: the assistant rail is already open, and files what he says', async () => {
+await step('today: the assistant is gone from the page, and stays gone', async () => {
+  /* It used to assert the rail WAS here, which was right until he asked for
+     it removed outright (2026-08-11: "remove the assistant functionality from
+     the Today page, completely out of the website"). Kept as its inverse so
+     nothing quietly puts it back. The /help in Notes is a different thing and
+     has its own tests. */
   await fresh('today')
-  const rail = page.locator('.assist-rail')
-  if (!(await rail.isVisible())) throw new Error('the rail is not on Today')
-  // Beside the day, not under it: the rail's top must sit level with the page.
-  const box = await page.evaluate(() => {
-    const r = document.querySelector('.assist-rail')?.getBoundingClientRect()
-    const m = document.querySelector('.today-main')?.getBoundingClientRect()
-    return r && m ? { railLeft: Math.round(r.left), mainRight: Math.round(m.right), sameRow: Math.abs(r.top - m.top) < 40 } : null
-  })
-  if (!box) throw new Error('no rail geometry')
-  if (!box.sameRow || box.railLeft < box.mainRight) throw new Error('the rail is not beside the day at 1500px')
-  await rail.locator('textarea').fill('Call the bank about the plan 20 min')
-  await rail.getByRole('button', { name: 'Understand' }).click(); await page.waitForTimeout(500)
-  await rail.getByRole('button', { name: /^File 1 item$/ }).click(); await page.waitForTimeout(500)
-  const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
-  const t = s.tasks.find((x) => /Call the bank about the plan/.test(x.title))
-  if (!t) throw new Error('nothing was filed')
-  if (t.estimateMin !== 20) throw new Error(`filed with ${t.estimateMin} minutes, not 20`)
-  if (!(await rail.getByText('Just filed').count())) throw new Error('the rail does not show what it filed')
+  const gone = await page.evaluate(() => ({
+    rail: document.querySelectorAll('.assist-rail').length,
+    mic: document.querySelectorAll('.assist-mic').length,
+    box: document.querySelectorAll('.assist-input').length,
+  }))
+  for (const [what, n] of Object.entries(gone)) {
+    if (n) throw new Error(`the assistant ${what} is back on Today (${n} found)`)
+  }
 })
 await step('focus: the page takes the width it is given', async () => {
   // Self-calibrating: Plan is an ordinary full-width page at this viewport, so
@@ -827,6 +822,44 @@ await step('focus: stopping mid-block banks the elapsed minutes', async () => {
   await cp.close()
 })
 
+await step('sync: typing a note fast never accuses your own device', async () => {
+  /* His own report: a note raised "Another device had a different version"
+     seconds after he first typed it, on a note never opened anywhere else.
+     Real. Every save merges the pushed copy against the remote head, which on
+     one device is that device's own push from a moment ago, and `hist` holds
+     one entry per KEYSTROKE and is capped, so a sentence typed between two
+     pushes rolled the older body off the end of its own history and the merge
+     read it as a stranger. Typed here at 90 characters, well past the cap. */
+  await fresh('notes')
+  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(300)
+  await page.getByRole('button', { name: 'New note' }).click(); await page.waitForTimeout(300)
+  await page.locator('textarea[aria-label="Note title"]').fill('Johny meeting')
+  await page.locator('.nt-editor').click()
+  const long = 'Domeq nefakturoval dataclubc ale kdyz se podari tak mame to cele hotove do patku rano'
+  for (const ch of long) await page.keyboard.type(ch, { delay: 4 })
+  await page.waitForTimeout(700)
+
+  // The merge the save path actually performs: this body against its own
+  // earlier self, exactly as the remote head would hold it.
+  const verdict = await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const note = s.notes.find((n) => n.title === 'Johny meeting')
+    if (!note) return { err: 'the note was not saved' }
+    const stale = { ...note, body: note.body.slice(0, 12), updatedAt: note.updatedAt - 4000 }
+    return { histLen: (note.hist ?? []).length, dev: note.dev ?? null, staleInHist: (note.hist ?? []).includes(stale.body) }
+  }, KEY)
+  if (verdict.err) throw new Error(verdict.err)
+  if (!verdict.dev) throw new Error('the note carries no device stamp, so a merge cannot tell it from another device')
+
+  // And end to end: reload, which boots through the merge, and no banner.
+  await page.reload(); await page.waitForTimeout(900)
+  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(300)
+  await page.locator('.nt-row', { hasText: 'Johny meeting' }).first().click(); await page.waitForTimeout(500)
+  if (await page.locator('.nt-conflict').count()) throw new Error('a note typed on one device only still shows the another-device banner')
+  const kept = await page.evaluate((K) => (JSON.parse(localStorage.getItem(K)).notes ?? []).find((n) => n.title === 'Johny meeting'), KEY)
+  if (kept.conflict) throw new Error(`the note carries a conflict it should never have had: ${JSON.stringify(kept.conflict).slice(0, 90)}`)
+  if (!kept.body.includes('patku')) throw new Error(`the typed body did not survive: ${JSON.stringify(kept.body).slice(0, 90)}`)
+})
 await step('sync: two tabs both keep what they added', async () => {
   /* His own repro. Two tabs of one browser share localStorage, so each save
      used to replace the other's lists wholesale. */

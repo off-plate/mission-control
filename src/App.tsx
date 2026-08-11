@@ -115,6 +115,12 @@ export default function App() {
   /* How far into the running block he is, for the Zone's water. Read here
      rather than inside the room because the shell is what paints it. */
   const zoneDepth = useZoneDepth()
+  /* Where pressing The Zone a second time puts him: the page he was on when
+     he walked in. A ref, not state, because nothing renders from it and it
+     must not cause one. Today is the floor, for a reload that lands straight
+     in the room with no history behind it. */
+  const backFromZone = useRef<PageId>('today')
+  useEffect(() => { if (page !== 'zone') backFromZone.current = page }, [page])
 
   return (
     /* The Zone is a room, not a dark card: the shell carries the class so the
@@ -171,13 +177,16 @@ export default function App() {
             <span className="btn-label">My Mind</span>
           </a>
           {/* The one thing running, full screen. Filled with the accent so it
-              reads as the button that starts something, not a place he browses. */}
+              reads as the button that starts something, not a place he browses.
+              It is a toggle: pressing it again puts him back on the page he
+              walked in from, because the room has no close of its own and he
+              was leaving it by pressing Note or Achievements to get out. */}
           <button
             className={`btn btn-primary${page === 'zone' ? ' is-on' : ''}`}
-            onClick={() => setPage('zone')}
+            onClick={() => setPage(page === 'zone' ? backFromZone.current : 'zone')}
             aria-pressed={page === 'zone'}
-            title="The Zone"
-            aria-label="The Zone"
+            title={page === 'zone' ? 'Leave the Zone' : 'The Zone'}
+            aria-label={page === 'zone' ? 'Leave the Zone' : 'The Zone'}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <path d="M12 3l2.6 6.2L21 11l-6.4 1.8L12 21l-2.6-8.2L3 11l6.4-1.8z" strokeLinejoin="round" />

@@ -135,10 +135,17 @@ export default function App() {
       <a className="skiplink" href="#main">Skip to the page</a>
       <div className="topstick">
       <header className="topbar">
-        <div className="brand">
+        {/* The name is the way home, on his instruction: back to All and
+            Today from wherever he is. It was decoration before. */}
+        <button
+          className="brand"
+          onClick={() => { setView('all'); setPage('today') }}
+          title="All workspaces, Today"
+          aria-label="Mission Control, back to Today"
+        >
           <Logo />
           <span className="brand-name">Mission Control</span>
-        </div>
+        </button>
         {/* The Zone is a room, not a tab: which workspace you were standing in
             when you walked in has nothing to do with the one thing running
             now, so the switcher goes quiet rather than sitting there unused. */}
@@ -163,7 +170,7 @@ export default function App() {
               tab then, not a sized window: that opened as a Chrome app window,
               which is not what he asked for and not where he keeps his tabs. */}
           <a
-            className="btn btn-ghost"
+            className="btn btn-ghost hide-phone"
             href="https://access.mymind.com/everything"
             target="_blank"
             rel="noreferrer"
@@ -211,7 +218,7 @@ export default function App() {
           {/* Money and Reflect, merged. Both are about looking back at what
               moved, so they are one destination and it lives up here. */}
           <button
-            className={`btn btn-ghost${['achievements', 'money', 'review', 'stats'].includes(page) ? ' is-on' : ''}`}
+            className={`btn btn-ghost hide-phone${['achievements', 'money', 'review', 'stats'].includes(page) ? ' is-on' : ''}`}
             onClick={() => setPage('achievements')}
             aria-pressed={['achievements', 'money', 'review', 'stats'].includes(page)}
             title="Achievements, money and reflection"

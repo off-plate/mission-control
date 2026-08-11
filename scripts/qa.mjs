@@ -784,6 +784,34 @@ await step('habits: routine-kept rows lock today and link out', async () => {
   await line.locator('.habit-auto').click(); await page.waitForTimeout(400)
   if (!(await page.locator('.routine-card', { hasText: 'After wake up' }).count())) throw new Error('link did not open Routines')
 })
+await step('phone: a task can be scheduled and rescheduled without dragging', async () => {
+  /* Why he said Plan "doesn't work at all" on mobile: the only way into a
+     time of day was dragging, and drag does not work with a thumb. Getting a
+     task onto the day from the list already had a tap path; moving it once it
+     was there did not. Both are tapped here, on a real touch context, and the
+     stored slot is checked rather than the look of the page. */
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
+  const p = await ctx.newPage()
+  await p.goto(URL); await p.waitForTimeout(400)
+  await p.evaluate((K) => localStorage.removeItem(K), KEY)
+  await p.goto(`${URL}#/plan`); await p.reload(); await p.waitForTimeout(1000)
+  const skip = p.getByRole('button', { name: 'Not today' })
+  if (await skip.count()) { await skip.first().click(); await p.waitForTimeout(400) }
+  await p.getByRole('textbox', { name: 'New task' }).fill('Thumb scheduling')
+  await p.getByRole('button', { name: 'Add', exact: true }).click(); await p.waitForTimeout(500)
+  const slotOf = () => p.evaluate((K) => JSON.parse(localStorage.getItem(K)).tasks.find((t) => t.title === 'Thumb scheduling')?.slot ?? null, KEY)
+
+  await p.locator('.todo-row', { hasText: 'Thumb scheduling' }).first().getByRole('button', { name: /Options/ }).click()
+  await p.waitForTimeout(250)
+  await p.getByRole('menuitem', { name: 'Morning' }).click(); await p.waitForTimeout(500)
+  if ((await slotOf()) !== 'morning') throw new Error(`tapping Morning from the list left it at ${await slotOf()}`)
+
+  await p.locator('.today-task', { hasText: 'Thumb scheduling' }).first().getByRole('button', { name: /Options/ }).click()
+  await p.waitForTimeout(250)
+  await p.getByRole('menuitem', { name: 'Evening' }).click(); await p.waitForTimeout(500)
+  if ((await slotOf()) !== 'evening') throw new Error(`a task already on the day could not be moved by tap: still ${await slotOf()}`)
+  await ctx.close()
+})
 await step('phone: plan is usable at 390', async () => {
   const mp = await b.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
   await mp.goto(URL); await mp.waitForTimeout(300)

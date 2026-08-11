@@ -11,12 +11,15 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
-    <!-- The Zone's own two faces, and only the Zone's. Array draws the
-         countdown as a dot-matrix instrument; Technor sets everything around
-         it. The CSS is small and the WOFF2 files are fetched only once a rule
-         using them actually renders, so the other pages do not pay for them. -->
-    <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
-    <link href="https://api.fontshare.com/v2/css?f[]=array@400&f[]=technor@500,700&display=swap" rel="stylesheet" />
+    <!-- The Zone's own two faces, and only the Zone's: Array draws the
+         countdown as a dot-matrix instrument, Technor sets everything around
+         it. Self-hosted (public/fonts, 49KB for all three cuts, @font-face in
+         styles.css) rather than fetched from Fontshare at runtime. Their CSS
+         endpoint returned a 500 during a gate run, and a third-party blip
+         there means the room silently loses its identity and renders in
+         system fonts. Preloaded because the countdown is the one glyph that
+         must not swap in late. -->
+    <link rel="preload" href="/mission-control/fonts/array-400.woff2" as="font" type="font/woff2" crossorigin />
   </head>
   <body>
     <div id="root"></div>

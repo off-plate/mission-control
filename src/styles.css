@@ -5,6 +5,27 @@
    for progress you own. Cabinet Grotesk carries the numbers.
    ============================================================ */
 
+/* The Zone's two faces, served from this origin. Fontshare's CSS endpoint
+   500'd during a gate run, and when it does the room loses the dot-matrix
+   countdown and the grotesque that give it its identity, silently, with no
+   error a person would see. 49KB for all three cuts, and one fewer host to
+   depend on. Both are free for commercial use (Fontshare licence). */
+@font-face {
+  font-family: 'Array';
+  src: url('/mission-control/fonts/array-400.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Technor';
+  src: url('/mission-control/fonts/technor-500.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Technor';
+  src: url('/mission-control/fonts/technor-700.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+
 :root {
   --bg: #f4efe4;
   --surface: #fbf8f1;

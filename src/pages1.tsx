@@ -762,8 +762,19 @@ export function PlanPage() {
   const isWeekend = dayIdx >= 5
   const today = localDateKey()
   /* Started counts as on today only. A routine cannot have been started on a day
-     that has not happened, so tomorrow shows exactly what he has planned onto it. */
-  const onToday = (r: Routine) => (ahead ? r.planned?.day === planDay : (!!r.startedAt || r.planned?.day === planDay))
+     that has not happened, so tomorrow shows exactly what he has planned onto it.
+
+     "Started" has to mean started TODAY, not merely started at some point in
+     the period still running. This read `!!r.startedAt`, and startedAt is only
+     cleared when the PERIOD rolls over, which for a monthly routine is the
+     turn of the month. So the Monthly review, begun once on an afternoon, sat
+     on every single day for the rest of that month, in the slot matching the
+     hour it was first opened, already finished, and "Take it off" could not
+     shift it because that only clears `planned`. His report, exactly. */
+  const startedOn = (r: Routine) => (r.startedAt ? localDateKey(new Date(r.startedAt)) : null)
+  const onToday = (r: Routine) => (ahead
+    ? r.planned?.day === planDay
+    : (startedOn(r) === planDay || r.planned?.day === planDay))
   const dueRoutines = routines.filter((r) => inView(r.space) && !r.archivedAt && onToday(r) && !(r.cadence === 'prework' && isWeekend))
   /* A slot he chose wins over the clock: planning it for the evening and
      starting it early should not throw it back to the morning while he is
@@ -2204,7 +2215,12 @@ export function RoutinesPage() {
   const tomorrow = nextDay()
   /* On a day means on either day he can plan: today, or the one he laid out
      last night. */
-  const onDay = (r: Routine) => !!r.startedAt || r.planned?.day === today || r.planned?.day === tomorrow
+  /* Same rule as Today's: started means started ON one of these days, not
+     merely underway inside a period that happens to be a whole month. */
+  const onDay = (r: Routine) => {
+    const began = r.startedAt ? localDateKey(new Date(r.startedAt)) : null
+    return began === today || began === tomorrow || r.planned?.day === today || r.planned?.day === tomorrow
+  }
   /* Where it goes when he puts it on the day: the part of the day it belongs to
      if it has one, otherwise the part of the day it is now. Either way he can
      move it from the list itself. */

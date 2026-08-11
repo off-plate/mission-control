@@ -8,7 +8,6 @@ import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
 import { Linkify } from './widgets'
 import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, dueOn, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, isCounted, COUNT_PERIODS, requiredSteps, routineComplete, routineProgress, routineRunsOn, slotMinutes, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
-import { AssistantRail } from './assist'
 import { DayLine, DayNumbers, WeekStrip } from './dayface'
 import { useFirstMove } from './ui'
 import { estimateFor } from './estimate'
@@ -116,9 +115,11 @@ export function TodayPage() {
       <DayLine />
       <DayNumbers savedMin={savedMin} />
 
-      {/* Today is the one page with a rail: the assistant is always open beside
-          the day rather than a tab you have to remember to visit. Below 1100px
-          it falls under the grid instead of squeezing both. */}
+      {/* The assistant rail (dictation, OCR, "file what I said") was removed
+          from this page on his instruction, 2026-08-11: "remove the assistant
+          functionality from the Today page, completely out of the website".
+          Not the /help in Notes, which stays. The day now takes the full
+          width it used to share. */}
       <div className="today-shell">
       <div className="today-main">
       {shownExceptions.length > 0 ? (
@@ -213,12 +214,9 @@ export function TodayPage() {
       <WeekStrip />
 
       </div>
-      <AssistantRail />
       </div>
 
-      {/* The footer belongs to the page, not to the left column: full width
-          under both, and on a phone it comes after the rail rather than
-          stranding the assistant below it. */}
+      {/* The footer belongs to the page: full width under the day. */}
       <div className={`status-strip${space === 'work' ? ' is-empty' : ''}`} aria-label="Background numbers">
         {space === 'personal' && (
           <button onClick={() => setPage('settings')}><span className="k">sync</span> {sources.filter((x) => x.status === 'connected').length} of {sources.filter((x) => x.status !== 'manual').length} live{sources.some((x) => x.status === 'off') ? `, ${sources.filter((x) => x.status === 'off').map((x) => x.name).join(', ')} paused` : ''}</button>
@@ -727,16 +725,21 @@ export function PlanPage() {
      pile. Grouped by room, in the order of the switcher above, so the list reads
      the same way the app is laid out. In a single room there is nothing to
      group, so his own order is left alone. */
-  /* Work that came back from a day he planned goes to the top, oldest first,
-     and says how many days it has been carried. The rollover was already
-     counting this and showing it nowhere, so a task on its fifth return looked
-     exactly like one added a minute ago. */
-  const cameBack = backlogOpen.filter((x) => (x.carried ?? 0) > 0).sort((a, b) => (b.carried ?? 0) - (a.carried ?? 0))
-  const fresh = backlogOpen.filter((x) => !(x.carried ?? 0))
-  const byRoom = (list: Task[]) => (view === 'all'
-    ? [...list].sort((a, b) => SPACES.indexOf(a.space) - SPACES.indexOf(b.space))
-    : list)
-  const backlogSorted = [...cameBack, ...byRoom(fresh)]
+  /* Newest first, full stop. His words: "every time I add something new into
+     the to-do list, it should be the first item, based on time added."
+
+     Two things used to push a new task down the page and both are gone. Work
+     carried over from a planned day was hoisted above everything, so anything
+     added today landed underneath it, which is the "somewhere in the middle"
+     he saw. And in All view the list was then sorted by workspace, so where a
+     new task appeared depended on which room it belonged to, which is the
+     "random" one. The carried count is still on the row, because that fact is
+     worth having; it just no longer decides the order.
+
+     addedAt is a real timestamp. Tasks from before it existed have none, sort
+     as 0, and keep their existing order below anything newly added, which is
+     already newest-first because the store prepends. */
+  const backlogSorted = [...backlogOpen].sort((a, b) => (b.addedAt ?? 0) - (a.addedAt ?? 0))
   /* Which day the right hand column is laying out. Sunday evening is exactly
      when a week gets planned, and until now the app could only ever mean today,
      so Monday could not be touched until Monday. One step forward is all this
@@ -1651,21 +1654,26 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
         ))}
       </div>
       )}
-      {goal && (
-        <button className="habit-goal" onClick={() => setPage('goals')}>
-          Feeding “{goal.name}”
-        </button>
-      )}
       {/* One fact and one action, on one line. State, else the steps still
           waiting, else the trend: three of them stacked into a 200px column
           and the row read as three ragged lines. The row is already named
-          after its routine, so the link is an action, not a sentence. */}
+          after its routine, so the link is an action, not a sentence.
+
+          The goal link lives INSIDE this row. It used to be its own element
+          assigned the same `foot` grid cell, and two elements in one cell
+          stack: "Feeding X" was drawn straight on top of "averaging N of 7
+          a week", which is the overlapping text he reported. */}
       <div className="habit-foot">
         {stateTag
           ? <span className={`col-tot mono${stateTag === 'done today' ? ' val-pos' : ''}`}>{stateTag}</span>
           : progress && progress.total > 1 && progress.done > 0 && progress.done < progress.total
             ? <span className="habit-weeks">{progress.done} of {progress.total} steps</span>
             : trend ? <span className="habit-weeks">{trend}</span> : null}
+        {goal && (
+          <button className="habit-goal" onClick={() => setPage('goals')}>
+            Feeding “{goal.name}”
+          </button>
+        )}
         {drivenBy ? (
           <button className="habit-auto" onClick={() => setPage('routines')}>Open the routine</button>
         ) : null}

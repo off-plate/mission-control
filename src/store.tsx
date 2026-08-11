@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { SUPABASE_ENABLED, deleteRemoteState, loadRemoteState, saveRemoteState } from './supabase'
 import { roll } from './roll'
-import { bodyHash, mergeStates, rowKey, type Tomb } from './sync-merge'
+import { bodyHash, deviceId, HIST, mergeStates, rowKey, type Tomb } from './sync-merge'
 import { dayIndexOf, dayOfWeekKey, goalPeriodKey, goalPeriodRange, isoWeekKey, localDateKey, periodIsPast, periodKeyFor, slotForTime, type GoalTf } from './util'
 import {
   DEFAULT_SPACES,
@@ -1652,15 +1652,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     },
 
-    addTask: (t) => setTasks((prev) => [{ ...t, id: newId('t'), done: false, createdAt: todayKey() }, ...prev]),
+    addTask: (t) => setTasks((prev) => [{ ...t, id: newId('t'), done: false, createdAt: todayKey(), addedAt: Date.now() }, ...prev]),
     addTasks: (ts) =>
-      setTasks((prev) => [...ts.map((t) => ({ ...t, id: newId('t'), done: false, createdAt: todayKey() })), ...prev]),
+      setTasks((prev) => [...ts.map((t, i) => ({ ...t, id: newId('t'), done: false, createdAt: todayKey(), addedAt: Date.now() + i })), ...prev]),
     addTaskWithSubtasks: (parent, subs) =>
       setTasks((prev) => {
         const pid = newId('t')
         const subtasks = subs.map((sub, i) => ({ id: `${pid}s${i}`, title: sub.title, estimateMin: sub.estimateMin, done: false }))
         const est = subtasks.reduce((a, s) => a + s.estimateMin, 0)
-        return [{ ...parent, id: pid, done: false, createdAt: todayKey(), estimateMin: est, estimated: true, subtasks }, ...prev]
+        return [{ ...parent, id: pid, done: false, createdAt: todayKey(), addedAt: Date.now(), estimateMin: est, estimated: true, subtasks }, ...prev]
       }),
     commitTask: (id, horizon, key) =>
       setTasks((prev) => prev.map((t) => (t.id === id
@@ -2160,7 +2160,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const sp = spaceOfFolder(folderId, noteFolders) ?? space
       setNotes((prev) => [{
         id, space: sp, folderId, title: noteTitle(body), body,
-        color: 'amber', when: todayKey(), updatedAt: Date.now(), hist: [],
+        color: 'amber', when: todayKey(), updatedAt: Date.now(), hist: [], dev: deviceId(),
       }, ...prev])
       return id
     },
@@ -2173,7 +2173,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return {
         ...n, ...patch,
         title: patch.body !== undefined ? noteTitle(patch.body) : n.title,
-        hist: bodyChanged ? [...(n.hist ?? []), bodyHash(n.body)].slice(-40) : n.hist,
+        hist: bodyChanged ? [...(n.hist ?? []), bodyHash(n.body)].slice(-HIST) : n.hist,
+        /* Who wrote it last. A merge uses this to tell this device's own
+           earlier push from a genuinely different device, which is the whole
+           of the "another device" question. */
+        dev: deviceId(),
         updatedAt: Date.now(),
       }
     })),
@@ -2197,13 +2201,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ...n,
         body: `${n.body}\n\n--- from another device ---\n${n.conflict.body}`,
         title: n.title,
-        hist: [...(n.hist ?? []), bodyHash(n.body), bodyHash(n.conflict.body)].slice(-40),
+        hist: [...(n.hist ?? []), bodyHash(n.body), bodyHash(n.conflict.body)].slice(-HIST), dev: deviceId(),
         conflict: undefined,
         updatedAt: Date.now(),
       }
       : n))),
     dropNoteConflict: (id) => setNotes((prev) => prev.map((n) => (n.id === id
-      ? { ...n, conflict: undefined, hist: [...(n.hist ?? []), ...(n.conflict ? [bodyHash(n.conflict.body)] : [])].slice(-40), updatedAt: Date.now() }
+      ? { ...n, conflict: undefined, hist: [...(n.hist ?? []), ...(n.conflict ? [bodyHash(n.conflict.body)] : [])].slice(-HIST), dev: deviceId(), updatedAt: Date.now() }
       : n))),
 
     addNoteFolder: (sp, name) => {
@@ -2239,7 +2243,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setNotes((prev) => prev.map((n) => {
         const body = n.body.replace(re, `#${clean}`)
         if (body === n.body) return n
-        return { ...n, body, title: noteTitle(body), hist: [...(n.hist ?? []), bodyHash(n.body)].slice(-40), updatedAt: Date.now() }
+        return { ...n, body, title: noteTitle(body), hist: [...(n.hist ?? []), bodyHash(n.body)].slice(-HIST), dev: deviceId(), updatedAt: Date.now() }
       }))
     },
 

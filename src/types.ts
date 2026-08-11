@@ -135,6 +135,10 @@ export interface Task {
   estimated?: boolean
   /** ISO date the task first appeared. Ageing is how avoidance gets detected. */
   createdAt?: string
+  /** When it was added, to the millisecond. createdAt is only a DAY, so it
+   *  cannot order the things he added this morning against this afternoon,
+   *  which is exactly the order he wants the list in: newest first. */
+  addedAt?: number
   /** The day it was put on the list. Without this, "today" means "every day I
    *  ever moved this to today", which is what it used to mean. */
   plannedOn?: string
@@ -753,6 +757,9 @@ export interface Note {
   /** A body from another device that lost the merge. Kept on the note, shown,
    *  and dropped only when he says so. Work is never the loser. */
   conflict?: { body: string; at: number }
+  /** Which install wrote this note last. A merge between two copies carrying
+   *  the SAME id is one device catching up with itself, never a conflict. */
+  dev?: string
 }
 
 export interface GoalMilestone {

@@ -2389,7 +2389,10 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .habit-list.w7 .habit-foot .quit-slip { flex: none; margin-right: auto; }
 .habit-list.w7 .habit-foot .habit-weeks { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .habit-list.w7 .habit-foot .habit-weeks { margin-left: 0; }
-.habit-list.w7 .habit-goal { grid-area: foot; justify-self: end; }
+/* The goal link is a child of .habit-foot now, not a second element competing
+   for the same `foot` cell. Two elements in one grid area stack, which is
+   what drew "Feeding X" on top of "averaging N of 7 a week". */
+.habit-list.w7 .habit-goal { margin-top: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* The legend is a row of the same grid, so it cannot drift out of line. */
 .habit-list .habit-row.is-legend { padding: 0 0 var(--s1); }
 .habit-list .habit-row.is-legend .day-lab { width: 26px; text-align: center; }

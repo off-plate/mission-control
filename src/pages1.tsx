@@ -1204,6 +1204,17 @@ export function PlanPage() {
                             {!t.done && <span className="kebab-sep" />}
                             {!t.done && (
                               <>
+                                {/* Moving a task between times used to be drag
+                                    only, and drag does not work with a thumb.
+                                    That is most of why he said Plan "doesn't
+                                    work at all" on a phone: he could get a
+                                    task onto the day from the list, then never
+                                    move it again. */}
+                                <span className="kebab-head">Move to</span>
+                                {SLOTS.filter((sl) => sl.id !== (t.slot ?? 'unsorted')).map((sl) => (
+                                  <button key={sl.id} role="menuitem" onClick={() => assignSlot(t.id, sl.id)}>{sl.label}</button>
+                                ))}
+                                <span className="kebab-sep" />
                                 <button role="menuitem" onClick={() => setEditingTask(t)}>Edit</button>
                                 <button role="menuitem" onClick={() => { moveTaskList(t.id, 'backlog'); assignSlot(t.id, undefined); setTaskAt(t.id, undefined) }}>Back to the list</button>
                               </>

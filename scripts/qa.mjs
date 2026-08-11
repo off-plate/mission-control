@@ -1605,6 +1605,50 @@ await step('notes: three dashes make a divider, and a table he sized himself', a
   if ((await page.locator('.nt-editor table tr').count()) < 4) throw new Error('the table did not come back whole')
 })
 
+await step('plan: a monthly routine started earlier this month is off the day', async () => {
+  /* His report: the Monthly review sat on Today every single day, in the
+     afternoon, already finished, and could not be moved or taken off. Today
+     counted a routine as "on today" if it had a startedAt at all, and
+     startedAt is only cleared when the PERIOD rolls over, which for a monthly
+     routine is the turn of the month. So one afternoon's start haunted every
+     remaining day of that month.
+
+     The day column with the morning/afternoon/evening buckets is the PLAN
+     page, which is the "afternoon" he meant. Verified in both directions
+     before being trusted: a routine started two hours ago is still on the
+     day, one started six days ago is not. */
+  await fresh('plan')
+  await page.evaluate(() => { localStorage.setItem('mc-view', 'personal'); localStorage.setItem('mc-space', 'personal') })
+  const seeded = await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const r = s.routines.find((x) => x.id === 'r-monthly')
+    if (!r) return { err: 'no monthly routine to seed' }
+    const now = new Date()
+    // Started on the 2nd of this month, at 14:30, and finished.
+    const began = new Date(now.getFullYear(), now.getMonth(), 2, 14, 30, 0)
+    // Only meaningful if that is genuinely not today; on the 2nd, use the 3rd.
+    const day = began.getDate() === now.getDate() ? new Date(now.getFullYear(), now.getMonth(), 3, 14, 30, 0) : began
+    if (day.getDate() === now.getDate()) return { skip: true }
+    r.startedAt = day.toISOString()
+    r.periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    r.doneStepIds = r.steps.map((st) => st.id)
+    s.routines = s.routines.map((x) => (x.id === 'r-monthly' ? r : x))
+    localStorage.setItem(K, JSON.stringify(s))
+    return { title: r.title }
+  }, KEY)
+  if (seeded.err) throw new Error(seeded.err)
+  if (seeded.skip) return // today IS the seeded day; nothing to prove
+  await page.reload(); await page.waitForTimeout(900)
+  const notNow = page.getByRole('button', { name: 'Not today' })
+  if (await notNow.count()) { await notNow.first().click(); await page.waitForTimeout(400) }
+  /* Targeted at the ROUTINE, by the accessible name its own checkbox carries.
+     A first version of this matched any text inside .today-main and reported a
+     failure that was not there: a HABIT of the same name is legitimately on
+     the page, and the container's textContent swept it up. */
+  const onDay = await page.evaluate((t) => [...document.querySelectorAll('[role="checkbox"]')]
+    .some((el) => new RegExp(`^(Finish|Reopen): ${t}$`).test(el.getAttribute('aria-label') ?? '')), seeded.title)
+  if (onDay) throw new Error(`the "${seeded.title}" routine is still on Today, days after it was started and finished`)
+})
 await step('routines: before bed reviews Compass', async () => {
   await fresh('routines')
   const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)

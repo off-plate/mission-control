@@ -5,6 +5,85 @@
    for progress you own. Cabinet Grotesk carries the numbers.
    ============================================================ */
 
+/* Every face this app uses is served from this origin. Google's CDN returned
+   a 404 for a Bricolage cut during a gate run, and Fontshare 500'd for the
+   Zone's before that; when either happens the app silently falls back to
+   system fonts and looks like a different product, with no error anyone would
+   see. latin and latin-ext only (Czech needs latin-ext), which is what the
+   browser would have fetched anyway. */
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  src: url('/mission-control/fonts/bricolage-grotesque-600-latin-ext.woff2') format('woff2');
+  font-weight: 600; font-style: normal; font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  src: url('/mission-control/fonts/bricolage-grotesque-600-latin.woff2') format('woff2');
+  font-weight: 600; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  src: url('/mission-control/fonts/bricolage-grotesque-700-latin-ext.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  src: url('/mission-control/fonts/bricolage-grotesque-700-latin.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  src: url('/mission-control/fonts/bricolage-grotesque-800-latin-ext.woff2') format('woff2');
+  font-weight: 800; font-style: normal; font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  src: url('/mission-control/fonts/bricolage-grotesque-800-latin.woff2') format('woff2');
+  font-weight: 800; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Instrument Sans';
+  src: url('/mission-control/fonts/instrument-sans-400-latin-ext.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Instrument Sans';
+  src: url('/mission-control/fonts/instrument-sans-400-latin.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Instrument Sans';
+  src: url('/mission-control/fonts/instrument-sans-500-latin-ext.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Instrument Sans';
+  src: url('/mission-control/fonts/instrument-sans-500-latin.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Instrument Sans';
+  src: url('/mission-control/fonts/instrument-sans-600-latin-ext.woff2') format('woff2');
+  font-weight: 600; font-style: normal; font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Instrument Sans';
+  src: url('/mission-control/fonts/instrument-sans-600-latin.woff2') format('woff2');
+  font-weight: 600; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 /* The Zone's two faces, served from this origin. Fontshare's CSS endpoint
    500'd during a gate run, and when it does the room loses the dot-matrix
    countdown and the grotesque that give it its identity, silently, with no
@@ -3956,4 +4035,54 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 @media (prefers-reduced-motion: reduce) {
   .dr-screen, .dr-stage, .dr-tile, .dr-list li, .dr-said, .dr-row.is-fixed { animation: none !important; }
   .dr-seg { transition: none; }
+}
+
+/* ---------- a folder of habits ----------
+   His model, 2026-08-11: a routine is a folder and its steps are the habits
+   inside it. The head is the routine, the rows are its habits, and the count
+   is how far through today it is. */
+.folder-head {
+  width: 100%; display: flex; align-items: center; gap: var(--s3);
+  background: none; border: none; text-align: left; cursor: pointer; min-height: 44px;
+}
+.folder-caret { color: var(--faint); font-size: 0.9rem; width: 12px; flex: none; }
+.folder-head:hover .folder-name { color: var(--accent-text); }
+.folder-name {
+  font-family: var(--font-display); font-weight: 700; font-size: var(--text-base);
+  color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.folder-when { color: var(--faint); white-space: nowrap; }
+.folder-head .col-tot { margin-left: auto; }
+.folder-streak {
+  margin-left: auto; font-size: var(--text-xs); color: var(--progress); font-weight: 600;
+}
+.folder-streak + .col-tot { margin-left: var(--s3); }
+/* The step's own description, kept when steps became habits. One line, and it
+   yields to the numbers beside it rather than pushing them off the row. */
+.habit-note {
+  font-size: var(--text-xs); color: var(--muted); min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ---------- phone chrome: two dropdowns, nothing that scrolls ----------
+   His design, 2026-08-12: "on mobile this could be one left dropdown where I
+   choose which workspace I'm in, and on the right a hamburger menu, again
+   with a dropdown, where I choose today, plan, habits, goals, why's. And by
+   default, not on scroll." Both strips are hidden on a phone and replaced
+   here; on a desktop the strips are better and these do not exist. */
+.phone-space, .phone-pages { display: none; }
+@media (max-width: 639px) {
+  .spaces, .nav { display: none; }
+  .phone-space { display: block; min-width: 0; flex: 0 1 auto; }
+  .phone-space select {
+    min-width: 0; width: auto; max-width: 42vw; min-height: 44px;
+    font-size: var(--text-xs); font-weight: 600; padding-inline: var(--s2);
+  }
+  .phone-pages { display: inline-flex; }
+  .phone-burger { gap: 6px; }
+  .phone-burger .btn-label { display: inline; font-size: var(--text-xs); }
+  /* The page menu is the widest thing in the header, so it opens flush to the
+     right edge rather than running off it. */
+  .phone-pages .kebab-menu { right: 0; left: auto; min-width: 168px; }
+  .phone-pages .kebab-menu .is-on { color: var(--accent-text); font-weight: 700; }
 }

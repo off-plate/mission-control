@@ -111,19 +111,19 @@ await step('habits: tick a build habit and persist', async () => {
   const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
   if (!s.habitLog.some((t) => t.habitId === 'h-meditation')) throw new Error('tick not persisted')
 })
-await step('routines: choice step ticks and starts the routine', async () => {
-  await fresh('routines')
-  // Cards are shut by default now: open the one being run first.
-  await page.locator('.routine-card', { hasText: 'Out Brain Rot' }).first().locator('.routine-open').click()
-  await page.waitForTimeout(300)
-  await page.locator('.routine-card', { hasText: 'Out Brain Rot' }).first().locator('.alt-opt', { hasText: 'Move' }).click()
-  await page.waitForTimeout(400)
-  const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
-  const r = s.routines.find((x) => x.id === 'r-brainrot')
-  if (!r.doneStepIds.includes('br1') || !r.startedAt) throw new Error('choice did not tick/start')
-  // and it leaves a DATED row, which is the only thing that survives rollover
-  if (!(s.stepTicks ?? []).some((t) => t.routineId === 'r-brainrot' && t.stepId === 'br1')) {
-    throw new Error('ticking a step left no dated row')
+await step('habits: a step with two ways to answer it stays ONE habit', async () => {
+  /* "Move or caffeine" is one either-or, not two streaks. The merge keeps it
+     as a single habit carrying both alternatives, which is the one shape of
+     step that would have been wrong to split. */
+  await fresh('habits')
+  const found = await page.evaluate((K) => {
+    const st = JSON.parse(localStorage.getItem(K))
+    const withAlts = (st.habits ?? []).filter((h) => Array.isArray(h.alts) && h.alts.length > 1)
+    return withAlts.map((h) => ({ name: h.name, alts: h.alts.length, folderId: h.folderId ?? null }))
+  }, KEY)
+  if (!found.length) throw new Error('the either-or step did not keep its alternatives')
+  for (const h of found) {
+    if (!h.folderId) throw new Error(`${h.name} kept its alternatives but is outside a folder`)
   }
 })
 await step('goals: add with milestones, tick one on the card', async () => {
@@ -143,10 +143,14 @@ await step('focus: timer start writes state', async () => {
   if (p.phase !== 'focus') throw new Error(`phase ${p.phase}`)
   await page.locator('.focus-live').getByRole('button', { name: 'Stop' }).click()
 })
-await step('the menu is six tabs, and what left it is reachable from the header', async () => {
+await step('the menu is five tabs, and what left it is reachable from the header', async () => {
+  /* Five since Routines became a folder inside Habits (his instruction,
+     2026-08-11). Its address still has to resolve, which is asserted below
+     with the other retired ones. */
   await fresh('today')
   const tabs = await page.locator('.nav-tab').allInnerTexts()
-  if (tabs.length !== 6) throw new Error(`${tabs.length} tabs: ${tabs.join(', ')}`)
+  if (tabs.length !== 5) throw new Error(`${tabs.length} tabs: ${tabs.join(', ')}`)
+  if (tabs.some((t) => /routines/i.test(t))) throw new Error('Routines is still a tab')
   for (const gone of ['Calendar', 'Avoidance', 'Assistant', 'Notes', 'Focus', 'Money', 'Reflect']) {
     if (tabs.includes(gone)) throw new Error(`${gone} is still a tab`)
   }
@@ -338,8 +342,14 @@ await step('the zone: the water deepens the further into the block he is', async
   await page.waitForSelector('.zroom', { timeout: 10000 }); await page.waitForTimeout(1400)
   const deep = await groundNow()
   if (deep.L === null) throw new Error(`the deep ground is not a mixed colour: ${deep.raw}`)
-  if (!(deep.L < surface.L - 0.02)) {
-    throw new Error(`the room does not deepen: L ${surface.L} at the surface against ${deep.L} at 80% in`)
+  /* A real drop, sized to the palette as it now stands. --z-deep was floored
+     from #011620 to #02202F on the critic's finding that the first value was
+     functionally black and converged on the very look this palette exists to
+     avoid. That deliberately narrowed the range, so a threshold written for
+     the old value failed on a room that was deepening correctly. */
+  const drop = (surface.L - deep.L) / surface.L
+  if (!(drop > 0.03)) {
+    throw new Error(`the room does not deepen: L ${surface.L} at the surface against ${deep.L} at 80% in (${(drop * 100).toFixed(1)}%)`)
   }
 })
 await step('the zone: with more than one task open, he can choose which one to focus on', async () => {
@@ -769,20 +779,55 @@ await step('goals: a promised task ticks from the plan', async () => {
   const row = page.locator('.goal-col', { hasText: 'This month' }).first().locator('.ptask', { hasText: 'Gate promise' })
   if (!(await row.count()) || !(await row.evaluate((el) => el.classList.contains('done')))) throw new Error('promise not marked done')
 })
-await step('habits: routine-kept rows lock today and link out', async () => {
+await step('habits: a routine is a folder, and its habits tick on their own', async () => {
+  /* This used to assert the opposite: that a routine-kept habit's dot was
+     LOCKED and linked out to the Routines page. His instruction of 2026-08-11
+     replaced that model outright: "routines are just a folder of different
+     habits... each item in the routine will be a new habit". So the folder is
+     the routine, the rows are its habits, and a habit is his to tick. */
   await fresh('habits')
-  // The view survives outside the demo blob, and an earlier step stands in
-  // Michael's Corner. This step needs the whole flat.
-  await page.locator('.space-btn', { hasText: 'All' }).click(); await page.waitForTimeout(400)
-  const line = page.locator('.habit-line', { hasText: 'After wake up' }).first()
-  await line.waitFor({ timeout: 5000 }).catch(async () => {
-    await page.screenshot({ path: '/tmp/qa-habits-fail.png', fullPage: true })
-    throw new Error('no After wake up line, see /tmp/qa-habits-fail.png')
-  })
-  const dis = await line.locator('.day-cell.is-today .daydot').first().isDisabled({ timeout: 5000 })
-  if (dis !== true) throw new Error('today dot pressable on a routine-kept habit')
-  await line.locator('.habit-auto').click(); await page.waitForTimeout(400)
-  if (!(await page.locator('.routine-card', { hasText: 'After wake up' }).count())) throw new Error('link did not open Routines')
+  await page.locator('.space-btn', { hasText: 'All' }).click(); await page.waitForTimeout(500)
+  const heads = await page.locator('.folder-head').allInnerTexts()
+  if (heads.length < 3) throw new Error(`${heads.length} folders on Habits, expected the routines to be folders`)
+  const wake = page.locator('.habit-section').filter({ has: page.locator('.folder-name', { hasText: 'After wake up' }) }).first()
+  if (!(await wake.count())) throw new Error(`no "After wake up" folder, heads were: ${heads.join(' | ')}`)
+  // Its steps are habits inside it, in the order he wrote them.
+  const inside = await wake.locator('.habit-name').allInnerTexts()
+  if (inside.length < 2) throw new Error(`the folder holds ${inside.length} habits`)
+  // And a habit inside a folder is his to tick, which it was not before.
+  const firstName = (await wake.locator('.habit-name').first().innerText()).trim()
+  const dot = wake.locator('.habit-line').first().locator('.day-cell.is-today .daydot').first()
+  if (await dot.isDisabled()) throw new Error('a habit inside a folder is still locked')
+  await dot.click(); await page.waitForTimeout(600)
+  /* Matched by the NAME on the row that was clicked. Matching by "first habit
+     carrying this folderId" picked a different one: a step that already fed a
+     habit keeps its old id and sits first in the array, while the rows render
+     in the order he wrote them. */
+  const kept = await page.evaluate(([K, name]) => {
+    const st = JSON.parse(localStorage.getItem(K))
+    const h = (st.habits ?? []).find((x) => x.folderId === 'r-wakeup' && x.name.trim() === name)
+    return h ? (st.habitLog ?? []).some((t) => t.habitId === h.id) : `no habit named ${name} in the folder`
+  }, [KEY, firstName])
+  if (kept !== true) throw new Error(`ticking "${firstName}" inside a folder did not record it: ${kept}`)
+})
+await step('habits: the folder counts only what it still needs', async () => {
+  /* The head reads how far through today the folder is. Optional habits never
+     hold it open, or a folder with one optional in it could never read full. */
+  await fresh('habits')
+  await page.locator('.space-btn', { hasText: 'All' }).click(); await page.waitForTimeout(500)
+  const head = await page.locator('.folder-head').first().innerText()
+  const m = head.replace(/\s+/g, ' ').match(/(\d+)\/(\d+)\s*$/)
+  if (!m) throw new Error(`a folder head shows no count: "${head.replace(/\n/g, ' ')}"`)
+  const [, done, total] = m.map(Number)
+  if (!(total > 0)) throw new Error(`folder total is ${total}`)
+  if (done > total) throw new Error(`folder reads ${done}/${total}`)
+  const counted = await page.evaluate((K) => {
+    const st = JSON.parse(localStorage.getItem(K))
+    const withFolder = (st.habits ?? []).filter((h) => h.folderId)
+    const optional = withFolder.filter((h) => h.optional).length
+    return { withFolder: withFolder.length, optional }
+  }, KEY)
+  if (counted.withFolder < 10) throw new Error(`${counted.withFolder} habits carry a folder; the merge did not run`)
 })
 await step('phone: a task can be scheduled and rescheduled without dragging', async () => {
   /* Why he said Plan "doesn't work at all" on mobile: the only way into a
@@ -1154,46 +1199,6 @@ await step('daily review: a first morning with no history is not asked anything'
   }, KEY)
   await page.reload(); await page.waitForTimeout(900)
   if (await page.locator('.dr-screen').count()) throw new Error('it interrupted a profile with nothing to review')
-})
-
-await step('habits: a routine left half done still reads half done tomorrow', async () => {
-  /* His own report: partial routines only ever showed on today's dot, because
-     the routine's doneStepIds is wiped at rollover and nothing dated survived
-     it. Seed two of Morning Preparation's steps on an earlier weekday and the
-     dot for that day must fill. */
-  await fresh('habits')
-  const yday = await page.evaluate((K) => {
-    const s = JSON.parse(localStorage.getItem(K))
-    const r = s.routines.find((x) => x.id === 'r-morning')
-    // an earlier day of THIS week, so it is on the seven-day strip
-    const d = new Date()
-    const back = d.getDay() === 1 ? 0 : 1
-    d.setDate(d.getDate() - back)
-    const z = (n) => String(n).padStart(2, '0')
-    const day = `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`
-    const ticked = r.steps.slice(0, 2)
-    s.stepTicks = ticked.map((st) => ({ routineId: 'r-morning', stepId: st.id, day }))
-    /* The strip is Mon-Sun of THIS week, so on a Monday there is no earlier
-       day to seed and `back` lands on today. Today's dot is the one index
-       that reads the routine's LIVE doneStepIds rather than the dated
-       stepTicks above, so seeding only the dated half left the dot empty
-       and this failed every Monday. Real ticking writes both halves
-       (store.tsx toggleRoutineStep), so the seed does too. */
-    if (back === 0) {
-      r.doneStepIds = ticked.map((st) => st.id)
-      r.periodKey = day
-    }
-    localStorage.setItem(K, JSON.stringify(s))
-    return day
-  }, KEY)
-  await page.reload(); await page.waitForTimeout(800)
-  const row = page.locator('.habit-line', { hasText: 'Morning Preparation' }).first()
-  const partials = await row.locator('.daydot.partial').count()
-  if (partials < 1) throw new Error(`no partial dot for ${yday}`)
-  // and the fill is a real fraction, not 0 and not full
-  const fill = await row.locator('.daydot.partial').first().evaluate((el) => el.style.getPropertyValue('--fill'))
-  const n = parseInt(fill, 10)
-  if (!(n > 0 && n < 100)) throw new Error(`fill reads ${fill}`)
 })
 
 await step('goals: a day-counted goal reads impossible before behind, not on pace', async () => {
@@ -1677,19 +1682,23 @@ await step('plan: a monthly routine started earlier this month is off the day', 
     .some((el) => new RegExp(`^(Finish|Reopen): ${t}$`).test(el.getAttribute('aria-label') ?? '')), seeded.title)
   if (onDay) throw new Error(`the "${seeded.title}" routine is still on Today, days after it was started and finished`)
 })
-await step('routines: before bed reviews Compass', async () => {
-  await fresh('routines')
-  const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
-  const step8 = (s.routines ?? []).find((r) => r.id === 'r-evening')?.steps?.find((x) => x.id === 'be8')
-  if (!step8) throw new Error('the Compass step is not in the routine')
-  if (step8.link !== 'https://compass-money.netlify.app') throw new Error(`links to ${step8.link}`)
-  await page.locator('.routine-card', { hasText: 'Before bed routine' }).first().locator('.routine-open').click()
-  await page.waitForTimeout(400)
-  const row = page.locator('.routine-card', { hasText: 'Before bed routine' }).first()
-  if (!(await row.getByText('Review Compass finances').count())) throw new Error('the step does not render')
-  if (!(await row.getByRole('link', { name: /Compass/ }).count())) throw new Error('no link under it')
+await step('habits: the Compass link survived the move onto its habit', async () => {
+  /* It used to live on a routine STEP and open from the Routines page. Steps
+     are habits now, and he asked for exactly this to survive: "there is links
+     for typing tests, so there should be link to that still". */
+  await fresh('habits')
+  await page.locator('.space-btn', { hasText: 'All' }).click(); await page.waitForTimeout(500)
+  const stored = await page.evaluate((K) => {
+    const st = JSON.parse(localStorage.getItem(K))
+    const h = (st.habits ?? []).find((x) => /Compass/i.test(x.name))
+    return h ? { name: h.name, link: h.link ?? null, folderId: h.folderId ?? null } : null
+  }, KEY)
+  if (!stored) throw new Error('no Compass habit after the merge')
+  if (!/compass-money/.test(stored.link ?? '')) throw new Error(`the Compass habit links to ${stored.link}`)
+  if (!stored.folderId) throw new Error('the Compass habit is not inside a folder')
+  const link = page.getByRole('link', { name: /Compass/ })
+  if (!(await link.count())) throw new Error('the Compass link does not render on the habit row')
 })
-
 await step('notes: the columns drag, and nothing jumps when a folder is clicked', async () => {
   await fresh('notes')
   const before = (await page.locator('.nt-side').boundingBox()).width

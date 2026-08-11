@@ -7,6 +7,7 @@ import { usePomodoro } from './pomodoro'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
 import { Linkify } from './widgets'
+import type { PageId } from './types'
 import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, dueOn, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, isCounted, COUNT_PERIODS, requiredSteps, routineComplete, routineProgress, routineRunsOn, slotMinutes, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
 import { DayLine, DayNumbers, WeekStrip } from './dayface'
 import { useFirstMove } from './ui'
@@ -1696,9 +1697,23 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
             Feeding “{goal.name}”
           </button>
         )}
-        {drivenBy ? (
-          <button className="habit-auto" onClick={() => setPage('routines')}>Open the routine</button>
-        ) : null}
+        {/* What the step carried and a habit did not. His instruction when the
+            merge was agreed: "it should still consist of short description if
+            it was previously... there is links for typing tests, so there
+            should be link to that still. The video doesn't have to be video,
+            it has to be a link to that video." */}
+        {h.note && <span className="habit-note" title={h.note}>{h.note}</span>}
+        {h.link && (
+          <a className="habit-auto" href={h.link} target="_blank" rel="noreferrer">
+            {h.linkLabel ?? 'Open'} ↗
+          </a>
+        )}
+        {h.goto && (
+          <button className="habit-auto" onClick={() => setPage(h.goto as PageId)}>
+            {h.gotoLabel ?? 'Open'}
+          </button>
+        )}
+        {h.seconds ? <span className="habit-weeks mono">{Math.round(h.seconds / 60)}m</span> : null}
       </div>
     </div>
   )
@@ -1973,9 +1988,53 @@ export function HabitsPage() {
   const nameCount = new Map<string, number>()
   for (const h of spaceHabits) nameCount.set(h.name, (nameCount.get(h.name) ?? 0) + 1)
   const qualifyOf = (h: HabitDef) => ((nameCount.get(h.name) ?? 0) > 1 ? SPACE_LABELS[h.space] : undefined)
-  const cols = KEEPER_GROUPS
-    .map((c) => ({ ...c, list: spaceHabits.filter((h) => keeperOf(h) === c.id).sort((a, b) => rank(a) - rank(b)) }))
-    .filter((c) => c.list.length > 0)
+  /* Folders first, then whatever is loose. His model: a routine IS a folder of
+     habits, and "if a habit doesn't have a folder it is basically just the
+     habit". Inside a folder the sequence he wrote is the order, because a
+     morning routine is a running order, not a ranked list; loose habits keep
+     the old open-first ranking, which is what a flat list wants. */
+  const folderGroups = routines
+    .filter((r) => !r.archivedAt && inView(r.space))
+    .map((r) => ({
+      id: r.id,
+      label: r.title,
+      folder: r,
+      list: spaceHabits
+        .filter((h) => h.folderId === r.id)
+        .sort((a, b) => (a.folderOrder ?? 0) - (b.folderOrder ?? 0)),
+    }))
+    .filter((g) => g.list.length > 0)
+  /* The habit a routine already kept ("did I finish Morning Preparation
+     today") is the FOLDER's own streak, not a habit sitting beside it. Left in
+     the loose list every routine appeared twice, once as its folder and once
+     as a row of the same name. It keeps its history and its id, it just is not
+     a second row. */
+  const folderHabitIds = new Set(routines.map((r) => r.habitId).filter(Boolean) as string[])
+  const looseList = spaceHabits
+    .filter((h) => !h.folderId && !folderHabitIds.has(h.id))
+    .sort((a, b) => rank(a) - rank(b))
+  const cols: { id: string; label: string; folder?: Routine; list: HabitDef[] }[] = [
+    ...folderGroups,
+    ...(looseList.length ? [{ id: 'loose', label: 'On their own', list: looseList }] : []),
+  ]
+  /* How far through a folder today is. Optional habits never hold it open, so
+     a folder of five with one optional reads 4/4 when the four that matter are
+     done, not 4/5 forever. */
+  const folderDone = (list: HabitDef[]) => {
+    const need = list.filter((h) => !h.optional)
+    return { done: need.filter((h) => h.days[todayIndex]).length, total: need.length }
+  }
+  const [shutFolders, setShutFolders] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('mc:shut-folders') ?? '[]') as string[]) } catch { return new Set() }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('mc:shut-folders', JSON.stringify([...shutFolders])) } catch { /* private mode */ }
+  }, [shutFolders])
+  const toggleFolder = (id: string) => setShutFolders((prev) => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
 
   return (
     <div className="page">
@@ -2006,13 +2065,39 @@ export function HabitsPage() {
       {cols.map((c) => (
         <section className="habit-section" key={c.id}>
           <div className={`panel habit-list${days === 7 ? ' w7' : ''}`}>
-            <div className="col-head">
-              <span className="microcap">{c.label}</span>
-              <span className="col-tot mono">{c.list.length}</span>
-            </div>
+            {c.folder ? (
+              /* A folder: the routine's name, how far through today it is, and
+                 a disclosure. Collapsed by default is wrong here, so it opens
+                 and he shuts what he does not want to look at. */
+              <button
+                className="col-head folder-head"
+                aria-expanded={!shutFolders.has(c.id)}
+                onClick={() => toggleFolder(c.id)}
+              >
+                <span className="folder-caret" aria-hidden="true">{shutFolders.has(c.id) ? '\u203A' : '\u02C5'}</span>
+                <span className="folder-name">{c.label}</span>
+                <span className="folder-when microcap">{habitFrequencyLabel({ frequency: c.list[0]?.frequency } as HabitDef)}</span>
+                {(() => {
+                  const { done, total } = folderDone(c.list)
+                  const own = c.folder?.habitId ? habits.find((h) => h.id === c.folder!.habitId) : undefined
+                  const streak = own ? currentStreak(habitLog, own.id) : 0
+                  return (
+                    <>
+                      {streak > 1 && <span className="folder-streak mono" title={`${streak} in a row`}>{streak}</span>}
+                      <span className={`col-tot mono${done === total && total > 0 ? ' val-pos' : ''}`}>{done}/{total}</span>
+                    </>
+                  )
+                })()}
+              </button>
+            ) : (
+              <div className="col-head">
+                <span className="microcap">{c.label}</span>
+                <span className="col-tot mono">{c.list.length}</span>
+              </div>
+            )}
             {/* The weekday letters ride the same grid as the rows, so they can
                 never drift out of line with the dots underneath them. */}
-            {days === 7 && (
+            {days === 7 && !(c.folder && shutFolders.has(c.id)) && (
               <div className="habit-row is-legend" aria-hidden="true">
                 <span className="habit-row-top" />
                 <span className="habit-days">
@@ -2022,7 +2107,7 @@ export function HabitsPage() {
                 </span>
               </div>
             )}
-            {c.list.map((h) => (
+            {(c.folder && shutFolders.has(c.id) ? [] : c.list).map((h) => (
               <div className={`habit-line is-${h.kind ?? 'build'}${h.paused ? ' is-paused' : ''}`} key={h.id}>
                 <HabitRow h={h} todayIndex={todayIndex} days={days} qualify={qualifyOf(h)} drivenBy={drivenBy.get(h.id)} progress={progressFor.get(h.id)} partOn={partFor.get(h.id)} goal={goalOn.get(h.id)} stateTag={h.paused ? 'paused' : h.days[todayIndex] ? 'done today' : null} actions={
                   <>

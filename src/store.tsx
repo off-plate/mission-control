@@ -18,6 +18,7 @@ import {
 } from './mock'
 import { goalCurrent, isTimeFed, requiredSteps, routineComplete, stepLocked } from './types'
 import { isSpace, SPACES, spaceFolderId } from './types'
+import type { HabitFrequency } from './types'
 import type {
   ViewId,
   FocusSession,
@@ -322,6 +323,78 @@ interface Store extends PersistedState {
 }
 
 const Ctx = createContext<Store | null>(null)
+
+/* Routines become folders and their steps become habits. Pure, and used by
+   BOTH paths on purpose: a saved state migrates through it once, and a fresh
+   install seeds through it, so a new install is not left with the old shape
+   that a migrated one no longer has. That gap was real: folders rendered for
+   his data and not for a clean boot, which is also what the gate runs on. */
+export function foldersFromRoutines(
+  routines: Routine[],
+  habits: HabitDef[],
+  stepTicks: StepTick[],
+): { habits: HabitDef[]; ticks: HabitTick[] } {
+  const out = habits.map((h) => ({ ...h }))
+  const byId = new Map(out.map((h) => [h.id, h]))
+  const freqFor = (c: string): HabitFrequency =>
+    (c === 'prework' ? 'weekdays' : c === 'weekly' ? 'weekly' : c === 'monthly' ? 'monthly' : 'daily')
+  /* Mon..Sun of the current week, so a habit born here shows the days it was
+     already kept instead of an empty strip he would read as a broken streak. */
+  const now = new Date()
+  const mon = new Date(now); mon.setDate(now.getDate() - ((now.getDay() + 6) % 7))
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(mon); d.setDate(mon.getDate() + i)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })
+  const made: HabitDef[] = []
+  const ticks: HabitTick[] = []
+
+  for (const r of routines) {
+    const folderHabit = r.habitId ? byId.get(r.habitId) : undefined
+    let order = 0
+    for (const st of r.steps ?? []) {
+      order += 1
+      const carried = {
+        note: st.note, example: st.example, link: st.link, linkLabel: st.linkLabel,
+        goto: st.goto, gotoLabel: st.gotoLabel, optional: st.optional,
+        alts: st.alts, seconds: st.seconds,
+        ...(st.id === 'mr4' ? { gatedBy: 'typing-wpm' as const } : {}),
+      }
+      /* A step that already fed a habit does not get a second one: that habit
+         joins the folder, keeping every day it has already been kept. */
+      const existing = st.habitId ? byId.get(st.habitId) : undefined
+      if (existing) {
+        existing.folderId = existing.folderId ?? r.id
+        existing.folderOrder = existing.folderOrder ?? order
+        const target = existing as unknown as Record<string, unknown>
+        for (const [k, v] of Object.entries(carried)) {
+          if (v !== undefined && target[k] === undefined) target[k] = v
+        }
+        continue
+      }
+      const id = `h-${r.id}-${st.id}`
+      if (byId.has(id)) continue
+      const mine = stepTicks.filter((t) => t.routineId === r.id && t.stepId === st.id)
+      /* Deliberately NOT kind:'measured' for a timer step. A measured habit in
+         this app fills itself from focus SESSIONS, and a three minute
+         meditation is not a focus session; it would have started auto-keeping
+         itself off unrelated work. The length rides along as `seconds`. */
+      const h: HabitDef = {
+        id, space: r.space, name: st.title,
+        days: weekDays.map((d) => mine.some((t) => t.day === d)),
+        paused: false, history: [],
+        folderId: r.id, folderOrder: order,
+        frequency: freqFor(r.cadence),
+        daypart: folderHabit?.daypart,
+        startedOn: mine.length ? mine.map((t) => t.day).sort()[0] : undefined,
+        ...carried,
+      }
+      made.push(h); byId.set(id, h)
+      for (const t of mine) ticks.push({ habitId: id, day: t.day, src: 'routine-merge' })
+    }
+  }
+  return { habits: [...out, ...made], ticks }
+}
 
 function loadPersisted(): PersistedState | null {
   try {
@@ -899,6 +972,31 @@ function loadPersisted(): PersistedState | null {
       const s = seedG.get(g.id)
       return s?.habitId && !g.habitId ? { ...g, habitId: s.habitId, unit: s.unit } : g
     })
+
+    /* THE MERGE, on his instruction 2026-08-11: "routines and habits are
+       basically the same thing. Routines are just a folder of different
+       habits. Each item in the routine will be a new habit."
+
+       A routine keeps its row and becomes the FOLDER. Every step it held
+       becomes a real habit pointing back at it, carrying the things a step
+       had and a habit did not: the description, the external link (the typing
+       test, a video), the in-app page, optional, the either-or choice, a
+       timer's length.
+
+       History is not reset. Every dated step tick becomes a dated habit tick
+       for the habit that step turned into, so a streak he has already earned
+       is the streak he keeps. That is the whole reason this was safe to do.
+
+       Runs once, and the untouched blob is already in BACKUP_KEY above. */
+    if (!p.removedSeeds.includes('fix:habits-folders')) {
+      p.removedSeeds.push('fix:habits-folders')
+      const merged = foldersFromRoutines(p.routines ?? [], p.habits ?? [], p.stepTicks ?? [])
+      p.habits = merged.habits
+      /* Never a duplicate: a tick for this habit on this day already existing
+         means the merge has partly run before, and his own tick wins. */
+      const seen = new Set((p.habitLog ?? []).map((t) => `${t.habitId}|${t.day}`))
+      p.habitLog = [...(p.habitLog ?? []), ...merged.ticks.filter((t) => !seen.has(`${t.habitId}|${t.day}`))]
+    }
     return p
   } catch {
     return null
@@ -971,10 +1069,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
      on a fresh load: you earn today by running the routine. */
   const seededHabits = useMemo(() => {
     const mirrored = new Set(MOCK_ROUTINES.map((r) => r.habitId).filter(Boolean) as string[])
-    return MOCK_HABITS.map((h) => ({
+    const base = MOCK_HABITS.map((h) => ({
       ...h,
       days: h.days.map((d, i) => (i > seedTodayIdx ? false : i === seedTodayIdx && mirrored.has(h.id) ? false : d)),
     }))
+    /* A fresh install seeds through the same conversion a saved one migrates
+       through, so the two never disagree about the shape of the app. Without
+       this a clean boot had routines and no folders, which is also what every
+       gate run starts from. */
+    return foldersFromRoutines(MOCK_ROUTINES, base, []).habits
   }, [seedTodayIdx])
   const seededGoals = MOCK_GOALS
   // Routine step definitions come from the mock (canonical); only the user's checks

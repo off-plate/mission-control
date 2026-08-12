@@ -829,6 +829,80 @@ await step('habits: the folder counts only what it still needs', async () => {
   }, KEY)
   if (counted.withFolder < 10) throw new Error(`${counted.withFolder} habits carry a folder; the merge did not run`)
 })
+await step('habits: a gated habit stays locked until the day\'s number clears it', async () => {
+  /* The typing test was never "did you open it", it was "did you hit 75". The
+     merge kept the lock's NAME (gatedBy) but dropped the only way to earn it,
+     which left a box he could tick on a warm-up. His words: "there's no way
+     that you will tell me that something doesn't work or doesn't live." */
+  await fresh('habits')
+  await page.locator('.space-btn', { hasText: 'All' }).click(); await page.waitForTimeout(500)
+  const row = page.locator('.habit-line').filter({ has: page.locator('.habit-name', { hasText: 'Typing test' }) }).first()
+  if (!(await row.count())) throw new Error('no Typing test habit on the page')
+  const dot = row.locator('.day-cell.is-today .daydot').first()
+  if (!(await dot.isDisabled())) throw new Error('the typing habit is tickable by hand before any score is logged')
+  await row.locator('.run-caret').click(); await page.waitForTimeout(300)
+  const input = row.locator('.wpm-row input')
+  await input.fill('40'); await row.getByRole('button', { name: 'Log it' }).click(); await page.waitForTimeout(400)
+  if (!(await dot.isDisabled())) throw new Error('40 WPM (under target) unlocked the habit')
+  const failMsg = await row.locator('.run-verdict').innerText()
+  if (!/short/.test(failMsg)) throw new Error(`a failing run did not say so: "${failMsg}"`)
+  await input.fill('80'); await row.getByRole('button', { name: 'Log it' }).click(); await page.waitForTimeout(400)
+  if (await dot.isDisabled()) throw new Error('80 WPM (over target) is still locked')
+  const kept = await page.evaluate(([K]) => {
+    const st = JSON.parse(localStorage.getItem(K))
+    const h = (st.habits ?? []).find((x) => x.name === 'Typing test')
+    return h ? (st.habitLog ?? []).some((t) => t.habitId === h.id) : 'no habit'
+  }, [KEY])
+  if (kept !== true) throw new Error(`a passing score did not keep the day: ${kept}`)
+  // The number itself lands in the same series Reflect charts under Numbers,
+  // keyed by the routine and step the habit came from, not by the habit id.
+  const logged = await page.evaluate((K) => {
+    const st = JSON.parse(localStorage.getItem(K))
+    return (st.stepLog ?? []).filter((e) => e.routineId === 'r-morning' && e.stepId === 'mr4')
+  }, KEY)
+  if (!logged.some((e) => e.value === 80)) throw new Error('80 was not written into stepLog for r-morning/mr4')
+})
+await step('habits: picking either answer of a two-way habit keeps the day', async () => {
+  /* "Move or caffeine" is one question. Picking Move has to tick the row, and
+     picking the other answer afterwards is a change of mind, not a second
+     thing done: the day stays kept either way. */
+  await fresh('habits')
+  await page.locator('.space-btn', { hasText: 'All' }).click(); await page.waitForTimeout(500)
+  const row = page.locator('.habit-line').filter({ has: page.locator('.habit-name', { hasText: 'Move or caffeine' }) }).first()
+  if (!(await row.count())) throw new Error('no "Move or caffeine" habit on the page')
+  const dot = row.locator('.day-cell.is-today .daydot').first()
+  if (!(await dot.isDisabled())) throw new Error('a two-way habit is tickable by hand before an answer is picked')
+  await row.locator('.run-caret').click(); await page.waitForTimeout(300)
+  await row.getByRole('button', { name: /^Move/ }).click(); await page.waitForTimeout(400)
+  const afterMove = await page.evaluate((K) => {
+    const st = JSON.parse(localStorage.getItem(K))
+    const h = (st.habits ?? []).find((x) => x.name === 'Move or caffeine')
+    return h ? (st.habitLog ?? []).some((t) => t.habitId === h.id) : 'no habit'
+  }, KEY)
+  if (afterMove !== true) throw new Error(`picking Move did not keep the day: ${afterMove}`)
+  await row.getByRole('button', { name: /^Caffeine/ }).click(); await page.waitForTimeout(400)
+  const afterSwitch = await page.evaluate((K) => {
+    const st = JSON.parse(localStorage.getItem(K))
+    const h = (st.habits ?? []).find((x) => x.name === 'Move or caffeine')
+    return h ? (st.habitLog ?? []).filter((t) => t.habitId === h.id).length : -1
+  }, KEY)
+  if (afterSwitch !== 1) throw new Error(`switching the answer left ${afterSwitch} rows for the day, expected 1`)
+})
+await step('habits: the two content steps still generate today\'s real body', async () => {
+  /* Pronunciation and the mouth stretch were never a note plus a checkbox:
+     their whole job was content the app built fresh each morning. A habit
+     with only a note where that used to be is a habit with the work removed. */
+  await fresh('habits')
+  await page.locator('.space-btn', { hasText: 'All' }).click(); await page.waitForTimeout(500)
+  const pron = page.locator('.habit-line').filter({ has: page.locator('.habit-name', { hasText: 'Pronunciation test' }) }).first()
+  await pron.locator('.run-caret').click(); await page.waitForTimeout(600)
+  const paras = await pron.locator('.pron-para').count()
+  if (paras < 2) throw new Error(`pronunciation habit shows ${paras} paragraphs, expected EN and CZ`)
+  const stretch = page.locator('.habit-line').filter({ has: page.locator('.habit-name', { hasText: 'mouth stretch' }) }).first()
+  await stretch.locator('.run-caret').click(); await page.waitForTimeout(300)
+  const twisters = await stretch.locator('.stretch-item').count()
+  if (twisters < 2) throw new Error(`mouth stretch habit shows ${twisters} tongue twisters`)
+})
 await step('phone: a task can be scheduled and rescheduled without dragging', async () => {
   /* Why he said Plan "doesn't work at all" on mobile: the only way into a
      time of day was dragging, and drag does not work with a thumb. Getting a

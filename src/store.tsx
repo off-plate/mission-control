@@ -16,7 +16,7 @@ import {
   MOCK_TASKS,
   WIDGET_DEFS,
 } from './mock'
-import { goalCurrent, isTimeFed, requiredSteps, routineComplete, stepLocked } from './types'
+import { goalCurrent, habitGate, habitStepKey, isTimeFed, requiredSteps, routineComplete, stepLocked } from './types'
 import { isSpace, SPACES, spaceFolderId } from './types'
 import type { HabitFrequency } from './types'
 import type {
@@ -189,6 +189,15 @@ interface Store extends PersistedState {
   dailyOpen: boolean
   openDaily: () => void
   toggleHabitDay: (id: string, day: number) => void
+  /** The number a habit is judged by, for today. Logging it IS the tick when it
+   *  clears the target, in one action: the typing test is not "did you open it",
+   *  it is "did you hit the number", and asking him to type the score and then
+   *  also tick a box would let him tick the box on a score that failed. */
+  logHabitNumber: (habitId: string, value: number) => void
+  /** Which of a habit's two answers he took today. One question, one answer:
+   *  picking the other one is a change of mind, not a second thing done, and
+   *  picking the same one again gives the day back. */
+  pickHabitAlt: (habitId: string, altId: string) => void
   /** Mark a habit kept, or not kept, on a NAMED day. The index version above is
    *  a position in this week and cannot address last Sunday. */
   markHabitOn: (id: string, day: string, value: boolean) => void
@@ -357,8 +366,13 @@ export function foldersFromRoutines(
       const carried = {
         note: st.note, example: st.example, link: st.link, linkLabel: st.linkLabel,
         goto: st.goto, gotoLabel: st.gotoLabel, optional: st.optional,
-        alts: st.alts, seconds: st.seconds,
+        alts: st.alts, seconds: st.seconds, srcStepId: st.id,
         ...(st.id === 'mr4' ? { gatedBy: 'typing-wpm' as const } : {}),
+        /* The two steps whose whole body was content the app made fresh every
+           morning. A note cannot stand in for today's news paragraphs or
+           today's tongue twisters, so the habit brings the body with it. */
+        ...(st.id === 'mr2' ? { runner: 'pronunciation' as const } : {}),
+        ...(st.id === 'mr3' ? { runner: 'stretch' as const } : {}),
       }
       /* A step that already fed a habit does not get a second one: that habit
          joins the folder, keeping every day it has already been kept. */
@@ -373,7 +387,19 @@ export function foldersFromRoutines(
         continue
       }
       const id = `h-${r.id}-${st.id}`
-      if (byId.has(id)) continue
+      /* Already made by an earlier run of this same function. It still gets
+         anything the step carries that it does not have yet, because the list
+         of what a step carries has grown since: running this twice must be the
+         way a habit CATCHES UP, not the way it is left behind. Only undefined
+         fields are filled, so nothing he has edited is overwritten. */
+      const already = byId.get(id)
+      if (already) {
+        const target = already as unknown as Record<string, unknown>
+        for (const [k, v] of Object.entries(carried)) {
+          if (v !== undefined && target[k] === undefined) target[k] = v
+        }
+        continue
+      }
       const mine = stepTicks.filter((t) => t.routineId === r.id && t.stepId === st.id)
       /* Deliberately NOT kind:'measured' for a timer step. A measured habit in
          this app fills itself from focus SESSIONS, and a three minute
@@ -997,6 +1023,17 @@ function loadPersisted(): PersistedState | null {
       const seen = new Set((p.habitLog ?? []).map((t) => `${t.habitId}|${t.day}`))
       p.habitLog = [...(p.habitLog ?? []), ...merged.ticks.filter((t) => !seen.has(`${t.habitId}|${t.day}`))]
     }
+
+    /* The merge above shipped before the habits carried everything their steps
+       could DO: which step they came from, so a number they record joins the
+       series Reflect already charts, and the two bodies the app builds fresh
+       each morning. Anyone who ran the first pass has habits without those, so
+       the same function runs again and fills only what is missing. Habits only,
+       because the ticks were already taken across. */
+    if (!p.removedSeeds.includes('fix:habit-runners')) {
+      p.removedSeeds.push('fix:habit-runners')
+      p.habits = foldersFromRoutines(p.routines ?? [], p.habits ?? [], []).habits
+    }
     return p
   } catch {
     return null
@@ -1516,17 +1553,74 @@ export function StoreProvider({ children }: { children: ReactNode }) {
      not happened yet. Anything that talks about a specific day goes through
      here; the index version below is a thin wrapper for the week strip. */
   const markDayOn = (habitId: string, day: string, value: boolean) => {
-    setHabitLog((prev) => {
-      const without = prev.filter((t) => !(t.habitId === habitId && t.day === day))
-      return value ? [...without, { habitId, day, at: day === todayKey() ? new Date().toISOString() : undefined }] : without
-    })
+    const without = habitLog.filter((t) => !(t.habitId === habitId && t.day === day))
+    const next = value ? [...without, { habitId, day, at: day === todayKey() ? new Date().toISOString() : undefined }] : without
+    setHabitLog(next)
     /* days[] is a cache of THIS week only. A day outside it has no cell, and
        writing one would put the mark on the wrong square. */
-    if (dayOfWeekKey(dayIndexOf(day)) !== day) return
+    if (dayOfWeekKey(dayIndexOf(day)) === day) {
+      const i = dayIndexOf(day)
+      setHabits((prev) => prev.map((h) => (h.id === habitId
+        ? { ...h, days: h.days.map((d, k) => (k === i ? value : d)) }
+        : h)))
+    }
+    /* A habit that came out of a routine step IS that step. Ticking it here has
+       to reach the routine card on Plan, or one morning reads as done in one
+       place and untouched in the other. */
+    const h = habits.find((x) => x.id === habitId)
+    if (h?.folderId && h.srcStepId && day === todayKey()) syncRoutineFromHabits(h.folderId, next)
+  }
+
+  /* The routine card and the habit folder are two views of one morning, so a
+     tick on either side settles both. Written out here rather than routed
+     through applyRoutine on purpose: that path writes the habit log back from
+     the routine, and would undo the very tick that called it. */
+  const syncRoutineFromHabits = (routineId: string, log: HabitTick[]) => {
+    const r = routines.find((x) => x.id === routineId)
+    if (!r) return
+    const day = todayKey()
+    const kept = (hid: string) => log.some((t) => t.habitId === hid && t.day === day)
+    /* A step with no habit of its own keeps whatever the routine already said
+       about it, so this can never quietly untick something it does not own. */
+    const doneStepIds = r.steps
+      .filter((st) => {
+        const hid = st.habitId ?? `h-${routineId}-${st.id}`
+        return habits.some((x) => x.id === hid) ? kept(hid) : r.doneStepIds.includes(st.id)
+      })
+      .map((st) => st.id)
+    markSteps(routineId, r.steps.map((s) => s.id).filter((id) => !doneStepIds.includes(id)), false)
+    markSteps(routineId, doneStepIds, true)
+
+    const key = periodKeyFor(r.cadence)
+    const after = {
+      ...r,
+      doneStepIds,
+      startedAt: doneStepIds.length === 0 ? undefined : (r.startedAt ?? new Date().toISOString()),
+    }
+    const wasComplete = routineComplete(r, periodKeyFor(r.cadence))
+    const isComplete = routineComplete(after, key)
+    setRoutines((prev) => prev.map((x) => (x.id === routineId
+      ? { ...after, periodKey: key, completedOn: isComplete ? (wasComplete ? r.completedOn ?? day : day) : null }
+      : x)))
+    if (wasComplete === isComplete) return
+
+    const run = r.run ?? 0
+    setRoutineLog((prev) => {
+      const without = prev.filter((x) => !(x.routineId === routineId && x.periodKey === key && (x.run ?? 0) === run))
+      return isComplete ? [...without, { routineId, day, periodKey: key, run, at: new Date().toISOString() }] : without
+    })
+    /* The folder's own streak. It is the routine's record of having been
+       finished, and it has to advance from this side too: keeping all five
+       habits IS keeping the morning routine. Written from the log this call was
+       given, so the tick that started it survives. */
+    if (!r.habitId) return
+    const hid = r.habitId
+    const rest = log.filter((t) => !(t.habitId === hid && t.day === day))
+    setHabitLog(isComplete ? [...rest, { habitId: hid, day, at: new Date().toISOString() }] : rest)
     const i = dayIndexOf(day)
-    setHabits((prev) => prev.map((h) => (h.id === habitId
-      ? { ...h, days: h.days.map((d, k) => (k === i ? value : d)) }
-      : h)))
+    setHabits((prev) => prev.map((x) => (x.id === hid
+      ? { ...x, days: x.days.map((d, k) => (k === i ? isComplete : d)) }
+      : x)))
   }
 
   const markDay = (habitId: string, dayIndex: number, value: boolean) =>
@@ -1537,7 +1631,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
      again inside Out Brain Rot leaves two rows: the day stays kept while either
      is ticked, undoing one does not undo the other, and the number of rows is
      how often he actually did it. */
-  const syncStepHabits = (changes: { habitId: string; src: string; on: boolean }[]) => {
+  const syncStepHabits = (changes: { habitId: string; src: string; on: boolean; exclusive?: boolean }[]) => {
     if (!changes.length) return
     const day = todayKey()
     /* Applied as one batch rather than one call per step: ticking a whole
@@ -1545,7 +1639,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
        would compute its result from the same stale log and undo the last. */
     let next = habitLog
     for (const c of changes) {
-      next = next.filter((t) => !(t.habitId === c.habitId && t.day === day && t.src === c.src))
+      /* `exclusive` is a habit that came out of THIS step and no other: one
+         row for the day, replaced, exactly as ticking it on the Habits page
+         writes it. The src-scoped rule below belongs to a habit two routines
+         share (meditation), where undoing one must not undo the other. Using
+         the shared rule for a private habit left the two surfaces able to hold
+         one row each, and the day stayed kept after he had untidied it. */
+      next = c.exclusive
+        ? next.filter((t) => !(t.habitId === c.habitId && t.day === day))
+        : next.filter((t) => !(t.habitId === c.habitId && t.day === day && t.src === c.src))
       if (c.on) next = [...next, { habitId: c.habitId, day, src: c.src, at: new Date().toISOString() }]
     }
     setHabitLog(next)
@@ -1582,11 +1684,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     /* A step that keeps a habit reports itself on every toggle, not only when
        the routine as a whole flips: meditation counts the moment he meditates,
        whatever the other four steps are doing. */
+    /* Every step is a habit now, not only the four that were wired to one by
+       hand. Without the derived id, ticking a step on the Plan card left the
+       habit it became untouched, so the same morning read done on one page and
+       untouched on the other. */
     syncStepHabits(after.steps.flatMap((st) => {
-      if (!st.habitId) return []
+      const hid = st.habitId ?? `h-${routineId}-${st.id}`
+      if (!habits.some((h) => h.id === hid)) return []
       const was = before.doneStepIds.includes(st.id)
       const is = after.doneStepIds.includes(st.id)
-      return was === is ? [] : [{ habitId: st.habitId, src: `${routineId}:${st.id}#${after.run ?? 0}`, on: is }]
+      return was === is ? [] : [{ habitId: hid, src: `${routineId}:${st.id}#${after.run ?? 0}`, on: is, exclusive: !st.habitId }]
     }))
 
     if (wasComplete === isComplete) return
@@ -1875,6 +1982,42 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       markDay(id, day, !h.days[day])
     },
     markHabitDay: (id, day, value) => markDay(id, day, value),
+    logHabitNumber: (habitId, value) => {
+      const h = habits.find((x) => x.id === habitId)
+      const key = h && habitStepKey(h)
+      if (!h || !key) return
+      const day = todayKey()
+      /* Every run is kept, with the moment it happened, in the same series the
+         step wrote before the merge. Reflect charts it by routine and step, so
+         the scores from before and after are one line about one test. */
+      setStepLog((prev) => [...prev, { routineId: key.routineId, stepId: key.stepId, day, at: new Date().toISOString(), value }])
+      const rk = `${key.routineId}:${key.stepId}`
+      setRecords((prev) => (value > (prev[rk] ?? 0) ? { ...prev, [rk]: value } : prev))
+      const gate = habitGate(h)
+      /* Judged on the number in hand, not on the log: the write above has not
+         reached this render's state, so reading it back would refuse the very
+         result that just passed. A failing run never takes the day away either,
+         because the day is his BEST run, and doing another one after you have
+         already passed is not a way to lose it. */
+      if (!gate || value >= gate.target) markDayOn(habitId, day, true)
+    },
+    pickHabitAlt: (habitId, altId) => {
+      const h = habits.find((x) => x.id === habitId)
+      if (!h?.alts?.length) return
+      const day = todayKey()
+      const src = `alt:${altId}`
+      const on = habitLog.some((t) => t.habitId === habitId && t.day === day && t.src === src)
+      const mine = new Set(h.alts.map((a) => `alt:${a.id}`))
+      const rest = habitLog.filter((t) => !(t.habitId === habitId && t.day === day && !!t.src && mine.has(t.src)))
+      const next = on ? rest : [...rest, { habitId, day, src, at: new Date().toISOString() }]
+      setHabitLog(next)
+      const i = dayIndexOf(day)
+      const held = next.some((t) => t.habitId === habitId && t.day === day)
+      setHabits((prev) => prev.map((x) => (x.id === habitId
+        ? { ...x, days: x.days.map((d, k) => (k === i ? held : d)) }
+        : x)))
+      if (h.folderId && h.srcStepId) syncRoutineFromHabits(h.folderId, next)
+    },
     dailyDone,
     dailySkipped,
     dailyOpen,

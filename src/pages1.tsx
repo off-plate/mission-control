@@ -7,8 +7,9 @@ import { usePomodoro } from './pomodoro'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
 import { Linkify } from './widgets'
+import { HabitRun, habitHasRun } from './habitrun'
 import type { PageId } from './types'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, dueOn, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, isCounted, COUNT_PERIODS, requiredSteps, routineComplete, routineProgress, routineRunsOn, slotMinutes, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
+import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, dueOn, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, habitGate, habitLocked, isCounted, COUNT_PERIODS, requiredSteps, routineComplete, routineProgress, routineRunsOn, slotMinutes, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
 import { DayLine, DayNumbers, WeekStrip } from './dayface'
 import { useFirstMove } from './ui'
 import { estimateFor } from './estimate'
@@ -596,16 +597,21 @@ function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
    marks it out is a small "repeats" tag, because a different layout for the same
    kind of thing reads as two different apps on one page. */
 function RoutineOnDay({ routine, day }: { routine: Routine; day?: string }) {
-  const { toggleRoutineStep, toggleRoutineAlt, setRoutineDone, planRoutine, setPage, inView } = useStore()
+  const { toggleRoutineStep, toggleRoutineAlt, setRoutineDone, planRoutine, setPage, inView, habits, stepLog } = useStore()
   const [open, setOpen] = useState(false)
   // Counts what the routine needs, so an optional step neither pads the total
   // nor keeps a finished routine one short of it.
   const { done, total } = routineProgress(routine)
   const complete = routineComplete(routine, periodKeyFor(routine.cadence))
-  /* A step that has to be earned elsewhere (the typing score) cannot be ticked
-     from here, so neither can the routine. Saying that is better than a
-     checkbox that quietly finishes four of five and stays empty. */
-  const gated = !complete && routine.steps.some((st) => !routine.doneStepIds.includes(st.id) && stepLocked(routine, st.id))
+  /* Every step is a habit now, and the gate lives on the habit, not on the
+     routine's own stepData: that field stopped being written the day logging
+     the number moved to the Habits page, so reading it here would have shown
+     the typing step locked forever, passed or not. */
+  const stepGated = (stepId: string): boolean => {
+    const h = habits.find((x) => x.id === (routine.steps.find((s) => s.id === stepId)?.habitId ?? `h-${routine.id}-${stepId}`))
+    return !!h && habitLocked(h, stepLog, localDateKey())
+  }
+  const gated = !complete && routine.steps.some((st) => !routine.doneStepIds.includes(st.id) && stepGated(st.id))
 
   return (
     <div className="today-item">
@@ -623,7 +629,7 @@ function RoutineOnDay({ routine, day }: { routine: Routine; day?: string }) {
           title={total === 0
             ? 'Write its steps first'
             : gated
-              ? `Open it in Routines: one step has to be earned, not ticked (${TYPING_TARGET_WPM} WPM)`
+              ? `Open it in Habits: one step has to be earned, not ticked (${TYPING_TARGET_WPM} WPM)`
               : undefined}
           onClick={() => setRoutineDone(routine.id, !complete)}
         >
@@ -649,7 +655,7 @@ function RoutineOnDay({ routine, day }: { routine: Routine; day?: string }) {
             <button key={s.id} role="menuitem" onClick={() => planRoutine(routine.id, s.id, day)}>Move to {s.label.toLowerCase()}</button>
           ))}
           <span className="kebab-sep" />
-          <button role="menuitem" onClick={() => setPage('routines')}>Open in Routines</button>
+          <button role="menuitem" onClick={() => setPage('habits')}>Open in Habits</button>
           {routine.planned && !routine.startedAt && (
             <button role="menuitem" onClick={() => planRoutine(routine.id)}>Take it off</button>
           )}
@@ -659,7 +665,7 @@ function RoutineOnDay({ routine, day }: { routine: Routine; day?: string }) {
       {total === 0 && (
         <p className="rod-empty">
           No steps yet.{' '}
-          <button className="rod-link" onClick={() => setPage('routines')}>Write them</button>
+          <button className="rod-link" onClick={() => setPage('habits')}>Write them</button>
         </p>
       )}
 
@@ -667,7 +673,7 @@ function RoutineOnDay({ routine, day }: { routine: Routine; day?: string }) {
         <div className="subtask-list">
           {routine.steps.map((s) => {
             const checked = routine.doneStepIds.includes(s.id)
-            const locked = !checked && stepLocked(routine, s.id)
+            const locked = !checked && stepGated(s.id)
             /* A step with a choice is ticked by picking one of its answers, so
                here it offers the answers instead of a checkbox that would have
                to guess which one he meant. */
@@ -695,8 +701,8 @@ function RoutineOnDay({ routine, day }: { routine: Routine; day?: string }) {
                 <button
                   className={`subtask${checked ? ' done' : ''}`}
                   disabled={locked}
-                  title={locked ? `Open this in Routines and log ${TYPING_TARGET_WPM} WPM to check it off` : undefined}
-                  onClick={() => (locked ? setPage('routines') : toggleRoutineStep(routine.id, s.id))}
+                  title={locked ? `Open this in Habits and log ${TYPING_TARGET_WPM} WPM to check it off` : undefined}
+                  onClick={() => (locked ? setPage('habits') : toggleRoutineStep(routine.id, s.id))}
                 >
                   <span className="sub-tick" aria-hidden="true" />
                   <span className="grow">{s.title}</span>
@@ -1396,7 +1402,8 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
   /** A goal counting itself off this habit, if one exists. */
   goal?: Goal
 }) {
-  const { toggleHabitDay, assertRoutineDay, logSlip, logCount, setPage, focusSessions, habitLog, slips, inView } = useStore()
+  const { toggleHabitDay, assertRoutineDay, logSlip, logCount, setPage, focusSessions, habitLog, slips, stepLog, inView } = useStore()
+  const [open, setOpen] = useState(false)
   /* The block on the clock counts toward today, so an hour reached while the
      timer is still running shows here rather than after it stops. */
   const pomo = usePomodoro()
@@ -1610,9 +1617,28 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
     )
   }
 
+  /* The step's own rules, at the habit's address. A gated habit cannot be
+     ticked until the day's number clears the target, and a habit with two
+     answers is ticked by picking one of them, never by a checkbox that would
+     have to guess which he meant. Both were true of the steps and neither
+     survived the merge, which is what he caught. */
+  const gate = habitGate(h)
+  const locked = !!gate && habitLocked(h, stepLog, localDateKey())
+  const byAnswer = !!h.alts?.length
+  const hasRun = habitHasRun(h)
+  const todayHeld = !!drivenBy || locked || byAnswer
+
   return (
-    <div className={`habit-row${drivenBy ? ' is-auto' : ''}`}>
+    <div className={`habit-row${drivenBy ? ' is-auto' : ''}${open ? ' is-open' : ''}`}>
       <div className="habit-row-top">
+        {hasRun ? (
+          <button
+            className="run-caret"
+            aria-expanded={open}
+            aria-label={open ? `Close ${h.name}` : `Open ${h.name}`}
+            onClick={() => setOpen((v) => !v)}
+          >{open ? '˅' : '›'}</button>
+        ) : <span className="run-caret is-blank" aria-hidden="true" />}
         <SpaceMark space={h.space} />
         <span className="habit-name">{h.name}{qualify && <span className="habit-qual">{qualify}</span>}</span>
         {/* The week's count belongs to the week. Showing 1/7 above a year of
@@ -1656,19 +1682,32 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
                  comes off the live routine, every earlier one off the dated
                  step record; a day already fully kept is never redrawn as
                  partial. */
-              className={`daydot${expected(i) ? '' : ' off-day'}${drivenBy ? ' is-auto' : ''}${partOf(i) > 0 ? ' partial' : ''}${drivenBy && i === todayIndex ? ' is-locked' : ''}`}
+              className={`daydot${expected(i) ? '' : ' off-day'}${drivenBy ? ' is-auto' : ''}${partOf(i) > 0 ? ' partial' : ''}${todayHeld && i === todayIndex ? ' is-locked' : ''}`}
               style={partOf(i) > 0 ? ({ ['--fill' as string]: `${partOf(i)}%` } as React.CSSProperties) : undefined}
               role="checkbox"
               aria-checked={h.days[i]}
-              /* TODAY belongs to the routine: ticking it by hand would
-                 contradict the checklist that owns it. A day already gone is
-                 his to correct, because a lost write must never become a
-                 permanent lie about what he did. */
-              disabled={i > todayIndex || (!!drivenBy && i === todayIndex)}
-              aria-label={drivenBy
-                ? (i === todayIndex ? `${h.name}, ${d}, set by the ${drivenBy} routine` : `${h.name}, ${d}, correct this day by hand`)
-                : `${h.name}, ${d}`}
-              title={drivenBy ? (i === todayIndex ? `Set by the ${drivenBy} routine` : `Done via ${drivenBy}? Set the record straight.`) : undefined}
+              /* TODAY belongs to whatever earns it: the routine that owns the
+                 habit, the number a gated habit has to hit, or the answer a
+                 two-way habit needs picked. A day already gone is his to
+                 correct, because a lost write must never become a permanent lie
+                 about what he did. */
+              disabled={i > todayIndex || (todayHeld && i === todayIndex)}
+              aria-label={
+                i !== todayIndex
+                  ? (drivenBy ? `${h.name}, ${d}, correct this day by hand` : `${h.name}, ${d}`)
+                  : drivenBy ? `${h.name}, ${d}, set by the ${drivenBy} routine`
+                    : locked ? `${h.name}, ${d}, log ${gate!.target} ${gate!.unit} or better to keep it`
+                      : byAnswer ? `${h.name}, ${d}, open it and pick an answer`
+                        : `${h.name}, ${d}`
+              }
+              title={
+                i !== todayIndex
+                  ? (drivenBy ? `Done via ${drivenBy}? Set the record straight.` : undefined)
+                  : drivenBy ? `Set by the ${drivenBy} routine`
+                    : locked ? `Hit ${gate!.target} ${gate!.unit} to keep this today`
+                      : byAnswer ? 'Open it and pick an answer'
+                        : undefined
+              }
               onClick={() => { if (drivenBy) { if (i < todayIndex) assertRoutineDay(h.id, i) } else toggleHabitDay(h.id, i) }}
             >
               <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
@@ -1702,7 +1741,9 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
             it was previously... there is links for typing tests, so there
             should be link to that still. The video doesn't have to be video,
             it has to be a link to that video." */}
-        {h.note && <span className="habit-note" title={h.note}>{h.note}</span>}
+        {locked
+          ? <span className="habit-weeks mono">{gate!.target} {gate!.unit} to pass</span>
+          : h.note && <span className="habit-note" title={h.note}>{h.note}</span>}
         {h.link && (
           <a className="habit-auto" href={h.link} target="_blank" rel="noreferrer">
             {h.linkLabel ?? 'Open'} ↗
@@ -1715,6 +1756,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
         )}
         {h.seconds ? <span className="habit-weeks mono">{Math.round(h.seconds / 60)}m</span> : null}
       </div>
+      {open && hasRun && <HabitRun h={h} />}
     </div>
   )
 }

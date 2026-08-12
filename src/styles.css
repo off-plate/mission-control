@@ -4064,6 +4064,42 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
+/* ---------- What a habit can DO ----------
+   A habit that came out of a routine step opens to the body that step had: the
+   description in full, today's news paragraphs, today's twisters, the number it
+   has to beat. It reads down the page under its own row rather than sideways
+   into the 264px foot column, which is where a two-sentence description used to
+   go to be ellipsised after four words. */
+.run-caret {
+  flex: none; width: 18px; align-self: center; padding: 0; cursor: pointer;
+  font-family: var(--font-mono); font-size: 0.8125rem; line-height: 1; color: var(--faint);
+}
+.run-caret:hover { color: var(--ink); }
+.run-caret.is-blank { cursor: default; }
+.habit-run {
+  grid-column: 1 / -1;
+  margin: var(--s1) 0 var(--s4) calc(18px + var(--s2));
+  padding-left: var(--s4); border-left: 2px solid var(--hairline-strong);
+  max-width: 72ch;
+}
+.run-note { font-size: var(--text-sm); color: var(--muted); line-height: 1.6; }
+.run-example { font-size: var(--text-base); line-height: 1.55; margin-top: var(--s2); }
+.run-alts { display: flex; gap: var(--s3); flex-wrap: wrap; margin-top: var(--s3); }
+.run-alt {
+  flex: 1 1 210px; display: flex; flex-direction: column; gap: 2px;
+  text-align: left; cursor: pointer; padding: var(--s3);
+  background: none; border: 1px solid var(--hairline-strong); border-radius: var(--r-sm);
+}
+.run-alt:hover { border-color: var(--ink); }
+.run-alt.picked { border-color: var(--progress); background: var(--progress-wash); }
+.run-alt-title { font-size: var(--text-sm); font-weight: 600; color: var(--ink); }
+.run-alt-note { font-size: var(--text-xs); color: var(--muted); line-height: 1.5; }
+.run-verdict { display: flex; align-items: baseline; gap: var(--s3); font-size: var(--text-sm); color: var(--muted); }
+.run-verdict.pass { color: var(--progress); }
+.run-best { font-size: var(--text-xs); color: var(--faint); }
+.run-links { display: flex; gap: var(--s2); flex-wrap: wrap; margin-top: var(--s3); }
+.habit-run .mr-typing, .habit-run .mr-pron, .habit-run .mr-stretch { margin-top: var(--s3); }
+
 /* ---------- phone chrome: two dropdowns, nothing that scrolls ----------
    His design, 2026-08-12: "on mobile this could be one left dropdown where I
    choose which workspace I'm in, and on the right a hamburger menu, again

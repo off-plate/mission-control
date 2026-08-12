@@ -451,12 +451,56 @@ export interface HabitDef {
   /** Two ways to answer one habit ("move or caffeine"). Doing either keeps it.
    *  One habit, not two, because it is one either-or and not two streaks. */
   alts?: RoutineAlt[]
-  /** A timer step's length, so the countdown survives the move to a habit. */
+  /** A timer step's length, so the length survives the move to a habit. */
   seconds?: number
   /** Cannot be ticked by hand until something is true elsewhere (the typing
    *  test is earned at 75 WPM). Without this it becomes a box he can just
    *  tick, which is not what the step meant. */
   gatedBy?: 'typing-wpm'
+  /** The step this habit was made from. A number logged against the habit has
+   *  to land in the SAME dated series Reflect already charts under Numbers, or
+   *  the typing scores from before the merge and the ones after it become two
+   *  unrelated lines about the same test. */
+  srcStepId?: string
+  /** Content the step generated fresh for the day, which no note and no link
+   *  can stand in for: today's real news paragraphs to read aloud, today's
+   *  tongue twisters. Without this the habit is a checkbox where the work used
+   *  to be. */
+  runner?: 'pronunciation' | 'stretch'
+}
+
+/** Where a habit's numbers are filed: the routine it came out of and the step
+ *  it used to be. Kept as one function because three surfaces need the same
+ *  answer and a second copy of this rule is a second answer. */
+export function habitStepKey(h: HabitDef): { routineId: string; stepId: string } | null {
+  if (!h.srcStepId) return null
+  return { routineId: h.folderId ?? h.id, stepId: h.srcStepId }
+}
+
+/** The number this habit has to beat, when it is judged by a number and not by
+ *  a tick. Null means it is an ordinary habit. */
+export function habitGate(h: HabitDef): { unit: string; target: number } | null {
+  if (h.gatedBy !== 'typing-wpm') return null
+  return { unit: 'WPM', target: TYPING_TARGET_WPM }
+}
+
+/** The best number this habit recorded on one day, or null if it recorded none.
+ *  The best and not the last: two attempts in a morning and the faster one is
+ *  the one he did, exactly as the routine used to read it. */
+export function habitNumberOn(log: StepEntry[], h: HabitDef, day: string): number | null {
+  const key = habitStepKey(h)
+  if (!key) return null
+  const runs = log.filter((e) => e.routineId === key.routineId && e.stepId === key.stepId && e.day === day)
+  return runs.length ? Math.max(...runs.map((e) => e.value)) : null
+}
+
+/** A gated habit stays locked until the day's number clears the target. This is
+ *  the rule the old routine ran and the merge dropped: without it the typing
+ *  test is a box he can tick, which is not what the step meant. */
+export function habitLocked(h: HabitDef, log: StepEntry[], day: string): boolean {
+  const gate = habitGate(h)
+  if (!gate) return false
+  return (habitNumberOn(log, h, day) ?? 0) < gate.target
 }
 
 /** Minutes of focus logged on a given day, in this habit's profile. */

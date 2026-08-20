@@ -77,7 +77,9 @@ export interface ExceptionItem {
    the eight hours he spends in Work. Hiding them there is exactly the avoidance
    this app exists to break, so they are computed once and shown everywhere,
    marked so it is obvious they come from Personal. */
-export function globalExceptions(ctx: { tasks: Task[]; routines: Routine[] }): ExceptionItem[] {
+export function globalExceptions(
+  ctx: { tasks: Task[]; routines: Routine[]; money?: { due: { day: number; amount: number; sent: boolean }[] } | null },
+): ExceptionItem[] {
   // Money and official post only. Personal's ageing tasks stay in Personal,
   // or the Work profile turns into a wall of somebody else's list.
   return exceptionsFor('personal', ctx)
@@ -85,7 +87,10 @@ export function globalExceptions(ctx: { tasks: Task[]; routines: Routine[] }): E
     .map((x) => ({ ...x, fromPersonal: true }))
 }
 
-export function exceptionsFor(space: SpaceId, ctx: { tasks: Task[]; routines: Routine[] }): ExceptionItem[] {
+export function exceptionsFor(
+  space: SpaceId,
+  ctx: { tasks: Task[]; routines: Routine[]; money?: { due: { day: number; amount: number; sent: boolean }[] } | null },
+): ExceptionItem[] {
   const out: ExceptionItem[] = []
 
   if (space === 'personal') {
@@ -104,6 +109,32 @@ export function exceptionsFor(space: SpaceId, ctx: { tasks: Task[]; routines: Ro
       })
     }
 
+    /* The real one, from Compass. The loop above has iterated an empty array
+       since MOCK_MONEY was emptied of invented figures, so the whole money
+       alert path was live, correct and pointed at nothing.
+
+       Only payments this month that Compass has NOT recorded going out, and
+       only once their day has arrived. A payment due on the 25th is not a
+       problem on the 3rd, and saying so every morning for three weeks is how
+       an alert row teaches you to scroll past it. */
+    const today = new Date()
+    const dayNow = today.getDate()
+    const owedNow = (ctx.money?.due ?? []).filter((r) => !r.sent && r.day <= dayNow)
+    if (owedNow.length) {
+      const total = owedNow.reduce((a, r) => a + r.amount, 0)
+      const kc = (n: number) => `${Math.round(n).toLocaleString('cs-CZ').replace(/\u00a0/g, ' ')} Kc`
+      const late = dayNow - Math.min(...owedNow.map((r) => r.day))
+      out.push({
+        id: 'x-money-compass',
+        text: owedNow.length === 1
+          ? `A payment of ${kc(total)} was due on the ${owedNow[0].day}th and Compass has not recorded it.`
+          : `${owedNow.length} payments totalling ${kc(total)} are due this month and Compass has recorded none of them.`,
+        when: late === 0 ? 'today' : `${late} ${late === 1 ? 'day' : 'days'} ago`,
+        action: 'add-task',
+        actionLabel: 'Put it on today',
+        task: { title: `Send this month's debt payment, ${kc(total)}`, estimateMin: 10 },
+      })
+    }
   }
 
   /* The slot math on Plan knows when a day cannot fit itself; the alert row

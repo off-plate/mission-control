@@ -355,7 +355,7 @@ const LIBRARY: { match: RegExp; steps: DecomposedStep[] }[] = [
       { title: 'Pick one concrete story from this week', estimateMin: 5 },
       { title: 'Draft 8 to 10 lines, no editing', estimateMin: 12, category: 'deep' },
       { title: 'Cut a third of it', why: 'shorter always reads better', estimateMin: 6 },
-      { title: 'Add one specific number or receipt', estimateMin: 4 },
+      { title: 'Add one specific number or proof', estimateMin: 4 },
       { title: 'Schedule for tomorrow 8:30', estimateMin: 3 },
     ],
   },

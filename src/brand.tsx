@@ -164,7 +164,7 @@ export function BrandPage() {
         <div className="spec">
           <div className="role">Data: JetBrains Mono</div>
           <div className="big" style={{ fontFamily: 'var(--mono)', fontSize: '20px' }}>162 900 Kč · 09:40 · +25m · 4/7</div>
-          <div className="use">Numbers only: times, counts, deltas, money, receipts. Tabular figures so columns line up. Never for prose.</div>
+          <div className="use">Numbers only: times, counts, deltas, money, totals. Tabular figures so columns line up. Never for prose.</div>
         </div>
       </section>
 

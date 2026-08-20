@@ -7,7 +7,7 @@ export { SPACE_LABELS, MOCK_AGENDA } from './mock'
 
 /* The other half of the ledger. The app is quick to tell him what is wrong, so
    this collects what is actually going right, from real events only. No score,
-   no streak-shaming, no emoji: receipts he earned. */
+   no streak-shaming, no emoji: things he actually did. */
 export function momentum(ctx: {
   tasks: Task[]
   routines: Routine[]

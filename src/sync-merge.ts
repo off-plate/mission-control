@@ -156,7 +156,25 @@ function resolveNote(a: Row, b: Row): Row {
 }
 
 /** Fields where being on the newer side is not enough to win outright. */
-const RESOLVE: Record<string, (a: Row, b: Row) => Row> = { notes: resolveNote }
+/* A habit row from a device that slept through a week seal. `history` is not
+ *  an authored field, it is a twelve-week cache of habitLog that roll() appends
+ *  to ONCE and then stamps lastRollDay so it can never seal that week again. So
+ *  a stale row winning this merge deletes a sealed week permanently, even though
+ *  the ticks it was counted from are still right there in habitLog. The side
+ *  that has sealed more weeks knows more, whichever side saved last, and the
+ *  week strip is the union: a day either side saw kept, was kept. */
+function resolveHabit(win: Row, lose: Row): Row {
+  const out = { ...win }
+  const wh = Array.isArray(win.history) ? (win.history as number[]) : []
+  const lh = Array.isArray(lose.history) ? (lose.history as number[]) : []
+  if (lh.length > wh.length) out.history = lh
+  const wd = Array.isArray(win.days) ? (win.days as boolean[]) : []
+  const ld = Array.isArray(lose.days) ? (lose.days as boolean[]) : []
+  if (wd.length === 7 && ld.length === 7) out.days = wd.map((v, i) => v || ld[i])
+  return out
+}
+
+const RESOLVE: Record<string, (a: Row, b: Row) => Row> = { notes: resolveNote, habits: resolveHabit }
 
 /** The key a row is buried under, so the store can bury or dig up the same
  *  thing this file will look for. */
@@ -235,6 +253,65 @@ export function mergeStates(a: string, b: string): string {
       const b2 = typeof newer[k] === 'string' ? (newer[k] as string) : ''
       const best = a2 > b2 ? a2 : b2
       if (best) out[k] = best
+    }
+
+    /* The same rule for the rollover watermark, and for the same reason in
+       reverse: roll() walks from lastRollDay and seals every week it crosses.
+       Let an older watermark win and the next boot re-seals weeks that were
+       already sealed, appending a second count for each to every habit's
+       history. Later date wins, so a seal happens exactly once. */
+    {
+      const a2 = typeof older.lastRollDay === 'string' ? older.lastRollDay : ''
+      const b2 = typeof newer.lastRollDay === 'string' ? newer.lastRollDay : ''
+      const best = a2 > b2 ? a2 : b2
+      if (best) out.lastRollDay = best
+    }
+
+    /* `plan` and `review` are objects, not collections, so they were never in
+       ALL_KEYS and fell through to the wholesale `{ ...newer }` above. That is
+       how a phone asleep for a week wiped both by waking up and saving once.
+
+       `review.reflections` is the worst thing in the store to lose: it is prose
+       he typed, with no dated log behind it to rebuild from. It carries ids, so
+       it unions like any other collection.
+
+       `plan.returnedOn/Count/Ids` is the record of what this morning's rollover
+       swept back to the list, and it is what draws the banner offering to put
+       yesterday's unfinished work back on today. It belongs to the most recent
+       roll, so it moves as one block or not at all: taking the ids from one day
+       and the count from another would describe a morning that never happened. */
+    const obj = (v: unknown): Row => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Row) : {})
+    const nRev = obj(newer.review)
+    const oRev = obj(older.review)
+    if (newer.review !== undefined || older.review !== undefined) {
+      const byId = new Map<string, Row>()
+      for (const r of [...((nRev.reflections as Row[]) ?? []), ...((oRev.reflections as Row[]) ?? [])]) {
+        if (!r || typeof r !== 'object') continue
+        const k = String(r.id ?? '')
+        if (!k || buried.has(`review.reflections:${k}`)) continue
+        if (!byId.has(k)) byId.set(k, r)
+      }
+      const lastA = typeof oRev.lastDoneDate === 'string' ? oRev.lastDoneDate : ''
+      const lastB = typeof nRev.lastDoneDate === 'string' ? nRev.lastDoneDate : ''
+      const last = lastA > lastB ? lastA : lastB
+      out.review = {
+        ...nRev,
+        ...(byId.size ? { reflections: [...byId.values()] } : {}),
+        ...(last ? { lastDoneDate: last } : {}),
+      }
+    }
+    const nPlan = obj(newer.plan)
+    const oPlan = obj(older.plan)
+    if (newer.plan !== undefined || older.plan !== undefined) {
+      const nOn = typeof nPlan.returnedOn === 'string' ? nPlan.returnedOn : ''
+      const oOn = typeof oPlan.returnedOn === 'string' ? oPlan.returnedOn : ''
+      const from = oOn > nOn ? oPlan : nPlan
+      out.plan = {
+        ...nPlan,
+        returnedOn: from.returnedOn,
+        returnedCount: from.returnedCount,
+        returnedIds: from.returnedIds,
+      }
     }
     return JSON.stringify(out)
   } catch {

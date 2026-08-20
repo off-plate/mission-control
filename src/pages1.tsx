@@ -9,7 +9,7 @@ import { BreakdownSheet, Sheet } from './modals'
 import { Linkify } from './widgets'
 import { HabitRun, habitHasRun } from './habitrun'
 import type { PageId } from './types'
-import { GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, dueOn, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, habitGate, habitLocked, isCounted, COUNT_PERIODS, requiredSteps, routineComplete, routineProgress, routineRunsOn, slotMinutes, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
+import { habitsDueToday, GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, dueOn, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, habitGate, habitLocked, isCounted, COUNT_PERIODS, requiredSteps, routineComplete, routineProgress, routineRunsOn, slotMinutes, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
 import { DayLine, DayNumbers, WeekStrip } from './dayface'
 import { useFirstMove } from './ui'
 import { estimateFor } from './estimate'
@@ -2015,8 +2015,10 @@ export function HabitsPage() {
      monthlies across four workspaces that he could not reconstruct from
      anything on screen. What he wants on a Sunday morning is what is still
      open TODAY. */
-  const dueToday = spaceHabits.filter((h) => dueOn(h, todayIndex, habitLog))
-  const doneToday = dueToday.filter((h) => h.days[todayIndex]).length
+  /* Folders, not raw rows: the same function Today's headline uses. This page
+     used to count every habit and open with "1/64" while Today said "1/14"
+     about the same morning. */
+  const { due: dueCount, kept: doneToday } = habitsDueToday(spaceHabits, routines, habitLog, todayIndex)
 
   /* Grouped by who keeps it, and inside a group what is still open comes
      first: a habit already ticked is a receipt, not a thing to do. */
@@ -2082,7 +2084,7 @@ export function HabitsPage() {
     <div className="page">
       <Band
         title="Habits"
-        metrics={[{ v: `${doneToday}/${dueToday.length}`, k: 'done today', tone: (doneToday > 0 ? 'pos' : 'info') as 'pos' | 'info' }]}
+        metrics={[{ v: `${doneToday}/${dueCount}`, k: 'done today', tone: (doneToday > 0 ? 'pos' : 'info') as 'pos' | 'info' }]}
         actions={
           <>
             <select

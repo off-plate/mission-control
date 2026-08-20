@@ -743,6 +743,50 @@ export function routineProgress(r: Routine): { done: number; total: number } {
   return { done: need.filter((s) => r.doneStepIds.includes(s.id)).length, total: need.length }
 }
 
+/** What today actually asks of him, counted in FOLDERS rather than in raw
+ *  habits, plus how many of them are done.
+ *
+ *  Since routines became folders of habits there are two honest ways to count
+ *  the same morning and they give wildly different answers: fifty-odd habits,
+ *  or the fourteen things those habits actually group into. A folder is ONE
+ *  thing to do, the way the routine it came from was, so fourteen is the
+ *  number a person can hold in their head and feel move.
+ *
+ *  It lives here because both Today and the Habits page print it as a headline
+ *  and they were computing it separately: Today collapsed folders and said
+ *  "1/14" while Habits counted raw rows and said "1/64", on the same screen,
+ *  about the same day. Today's file even carried a comment promising the rule
+ *  was "imported rather than rewritten, so the two can never disagree". It was
+ *  not imported. Now it is, and that comment is true.
+ *
+ *  `visible` is the caller's already-filtered list (workspace, not archived),
+ *  because each page has its own idea of what is on screen and only the
+ *  counting rule is shared. */
+export function habitsDueToday(
+  visible: HabitDef[],
+  routines: { id: string; habitId?: string }[],
+  log: HabitTick[],
+  todayIndex: number,
+): { due: number; kept: number } {
+  const dueRaw = visible.filter((h) => dueOn(h, todayIndex, log))
+  const folderIds = new Set(dueRaw.map((h) => h.folderId).filter(Boolean) as string[])
+  /* A routine's own habit belongs to the folder as its streak, so it never
+     appears as a row of its own. */
+  const folderHabitIds = new Set(routines.map((r) => r.habitId).filter(Boolean) as string[])
+  const folders = [...folderIds]
+    .map((id) => {
+      // Optional habits never hold a folder open.
+      const need = dueRaw.filter((h) => h.folderId === id && !h.optional)
+      return { total: need.length, done: need.filter((h) => h.days[todayIndex]).length }
+    })
+    .filter((f) => f.total > 0)
+  const loose = dueRaw.filter((h) => !h.folderId && !folderHabitIds.has(h.id))
+  return {
+    due: folders.length + loose.length,
+    kept: folders.filter((f) => f.done === f.total).length + loose.filter((h) => h.days[todayIndex]).length,
+  }
+}
+
 /** Steps that cannot be ticked by hand until something is true. The typing test
  *  is earned at 75 WPM, and that has to hold on every surface, not only on the
  *  one where the rule happens to be written. */

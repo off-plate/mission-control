@@ -69,7 +69,7 @@ export function MoneyPage() {
         title="Money"
         metrics={m ? [
           { v: kc(m.owed), k: 'still owed', tone: 'urgent' as const },
-          { v: `${m.pct}%`, k: 'of it paid off', tone: 'pos' as const },
+          { v: `${m.pct}%`, k: 'of it paid off', tone: (m.pct > 0 ? 'pos' : 'info') as 'pos' | 'info' },
         ] : []}
         actions={m ? <button className="btn btn-quiet" onClick={reload}>Refresh</button> : undefined}
       />
@@ -83,7 +83,7 @@ export function MoneyPage() {
             <>
               <div className="kpi">{kc(m.owed)}<span className="unit">left</span></div>
               <div className="bar debt" style={{ marginTop: 12 }}><i style={{ width: `${m.pct}%` }} /></div>
-              <div className="kpi-sub"><span className="val-pos">{kc(m.paidOff)} paid</span> of {kc(m.baseline)}</div>
+              <div className="kpi-sub"><span className={m.paidOff > 0 ? 'val-pos' : undefined}>{kc(m.paidOff)} paid</span> of {kc(m.baseline)}</div>
             </>
           ) : (
             <>
@@ -464,7 +464,7 @@ export function ReviewPage() {
         </div>
         <div className="panel">
           <span className="microcap">Habits kept</span>
-          <div className="kpi val-pos">{keptDays}</div>
+          <div className={`kpi${keptDays > 0 ? ' val-pos' : ''}`}>{keptDays}</div>
           <div className="kpi-sub">
             {routinesDone} {routinesDone === 1 ? 'routine' : 'routines'} finished
           </div>
@@ -472,13 +472,13 @@ export function ReviewPage() {
         </div>
         <div className="panel">
           <span className="microcap">Focus time</span>
-          <div className="kpi val-pos">{fmtDuration(focusMin)}</div>
+          <div className={`kpi${focusMin > 0 ? ' val-pos' : ''}`}>{fmtDuration(focusMin)}</div>
           <div className="kpi-sub">across {blocks.length} {blocks.length === 1 ? 'block' : 'blocks'}</div>
           <Delta now={focusMin} before={priorFocus} unit="m" />
         </div>
         <div className="panel">
           <span className="microcap">{saved >= 0 ? 'Time saved' : 'Time over'}</span>
-          <div className={`kpi ${saved >= 0 ? 'val-pos' : 'val-urgent'}`}>{saved >= 0 ? fmtSigned(saved) : fmtDuration(-saved)}</div>
+          <div className={`kpi${saved === 0 ? '' : saved > 0 ? ' val-pos' : ' val-urgent'}`}>{saved >= 0 ? fmtSigned(saved) : fmtDuration(-saved)}</div>
           <div className="kpi-sub">against your own estimates</div>
         </div>
         <div className="panel panel-wide">
@@ -576,7 +576,7 @@ export function ReviewPage() {
             </div>
             <div className="panel">
               <span className="microcap">Faced in Avoidance</span>
-              <div className="kpi val-pos">{facedDone.length}<span className="unit">of {facedIn.length}</span></div>
+              <div className={`kpi${facedDone.length > 0 ? ' val-pos' : ''}`}>{facedDone.length}<span className="unit">of {facedIn.length}</span></div>
               <div className="kpi-sub">
                 {facedIn.filter((c) => c.didIt && c.felt === 'easier').length > 0
                   ? `${facedIn.filter((c) => c.didIt && c.felt === 'easier').length} felt easier than you feared`

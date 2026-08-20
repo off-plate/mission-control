@@ -2986,7 +2986,7 @@ export function GoalsPage() {
     <div className="page">
       <Band
         title="Goals"
-        metrics={[{ v: `${done}/${spaceGoals.length}`, k: 'reached', tone: 'pos' as const }]}
+        metrics={[{ v: `${done}/${spaceGoals.length}`, k: 'reached', tone: (done > 0 ? 'pos' : 'info') as 'pos' | 'info' }]}
         actions={<><WriteTo /><button className="btn btn-primary" onClick={() => setAdding(true)}>Add a goal</button></>}
       />
 

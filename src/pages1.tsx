@@ -2027,7 +2027,8 @@ export function HabitsPage() {
   const { due: dueCount, kept: doneToday } = habitsDueToday(spaceHabits, routines, habitLog, todayIndex)
 
   /* Grouped by who keeps it, and inside a group what is still open comes
-     first: a habit already ticked is a receipt, not a thing to do. */
+     first, because a habit already ticked is a record and not a thing
+     still to do. */
   const keeperOf = (h: HabitDef): Keeper =>
     (h.auto?.from === 'focus' || h.kind === 'measured') ? 'clock' : drivenBy.has(h.id) ? 'routine' : 'you'
   const rank = (h: HabitDef) =>

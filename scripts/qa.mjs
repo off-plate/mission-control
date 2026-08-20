@@ -1039,6 +1039,140 @@ await step('sync: two tabs both keep what they added', async () => {
   await ctx.close()
 })
 
+await step('sync: a phone that slept through the week cannot wipe what happened while it slept', async () => {
+  /* The scare that commissioned this: away for over a week, came back, the
+     banner offering to put yesterday's unfinished work back was gone and the
+     to-do list looked emptied.
+
+     The tasks were never in danger, they merge row by row. `plan` and `review`
+     were: neither is a collection, so neither was in ALL_KEYS, and both fell
+     through to the wholesale `{ ...newer }`. A device asleep since before the
+     trip wakes, saves once, is "newer" by savedAt, and its idea of plan and
+     review replaces what actually happened. `plan.returnedOn/Ids` IS the
+     banner. `review.reflections` is prose he typed with no log to rebuild from.
+
+     Driven through the real storage event, which is the same applyExternal
+     path a second device takes. */
+  const ctx = await b.newContext({ viewport: { width: 1300, height: 900 } })
+  const A = await ctx.newPage()
+  await A.goto(URL); await A.waitForTimeout(400)
+  await A.evaluate((K) => localStorage.removeItem(K), KEY)
+  await A.goto(`${URL}#/plan`); await A.reload(); await A.waitForTimeout(900)
+
+  // Nine days asleep, with real work behind it: a written reflection, a sealed
+  // week of habit history, and two unfinished tasks planned for the day it slept.
+  const seeded = await A.evaluate((K) => {
+    const st = JSON.parse(localStorage.getItem(K))
+    const d = new Date(); d.setDate(d.getDate() - 9)
+    const key = (x) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+    const gone = key(d)
+    st.lastRollDay = gone
+    /* A habit of our own with a known id, and real ticks in the week that
+       ended, so the seal has something true to count and the assertion is not
+       riding on whatever happens to be first in the array. */
+    st.habits = [...(st.habits ?? []), { id: 'slept-h', space: 'personal', name: 'Slept through it', frequency: 'daily', kind: 'build', paused: false, days: [false, false, false, false, false, false, false], history: [5, 4] }]
+    const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+    st.habitLog = [...(st.habitLog ?? []), ...[0, 1, 2].map((n) => {
+      const x = new Date(mon); x.setDate(mon.getDate() + n)
+      return { habitId: 'slept-h', day: key(x) }
+    })]
+    st.tasks = [
+      { id: 'slept-a', space: 'personal', title: 'Write to FU', list: 'today', plannedOn: gone, done: false, createdAt: gone, estimateMin: 15, category: 'admin' },
+      { id: 'slept-b', space: 'personal', title: 'Call VZP', list: 'today', plannedOn: gone, done: false, createdAt: gone, estimateMin: 15, category: 'admin' },
+    ]
+    localStorage.setItem(K, JSON.stringify(st))
+    return { gone, blob: localStorage.getItem(K) }
+  }, KEY)
+
+  // Boot: the gap rolls, both tasks come back, the banner exists.
+  await A.reload(); await A.waitForTimeout(1200)
+  const rolled = await A.evaluate((K) => {
+    const st = JSON.parse(localStorage.getItem(K))
+    return {
+      returnedCount: st.plan?.returnedCount ?? 0,
+      returnedIds: st.plan?.returnedIds ?? [],
+      reflections: (st.review?.reflections ?? []).length,
+      history: (st.habits ?? []).find((h) => h.id === 'slept-h')?.history ?? [],
+      backlog: (st.tasks ?? []).filter((t) => t.list === 'backlog').map((t) => t.id).sort(),
+    }
+  }, KEY)
+  if (rolled.returnedCount !== 2) throw new Error(`the gap returned ${rolled.returnedCount} tasks, expected 2`)
+
+  /* Written AFTER the phone's snapshot was taken, which is the whole point: a
+     phone that went to sleep before he typed this cannot be holding a copy, so
+     if it wins the merge the prose is simply gone. */
+  await A.evaluate((K) => {
+    const st = JSON.parse(localStorage.getItem(K))
+    st.review = { ...(st.review ?? {}), reflections: [{ id: 'refl-1', from: '2026-08-10', to: '2026-08-16', wins: ['Filed the tax return'], outcomes: [], drifted: '' }] }
+    localStorage.setItem(K, JSON.stringify(st))
+  }, KEY)
+  await A.reload(); await A.waitForTimeout(900)
+  const wrote = await A.evaluate((K) => (JSON.parse(localStorage.getItem(K)).review?.reflections ?? []).length, KEY)
+  if (wrote !== 1) throw new Error(`the reflection did not persist before the merge: ${wrote}`)
+  if (rolled.history.join(',') !== '5,4,3') throw new Error(`the sealed week counted wrong: ${JSON.stringify(rolled.history)}, expected [5,4,3]`)
+
+  /* Now the sleeping phone wakes and saves: the SAME pre-roll blob, stamped
+     later, plus one new note so the merge is not a no-op. Written from a page
+     on the same origin that is not the app, so nothing races its own boot. */
+  await A.evaluate(([K, blob]) => {
+    const stale = JSON.parse(blob)
+    stale.savedAt = Date.now() + 120000
+    stale.notes = [...(stale.notes ?? []), { id: 'phone-note', space: 'personal', body: 'from the phone', title: 'from the phone', updatedAt: Date.now() }]
+    // Dispatched exactly as another tab would, which is the path applyExternal takes.
+    localStorage.setItem(K, JSON.stringify(stale))
+    window.dispatchEvent(new StorageEvent('storage', { key: K, newValue: JSON.stringify(stale) }))
+  }, [KEY, seeded.blob])
+  await A.waitForTimeout(1500)
+  await A.reload(); await A.waitForTimeout(1200)
+
+  const after = await A.evaluate((K) => {
+    const st = JSON.parse(localStorage.getItem(K))
+    return {
+      merged: (st.notes ?? []).some((n) => n.id === 'phone-note'),
+      returnedCount: st.plan?.returnedCount ?? 0,
+      returnedIds: (st.plan?.returnedIds ?? []).slice().sort(),
+      reflections: (st.review?.reflections ?? []).length,
+      history: (st.habits ?? []).find((h) => h.id === 'slept-h')?.history ?? [],
+      tasks: (st.tasks ?? []).filter((t) => t.id === 'slept-a' || t.id === 'slept-b').length,
+    }
+  }, KEY)
+  // The merge really ran, or the rest proves nothing.
+  if (!after.merged) throw new Error('the phone blob never merged, so this test asserts nothing')
+  if (after.tasks !== 2) throw new Error(`${after.tasks} of the 2 tasks survived`)
+  if (after.reflections !== 1) throw new Error(`a sleeping phone deleted a written reflection: ${after.reflections} left`)
+  if (after.returnedCount !== 2) throw new Error(`the postpone banner lost its count: ${after.returnedCount}`)
+  if (after.returnedIds.join(',') !== 'slept-a,slept-b') throw new Error(`the banner lost which tasks: ${after.returnedIds.join(',')}`)
+  if (after.history.join(',') !== '5,4,3') throw new Error(`a sleeping phone rolled back a sealed week: ${JSON.stringify(after.history)}, expected [5,4,3]`)
+  await ctx.close()
+})
+
+await step('one fact, one number: Today and Habits agree on what today asked', async () => {
+  /* They did not. Today collapsed routines into folders and opened with
+     "1/14"; the Habits page counted raw rows and opened with "1/64", on the
+     same morning, about the same habits. Two headline numbers for one fact is
+     the fastest way to stop trusting every other number in the app.
+
+     Asserted as exact strings, not as a shape: the old check here was a regex
+     for /^\d+\/\d+$/, which "1/14" and "1/64" both satisfy happily. */
+  await fresh('today')
+  await page.locator('.space-btn', { hasText: 'All' }).click(); await page.waitForTimeout(500)
+  const todayNum = (await page.locator('.daynum').nth(1).innerText()).replace(/\s+/g, ' ').trim()
+  const todayFrac = todayNum.split(' ')[0]
+  await page.goto(`${URL}#/habits`); await page.waitForTimeout(900)
+  const habitsFrac = (await page.locator('.band-metric .v, .band-metrics .v').first().innerText()).trim()
+  if (!/^\d+\/\d+$/.test(todayFrac)) throw new Error(`Today's habit number is not a fraction: "${todayNum}"`)
+  if (todayFrac !== habitsFrac) {
+    throw new Error(`Today says ${todayFrac} habits kept and Habits says ${habitsFrac} done today, about the same day`)
+  }
+  // And the denominator is folders, not raw rows: a seeded profile has far
+  // more habits than it has things to actually do.
+  const raw = await page.evaluate((K) => (JSON.parse(localStorage.getItem(K)).habits ?? []).length, KEY)
+  const denom = Number(todayFrac.split('/')[1])
+  if (!(denom > 0 && denom < raw)) {
+    throw new Error(`denominator ${denom} against ${raw} habits: expected folders to collapse the count`)
+  }
+})
+
 await step('habits: a quitting row keeps its slip button off the day dots', async () => {
   /* The foot column is a fixed width, so a long "since 12 Apr, 114 best run"
      used to push the button out of its own column and onto Sunday's dot, at a

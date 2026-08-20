@@ -11,7 +11,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from './store'
 import { fmtDuration, fmtSigned, localDateKey } from './util'
-import { dueOn, type FocusSession, type HabitDef, type Task } from './types'
+import { habitsDueToday, dueOn, type FocusSession, type HabitDef, type Task } from './types'
 
 /* ---------------- the day, drawn on a line ---------------- */
 
@@ -129,23 +129,12 @@ export function DayNumbers({ savedMin }: { savedMin: number }) {
   const day = localDateKey()
 
   const focused = focusSessions.filter((f) => f.day === day && inView(f.space)).reduce((a, f) => a + f.minutes, 0)
-  /* The same rule the Habits page opens with, imported rather than rewritten,
-     so the two can never disagree about what today asked of him. */
-  /* Counted in FOLDERS, not in raw habits. Since routines became folders of
-     habits this number was "0/50", which is not a thing anybody can hold in
-     their head or feel good about moving. A folder is one thing to do, the
-     way the routine it came from was, and a habit on its own is one thing.
-     Optional habits never hold a folder open. */
-  const dueRaw = habits.filter((h: HabitDef) => inView(h.space) && !h.archivedAt && dueOn(h, todayIndex, habitLog))
-  const folderIds = new Set(dueRaw.map((h) => h.folderId).filter(Boolean) as string[])
-  const folderHabitIds = new Set(routines.map((r) => r.habitId).filter(Boolean) as string[])
-  const folders = [...folderIds].map((id) => {
-    const need = dueRaw.filter((h) => h.folderId === id && !h.optional)
-    return { id, total: need.length, done: need.filter((h) => h.days[todayIndex]).length }
-  }).filter((f) => f.total > 0)
-  const loose = dueRaw.filter((h) => !h.folderId && !folderHabitIds.has(h.id))
-  const due = [...folders, ...loose]
-  const kept = folders.filter((f) => f.done === f.total).length + loose.filter((h) => h.days[todayIndex]).length
+  /* The same rule the Habits page opens with, genuinely imported now, so the
+     two can never disagree about what today asked of him. */
+  const { due, kept } = habitsDueToday(
+    habits.filter((h: HabitDef) => inView(h.space) && !h.archivedAt),
+    routines, habitLog, todayIndex,
+  )
   /* Ticked today, by its own stamp. Not the ledger: a ledger row is only
      written when he gives the task an actual, so counting rows would quietly
      drop everything he ticked and moved on from.
@@ -165,7 +154,7 @@ export function DayNumbers({ savedMin }: { savedMin: number }) {
         <span className="k">focused today</span>
       </div>
       <div className="daynum">
-        <span className="v">{kept}<span className="of">/{due.length}</span></span>
+        <span className="v">{kept}<span className="of">/{due}</span></span>
         <span className="k">habits kept</span>
       </div>
       <div className="daynum">

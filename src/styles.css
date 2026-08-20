@@ -185,9 +185,18 @@
   --r-sm: 4px;
   --r-md: 8px;
 
+  /* Motion: three speeds, one curve, two documented exceptions.
+     The curve is an expo-out. It leaves fast and settles, which is what makes
+     a panel read as having ARRIVED rather than slid. Anything that repeats
+     forever uses --ease-loop instead, because a breathing pulse has to be
+     symmetrical at both ends. `linear` survives in exactly two places, the
+     focus ring and the Zone's water, and it has to: a progress indicator on
+     any other curve is lying about how much time is left. */
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --t-fast: 160ms var(--ease);
-  --t-med: 220ms var(--ease);
+  --ease-loop: ease-in-out;
+  --t-fast: 140ms var(--ease);
+  --t-med: 200ms var(--ease);
+  --t-slow: 320ms var(--ease);
 }
 
 /* Root type scale steps up with viewport so a 3440px monitor gets
@@ -231,7 +240,7 @@ body {
   line-height: 1.55;
   color: var(--ink);
   background: var(--bg);
-  transition: background 220ms ease, color 220ms ease;
+  transition: background var(--t-med), color var(--t-med);
 }
 
 img, svg { display: block; max-width: 100%; }
@@ -256,7 +265,7 @@ button, a, [role='button'], summary, label, input, select, textarea {
   position: absolute; left: var(--s4); top: -60px; z-index: 300;
   background: var(--ink); color: var(--bg); padding: var(--s2) var(--s4);
   border-radius: var(--r-sm); font-size: var(--text-sm); font-weight: 600;
-  transition: top 140ms var(--ease);
+  transition: top var(--t-fast);
 }
 .skiplink:focus { top: var(--s3); }
 
@@ -461,7 +470,7 @@ main { padding-inline: var(--gutter); }
   cursor: pointer;
 }
 .assist-mic:hover { border-color: var(--accent-text); color: var(--accent-text); }
-.assist-mic.on { background: var(--alert); border-color: var(--alert); color: var(--bg); animation: pomo-pulse 1.4s ease-in-out infinite; }
+.assist-mic.on { background: var(--alert); border-color: var(--alert); color: var(--bg); animation: pomo-pulse 1.4s var(--ease-loop) infinite; }
 .assist-note { font-size: var(--text-xs); color: var(--faint); }
 .assist-proposed { margin-top: var(--s4); border-top: 1px solid var(--hairline); padding-top: var(--s4); }
 .assist-row { display: flex; align-items: center; gap: var(--s2); padding: var(--s2) 0; border-bottom: 1px solid var(--hairline); font-size: var(--text-sm); }
@@ -825,7 +834,7 @@ button.chip:hover { color: var(--accent-text); background: var(--accent-wash); }
 .checkbox[aria-checked="true"] { background: var(--progress); border-color: var(--progress); color: var(--bg); }
 
 .bar { height: 7px; border-radius: 4px; background: var(--surface-2); border: 1px solid var(--hairline-strong); overflow: hidden; }
-.bar > i { display: block; height: 100%; border-radius: 4px; background: var(--accent); transition: width 400ms var(--ease); }
+.bar > i { display: block; height: 100%; border-radius: 4px; background: var(--accent); transition: width var(--t-slow); }
 .bar.prog > i { background: var(--progress); }
 /* debt paydown is never green (money owed): neutral info fill */
 .bar.debt > i { background: var(--info); }
@@ -875,13 +884,21 @@ button.chip:hover { color: var(--accent-text); background: var(--accent-wash); }
 
 /* ---------- phone stack ---------- */
 .stack { display: flex; flex-direction: column; gap: var(--s3); }
-.stack .widget { min-height: 88px; }
+/* A phone widget needs a CEILING as well as a floor. On a desktop the grid
+   hands every tile a fixed height, so `height: 100%` plus the body's own
+   `overflow: auto` caps it and it scrolls. Stacked on a phone there is no
+   height to inherit, `height: 100%` resolves to auto, and the tile grows to
+   fit whatever is in it: the Habits tile printed all fifty-odd pills and took
+   Today from under two screens on a desktop to six on a phone, burying Goals
+   and the week behind a scroll nobody would finish. Same 68vh the day's
+   schedule already uses, so the cap is one decision and not two. */
+.stack .widget { min-height: 88px; max-height: 68vh; }
 .stack-reorder { display: flex; gap: var(--s1); }
 .stack-reorder button { color: var(--faint); padding: 0 var(--s2); font-size: var(--text-sm); }
 .stack-reorder button:hover { color: var(--ink); }
 
 /* ---------- pages ---------- */
-.page { animation: pagein 200ms var(--ease); }
+.page { animation: pagein var(--t-med); }
 /* Content-light pages sit in one centered column so the band metric tracks
    the content, never floats to the far screen edge on ultrawide. */
 .page.narrow { max-width: 1180px; margin-inline: auto; }
@@ -1137,7 +1154,7 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
   place-items: center;
   padding: var(--s4);
   z-index: 100;
-  animation: fadein 160ms ease;
+  animation: fadein var(--t-fast);
 }
 @keyframes fadein { from { opacity: 0; } }
 
@@ -1151,7 +1168,7 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
   border: 1px solid var(--hairline-strong);
   border-radius: 12px;
   box-shadow: var(--shadow-pop);
-  animation: rise 220ms var(--ease);
+  animation: rise var(--t-med);
 }
 @keyframes rise { from { transform: translateY(14px); opacity: 0; } }
 
@@ -1175,7 +1192,7 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
   align-items: baseline;
   padding: var(--s3) 0;
   border-bottom: 1px solid var(--hairline);
-  animation: rise 260ms var(--ease) backwards;
+  animation: rise var(--t-med) backwards;
 }
 .step-item .n { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--faint); min-width: 2ch; }
 .step-item .grow { flex: 1; }
@@ -1330,7 +1347,7 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 .fold-caret {
   align-self: center; flex: none; width: 7px; height: 7px; margin-right: 1px;
   border-right: 1.6px solid var(--faint); border-bottom: 1.6px solid var(--faint);
-  transform: rotate(45deg); transition: transform 140ms var(--ease);
+  transform: rotate(45deg); transition: transform var(--t-fast);
 }
 .bucket.is-shut .fold-caret { transform: rotate(-45deg); }
 .bucket-head:hover .fold-caret { border-color: var(--accent-text); }
@@ -1345,7 +1362,7 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 /* Today or tomorrow. Two words, the live one in ink and the other quiet, so the
    head still reads as a heading rather than a pair of buttons. */
 .day-switch { display: flex; align-items: baseline; gap: var(--s3); }
-.day-switch .microcap { margin-bottom: 0; color: var(--faint); transition: color 140ms var(--ease); }
+.day-switch .microcap { margin-bottom: 0; color: var(--faint); transition: color var(--t-fast); }
 .day-switch .microcap[aria-pressed='true'] { color: var(--ink); }
 .day-switch .microcap:hover { color: var(--ink); }
 .day-switch .microcap[aria-pressed='true']::after {
@@ -1431,7 +1448,7 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
   background: var(--ink); color: var(--bg);
   border-radius: 12px; box-shadow: var(--shadow-pop);
   padding: var(--s2) var(--s3) var(--s2) var(--s5);
-  animation: rise 180ms var(--ease);
+  animation: rise var(--t-med);
 }
 .movebar-count { font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 600; }
 .movebar .movebar-clear { color: var(--bg); border-color: transparent; min-height: 34px; }
@@ -1609,7 +1626,7 @@ button.chip:hover { filter: brightness(0.96); }
 .routine-open::before {
   content: ''; flex: none; width: 7px; height: 7px; margin-right: 1px;
   border-right: 1.6px solid var(--faint); border-bottom: 1.6px solid var(--faint);
-  transform: rotate(-45deg); transition: transform 140ms var(--ease);
+  transform: rotate(-45deg); transition: transform var(--t-fast);
 }
 .routine-open.is-open::before { transform: rotate(45deg); }
 .routine-open:hover::before { border-color: var(--accent-text); }
@@ -1664,7 +1681,7 @@ button.chip:hover { filter: brightness(0.96); }
 .routine-check {
   flex: none; width: 24px; height: 24px; margin-top: 1px; border-radius: 6px;
   border: 1.5px solid var(--hairline-strong); color: transparent; display: grid; place-items: center;
-  transition: background 140ms ease-out, border-color 140ms ease-out, color 140ms ease-out;
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
 }
 .routine-check:hover { border-color: var(--accent-text); }
 /* Done is green everywhere, including here. This tick was the one checkbox in
@@ -1687,7 +1704,7 @@ button.chip:hover { filter: brightness(0.96); }
 .alt-opt {
   display: flex; align-items: flex-start; gap: var(--s2); text-align: left; width: 100%;
   padding: var(--s2) var(--s3); border: 1px solid var(--hairline); border-radius: 4px;
-  transition: border-color 140ms ease-out, background 140ms ease-out;
+  transition: border-color var(--t-fast), background var(--t-fast);
 }
 .alt-opt:hover { border-color: var(--accent-text); }
 .alt-tick { flex: none; width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; border: 1.5px solid var(--faint); }
@@ -1728,7 +1745,7 @@ button.chip:hover { filter: brightness(0.96); }
 .mr-step.done .mr-title { color: var(--muted); }
 .mr-status { font-family: var(--font-mono); font-size: 0.6875rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
 .mr-step.open .mr-status { color: var(--accent-text); }
-.mr-chev { color: var(--faint); transition: transform 180ms var(--ease); }
+.mr-chev { color: var(--faint); transition: transform var(--t-med); }
 .mr-step.open .mr-chev { transform: rotate(180deg); }
 .mr-body { padding: 0 var(--s1) var(--s5); }
 .mr-lead { font-size: var(--text-sm); color: var(--muted); margin-bottom: var(--s3); }
@@ -1738,7 +1755,7 @@ button.chip:hover { filter: brightness(0.96); }
 .mr-med { display: flex; flex-direction: column; }
 .med-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: var(--r-md); overflow: hidden; background: var(--surface-2); border: 1px solid var(--hairline); }
 .med-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-.med-stage { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--s2); padding: var(--s5) var(--s4); margin-top: var(--s4); border-radius: var(--r-md); background: var(--surface-2); transition: background 300ms var(--ease); }
+.med-stage { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--s2); padding: var(--s5) var(--s4); margin-top: var(--s4); border-radius: var(--r-md); background: var(--surface-2); transition: background var(--t-slow); }
 .med-stage.phase-run { background: var(--accent-wash); }
 .med-stage.phase-ended { background: var(--progress-wash); }
 .med-phase { font-family: var(--font-mono); font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
@@ -1807,7 +1824,7 @@ a.pron-src:hover { color: var(--accent-text); text-decoration: underline; }
   flex: none; width: 17px; height: 17px; border-radius: 4px;
   border: 1.5px solid var(--hairline-strong); background: transparent;
   display: inline-flex; align-items: center; justify-content: center;
-  cursor: pointer; transition: background 140ms ease-out, border-color 140ms ease-out;
+  cursor: pointer; transition: background var(--t-fast), border-color var(--t-fast);
 }
 .goal-ms-check:hover { border-color: var(--accent-text); }
 .goal-ms-item.done .goal-ms-check { background: var(--progress); border-color: var(--progress); color: var(--bg); }
@@ -1836,7 +1853,7 @@ a.pron-src:hover { color: var(--accent-text); text-decoration: underline; }
 /* The grips sit ON the column edges rather than taking a track of their own,
    so dragging one cannot shift the thing it is resizing. */
 .nt-grip { position: absolute; top: 0; bottom: 0; width: 11px; margin-left: -5px; cursor: col-resize; z-index: 6; }
-.nt-grip::after { content: ''; position: absolute; inset: 0 5px; background: transparent; transition: background 120ms var(--ease); }
+.nt-grip::after { content: ''; position: absolute; inset: 0 5px; background: transparent; transition: background var(--t-fast); }
 .nt-grip:hover::after, body.is-colresize .nt-grip::after { background: var(--accent); }
 body.is-colresize { cursor: col-resize; user-select: none; }
 
@@ -1942,7 +1959,7 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 /* Pinned folds. The chevron turns, and where it points is the state. */
 .nt-groupfold { cursor: pointer; }
 .nt-groupfold:hover { color: var(--accent-text); }
-.nt-chev { margin-left: auto; color: var(--faint); transition: transform 160ms var(--ease); }
+.nt-chev { margin-left: auto; color: var(--faint); transition: transform var(--t-fast); }
 .nt-chev.open { transform: rotate(90deg); }
 .nt-groupfold:hover .nt-chev { color: var(--accent-text); }
 .nt-row {
@@ -2094,7 +2111,7 @@ mark { background: var(--accent-wash); color: var(--accent-text); font-weight: 6
    pending line is gone the moment an answer lands, and the error line is
    just his own request handed back so nothing he typed is lost. */
 @keyframes nt-help-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.85; } }
-.nt-editor .nt-help-pending { color: var(--faint); font-style: italic; animation: nt-help-pulse 1.1s ease-in-out infinite; }
+.nt-editor .nt-help-pending { color: var(--faint); font-style: italic; animation: nt-help-pulse 1.1s var(--ease-loop) infinite; }
 @media (prefers-reduced-motion: reduce) { .nt-editor .nt-help-pending { animation: none; } }
 .nt-editor .nt-help-error { color: var(--alert); font-size: var(--text-sm); }
 
@@ -2824,7 +2841,7 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
   display: flex; align-items: center; gap: var(--s2);
   background: var(--ink); color: var(--bg);
   border-radius: 999px; padding: 8px 8px 8px 16px; box-shadow: var(--shadow-pop);
-  animation: undo-in 180ms ease-out;
+  animation: undo-in var(--t-med);
 }
 .undo-what { font-size: var(--text-sm); max-width: 42ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .undo-do {
@@ -3085,7 +3102,7 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .pomo-done h2 { font-size: var(--text-lg); line-height: 1.3; }
 .pomo-done p { color: var(--muted); font-size: var(--text-sm); }
 .pomo-done-actions { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s3); }
-.pomo-ambient.await { animation: pomo-pulse 1.2s ease-in-out infinite; }
+.pomo-ambient.await { animation: pomo-pulse 1.2s var(--ease-loop) infinite; }
 @keyframes pomo-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
 .pomo-badge.await .pomo-phase { color: var(--progress); }
 
@@ -3115,7 +3132,7 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
   padding: var(--s4) var(--s5);
   border: 1px solid var(--progress); border-radius: var(--r-md);
   background: var(--progress-wash);
-  animation: ms-land 260ms var(--ease) both;
+  animation: ms-land var(--t-med) both;
 }
 @keyframes ms-land {
   from { opacity: 0; transform: translateY(-6px); }
@@ -3418,7 +3435,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .zring-track { fill: none; stroke: var(--z-track); stroke-width: 1.2; }
 .zring-fill {
   fill: none; stroke: var(--ring); stroke-width: 1.2; stroke-linecap: round;
-  transition: stroke-dashoffset 900ms linear, stroke 300ms ease-out;
+  transition: stroke-dashoffset 900ms linear, stroke var(--t-slow);
 }
 .zn-paused .znow-face { --ring: #E8C37A; }
 .zn-break .znow-face { --ring: var(--z-muted); }
@@ -3449,7 +3466,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .znow-icon {
   flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
   border: 1px solid var(--z-line); color: var(--z-muted); background: transparent;
-  transition: color 160ms ease-out, border-color 160ms ease-out;
+  transition: color var(--t-fast), border-color var(--t-fast);
 }
 .znow-icon:hover { border-color: var(--z-ice); color: var(--z-ice); }
 .znow-pill {
@@ -3460,7 +3477,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   /* The only filled ice in the room, now that the header's active pill is an
      outline: the one control meant to be pressed is the one solid thing. */
   background: var(--z-ice); color: #04222F; border: none;
-  transition: background 160ms ease-out;
+  transition: background var(--t-fast);
 }
 .znow-pill:hover { background: #A6E4F2; }
 .znow-pill.is-done { background: none; border: 1px solid var(--z-line); color: var(--z-bone); }
@@ -3604,7 +3621,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .zplayer-btn {
   flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
   border: 1px solid transparent; color: var(--z-muted); background: transparent;
-  transition: color 160ms ease-out;
+  transition: color var(--t-fast);
 }
 .zplayer-btn:hover:not(:disabled) { color: var(--z-bone); }
 .zplayer-btn:disabled { opacity: 0.4; }
@@ -3752,7 +3769,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .ptask.done { color: var(--progress); }
 .ptask.done .goal-ms-check { background: var(--progress); border-color: var(--progress); color: var(--bg); }
 .ptask.done .grow { text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
-.ptask .sub-tool { flex: none; opacity: 0; transition: opacity 140ms var(--ease); }
+.ptask .sub-tool { flex: none; opacity: 0; transition: opacity var(--t-fast); }
 .ptask:hover .sub-tool, .ptask .sub-tool:focus-visible { opacity: 1; }
 .ptask-add-box { margin-top: var(--s3); display: flex; flex-direction: column; gap: var(--s2); }
 .ptask-offer { display: flex; flex-direction: column; border: 1px solid var(--hairline); border-radius: var(--r-sm); overflow: hidden; }
@@ -3820,7 +3837,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .bcard {
   margin: 0; border-radius: 10px; overflow: hidden;
   transform: rotate(var(--tilt, 0deg));
-  transition: transform 180ms ease-out;
+  transition: transform var(--t-med);
   /* Not stretched to the grid area: the row span is computed from the card's
      own height, and a stretched card would chase its own measurement. */
   align-self: start;
@@ -3923,7 +3940,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .dr-screen {
   position: fixed; inset: 0; z-index: 200; background: var(--bg);
   display: flex; flex-direction: column; align-items: center;
-  animation: dr-open 220ms var(--ease) both;
+  animation: dr-open var(--t-med) both;
 }
 @keyframes dr-open { from { opacity: 0 } to { opacity: 1 } }
 
@@ -3940,10 +3957,10 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .dr-stage {
   /* Scales with the screen instead of sitting as a 680px stamp in the middle of
      an ultrawide with 1380px of cream either side. */
-  width: min(920px, 100%); animation: dr-rise 200ms var(--ease) both;
+  width: min(920px, 100%); animation: dr-rise var(--t-med) both;
 }
 .dr-rail { display: flex; gap: 5px; width: min(920px, 100%); margin-bottom: var(--s6); flex: none; }
-.dr-seg { flex: 1; height: 3px; border-radius: 2px; background: var(--hairline-strong); transition: background 260ms var(--ease); }
+.dr-seg { flex: 1; height: 3px; border-radius: 2px; background: var(--hairline-strong); transition: background var(--t-med); }
 .dr-seg.on { background: var(--accent); }
 @keyframes dr-rise { from { opacity: 0; transform: translateY(14px) } to { opacity: 1; transform: none } }
 
@@ -3959,13 +3976,13 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
    it is actually visible. This is the one celebration in here, and it is his
    own week arriving rather than confetti. */
 .dr-score { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--s6) var(--s5); margin: var(--s6) 0 var(--s5); }
-.dr-tile { display: flex; flex-direction: column; gap: 2px; animation: dr-pop 340ms var(--ease) both; }
+.dr-tile { display: flex; flex-direction: column; gap: 2px; animation: dr-pop var(--t-slow) both; }
 @keyframes dr-pop { from { opacity: 0; transform: translateY(10px) scale(.96) } to { opacity: 1; transform: none } }
 .dr-num { font-family: var(--disp); font-weight: 700; font-size: clamp(2.2rem, 1.6rem + 2vw, 3.4rem); line-height: 1; color: var(--accent-text); }
 .dr-lab { font-size: var(--text-sm); color: var(--muted); }
 
 .dr-list { list-style: none; display: flex; flex-direction: column; gap: var(--s2); margin-top: var(--s4); }
-.dr-list li { display: flex; align-items: center; gap: var(--s3); font-size: var(--text-base); color: var(--ink); animation: dr-rise 260ms var(--ease) both; }
+.dr-list li { display: flex; align-items: center; gap: var(--s3); font-size: var(--text-base); color: var(--ink); animation: dr-rise var(--t-med) both; }
 .dr-plain li { color: var(--muted); }
 .dr-at { font-size: 0.75rem; color: var(--faint); }
 .dr-more { color: var(--faint); font-size: var(--text-sm); }
@@ -3997,11 +4014,11 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .dr-drop:hover { border-color: var(--alert); }
 .dr-rest { justify-content: center; }
 .dr-more-btn { color: var(--muted); }
-.dr-said { font-size: 0.6875rem; color: var(--progress); flex: none; animation: dr-said 320ms var(--ease) both; }
+.dr-said { font-size: 0.6875rem; color: var(--progress); flex: none; animation: dr-said var(--t-slow) both; }
 @keyframes dr-said { from { opacity: 0; transform: translateX(8px) } to { opacity: 1; transform: none } }
 /* The signature: a row he has just settled fills green and stays put. It stays
    in the list rather than vanishing, which is what made the list jump. */
-.dr-row.is-fixed { animation: dr-settle 460ms var(--ease) both; }
+.dr-row.is-fixed { animation: dr-settle var(--t-slow) both; }
 @keyframes dr-settle {
   0% { background: color-mix(in srgb, var(--progress) 20%, transparent) }
   100% { background: transparent }

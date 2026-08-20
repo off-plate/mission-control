@@ -1292,10 +1292,18 @@ await step('goals: a day-counted goal reads impossible before behind, not on pac
       id, space: 'personal', name, current: 0, target, unit: 'checkoffs', note: '',
       why: '', timeframe: 'monthly', category: 'health', milestones: [], habitId: `h-${id}`,
     })
-    s.goals = [mk('gate-imp', 'Gate impossible', daysLeft + 5), mk('gate-ok', 'Gate reachable', Math.max(1, daysLeft - 5))]
+    /* The reachable one has to be reachable on the 28th as well as the 2nd.
+       It used to be seeded at zero progress with a target of daysLeft-5, which
+       only reads as on pace while less than half the month has gone: at zero
+       done, goalPace needs timeLeft > 0.5, so from the 16th onward NO target
+       could have passed and the gate failed every month from the 16th to the
+       31st. It quit on the 1st and has not slipped, so its clean days track
+       elapsed days exactly, which is what being on pace actually means. */
+    const first = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+    s.goals = [mk('gate-imp', 'Gate impossible', daysLeft + 5), mk('gate-ok', 'Gate reachable', daysInMonth)]
     s.habits = [
       { id: 'h-gate-imp', space: 'personal', name: 'Gate impossible', frequency: 'monthly', paused: false, kind: 'break', days: [false,false,false,false,false,false,false], history: [] },
-      { id: 'h-gate-ok', space: 'personal', name: 'Gate reachable', frequency: 'monthly', paused: false, kind: 'break', days: [false,false,false,false,false,false,false], history: [] },
+      { id: 'h-gate-ok', space: 'personal', name: 'Gate reachable', frequency: 'monthly', paused: false, kind: 'break', quitSince: first, days: [false,false,false,false,false,false,false], history: [] },
     ]
     s.slips = []
     localStorage.setItem(K, JSON.stringify(s))
@@ -1316,7 +1324,11 @@ await step('goals: a day-counted goal reads impossible before behind, not on pac
   if (!/needs a push/i.test(cardStatus('Gate impossible'))) {
     throw new Error(`with ${seeded.daysLeft} days left, an unreachable target still reads on pace: ${JSON.stringify(cardStatus('Gate impossible'))}`)
   }
-  if (!/on pace/i.test(cardStatus('Gate reachable'))) {
+  /* The claim under test is that the IMPOSSIBLE one flags and the reachable
+     one does not. On the last day of the month a goal tracking elapsed days
+     exactly has also been reached, and "reached" is not a false alarm, so the
+     assertion is that it is not flagged rather than that it says one word. */
+  if (/needs a push/i.test(cardStatus('Gate reachable'))) {
     throw new Error(`a comfortably reachable target got flagged as needing a push: ${JSON.stringify(cardStatus('Gate reachable'))}`)
   }
 })

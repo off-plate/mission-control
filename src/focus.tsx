@@ -73,7 +73,7 @@ export function FocusPage() {
 
   return (
     <div className="page focus-page">
-      <Band title="Focus" metrics={[{ v: fmtDuration(today), k: 'today', tone: 'pos' as const }]} />
+      <Band title="Focus" metrics={[{ v: fmtDuration(today), k: 'today', tone: (today > 0 ? 'pos' : 'info') as 'pos' | 'info' }]} />
 
       {/* Shown whenever a block exists, paused included: a paused block is still
           the one he is in the middle of. */}

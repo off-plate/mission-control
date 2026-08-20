@@ -4,6 +4,7 @@ import { MOCK_AGENDA, SPACE_LABELS, exceptionsFor, globalExceptions, momentum } 
 import { MOCK_MONEY, fakeDecompose } from './mock'
 import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
+import { useCompass } from './compass'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
 import { Linkify } from './widgets'
@@ -72,12 +73,17 @@ export function TodayPage() {
   const { space, tasks, routines, habits, plan, editing, setEditing, setPage, savedMin, todayIndex, review, addTask, deleteTask, moveTaskList, setFocusTaskId, sources, inView } = useStore()
   const pomo = usePomodoro()
   const nextEvent = useNextEvent(space)
-  const exceptions = exceptionsFor(space, { tasks, routines })
+  /* The money alert needs Compass, which arrives async. Until it does, `money`
+     is undefined and the alert simply is not there, which is correct: silence
+     is honest, an invented figure is not. */
+  const compass = useCompass()
+  const money = compass.state.status === 'ok' ? compass.state.money : null
+  const exceptions = exceptionsFor(space, { tasks, routines, money })
   /* Money and official post follow you into Work and Off-Plate. Sitting in the
      Work profile all day used to mean the app told you nothing was wrong. */
   const shownExceptions = space === 'personal'
     ? exceptions
-    : [...globalExceptions({ tasks, routines }), ...exceptions]
+    : [...globalExceptions({ tasks, routines, money }), ...exceptions]
   const open = tasks.filter((t) => inView(t.space) && t.list === 'today' && !t.done && (t.plannedOn ?? localDateKey()) === localDateKey())
   const firstMove = useFirstMove()
   const [addOpen, setAddOpen] = useState(false)

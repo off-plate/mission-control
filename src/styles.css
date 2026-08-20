@@ -3266,6 +3266,11 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 }
 @media (max-width: 520px) {
   .weekstrip-days { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* Seven days do not divide by two, so the last cell sat alone with an empty
+     square beside it, and the last cell is TODAY, the one with the ring on it.
+     It takes the full width instead: the odd one out is the point of the row,
+     not an accident to be left hanging. */
+  .weekstrip-days > :last-child:nth-child(odd) { grid-column: span 2; }
 }
 
 /* ---------- the clock widget ----------

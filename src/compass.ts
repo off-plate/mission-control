@@ -46,6 +46,15 @@ export interface CompassMoney {
   savedThisMonth: number
   /** How many debts are still open. */
   openDebts: number
+  /** This month's payments, one row per open debt: the day of the month it
+   *  lands on, what it is, and whether Compass has already recorded it going
+   *  out. Derived from `start_on` and the transaction log, so it needs no
+   *  column this file was not already reading.
+   *
+   *  These are not due dates in the to-do sense and nothing here invents one.
+   *  A debt payment has a real date imposed from outside, by a bank, and the
+   *  only question worth asking is whether it went. */
+  due: { day: number; amount: number; sent: boolean }[]
 }
 
 export type CompassState =
@@ -89,6 +98,18 @@ export function summarise(debts: CompassDebt[], tx: CompassTx[]): CompassMoney {
     monthly: open.reduce((s, d) => s + d.monthly_payment, 0),
     savedThisMonth,
     openDebts: open.length,
+    /* Day of month off start_on, read from the string rather than through a
+       Date, because `new Date('2026-08-15')` is parsed as UTC midnight and in
+       Prague that is still the 14th for two hours. A payment already recorded
+       against this debt inside this calendar month counts as gone. */
+    due: open
+      .map((d) => ({
+        day: Number(d.start_on.slice(8, 10)) || 1,
+        amount: d.monthly_payment,
+        sent: tx.some((t) => t.kind === 'debt_payment' && t.debt_id === d.id && t.occurred_on.slice(0, 7) === month),
+      }))
+      .filter((r) => r.amount > 0)
+      .sort((a, b) => a.day - b.day),
   }
 }
 

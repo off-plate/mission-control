@@ -3018,6 +3018,9 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .day-rows .day-row:first-child { border-top: 0; }
 .day-row-title { flex: 1 1 auto; min-width: 0; }
 .day-row-fig { flex: none; font-size: var(--text-xs); color: var(--muted); }
+/* Finished, but never timed. It is a fact about the record rather than a
+   figure, so it reads quieter than the ones with numbers beside them. */
+.day-row-untimed { color: var(--faint); }
 .day-row.is-slip .day-row-title { color: var(--muted); }
 .day-tag {
   flex: none; padding: 1px 7px; border: 1px solid var(--hairline-strong); border-radius: 999px;

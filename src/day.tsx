@@ -27,7 +27,7 @@ const longDate = (iso: string): string => {
 export function DayPage() {
   const {
     dayKey, openDay, setPage, inView,
-    ledger, habits, habitLog, routines, routineLog, focusSessions, slips, stepLog, coachSessions,
+    ledger, tasks, habits, habitLog, routines, routineLog, focusSessions, slips, stepLog, coachSessions,
   } = useStore()
   const day = dayKey ?? localDateKey()
   const today = localDateKey()
@@ -39,6 +39,19 @@ export function DayPage() {
      blocks have their own panel below. */
   const fromFocus = new Set(focusSessions.map((f) => f.ledgerId).filter(Boolean) as string[])
   const finished = ledger.filter((e) => e.when === day && inView(e.space) && !fromFocus.has(e.id))
+  /* Ticked and moved on from. A ledger row is only written when he gives the
+     task a time, so everything finished through the "skip" button left no
+     trace here at all: Today counted it (it reads doneAt), this page did not,
+     and a day of real work could open with "Nothing was logged on this day".
+
+     No overlap with the rows above by construction: logActual is the only
+     thing that writes a ledger row and it is also the only thing that sets
+     actualMin, so a task without one is exactly a task without a row. They
+     stay separate from the ledger rather than joining it because the accuracy
+     figures below are estimate-versus-actual, and a row with no actual in it
+     would score a free saving on every task he never timed. */
+  const untimed = tasks.filter((t) => t.done && t.actualMin === undefined && inView(t.space)
+    && t.doneAt && localDateKey(new Date(t.doneAt)) === day)
   const focusMin = focus.reduce((a, f) => a + f.minutes, 0)
 
   /* A habit he has since retired still kept the days he kept it. Deleting the
@@ -59,7 +72,7 @@ export function DayPage() {
   const numbers = stepLog.filter((e) => e.day === day)
   const faced = coachSessions.filter((c) => c.when === day && inView(c.space))
 
-  const anything = finished.length || keptHabits.length || slippedHabits.length || doneRoutines.length || focus.length || numbers.length || faced.length
+  const anything = finished.length || untimed.length || keptHabits.length || slippedHabits.length || doneRoutines.length || focus.length || numbers.length || faced.length
   const savedMin = finished.reduce((a, e) => a + (e.estimateMin - e.actualMin), 0)
   /* "2, 0h 10m against the estimates" was a count, a comma and a signed duration
      pretending to be a sentence. Say the direction in a word. */
@@ -86,11 +99,15 @@ export function DayPage() {
         </div>
       )}
 
-      {finished.length > 0 && (
+      {(finished.length > 0 || untimed.length > 0) && (
         <div className="panel day-panel">
           <div className="day-head">
             <span className="microcap">Finished</span>
-            <span className="day-fig mono">{finished.length} finished, {against}</span>
+            {/* The comparison belongs to the timed ones, so it is only said
+                when there are any, and the count is everything he finished. */}
+            <span className="day-fig mono">
+              {finished.length + untimed.length} finished{finished.length > 0 ? `, ${against}` : ''}
+            </span>
           </div>
           <div className="day-rows">
             {finished.map((e) => (
@@ -98,6 +115,13 @@ export function DayPage() {
                 <SpaceMark space={e.space} />
                 <span className="day-row-title">{e.title}</span>
                 <span className="day-row-fig mono">{fmtDuration(e.actualMin)} of {fmtDuration(e.estimateMin)}</span>
+              </div>
+            ))}
+            {untimed.map((t) => (
+              <div className="day-row" key={t.id}>
+                <SpaceMark space={t.space} />
+                <span className="day-row-title">{t.title}</span>
+                <span className="day-row-fig mono day-row-untimed">no time logged</span>
               </div>
             ))}
           </div>

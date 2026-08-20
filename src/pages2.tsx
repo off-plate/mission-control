@@ -295,6 +295,17 @@ export function ReviewPage() {
   const worked = rows.reduce((a, e) => a + e.actualMin, 0)
   const onTime = rows.filter((e) => Math.abs(e.estimateMin - e.actualMin) <= e.estimateMin * 0.25).length
   const accuracy = rows.length ? Math.round((onTime / rows.length) * 100) : 0
+  /* Finished and TIMED are two different questions, and this page was
+     answering the second while labelling it the first. A ledger row is only
+     written when he gives a task a time, so a week of work ticked through the
+     "skip" button counted zero here while Today counted every one of them.
+     The times and the accuracy above stay on the ledger, where an actual is
+     required for the arithmetic to mean anything; the COUNT reads what he
+     finished. No double count: logActual is the only writer of a ledger row
+     and the only setter of actualMin, so a task without one has no row. */
+  const untimedDone = tasks.filter((t) => t.done && t.actualMin === undefined && inView(t.space)
+    && t.doneAt && inRange(localDateKey(new Date(t.doneAt)), range)).length
+  const finishedCount = rows.length + untimedDone
 
   /* What he actually did, counted. The page held the times and the shapes but
      never the plain totals, which are the first thing you want when you sit
@@ -458,9 +469,9 @@ export function ReviewPage() {
       <div className="grid-4">
         <div className="panel">
           <span className="microcap">Finished</span>
-          <div className="kpi">{rows.length}<span className="unit">{rows.length === 1 ? 'task' : 'tasks'}</span></div>
+          <div className="kpi">{finishedCount}<span className="unit">{finishedCount === 1 ? 'task' : 'tasks'}</span></div>
           <div className="kpi-sub">{fmtDuration(worked)} of it, start to finish</div>
-          <Delta now={rows.length} before={priorRows.length} />
+          <Delta now={finishedCount} before={priorRows.length} />
         </div>
         <div className="panel">
           <span className="microcap">Habits kept</span>

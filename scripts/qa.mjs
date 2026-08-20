@@ -1173,6 +1173,60 @@ await step('one fact, one number: Today and Habits agree on what today asked', a
   }
 })
 
+await step('a task finished without a time is finished on every page that counts', async () => {
+  /* Ticking a task opens the "how long?" strip, and pressing skip finishes it
+     without a time. That path wrote no ledger row, so Today counted it (it
+     reads doneAt) while Reflect and the day record counted the ledger and saw
+     nothing. A day of work ticked and moved on from opened with "Nothing was
+     logged on this day", which is how a week comes to look erased.
+
+     Both paths are driven here, so the test proves they AGREE rather than that
+     one of them works. */
+  const doIt = async (title, skip) => {
+    await page.goto(`${URL}#/plan`); await page.waitForTimeout(700)
+    await page.getByRole('textbox', { name: 'New task' }).fill(title)
+    await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(500)
+    const row = page.locator('.todo-row', { hasText: title }).first()
+    await row.getByRole('button', { name: /Options/ }).click()
+    await page.getByRole('menuitem', { name: 'Move to today' }).click(); await page.waitForTimeout(600)
+    await page.locator('.today-task', { hasText: title }).first().locator('.checkbox').click()
+    await page.waitForTimeout(400)
+    if (skip) await page.locator('.actual-skip').first().click()
+    else await page.locator('.actual-chip').first().click()
+    await page.waitForTimeout(700)
+  }
+
+  for (const skip of [true, false]) {
+    await fresh('plan')
+    const title = skip ? 'Gate skip finish' : 'Gate timed finish'
+    await doIt(title, skip)
+
+    const state = await page.evaluate(([K, t]) => {
+      const st = JSON.parse(localStorage.getItem(K))
+      const task = (st.tasks ?? []).find((x) => x.title === t)
+      return { done: task?.done, doneAt: typeof task?.doneAt, actualMin: task?.actualMin ?? null }
+    }, [KEY, title])
+    if (state.done !== true || state.doneAt !== 'string') throw new Error(`${title}: not recorded as finished (${JSON.stringify(state)})`)
+
+    await page.goto(`${URL}#/today`); await page.waitForTimeout(900)
+    const todayFinished = (await page.locator('.daynum').nth(2).innerText()).trim().split(/\s+/)[0]
+    if (todayFinished !== '1') throw new Error(`${title}: Today says "${todayFinished}" things finished, expected 1`)
+
+    await page.goto(`${URL}#/review`); await page.waitForTimeout(1100)
+    const reflectFinished = (await page.locator('.panel', { hasText: 'Finished' }).first().locator('.kpi').first().innerText()).trim().replace(/\D+$/, '')
+    if (reflectFinished !== '1') throw new Error(`${title}: Reflect says "${reflectFinished}" finished, expected 1`)
+
+    const dayKey = await page.evaluate(() => {
+      const d = new Date()
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    })
+    await page.goto(`${URL}#/day/${dayKey}`); await page.waitForTimeout(900)
+    const dayText = await page.evaluate(() => document.body.innerText)
+    if (!dayText.includes(title)) throw new Error(`${title}: the day record does not name it`)
+    if (/Nothing was logged on this day/.test(dayText)) throw new Error(`${title}: the day record says nothing was logged`)
+  }
+})
+
 await step('habits: a quitting row keeps its slip button off the day dots', async () => {
   /* The foot column is a fixed width, so a long "since 12 Apr, 114 best run"
      used to push the button out of its own column and onto Sunday's dot, at a

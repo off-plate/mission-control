@@ -153,11 +153,11 @@ function PhonePages({ tabs, page, setPage }: {
 }
 
 export default function App() {
-  const { space, view, setView, page, setPage, tasks, routines, openDaily } = useStore()
+  const { space, view, setView, page, setPage, tasks, routines, goals, openDaily } = useStore()
   // The dot follows the alerts: money and admin count from any profile.
   const exceptions = space === 'personal'
-    ? exceptionsFor(space, { tasks, routines })
-    : [...globalExceptions({ tasks, routines }), ...exceptionsFor(space, { tasks, routines })]
+    ? exceptionsFor(space, { tasks, routines, goals })
+    : [...globalExceptions({ tasks, routines }), ...exceptionsFor(space, { tasks, routines, goals })]
 
   /* Every space now has every tab: Money left the menu for Achievements, which
      is reached from the header and is his regardless of which space he happens

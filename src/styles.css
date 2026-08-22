@@ -4147,3 +4147,25 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   .phone-pages .kebab-menu { right: 0; left: auto; min-width: 168px; }
   .phone-pages .kebab-menu .is-on { color: var(--accent-text); font-weight: 700; }
 }
+
+/* ---------- Precedent ----------
+   His own evening, quoted back to him. It is deliberately quiet furniture: a
+   hairline and a rule, no card, no shadow, no colour of its own. The only
+   emphasis in it is his own sentence, because that is the part doing the work
+   and everything around it is scaffolding. */
+.precedent {
+  margin: var(--s4) 0;
+  padding: var(--s4) 0 var(--s4) var(--s4);
+  border-left: 2px solid var(--accent);
+}
+.pr-head { font-size: var(--text-base); color: var(--ink); line-height: 1.5; max-width: 62ch; }
+.pr-quote {
+  margin: var(--s3) 0 0; display: flex; flex-direction: column; gap: 2px;
+  max-width: 62ch;
+}
+.pr-quote-text {
+  font-family: var(--font-display); font-size: var(--text-lg); line-height: 1.4; color: var(--ink);
+}
+.pr-quote-day { font-size: var(--text-xs); color: var(--faint); }
+.pr-turn { margin-top: var(--s3); font-size: var(--text-sm); color: var(--muted); max-width: 62ch; }
+.pr-do { display: flex; gap: var(--s2); margin-top: var(--s4); flex-wrap: wrap; }

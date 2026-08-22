@@ -1030,6 +1030,20 @@ function loadPersisted(): PersistedState | null {
        each morning. Anyone who ran the first pass has habits without those, so
        the same function runs again and fills only what is missing. Habits only,
        because the ticks were already taken across. */
+    /* Goals predate having an age at all. Stamped once, at the day this build
+       first reads them, rather than back-dated: the app does not know when they
+       were set and guessing would put a number on screen that is not true.
+       The clock starts now, and says so. */
+    if (!p.removedSeeds.includes('fix:goal-age')) {
+      p.removedSeeds.push('fix:goal-age')
+      const today = localDateKey()
+      p.goals = (p.goals ?? []).map((g) => ({
+        ...g,
+        createdAt: g.createdAt ?? today,
+        touchedAt: g.touchedAt ?? today,
+      }))
+    }
+
     if (!p.removedSeeds.includes('fix:habit-runners')) {
       p.removedSeeds.push('fix:habit-runners')
       p.habits = foldersFromRoutines(p.routines ?? [], p.habits ?? [], []).habits
@@ -2107,6 +2121,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ...g,
       id: newId('g'),
       periodKey: g.periodKey ?? goalPeriodKey((g.timeframe ?? 'quarter') as GoalTf),
+      /* Age, so the avoidance rule can reach a goal the way it reaches a task. */
+      createdAt: todayKey(),
+      touchedAt: todayKey(),
     }]),
     /** Set the same goal again for the period we are in now. */
     repeatGoal: (id) => {
@@ -2119,6 +2136,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         periodKey: goalPeriodKey(tf),
         current: 0,
         closed: undefined,
+        createdAt: todayKey(),
+        touchedAt: todayKey(),
         milestones: g.milestones?.map((m) => ({ ...m, done: false })),
       }])
       setPageState('goals')
@@ -2129,14 +2148,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     updateGoal: (id, patch) =>
       setGoals((prev) => prev.map((g) => {
         if (g.id !== id) return g
-        const next = { ...g, ...patch }
+        const next = { ...g, ...patch, touchedAt: todayKey() }
         if ('habitId' in patch && !patch.habitId && g.habitId) next.current = g.current
         return next
       })),
     bumpGoal: (id, delta) =>
       setGoals((prev) =>
         prev.map((g) =>
-          g.id === id ? { ...g, current: Math.max(0, Math.min(g.target, g.current + delta)) } : g,
+          g.id === id ? { ...g, current: Math.max(0, Math.min(g.target, g.current + delta)), touchedAt: todayKey() } : g,
         ),
       ),
     /* Ticking a milestone advances the goal itself when the goal is measured in
@@ -2149,7 +2168,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           const milestones = g.milestones.map((m) => (m.id === milestoneId ? { ...m, done: !m.done } : m))
           const doneCount = milestones.filter((m) => m.done).length
           const current = g.target === milestones.length ? doneCount : g.current
-          return { ...g, milestones, current }
+          return { ...g, milestones, current, touchedAt: todayKey() }
         }),
       ),
     deleteGoal: (id) => {

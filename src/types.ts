@@ -919,6 +919,22 @@ export interface Goal {
   /** Set when its period ended, with the number it finished on, so a past goal
    *  keeps its result instead of quietly continuing to count. */
   closed?: { on: string; final: number }
+  /* ---- age ----
+     The app's one real accountability mechanism is AGE: a task open seven days
+     is named out loud, oldest first, with two honest answers under it. That
+     mechanism was wired to tasks and to nothing else, so a GOAL could sit
+     untouched for four months and nothing here would ever mention it. These
+     two fields are what let the same rule reach it.
+
+     Deliberately not a deadline. Nothing counts down, nothing goes red on a
+     date, and the question it eventually asks is the same one a stale task
+     gets: is this still yours, or is it time to let it go. */
+  /** The day it was set. */
+  createdAt?: string
+  /** The last day anything about it moved: edited, a milestone ticked, its
+   *  number changed by hand. Untouched is the fact worth knowing; a goal that
+   *  fills itself from a habit is being kept, not neglected. */
+  touchedAt?: string
 }
 
 /** Weeks of habit history a goal's timeframe covers. */

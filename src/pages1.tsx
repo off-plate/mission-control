@@ -9,6 +9,7 @@ import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
 import { Linkify } from './widgets'
 import { HabitRun, habitHasRun } from './habitrun'
+import { PrecedentCard } from './precedentcard'
 import type { PageId } from './types'
 import { habitsDueToday, GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, dueOn, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, habitGate, habitLocked, isCounted, COUNT_PERIODS, requiredSteps, routineComplete, routineProgress, routineRunsOn, slotMinutes, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
 import { DayLine, DayNumbers, WeekStrip } from './dayface'
@@ -70,7 +71,7 @@ const shortDay = (key: string): string => {
 /* ---------------- TODAY ---------------- */
 
 export function TodayPage() {
-  const { space, tasks, routines, habits, plan, editing, setEditing, setPage, savedMin, todayIndex, review, addTask, deleteTask, moveTaskList, setFocusTaskId, sources, inView } = useStore()
+  const { space, tasks, routines, habits, goals, plan, editing, setEditing, setPage, savedMin, todayIndex, review, addTask, deleteTask, moveTaskList, setFocusTaskId, sources, inView } = useStore()
   const pomo = usePomodoro()
   const nextEvent = useNextEvent(space)
   /* The money alert needs Compass, which arrives async. Until it does, `money`
@@ -78,7 +79,7 @@ export function TodayPage() {
      is honest, an invented figure is not. */
   const compass = useCompass()
   const money = compass.state.status === 'ok' ? compass.state.money : null
-  const exceptions = exceptionsFor(space, { tasks, routines, money })
+  const exceptions = exceptionsFor(space, { tasks, routines, money, goals })
   /* Money and official post follow you into Work and Off-Plate. Sitting in the
      Work profile all day used to mean the app told you nothing was wrong. */
   const shownExceptions = space === 'personal'
@@ -176,6 +177,13 @@ export function TodayPage() {
           Nothing is on fire.
         </div>
       )}
+
+      {/* What usually happens from here, when there is a strong enough answer
+          and his own words to back it. Silent almost every evening: see the
+          four laws at the top of precedent.ts. It sits under the alert row
+          because this is where the day gets judged, and above momentum
+          because it is about tonight rather than about the record. */}
+      <PrecedentCard />
 
       {/* The other side of the ledger. Only real events, never a score. */}
       {wins.length > 0 && (

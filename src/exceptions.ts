@@ -87,9 +87,21 @@ export function globalExceptions(
     .map((x) => ({ ...x, fromPersonal: true }))
 }
 
+/** A goal untouched this long has stopped being a goal and become a wish.
+ *  Longer than a task's seven days on purpose: a quarter goal is allowed a
+ *  quiet fortnight, and naming it sooner would be nagging rather than noticing. */
+const GOAL_COLD_DAYS = 21
+
 export function exceptionsFor(
   space: SpaceId,
-  ctx: { tasks: Task[]; routines: Routine[]; money?: { due: { day: number; amount: number; sent: boolean }[] } | null },
+  ctx: {
+    tasks: Task[]
+    routines: Routine[]
+    money?: { due: { day: number; amount: number; sent: boolean }[] } | null
+    /** Goals, so the ageing rule reaches them too. Optional, so every existing
+     *  caller keeps working and simply gets no goal alerts. */
+    goals?: { id: string; name: string; space: SpaceId; touchedAt?: string; habitId?: string; closed?: unknown }[]
+  },
 ): ExceptionItem[] {
   const out: ExceptionItem[] = []
 
@@ -176,6 +188,29 @@ export function exceptionsFor(
         ? `One thing you promised is still unfinished: “${left[0].title}”.`
         : `${left.length} things you promised are still unfinished.`,
       when: oldest.label,
+      action: 'open-goals',
+      actionLabel: 'Decide now',
+    })
+  }
+
+  /* The same rule, pointed at goals. This is the whole reason goals were given
+     an age: the app's one honest accountability mechanism was wired to tasks
+     and nothing else, so a goal could sit untouched for a season and no surface
+     here would ever mention it.
+
+     A goal fed by a habit is excluded. It fills itself every time he keeps the
+     habit, so "untouched" would be measuring the wrong hand entirely. Closed
+     goals are done and are not owed anything. */
+  const cold = (ctx.goals ?? [])
+    .filter((g) => g.space === space && !g.closed && !g.habitId && daysOld(g.touchedAt) >= GOAL_COLD_DAYS)
+    .sort((a2, b2) => daysOld(b2.touchedAt) - daysOld(a2.touchedAt))
+    .slice(0, 1)
+  for (const g of cold) {
+    const d = daysOld(g.touchedAt)
+    out.push({
+      id: `x-goal-cold-${g.id}`,
+      text: `You have not touched "${g.name}" in ${d} days.`,
+      when: `${d} days`,
       action: 'open-goals',
       actionLabel: 'Decide now',
     })

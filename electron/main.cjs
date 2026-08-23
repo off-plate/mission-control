@@ -52,6 +52,13 @@ app.setName('Mission Control')
 if (!app.isPackaged) {
   app.setPath('userData', path.join(app.getPath('appData'), 'Mission Control Dev'))
 }
+/* --qa-profile: the packaged binary under test. Same reason as the dev profile
+   above, but for verifying a built dmg while the real app is open: without it
+   the single-instance lock makes the test launch silently focus HIS window and
+   verify nothing. Normal double-click launches never pass flags. */
+if (app.commandLine.hasSwitch('qa-profile')) {
+  app.setPath('userData', path.join(app.getPath('appData'), 'Mission Control QA'))
+}
 
 const singleInstance = app.requestSingleInstanceLock()
 if (!singleInstance) { app.quit(); return }

@@ -8,6 +8,7 @@ import { PomodoroProvider } from './pomodoro'
 import { MundiOpusProvider } from './mundiplayer'
 import { SUPABASE_ENABLED, clearAuthFragment, currentAccount, loadRemoteState, onAccountChange } from './supabase'
 import { mergeStates } from './sync-merge'
+import { outbox } from './sync'
 import { LOCAL_ONLY_KEY, SignIn } from './signin'
 
 // One root for the container's lifetime: choosing "this device only" swaps the
@@ -64,6 +65,11 @@ async function accountAfterLink(): Promise<Awaited<ReturnType<typeof currentAcco
    slate came back full. A row from a different schema is ignored, the app seeds
    fresh, and the first change overwrites the row. */
 async function boot() {
+  /* Arm the reconnect and wake triggers before anything can go wrong, so a
+     launch that starts offline still retries the moment the network returns.
+     The store's own save effect fires on mount, which is what re-sends anything
+     left unsent when he quit. */
+  outbox.start()
   if (SUPABASE_ENABLED) {
     try {
       const me = await accountAfterLink()

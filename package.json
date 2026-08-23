@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "desktop": "npm run build && env -u ELECTRON_RUN_AS_NODE electron .",
+    "dist:mac": "npm run build && env -u ELECTRON_RUN_AS_NODE electron-builder --mac --arm64",
+    "desktop:smoke": "env -u ELECTRON_RUN_AS_NODE node tools/desktop-smoke.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.8",
@@ -18,8 +21,60 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3",
     "playwright": "^1.61.1",
     "typescript": "~5.6.2",
     "vite": "^6.0.5"
-  }
+  },
+  "main": "electron/main.cjs",
+  "description": "Personal life command center.",
+  "build": {
+    "appId": "com.offplate.missioncontrol",
+    "productName": "Mission Control",
+    "copyright": "Michael Florian",
+    "directories": {
+      "output": "release",
+      "buildResources": "build-assets"
+    },
+    "files": [
+      "docs/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "build-assets/icon.icns",
+      "darkModeSupport": false,
+      "hardenedRuntime": false,
+      "identity": null
+    },
+    "dmg": {
+      "title": "Mission Control",
+      "contents": [
+        {
+          "x": 140,
+          "y": 200,
+          "type": "file"
+        },
+        {
+          "x": 400,
+          "y": 200,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "afterPack": "build-assets/after-pack.cjs"
+  },
+  "author": "Michael Florian"
 }

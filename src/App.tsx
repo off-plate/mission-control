@@ -1,5 +1,6 @@
 import { Component, useEffect, useRef, useState, type ReactNode } from 'react'
 import { exceptionsFor, globalExceptions } from './exceptions'
+import { useDockBadge } from './desktop'
 import { SPACE_LABELS } from './mock'
 import { GoalsPage, HabitsPage, PlanPage, TodayPage } from './pages1'
 import { SettingsPage } from './pages2'
@@ -158,6 +159,9 @@ export default function App() {
   const exceptions = space === 'personal'
     ? exceptionsFor(space, { tasks, routines, goals })
     : [...globalExceptions({ tasks, routines }), ...exceptionsFor(space, { tasks, routines, goals })]
+
+  /* macOS dock badge, same list as the alerts above. No-op on the website. */
+  useDockBadge(exceptions.length)
 
   /* Every space now has every tab: Money left the menu for Achievements, which
      is reached from the header and is his regardless of which space he happens

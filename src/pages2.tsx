@@ -9,6 +9,8 @@ import { WALL } from './board'
 import { getAiKey, hasAiKey, setAiKey } from './ai'
 import { paymentTaskTitle } from './exceptions'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange, sendSignInCode, signInWithCode, signOutAccount, type Account } from './supabase'
+import { describe, useSyncStatus } from './sync'
+import { getOpenAtLogin, isDesktop, setOpenAtLogin } from './desktop'
 import { goalCurrent, isTimeFed, ON_TRACK_PCT, STEP_UNITS, stepSeries, type StepEntry, type TaskCategory } from './types'
 
 /* ---------------- MONEY ---------------- */
@@ -789,6 +791,7 @@ export function ReviewPage() {
    cannot tell him apart from anyone who opened the site. */
 function AccountField() {
   const [me, setMe] = useState<Account | null>(null)
+  const sync = useSyncStatus()
   const [ready, setReady] = useState(false)
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
@@ -829,12 +832,12 @@ function AccountField() {
   return (
     <div className="ai-key">
       <div className="source-row">
-        <span className={`status-dot ${me ? 'connected' : 'off'}`} />
+        <span className={`status-dot ${!me ? 'off' : (sync.phase === 'offline' || sync.phase === 'error' || sync.phase === 'waiting') ? 'warn' : 'connected'}`} />
         <span className="info">
           <span className="name">Sync across your devices</span>
           <span className="detail" style={{ display: 'block' }}>
             {!ready ? 'Checking...'
-              : me ? `Signed in as ${me.email}. Every change is saved and reaches your other devices.`
+              : me ? `${me.email}. ${describe(sync)}.`
               : 'Signed out. This browser only, and nothing is backed up.'}
           </span>
         </span>
@@ -881,6 +884,29 @@ function AccountField() {
           </p>
         </>
       )}
+      <OpenAtLogin />
+    </div>
+  )
+}
+
+/* macOS only. Renders nothing in a browser tab, where there is no such thing as
+   launching at login. */
+function OpenAtLogin() {
+  const [on, setOn] = useState<boolean | null>(null)
+  useEffect(() => { void getOpenAtLogin().then(setOn) }, [])
+  if (!isDesktop() || on === null) return null
+  return (
+    <div className="source-row" style={{ marginTop: 'var(--s2)' }}>
+      <span className={`status-dot ${on ? 'connected' : 'off'}`} />
+      <span className="info">
+        <span className="name">Open Mission Control when the Mac starts</span>
+      </span>
+      <button
+        className="btn btn-quiet"
+        onClick={() => { void setOpenAtLogin(!on).then((v) => { if (v !== null) setOn(v) }) }}
+      >
+        {on ? 'Turn off' : 'Turn on'}
+      </button>
     </div>
   )
 }

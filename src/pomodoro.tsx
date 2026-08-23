@@ -3,6 +3,7 @@ import { useStore } from './store'
 import { fmtDuration, taskMinutes } from './util'
 import { thumbUrl, useMundiOpus } from './mundiplayer'
 import { MUNDI_OPUS_QUEUE } from './mundiopus'
+import { isDesktop, notify as nativeNotify } from './desktop'
 
 /* A global Pomodoro that lives above the whole app: a bottom-right badge you
    see on every tab, a corner ambient glow that shows the state at a glance,
@@ -141,7 +142,11 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     ? Math.max(0, Math.round((endsAt - Date.now()) / 1000))
     : pausedLeft ?? 0
 
+  /* On the desktop this goes through macOS, which means the end of a block still
+     announces itself when the window is closed or behind something. In a browser
+     tab it stays the web notification, which only fires while the tab lives. */
   const notify = (title: string, body: string) => {
+    if (isDesktop()) { void nativeNotify(title, body); return }
     if ('Notification' in window && Notification.permission === 'granted') {
       try { new Notification(title, { body, tag: 'mc-pomodoro' }) } catch { /* ignore */ }
     }
@@ -223,7 +228,9 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   /* Started from a task, the block runs for that task's own estimate and carries
      its name, so the badge says what you are actually doing. */
   const startFocus = (minutes?: number, label?: string) => {
-    if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission()
+    /* The desktop app needs no permission prompt: macOS asks once, itself, the
+       first time it actually posts one. */
+    if (!isDesktop() && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission()
     const mins = Math.max(1, Math.round(minutes ?? focusMin))
     setBlockMin(mins)
     setStartedAt(Date.now())

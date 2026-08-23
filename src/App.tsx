@@ -10,6 +10,7 @@ import { DailyReview } from './daily'
 import { BrandPage } from './brand'
 import { DayPage } from './day'
 import { BoardPage } from './board'
+import { AppsPage } from './apps'
 import { FocusPage } from './focus'
 import { ZonePage, useZoneDepth } from './zone'
 import { useStore } from './store'
@@ -64,6 +65,7 @@ const NAV: { id: PageId; label: string }[] = [
      nothing: see the redirect where the pages are chosen. */
   { id: 'goals', label: 'Goals' },
   { id: 'board', label: 'Why’s' },
+  { id: 'apps', label: 'Apps' },
 ]
 
 function PageNav({
@@ -379,6 +381,7 @@ export default function App() {
         {(page === 'achievements' || page === 'money' || page === 'review' || page === 'stats') && <AchievementsPage />}
         {page === 'focus' && <FocusPage />}
         {page === 'board' && <BoardPage />}
+        {page === 'apps' && <AppsPage />}
         {page === 'notes' && <NotesPage />}
         {page === 'settings' && <SettingsPage />}
         {page === 'brand' && <BrandPage />}

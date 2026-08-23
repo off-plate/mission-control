@@ -45,6 +45,14 @@ protocol.registerSchemesAsPrivileged([{
    running process agree with it, including in `npm run desktop`. */
 app.setName('Mission Control')
 
+/* Development and the QA suites run against their own profile. The single
+   -instance lock lives in userData, so without this a dev run cannot start
+   while the installed app is open, and worse, a test run would read and write
+   the INSTALLED app's live data. His day does not belong to a test. */
+if (!app.isPackaged) {
+  app.setPath('userData', path.join(app.getPath('appData'), 'Mission Control Dev'))
+}
+
 const singleInstance = app.requestSingleInstanceLock()
 if (!singleInstance) { app.quit(); return }
 
@@ -167,10 +175,13 @@ function buildMenu() {
       label: 'Go',
       submenu: [
         { label: 'Today', accelerator: 'Cmd+1', click: () => go('today') },
-        { label: 'Tasks', accelerator: 'Cmd+2', click: () => go('tasks') },
+        /* 'plan' is the page's real route; 'tasks' never existed and fell back
+           to Today, which made Cmd+2 a second Cmd+1. */
+        { label: 'Plan', accelerator: 'Cmd+2', click: () => go('plan') },
         { label: 'Habits', accelerator: 'Cmd+3', click: () => go('habits') },
         { label: 'Notes', accelerator: 'Cmd+4', click: () => go('notes') },
         { label: 'The Zone', accelerator: 'Cmd+5', click: () => go('zone') },
+        { label: 'Apps', accelerator: 'Cmd+6', click: () => go('apps') },
       ],
     },
     {

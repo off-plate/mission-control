@@ -163,6 +163,23 @@ export default function App() {
   /* macOS dock badge, same list as the alerts above. No-op on the website. */
   useDockBadge(exceptions.length)
 
+  /* File -> New Task (Cmd+N) in the macOS menu. There is no dialog to open:
+     adding a task IS the input at the top of Plan's list, so the shortcut goes
+     there and puts the cursor in it. Wired on the website too, where it simply
+     never fires because nothing dispatches the event outside the app shell. */
+  useEffect(() => {
+    const onNewTask = () => {
+      location.hash = '/plan'
+      /* After the page mounts. Two frames, not a timeout: the second frame is
+         the first one in which the new page's DOM exists. */
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        document.querySelector<HTMLInputElement>('input[aria-label="New task"]')?.focus()
+      }))
+    }
+    window.addEventListener('mc:new-task', onNewTask)
+    return () => window.removeEventListener('mc:new-task', onNewTask)
+  }, [])
+
   /* Every space now has every tab: Money left the menu for Achievements, which
      is reached from the header and is his regardless of which space he happens
      to be standing in. */

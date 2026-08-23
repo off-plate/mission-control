@@ -30,7 +30,7 @@ const setSize = (w, h) => app.evaluate(({ BrowserWindow }, [W, H]) => {
 }, [w, h])
 
 /* Every reachable page, including the redirect aliases. */
-const PAGES = ['today', 'plan', 'habits', 'goals', 'board', 'notes', 'settings', 'achievements', 'stats', 'zone', 'review', 'brand', 'routines', 'braindump']
+const PAGES = ['today', 'plan', 'habits', 'goals', 'board', 'apps', 'notes', 'settings', 'achievements', 'stats', 'zone', 'review', 'brand', 'routines', 'braindump']
 
 await setSize(1440, 940)
 for (const p of PAGES) {
@@ -41,12 +41,23 @@ for (const p of PAGES) {
 }
 ok(consoleErrors.length === 0, `no console errors across all pages${consoleErrors.length ? ` (first: ${consoleErrors[0].slice(0, 120)})` : ''}`)
 
+/* Apps inside Electron: the frame must actually load foreign content, which is
+   the one thing the web gate cannot prove about THIS shell. */
+await page.evaluate(() => { location.hash = '/apps' })
+await page.waitForTimeout(4000)
+const frame = page.frames().find((f) => f.url().startsWith('https://watchless.netlify.app'))
+ok(!!frame, 'the Watchless frame loads real content inside the app shell')
+if (frame) {
+  const text = await frame.evaluate(() => (document.body?.innerText ?? '').slice(0, 200)).catch(() => '')
+  ok(/watchless/i.test(text) || text.length > 20, `the framed app rendered something (${text.slice(0, 40).replace(/\s+/g, ' ')}...)`)
+}
+
 /* ---- responsiveness: the sizes this window can actually be ---- */
 const SIZES = [[880, 600, 'min'], [1280, 800, 'laptop'], [2560, 1000, 'ultrawide']]
 for (const [w, h, name] of SIZES) {
   await setSize(w, h)
   await page.waitForTimeout(600)
-  for (const p of ['today', 'habits', 'notes']) {
+  for (const p of ['today', 'habits', 'notes', 'apps']) {
     await page.evaluate((id) => { location.hash = `/${id}` }, p)
     await page.waitForTimeout(600)
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)

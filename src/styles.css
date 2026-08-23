@@ -4189,3 +4189,18 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .is-desktop .topbar [role="tab"] {
   -webkit-app-region: no-drag;
 }
+
+/* ---- Apps: his other tools, framed ---- */
+.apps-bar { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; margin-bottom: var(--s3); }
+.apps-bar h1 { margin-right: var(--s3); }
+.apps-out { margin-left: auto; }
+.apps-frame {
+  width: 100%;
+  /* The frame is the page: everything above it, then the app gets the rest. */
+  height: calc(100vh - 232px);
+  min-height: 480px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-md);
+  background: #fff;
+  display: block;
+}

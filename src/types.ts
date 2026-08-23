@@ -32,6 +32,8 @@ export type PageId =
    *  somewhere real: the route walks it to Notes. */
   | 'braindump'
   | 'board'
+  /** His other tools, embedded live. */
+  | 'apps'
   /** Focus blocks: the history, and the ones he wants to fix. */
   | 'focus'
   /** One day of the record, read-only. Carries a date in the route. */

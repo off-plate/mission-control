@@ -143,13 +143,15 @@ await step('focus: timer start writes state', async () => {
   if (p.phase !== 'focus') throw new Error(`phase ${p.phase}`)
   await page.locator('.focus-live').getByRole('button', { name: 'Stop' }).click()
 })
-await step('the menu is five tabs, and what left it is reachable from the header', async () => {
+await step('the menu is six tabs, and what left it is reachable from the header', async () => {
   /* Five since Routines became a folder inside Habits (his instruction,
-     2026-08-11). Its address still has to resolve, which is asserted below
-     with the other retired ones. */
+     2026-08-11); six since Apps joined after Why's (his instruction,
+     2026-08-23). The retired addresses still have to resolve, which is
+     asserted below with the other retired ones. */
   await fresh('today')
   const tabs = await page.locator('.nav-tab').allInnerTexts()
-  if (tabs.length !== 5) throw new Error(`${tabs.length} tabs: ${tabs.join(', ')}`)
+  if (tabs.length !== 6) throw new Error(`${tabs.length} tabs: ${tabs.join(', ')}`)
+  if (!tabs.some((t) => /apps/i.test(t))) throw new Error('Apps is not a tab')
   if (tabs.some((t) => /routines/i.test(t))) throw new Error('Routines is still a tab')
   for (const gone of ['Calendar', 'Avoidance', 'Assistant', 'Notes', 'Focus', 'Money', 'Reflect']) {
     if (tabs.includes(gone)) throw new Error(`${gone} is still a tab`)
@@ -2022,6 +2024,34 @@ await step('notes: the note menu opens where it can be reached', async () => {
   if (bar.stray) throw new Error('there is still a toolbar between the title and the body')
   if (bar.round.some((r) => !r)) throw new Error('a menu button is not a circle')
   if (Math.abs(bar.offset) > 1) throw new Error(`the date sits ${bar.offset}px off the title's margin`)
+})
+
+/* Apps: the embedded tools. The frame's CONTENT is other sites and is not this
+   gate's to judge; what is asserted is Mission Control's half of the contract:
+   the tab exists, Watchless is the frame's target and the default, switching
+   apps retargets the frame, and the browser escape hatch points at the same
+   place the frame does. */
+await step('apps: Watchless framed by default, switching retargets, browser link agrees', async () => {
+  await fresh('apps')
+  const first = await page.evaluate(() => ({
+    tab: [...document.querySelectorAll('.nav a, .nav button, nav a, nav button')].some((el) => el.textContent.trim() === 'Apps'),
+    src: document.querySelector('.apps-frame')?.getAttribute('src') ?? '',
+    out: document.querySelector('.apps-out')?.getAttribute('href') ?? '',
+    on: document.querySelector('.apps-bar .is-on')?.textContent.trim() ?? '',
+  }))
+  if (!first.src.startsWith('https://watchless.netlify.app')) throw new Error(`default frame is ${first.src || 'missing'}`)
+  if (first.out !== first.src) throw new Error(`Open in browser goes to ${first.out}, the frame to ${first.src}`)
+  if (first.on !== 'Watchless') throw new Error(`active pill reads ${first.on}`)
+  await page.evaluate(() => { [...document.querySelectorAll('.apps-bar button')].find((b) => b.textContent.trim() === 'Compass')?.click() })
+  await page.waitForTimeout(400)
+  const second = await page.evaluate(() => ({
+    src: document.querySelector('.apps-frame')?.getAttribute('src') ?? '',
+    out: document.querySelector('.apps-out')?.getAttribute('href') ?? '',
+  }))
+  if (!second.src.startsWith('https://compass-money.netlify.app')) throw new Error(`after switching, frame is ${second.src}`)
+  if (second.out !== second.src) throw new Error('the browser link did not follow the switch')
+  const kept = await page.evaluate(() => localStorage.getItem('mc-apps-last'))
+  if (kept !== 'compass') throw new Error(`choice not remembered (got ${kept})`)
 })
 
 await b.close(); server.close()

@@ -24,7 +24,7 @@ nothing" from a terminal, that variable is why.
   marker is persisted, so quitting offline loses nothing. Settings shows the
   truthful state (amber dot = work held on this device).
 - Native notifications (Focus timer) that fire even with the window closed.
-- Dock badge = the same count as Today's alerts. Cmd+1..5 page shortcuts,
+- Dock badge = the same count as Today's alerts. Cmd+1..6 page shortcuts (6 is Apps),
   Cmd+, for Settings. Window position remembered. Open-at-login toggle in
   Settings (visible only in the app).
 - The top bar clears the traffic lights and drags the window (`.is-desktop`).

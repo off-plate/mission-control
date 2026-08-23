@@ -1,5 +1,13 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { SUPABASE_ENABLED, deleteRemoteState, loadRemoteState, saveRemoteState } from './supabase'
+import { SUPABASE_ENABLED, deleteRemoteState, loadRemoteState } from './supabase'
+import { outbox } from './sync'
+
+/* Two blobs are the same work if they differ only in when they were saved.
+   Used both to stop two tabs answering each other's saves forever, and to decide
+   whether this device is holding anything the server has not got. */
+function stripDates(j: string): string {
+  try { const o = JSON.parse(j) as Record<string, unknown>; delete o.savedAt; return JSON.stringify(o) } catch { return j }
+}
 import { roll } from './roll'
 import { bodyHash, deviceId, HIST, mergeStates, rowKey, type Tomb } from './sync-merge'
 import { dayIndexOf, dayOfWeekKey, goalPeriodKey, goalPeriodRange, isoWeekKey, localDateKey, periodIsPast, periodKeyFor, slotForTime, type GoalTf } from './util'
@@ -1062,7 +1070,7 @@ function routeFromHash(): { page: PageId; day: string | null } {
   if (m) return { page: 'day', day: m[1] }
   // The board's old address still resolves: a bookmark lands on its successor.
   if (h === 'braindump') return { page: 'notes', day: null }
-  const pages: PageId[] = ['today', 'plan', 'habits', 'routines', 'goals', 'achievements', 'money', 'review', 'stats', 'settings', 'brand', 'notes', 'focus', 'board', 'zone']
+  const pages: PageId[] = ['today', 'plan', 'habits', 'routines', 'goals', 'achievements', 'money', 'review', 'stats', 'settings', 'brand', 'notes', 'focus', 'board', 'zone', 'apps']
   return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
 }
 
@@ -1292,10 +1300,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     } catch {
       /* localStorage full or unavailable; Supabase (if configured) is the source of truth */
     }
-    // Mirror to Supabase when configured, debounced so rapid edits collapse into one write.
+    /* Mirror to Supabase when configured, debounced so rapid edits collapse into
+       one write. The outbox owns the write from here: a failure is retried on a
+       backoff and on reconnect rather than dropped, and the intent to sync is
+       persisted so quitting while offline does not lose it. */
     if (SUPABASE_ENABLED) {
       window.clearTimeout(remoteSaveTimer.current)
-      remoteSaveTimer.current = window.setTimeout(() => { void saveRemoteState(json) }, 800)
+      remoteSaveTimer.current = window.setTimeout(() => { outbox.push(json) }, 800)
     }
   }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dailyDone, dailySkipped, graveyard])
 
@@ -1313,8 +1324,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (p.schema !== STORAGE_KEY) return
     /* Nothing new once the dates are set aside: stop, or two tabs would answer
        each other's saves forever. */
-    const strip = (j: string) => { try { const o = JSON.parse(j) as Record<string, unknown>; delete o.savedAt; return JSON.stringify(o) } catch { return j } }
-    if (mine && strip(merged) === strip(mine)) return
+    if (mine && stripDates(merged) === stripDates(mine)) return
     if (p.tasks) setTasks(p.tasks)
     if (p.habits) setHabits(p.habits)
     if (p.goals) setGoals(p.goals)
@@ -1365,7 +1375,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const pull = async () => {
       if (document.visibilityState !== 'visible') return
       const remote = await loadRemoteState()
-      if (!stop && remote) applyExternal(remote)
+      if (stop) return
+      if (remote) applyExternal(remote)
+      /* And the other direction. Without this, work done offline never leaves the
+         device: applyExternal finds local is already a superset of the stale
+         remote, changes no state, and so never fires the save effect. The device
+         stayed correct and the server stayed behind, silently, until he happened
+         to edit something else while connected. */
+      const mine = latestJson.current
+      if (!mine) return
+      const united = remote ? mergeStates(mine, remote) : mine
+      if (!remote || stripDates(united) !== stripDates(remote)) outbox.push(mine)
     }
     const onWake = () => { void pull() }
     document.addEventListener('visibilitychange', onWake)
@@ -1393,7 +1413,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (remoteSaveTimer.current !== undefined && latestJson.current) {
         window.clearTimeout(remoteSaveTimer.current)
         remoteSaveTimer.current = undefined
-        void saveRemoteState(latestJson.current)
+        outbox.push(latestJson.current)
       }
     }
     window.addEventListener('pagehide', flush)

@@ -4169,3 +4169,38 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .pr-quote-day { font-size: var(--text-xs); color: var(--faint); }
 .pr-turn { margin-top: var(--s3); font-size: var(--text-sm); color: var(--muted); max-width: 62ch; }
 .pr-do { display: flex; gap: var(--s2); margin-top: var(--s4); flex-wrap: wrap; }
+
+/* ---- macOS app only -------------------------------------------------------
+   The window has no title bar of its own: titleBarStyle 'hiddenInset' floats the
+   three window buttons over the top left of the page, on top of the wordmark. So
+   the top bar gains a strip of clearance, and becomes the window's drag handle,
+   which is what a Mac user expects from a chrome-less window. Nothing here loads
+   in a browser, where .is-desktop is never set. */
+.is-desktop .topbar {
+  padding-top: calc(var(--s3) + 26px);
+  -webkit-app-region: drag;
+}
+/* Anything you click has to opt out, or the drag region eats the click. */
+.is-desktop .topbar button,
+.is-desktop .topbar a,
+.is-desktop .topbar input,
+.is-desktop .topbar select,
+.is-desktop .topbar [role="button"],
+.is-desktop .topbar [role="tab"] {
+  -webkit-app-region: no-drag;
+}
+
+/* ---- Apps: his other tools, framed ---- */
+.apps-bar { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; margin-bottom: var(--s3); }
+.apps-bar h1 { margin-right: var(--s3); }
+.apps-out { margin-left: auto; }
+.apps-frame {
+  width: 100%;
+  /* The frame is the page: everything above it, then the app gets the rest. */
+  height: calc(100vh - 232px);
+  min-height: 480px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-md);
+  background: #fff;
+  display: block;
+}

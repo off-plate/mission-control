@@ -1,5 +1,6 @@
 import { Component, useEffect, useRef, useState, type ReactNode } from 'react'
 import { exceptionsFor, globalExceptions } from './exceptions'
+import { useDockBadge } from './desktop'
 import { SPACE_LABELS } from './mock'
 import { GoalsPage, HabitsPage, PlanPage, TodayPage } from './pages1'
 import { SettingsPage } from './pages2'
@@ -9,6 +10,7 @@ import { DailyReview } from './daily'
 import { BrandPage } from './brand'
 import { DayPage } from './day'
 import { BoardPage } from './board'
+import { AppsPage } from './apps'
 import { FocusPage } from './focus'
 import { ZonePage, useZoneDepth } from './zone'
 import { useStore } from './store'
@@ -63,6 +65,7 @@ const NAV: { id: PageId; label: string }[] = [
      nothing: see the redirect where the pages are chosen. */
   { id: 'goals', label: 'Goals' },
   { id: 'board', label: 'Why’s' },
+  { id: 'apps', label: 'Apps' },
 ]
 
 function PageNav({
@@ -158,6 +161,26 @@ export default function App() {
   const exceptions = space === 'personal'
     ? exceptionsFor(space, { tasks, routines, goals })
     : [...globalExceptions({ tasks, routines }), ...exceptionsFor(space, { tasks, routines, goals })]
+
+  /* macOS dock badge, same list as the alerts above. No-op on the website. */
+  useDockBadge(exceptions.length)
+
+  /* File -> New Task (Cmd+N) in the macOS menu. There is no dialog to open:
+     adding a task IS the input at the top of Plan's list, so the shortcut goes
+     there and puts the cursor in it. Wired on the website too, where it simply
+     never fires because nothing dispatches the event outside the app shell. */
+  useEffect(() => {
+    const onNewTask = () => {
+      location.hash = '/plan'
+      /* After the page mounts. Two frames, not a timeout: the second frame is
+         the first one in which the new page's DOM exists. */
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        document.querySelector<HTMLInputElement>('input[aria-label="New task"]')?.focus()
+      }))
+    }
+    window.addEventListener('mc:new-task', onNewTask)
+    return () => window.removeEventListener('mc:new-task', onNewTask)
+  }, [])
 
   /* Every space now has every tab: Money left the menu for Achievements, which
      is reached from the header and is his regardless of which space he happens
@@ -358,6 +381,7 @@ export default function App() {
         {(page === 'achievements' || page === 'money' || page === 'review' || page === 'stats') && <AchievementsPage />}
         {page === 'focus' && <FocusPage />}
         {page === 'board' && <BoardPage />}
+        {page === 'apps' && <AppsPage />}
         {page === 'notes' && <NotesPage />}
         {page === 'settings' && <SettingsPage />}
         {page === 'brand' && <BrandPage />}

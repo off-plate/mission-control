@@ -106,38 +106,65 @@ export function clearAuthFragment(): void {
   history.replaceState(null, '', location.pathname + location.search)
 }
 
-/** The saved state as a JSON string, or null if none / signed out. */
-export async function loadRemoteState(): Promise<string | null> {
+/* A read has three outcomes, and collapsing them to null was a bug waiting to
+   happen: "no row yet" and "the network is down" are opposites. The first means
+   this device's copy is the only copy and should be written; the second means we
+   know nothing and must not write anything, or an offline laptop would overwrite
+   a phone's good data with its own stale blob the moment one packet got through. */
+export type Head =
+  | { ok: true; json: string | null }
+  | { ok: false; reason: 'offline' | 'signed-out' | 'error'; message?: string }
+
+export async function loadRemoteHead(): Promise<Head> {
   const c = db()
+  if (!c) return { ok: false, reason: 'signed-out' }
   const me = await currentAccount()
-  if (!c || !me) return null
+  if (!me) return { ok: false, reason: 'signed-out' }
   try {
     const { data, error } = await c.from(TABLE).select('data').eq('id', me.id).maybeSingle()
-    if (error) { console.warn('supabase load:', error.message); return null }
-    return data?.data ? JSON.stringify(data.data) : null
+    if (error) return { ok: false, reason: 'error', message: error.message }
+    return { ok: true, json: data?.data ? JSON.stringify(data.data) : null }
   } catch (e) {
-    console.warn('supabase load failed', e)
-    return null
+    // Thrown, rather than returned as an error, is what a dead connection looks like.
+    return { ok: false, reason: 'offline', message: e instanceof Error ? e.message : String(e) }
   }
+}
+
+/** The saved state as a JSON string, or null if none / signed out / unreachable. */
+export async function loadRemoteState(): Promise<string | null> {
+  const head = await loadRemoteHead()
+  return head.ok ? head.json : null
 }
 
 import { mergeStates } from './sync-merge'
 
+export type SaveResult =
+  | { ok: true; merged: string }
+  | { ok: false; reason: 'offline' | 'signed-out' | 'error'; message?: string }
+
 /** Upsert the state against the signed-in account. NEVER blind: the remote head
  *  is read first and the dated logs of both sides are united, so a save from a
- *  stale tab can no longer erase work a fresher one already banked. */
-export async function saveRemoteState(json: string): Promise<void> {
+ *  stale tab can no longer erase work a fresher one already banked.
+ *
+ *  If the head cannot be READ, this refuses to write and says so. The caller
+ *  retries later. Writing anyway is how an offline device silently wins. */
+export async function saveRemoteState(json: string): Promise<SaveResult> {
   const c = db()
+  if (!c) return { ok: false, reason: 'signed-out' }
   const me = await currentAccount()
-  if (!c || !me) return
+  if (!me) return { ok: false, reason: 'signed-out' }
+
+  const head = await loadRemoteHead()
+  if (!head.ok) return { ok: false, reason: head.reason, message: head.message }
+
   try {
-    const head = await loadRemoteState()
-    const merged = head ? mergeStates(json, head) : json
+    const merged = head.json ? mergeStates(json, head.json) : json
     const data = JSON.parse(merged)
     const { error } = await c.from(TABLE).upsert({ id: me.id, owner: me.id, data, updated_at: new Date().toISOString() })
-    if (error) console.warn('supabase save:', error.message)
+    if (error) return { ok: false, reason: 'error', message: error.message }
+    return { ok: true, merged }
   } catch (e) {
-    console.warn('supabase save failed', e)
+    return { ok: false, reason: 'offline', message: e instanceof Error ? e.message : String(e) }
   }
 }
 

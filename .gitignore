@@ -8,3 +8,4 @@ qa-shots/
 # One-off probe and screenshot scripts. They belong to a session, not the repo.
 _*.mjs
 /perm.mjs
+release/

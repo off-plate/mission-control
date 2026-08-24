@@ -85,7 +85,7 @@ function blockAt(root: HTMLElement): HTMLElement | null {
 export type EditorTool = 'bold' | 'italic' | 'heading' | 'bullet' | 'checklist' | 'quote' | 'divider' | 'table' | 'clear'
 const ALL_TOOLS: EditorTool[] = ['bold', 'italic', 'heading', 'bullet', 'checklist', 'quote', 'divider', 'table', 'clear']
 
-export function Editor({ note, onChange, lead, trail, children, tools, plain, slashHelp }: {
+export function Editor({ note, onChange, lead, trail, children, tools, plain, slashHelp, slashTask }: {
   note: Pick<Note, 'id' | 'body'>
   onChange: (md: string) => void
   /** Sits at the start of the pane's own bar, before the formatting. */
@@ -106,8 +106,17 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
    *  or looks something up in its place. Notes page only, on his word ("the
    *  page itself, not the Zone section"). Off unless a caller opts in. */
   slashHelp?: boolean
+  /** "/task <what>" or "<what> /task", Enter to send: the line becomes a task
+   *  on today's list and stays in the note as the sentence he wrote. Writing
+   *  and planning happen in the same breath, so the app should not make him
+   *  carry the thought to another page to keep it. */
+  slashTask?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
+  /* The one thing this editor needs from the store, for /task. Everything else
+     it does is handed to it as a prop, and that is still the right shape:
+     writing a task is an action on the app, not a change to the note. */
+  const { addTask, space } = useStore()
   const show = (t: EditorTool) => (tools ?? ALL_TOOLS).includes(t)
   /* The markdown this editor last produced. Without it, every keystroke would
      come back through props and rewrite the DOM under his caret. */
@@ -141,26 +150,26 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
     onChange(md)
   }
 
-  /* Where "/help" is allowed to sit on the line.
+  /* Where a slash command is allowed to sit on the line.
 
      It used to be the start, and only the start. He wrote
 
          33 tis vyfaktuovat /help
 
-     which is how a person actually asks for help with something they have
-     just written, pressed Enter, and got nothing at all: no answer, no error,
-     no sign the app had even seen it. Silence is the worst available response
-     here, because it cannot be told apart from the feature being broken,
-     which is exactly what he concluded.
+     which is how a person actually asks for help with something they have just
+     written, pressed Enter, and got nothing at all: no answer, no error, no
+     sign the app had even seen it. Silence cannot be told apart from the
+     feature being broken, which is exactly what he concluded.
 
-     So it is taken at either end and the request is whatever sits on the
-     other side of it. A line that is only "/help" has nothing to work with,
-     so it is left alone rather than sent empty. */
-  const helpAsk = (line: string): string | null => {
+     So a command is taken at either end of the line, and its argument is
+     everything on the other side of it up to the Enter that sent it. A line
+     that is only the command has no argument, so it is left alone rather than
+     acted on empty. */
+  const slashArg = (line: string, cmd: string): string | null => {
     const t = line.trim()
-    const lead = t.match(/^\/help\b\s*(.*)$/i)
+    const lead = t.match(new RegExp(String.raw`^\/${cmd}\b\s*(.*)$`, 'i'))
     if (lead) return lead[1].trim() || null
-    const trail = t.match(/^(.*?)\s*\/help\s*$/i)
+    const trail = t.match(new RegExp(String.raw`^(.*?)\s*\/${cmd}\s*$`, 'i'))
     if (trail) return trail[1].trim() || null
     return null
   }
@@ -192,6 +201,46 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
       err.textContent = HELP_ERROR[result.reason]
       placeholder.replaceWith(said, err)
     }
+    emit()
+  }
+
+  /* "/task" on a line: it goes onto today's list, and the line stays exactly
+     as he wrote it minus the command, with a quiet mark saying where it went.
+
+     The note is not the task and the task is not the note. Nothing here syncs
+     the two afterwards: ticking the task does not strike the sentence out, and
+     editing the sentence does not rename the task. Pretending otherwise would
+     mean a second source of truth for the same thing, which is the bug this
+     app keeps having. This is a one-way door, taken deliberately.
+
+     No estimate, because he did not give one and a guessed number is exactly
+     what poisons the estimate ledger. It lands in the current workspace, on
+     today, unsorted, which is where a thought written down at 11pm belongs. */
+  const makeTask = (block: HTMLElement, title: string) => {
+    addTask({
+      title,
+      source: 'mc',
+      estimateMin: 0,
+      space,
+      list: 'today',
+      plannedOn: localDateKey(),
+      category: 'quick',
+    })
+    const said = document.createElement('p')
+    said.textContent = title
+    const mark = document.createElement('span')
+    mark.className = 'nt-task-made'
+    mark.textContent = 'on today'
+    said.appendChild(document.createTextNode(' '))
+    said.appendChild(mark)
+    block.replaceWith(said)
+    /* The cursor goes to a fresh line under it, because he was mid-thought and
+       the next bullet is where he was heading. */
+    const next = document.createElement('p')
+    next.innerHTML = '<br>'
+    said.after(next)
+    const sel = window.getSelection()
+    if (sel) { const r = document.createRange(); r.setStart(next, 0); r.collapse(true); sel.removeAllRanges(); sel.addRange(r) }
     emit()
   }
 
@@ -427,13 +476,20 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
         onBlur={emit}
         onMouseDown={onMouseDown}
             onKeyDown={(e) => {
-              if (slashHelp && e.key === 'Enter' && !e.shiftKey) {
+              if ((slashHelp || slashTask) && e.key === 'Enter' && !e.shiftKey) {
                 const root = ref.current
                 const block = root && blockAt(root)
-                const ask = helpAsk(block?.textContent ?? '')
+                const line = block?.textContent ?? ''
+                const ask = slashHelp ? slashArg(line, 'help') : null
                 if (block && ask) {
                   e.preventDefault()
                   void runHelp(block, ask)
+                  return
+                }
+                const wanted = slashTask ? slashArg(line, 'task') : null
+                if (block && wanted) {
+                  e.preventDefault()
+                  makeTask(block, wanted)
                   return
                 }
               }
@@ -921,6 +977,7 @@ export function NotesPage() {
             note={open}
             onChange={(md) => updateNote(open.id, { body: join(headOf(open.body), md) })}
             slashHelp
+            slashTask
             lead={phone ? (
               <button className="nt-back" onClick={() => setOpenId(null)}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">

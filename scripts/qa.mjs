@@ -1240,6 +1240,47 @@ await step('a task finished without a time is finished on every page that counts
   }
 })
 
+await step('notes: a slash command is taken at either end of the line', async () => {
+  /* He wrote "33 tis vyfaktuovat /help", pressed Enter, and got silence, which
+     is indistinguishable from the feature being deleted. It was anchored to the
+     start of the line and only the start. Both commands now take either end,
+     and the argument is the rest of the line. */
+  await fresh('notes')
+  const write = async (text) => {
+    await page.goto(`${URL}#/notes`); await page.waitForTimeout(700)
+    const add = page.getByRole('button', { name: /New note/i }).first()
+    if (await add.count()) { await add.click(); await page.waitForTimeout(700) }
+    const ed = page.locator('[contenteditable="true"]').first()
+    await ed.click(); await page.waitForTimeout(150)
+    await page.keyboard.type(text); await page.waitForTimeout(200)
+    await page.keyboard.press('Enter'); await page.waitForTimeout(800)
+  }
+  const todays = () => page.evaluate((K) => {
+    const st = JSON.parse(localStorage.getItem(K) || '{}')
+    return (st.tasks ?? []).filter((t) => t.list === 'today').map((t) => t.title)
+  }, KEY)
+
+  // The whole sentence before the command becomes the task, command stripped.
+  await write('Dat dohromady glosar veci ktere ctp pouziva /task')
+  let t = await todays()
+  if (t.length !== 1) throw new Error(`trailing /task made ${t.length} tasks, expected 1`)
+  if (t[0] !== 'Dat dohromady glosar veci ktere ctp pouziva') {
+    throw new Error(`trailing /task kept the command or lost text: "${t[0]}"`)
+  }
+  if (!(await page.locator('.nt-task-made').count())) throw new Error('no mark saying where the line went')
+
+  // And at the head of the line.
+  await write('/task Zavolat na VZP')
+  t = await todays()
+  if (!t.includes('Zavolat na VZP')) throw new Error(`leading /task did not land: ${JSON.stringify(t)}`)
+  const before = t.length
+
+  // A command with no argument does nothing at all, rather than filing an empty task.
+  await write('/task')
+  t = await todays()
+  if (t.length !== before) throw new Error(`bare /task filed something: ${JSON.stringify(t)}`)
+})
+
 await step('habits: a quitting row keeps its slip button off the day dots', async () => {
   /* The foot column is a fixed width, so a long "since 12 Apr, 114 best run"
      used to push the button out of its own column and onto Sunday's dot, at a

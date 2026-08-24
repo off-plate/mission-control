@@ -4297,3 +4297,12 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 @media (min-width: 640px) and (max-width: 1039px) {
   .brand-name { display: none; }
 }
+
+/* A line that became a task. Quiet on purpose: the sentence is his, the mark
+   is only the app saying where it went. */
+.nt-task-made {
+  font-family: var(--font-mono); font-size: 0.625rem; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--progress);
+  border: 1px solid var(--progress); border-radius: 3px; padding: 1px 5px;
+  margin-left: var(--s2); white-space: nowrap;
+}

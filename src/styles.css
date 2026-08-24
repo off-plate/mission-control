@@ -4311,3 +4311,36 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
    over reads back rather than shouting, because it is a record now. */
 .cal-next { color: var(--accent-text); font-weight: 600; }
 .cal-past { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
+
+/* ---------- Calendar ---------- */
+.cal-day + .cal-day { margin-top: var(--s6); }
+.cal-day-head { display: flex; align-items: baseline; gap: var(--s3); padding-bottom: var(--s2); border-bottom: 1px solid var(--hairline-strong); }
+.cal-day-name { font-family: var(--font-display); font-size: var(--text-lg); color: var(--ink); }
+.cal-day-count { font-size: var(--text-xs); color: var(--faint); margin-left: auto; }
+.cal-rows { display: flex; flex-direction: column; }
+.cal-row {
+  display: grid; grid-template-columns: 108px minmax(0, 1fr) auto;
+  gap: var(--s4); align-items: baseline;
+  padding: var(--s3) 0; border-bottom: 1px solid var(--hairline);
+}
+.cal-when { font-size: var(--text-xs); color: var(--muted); white-space: nowrap; }
+.cal-what { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cal-title { font-size: var(--text-base); color: var(--ink); }
+.cal-people { font-size: var(--text-xs); color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-do { display: flex; align-items: center; gap: var(--s3); white-space: nowrap; }
+.cal-written { font-size: 0.625rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--progress); }
+@media (max-width: 700px) {
+  .cal-row { grid-template-columns: 1fr; gap: var(--s1); }
+  .cal-do { margin-top: var(--s2); }
+}
+
+/* The one prompt that exists to remove one decision: what to call the note. */
+.meet-prompt {
+  display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap;
+  padding: var(--s3) var(--s4); margin-bottom: var(--s3);
+  border: 1px solid var(--accent); border-radius: var(--r-sm);
+  background: var(--accent-wash);
+}
+.meet-when { font-size: 0.625rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-text); }
+.meet-what { font-size: var(--text-sm); color: var(--ink); min-width: 0; flex: 1; }
+.meet-go { flex: none; }

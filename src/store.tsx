@@ -148,6 +148,12 @@ interface Store extends PersistedState {
   editing: boolean
   setEditing: (v: boolean) => void
   focusTaskId: string | null
+  /** A note another page wants opened, handed over once. The Notes page owns
+   *  which note is on screen; this is only how a link from elsewhere says
+   *  "that one", and it clears itself the moment it is read so a later visit
+   *  does not reopen a note he closed. */
+  noteToOpen: string | null
+  openNote: (id: string | null) => void
   setFocusTaskId: (id: string | null) => void
 
   reorderSpace: (space: SpaceId, order: string[]) => void
@@ -1072,7 +1078,7 @@ function routeFromHash(): { page: PageId; day: string | null } {
   if (m) return { page: 'day', day: m[1] }
   // The board's old address still resolves: a bookmark lands on its successor.
   if (h === 'braindump') return { page: 'notes', day: null }
-  const pages: PageId[] = ['today', 'plan', 'habits', 'routines', 'goals', 'achievements', 'money', 'review', 'stats', 'settings', 'brand', 'notes', 'focus', 'board', 'zone', 'apps']
+  const pages: PageId[] = ['today', 'plan', 'habits', 'routines', 'goals', 'achievements', 'money', 'review', 'stats', 'settings', 'brand', 'notes', 'focus', 'board', 'zone', 'apps', 'calendar']
   return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
 }
 
@@ -1246,6 +1252,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const setPageState = (p: PageId) => setRoute({ page: p, day: null })
   const [editing, setEditing] = useState(false)
   const [focusTaskId, setFocusTaskId] = useState<string | null>(null)
+  const [noteToOpen, setNoteToOpen] = useState<string | null>(null)
 
   useEffect(() => {
     document.documentElement.setAttribute('data-space', view)
@@ -1825,6 +1832,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     page, setPage, dayKey, openDay,
     editing, setEditing,
     focusTaskId, setFocusTaskId,
+    noteToOpen, openNote: setNoteToOpen,
 
     reorderSpace: (sp, order) =>
       setSpaces((prev) => {

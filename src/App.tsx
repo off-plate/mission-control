@@ -11,6 +11,7 @@ import { BrandPage } from './brand'
 import { DayPage } from './day'
 import { BoardPage } from './board'
 import { AppsPage } from './apps'
+import { CalendarPage } from './calendarpage'
 import { FocusPage } from './focus'
 import { ZonePage, useZoneDepth } from './zone'
 import { useStore } from './store'
@@ -54,8 +55,13 @@ function Logo() {
   )
 }
 
-/* Every space shows the same menu. What changes between spaces is the content of
-   each page, never which pages exist. */
+/* The menu was identical everywhere, and mostly still is: what changes between
+   spaces is the CONTENT of each page, not which pages exist.
+
+   Calendar is the first and so far only exception, and it earns it. It is not
+   a view of his data with a filter on it, it is a read of somebody else's
+   system that exists for exactly one workspace, and showing an empty Calendar
+   in Personal would be the app advertising a feature that cannot work there. */
 const NAV: { id: PageId; label: string }[] = [
   { id: 'today', label: 'Today' },
   { id: 'plan', label: 'Plan' },
@@ -67,6 +73,16 @@ const NAV: { id: PageId; label: string }[] = [
   { id: 'board', label: 'Why’s' },
   { id: 'apps', label: 'Apps' },
 ]
+
+/** Pages that belong to one workspace. */
+const SPACE_ONLY: Partial<Record<PageId, SpaceId>> = { calendar: 'work' }
+
+function navFor(view: ViewId): { id: PageId; label: string }[] {
+  const extra = (Object.entries(SPACE_ONLY) as [PageId, SpaceId][])
+    .filter(([, sp]) => view === sp)
+    .map(([id]) => ({ id, label: id === 'calendar' ? 'Calendar' : id }))
+  return [...NAV, ...extra]
+}
 
 function PageNav({
   tabs, page, setPage, attention,
@@ -185,7 +201,7 @@ export default function App() {
   /* Every space now has every tab: Money left the menu for Achievements, which
      is reached from the header and is his regardless of which space he happens
      to be standing in. */
-  const tabs = NAV
+  const tabs = navFor(view)
 
   /* Signed out, nothing is backed up and the phone shows a different day. That is
      worth a mark on the gear rather than a banner across the top. */
@@ -382,6 +398,7 @@ export default function App() {
         {page === 'focus' && <FocusPage />}
         {page === 'board' && <BoardPage />}
         {page === 'apps' && <AppsPage />}
+        {page === 'calendar' && <CalendarPage />}
         {page === 'notes' && <NotesPage />}
         {page === 'settings' && <SettingsPage />}
         {page === 'brand' && <BrandPage />}

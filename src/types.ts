@@ -40,6 +40,8 @@ export type PageId =
   | 'day'
   /** Full-screen focus room. Reached from the header only, never a nav tab. */
   | 'zone'
+  /** The work calendar, read from the feed. Big Time only: see NAV. */
+  | 'calendar'
 
 export type WidgetType =
   | 'clock'

@@ -82,6 +82,31 @@ function blockAt(root: HTMLElement): HTMLElement | null {
   return n && n.nodeType === 1 ? (n as HTMLElement) : null
 }
 
+/* The one LINE the cursor is on, which inside a list is the item and not the
+   list. blockAt walks up to a child of the root, so in
+
+       <ul><li>a</li><li>b</li><li>c</li></ul>
+
+   it returns the whole <ul>. A slash command then read every bullet as one
+   line: he put /task on the last item of a five-item list and got all five
+   glued into a single task, with the words run together. /help had the same
+   bug and a worse blast radius, since it would have replaced the entire list
+   with one answer.
+
+   Block-level markdown (a dash making a bullet) still wants blockAt, so this
+   is a second reader rather than a change to that one. */
+function lineAt(root: HTMLElement): HTMLElement | null {
+  const sel = window.getSelection()
+  if (!sel || !sel.focusNode) return null
+  let n: Node | null = sel.focusNode
+  if (n.nodeType === 3) n = n.parentNode
+  while (n && n !== root) {
+    if (n.nodeType === 1 && (n as HTMLElement).tagName === 'LI') return n as HTMLElement
+    n = n.parentNode
+  }
+  return blockAt(root)
+}
+
 export type EditorTool = 'bold' | 'italic' | 'heading' | 'bullet' | 'checklist' | 'quote' | 'divider' | 'table' | 'clear'
 const ALL_TOOLS: EditorTool[] = ['bold', 'italic', 'heading', 'bullet', 'checklist', 'quote', 'divider', 'table', 'clear']
 
@@ -181,7 +206,7 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
   const runHelp = async (block: HTMLElement, instruction: string) => {
     const root = ref.current
     if (!root) return
-    const placeholder = document.createElement('p')
+    const placeholder = document.createElement(block.tagName === 'LI' ? 'li' : 'p')
     placeholder.className = 'nt-help-pending'
     placeholder.textContent = 'Thinking…'
     block.replaceWith(placeholder)
@@ -194,9 +219,10 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
       const nodes = [...tmp.childNodes]
       placeholder.replaceWith(...(nodes.length ? nodes : [Object.assign(document.createElement('p'), { innerHTML: '<br>' })]))
     } else {
-      const said = document.createElement('p')
+      const tag = placeholder.tagName === 'LI' ? 'li' : 'p'
+      const said = document.createElement(tag)
       said.textContent = `/help ${instruction}`
-      const err = document.createElement('p')
+      const err = document.createElement(tag)
       err.className = 'nt-help-error'
       err.textContent = HELP_ERROR[result.reason]
       placeholder.replaceWith(said, err)
@@ -226,7 +252,11 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
       plannedOn: localDateKey(),
       category: 'quick',
     })
-    const said = document.createElement('p')
+    /* A bullet stays a bullet. Replacing an <li> with a <p> would put a
+       paragraph inside a <ul>, which is invalid and renders as a stray line
+       with no marker next to the items above it. */
+    const inList = block.tagName === 'LI'
+    const said = document.createElement(inList ? 'li' : 'p')
     said.textContent = title
     const mark = document.createElement('span')
     mark.className = 'nt-task-made'
@@ -236,7 +266,7 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
     block.replaceWith(said)
     /* The cursor goes to a fresh line under it, because he was mid-thought and
        the next bullet is where he was heading. */
-    const next = document.createElement('p')
+    const next = document.createElement(inList ? 'li' : 'p')
     next.innerHTML = '<br>'
     said.after(next)
     const sel = window.getSelection()
@@ -478,7 +508,7 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
             onKeyDown={(e) => {
               if ((slashHelp || slashTask) && e.key === 'Enter' && !e.shiftKey) {
                 const root = ref.current
-                const block = root && blockAt(root)
+                const block = root && lineAt(root)
                 const line = block?.textContent ?? ''
                 const ask = slashHelp ? slashArg(line, 'help') : null
                 if (block && ask) {

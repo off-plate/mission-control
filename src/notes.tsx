@@ -132,9 +132,9 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
    *  page itself, not the Zone section"). Off unless a caller opts in. */
   slashHelp?: boolean
   /** "/task <what>" or "<what> /task", Enter to send: the line becomes a task
-   *  on today's list and stays in the note as the sentence he wrote. Writing
-   *  and planning happen in the same breath, so the app should not make him
-   *  carry the thought to another page to keep it. */
+   *  on the to-do list and stays in the note as the sentence he wrote. Capture
+   *  and planning are different acts, so this only captures: choosing it for a
+   *  day happens on Plan, on purpose. */
   slashTask?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -230,8 +230,14 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
     emit()
   }
 
-  /* "/task" on a line: it goes onto today's list, and the line stays exactly
+  /* "/task" on a line: it goes onto the to-do list, and the line stays exactly
      as he wrote it minus the command, with a quiet mark saying where it went.
+
+     The LIST, not today. His call, and it is the right one: writing a thought
+     down is not the same as committing to doing it before midnight, and an app
+     that quietly promises the day to everything he jots at 11pm is how a day
+     gets over-planned before it starts. Choosing it for a day is a separate,
+     deliberate act on the Plan page.
 
      The note is not the task and the task is not the note. Nothing here syncs
      the two afterwards: ticking the task does not strike the sentence out, and
@@ -240,16 +246,14 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
      app keeps having. This is a one-way door, taken deliberately.
 
      No estimate, because he did not give one and a guessed number is exactly
-     what poisons the estimate ledger. It lands in the current workspace, on
-     today, unsorted, which is where a thought written down at 11pm belongs. */
+     what poisons the estimate ledger everything else reads. */
   const makeTask = (block: HTMLElement, title: string) => {
     addTask({
       title,
       source: 'mc',
       estimateMin: 0,
       space,
-      list: 'today',
-      plannedOn: localDateKey(),
+      list: 'backlog',
       category: 'quick',
     })
     /* A bullet stays a bullet. Replacing an <li> with a <p> would put a
@@ -260,7 +264,7 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
     said.textContent = title
     const mark = document.createElement('span')
     mark.className = 'nt-task-made'
-    mark.textContent = 'on today'
+    mark.textContent = 'on the list'
     said.appendChild(document.createTextNode(' '))
     said.appendChild(mark)
     block.replaceWith(said)

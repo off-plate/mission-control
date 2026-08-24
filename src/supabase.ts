@@ -29,16 +29,21 @@ function db(): SupabaseClient | null {
  *  the JWT, so nobody without his session can pull his work calendar through
  *  it: the function is the only thing holding the feed's secret address, and a
  *  function anyone may call is the same as publishing that address. */
-export async function callFunction(name: string): Promise<{ ok: true; text: string } | { ok: false; reason: 'off' | 'signed-out' | 'error'; message?: string }> {
+export async function callFunction(name: string): Promise<{ ok: true; data: unknown } | { ok: false; reason: 'off' | 'signed-out' | 'error'; message?: string }> {
   const c = db()
   if (!c) return { ok: false, reason: 'off' }
   const me = await currentAccount()
   if (!me) return { ok: false, reason: 'signed-out' }
   try {
+    /* supabase-js decides the shape from the response's content-type: JSON comes
+       back already parsed, text/plain as a string, anything else as a Blob. So
+       the value is handed on as-is and the caller reads what it asked for.
+       This used to force everything through a string, which turned a parsed
+       object into "[object Object]" the moment the function started answering
+       JSON, and the app reported the calendar as unreadable. */
     const { data, error } = await c.functions.invoke(name, { method: 'GET' })
     if (error) return { ok: false, reason: 'error', message: error.message }
-    const text = typeof data === 'string' ? data : await (data as Blob).text?.() ?? String(data)
-    return { ok: true, text }
+    return { ok: true, data }
   } catch (e) {
     return { ok: false, reason: 'error', message: e instanceof Error ? e.message : 'unreachable' }
   }

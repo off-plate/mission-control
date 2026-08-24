@@ -18,6 +18,8 @@ export type CalState =
   | { status: 'error'; message: string }
   | { status: 'ok'; events: CalEvent[] }
 
+const safeJson = (t: string): unknown => { try { return JSON.parse(t) } catch { return null } }
+
 /** How far ahead to read. A week is what the widget and the day view ask for. */
 const DAYS_AHEAD = 8
 
@@ -33,14 +35,13 @@ export async function readCalendar(): Promise<CalState> {
     return { status: 'error', message: r.message ?? 'Calendar could not be read.' }
   }
   /* The function parses and trims; this only reads what it sent. Dates come
-     back as plain strings and minute counts, so nothing needs reviving. */
-  try {
-    const body = JSON.parse(r.text) as { events?: CalEvent[] }
-    if (!Array.isArray(body.events)) return { status: 'not-set-up' }
-    return { status: 'ok', events: body.events }
-  } catch {
-    return { status: 'error', message: 'The calendar answered something unreadable.' }
-  }
+     back as plain strings and minute counts, so nothing needs reviving.
+     A string is accepted too, in case the function is ever redeployed with a
+     different content-type: it costs one line and saves a silent outage. */
+  const raw = typeof r.data === 'string' ? safeJson(r.data) : r.data
+  const body = raw as { events?: CalEvent[] } | null
+  if (!body || !Array.isArray(body.events)) return { status: 'not-set-up' }
+  return { status: 'ok', events: body.events }
 }
 
 /** Reads once on open, then every ten minutes. A work calendar does not move

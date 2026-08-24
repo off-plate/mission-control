@@ -44,3 +44,18 @@ the secret address.
 If the address ever leaks, Google Calendar has a **Reset** button next to it.
 Reset there, then `supabase secrets set MC_CALENDAR_ICS=` the new one. Nothing
 in the app needs redeploying.
+
+
+## Why the function parses
+
+The feed is 4.8 MB and 5,462 events. Sending that to the browser every ten
+minutes came to roughly 8 GB a month against a free tier of 5 GB. The function
+parses it and returns only the window asked for: 15 KB, and 26 MB a month.
+
+The parser in `_shared/ical.ts` is the same file the app imports, not a copy,
+so there is one set of rules and one set of tests.
+
+## Status
+
+Deployed and working. Verified end to end on 2026-08-24: 200, the right CORS
+origin, 67 events in the next eight days, every one with a uid.

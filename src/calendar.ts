@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from 'react'
 import { SUPABASE_ENABLED, callFunction } from './supabase'
-import { parseIcs, type CalEvent } from './ical'
+import type { CalEvent } from './ical'
 
 export type CalState =
   | { status: 'off' }
@@ -23,7 +23,7 @@ const DAYS_AHEAD = 8
 
 export async function readCalendar(): Promise<CalState> {
   if (!SUPABASE_ENABLED) return { status: 'off' }
-  const r = await callFunction('calendar')
+  const r = await callFunction(`calendar?days=${DAYS_AHEAD}`)
   if (!r.ok) {
     if (r.reason === 'off') return { status: 'off' }
     if (r.reason === 'signed-out') return { status: 'signed-out' }
@@ -32,10 +32,15 @@ export async function readCalendar(): Promise<CalState> {
     if ((r.message ?? '').includes('No calendar configured')) return { status: 'not-set-up' }
     return { status: 'error', message: r.message ?? 'Calendar could not be read.' }
   }
-  if (!r.text.includes('BEGIN:VCALENDAR')) return { status: 'not-set-up' }
-  const from = new Date(); from.setHours(0, 0, 0, 0)
-  const to = new Date(from); to.setDate(from.getDate() + DAYS_AHEAD)
-  return { status: 'ok', events: parseIcs(r.text, from, to) }
+  /* The function parses and trims; this only reads what it sent. Dates come
+     back as plain strings and minute counts, so nothing needs reviving. */
+  try {
+    const body = JSON.parse(r.text) as { events?: CalEvent[] }
+    if (!Array.isArray(body.events)) return { status: 'not-set-up' }
+    return { status: 'ok', events: body.events }
+  } catch {
+    return { status: 'error', message: 'The calendar answered something unreadable.' }
+  }
 }
 
 /** Reads once on open, then every ten minutes. A work calendar does not move

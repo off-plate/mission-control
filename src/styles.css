@@ -2854,12 +2854,58 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .kebab-menu.opens-up { top: auto; bottom: 100%; margin-top: 0; margin-bottom: 2px; }
 
 /* A long task wraps and the row grows; the controls stay on the first line,
-   pinned right, so nothing is hidden and nothing falls to a line of its own. */
-.today-task, .todo-row { align-items: flex-start; }
-.today-task > .checkbox, .today-task > .drag-grip, .today-task > .cat-dot,
-.todo-row > .checkbox, .todo-row > .drag-grip, .todo-row > .cat-dot { margin-top: 3px; }
-.today-task .task-actions, .today-task > .kebab-wrap, .today-task > .chip, .today-task > .est-vs-actual,
-.todo-row .task-actions, .todo-row > .kebab-wrap, .todo-row > .chip, .todo-row > .expand-btn { margin-top: 1px; }
+   pinned right, so nothing is hidden and nothing falls to a line of its own.
+   That is why the row is flex-start rather than centre, and it stays.
+
+   What is gone is how it used to compensate: `margin-top: 3px` on the grip and
+   the checkbox, `1px` on everything else. Two magic numbers, tuned by eye to
+   one font at one size, and wrong the moment either changed. The grip sat 8px
+   above the kebab in a 49px row, measured, which is what he saw and reported
+   across every row of the list.
+
+   The principled version: every control declares that it is as tall as ONE
+   LINE of the row's text and centres itself inside that. So each one lines up
+   with the first line of the title whatever the font, whatever the size, and
+   however many lines the title runs to. Nothing here is tuned by eye. */
+.today-task, .todo-row { align-items: flex-start; --line: calc(var(--text-sm) * 1.45); }
+.today-task > *, .todo-row > * {
+  min-height: var(--line);
+  display: inline-flex;
+  align-items: center;
+}
+/* The title is the exception: it is the thing the others align TO, so it keeps
+   normal text flow and is allowed to wrap to as many lines as it needs. */
+.today-task > .grow, .todo-row > .grow,
+.today-task > .task-link, .todo-row > .task-link { display: block; }
+/* The workspace bar stops stretching to the full height of a wrapped row: it
+   marks the row, it is not a scale beside it. */
+.today-task > .spacemark, .todo-row > .spacemark { align-self: flex-start; height: var(--line); }
+
+/* The kebab and the hover actions are taller than a line ON PURPOSE, because
+   they are touch targets. That height belongs to the finger, not to the
+   layout: left in the flow it dragged their centres 5px below everything else.
+
+   So the box shrinks to one line and the target is given back as an invisible
+   pad around it, which is the trick the select box on these same rows already
+   uses. The thumb still gets 32px; the row gets a straight line. */
+.today-task > .kebab-wrap .kebab, .todo-row > .kebab-wrap .kebab,
+.today-task .task-actions > *, .todo-row .task-actions > * {
+  min-height: var(--line);
+  position: relative;
+}
+.today-task > .kebab-wrap .kebab::after, .todo-row > .kebab-wrap .kebab::after {
+  content: ''; position: absolute; inset: -7px;
+}
+/* The hover actions keep their 28px square, because that square is visible:
+   it is the hover background. So instead of shrinking it, it is pulled up by
+   exactly half its overflow past the line. Both numbers in that subtraction
+   are declared in this file (--line above, 28px on .task-act below), so if
+   either moves the other follows. That is the difference between arithmetic
+   and the eyeballed 3px this replaced. */
+.today-task .task-actions, .todo-row .task-actions {
+  margin-top: calc((var(--line) - 28px) / 2);
+  align-self: flex-start;
+}
 
 /* How deep to break a task down. */
 .detail-seg { margin-bottom: var(--s4); }

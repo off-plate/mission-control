@@ -4506,7 +4506,10 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .btn-helmet { padding: 0 var(--s3); }
 .helmet { display: block; }
 .btn-helmet.is-on { color: var(--accent-text); border-color: var(--accent); }
-/* The eyes come up rather than snapping, which is the one piece of motion this
-   mode gets. Same curve as everything else in the app. */
-.helmet-eyes { transition: fill var(--t-med), opacity var(--t-med); }
+/* His artwork is one filled silhouette with the eyes cut out of it, so the
+   whole helmet carries the state rather than the eyes alone. Quiet when the
+   mode is off, lit when it is on, and it comes up rather than snapping. */
+.helmet { transition: color var(--t-med), opacity var(--t-med); opacity: 0.62; }
+.btn-helmet:hover .helmet { opacity: 1; }
+.helmet.lit { opacity: 1; }
 .shell.is-hud .btn-helmet { color: var(--accent-text); }

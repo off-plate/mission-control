@@ -153,7 +153,10 @@ await step('the menu is six tabs, and what left it is reachable from the header'
   if (tabs.length !== 6) throw new Error(`${tabs.length} tabs: ${tabs.join(', ')}`)
   if (!tabs.some((t) => /apps/i.test(t))) throw new Error('Apps is not a tab')
   if (tabs.some((t) => /routines/i.test(t))) throw new Error('Routines is still a tab')
-  for (const gone of ['Calendar', 'Avoidance', 'Assistant', 'Notes', 'Focus', 'Money', 'Reflect']) {
+  /* Calendar left this list when it became a real page. It is still not a tab
+     HERE, because this test runs in Personal and Calendar is Big Time only;
+     the calendar test above owns that rule. */
+  for (const gone of ['Avoidance', 'Assistant', 'Notes', 'Focus', 'Money', 'Reflect']) {
     if (tabs.includes(gone)) throw new Error(`${gone} is still a tab`)
   }
   for (const name of ['Note', 'Achievements', 'My Mind']) {
@@ -162,7 +165,7 @@ await step('the menu is six tabs, and what left it is reachable from the header'
     }
   }
   // Every old address still lands somewhere real.
-  for (const [route, heading] of [['calendar', 'Today'], ['coach', 'Today'], ['assistant', 'Today'], ['money', 'Money'], ['review', 'Reflect']]) {
+  for (const [route, heading] of [['coach', 'Today'], ['assistant', 'Today'], ['money', 'Money'], ['review', 'Reflect']]) {
     await page.goto(`${URL}#/${route}`); await page.reload(); await page.waitForTimeout(500)
     const h1 = await page.locator('h1').first().innerText()
     if (h1 !== heading) throw new Error(`#/${route} landed on ${h1}, not ${heading}`)
@@ -1320,6 +1323,38 @@ await step('notes: a slash command inside a list takes one bullet, not the list'
   const lis = (html.match(/<li/g) || []).length
   if (lis < 5) throw new Error(`the list lost its shape: ${lis} items left`)
   if (!/<li[^>]*>[^<]*Budget na pristi rok/.test(html)) throw new Error('the task line stopped being a bullet')
+})
+
+await step('calendar: Big Time only, and it never pretends the day is empty', async () => {
+  /* The first menu item that is not in every workspace. It earns that: it is
+     not a view of his own data with a filter on it, it is a read of somebody
+     else's system that exists for one workspace, and an empty Calendar in
+     Personal would advertise something that cannot work there. */
+  await fresh('today')
+  const tabsIn = async (label) => {
+    await page.locator('.space-btn', { hasText: label }).first().click()
+    await page.waitForTimeout(600)
+    return (await page.locator('.nav-tab').allInnerTexts()).map((t) => t.trim().toUpperCase())
+  }
+  const personal = await tabsIn('Personal')
+  if (personal.includes('CALENDAR')) throw new Error(`Calendar showed in Personal: ${personal.join(', ')}`)
+  const work = await tabsIn('Big Time')
+  if (!work.includes('CALENDAR')) throw new Error(`Calendar missing in Big Time: ${work.join(', ')}`)
+
+  /* And with no feed reachable it says so, rather than rendering an empty week.
+     "Nothing scheduled" over a day full of meetings is the most expensive thing
+     this page could say, so every state is named. */
+  await page.goto(`${URL}#/calendar`); await page.waitForTimeout(900)
+  const said = await page.locator('.page').innerText()
+  if (await page.locator('.cal-row').count()) throw new Error('rows rendered with no feed')
+  if (!/cannot be read|not connected|Sign in/i.test(said)) {
+    throw new Error(`the page went quiet instead of saying why: ${JSON.stringify(said.slice(0, 120))}`)
+  }
+  /* The workspace lives OUTSIDE the state blob, so fresh() does not clear it.
+     Leaving it on Big Time made the next test run in the wrong workspace and
+     find none of its habits. Put it back. */
+  await page.locator('.space-btn', { hasText: 'Personal' }).first().click()
+  await page.waitForTimeout(400)
 })
 
 await step('habits: a quitting row keeps its slip button off the day dots', async () => {

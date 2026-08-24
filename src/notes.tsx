@@ -15,6 +15,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AutoTextarea, Dropdown } from './pages1'
 import { useStore } from './store'
+import { MeetingPrompt } from './meetingprompt'
 import { fmtWhen, localDateKey } from './util'
 import { htmlToMd, mdToHtml } from './richtext'
 import { spaceFolderId, type Note, type SpaceId } from './types'
@@ -621,6 +622,7 @@ export function NotesPage() {
     notes, noteFolders, view, space, addNote, updateNote, moveNote, deleteNote,
     addNoteFolder, renameNoteFolder, deleteNoteFolder, renameNoteTag,
     keepNoteConflict, dropNoteConflict, addTask, setPage, setNoteDone,
+    noteToOpen, openNote,
   } = useStore()
 
   /* Notes are not filed by workspace any more, on his instruction: folders are
@@ -723,6 +725,15 @@ export function NotesPage() {
     if (openId && shown.some((n) => n.id === openId)) return
     setOpenId(shown[0]?.id ?? null)
   }, [phone, shown, openId])
+
+  /* A note another page asked for, taken once and cleared, so coming back to
+     Notes later does not reopen something he has since closed. */
+  useEffect(() => {
+    if (!noteToOpen) return
+    setOpenId(noteToOpen)
+    setFresh(noteToOpen)
+    openNote(null)
+  }, [noteToOpen, openNote])
 
   const open = notes.find((n) => n.id === openId) ?? null
 
@@ -891,6 +902,11 @@ export function NotesPage() {
 
       {/* ---- the list ---- */}
       <div className="nt-list">
+        {/* Only in Big Time, where a calendar exists, and only when there is a
+            meeting worth naming. Everywhere else it renders nothing at all. It
+            sits at the head of the LIST, which is where he already looks when
+            he is about to start writing something. */}
+        {space === 'work' && <MeetingPrompt />}
         <div className="nt-listhead">
           <div className="nt-headmain">
             <h1>{finding ? 'Everything' : nameOf(openFolder)}</h1>

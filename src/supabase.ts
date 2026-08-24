@@ -25,6 +25,25 @@ function db(): SupabaseClient | null {
   return client
 }
 
+/** Call an Edge Function as the signed-in user. The calendar proxy verifies
+ *  the JWT, so nobody without his session can pull his work calendar through
+ *  it: the function is the only thing holding the feed's secret address, and a
+ *  function anyone may call is the same as publishing that address. */
+export async function callFunction(name: string): Promise<{ ok: true; text: string } | { ok: false; reason: 'off' | 'signed-out' | 'error'; message?: string }> {
+  const c = db()
+  if (!c) return { ok: false, reason: 'off' }
+  const me = await currentAccount()
+  if (!me) return { ok: false, reason: 'signed-out' }
+  try {
+    const { data, error } = await c.functions.invoke(name, { method: 'GET' })
+    if (error) return { ok: false, reason: 'error', message: error.message }
+    const text = typeof data === 'string' ? data : await (data as Blob).text?.() ?? String(data)
+    return { ok: true, text }
+  } catch (e) {
+    return { ok: false, reason: 'error', message: e instanceof Error ? e.message : 'unreachable' }
+  }
+}
+
 export interface Account { id: string; email: string }
 
 /** The signed-in account, or null. Null also covers "sync is not configured". */

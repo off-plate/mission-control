@@ -5,6 +5,7 @@ import { MOCK_MONEY, fakeDecompose } from './mock'
 import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
 import { useCompass } from './compass'
+import { useCalendar } from './calendar'
 import { MorningRoutine } from './morning'
 import { BreakdownSheet, Sheet } from './modals'
 import { Linkify } from './widgets'
@@ -26,21 +27,27 @@ export { AutoTextarea, Band, Dropdown, SpaceMark, WriteTo }
 
 /* Page helpers, not primitives: these read the mock agenda and this app's own
    idea of what "yesterday" means, so they belong to the pages that ask. */
-function useNextEvent(space: string): { v: string; k: string } {
+/* The line at the top of Today. It reads the SAME feed the calendar widget
+   reads, so the header and the tile can never disagree about what is next.
+   It used to read MOCK_AGENDA, which is empty for every workspace, so it has
+   said "none today" every day since it was written. */
+function useNextEvent(): { v: string; k: string } {
   const [, tick] = useState(0)
   useEffect(() => {
     const t = window.setInterval(() => tick((x) => x + 1), 30_000)
     return () => window.clearInterval(t)
   }, [])
-  const events = MOCK_AGENDA[space as keyof typeof MOCK_AGENDA] ?? []
+  const { state } = useCalendar()
+  if (state.status !== 'ok') return { v: 'none today', k: 'next event' }
   const now = new Date()
   const nowMin = now.getHours() * 60 + now.getMinutes()
-  const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m }
-  const ongoing = events.find((e) => toMin(e.start) <= nowMin && nowMin < toMin(e.end))
-  if (ongoing) return { v: `${ongoing.title.split(':')[0]} until ${fmtTimeShort(ongoing.end)}`, k: 'now' }
-  const next = events.find((e) => toMin(e.start) > nowMin)
+  const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+  const todays = state.events.filter((e) => e.day === localDateKey() && e.start !== null)
+  const ongoing = todays.find((e) => (e.start as number) <= nowMin && nowMin < (e.end ?? e.start as number))
+  if (ongoing) return { v: `${ongoing.title.split(':')[0]} until ${hm(ongoing.end ?? ongoing.start as number)}`, k: 'now' }
+  const next = todays.find((e) => (e.start as number) > nowMin)
   if (!next) return { v: 'none today', k: 'next event' }
-  return { v: `${fmtTimeShort(next.start)} ${next.title.split(':')[0]}`, k: 'next event' }
+  return { v: `${hm(next.start as number)} ${next.title.split(':')[0]}`, k: 'next event' }
 }
 
 /** Yesterday's date. Stepping the calendar day, not subtracting 24 hours, so
@@ -73,7 +80,7 @@ const shortDay = (key: string): string => {
 export function TodayPage() {
   const { space, tasks, routines, habits, goals, plan, editing, setEditing, setPage, savedMin, todayIndex, review, addTask, deleteTask, moveTaskList, setFocusTaskId, sources, inView } = useStore()
   const pomo = usePomodoro()
-  const nextEvent = useNextEvent(space)
+  const nextEvent = useNextEvent()
   /* The money alert needs Compass, which arrives async. Until it does, `money`
      is undefined and the alert simply is not there, which is correct: silence
      is honest, an invented figure is not. */

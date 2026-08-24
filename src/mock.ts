@@ -91,6 +91,10 @@ export const DEFAULT_SPACES: Record<SpaceId, WidgetInstance[]> = {
   ],
   work: [
     { id: wid('clock'), type: 'clock', size: 'S' },
+    /* The Big Time calendar, read through the proxy. It sits above the task
+       list on purpose: what the day already owes to other people decides what
+       is left, so it has to be read first. */
+    { id: wid('agenda'), type: 'agenda', size: 'M' },
     { id: wid('tasks'), type: 'tasks', size: 'L' },
     { id: wid('goals'), type: 'goals', size: 'M' },
   ],

@@ -4306,3 +4306,8 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   border: 1px solid var(--progress); border-radius: 3px; padding: 1px 5px;
   margin-left: var(--s2); white-space: nowrap;
 }
+
+/* The calendar widget. The next thing up is the only emphasis; what is already
+   over reads back rather than shouting, because it is a record now. */
+.cal-next { color: var(--accent-text); font-weight: 600; }
+.cal-past { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--hairline-strong); }

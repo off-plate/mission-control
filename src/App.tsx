@@ -12,6 +12,7 @@ import { DayPage } from './day'
 import { BoardPage } from './board'
 import { AppsPage } from './apps'
 import { CalendarPage } from './calendarpage'
+import { Helmet } from './helmet'
 import { FocusPage } from './focus'
 import { ZonePage, useZoneDepth } from './zone'
 import { useStore } from './store'
@@ -218,6 +219,17 @@ export default function App() {
      he walked in. A ref, not state, because nothing renders from it and it
      must not cause one. Today is the floor, for a reload that lands straight
      in the room with no history behind it. */
+  /* HUD mode. Per device rather than synced: it is how he wants THIS screen to
+     look right now, not a fact about his life, and the laptop and the phone can
+     reasonably disagree about it. Read on the first render so the mode is
+     already right when the shell paints, with no flash of paper first. */
+  const [hud, setHud] = useState<boolean>(() => {
+    try { return localStorage.getItem('mc:hud') === '1' } catch { return false }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('mc:hud', hud ? '1' : '0') } catch { /* private mode */ }
+  }, [hud])
+
   const backFromZone = useRef<PageId>('today')
   useEffect(() => { if (page !== 'zone') backFromZone.current = page }, [page])
 
@@ -228,7 +240,7 @@ export default function App() {
        because this is the element that paints the water; set any lower down
        it could never reach this rule, and the room never deepened at all. */
     <div
-      className={`shell${page === 'zone' ? ' in-zone' : ''}`}
+      className={`shell${page === 'zone' ? ' in-zone' : ''}${hud ? ' is-hud' : ''}`}
       style={page === 'zone' ? ({ '--depth': zoneDepth } as React.CSSProperties) : undefined}
     >
       <a className="skiplink" href="#main">Skip to the page</a>
@@ -312,6 +324,17 @@ export default function App() {
               <path d="M12 3l2.6 6.2L21 11l-6.4 1.8L12 21l-2.6-8.2L3 11l6.4-1.8z" strokeLinejoin="round" />
             </svg>
             <span className="btn-label">The Zone</span>
+          </button>
+          {/* The helmet. Its eyes light when the mode is on, so the icon IS the
+              state and the button needs no second indicator. */}
+          <button
+            className={`btn btn-ghost btn-helmet${hud ? ' is-on' : ''}`}
+            onClick={() => setHud((v) => !v)}
+            aria-pressed={hud}
+            title={hud ? 'Back to paper' : 'HUD mode'}
+            aria-label={hud ? 'Turn HUD mode off' : 'Turn HUD mode on'}
+          >
+            <Helmet lit={hud} />
           </button>
           {/* Notes, one click from any screen. It left the menu because he
               reaches for it mid-thought, not by navigating to it. */}

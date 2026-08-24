@@ -129,6 +129,23 @@ ok(await page.evaluate(() => document.querySelectorAll('.nt-row').length === 1),
 await page.locator('.nt-tick.on').first().click()
 await page.waitForTimeout(600)
 
+/* The top bar is one row at every width the window can be dragged to. It used to
+   need 1495px and his is about 1465, so the actions dropped to a second row and
+   left a hole across the first. Asserted at the window's own minimum upward. */
+for (const w of [880, 1100, 1465, 1728, 2560]) {
+  await setSize(w, 900)
+  await page.waitForTimeout(400)
+  const bar = await page.evaluate(() => {
+    const brand = document.querySelector('.brand').getBoundingClientRect()
+    const right = document.querySelector('.topbar-right').getBoundingClientRect()
+    const kids = [...document.querySelectorAll('.topbar-right > *')]
+    const last = kids[kids.length - 1].getBoundingClientRect()
+    return { wrapped: right.top >= brand.bottom - 2, clipped: last.right > document.documentElement.clientWidth }
+  })
+  ok(!bar.wrapped, `the top bar is one row at ${w}px`)
+  ok(!bar.clipped, `the last control is reachable at ${w}px`)
+}
+
 /* ---- responsiveness: the sizes this window can actually be ---- */
 const SIZES = [[880, 600, 'min'], [1280, 800, 'laptop'], [2560, 1000, 'ultrawide']]
 for (const [w, h, name] of SIZES) {

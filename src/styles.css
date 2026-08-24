@@ -4266,3 +4266,34 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
    rest of the row is untouched so the date and folder stay legible. */
 .nt-row.is-done .nt-rowname { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
 .nt-doneicon { color: var(--progress); flex: none; }
+
+/* ---- the top bar stays one row ----
+   Measured on his Mac: brand 180 + spaces 497 + actions 706, plus gaps and the
+   page gutter, needed 1495px. His window is about 1465, so the actions dropped
+   to a second row and left a hole across the right of the first one. That reads
+   as broken rather than as a layout.
+
+   Two steps, in order of how much they cost him:
+   1. Tighten the bar's own spacing. 16px of padding inside every pill and every
+      action button was generous, not necessary; 11 and 12 still clear a
+      comfortable hit area and buy back about 110px.
+   2. Only if that is still not enough, drop the action LABELS and keep the
+      icons. Every one of those buttons already carries an aria-label and a
+      title, so the tooltip and the screen reader are unaffected. This is the
+      same trade the phone breakpoint already makes, one tier earlier. */
+.topbar { gap: var(--s3); }
+.topbar-right { gap: 6px; }
+.topbar-right .btn { padding-inline: 11px; }
+.spaces .space-btn { padding-inline: 12px; }
+
+/* Between a phone and a roomy desktop: icons carry the actions. */
+@media (min-width: 640px) and (max-width: 1379px) {
+  .topbar-right .btn-label { display: none; }
+  .topbar-right .btn { padding-inline: 10px; }
+}
+/* Narrower still, and the wordmark goes too: the reticle is the mark, the word
+   beside it is the part that can be spared. The window's own minimum is 880, so
+   this tier has to hold or the bar breaks at a size he can actually drag to. */
+@media (min-width: 640px) and (max-width: 1039px) {
+  .brand-name { display: none; }
+}

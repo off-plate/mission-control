@@ -1255,9 +1255,11 @@ await step('notes: a slash command is taken at either end of the line', async ()
     await page.keyboard.type(text); await page.waitForTimeout(200)
     await page.keyboard.press('Enter'); await page.waitForTimeout(800)
   }
+  /* The LIST, not today. Capture and committing to a day are different acts:
+     /task only captures. */
   const todays = () => page.evaluate((K) => {
     const st = JSON.parse(localStorage.getItem(K) || '{}')
-    return (st.tasks ?? []).filter((t) => t.list === 'today').map((t) => t.title)
+    return (st.tasks ?? []).filter((t) => t.list === 'backlog').map((t) => t.title)
   }, KEY)
 
   // The whole sentence before the command becomes the task, command stripped.
@@ -1268,6 +1270,11 @@ await step('notes: a slash command is taken at either end of the line', async ()
     throw new Error(`trailing /task kept the command or lost text: "${t[0]}"`)
   }
   if (!(await page.locator('.nt-task-made').count())) throw new Error('no mark saying where the line went')
+  const onToday = await page.evaluate((K) => {
+    const st = JSON.parse(localStorage.getItem(K) || '{}')
+    return (st.tasks ?? []).filter((t) => t.list === 'today').length
+  }, KEY)
+  if (onToday !== 0) throw new Error(`/task put ${onToday} straight onto today; it captures to the list only`)
 
   // And at the head of the line.
   await write('/task Zavolat na VZP')
@@ -1302,7 +1309,7 @@ await step('notes: a slash command inside a list takes one bullet, not the list'
 
   const titles = await page.evaluate((K) => {
     const st = JSON.parse(localStorage.getItem(K) || '{}')
-    return (st.tasks ?? []).filter((t) => t.list === 'today').map((t) => t.title)
+    return (st.tasks ?? []).filter((t) => t.list === 'backlog').map((t) => t.title)
   }, KEY)
   if (titles.length !== 1) throw new Error(`${titles.length} tasks from one bullet: ${JSON.stringify(titles)}`)
   if (titles[0] !== 'Budget na pristi rok') {

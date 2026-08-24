@@ -159,7 +159,9 @@ await step('the menu is six tabs, and what left it is reachable from the header'
   for (const gone of ['Avoidance', 'Assistant', 'Notes', 'Focus', 'Money', 'Reflect']) {
     if (tabs.includes(gone)) throw new Error(`${gone} is still a tab`)
   }
-  for (const name of ['Note', 'Achievements', 'My Mind']) {
+  /* My Mind left the header for the Apps shelf on his instruction. The apps
+     test below owns it now. */
+  for (const name of ['Note', 'Achievements']) {
     if (!(await page.getByRole('button', { name, exact: true }).count()) && !(await page.getByRole('link', { name }).count())) {
       throw new Error(`no ${name} in the header`)
     }
@@ -2166,8 +2168,21 @@ await step('apps: a shelf that embeds nothing until an app is opened', async () 
     subs: document.querySelectorAll('.apps-what').length,
   }))
   if (shelf.frames !== 0) throw new Error(`${shelf.frames} iframe(s) mounted on the shelf; nothing should load unasked`)
-  if (shelf.tiles[0] !== 'Watchless') throw new Error(`first app is ${shelf.tiles[0]}`)
-  if (shelf.tiles.length !== 6) throw new Error(`${shelf.tiles.length} apps on the shelf`)
+  /* My Mind sits first, and it is the one app on this shelf that opens in a
+     tab rather than a frame: mymind answers with frame-ancestors 'none', so a
+     panel inside this page is not something the app is allowed to build.
+     Asserted as a real link with a real target, because a tile that silently
+     did nothing would look identical to one that worked. */
+  if (shelf.tiles[0] !== 'My Mind') throw new Error(`first app is ${shelf.tiles[0]}`)
+  if (!shelf.tiles.includes('Watchless')) throw new Error(`Watchless left the shelf: ${shelf.tiles.join(', ')}`)
+  const mind = await page.evaluate(() => {
+    const el = [...document.querySelectorAll('.apps-tile')].find((t) => /My Mind/.test(t.textContent))
+    return el ? { tag: el.tagName, href: el.getAttribute('href'), target: el.getAttribute('target') } : null
+  })
+  if (!mind || mind.tag !== 'A') throw new Error('My Mind is not a link, so it would try to frame a site that refuses framing')
+  if (!/access\.mymind\.com/.test(mind.href ?? '')) throw new Error(`My Mind points at ${mind.href}`)
+  if (mind.target !== '_blank') throw new Error('My Mind does not open in a new tab')
+  if (shelf.tiles.length !== 7) throw new Error(`${shelf.tiles.length} apps on the shelf`)
   if (shelf.subs) throw new Error('a tile carries a subtitle')
 })
 

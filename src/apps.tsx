@@ -23,6 +23,10 @@ interface EmbeddedApp {
   name: string
   url: string
   icon: JSX.Element
+  /** Opens in a new tab instead of a frame. For the ones that refuse to be
+   *  framed: a blank panel is worse than an honest hand-off, and an app the
+   *  shelf cannot show is still an app that belongs on the shelf. */
+  external?: boolean
 }
 
 /* House glyphs rather than an icon library: one stroke weight, one geometry,
@@ -30,6 +34,17 @@ interface EmbeddedApp {
 const S = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.75, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
 
 const APPS: EmbeddedApp[] = [
+  {
+    /* Moved off the header on his instruction. It opens in a TAB, not a frame,
+       and that is not a preference: mymind answers with frame-ancestors 'none',
+       so a panel inside this page is not something the app is allowed to build.
+       That constraint used to be written above the header button; it moves here
+       with the app it describes. */
+    id: 'mymind', name: 'My Mind',
+    url: 'https://access.mymind.com/everything',
+    external: true,
+    icon: <svg viewBox="0 0 24 24" {...S}><rect x="3" y="6" width="11" height="14" rx="2" /><path d="M8 3h11a2 2 0 0 1 2 2v11" /></svg>,
+  },
   {
     id: 'watchless', name: 'Watchless',
     url: 'https://watchless.netlify.app',
@@ -104,10 +119,17 @@ export function AppsPage() {
       <ul className="apps-shelf">
         {APPS.map((a) => (
           <li key={a.id}>
-            <button className="apps-tile" onClick={() => setOpenId(a.id)}>
-              <span className="apps-ico" aria-hidden="true">{a.icon}</span>
-              <span className="apps-name">{a.name}</span>
-            </button>
+            {a.external ? (
+              <a className="apps-tile" href={a.url} target="_blank" rel="noreferrer">
+                <span className="apps-ico" aria-hidden="true">{a.icon}</span>
+                <span className="apps-name">{a.name}</span>
+              </a>
+            ) : (
+              <button className="apps-tile" onClick={() => setOpenId(a.id)}>
+                <span className="apps-ico" aria-hidden="true">{a.icon}</span>
+                <span className="apps-name">{a.name}</span>
+              </button>
+            )}
           </li>
         ))}
       </ul>

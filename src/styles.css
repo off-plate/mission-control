@@ -2636,6 +2636,14 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
    LEFT and sat on top of Sunday's dot. */
 :root { --daystrip: calc(7 * 26px + 6 * var(--s3)); --habit-foot-col: 264px; --habit-menu-col: 34px; }
 @media (min-width: 1600px) { :root { --habit-foot-col: 340px; } }
+/* The row's layout is decided by the PANEL it sits in, not by the window.
+   The Habits page lays its panels out in columns, so on a wide screen a panel
+   can be 780px while the viewport is 1500. The stacked layout below was gated
+   on the viewport, so a narrow panel on a wide screen got the wide layout: the
+   habit name, the most important thing on the row, was squeezed into whatever
+   was left after a FIXED 264px of secondary text, and wrapped to five lines
+   while truncated fragments sat beside it. */
+.habit-list { container-type: inline-size; container-name: habitlist; }
 .habit-list .col-head { margin-bottom: var(--s2); }
 .habit-list .col-head .col-tot { margin-left: 0; }
 .habit-line { border-top: 1px solid var(--hairline); }
@@ -2651,7 +2659,10 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
   /* Every column fixed but the name: an "auto" menu column measured itself per
      row, so the legend row (which has no menu) sat 41px to the right of the
      dots it was labelling. */
-  grid-template-columns: minmax(0, 1fr) var(--daystrip) var(--habit-foot-col) var(--habit-menu-col);
+  /* The name takes nearly twice what the secondary column does, rather than
+     the leftovers after a fixed 264px. His order of importance, in his words:
+     the name first, the week second, and everything on the right last. */
+  grid-template-columns: minmax(0, 1.7fr) var(--daystrip) minmax(0, 1fr) var(--habit-menu-col);
   grid-template-areas: 'name days foot menu';
   padding: var(--s2) 0;
 }
@@ -2690,12 +2701,25 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 /* A dot the routine owns is not his to press, so it does not draw as one. */
 .daydot.is-locked { border-style: dotted; opacity: 0.75; }
 
-@media (max-width: 1000px) {
+/* Below this the row cannot hold three columns of text without squeezing the
+   name, so the secondary line drops underneath and gets the full width. It
+   reads as what it is, a footnote to the row, and nothing is truncated. */
+@container habitlist (max-width: 1240px) {
   .habit-list.w7 .habit-row {
     grid-template-columns: minmax(0, 1fr) var(--daystrip) var(--habit-menu-col);
     grid-template-areas: 'name days menu' 'foot foot foot';
   }
-  .habit-list.w7 .habit-foot { justify-content: flex-start; text-align: left; }
+  .habit-list.w7 .habit-foot {
+    justify-content: flex-start; text-align: left;
+    flex-wrap: wrap; white-space: normal;
+  }
+  /* Stacked, there is room to read them, so they stop being clipped. */
+  .habit-list.w7 .habit-foot .habit-weeks,
+  .habit-list.w7 .habit-goal,
+  .habit-list.w7 .habit-note { overflow: visible; text-overflow: clip; white-space: normal; }
+  .habit-list .habit-days.is-legend { margin-right: 0; }
+}
+@media (max-width: 1000px) {
   .habit-list .habit-days.is-legend { margin-right: 0; }
 }
 @media (max-width: 700px) {

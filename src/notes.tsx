@@ -39,7 +39,6 @@ function FolderIcon({ open, small }: { open?: boolean; small?: boolean }) {
   )
 }
 
-const colorBg = (id: string) => NOTE_COLORS.find((c) => c.id === id)?.bg ?? '#fbf8f1'
 
 const TAG_RE = /#[\p{L}\d_/-]+/gu
 const tagsOf = (t: string) => (t.match(TAG_RE) ?? []).map((x) => x.toLowerCase())
@@ -994,8 +993,12 @@ export function NotesPage() {
                       aria-current={n.id === openId ? 'true' : undefined}
                       onClick={() => { setOpenId(n.id); if (phone) window.scrollTo({ top: 0 }) }}
                     >
+                      {/* No dot. His words: "in the notes it should not have
+                          any fucking dots". The colour swatch that sat here said
+                          nothing the note's own title does not, and it pushed
+                          every title in the list off the left edge for the sake
+                          of a decoration. */}
                       <span className="nt-rowtitle">
-                        <span className="nt-swatch" style={{ background: colorBg(n.color) }} aria-hidden="true" />
                         <span className="nt-rowname">{headOf(n.body) || 'Untitled'}</span>
                       </span>
                       <span className="nt-rowsub">

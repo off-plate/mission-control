@@ -289,25 +289,6 @@ export default function App() {
           </nav>
         )}
         <div className="topbar-right">
-          {/* mymind cannot be embedded: it answers with frame-ancestors 'none',
-              which forbids every iframe anywhere, so a panel inside this page is
-              not something the app is allowed to build. A plain link in a new
-              tab then, not a sized window: that opened as a Chrome app window,
-              which is not what he asked for and not where he keeps his tabs. */}
-          <a
-            className="btn btn-ghost hide-phone"
-            href="https://access.mymind.com/everything"
-            target="_blank"
-            rel="noreferrer"
-            title="Open My Mind in a new tab"
-            aria-label="My Mind"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <rect x="3" y="6" width="11" height="14" rx="2" />
-              <path d="M8 3h11a2 2 0 0 1 2 2v11" strokeLinecap="round" />
-            </svg>
-            <span className="btn-label">My Mind</span>
-          </a>
           {/* The one thing running, full screen. Filled with the accent so it
               reads as the button that starts something, not a place he browses.
               It is a toggle: pressing it again puts him back on the page he

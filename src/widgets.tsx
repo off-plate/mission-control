@@ -9,6 +9,7 @@ import {
   SPACE_LABELS,
 } from './mock'
 import { useStore } from './store'
+import { useCalendar } from './calendar'
 import { goalCurrent, isTimeFed, keptThisPeriod, ON_TRACK_PCT, type SizeKey, type SpaceId, type WidgetType } from './types'
 import { useClockStamp } from './ui'
 import { fmtDuration, fmtNum, fmtTimeShort, goalPace, goalPeriodKey, goalPeriodRange, isoWeekKey, localDateKey, type GoalTf } from './util'
@@ -99,24 +100,47 @@ export function SparkBox({ data, unit, caption }: { data: number[]; unit: string
   )
 }
 
-const AgendaBody = memo(function AgendaBody({ space, size }: { space: SpaceId; size: SizeKey }) {
-  const events = MOCK_AGENDA[space]
+/* His real work calendar, drawn here rather than embedded.
+
+   An iframe was the obvious way and the wrong one: it cannot be styled, it
+   cannot answer "what is next", and it drops a Google login into a page that
+   otherwise only ever shows his own record. The feed is fetched by an Edge
+   Function (Google sends no CORS header, measured) and parsed in src/ical.ts.
+
+   Every state is named. An empty day and a calendar that could not be read
+   look identical if you let them, and "nothing scheduled" over a day full of
+   meetings is the most expensive lie this widget could tell. */
+const AgendaBody = memo(function AgendaBody({ size }: { space: SpaceId; size: SizeKey }) {
+  const { state } = useCalendar()
   const narrow = size === 'T' || size === 'S'
   const now = new Date()
   const nowMin = now.getHours() * 60 + now.getMinutes()
-  const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m }
-  const nextIdx = events.findIndex((e) => toMin(e.end) > nowMin)
-  if (!events.length) {
-    return <div className="empty">Nothing scheduled. Protect the evening.</div>
-  }
+  const today = localDateKey()
+
+  if (state.status === 'loading') return <div className="empty">Reading the calendar.</div>
+  if (state.status === 'off') return <div className="empty">Sync is off, so the calendar cannot be read.</div>
+  if (state.status === 'signed-out') return <div className="empty">Sign in to read the calendar.</div>
+  if (state.status === 'not-set-up') return <div className="empty">No calendar feed connected yet.</div>
+  if (state.status === 'error') return <div className="empty">Calendar could not be read. {state.message}</div>
+
+  const todays = state.events.filter((e) => e.day === today)
+  if (!todays.length) return <div className="empty">Nothing in the calendar today.</div>
+
+  const nextIdx = todays.findIndex((e) => e.start !== null && (e.end ?? e.start) > nowMin)
+  const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
   return (
     <div className="rowlist">
-      {events.map((e, i) => {
-        const past = toMin(e.end) <= nowMin
+      {todays.map((e, i) => {
+        const past = e.start !== null && (e.end ?? e.start) <= nowMin
         return (
-          <div className="rowitem" key={e.id}>
-            <span className="mono meta" style={i === nextIdx ? { color: 'var(--accent)', fontWeight: 600 } : undefined}>{fmtTimeShort(e.start)}</span>
-            <span className="grow wrap2" style={past ? { color: 'var(--muted)', textDecoration: 'line-through', textDecorationColor: 'var(--hairline-strong)' } : undefined} title={e.where ? `${e.title}, ${e.where}` : e.title}>{e.title}</span>
+          <div className="rowitem" key={`${e.day}-${e.start ?? 'all'}-${e.title}`}>
+            <span className={`mono meta${i === nextIdx ? ' cal-next' : ''}`}>
+              {e.allDay ? 'all day' : hm(e.start as number)}
+            </span>
+            <span
+              className={`grow wrap2${past ? ' cal-past' : ''}`}
+              title={e.where ? `${e.title}, ${e.where}` : e.title}
+            >{e.title}</span>
             {past ? <span className="meta mono">done</span> : e.where && !narrow ? <span className="meta">{e.where}</span> : null}
           </div>
         )

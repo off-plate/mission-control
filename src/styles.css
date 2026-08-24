@@ -11,6 +11,114 @@
    system fonts and looks like a different product, with no error anyone would
    see. latin and latin-ext only (Czech needs latin-ext), which is what the
    browser would have fetched anyway. */
+/* HUD mode, behind the helmet in the header. Self-hosted with latin-ext, so
+   Czech renders in the real face here too. */
+@font-face {
+  font-family: 'Michroma';
+  src: url('/mission-control/fonts/michroma-400-latin-ext.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Michroma';
+  src: url('/mission-control/fonts/michroma-400-latin.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Saira';
+  src: url('/mission-control/fonts/saira-400-latin-ext.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Saira';
+  src: url('/mission-control/fonts/saira-400-latin.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Saira';
+  src: url('/mission-control/fonts/saira-600-latin-ext.woff2') format('woff2');
+  font-weight: 600; font-style: normal; font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Saira';
+  src: url('/mission-control/fonts/saira-600-latin.woff2') format('woff2');
+  font-weight: 600; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ---------- HUD ----------
+   A MODE, not a repaint. The warm paper dashboard is still the app; this is a
+   second skin he switches on, and it lives entirely in token overrides on one
+   class, the same mechanism the Zone already uses. Nothing below restyles a
+   component: every rule here reassigns a variable, which is why one class can
+   turn the whole app over without touching a single page.
+
+   The palette is a cockpit readout: near-black with depth rather than flat
+   black, one cyan that carries every accent, and hairlines instead of fills.
+   Red and green survive because they carry meaning the app depends on, but
+   they are pulled toward the display so they read as instrument warnings
+   rather than as stickers from the light theme. */
+/* On the BODY, not only on the shell. The focus pill, the undo bar, sheets and
+   the daily review are fixed siblings of .shell rather than descendants, so
+   token overrides scoped to .shell never reached them and they stayed on warm
+   paper over a dark app. The Zone hit exactly this once before. */
+body:has(.shell.is-hud) {
+  --bg: #070B10;
+  --surface: #0C121A;
+  --surface-2: #121A24;
+  --ink: #E6F1F8;
+  --muted: #93A7B8;
+  --faint: #6E8496;
+  --hairline: rgba(79, 216, 232, 0.14);
+  --hairline-strong: rgba(79, 216, 232, 0.34);
+  --accent: #4FD8E8;
+  --accent-text: #6FE4F2;
+  --accent-hover: #7FEBF7;
+  --accent-ink: #04141A;
+  --focus: #4FD8E8;
+  --focus-text: #6FE4F2;
+  --alert: #FF6B5A;
+  --progress: #55E0A0;
+  --info: #7FA6C4;
+  --warn: #FFC46B;
+  --cat-call: #FF9E7A;
+  --cat-admin: #7FA6C4;
+  --cat-deep: #C89BF0;
+  --cat-quick: #4FD8E8;
+  --shadow-pop: 0 18px 50px rgba(0, 0, 0, 0.65);
+  --font-display: 'Michroma', 'Eurostile', sans-serif;
+  --font-body: 'Saira', 'Helvetica Neue', sans-serif;
+  --font-mono: 'Saira', 'Helvetica Neue', sans-serif;
+  /* Redeclaring the family, not only the token. `body` computes its
+     font-family from the ROOT token, and everything that does not set its own
+     family inherits that COMPUTED value rather than the variable, so half the
+     app stayed in Instrument Sans while the other half switched. Caught by
+     reading the rendered font off the page rather than trusting the override. */
+  font-family: var(--font-body);
+}
+.shell.is-hud { background: var(--bg); color: var(--ink); }
+body:has(.shell.is-hud) { background: var(--bg); }
+/* Michroma has one weight and a very wide set width, so it is used at display
+   sizes only and never asked for a bold it does not own. Headings get letter
+   spacing because that is what makes a technical face read as an instrument
+   label rather than as a shouty title. */
+.shell.is-hud h1, .shell.is-hud h2, .shell.is-hud h3 {
+  font-weight: 400; letter-spacing: 0.045em;
+}
+.shell.is-hud .microcap, .shell.is-hud .k, .shell.is-hud .col-head { letter-spacing: 0.18em; }
+/* Panels stop being paper and become readouts: a hairline, a breath of the
+   accent behind them, and square corners. */
+.shell.is-hud .panel, .shell.is-hud .widget, .shell.is-hud .card {
+  border-color: var(--hairline-strong);
+  background: color-mix(in srgb, var(--accent) 3%, var(--surface));
+  border-radius: 2px;
+}
+.shell.is-hud .btn-primary { color: var(--accent-ink); }
+
 /* Special Gothic, his pick, self-hosted like everything else here: both CDNs
    failed mid-session once already and a dashboard whose type vanishes is worse
    than one that loads a beat slower.
@@ -199,8 +307,8 @@
 
   --shadow-pop: 0 18px 50px rgba(22, 21, 15, 0.18);
 
-  --font-display: 'Special Gothic Expanded One', 'Avenir Next', sans-serif;
-  --font-body: 'Special Gothic', 'Helvetica Neue', sans-serif;
+  --font-display: 'Bricolage Grotesque', 'Avenir Next', sans-serif;
+  --font-body: 'Instrument Sans', 'Helvetica Neue', sans-serif;
   /* The machine's own mono. Nothing is downloaded and no typeface is imposed:
      what this token has to deliver is figures of equal width, which the system
      face already does. It used to resolve to Instrument Sans, so forty call
@@ -210,7 +318,7 @@
      line numbers up in columns, and that job is done by tabular figures rather
      than by a monospaced face. So it points at the body font and keeps only
      the number alignment. */
-  --font-mono: 'Special Gothic', 'Helvetica Neue', sans-serif;
+  --font-mono: 'Instrument Sans', 'Helvetica Neue', sans-serif;
 
   --text-xs: 0.8125rem;
   --text-sm: 0.9375rem;
@@ -324,23 +432,10 @@ a, button, input, select, textarea {
               border-color var(--t-fast), opacity var(--t-fast);
 }
 
-/* ---------- one weight, two faces ----------
-   Both files are weight 400 and nothing else exists, so every font-weight above
-   400 in this stylesheet would be drawn by the browser as a synthetic bold:
-   the same outlines smeared sideways. On an expanded display face that reads as
-   a printing fault rather than as emphasis.
-
-   So synthesis is off, and emphasis is expressed the way this pairing intends
-   it: by switching to the expanded face. Anything that asked to be bold now
-   says so by being WIDER, not fatter. */
+/* Never fake a weight the file does not have. Bricolage ships 600/700/800 and
+   Instrument Sans 400/500/600, so nothing here needs synthesis, and HUD mode
+   below runs on faces with fewer cuts where faking one would show. */
 * { font-synthesis-weight: none; font-synthesis-style: none; }
-
-/* Bold in running text, and the two tags browsers bold by default. */
-strong, b, th, dt { font-family: var(--font-display); font-weight: 400; }
-
-/* Headings already use the display face; this stops them asking for a weight
-   that does not exist and getting a fake one on top of the real thing. */
-h1, h2, h3, h4, h5, h6 { font-weight: 400; }
 
 .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 /* Labels are body-font small caps; mono is reserved for data. */
@@ -4405,3 +4500,13 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .meet-when { font-size: 0.625rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-text); }
 .meet-what { font-size: var(--text-sm); color: var(--ink); min-width: 0; flex: 1; }
 .meet-go { flex: none; }
+
+/* The helmet button. Square, so it reads as an instrument switch beside the
+   Zone's pill rather than as a second label. */
+.btn-helmet { padding: 0 var(--s3); }
+.helmet { display: block; }
+.btn-helmet.is-on { color: var(--accent-text); border-color: var(--accent); }
+/* The eyes come up rather than snapping, which is the one piece of motion this
+   mode gets. Same curve as everything else in the app. */
+.helmet-eyes { transition: fill var(--t-med), opacity var(--t-med); }
+.shell.is-hud .btn-helmet { color: var(--accent-text); }

@@ -1111,7 +1111,15 @@ await step('sync: a phone that slept through the week cannot wipe what happened 
   await A.reload(); await A.waitForTimeout(900)
   const wrote = await A.evaluate((K) => (JSON.parse(localStorage.getItem(K)).review?.reflections ?? []).length, KEY)
   if (wrote !== 1) throw new Error(`the reflection did not persist before the merge: ${wrote}`)
-  if (rolled.history.join(',') !== '5,4,3') throw new Error(`the sealed week counted wrong: ${JSON.stringify(rolled.history)}, expected [5,4,3]`)
+  /* The sealed weeks must survive, in order. A run on a Monday legitimately has
+     one more bucket than a run on a Sunday, because the ISO week turned and the
+     app opened the current one at zero; asserting exact equality made this gate
+     fail every Monday for a reason that was never a bug. What matters is that
+     nothing already banked was lost or reordered. */
+  const sealed = rolled.history.slice(0, 3).join(',')
+  if (sealed !== '5,4,3') throw new Error(`the sealed weeks counted wrong: ${JSON.stringify(rolled.history)}, expected them to start [5,4,3]`)
+  if (rolled.history.length > 4) throw new Error(`unexpected extra weeks: ${JSON.stringify(rolled.history)}`)
+  if (rolled.history.length === 4 && rolled.history[3] !== 0) throw new Error(`the new week did not open at zero: ${JSON.stringify(rolled.history)}`)
 
   /* Now the sleeping phone wakes and saves: the SAME pre-roll blob, stamped
      later, plus one new note so the merge is not a no-op. Written from a page
@@ -1144,7 +1152,10 @@ await step('sync: a phone that slept through the week cannot wipe what happened 
   if (after.reflections !== 1) throw new Error(`a sleeping phone deleted a written reflection: ${after.reflections} left`)
   if (after.returnedCount !== 2) throw new Error(`the postpone banner lost its count: ${after.returnedCount}`)
   if (after.returnedIds.join(',') !== 'slept-a,slept-b') throw new Error(`the banner lost which tasks: ${after.returnedIds.join(',')}`)
-  if (after.history.join(',') !== '5,4,3') throw new Error(`a sleeping phone rolled back a sealed week: ${JSON.stringify(after.history)}, expected [5,4,3]`)
+  /* Same reason as above: the assertion is that the sealed weeks survived the
+     merge intact, not that today happens to be a Sunday. */
+  if (after.history.slice(0, 3).join(',') !== '5,4,3') throw new Error(`a sleeping phone rolled back a sealed week: ${JSON.stringify(after.history)}, expected them to start [5,4,3]`)
+  if (after.history.length < rolled.history.length) throw new Error(`a sleeping phone dropped a week: ${JSON.stringify(after.history)} was ${JSON.stringify(rolled.history)}`)
   await ctx.close()
 })
 
@@ -2026,32 +2037,74 @@ await step('notes: the note menu opens where it can be reached', async () => {
   if (Math.abs(bar.offset) > 1) throw new Error(`the date sits ${bar.offset}px off the title's margin`)
 })
 
-/* Apps: the embedded tools. The frame's CONTENT is other sites and is not this
-   gate's to judge; what is asserted is Mission Control's half of the contract:
-   the tab exists, Watchless is the frame's target and the default, switching
-   apps retargets the frame, and the browser escape hatch points at the same
-   place the frame does. */
-await step('apps: Watchless framed by default, switching retargets, browser link agrees', async () => {
+/* Apps: a shelf of icons that opens one app at a time. The frame's CONTENT is
+   other sites and is not this gate's to judge; what is asserted is Mission
+   Control's half of the contract: nothing is embedded until he asks, opening
+   targets the right app, and the browser link agrees with the frame. */
+await step('apps: a shelf that embeds nothing until an app is opened', async () => {
   await fresh('apps')
-  const first = await page.evaluate(() => ({
-    tab: [...document.querySelectorAll('.nav a, .nav button, nav a, nav button')].some((el) => el.textContent.trim() === 'Apps'),
-    src: document.querySelector('.apps-frame')?.getAttribute('src') ?? '',
-    out: document.querySelector('.apps-out')?.getAttribute('href') ?? '',
-    on: document.querySelector('.apps-bar .is-on')?.textContent.trim() ?? '',
+  const shelf = await page.evaluate(() => ({
+    tiles: [...document.querySelectorAll('.apps-tile .apps-name')].map((el) => el.textContent.trim()),
+    frames: document.querySelectorAll('iframe').length,
+    subs: document.querySelectorAll('.apps-what').length,
   }))
-  if (!first.src.startsWith('https://watchless.netlify.app')) throw new Error(`default frame is ${first.src || 'missing'}`)
-  if (first.out !== first.src) throw new Error(`Open in browser goes to ${first.out}, the frame to ${first.src}`)
-  if (first.on !== 'Watchless') throw new Error(`active pill reads ${first.on}`)
-  await page.evaluate(() => { [...document.querySelectorAll('.apps-bar button')].find((b) => b.textContent.trim() === 'Compass')?.click() })
+  if (shelf.frames !== 0) throw new Error(`${shelf.frames} iframe(s) mounted on the shelf; nothing should load unasked`)
+  if (shelf.tiles[0] !== 'Watchless') throw new Error(`first app is ${shelf.tiles[0]}`)
+  if (shelf.tiles.length !== 6) throw new Error(`${shelf.tiles.length} apps on the shelf`)
+  if (shelf.subs) throw new Error('a tile carries a subtitle')
+})
+
+await step('apps: opening one frames it, Escape comes back, browser link agrees', async () => {
+  await fresh('apps')
+  await page.evaluate(() => { [...document.querySelectorAll('.apps-tile')].find((t) => t.textContent.includes('Watchless'))?.click() })
   await page.waitForTimeout(400)
-  const second = await page.evaluate(() => ({
+  const opened = await page.evaluate(() => ({
     src: document.querySelector('.apps-frame')?.getAttribute('src') ?? '',
-    out: document.querySelector('.apps-out')?.getAttribute('href') ?? '',
+    out: [...document.querySelectorAll('.apps-open a')].map((a) => a.getAttribute('href'))[0] ?? '',
+    name: document.querySelector('.apps-openname')?.textContent.trim() ?? '',
+    clipped: (() => {
+      const clip = document.querySelector('.apps-clip'); const f = document.querySelector('.apps-frame')
+      if (!clip || !f) return false
+      // The frame must be wider than its clip, which is what hides the inner scrollbar.
+      return f.getBoundingClientRect().width > clip.getBoundingClientRect().width + 8
+    })(),
   }))
-  if (!second.src.startsWith('https://compass-money.netlify.app')) throw new Error(`after switching, frame is ${second.src}`)
-  if (second.out !== second.src) throw new Error('the browser link did not follow the switch')
-  const kept = await page.evaluate(() => localStorage.getItem('mc-apps-last'))
-  if (kept !== 'compass') throw new Error(`choice not remembered (got ${kept})`)
+  if (!opened.src.startsWith('https://watchless.netlify.app')) throw new Error(`frame is ${opened.src || 'missing'}`)
+  if (opened.out !== opened.src) throw new Error(`Open in browser goes to ${opened.out}, the frame to ${opened.src}`)
+  if (opened.name !== 'Watchless') throw new Error(`header reads ${opened.name}`)
+  if (!opened.clipped) throw new Error('the frame is not wider than its clip, so its scrollbar will show')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+  const back = await page.evaluate(() => document.querySelectorAll('iframe').length)
+  if (back !== 0) throw new Error('Escape did not close the app')
+})
+
+await step('notes: ticking one files it under Done and takes it out of the folder', async () => {
+  await fresh('notes')
+  const before = await page.evaluate(() => document.querySelectorAll('.nt-row').length)
+  if (!before) throw new Error('no notes to tick')
+  const title = await page.evaluate(() => document.querySelector('.nt-rowname')?.textContent.trim())
+  await page.locator('.nt-tick').first().click()
+  await page.waitForTimeout(500)
+  const after = await page.evaluate(() => ({
+    rows: document.querySelectorAll('.nt-row').length,
+    doneChip: [...document.querySelectorAll('.nt-fname')].some((el) => el.textContent.trim() === 'Done'),
+  }))
+  if (after.rows !== before - 1) throw new Error(`list went ${before} -> ${after.rows}; a ticked note must leave the list`)
+  if (!after.doneChip) throw new Error('no Done folder appeared')
+  // and it is in Done, struck through, and can come back
+  await page.evaluate(() => { [...document.querySelectorAll('.nt-folder')].find((b) => b.textContent.includes('Done'))?.click() })
+  await page.waitForTimeout(400)
+  const inDone = await page.evaluate((t) => {
+    const row = [...document.querySelectorAll('.nt-row')].find((r) => r.textContent.includes(t))
+    return { found: !!row, struck: row ? getComputedStyle(row.querySelector('.nt-rowname')).textDecorationLine.includes('line-through') : false }
+  }, title)
+  if (!inDone.found) throw new Error('the ticked note is not in Done')
+  if (!inDone.struck) throw new Error('the done note does not read as done')
+  await page.locator('.nt-tick.on').first().click()
+  await page.waitForTimeout(500)
+  const restored = await page.evaluate(() => document.querySelectorAll('.nt-row').length)
+  if (restored !== 0) throw new Error('un-ticking did not take it out of Done')
 })
 
 await b.close(); server.close()

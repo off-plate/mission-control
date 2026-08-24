@@ -876,6 +876,11 @@ export interface Note {
   when: string
   updatedAt: number
   pinned?: boolean
+  /** When he ticked it off, as a timestamp. A note is a thing to deal with as
+   *  often as it is a thing to keep, so ticking one files it under Done and
+   *  takes it out of every other list. A number, not a flag, so the merge keeps
+   *  the later word when two devices disagree and Done can sort by when. */
+  done?: number
   /** Short hashes of the bodies this note has already had, oldest first. This is
    *  what lets the merge tell a copy that is merely behind from one that has
    *  genuinely diverged, instead of crying conflict on every ordinary save. */

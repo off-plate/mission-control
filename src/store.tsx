@@ -312,6 +312,8 @@ interface Store extends PersistedState {
   /** Makes an empty note in that folder and hands back its id to open. */
   addNote: (folderId: string, body?: string) => string
   updateNote: (id: string, patch: Partial<Pick<Note, 'title' | 'body' | 'color' | 'pinned'>>) => void
+  /** Tick a note off, or put it back. */
+  setNoteDone: (id: string, done: boolean) => void
   moveNote: (id: string, folderId: string) => void
   deleteNote: (id: string) => void
   /** The losing body from another device: take it into this note, or drop it. */
@@ -2470,6 +2472,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
        folder's workspace, which is how a note moved into a folder made in
        Michael's Corner quietly became a Corner note. Folders are folders now:
        they hold notes, they do not reassign them. */
+    /* Ticking a note is not an edit of its text, so it does not touch hist or
+       the body. It does stamp updatedAt, because a note that just changed state
+       has changed and the list should feel it. Unpinned on the way out: a done
+       note holding a pinned slot at the top is exactly the clutter this removes. */
+    setNoteDone: (id, done) => setNotes((prev) => prev.map((n) => (n.id === id
+      ? { ...n, done: done ? Date.now() : undefined, pinned: done ? false : n.pinned, dev: deviceId(), updatedAt: Date.now() }
+      : n))),
     moveNote: (id, folderId) => setNotes((prev) => prev.map((n) => (n.id === id
       ? { ...n, folderId, updatedAt: Date.now() }
       : n))),

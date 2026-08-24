@@ -141,6 +141,30 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
     onChange(md)
   }
 
+  /* Where "/help" is allowed to sit on the line.
+
+     It used to be the start, and only the start. He wrote
+
+         33 tis vyfaktuovat /help
+
+     which is how a person actually asks for help with something they have
+     just written, pressed Enter, and got nothing at all: no answer, no error,
+     no sign the app had even seen it. Silence is the worst available response
+     here, because it cannot be told apart from the feature being broken,
+     which is exactly what he concluded.
+
+     So it is taken at either end and the request is whatever sits on the
+     other side of it. A line that is only "/help" has nothing to work with,
+     so it is left alone rather than sent empty. */
+  const helpAsk = (line: string): string | null => {
+    const t = line.trim()
+    const lead = t.match(/^\/help\b\s*(.*)$/i)
+    if (lead) return lead[1].trim() || null
+    const trail = t.match(/^(.*?)\s*\/help\s*$/i)
+    if (trail) return trail[1].trim() || null
+    return null
+  }
+
   /* "/help <request>" on its own line, Enter to send. The line becomes a
      "Thinking…" placeholder, Groq answers in its place, and on failure the
      line comes back exactly as typed plus one honest sentence about why:
@@ -406,10 +430,10 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
               if (slashHelp && e.key === 'Enter' && !e.shiftKey) {
                 const root = ref.current
                 const block = root && blockAt(root)
-                const m = (block?.textContent ?? '').match(/^\/help\s+(.+)/i)
-                if (block && m) {
+                const ask = helpAsk(block?.textContent ?? '')
+                if (block && ask) {
                   e.preventDefault()
-                  void runHelp(block, m[1].trim())
+                  void runHelp(block, ask)
                   return
                 }
               }

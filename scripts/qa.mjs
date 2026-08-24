@@ -1281,6 +1281,40 @@ await step('notes: a slash command is taken at either end of the line', async ()
   if (t.length !== before) throw new Error(`bare /task filed something: ${JSON.stringify(t)}`)
 })
 
+await step('notes: a slash command inside a list takes one bullet, not the list', async () => {
+  /* His report: five bullets, /task on the last one, and all five arrived as a
+     single task with the words run together. blockAt walks up to a child of the
+     root, so inside a <ul> it returns the whole list. /help had the same bug
+     and would have replaced every bullet with one answer. */
+  await fresh('notes')
+  await page.goto(`${URL}#/notes`); await page.waitForTimeout(700)
+  const add = page.getByRole('button', { name: /New note/i }).first()
+  if (await add.count()) { await add.click(); await page.waitForTimeout(700) }
+  const ed = page.locator('[contenteditable="true"]').first()
+  await ed.click(); await page.waitForTimeout(150)
+  const items = ['33 tis vyfakturovat na nove PO', 'Skoleni AI certifikace', 'Shrnuti', 'Mirek', 'Budget na pristi rok']
+  await page.keyboard.type('- ' + items[0])
+  for (const it of items.slice(1)) { await page.keyboard.press('Enter'); await page.keyboard.type(it) }
+  await page.waitForTimeout(250)
+  await page.keyboard.type(' /task')
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(900)
+
+  const titles = await page.evaluate((K) => {
+    const st = JSON.parse(localStorage.getItem(K) || '{}')
+    return (st.tasks ?? []).filter((t) => t.list === 'today').map((t) => t.title)
+  }, KEY)
+  if (titles.length !== 1) throw new Error(`${titles.length} tasks from one bullet: ${JSON.stringify(titles)}`)
+  if (titles[0] !== 'Budget na pristi rok') {
+    throw new Error(`the bullet did not come across on its own: "${titles[0]}"`)
+  }
+  // the other four are still bullets, and the marked one is still a list item
+  const html = await page.evaluate(() => document.querySelector('[contenteditable="true"]').innerHTML)
+  const lis = (html.match(/<li/g) || []).length
+  if (lis < 5) throw new Error(`the list lost its shape: ${lis} items left`)
+  if (!/<li[^>]*>[^<]*Budget na pristi rok/.test(html)) throw new Error('the task line stopped being a bullet')
+})
+
 await step('habits: a quitting row keeps its slip button off the day dots', async () => {
   /* The foot column is a fixed width, so a long "since 12 Apr, 114 best run"
      used to push the button out of its own column and onto Sunday's dot, at a

@@ -4190,17 +4190,79 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   -webkit-app-region: no-drag;
 }
 
-/* ---- Apps: his other tools, framed ---- */
-.apps-bar { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; margin-bottom: var(--s3); }
-.apps-bar h1 { margin-right: var(--s3); }
-.apps-out { margin-left: auto; }
-.apps-frame {
-  width: 100%;
-  /* The frame is the page: everything above it, then the app gets the rest. */
-  height: calc(100vh - 232px);
-  min-height: 480px;
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--r-md);
-  background: #fff;
-  display: block;
+/* ---- Apps ----
+   A shelf of icons, and one app at a time when he opens one. */
+
+/* The same air every other page gets from its Band. Without it the heading sits
+   on the navigation with nothing between them. */
+.apps-h { padding: var(--s6) 0 var(--s5); }
+
+.apps-shelf {
+  list-style: none;
+  display: flex; flex-wrap: wrap; gap: var(--s3);
 }
+.apps-tile {
+  /* Fixed, so six apps read as six icons on a shelf rather than stretching into
+     a toolbar the width of an ultrawide. */
+  width: 132px;
+  display: flex; flex-direction: column; align-items: center; gap: var(--s2);
+  padding: var(--s4) var(--s2);
+  border: 1px solid var(--hairline-strong); border-radius: var(--r-md);
+  background: var(--card);
+  transition: border-color var(--t-fast), background var(--t-fast), transform var(--t-fast);
+}
+.apps-tile:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, var(--card));
+  transform: translateY(-1px);
+}
+.apps-ico {
+  width: 46px; height: 46px; flex: none; border-radius: 12px;
+  display: grid; place-items: center; color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.apps-ico svg { width: 25px; height: 25px; }
+.apps-name { font-weight: 600; text-align: center; }
+
+/* One app, open. */
+.apps-open { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; padding: var(--s5) 0 var(--s4); }
+.apps-openname { margin-right: auto; margin-left: var(--s2); }
+.apps-clip {
+  /* The clip is the visible edge; the iframe inside it is deliberately wider,
+     so the framed app's scrollbar falls outside and is never drawn. */
+  overflow: hidden;
+  border: 1px solid var(--hairline-strong); border-radius: var(--r-md);
+  background: #fff;
+}
+.apps-frame {
+  display: block; border: 0;
+  width: calc(100% + 17px);
+  height: calc(100vh - 250px); min-height: 460px;
+}
+
+/* ---- a note can be ticked off ----
+   The tick is a sibling of the row, not a child: a button inside a button is
+   invalid, and VoiceOver reads the inner one as part of the outer label. The li
+   positions it; the row leaves a lane for it. */
+.nt-rowli { position: relative; }
+.nt-row.has-tick { padding-left: calc(var(--s3) + 26px); }
+.nt-tick {
+  /* Level with the TITLE, not the middle of the row: a row is three lines tall
+     and centring put the box beside the date, which is not what it ticks. */
+  position: absolute; left: var(--s3); top: calc(var(--s3) + 1px);
+  z-index: 2;
+  width: 19px; height: 19px; border-radius: 5px;
+  border: 1.5px solid var(--hairline-strong);
+  display: grid; place-items: center;
+  color: transparent; background: transparent;
+  transition: border-color var(--t-fast), background var(--t-fast), color var(--t-fast);
+}
+.nt-tick svg { pointer-events: none; }
+.nt-tick:hover { border-color: var(--accent); }
+/* Green is progress, and a note ticked off is progress. COLOR.md's role, not a
+   new colour. */
+.nt-tick.on { background: var(--progress); border-color: var(--progress); color: #fff; }
+/* Done rows read as finished without being unreadable: the title softens, the
+   rest of the row is untouched so the date and folder stay legible. */
+.nt-row.is-done .nt-rowname { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
+.nt-doneicon { color: var(--progress); flex: none; }

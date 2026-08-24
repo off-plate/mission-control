@@ -20,7 +20,17 @@ const consoleErrors = []
 page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text()) })
 page.on('pageerror', (e) => consoleErrors.push(String(e)))
 await page.waitForLoadState('domcontentloaded')
-await page.evaluate(() => localStorage.setItem('mc-local-only', '1'))
+/* Start from seed every run. The dev profile is disposable by definition, and a
+   suite whose result depends on what the last run left behind is not a gate. */
+await page.evaluate(() => {
+  /* The state blob's key is mission-control-*, not mc-*; mc-* is view
+     preferences and sync flags. Clearing only the latter left the previous
+     run's data in place and made this suite depend on what it did last time. */
+  for (const k of Object.keys(localStorage)) {
+    if (k.startsWith('mc-') || k.startsWith('mission-control')) localStorage.removeItem(k)
+  }
+  localStorage.setItem('mc-local-only', '1')
+})
 await page.reload()
 await page.waitForSelector('#root *', { timeout: 20000 })
 
@@ -41,16 +51,83 @@ for (const p of PAGES) {
 }
 ok(consoleErrors.length === 0, `no console errors across all pages${consoleErrors.length ? ` (first: ${consoleErrors[0].slice(0, 120)})` : ''}`)
 
-/* Apps inside Electron: the frame must actually load foreign content, which is
-   the one thing the web gate cannot prove about THIS shell. */
+/* Apps inside Electron. The shelf must embed nothing unasked, and opening one
+   must actually load foreign content in THIS shell, which is the one thing the
+   web gate cannot prove. */
 await page.evaluate(() => { location.hash = '/apps' })
-await page.waitForTimeout(4000)
+await page.waitForTimeout(900)
+const shelf = await page.evaluate(() => ({
+  tiles: document.querySelectorAll('.apps-tile').length,
+  frames: document.querySelectorAll('.apps-frame').length,
+  gap: (() => {
+    const nav = document.querySelector('.nav, nav')?.getBoundingClientRect()
+    const h = document.querySelector('.apps-h')?.getBoundingClientRect()
+    return nav && h ? Math.round(h.top - nav.bottom) : -1
+  })(),
+}))
+ok(shelf.tiles === 6, `the shelf shows six apps (got ${shelf.tiles})`)
+ok(shelf.frames === 0, `no app is embedded until asked (got ${shelf.frames})`)
+ok(shelf.gap >= 40, `the heading clears the navigation (${shelf.gap}px)`)
+
+await page.evaluate(() => { [...document.querySelectorAll('.apps-tile')].find((t) => t.textContent.includes('Watchless'))?.click() })
+await page.waitForTimeout(5000)
 const frame = page.frames().find((f) => f.url().startsWith('https://watchless.netlify.app'))
-ok(!!frame, 'the Watchless frame loads real content inside the app shell')
-if (frame) {
-  const text = await frame.evaluate(() => (document.body?.innerText ?? '').slice(0, 200)).catch(() => '')
-  ok(/watchless/i.test(text) || text.length > 20, `the framed app rendered something (${text.slice(0, 40).replace(/\s+/g, ' ')}...)`)
+ok(!!frame, 'opening Watchless loads real content inside the app shell')
+const clipped = await page.evaluate(() => {
+  const c = document.querySelector('.apps-clip')?.getBoundingClientRect()
+  const f = document.querySelector('.apps-frame')?.getBoundingClientRect()
+  return c && f ? f.width > c.width + 8 : false
+})
+ok(clipped, 'the frame is wider than its clip, so the embedded scrollbar is hidden')
+/* Focus has to be in Mission Control's own chrome for this: keystrokes inside a
+   cross-origin frame belong to that site and the parent never sees them, which
+   is a browser boundary and not something the page can reach around. Back to
+   apps is the control that always works; Escape is the shortcut for when he has
+   not clicked into the embedded app. */
+await page.evaluate(() => document.querySelector('.apps-openname')?.scrollIntoView())
+await page.locator('.apps-openname').click()
+await page.keyboard.press('Escape')
+await page.waitForTimeout(400)
+ok(await page.evaluate(() => document.querySelectorAll('.apps-frame').length === 0), 'Escape closes the app when focus is in the app chrome')
+
+/* And the button, which works from anywhere. */
+await page.evaluate(() => { [...document.querySelectorAll('.apps-tile')].find((t) => t.textContent.includes('Compass'))?.click() })
+await page.waitForTimeout(1200)
+await page.evaluate(() => { [...document.querySelectorAll('.apps-open button')].find((b) => b.textContent.includes('Back to apps'))?.click() })
+await page.waitForTimeout(400)
+ok(await page.evaluate(() => document.querySelectorAll('.apps-frame').length === 0 && document.querySelectorAll('.apps-tile').length === 6), 'Back to apps returns to the shelf')
+
+/* Notes tick: the checkbox has to sit beside the TITLE, be the thing a click
+   lands on, and file the note under Done. */
+await page.evaluate(() => { location.hash = '/notes' })
+await page.waitForTimeout(1500)
+const geom = await page.evaluate(() => {
+  const t = document.querySelector('.nt-tick')?.getBoundingClientRect()
+  const n = document.querySelector('.nt-rowname')?.getBoundingClientRect()
+  if (!t || !n) return null
+  const el = document.elementFromPoint(t.left + t.width / 2, t.top + t.height / 2)
+  return { off: Math.round((t.top + t.height / 2) - (n.top + n.height / 2)), tickIsTarget: !!el?.closest('.nt-tick') }
+})
+ok(!!geom, 'a note row has a tick box')
+if (geom) {
+  ok(Math.abs(geom.off) <= 6, `the tick is level with the title (${geom.off}px off)`)
+  ok(geom.tickIsTarget, 'a click at the tick lands on the tick, not the row beneath it')
 }
+const rowsBefore = await page.evaluate(() => document.querySelectorAll('.nt-row').length)
+await page.locator('.nt-tick').first().click()
+await page.waitForTimeout(700)
+const ticked = await page.evaluate(() => ({
+  rows: document.querySelectorAll('.nt-row').length,
+  done: [...document.querySelectorAll('.nt-fname')].some((e) => e.textContent.trim() === 'Done'),
+}))
+ok(ticked.rows === rowsBefore - 1, `a ticked note leaves the list (${rowsBefore} -> ${ticked.rows})`)
+ok(ticked.done, 'a Done folder appears once something is in it')
+await page.evaluate(() => { [...document.querySelectorAll('.nt-folder')].find((b) => b.textContent.includes('Done'))?.click() })
+await page.waitForTimeout(600)
+ok(await page.evaluate(() => document.querySelectorAll('.nt-row').length === 1), 'the ticked note is in Done')
+// put it back, so the profile is left as it was found
+await page.locator('.nt-tick.on').first().click()
+await page.waitForTimeout(600)
 
 /* ---- responsiveness: the sizes this window can actually be ---- */
 const SIZES = [[880, 600, 'min'], [1280, 800, 'laptop'], [2560, 1000, 'ultrawide']]

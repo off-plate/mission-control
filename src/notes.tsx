@@ -469,6 +469,9 @@ function TablePicker({ onPick }: { onPick: (rows: number, cols: number) => void 
 
 /** Everything, everywhere, the way All iCloud sits above the folders. */
 const ALL = 'nf-all'
+/* Not a real folder: nothing is filed into it and it cannot be renamed or
+   deleted. A note is in Done because it is ticked, and nowhere else while it is. */
+const DONE = 'nf-done'
 const SORT_KEY = 'mc:notes-sort'
 const PIN_KEY = 'mc:notes-pinshut'
 type Sort = 'edited' | 'created' | 'title'
@@ -503,7 +506,7 @@ export function NotesPage() {
   const {
     notes, noteFolders, view, space, addNote, updateNote, moveNote, deleteNote,
     addNoteFolder, renameNoteFolder, deleteNoteFolder, renameNoteTag,
-    keepNoteConflict, dropNoteConflict, addTask, setPage,
+    keepNoteConflict, dropNoteConflict, addTask, setPage, setNoteDone,
   } = useStore()
 
   /* Notes are not filed by workspace any more, on his instruction: folders are
@@ -544,10 +547,15 @@ export function NotesPage() {
      asked to be rid of. */
   const nameOf = (id: string) => {
     if (id === ALL) return 'All notes'
+    if (id === DONE) return 'Done'
     if (spaceOf(id)) return 'No folder'
     return noteFolders.find((f) => f.id === id)?.name ?? 'No folder'
   }
+  /* Done is a state, not a place: a ticked note keeps the folder it was filed
+     in, and simply stops appearing there until it is un-ticked. */
   const inFolder = (n: Note, id: string) => {
+    if (id === DONE) return !!n.done
+    if (n.done) return false
     if (id === ALL) return true
     const s = spaceOf(id)
     return s ? n.space === s : n.folderId === id
@@ -561,14 +569,18 @@ export function NotesPage() {
 
   const shown = useMemo(() => {
     const q = query.trim()
+    /* Searching inside Done searches Done. Searching anywhere else does not drag
+       ticked notes back into the results. */
     const rows = finding
-      ? notes.filter((n) => (!tag || tagsOf(n.body).includes(tag)) && (!q || flat(n.body).includes(flat(q))))
+      ? notes.filter((n) => (openFolder === DONE ? !!n.done : !n.done)
+        && (!tag || tagsOf(n.body).includes(tag)) && (!q || flat(n.body).includes(flat(q))))
       : notes.filter((n) => inFolder(n, openFolder))
     const by = sort === 'title'
       ? (a: Note, b: Note) => (headOf(a.body) || 'Untitled').localeCompare(headOf(b.body) || 'Untitled')
       : sort === 'created'
         ? (a: Note, b: Note) => (b.when > a.when ? 1 : b.when < a.when ? -1 : 0)
         : (a: Note, b: Note) => b.updatedAt - a.updatedAt
+    if (openFolder === DONE) return rows.sort((a, b) => (b.done ?? 0) - (a.done ?? 0))
     return rows.sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || by(a, b))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notes, finding, tag, query, openFolder, noteFolders, sort])
@@ -579,7 +591,8 @@ export function NotesPage() {
   const groups = useMemo(() => {
     const out: { head: string; rows: Note[] }[] = []
     for (const n of shown) {
-      const head = n.pinned ? 'Pinned'
+      const head = n.done ? bucketOf(localDateKey(new Date(n.done)))
+        : n.pinned ? 'Pinned'
         : sort === 'title' ? (headOf(n.body) || 'U').slice(0, 1).toUpperCase()
           : bucketOf(sort === 'created' ? n.when : localDateKey(new Date(n.updatedAt)))
       const last = out[out.length - 1]
@@ -698,6 +711,20 @@ export function NotesPage() {
               </button>
               <span className="nt-slot" aria-hidden="true" />
             </div>
+            {/* Only once there is something in it: an empty Done is a row that
+                asks a question nobody has. */}
+            {notes.some((n) => n.done) && (
+              <div className={`nt-folder-row${!finding && openFolder === DONE ? ' on' : ''}`}>
+                <button className="nt-folder" aria-current={!finding && openFolder === DONE ? 'true' : undefined} onClick={() => goFolder(DONE)}>
+                  <svg className="nt-doneicon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+                    <path d="M4 12.5l5.5 5.5L20 6.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span className="nt-fname">Done</span>
+                  <span className="nt-count mono">{notes.filter((n) => n.done).length}</span>
+                </button>
+                <span className="nt-slot" aria-hidden="true" />
+              </div>
+            )}
           </div>
           {/* One flat list. It used to be four workspace sections with their own
               folders nested inside, which meant a note's home depended on which
@@ -820,9 +847,20 @@ export function NotesPage() {
               )}
               <ul hidden={g.head === 'Pinned' && pinShut}>
                 {g.rows.map((n) => (
-                  <li key={n.id}>
+                  <li key={n.id} className="nt-rowli">
                     <button
-                      className={`nt-row${n.id === openId ? ' on' : ''}`}
+                      className={`nt-tick${n.done ? ' on' : ''}`}
+                      role="checkbox"
+                      aria-checked={n.done ? 'true' : 'false'}
+                      aria-label={n.done ? `Put ${headOf(n.body) || 'Untitled'} back` : `Mark ${headOf(n.body) || 'Untitled'} done`}
+                      onClick={() => setNoteDone(n.id, !n.done)}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" aria-hidden="true">
+                        <path d="M4 12.5l5.5 5.5L20 6.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                    <button
+                      className={`nt-row has-tick${n.id === openId ? ' on' : ''}${n.done ? ' is-done' : ''}`}
                       aria-current={n.id === openId ? 'true' : undefined}
                       onClick={() => { setOpenId(n.id); if (phone) window.scrollTo({ top: 0 }) }}
                     >

@@ -11,6 +11,44 @@
    system fonts and looks like a different product, with no error anyone would
    see. latin and latin-ext only (Czech needs latin-ext), which is what the
    browser would have fetched anyway. */
+/* Special Gothic, his pick, self-hosted like everything else here: both CDNs
+   failed mid-session once already and a dashboard whose type vanishes is worse
+   than one that loads a beat slower.
+
+   BOTH FACES HAVE EXACTLY ONE WEIGHT. That is the whole shape of this type
+   system: emphasis is a change of FACE, not a number. Expanded One is the
+   heavy one and carries every heading; Special Gothic carries everything else.
+   Asking either of them for 600 would make the browser draw a fake bold, which
+   on an expanded face looks like a printing fault, so font-synthesis is off
+   everywhere and nothing below ever asks for a weight these files do not have.
+
+   latin-ext is loaded for both, so ě š č ř ž ů render in the real face rather
+   than dropping to a fallback halfway through a Czech sentence. */
+@font-face {
+  font-family: 'Special Gothic';
+  src: url('/mission-control/fonts/special-gothic-latin-ext.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Special Gothic';
+  src: url('/mission-control/fonts/special-gothic-latin.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Special Gothic Expanded One';
+  src: url('/mission-control/fonts/special-gothic-expanded-latin-ext.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Special Gothic Expanded One';
+  src: url('/mission-control/fonts/special-gothic-expanded-latin.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 @font-face {
   font-family: 'Bricolage Grotesque';
   src: url('/mission-control/fonts/bricolage-grotesque-600-latin-ext.woff2') format('woff2');
@@ -161,13 +199,18 @@
 
   --shadow-pop: 0 18px 50px rgba(22, 21, 15, 0.18);
 
-  --font-display: 'Bricolage Grotesque', 'Avenir Next', sans-serif;
-  --font-body: 'Instrument Sans', 'Helvetica Neue', sans-serif;
+  --font-display: 'Special Gothic Expanded One', 'Avenir Next', sans-serif;
+  --font-body: 'Special Gothic', 'Helvetica Neue', sans-serif;
   /* The machine's own mono. Nothing is downloaded and no typeface is imposed:
      what this token has to deliver is figures of equal width, which the system
      face already does. It used to resolve to Instrument Sans, so forty call
      sites marked `mono` were only claiming to be data. */
-  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  /* No typewriter face anywhere, on his instruction: "DO NOT USE typewriter
+     fonts at all". The .mono class survives because sixty-one places use it to
+     line numbers up in columns, and that job is done by tabular figures rather
+     than by a monospaced face. So it points at the body font and keeps only
+     the number alignment. */
+  --font-mono: 'Special Gothic', 'Helvetica Neue', sans-serif;
 
   --text-xs: 0.8125rem;
   --text-sm: 0.9375rem;
@@ -280,6 +323,24 @@ a, button, input, select, textarea {
   transition: color var(--t-fast), background var(--t-fast),
               border-color var(--t-fast), opacity var(--t-fast);
 }
+
+/* ---------- one weight, two faces ----------
+   Both files are weight 400 and nothing else exists, so every font-weight above
+   400 in this stylesheet would be drawn by the browser as a synthetic bold:
+   the same outlines smeared sideways. On an expanded display face that reads as
+   a printing fault rather than as emphasis.
+
+   So synthesis is off, and emphasis is expressed the way this pairing intends
+   it: by switching to the expanded face. Anything that asked to be bold now
+   says so by being WIDER, not fatter. */
+* { font-synthesis-weight: none; font-synthesis-style: none; }
+
+/* Bold in running text, and the two tags browsers bold by default. */
+strong, b, th, dt { font-family: var(--font-display); font-weight: 400; }
+
+/* Headings already use the display face; this stops them asking for a weight
+   that does not exist and getting a fake one on top of the real thing. */
+h1, h2, h3, h4, h5, h6 { font-weight: 400; }
 
 .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 /* Labels are body-font small caps; mono is reserved for data. */

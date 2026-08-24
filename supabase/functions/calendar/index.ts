@@ -31,10 +31,16 @@ const ALLOW = [
   'http://localhost:4173',
 ]
 
+/* Every header supabase-js actually sends. It sets `apikey` and `x-client-info`
+   as well as `authorization`, and a preflight that does not name ALL of them is
+   refused by the browser before the real request is made. curl never caught it
+   because curl does not preflight: the function answered 200 to a direct call
+   while the app got "Failed to send a request to the Edge Function". */
 const cors = (origin: string | null) => ({
   'access-control-allow-origin': origin && ALLOW.includes(origin) ? origin : ALLOW[0],
-  'access-control-allow-headers': 'authorization, content-type',
+  'access-control-allow-headers': 'authorization, apikey, content-type, x-client-info, x-supabase-api-version',
   'access-control-allow-methods': 'GET, OPTIONS',
+  'access-control-max-age': '86400',
   'vary': 'origin',
 })
 

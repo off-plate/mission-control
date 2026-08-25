@@ -4506,7 +4506,18 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: clamp(var(--s6), 2.4vw, var(--s12)); align-items: start;
 }
-.cal-rail { position: sticky; top: var(--s4); display: flex; flex-direction: column; gap: var(--s4); }
+/* Sticks BELOW the header, never under it. --topstick-h is measured on the
+   real element by the page, because the top bar wraps at narrow widths and no
+   single number is right at every size; the fallback only has to be sane for
+   the first frame. The max-height is insurance: on a short window a month plus
+   its head could otherwise run past the bottom of the screen with no way to
+   reach the rest of it. */
+.cal-rail {
+  position: sticky; top: calc(var(--topstick-h, 104px) + var(--s3));
+  max-height: calc(100vh - var(--topstick-h, 104px) - var(--s6));
+  overflow-y: auto;
+  display: flex; flex-direction: column; gap: var(--s4);
+}
 
 /* The name on the left, the two steps together on the right. Pushed to
    opposite edges they were a metre apart on a wide screen and stopped reading
@@ -4572,9 +4583,9 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 
 /* One column. Always. */
 .cal-agenda { display: flex; flex-direction: column; gap: var(--s8); }
-/* The grid scrolls the column to a day, and a sticky header would otherwise
-   land on top of the day it just jumped to. */
-.cal-day { scroll-margin-top: var(--s10); }
+/* The grid scrolls the column to a day, and the sticky header would otherwise
+   land on top of the day it just jumped to. Same measured height as the rail. */
+.cal-day { scroll-margin-top: calc(var(--topstick-h, 104px) + var(--s4)); }
 .cal-day-head { display: flex; align-items: baseline; gap: var(--s3); padding-bottom: var(--s2); border-bottom: 1px solid var(--hairline-strong); }
 .cal-day-num { font-family: var(--font-display); font-size: var(--text-xl); line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
 .cal-day-name { font-family: var(--font-display); font-size: var(--text-lg); color: var(--ink); }
@@ -4616,7 +4627,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
    the page for. The month keeps its job, jumping to a day, from below it. */
 @media (max-width: 1200px) {
   .cal-split { grid-template-columns: 1fr; gap: var(--s8); }
-  .cal-rail { position: static; order: 2; }
+  .cal-rail { position: static; order: 2; max-height: none; overflow: visible; }
   .cal-agenda { order: 1; }
   .cal-grid { max-width: 420px; grid-template-rows: auto repeat(6, clamp(38px, 7vh, 56px)); }
 }

@@ -96,6 +96,23 @@ export function CalendarPage() {
      grid beside it is already showing. */
   const thisMonth = Number(today.split('-')[1])
 
+  /* How tall the sticky header is, published as a custom property.
+     The month rail sticks too, and it was sticking to the top of the VIEWPORT,
+     which put its name, its year and its weekday row underneath the header the
+     moment the page scrolled. The header is not a fixed height: the top bar
+     wraps at narrow widths and the nav row comes and goes, so this is measured
+     rather than guessed, and re-measured when it changes. */
+  useEffect(() => {
+    const top = document.querySelector('.topstick')
+    if (!top) return
+    const set = () => document.documentElement.style.setProperty('--topstick-h', `${Math.ceil(top.getBoundingClientRect().height)}px`)
+    set()
+    const ro = new ResizeObserver(set)
+    ro.observe(top)
+    window.addEventListener('resize', set)
+    return () => { ro.disconnect(); window.removeEventListener('resize', set) }
+  }, [])
+
   /* The clock moves while the page is open, so what counts as past moves with
      it. A minute is fine: nothing here turns over faster. */
   const [minute, setMinute] = useState(() => Math.floor(Date.now() / 60000))

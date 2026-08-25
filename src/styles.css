@@ -2972,15 +2972,23 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
   content: ''; position: absolute; inset: -7px;
 }
 /* The hover actions keep their 28px square, because that square is visible:
-   it is the hover background. So instead of shrinking it, it is pulled up by
-   exactly half its overflow past the line. Both numbers in that subtraction
-   are declared in this file (--line above, 28px on .task-act below), so if
-   either moves the other follows. That is the difference between arithmetic
-   and the eyeballed 3px this replaced. */
-.today-task .task-actions, .todo-row .task-actions {
-  margin-top: calc((var(--line) - 28px) / 2);
-  align-self: flex-start;
-}
+   it is the hover background. It overflows the line by 3px top and bottom and
+   that is fine: it is a background, not a glyph, and the glyph inside it is
+   centred on the line like everything else.
+
+   Nothing here compensates for that overflow any more. It used to: a
+   `margin-top: calc((var(--line) - 28px) / 2)` with `align-self: flex-start`,
+   written when this block really was 28px tall in the flow. The rule above
+   then made EVERY direct child exactly `--line` tall, which removed the
+   overflow from the layout, and the -3px was left behind correcting something
+   that no longer happened. It rode the play and estimate buttons 3px above the
+   title, the chip and the kebab, which is what Michael saw and reported.
+
+   Measured before the fix: every other element in the row centred 19px from
+   the row top, these two centred at 16.
+
+   If a compensation is ever needed here again, measure the centres first. Two
+   fixes for the same 3px is how this row got crooked in the first place. */
 
 /* How deep to break a task down. */
 .detail-seg { margin-bottom: var(--s4); }

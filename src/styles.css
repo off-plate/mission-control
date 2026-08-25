@@ -1040,10 +1040,9 @@ button.chip:hover { color: var(--accent-text); background: var(--accent-wash); }
 /* One shell strategy: every page runs full-bleed like Today.
    Standalone flow cards center themselves; grids span the width. */
 .grid-2 { display: grid; gap: var(--s5); grid-template-columns: 1fr; }
-/* Settings is one column now that Connected sources is gone. Capped, because a
-   single panel stretched across 3440px puts a label and its button half a metre
-   apart, which is the same bug the wide-row rail fixes everywhere else. */
-.settings-col { max-width: 820px; }
+/* Settings is one column now that Connected sources is gone, and it takes the
+   whole page. */
+.settings-col { width: 100%; }
 .grid-3 { display: grid; gap: var(--s5); grid-template-columns: 1fr; }
 .grid-4 { display: grid; gap: var(--s5); grid-template-columns: 1fr; align-items: stretch; }
 .grid-2 > *, .grid-3 > *, .grid-4 > * { min-width: 0; }

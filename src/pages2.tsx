@@ -207,8 +207,8 @@ export function SettingsPage() {
   return (
     <div className="page">
       <Band title="Settings" />
-      {/* One column. Connected sources was the other half of this grid and it
-          listed integrations that do not exist, so the grid went with it. */}
+      {/* One column, the width of the page. Connected sources was the other
+          half of this grid and it listed integrations that do not exist. */}
       <div className="settings-col">
         <div className="panel">
           <span className="microcap">Your account</span>

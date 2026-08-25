@@ -3,7 +3,7 @@ import { useStore } from './store'
 import { useCalendar } from './calendar'
 import { SpaceMark } from './ui'
 import { SPACE_LABELS } from './mock'
-import { ask, STARTERS, opener, type Brief, type Card, type CardKind, type Reply } from './assistant'
+import { ask, STARTERS, opener, type Action, type Brief, type Card, type CardKind, type Reply } from './assistant'
 import { engineName, speechState, stop as stopSpeech, subscribe, toggle } from './speech'
 import { SLOTS, dueOn, habitsDueToday, goalCurrent, type HabitDef, type PageId, type SpaceId, type Task } from './types'
 import { localDateKey, fmtDuration, goalPeriodKey, goalPeriodRange, type GoalTf } from './util'
@@ -83,6 +83,7 @@ function useBrief(): Brief {
       weekday: dayLabel(),
       planned,
       backlogCount: backlog.length,
+      backlog: backlog.slice(0, 25).map((t) => ({ title: t.title, space: label(t.space) })),
       oldest: [...backlog].sort((a, b) => age(b) - age(a)).slice(0, 3).map((t) => ({ title: t.title, days: age(t), space: label(t.space) })),
       habits: { due, kept, open: open.slice(0, 6) },
       meetings,
@@ -101,6 +102,37 @@ function useBrief(): Brief {
    Every one reads the store directly. None of them is handed anything by the
    model beyond its own name. Every row carries its workspace, always, because
    this page mixes all three on purpose. */
+
+/* WHAT HAPPENED, in the app's words rather than the model's.
+
+   `ok` is what actually changed. `no` is a change that could not be made, and
+   it says why in the same breath, because "Added it" over a task that was never
+   added is the failure this whole mechanism exists to prevent. */
+export interface Done { ok: boolean; text: string }
+
+/** Loose enough to find "the noon testing task" from "test testing website",
+ *  strict enough to refuse when two rows could both be meant. Accents are
+ *  folded because half his titles are Czech and he types them without. */
+const fold = (t: string) =>
+  t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim()
+
+function pick<T extends { title: string }>(rows: T[], match: string): { row?: T; why?: string } {
+  const m = fold(match)
+  if (!m) return { why: 'nothing to look for' }
+  const exact = rows.filter((r) => fold(r.title) === m)
+  if (exact.length === 1) return { row: exact[0] }
+  const has = rows.filter((r) => fold(r.title).includes(m))
+  if (has.length === 1) return { row: has[0] }
+  if (has.length > 1) return { why: `${has.length} of them match "${match}"` }
+  /* Last resort: every word he used has to appear, in any order. This is what
+     turns "noon testing task" into the row actually called "test testing
+     website", and it is deliberately the LAST thing tried. */
+  const words = m.split(' ').filter((w) => w.length > 2)
+  const all = words.length ? rows.filter((r) => words.every((w) => fold(r.title).includes(w))) : []
+  if (all.length === 1) return { row: all[0] }
+  if (all.length > 1) return { why: `${all.length} of them match "${match}"` }
+  return { why: `nothing here is called "${match}"` }
+}
 
 /* Rows land one after another instead of all at once, capped at ten so a long
    list never turns into a loading screen. 18ms apart is under the threshold
@@ -331,11 +363,98 @@ function Speak({ id, text }: { id: string; text: string }): JSX.Element {
   )
 }
 
-interface Turn { who: 'you' | 'it'; text: string; reply?: Reply }
+/** Runs what the model named, against the same store every page writes to, and
+ *  reports what it actually did. Nothing here trusts a title: every match is
+ *  resolved against his real rows first, and an unresolved one changes nothing.
+ *
+ *  It reads `tasks` through a ref rather than through the closure, because a
+ *  reply naming three changes runs them back to back and each one has to see
+ *  the row the last one just wrote. */
+function useDoer() {
+  const st = useStore()
+  const { space, todayIndex } = st
+  const live = useRef(st)
+  live.current = st
+
+  return (actions: Action[]): Done[] => {
+    const out: Done[] = []
+    for (const a of actions) {
+      const s2 = live.current
+      const day = localDateKey()
+      if (a.kind === 'add') {
+        const slot = a.list === 'backlog' ? undefined : a.slot
+        const list = a.list ?? (a.slot ? 'today' : 'backlog')
+        s2.addTask({
+          title: a.title,
+          source: 'mc',
+          estimateMin: a.min ?? 15,
+          estimated: a.min != null,
+          space: a.space ?? space,
+          list,
+          category: 'admin',
+          slot,
+          plannedOn: list === 'today' ? day : undefined,
+        })
+        out.push({ ok: true, text: `Added to ${slot ? SLOTS.find((x) => x.id === slot)?.label.toLowerCase() : list === 'today' ? 'today' : 'the list'}: ${a.title}` })
+        continue
+      }
+      if (a.kind === 'habit') {
+        const rows = s2.habits.filter((h) => !h.archivedAt).map((h) => ({ ...h, title: h.name }))
+        const { row, why } = pick(rows, a.match)
+        if (!row) { out.push({ ok: false, text: why ?? 'no habit matched' }); continue }
+        const already = row.days[todayIndex]
+        if (already === a.on) { out.push({ ok: true, text: `${row.name} was already ${a.on ? 'kept' : 'open'} today` }); continue }
+        s2.markHabitDay(row.id, todayIndex, a.on)
+        out.push({ ok: true, text: a.on ? `Kept today: ${row.name}` : `Reopened today: ${row.name}` })
+        continue
+      }
+      const { row, why } = pick(s2.tasks, a.match)
+      if (!row) { out.push({ ok: false, text: why ?? 'no task matched' }); continue }
+      switch (a.kind) {
+        case 'done':
+          if (row.done) { out.push({ ok: true, text: `${row.title} was already done` }); break }
+          s2.toggleTask(row.id)
+          out.push({ ok: true, text: `Done: ${row.title}` })
+          break
+        case 'undone':
+          if (!row.done) { out.push({ ok: true, text: `${row.title} was already open` }); break }
+          s2.toggleTask(row.id)
+          out.push({ ok: true, text: `Reopened: ${row.title}` })
+          break
+        case 'move':
+          if (a.list && a.list !== row.list) s2.moveTaskList(row.id, a.list, day)
+          if (a.slot) {
+            if (row.list !== 'today' && !a.list) s2.moveTaskList(row.id, 'today', day)
+            s2.assignSlot(row.id, a.slot)
+          }
+          out.push({
+            ok: true,
+            text: a.slot
+              ? `Moved to ${SLOTS.find((x) => x.id === a.slot)?.label.toLowerCase()}: ${row.title}`
+              : `Moved to ${a.list === 'today' ? 'today' : 'the list'}: ${row.title}`,
+          })
+          break
+        case 'estimate':
+          s2.setEstimate(row.id, a.min)
+          out.push({ ok: true, text: `${fmtDuration(a.min)} on ${row.title}` })
+          break
+        case 'drop':
+          s2.deleteTask(row.id)
+          out.push({ ok: true, text: `Deleted: ${row.title}` })
+          break
+        default: break
+      }
+    }
+    return out
+  }
+}
+
+interface Turn { who: 'you' | 'it'; text: string; reply?: Reply; done?: Done[] }
 
 export function AssistantPage() {
   const brief = useBrief()
   const split = useSplit()
+  const run = useDoer()
   const [turns, setTurns] = useState<Turn[]>([])
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
@@ -363,9 +482,15 @@ export function AssistantPage() {
     const history = turns.map((t) => ({ role: (t.who === 'you' ? 'user' : 'assistant') as 'user' | 'assistant', content: t.text }))
     const out = await ask(text, brief, history, setLive)
     if (out.ok) {
-      setTurns((t) => [...t, { who: 'it', text: out.reply.say, reply: out.reply }])
+      /* Performed BEFORE the turn is drawn, so the line under the sentence is
+         the outcome and not a prediction of it. */
+      const done = out.reply.do?.length ? run(out.reply.do) : undefined
+      setTurns((t) => [...t, { who: 'it', text: out.reply.say, reply: out.reply, done }])
       const kinds = out.reply.show.map((c: Card) => c.kind)
       if (kinds.length) setCanvas(kinds.slice(0, 3))
+      /* A change he cannot see is a change he will not believe. Anything that
+         touched the day puts the day on the canvas unless it named its own. */
+      else if (done?.some((d) => d.ok)) setCanvas(out.reply.do?.some((a) => a.kind === 'habit') ? ['habits'] : ['today'])
     } else {
       setErr(
         out.reason === 'no-key' ? 'No Groq key yet.'
@@ -454,6 +579,19 @@ export function AssistantPage() {
               {turns.map((t, i) => (
                 <div className={`as-turn is-${t.who}`} key={i}>
                   <p className="as-said">{t.text}</p>
+                  {/* The app's own account of what changed, not the model's.
+                      It sits under the sentence because the sentence is an
+                      intention and this is the fact. */}
+                  {t.done?.length ? (
+                    <ul className="as-did">
+                      {t.done.map((d, k) => (
+                        <li className={d.ok ? 'is-ok' : 'is-no'} key={k}>
+                          {d.ok ? null : <span className="as-did-head">Nothing changed, </span>}
+                          {d.text}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                   {/* One row of things you can do with the answer: hear it, and
                       go to what it pulled. Play used to sit on its own line above
                       these and read as a fourth stacked pill, which made a

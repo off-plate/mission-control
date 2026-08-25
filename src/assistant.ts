@@ -33,6 +33,78 @@ export type CardKind =
 
 export interface Card { kind: CardKind; note?: string }
 
+/* WHAT IT CAN DO, and the whole of what it can do.
+
+   Until now it could only show. Asked to add a task it answered "Added it",
+   having added nothing, which is worse than not being able to: a wrong card is
+   a wrong card, but a false confirmation is the app lying about his own data.
+
+   So the model does not act. It NAMES an action out of this closed list and the
+   app performs it, against the same store every page writes to, and then the
+   APP says what changed. Anything it invents outside this vocabulary is dropped
+   before it reaches the store. It never names an id, only a title, and the app
+   resolves that title against his real rows: no match or two matches means
+   nothing happens and it says so. */
+export type Slot = 'morning' | 'noon' | 'afternoon' | 'evening'
+export type Where = 'today' | 'backlog'
+export type Space = 'personal' | 'work' | 'offplate' | 'corner'
+
+export type Action =
+  /** A new task. The only action carrying words of its own, and they are HIS
+   *  words out of the question he just typed, never a number. */
+  | { kind: 'add'; title: string; list?: Where; slot?: Slot; space?: Space; min?: number }
+  | { kind: 'done'; match: string }
+  | { kind: 'undone'; match: string }
+  | { kind: 'move'; match: string; slot?: Slot; list?: Where }
+  | { kind: 'estimate'; match: string; min: number }
+  | { kind: 'drop'; match: string }
+  | { kind: 'habit'; match: string; on: boolean }
+
+const SLOTS_OK: Slot[] = ['morning', 'noon', 'afternoon', 'evening']
+const WHERE_OK: Where[] = ['today', 'backlog']
+const SPACE_OK: Space[] = ['personal', 'work', 'offplate', 'corner']
+
+/** Everything the model sent, minus everything this app cannot promise to do. */
+function cleanActions(raw: unknown): Action[] {
+  if (!Array.isArray(raw)) return []
+  const out: Action[] = []
+  for (const a of raw.slice(0, 6)) {
+    if (!a || typeof a !== 'object') continue
+    const o = a as Record<string, unknown>
+    const str = (v: unknown, cap: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, cap) : '')
+    const slot = SLOTS_OK.includes(o.slot as Slot) ? (o.slot as Slot) : undefined
+    const list = WHERE_OK.includes(o.list as Where) ? (o.list as Where) : undefined
+    const min = typeof o.min === 'number' && o.min > 0 && o.min <= 480 ? Math.round(o.min) : undefined
+    const match = str(o.match, 200)
+    switch (o.kind) {
+      case 'add': {
+        const title = str(o.title, 200)
+        if (!title) break
+        out.push({
+          kind: 'add', title, list, slot, min,
+          space: SPACE_OK.includes(o.space as Space) ? (o.space as Space) : undefined,
+        })
+        break
+      }
+      case 'done': case 'undone': case 'drop':
+        if (match) out.push({ kind: o.kind, match })
+        break
+      case 'move':
+        /* A move that names neither a destination nor a list is not a move. */
+        if (match && (slot || list)) out.push({ kind: 'move', match, slot, list })
+        break
+      case 'estimate':
+        if (match && min) out.push({ kind: 'estimate', match, min })
+        break
+      case 'habit':
+        if (match) out.push({ kind: 'habit', match, on: o.on !== false })
+        break
+      default: break
+    }
+  }
+  return out
+}
+
 export interface Reply {
   /** One or two sentences. His language, no numbers. */
   say: string
@@ -40,6 +112,8 @@ export interface Reply {
   show: Card[]
   /** Follow-ups worth a tap, phrased as he would ask them. */
   next?: string[]
+  /** What to actually change. The app runs these and reports the outcome. */
+  do?: Action[]
 }
 
 const KINDS: CardKind[] = ['today', 'backlog', 'habits', 'calendar', 'goals', 'focus', 'stale']
@@ -50,6 +124,8 @@ export interface Brief {
   weekday: string
   planned: { slot: string; items: { title: string; done: boolean; min: number; space: string }[] }[]
   backlogCount: number
+  /** Enough of the list to act on by name, not only to count. */
+  backlog: { title: string; space: string }[]
   oldest: { title: string; days: number; space: string }[]
   habits: { due: number; kept: number; open: string[] }
   meetings: { at: string; title: string }[]
@@ -77,10 +153,37 @@ will eventually be the wrong one and he will stop believing the app. Say what
 he should look at and why, then name the cards.
 
 Answer ONLY with JSON:
-{"say": "...", "show": [{"kind":"today"}], "next": ["...", "..."]}
+{"say": "...", "show": [{"kind":"today"}], "do": [], "next": ["...", "..."]}
 
 kind is one of: today, backlog, habits, calendar, goals, focus, stale.
 Use several cards when the question spans them. Use none if he is just talking.
+
+"do" IS HOW YOU CHANGE HIS DATA. You do not perform anything yourself: you name
+the change and the app makes it, against his real log, and then the APP writes
+the line saying what happened. So:
+
+NEVER WRITE THAT SOMETHING IS DONE. Not "Added it", not "Moved that to noon",
+not "Ticked it off". If the app cannot find the task you named, or the title is
+ambiguous, nothing changes, and a sentence claiming otherwise is the app lying
+about his own data, which is the one thing it must never do. Say what you are
+setting in motion, briefly, and let the line under it carry the fact.
+
+The whole vocabulary, and nothing outside it works:
+{"kind":"add","title":"...","list":"today"|"backlog","slot":"morning"|"noon"|"afternoon"|"evening","space":"personal"|"work"|"offplate"|"corner","min":30}
+{"kind":"done","match":"part of the title"}
+{"kind":"undone","match":"..."}
+{"kind":"move","match":"...","slot":"noon"}          moves it inside the day
+{"kind":"move","match":"...","list":"backlog"}       takes it off the day
+{"kind":"estimate","match":"...","min":45}
+{"kind":"drop","match":"..."}                        deletes it, and he can undo
+{"kind":"habit","match":"habit name","on":true}      keeps or un-keeps it today
+
+"match" is words out of the real title as it appears in the briefing above, not
+a description of it. "add" carries HIS words for the new task, off the message
+he just typed, and nothing invented around them. Leave "min" out unless he gave
+a number: a made-up estimate is a made-up number.
+
+Only act when he asked for a change. A question is a question.
 "next" holds up to three follow-ups written in HIS voice, as questions he might
 ask next.
 
@@ -138,6 +241,7 @@ export function briefText(b: Brief): string {
     'Everything below spans all his workspaces at once.',
     `Planned today:\n${slots}`,
     `Backlog: ${b.backlogCount} open`,
+    b.backlog.length ? `On the list:\n${b.backlog.map((t) => `- [${t.space}] ${t.title}`).join('\n')}` : '',
     b.oldest.length ? `Oldest untouched: ${b.oldest.map((o) => `[${o.space}] ${o.title} (${o.days}d)`).join('; ')}` : 'Nothing is ageing badly',
     `Habits today: ${b.habits.kept} of ${b.habits.due} kept${b.habits.open.length ? `, still open: ${b.habits.open.join('; ')}` : ''}`,
     b.meetings.length ? `Meetings: ${b.meetings.map((m) => `${m.at} ${m.title}`).join('; ')}` : 'No meetings in the calendar',
@@ -304,7 +408,7 @@ function finish(raw: string): Outcome {
     const next = Array.isArray(parsed.next)
       ? parsed.next.filter((n) => typeof n === 'string' && n.trim()).slice(0, 3)
       : []
-    return { ok: true, reply: { say, show, next } }
+    return { ok: true, reply: { say, show, next, do: cleanActions((parsed as { do?: unknown }).do) } }
   } catch {
     return { ok: false, reason: 'unreadable' }
   }

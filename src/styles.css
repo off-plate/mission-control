@@ -4817,6 +4817,24 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .as-pulled-btn:hover, .as-chip:hover { transform: translateY(-1px); }
 .as-pulled-btn:active, .as-chip:active { transform: translateY(0); transition-duration: 60ms; }
 
+/* What changed, written by the app after it changed it. A tick that means the
+   store was actually written, and a struck line when nothing was, because the
+   failure has to be as visible as the success or the tick means nothing. */
+.as-did { margin-top: var(--s3); display: flex; flex-direction: column; gap: 4px; }
+.as-did > li {
+  display: flex; align-items: baseline; gap: var(--s2);
+  font-size: var(--text-sm); padding-left: var(--s4); position: relative;
+}
+.as-did > li::before {
+  content: '\2713'; position: absolute; left: 0; top: 0;
+  font-size: 0.75rem; line-height: 1.7;
+}
+.as-did > li.is-ok { color: var(--ink); }
+.as-did > li.is-ok::before { color: var(--progress); }
+.as-did > li.is-no { color: var(--muted); }
+.as-did > li.is-no::before { content: '\00d7'; color: var(--alert); font-size: 0.85rem; }
+.as-did-head { color: var(--alert); }
+
 .as-next { display: flex; gap: var(--s2); flex-wrap: wrap; margin-top: var(--s3); }
 
 /* Thinking, and visibly so. A still page that has stopped answering looks the

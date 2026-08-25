@@ -3027,7 +3027,10 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
    both, so it falls under the grid rather than squeezing the day into a
    gutter. The rail sticks while the day scrolls past it. */
 .today-shell { display: grid; gap: var(--s5); grid-template-columns: minmax(0, 1fr); align-items: start; }
-@media (min-width: 1100px) { .today-shell { grid-template-columns: minmax(0, 1fr) 340px; } }
+/* One column, because there is no second one. The assistant rail was taken off
+   this page on 2026-08-11 and this rule kept holding its 340px open, so the day
+   ran at 76% of the window and the rest was reserved for nothing. Measured at
+   1600px before the fix: 1170 of 1530. */
 .today-main { min-width: 0; }
 .assist-rail { min-width: 0; display: flex; flex-direction: column; gap: var(--s4); }
 @media (min-width: 1100px) { .assist-rail { position: sticky; top: var(--s4); } }
@@ -5107,3 +5110,136 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
    colour, which is why btn-primary darkens instead. */
 .as-brief:hover { background: var(--accent-hover); transform: translateY(-1px); }
 .as-brief:active { transform: translateY(0); transition-duration: 60ms; }
+/* ==========================================================================
+   THE TODAY ROOM
+   A dark slab inset in the warm paper app. It does not repaint the shell:
+   Today is the landing page, and flipping the header between paper and ink on
+   every navigation would cost more than it bought. The Zone takes the whole window
+   because you enter the Zone on purpose.
+
+   Every token below is scoped to `.troom` and must stay that way, exactly as
+   the Zone's `--z-*` are scoped to theirs. Nothing here may leak onto a page
+   that did not ask for it.
+
+   NO SUBTITLES LIVE IN THIS BLOCK. There is one label class and one figure
+   class. If a rule appears here for a sentence under a number, delete it and
+   delete the markup that wanted it.
+   ========================================================================== */
+.troom {
+  --t-ground: #141009;
+  --t-card: #1c1710;
+  --t-card2: #221c14;
+  --t-ink: #f6f0e4;
+  --t-muted: #8d8376;
+  --t-dim: #5d554a;
+  --t-hot: #f2712f;
+  --t-hotdim: rgba(242, 113, 47, 0.16);
+  --t-line: rgba(246, 240, 228, 0.1);
+  --t-r: 16px;
+  background: var(--t-ground);
+  color: var(--t-ink);
+  border-radius: 20px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: var(--s4);
+}
+/* One label, one figure. The whole room is built from these two. */
+.troom .tr-l {
+  font: 600 11px/1 var(--font-body); letter-spacing: 0.17em; text-transform: uppercase;
+  color: var(--t-muted); margin: 0;
+}
+.troom .tr-n {
+  font-family: var(--font-display); font-weight: 800; letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums; line-height: 0.9; margin: 0;
+}
+.troom .tr-n i { font-family: var(--font-body); font-style: normal; font-size: 0.34em; font-weight: 600; color: var(--t-dim); letter-spacing: 0; margin: 0 0.1em 0 0.04em; vertical-align: 0.14em; }
+.troom .tr-n.is-hot { color: var(--t-hot); }
+.troom .tr-sm { font-size: 19px; }
+.troom .tr-card { background: var(--t-card); border: 1px solid var(--t-line); border-radius: var(--t-r); padding: 20px 22px; }
+
+/* ---- the figures ---- */
+.troom-hero { display: grid; grid-template-columns: minmax(0, 1.5fr) repeat(4, minmax(0, 0.42fr)); gap: 14px; }
+.tr-clock, .tr-tile { display: flex; flex-direction: column; justify-content: center; gap: 16px; min-height: 168px; }
+.tr-count { font-size: clamp(52px, 8vw, 122px); }
+.troom .tr-u { font-size: 0.3em; color: var(--t-dim); margin: 0 0.16em 0 0.05em; vertical-align: 0.34em; letter-spacing: 0; }
+.troom .tr-hot { color: var(--t-hot); }
+.tr-tile .tr-n { font-size: clamp(38px, 4.4vw, 64px); }
+.troom .tr-mo { font-family: var(--font-body); font-size: 0.29em; font-weight: 600; color: var(--t-dim); letter-spacing: 0.04em; margin-left: 0.14em; vertical-align: 0.42em; }
+.tr-tile.is-hot .tr-n { color: var(--t-hot); }
+.tr-phase { font-size: clamp(28px, 2.9vw, 42px) !important; text-transform: uppercase; }
+.troom .tr-bar { height: 7px; border-radius: 4px; background: rgba(246, 240, 228, 0.11); overflow: hidden; }
+.troom .tr-bar i { display: block; height: 100%; background: var(--t-hot); border-radius: 4px; }
+
+/* ---- the day ---- */
+.tr-day { padding-bottom: 16px; }
+.troom .tr-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 16px; }
+.tr-count-inline { display: flex; align-items: baseline; gap: 9px; }
+.tr-count-inline .tr-n { font-size: 26px; }
+.tr-dots { display: grid; grid-template-columns: repeat(96, 1fr); gap: 3px; }
+.tr-q { aspect-ratio: 1; border-radius: 2px; background: var(--t-ink); opacity: 0.85; }
+.tr-q.is-spent { background: none; box-shadow: inset 0 0 0 1px rgba(246, 240, 228, 0.13); opacity: 1; }
+.tr-q.is-busy { background: var(--t-hot); opacity: 0.42; }
+/* The one glow in the app, and it is a state marker, not atmosphere: 12px on a
+   9px dot, so THIS MOMENT is findable at a glance in a field of ninety six.
+   Take the glow away and finding now costs a scan every time. */
+.tr-q.is-now { background: var(--t-hot); box-shadow: 0 0 12px rgba(242, 113, 47, 0.85); opacity: 1; } /* slop-lint-ignore neon-glow */
+/* Weighted by real hours, so a marker sits under the quarters it owns. */
+.tr-phases { display: flex; gap: 3px; margin-top: 12px; }
+.tr-ph {
+  font: 600 11px/1 var(--font-body); letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--t-dim); padding-top: 9px; border-top: 1px solid var(--t-line); min-width: 0; overflow: hidden;
+}
+.tr-ph.is-on { color: var(--t-hot); border-top-color: var(--t-hot); }
+
+/* ---- next ---- */
+/* The single gradient in the app, and a deliberate one: a short wash that
+   marks ONE card as the live one. Not a hero background, not a button. */
+.tr-next { background: linear-gradient(180deg, var(--t-hotdim), transparent 62%), var(--t-card); } /* slop-lint-ignore gradient-hero */
+.tr-nextt { font-family: var(--font-display); font-weight: 800; font-size: clamp(24px, 2.5vw, 34px); line-height: 1.06; letter-spacing: -0.03em; margin: 0 0 18px; }
+.tr-chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.troom .tr-chip { font: 600 12px/1 var(--font-body); padding: 8px 11px; border-radius: 8px; background: var(--t-hotdim); color: var(--t-hot); }
+.troom .tr-start { font: 600 15px/1 var(--font-body); background: var(--t-hot); color: #141009; border: 0; border-radius: 9px; padding: 14px 24px; cursor: pointer; margin-left: auto; }
+.troom .tr-start:hover { filter: brightness(1.1); }
+
+/* ---- the lists, ten rows deep because three was not worth reading ---- */
+.troom-lists { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; }
+.tr-rows { display: flex; flex-direction: column; }
+.tr-r { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--t-line); min-height: 44px; }
+.tr-r:last-child { border-bottom: 0; }
+.tr-t { flex: 1; min-width: 0; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr-r.is-done { color: var(--t-dim); }
+.troom .tr-slot { font: 600 11px/1 var(--font-body); letter-spacing: 0.1em; text-transform: uppercase; color: var(--t-muted); min-width: 74px; }
+.tr-r.is-done .tr-slot { color: var(--t-dim); }
+.tr-tick { width: 9px; height: 9px; border-radius: 50%; background: var(--t-hot); flex: none; }
+.tr-r.is-done .tr-tick { background: none; box-shadow: inset 0 0 0 1px var(--t-dim); }
+.troom .tr-age { font-family: var(--font-display); font-weight: 800; font-size: 26px; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; min-width: 74px; color: var(--t-hot); }
+.troom .tr-age.is-cool { color: var(--t-dim); }
+.troom .tr-age u { text-decoration: none; font-family: var(--font-body); font-size: 12px; font-weight: 600; color: var(--t-dim); margin-left: 2px; }
+.troom .tr-box { width: 20px; height: 20px; flex: none; border-radius: 6px; border: 1.5px solid rgba(246, 240, 228, 0.28); background: none; cursor: pointer; padding: 0; }
+.troom .tr-box:hover { border-color: var(--t-hot); }
+.troom .tr-empty { color: var(--t-dim); font-size: 14.5px; margin: 6px 0 0; }
+
+/* ---- the three numbers ---- */
+.troom-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.tr-stat { display: flex; flex-direction: column; justify-content: center; gap: 14px; min-height: 128px; }
+.tr-stat .tr-n { font-size: clamp(36px, 3.8vw, 52px); }
+.tr-pips { display: flex; gap: 4px; }
+.tr-pips i { flex: 1; height: 9px; border-radius: 2px; background: rgba(246, 240, 228, 0.11); }
+.tr-pips i.is-on { background: var(--t-hot); }
+
+@media (max-width: 1180px) {
+  .troom-lists { grid-template-columns: 1fr; }
+  .troom-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .troom-hero { grid-template-columns: 1fr 1fr; }
+  .tr-clock { grid-column: 1 / -1; min-height: 0; }
+}
+@media (max-width: 620px) {
+  .troom { padding: 12px; border-radius: 16px; }
+  .troom .tr-card { padding: 16px 17px; }
+  .tr-tile { min-height: 112px; }
+  .tr-dots { grid-template-columns: repeat(48, 1fr); gap: 4px; }
+  .tr-ph { font-size: 9px; letter-spacing: 0.05em; }
+  .troom .tr-slot { min-width: 62px; }
+}

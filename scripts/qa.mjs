@@ -608,7 +608,8 @@ await step('today: the day line, the numbers and the week are his own', async ()
       return { startMin: Math.round(((r.left - track.left) / track.width) * 1440), min: Math.round((r.width / track.width) * 1440) }
     })
     const nowEl = document.querySelector('.dayline-now')?.getBoundingClientRect()
-    const nums = [...document.querySelectorAll('.daynum')].map((el) => ({
+    /* The four numbers live in the Today room now. Same facts, same order. */
+    const nums = [...document.querySelectorAll('.troom [data-stat]')].map((el) => ({
       v: el.querySelector('.v')?.textContent ?? '', k: el.querySelector('.k')?.textContent ?? '',
     }))
     const d = new Date()
@@ -680,7 +681,7 @@ await step('today: a task finished right after midnight still counts as finished
   await page.reload(); await page.waitForTimeout(700)
   const skip = page.getByRole('button', { name: 'Not today' })
   if (await skip.count()) { await skip.first().click(); await page.waitForTimeout(400) }
-  const finished = await page.locator('.daynum').nth(2).locator('.v').innerText()
+  const finished = await page.locator('.troom [data-stat]').nth(2).locator('.v').innerText()
   if (finished !== '1') throw new Error(`finished reads "${finished}" for a task closed at 00:20 local, not 1`)
 })
 await step('today: the assistant is gone from the page, and stays gone', async () => {
@@ -1157,8 +1158,10 @@ await step('one fact, one number: Today and Habits agree on what today asked', a
      for /^\d+\/\d+$/, which "1/14" and "1/64" both satisfy happily. */
   await fresh('today')
   await page.locator('.space-btn', { hasText: 'All' }).click(); await page.waitForTimeout(500)
-  const todayNum = (await page.locator('.daynum').nth(1).innerText()).replace(/\s+/g, ' ').trim()
-  const todayFrac = todayNum.split(' ')[0]
+  /* Read the figure itself. The room puts the label above the number, so
+     splitting innerText on whitespace would hand back the label. */
+  const todayNum = (await page.locator('.troom [data-stat="habits"] .v').innerText()).replace(/\s+/g, ' ').trim()
+  const todayFrac = todayNum
   await page.goto(`${URL}#/habits`); await page.waitForTimeout(900)
   const habitsFrac = (await page.locator('.band-metric .v, .band-metrics .v').first().innerText()).trim()
   if (!/^\d+\/\d+$/.test(todayFrac)) throw new Error(`Today's habit number is not a fraction: "${todayNum}"`)
@@ -1210,7 +1213,7 @@ await step('a task finished without a time is finished on every page that counts
     if (state.done !== true || state.doneAt !== 'string') throw new Error(`${title}: not recorded as finished (${JSON.stringify(state)})`)
 
     await page.goto(`${URL}#/today`); await page.waitForTimeout(900)
-    const todayFinished = (await page.locator('.daynum').nth(2).innerText()).trim().split(/\s+/)[0]
+    const todayFinished = (await page.locator('.troom [data-stat="finished"] .v').innerText()).trim()
     if (todayFinished !== '1') throw new Error(`${title}: Today says "${todayFinished}" things finished, expected 1`)
 
     const dayKey = await page.evaluate(() => {

@@ -109,8 +109,34 @@ const b = await chromium.launch()
      (await page.locator('.as-input').inputValue()) === 'remind me about the tax return',
      await page.locator('.as-input').inputValue())
 
-  await page.keyboard.press('Enter'); await page.waitForTimeout(600)
+  /* Click Ask, which is what he does. Pressing Enter here would land on the mic
+     button, because clicking it left the focus there, and Enter on a button
+     just toggles that button. An earlier version of this test did exactly that
+     and "sending stops the mic" passed because the mic had been switched off by
+     hand, not because sending stopped it. */
+  await page.locator('.as-send').click(); await page.waitForTimeout(600)
   ok('sending stops the mic', !(await mic.getAttribute('class'))?.includes('is-listening'), await mic.getAttribute('class'))
+  ok('sending empties the box', (await page.locator('.as-input').inputValue()) === '',
+     JSON.stringify(await page.locator('.as-input').inputValue()))
+
+  /* His report, exactly. SpeechRecognition delivers one last `result` AFTER
+     stop() is called, to flush a half-said phrase into a final one. Sending
+     cleared the box and then that trailing result put the question straight
+     back into it, so every dictated question had to be deleted by hand. The
+     engine is stubbed here, so the late result is fired by hand instead. */
+  await page.evaluate(() => window.__say && window.__say('what should I do today', true))
+  await page.waitForTimeout(250)
+  ok('a result arriving after send does not refill the box',
+     (await page.locator('.as-input').inputValue()) === '',
+     JSON.stringify(await page.locator('.as-input').inputValue()))
+
+  // And dictation still works for the NEXT question after a send.
+  await mic.click(); await page.waitForTimeout(150)
+  await page.evaluate(() => window.__say('and after that', true))
+  await page.waitForTimeout(200)
+  ok('dictation still works for the next question',
+     (await page.locator('.as-input').inputValue()) === 'and after that',
+     await page.locator('.as-input').inputValue())
   await page.close()
 }
 

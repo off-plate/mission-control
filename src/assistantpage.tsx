@@ -6,7 +6,7 @@ import { SPACE_LABELS } from './mock'
 import { ask, STARTERS, opener, type Action, type Brief, type Card, type CardKind, type Reply } from './assistant'
 import { engineName, speechState, stop as stopSpeech, subscribe, toggle } from './speech'
 import {
-  dictateState, dictationAvailable, dictationEngine,
+  cancel as cancelDictation, dictateState, dictationAvailable, dictationEngine,
   stop as stopDictation, subscribe as subscribeDictation, toggle as toggleDictation,
 } from './dictation'
 import { SLOTS, dueOn, habitsDueToday, goalCurrent, type HabitDef, type PageId, type SpaceId, type Task } from './types'
@@ -461,7 +461,7 @@ function useDoer() {
 function Dictate({ base, onText, busy }: { base: string; onText: (t: string) => void; busy: boolean }): JSX.Element | null {
   const [, bump] = useState(0)
   useEffect(() => subscribeDictation(() => bump((n) => n + 1)), [])
-  useEffect(() => stopDictation, [])
+  useEffect(() => cancelDictation, [])
   if (!dictationAvailable()) return null
   const st = dictateState()
   const label = st === 'listening' ? 'Stop' : st === 'transcribing' ? 'Writing it down' : 'Dictate'
@@ -557,7 +557,9 @@ export function AssistantPage() {
   useEffect(() => stopSpeech, [])
 
   const empty = turns.length === 0 && !busy && !err
-  const submit = () => { const t = q.trim(); if (t) { stopDictation(); setQ(''); void send(t) } }
+  /* cancel, not stop: the question has been asked, so the tail of it is not
+     wanted back in the box that is about to be cleared. */
+  const submit = () => { const t = q.trim(); if (t) { cancelDictation(); setQ(''); void send(t) } }
 
   const askBox = (
     <form className="as-ask" onSubmit={(e) => { e.preventDefault(); submit() }}>

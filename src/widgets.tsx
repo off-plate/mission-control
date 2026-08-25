@@ -85,22 +85,6 @@ export function Spark({ data, width = 120, height = 32, fluid = false }: { data:
   )
 }
 
-/** Full-width sparkline with labeled endpoints; numbers get context. */
-export function SparkBox({ data, unit, caption }: { data: number[]; unit: string; caption: string }) {
-  const first = data[0]
-  const last = data[data.length - 1]
-  return (
-    <span className="sparkbox">
-      <Spark data={data} width={400} height={64} />
-      <span className="spark-vals">
-        <span>{first}{unit}</span>
-        <span className="last">{last}{unit} now</span>
-      </span>
-      <span className="spark-caption">{caption}</span>
-    </span>
-  )
-}
-
 /* His real work calendar, drawn here rather than embedded.
 
    An iframe was the obvious way and the wrong one: it cannot be styled, it
@@ -318,17 +302,19 @@ const GoalsBody = memo(function GoalsBody({ space }: { space: SpaceId }) {
 })
 
 const TimeSavedBody = memo(function TimeSavedBody() {
-  const { savedMin, accuracyPct, setPage, inView } = useStore()
+  const { savedMin, accuracyPct, inView } = useStore()
   const abs = Math.abs(savedMin)
   const h = Math.floor(abs / 60)
   const m = abs % 60
   const sign = savedMin < 0 ? '-' : ''
+  /* Not a button any more: Reflect was the log it opened, and a click that goes
+     nowhere is worse than no click. */
   return (
-    <button onClick={() => setPage('review')} style={{ textAlign: 'left', display: 'block', width: '100%' }} aria-label="Open the time saved log">
+    <div>
       <div className={`kpi${savedMin >= 0 ? ' val-pos' : ' val-urgent'}`}>{h > 0 ? `${sign}${h}h ${m}` : `${sign}${m}`}<span className="unit">min</span></div>
       <div className="kpi-sub">net minutes under your own estimates this week</div>
       <div className="kpi-sub">estimate accuracy {accuracyPct}%</div>
-    </button>
+    </div>
   )
 })
 

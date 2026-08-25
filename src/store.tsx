@@ -255,7 +255,6 @@ interface Store extends PersistedState {
 
   commitPlan: (taskIds: string[], firstMoveId: string | null) => void
   /** Close a window: any range, one act. Its outcomes land in the backlog. */
-  closeReview: (window: { id: string; label: string; from: string; to: string }, wins: string[], outcomes: string[], drifted?: string) => void
 
   assistantLog: AssistantEntry[]
   applyDictation: (text: string, items: { kind: 'task' | 'goal' | 'done'; text: string; estimateMin?: number }[]) => void
@@ -587,18 +586,14 @@ function loadPersisted(): PersistedState | null {
       }
     }
 
-    /* The two review steps learn to open Reflect. The step is his once it
-       exists, so the seed cannot reach it; this adds the pointer without
-       touching his words, and runs once. */
-    if (!p.removedSeeds.includes('fix:review-goto')) {
-      p.removedSeeds.push('fix:review-goto')
-      const GOTO: Record<string, { goto: 'review'; gotoLabel: string }> = {
-        wr2: { goto: 'review', gotoLabel: 'Open last week in Reflect' },
-        mo0: { goto: 'review', gotoLabel: 'Open the month in Reflect' },
-      }
-      p.routines = (p.routines ?? []).map((r) => (r.id !== 'r-weekly' && r.id !== 'r-monthly' ? r : {
+    /* Reflect is gone, so the two review steps that learned to open it lose the
+       pointer again. Only the pointer: his own words on the step are untouched,
+       and it runs once. */
+    if (!p.removedSeeds.includes('fix:review-goto-drop')) {
+      p.removedSeeds.push('fix:review-goto-drop')
+      p.routines = (p.routines ?? []).map((r) => ({
         ...r,
-        steps: r.steps.map((st) => (GOTO[st.id] && !st.goto ? { ...st, ...GOTO[st.id] } : st)),
+        steps: r.steps.map((st) => ((st.goto as string | undefined) === 'review' ? { ...st, goto: undefined, gotoLabel: undefined } : st)),
       }))
     }
 
@@ -1057,7 +1052,7 @@ function loadPersisted(): PersistedState | null {
 
     /* The merge above shipped before the habits carried everything their steps
        could DO: which step they came from, so a number they record joins the
-       series Reflect already charts, and the two bodies the app builds fresh
+       series the step already writes, and the two bodies the app builds fresh
        each morning. Anyone who ran the first pass has habits without those, so
        the same function runs again and fills only what is missing. Habits only,
        because the ticks were already taken across. */
@@ -1093,7 +1088,10 @@ function routeFromHash(): { page: PageId; day: string | null } {
   if (m) return { page: 'day', day: m[1] }
   // The board's old address still resolves: a bookmark lands on its successor.
   if (h === 'braindump') return { page: 'notes', day: null }
-  const pages: PageId[] = ['today', 'plan', 'habits', 'routines', 'goals', 'achievements', 'money', 'review', 'stats', 'settings', 'brand', 'notes', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant']
+  /* Achievements, Money and Reflect were removed. Their addresses land on Today
+     rather than on nothing, the same courtesy braindump gets above. */
+  if (h === 'achievements' || h === 'money' || h === 'review' || h === 'stats') return { page: 'today', day: null }
+  const pages: PageId[] = ['today', 'plan', 'habits', 'routines', 'goals', 'settings', 'brand', 'notes', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant']
   return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
 }
 
@@ -2076,8 +2074,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (!h || !key) return
       const day = todayKey()
       /* Every run is kept, with the moment it happened, in the same series the
-         step wrote before the merge. Reflect charts it by routine and step, so
-         the scores from before and after are one line about one test. */
+         step wrote before the merge, keyed by routine and step, so the scores
+         from before and after are one line about one test. */
       setStepLog((prev) => [...prev, { routineId: key.routineId, stepId: key.stepId, day, at: new Date().toISOString(), value }])
       const rk = `${key.routineId}:${key.stepId}`
       setRecords((prev) => (value > (prev[rk] ?? 0) ? { ...prev, [rk]: value } : prev))
@@ -2269,43 +2267,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ),
       )
       setPlan({ committedDate: todayKey(), firstMoveId })
-    },
-
-    /* One close for any window. A window that ends today and started this week
-       also marks the weekly ritual done, so the Sunday nudge keeps working. */
-    closeReview: (w, wins, outcomes, drifted) => {
-      setReview((prev) => {
-        /* Closing the same window again appends and supersedes. It used to drop
-           the previous one, so a second close with empty boxes erased what he
-           had written the first time. */
-        const prior = (prev.reflections ?? []).find((r) => r.from === w.from && r.to === w.to && !r.supersededBy)
-        const id = newId('rf')
-        const kept = (prev.reflections ?? []).map((r) => (r.id === prior?.id ? { ...r, supersededBy: id } : r))
-        const entry = { id, label: w.label, from: w.from, to: w.to, when: todayKey(), wins, drifted: drifted?.trim() || undefined, outcomes }
-        const isThisWeek = w.from === dayOfWeekKey(0) && w.to === todayKey()
-        return {
-          ...prev,
-          lastDoneDate: isThisWeek ? todayKey() : prev.lastDoneDate,
-          wins: isThisWeek ? wins : prev.wins,
-          outcomes: isThisWeek ? outcomes : prev.outcomes,
-          // No cap. This is a handful of sentences a week, and it is his writing.
-          reflections: [entry, ...kept],
-        }
-      })
-      setTasks((prev) => [
-        ...outcomes.filter(Boolean).map((o) => ({
-          id: newId('t'),
-          title: o,
-          source: 'mc' as const,
-          estimateMin: 30,
-          done: false,
-          createdAt: todayKey(),
-          space,
-          list: 'backlog' as const,
-          category: 'admin' as const,
-        })),
-        ...prev,
-      ])
     },
 
 

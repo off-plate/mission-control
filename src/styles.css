@@ -782,27 +782,6 @@ main { padding-inline: var(--gutter); }
 .firstmove .fm-title { font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); min-width: 0; }
 .firstmove .chip { font-size: 0.8125rem; }
 
-/* quiet periphery: one mono line for the tier-3 numbers */
-.status-strip {
-  display: flex;
-  gap: var(--s2) var(--s6);
-  flex-wrap: wrap;
-  margin-top: var(--s6);
-  padding-top: var(--s4);
-  border-top: 1px solid var(--hairline);
-}
-.status-strip button {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--muted);
-  /* nowrap clipped the strip mid-word on a phone; wrapping is just reading */
-  white-space: normal;
-  text-align: left;
-  padding: var(--s1) 0;
-}
-.status-strip button:hover { color: var(--accent-text); }
-.status-strip .k { color: var(--faint); }
-
 /* exceptions */
 .exceptions {
   display: flex;
@@ -1061,6 +1040,10 @@ button.chip:hover { color: var(--accent-text); background: var(--accent-wash); }
 /* One shell strategy: every page runs full-bleed like Today.
    Standalone flow cards center themselves; grids span the width. */
 .grid-2 { display: grid; gap: var(--s5); grid-template-columns: 1fr; }
+/* Settings is one column now that Connected sources is gone. Capped, because a
+   single panel stretched across 3440px puts a label and its button half a metre
+   apart, which is the same bug the wide-row rail fixes everywhere else. */
+.settings-col { max-width: 820px; }
 .grid-3 { display: grid; gap: var(--s5); grid-template-columns: 1fr; }
 .grid-4 { display: grid; gap: var(--s5); grid-template-columns: 1fr; align-items: stretch; }
 .grid-2 > *, .grid-3 > *, .grid-4 > * { min-width: 0; }
@@ -1419,13 +1402,6 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
   font-size: var(--text-xs);
 }
 .textinput::placeholder { color: var(--muted); opacity: 0.85; }
-
-/* sparkline with endpoint values */
-.sparkbox { display: block; width: 100%; }
-.sparkbox svg { width: 100%; height: auto; }
-.spark-vals { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
-.spark-vals .last { color: var(--ink); font-weight: 600; }
-.spark-caption { display: block; margin-top: var(--s2); color: var(--muted); font-size: var(--text-xs); }
 
 /* plan timeline */
 .timeline { position: relative; height: 44px; border: 1px solid var(--hairline); border-radius: var(--r-sm); background: var(--bg); margin-block: var(--s3); }
@@ -1960,12 +1936,6 @@ a.pron-src:hover { color: var(--accent-text); text-decoration: underline; }
 /* typing */
 .mr-typing { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s2); }
 
-/* ---------- Money: Compass handoff ---------- */
-.money-compass { display: flex; align-items: center; gap: var(--s5); flex-wrap: wrap; }
-.money-compass-copy { flex: 1; min-width: 260px; }
-.money-compass-copy p { font-size: var(--text-sm); color: var(--muted); margin-top: var(--s2); max-width: 60ch; }
-.money-compass-btn { font-size: var(--text-base); padding: var(--s3) var(--s5); gap: var(--s2); white-space: nowrap; }
-
 /* ---------- Brand & guidelines page ---------- */
 .brand-block { margin-bottom: var(--s6); }
 .brand-swatches { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: var(--s3); }
@@ -2420,8 +2390,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .expand-btn { border: 1px solid var(--hairline-strong); border-radius: 3px; padding: 1px 6px; }
 .exception-row button { text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px; }
 .exception-row button:hover { color: var(--accent-hover); text-decoration-color: currentColor; }
-.status-strip button { border-bottom: 1px dotted var(--hairline-strong); }
-.status-strip button:hover { color: var(--accent-text); border-bottom-color: var(--accent-text); }
 /* Widget titles navigate, so they get a resting cue. */
 .widget-title-btn::after { content: '\203A'; font-size: 0.95rem; line-height: 1; color: var(--faint); margin-left: 2px; }
 .widget-title-btn:hover::after { color: var(--accent-text); }
@@ -2587,7 +2555,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 
 /* The floating focus badge used to sit on top of the last drop zone. */
 .page { padding-bottom: 76px; }
-.status-strip.is-empty { display: none; }
 /* Finished-but-unscheduled work, below the time buckets. */
 .done-group { margin-top: var(--s4); padding-top: var(--s3); border-top: 1px solid var(--hairline); }
 .done-group .today-task { margin-top: 4px; }
@@ -2638,7 +2605,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 @media (min-width: 1600px) {
   .exception-row, .firstmove, .momentum { --rail: 1400px; }
   .exception-row > span:nth-of-type(2) { max-width: var(--rail); }
-  .money-compass { max-width: 1500px; }
   .widget .rowitem > .grow { max-width: 900px; }
 }
 
@@ -3349,30 +3315,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
    (settings row, empty state) is left hugging the gutter. */
 .day-page > * { max-width: 940px; margin-inline: auto; }
 
-/* ---------- a measured number over time ---------- */
-/* A chart, not a sparkline: dated axis, real spread, and the target drawn as a
-   line you can see yourself crossing. Capped in width, because a graph stretched
-   across a wide monitor flattens every slope it is meant to show. */
-/* The panel is full width like every other section on this page. The DRAWING
-   is capped, because an SVG scaled to 100% scales its height too: at 1500px
-   wide a 680x220 chart renders 480px tall, which is what made it look like a
-   poster. Fixed drawing, whatever the panel does. */
-.numpanel { margin-bottom: var(--s4); }
-.numpanel-head { display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap; }
-.numpanel-head .numpanel-fig { margin-left: auto; }
-.numpanel-title { font-size: var(--text-md); font-weight: 600; }
-.numpanel-fig { font-size: var(--text-xs); color: var(--muted); }
-.numchart-scroll { overflow-x: auto; margin-top: var(--s3); }
-.numchart { display: block; overflow: visible; }
-.nc-grid { stroke: var(--hairline); stroke-width: 1; }
-.nc-axis { font-size: 11px; fill: var(--faint); font-family: var(--font-mono); }
-.nc-target { stroke: var(--progress); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: 0.85; }
-.nc-target-lab { font-size: 11px; fill: var(--progress); font-family: var(--font-mono); font-weight: 600; }
-.nc-line { stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-.nc-dot { fill: var(--surface); stroke: var(--ink); stroke-width: 2; }
-.nc-dot.pass { fill: var(--progress); stroke: var(--progress); }
-.nc-val { font-size: 11px; fill: var(--muted); font-family: var(--font-mono); }
-
 /* Work that keeps coming back. Not an alarm: a fact, in the row, so the age of
    a thing being avoided is visible instead of counted in silence. */
 .carried-tag {
@@ -3420,72 +3362,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .pomo-ambient.await { animation: pomo-pulse 1.2s var(--ease-loop) infinite; }
 @keyframes pomo-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
 .pomo-badge.await .pomo-phase { color: var(--progress); }
-
-/* ---------- Achievements: milestones, money and reflection in one place ----------
-   The segmented bar sits above the page it switches, so all three faces keep
-   their own band and nothing had to be rebuilt to merge them. */
-.achnav {
-  display: flex; gap: var(--s2); padding: var(--s4) var(--s5) 0;
-  max-width: 100%; overflow-x: auto; scrollbar-width: none;
-}
-.achnav::-webkit-scrollbar { display: none; }
-/* The tablist is a segmented control that also changes the address, so it
-   wears the same clothes and only the shape of the ends differs. */
-.achtab {
-  font-size: var(--text-sm); font-weight: 600; color: var(--muted);
-  padding: var(--s2) var(--s4); min-height: 34px; border-radius: 999px;
-  border: 1px solid var(--hairline-strong); background: transparent; cursor: pointer; white-space: nowrap;
-}
-.achtab:hover { color: var(--ink); border-color: var(--ink); }
-.achtab.on, .achtab[aria-selected="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
-.achnav + .page { padding-top: var(--s4); }
-
-/* One thing crossed its line. The only celebration in the app, and it is
-   earned: it names the milestone and what did it. */
-.ms-landed {
-  display: flex; align-items: center; gap: var(--s4); margin-bottom: var(--s5);
-  padding: var(--s4) var(--s5);
-  border: 1px solid var(--progress); border-radius: var(--r-md);
-  background: var(--progress-wash);
-  animation: ms-land var(--t-med) both;
-}
-@keyframes ms-land {
-  from { opacity: 0; transform: translateY(-6px); }
-  to { opacity: 1; transform: none; }
-}
-.ms-landed-mark {
-  flex: none; width: 42px; height: 42px; border-radius: 50%;
-  display: grid; place-items: center; color: var(--bg); background: var(--progress);
-}
-.ms-landed-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.ms-landed-copy strong { font-size: var(--text-base); }
-@media (prefers-reduced-motion: reduce) { .ms-landed { animation: none; } }
-
-.ms-next { margin-bottom: var(--s5); }
-.ms-next-row { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s5); margin-top: var(--s2); }
-.ms-next-item { display: flex; align-items: baseline; gap: var(--s2); font-size: var(--text-sm); }
-.ms-next-item .mono { color: var(--faint); font-size: var(--text-xs); }
-
-.ms-group { margin-bottom: var(--s5); }
-.ms-cards { display: grid; gap: var(--s3); grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 900px) { .ms-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 1600px) { .ms-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-.ms-card {
-  display: flex; align-items: center; gap: var(--s3); min-width: 0;
-  padding: var(--s3) var(--s4);
-  border: 1px solid var(--hairline); border-radius: var(--r-md); background: var(--surface);
-}
-.ms-card.is-earned { border-color: var(--progress); background: var(--progress-wash); }
-.ms-card.is-unknown { opacity: 0.6; }
-.ms-mark { flex: none; width: 36px; height: 36px; display: grid; place-items: center; color: var(--accent-text); }
-.ms-card.is-earned .ms-mark { color: var(--progress); }
-.ms-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.ms-title { font-size: var(--text-sm); font-weight: 600; }
-.ms-hint { font-size: var(--text-xs); color: var(--muted); }
-.ms-fig { flex: none; font-size: var(--text-xs); color: var(--faint); white-space: nowrap; }
-.ms-card.is-earned .ms-fig { color: var(--progress); font-weight: 600; }
-.ms-unit { color: var(--faint); }
-.ms-foot { font-size: var(--text-xs); color: var(--faint); margin-top: var(--s5); }
 
 /* ---------- Today: the face of the day ----------
    Taken from a dashboard he sent: a band across the top, big numbers under it,
@@ -4225,28 +4101,6 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 @media (max-width: 700px) {
   .habit-days.is-period { justify-content: flex-start; }
   .period-unit { margin-right: var(--s2); }
-}
-
-/* ---------- Reflect: the questions the page can now answer ---------- */
-/* A number with a direction under it. Quiet: the number is the headline. */
-.rf-delta { display: block; margin-top: var(--s2); font-family: var(--font-mono); font-size: 0.625rem; color: var(--faint); }
-.rf-delta.up { color: var(--progress); }
-.rf-delta.down { color: var(--alert); }
-.rf-delta.same { color: var(--faint); }
-.rf-promise-head { display: flex; align-items: baseline; gap: var(--s3); }
-.rf-promise-head .kpi { margin: 0; }
-.rf-promise-head .linkish { margin-left: auto; font-size: var(--text-xs); }
-.rf-done { text-decoration: line-through; text-decoration-color: var(--hairline-strong); color: var(--muted); }
-.rf-dead { font-family: var(--font-mono); font-size: 0.625rem; color: var(--alert); white-space: nowrap; }
-.rf-bar { flex: 0 0 120px; height: 4px; }
-/* His own wall, at the end of a long window. A card, not a decoration: it
-   opens the wall. */
-.rf-why { display: block; width: 100%; text-align: left; padding: var(--s6) var(--s5); }
-.rf-why-text { display: block; font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); line-height: 1.25; max-width: 46ch; }
-.rf-why-by { display: block; margin-top: var(--s3); font-family: var(--font-mono); font-size: 0.6875rem; color: var(--faint); }
-.rf-why:hover .rf-why-text { color: var(--accent-text); }
-@media (max-width: 700px) {
-  .rf-bar { flex: 0 0 60px; }
 }
 
 /* ============================================================

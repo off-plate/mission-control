@@ -12,19 +12,15 @@ export function isSpace(v: ViewId): v is SpaceId {
   return v !== 'all'
 }
 
-/** One shared on-track threshold, so Goals, Review and the widget never disagree. */
+/** One shared on-track threshold, so Goals and the widget never disagree. */
 export const ON_TRACK_PCT = 50
 
 export type PageId =
-  | 'achievements'
   | 'today'
   | 'plan'
   | 'habits'
   | 'routines'
   | 'goals'
-  | 'money'
-  | 'review'
-  | 'stats'
   | 'settings'
   | 'brand'
   | 'notes'
@@ -196,9 +192,8 @@ export interface RoutineStep {
   /** optional external tool to open (typing test, etc.). */
   link?: string
   linkLabel?: string
-  /** A page of this app the step opens, for a step whose work IS a page here:
-   *  "review last week" belongs in Reflect, not in a second place that asks
-   *  the same question. */
+  /** A page of this app the step opens, for a step whose work IS a page here,
+   *  rather than a second place asking the same question. */
   goto?: PageId
   gotoLabel?: string
 }
@@ -465,9 +460,9 @@ export interface HabitDef {
    *  tick, which is not what the step meant. */
   gatedBy?: 'typing-wpm'
   /** The step this habit was made from. A number logged against the habit has
-   *  to land in the SAME dated series Reflect already charts under Numbers, or
-   *  the typing scores from before the merge and the ones after it become two
-   *  unrelated lines about the same test. */
+   *  to land in the SAME dated series the step writes, or the typing scores
+   *  from before the merge and the ones after it become two unrelated lines
+   *  about the same test. */
   srcStepId?: string
   /** Content the step generated fresh for the day, which no note and no link
    *  can stand in for: today's real news paragraphs to read aloud, today's

@@ -183,12 +183,12 @@ await step('the menu is seven tabs, and what left it is reachable from the heade
   /* Calendar left this list when it became a real page. It is still not a tab
      HERE, because this test runs in Personal and Calendar is Big Time only;
      the calendar test above owns that rule. */
-  for (const gone of ['Avoidance', 'Assistant', 'Notes', 'Focus', 'Money', 'Reflect']) {
+  for (const gone of ['Avoidance', 'Assistant', 'Notes', 'Focus', 'Money', 'Reflect', 'Achievements']) {
     if (tabs.includes(gone)) throw new Error(`${gone} is still a tab`)
   }
   /* My Mind left the header for the Apps shelf on his instruction. The apps
-     test below owns it now. */
-  for (const name of ['Note', 'Achievements']) {
+     test below owns it now, and Achievements left the header entirely. */
+  for (const name of ['Note']) {
     if (!(await page.getByRole('button', { name, exact: true }).count()) && !(await page.getByRole('link', { name }).count())) {
       throw new Error(`no ${name} in the header`)
     }
@@ -197,7 +197,7 @@ await step('the menu is seven tabs, and what left it is reachable from the heade
   /* 'assistant' left this list when it became a real page of its own. It used
      to be a dead address walking to Today, back when the assistant was a rail
      that was removed. */
-  for (const [route, heading] of [['coach', 'Today'], ['money', 'Money'], ['review', 'Reflect']]) {
+  for (const [route, heading] of [['coach', 'Today'], ['money', 'Today'], ['review', 'Today'], ['stats', 'Today'], ['achievements', 'Today']]) {
     await page.goto(`${URL}#/${route}`); await page.reload(); await page.waitForTimeout(500)
     const h1 = await page.locator('h1').first().innerText()
     if (h1 !== heading) throw new Error(`#/${route} landed on ${h1}, not ${heading}`)
@@ -516,49 +516,6 @@ await step('the zone: the note takes real formatting, not a plain textarea', asy
   if (!/\*\*[^*]+\*\*/.test(saved.body)) throw new Error(`bold did not round-trip to markdown: ${saved.body}`)
   if (!/^-\s/m.test(saved.body)) throw new Error(`the bullet did not round-trip to markdown: ${saved.body}`)
 })
-await step('achievements: three faces, and every milestone is earned by the log', async () => {
-  await fresh('achievements')
-  const segs = await page.locator('.achtab').allInnerTexts()
-  if (segs.join(',') !== 'Milestones,Money,Reflect') throw new Error(`segments are ${segs.join(', ')}`)
-  if ((await page.locator('.ms-card').count()) < 8) throw new Error('the milestone list is short')
-  // Nothing is earned on an empty install: a badge for opening the app is the
-  // exact thing this page must not do.
-  if (await page.locator('.ms-card.is-earned').count()) throw new Error('something was earned with no record behind it')
-  await page.getByRole('tab', { name: 'Money' }).click(); await page.waitForTimeout(400)
-  if ((await page.locator('h1').first().innerText()) !== 'Money') throw new Error('the Money face did not open')
-  await page.getByRole('tab', { name: 'Reflect' }).click(); await page.waitForTimeout(400)
-  if ((await page.locator('h1').first().innerText()) !== 'Reflect') throw new Error('the Reflect face did not open')
-})
-await step('achievements: a real record earns its milestone, and says so once', async () => {
-  await fresh('achievements')
-  await page.evaluate((K) => {
-    const s = JSON.parse(localStorage.getItem(K))
-    const key = (x) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
-    s.focusSessions = Array.from({ length: 20 }, (_, i) => {
-      const d = new Date(); d.setDate(d.getDate() - i)
-      return { id: `af${i}`, day: key(d), minutes: 35, space: 'personal', label: 'Deep work' }
-    })
-    localStorage.setItem(K, JSON.stringify(s))
-    localStorage.removeItem('mc:earned')
-  }, KEY)
-  await page.reload(); await page.waitForTimeout(800)
-  // Twenty days of history makes the morning review offer itself over the top
-  // of the page. Answer it first; it is not what this step is about.
-  const notNow = page.getByRole('button', { name: 'Not today' })
-  if (await notNow.count()) { await notNow.first().click(); await page.waitForTimeout(400) }
-  // 20 blocks of 35 minutes is 11 hours, which clears the ten hour line and
-  // nothing else.
-  const earned = await page.locator('.ms-card.is-earned').allInnerTexts()
-  if (earned.length !== 1) throw new Error(`${earned.length} earned, expected 1: ${earned.join(' | ')}`)
-  if (!/Ten hours/.test(earned[0])) throw new Error(`the wrong one was earned: ${earned[0]}`)
-  if (!(await page.locator('.ms-landed').count())) throw new Error('nothing celebrated a milestone that just landed')
-  await page.getByRole('button', { name: 'Good' }).click(); await page.waitForTimeout(300)
-  if (await page.locator('.ms-landed').count()) throw new Error('the celebration did not stand down')
-  await page.reload(); await page.waitForTimeout(700)
-  const again = page.getByRole('button', { name: 'Not today' })
-  if (await again.count()) { await again.first().click(); await page.waitForTimeout(300) }
-  if (await page.locator('.ms-landed').count()) throw new Error('it celebrated the same milestone twice')
-})
 await step('notes: folders are folders, with no workspace above them', async () => {
   await fresh('notes')
   const names = await page.locator('.nt-side .nt-fname').allInnerTexts()
@@ -767,17 +724,6 @@ await step('today: nothing to upload, and no camera left on the page', async () 
   await fresh('today')
   const n = await page.locator('input[type="file"]').count()
   if (n) throw new Error(`${n} file inputs are still in the app`)
-})
-await step('money: reads Compass, and invents nothing when it cannot', async () => {
-  await fresh('money')
-  // The gate runs ?noremote, so Compass is unreachable by design. Every figure
-  // must be a dash: a zero here would read as "you owe nothing".
-  const kpis = await page.locator('.kpi').allInnerTexts()
-  if (!kpis.length) throw new Error('no figures on the page at all')
-  for (const k of kpis) {
-    if (/\d/.test(k)) throw new Error(`a number appeared with no Compass behind it: ${k}`)
-  }
-  if (!(await page.getByText('Open Compass').count())) throw new Error('no way through to Compass')
 })
 await step('workspaces: write a task into Michael’s Corner', async () => {
   await fresh('plan')
@@ -1266,10 +1212,6 @@ await step('a task finished without a time is finished on every page that counts
     await page.goto(`${URL}#/today`); await page.waitForTimeout(900)
     const todayFinished = (await page.locator('.daynum').nth(2).innerText()).trim().split(/\s+/)[0]
     if (todayFinished !== '1') throw new Error(`${title}: Today says "${todayFinished}" things finished, expected 1`)
-
-    await page.goto(`${URL}#/review`); await page.waitForTimeout(1100)
-    const reflectFinished = (await page.locator('.panel', { hasText: 'Finished' }).first().locator('.kpi').first().innerText()).trim().replace(/\D+$/, '')
-    if (reflectFinished !== '1') throw new Error(`${title}: Reflect says "${reflectFinished}" finished, expected 1`)
 
     const dayKey = await page.evaluate(() => {
       const d = new Date()

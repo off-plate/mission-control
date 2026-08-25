@@ -2917,21 +2917,29 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
    22px removes the question: the control and the line it sits on are the same
    whole number of pixels, so there is nothing left to round apart. */
 .today-task, .todo-row { align-items: flex-start; --line: 22px; }
-/* A quarter pixel, measured rather than guessed: a sweep from -3px to +1.5px
-   against the text's own x-height centre (the band the eye actually aligns to,
-   not the full ascender-to-descender extent) put the zero at +0.25. It is
-   below what anyone can see on its own, and it is the difference between
-   "close" and "right". */
-.today-task > .checkbox, .todo-row > .checkbox { margin-top: 0.25px; }
+/* Every child is EXACTLY one line tall and centres inside it, so every centre
+   lands on the same y. min-height let taller things grow and drift; height
+   does not. */
 .today-task > *, .todo-row > * {
-  min-height: var(--line);
+  height: var(--line);
   display: inline-flex;
   align-items: center;
+  /* Horizontally too. Without this, `display: inline-flex` silently replaced
+     the checkbox's own `place-items: center` and left its tick sitting against
+     the left edge of the green square. I introduced that today while fixing the
+     vertical alignment, and then spent hours measuring the box against the text
+     while the thing actually out of place was the mark inside the box. */
+  justify-content: center;
 }
 /* The title is the exception: it is the thing the others align TO, so it keeps
    normal text flow and is allowed to wrap to as many lines as it needs. */
+/* The title is the exception twice over: it must wrap to as many lines as it
+   needs, and its LINE must be the same height as everything else or its first
+   line sits on a different centre from every control beside it. */
 .today-task > .grow, .todo-row > .grow,
-.today-task > .task-link, .todo-row > .task-link { display: block; }
+.today-task > .task-link, .todo-row > .task-link {
+  display: block; height: auto; min-height: var(--line); line-height: var(--line);
+}
 /* The workspace bar stops stretching to the full height of a wrapped row: it
    marks the row, it is not a scale beside it. */
 .today-task > .spacemark, .todo-row > .spacemark { align-self: flex-start; height: var(--line); }

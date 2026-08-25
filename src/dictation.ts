@@ -63,6 +63,9 @@ export function dictationEngine(): 'browser' | 'whisper' | 'none' {
 let state: DictateState = 'idle'
 let rec: Recognition | null = null
 let recorder: MediaRecorder | null = null
+/* Set when a recording is abandoned rather than finished, so onstop knows not
+   to spend a Whisper call on audio nobody is waiting for. */
+let discard = false
 let stream: MediaStream | null = null
 const listeners = new Set<() => void>()
 
@@ -76,12 +79,42 @@ function set(s: DictateState): void { state = s; listeners.forEach((f) => f()) }
 /** Called with the full text the box should show, live. */
 export type OnText = (text: string) => void
 
-/** Stop listening. Safe when nothing is. */
+/** Stop listening and KEEP what was said. This is the Stop button. */
 export function stop(): void {
   if (rec) { try { rec.stop() } catch { /* already stopped */ } rec = null }
   if (recorder && recorder.state !== 'inactive') {
     try { recorder.stop() } catch { /* already stopped */ }
     return  // its onstop transcribes, and sets the state itself
+  }
+  releaseMic()
+  set('idle')
+}
+
+/** Stop listening and THROW AWAY what was said. This is sending, or leaving.
+
+    Stopping and discarding are different intents and stop() cannot serve both.
+    SpeechRecognition delivers one last `result` AFTER stop() is called, which is
+    how it flushes a half-said phrase into a final one. Sending used to call
+    stop(), clear the box, and then take that trailing result straight back into
+    the box it had just cleared, so every dictated question had to be deleted by
+    hand before the next one.
+
+    So the handler is detached before anything else, and abort() is used rather
+    than stop() because abort is the one that does not deliver a final result. */
+export function cancel(): void {
+  if (rec) {
+    rec.onresult = null
+    rec.onend = null
+    rec.onerror = null
+    try { rec.abort() } catch { /* already gone */ }
+    rec = null
+  }
+  if (recorder && recorder.state !== 'inactive') {
+    /* Same idea for the recording path: let it stop, but tell onstop there is
+       nothing to send and nothing to write. */
+    discard = true
+    try { recorder.stop() } catch { /* already stopped */ }
+    return
   }
   releaseMic()
   set('idle')
@@ -131,12 +164,14 @@ async function startWhisper(base: string, onText: OnText): Promise<void> {
     set('idle')  // permission refused; nothing to say about it that the browser has not
     return
   }
+  discard = false
   const chunks: Blob[] = []
   const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : ''
   const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
   mr.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data) }
   mr.onstop = () => {
     releaseMic()
+    if (discard) { discard = false; set('idle'); return }
     const blob = new Blob(chunks, { type: mime || 'audio/webm' })
     if (!blob.size) { set('idle'); return }
     set('transcribing')

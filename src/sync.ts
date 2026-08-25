@@ -174,20 +174,25 @@ export class Outbox {
 export const outbox = new Outbox()
 
 /** Human-readable, factual, no reassurance. Used by the settings row. */
+/** "4 min ago", the same way everywhere. Coarse on purpose: he does not need
+ *  seconds, and a number that keeps ticking is a number that keeps pulling his
+ *  eye back to it. */
+export function ago(ts: number): string {
+  const mins = Math.floor((Date.now() - ts) / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins} min ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs} h ago`
+  return `${Math.floor(hrs / 24)} d ago`
+}
+
 export function describe(s: SyncStatus): string {
   if (s.phase === 'off') return 'This device only'
   if (s.phase === 'saving') return 'Saving'
   if (s.phase === 'offline') return s.dirtySince ? 'Offline, changes held here' : 'Offline'
   if (s.phase === 'error') return 'Cannot reach the server, still trying'
   if (s.phase === 'waiting') return 'Changes not sent yet'
-  if (s.lastSyncedAt) {
-    const mins = Math.floor((Date.now() - s.lastSyncedAt) / 60000)
-    if (mins < 1) return 'Synced just now'
-    if (mins < 60) return `Synced ${mins} min ago`
-    const hrs = Math.floor(mins / 60)
-    if (hrs < 24) return `Synced ${hrs} h ago`
-    return `Synced ${Math.floor(hrs / 24)} d ago`
-  }
+  if (s.lastSyncedAt) return `Synced ${ago(s.lastSyncedAt)}`
   return 'Synced'
 }
 

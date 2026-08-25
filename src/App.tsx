@@ -17,9 +17,61 @@ import { Helmet } from './helmet'
 import { FocusPage } from './focus'
 import { ZonePage, useZoneDepth } from './zone'
 import { useStore } from './store'
+import { ago, describe, useSyncStatus } from './sync'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange } from './supabase'
 import { isReadOnly } from './store'
 import type { PageId, SpaceId, ViewId } from './types'
+
+/* Is this thing up to date, and where did the last change come from.
+
+   He asked for it after working on the laptop, editing on the phone, and having
+   no way to tell whether the two had met. The answer was already in the app, on
+   the Settings page, which is exactly where nobody looks to find out whether
+   something that should be automatic is working.
+
+   Two facts, one line. Ordinarily it says when the state last reached the
+   server. When a change arrived from somewhere else it says so instead, and
+   keeps saying so until he writes something here, because "your phone's edit
+   landed" is the news and "synced" is the assumption.
+
+   Alert by exception on the phone: at that width the ordinary case is a dot
+   with no words, and the words come back the moment there is something to say. */
+function SyncPip() {
+  const sync = useSyncStatus()
+  const { syncOrigin } = useStore()
+
+  const settled = sync.phase === 'synced' || sync.phase === 'off'
+  /* A pending or failed push is about THIS device and outranks the news from
+     another one: telling him his phone's edit arrived while his own is stuck in
+     an outbox would be true and useless. */
+  const fromElsewhere = Boolean(syncOrigin) && settled
+  const text = fromElsewhere && syncOrigin
+    ? `Updated from ${syncOrigin.name} ${ago(syncOrigin.at)}`
+    : describe(sync)
+
+  /* The dot answers one question only: is sync healthy. A change arriving from
+     his phone is not a warning and not a problem, so it is the same green as an
+     ordinary sync and the WORDS carry the difference. The alternative was a
+     fifth colour for "news", and `.status-dot.manual` is already redefined
+     further down the stylesheet to the same amber as `warn`, so reusing it
+     would have made "your phone's edit landed" look exactly like "still
+     saving". */
+  const tone = sync.phase === 'off' ? 'off'
+    : sync.phase === 'error' || sync.phase === 'offline' ? 'alert'
+    : sync.phase === 'saving' || sync.phase === 'waiting' ? 'warn'
+    : 'connected'
+
+  /* Quiet on a phone means the dot alone. News from another device is exactly
+     the case that has earned its words, so it is never quiet. */
+  const quiet = tone === 'connected' && !fromElsewhere
+
+  return (
+    <span className="syncpip" data-quiet={quiet || undefined} title={sync.detail || text}>
+      <span className={`status-dot ${tone}`} />
+      <span className="syncpip-text">{text}</span>
+    </span>
+  )
+}
 
 /* One failing page must not take the whole shell with it: the header, the nav
    and every other tab keep working while the broken view shows a card. */
@@ -291,6 +343,9 @@ export default function App() {
           </nav>
         )}
         <div className="topbar-right">
+          {/* Status before actions, and not in the Zone: that room is one thing
+              at a time and a sync line is not the thing. */}
+          {page !== 'zone' && <SyncPip />}
           {/* The one thing running, full screen. Filled with the accent so it
               reads as the button that starts something, not a place he browses.
               It is a toggle: pressing it again puts him back on the page he

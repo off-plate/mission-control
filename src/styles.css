@@ -2261,7 +2261,7 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 }
 .nt-editor li[data-done="1"]::before {
   background: var(--progress); border-color: var(--progress);
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'><path d='M4 12.5L9.5 18L20 6'/></svg>");
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><path d='M15.5 9L9.41421 15.0858'/><path d='M7 13.0858L9.41422 15.0858'/></svg>");
   background-size: 13px 13px; background-repeat: no-repeat; background-position: center;
 }
 .nt-editor li[data-done="1"] { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
@@ -2318,8 +2318,6 @@ mark { background: var(--accent-wash); color: var(--accent-text); font-weight: 6
   .nt-slash { min-width: 0; left: var(--s3) !important; right: var(--s3); max-width: none; }
   .nt-slash-row { flex-direction: column; gap: 2px; }
 }
-
-
 
 
 /* ---- a body that lost the merge, still on the note ---- */
@@ -4523,6 +4521,10 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   padding: var(--s4) var(--s2);
   border: 1px solid var(--hairline-strong); border-radius: var(--r-md);
   background: var(--card);
+  /* The shelf mixes <a> (an app that opens in a tab) with <button> (an app that
+     frames here). Without this the anchor picks up the browser's blue underline
+     and one tile in the row looks broken. */
+  color: var(--ink); text-decoration: none;
   transition: border-color var(--t-fast), background var(--t-fast), transform var(--t-fast);
 }
 .apps-tile:hover {
@@ -4801,12 +4803,26 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 
 .as-hero { text-align: center; margin-bottom: var(--s6); }
 /* One mark, and the only gradient in this app. It earns the exception by being
-   the single thing on an empty page: a small sign that something is listening. */
+   the single thing on an empty page: a small sign that something is listening.
+
+   And it is never completely still. A page with one object on it and no motion
+   at all reads as a screenshot; the light moving slowly across the sphere is
+   what says the thing is awake, without asking to be watched. */
 .as-orb {
   display: block; width: 58px; height: 58px; margin: 0 auto var(--s5);
   border-radius: 50%;
-  background: radial-gradient(circle at 32% 28%, #cfe9dd 0%, #7fb3d8 42%, #2f6bc4 100%);
+  background: radial-gradient(circle at var(--lx, 32%) var(--ly, 28%), #cfe9dd 0%, #7fb3d8 42%, #2f6bc4 100%);
+  animation: as-drift 9s var(--ease-loop) infinite;
 }
+@keyframes as-drift {
+  0%, 100% { --lx: 32%; --ly: 28%; }
+  50%      { --lx: 58%; --ly: 40%; }
+}
+/* The gradient stops only interpolate where the browser knows the properties
+   are lengths. Without this the light jumps between the two positions instead
+   of travelling, in every engine that supports the animation at all. */
+@property --lx { syntax: '<percentage>'; inherits: false; initial-value: 32%; }
+@property --ly { syntax: '<percentage>'; inherits: false; initial-value: 28%; }
 .as-hero-q {
   font-family: var(--font-display); font-size: clamp(1.6rem, 1.1rem + 2vw, 2.2rem);
   line-height: 1.15; color: var(--ink);
@@ -4900,6 +4916,17 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   padding: var(--s2) var(--s4); font-size: var(--text-sm);
 }
 .as-turn.is-it .as-said { font-size: var(--text-base); line-height: 1.55; max-width: 62ch; }
+/* The sentence while it is still being written. No animation on the text
+   itself: the words arrive from the model at their own rate, and dressing that
+   up with a second, fake reveal would put the app's guess about the pace on top
+   of the real one. Only the caret moves. */
+.as-turn.is-it .as-said.is-live { animation: none; }
+.as-caret {
+  display: inline-block; width: 2px; height: 1.05em; margin-left: 3px;
+  vertical-align: -0.16em; background: var(--accent);
+  animation: as-blink 1s steps(2, jump-none) infinite;
+}
+@keyframes as-blink { 50% { opacity: 0; } }
 
 /* What it pulled, as a way back to it. The cards themselves are on the right;
    this is the handle, so scrolling up four questions still reaches them. */
@@ -4913,6 +4940,11 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 }
 .as-pulled-btn::after { content: '\2192'; color: var(--faint); }
 .as-pulled-btn:hover { border-color: var(--accent); color: var(--accent-text); }
+/* One shared gesture on everything pressable here: it rises a pixel to meet the
+   cursor and drops back on the press. Same two curves as the rest of the app. */
+.as-pulled-btn, .as-chip { transform: translateY(0); transition: border-color var(--t-fast), color var(--t-fast), transform var(--t-fast); }
+.as-pulled-btn:hover, .as-chip:hover { transform: translateY(-1px); }
+.as-pulled-btn:active, .as-chip:active { transform: translateY(0); transition-duration: 60ms; }
 
 .as-next { display: flex; gap: var(--s2); flex-wrap: wrap; margin-top: var(--s3); }
 
@@ -4955,6 +4987,13 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   animation: as-swap 240ms var(--ease) both;
 }
 @keyframes as-swap { from { opacity: 0; transform: translateY(9px); } }
+/* The label changes with the content it labels, rather than being replaced
+   under a body that is still arriving. */
+.as-canvas-head h2 { animation: as-swap 220ms var(--ease) both; }
+/* Dealt, not dropped. The delay per row is set in the markup, capped at ten. */
+.as-canvas-body .as-row { animation: as-rowin 200ms var(--ease) both; }
+@keyframes as-rowin { from { opacity: 0; transform: translateY(5px); } }
+.as-canvas-body .as-group > .microcap { animation: as-swap 200ms var(--ease) both; }
 .as-pane + .as-pane { margin-top: var(--s6); padding-top: var(--s5); border-top: 1px solid var(--hairline); }
 .as-pane-head { display: block; margin-bottom: var(--s2); }
 
@@ -4991,6 +5030,31 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .as-more:hover { color: var(--accent-text); border-color: var(--accent); }
 
 @media (prefers-reduced-motion: reduce) {
-  .as-turn, .as-canvas-body { animation: none; }
-  .as-orb-sm, .as-dots > i { animation: none; opacity: 1; }
+  .as-turn, .as-canvas-body, .as-canvas-head h2,
+  .as-canvas-body .as-row, .as-canvas-body .as-group > .microcap { animation: none; }
+  .as-orb, .as-orb-sm, .as-dots > i, .as-caret { animation: none; opacity: 1; }
+  .as-pulled-btn:hover, .as-chip:hover { transform: none; }
 }
+
+/* Play and pause under an answer. Sized and coloured to sit below the sentence
+   without competing with it: quiet until hovered, accent only while it talks.
+   Borrows the same rise-to-meet-the-cursor gesture as everything else here
+   rather than introducing a second one. */
+.as-speak {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--hairline-strong); border-radius: var(--r-sm);
+  padding: 4px var(--s3); background: none; cursor: pointer;
+  font-size: var(--text-xs); color: var(--muted);
+  transform: translateY(0);
+  transition: border-color var(--t-fast), color var(--t-fast), transform var(--t-fast);
+}
+.as-speak:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-text); transform: translateY(-1px); }
+.as-speak:active:not(:disabled) { transform: translateY(0); transition-duration: 60ms; }
+.as-speak-ico { display: inline-flex; }
+.as-speak-ico svg { fill: currentColor; display: block; }
+/* Talking, so it holds the accent without being hovered. */
+.as-speak.is-playing, .as-speak.is-paused { border-color: var(--accent); color: var(--accent-text); }
+/* Waiting on the network. The cursor says wait; nothing spins, because a
+   spinner on a two-second call is more motion than the wait deserves. */
+.as-speak.is-loading { cursor: progress; opacity: 0.6; }
+.as-speak:disabled { cursor: progress; }

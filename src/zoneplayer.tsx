@@ -6,6 +6,7 @@
 import { useEffect, useRef } from 'react'
 import { MUNDI_OPUS_QUEUE } from './mundiopus'
 import { thumbUrl, useMundiOpus } from './mundiplayer'
+import * as Icon from './icons'
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`
 
@@ -60,23 +61,20 @@ export function ZonePlayer() {
           aria-pressed={p.loop}
           aria-label={p.loop ? 'Repeat this track: on' : 'Repeat this track: off'}
         >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M4 7h13a3 3 0 0 1 3 3v2M20 17H7a3 3 0 0 1-3-3v-2" strokeLinecap="round" />
-            <path d="M14 4l3 3-3 3M10 20l-3-3 3-3" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <Icon.Repeat size={15} />
         </button>
         <button className="zplayer-btn" onClick={() => p.go(-1)} aria-label="Previous track" disabled={!p.ready}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h2.5v14H6zM19 5v14L9 12z" /></svg>
+          <Icon.SkipBack size={16} filled />
         </button>
         <button className="zplayer-btn zplayer-play" onClick={p.toggle} aria-label={p.playing ? 'Pause' : 'Play'} disabled={!p.ready}>
           {p.playing ? (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4.5" height="14" rx="1" /><rect x="13.5" y="5" width="4.5" height="14" rx="1" /></svg>
+            <Icon.Pause size={18} filled />
           ) : (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5.5l13 6.5-13 6.5z" /></svg>
+            <Icon.Play size={18} filled />
           )}
         </button>
         <button className="zplayer-btn" onClick={() => p.go(1)} aria-label="Next track" disabled={!p.ready}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 5h2.5v14H16zM5 5v14l10-7z" /></svg>
+          <Icon.SkipNext size={16} filled />
         </button>
         <button
           className={`zplayer-btn zplayer-tog${p.shuffle ? ' is-on' : ''}`}
@@ -84,10 +82,7 @@ export function ZonePlayer() {
           aria-pressed={p.shuffle}
           aria-label={p.shuffle ? 'Shuffle: on' : 'Shuffle: off'}
         >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M4 7h3.5l9 10H20M4 17h3.5l3-3.3" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M17 4l3 3-3 3M17 14l3 3-3 3" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <Icon.Shuffle size={15} />
         </button>
       </div>
     </div>

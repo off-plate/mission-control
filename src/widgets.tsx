@@ -13,6 +13,7 @@ import { useCalendar } from './calendar'
 import { goalCurrent, isTimeFed, keptThisPeriod, ON_TRACK_PCT, type SizeKey, type SpaceId, type WidgetType } from './types'
 import { useClockStamp } from './ui'
 import { fmtDuration, fmtNum, fmtTimeShort, goalPace, goalPeriodKey, goalPeriodRange, isoWeekKey, localDateKey, type GoalTf } from './util'
+import * as Icon from './icons'
 
 /** `fluid` makes the line span its container, so label rows underneath line up. */
 /* A pasted URL is an address, not prose: shown raw it swallowed two lines of a
@@ -180,9 +181,7 @@ const TasksBody = memo(function TasksBody({ space, size }: { space: SpaceId; siz
                 setLogOpen(logOpen === t.id ? null : t.id)
               }}
             >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                <path d="M2 5.65 5 8.65 10 2.15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
+              <Icon.Check size={12} strokeWidth={1.0} />
             </button>
             <span className={`cat-dot ${t.category}`} title={t.category} aria-hidden="true" />
             <span className="grow wrap2"><Linkify text={t.title} /></span>

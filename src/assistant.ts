@@ -139,6 +139,38 @@ export function briefText(b: Brief): string {
   ].join('\n')
 }
 
+/** How much of "say" has arrived, decoded, from a reply that is still being
+ *  written. The model emits `say` first, so this is readable long before the
+ *  object closes: it is what turns a spinner into a sentence appearing. */
+export function partialSay(raw: string): string | null {
+  const k = raw.indexOf('"say"')
+  if (k < 0) return null
+  const colon = raw.indexOf(':', k + 5)
+  if (colon < 0) return null
+  const open = raw.indexOf('"', colon + 1)
+  if (open < 0) return null
+  const ESC: Record<string, string> = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f' }
+  let out = ''
+  for (let i = open + 1; i < raw.length; i++) {
+    const ch = raw[i]
+    if (ch === '\\') {
+      const next = raw[i + 1]
+      /* The escape itself is only half here. Stop, and the next chunk finishes
+         it, rather than printing a stray backslash for one frame. */
+      if (next === undefined) break
+      if (next === 'u') {
+        if (i + 5 >= raw.length) break
+        out += String.fromCharCode(parseInt(raw.slice(i + 2, i + 6), 16))
+        i += 5
+      } else { out += ESC[next] ?? next; i += 1 }
+      continue
+    }
+    if (ch === '"') break
+    out += ch
+  }
+  return out
+}
+
 /** The first balanced {...} in a blob of text, or null. */
 function firstObject(text: string): string | null {
   const start = text.indexOf('{')
@@ -160,11 +192,14 @@ export type Outcome =
   | { ok: true; reply: Reply }
   | { ok: false; reason: 'no-key' | 'rejected' | 'offline' | 'unreadable' | 'model-gone'; detail?: string }
 
-/** One turn. `history` is the conversation so far, oldest first. */
+/** One turn. `history` is the conversation so far, oldest first.
+ *  `onSay` makes it stream: the sentence arrives a few words at a time, which
+ *  is the difference between watching it think and watching a spinner. */
 export async function ask(
   question: string,
   brief: Brief,
   history: { role: 'user' | 'assistant'; content: string }[],
+  onSay?: (partial: string) => void,
 ): Promise<Outcome> {
   const key = getAiKey()
   if (!key) return { ok: false, reason: 'no-key' }
@@ -174,6 +209,7 @@ export async function ask(
       model: MODEL,
       temperature: 0.3,
       max_tokens: 700,
+      stream: !!onSay,
       messages: [
         { role: 'system', content: SYSTEM },
         { role: 'system', content: `Today's briefing, read from his own log:\n${briefText(brief)}` },
@@ -200,9 +236,52 @@ export async function ask(
     return { ok: false, reason: res.status === 404 ? 'model-gone' : 'unreadable', detail }
   }
 
+  if (onSay && res.body) return readStream(res.body, onSay)
   try {
     const data = await res.json()
-    const raw = String(data?.choices?.[0]?.message?.content ?? '')
+    return finish(String(data?.choices?.[0]?.message?.content ?? ''))
+  } catch {
+    return { ok: false, reason: 'unreadable' }
+  }
+}
+
+/* Server-sent events, one `data:` line at a time. Lines are cut on newlines
+   from a buffer, because a frame is regularly split across two chunks and
+   parsing what has arrived so far would throw on every second token. */
+async function readStream(body: ReadableStream<Uint8Array>, onSay: (t: string) => void): Promise<Outcome> {
+  const reader = body.getReader()
+  const dec = new TextDecoder()
+  let buf = '', raw = '', shown = -1
+  try {
+    for (;;) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buf += dec.decode(value, { stream: true })
+      let nl: number
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl).trim()
+        buf = buf.slice(nl + 1)
+        if (!line.startsWith('data:')) continue
+        const payload = line.slice(5).trim()
+        if (!payload || payload === '[DONE]') continue
+        try {
+          const piece = JSON.parse(payload)?.choices?.[0]?.delta?.content
+          if (typeof piece !== 'string' || !piece) continue
+          raw += piece
+          const say = partialSay(raw)
+          if (say != null && say.length > shown) { shown = say.length; onSay(say) }
+        } catch { /* a frame that is not JSON yet; the next read completes it */ }
+      }
+    }
+  } catch {
+    return { ok: false, reason: 'offline' }
+  }
+  return finish(raw)
+}
+
+/** One raw answer, whatever shape it came in, turned into a Reply. */
+function finish(raw: string): Outcome {
+  try {
     /* Parsed out of the text rather than trusting a JSON response mode this
        model does not document. It answers with an object, sometimes wrapped in
        a fence or a sentence, so the first balanced {...} is taken and the rest

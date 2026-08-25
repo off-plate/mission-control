@@ -17,6 +17,7 @@
    not here either. */
 
 import { useEffect, useRef, useState } from 'react'
+import * as Icon from './icons'
 
 interface EmbeddedApp {
   id: string
@@ -31,7 +32,6 @@ interface EmbeddedApp {
 
 /* House glyphs rather than an icon library: one stroke weight, one geometry,
    drawn for these six. See DESIGN.md on Lucide-at-default-weight. */
-const S = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.75, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
 
 const APPS: EmbeddedApp[] = [
   {
@@ -43,37 +43,37 @@ const APPS: EmbeddedApp[] = [
     id: 'mymind', name: 'My Mind',
     url: 'https://access.mymind.com/everything',
     external: true,
-    icon: <svg viewBox="0 0 24 24" {...S}><rect x="3" y="6" width="11" height="14" rx="2" /><path d="M8 3h11a2 2 0 0 1 2 2v11" /></svg>,
+    icon: <Icon.ExternalLink size={20} />,
   },
   {
     id: 'watchless', name: 'Watchless',
     url: 'https://watchless.netlify.app',
-    icon: <svg viewBox="0 0 24 24" {...S}><rect x="2.5" y="4.5" width="19" height="15" rx="3.5" /><path d="M10 9.5l5 2.5-5 2.5z" /></svg>,
+    icon: <Icon.Video size={20} />,
   },
   {
     id: 'compass', name: 'Compass',
     url: 'https://compass-money.netlify.app',
-    icon: <svg viewBox="0 0 24 24" {...S}><circle cx="12" cy="12" r="9" /><path d="M15.5 8.5l-2 5-5 2 2-5z" /></svg>,
+    icon: <Icon.Compass size={20} />,
   },
   {
     id: 'forge', name: 'Forge',
     url: 'https://off-plate.github.io/forge/',
-    icon: <svg viewBox="0 0 24 24" {...S}><path d="M12 3s4.5 4 4.5 8a4.5 4.5 0 0 1-9 0c0-1.4.6-2.7 1.3-3.7.5 1 1.2 1.7 2 2 .3-2.6-.5-4.6 1.2-6.3z" /><path d="M7 21h10" /></svg>,
+    icon: <Icon.Bolt size={20} />,
   },
   {
     id: 'hodina', name: 'Hodina',
     url: 'https://hodina.netlify.app',
-    icon: <svg viewBox="0 0 24 24" {...S}><circle cx="12" cy="12" r="9" /><path d="M12 6.75V12l3.5 2" /></svg>,
+    icon: <Icon.Clock size={20} />,
   },
   {
     id: 'hunterpart', name: 'Hunterpart',
     url: 'https://hunterpart.netlify.app',
-    icon: <svg viewBox="0 0 24 24" {...S}><path d="M3.5 10.5L12 4l8.5 6.5" /><path d="M5.5 9.5V20h13V9.5" /><path d="M10 20v-5.5h4V20" /></svg>,
+    icon: <Icon.Home size={20} />,
   },
   {
     id: 'zepp', name: 'Zepp Health',
     url: 'https://zepp-health.netlify.app',
-    icon: <svg viewBox="0 0 24 24" {...S}><path d="M20.5 11c0 4.5-8.5 9.5-8.5 9.5S3.5 15.5 3.5 11a4.5 4.5 0 0 1 8.5-2.1A4.5 4.5 0 0 1 20.5 11z" /><path d="M3.8 12.5h4l1.5-2.5 2 5 1.5-2.5h3.5" /></svg>,
+    icon: <Icon.Heart size={20} />,
   },
 ]
 

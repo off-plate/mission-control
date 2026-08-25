@@ -4,6 +4,7 @@ import { fmtDuration, taskMinutes } from './util'
 import { thumbUrl, useMundiOpus } from './mundiplayer'
 import { MUNDI_OPUS_QUEUE } from './mundiopus'
 import { isDesktop, notify as nativeNotify } from './desktop'
+import * as Icon from './icons'
 
 /* A global Pomodoro that lives above the whole app: a bottom-right badge you
    see on every tab, a corner ambient glow that shows the state at a glance,
@@ -344,17 +345,17 @@ function MediaBadge() {
       <img className="pomo-media-art" src={thumbUrl(current.id)} alt="" />
       <span className="pomo-media-title" title={current.title}>{current.title}</span>
       <button className="pomo-icon" onClick={() => mo.go(-1)} aria-label="Previous track">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h2.5v14H6zM19 5v14L9 12z" /></svg>
+        <Icon.SkipBack size={13} filled />
       </button>
       <button className="pomo-icon" onClick={mo.toggle} aria-label={mo.playing ? 'Pause' : 'Play'}>
         {mo.playing ? (
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4.5" height="14" rx="1" /><rect x="13.5" y="5" width="4.5" height="14" rx="1" /></svg>
+          <Icon.Pause size={13} filled />
         ) : (
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5.5l13 6.5-13 6.5z" /></svg>
+          <Icon.Play size={13} filled />
         )}
       </button>
       <button className="pomo-icon" onClick={() => mo.go(1)} aria-label="Next track">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 5h2.5v14H16zM5 5v14l10-7z" /></svg>
+        <Icon.SkipNext size={13} filled />
       </button>
     </div>
   )
@@ -381,9 +382,7 @@ function PomodoroBadge() {
       aria-label="Open the focus history"
       title="Open Focus"
     >
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-        <path d="M4 19.5h16M6.5 19.5V12M11 19.5V6.5M15.5 19.5v-5M20 19.5V9" strokeLinecap="round" />
-      </svg>
+      <Icon.BarChart size={15} />
     </button>
   )
 
@@ -403,10 +402,7 @@ function PomodoroBadge() {
             blocks says nothing about whether they were ten minutes or fifty. */}
         {today > 0 && <span className="pomo-cycles mono" title="Focused today">{fmtDuration(today)} today</span>}
         <button className="pomo-icon" aria-label="Timer settings" aria-expanded={setupOpen} onClick={() => setSetupOpen((v) => !v)}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1" strokeLinecap="round" />
-          </svg>
+          <Icon.Sliders size={15} />
         </button>
         {open}
       </div>
@@ -422,16 +418,16 @@ function PomodoroBadge() {
       <span className="pomo-clock mono">{p.phase === 'await' ? 'done' : mmss(p.secondsLeft)}</span>
       <button className="pomo-icon" onClick={p.toggle} aria-label={p.running ? 'Pause' : 'Resume'}>
         {p.running ? (
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="7" y="5" width="3.6" height="14" rx="1" /><rect x="13.4" y="5" width="3.6" height="14" rx="1" /></svg>
+          <Icon.Pause size={15} filled />
         ) : (
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5l11 6.5-11 6.5z" /></svg>
+          <Icon.Play size={15} filled />
         )}
       </button>
       <button className="pomo-icon" onClick={p.skip} aria-label={p.phase === 'focus' ? 'Skip to the break' : 'End the break'}>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5.5l9 6.5-9 6.5z" /><rect x="16" y="5" width="2.8" height="14" rx="1" /></svg>
+        <Icon.SkipNext size={15} filled />
       </button>
       <button className="pomo-icon" onClick={p.stop} aria-label="Stop this block">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" /></svg>
+        <Icon.Close size={15} />
       </button>
       {open}
     </div>
@@ -440,8 +436,6 @@ function PomodoroBadge() {
 
 function ClockIcon() {
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" strokeLinecap="round" />
-    </svg>
+    <Icon.Clock size={15} />
   )
 }

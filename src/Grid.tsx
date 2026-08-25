@@ -5,6 +5,7 @@ import { WIDGET_DEFS } from './mock'
 import { useStore } from './store'
 import type { SpaceId, WidgetInstance } from './types'
 import { WidgetBody } from './widgets'
+import * as Icon from './icons'
 
 class WidgetBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false }
@@ -50,9 +51,7 @@ function WidgetFrame({ inst, space }: { inst: WidgetInstance; space: SpaceId }) 
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((v) => !v)}
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
-              <circle cx="2.5" cy="7" r="1.4" /><circle cx="7" cy="7" r="1.4" /><circle cx="11.5" cy="7" r="1.4" />
-            </svg>
+            <Icon.More size={14} />
           </button>
         )}
       </header>

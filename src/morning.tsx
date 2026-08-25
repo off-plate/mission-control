@@ -3,6 +3,7 @@ import { useStore } from './store'
 import { FALLBACK_NEWS, PER_LANG, loadMorningNews, twistersForDay, type MorningNews } from './morning-data'
 import { TYPING_TARGET_WPM, type PageId, type Routine } from './types'
 import { SpaceMark } from './pages1'
+import * as Icon from './icons'
 
 /* The Morning routine as a guided, foldable accordion. Every step starts collapsed;
    you open one to work through it and check it off yourself with the checkbox, same
@@ -255,7 +256,7 @@ export function MorningRoutine({ routine, onEdit, onShut }: { routine: Routine; 
                   title={s.id === 'mr4' && typingLocked && !isDone ? `Hit ${TYPING_TARGET_WPM} WPM to check this off` : undefined}
                   onClick={() => onComplete(s.id)}
                 >
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 5.65 5 8.65 10 2.15" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  <Icon.Check size={12} strokeWidth={1.1} />
                 </button>
                 <button className="mr-head-main" onClick={() => setOpen(isOpen ? '' : s.id)} aria-expanded={isOpen}>
                   <span className="mr-title">{s.title}</span>
@@ -264,7 +265,7 @@ export function MorningRoutine({ routine, onEdit, onShut }: { routine: Routine; 
                       : s.id === 'mr4' ? (typingWpm != null ? `${typingWpm} of ${TYPING_TARGET_WPM} WPM` : `${TYPING_TARGET_WPM} WPM to pass`)
                       : isOpen ? 'now' : 'to do'}
                   </span>
-                  <svg className="mr-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  <Icon.ChevronDown size={14} className="mr-chev" />
                 </button>
               </div>
               {isOpen && <div className="mr-body">{body(s.id)}</div>}

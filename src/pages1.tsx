@@ -281,6 +281,7 @@ function AddWidgetInline({ onClose }: { onClose: () => void }) {
 }
 
 import { WIDGET_DEFS } from './mock'
+import * as Icon from './icons'
 const WIDGET_DEFS_LIST = WIDGET_DEFS
 
 /* ---------------- PLAN ---------------- */
@@ -585,9 +586,7 @@ function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
           title={isEstimated(task) ? `Focus ${taskMinutes(task)}m on this` : 'Estimate it first'}
           onClick={onFocus}
         >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M8 5.5v13l10-6.5-10-6.5z" strokeLinejoin="round" />
-          </svg>
+          <Icon.Play size={15} />
         </button>
       )}
       <button
@@ -600,9 +599,7 @@ function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
         {thinking
           ? <span className="est-thinking" aria-label="Estimating" />
           : (
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <circle cx="12" cy="13" r="8" /><path d="M12 9v4l2.5 2M9 2h6" strokeLinecap="round" />
-            </svg>
+            <Icon.Hourglass size={15} />
           )}
       </button>
     </span>
@@ -639,7 +636,7 @@ function RoutineOnDay({ routine, day }: { routine: Routine; day?: string }) {
       <div className={`today-task${complete ? ' done' : ''}`}>
         {/* A routine is not dragged into a time, but its checkbox still has to
             line up with the ones under it. */}
-        <span className="drag-grip is-blank" aria-hidden="true"><svg viewBox="0 0 6 16" width="6" height="16"><circle cx="1.5" cy="4" r="1" /><circle cx="4.5" cy="4" r="1" /><circle cx="1.5" cy="8" r="1" /><circle cx="4.5" cy="8" r="1" /><circle cx="1.5" cy="12" r="1" /><circle cx="4.5" cy="12" r="1" /></svg></span>
+        <span className="drag-grip is-blank" aria-hidden="true"><Icon.Grip /></span>
         <SpaceMark space={routine.space} />
         <button
           className="checkbox"
@@ -654,9 +651,7 @@ function RoutineOnDay({ routine, day }: { routine: Routine; day?: string }) {
               : undefined}
           onClick={() => setRoutineDone(routine.id, !complete)}
         >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-            <path d="M2 5.65 5 8.65 10 2.15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          </svg>
+          <Icon.Check size={12} strokeWidth={1.0} />
         </button>
         <span className="grow wrap2">{routine.title}</span>
         {/* One tag, saying the one thing it needs to: this is a routine, it put
@@ -1031,7 +1026,7 @@ export function PlanPage() {
                   draggable
                   onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move' }}
                 >
-                  <span className="drag-grip" aria-hidden="true"><svg viewBox="0 0 6 16" width="6" height="16"><circle cx="1.5" cy="4" r="1" /><circle cx="4.5" cy="4" r="1" /><circle cx="1.5" cy="8" r="1" /><circle cx="4.5" cy="8" r="1" /><circle cx="1.5" cy="12" r="1" /><circle cx="4.5" cy="12" r="1" /></svg></span>
+                  <span className="drag-grip" aria-hidden="true"><Icon.Grip /></span>
                   <SpaceMark space={t.space} />
                   <span className={`cat-dot ${t.category}`} aria-hidden="true" />
                   <span className="grow"><Linkify text={t.title} /></span>
@@ -1177,7 +1172,7 @@ export function PlanPage() {
                           draggable={!t.done}
                           onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move' }}
                         >
-                          <span className="drag-grip" aria-hidden="true"><svg viewBox="0 0 6 16" width="6" height="16"><circle cx="1.5" cy="4" r="1" /><circle cx="4.5" cy="4" r="1" /><circle cx="1.5" cy="8" r="1" /><circle cx="4.5" cy="8" r="1" /><circle cx="1.5" cy="12" r="1" /><circle cx="4.5" cy="12" r="1" /></svg></span>
+                          <span className="drag-grip" aria-hidden="true"><Icon.Grip /></span>
                           <SpaceMark space={t.space} />
                           <button
                             className="checkbox" role="checkbox" aria-checked={t.done}
@@ -1189,7 +1184,7 @@ export function PlanPage() {
                               setLogging(t.id)
                             }}
                           >
-                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 5.65 5 8.65 10 2.15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+                            <Icon.Check size={12} strokeWidth={1.0} />
                           </button>
                           <span className={`cat-dot ${t.category}`} aria-hidden="true" />
                           <span className="grow wrap2"><Linkify text={t.title} /></span>
@@ -1276,9 +1271,7 @@ export function PlanPage() {
                                     title={`Focus ${s.estimateMin}m on this step`}
                                     onClick={() => startFocus(s.estimateMin, s.title)}
                                   >
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                                      <path d="M8 5.5v13l10-6.5-10-6.5z" strokeLinejoin="round" />
-                                    </svg>
+                                    <Icon.Play size={14} />
                                   </button>
                                 )}
                                 {/* The same tools the list gives a step. A step
@@ -1312,7 +1305,7 @@ export function PlanPage() {
               {doneUnsorted.map((t) => (
                 <div className="today-task done" key={t.id} data-task-id={t.id}>
                   <button className="checkbox" role="checkbox" aria-checked aria-label={`Reopen: ${t.title}`} onClick={() => toggleTask(t.id)}>
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 5.65 5 8.65 10 2.15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+                    <Icon.Check size={12} strokeWidth={1.0} />
                   </button>
                   <span className={`cat-dot ${t.category}`} aria-hidden="true" />
                   <span className="grow">{t.title}</span>
@@ -1731,7 +1724,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
               }
               onClick={() => { if (drivenBy) { if (i < todayIndex) assertRoutineDay(h.id, i) } else toggleHabitDay(h.id, i) }}
             >
-              <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 5.65 5 8.65 10 2.15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+              <Icon.Check size={11} strokeWidth={1.0} />
             </button>
           </span>
         ))}
@@ -2512,7 +2505,7 @@ export function RoutinesPage() {
                           disabled={stepLocked(r, next.id)}
                           onClick={() => toggleRoutineStep(r.id, next.id)}
                         >
-                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 5.65 5 8.65 10 2.15" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          <Icon.Check size={12} strokeWidth={1.1} />
                         </button>
                       )}
                       <span className="routine-step-body">
@@ -2575,7 +2568,7 @@ export function RoutinesPage() {
                         <span className="routine-check is-blank" aria-hidden="true" />
                       ) : (
                         <button className="routine-check" role="checkbox" aria-checked={checked} aria-label={s.title} onClick={() => toggleRoutineStep(r.id, s.id)}>
-                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 5.65 5 8.65 10 2.15" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          <Icon.Check size={12} strokeWidth={1.1} />
                         </button>
                       )}
                       <span className="routine-step-body">
@@ -2946,7 +2939,7 @@ function PeriodTasks({ tf, periodKey }: { tf: GoalTimeframe; periodKey: string }
             aria-label={`${t.title}, ${t.done ? 'done' : 'not done'}`}
             onClick={() => toggleTask(t.id)}
           >
-            {t.done && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 5.65 5 8.65 10 2.15" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+            {t.done && <Icon.Check size={10} strokeWidth={1.1} />}
           </button>
           <SpaceMark space={t.space} />
           <span className="grow">{t.title}</span>
@@ -3093,7 +3086,7 @@ export function GoalsPage() {
                               aria-label={`${m.label}, ${m.done ? 'done' : 'not done'}`}
                               onClick={() => toggleGoalMilestone(g.id, m.id)}
                             >
-                              {m.done && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 5.65 5 8.65 10 2.15" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                              {m.done && <Icon.Check size={10} strokeWidth={1.1} />}
                             </button>
                             <span>{m.label}</span>
                           </li>

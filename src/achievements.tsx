@@ -17,6 +17,7 @@ import { useStore } from './store'
 import { useCompass } from './compass'
 import { fmtNum } from './util'
 import { bestStreak, currentStreak } from './types'
+import * as Icon from './icons'
 
 type Tab = 'wins' | 'money' | 'reflect'
 
@@ -114,9 +115,7 @@ function Card({ m }: { m: Milestone }) {
     <div className={`ms-card${done ? ' is-earned' : ''}${m.unknown ? ' is-unknown' : ''}`}>
       <div className="ms-mark">
         {done ? (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
-            <path d="M4 12.5l5 5L20 6.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <Icon.Check size={20} strokeWidth={2.4} />
         ) : (
           <Ring pct={pct} />
         )}
@@ -140,9 +139,7 @@ function Landed({ list, onSeen }: { list: Milestone[]; onSeen: () => void }) {
   return (
     <div className="ms-landed" role="status">
       <div className="ms-landed-mark" aria-hidden="true">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
-          <path d="M4 12.5l5 5L20 6.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <Icon.Check size={26} strokeWidth={2.4} />
       </div>
       <div className="ms-landed-copy">
         <span className="microcap">{list.length === 1 ? 'Earned since you last looked' : `${list.length} earned since you last looked`}</span>

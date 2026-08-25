@@ -20,6 +20,7 @@ import { fmtWhen, localDateKey } from './util'
 import { htmlToMd, mdToHtml } from './richtext'
 import { spaceFolderId, type Note, type SpaceId } from './types'
 import { helpWithNote, type HelpResult } from './notesai'
+import * as Icon from './icons'
 
 const NOTE_COLORS: { id: string; bg: string; label: string }[] = [
   { id: 'amber', bg: '#f6ead0', label: 'Amber' },
@@ -31,12 +32,7 @@ const NOTE_COLORS: { id: string; bg: string; label: string }[] = [
 ]
 /** The folder mark, filled when it is the one he is standing in. */
 function FolderIcon({ open, small }: { open?: boolean; small?: boolean }) {
-  const n = small ? 11 : 14
-  return (
-    <svg className={`nt-ficon${open ? ' on' : ''}`} width={n} height={n} viewBox="0 0 24 24" fill={open ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <path d="M3 7.5A2 2 0 0 1 5 5.5h3.6a2 2 0 0 1 1.5.7l1 1.2H19a2 2 0 0 1 2 2v7.1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" strokeLinejoin="round" />
-    </svg>
-  )
+  return <Icon.Folder size={small ? 11 : 14} filled={open} className={`nt-ficon${open ? ' on' : ''}`} />
 }
 
 
@@ -531,17 +527,12 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
         <span className="nt-toolgroup">
         {show('bullet') && (
         <T label="Bullet list" on={() => cmd('insertUnorderedList')}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <circle cx="5" cy="7" r="1.4" fill="currentColor" /><circle cx="5" cy="17" r="1.4" fill="currentColor" />
-            <path d="M10 7h10M10 17h10" strokeLinecap="round" />
-          </svg>
+          <Icon.List size={15} />
         </T>
         )}
         {show('checklist') && (
         <T label="Checklist" on={checklist}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <rect x="3" y="4" width="7" height="7" rx="1.6" /><path d="M4.5 17.5l2 2 4-4M14 7.5h7M14 17.5h7" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <Icon.Checklist size={15} />
         </T>
         )}
         {show('quote') && <T label="Quote" on={() => toggleBlock('blockquote')}>&rdquo;</T>}
@@ -551,23 +542,17 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
         <span className="nt-toolgroup">
         {show('divider') && (
         <T label="Divider" on={divider}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M3 12h18" strokeLinecap="round" />
-          </svg>
+          <Icon.Divider size={15} />
         </T>
         )}
         {show('table') && (
         <>
         <TablePicker onPick={insertTable} />
         <T label="Add a row" on={() => grow('row')}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <rect x="3" y="4" width="18" height="8" rx="1.6" /><path d="M12 15v6M9 18h6" strokeLinecap="round" />
-          </svg>
+          <Icon.TableRowAdd size={15} />
         </T>
         <T label="Add a column" on={() => grow('col')}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <rect x="4" y="3" width="8" height="18" rx="1.6" /><path d="M18 9v6M15 12h6" strokeLinecap="round" />
-          </svg>
+          <Icon.TableColAdd size={15} />
         </T>
         </>
         )}
@@ -576,9 +561,7 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
         {show('clear') && (
         <span className="nt-toolgroup">
         <T label="Clear formatting" on={() => cmd('removeFormat')}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M6 5h13M9.5 5L7 19M14 12l6 7M20 12l-6 7" strokeLinecap="round" />
-          </svg>
+          <Icon.ClearFormat size={15} />
         </T>
         </span>
         )}
@@ -711,9 +694,7 @@ function TablePicker({ onPick }: { onPick: (rows: number, cols: number) => void 
   return (
     <span className="nt-tablepick" ref={wrap}>
       <button className="nt-tool" title="Table" aria-label="Table" aria-expanded={open} onMouseDown={(e) => e.preventDefault()} onClick={() => setOpen((v) => !v)}>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-          <rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 10h18M9 10v10M15 10v10" />
-        </svg>
+        <Icon.Table size={15} />
       </button>
       {open && (
         <div className="nt-tablemenu">
@@ -987,9 +968,7 @@ export function NotesPage() {
             {notes.some((n) => n.done) && (
               <div className={`nt-folder-row${!finding && openFolder === DONE ? ' on' : ''}`}>
                 <button className="nt-folder" aria-current={!finding && openFolder === DONE ? 'true' : undefined} onClick={() => goFolder(DONE)}>
-                  <svg className="nt-doneicon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
-                    <path d="M4 12.5l5.5 5.5L20 6.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <Icon.Check size={16} strokeWidth={2.2} className="nt-doneicon" />
                   <span className="nt-fname">Done</span>
                   <span className="nt-count mono">{notes.filter((n) => n.done).length}</span>
                 </button>
@@ -1038,10 +1017,7 @@ export function NotesPage() {
           title="New folder"
           onClick={() => setNaming({ space: newFolderIn, value: '' })}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
-            <path d="M3 7.5A2 2 0 0 1 5 5.5h3.6a2 2 0 0 1 1.5.7l1 1.2H19a2 2 0 0 1 2 2v7.1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" strokeLinejoin="round" />
-            <path d="M12 11.4v4.6M9.7 13.7h4.6" strokeLinecap="round" />
-          </svg>
+          <Icon.FolderAdd size={14} />
           New folder
         </button>
       </aside>
@@ -1067,16 +1043,12 @@ export function NotesPage() {
             ))}
           </Dropdown>
           <button className="nt-new" onClick={create} aria-label="New note" title="New note">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" aria-hidden="true">
-              <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-            </svg>
+            <Icon.Plus size={15} />
           </button>
         </div>
 
         <div className="nt-search">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <circle cx="11" cy="11" r="7" /><path d="M20 20l-3.6-3.6" strokeLinecap="round" />
-          </svg>
+          <Icon.Search size={15} />
           <input
             className="textinput" type="search" value={query} placeholder="Search…"
             aria-label="Search notes"
@@ -1114,9 +1086,7 @@ export function NotesPage() {
               {g.head === 'Pinned' ? (
                 <button className="nt-grouphead nt-groupfold" aria-expanded={!pinShut} onClick={() => setPinShut((v) => !v)}>
                   Pinned
-                  <svg className={`nt-chev${pinShut ? '' : ' open'}`} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
-                    <path d="M9 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <Icon.ChevronRight size={14} />
                 </button>
               ) : (
                 <p className="nt-grouphead">{g.head}</p>
@@ -1131,9 +1101,7 @@ export function NotesPage() {
                       aria-label={n.done ? `Put ${headOf(n.body) || 'Untitled'} back` : `Mark ${headOf(n.body) || 'Untitled'} done`}
                       onClick={() => setNoteDone(n.id, !n.done)}
                     >
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" aria-hidden="true">
-                        <path d="M4 12.5l5.5 5.5L20 6.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
+                      <Icon.Check size={13} strokeWidth={3.4} />
                     </button>
                     <button
                       className={`nt-row has-tick${n.id === openId ? ' on' : ''}${n.done ? ' is-done' : ''}`}
@@ -1180,9 +1148,7 @@ export function NotesPage() {
             slashTask
             lead={phone ? (
               <button className="nt-back" onClick={() => setOpenId(null)}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
-                  <path d="M15 5l-7 7 7 7" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                <Icon.ChevronLeft size={15} />
                 {nameOf(open.folderId)}
               </button>
             ) : undefined}

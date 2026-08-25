@@ -392,8 +392,15 @@ async function run() {
   const total = plan.create.length + plan.toVault.length + plan.toApp.length
     + plan.conflict.length + plan.tick.length + plan.remove.length + plan.rename.length
 
+  /* The folder has to exist in the app before he can put anything in it. It
+     used to be created only as a side effect of the first write, which left him
+     with a mirror he could not aim at: no folder in Notes, so nothing to drag
+     into, so nothing ever to sync. It is now made on sight, empty. */
+  const folderMissing = !folders.some((f) => f.id === FOLDER_ID)
+
   if (STATUS || DRY) {
     say(`${mine.length} note(s) in ${FOLDER_NAME}, ${files.length} file(s) in the vault.`)
+    if (folderMissing) say(`  would create the ${FOLDER_NAME} folder in Mission Control`)
     for (const p of plan.create) say(`  new file -> new note      ${p.file.name}`)
     for (const p of plan.toVault) say(`  note -> file              ${noteTitle(p.note.body) || 'Untitled'}`)
     for (const p of plan.toApp) say(`  file -> note              ${p.file.name}`)
@@ -405,7 +412,7 @@ async function run() {
     return
   }
 
-  if (!total) { say('nothing to do.'); return }
+  if (!total && !folderMissing) { say('nothing to do.'); return }
 
   /* ---- carry it out ------------------------------------------------------
      Vault first, then one write to the server. If the process dies between the
@@ -532,7 +539,7 @@ async function run() {
 
   await writeHead(c, user.id, fresh)
   await writeLedger(ledgerNext)
-  say(`done: ${total} change(s).`)
+  say(total ? `done: ${total} change(s).` : 'done.')
 }
 
 const isEntry = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href

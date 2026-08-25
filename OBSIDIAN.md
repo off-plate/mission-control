@@ -5,7 +5,9 @@ One folder in the vault mirrors one folder of Notes, both ways.
 ```
 ~/Library/Mobile Documents/com~apple~CloudDocs/Off-Plate System/
   Mission Control/
-    MC Notes/          <-->   Notes -> MC Notes, in the app
+    MC Notes/
+      All notes/       <-->   the notes in MC Notes that are still open
+      Done/            <-->   the ones ticked off
 ```
 
 Nothing else in the vault is touched. The other three top folders are his
@@ -70,13 +72,22 @@ convention: `noteTitle` reads the first non-empty line and drops a leading `#`.
 renaming the file rewrites the note's first line. Retitling in the app renames
 the file. Whichever side changed since the last agreement is the one that wins.
 
-**Delete a file in the vault and the note is ticked off,** not destroyed. It
-moves to Done in Mission Control and is out of every other list, which is what he
-asked for: a deletion in Obsidian is a decision, not an accident, but a note is
-still a paragraph he wrote and nothing here throws one away.
+**Which folder a file sits in IS the note's done state,** and it reads both
+ways. Tick a note off in the app and its file moves from `All notes/` to `Done/`.
+Drag the file between those two folders yourself and the tick follows. When both
+happened since the last agreement and they disagree, the later gesture wins,
+which is the same rule the note body uses.
 
-**Tick a note off in the app and its file leaves the vault.** The same rule read
-from the other end, so Done never accumulates dead files.
+**Delete a file out of `All notes/` and the note is ticked off,** not destroyed:
+it reappears in `Done/`. That is the point rather than a quirk. A deletion in
+Obsidian is a decision, not an accident, but a note is still a paragraph he
+wrote, and seeing it turn up in Done is the proof that nothing was thrown away.
+
+**Delete a file out of `Done/` and it stays gone.** That is the one deletion
+taken literally, and the ledger remembers it as archived. Without that memory
+the next run would find a done note with no file and helpfully recreate it, then
+do it again every two minutes forever. Un-tick that note in the app and the file
+comes back to `All notes/`.
 
 **Both sides changed: the newer text becomes the note, the older is kept twice.**
 On the note as `conflict`, which the app already renders, and as

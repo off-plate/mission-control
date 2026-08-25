@@ -43,6 +43,14 @@ const VAULT = path.join(
   'Library/Mobile Documents/com~apple~CloudDocs/Off-Plate System/Mission Control/MC Notes',
 )
 
+/* Two rooms, on his instruction 2026-08-25. A note he has ticked off is not
+   rubbish, it is finished, so it moves rather than disappearing. Which of these
+   two folders a file sits in IS the note's done state, in both directions:
+   ticking it in the app moves the file, and dragging the file moves the tick. */
+const ACTIVE_DIR = path.join(VAULT, 'All notes')
+const DONE_DIR = path.join(VAULT, 'Done')
+const dirOf = (where) => (where === 'done' ? DONE_DIR : ACTIVE_DIR)
+
 /* One flat folder on the Mission Control side. Notes stopped being filed by
    workspace at his instruction, so this does not pick a workspace to live in;
    the folder row still carries one because the stored shape has the field. */
@@ -260,7 +268,13 @@ async function writeHead(c, uid, state) {
    thing collapses into last-writer-wins, which loses paragraphs. */
 
 async function readLedger() {
-  try { return JSON.parse(await fsp.readFile(LEDGER_FILE, 'utf8')) } catch { return {} }
+  let l
+  try { l = JSON.parse(await fsp.readFile(LEDGER_FILE, 'utf8')) } catch { return {} }
+  /* Rows written before Done existed do not name a room. They were all active,
+     because there was nowhere else to be. Without this they read as "he moved
+     it", and the first run after the change would un-tick everything. */
+  for (const k of Object.keys(l)) if (l[k] && !l[k].where) l[k].where = 'active'
+  return l
 }
 async function writeLedger(l) {
   await fsp.mkdir(STATE_DIR, { recursive: true, mode: 0o700 })
@@ -269,30 +283,48 @@ async function writeLedger(l) {
 
 /* ---- reading the vault ---------------------------------------------------- */
 
-/** Every real note file in the folder, plus the names iCloud has not downloaded
- *  yet. A placeholder is a file that EXISTS and is merely not here, so treating
- *  it as deleted would tick off a note he never touched. */
+/** Every real note file across both rooms, tagged with which room it is in,
+ *  plus the names iCloud has not downloaded yet. A placeholder is a file that
+ *  EXISTS and is merely not here, so treating it as deleted would tick off a
+ *  note he never touched.
+ *
+ *  Files left flat in MC Notes from before the two rooms existed are read as
+ *  active, so the first run after this change files them instead of losing
+ *  them. */
 async function readVault() {
-  await fsp.mkdir(VAULT, { recursive: true })
-  const entries = await fsp.readdir(VAULT, { withFileTypes: true })
+  await fsp.mkdir(ACTIVE_DIR, { recursive: true })
+  await fsp.mkdir(DONE_DIR, { recursive: true })
+
   const files = []
   const pending = []
-  for (const e of entries) {
-    if (e.isDirectory()) continue
-    /* iCloud parks an undownloaded file as ".<name>.md.icloud". */
-    const cloud = e.name.match(/^\.(.+)\.icloud$/)
-    if (cloud) { pending.push(cloud[1]); continue }
-    if (!e.name.endsWith('.md')) continue
-    if (e.name.startsWith('.')) continue
-    /* The losing side of a past conflict. It is his to read and delete; this
-       job never reads one back in, or a resolved conflict would return. */
-    if (/ \(conflict [\d-]+ [\d-]+\)\.md$/.test(e.name)) continue
-    const full = path.join(VAULT, e.name)
-    const stat = await fsp.stat(full)
-    const text = await fsp.readFile(full, 'utf8')
-    const { fm, body } = parseFile(text)
-    files.push({ name: e.name, full, mtimeMs: stat.mtimeMs, id: fm.mc || null, body })
+
+  const scan = async (dir, where) => {
+    let entries
+    try { entries = await fsp.readdir(dir, { withFileTypes: true }) } catch { return }
+    for (const e of entries) {
+      if (e.isDirectory()) continue
+      /* iCloud parks an undownloaded file as ".<name>.md.icloud". */
+      const cloud = e.name.match(/^\.(.+)\.icloud$/)
+      if (cloud) { pending.push(cloud[1]); continue }
+      if (!e.name.endsWith('.md')) continue
+      if (e.name.startsWith('.')) continue
+      /* The losing side of a past conflict. It is his to read and delete; this
+         job never reads one back in, or a resolved conflict would return. */
+      if (/ \(conflict [\d-]+ [\d-]+\)\.md$/.test(e.name)) continue
+      const full = path.join(dir, e.name)
+      const stat = await fsp.stat(full)
+      const text = await fsp.readFile(full, 'utf8')
+      const { fm, body } = parseFile(text)
+      files.push({ name: e.name, full, where, mtimeMs: stat.mtimeMs, id: fm.mc || null, body })
+    }
   }
+
+  await scan(ACTIVE_DIR, 'active')
+  await scan(DONE_DIR, 'done')
+  /* The old flat layout. Anything still sitting there is treated as active and
+     gets filed on this run. */
+  await scan(VAULT, 'active')
+
   return { files, pending }
 }
 
@@ -312,6 +344,21 @@ async function run() {
   const notes = Array.isArray(state.notes) ? state.notes : []
   const folders = Array.isArray(state.noteFolders) ? state.noteFolders : []
   const ledger = await readLedger()
+
+  /* Files from before the two rooms existed sit flat in MC Notes. Move them into
+     All notes first, so the reconcile below sees one layout and not two. A note
+     that is already ticked gets carried on to Done by the ordinary rules. */
+  if (!DRY && !STATUS) {
+    await fsp.mkdir(ACTIVE_DIR, { recursive: true })
+    let stray = 0
+    for (const e of await fsp.readdir(VAULT, { withFileTypes: true })) {
+      if (e.isDirectory() || !e.name.endsWith('.md') || e.name.startsWith('.')) continue
+      await fsp.rename(path.join(VAULT, e.name), path.join(ACTIVE_DIR, e.name))
+      stray++
+    }
+    if (stray) say(`filed ${stray} loose file(s) into All notes`)
+  }
+
   const { files, pending } = await readVault()
 
   if (pending.length) say(`iCloud has not downloaded ${pending.length} file(s) yet; leaving them alone this run.`)
@@ -325,7 +372,7 @@ async function run() {
 
   /* Everything the run decides, collected before anything is done, so --dry is
      the same code path as a real run and cannot drift from it. */
-  const plan = { create: [], toVault: [], toApp: [], rename: [], conflict: [], tick: [], remove: [] }
+  const plan = { create: [], toVault: [], toApp: [], rename: [], conflict: [], tick: [], move: [], archive: [] }
 
   /* 1. Files with no id: new in Obsidian. In Obsidian the FILENAME is the title,
         so that is what the note gets, and the file's own text goes underneath. */
@@ -333,28 +380,65 @@ async function run() {
     if (f.id) continue
     const title = f.name.replace(/\.md$/, '')
     const body = f.body.trim() ? `# ${title}\n\n${f.body}` : `# ${title}`
-    plan.create.push({ file: f, title, body })
+    /* Dropped straight into Done is a legitimate thing to do: it is how he
+       files something he has already finished. */
+    plan.create.push({ file: f, title, body, where: f.where })
   }
 
-  /* 2. Notes with no file. Either brand new in the app, or ticked off. */
+  /* 2. Notes with no file at all. */
   for (const n of mine) {
     if (fileById.has(n.id)) continue
-    if (n.done) { if (ledger[n.id]) plan.remove.push({ id: n.id, name: ledger[n.id].file, why: 'done in the app' }); continue }
-    if (ledger[n.id]) {
-      /* It had a file and the file is gone: he deleted it in Obsidian. */
-      plan.tick.push({ note: n, name: ledger[n.id].file })
-    } else {
-      plan.toVault.push({ note: n, name: null })
+    const seen = ledger[n.id]
+
+    /* He deleted it out of Done. That is the one deletion this job takes
+       literally: the note is already finished and he has said he is done
+       looking at it, so it is remembered as archived and never written back.
+       Without that memory the next run would see a done note with no file and
+       helpfully recreate it, forever. */
+    if (seen?.archived) {
+      if (!n.done) plan.toVault.push({ note: n, name: seen.file, where: 'active', why: 'put back in the app' })
+      continue
     }
+
+    if (!seen) { plan.toVault.push({ note: n, name: null, where: n.done ? 'done' : 'active' }); continue }
+
+    if (seen.where === 'done') {
+      /* Its file was in Done and is gone: he cleared it out. */
+      plan.archive.push({ id: n.id, name: seen.file })
+      continue
+    }
+
+    /* Its file was in All notes and is gone. His rule: a deletion in Obsidian
+       ticks the note off rather than destroying it, so it reappears in Done.
+       That is the point, and it is what makes deleting safe. */
+    if (!n.done) plan.tick.push({ note: n, name: seen.file })
+    else plan.toVault.push({ note: n, name: seen.file, where: 'done' })
   }
 
   /* 3. Both sides present. This is where the real work is. */
   for (const n of mine) {
     const f = fileById.get(n.id)
     if (!f) continue
-    if (n.done) { plan.remove.push({ id: n.id, name: f.name, why: 'done in the app' }); continue }
 
     const seen = ledger[n.id]
+
+    /* Which room it belongs in, and which room he last agreed it was in. A file
+       that has moved rooms since then is him ticking it by hand; a note whose
+       done state changed is him ticking it in the app. Either way the other
+       side follows. When both moved at once and disagree, the later gesture
+       wins, the same rule the note body uses. */
+    const want = n.done ? 'done' : 'active'
+    const movedInVault = seen && f.where !== seen.where
+    const movedInApp = seen && want !== seen.where
+
+    if (movedInVault && movedInApp && want !== f.where) {
+      if (f.mtimeMs > (n.done || 0)) plan.tick.push({ note: n, name: f.name, to: f.where, already: f })
+      else plan.move.push({ note: n, file: f, to: want })
+    } else if (movedInVault) {
+      plan.tick.push({ note: n, name: f.name, to: f.where, already: f })
+    } else if (want !== f.where) {
+      plan.move.push({ note: n, file: f, to: want })
+    }
     const noteChanged = !seen || bodyHash(n.body) !== seen.hash
     const fileChanged = !seen || bodyHash(f.body) !== seen.hash
     const renamed = seen && f.name !== seen.file
@@ -381,16 +465,18 @@ async function run() {
 
   /* 4. The rail. A folder iCloud has evicted looks precisely like him deleting
         everything, and that would tick off the lot in one run. */
-  if (plan.tick.length > MAX_VANISHED) {
-    say(`REFUSING: ${plan.tick.length} files vanished at once, which is more likely iCloud than a decision.`)
-    say(`  ${plan.tick.map((t) => t.name).join(', ')}`)
+  const vanished = [...plan.tick.filter((t) => !t.already), ...plan.archive]
+  if (vanished.length > MAX_VANISHED) {
+    say(`REFUSING: ${vanished.length} files vanished at once, which is more likely iCloud than a decision.`)
+    say(`  ${vanished.map((t) => t.name).join(', ')}`)
     say('  Nothing was changed. If the deletions are real, run again after removing fewer at a time.')
     process.exitCode = 2
     return
   }
 
   const total = plan.create.length + plan.toVault.length + plan.toApp.length
-    + plan.conflict.length + plan.tick.length + plan.remove.length + plan.rename.length
+    + plan.conflict.length + plan.tick.length + plan.move.length + plan.archive.length
+    + plan.rename.length
 
   /* The folder has to exist in the app before he can put anything in it. It
      used to be created only as a side effect of the first write, which left him
@@ -406,8 +492,11 @@ async function run() {
     for (const p of plan.toApp) say(`  file -> note              ${p.file.name}`)
     for (const p of plan.rename) say(`  retitled (${p.source})        ${p.from}`)
     for (const p of plan.conflict) say(`  BOTH CHANGED              ${p.file.name}`)
-    for (const p of plan.tick) say(`  file deleted -> done      ${p.name}`)
-    for (const p of plan.remove) say(`  ${p.why} -> file removed  ${p.name}`)
+    for (const p of plan.tick) say(p.already
+      ? `  moved to ${p.to === 'done' ? 'Done' : 'All notes'} -> ${p.to === 'done' ? 'ticked' : 'un-ticked'}  ${p.name}`
+      : `  file deleted -> ticked, and filed under Done  ${p.name}`)
+    for (const p of plan.move) say(`  ${p.to === 'done' ? 'ticked' : 'un-ticked'} in the app -> moved to ${p.to === 'done' ? 'Done' : 'All notes'}  ${p.file.name}`)
+    for (const p of plan.archive) say(`  cleared out of Done, staying gone  ${p.name}`)
     if (!total) say('  nothing to do.')
     return
   }
@@ -441,24 +530,24 @@ async function run() {
     }
     noteAdds.push(row)
     await fsp.writeFile(p.file.full, renderFile(row))
-    ledgerNext[id] = { file: p.file.name, hash: bodyHash(p.body), title: p.title, mtimeMs: Date.now() }
-    say(`new note from ${p.file.name}`)
+    ledgerNext[id] = { file: p.file.name, where: p.where, hash: bodyHash(p.body), title: p.title, mtimeMs: Date.now() }
+    say(`new note from ${p.file.name}${p.where === 'done' ? ', filed as done' : ''}`)
   }
 
   for (const p of plan.toApp) {
     const patched = stampBody(p.note, p.file.body)
     noteEdits.set(p.note.id, patched)
     await fsp.writeFile(p.file.full, renderFile(patched))
-    ledgerNext[p.note.id] = { file: p.file.name, hash: bodyHash(patched.body), title: patched.title, mtimeMs: Date.now() }
+    ledgerNext[p.note.id] = { file: p.file.name, where: p.file.where, hash: bodyHash(patched.body), title: patched.title, mtimeMs: Date.now() }
     say(`vault -> app: ${p.file.name}`)
   }
 
   for (const p of plan.toVault) {
     const name = p.name ?? fileNameFor(noteTitle(p.note.body), taken)
-    const full = path.join(VAULT, name)
-    await fsp.writeFile(full, renderFile(p.note))
-    ledgerNext[p.note.id] = { file: name, hash: bodyHash(p.note.body), title: noteTitle(p.note.body), mtimeMs: Date.now() }
-    say(`app -> vault: ${name}`)
+    const where = p.where ?? 'active'
+    await fsp.writeFile(path.join(dirOf(where), name), renderFile(p.note))
+    ledgerNext[p.note.id] = { file: name, where, hash: bodyHash(p.note.body), title: noteTitle(p.note.body), mtimeMs: Date.now() }
+    say(p.why ? `${p.why}: ${name}` : `app -> vault: ${where === 'done' ? 'Done/' : 'All notes/'}${name}`)
   }
 
   /* Both sides wrote. Newer text becomes the note; the older is kept where he
@@ -475,9 +564,9 @@ async function run() {
     const d = new Date()
     const p2 = (n) => String(n).padStart(2, '0')
     const stamp = `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${p2(d.getHours())}-${p2(d.getMinutes())}`
-    const side = path.join(VAULT, `${p.file.name.replace(/\.md$/, '')} (conflict ${stamp}).md`)
+    const side = path.join(dirOf(p.file.where), `${p.file.name.replace(/\.md$/, '')} (conflict ${stamp}).md`)
     await fsp.writeFile(side, `${loser}\n`)
-    ledgerNext[p.note.id] = { file: p.file.name, hash: bodyHash(winner), title: patched.title, mtimeMs: Date.now() }
+    ledgerNext[p.note.id] = { file: p.file.name, where: p.file.where, hash: bodyHash(winner), title: patched.title, mtimeMs: Date.now() }
     say(`BOTH CHANGED ${p.file.name}: kept the ${fileWins ? 'vault' : 'app'} text, older one saved beside it`)
   }
 
@@ -491,31 +580,61 @@ async function run() {
       const patched = stampBody(base, body)
       noteEdits.set(p.note.id, patched)
       await fsp.writeFile(p.file.full, renderFile(patched))
-      ledgerNext[p.note.id] = { file: p.file.name, hash: bodyHash(body), title, mtimeMs: Date.now() }
+      ledgerNext[p.note.id] = { file: p.file.name, where: p.file.where, hash: bodyHash(body), title, mtimeMs: Date.now() }
       say(`retitled in the vault: ${p.from} -> ${p.file.name}`)
     } else {
       const base = noteEdits.get(p.note.id) ?? p.note
       const title = noteTitle(base.body)
       taken.delete(p.file.name.toLowerCase())
       const name = fileNameFor(title, taken)
-      if (name !== p.file.name) await fsp.rename(p.file.full, path.join(VAULT, name))
-      await fsp.writeFile(path.join(VAULT, name), renderFile(base))
-      ledgerNext[p.note.id] = { file: name, hash: bodyHash(base.body), title, mtimeMs: Date.now() }
+      const dir = dirOf(p.file.where)
+      if (name !== p.file.name) await fsp.rename(p.file.full, path.join(dir, name))
+      await fsp.writeFile(path.join(dir, name), renderFile(base))
+      ledgerNext[p.note.id] = { file: name, where: p.file.where, hash: bodyHash(base.body), title, mtimeMs: Date.now() }
       say(`retitled in the app: ${p.file.name} -> ${name}`)
     }
   }
 
+  /* He ticked it by hand, either by dragging the file between the two rooms or
+     by deleting it out of All notes. Both mean the same thing to the note. */
   for (const p of plan.tick) {
-    noteEdits.set(p.note.id, { ...p.note, done: Date.now(), dev: DEV, updatedAt: Date.now() })
-    delete ledgerNext[p.note.id]
-    say(`deleted in the vault -> ticked off in the app: ${p.name}`)
+    const base = noteEdits.get(p.note.id) ?? p.note
+    const to = p.to ?? 'done'
+    const patched = { ...base, done: to === 'done' ? Date.now() : undefined, dev: DEV, updatedAt: Date.now() }
+    if (to !== 'done') delete patched.done
+    noteEdits.set(p.note.id, patched)
+
+    if (p.already) {
+      /* The file is already in the right room; only the note had to catch up. */
+      ledgerNext[p.note.id] = { ...(ledgerNext[p.note.id] ?? {}), file: p.already.name, where: to, mtimeMs: Date.now() }
+      say(`moved to ${to === 'done' ? 'Done' : 'All notes'} in the vault -> ${to === 'done' ? 'ticked' : 'un-ticked'} in the app: ${p.name}`)
+    } else {
+      /* He deleted it out of All notes. It is ticked off, and it reappears in
+         Done, because his rule is that a deletion files a note rather than
+         destroying it. */
+      const name = p.name
+      await fsp.writeFile(path.join(DONE_DIR, name), renderFile(patched))
+      ledgerNext[p.note.id] = { file: name, where: 'done', hash: bodyHash(patched.body), title: noteTitle(patched.body), mtimeMs: Date.now() }
+      say(`deleted in the vault -> ticked off, and filed under Done: ${name}`)
+    }
   }
 
-  for (const p of plan.remove) {
-    const full = path.join(VAULT, p.name)
-    try { await fsp.rm(full, { force: true }) } catch { /* already gone is the outcome we wanted */ }
-    delete ledgerNext[p.id]
-    say(`${p.why}: removed ${p.name} from the vault`)
+  /* He ticked it in the app. The file follows, it is not deleted. */
+  for (const p of plan.move) {
+    const from = p.file.full
+    const name = p.file.name
+    const dest = path.join(dirOf(p.to), name)
+    try { await fsp.rename(from, dest) } catch { await fsp.writeFile(dest, renderFile(p.note)) }
+    await fsp.writeFile(dest, renderFile(noteEdits.get(p.note.id) ?? p.note))
+    ledgerNext[p.note.id] = { ...(ledgerNext[p.note.id] ?? {}), file: name, where: p.to, hash: bodyHash(p.note.body), title: noteTitle(p.note.body), mtimeMs: Date.now() }
+    say(`${p.to === 'done' ? 'ticked' : 'un-ticked'} in the app -> moved to ${p.to === 'done' ? 'Done' : 'All notes'}: ${name}`)
+  }
+
+  /* Cleared out of Done by hand. Remembered, so it is not helpfully recreated
+     on the next run and every run after that. */
+  for (const p of plan.archive) {
+    ledgerNext[p.id] = { ...(ledgerNext[p.id] ?? {}), archived: true, mtimeMs: Date.now() }
+    say(`cleared out of Done, staying gone: ${p.name}`)
   }
 
   /* One write, against the head as it is RIGHT NOW rather than the copy read at

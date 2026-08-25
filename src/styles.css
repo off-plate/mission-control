@@ -2905,7 +2905,18 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
    LINE of the row's text and centres itself inside that. So each one lines up
    with the first line of the title whatever the font, whatever the size, and
    however many lines the title runs to. Nothing here is tuned by eye. */
-.today-task, .todo-row { align-items: flex-start; --line: calc(var(--text-sm) * 1.45); }
+/* An INTEGER line, and the same integer the checkbox is.
+
+   It was calc(var(--text-sm) * 1.45) = 21.75px against a 22px checkbox. Those
+   two centres agree to a quarter of a pixel, which measures as aligned and
+   renders as aligned on a whole-number display. On a fractionally scaled one
+   (macOS "more space", a browser at 110%, a 1.5x panel) the two round in
+   different directions and the control visibly steps off the text. That is a
+   difference this machine cannot reproduce and his screen shows every day.
+
+   22px removes the question: the control and the line it sits on are the same
+   whole number of pixels, so there is nothing left to round apart. */
+.today-task, .todo-row { align-items: flex-start; --line: 22px; }
 .today-task > *, .todo-row > * {
   min-height: var(--line);
   display: inline-flex;

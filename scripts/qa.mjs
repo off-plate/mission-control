@@ -2522,6 +2522,105 @@ await step('assistant: the canvas deals its rows in, and stops moving for a read
   await page.emulateMedia({ reducedMotion: null })
 })
 
+await step('assistant: it adds the task he asked for, and the app says so, not the model', async () => {
+  /* His report: he asked it three times to add a task to noon. It answered
+     "Added it" every time and added nothing. A false confirmation is the app
+     lying about his own data, so the model no longer writes that sentence: it
+     names the change, the app makes it, and the APP writes the outcome. */
+  await fresh('assistant')
+  await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
+  await stubAssistant(() => JSON.stringify({
+    say: 'Putting it on noon.',
+    show: [{ kind: 'today' }],
+    do: [{ kind: 'add', title: 'test testing website', list: 'today', slot: 'noon' }],
+  }))
+  await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('add to the noon section a task called test testing website')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  const line = await page.locator('.as-did li').first().innerText()
+  if (!/test testing website/.test(line)) throw new Error(`the app did not name what it added: ${JSON.stringify(line)}`)
+  if (!/noon/i.test(line)) throw new Error(`the app did not say where it went: ${JSON.stringify(line)}`)
+  /* And it is REALLY there, in the store every other page reads. */
+  const saved = await page.evaluate((K) => (JSON.parse(localStorage.getItem(K)).tasks ?? [])
+    .find((t) => t.title === 'test testing website') ?? null, KEY)
+  if (!saved) throw new Error('it said it added the task and the store has no such task')
+  if (saved.slot !== 'noon') throw new Error(`the task landed in ${saved.slot}, not noon`)
+  if (saved.list !== 'today') throw new Error(`the task landed on ${saved.list}, not today`)
+  /* And the canvas shows it, because a change he cannot see is one he will not
+     believe. */
+  if (!(await page.locator('.as-canvas', { hasText: 'test testing website' }).count())) {
+    throw new Error('the new task is not on the canvas')
+  }
+})
+
+await step('assistant: a title it cannot find changes nothing, and it says nothing changed', async () => {
+  /* The failure mode that matters more than the feature. */
+  await fresh('assistant')
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const d = new Date()
+    const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const t = (id, title) => ({
+      id, title, space: 'work', source: 'mc', estimateMin: 15, done: false,
+      list: 'today', category: 'admin', slot: 'morning', plannedOn: day, createdAt: day, addedAt: Date.now(),
+    })
+    s.tasks = [t('g1', 'Zpracování směrnice GDPR'), t('g2', 'Revize hodinovek externistů')]
+    localStorage.setItem(K, JSON.stringify(s))
+    localStorage.setItem('mc-groq-key', 'gsk_gatetest')
+  }, KEY)
+  await stubAssistant(() => JSON.stringify({
+    say: 'Marking it off.', show: [],
+    do: [{ kind: 'done', match: 'the invoice for Klarka' }],
+  }))
+  await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('tick off the invoice for Klarka')
+  await page.waitForSelector('.as-did li.is-no', { timeout: 4000 })
+  const said = await page.locator('.as-did li.is-no').first().innerText()
+  if (!/nothing changed/i.test(said)) throw new Error(`the failure does not read as a failure: ${JSON.stringify(said)}`)
+  if (!/Klarka/i.test(said)) throw new Error(`it does not say what it could not find: ${JSON.stringify(said)}`)
+  const still = await page.evaluate((K) => (JSON.parse(localStorage.getItem(K)).tasks ?? []).filter((t) => t.done).length, KEY)
+  if (still) throw new Error(`${still} tasks were ticked off by a match that did not exist`)
+})
+
+await step('assistant: it ticks, moves, estimates and keeps a habit, on his real rows', async () => {
+  await fresh('assistant')
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const d = new Date()
+    const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const t = (id, title, slot) => ({
+      id, title, space: 'work', source: 'mc', estimateMin: 15, done: false,
+      list: 'today', category: 'admin', slot, plannedOn: day, createdAt: day, addedAt: Date.now(),
+    })
+    s.tasks = [t('g1', 'Zpracování směrnice GDPR', 'morning'), t('g2', 'Revize hodinovek externistů', 'morning')]
+    localStorage.setItem(K, JSON.stringify(s))
+    localStorage.setItem('mc-groq-key', 'gsk_gatetest')
+  }, KEY)
+  /* Accents folded on the way in: he types "smernice", the row says "směrnice". */
+  await stubAssistant(() => JSON.stringify({
+    say: 'On it.', show: [],
+    do: [
+      { kind: 'done', match: 'smernice GDPR' },
+      { kind: 'move', match: 'hodinovek', slot: 'evening' },
+      { kind: 'estimate', match: 'hodinovek', min: 45 },
+    ],
+  }))
+  await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('tick off the GDPR one, push the hodinovek to the evening and give it 45 minutes')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  const lines = await page.locator('.as-did li').allInnerTexts()
+  if (lines.length !== 3) throw new Error(`${lines.length} outcome lines for 3 changes: ${JSON.stringify(lines)}`)
+  if (lines.some((l) => /nothing changed/i.test(l))) throw new Error(`something failed: ${JSON.stringify(lines)}`)
+  const after = await page.evaluate((K) => {
+    const t = JSON.parse(localStorage.getItem(K)).tasks ?? []
+    const g = t.find((x) => x.id === 'g1'), h = t.find((x) => x.id === 'g2')
+    return { gdprDone: !!g?.done, slot: h?.slot, min: h?.estimateMin }
+  }, KEY)
+  if (!after.gdprDone) throw new Error('the accented title was never matched, so nothing was ticked')
+  if (after.slot !== 'evening') throw new Error(`the task is in ${after.slot}, not evening`)
+  if (after.min !== 45) throw new Error(`the estimate is ${after.min}, not 45`)
+})
+
 await page.unroute('https://api.groq.com/**').catch(() => {})
 
 await b.close(); server.close(); rmSync(SNAP, { recursive: true, force: true })

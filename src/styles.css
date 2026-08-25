@@ -2280,6 +2280,12 @@ mark { background: var(--accent-wash); color: var(--accent-text); font-weight: 6
 }
 .nt-slash-row[aria-selected="true"] { background: var(--accent-wash); }
 .nt-slash-cmd { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--accent-text); flex: none; }
+/* The Zone repaints itself, and the menu has to be repainted with it or it
+   arrives as a slab of warm paper floating in deep water. */
+.shell.in-zone .nt-slash { background: var(--z-deep); border-color: var(--z-line); }
+.shell.in-zone .nt-slash-cmd { color: var(--z-ice); }
+.shell.in-zone .nt-slash-says { color: var(--z-muted); }
+.shell.in-zone .nt-slash-row[aria-selected="true"] { background: rgba(237, 230, 216, 0.09); }
 .nt-slash-says { font-size: var(--text-sm); color: var(--muted); min-width: 0; }
 @media (max-width: 639px) {
   /* At 390 the description is what he came for and the name is four
@@ -3596,6 +3602,20 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   font-size: clamp(1.5rem, 3.2vw, 2.75rem); line-height: 1.08;
   letter-spacing: -0.02em; margin: 0; max-width: 22ch;
   color: var(--z-bone); text-wrap: balance;
+}
+/* A task title can be a pasted URL, and a URL has no spaces in it, so nothing
+   above could break it: it ignored the 22ch cap, ran the width of the room and
+   sat on top of the clock. Reported from his own screen, on a task titled
+   "Aktualizovat strategickou tabulku https://docs.google.com/...".
+
+   So it may break anywhere, and it stops at two lines. This room shows ONE
+   thing; a title that takes three lines of address bar is not that thing. The
+   whole title stays available on hover and to a screen reader, so clamping
+   hides nothing he cannot get back. */
+.znow-title > span {
+  overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 .znow-title svg { flex: none; width: 0.62em; height: 0.62em; transform: translateY(-0.04em); color: var(--z-muted); }
 .zn-running .znow-title svg { color: var(--z-ice); }

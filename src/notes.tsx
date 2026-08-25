@@ -324,7 +324,12 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
       said.textContent = `/help ${instruction}`
       const err = document.createElement(tag)
       err.className = 'nt-help-error'
-      err.textContent = HELP_ERROR[result.reason]
+      /* The reason in his language, plus whatever Groq actually said. A line
+         that only says "that did not go through" is the same to him as the
+         feature being broken, and he read it exactly that way. */
+      err.textContent = result.detail
+        ? `${HELP_ERROR[result.reason]} (${result.detail})`
+        : HELP_ERROR[result.reason]
       placeholder.replaceWith(said, err)
     }
     emit()

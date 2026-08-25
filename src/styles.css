@@ -3605,18 +3605,20 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 }
 /* A task title can be a pasted URL, and a URL has no spaces in it, so nothing
    above could break it: it ignored the 22ch cap, ran the width of the room and
-   sat on top of the clock. Reported from his own screen, on a task titled
-   "Aktualizovat strategickou tabulku https://docs.google.com/...".
+   sat on top of the clock.
 
-   So it may break anywhere, and it stops at two lines. This room shows ONE
-   thing; a title that takes three lines of address bar is not that thing. The
-   whole title stays available on hover and to a screen reader, so clamping
-   hides nothing he cannot get back. */
-.znow-title > span {
-  overflow-wrap: anywhere;
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
-  overflow: hidden;
-}
+   It breaks anywhere now, and it is NOT truncated. Clamping it to two lines was
+   my first answer and it was the wrong one: he asked for a long title to be
+   handled, not hidden, and an ellipsis in the middle of an address is worse
+   than useless because the part it hides is the part you would need to read.
+   Wrapping inside the 22ch column is what stops the collision; the length is
+   his business. */
+.znow-title > span { overflow-wrap: anywhere; min-width: 0; }
+/* Fit it, do not cut it. A title long enough to be an address gets smaller
+   type and a wider column, so the whole thing is readable without taking the
+   room over. Nothing is ever hidden at any size. */
+.znow-title[data-len="l"] { font-size: clamp(1.15rem, 2vw, 1.6rem); max-width: 34ch; }
+.znow-title[data-len="xl"] { font-size: clamp(1rem, 1.5vw, 1.25rem); max-width: 46ch; line-height: 1.25; }
 .znow-title svg { flex: none; width: 0.62em; height: 0.62em; transform: translateY(-0.04em); color: var(--z-muted); }
 .zn-running .znow-title svg { color: var(--z-ice); }
 .zn-paused .znow-title svg { color: #E8C37A; }

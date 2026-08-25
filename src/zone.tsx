@@ -161,7 +161,16 @@ function ZoneTask() {
               and the button's verb already say the state, and in the empty
               case it read "Nothing lined up" directly above a title saying
               the same sentence again. */}
-          <h1 className="znow-title" title={title}>
+          {/* Long titles get smaller type, not fewer characters. A pasted URL
+              can run to seven lines at display size and swallow the room, and
+              the answer to that is to fit it, not to cut it: he asked for a
+              long title to be HANDLED, and an ellipsis through the middle of
+              an address hides exactly the part worth reading. */}
+          <h1
+            className="znow-title"
+            data-len={title.length > 120 ? 'xl' : title.length > 60 ? 'l' : undefined}
+            title={title}
+          >
             <PhaseIcon state={phaseState} />
             <span>{title}</span>
           </h1>
@@ -314,7 +323,6 @@ function ZoneClock() {
   )
 }
 
-const FOLDER_KEY = 'mc:zone-folder'
 
 function NoteIcon() {
   return (
@@ -329,26 +337,12 @@ function PlusIcon() {
 
 function ZoneNote() {
   const { space, noteFolders, notes, addNote, updateNote } = useStore()
-  /* Folders, and not workspaces. Notes stopped being filed by workspace on
-     his instruction, and every note is visible from every one of them, so
-     offering him a workspace to "save to" was asking a question that has no
-     consequence and implying a filing that does not happen. What is left is
-     the same choice the Notes page offers: no folder, or one he made. */
-  const options = [
-    { id: spaceFolderId(space), name: 'No folder' },
-    ...noteFolders.map((f) => ({ id: f.id, name: f.name })),
-  ]
-  const [folderId, setFolderId] = useState(() => {
-    try { return localStorage.getItem(FOLDER_KEY) ?? spaceFolderId(space) } catch { return spaceFolderId(space) }
-  })
-  /* A folder remembered from before the picker offered workspaces can be
-     another workspace's folder, which is not on the list any more. Left alone
-     the select renders blank and the note quietly files itself somewhere he
-     never chose, so anything off the list falls back to no folder. */
-  useEffect(() => {
-    if (!options.some((o) => o.id === folderId)) setFolderId(spaceFolderId(space))
-  }, [folderId, options, space])
-  useEffect(() => { try { localStorage.setItem(FOLDER_KEY, folderId) } catch { /* quota */ } }, [folderId])
+  /* No picker, and no choice to make. His instruction: a note written in the
+     Zone goes where a note written on the Notes page goes, which is the same
+     default folder every note already lands in. Offering a folder here asked a
+     question mid-focus-block that the Notes page does not ask, and the answer
+     never mattered: every note is visible from every workspace anyway. */
+  const folderId = spaceFolderId(space)
 
   const [noteId, setNoteId] = useState<string | null>(null)
   // Before the first character, there is no note to hold the draft yet: it
@@ -377,22 +371,14 @@ function ZoneNote() {
     }
   }
   const fresh = () => { noteIdRef.current = null; setNoteId(null); draft.current = '' }
-  const folderName = options.find((o) => o.id === folderId)?.name ?? 'Notes'
   const hasBody = (active?.body ?? draft.current).trim().length > 0
 
   return (
     <div className="znote">
       <div className="znote-head">
         <span className="znote-heading"><NoteIcon /> Note</span>
-        <select
-          className="znote-folder" value={folderId}
-          onChange={(e) => { setFolderId(e.target.value); fresh() }}
-          aria-label="Folder this note is saved to"
-        >
-          {options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-        </select>
       </div>
-      <div className="znote-rich" aria-label={`Zone note, saved to ${folderName}`}>
+      <div className="znote-rich" aria-label="Zone note">
         {/* The same two commands the Notes page has. A thought worth writing
             down mid-block is exactly the thought worth putting on the list
             without leaving the room, which is the whole argument for /task

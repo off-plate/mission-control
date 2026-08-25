@@ -363,9 +363,14 @@ async function run() {
 
   if (pending.length) say(`iCloud has not downloaded ${pending.length} file(s) yet; leaving them alone this run.`)
 
-  /* Notes on the Mission Control side of the mirror. Done ones are deliberately
-     included: a note ticked off in the app has to take its file with it. */
-  const mine = notes.filter((n) => n.folderId === FOLDER_ID)
+  /* EVERY note, not just the ones filed into MC Notes. His call 2026-08-25,
+     after living with the narrow version: "synchronize every mission control
+     note into the obsidian". A note keeps whatever folder it has in the app;
+     this only decides what gets mirrored, never where a note lives.
+
+     Done ones are deliberately included: a note ticked off in the app has to
+     take its file with it, into Done. */
+  const mine = notes
   const byId = new Map(mine.map((n) => [n.id, n]))
   const fileById = new Map(files.filter((f) => f.id).map((f) => [f.id, f]))
   const taken = new Set(files.map((f) => f.name.toLowerCase()))
@@ -478,14 +483,13 @@ async function run() {
     + plan.conflict.length + plan.tick.length + plan.move.length + plan.archive.length
     + plan.rename.length
 
-  /* The folder has to exist in the app before he can put anything in it. It
-     used to be created only as a side effect of the first write, which left him
-     with a mirror he could not aim at: no folder in Notes, so nothing to drag
-     into, so nothing ever to sync. It is now made on sight, empty. */
+  /* The folder still has to exist, but its job changed when the mirror widened
+     to every note: it is no longer the thing you file INTO to make a note sync,
+     it is where a note born in Obsidian lands. Made on sight either way. */
   const folderMissing = !folders.some((f) => f.id === FOLDER_ID)
 
   if (STATUS || DRY) {
-    say(`${mine.length} note(s) in ${FOLDER_NAME}, ${files.length} file(s) in the vault.`)
+    say(`${mine.length} note(s) in Mission Control, ${files.length} file(s) in the vault.`)
     if (folderMissing) say(`  would create the ${FOLDER_NAME} folder in Mission Control`)
     for (const p of plan.create) say(`  new file -> new note      ${p.file.name}`)
     for (const p of plan.toVault) say(`  note -> file              ${noteTitle(p.note.body) || 'Untitled'}`)

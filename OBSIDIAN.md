@@ -10,6 +10,12 @@ One folder in the vault mirrors one folder of Notes, both ways.
       Done/            <-->   the ones ticked off
 ```
 
+**Every** Mission Control note is mirrored, not only the ones filed into the
+MC Notes folder. His call 2026-08-25, after living with the narrow version. A
+note keeps whatever folder it has in the app; this decides only what gets
+mirrored, never where a note lives. The MC Notes folder in the app still exists,
+but its job is now to be where a note born in Obsidian lands.
+
 Nothing else in the vault is touched. The other three top folders are his
 writing and stay his.
 

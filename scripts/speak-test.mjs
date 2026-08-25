@@ -1,12 +1,17 @@
 import { chromium } from 'playwright'
-const URL = process.argv[2] || 'http://localhost:4178/mission-control'  // serve docs/ under a /mission-control/ path
+const URL = process.argv[2] || 'http://localhost:4178/mission-control'
 const b = await chromium.launch()
 const page = await b.newPage()
 const fails = []
 const ok = (n, c, d='') => { console.log(`${c ? 'PASS' : 'FAIL'}  ${n}${d ? '  ('+d+')' : ''}`); if (!c) fails.push(n) }
 
-// Stub Groq so the assistant answers without a real key.
-// Stub Groq as a real SSE stream, which is what ask() asks for.
+const REPLY = { say: 'Two things are sitting untouched and both are yours to clear this morning.',
+                show: [{ kind: 'backlog' }], next: ['What is oldest?'] }
+
+/* Answer in whatever shape the request actually asked for. ask() streams today
+   and did not a commit ago, and a stub that knows only one shape fails as "the
+   answer came back unreadable", which reads as a broken play button and is not.
+   This has already cost one debugging round. */
 const sse = (obj) => {
   const json = JSON.stringify(obj)
   let body = ''
@@ -15,11 +20,14 @@ const sse = (obj) => {
   }
   return body + 'data: [DONE]\n\n'
 }
-await page.route('**/api.groq.com/**', (r) => r.fulfill({
-  status: 200, contentType: 'text/event-stream',
-  body: sse({ say: 'Two things are sitting untouched and both are yours to clear this morning.',
-              show: [{ kind: 'backlog' }], next: ['What is oldest?'] }),
-}))
+await page.route('**/api.groq.com/**', (r) => {
+  let streaming = false
+  try { streaming = JSON.parse(r.request().postData() || '{}').stream === true } catch { /* default to non-streaming */ }
+  if (streaming) return r.fulfill({ status: 200, contentType: 'text/event-stream', body: sse(REPLY) })
+  return r.fulfill({ status: 200, contentType: 'application/json',
+    body: JSON.stringify({ choices: [{ message: { content: JSON.stringify(REPLY) } }] }) })
+})
+
 // Stub Gemini TTS with a real 0.2s WAV so the audio path is exercised for real.
 await page.route('**/generativelanguage.googleapis.com/**', (r) => {
   const n = 24000 * 3, pcm = Buffer.alloc(n * 2)

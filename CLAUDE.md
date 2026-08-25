@@ -23,6 +23,14 @@ Nothing gets deployed or shown to Michael as "ready" until the release team retu
   the countdown read-out and Technor for everything around it. Both are scoped
   to that page. Do not "fix" either back to the app defaults, and do not let
   them leak onto any other page.
+- **Icons come from one set, and it lives in `src/icons.tsx`.** Hicon Circular
+  Interface Icons (MIT, credited in `LICENSES.md`), 24x24, stroke 2, `currentColor`.
+  Never inline a new `<svg>` in a page: add the icon to `icons.tsx` or reuse the one
+  that already means what you mean. Two exports doing the same job are one icon.
+  Five house glyphs in that file (table, add-row, add-column, clear-formatting, the
+  drag grip) exist only because Hicon has no equivalent, and are labelled.
+  Exempt, and not icons: the Iron Man helmet, the logo mark, the achievement ring,
+  the Zone timer ring, the sparkline, the money chart, the board art.
 - **Light only.** There is no dark mode and no `data-theme` anywhere in the CSS. Do not write docs, tokens or review notes that assume one; if dark mode is ever wanted, it is a project, not an afterthought. The Zone being dark is not a theme: it repaints itself on one page, it does not switch one.
 - **No subtitles anywhere.** Jarvis DESIGN.md's hard rule applies in full: no line under a page title, section heading or card title, no eyebrow, no cadence label beside a title that implies it. Do not add a `sub`/`note`/`description` prop to a heading component. The only thing allowed under a heading is a fact that appears nowhere else and that he can act on.
 - Jarvis DESIGN.md anti-slop canon applies, EXCEPT the color system is a deliberate documented expansion: see `COLOR.md`. Semantic roles: accent = interactive and the active space's identity (**Personal burnt orange `#d1502a`, Work navy `#1d4e79`, Off-Plate gold `#8a6410`**), coral `--alert` = urgent/debt, amber `--warn` = at-risk, green `--progress` = yours/progress (never debt), info-slate = plain data, plus muted category dots. Read COLOR.md before touching any color; keep its discipline or it becomes slop.

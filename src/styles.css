@@ -4829,35 +4829,46 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 }
 .as-hero-now { margin-top: var(--s3); font-size: var(--text-sm); color: var(--muted); }
 
-/* ---- the split ---- */
+/* ---- the split ----
+
+   The page owns the screen, and it is TOLD that in CSS rather than measured in
+   JS. It used to compute its own height from the header's offset, read once on
+   mount. That is wrong the moment the header wraps to a second row at a width
+   it did not expect, and it was wrong by exactly the amount the document then
+   scrolled: a second scrollbar beside the two real ones, and the air above the
+   first message scrolled away with it. Now the shell is the viewport, main
+   takes what is left, and this page fills main. No number is involved, so
+   there is no number to get wrong. */
+.shell:has(.as-page.is-split) { height: 100dvh; min-height: 0; padding-bottom: 0; }
+.shell:has(.as-page.is-split) > main {
+  flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;
+}
 .as-page.is-split {
-  /* Exactly the room left under the header. Measured in JS rather than assumed,
-     because the header grows a banner on some days and a hardcoded offset would
-     be a banner's height wrong on exactly those days. */
-  height: calc(100dvh - var(--as-top, 220px));
-  min-height: 460px;
-  /* Room under the box, and on a phone enough of it to clear the focus pill,
-     which is fixed to the bottom right and was sitting on top of Ask. */
-  padding-bottom: var(--s5);
+  flex: 1 1 auto; min-height: 0; height: auto;
+  /* Air above and below, always, because neither edge is a scroll away now. */
+  padding: var(--s5) 0;
   box-sizing: border-box;
   display: grid; gap: var(--s6);
   grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
 }
-/* The page owns the screen while it is a workspace, so nothing hangs below it
-   for the document to scroll to. */
-.shell:has(.as-page.is-split) { padding-bottom: 0; }
 @media (max-width: 999px) {
+  /* The focus pill is fixed to the bottom right and was sitting on top of Ask. */
   .as-page.is-split { padding-bottom: 76px; }
 }
+/* Both halves take the width they are given, up to a cap that keeps a row's
+   title and its minutes in the same glance. The old rule pinned them to 620 and
+   780 and centred the pair, which on a wide monitor left a third of the screen
+   empty either side of two columns too narrow for either job. */
 @media (min-width: 1000px) {
-  .as-page.is-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1.04fr); }
-}
-@media (min-width: 1700px) {
-  .as-page.is-split { grid-template-columns: minmax(0, 620px) minmax(0, 780px); justify-content: center; }
+  .as-page.is-split {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    max-width: 2100px; margin-inline: auto; width: 100%;
+  }
 }
 
 .as-chat { display: flex; flex-direction: column; min-height: 0; }
+.as-thread, .as-canvas-body { scrollbar-width: thin; scrollbar-color: var(--hairline-strong) transparent; }
 .as-thread {
   flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
   display: flex; flex-direction: column; gap: var(--s5);

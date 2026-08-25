@@ -4756,7 +4756,10 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
      be a banner's height wrong on exactly those days. */
   height: calc(100dvh - var(--as-top, 220px));
   min-height: 460px;
-  padding-bottom: 0;
+  /* Room under the box, and on a phone enough of it to clear the focus pill,
+     which is fixed to the bottom right and was sitting on top of Ask. */
+  padding-bottom: var(--s5);
+  box-sizing: border-box;
   display: grid; gap: var(--s6);
   grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
@@ -4764,6 +4767,9 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 /* The page owns the screen while it is a workspace, so nothing hangs below it
    for the document to scroll to. */
 .shell:has(.as-page.is-split) { padding-bottom: 0; }
+@media (max-width: 999px) {
+  .as-page.is-split { padding-bottom: 76px; }
+}
 @media (min-width: 1000px) {
   .as-page.is-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1.04fr); }
 }
@@ -4779,6 +4785,12 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
      bottom edge of the navigation. */
   padding: var(--s6) var(--s3) var(--s5) 0;
 }
+/* The conversation sits ON the box and grows upward, the way every messaging
+   app he uses does. Anchored to the top instead, one question and its answer
+   left most of a 1000px column empty between the reply and the field. Done with
+   a margin on the first child, not justify-content, because a flex-end column
+   that overflows clips its own top and he could not scroll back to it. */
+.as-thread > :first-child { margin-top: auto; }
 .as-chat .as-ask { flex: none; }
 
 /* ---- the box ---- */
@@ -4801,7 +4813,12 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .as-send { margin-left: auto; }
 
 /* ---- chips ---- */
-.as-starters { display: flex; flex-wrap: wrap; gap: var(--s2); justify-content: center; margin-top: var(--s5); }
+.as-starters {
+  display: flex; flex-wrap: wrap; gap: var(--s2); justify-content: center;
+  /* Narrower than the box on purpose: at full width six chips came out five on
+     one line and one stranded underneath, which reads as a mistake. */
+  max-width: 620px; margin: var(--s5) auto 0;
+}
 .as-chip {
   border: 1px solid var(--hairline-strong); border-radius: 999px;
   padding: var(--s2) var(--s4); background: none; cursor: pointer;
@@ -4866,7 +4883,9 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 }
 .as-canvas-body {
   flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
-  padding: var(--s4) var(--s5) var(--s6);
+  /* The focus pill is fixed to the bottom right, over this column. Without the
+     room it covers the last two rows of whatever is on the canvas. */
+  padding: var(--s4) var(--s5) 76px;
   /* The swap is animated because a silent substitution, while he is looking at
      the sentence on the left, reads as nothing having happened. */
   animation: as-swap 240ms var(--ease) both;
@@ -4899,6 +4918,13 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .as-link { cursor: pointer; }
 .as-link:hover .as-row-title { color: var(--accent-text); }
 .as-empty { font-size: var(--text-sm); color: var(--muted); margin-top: var(--s2); }
+.as-more {
+  align-self: flex-start; margin-top: var(--s3); padding: 0; background: none;
+  border: none; border-bottom: 1px solid var(--hairline-strong); cursor: pointer;
+  font-size: var(--text-xs); color: var(--muted);
+  transition: color var(--t-fast), border-color var(--t-fast);
+}
+.as-more:hover { color: var(--accent-text); border-color: var(--accent); }
 
 @media (prefers-reduced-motion: reduce) {
   .as-turn, .as-canvas-body { animation: none; }

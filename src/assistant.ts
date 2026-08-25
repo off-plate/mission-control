@@ -48,9 +48,9 @@ const KINDS: CardKind[] = ['today', 'backlog', 'habits', 'calendar', 'goals', 'f
 export interface Brief {
   now: string
   weekday: string
-  planned: { slot: string; items: { title: string; done: boolean; min: number }[] }[]
+  planned: { slot: string; items: { title: string; done: boolean; min: number; space: string }[] }[]
   backlogCount: number
-  oldest: { title: string; days: number }[]
+  oldest: { title: string; days: number; space: string }[]
   habits: { due: number; kept: number; open: string[] }
   meetings: { at: string; title: string }[]
   focusToday: number
@@ -63,6 +63,13 @@ He is Czech, in Prague, running a design agency job plus a side business, and
 the app exists because admin rots on his list and evenings get lost. Talk to him
 the way a sharp chief of staff would: short, direct, no cheerleading, no
 "I'd be happy to". Never more than two sentences before the cards.
+
+YOU SEE ALL THREE WORKSPACES AT ONCE. Every other page in this app is filtered
+to the one he is standing in; you are not, on purpose, because half a day
+answered confidently is a wrong answer. The briefing marks each item with its
+workspace and the cards show that mark on every row. So you may say the shape of
+it in words, like that most of what is left is Off-Plate rather than the job,
+which is exactly the judgement he cannot get anywhere else in the app.
 
 YOU MUST NOT STATE NUMBERS OR TITLES. Not "you have 3 tasks", not "your first
 is X". The app draws the real data from his own log; if you write a number it
@@ -117,13 +124,14 @@ export const OPENING_PROMPT =
 
 export function briefText(b: Brief): string {
   const slots = b.planned
-    .map((s) => `${s.slot}: ${s.items.length ? s.items.map((i) => `${i.title}${i.done ? ' (done)' : ''}`).join('; ') : 'empty'}`)
+    .map((s) => `${s.slot}: ${s.items.length ? s.items.map((i) => `[${i.space}] ${i.title}${i.done ? ' (done)' : ''}`).join('; ') : 'empty'}`)
     .join('\n')
   return [
     `Now: ${b.now}, ${b.weekday}`,
+    'Everything below spans all his workspaces at once.',
     `Planned today:\n${slots}`,
     `Backlog: ${b.backlogCount} open`,
-    b.oldest.length ? `Oldest untouched: ${b.oldest.map((o) => `${o.title} (${o.days}d)`).join('; ')}` : 'Nothing is ageing badly',
+    b.oldest.length ? `Oldest untouched: ${b.oldest.map((o) => `[${o.space}] ${o.title} (${o.days}d)`).join('; ')}` : 'Nothing is ageing badly',
     `Habits today: ${b.habits.kept} of ${b.habits.due} kept${b.habits.open.length ? `, still open: ${b.habits.open.join('; ')}` : ''}`,
     b.meetings.length ? `Meetings: ${b.meetings.map((m) => `${m.at} ${m.title}`).join('; ')}` : 'No meetings in the calendar',
     `Focus logged today: ${b.focusToday} minutes`,

@@ -17,7 +17,15 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css
 const server = createServer((req, res) => {
   const path = (req.url ?? '/').split('?')[0].replace(/^\/mission-control/, '') || '/'
   const file = join(DOCS, path === '/' ? 'index.html' : path)
-  if (!existsSync(file)) { res.writeHead(404); res.end(); return }
+  /* Anything without a file extension is an app route, and GitHub Pages hands
+     those the app itself. Serving a 404 for them instead made this gate red at
+     random: one run in three saw a console error for a path that was never a
+     file. A missing ASSET still 404s, and still fails the gate, because that is
+     the failure worth catching. */
+  if (!existsSync(file)) {
+    if (extname(file)) { console.log(`MISS ${path}`); res.writeHead(404); res.end(); return }
+    res.writeHead(200, { 'content-type': 'text/html' }); res.end(readFileSync(join(DOCS, 'index.html'))); return
+  }
   res.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream' })
   res.end(readFileSync(file))
 })
@@ -44,7 +52,14 @@ const THIRD_PARTY_NOISE = /youtube\.com\/(api\/stats|ptracking|s\/player)|double
    a bare "Failed to load resource: net::ERR_FAILED" says nothing on its own,
    so the URL is matched against the list above AND kept in what gets
    reported, so the next one of these is diagnosable without a repro run. */
+/* A step that deliberately stubs a failing response owns the console error it
+   causes. Anything else on that URL still fails the gate, because this is set
+   for the length of one assertion and cleared straight after: a permanent
+   entry in the list above would have hidden the very outage this gate exists
+   to catch. */
+let expected = null
 const noteError = (text, url = '') => {
+  if (expected && (expected.test(text) || (url && expected.test(url)))) return
   if (THIRD_PARTY_NOISE.test(text) || (url && THIRD_PARTY_NOISE.test(url))) return
   errors.push(`${text.slice(0, 120)}${url ? ` [${url.slice(0, 100)}]` : ''}`)
 }
@@ -2242,6 +2257,178 @@ await step('notes: ticking one files it under Done and takes it out of the folde
   const restored = await page.evaluate(() => document.querySelectorAll('.nt-row').length)
   if (restored !== 0) throw new Error('un-ticking did not take it out of Done')
 })
+
+/* ---------- The assistant, as a room with two halves ----------
+   His report, in his words: the first message was welded to the bottom of the
+   navigation, the ask box travelled up the screen with every answer, there was
+   no sign it was thinking, and it only ever answered about the workspace he
+   happened to be standing in. Every one of those is a step below. */
+
+/** Answer as Groq would, choosing the reply from what he actually asked. */
+const stubAssistant = async (reply, { delay = 0, status = 0, message = '' } = {}) => {
+  await page.unroute('https://api.groq.com/**').catch(() => {})
+  await page.route('https://api.groq.com/**', async (route) => {
+    const req = route.request().postDataJSON()
+    const asked = String(req.messages[req.messages.length - 1]?.content ?? '')
+    if (delay) await new Promise((r) => setTimeout(r, delay))
+    if (status) {
+      await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ error: { message } }) })
+      return
+    }
+    await route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ choices: [{ message: { content: reply(asked, req) } }] }),
+    })
+  })
+}
+const askAssistant = async (text) => {
+  await page.locator('.as-input').fill(text)
+  await page.locator('.as-input').press('Enter')
+  await page.waitForTimeout(700)
+}
+
+await step('assistant: the empty page is a doorway, with none of a chatbot’s furniture', async () => {
+  await fresh('assistant')
+  if (!(await page.locator('.as-orb').count())) throw new Error('the mark is missing')
+  const q = await page.locator('.as-hero-q').innerText()
+  if (q !== 'What can I help with?') throw new Error(`the question reads "${q}"`)
+  const chips = await page.locator('.as-starters .as-chip').count()
+  if (chips !== 6) throw new Error(`${chips} starters, expected 6`)
+  /* His instruction, twice over: no voice of any kind, and specifically not
+     attach / search / reason / create an image / summarise / translate. Those
+     belong to a general chatbot and not one of them is a thing this app does. */
+  const text = await page.locator('.as-page').innerText()
+  for (const banned of [/voice/i, /microphone/i, /\bdictate/i, /attach/i, /create (an )?image/i, /summari[sz]e/i, /translate/i, /\breason\b/i]) {
+    if (banned.test(text)) throw new Error(`the page offers ${banned}: ${JSON.stringify(text.slice(0, 200))}`)
+  }
+  const audio = await page.evaluate(() =>
+    document.querySelectorAll('.as-page [aria-label*="voice" i], .as-page [aria-label*="mic" i], .as-page audio').length)
+  if (audio) throw new Error(`${audio} voice controls on the page`)
+  /* The line under the question is counted by the app, so it says something
+     true the instant the page opens instead of waiting on a model. */
+  const now = await page.locator('.as-hero-now').innerText()
+  if (!now.trim()) throw new Error('the page opens saying nothing about his day')
+})
+
+await step('assistant: the answer splits the room and the ask box stops moving', async () => {
+  await fresh('assistant')
+  await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
+  await stubAssistant(() => JSON.stringify({ say: 'Pulled the day.', show: [{ kind: 'today' }], next: ['And the habits?'] }))
+  await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('what is on today')
+  await page.waitForSelector('.as-canvas', { timeout: 4000 })
+  const thread = await page.locator('.as-thread').boundingBox()
+  const canvas = await page.locator('.as-canvas').boundingBox()
+  if (canvas.x <= thread.x + thread.width - 4) throw new Error('the canvas is not to the right of the thread')
+  /* His complaint: the first message sat welded to the bottom of the menu. */
+  const first = await page.locator('.as-turn').first().boundingBox()
+  if (first.y - thread.y < 16) throw new Error(`the first message sits ${Math.round(first.y - thread.y)}px under the top of the thread`)
+  /* And the one that mattered most: the box must not travel with the answers. */
+  const before = await page.locator('.as-ask').boundingBox()
+  await askAssistant('and again')
+  await askAssistant('and once more')
+  const after = await page.locator('.as-ask').boundingBox()
+  if (Math.abs(before.y - after.y) > 1) throw new Error(`the ask box moved ${Math.round(Math.abs(before.y - after.y))}px after two more answers`)
+  /* It stays put because the THREAD scrolls, not the document. */
+  const overflow = await page.evaluate(() => document.scrollingElement.scrollHeight - document.scrollingElement.clientHeight)
+  if (overflow > 4) throw new Error(`the document itself scrolls by ${overflow}px`)
+  const scrolls = await page.evaluate(() => {
+    const t = document.querySelector('.as-thread')
+    return t.scrollHeight > t.clientHeight ? 'thread' : 'nothing yet'
+  })
+  if (scrolls === 'nothing yet' && (await page.locator('.as-turn').count()) < 6) throw new Error('not enough turns to prove the thread is the scroller')
+})
+
+await step('assistant: the canvas swaps to whatever he just asked for', async () => {
+  await fresh('assistant')
+  await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
+  await stubAssistant((asked) => JSON.stringify(
+    /habit/i.test(asked)
+      ? { say: 'Habits, on the right.', show: [{ kind: 'habits' }] }
+      : { say: 'The day, on the right.', show: [{ kind: 'today' }] }))
+  await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('what is on today')
+  await page.waitForSelector('.as-canvas', { timeout: 4000 })
+  const head = async () => (await page.locator('.as-canvas-head h2').innerText()).trim().toLowerCase()
+  if (await head() !== 'on the day') throw new Error(`the canvas opened on "${await head()}"`)
+  await askAssistant('and which habits are open')
+  await page.waitForTimeout(500)
+  if (await head() !== 'habits today') throw new Error(`the canvas did not swap, it still reads "${await head()}"`)
+  /* One canvas, swapped. Not two stacked, which is the thing he did not want. */
+  if ((await page.locator('.as-canvas').count()) !== 1) throw new Error('there is more than one canvas')
+  if (await page.locator('.as-thread .as-card').count()) throw new Error('cards are still being drawn inside the thread on a wide screen')
+  /* And the way back to an earlier one is on its own turn. */
+  const back = page.locator('.as-pulled-btn', { hasText: 'On the day' }).first()
+  if (!(await back.count())) throw new Error('no way back to the first thing it pulled')
+  await back.click(); await page.waitForTimeout(400)
+  if (await head() !== 'on the day') throw new Error(`clicking back landed on "${await head()}"`)
+})
+
+await step('assistant: it answers across every workspace, not the one he is standing in', async () => {
+  await fresh('assistant')
+  const seeded = await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const d = new Date()
+    const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const task = (id, title, space) => ({
+      id, title, space, source: 'mc', estimateMin: 30, done: false,
+      list: 'today', category: 'admin', slot: 'morning', plannedOn: day, createdAt: day, addedAt: Date.now(),
+    })
+    s.tasks = [task('gate-as-p', 'Gate personal thing', 'personal'), task('gate-as-o', 'Gate offplate thing', 'offplate')]
+    localStorage.setItem(K, JSON.stringify(s))
+    localStorage.setItem('mc-groq-key', 'gsk_gatetest')
+    /* Standing in Personal on purpose: every other page would hide the
+       Off-Plate row, and this one must not. */
+    localStorage.setItem('mc-view', 'personal')
+    localStorage.setItem('mc-space', 'personal')
+    return { ok: true }
+  }, KEY)
+  if (seeded.err) throw new Error(seeded.err)
+  let briefed = ''
+  await stubAssistant((asked, req) => {
+    briefed = req.messages.map((m) => m.content).join('\n')
+    return JSON.stringify({ say: 'Both workspaces are on the right.', show: [{ kind: 'today' }] })
+  })
+  await page.reload(); await page.waitForTimeout(800)
+  await askAssistant('what is on today')
+  await page.waitForSelector('.as-canvas', { timeout: 4000 })
+  const canvas = await page.locator('.as-canvas').innerText()
+  if (!/Gate personal thing/.test(canvas)) throw new Error('the Personal task is missing from the canvas')
+  if (!/Gate offplate thing/.test(canvas)) throw new Error('standing in Personal hid the Off-Plate task, which is the whole bug')
+  /* And each row says which workspace it came from, since they are mixed. */
+  if (!(await page.locator('.as-canvas .as-row .spacemark.s-offplate').count())) throw new Error('the Off-Plate row carries no workspace mark')
+  if (!(await page.locator('.as-canvas .as-row .spacemark.s-personal').count())) throw new Error('the Personal row carries no workspace mark')
+  /* The model was told the same thing, so its sentence cannot contradict the
+     cards: it saw both, and it saw which workspace each one belongs to. */
+  if (!/Gate offplate thing/.test(briefed)) throw new Error('the briefing sent to the model was still filtered to one workspace')
+  if (!/\[Off-Plate\]/.test(briefed)) throw new Error('the briefing does not tell the model which workspace anything came from')
+})
+
+await step('assistant: it visibly thinks, and says what to do when the model is gone', async () => {
+  await fresh('assistant')
+  await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
+  await stubAssistant(() => JSON.stringify({ say: 'Here.', show: [{ kind: 'today' }] }), { delay: 1200 })
+  await page.reload(); await page.waitForTimeout(700)
+  await page.locator('.as-input').fill('take your time')
+  await page.locator('.as-input').press('Enter')
+  await page.waitForTimeout(350)
+  if (!(await page.locator('.as-dots').isVisible())) throw new Error('nothing on screen says it is working')
+  const bobbing = await page.evaluate(() => getComputedStyle(document.querySelector('.as-dots > i')).animationName)
+  if (!bobbing || bobbing === 'none') throw new Error('the thinking indicator is a still picture')
+  await page.waitForSelector('.as-dots', { state: 'detached', timeout: 6000 })
+  if (!(await page.locator('.as-turn.is-it .as-said').count())) throw new Error('it stopped thinking without answering')
+  /* The failure that started all of this: the model this app named was retired
+     and every AI feature died silently. It must now say so, and say what to do. */
+  expected = /api\.groq\.com/
+  await stubAssistant(() => '', { status: 404, message: 'The model `llama-3.3-70b-versatile` has been decommissioned.' })
+  await askAssistant('and now')
+  const err = await page.locator('.as-error').innerText()
+  if (!/decommissioned/.test(err)) throw new Error(`the provider's own words are not on screen: ${JSON.stringify(err)}`)
+  if (!/reload/i.test(err)) throw new Error(`the error does not say what to do about it: ${JSON.stringify(err)}`)
+  expected = null
+})
+
+await page.unroute('https://api.groq.com/**').catch(() => {})
 
 await b.close(); server.close()
 if (errors.length) console.log(`CONSOLE ERRORS (${errors.length}): ${errors[0]}`)

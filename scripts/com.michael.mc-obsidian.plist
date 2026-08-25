@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Mirrors "Mission Control/MC Notes" in the Obsidian vault against the MC Notes
+     folder in Mission Control, both ways, every two minutes.
+
+     Two minutes rather than something cleverer because the work is reading a
+     handful of local files and, only when something actually changed, one round
+     trip to Supabase. An idle run costs almost nothing.
+
+     RunAtLoad is true on purpose: the vault only exists on this Mac, so an edit
+     made on his phone has been waiting since the lid was last closed. The first
+     run after login is the one that matters most.
+
+     Sign in once before loading this:
+       cd "/Users/michaelflorianrvltdigital/Claude Helpers/Mission Control"
+       node tools/obsidian-sync.mjs --login
+
+     Install:
+       cp "/Users/michaelflorianrvltdigital/Claude Helpers/Mission Control/scripts/com.michael.mc-obsidian.plist" ~/Library/LaunchAgents/
+       launchctl unload ~/Library/LaunchAgents/com.michael.mc-obsidian.plist 2>/dev/null
+       launchctl load ~/Library/LaunchAgents/com.michael.mc-obsidian.plist
+
+     Stop it any time with launchctl unload on the same path. What it did is in
+     ~/.mc-obsidian/sync.log. -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.michael.mc-obsidian</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/node</string>
+        <string>tools/obsidian-sync.mjs</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/michaelflorianrvltdigital/Claude Helpers/Mission Control</string>
+    <key>StartInterval</key>
+    <integer>120</integer>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/mc-obsidian.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/mc-obsidian.error.log</string>
+</dict>
+</plist>

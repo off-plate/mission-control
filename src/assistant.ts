@@ -374,7 +374,12 @@ export async function ask(
     res = await groq({
       model: MODEL,
       temperature: 0.3,
-      max_tokens: 700,
+      /* 700 was set when the answer was two sentences and a card name. The
+         brief now greets him, picks a first task, and asks about one leftover,
+         and a reasoning model spends budget thinking before it writes a word.
+         Running out mid-object produced "the answer came back unreadable" on
+         the morning brief, which is the one answer he most wanted. */
+      max_tokens: 1400,
       stream: !!onSay,
       messages: [
         { role: 'system', content: SYSTEM },
@@ -452,7 +457,19 @@ function finish(raw: string): Outcome {
        model does not document. It answers with an object, sometimes wrapped in
        a fence or a sentence, so the first balanced {...} is taken and the rest
        ignored. */
-    const parsed = JSON.parse(firstObject(raw) ?? raw) as Partial<Reply>
+    const obj = firstObject(raw)
+    /* NOTHING BALANCED CAME BACK, so the object was cut off mid-write. The
+       sentence is usually complete long before the closing brace, and it has
+       already been read out on screen by partialSay while it streamed. Throwing
+       it away to show an error is the worst of both: he watched a good answer
+       arrive and then watched it be replaced. Keep the sentence, drop the cards,
+       because a card that was never named is not a card this app can promise. */
+    if (!obj) {
+      const partial = partialSay(raw)?.trim()
+      if (partial) return { ok: true, reply: { say: partial, show: [], next: [] } }
+      return { ok: false, reason: 'unreadable' }
+    }
+    const parsed = JSON.parse(obj) as Partial<Reply>
     const say = typeof parsed.say === 'string' ? parsed.say.trim() : ''
     if (!say) return { ok: false, reason: 'unreadable' }
     /* Anything it invented outside the card vocabulary is dropped rather than
@@ -465,6 +482,10 @@ function finish(raw: string): Outcome {
       : []
     return { ok: true, reply: { say, show, next, do: cleanActions((parsed as { do?: unknown }).do) } }
   } catch {
+    /* Balanced but not valid JSON. Same reasoning as above: a sentence beats
+       an error, when the sentence is one he already saw. */
+    const partial = partialSay(raw)?.trim()
+    if (partial) return { ok: true, reply: { say: partial, show: [], next: [] } }
     return { ok: false, reason: 'unreadable' }
   }
 }

@@ -110,6 +110,22 @@ function lineAt(root: HTMLElement): HTMLElement | null {
 export type EditorTool = 'bold' | 'italic' | 'heading' | 'bullet' | 'checklist' | 'quote' | 'divider' | 'table' | 'clear'
 const ALL_TOOLS: EditorTool[] = ['bold', 'italic', 'heading', 'bullet', 'checklist', 'quote', 'divider', 'table', 'clear']
 
+/* What "/" can do, in his words rather than the code's.
+
+   He asked for this after the obvious happened: two commands exist, both are
+   invisible, and remembering which is which is a job the app should be doing.
+   "I'm struggling that I will write the slash, and I have to remember what is
+   in there."
+
+   The second line of each entry is not a subtitle under a title, which the
+   canon forbids. It is the whole payload: the name alone is what he already
+   could not remember, so a menu that showed only names would be the same
+   problem in a box. */
+const SLASH: { cmd: string; says: string; needs: 'help' | 'task' }[] = [
+  { cmd: 'help', says: 'Ask about this note, the answer lands in it', needs: 'help' },
+  { cmd: 'task', says: 'Put this line on the to-do list', needs: 'task' },
+]
+
 export function Editor({ note, onChange, lead, trail, children, tools, plain, slashHelp, slashTask }: {
   note: Pick<Note, 'id' | 'body'>
   onChange: (md: string) => void
@@ -173,6 +189,75 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
     const md = htmlToMd(el)
     mine.current = md
     onChange(md)
+  }
+
+  /* ---- the "/" menu ------------------------------------------------------
+     Only ever offers what this editor can actually do. The Zone's editor gets
+     neither command, so it gets no menu; a menu that lists something the press
+     of Enter will ignore is worse than no menu. */
+  const available = SLASH.filter((c) => (c.needs === 'help' ? slashHelp : slashTask))
+  const [menu, setMenu] = useState<{ q: string; x: number; y: number; i: number } | null>(null)
+  const shown = menu ? available.filter((c) => c.cmd.startsWith(menu.q.toLowerCase())) : []
+
+  /** The text from the start of the current line up to the caret. Read through
+   *  a Range rather than off a text node, because a line is often several nodes
+   *  once there is a bold word in it and the caret can sit in any of them. */
+  const beforeCaret = (): { text: string; range: Range } | null => {
+    const sel = window.getSelection()
+    const root = ref.current
+    if (!sel || !sel.isCollapsed || !root || !sel.rangeCount) return null
+    const r = sel.getRangeAt(0)
+    if (!root.contains(r.endContainer)) return null
+    const block = lineAt(root)
+    if (!block) return null
+    const pre = document.createRange()
+    pre.selectNodeContents(block)
+    try { pre.setEnd(r.endContainer, r.endOffset) } catch { return null }
+    return { text: pre.toString(), range: r }
+  }
+
+  /* Open on a "/" that starts a word, keep it open while he narrows it, close
+     as soon as what he typed stops being a command. A slash mid-word is a date
+     or a path, never a command, so it is left alone. */
+  const trackMenu = () => {
+    if (!available.length) return
+    const at = beforeCaret()
+    if (!at) { setMenu(null); return }
+    const m = at.text.match(/(?:^|\s)\/([a-z]*)$/i)
+    if (!m) { setMenu(null); return }
+    const rect = at.range.getClientRects()[0] ?? lineAt(ref.current!)?.getBoundingClientRect()
+    if (!rect) { setMenu(null); return }
+    setMenu((prev) => ({ q: m[1], x: rect.left, y: rect.bottom, i: prev && prev.q === m[1] ? prev.i : 0 }))
+  }
+
+  /** Swap the half-typed "/wha" for the real command and leave the caret ready
+   *  for the argument. The token has no spaces in it, so it lives inside one
+   *  text node and can be found there.
+   *
+   *  The insert goes through execCommand rather than through the text node
+   *  directly, and that is not laziness. The command ends in a space, and a
+   *  trailing space at the end of a line is collapsed in contenteditable: put
+   *  the caret after it by hand and the browser quietly moves it back in front,
+   *  so the next character he types lands against the command and "/task x"
+   *  comes out as "/taskx". Letting the browser perform the insert makes the
+   *  space a real one and leaves the caret where it belongs. */
+  const accept = (cmd: string) => {
+    setMenu(null)
+    const sel = window.getSelection()
+    if (!sel || !sel.rangeCount) return
+    const r = sel.getRangeAt(0)
+    const node = r.endContainer
+    if (node.nodeType !== 3) return
+    const t = node as Text
+    const start = t.data.slice(0, r.endOffset).lastIndexOf('/')
+    if (start < 0) return
+    const token = document.createRange()
+    token.setStart(t, start)
+    token.setEnd(t, r.endOffset)
+    sel.removeAllRanges()
+    sel.addRange(token)
+    document.execCommand('insertText', false, `/${cmd} `)
+    emit()
   }
 
   /* Where a slash command is allowed to sit on the line.
@@ -506,10 +591,32 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
         aria-multiline="true"
         aria-label="Note text"
         data-empty={!restOf(note.body).trim() || undefined}
-        onInput={() => { autoformat(); emit() }}
-        onBlur={emit}
+        onInput={() => { autoformat(); emit(); trackMenu() }}
+        /* Moving the caret with the mouse or the arrows can carry it out of the
+           token that opened the menu, and a menu still sitting there is a menu
+           that will act on the wrong line. */
+        onKeyUp={(e) => { if (e.key.startsWith('Arrow') || e.key === 'Home' || e.key === 'End') trackMenu() }}
+        onMouseUp={trackMenu}
+        onBlur={() => { setMenu(null); emit() }}
         onMouseDown={onMouseDown}
             onKeyDown={(e) => {
+              /* The menu owns these keys while it is open, and only then, so
+                 Enter still sends a command and Escape still does nothing when
+                 there is no menu to close. */
+              if (menu && shown.length) {
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                  e.preventDefault()
+                  const d = e.key === 'ArrowDown' ? 1 : -1
+                  setMenu({ ...menu, i: (menu.i + d + shown.length) % shown.length })
+                  return
+                }
+                if (e.key === 'Enter' || e.key === 'Tab') {
+                  e.preventDefault()
+                  accept(shown[Math.min(menu.i, shown.length - 1)].cmd)
+                  return
+                }
+                if (e.key === 'Escape') { e.preventDefault(); setMenu(null); return }
+              }
               if ((slashHelp || slashTask) && e.key === 'Enter' && !e.shiftKey) {
                 const root = ref.current
                 const block = root && lineAt(root)
@@ -539,6 +646,39 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
               emit()
             }}
           />
+          {menu && shown.length > 0 && (
+            <div
+              className="nt-slash"
+              style={{ left: menu.x, top: menu.y + 6 }}
+              role="listbox"
+              aria-label="Commands"
+            >
+              {shown.map((c, i) => (
+                <button
+                  key={c.cmd}
+                  type="button"
+                  className="nt-slash-row"
+                  role="option"
+                  aria-selected={i === Math.min(menu.i, shown.length - 1)}
+                  /* Down, not click: a click lands after the editor has already
+                     lost the selection, and the token to replace is gone with
+                     it. */
+                  onMouseDown={(e) => { e.preventDefault(); accept(c.cmd) }}
+                  /* Move, not enter. The menu opens underneath wherever the
+                     pointer happens to be resting, and mouseenter fires on
+                     appearance, so the highlighted row was being chosen by
+                     where the mouse had been left rather than being the first
+                     one. Then Enter ran the wrong command. mousemove only fires
+                     when the mouse actually moves, which is the moment he is
+                     genuinely pointing at something. */
+                  onMouseMove={() => { if (menu.i !== i) setMenu({ ...menu, i }) }}
+                >
+                  <span className="nt-slash-cmd">/{c.cmd}</span>
+                  <span className="nt-slash-says">{c.says}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </article>
       </div>
     </>

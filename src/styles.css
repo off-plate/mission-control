@@ -2292,6 +2292,36 @@ mark { background: var(--accent-wash); color: var(--accent-text); font-weight: 6
 @media (prefers-reduced-motion: reduce) { .nt-editor .nt-help-pending { animation: none; } }
 .nt-editor .nt-help-error { color: var(--alert); font-size: var(--text-sm); }
 
+/* The "/" menu. It exists because two commands were invisible and he had to
+   remember them; so the description beside each name is the point of the thing,
+   not decoration under a title.
+
+   Hairline, no shadow, 4px radius: it is a small piece of the page that has
+   floated up, not a dialog. Fixed, because its coordinates come from the
+   caret's own rect, which is measured against the viewport. */
+.nt-slash {
+  position: fixed; z-index: 40; min-width: 260px; max-width: min(380px, 90vw);
+  background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-sm);
+  padding: var(--s1); display: flex; flex-direction: column;
+}
+.nt-slash-row {
+  display: flex; align-items: baseline; gap: var(--s3); width: 100%;
+  padding: var(--s2) var(--s3); border: 0; border-radius: 3px;
+  background: transparent; text-align: left; cursor: pointer; font: inherit;
+}
+.nt-slash-row[aria-selected="true"] { background: var(--accent-wash); }
+.nt-slash-cmd { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--accent-text); flex: none; }
+.nt-slash-says { font-size: var(--text-sm); color: var(--muted); min-width: 0; }
+@media (max-width: 639px) {
+  /* At 390 the description is what he came for and the name is four
+     characters, so they stack rather than fight for one line. */
+  .nt-slash { min-width: 0; left: var(--s3) !important; right: var(--s3); max-width: none; }
+  .nt-slash-row { flex-direction: column; gap: 2px; }
+}
+
+
+
+
 /* ---- a body that lost the merge, still on the note ---- */
 .nt-conflict { margin-bottom: var(--s4); border: 1px solid var(--alert); border-radius: 6px; padding: var(--s3) var(--s4); }
 .nt-conflict-head { font-size: var(--text-sm); color: var(--alert); }

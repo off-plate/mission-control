@@ -267,3 +267,28 @@ export async function toggle(id: string, text: string): Promise<void> {
   await el.play().catch(() => { if (current === id) void speakOnDevice(id, clean) })
   if (current === id && audio === el) set(id, 'playing')
 }
+
+/** Speak, and resolve when it has actually finished.
+
+    Voice mode needs this and the button does not: a conversation has to know
+    the moment the answer stops, because that is when it is safe to listen
+    again. Listening while it talks means transcribing its own voice and
+    answering itself, which is the failure mode of every hands-free assistant.
+
+    It resolves on the way back down to idle, and only after it has genuinely
+    started, or a call that never begins would resolve instantly and hand the
+    microphone back while the answer is still being fetched. */
+export function say(id: string, text: string): Promise<void> {
+  return new Promise((resolve) => {
+    let started = false
+    const off = subscribe(() => {
+      const s = speechState(id)
+      if (s !== 'idle') { started = true; return }
+      if (started) { off(); resolve() }
+    })
+    void toggle(id, text).then(() => {
+      /* Nothing to wait for: no text, or the engine refused outright. */
+      if (!started && speechState(id) === 'idle') { off(); resolve() }
+    })
+  })
+}

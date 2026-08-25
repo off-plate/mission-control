@@ -5019,3 +5019,69 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   .as-mic-text { display: none; }
   .as-mic { padding: 6px var(--s2); }
 }
+
+/* Voice mode, standing exactly where the ask box stood: same frame, same
+   width, same place on the page, so the thread above it does not shift when it
+   turns on. It is a change of state, not a change of screen. */
+.as-voice {
+  border: 1px solid var(--accent); border-radius: var(--r-md);
+  background: var(--surface); padding: var(--s4);
+  display: flex; flex-direction: column; gap: var(--s3);
+}
+.as-voice-head { display: flex; align-items: center; gap: var(--s3); }
+.as-voice-state { font-size: var(--text-xs); color: var(--accent-text); letter-spacing: 0.02em; }
+.as-voice-exit {
+  margin-left: auto;
+  border: 1px solid var(--hairline-strong); border-radius: var(--r-sm);
+  padding: 4px var(--s3); background: none; cursor: pointer;
+  font-size: var(--text-xs); color: var(--muted);
+  transition: border-color var(--t-fast), color var(--t-fast);
+}
+.as-voice-exit:hover { border-color: var(--accent); color: var(--accent-text); }
+
+/* The bars ARE the microphone. Height is set inline from the live reading, so
+   nothing here animates them: CSS only smooths the step between frames, which
+   keeps a 60fps signal from looking like a strobe. */
+/* Full width of the box, because a small meter marooned in a wide panel reads
+   as a decoration rather than as the thing that is listening. The bars share
+   the space, so this holds from a phone to an ultrawide without a media query
+   or a resize observer. */
+.as-wave {
+  display: flex; align-items: center; justify-content: center;
+  gap: 2px; height: 48px; width: 100%;
+}
+.as-wave-bar {
+  flex: 1 1 0; min-width: 1px; max-width: 4px;
+  min-height: 2px; border-radius: 2px;
+  background: var(--accent);
+  transition: height 90ms linear;
+}
+/* Mouth shut, ears shut: flat and faint, because there is no signal to draw. */
+.as-voice.is-thinking .as-wave-bar,
+.as-voice.is-speaking .as-wave-bar { background: var(--faint); }
+
+.as-voice-heard {
+  font-size: var(--text-sm); color: var(--ink);
+  min-height: 1.5em; text-align: center; line-height: 1.5;
+}
+.as-voice.is-listening .as-voice-heard:empty::before { content: ''; }
+
+/* The way in, beside Dictate. */
+.as-voice-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-left: auto;
+  border: 1px solid var(--hairline-strong); border-radius: var(--r-sm);
+  padding: 5px var(--s3); background: none; cursor: pointer;
+  font-size: var(--text-xs); color: var(--muted);
+  transform: translateY(0);
+  transition: border-color var(--t-fast), color var(--t-fast), transform var(--t-fast);
+}
+/* Whichever of the two comes first takes the auto margin; the rest sit beside it. */
+.as-voice-btn ~ .as-mic, .as-voice-btn ~ .as-send { margin-left: 0; }
+.as-voice-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-text); transform: translateY(-1px); }
+.as-voice-btn:active:not(:disabled) { transform: translateY(0); transition-duration: 60ms; }
+.as-voice-btn:disabled { cursor: default; opacity: 0.55; }
+
+@media (prefers-reduced-motion: reduce) {
+  .as-wave-bar { transition: none; }
+}

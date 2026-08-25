@@ -2304,17 +2304,20 @@ await step('assistant: the empty page is a doorway, with none of a chatbot’s f
      attach / search / reason / create an image / summarise / translate. Those
      belong to a general chatbot and not one of them is a thing this app does.
 
-     Dictation was struck from that list on 2026-08-25, on his explicit
-     instruction: "I want to implement it next to the ask button right now."
-     ONLY dictation. Speaking his question is how he uses this app on a phone,
-     and it is the one control here that does something this app actually does.
-     Everything else on the list stays banned, and so does the page growing any
-     OTHER voice furniture, which is why /voice/i and /microphone/i are still
-     here. The mic is asserted present below, so this test still holds a line;
-     it holds a different one. */
+     Dictation was struck from that list on 2026-08-25 and voice mode on
+     2026-08-26, both on his explicit instruction, the second being "I want you
+     to create the hardest thing ever right now, and that's voice mode... the
+     input box changes to some kind of sound waves design".
+
+     Talking to it is now a thing this app does, so the ban cannot cover it.
+     Attach, image, summarise, translate and reason stay banned: those are a
+     general chatbot's furniture and none of them is a thing this app does. Both
+     controls are asserted present below, so this test still holds a line, it
+     holds a different one. */
   const text = await page.locator('.as-page').innerText()
   if (!(await page.locator('.as-ask-foot .as-mic').count())) throw new Error('the dictate button is missing from the ask row')
-  for (const banned of [/voice/i, /microphone/i, /attach/i, /create (an )?image/i, /summari[sz]e/i, /translate/i, /\breason\b/i]) {
+  if (!(await page.locator('.as-ask-foot .as-voice-btn').count())) throw new Error('the voice mode button is missing from the ask row')
+  for (const banned of [/attach/i, /create (an )?image/i, /summari[sz]e/i, /translate/i, /\breason\b/i]) {
     if (banned.test(text)) throw new Error(`the page offers ${banned}: ${JSON.stringify(text.slice(0, 200))}`)
   }
   const audio = await page.evaluate(() =>

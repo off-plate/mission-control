@@ -121,6 +121,10 @@ export const Repeat = make(<><path d="M21 13V11.6C21 8.50721 18.4928 6 15.4 6H4"
 export const Sliders = make(<><line x1="3" y1="16" x2="7" y2="16"/><line x1="10" y1="12" x2="14" y2="12"/><line x1="17" y1="8" x2="21" y2="8"/><path d="M12 4L12 9M12 20L12 15"/><path d="M19 4L19 5M19 20L19 11"/><path d="M5 4L5 13M5 20L5 19"/></>, 16, { k: 1.0944, x: -1.133, y: -1.133 })
 /* hicon: square */
 export const Square = make(<><rect x="4" y="4" width="16" height="16"/></>, 16, { k: 1.2312, x: -2.775, y: -2.775 })
+/* Four bars at speech heights: sound, not a bar chart. BarChart already means
+   data and this means audio, so they stay two icons. Ink 6-18 across, 5-19
+   down, so k = 19.7/14 like the other tall glyphs. */
+export const Waveform = make(<><line x1="6" y1="9" x2="6" y2="15"/><line x1="10" y1="5" x2="10" y2="19"/><line x1="14" y1="7" x2="14" y2="17"/><line x1="18" y1="10" x2="18" y2="14"/></>, 16, { k: 1.4071, x: -4.886, y: -4.886 })
 /* hicon: mic. Fit measured like the rest: ink runs 5.5-18.5 across and 3-21
    down, so k = 19.7/18 and the offsets centre that box. */
 export const Mic = make(<><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"/><line x1="12" y1="18" x2="12" y2="21"/></>, 16, { k: 1.0944, x: -1.133, y: -1.133 })

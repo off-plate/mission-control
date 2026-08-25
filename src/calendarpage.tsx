@@ -90,7 +90,6 @@ export function CalendarPage() {
   const { notes, addNote, setPage, openNote, space } = useStore()
   const { state, reload, reading } = useCalendar()
   const [madeFor, setMadeFor] = useState<string | null>(null)
-  const [range, setRange] = useState<'week' | 'month'>('week')
   const [picked, setPicked] = useState<string | null>(null)
   const today = localDateKey()
   /* The month word is only worth printing when the day is not in the month the
@@ -139,22 +138,26 @@ export function CalendarPage() {
     return [...m.entries()]
   }, [events, minute])
 
-  const weekEnd = useMemo(() => { const d = new Date(); d.setDate(d.getDate() + 6); return localDateKey(d) }, [today])
-  const shown = range === 'week' ? byDay.filter(([day]) => day <= weekEnd) : byDay
 
   /** Jump the column to a day, or to the first one after it that has anything.
-   *  Picking a day past this week widens the column to the month first, so the
-   *  scroll happens in the render that actually contains the section. */
+   *  Everything the feed returned is already on the page, so this only ever
+   *  scrolls; there is no range to widen first. */
   const [jumpTo, setJumpTo] = useState<string | null>(null)
   const goTo = (day: string) => {
     setPicked(day)
-    if (day > weekEnd) setRange('month')
     setJumpTo(day)
   }
   useEffect(() => {
     if (!jumpTo) return
     const target = byDay.find(([d]) => d >= jumpTo)?.[0]
-    if (target) document.getElementById(`cal-${target}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    const el = target ? document.getElementById(`cal-${target}`) : null
+    if (el) {
+      /* Smooth for a short hop, instant for a long one. A month of his days is
+         26,000px, so gliding to the far end took two seconds of everything he
+         owns flying past, which reads as a fault rather than a movement. */
+      const far = Math.abs(el.getBoundingClientRect().top) > window.innerHeight * 2
+      el.scrollIntoView({ block: 'start', behavior: far ? 'auto' : 'smooth' })
+    }
     setJumpTo(null)
   }, [jumpTo, byDay])
 
@@ -209,22 +212,13 @@ export function CalendarPage() {
               ))}
             </div>
 
-            <div className="cal-range" role="group" aria-label="How far ahead">
-              <button className={`cal-rbtn${range === 'week' ? ' is-on' : ''}`} onClick={() => setRange('week')}>Week</button>
-              <button className={`cal-rbtn${range === 'month' ? ' is-on' : ''}`} onClick={() => setRange('month')}>Month</button>
-            </div>
-
             {state.problem && <p className="cal-problem">Last refresh did not land. {state.problem}</p>}
           </aside>
 
           <div className="cal-agenda">
-            {shown.length === 0 && (
-              <div className="empty">
-                {range === 'week' && byDay.length > 0 ? 'Nothing left this week.' : 'Nothing ahead in the next month.'}
-              </div>
-            )}
+            {byDay.length === 0 && <div className="empty">Nothing ahead in the next month.</div>}
 
-            {shown.map(([day, list]) => {
+            {byDay.map(([day, list]) => {
               const [, mm, dd] = day.split('-').map(Number)
               const isToday = day === today
               return (

@@ -39,7 +39,7 @@ export const WIDGET_DEFS: Record<WidgetType, WidgetDef> = {
   },
   finance: {
     type: 'finance', title: 'Money', description: 'Cycle budget and next obligation',
-    supportedSizes: ['M', 'L'], defaultSize: 'M', freshMinutes: 60 * 7, staleAfter: 60 * 26, page: 'money',
+    supportedSizes: ['M', 'L'], defaultSize: 'M', freshMinutes: 60 * 7, staleAfter: 60 * 26, page: 'today',
   },
   habits: {
     type: 'habits', title: 'Habits', description: 'Today’s checkoffs, no guilt attached',
@@ -55,15 +55,15 @@ export const WIDGET_DEFS: Record<WidgetType, WidgetDef> = {
   },
   timesaved: {
     type: 'timesaved', title: 'Time saved', description: 'Estimate minus actual, from your own log',
-    supportedSizes: ['S', 'M'], defaultSize: 'S', freshMinutes: 0, staleAfter: Infinity, page: 'review',
+    supportedSizes: ['S', 'M'], defaultSize: 'S', freshMinutes: 0, staleAfter: Infinity, page: 'plan',
   },
   claude: {
     type: 'claude', title: 'Claude', description: 'Sessions and tokens this week',
-    supportedSizes: ['S', 'M'], defaultSize: 'S', freshMinutes: 32, staleAfter: 60 * 26, page: 'review',
+    supportedSizes: ['S', 'M'], defaultSize: 'S', freshMinutes: 32, staleAfter: 60 * 26, page: 'today',
   },
   social: {
     type: 'social', title: 'Audience', description: 'Followers and last post, entered weekly',
-    supportedSizes: ['M', 'L'], defaultSize: 'M', freshMinutes: 60 * 24 * 9, staleAfter: 60 * 24 * 8, page: 'review',
+    supportedSizes: ['M', 'L'], defaultSize: 'M', freshMinutes: 60 * 24 * 9, staleAfter: 60 * 24 * 8, page: 'today',
   },
   sources: {
     type: 'sources', title: 'Sync health', description: 'Every connected source and its state',
@@ -271,7 +271,7 @@ export const MOCK_ROUTINES: Routine[] = [
     doneStepIds: [],
     steps: [
       { id: 'wr1', title: 'Refill vitamins in the GymBeam box', kind: 'do' },
-      { id: 'wr2', title: 'Review last week: goals and what stayed undone', kind: 'do', note: 'The journal and Mission Control, both.', goto: 'review', gotoLabel: 'Open last week in Reflect' },
+      { id: 'wr2', title: 'Review last week: goals and what stayed undone', kind: 'do', note: 'The journal and Mission Control, both.' },
       { id: 'wr3', title: 'Plan next week’s goals', kind: 'do' },
       { id: 'wr4', title: 'Plan Monday’s tasks', kind: 'do' },
     ],
@@ -280,7 +280,7 @@ export const MOCK_ROUTINES: Routine[] = [
     id: 'r-monthly', space: 'personal', title: 'Monthly review', cadence: 'monthly', habitId: 'h-monthly',
     doneStepIds: [],
     steps: [
-      { id: 'mo0', title: 'Reflect the month', kind: 'do', goto: 'review', gotoLabel: 'Open the month in Reflect' },
+      { id: 'mo0', title: 'Reflect the month', kind: 'do' },
       { id: 'mo1', title: 'Review last month’s goals', kind: 'do' },
       { id: 'mo2', title: 'Plan next month’s goals', kind: 'do' },
       { id: 'mo3', title: 'Review the finances', kind: 'do', note: 'Savings, total spent, total received, debt update.' },
@@ -334,8 +334,6 @@ export const MOCK_SOURCES: SourceState[] = [
   { id: 's7', name: 'Compass', kind: 'money', status: 'off', detail: 'Not connected yet' },
   { id: 's8', name: 'Hevy', kind: 'training', status: 'off', detail: 'Not connected yet' },
 ]
-
-export const MOCK_STATS: { weeklySavedMin: number[]; weeklyAccuracy: number[]; calibration: { category: string; label: string; factor: number; note: string }[] } = { weeklySavedMin: [], weeklyAccuracy: [], calibration: [] }
 
 export interface DecomposedStep { title: string; why?: string; estimateMin: number; category?: 'call' | 'admin' | 'deep' | 'quick' }
 

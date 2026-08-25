@@ -78,7 +78,7 @@ const shortDay = (key: string): string => {
 /* ---------------- TODAY ---------------- */
 
 export function TodayPage() {
-  const { space, tasks, routines, habits, goals, plan, editing, setEditing, setPage, savedMin, todayIndex, review, addTask, deleteTask, moveTaskList, setFocusTaskId, sources, inView } = useStore()
+  const { space, tasks, routines, habits, goals, plan, editing, setEditing, setPage, savedMin, addTask, deleteTask, moveTaskList, setFocusTaskId, inView } = useStore()
   const pomo = usePomodoro()
   const nextEvent = useNextEvent()
   /* The money alert needs Compass, which arrives async. Until it does, `money`
@@ -95,7 +95,6 @@ export function TodayPage() {
   const open = tasks.filter((t) => inView(t.space) && t.list === 'today' && !t.done && (t.plannedOn ?? localDateKey()) === localDateKey())
   const firstMove = useFirstMove()
   const [addOpen, setAddOpen] = useState(false)
-  const reviewDue = todayIndex === 6 && review.lastDoneDate !== localDateKey()
   // Next payment badge derives from the money schedule instead of a hardcoded string.
   const nextPay = MOCK_MONEY?.schedule.find((r) => r.state === 'not sent' || r.state === 'action needed')
   const wins = momentum({ tasks: tasks.filter((t) => inView(t.space)), routines, habits: habits.filter((h) => inView(h.space) && !h.archivedAt) })
@@ -200,7 +199,7 @@ export function TodayPage() {
         </div>
       )}
 
-      {(firstMove || (reviewDue && space === 'personal')) && (
+      {firstMove && (
         <div className="pin-row">
           {firstMove && (
             <div className="firstmove">
@@ -222,13 +221,6 @@ export function TodayPage() {
               </button>
             </div>
           )}
-          {reviewDue && space === 'personal' && (
-            <div className="firstmove" style={{ borderColor: 'var(--accent)' }}>
-              <span className="microcap fm-label">Sunday</span>
-              <span className="fm-title">Weekly reset, 15 minutes</span>
-              <button className="btn btn-primary" onClick={() => setPage('review')}>Start</button>
-            </div>
-          )}
         </div>
       )}
 
@@ -239,15 +231,6 @@ export function TodayPage() {
       </div>
       </div>
 
-      {/* The footer belongs to the page: full width under the day. */}
-      <div className={`status-strip${space === 'work' ? ' is-empty' : ''}`} aria-label="Background numbers">
-        {space === 'personal' && (
-          <button onClick={() => setPage('settings')}><span className="k">sync</span> {sources.filter((x) => x.status === 'connected').length} of {sources.filter((x) => x.status !== 'manual').length} live{sources.some((x) => x.status === 'off') ? `, ${sources.filter((x) => x.status === 'off').map((x) => x.name).join(', ')} paused` : ''}</button>
-        )}
-        {space === 'offplate' && (
-          <button onClick={() => setPage('review')}><span className="k">follower stats</span> entered 9 d ago, stale</button>
-        )}
-      </div>
       {addOpen && <AddWidgetInline onClose={() => setAddOpen(false)} />}
     </div>
   )
@@ -2582,8 +2565,7 @@ export function RoutinesPage() {
                         {s.example && <span className="ex mono">{s.example}</span>}
                         {s.link && <a className="routine-link" href={s.link} target="_blank" rel="noreferrer">{s.linkLabel ?? 'Open'} ↗</a>}
                         {/* A step whose work is a page of this app opens it,
-                            so "review last week" and Reflect stop being two
-                            places asking the same question. */}
+                            rather than describing where to go. */}
                         {s.goto && (
                           <button className="routine-link" onClick={() => setPage(s.goto!)}>{s.gotoLabel ?? 'Open it'}</button>
                         )}

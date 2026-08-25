@@ -219,10 +219,10 @@ export function SectionHead({ label, fact, className = '' }: {
   )
 }
 
-/* A run of choices where exactly one is on. Five of these existed: `.seg`,
-   the achievements tabs, the focus break lengths, the habit kind picker and
-   Plan's today/tomorrow. They differ in size and in whether the choice carries
-   a description, so those are the two props. */
+/* A run of choices where exactly one is on. Several of these existed: `.seg`,
+   the focus break lengths, the habit kind picker and Plan's today/tomorrow.
+   They differ in size and in whether the choice carries a description, so those
+   are the two props. */
 export function Segmented<T extends string>({ value, options, onPick, size = 'md', label, className = '' }: {
   value: T
   options: { id: T; label: string; hint?: string; disabled?: boolean }[]

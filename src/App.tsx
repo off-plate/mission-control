@@ -4,7 +4,6 @@ import { useDockBadge } from './desktop'
 import { SPACE_LABELS } from './mock'
 import { GoalsPage, HabitsPage, PlanPage, TodayPage } from './pages1'
 import { SettingsPage } from './pages2'
-import { AchievementsPage } from './achievements'
 import { NotesPage } from './notes'
 import { DailyReview } from './daily'
 import { BrandPage } from './brand'
@@ -252,9 +251,6 @@ export default function App() {
     return () => window.removeEventListener('mc:new-task', onNewTask)
   }, [])
 
-  /* Every space now has every tab: Money left the menu for Achievements, which
-     is reached from the header and is his regardless of which space he happens
-     to be standing in. */
   const tabs = navFor(view)
 
   /* Signed out, nothing is backed up and the phone shows a different day. That is
@@ -349,7 +345,7 @@ export default function App() {
               reads as the button that starts something, not a place he browses.
               It is a toggle: pressing it again puts him back on the page he
               walked in from, because the room has no close of its own and he
-              was leaving it by pressing Note or Achievements to get out. */}
+              was leaving it by pressing Note to get out. */}
           <button
             className={`btn btn-primary${page === 'zone' ? ' is-on' : ''}`}
             onClick={() => setPage(page === 'zone' ? backFromZone.current : 'zone')}
@@ -382,18 +378,6 @@ export default function App() {
           >
             <Icon.Note size={18} />
             <span className="btn-label">Note</span>
-          </button>
-          {/* Money and Reflect, merged. Both are about looking back at what
-              moved, so they are one destination and it lives up here. */}
-          <button
-            className={`btn btn-ghost hide-phone${['achievements', 'money', 'review', 'stats'].includes(page) ? ' is-on' : ''}`}
-            onClick={() => setPage('achievements')}
-            aria-pressed={['achievements', 'money', 'review', 'stats'].includes(page)}
-            title="Achievements, money and reflection"
-            aria-label="Achievements"
-          >
-            <Icon.Award size={18} />
-            <span className="btn-label">Achievements</span>
           </button>
           {/* Yesterday, on demand. It offers itself once a morning; after that
               it is his to open, from any page, without hunting for a pill. */}
@@ -436,10 +420,6 @@ export default function App() {
         {page === 'plan' && <PlanPage />}
         {(page === 'habits' || page === 'routines') && <HabitsPage />}
         {page === 'goals' && <GoalsPage />}
-        {/* Money and Reflect are faces of Achievements now. Their old
-            addresses still resolve, so a bookmark lands on the merged page
-            rather than on nothing. */}
-        {(page === 'achievements' || page === 'money' || page === 'review' || page === 'stats') && <AchievementsPage />}
         {page === 'focus' && <FocusPage />}
         {page === 'board' && <BoardPage />}
         {page === 'apps' && <AppsPage />}

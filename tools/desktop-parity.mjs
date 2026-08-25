@@ -40,7 +40,7 @@ const setSize = (w, h) => app.evaluate(({ BrowserWindow }, [W, H]) => {
 }, [w, h])
 
 /* Every reachable page, including the redirect aliases. */
-const PAGES = ['today', 'plan', 'habits', 'goals', 'board', 'apps', 'notes', 'settings', 'achievements', 'stats', 'zone', 'review', 'brand', 'routines', 'braindump']
+const PAGES = ['today', 'plan', 'habits', 'goals', 'board', 'apps', 'notes', 'settings', 'achievements', 'money', 'stats', 'zone', 'review', 'brand', 'routines', 'braindump']
 
 await setSize(1440, 940)
 for (const p of PAGES) {

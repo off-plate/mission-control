@@ -19,9 +19,7 @@
    money, no note contents. It is what a colleague glancing at the screen would
    see, and nothing that would be a problem if the model logged it. */
 
-import { getAiKey, groq } from './ai'
-
-const MODEL = 'llama-3.3-70b-versatile'
+import { MODEL, getAiKey, groq } from './ai'
 
 /** What a card shows. The app owns every one of these; the model only names one. */
 export type CardKind =
@@ -79,6 +77,40 @@ Use several cards when the question spans them. Use none if he is just talking.
 "next" holds up to three follow-ups written in HIS voice, as questions he might
 ask next. Reply in the language he wrote in.`
 
+/* The chips under the box. Not "attach", "search", "reason", "create image":
+   those are a general chatbot's furniture and none of them is a thing this app
+   can do. His words: he wants them to be practices that are useful in THIS
+   application. So each one is a question about his own week that the assistant
+   can actually answer from his own log, and pressing one asks it. */
+export const STARTERS: { label: string; ask: string }[] = [
+  { label: 'What is on today', ask: 'What is on my plate today? Show me the day.' },
+  { label: 'What am I avoiding', ask: 'What have I been putting off the longest? Show me the oldest things on the list.' },
+  { label: 'Plan my evening', ask: 'It is evening. What is realistic to finish tonight, and what should wait?' },
+  { label: 'How was my week', ask: 'How did this week actually go? Show me the focus and the habits.' },
+  { label: 'What is next', ask: 'What is coming up in the calendar, and does the day still fit?' },
+  { label: 'Habits today', ask: 'Which habits are still open today?' },
+]
+
+/** The line under the question on the empty page.
+
+ *  Computed HERE, from his own briefing, and never sent to a model. It is the
+ *  proactive half of what he asked for, and it costs no request: opening the
+ *  page should tell him something true immediately, not spin while a model is
+ *  asked what his own log already says. It is also the one place numbers are
+ *  allowed in a sentence, because the app is the one counting. */
+export function opener(b: Brief): string {
+  const open = b.planned.flatMap((s) => s.items).filter((i) => !i.done).length
+  const oldest = b.oldest[0]
+  const bits: string[] = []
+  if (open) bits.push(`${open} thing${open === 1 ? '' : 's'} still open today`)
+  if (b.meetings.length) bits.push(`${b.meetings.length} in the calendar`)
+  if (b.habits.due - b.habits.kept > 0) bits.push(`${b.habits.due - b.habits.kept} habit${b.habits.due - b.habits.kept === 1 ? '' : 's'} not kept yet`)
+  const head = bits.length ? `${bits.join(', ')}.` : 'Nothing on the day yet.'
+  return oldest && oldest.days >= 7
+    ? `${head} "${oldest.title}" has been waiting ${oldest.days} days.`
+    : head
+}
+
 /** The opening move, before he has asked anything. */
 export const OPENING_PROMPT =
   'Open the day. Look at the briefing and tell me what deserves attention first, then show it.'
@@ -99,9 +131,26 @@ export function briefText(b: Brief): string {
   ].join('\n')
 }
 
+/** The first balanced {...} in a blob of text, or null. */
+function firstObject(text: string): string | null {
+  const start = text.indexOf('{')
+  if (start < 0) return null
+  let depth = 0, inStr = false, esc = false
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i]
+    if (esc) { esc = false; continue }
+    if (ch === '\\') { esc = true; continue }
+    if (ch === '"') { inStr = !inStr; continue }
+    if (inStr) continue
+    if (ch === '{') depth++
+    else if (ch === '}') { depth--; if (!depth) return text.slice(start, i + 1) }
+  }
+  return null
+}
+
 export type Outcome =
   | { ok: true; reply: Reply }
-  | { ok: false; reason: 'no-key' | 'rejected' | 'offline' | 'unreadable'; detail?: string }
+  | { ok: false; reason: 'no-key' | 'rejected' | 'offline' | 'unreadable' | 'model-gone'; detail?: string }
 
 /** One turn. `history` is the conversation so far, oldest first. */
 export async function ask(
@@ -117,7 +166,6 @@ export async function ask(
       model: MODEL,
       temperature: 0.3,
       max_tokens: 700,
-      response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: SYSTEM },
         { role: 'system', content: `Today's briefing, read from his own log:\n${briefText(brief)}` },
@@ -129,12 +177,29 @@ export async function ask(
     return { ok: false, reason: 'offline' }
   }
   if (res.status === 401 || res.status === 403) return { ok: false, reason: 'rejected' }
-  if (!res.ok) return { ok: false, reason: 'unreadable', detail: `The model answered ${res.status}.` }
+  if (!res.ok) {
+    /* Say WHAT went wrong, in the provider's own words. The model this app used
+       was retired on 2026-08-16 and every AI feature died at once, silently,
+       because each caller swallowed the error and showed nothing. A dead model
+       answers 404 with a sentence naming itself; that sentence belongs on
+       screen. */
+    let detail = `The model answered ${res.status}.`
+    try {
+      const body = await res.json()
+      const msg = body?.error?.message
+      if (typeof msg === 'string' && msg.trim()) detail = msg.trim()
+    } catch { /* not JSON, keep the status */ }
+    return { ok: false, reason: res.status === 404 ? 'model-gone' : 'unreadable', detail }
+  }
 
   try {
     const data = await res.json()
-    const raw = data?.choices?.[0]?.message?.content ?? ''
-    const parsed = JSON.parse(raw) as Partial<Reply>
+    const raw = String(data?.choices?.[0]?.message?.content ?? '')
+    /* Parsed out of the text rather than trusting a JSON response mode this
+       model does not document. It answers with an object, sometimes wrapped in
+       a fence or a sentence, so the first balanced {...} is taken and the rest
+       ignored. */
+    const parsed = JSON.parse(firstObject(raw) ?? raw) as Partial<Reply>
     const say = typeof parsed.say === 'string' ? parsed.say.trim() : ''
     if (!say) return { ok: false, reason: 'unreadable' }
     /* Anything it invented outside the card vocabulary is dropped rather than

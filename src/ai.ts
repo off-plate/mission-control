@@ -11,7 +11,14 @@
 import type { TaskCategory } from './types'
 
 const KEY_STORE = 'mc-groq-key'
-const MODEL = 'llama-3.3-70b-versatile'
+/* The model, named ONCE for the whole app.
+   llama-3.3-70b-versatile was shut off for free and developer tier on
+   2026-08-16, which silently killed every AI feature here at the same moment:
+   the assistant, /help in Notes, task breakdowns and estimates. Nothing in the
+   app said so, because a dead model answers with an HTTP error that each
+   caller was quietly swallowing.
+   Exported so the next retirement is one line, not three files. */
+export const MODEL = 'openai/gpt-oss-120b'
 const ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions'
 
 export function getAiKey(): string {

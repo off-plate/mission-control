@@ -3,7 +3,7 @@ import { useStore } from './store'
 import { useCalendar } from './calendar'
 import { Band } from './ui'
 import { hasAiKey } from './ai'
-import { ask, OPENING_PROMPT, type Brief, type Card, type Reply } from './assistant'
+import { ask, STARTERS, opener, type Brief, type Card, type Reply } from './assistant'
 import { SLOTS, dueOn, habitsDueToday, goalCurrent, type HabitDef, type Task } from './types'
 import { localDateKey, fmtDuration, goalPeriodKey, goalPeriodRange, type GoalTf } from './util'
 
@@ -199,75 +199,124 @@ export function AssistantPage() {
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const opened = useRef(false)
+  /* A second line that says what to DO about it. An error naming a retired
+     model means nothing to him; "the model this app used was retired, this
+     build already moved to its replacement, reload" is something he can act on. */
+  const [errHint, setErrHint] = useState<string | null>(null)
   const foot = useRef<HTMLDivElement>(null)
 
   const send = async (text: string, silent = false) => {
     if (busy) return
-    setBusy(true); setErr(null)
+    setBusy(true); setErr(null); setErrHint(null)
     if (!silent) setTurns((t) => [...t, { who: 'you', text }])
     const history = turns.map((t) => ({ role: (t.who === 'you' ? 'user' : 'assistant') as 'user' | 'assistant', content: t.text }))
     const out = await ask(text, brief, history)
-    if (out.ok) setTurns((t) => [...t, { who: 'it', text: out.reply.say, reply: out.reply }])
-    else setErr(
-      out.reason === 'no-key' ? 'No Groq key yet. Add one in Settings and this can answer.'
-        : out.reason === 'rejected' ? 'That Groq key was rejected. Check it in Settings.'
-          : out.reason === 'offline' ? 'Could not reach the model.'
-            : out.detail ?? 'The answer came back unreadable.',
-    )
+    if (out.ok) {
+      setTurns((t) => [...t, { who: 'it', text: out.reply.say, reply: out.reply }])
+    } else {
+      setErr(
+        out.reason === 'no-key' ? 'No Groq key yet.'
+          : out.reason === 'rejected' ? 'That Groq key was rejected.'
+            : out.reason === 'offline' ? 'Could not reach the model.'
+              : out.detail ?? 'The answer came back unreadable.',
+      )
+      setErrHint(
+        out.reason === 'no-key' ? 'Add one in Settings. It is free and it stays on this device.'
+          : out.reason === 'rejected' ? 'Check it in Settings, or generate a new one at console.groq.com.'
+            : out.reason === 'model-gone' ? 'The model this app used was retired. This build already moved to its replacement, so reload the page.'
+              : out.reason === 'offline' ? 'Check the connection and ask again.'
+                : 'Ask again, or rephrase it.',
+      )
+    }
     setBusy(false)
   }
 
-  /* It speaks first. Opening on an empty box would hand him the decision of
-     what to ask, and deciding is the thing he came here to be helped with. */
-  useEffect(() => {
-    if (opened.current || !hasAiKey()) return
-    opened.current = true
-    void send(OPENING_PROMPT, true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
   useEffect(() => { foot.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }) }, [turns, busy])
 
+  const empty = turns.length === 0 && !busy && !err
+
   return (
-    <div className="page as-page">
-      <Band title="Assistant" />
-      {!hasAiKey() && (
-        <div className="empty">No Groq key yet. Add one in Settings and this page can answer.</div>
+    <div className={`page as-page${empty ? ' is-empty' : ''}`}>
+      {/* Before he has asked anything the page is a doorway, not a transcript:
+          one mark, one question, one box. Once he asks, the hero gets out of
+          the way and the thread takes the room. */}
+      {empty && (
+        <div className="as-hero">
+          <span className="as-orb" aria-hidden="true" />
+          <h1 className="as-hero-q">What can I help with?</h1>
+          {/* Something true the moment the page opens, counted by the app, not
+              asked of a model. This is the only sentence here allowed to carry
+              numbers, because the app is the thing doing the counting. */}
+          <p className="as-hero-now">{opener(brief)}</p>
+        </div>
       )}
-      <div className="as-thread">
-        {turns.map((t, i) => (
-          <div className={`as-turn is-${t.who}`} key={i}>
-            <p className="as-said">{t.text}</p>
-            {t.reply?.show.map((c, k) => (
-              <section className="as-card" key={k}>
-                <span className="microcap">{TITLES[c.kind]}</span>
-                <CardBody kind={c.kind} />
-              </section>
-            ))}
-            {t.reply?.next && t.reply.next.length > 0 && (
-              <div className="as-next">
-                {t.reply.next.map((n, k) => (
-                  <button className="btn btn-quiet" key={k} onClick={() => void send(n)}>{n}</button>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-        {busy && <p className="as-thinking">Reading your day.</p>}
-        {err && <p className="as-error">{err}</p>}
-        <div ref={foot} />
-      </div>
+
+      {!empty && (
+        <div className="as-thread">
+          {turns.map((t, i) => (
+            <div className={`as-turn is-${t.who}`} key={i}>
+              <p className="as-said">{t.text}</p>
+              {t.reply?.show.map((c, k) => (
+                <section className="as-card" key={k}>
+                  <span className="microcap">{TITLES[c.kind]}</span>
+                  <CardBody kind={c.kind} />
+                </section>
+              ))}
+              {t.reply?.next && t.reply.next.length > 0 && (
+                <div className="as-next">
+                  {t.reply.next.map((n, k) => (
+                    <button className="as-chip" key={k} onClick={() => void send(n)}>{n}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+          {busy && <p className="as-thinking">Reading your day.</p>}
+          {err && (
+            <div className="as-error">
+              <p>{err}</p>
+              {errHint && <p className="as-error-hint">{errHint}</p>}
+            </div>
+          )}
+          <div ref={foot} />
+        </div>
+      )}
+
       <form
         className="as-ask"
         onSubmit={(e) => { e.preventDefault(); const t = q.trim(); if (t) { setQ(''); void send(t) } }}
       >
-        <input
-          className="textinput" value={q} placeholder="Ask about your day"
+        <textarea
+          className="as-input"
+          value={q}
+          rows={1}
+          placeholder="Ask anything about your week"
           aria-label="Ask the assistant"
           onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              const t = q.trim(); if (t) { setQ(''); void send(t) }
+            }
+          }}
         />
-        <button className="btn btn-primary" disabled={busy || !q.trim()}>Ask</button>
+        <div className="as-ask-foot">
+          <span className="as-hint">Enter sends. Shift and Enter for a new line.</span>
+          <button className="btn btn-primary as-send" disabled={busy || !q.trim()}>Ask</button>
+        </div>
       </form>
+
+      {/* Not attach, search, reason, create an image. Those are a general
+          chatbot's furniture and none of them is a thing this app does. These
+          are questions about his own week, and each one is answerable from his
+          own log. */}
+      {empty && (
+        <div className="as-starters">
+          {STARTERS.map((s2) => (
+            <button className="as-chip" key={s2.label} onClick={() => void send(s2.ask)}>{s2.label}</button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

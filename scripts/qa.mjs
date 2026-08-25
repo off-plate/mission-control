@@ -143,14 +143,15 @@ await step('focus: timer start writes state', async () => {
   if (p.phase !== 'focus') throw new Error(`phase ${p.phase}`)
   await page.locator('.focus-live').getByRole('button', { name: 'Stop' }).click()
 })
-await step('the menu is six tabs, and what left it is reachable from the header', async () => {
+await step('the menu is seven tabs, and what left it is reachable from the header', async () => {
   /* Five since Routines became a folder inside Habits (his instruction,
-     2026-08-11); six since Apps joined after Why's (his instruction,
-     2026-08-23). The retired addresses still have to resolve, which is
-     asserted below with the other retired ones. */
+     2026-08-11); six since Apps joined after Why's (2026-08-23); seven since
+     the Assistant got a page of its own (2026-08-25). The retired addresses
+     still have to resolve, which is asserted below with the other retired
+     ones. */
   await fresh('today')
   const tabs = await page.locator('.nav-tab').allInnerTexts()
-  if (tabs.length !== 6) throw new Error(`${tabs.length} tabs: ${tabs.join(', ')}`)
+  if (tabs.length !== 7) throw new Error(`${tabs.length} tabs: ${tabs.join(', ')}`)
   if (!tabs.some((t) => /apps/i.test(t))) throw new Error('Apps is not a tab')
   if (tabs.some((t) => /routines/i.test(t))) throw new Error('Routines is still a tab')
   /* Calendar left this list when it became a real page. It is still not a tab
@@ -167,7 +168,10 @@ await step('the menu is six tabs, and what left it is reachable from the header'
     }
   }
   // Every old address still lands somewhere real.
-  for (const [route, heading] of [['coach', 'Today'], ['assistant', 'Today'], ['money', 'Money'], ['review', 'Reflect']]) {
+  /* 'assistant' left this list when it became a real page of its own. It used
+     to be a dead address walking to Today, back when the assistant was a rail
+     that was removed. */
+  for (const [route, heading] of [['coach', 'Today'], ['money', 'Money'], ['review', 'Reflect']]) {
     await page.goto(`${URL}#/${route}`); await page.reload(); await page.waitForTimeout(500)
     const h1 = await page.locator('h1').first().innerText()
     if (h1 !== heading) throw new Error(`#/${route} landed on ${h1}, not ${heading}`)

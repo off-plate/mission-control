@@ -2917,6 +2917,12 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
    22px removes the question: the control and the line it sits on are the same
    whole number of pixels, so there is nothing left to round apart. */
 .today-task, .todo-row { align-items: flex-start; --line: 22px; }
+/* A quarter pixel, measured rather than guessed: a sweep from -3px to +1.5px
+   against the text's own x-height centre (the band the eye actually aligns to,
+   not the full ascender-to-descender extent) put the zero at +0.25. It is
+   below what anyone can see on its own, and it is the difference between
+   "close" and "right". */
+.today-task > .checkbox, .todo-row > .checkbox { margin-top: 0.25px; }
 .today-task > *, .todo-row > * {
   min-height: var(--line);
   display: inline-flex;
@@ -4608,3 +4614,52 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .btn-helmet:hover .helmet { opacity: 1; }
 .helmet.lit { opacity: 1; }
 .shell.is-hud .btn-helmet { color: var(--accent-text); }
+
+/* ---------- Assistant ----------
+   A conversation that draws real cards. The talking is quiet furniture; the
+   cards are the app's own components, so they look like the rest of the app
+   because they ARE the rest of the app. */
+.as-page { max-width: 900px; }
+.as-thread { display: flex; flex-direction: column; gap: var(--s5); margin-top: var(--s4); }
+.as-turn.is-you .as-said {
+  align-self: flex-end; max-width: 62ch; margin-left: auto;
+  background: var(--surface-2); border-radius: var(--r-md);
+  padding: var(--s2) var(--s4); font-size: var(--text-sm);
+}
+.as-turn.is-it .as-said { font-size: var(--text-base); line-height: 1.55; max-width: 68ch; }
+.as-card {
+  margin-top: var(--s3); padding: var(--s4);
+  border: 1px solid var(--hairline-strong); border-radius: var(--r-sm);
+  background: var(--surface);
+}
+.as-list { display: flex; flex-direction: column; gap: var(--s1); margin-top: var(--s2); }
+.as-list > div + div { margin-top: var(--s3); }
+.as-row {
+  display: flex; align-items: flex-start; gap: var(--s3);
+  padding: var(--s2) 0; border-top: 1px solid var(--hairline);
+  --line: 22px; width: 100%; text-align: left; background: none;
+}
+.as-row > * { min-height: var(--line); display: inline-flex; align-items: center; }
+.as-row > .as-row-title { display: block; }
+.as-row:first-of-type { border-top: none; }
+.as-row.is-done .as-row-title { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
+.as-row-title { flex: 1; min-width: 0; font-size: var(--text-sm); }
+.as-row-min { flex: none; font-size: var(--text-xs); color: var(--faint); white-space: nowrap; }
+.as-link { cursor: pointer; }
+.as-link:hover .as-row-title { color: var(--accent-text); }
+.as-empty { font-size: var(--text-sm); color: var(--muted); margin-top: var(--s2); }
+.as-next { display: flex; gap: var(--s2); flex-wrap: wrap; margin-top: var(--s3); }
+.as-thinking { font-size: var(--text-sm); color: var(--faint); font-style: italic; }
+.as-error { font-size: var(--text-sm); color: var(--alert); }
+/* The ask bar floats over the thread, so the thread has to end above it rather
+   than under it: a follow-up hidden behind the box that asks for follow-ups is
+   the worst place to put one. The extra room on the right keeps it clear of
+   the focus pill in the corner. */
+.as-thread { padding-bottom: 84px; }
+.as-ask {
+  display: flex; gap: var(--s2); position: sticky; bottom: var(--s4);
+  margin-top: var(--s5); padding: var(--s3) 0;
+  background: linear-gradient(var(--bg) 65%, transparent);
+}
+.as-ask .textinput { flex: 1; }
+@media (min-width: 900px) { .as-ask { padding-right: 210px; } }

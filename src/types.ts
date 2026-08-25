@@ -42,6 +42,9 @@ export type PageId =
   | 'zone'
   /** The work calendar, read from the feed. Big Time only: see NAV. */
   | 'calendar'
+  /** The assistant: asks about the day, and shows real cards rather than
+   *  writing numbers into a sentence. */
+  | 'assistant'
 
 export type WidgetType =
   | 'clock'

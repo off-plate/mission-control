@@ -4596,10 +4596,68 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .cal-next { color: var(--accent-text); font-weight: 600; }
 .cal-past { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
 
-/* ---------- Calendar ---------- */
-.cal-day + .cal-day { margin-top: var(--s6); }
+/* ---------- Calendar ----------
+   A month to point at on the left, the days themselves on the right. The grid
+   is an index, not the calendar: it never shows a meeting, only that a day has
+   one, which is what keeps it small enough to sit beside the real list rather
+   than replacing it. */
+.cal-split {
+  display: grid; grid-template-columns: 264px minmax(0, 880px);
+  gap: var(--s10); align-items: start;
+}
+.cal-rail { position: sticky; top: var(--s4); display: flex; flex-direction: column; gap: var(--s4); }
+
+.cal-mhead { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
+.cal-mname { font-family: var(--font-display); font-size: var(--text-base); color: var(--ink); }
+.cal-step {
+  width: 30px; height: 30px; padding: 0; line-height: 1; font-size: 1.125rem;
+  background: none; border: 1px solid var(--hairline); border-radius: var(--r-sm);
+  color: var(--muted); cursor: pointer; transition: color var(--t-fast), border-color var(--t-fast);
+}
+.cal-step:hover { color: var(--ink); border-color: var(--hairline-strong); }
+
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal-wd {
+  font-size: 0.6875rem; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--faint); text-align: center; padding-bottom: var(--s2);
+}
+.cal-cell {
+  position: relative; aspect-ratio: 1 / 1; display: grid; place-items: center;
+  padding: 0; background: none; border: 1px solid transparent; border-radius: var(--r-sm);
+  cursor: pointer; transition: border-color var(--t-fast);
+}
+.cal-cell-n { font-size: var(--text-xs); color: var(--ink); font-variant-numeric: tabular-nums; }
+.cal-cell.is-out .cal-cell-n { color: var(--faint); }
+.cal-cell:hover { border-color: var(--hairline-strong); }
+/* A day that has something in it. A dot, because the grid's job is to say
+   where to look, and a count here would be a second agenda competing with the
+   real one. */
+.cal-cell.has-events::after {
+  content: ''; position: absolute; bottom: 4px;
+  width: 3px; height: 3px; border-radius: 50%; background: var(--accent);
+}
+.cal-cell.is-picked { border-color: var(--hairline-strong); }
+.cal-cell.is-today { background: var(--accent); }
+.cal-cell.is-today .cal-cell-n { color: var(--accent-ink); font-weight: 600; }
+.cal-cell.is-today.has-events::after { background: var(--accent-ink); }
+
+.cal-range { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--hairline); border-radius: var(--r-sm); overflow: hidden; }
+.cal-rbtn {
+  padding: 7px 0; background: none; border: 0; font: inherit; font-size: var(--text-xs);
+  color: var(--muted); cursor: pointer;
+}
+.cal-rbtn + .cal-rbtn { border-left: 1px solid var(--hairline); }
+.cal-rbtn.is-on { background: var(--surface-2); color: var(--ink); font-weight: 600; }
+.cal-problem { font-size: var(--text-xs); color: var(--warn); margin: 0; }
+
+.cal-agenda { display: flex; flex-direction: column; gap: var(--s8); }
+/* The grid scrolls the column to a day, and a sticky header would otherwise
+   land on top of the day it just jumped to. */
+.cal-day { scroll-margin-top: var(--s10); }
 .cal-day-head { display: flex; align-items: baseline; gap: var(--s3); padding-bottom: var(--s2); border-bottom: 1px solid var(--hairline-strong); }
+.cal-day-num { font-family: var(--font-display); font-size: var(--text-xl); line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
 .cal-day-name { font-family: var(--font-display); font-size: var(--text-lg); color: var(--ink); }
+.cal-day-mon { font-size: var(--text-xs); color: var(--faint); }
 .cal-day-count { font-size: var(--text-xs); color: var(--faint); margin-left: auto; }
 .cal-rows { display: flex; flex-direction: column; }
 .cal-row {
@@ -4613,6 +4671,21 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .cal-people { font-size: var(--text-xs); color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cal-do { display: flex; align-items: center; gap: var(--s3); white-space: nowrap; }
 .cal-written { font-size: 0.625rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--progress); }
+/* The one running now, and the one that finished within the hour it is still
+   shown for. Weight and colour do the work; nothing moves. */
+.cal-row.is-now .cal-title, .cal-row.is-now .cal-when { color: var(--accent-text); font-weight: 600; }
+.cal-now { font-size: 0.625rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent-text); }
+.cal-row.is-past .cal-title, .cal-row.is-past .cal-when, .cal-row.is-past .cal-people { color: var(--faint); }
+.cal-ago { font-size: 0.625rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
+
+/* On a phone there is no left and right, and the list is the thing he opened
+   the page for. The month grid keeps its job, jumping to a day, from below it. */
+@media (max-width: 900px) {
+  .cal-split { grid-template-columns: 1fr; gap: var(--s8); }
+  .cal-rail { position: static; order: 2; }
+  .cal-agenda { order: 1; }
+  .cal-grid { max-width: 360px; }
+}
 @media (max-width: 700px) {
   .cal-row { grid-template-columns: 1fr; gap: var(--s1); }
   .cal-do { margin-top: var(--s2); }

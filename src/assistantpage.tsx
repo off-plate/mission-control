@@ -9,6 +9,10 @@ import {
   cancel as cancelDictation, dictateState, dictationAvailable, dictationEngine,
   stop as stopDictation, subscribe as subscribeDictation, toggle as toggleDictation,
 } from './dictation'
+import {
+  enter as enterVoice, exit as exitVoice, subscribe as subscribeVoice,
+  voiceHeard, voiceLevel, voiceModeAvailable, voicePhase,
+} from './voicemode'
 import { SLOTS, dueOn, habitsDueToday, goalCurrent, type HabitDef, type PageId, type SpaceId, type Task } from './types'
 import { localDateKey, fmtDuration, goalPeriodKey, goalPeriodRange, type GoalTf } from './util'
 import * as Icon from './icons'
@@ -484,6 +488,58 @@ function Dictate({ base, onText, busy }: { base: string; onText: (t: string) => 
   )
 }
 
+/* Voice mode, in the place the ask box was.
+
+   Not a takeover screen. The thread behind it does not move and every question
+   and answer lands in it as an ordinary turn, so what he said is still there to
+   read afterwards. Only the box changes shape.
+
+   The bars are a real reading. `voiceLevel()` is the RMS of the microphone
+   right now, kept as a short history so the wave travels left as he talks. When
+   the microphone is shut, during thinking and speaking, the bars go flat and
+   dim, because inventing motion there would be drawing a signal that does not
+   exist. */
+const BARS = 96
+
+function VoicePanel({ onExit }: { onExit: () => void }): JSX.Element {
+  const [, bump] = useState(0)
+  const history = useRef<number[]>(Array.from({ length: BARS }, () => 0))
+  useEffect(() => subscribeVoice(() => {
+    const h = history.current
+    h.push(voiceLevel())
+    if (h.length > BARS) h.shift()
+    bump((n) => n + 1)
+  }), [])
+
+  const phase = voicePhase()
+  const heard = voiceHeard()
+  const live = phase === 'listening'
+  const said = phase === 'thinking' ? 'Thinking' : phase === 'speaking' ? 'Reading it out' : 'Listening'
+
+  return (
+    <div className={`as-voice is-${phase}`}>
+      <div className="as-voice-head">
+        <span className="as-voice-state">{said}</span>
+        <button type="button" className="as-voice-exit" onClick={onExit}>Done</button>
+      </div>
+      {/* aria-hidden: the bars are the state made visible, and the state is
+          already announced in words beside them. */}
+      <div className="as-wave" aria-hidden="true">
+        {history.current.map((v, i) => (
+          <span
+            key={i}
+            className="as-wave-bar"
+            style={{ height: `${live ? 6 + Math.min(1, v) * 94 : 4}%` }}
+          />
+        ))}
+      </div>
+      <p className="as-voice-heard" aria-live="polite">
+        {heard || (live ? 'Say something.' : '\u00a0')}
+      </p>
+    </div>
+  )
+}
+
 interface Turn { who: 'you' | 'it'; text: string; reply?: Reply; done?: Done[] }
 
 export function AssistantPage() {
@@ -510,8 +566,10 @@ export function AssistantPage() {
   const foot = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLTextAreaElement>(null)
 
-  const send = async (text: string) => {
-    if (busy) return
+  /* Returns the answer's words. The button ignores them and voice mode reads
+     them out; an empty string means there was nothing to say. */
+  const send = async (text: string): Promise<string> => {
+    if (busy) return ''
     setBusy(true); setErr(null); setErrHint(null); setLive('')
     setTurns((t) => [...t, { who: 'you', text }])
     const history = turns.map((t) => ({ role: (t.who === 'you' ? 'user' : 'assistant') as 'user' | 'assistant', content: t.text }))
@@ -543,6 +601,7 @@ export function AssistantPage() {
     }
     setBusy(false); setLive('')
     box.current?.focus()
+    return out.ok ? out.reply.say : ''
   }
 
   useEffect(() => { foot.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }) }, [turns, busy])
@@ -561,7 +620,23 @@ export function AssistantPage() {
      wanted back in the box that is about to be cleared. */
   const submit = () => { const t = q.trim(); if (t) { cancelDictation(); setQ(''); void send(t) } }
 
-  const askBox = (
+  const [voice, setVoice] = useState(false)
+  /* Voice mode drives the SAME send as the button, so a spoken question is an
+     ordinary turn in the thread and the answer it reads out is the answer he
+     can also see. */
+  const startVoice = async () => {
+    cancelDictation()
+    setQ('')
+    setVoice(true)
+    const ok = await enterVoice((text) => send(text))
+    if (!ok) setVoice(false)
+  }
+  const endVoice = () => { exitVoice(); setVoice(false); box.current?.focus() }
+  /* Leaving the page hangs up. A microphone left open on a page he has walked
+     away from is the worst bug this feature could have. */
+  useEffect(() => exitVoice, [])
+
+  const askBox = voice ? <VoicePanel onExit={endVoice} /> : (
     <form className="as-ask" onSubmit={(e) => { e.preventDefault(); submit() }}>
       <textarea
         ref={box}
@@ -577,6 +652,15 @@ export function AssistantPage() {
       />
       <div className="as-ask-foot">
         <span className="as-hint">Enter sends. Shift and Enter for a new line.</span>
+        {voiceModeAvailable() ? (
+          <button
+            type="button" className="as-voice-btn" onClick={() => void startVoice()} disabled={busy}
+            title="Talk to it, and it talks back. It keeps listening until you are done."
+          >
+            <Icon.Waveform size={15} />
+            <span className="as-mic-text">Voice</span>
+          </button>
+        ) : null}
         <Dictate base={q} onText={setQ} busy={busy} />
         <button className="btn btn-primary as-send" disabled={busy || !q.trim()}>Ask</button>
       </div>

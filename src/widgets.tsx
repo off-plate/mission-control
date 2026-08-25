@@ -181,7 +181,7 @@ const TasksBody = memo(function TasksBody({ space, size }: { space: SpaceId; siz
               }}
             >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                <path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <path d="M2 5.65 5 8.65 10 2.15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
             </button>
             <span className={`cat-dot ${t.category}`} title={t.category} aria-hidden="true" />

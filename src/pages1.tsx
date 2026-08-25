@@ -655,7 +655,7 @@ function RoutineOnDay({ routine, day }: { routine: Routine; day?: string }) {
           onClick={() => setRoutineDone(routine.id, !complete)}
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-            <path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            <path d="M2 5.65 5 8.65 10 2.15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>
         </button>
         <span className="grow wrap2">{routine.title}</span>
@@ -1189,7 +1189,7 @@ export function PlanPage() {
                               setLogging(t.id)
                             }}
                           >
-                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 5.65 5 8.65 10 2.15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
                           </button>
                           <span className={`cat-dot ${t.category}`} aria-hidden="true" />
                           <span className="grow wrap2"><Linkify text={t.title} /></span>
@@ -1312,7 +1312,7 @@ export function PlanPage() {
               {doneUnsorted.map((t) => (
                 <div className="today-task done" key={t.id} data-task-id={t.id}>
                   <button className="checkbox" role="checkbox" aria-checked aria-label={`Reopen: ${t.title}`} onClick={() => toggleTask(t.id)}>
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 5.65 5 8.65 10 2.15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
                   </button>
                   <span className={`cat-dot ${t.category}`} aria-hidden="true" />
                   <span className="grow">{t.title}</span>
@@ -1731,7 +1731,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
               }
               onClick={() => { if (drivenBy) { if (i < todayIndex) assertRoutineDay(h.id, i) } else toggleHabitDay(h.id, i) }}
             >
-              <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 5.65 5 8.65 10 2.15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
             </button>
           </span>
         ))}
@@ -2512,7 +2512,7 @@ export function RoutinesPage() {
                           disabled={stepLocked(r, next.id)}
                           onClick={() => toggleRoutineStep(r.id, next.id)}
                         >
-                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 5.65 5 8.65 10 2.15" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                         </button>
                       )}
                       <span className="routine-step-body">
@@ -2575,7 +2575,7 @@ export function RoutinesPage() {
                         <span className="routine-check is-blank" aria-hidden="true" />
                       ) : (
                         <button className="routine-check" role="checkbox" aria-checked={checked} aria-label={s.title} onClick={() => toggleRoutineStep(r.id, s.id)}>
-                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 5.65 5 8.65 10 2.15" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                         </button>
                       )}
                       <span className="routine-step-body">
@@ -2946,7 +2946,7 @@ function PeriodTasks({ tf, periodKey }: { tf: GoalTimeframe; periodKey: string }
             aria-label={`${t.title}, ${t.done ? 'done' : 'not done'}`}
             onClick={() => toggleTask(t.id)}
           >
-            {t.done && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+            {t.done && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 5.65 5 8.65 10 2.15" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
           </button>
           <SpaceMark space={t.space} />
           <span className="grow">{t.title}</span>
@@ -3093,7 +3093,7 @@ export function GoalsPage() {
                               aria-label={`${m.label}, ${m.done ? 'done' : 'not done'}`}
                               onClick={() => toggleGoalMilestone(g.id, m.id)}
                             >
-                              {m.done && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                              {m.done && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 5.65 5 8.65 10 2.15" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                             </button>
                             <span>{m.label}</span>
                           </li>

@@ -5085,3 +5085,25 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 @media (prefers-reduced-motion: reduce) {
   .as-wave-bar { transition: none; }
 }
+
+/* Morning brief: the one thing he does most mornings, so it is the only filled
+   control on the page. It sits above the ask box because the box is what you
+   use when you have a question, and this is for when you do not have one yet. */
+.as-brief {
+  /* .as-open is a plain block, so align-self had nothing to align against.
+     fit-content plus auto margins is what actually centres it under the hero. */
+  display: flex; align-items: center; justify-content: center; gap: var(--s2);
+  width: fit-content; margin: 0 auto var(--s4);
+  border: 1px solid var(--accent); border-radius: var(--r-sm);
+  background: var(--accent); color: var(--accent-ink);
+  padding: var(--s3) var(--s5);
+  font-size: var(--text-base); font-weight: 500;
+  cursor: pointer;
+  transform: translateY(0);
+  transition: background var(--t-fast), transform var(--t-fast);
+}
+/* The app's own hover for a filled accent control, not a fade. A half-faded
+   accent fill already read as "broken" once on the pages where it is the only
+   colour, which is why btn-primary darkens instead. */
+.as-brief:hover { background: var(--accent-hover); transform: translateY(-1px); }
+.as-brief:active { transform: translateY(0); transition-duration: 60ms; }

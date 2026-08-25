@@ -13,6 +13,7 @@ import {
   enter as enterVoice, exit as exitVoice, subscribe as subscribeVoice,
   voiceHeard, voiceLevel, voiceModeAvailable, voicePhase,
 } from './voicemode'
+import { getWeather, weatherLine } from './weather'
 import { SLOTS, dueOn, habitsDueToday, goalCurrent, type HabitDef, type PageId, type SpaceId, type Task } from './types'
 import { localDateKey, fmtDuration, goalPeriodKey, goalPeriodRange, type GoalTf } from './util'
 import * as Icon from './icons'
@@ -59,8 +60,16 @@ function useSplit(): boolean {
 }
 
 function useBrief(): Brief {
-  const { tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, slips } = useStore()
+  const { tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, slips, plan } = useStore()
   const { state: cal } = useCalendar()
+  /* Fetched once when the page opens. It is a garnish on the brief, so it never
+     blocks anything and a failure just means no weather line. */
+  const [sky, setSky] = useState<string | null>(null)
+  useEffect(() => {
+    let live = true
+    void getWeather().then((w) => { if (live && w) setSky(weatherLine(w)) })
+    return () => { live = false }
+  }, [])
   return useMemo(() => {
     const day = localDateKey()
     /* No inView. The briefing is his whole life, because he asked the whole
@@ -96,6 +105,16 @@ function useBrief(): Brief {
       habits: { due, kept, open: open.slice(0, 6) },
       meetings,
       focusToday: focusSessions.filter((f) => f.day === day).reduce((a, f) => a + f.minutes, 0),
+      /* NOT `plannedOn === yesterday`. The rollover has already swept these
+         into the backlog and cleared plannedOn by the time this runs, so that
+         filter finds an empty set every single time and the leftovers never
+         reach the model. daily.tsx carries the same warning, having been caught
+         by it first. plan.returnedIds is where they went. */
+      unfinishedYesterday: (plan.returnedOn === day
+        ? tasks.filter((t) => new Set(plan.returnedIds ?? []).has(t.id) && !t.done && t.list !== 'today')
+        : []
+      ).slice(0, 12).map((t) => ({ title: t.title, space: label(t.space) })),
+      weather: sky,
       goals: goals.filter((g) => !g.closed).slice(0, 4).map((g) => {
         const tf = (g.timeframe ?? 'quarter') as GoalTf
         const range = goalPeriodRange(tf, g.periodKey ?? goalPeriodKey(tf))
@@ -103,7 +122,7 @@ function useBrief(): Brief {
         return { name: g.name, pct: g.target > 0 ? Math.round((cur / g.target) * 100) : 0 }
       }),
     }
-  }, [tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, slips, cal])
+  }, [tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, slips, cal, sky, plan])
 }
 
 /* ---- the cards ----
@@ -499,6 +518,12 @@ function Dictate({ base, onText, busy }: { base: string; onText: (t: string) => 
    the microphone is shut, during thinking and speaking, the bars go flat and
    dim, because inventing motion there would be drawing a signal that does not
    exist. */
+/* His words, not a prompt. It is written as he would say it so the answer comes
+   back in the same register, and so the turn in the thread reads like something
+   he asked rather than something the app injected. */
+const BRIEF_ASK = 'Give me my morning brief. What is it like out, what is on today, '
+  + 'and what did I not finish yesterday?'
+
 const BARS = 96
 
 function VoicePanel({ onExit }: { onExit: () => void }): JSX.Element {
@@ -624,11 +649,11 @@ export function AssistantPage() {
   /* Voice mode drives the SAME send as the button, so a spoken question is an
      ordinary turn in the thread and the answer it reads out is the answer he
      can also see. */
-  const startVoice = async () => {
+  const startVoice = async (opening?: string) => {
     cancelDictation()
     setQ('')
     setVoice(true)
-    const ok = await enterVoice((text) => send(text))
+    const ok = await enterVoice((text) => send(text), opening)
     if (!ok) setVoice(false)
   }
   const endVoice = () => { exitVoice(); setVoice(false); box.current?.focus() }
@@ -681,6 +706,16 @@ export function AssistantPage() {
                 numbers, because the app is the thing doing the counting. */}
             <p className="as-hero-now">{opener(brief)}</p>
           </div>
+          {/* The one thing he came here to do most mornings, so it is the one
+              thing that looks like a button rather than a suggestion. It opens
+              voice mode and asks for him, because at eight in the morning the
+              ask is the friction. */}
+          {voiceModeAvailable() ? (
+            <button className="as-brief" onClick={() => void startVoice(BRIEF_ASK)}>
+              <Icon.Waveform size={18} />
+              Morning brief
+            </button>
+          ) : null}
           {askBox}
           {/* Not attach, search, reason, create an image. Those are a general
               chatbot's furniture and none of them is a thing this app does.

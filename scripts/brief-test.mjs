@@ -1,0 +1,128 @@
+/* The morning brief: the button, and what the model is actually told.
+     node scripts/brief-test.mjs [baseUrl]
+
+   The valuable half is the second one. The button is easy to see working; what
+   is easy to get wrong is the briefing quietly losing the weather or yesterday's
+   leftovers, in which case the brief still "works" and is simply useless. So the
+   Groq request body is captured and read. */
+import { chromium } from 'playwright'
+const URL = process.argv[2] || 'http://localhost:4191/mission-control'
+const fails = []
+const ok = (n, c, d = '') => { console.log(`${c ? 'PASS' : 'FAIL'}  ${n}${d ? '  (' + d + ')' : ''}`); if (!c) fails.push(n) }
+
+const REPLY = { say: 'Morning Michael. Start with the VZP letter.', show: [{ kind: 'today' }, { kind: 'backlog' }], next: ['Put it on the morning'] }
+const b = await chromium.launch()
+const page = await b.newPage()
+let sent = null
+
+await page.addInitScript(() => {
+  class F { start() { window.__rec = this } stop() { this.onend && this.onend() } abort() {} }
+  window.SpeechRecognition = F; window.webkitSpeechRecognition = F
+  navigator.mediaDevices = navigator.mediaDevices || {}
+  navigator.mediaDevices.getUserMedia = async () => ({ getTracks: () => [{ stop() {} }] })
+  window.__spoken = []
+  speechSynthesis.speak = (u) => { window.__spoken.push(u.text); setTimeout(() => u.onend && u.onend(), 300) }
+  speechSynthesis.cancel = () => {}
+})
+// A known sky, so the assertion is about plumbing and not about the weather.
+await page.route('**/api.open-meteo.com/**', (r) => r.fulfill({
+  status: 200, contentType: 'application/json',
+  body: JSON.stringify({
+    current: { temperature_2m: 7.4, apparent_temperature: 4.1, weather_code: 3 },
+    daily: { temperature_2m_max: [12.2], temperature_2m_min: [5.0], precipitation_probability_max: [55] },
+  }),
+}))
+await page.route('**/api.groq.com/openai/v1/chat/completions', (r) => {
+  const body = r.request().postData() || '{}'
+  sent = body
+  let st = false
+  try { st = JSON.parse(body).stream === true } catch { /* default */ }
+  if (st) {
+    const j = JSON.stringify(REPLY); let x = ''
+    for (let i = 0; i < j.length; i += 24) x += `data: ${JSON.stringify({ choices: [{ delta: { content: j.slice(i, i + 24) } }] })}\n\n`
+    return r.fulfill({ status: 200, contentType: 'text/event-stream', body: x + 'data: [DONE]\n\n' })
+  }
+  return r.fulfill({ status: 200, contentType: 'application/json',
+    body: JSON.stringify({ choices: [{ message: { content: JSON.stringify(REPLY) } }] }) })
+})
+
+await page.goto(URL); await page.waitForTimeout(600)
+const local = page.locator('button', { hasText: /Use this device only/i })
+if (await local.count()) { await local.first().click(); await page.waitForTimeout(900) }
+await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_test'))
+
+// Something planned for yesterday and never ticked, plus one for today.
+await page.evaluate(() => {
+  const K = Object.keys(localStorage).find((k) => k.startsWith('mission-control-demo-'))
+  const s = JSON.parse(localStorage.getItem(K))
+  const d = new Date(); d.setDate(d.getDate() - 1)
+  const p = (x) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+  /* Seeded the way the ROLLOVER leaves it, which is the only state this can
+     ever be observed in: the unfinished task is already in the backlog with
+     plannedOn cleared, and its id is recorded in plan.returnedIds. Seeding it
+     as list:'today' with plannedOn:yesterday describes a moment that has always
+     passed by the time the assistant reads anything. */
+  s.tasks = [
+    { id: 'y1', title: 'Send the VZP letter', list: 'backlog', space: 'personal', createdAt: p(d), carried: 1 },
+    { id: 't1', title: 'Draft the Blastburn quote', list: 'today', plannedOn: p(new Date()), slot: 'morning', space: 'work', createdAt: p(new Date()) },
+  ]
+  s.plan = { ...(s.plan || {}), returnedOn: p(new Date()), returnedIds: ['y1'], returnedCount: 1 }
+  /* Mark the rollover as already run today, or it runs on mount and rebuilds
+     plan from scratch, leaving the fixture at the mercy of what it decides. */
+  s.lastRollDay = p(new Date())
+  localStorage.setItem(K, JSON.stringify(s))
+})
+await page.goto(`${URL}/#/assistant`); await page.reload(); await page.waitForTimeout(1600)
+
+const brief = page.locator('.as-brief')
+ok('the doorway offers a Morning brief button', await brief.count() === 1)
+ok('it is the page\'s one filled control',
+   await page.evaluate(() => {
+     const el = document.querySelector('.as-brief')
+     const bg = getComputedStyle(el).backgroundColor
+     return bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent'
+   }))
+ok('it reads Morning brief', (await brief.textContent())?.includes('Morning brief'), await brief.textContent())
+
+await brief.click()
+await page.waitForSelector('.as-turn.is-it .as-said', { timeout: 15000 })
+
+ok('it opened voice mode rather than the text box', await page.locator('.as-voice').count() === 1)
+ok('the question was asked for him, in the thread',
+   (await page.locator('.as-turn.is-you .as-said').first().textContent())?.includes('morning brief'),
+   await page.locator('.as-turn.is-you .as-said').first().textContent())
+ok('the answer is in the thread as text',
+   (await page.locator('.as-turn.is-it .as-said').first().textContent())?.includes('VZP'))
+await page.waitForFunction(() => window.__spoken.length > 0, null, { timeout: 8000 }).catch(() => {})
+ok('and it is read out loud', (await page.evaluate(() => window.__spoken)).length === 1,
+   JSON.stringify(await page.evaluate(() => window.__spoken)).slice(0, 60))
+
+/* What the model was actually told. A brief that reaches the model without
+   yesterday's leftovers or the weather still answers, and is worthless. */
+/* Parse the request rather than pattern-matching it. The body is JSON, so its
+   newlines are escaped, and a regex written against real newlines silently
+   matches nothing and reports the section missing when it is right there. */
+const msgs = JSON.parse(sent ?? '{}').messages ?? []
+/* Match the briefing's own opening line. Searching for the word "briefing"
+   alone returns the system prompt, which uses the word too, and then every
+   assertion below reports the data missing while it is sitting right there. */
+const briefing = msgs.map((m) => m.content).find((c) => c.startsWith("Today's briefing")) ?? ''
+const system = msgs.map((m) => m.content).join('\n')
+const leftovers = (briefing.match(/LEFT OVER FROM YESTERDAY, still not done:\n((?:- .*\n?)+)/) ?? [])[1]
+ok("the briefing carries the weather, with the app's own figures",
+   briefing.includes('7 degrees') && briefing.includes('overcast'),
+   (briefing.match(/Weather.*/) ?? ['none'])[0].slice(0, 80))
+ok("the briefing carries yesterday's unfinished work by name",
+   !!leftovers && leftovers.includes('Send the VZP letter'), JSON.stringify(leftovers ?? 'section missing'))
+ok("today's own work is not raised as a leftover",
+   !!leftovers && !leftovers.includes('Blastburn'), JSON.stringify(leftovers ?? 'section missing'))
+ok("the briefing still carries today's plan",
+   briefing.includes('Draft the Blastburn quote'), briefing.includes('Blastburn') ? 'present' : 'MISSING')
+ok('the prompt tells it to take a position, not to recite',
+   system.includes('YOU ARE HIS CHIEF OF STAFF') && system.includes('THE MORNING BRIEF'))
+ok('naming one task is now allowed, counts still are not',
+   system.includes('YOU MUST NOT STATE COUNTS') && system.includes('TITLES ARE DIFFERENT'))
+
+await b.close()
+console.log(fails.length ? `\n${fails.length} FAILED` : '\nALL PASS')
+process.exit(fails.length ? 1 : 0)

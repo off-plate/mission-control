@@ -1474,7 +1474,21 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 /* drag-and-drop between time buckets */
 .drop-zone { border-radius: var(--r-md); transition: background var(--t-fast); }
 .drop-zone.drop-over { background: var(--accent-wash); outline: 1px dashed var(--accent); outline-offset: 2px; }
-.drag-grip { cursor: grab; color: var(--faint); font-size: 0.75rem; line-height: 1; flex: none; user-select: none; }
+/* Drawn, not typed. This was the braille glyph U+283F, and where a glyph's
+   ink sits inside its em box is the FONT's decision, not this file's: it moves
+   when the font changes, it is not the same in Instrument Sans and Saira, and
+   no amount of box alignment fixes it because the box was never the thing out
+   of line. He reported it three times and each time the boxes measured
+   correct, which is exactly what a font-metric problem looks like from here.
+
+   Six dots in a 6x16 viewBox, centred by construction. Its ink is now
+   something this file decides, so it aligns in both modes and stays aligned
+   through any future change of typeface. */
+.drag-grip {
+  cursor: grab; color: var(--faint); flex: none; user-select: none;
+  display: inline-flex; align-items: center;
+}
+.drag-grip svg { display: block; fill: currentColor; }
 .drag-grip:active { cursor: grabbing; }
 .today-task[draggable="true"]:hover .drag-grip { color: var(--muted); }
 

@@ -109,7 +109,7 @@ const stagger = (i: number) => ({ animationDelay: `${Math.min(i, 10) * 18}ms` })
 
 function Tick() {
   return (
-    <Icon.Check size={12} strokeWidth={1.0} />
+    <Icon.Check size={12} strokeWidth={4} />
   )
 }
 

@@ -586,7 +586,7 @@ function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
           title={isEstimated(task) ? `Focus ${taskMinutes(task)}m on this` : 'Estimate it first'}
           onClick={onFocus}
         >
-          <Icon.Play size={15} />
+          <Icon.Play size={18} />
         </button>
       )}
       <button
@@ -599,7 +599,7 @@ function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
         {thinking
           ? <span className="est-thinking" aria-label="Estimating" />
           : (
-            <Icon.Hourglass size={15} />
+            <Icon.Hourglass size={18} />
           )}
       </button>
     </span>
@@ -651,7 +651,7 @@ function RoutineOnDay({ routine, day }: { routine: Routine; day?: string }) {
               : undefined}
           onClick={() => setRoutineDone(routine.id, !complete)}
         >
-          <Icon.Check size={12} strokeWidth={1.0} />
+          <Icon.Check size={12} strokeWidth={4} />
         </button>
         <span className="grow wrap2">{routine.title}</span>
         {/* One tag, saying the one thing it needs to: this is a routine, it put
@@ -1184,7 +1184,7 @@ export function PlanPage() {
                               setLogging(t.id)
                             }}
                           >
-                            <Icon.Check size={12} strokeWidth={1.0} />
+                            <Icon.Check size={12} strokeWidth={4} />
                           </button>
                           <span className={`cat-dot ${t.category}`} aria-hidden="true" />
                           <span className="grow wrap2"><Linkify text={t.title} /></span>
@@ -1271,7 +1271,7 @@ export function PlanPage() {
                                     title={`Focus ${s.estimateMin}m on this step`}
                                     onClick={() => startFocus(s.estimateMin, s.title)}
                                   >
-                                    <Icon.Play size={14} />
+                                    <Icon.Play size={17} />
                                   </button>
                                 )}
                                 {/* The same tools the list gives a step. A step
@@ -1305,7 +1305,7 @@ export function PlanPage() {
               {doneUnsorted.map((t) => (
                 <div className="today-task done" key={t.id} data-task-id={t.id}>
                   <button className="checkbox" role="checkbox" aria-checked aria-label={`Reopen: ${t.title}`} onClick={() => toggleTask(t.id)}>
-                    <Icon.Check size={12} strokeWidth={1.0} />
+                    <Icon.Check size={12} strokeWidth={4} />
                   </button>
                   <span className={`cat-dot ${t.category}`} aria-hidden="true" />
                   <span className="grow">{t.title}</span>
@@ -1724,7 +1724,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
               }
               onClick={() => { if (drivenBy) { if (i < todayIndex) assertRoutineDay(h.id, i) } else toggleHabitDay(h.id, i) }}
             >
-              <Icon.Check size={11} strokeWidth={1.0} />
+              <Icon.Check size={11} strokeWidth={4} />
             </button>
           </span>
         ))}
@@ -2505,7 +2505,7 @@ export function RoutinesPage() {
                           disabled={stepLocked(r, next.id)}
                           onClick={() => toggleRoutineStep(r.id, next.id)}
                         >
-                          <Icon.Check size={12} strokeWidth={1.1} />
+                          <Icon.Check size={12} strokeWidth={4.4} />
                         </button>
                       )}
                       <span className="routine-step-body">
@@ -2568,7 +2568,7 @@ export function RoutinesPage() {
                         <span className="routine-check is-blank" aria-hidden="true" />
                       ) : (
                         <button className="routine-check" role="checkbox" aria-checked={checked} aria-label={s.title} onClick={() => toggleRoutineStep(r.id, s.id)}>
-                          <Icon.Check size={12} strokeWidth={1.1} />
+                          <Icon.Check size={12} strokeWidth={4.4} />
                         </button>
                       )}
                       <span className="routine-step-body">
@@ -2939,7 +2939,7 @@ function PeriodTasks({ tf, periodKey }: { tf: GoalTimeframe; periodKey: string }
             aria-label={`${t.title}, ${t.done ? 'done' : 'not done'}`}
             onClick={() => toggleTask(t.id)}
           >
-            {t.done && <Icon.Check size={10} strokeWidth={1.1} />}
+            {t.done && <Icon.Check size={10} strokeWidth={4.4} />}
           </button>
           <SpaceMark space={t.space} />
           <span className="grow">{t.title}</span>
@@ -3086,7 +3086,7 @@ export function GoalsPage() {
                               aria-label={`${m.label}, ${m.done ? 'done' : 'not done'}`}
                               onClick={() => toggleGoalMilestone(g.id, m.id)}
                             >
-                              {m.done && <Icon.Check size={10} strokeWidth={1.1} />}
+                              {m.done && <Icon.Check size={10} strokeWidth={4.4} />}
                             </button>
                             <span>{m.label}</span>
                           </li>

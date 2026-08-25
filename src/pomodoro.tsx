@@ -345,17 +345,17 @@ function MediaBadge() {
       <img className="pomo-media-art" src={thumbUrl(current.id)} alt="" />
       <span className="pomo-media-title" title={current.title}>{current.title}</span>
       <button className="pomo-icon" onClick={() => mo.go(-1)} aria-label="Previous track">
-        <Icon.SkipBack size={13} filled />
+        <Icon.SkipBack size={17} filled />
       </button>
       <button className="pomo-icon" onClick={mo.toggle} aria-label={mo.playing ? 'Pause' : 'Play'}>
         {mo.playing ? (
-          <Icon.Pause size={13} filled />
+          <Icon.Pause size={17} filled />
         ) : (
-          <Icon.Play size={13} filled />
+          <Icon.Play size={17} filled />
         )}
       </button>
       <button className="pomo-icon" onClick={() => mo.go(1)} aria-label="Next track">
-        <Icon.SkipNext size={13} filled />
+        <Icon.SkipNext size={17} filled />
       </button>
     </div>
   )
@@ -382,7 +382,7 @@ function PomodoroBadge() {
       aria-label="Open the focus history"
       title="Open Focus"
     >
-      <Icon.BarChart size={15} />
+      <Icon.BarChart size={17} />
     </button>
   )
 
@@ -402,7 +402,7 @@ function PomodoroBadge() {
             blocks says nothing about whether they were ten minutes or fifty. */}
         {today > 0 && <span className="pomo-cycles mono" title="Focused today">{fmtDuration(today)} today</span>}
         <button className="pomo-icon" aria-label="Timer settings" aria-expanded={setupOpen} onClick={() => setSetupOpen((v) => !v)}>
-          <Icon.Sliders size={15} />
+          <Icon.Sliders size={17} />
         </button>
         {open}
       </div>
@@ -418,16 +418,16 @@ function PomodoroBadge() {
       <span className="pomo-clock mono">{p.phase === 'await' ? 'done' : mmss(p.secondsLeft)}</span>
       <button className="pomo-icon" onClick={p.toggle} aria-label={p.running ? 'Pause' : 'Resume'}>
         {p.running ? (
-          <Icon.Pause size={15} filled />
+          <Icon.Pause size={17} filled />
         ) : (
-          <Icon.Play size={15} filled />
+          <Icon.Play size={17} filled />
         )}
       </button>
       <button className="pomo-icon" onClick={p.skip} aria-label={p.phase === 'focus' ? 'Skip to the break' : 'End the break'}>
-        <Icon.SkipNext size={15} filled />
+        <Icon.SkipNext size={17} filled />
       </button>
       <button className="pomo-icon" onClick={p.stop} aria-label="Stop this block">
-        <Icon.Close size={15} />
+        <Icon.Close size={17} />
       </button>
       {open}
     </div>
@@ -436,6 +436,6 @@ function PomodoroBadge() {
 
 function ClockIcon() {
   return (
-    <Icon.Clock size={15} />
+    <Icon.Clock size={17} />
   )
 }

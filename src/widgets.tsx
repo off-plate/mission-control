@@ -181,7 +181,7 @@ const TasksBody = memo(function TasksBody({ space, size }: { space: SpaceId; siz
                 setLogOpen(logOpen === t.id ? null : t.id)
               }}
             >
-              <Icon.Check size={12} strokeWidth={1.0} />
+              <Icon.Check size={12} strokeWidth={4} />
             </button>
             <span className={`cat-dot ${t.category}`} title={t.category} aria-hidden="true" />
             <span className="grow wrap2"><Linkify text={t.title} /></span>

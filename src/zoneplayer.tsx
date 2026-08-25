@@ -61,7 +61,7 @@ export function ZonePlayer() {
           aria-pressed={p.loop}
           aria-label={p.loop ? 'Repeat this track: on' : 'Repeat this track: off'}
         >
-          <Icon.Repeat size={15} />
+          <Icon.Repeat size={17} />
         </button>
         <button className="zplayer-btn" onClick={() => p.go(-1)} aria-label="Previous track" disabled={!p.ready}>
           <Icon.SkipBack size={16} filled />
@@ -82,7 +82,7 @@ export function ZonePlayer() {
           aria-pressed={p.shuffle}
           aria-label={p.shuffle ? 'Shuffle: on' : 'Shuffle: off'}
         >
-          <Icon.Shuffle size={15} />
+          <Icon.Shuffle size={17} />
         </button>
       </div>
     </div>

@@ -69,12 +69,12 @@ function StopIcon() {
 }
 function CloseIcon() {
   return (
-    <Icon.Close size={15} />
+    <Icon.Close size={17} />
   )
 }
 function BackIcon() {
   return (
-    <Icon.ChevronLeft size={15} />
+    <Icon.ChevronLeft size={17} />
   )
 }
 function ListIcon() {

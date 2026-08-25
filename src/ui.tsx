@@ -82,7 +82,7 @@ export function Dropdown({ label, children, className = '' }: { label: string; c
       {/* Drawn, not typed. The midline-ellipsis character sits wherever the
           font puts it, which is why it never looked centred in a circle. */}
       <button className="kebab" aria-label={label} aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-        <Icon.More size={15} />
+        <Icon.More size={17} />
       </button>
       {open && (
         <div className={`kebab-menu${up ? ' opens-up' : ''}`} role="menu" onClick={() => setOpen(false)}>

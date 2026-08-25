@@ -527,12 +527,12 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
         <span className="nt-toolgroup">
         {show('bullet') && (
         <T label="Bullet list" on={() => cmd('insertUnorderedList')}>
-          <Icon.List size={15} />
+          <Icon.List size={17} />
         </T>
         )}
         {show('checklist') && (
         <T label="Checklist" on={checklist}>
-          <Icon.Checklist size={15} />
+          <Icon.Checklist size={17} />
         </T>
         )}
         {show('quote') && <T label="Quote" on={() => toggleBlock('blockquote')}>&rdquo;</T>}
@@ -542,17 +542,17 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
         <span className="nt-toolgroup">
         {show('divider') && (
         <T label="Divider" on={divider}>
-          <Icon.Divider size={15} />
+          <Icon.Divider size={17} />
         </T>
         )}
         {show('table') && (
         <>
         <TablePicker onPick={insertTable} />
         <T label="Add a row" on={() => grow('row')}>
-          <Icon.TableRowAdd size={15} />
+          <Icon.TableRowAdd size={17} />
         </T>
         <T label="Add a column" on={() => grow('col')}>
-          <Icon.TableColAdd size={15} />
+          <Icon.TableColAdd size={17} />
         </T>
         </>
         )}
@@ -561,7 +561,7 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
         {show('clear') && (
         <span className="nt-toolgroup">
         <T label="Clear formatting" on={() => cmd('removeFormat')}>
-          <Icon.ClearFormat size={15} />
+          <Icon.ClearFormat size={17} />
         </T>
         </span>
         )}
@@ -694,7 +694,7 @@ function TablePicker({ onPick }: { onPick: (rows: number, cols: number) => void 
   return (
     <span className="nt-tablepick" ref={wrap}>
       <button className="nt-tool" title="Table" aria-label="Table" aria-expanded={open} onMouseDown={(e) => e.preventDefault()} onClick={() => setOpen((v) => !v)}>
-        <Icon.Table size={15} />
+        <Icon.Table size={17} />
       </button>
       {open && (
         <div className="nt-tablemenu">
@@ -1048,7 +1048,7 @@ export function NotesPage() {
         </div>
 
         <div className="nt-search">
-          <Icon.Search size={15} />
+          <Icon.Search size={17} />
           <input
             className="textinput" type="search" value={query} placeholder="Search…"
             aria-label="Search notes"

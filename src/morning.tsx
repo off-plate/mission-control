@@ -256,7 +256,7 @@ export function MorningRoutine({ routine, onEdit, onShut }: { routine: Routine; 
                   title={s.id === 'mr4' && typingLocked && !isDone ? `Hit ${TYPING_TARGET_WPM} WPM to check this off` : undefined}
                   onClick={() => onComplete(s.id)}
                 >
-                  <Icon.Check size={12} strokeWidth={1.1} />
+                  <Icon.Check size={12} strokeWidth={4.4} />
                 </button>
                 <button className="mr-head-main" onClick={() => setOpen(isOpen ? '' : s.id)} aria-expanded={isOpen}>
                   <span className="mr-title">{s.title}</span>

@@ -13,8 +13,8 @@ import { HabitRun, habitHasRun } from './habitrun'
 import { PrecedentCard } from './precedentcard'
 import type { PageId } from './types'
 import { habitsDueToday, GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, dueOn, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, habitGate, habitLocked, isCounted, COUNT_PERIODS, requiredSteps, routineComplete, routineProgress, routineRunsOn, slotMinutes, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
-import { DayLine, DayNumbers, WeekStrip } from './dayface'
-import { useFirstMove } from './ui'
+import { DayLine, WeekStrip } from './dayface'
+import { useFirstMove, useOpenToday } from './ui'
 import { estimateFor } from './estimate'
 import { estimateTask } from './ai'
 import { goalPeriodKey, goalPeriodRange, habitPeriodRange, periodIsPast, periodKeyFor, periodLabel, shiftPeriodKey, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForMoment, taskMinutes, toMin } from './util'
@@ -78,26 +78,10 @@ const shortDay = (key: string): string => {
 /* ---------------- TODAY ---------------- */
 
 export function TodayPage() {
-  const { space, tasks, routines, habits, goals, plan, editing, setEditing, setPage, savedMin, addTask, deleteTask, moveTaskList, setFocusTaskId, inView } = useStore()
-  const pomo = usePomodoro()
-  const nextEvent = useNextEvent()
-  /* The money alert needs Compass, which arrives async. Until it does, `money`
-     is undefined and the alert simply is not there, which is correct: silence
-     is honest, an invented figure is not. */
-  const compass = useCompass()
-  const money = compass.state.status === 'ok' ? compass.state.money : null
-  const exceptions = exceptionsFor(space, { tasks, routines, money, goals })
-  /* Money and official post follow you into Work and Off-Plate. Sitting in the
-     Work profile all day used to mean the app told you nothing was wrong. */
-  const shownExceptions = space === 'personal'
-    ? exceptions
-    : [...globalExceptions({ tasks, routines, money }), ...exceptions]
-  const open = tasks.filter((t) => inView(t.space) && t.list === 'today' && !t.done && (t.plannedOn ?? localDateKey()) === localDateKey())
-  const firstMove = useFirstMove()
+  const { editing, setEditing } = useStore()
   const [addOpen, setAddOpen] = useState(false)
-  // Next payment badge derives from the money schedule instead of a hardcoded string.
-  const nextPay = MOCK_MONEY?.schedule.find((r) => r.state === 'not sent' || r.state === 'action needed')
-  const wins = momentum({ tasks: tasks.filter((t) => inView(t.space)), routines, habits: habits.filter((h) => inView(h.space) && !h.archivedAt) })
+  const nextEvent = useNextEvent()
+  const open = useOpenToday()
 
   return (
     <div className="page">
@@ -106,17 +90,9 @@ export function TodayPage() {
         metrics={[
           { v: nextEvent.v, k: nextEvent.k, tone: 'info' as const },
           { v: String(open.length), k: 'tasks open' },
-          /* The estimate figure moved into the day's numbers below, where it
-             sits beside the other three instead of competing with the payment
-             warning for the same slot. */
-          ...(space === 'personal' && nextPay
-            ? [{ v: `${nextPay.amount} ${nextPay.date.split(' ')[0]}`, k: 'next payment', tone: 'urgent' as const }]
-            : []),
         ]}
         actions={
           <>
-            {/* Shown on phone too: the stack has its own reorder arrows and
-                widget menu, which were unreachable while this button was hidden. */}
             <button className="btn btn-quiet" aria-pressed={editing} onClick={() => setEditing(!editing)}>
               {editing ? 'Done' : 'Edit grid'}
             </button>
@@ -125,110 +101,21 @@ export function TodayPage() {
         }
       />
 
-      {/* The day itself, before anything about it: what has been on the clock,
-          then the four numbers the day is actually judged by. */}
-      <DayLine />
-      <DayNumbers savedMin={savedMin} />
+      {/* The room carries the day itself: the countdown, the dot field, what is
+          next, the to-do, the clock and what has been standing. Everything that
+          used to sit here in half-empty cards is inside it. The widget grid and
+          the week strip stay below, on paper, because they are not the day. */}
+      <TodayRoom />
 
-      {/* The assistant rail (dictation, OCR, "file what I said") was removed
-          from this page on his instruction, 2026-08-11: "remove the assistant
-          functionality from the Today page, completely out of the website".
-          Not the /help in Notes, which stays. The day now takes the full
-          width it used to share. */}
+      {/* Paper again below the slab. The day line stays because it is the one
+          thing the room does not draw: where his focus blocks actually landed
+          in the day, at the minute they happened. */}
       <div className="today-shell">
-      <div className="today-main">
-      {shownExceptions.length > 0 ? (
-        <div className="exceptions" role="alert" aria-label="Needs attention">
-          {shownExceptions.map((x) => {
-            const queued = x.task ? tasks.find((t) => t.title === x.task!.title) : undefined
-            const resolved = queued?.done
-            if (resolved) return null
-            return (
-              <div className={`exception-row${x.fromPersonal && space !== 'personal' ? ' from-other' : ''}`} key={x.id}>
-                <span className="dot" aria-hidden="true" />
-                {x.fromPersonal && space !== 'personal' && <span className="exc-origin">Personal</span>}
-                <span>{x.text}</span>
-                <span className="when">{x.when}</span>
-                {x.action === 'add-task' && x.task && (
-                  queued ? (
-                    <span className="microcap" style={{ color: 'var(--progress)', marginLeft: 'var(--s2)' }}>queued for today</span>
-                  ) : (
-                    <button onClick={() => addTask({ title: x.task!.title, source: 'mc', estimateMin: x.task!.estimateMin, space: 'personal', list: 'today', category: 'admin' })}>
-                      {x.actionLabel}
-                    </button>
-                  )
-                )}
-                {x.action === 'open-goals' && (
-                  <button onClick={() => setPage('goals')}>{x.actionLabel ?? 'Open Goals'}</button>
-                )}
-                {x.action === 'open-plan' && (
-                  <button onClick={() => setPage('plan')}>{x.actionLabel ?? 'Open the plan'}</button>
-                )}
-                {x.action === 'do-today' && x.taskId && (
-                  <>
-                    {/* An old task deserves an honest pair of answers: do it
-                        today, or let it go. Nothing in between, and nothing
-                        that only navigates. */}
-                    <button onClick={() => moveTaskList(x.taskId!, 'today')}>{x.actionLabel ?? 'Do it today'}</button>
-                    <button className="exc-drop" onClick={() => deleteTask(x.taskId!)}>Drop it</button>
-                  </>
-                )}
-              </div>
-            )
-          })}
+        <div className="today-main">
+          <DayLine />
+          <SpaceGrid />
+          <WeekStrip />
         </div>
-      ) : (
-        <div className="allclear">
-          <span className="dot" aria-hidden="true" />
-          Nothing is on fire.
-        </div>
-      )}
-
-      {/* What usually happens from here, when there is a strong enough answer
-          and his own words to back it. Silent almost every evening: see the
-          four laws at the top of precedent.ts. It sits under the alert row
-          because this is where the day gets judged, and above momentum
-          because it is about tonight rather than about the record. */}
-      <PrecedentCard />
-
-      {/* The other side of the ledger. Only real events, never a score. */}
-      {wins.length > 0 && (
-        <div className="momentum" aria-label="What is going right">
-          <span className="microcap">Going right</span>
-          {wins.map((w, i) => <span className="momentum-item" key={i}>{w}</span>)}
-        </div>
-      )}
-
-      {firstMove && (
-        <div className="pin-row">
-          {firstMove && (
-            <div className="firstmove">
-              <span className="microcap fm-label">First move</span>
-              <span className="fm-title">{firstMove.title}</span>
-              {isEstimated(firstMove) && firstMove.estimateMin > 0 && <span className="chip tone-info">{fmtDuration(firstMove.estimateMin)}</span>}
-              {/* Start means start: the clock begins on this task for its own
-                  estimate, and Plan opens with it highlighted. A button that
-                  said Start and only navigated was the first lie of the day. */}
-              <button
-                className="btn btn-primary"
-                onClick={() => {
-                  pomo.startFocus(isEstimated(firstMove) && firstMove.estimateMin > 0 ? taskMinutes(firstMove) : undefined, firstMove.title)
-                  setFocusTaskId(firstMove.id)
-                  setPage('plan')
-                }}
-              >
-                Start
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      <SpaceGrid />
-
-      <WeekStrip />
-
-      </div>
       </div>
 
       {addOpen && <AddWidgetInline onClose={() => setAddOpen(false)} />}
@@ -265,6 +152,7 @@ function AddWidgetInline({ onClose }: { onClose: () => void }) {
 
 import { WIDGET_DEFS } from './mock'
 import * as Icon from './icons'
+import { TodayRoom } from './todayroom'
 const WIDGET_DEFS_LIST = WIDGET_DEFS
 
 /* ---------------- PLAN ---------------- */

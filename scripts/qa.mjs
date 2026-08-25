@@ -2289,11 +2289,21 @@ await step('assistant: the empty page is a doorway, with none of a chatbot’s f
   if (q !== 'What can I help with?') throw new Error(`the question reads "${q}"`)
   const chips = await page.locator('.as-starters .as-chip').count()
   if (chips !== 6) throw new Error(`${chips} starters, expected 6`)
-  /* His instruction, twice over: no voice of any kind, and specifically not
+  /* His instruction was, twice over, no voice of any kind, and specifically not
      attach / search / reason / create an image / summarise / translate. Those
-     belong to a general chatbot and not one of them is a thing this app does. */
+     belong to a general chatbot and not one of them is a thing this app does.
+
+     Dictation was struck from that list on 2026-08-25, on his explicit
+     instruction: "I want to implement it next to the ask button right now."
+     ONLY dictation. Speaking his question is how he uses this app on a phone,
+     and it is the one control here that does something this app actually does.
+     Everything else on the list stays banned, and so does the page growing any
+     OTHER voice furniture, which is why /voice/i and /microphone/i are still
+     here. The mic is asserted present below, so this test still holds a line;
+     it holds a different one. */
   const text = await page.locator('.as-page').innerText()
-  for (const banned of [/voice/i, /microphone/i, /\bdictate/i, /attach/i, /create (an )?image/i, /summari[sz]e/i, /translate/i, /\breason\b/i]) {
+  if (!(await page.locator('.as-ask-foot .as-mic').count())) throw new Error('the dictate button is missing from the ask row')
+  for (const banned of [/voice/i, /microphone/i, /attach/i, /create (an )?image/i, /summari[sz]e/i, /translate/i, /\breason\b/i]) {
     if (banned.test(text)) throw new Error(`the page offers ${banned}: ${JSON.stringify(text.slice(0, 200))}`)
   }
   const audio = await page.evaluate(() =>

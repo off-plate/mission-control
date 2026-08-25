@@ -5,6 +5,10 @@ import { SpaceMark } from './ui'
 import { SPACE_LABELS } from './mock'
 import { ask, STARTERS, opener, type Action, type Brief, type Card, type CardKind, type Reply } from './assistant'
 import { engineName, speechState, stop as stopSpeech, subscribe, toggle } from './speech'
+import {
+  dictateState, dictationAvailable, dictationEngine,
+  stop as stopDictation, subscribe as subscribeDictation, toggle as toggleDictation,
+} from './dictation'
 import { SLOTS, dueOn, habitsDueToday, goalCurrent, type HabitDef, type PageId, type SpaceId, type Task } from './types'
 import { localDateKey, fmtDuration, goalPeriodKey, goalPeriodRange, type GoalTf } from './util'
 import * as Icon from './icons'
@@ -449,6 +453,37 @@ function useDoer() {
   }
 }
 
+/* Dictation, beside Ask. One button, three states, no settings.
+
+   It is hidden rather than disabled where no engine exists, because a mic that
+   cannot ever listen is furniture, and a disabled control invites a click that
+   teaches nothing. */
+function Dictate({ base, onText, busy }: { base: string; onText: (t: string) => void; busy: boolean }): JSX.Element | null {
+  const [, bump] = useState(0)
+  useEffect(() => subscribeDictation(() => bump((n) => n + 1)), [])
+  useEffect(() => stopDictation, [])
+  if (!dictationAvailable()) return null
+  const st = dictateState()
+  const label = st === 'listening' ? 'Stop' : st === 'transcribing' ? 'Writing it down' : 'Dictate'
+  const how = dictationEngine() === 'browser'
+    ? 'Speak and the words appear as you go.'
+    : 'Speak, then stop, and Whisper writes it down.'
+  return (
+    <button
+      type="button"
+      className={`as-mic is-${st}`}
+      onClick={() => toggleDictation(base, onText)}
+      disabled={busy || st === 'transcribing'}
+      aria-label={label}
+      aria-pressed={st === 'listening'}
+      title={st === 'idle' ? how : label}
+    >
+      <Icon.Mic size={15} />
+      <span className="as-mic-text">{label}</span>
+    </button>
+  )
+}
+
 interface Turn { who: 'you' | 'it'; text: string; reply?: Reply; done?: Done[] }
 
 export function AssistantPage() {
@@ -522,7 +557,7 @@ export function AssistantPage() {
   useEffect(() => stopSpeech, [])
 
   const empty = turns.length === 0 && !busy && !err
-  const submit = () => { const t = q.trim(); if (t) { setQ(''); void send(t) } }
+  const submit = () => { const t = q.trim(); if (t) { stopDictation(); setQ(''); void send(t) } }
 
   const askBox = (
     <form className="as-ask" onSubmit={(e) => { e.preventDefault(); submit() }}>
@@ -540,6 +575,7 @@ export function AssistantPage() {
       />
       <div className="as-ask-foot">
         <span className="as-hint">Enter sends. Shift and Enter for a new line.</span>
+        <Dictate base={q} onText={setQ} busy={busy} />
         <button className="btn btn-primary as-send" disabled={busy || !q.trim()}>Ask</button>
       </div>
     </form>

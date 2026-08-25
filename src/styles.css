@@ -4966,3 +4966,34 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
    spinner on a two-second call is more motion than the wait deserves. */
 .as-speak.is-loading { cursor: progress; opacity: 0.6; }
 .as-speak:disabled { cursor: progress; }
+
+/* Dictate, beside Ask. Quiet at rest, accent while it listens, and it takes
+   the margin that used to push Ask right so the two sit as one group. When no
+   engine exists the button is not rendered, so Ask keeps its own auto margin
+   and the row is unchanged. */
+.as-mic {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-left: auto;
+  border: 1px solid var(--hairline-strong); border-radius: var(--r-sm);
+  padding: 5px var(--s3); background: none; cursor: pointer;
+  font-size: var(--text-xs); color: var(--muted);
+  transform: translateY(0);
+  transition: border-color var(--t-fast), color var(--t-fast), transform var(--t-fast);
+}
+.as-mic ~ .as-send { margin-left: 0; }
+.as-mic:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-text); transform: translateY(-1px); }
+.as-mic:active:not(:disabled) { transform: translateY(0); transition-duration: 60ms; }
+.as-mic:disabled { cursor: default; opacity: 0.55; }
+/* Listening. The same breath the assistant's own orb uses, so the app has one
+   idea of "this is live" rather than two. */
+.as-mic.is-listening { border-color: var(--accent); color: var(--accent-text); }
+.as-mic.is-listening svg { animation: as-breathe 1.6s var(--ease-loop) infinite; transform-origin: center; }
+.as-mic.is-transcribing { color: var(--accent-text); cursor: progress; }
+@media (prefers-reduced-motion: reduce) {
+  .as-mic.is-listening svg { animation: none; }
+}
+/* On a phone the row is tight and the icon carries it. */
+@media (max-width: 560px) {
+  .as-mic-text { display: none; }
+  .as-mic { padding: 6px var(--s2); }
+}

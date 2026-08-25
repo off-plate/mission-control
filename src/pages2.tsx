@@ -980,6 +980,23 @@ export function SettingsPage() {
             <span className="info"><span className="name">Brand &amp; guidelines</span><span className="detail" style={{ display: 'block' }}>The colours, type and rules this app is built on</span></span>
             <button className="btn btn-quiet" onClick={() => setPage('brand')}>Open</button>
           </div>
+          {/* Which build is on this screen, in plain sight.
+
+              This exists because "still not fixed" and "it is fixed here" were
+              both true at once for an afternoon: the fix was live and the
+              browser was serving an older bundle, and neither of us could see
+              which. Now the screen says so, and Reload gets past a cached copy
+              without going anywhere near developer tools. */}
+          <span className="microcap" style={{ marginTop: 24, display: 'block' }}>This build</span>
+          <div className="source-row">
+            <span className="info">
+              <span className="name mono">{__BUILD__}</span>
+              <span className="detail" style={{ display: 'block' }}>
+                If a fix seems missing, check this number changed. If it has not, the browser is serving an old copy.
+              </span>
+            </span>
+            <button className="btn btn-quiet" onClick={() => location.reload()}>Reload</button>
+          </div>
           <span className="microcap" style={{ marginTop: 24, display: 'block' }}>Start over</span>
           <div className="source-row">
             <span className="info"><span className="name">Wipe everything</span><span className="detail" style={{ display: 'block' }}>Clears this device and the saved copy. There is no undo on this one.</span></span>

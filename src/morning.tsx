@@ -255,7 +255,7 @@ export function MorningRoutine({ routine, onEdit, onShut }: { routine: Routine; 
                   title={s.id === 'mr4' && typingLocked && !isDone ? `Hit ${TYPING_TARGET_WPM} WPM to check this off` : undefined}
                   onClick={() => onComplete(s.id)}
                 >
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 5.65 5 8.65 10 2.15" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </button>
                 <button className="mr-head-main" onClick={() => setOpen(isOpen ? '' : s.id)} aria-expanded={isOpen}>
                   <span className="mr-title">{s.title}</span>

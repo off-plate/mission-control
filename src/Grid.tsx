@@ -51,7 +51,7 @@ function WidgetFrame({ inst, space }: { inst: WidgetInstance; space: SpaceId }) 
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((v) => !v)}
           >
-            <Icon.More size={14} />
+            <Icon.More size={16} />
           </button>
         )}
       </header>

@@ -2261,7 +2261,7 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 }
 .nt-editor li[data-done="1"]::before {
   background: var(--progress); border-color: var(--progress);
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><path d='M15.5 9L9.41421 15.0858'/><path d='M7 13.0858L9.41422 15.0858'/></svg>");
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.467' stroke-linecap='round' stroke-linejoin='round'><g transform='translate(-14.074 -15.916) scale(2.3176)'><path d='M15.5 9L9.41421 15.0858'/><path d='M7 13.0858L9.41422 15.0858'/></g></svg>");
   background-size: 13px 13px; background-repeat: no-repeat; background-position: center;
 }
 .nt-editor li[data-done="1"] { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--hairline-strong); }

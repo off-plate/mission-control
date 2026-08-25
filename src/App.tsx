@@ -203,7 +203,7 @@ function PhonePages({ tabs, page, setPage }: {
         aria-label={`Pages, currently ${here?.label ?? 'Today'}`}
         onClick={() => setOpen((v) => !v)}
       >
-        <Icon.Menu size={16} />
+        <Icon.Menu size={18} />
         <span className="btn-label">{here?.label ?? 'Pages'}</span>
       </button>
       {open && (
@@ -357,7 +357,7 @@ export default function App() {
             title={page === 'zone' ? 'Leave the Zone' : 'The Zone'}
             aria-label={page === 'zone' ? 'Leave the Zone' : 'The Zone'}
           >
-            <Icon.Star size={15} />
+            <Icon.Star size={18} />
             <span className="btn-label">The Zone</span>
           </button>
           {/* The helmet. Its eyes light when the mode is on, so the icon IS the
@@ -380,7 +380,7 @@ export default function App() {
             title="Notes"
             aria-label="Note"
           >
-            <Icon.Note size={15} />
+            <Icon.Note size={18} />
             <span className="btn-label">Note</span>
           </button>
           {/* Money and Reflect, merged. Both are about looking back at what
@@ -392,13 +392,13 @@ export default function App() {
             title="Achievements, money and reflection"
             aria-label="Achievements"
           >
-            <Icon.Award size={15} />
+            <Icon.Award size={18} />
             <span className="btn-label">Achievements</span>
           </button>
           {/* Yesterday, on demand. It offers itself once a morning; after that
               it is his to open, from any page, without hunting for a pill. */}
           <button className="btn btn-ghost" onClick={openDaily} aria-label="Yesterday" title="Walk yesterday and today">
-            <Icon.Rewind size={15} />
+            <Icon.Rewind size={18} />
             <span className="btn-label">Yesterday</span>
           </button>
           {page !== 'zone' && <PhonePages tabs={tabs} page={page} setPage={setPage} />}
@@ -408,7 +408,7 @@ export default function App() {
             aria-label={needsSignIn ? 'Settings, sync is off' : 'Settings'}
             aria-pressed={page === 'settings'}
           >
-            <Icon.Settings size={17} />
+            <Icon.Settings size={18} />
           </button>
         </div>
       </header>

@@ -4628,17 +4628,24 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 
 /* ---------- Calendar ----------
    A month to point at on the left, the days themselves on the right. The grid
-   is an index, not the calendar: it never shows a meeting, only that a day has
-   one, which is what keeps it small enough to sit beside the real list rather
-   than replacing it. */
+   is an index: it never shows a meeting, only that a day has one.
+
+   Both halves grow with the screen. The first version pinned the grid at 264px
+   and capped the column at 880px, which on his 3440 monitor left two thirds of
+   the page empty with a postage stamp calendar in the corner. So the grid takes
+   a share of the viewport up to 560px, where its cells are 76px and it reads as
+   a wall calendar, and the days run in two columns from 1700px and three from
+   2600px. A wide screen shows more of the week, which is the only thing extra
+   width is good for here. */
 .cal-split {
-  display: grid; grid-template-columns: 264px minmax(0, 880px);
-  gap: var(--s10); align-items: start;
+  display: grid;
+  grid-template-columns: clamp(264px, 21vw, 560px) minmax(0, 1fr);
+  gap: clamp(var(--s8), 2.4vw, var(--s12)); align-items: start;
 }
 .cal-rail { position: sticky; top: var(--s4); display: flex; flex-direction: column; gap: var(--s4); }
 
 .cal-mhead { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
-.cal-mname { font-family: var(--font-display); font-size: var(--text-base); color: var(--ink); }
+.cal-mname { font-family: var(--font-display); font-size: clamp(var(--text-base), 0.4vw + 0.9rem, var(--text-lg)); color: var(--ink); }
 .cal-step {
   width: 30px; height: 30px; padding: 0; line-height: 1; font-size: 1.125rem;
   background: none; border: 1px solid var(--hairline); border-radius: var(--r-sm);
@@ -4646,9 +4653,10 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 }
 .cal-step:hover { color: var(--ink); border-color: var(--hairline-strong); }
 
-.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: clamp(2px, 0.2vw, 6px); }
 .cal-wd {
-  font-size: 0.6875rem; letter-spacing: 0.06em; text-transform: uppercase;
+  font-size: clamp(0.6875rem, 0.25vw + 0.6rem, 0.875rem);
+  letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--faint); text-align: center; padding-bottom: var(--s2);
 }
 .cal-cell {
@@ -4656,15 +4664,18 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   padding: 0; background: none; border: 1px solid transparent; border-radius: var(--r-sm);
   cursor: pointer; transition: border-color var(--t-fast);
 }
-.cal-cell-n { font-size: var(--text-xs); color: var(--ink); font-variant-numeric: tabular-nums; }
+.cal-cell-n {
+  font-size: clamp(var(--text-xs), 0.55vw + 0.55rem, var(--text-lg));
+  color: var(--ink); font-variant-numeric: tabular-nums;
+}
 .cal-cell.is-out .cal-cell-n { color: var(--faint); }
 .cal-cell:hover { border-color: var(--hairline-strong); }
 /* A day that has something in it. A dot, because the grid's job is to say
    where to look, and a count here would be a second agenda competing with the
    real one. */
 .cal-cell.has-events::after {
-  content: ''; position: absolute; bottom: 4px;
-  width: 3px; height: 3px; border-radius: 50%; background: var(--accent);
+  content: ''; position: absolute; bottom: clamp(4px, 0.35vw, 9px);
+  width: clamp(3px, 0.22vw, 5px); aspect-ratio: 1; border-radius: 50%; background: var(--accent);
 }
 .cal-cell.is-picked { border-color: var(--hairline-strong); }
 .cal-cell.is-today { background: var(--accent); }
@@ -4681,6 +4692,19 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .cal-problem { font-size: var(--text-xs); color: var(--warn); margin: 0; }
 
 .cal-agenda { display: flex; flex-direction: column; gap: var(--s8); }
+/* Days side by side once there is room for two readable columns. Newspaper
+   columns rather than grid cells: a day runs to whatever height its meetings
+   need, and a grid row would then hold every other day of that row hostage to
+   the tallest one. Twelve meetings tomorrow and three today left half a screen
+   of holes. A day is never split across a column break. */
+@media (min-width: 1700px) {
+  .cal-agenda {
+    display: block; columns: 2;
+    column-gap: clamp(var(--s8), 2.2vw, var(--s12));
+  }
+  .cal-day { break-inside: avoid; margin-bottom: var(--s10); }
+}
+@media (min-width: 2600px) { .cal-agenda { columns: 3; } }
 /* The grid scrolls the column to a day, and a sticky header would otherwise
    land on top of the day it just jumped to. */
 .cal-day { scroll-margin-top: var(--s10); }
@@ -4690,8 +4714,12 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .cal-day-mon { font-size: var(--text-xs); color: var(--faint); }
 .cal-day-count { font-size: var(--text-xs); color: var(--faint); margin-left: auto; }
 .cal-rows { display: flex; flex-direction: column; }
+/* Four columns for three things. The last one is empty on purpose: it takes
+   the slack so what a row says and what he can do about it stay next to each
+   other. Pinned to the far edge instead, "Gym: Back" and its button sat nine
+   hundred pixels apart on a laptop. The rule still runs the full width. */
 .cal-row {
-  display: grid; grid-template-columns: 108px minmax(0, 1fr) auto;
+  display: grid; grid-template-columns: 104px minmax(0, 56ch) auto minmax(0, 1fr);
   gap: var(--s4); align-items: baseline;
   padding: var(--s3) 0; border-bottom: 1px solid var(--hairline);
 }
@@ -4700,6 +4728,12 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .cal-title { font-size: var(--text-base); color: var(--ink); }
 .cal-people { font-size: var(--text-xs); color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cal-do { display: flex; align-items: center; gap: var(--s3); white-space: nowrap; }
+/* Once the row has slack, reserve the width of a full set of actions so the
+   buttons line up. Without it a row carrying "just ended" and a Join link put
+   its button 130px left of the row above, and the column read as ragged. */
+@media (min-width: 1200px) {
+  .cal-do { min-width: 15.5rem; justify-content: flex-end; }
+}
 .cal-written { font-size: 0.625rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--progress); }
 /* The one running now, and the one that finished within the hour it is still
    shown for. Weight and colour do the work; nothing moves. */

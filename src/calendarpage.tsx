@@ -26,6 +26,10 @@ import type { CalEvent } from './ical'
 
 const HM = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
 const clock = (ms: number) => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+/* The band sets its value large, so a full meeting title ran to three lines at
+   390px and pushed the day off the first screen. The list underneath carries
+   the whole name. */
+const short = (t: string) => (t.length > 30 ? `${t.slice(0, 29).trimEnd()}…` : t)
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -139,7 +143,7 @@ export function CalendarPage() {
     ? [
         next
           ? {
-              v: next.start === null ? next.title : `${HM(next.start)} ${next.title}`,
+              v: next.start === null ? short(next.title) : `${HM(next.start)} ${short(next.title)}`,
               k: running ? 'now' : next.day === today ? 'next today' : dayLabel(next.day, today).toLowerCase(),
             }
           : { v: 'clear', k: 'ahead' },

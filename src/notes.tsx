@@ -225,6 +225,13 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
     if (!at) { setMenu(null); return }
     const m = at.text.match(/(?:^|\s)\/([a-z]*)$/i)
     if (!m) { setMenu(null); return }
+    /* He has typed the whole command. There is nothing left to offer him, and
+       leaving the menu up would be worse than useless: it owns Enter while it
+       is open, so pressing Enter would re-insert the command he had just
+       finished typing instead of running it. That is exactly what broke the
+       trailing "33 tis /task" form and the one inside a list, and the suite
+       caught both. A complete command belongs to the line, not to the menu. */
+    if (available.some((c) => c.cmd === m[1].toLowerCase())) { setMenu(null); return }
     const rect = at.range.getClientRects()[0] ?? lineAt(ref.current!)?.getBoundingClientRect()
     if (!rect) { setMenu(null); return }
     setMenu((prev) => ({ q: m[1], x: rect.left, y: rect.bottom, i: prev && prev.q === m[1] ? prev.i : 0 }))

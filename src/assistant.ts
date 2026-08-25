@@ -1,74 +1,152 @@
-/* Demo language parser for the dictation assistant. It splits what you say
-   into items and guesses where each belongs. This is a stand-in: the real
-   build sends the text to a model (Groq is the strong free option) that
-   returns the same shape, then the store places and logs it identically.
+/* The assistant's brain. Pure: it builds the briefing, calls the model, and
+   validates what comes back. Nothing here renders and nothing here writes.
 
-   The mic is set to Czech, so Czech is the FIRST language here, not a bonus.
-   And one rule above all: never strip a word whose meaning was not applied.
-   The old version deleted "cíl" from the front of a line and then filed the
-   line as a task, which is worse than not understanding it at all. */
+   THE RULE THAT MAKES IT TRUSTWORTHY: the model never states a number.
 
-export interface ParsedItem {
-  kind: 'task' | 'goal' | 'done'
-  text: string
-  estimateMin?: number
+   It cannot say "you have three things today", because a model that says that
+   will one day say four when there are three, and then every figure in this
+   app is worth nothing. It picks WHICH CARD TO SHOW; the app draws that card
+   from the same store every other page reads. So the sentence is the model's
+   and the data is his, and the two cannot disagree because they do not come
+   from the same place.
+
+   MULTI-USER, BY CONSTRUCTION: this runs in his browser, against a store that
+   is already scoped to his account, with a key that lives on his device only.
+   There is no server here to query the wrong row. Another person's data is not
+   kept out by a check that could be wrong; it is not in the building.
+
+   The briefing below is deliberately small: counts and titles, no bodies, no
+   money, no note contents. It is what a colleague glancing at the screen would
+   see, and nothing that would be a problem if the model logged it. */
+
+import { getAiKey, groq } from './ai'
+
+const MODEL = 'llama-3.3-70b-versatile'
+
+/** What a card shows. The app owns every one of these; the model only names one. */
+export type CardKind =
+  | 'today'      // what is on the day, by part of day
+  | 'backlog'    // the list, oldest first
+  | 'habits'     // what today asks of him
+  | 'calendar'   // the meetings ahead
+  | 'goals'
+  | 'focus'      // the week's blocks
+  | 'stale'      // what has been sitting too long
+
+export interface Card { kind: CardKind; note?: string }
+
+export interface Reply {
+  /** One or two sentences. His language, no numbers. */
+  say: string
+  /** What to draw underneath, in order. */
+  show: Card[]
+  /** Follow-ups worth a tap, phrased as he would ask them. */
+  next?: string[]
 }
 
-/* What makes a line a goal: the word for one (EN or CZ, diacritics optional),
-   or wanting-language. A bare "týden" does not - planning a week is a task. */
-const GOAL_HINTS = /\b(goals?|c[íi]le?|chci|cht[ěe]l bych|want to|i want|by the end|this (week|month|quarter|year))\b/i
-const DONE_HINTS = /\b(done|did|finished|completed|hotovo|ud[ěe]lal|dokon[čc]il|u[žz] jsem)\b/i
-const TASK_LEADS = /^((p[řr]idej|p[řr]idat|add|create|new)\s+)?(task|todo|to-do|[úu]kol)\b\s*[:\-]?\s*/i
-const GOAL_LEADS = /^(goals?|c[íi]l)\b\s*[:\-]?\s*/i
-const DONE_LEADS = /^(done|hotovo)\b\s*[:\-]?\s*/i
-/* "na tento týden", "do konce měsíce", "this month" - the horizon phrase that
-   follows a goal word and belongs to the routing, not to the goal's name. */
-const HORIZON_TAIL = /^((na|za|do|pro)\s+)?((konce?\s+)?(tento|tenhle|tohoto|p[řr][íi][šs]t[íi])\s+)?(t[ýy]den|t[ýy]dne|m[ěe]s[íi]ce?|kvart[áa]lu?|roku?|this\s+(week|month|quarter|year))\s*/i
+const KINDS: CardKind[] = ['today', 'backlog', 'habits', 'calendar', 'goals', 'focus', 'stale']
 
-const DURATION = /(\d+)\s*(hours?|hrs?|h|hodin[ay]?|minutes?|mins?|min|minut[ya]?|m)\b/i
-
-function estimate(line: string): number | undefined {
-  const m = line.match(DURATION)
-  if (!m) return undefined
-  const n = Number(m[1])
-  return /^h/i.test(m[2]) ? n * 60 : n
+/** A compact picture of his day. Titles and counts, nothing private. */
+export interface Brief {
+  now: string
+  weekday: string
+  planned: { slot: string; items: { title: string; done: boolean; min: number }[] }[]
+  backlogCount: number
+  oldest: { title: string; days: number }[]
+  habits: { due: number; kept: number; open: string[] }
+  meetings: { at: string; title: string }[]
+  focusToday: number
+  goals: { name: string; pct: number }[]
 }
 
-export function parseDictation(input: string): ParsedItem[] {
-  return input
-    .split(/[\n;.]+|,\s+(?:and\s+)?|\band\s+(?:then\s+)?|\bthen\b|\ba\s+pak\b/i)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 1)
-    .map((raw) => {
-      let kind: ParsedItem['kind'] = 'task'
-      if (GOAL_LEADS.test(raw) || GOAL_HINTS.test(raw)) kind = 'goal'
-      if (DONE_LEADS.test(raw) || DONE_HINTS.test(raw)) kind = 'done'
-      /* Strip ONLY the words whose meaning the kind above actually carries. */
-      let text = raw.replace(TASK_LEADS, '')
-      if (kind === 'goal') {
-        text = text.replace(GOAL_LEADS, '').replace(HORIZON_TAIL, '')
-          .replace(/^(chci|cht[ěe]l bych|i want to|want to)\s+/i, '')
-      }
-      if (kind === 'done') {
-        text = text.replace(DONE_LEADS, '')
-          .replace(/^(done|finished|completed|hotovo)\s+(with\s+)?/i, '')
-          .replace(/^(u[žz] jsem|ud[ěe]lal jsem|dokon[čc]il jsem)\s+/i, '')
-      }
-      const est = estimate(raw)
-      text = text
-        .replace(/^(i (need to|have to|should)|today i want to|remind me to|mus[íi]m|m[ěe]l bych)\s+/i, '')
-        .replace(/\s+/g, ' ')
-        .trim()
-      /* The duration's meaning became the chip, so the words leave the title:
-         "zavolat do VZP 20 minut" + a 20m chip said the number twice. */
-      if (est !== undefined) text = text.replace(DURATION, '').replace(/\s{2,}/g, ' ').replace(/[,;]\s*$/, '').trim()
-      return { kind, text: text.charAt(0).toUpperCase() + text.slice(1), estimateMin: est }
-    })
-    .filter((p) => p.text.length > 1)
+const SYSTEM = `You are the assistant inside Mission Control, Michael's own life dashboard.
+
+He is Czech, in Prague, running a design agency job plus a side business, and
+the app exists because admin rots on his list and evenings get lost. Talk to him
+the way a sharp chief of staff would: short, direct, no cheerleading, no
+"I'd be happy to". Never more than two sentences before the cards.
+
+YOU MUST NOT STATE NUMBERS OR TITLES. Not "you have 3 tasks", not "your first
+is X". The app draws the real data from his own log; if you write a number it
+will eventually be the wrong one and he will stop believing the app. Say what
+he should look at and why, then name the cards.
+
+Answer ONLY with JSON:
+{"say": "...", "show": [{"kind":"today"}], "next": ["...", "..."]}
+
+kind is one of: today, backlog, habits, calendar, goals, focus, stale.
+Use several cards when the question spans them. Use none if he is just talking.
+"next" holds up to three follow-ups written in HIS voice, as questions he might
+ask next. Reply in the language he wrote in.`
+
+/** The opening move, before he has asked anything. */
+export const OPENING_PROMPT =
+  'Open the day. Look at the briefing and tell me what deserves attention first, then show it.'
+
+export function briefText(b: Brief): string {
+  const slots = b.planned
+    .map((s) => `${s.slot}: ${s.items.length ? s.items.map((i) => `${i.title}${i.done ? ' (done)' : ''}`).join('; ') : 'empty'}`)
+    .join('\n')
+  return [
+    `Now: ${b.now}, ${b.weekday}`,
+    `Planned today:\n${slots}`,
+    `Backlog: ${b.backlogCount} open`,
+    b.oldest.length ? `Oldest untouched: ${b.oldest.map((o) => `${o.title} (${o.days}d)`).join('; ')}` : 'Nothing is ageing badly',
+    `Habits today: ${b.habits.kept} of ${b.habits.due} kept${b.habits.open.length ? `, still open: ${b.habits.open.join('; ')}` : ''}`,
+    b.meetings.length ? `Meetings: ${b.meetings.map((m) => `${m.at} ${m.title}`).join('; ')}` : 'No meetings in the calendar',
+    `Focus logged today: ${b.focusToday} minutes`,
+    b.goals.length ? `Goals: ${b.goals.map((g) => `${g.name} ${g.pct}%`).join('; ')}` : 'No goals set',
+  ].join('\n')
 }
 
-export const TAB_FOR: Record<ParsedItem['kind'], string> = {
-  task: 'Plan · today',
-  done: 'Plan · done today',
-  goal: 'Goals · this week',
+export type Outcome =
+  | { ok: true; reply: Reply }
+  | { ok: false; reason: 'no-key' | 'rejected' | 'offline' | 'unreadable'; detail?: string }
+
+/** One turn. `history` is the conversation so far, oldest first. */
+export async function ask(
+  question: string,
+  brief: Brief,
+  history: { role: 'user' | 'assistant'; content: string }[],
+): Promise<Outcome> {
+  const key = getAiKey()
+  if (!key) return { ok: false, reason: 'no-key' }
+  let res: Response
+  try {
+    res = await groq({
+      model: MODEL,
+      temperature: 0.3,
+      max_tokens: 700,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: SYSTEM },
+        { role: 'system', content: `Today's briefing, read from his own log:\n${briefText(brief)}` },
+        ...history.slice(-8),
+        { role: 'user', content: question },
+      ],
+    }, key)
+  } catch {
+    return { ok: false, reason: 'offline' }
+  }
+  if (res.status === 401 || res.status === 403) return { ok: false, reason: 'rejected' }
+  if (!res.ok) return { ok: false, reason: 'unreadable', detail: `The model answered ${res.status}.` }
+
+  try {
+    const data = await res.json()
+    const raw = data?.choices?.[0]?.message?.content ?? ''
+    const parsed = JSON.parse(raw) as Partial<Reply>
+    const say = typeof parsed.say === 'string' ? parsed.say.trim() : ''
+    if (!say) return { ok: false, reason: 'unreadable' }
+    /* Anything it invented outside the card vocabulary is dropped rather than
+       rendered: an unknown card is a card this app cannot promise is true. */
+    const show = Array.isArray(parsed.show)
+      ? parsed.show.filter((c): c is Card => !!c && KINDS.includes((c as Card).kind)).slice(0, 4)
+      : []
+    const next = Array.isArray(parsed.next)
+      ? parsed.next.filter((n) => typeof n === 'string' && n.trim()).slice(0, 3)
+      : []
+    return { ok: true, reply: { say, show, next } }
+  } catch {
+    return { ok: false, reason: 'unreadable' }
+  }
 }

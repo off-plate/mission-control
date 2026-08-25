@@ -12,6 +12,7 @@ import { DayPage } from './day'
 import { BoardPage } from './board'
 import { AppsPage } from './apps'
 import { CalendarPage } from './calendarpage'
+import { AssistantPage } from './assistantpage'
 import { Helmet } from './helmet'
 import { FocusPage } from './focus'
 import { ZonePage, useZoneDepth } from './zone'
@@ -73,6 +74,7 @@ const NAV: { id: PageId; label: string }[] = [
   { id: 'goals', label: 'Goals' },
   { id: 'board', label: 'Why’s' },
   { id: 'apps', label: 'Apps' },
+  { id: 'assistant', label: 'Assistant' },
 ]
 
 /** Pages that belong to one workspace. */
@@ -403,6 +405,7 @@ export default function App() {
         {page === 'board' && <BoardPage />}
         {page === 'apps' && <AppsPage />}
         {page === 'calendar' && <CalendarPage />}
+        {page === 'assistant' && <AssistantPage />}
         {page === 'notes' && <NotesPage />}
         {page === 'settings' && <SettingsPage />}
         {page === 'brand' && <BrandPage />}

@@ -1078,7 +1078,7 @@ function routeFromHash(): { page: PageId; day: string | null } {
   if (m) return { page: 'day', day: m[1] }
   // The board's old address still resolves: a bookmark lands on its successor.
   if (h === 'braindump') return { page: 'notes', day: null }
-  const pages: PageId[] = ['today', 'plan', 'habits', 'routines', 'goals', 'achievements', 'money', 'review', 'stats', 'settings', 'brand', 'notes', 'focus', 'board', 'zone', 'apps', 'calendar']
+  const pages: PageId[] = ['today', 'plan', 'habits', 'routines', 'goals', 'achievements', 'money', 'review', 'stats', 'settings', 'brand', 'notes', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant']
   return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
 }
 

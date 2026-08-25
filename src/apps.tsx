@@ -16,7 +16,7 @@
    refuses to be framed (frame-ancestors 'none', its own correct call) so it is
    not here either. */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface EmbeddedApp {
   id: string
@@ -86,9 +86,19 @@ export function AppsPage() {
   const [reload, setReload] = useState(0)
   const open = APPS.find((a) => a.id === openId) ?? null
 
-  /* Escape closes the app, the way it closes everything else here. */
+  /* Escape closes the app, the way it closes everything else here.
+
+     The way out has to be given focus for that to be true. A keydown listener
+     on this window never hears a key pressed inside the frame, and the frame
+     takes focus as soon as it loads, so Escape was landing in somebody else's
+     app and doing nothing. The test caught it intermittently for a day and I
+     kept filing it as flaky; it was not flaky, it was a race with the frame
+     loading. Focusing the way out fixes the keyboard for real and makes the
+     test deterministic at the same time. */
+  const wayOut = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     if (!open) return
+    wayOut.current?.focus()
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpenId(null) }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -98,7 +108,7 @@ export function AppsPage() {
     return (
       <div className="page">
         <div className="apps-open">
-          <button className="btn btn-quiet" onClick={() => setOpenId(null)}>Back to apps</button>
+          <button ref={wayOut} className="btn btn-quiet" onClick={() => setOpenId(null)}>Back to apps</button>
           <h1 className="apps-openname">{open.name}</h1>
           <button className="btn btn-quiet" onClick={() => setReload((n) => n + 1)}>Reload</button>
           <a className="btn btn-quiet" href={open.url} target="_blank" rel="noreferrer">Open in browser</a>
@@ -107,7 +117,19 @@ export function AppsPage() {
             made wider than the window that shows it, so the bar sits in the
             overhang. Scrolling still works, it is just not drawn. */}
         <div className="apps-clip">
-          <iframe key={`${open.id}-${reload}`} className="apps-frame" src={open.url} title={open.name} />
+          <iframe
+            key={`${open.id}-${reload}`}
+            className="apps-frame"
+            src={open.url}
+            title={open.name}
+            /* The frame takes focus when it finishes loading, and a key pressed
+               inside a cross-origin frame is invisible to this page: no listener
+               here can ever see it. So the way out is given focus back once the
+               frame is ready, which is the only moment this page can win the
+               race. After he clicks into the app, Escape belongs to that app,
+               and that is correct. */
+            onLoad={() => wayOut.current?.focus()}
+          />
         </div>
       </div>
     )

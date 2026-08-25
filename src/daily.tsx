@@ -36,6 +36,7 @@ import { SPACE_LABELS } from './mock'
 import { MOCK_AGENDA } from './exceptions'
 import { dayIndexOf, fmtDuration, localDateKey } from './util'
 import { SPACES, currentStreak, focusMinutesOn, isCounted, type AgendaEvent, type HabitDef, type Routine, type Task } from './types'
+import * as Icon from './icons'
 
 const yesterdayKey = () => {
   const d = new Date()
@@ -416,9 +417,7 @@ export function DailyReview() {
                 {doneYesterday.slice(0, 6).map((t, i) => (
                   <li key={t.id} style={{ animationDelay: `${520 + i * 50}ms` }}>
                     <span className="dr-check" aria-hidden="true">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4">
-                        <path d="M4 12.5L9.5 18L20 6" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
+                      <Icon.Check size={12} strokeWidth={3.4} />
                     </span>
                     {t.title}
                   </li>

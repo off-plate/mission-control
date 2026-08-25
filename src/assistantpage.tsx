@@ -4,8 +4,10 @@ import { useCalendar } from './calendar'
 import { SpaceMark } from './ui'
 import { SPACE_LABELS } from './mock'
 import { ask, STARTERS, opener, type Brief, type Card, type CardKind, type Reply } from './assistant'
+import { engineName, speechState, stop as stopSpeech, subscribe, toggle } from './speech'
 import { SLOTS, dueOn, habitsDueToday, goalCurrent, type HabitDef, type PageId, type SpaceId, type Task } from './types'
 import { localDateKey, fmtDuration, goalPeriodKey, goalPeriodRange, type GoalTf } from './util'
+import * as Icon from './icons'
 
 /* The assistant, as a room of its own.
 
@@ -100,11 +102,14 @@ function useBrief(): Brief {
    model beyond its own name. Every row carries its workspace, always, because
    this page mixes all three on purpose. */
 
+/* Rows land one after another instead of all at once, capped at ten so a long
+   list never turns into a loading screen. 18ms apart is under the threshold
+   where it reads as waiting; it reads as the list being dealt. */
+const stagger = (i: number) => ({ animationDelay: `${Math.min(i, 10) * 18}ms` })
+
 function Tick() {
   return (
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-      <path d="M2 5.65 5 8.65 10 2.15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
+    <Icon.Check size={12} strokeWidth={1.0} />
   )
 }
 
@@ -146,8 +151,8 @@ function CardBody({ kind, limit }: { kind: CardKind; limit?: number }) {
         {groups.map((g) => (
           <div className="as-group" key={g.label}>
             <span className="microcap">{g.label}</span>
-            {g.items.map((t) => (
-              <div className={`as-row${t.done ? ' is-done' : ''}`} key={t.id}>
+            {g.items.map((t, i) => (
+              <div className={`as-row${t.done ? ' is-done' : ''}`} key={t.id} style={stagger(i)}>
                 <button className="checkbox" role="checkbox" aria-checked={!!t.done}
                   aria-label={t.title} onClick={() => toggleTask(t.id)}><Tick /></button>
                 <SpaceMark space={t.space} always />
@@ -169,8 +174,8 @@ function CardBody({ kind, limit }: { kind: CardKind; limit?: number }) {
     return (
       <div className="as-list">
         <div className="as-group">
-          {rows.map((t) => (
-            <div className="as-row" key={t.id}>
+          {rows.map((t, i) => (
+            <div className="as-row" key={t.id} style={stagger(i)}>
               <button className="checkbox" role="checkbox" aria-checked={false}
                 aria-label={t.title} onClick={() => toggleTask(t.id)}><Tick /></button>
               <SpaceMark space={t.space} always />
@@ -192,8 +197,8 @@ function CardBody({ kind, limit }: { kind: CardKind; limit?: number }) {
     return (
       <div className="as-list">
         <div className="as-group">
-          {rows.map((h: HabitDef) => (
-            <div className={`as-row${h.days[todayIndex] ? ' is-done' : ''}`} key={h.id}>
+          {rows.map((h: HabitDef, i) => (
+            <div className={`as-row${h.days[todayIndex] ? ' is-done' : ''}`} key={h.id} style={stagger(i)}>
               <button className="checkbox" role="checkbox" aria-checked={h.days[todayIndex]}
                 aria-label={h.name} onClick={() => toggleHabitDay(h.id, todayIndex)}><Tick /></button>
               <SpaceMark space={h.space} always />
@@ -214,8 +219,8 @@ function CardBody({ kind, limit }: { kind: CardKind; limit?: number }) {
     return (
       <div className="as-list">
         <div className="as-group">
-          {rows.map((e) => (
-            <div className="as-row" key={e.uid + e.day}>
+          {rows.map((e, i) => (
+            <div className="as-row" key={e.uid + e.day} style={stagger(i)}>
               <span className="as-row-when mono">{e.allDay ? 'all day' : `${String(Math.floor((e.start as number) / 60)).padStart(2, '0')}:${String((e.start as number) % 60).padStart(2, '0')}`}</span>
               <span className="as-row-title">{e.title}</span>
               {e.day !== day && <span className="as-row-min mono">{e.day.slice(5)}</span>}
@@ -235,7 +240,7 @@ function CardBody({ kind, limit }: { kind: CardKind; limit?: number }) {
       <div className="as-list">
         <div className="as-group">
           {week.map((f, i) => (
-            <div className="as-row" key={i}>
+            <div className="as-row" key={i} style={stagger(i)}>
               <span className="as-row-when mono">{f.day.slice(5)}</span>
               <SpaceMark space={f.space} always />
               <span className="as-row-title">{f.label ?? 'Focus block'}</span>
@@ -254,8 +259,8 @@ function CardBody({ kind, limit }: { kind: CardKind; limit?: number }) {
   return (
     <div className="as-list">
       <div className="as-group">
-        {gs.map((g) => (
-          <button className="as-row as-link" key={g.id} onClick={() => setPage('goals')}>
+        {gs.map((g, i) => (
+          <button className="as-row as-link" key={g.id} style={stagger(i)} onClick={() => setPage('goals')}>
             <SpaceMark space={g.space} always />
             <span className="as-row-title">{g.name}</span>
             <span className="as-row-min mono">{g.current} / {g.target}</span>
@@ -279,7 +284,7 @@ function Canvas({ kinds }: { kinds: CardKind[] }) {
   return (
     <aside className="as-canvas" aria-live="polite">
       <header className="as-canvas-head">
-        <h2>{kinds.map((k) => TITLES[k]).join(' · ')}</h2>
+        <h2 key={sig}>{kinds.map((k) => TITLES[k]).join(' · ')}</h2>
       </header>
       <div className="as-canvas-body" key={sig}>
         {kinds.map((k) => (
@@ -290,6 +295,39 @@ function Canvas({ kinds }: { kinds: CardKind[] }) {
         ))}
       </div>
     </aside>
+  )
+}
+
+/* Play and pause on an answer, the way it sits under a reply in Claude.
+
+   It is deliberately not a row of transport controls. There is no scrubber, no
+   speed, no voice picker: this is a thing he presses once on the way to making
+   coffee, and every control that is not play is a control he would never touch.
+
+   The label is the state, not a fixed word, because an icon alone cannot say
+   whether a silent second means loading or finished. */
+function Speak({ id, text }: { id: string; text: string }): JSX.Element {
+  const [, bump] = useState(0)
+  useEffect(() => subscribe(() => bump((n) => n + 1)), [])
+  const st = speechState(id)
+  const label = st === 'playing' ? 'Pause' : st === 'loading' ? 'Loading' : st === 'paused' ? 'Resume' : 'Play'
+  return (
+    <button
+      className={`as-speak is-${st}`}
+      onClick={() => void toggle(id, text)}
+      disabled={st === 'loading'}
+      aria-label={`${label} this answer, spoken by ${engineName()}`}
+      title={`${label}. Read by ${engineName()}.`}
+    >
+      <span className="as-speak-ico" aria-hidden="true">
+        {st === 'playing' ? (
+          <Icon.Pause size={12} filled />
+        ) : (
+          <Icon.Play size={12} filled />
+        )}
+      </span>
+      {label}
+    </button>
   )
 }
 
@@ -310,6 +348,11 @@ export function AssistantPage() {
      because a canvas that empties itself every time he asks a plain question is
      a canvas he cannot work from. */
   const [canvas, setCanvas] = useState<CardKind[]>(['today'])
+  /* The answer as it is being written. The model emits its sentence first, so
+     this fills in a few words at a time while the rest of the object is still
+     coming, which is the difference between watching it think and watching a
+     spinner spin. */
+  const [live, setLive] = useState('')
   const foot = useRef<HTMLDivElement>(null)
   const shell = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLTextAreaElement>(null)
@@ -334,10 +377,10 @@ export function AssistantPage() {
 
   const send = async (text: string) => {
     if (busy) return
-    setBusy(true); setErr(null); setErrHint(null)
+    setBusy(true); setErr(null); setErrHint(null); setLive('')
     setTurns((t) => [...t, { who: 'you', text }])
     const history = turns.map((t) => ({ role: (t.who === 'you' ? 'user' : 'assistant') as 'user' | 'assistant', content: t.text }))
-    const out = await ask(text, brief, history)
+    const out = await ask(text, brief, history, setLive)
     if (out.ok) {
       setTurns((t) => [...t, { who: 'it', text: out.reply.say, reply: out.reply }])
       const kinds = out.reply.show.map((c: Card) => c.kind)
@@ -357,14 +400,20 @@ export function AssistantPage() {
                 : 'Ask again, or rephrase it.',
       )
     }
-    setBusy(false)
+    setBusy(false); setLive('')
     box.current?.focus()
   }
 
   useEffect(() => { foot.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }) }, [turns, busy])
+  /* Instant while it writes. Smooth-scrolling on every token makes each new
+     word fight the last one's animation and the column shivers. */
+  useEffect(() => { if (live) foot.current?.scrollIntoView({ block: 'end' }) }, [live])
   /* The caret is in the box when the page opens. Every other page here is a
      thing to read; this one is a thing to type into. */
   useEffect(() => { box.current?.focus() }, [])
+  /* Walking off the page stops the voice. Otherwise it keeps reading an answer
+     that is no longer on screen, from a page he has already left. */
+  useEffect(() => stopSpeech, [])
 
   const empty = turns.length === 0 && !busy && !err
   const submit = () => { const t = q.trim(); if (t) { setQ(''); void send(t) } }
@@ -424,19 +473,27 @@ export function AssistantPage() {
               {turns.map((t, i) => (
                 <div className={`as-turn is-${t.who}`} key={i}>
                   <p className="as-said">{t.text}</p>
-                  {/* On a wide screen the cards live on the right, so the thread
+                  {/* One row of things you can do with the answer: hear it, and
+                      go to what it pulled. Play used to sit on its own line above
+                      these and read as a fourth stacked pill, which made a
+                      two-line sentence carry three rows of furniture.
+                      On a wide screen the cards live on the right, so the thread
                       keeps only a way back to them. On a phone there is no right,
-                      so they render here. */}
+                      so they render below, full size. */}
+                  {t.who === 'it' && (t.text.trim() || (split && t.reply?.show.length)) ? (
+                    <div className="as-pulled">
+                      {t.text.trim() ? <Speak id={`t${i}`} text={t.text} /> : null}
+                      {split && t.reply?.show.length
+                        ? t.reply.show.map((c, k) => (
+                            <button className="as-pulled-btn" key={k} onClick={() => setCanvas([c.kind])}>
+                              {TITLES[c.kind]}
+                            </button>
+                          ))
+                        : null}
+                    </div>
+                  ) : null}
                   {t.reply?.show.length ? (
-                    split ? (
-                      <div className="as-pulled">
-                        {t.reply.show.map((c, k) => (
-                          <button className="as-pulled-btn" key={k} onClick={() => setCanvas([c.kind])}>
-                            {TITLES[c.kind]}
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
+                    split ? null : (
                       t.reply.show.map((c, k) => (
                         <section className="as-card" key={k}>
                           <h3 className="microcap">{TITLES[c.kind]}</h3>
@@ -456,11 +513,19 @@ export function AssistantPage() {
               ))}
               {busy && (
                 <div className="as-turn is-it">
-                  <p className="as-thinking" role="status">
-                    <span className="as-orb as-orb-sm" aria-hidden="true" />
-                    <span className="as-dots" aria-hidden="true"><i /><i /><i /></span>
-                    <span className="visually-hidden">Reading your day</span>
-                  </p>
+                  {live
+                    ? (
+                      <p className="as-said is-live" role="status">
+                        {live}<span className="as-caret" aria-hidden="true" />
+                      </p>
+                    )
+                    : (
+                      <p className="as-thinking" role="status">
+                        <span className="as-orb as-orb-sm" aria-hidden="true" />
+                        <span className="as-dots" aria-hidden="true"><i /><i /><i /></span>
+                        <span className="visually-hidden">Reading your day</span>
+                      </p>
+                    )}
                 </div>
               )}
               {err && (

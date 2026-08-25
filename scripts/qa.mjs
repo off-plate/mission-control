@@ -6,13 +6,23 @@
    selectors, and fails loudly on any console error. */
 import { chromium } from 'playwright'
 import { createServer } from 'http'
-import { readFileSync, existsSync } from 'fs'
+import { readFileSync, existsSync, cpSync, rmSync, mkdtempSync } from 'fs'
+import { tmpdir } from 'os'
 import { fileURLToPath } from 'url'
 import { dirname, resolve, join, extname } from 'path'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const DOCS = resolve(HERE, '..', 'docs')
-const PORT = 8321
+/* A COPY of docs/, taken once. Served straight from the real directory this
+   suite went red at random: a rebuild landing mid-run deletes index.html for a
+   moment and changes every chunk hash, which showed up as a 404 on the page
+   itself and as steps failing against a bundle that no longer existed. The
+   snapshot is what was built when the run started, for the whole run. */
+const SNAP = mkdtempSync(join(tmpdir(), 'mc-gate-'))
+cpSync(resolve(HERE, '..', 'docs'), SNAP, { recursive: true })
+const DOCS = SNAP
+/* Whatever port the OS hands out. A fixed one meant a run that died badly left
+   the socket bound, and the NEXT run crashed on EADDRINUSE before a single
+   step, or worse, half-ran against the previous run's server. */
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml' }
 const server = createServer((req, res) => {
   const path = (req.url ?? '/').split('?')[0].replace(/^\/mission-control/, '') || '/'
@@ -29,7 +39,8 @@ const server = createServer((req, res) => {
   res.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream' })
   res.end(readFileSync(file))
 })
-await new Promise((ok) => server.listen(PORT, ok))
+await new Promise((ok) => server.listen(0, ok))
+const PORT = server.address().port
 const URL = `http://localhost:${PORT}/mission-control/?noremote`
 const KEY = 'mission-control-demo-v12'
 
@@ -71,7 +82,7 @@ const step = async (name, fn) => {
 }
 const fresh = async (route = '') => {
   await page.goto(URL); await page.waitForTimeout(300)
-  await page.evaluate((K) => localStorage.removeItem(K), KEY)
+  await page.evaluate((K) => { localStorage.removeItem(K); localStorage.removeItem('qa-stream') }, KEY)
   await page.goto(`${URL}#/${route}`); await page.reload(); await page.waitForTimeout(700)
 }
 
@@ -594,6 +605,13 @@ await step('today: the clock is a widget in the grid, and it says the real minut
       inGrid: !!frame && !!grid && frame.top >= grid.top - 1,
       leftmost: !!frame && !!grid && Math.round(frame.left - grid.left) < 8,
       realTime: d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+      /* The minute BEFORE now, and it is not slack. The widget renders when the
+         page loads and this assertion reads the clock some time later, so a
+         rollover in between made a correct clock fail. It failed exactly that
+         way on 2026-08-25 at 21:03/21:04, on a run whose only other result was
+         green. Accepting either minute still catches a clock that is stuck,
+         blank, or wrong by more than the gap this test itself creates. */
+      prevTime: new Date(d.getTime() - 60_000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
       realDay: d.toLocaleDateString('en-GB', { weekday: 'long' }),
       bandHasClock: [...document.querySelectorAll('.band-metric .v')].some((el) => /^\d{2}:\d{2}$/.test(el.textContent ?? '')),
     }
@@ -601,7 +619,7 @@ await step('today: the clock is a widget in the grid, and it says the real minut
   if (!c) throw new Error('there is no clock widget on Today')
   if (!c.inGrid) throw new Error('the clock is not inside the widget grid')
   if (!c.leftmost) throw new Error('the clock is not at the left of the grid')
-  if (c.time !== c.realTime) throw new Error(`the widget reads ${c.time}, the browser says ${c.realTime}`)
+  if (c.time !== c.realTime && c.time !== c.prevTime) throw new Error(`the widget reads ${c.time}, the browser says ${c.realTime}`)
   if (c.day !== c.realDay) throw new Error(`the widget reads ${c.day}, the browser says ${c.realDay}`)
   if (c.bandHasClock) throw new Error('the clock is still in the band as well')
 })
@@ -2264,7 +2282,13 @@ await step('notes: ticking one files it under Done and takes it out of the folde
    no sign it was thinking, and it only ever answered about the workspace he
    happened to be standing in. Every one of those is a step below. */
 
-/** Answer as Groq would, choosing the reply from what he actually asked. */
+/** Answer as Groq would, choosing the reply from what he actually asked.
+ *  Groq is asked to stream now, so the stub answers in the wire format it
+ *  really uses: server-sent events. A plain JSON body would pass through the
+ *  reader as zero frames and every one of these steps would go green on an
+ *  empty answer. */
+const sse = (text) =>
+  `data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\ndata: [DONE]\n\n`
 const stubAssistant = async (reply, { delay = 0, status = 0, message = '' } = {}) => {
   await page.unroute('https://api.groq.com/**').catch(() => {})
   await page.route('https://api.groq.com/**', async (route) => {
@@ -2275,12 +2299,41 @@ const stubAssistant = async (reply, { delay = 0, status = 0, message = '' } = {}
       await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ error: { message } }) })
       return
     }
-    await route.fulfill({
-      status: 200, contentType: 'application/json',
-      body: JSON.stringify({ choices: [{ message: { content: reply(asked, req) } }] }),
-    })
+    await route.fulfill({ status: 200, contentType: 'text/event-stream', body: sse(reply(asked, req)) })
   })
 }
+
+/* A stub that arrives in pieces, over time, so the progressive render is what
+   is under test rather than the parse. Playwright fulfils a route in one shot,
+   so this replaces fetch inside the page instead. It stays inert until a step
+   asks for it, because it is installed for the rest of the run. */
+await page.addInitScript(() => {
+  const real = window.fetch.bind(window)
+  window.fetch = async (input, init) => {
+    let cfg = null
+    try { cfg = JSON.parse(localStorage.getItem('qa-stream') ?? 'null') } catch { /* off */ }
+    const url = typeof input === 'string' ? input : input.url
+    if (!cfg || !/api\.groq\.com/.test(String(url))) return real(input, init)
+    /* This never reaches the network, so Playwright sees no request. The ask is
+       recorded here instead, which is the only way to prove the app asked the
+       model to stream rather than quietly going back to one blocking call. */
+    try { window.__qaAsked = JSON.parse(String(init?.body ?? 'null')) } catch { window.__qaAsked = null }
+    const obj = JSON.stringify({ say: cfg.say, show: (cfg.show ?? []).map((k) => ({ kind: k })), next: [] })
+    const frames = obj.match(/[\s\S]{1,8}/g) ?? []
+    const enc = new TextEncoder()
+    const body = new ReadableStream({
+      async start(c) {
+        for (const f of frames) {
+          c.enqueue(enc.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: f } }] })}\n\n`))
+          await new Promise((r) => setTimeout(r, cfg.gap ?? 40))
+        }
+        c.enqueue(enc.encode('data: [DONE]\n\n'))
+        c.close()
+      },
+    })
+    return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } })
+  }
+})
 const askAssistant = async (text) => {
   await page.locator('.as-input').fill(text)
   await page.locator('.as-input').press('Enter')
@@ -2428,9 +2481,80 @@ await step('assistant: it visibly thinks, and says what to do when the model is 
   expected = null
 })
 
+await step('assistant: the answer is written out, it does not appear finished', async () => {
+  /* The whole point of streaming: he sees the sentence forming. Tested against
+     a body that genuinely arrives in pieces over time, because a stub that
+     answers in one shot proves the parse and nothing about the render. */
+  await fresh('assistant')
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const d = new Date()
+    const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    s.tasks = [{
+      id: 'gate-stream', title: 'Gate streaming task', space: 'personal', source: 'mc',
+      estimateMin: 30, done: false, list: 'today', category: 'admin', slot: 'morning',
+      plannedOn: day, createdAt: day, addedAt: Date.now(),
+    }]
+    localStorage.setItem(K, JSON.stringify(s))
+    localStorage.setItem('mc-groq-key', 'gsk_gatetest')
+    localStorage.setItem('qa-stream', JSON.stringify({
+      say: 'The whole day is on the right, and most of what is still open belongs to the side business.',
+      show: ['today'], gap: 45,
+    }))
+  }, KEY)
+  await page.reload(); await page.waitForTimeout(700)
+  await page.locator('.as-input').fill('what is on today')
+  await page.locator('.as-input').press('Enter')
+  await page.waitForFunction(() => !!window.__qaAsked, null, { timeout: 5000 })
+  if (!(await page.evaluate(() => window.__qaAsked?.stream === true))) {
+    throw new Error('the request did not ask the model to stream, so nothing can arrive early')
+  }
+  /* Caught mid-sentence: some of it on screen, not all of it, and a caret. */
+  await page.waitForSelector('.as-said.is-live', { timeout: 4000 })
+  const mid = await page.locator('.as-said.is-live').innerText()
+  if (!mid.trim()) throw new Error('the live line is empty, so nothing is arriving early')
+  if (mid.includes('side business')) throw new Error(`the whole sentence was there at once: ${JSON.stringify(mid)}`)
+  if (!(await page.locator('.as-caret').count())) throw new Error('no caret while it writes')
+  const caret = await page.evaluate(() => getComputedStyle(document.querySelector('.as-caret')).animationName)
+  if (!caret || caret === 'none') throw new Error('the caret is a still bar')
+  /* And it lands whole, with the cards, and the caret goes. */
+  await page.waitForSelector('.as-canvas-body .as-row', { timeout: 8000 })
+  await page.waitForSelector('.as-caret', { state: 'detached', timeout: 8000 })
+  const done = await page.locator('.as-turn.is-it .as-said').last().innerText()
+  if (!done.includes('side business')) throw new Error(`the finished sentence is wrong: ${JSON.stringify(done)}`)
+  await page.evaluate(() => localStorage.removeItem('qa-stream'))
+})
+
+await step('assistant: the canvas deals its rows in, and stops moving for a reader who asked it to', async () => {
+  await fresh('assistant')
+  await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
+  await stubAssistant(() => JSON.stringify({ say: 'Here.', show: [{ kind: 'habits' }] }))
+  await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('habits please')
+  await page.waitForSelector('.as-canvas-body .as-row', { timeout: 4000 })
+  const rows = await page.evaluate(() => [...document.querySelectorAll('.as-canvas-body .as-row')].slice(0, 6)
+    .map((r) => { const c = getComputedStyle(r); return { name: c.animationName, delay: c.animationDelay } }))
+  if (rows.length < 3) throw new Error('not enough rows to judge the stagger')
+  if (rows.some((r) => r.name === 'none')) throw new Error('the rows are not animated at all')
+  const delays = rows.map((r) => Math.round(parseFloat(r.delay) * 1000))
+  if (new Set(delays).size < 3) throw new Error(`the rows all land together: ${JSON.stringify(delays)}`)
+  if (delays[delays.length - 1] > 400) throw new Error(`the last row waits ${delays[delays.length - 1]}ms, which is a loading screen`)
+  /* Every one of these is off for someone who asked their system for less
+     motion, which is the whole contract of adding motion in the first place. */
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.waitForTimeout(200)
+  const still = await page.evaluate(() => {
+    const names = (sel) => [...document.querySelectorAll(sel)].map((e) => getComputedStyle(e).animationName)
+    return [...names('.as-canvas-body .as-row'), ...names('.as-turn'), ...names('.as-orb'), ...names('.as-canvas-body')]
+  })
+  const moving = still.filter((n) => n && n !== 'none')
+  if (moving.length) throw new Error(`${moving.length} things still animate under reduced motion: ${[...new Set(moving)].join(', ')}`)
+  await page.emulateMedia({ reducedMotion: null })
+})
+
 await page.unroute('https://api.groq.com/**').catch(() => {})
 
-await b.close(); server.close()
+await b.close(); server.close(); rmSync(SNAP, { recursive: true, force: true })
 if (errors.length) console.log(`CONSOLE ERRORS (${errors.length}): ${errors[0]}`)
 console.log(`${pass} pass, ${fail} fail${errors.length ? `, ${errors.length} console errors` : ', 0 console errors'}`)
 process.exit(fail || errors.length ? 1 : 0)

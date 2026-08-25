@@ -14,6 +14,7 @@ import { AppsPage } from './apps'
 import { CalendarPage } from './calendarpage'
 import { AssistantPage } from './assistantpage'
 import { Helmet } from './helmet'
+import * as Icon from './icons'
 import { FocusPage } from './focus'
 import { ZonePage, useZoneDepth } from './zone'
 import { useStore } from './store'
@@ -202,9 +203,7 @@ function PhonePages({ tabs, page, setPage }: {
         aria-label={`Pages, currently ${here?.label ?? 'Today'}`}
         onClick={() => setOpen((v) => !v)}
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-          <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
-        </svg>
+        <Icon.Menu size={16} />
         <span className="btn-label">{here?.label ?? 'Pages'}</span>
       </button>
       {open && (
@@ -358,9 +357,7 @@ export default function App() {
             title={page === 'zone' ? 'Leave the Zone' : 'The Zone'}
             aria-label={page === 'zone' ? 'Leave the Zone' : 'The Zone'}
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <path d="M12 3l2.6 6.2L21 11l-6.4 1.8L12 21l-2.6-8.2L3 11l6.4-1.8z" strokeLinejoin="round" />
-            </svg>
+            <Icon.Star size={15} />
             <span className="btn-label">The Zone</span>
           </button>
           {/* The helmet. Its eyes light when the mode is on, so the icon IS the
@@ -383,10 +380,7 @@ export default function App() {
             title="Notes"
             aria-label="Note"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <path d="M5 3.5h9.5L19 8v12.5H5z" strokeLinejoin="round" />
-              <path d="M14 3.5V8h5M8.5 12.5h7M8.5 16h4.5" strokeLinecap="round" />
-            </svg>
+            <Icon.Note size={15} />
             <span className="btn-label">Note</span>
           </button>
           {/* Money and Reflect, merged. Both are about looking back at what
@@ -398,20 +392,13 @@ export default function App() {
             title="Achievements, money and reflection"
             aria-label="Achievements"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <path d="M7 3.5h10v5a5 5 0 0 1-10 0z" strokeLinejoin="round" />
-              <path d="M7 5H4.5v1.5A3.5 3.5 0 0 0 8 10M17 5h2.5v1.5A3.5 3.5 0 0 1 16 10" strokeLinecap="round" />
-              <path d="M12 13.5v3.5M9 20.5h6" strokeLinecap="round" />
-            </svg>
+            <Icon.Award size={15} />
             <span className="btn-label">Achievements</span>
           </button>
           {/* Yesterday, on demand. It offers itself once a morning; after that
               it is his to open, from any page, without hunting for a pill. */}
           <button className="btn btn-ghost" onClick={openDaily} aria-label="Yesterday" title="Walk yesterday and today">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <path d="M3.5 9a9 9 0 1 0 2.3-3.7L3 8" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M3 4v4h4M12 7.5V12l3 2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <Icon.Rewind size={15} />
             <span className="btn-label">Yesterday</span>
           </button>
           {page !== 'zone' && <PhonePages tabs={tabs} page={page} setPage={setPage} />}
@@ -421,10 +408,7 @@ export default function App() {
             aria-label={needsSignIn ? 'Settings, sync is off' : 'Settings'}
             aria-pressed={page === 'settings'}
           >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
+            <Icon.Settings size={17} />
           </button>
         </div>
       </header>

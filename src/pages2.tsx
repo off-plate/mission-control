@@ -7,11 +7,13 @@ import { Spark, SparkBox } from './widgets'
 import { RANGE_OPTIONS, allTimeRange, customRange, fmtDuration, fmtNum, fmtSigned, fmtWhen, goalPace, goalPeriodKey, goalPeriodRange, inRange, isoWeekKey, localDateKey, monthName, monthRange, monthsWithData, rangeFor, taskMinutes, type GoalTf, type RangeId } from './util'
 import { WALL } from './board'
 import { getAiKey, hasAiKey, setAiKey } from './ai'
+import { getTtsKey, hasTtsKey, setTtsKey } from './speech'
 import { paymentTaskTitle } from './exceptions'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange, sendSignInCode, signInWithCode, signOutAccount, type Account } from './supabase'
 import { describe, useSyncStatus } from './sync'
 import { getOpenAtLogin, isDesktop, setOpenAtLogin } from './desktop'
 import { goalCurrent, isTimeFed, ON_TRACK_PCT, STEP_UNITS, stepSeries, type StepEntry, type TaskCategory } from './types'
+import * as Icon from './icons'
 
 /* ---------------- MONEY ---------------- */
 
@@ -55,7 +57,7 @@ function CompassCard({ state, onReload }: { state: CompassState; onReload: () =>
       )}
       <a className="btn btn-primary money-compass-btn" href="https://compass-money.netlify.app" target="_blank" rel="noreferrer">
         Open Compass
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M7 17L17 7M17 7H8M17 7v9" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        <Icon.ExternalLink size={15} />
       </a>
     </div>
   )
@@ -942,6 +944,42 @@ function AiKeyField() {
   )
 }
 
+function VoiceKeyField() {
+  const [key, setKey] = useState(getTtsKey())
+  const [saved, setSaved] = useState(false)
+  const live = hasTtsKey()
+  return (
+    <div className="ai-key">
+      <div className="source-row">
+        {/* Never "off". Without a key the play button still reads the answer,
+            using the voice already on the machine, so the honest states are
+            which voice you get, not whether the feature exists. */}
+        <span className={`status-dot ${live ? 'connected' : 'partial'}`} />
+        <span className="info">
+          <span className="name">Gemini, for the voice that reads answers aloud</span>
+          <span className="detail" style={{ display: 'block' }}>
+            {live
+              ? 'Connected. Play on an answer is read by Gemini, and it can be told how to deliver a line.'
+              : 'Not set. Play still works, read by the voice built into this machine. Gemini sounds better.'}
+          </span>
+        </span>
+        <a className="btn btn-quiet" href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">Get a free key ↗</a>
+      </div>
+      <div className="formrow" style={{ marginTop: 'var(--s2)', marginBottom: 0 }}>
+        <input
+          className="textinput grow" type="password" placeholder="AIza…" value={key}
+          onChange={(e) => { setKey(e.target.value); setSaved(false) }}
+          aria-label="Gemini API key"
+        />
+        <button className="btn btn-primary" onClick={() => { setTtsKey(key); setSaved(true) }}>Save</button>
+      </div>
+      <p className="assist-note" style={{ marginTop: 6 }}>
+        {saved ? 'Saved on this device.' : 'Same deal as the key above: this browser only, never synced, never in the code. Check the project is on the free tier before you lean on it.'}
+      </p>
+    </div>
+  )
+}
+
 export function SettingsPage() {
   const { sources, toggleSource, resetDemo, setPage, inView } = useStore()
   return (
@@ -975,6 +1013,7 @@ export function SettingsPage() {
           <AccountField />
           <span className="microcap" style={{ marginTop: 24, display: 'block' }}>AI</span>
           <AiKeyField />
+          <VoiceKeyField />
           <span className="microcap" style={{ marginTop: 24, display: 'block' }}>Design</span>
           <div className="source-row">
             <span className="info"><span className="name">Brand &amp; guidelines</span><span className="detail" style={{ display: 'block' }}>The colours, type and rules this app is built on</span></span>

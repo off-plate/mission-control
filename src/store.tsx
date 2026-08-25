@@ -6,10 +6,19 @@ import { outbox } from './sync'
    Used both to stop two tabs answering each other's saves forever, and to decide
    whether this device is holding anything the server has not got. */
 function stripDates(j: string): string {
-  try { const o = JSON.parse(j) as Record<string, unknown>; delete o.savedAt; return JSON.stringify(o) } catch { return j }
+  try {
+    const o = JSON.parse(j) as Record<string, unknown>
+    delete o.savedAt
+    /* Who wrote it is not part of the work either. Leaving it in would make
+       every save differ from the last one by a fresh timestamp, and the two
+       things this comparison protects, two tabs answering each other forever
+       and a device pushing what the server already has, would both come back. */
+    delete o.lastWrite
+    return JSON.stringify(o)
+  } catch { return j }
 }
 import { roll } from './roll'
-import { bodyHash, deviceId, HIST, mergeStates, rowKey, type Tomb } from './sync-merge'
+import { bodyHash, deviceId, deviceName, HIST, mergeStates, rowKey, type LastWrite, type Tomb } from './sync-merge'
 import { dayIndexOf, dayOfWeekKey, goalPeriodKey, goalPeriodRange, isoWeekKey, localDateKey, periodIsPast, periodKeyFor, slotForTime, type GoalTf } from './util'
 import {
   DEFAULT_SPACES,
@@ -95,6 +104,8 @@ interface PersistedState {
   /** Personal bests, keyed by `routineId:stepId`. Survives every rollover. */
   records?: Record<string, number>
   savedAt?: number
+  /** Which device saved this copy. Read by the OTHER devices. */
+  lastWrite?: LastWrite
   /** Which storage schema wrote this. A row from an older one is not reused. */
   schema?: string
   /** Seeded habits and routines he deleted on purpose; never re-seeded. */
@@ -308,6 +319,10 @@ interface Store extends PersistedState {
   slips: HabitSlip[]
   stepLog: StepEntry[]
   stepTicks: StepTick[]
+
+  /* Where the copy on screen last came from, when that was another device.
+     Null means this one, which is the ordinary case and needs no words. */
+  syncOrigin: { name: string; at: number } | null
 
   /* ---- Notes ----
      The folder is the note's address and its workspace both: move a note into
@@ -1223,6 +1238,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [undoable, setUndoable] = useState<Undoable | null>(null)
   const remoteSaveTimer = useRef<number | undefined>(undefined)
   const latestJson = useRef<string>('')
+  /* Where the copy on screen last came from, when that was somewhere else.
+     Deliberately NOT persisted: it answers "did my phone's edit land here yet",
+     which is a question about this device right now, and a stored answer would
+     survive into a session where it is no longer true.
+
+     It is set when a change actually arrives from another device and cleared
+     the moment he edits anything here, so the topbar reads "updated from your
+     iPhone" until he writes something himself, then goes back to plain. */
+  const [syncOrigin, setSyncOrigin] = useState<{ name: string; at: number } | null>(null)
+  /* Set by applyExternal so the save effect it triggers can tell "this arrived
+     from elsewhere" from "he typed something", which look identical from inside
+     a state update. */
+  const fromExternal = useRef(false)
   /* The view and the write-space survive a reload, kept out of the synced blob on
      purpose so working on the phone does not flip the desktop. All is the default:
      the whole point is that nothing hides in a profile he did not open. */
@@ -1299,10 +1327,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const state: PersistedState = {
       version: 3, spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
       notes, noteFolders,
-      savedAt: Date.now(), weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
+      savedAt: Date.now(), lastWrite: { dev: deviceId(), name: deviceName(), at: Date.now() },
+      weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
       habitLog, routineLog, slips, stepLog, stepTicks, dailyDone, dailySkipped, spaceGuessed, graveyard, lastRollDay: lastRollDay ?? localDateKey(),
     }
     const json = JSON.stringify(state)
+    /* His own writing is the one thing that makes "updated from your iPhone"
+       stale, so it is what takes the line down. The save that applyExternal
+       itself triggers is not his writing, and says so through the flag. */
+    if (fromExternal.current) fromExternal.current = false
+    else setSyncOrigin(null)
     latestJson.current = json
     try {
       localStorage.setItem(STORAGE_KEY, json)
@@ -1334,6 +1368,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     /* Nothing new once the dates are set aside: stop, or two tabs would answer
        each other's saves forever. */
     if (mine && stripDates(merged) === stripDates(mine)) return
+    /* Something genuinely arrived. Read the stamp off the INCOMING blob rather
+       than the merged one: the merge keeps the newer side's stamp, which on a
+       pull that this device wins is this device, and "updated from the Mac" is
+       not news to the Mac. */
+    try {
+      const inc = JSON.parse(incoming) as PersistedState
+      const w = inc.lastWrite
+      if (w && w.dev && w.dev !== deviceId()) setSyncOrigin({ name: w.name, at: w.at })
+    } catch { /* a stamp is a nicety; never let it stop the merge */ }
+    fromExternal.current = true
     if (p.tasks) setTasks(p.tasks)
     if (p.habits) setHabits(p.habits)
     if (p.goals) setGoals(p.goals)
@@ -2449,6 +2493,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       })
     }),
 
+    syncOrigin,
     notes, noteFolders,
     addNote: (folderId, body = '') => {
       const id = newId('note')

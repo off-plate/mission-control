@@ -1272,6 +1272,13 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 .status-dot.off { background: var(--faint); }
 .status-dot.manual { background: var(--accent); }
 .status-dot.warn { background: var(--warn); }
+.status-dot.alert { background: var(--alert); }
+
+/* The sync line in the topbar. Muted and small on purpose: it is an assurance,
+   not an alert, and an assurance that shouts is one he learns to stop reading.
+   The dot carries the state, the words carry the detail. */
+.syncpip { display: inline-flex; align-items: center; gap: var(--s2); min-width: 0; margin-right: var(--s2); }
+.syncpip-text { font-size: 0.8125rem; color: var(--muted); white-space: nowrap; }
 /* In Settings the toggle beside it already states on/off. The dot stays in
    the compact Sources widget, where it is the only state signal in the row. */
 .source-row .status-dot { display: none; }
@@ -2446,6 +2453,18 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 @media (max-width: 639px) {
   .topbar-right .btn-label { display: none; }
   .brand-name { display: none; }
+  /* Alert by exception. On a phone the ordinary "Synced 4 min ago" is a dot and
+     nothing else, because at this width every word competes with the buttons
+     beside it. The words come back the instant the state stops being ordinary:
+     an unsent change, a failed push, or an edit that arrived from elsewhere. */
+  .syncpip[data-quiet] .syncpip-text { display: none; }
+  .syncpip { margin-right: 0; }
+  /* When there IS something to say, the line takes its own row UNDER the
+     buttons instead of shoving six 44px targets down the page. Ordering it last
+     is what puts it below them rather than above: the news is worth a line, it
+     is not worth moving everything he taps. */
+  .syncpip:not([data-quiet]) { order: 1; flex-basis: 100%; justify-content: flex-end; }
+  .topbar-right { row-gap: var(--s2); }
   /* Icon-only now: width has to clear the 44px floor on its own, the same
      one the height already meets, or a narrow icon glyph with slim padding
      quietly ships a target a few pixels short of it. */
@@ -4624,17 +4643,21 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .shell.is-hud .btn-helmet { color: var(--accent-text); }
 
 /* ---------- Assistant ----------
-   Built to the page he sent: a mark, one question, one wide box, and a row of
-   chips under it. What is NOT here, on his instruction: no voice button, and
-   none of "attach / search / reason / create an image / summarise / translate".
-   Those belong to a general chatbot; the chips here are questions about his own
-   week, which is the only thing this assistant can actually answer.
+   Two states, and they are different rooms.
 
-   Empty, the page is a doorway and everything sits in the middle of the screen.
-   Once he has asked, the hero goes and the thread takes the room, with the box
-   settling to the bottom where a conversation expects it. */
-.as-page { max-width: 780px; margin: 0 auto; }
+   EMPTY, it is the page he sent: a mark, one question, one wide box, chips
+   under it. What is NOT here, on his instruction: no voice button, and none of
+   "attach / search / reason / create an image / summarise / translate". Those
+   belong to a general chatbot; the chips here are questions about his own week,
+   which is the only thing this assistant can answer.
+
+   ASKED, it splits. The left half talks and scrolls; the right half shows and
+   swaps. The page is sized to exactly the room under the header, so the THREAD
+   scrolls and the document does not, which is what stops the ask box travelling
+   up the screen every time an answer arrives. A list you are working from
+   should not move while you type the next question about it. */
 .as-page.is-empty {
+  max-width: 780px; margin: 0 auto;
   min-height: calc(100dvh - 210px);
   display: flex; flex-direction: column; justify-content: center;
 }
@@ -4651,17 +4674,48 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   font-family: var(--font-display); font-size: clamp(1.6rem, 1.1rem + 2vw, 2.2rem);
   line-height: 1.15; color: var(--ink);
 }
+.as-hero-now { margin-top: var(--s3); font-size: var(--text-sm); color: var(--muted); }
 
-/* The box. One field, and the send under it, because a row of controls beside
-   the caret is what makes these things look like a cockpit. */
+/* ---- the split ---- */
+.as-page.is-split {
+  /* Exactly the room left under the header. Measured in JS rather than assumed,
+     because the header grows a banner on some days and a hardcoded offset would
+     be a banner's height wrong on exactly those days. */
+  height: calc(100dvh - var(--as-top, 220px));
+  min-height: 460px;
+  padding-bottom: 0;
+  display: grid; gap: var(--s6);
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+}
+/* The page owns the screen while it is a workspace, so nothing hangs below it
+   for the document to scroll to. */
+.shell:has(.as-page.is-split) { padding-bottom: 0; }
+@media (min-width: 1000px) {
+  .as-page.is-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1.04fr); }
+}
+@media (min-width: 1700px) {
+  .as-page.is-split { grid-template-columns: minmax(0, 620px) minmax(0, 780px); justify-content: center; }
+}
+
+.as-chat { display: flex; flex-direction: column; min-height: 0; }
+.as-thread {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: var(--s5);
+  /* Air at the top. Without it the first thing he ever said sits welded to the
+     bottom edge of the navigation. */
+  padding: var(--s6) var(--s3) var(--s5) 0;
+}
+.as-chat .as-ask { flex: none; }
+
+/* ---- the box ---- */
 .as-ask {
   border: 1px solid var(--hairline-strong); border-radius: var(--r-md);
   background: var(--surface); padding: var(--s4);
   display: flex; flex-direction: column; gap: var(--s3);
+  transition: border-color var(--t-fast);
 }
-.as-page:not(.is-empty) .as-ask {
-  position: sticky; bottom: var(--s4); box-shadow: var(--shadow-pop);
-}
+.as-ask:focus-within { border-color: var(--accent); }
 .as-input {
   width: 100%; border: none; background: none; resize: none;
   font: inherit; font-size: var(--text-base); color: var(--ink);
@@ -4673,29 +4727,90 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .as-hint { font-size: var(--text-xs); color: var(--faint); }
 .as-send { margin-left: auto; }
 
-/* The chips. Same shape as the reference, his content. */
+/* ---- chips ---- */
 .as-starters { display: flex; flex-wrap: wrap; gap: var(--s2); justify-content: center; margin-top: var(--s5); }
 .as-chip {
   border: 1px solid var(--hairline-strong); border-radius: 999px;
   padding: var(--s2) var(--s4); background: none; cursor: pointer;
   font-size: var(--text-sm); color: var(--muted); white-space: nowrap;
+  transition: border-color var(--t-fast), color var(--t-fast);
 }
 .as-chip:hover { border-color: var(--accent); color: var(--accent-text); }
 
-.as-thread { display: flex; flex-direction: column; gap: var(--s5); padding-bottom: var(--s5); }
+/* ---- the thread ---- */
+.as-turn { animation: as-rise 220ms var(--ease) both; }
+@keyframes as-rise { from { opacity: 0; transform: translateY(7px); } }
 .as-turn.is-you .as-said {
-  align-self: flex-end; max-width: 62ch; margin-left: auto;
+  width: fit-content; max-width: 52ch; margin-left: auto;
   background: var(--surface-2); border-radius: var(--r-md);
   padding: var(--s2) var(--s4); font-size: var(--text-sm);
 }
-.as-turn.is-it .as-said { font-size: var(--text-base); line-height: 1.55; max-width: 68ch; }
+.as-turn.is-it .as-said { font-size: var(--text-base); line-height: 1.55; max-width: 62ch; }
+
+/* What it pulled, as a way back to it. The cards themselves are on the right;
+   this is the handle, so scrolling up four questions still reaches them. */
+.as-pulled { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s3); }
+.as-pulled-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--hairline-strong); border-radius: var(--r-sm);
+  padding: 4px var(--s3); background: none; cursor: pointer;
+  font-size: var(--text-xs); color: var(--muted);
+  transition: border-color var(--t-fast), color var(--t-fast);
+}
+.as-pulled-btn::after { content: '\2192'; color: var(--faint); }
+.as-pulled-btn:hover { border-color: var(--accent); color: var(--accent-text); }
+
+.as-next { display: flex; gap: var(--s2); flex-wrap: wrap; margin-top: var(--s3); }
+
+/* Thinking, and visibly so. A still page that has stopped answering looks the
+   same as a page that is answering, and that is the moment he reloads. */
+.as-thinking { display: flex; align-items: center; gap: var(--s3); }
+.as-orb-sm { width: 20px; height: 20px; margin: 0; animation: as-breathe 2.4s var(--ease-loop) infinite; }
+.as-dots { display: inline-flex; align-items: center; gap: 5px; }
+.as-dots > i { width: 5px; height: 5px; border-radius: 50%; background: var(--faint); animation: as-bob 1.15s var(--ease-loop) infinite; }
+.as-dots > i:nth-child(2) { animation-delay: 0.14s; }
+.as-dots > i:nth-child(3) { animation-delay: 0.28s; }
+@keyframes as-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.14); } }
+@keyframes as-bob { 0%, 100% { opacity: 0.28; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-3px); } }
+
+.as-error { border-left: 2px solid var(--alert); padding-left: var(--s4); }
+.as-error p { font-size: var(--text-sm); color: var(--alert); }
+.as-error-hint { color: var(--muted) !important; margin-top: var(--s1); }
+
+/* ---- the canvas ---- */
+.as-canvas {
+  display: flex; flex-direction: column; min-height: 0;
+  border: 1px solid var(--hairline-strong); border-radius: var(--r-md);
+  background: var(--surface); overflow: hidden;
+}
+.as-canvas-head {
+  flex: none; padding: var(--s3) var(--s5);
+  border-bottom: 1px solid var(--hairline); background: var(--surface-2);
+}
+.as-canvas-head h2 {
+  font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--muted); font-weight: 500;
+}
+.as-canvas-body {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding: var(--s4) var(--s5) var(--s6);
+  /* The swap is animated because a silent substitution, while he is looking at
+     the sentence on the left, reads as nothing having happened. */
+  animation: as-swap 240ms var(--ease) both;
+}
+@keyframes as-swap { from { opacity: 0; transform: translateY(9px); } }
+.as-pane + .as-pane { margin-top: var(--s6); padding-top: var(--s5); border-top: 1px solid var(--hairline); }
+.as-pane-head { display: block; margin-bottom: var(--s2); }
+
+/* ---- rows, shared by the canvas and the phone thread ---- */
 .as-card {
   margin-top: var(--s3); padding: var(--s4);
   border: 1px solid var(--hairline-strong); border-radius: var(--r-sm);
   background: var(--surface);
 }
-.as-list { display: flex; flex-direction: column; gap: var(--s1); margin-top: var(--s2); }
-.as-list > div + div { margin-top: var(--s3); }
+.as-list { display: flex; flex-direction: column; }
+.as-group + .as-group { margin-top: var(--s5); }
+.as-group > .microcap { display: block; margin-bottom: var(--s1); }
 .as-row {
   display: flex; align-items: flex-start; gap: var(--s3);
   padding: var(--s2) 0; border-top: 1px solid var(--hairline);
@@ -4703,16 +4818,16 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 }
 .as-row > * { height: var(--line); display: inline-flex; align-items: center; justify-content: center; }
 .as-row > .as-row-title { display: block; height: auto; min-height: var(--line); line-height: var(--line); }
-.as-row:first-of-type { border-top: none; }
+.as-group > .as-row:first-of-type { border-top: none; }
 .as-row.is-done .as-row-title { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
-.as-row-title { flex: 1; min-width: 0; font-size: var(--text-sm); text-align: left; }
+.as-row-title { flex: 1; min-width: 0; font-size: var(--text-sm); text-align: left; overflow-wrap: anywhere; }
 .as-row-min { flex: none; font-size: var(--text-xs); color: var(--faint); white-space: nowrap; }
+.as-row-when { flex: none; font-size: var(--text-xs); color: var(--muted); white-space: nowrap; min-width: 5ch; justify-content: flex-start !important; }
 .as-link { cursor: pointer; }
 .as-link:hover .as-row-title { color: var(--accent-text); }
 .as-empty { font-size: var(--text-sm); color: var(--muted); margin-top: var(--s2); }
-.as-next { display: flex; gap: var(--s2); flex-wrap: wrap; margin-top: var(--s3); }
-.as-thinking { font-size: var(--text-sm); color: var(--faint); font-style: italic; }
-.as-error { border-left: 2px solid var(--alert); padding-left: var(--s4); }
-.as-error p { font-size: var(--text-sm); color: var(--alert); }
-.as-error-hint { color: var(--muted) !important; margin-top: var(--s1); }
-.as-hero-now { margin-top: var(--s3); font-size: var(--text-sm); color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .as-turn, .as-canvas-body { animation: none; }
+  .as-orb-sm, .as-dots > i { animation: none; opacity: 1; }
+}

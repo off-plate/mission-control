@@ -238,6 +238,16 @@ async function readHead(c, uid) {
 }
 
 async function writeHead(c, uid, state) {
+  /* Stamp it the way a device would, so the topbar in the app can say "Updated
+     from Obsidian 2 min ago" instead of a change appearing from nowhere. The
+     dev id is a literal rather than a random one: this job IS one writer, on
+     one machine, for as long as it exists. */
+  state.lastWrite = { dev: DEV, name: 'Obsidian', at: Date.now() }
+  /* And savedAt, because the merge picks the newer blob by this field and this
+     job genuinely did just write. The head was read moments ago, so everything
+     else in the copy being stamped is current; being the newer side is true,
+     not a way of winning. */
+  state.savedAt = Date.now()
   const { error } = await c.from(TABLE).upsert({
     id: uid, owner: uid, data: state, updated_at: new Date().toISOString(),
   })

@@ -53,6 +53,32 @@ export function deviceId(): string {
   }
 }
 
+/** A human name for this device, so the other ones can say where a change came
+ *  from. Derived, never asked for: a setting he has to fill in is a setting that
+ *  stays empty, and then the indicator says "from unknown" forever.
+ *
+ *  Coarse on purpose. "iPhone" is the whole of what he needs to know; parsing a
+ *  user agent for a model number is a losing game and tells him nothing extra. */
+export function deviceName(): string {
+  try {
+    const w = window as unknown as { mc?: { desktop?: boolean } }
+    if (w.mc?.desktop) return 'the Mac app'
+    const ua = navigator.userAgent
+    if (/iPhone/.test(ua)) return 'iPhone'
+    if (/iPad/.test(ua)) return 'iPad'
+    if (/Android/.test(ua)) return 'Android'
+    if (/Macintosh/.test(ua)) return 'the Mac'
+    if (/Windows/.test(ua)) return 'Windows'
+    return 'another device'
+  } catch { return 'another device' }
+}
+
+/** Who wrote the copy of the state you are holding. Stamped on every save and
+ *  read by every OTHER device, which is the only thing it is for. It rides in
+ *  the blob rather than in a table because there is no table: the whole app is
+ *  one row, and this is one more field on it. */
+export interface LastWrite { dev: string; name: string; at: number }
+
 /** What happened to a key, and when. `undone` is an un-delete: a tombstone can
  *  only ever be ADDED across devices, so without a dated opposite an undo on
  *  this device is overturned the moment another device that still holds the

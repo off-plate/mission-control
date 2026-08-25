@@ -639,7 +639,7 @@ function RoutineOnDay({ routine, day }: { routine: Routine; day?: string }) {
       <div className={`today-task${complete ? ' done' : ''}`}>
         {/* A routine is not dragged into a time, but its checkbox still has to
             line up with the ones under it. */}
-        <span className="drag-grip is-blank" aria-hidden="true">⠿</span>
+        <span className="drag-grip is-blank" aria-hidden="true"><svg viewBox="0 0 6 16" width="6" height="16"><circle cx="1.5" cy="4" r="1" /><circle cx="4.5" cy="4" r="1" /><circle cx="1.5" cy="8" r="1" /><circle cx="4.5" cy="8" r="1" /><circle cx="1.5" cy="12" r="1" /><circle cx="4.5" cy="12" r="1" /></svg></span>
         <SpaceMark space={routine.space} />
         <button
           className="checkbox"
@@ -1031,7 +1031,7 @@ export function PlanPage() {
                   draggable
                   onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move' }}
                 >
-                  <span className="drag-grip" aria-hidden="true">⠿</span>
+                  <span className="drag-grip" aria-hidden="true"><svg viewBox="0 0 6 16" width="6" height="16"><circle cx="1.5" cy="4" r="1" /><circle cx="4.5" cy="4" r="1" /><circle cx="1.5" cy="8" r="1" /><circle cx="4.5" cy="8" r="1" /><circle cx="1.5" cy="12" r="1" /><circle cx="4.5" cy="12" r="1" /></svg></span>
                   <SpaceMark space={t.space} />
                   <span className={`cat-dot ${t.category}`} aria-hidden="true" />
                   <span className="grow"><Linkify text={t.title} /></span>
@@ -1177,7 +1177,7 @@ export function PlanPage() {
                           draggable={!t.done}
                           onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move' }}
                         >
-                          <span className="drag-grip" aria-hidden="true">⠿</span>
+                          <span className="drag-grip" aria-hidden="true"><svg viewBox="0 0 6 16" width="6" height="16"><circle cx="1.5" cy="4" r="1" /><circle cx="4.5" cy="4" r="1" /><circle cx="1.5" cy="8" r="1" /><circle cx="4.5" cy="8" r="1" /><circle cx="1.5" cy="12" r="1" /><circle cx="4.5" cy="12" r="1" /></svg></span>
                           <SpaceMark space={t.space} />
                           <button
                             className="checkbox" role="checkbox" aria-checked={t.done}

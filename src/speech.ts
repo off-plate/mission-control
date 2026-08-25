@@ -46,6 +46,7 @@ export function engineName(): 'Gemini' | 'device' {
 
 export type SpeechState = 'idle' | 'loading' | 'playing' | 'paused'
 
+
 /* Who is talking, and what about. `id` is the caller's own handle (the turn
    index), so a button can ask "is it me?" without comparing text. */
 let current: string | null = null
@@ -146,18 +147,79 @@ async function fetchGemini(text: string, key: string): Promise<Blob | null> {
   }
 }
 
+/* WHICH VOICE, AND WHY IT IS NOT WHICHEVER COMES FIRST.
+
+   `speechSynthesis.getVoices()` returns an EMPTY ARRAY on first call. The list
+   arrives asynchronously and only then fires `voiceschanged`. Speaking before
+   it lands leaves `utterance.voice` null, so the browser picks its own
+   fallback, and the first answer of every session was read by something that
+   sounded like a dying grandfather while a replay a second later sounded fine.
+   That was the bug: not the audio, the timing.
+
+   The second half matters just as much. macOS ships 28 en-US voices and most
+   are novelty: Bahh, Boing, Bubbles, Zarvox, Trinoids, Grandma, Grandpa, Fred.
+   Sorted, the FIRST en-US voice is "Albert", so "just take an en-US one" is a
+   coin flip on a joke voice. Only a named preference is safe, and when none of
+   them is installed it is better to leave the voice unset and let the OS decide
+   than to read the brief in Boing. */
+const GOOD = [
+  'Google US English',            // Chrome's remote voice, the best of these
+  'Samantha', 'Alex', 'Ava', 'Allison', 'Susan', 'Tom',
+  'Microsoft Aria', 'Microsoft Jenny', 'Microsoft Guy',
+]
+/* Named, not pattern-matched: these are jokes, not accents. */
+const NOVELTY = /^(Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Deranged|Good News|Hysterical|Jester|Junior|Kathy|Organ|Princess|Ralph|Fred|Grandma|Grandpa|Superstar|Trinoids|Whisper|Wobble|Zarvox)\b/i
+
+let voicePromise: Promise<SpeechSynthesisVoice[]> | null = null
+
+/** The voice list, once it actually exists. Resolved once and reused. */
+function voicesReady(): Promise<SpeechSynthesisVoice[]> {
+  if (voicePromise) return voicePromise
+  voicePromise = new Promise<SpeechSynthesisVoice[]>((resolve) => {
+    const now = speechSynthesis.getVoices()
+    if (now.length) return resolve(now)
+    const done = () => resolve(speechSynthesis.getVoices())
+    speechSynthesis.addEventListener('voiceschanged', done, { once: true })
+    /* Not every browser fires the event, and a brief that never speaks is
+       worse than one read in the default voice. */
+    setTimeout(done, 1500)
+  }).then((list) => {
+    /* An empty answer is a timeout, not a result. Caching it would make one
+       slow start permanent: every later click would reuse the empty list and
+       fall back to the browser voice forever. Drop it and ask again next time. */
+    if (!list.length) voicePromise = null
+    return list
+  })
+  return voicePromise
+}
+
+function pickVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+  for (const name of GOOD) {
+    const hit = voices.find((v) => v.name === name || v.name.startsWith(`${name} `))
+    if (hit) return hit
+  }
+  return voices.find((v) => /^en[-_]US/i.test(v.lang) && !NOVELTY.test(v.name))
+    ?? voices.find((v) => /^en[-_]/i.test(v.lang) && !NOVELTY.test(v.name))
+    ?? null
+}
+
+/* Ask for the list the moment this module loads, so by the time he clicks Play
+   the promise has long since resolved and the first answer sounds like the
+   second. This sits BELOW voicePromise: the function is hoisted but the `let`
+   is not, so calling it any earlier is a temporal-dead-zone ReferenceError. */
+try { void voicesReady() } catch { /* no speech synthesis here */ }
+
 /* The no-key path, and the fallback when the network or the key lets us down.
    Speaking is never allowed to be the thing that does not happen. */
-function speakOnDevice(id: string, text: string): void {
+async function speakOnDevice(id: string, text: string): Promise<void> {
   try {
+    const voices = await voicesReady()
+    /* He clicked something else while the list was loading. */
+    if (current !== id && current !== null) return
     const u = new SpeechSynthesisUtterance(text)
     u.lang = 'en-US'
     u.rate = 1.0
-    /* Pick a real en-US voice if the machine has one; the default is whatever
-       the OS locale is, which is not necessarily English. */
-    const voices = speechSynthesis.getVoices()
-    const pick = voices.find((v) => /en-US/i.test(v.lang) && /samantha|alex|aaron|allison/i.test(v.name))
-      ?? voices.find((v) => /en-US/i.test(v.lang))
+    const pick = pickVoice(voices)
     if (pick) u.voice = pick
     u.onend = () => { if (current === id) set(null, 'idle') }
     u.onerror = () => { if (current === id) set(null, 'idle') }
@@ -189,19 +251,19 @@ export async function toggle(id: string, text: string): Promise<void> {
   if (!clean) return
 
   const key = getTtsKey()
-  if (!key) { speakOnDevice(id, clean); return }
+  if (!key) { await speakOnDevice(id, clean); return }
 
   set(id, 'loading')
   const blob = await fetchGemini(clean, key)
   /* He clicked something else while this was in flight. Whatever we just
      fetched is no longer wanted, and playing it would talk over the new one. */
   if (current !== id) return
-  if (!blob) { speakOnDevice(id, clean); return }
+  if (!blob) { await speakOnDevice(id, clean); return }
 
   const el = new Audio(URL.createObjectURL(blob))
   el.onended = () => { if (current === id) stop() }
-  el.onerror = () => { if (current === id) speakOnDevice(id, clean) }
+  el.onerror = () => { if (current === id) void speakOnDevice(id, clean) }
   audio = el
-  await el.play().catch(() => { if (current === id) speakOnDevice(id, clean) })
+  await el.play().catch(() => { if (current === id) void speakOnDevice(id, clean) })
   if (current === id && audio === el) set(id, 'playing')
 }

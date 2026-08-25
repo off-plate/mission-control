@@ -4561,16 +4561,6 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .cal-cell.is-today .cal-cell-n { color: var(--accent-ink); font-weight: 600; }
 .cal-cell.is-today.has-events::after { background: var(--accent-ink); }
 
-.cal-range {
-  display: grid; grid-template-columns: 1fr 1fr; max-width: 320px;
-  border: 1px solid var(--hairline); border-radius: var(--r-sm); overflow: hidden;
-}
-.cal-rbtn {
-  padding: 7px 0; background: none; border: 0; font: inherit; font-size: var(--text-xs);
-  color: var(--muted); cursor: pointer;
-}
-.cal-rbtn + .cal-rbtn { border-left: 1px solid var(--hairline); }
-.cal-rbtn.is-on { background: var(--surface-2); color: var(--ink); font-weight: 600; }
 .cal-problem { font-size: var(--text-xs); color: var(--warn); margin: 0; }
 
 /* One column. Always. */

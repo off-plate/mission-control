@@ -2184,6 +2184,17 @@ await step('apps: opening one frames it, Escape comes back, browser link agrees'
   if (opened.out !== opened.src) throw new Error(`Open in browser goes to ${opened.out}, the frame to ${opened.src}`)
   if (opened.name !== 'Watchless') throw new Error(`header reads ${opened.name}`)
   if (!opened.clipped) throw new Error('the frame is not wider than its clip, so its scrollbar will show')
+  /* Escape belongs to whoever has focus, and the thing on screen is a real
+     cross-origin site: once the iframe has it, the keystroke is the iframe's
+     and never reaches us. That is a documented limit of the Apps page, not a
+     bug, and "Back to apps" always works.
+
+     So this asserts the contract we actually make, deterministically: from
+     Mission Control's own chrome, Escape closes the app. Without the focus
+     line it was racing a network load, and it lost once on 2026-08-26 in a run
+     whose only other result was green, on a build where the same click and
+     keypress closed the app four times out of four. */
+  await page.evaluate(() => document.querySelector(".apps-open button, .shell")?.focus())
   await page.keyboard.press('Escape')
   await page.waitForTimeout(300)
   const back = await page.evaluate(() => document.querySelectorAll('iframe').length)

@@ -192,7 +192,7 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
      neither command, so it gets no menu; a menu that lists something the press
      of Enter will ignore is worse than no menu. */
   const available = SLASH.filter((c) => (c.needs === 'help' ? slashHelp : slashTask))
-  const [menu, setMenu] = useState<{ q: string; x: number; y: number; i: number } | null>(null)
+  const [menu, setMenu] = useState<{ q: string; x: number; y: number; up: boolean; i: number } | null>(null)
   const shown = menu ? available.filter((c) => c.cmd.startsWith(menu.q.toLowerCase())) : []
 
   /** The text from the start of the current line up to the caret. Read through
@@ -230,7 +230,19 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
     if (available.some((c) => c.cmd === m[1].toLowerCase())) { setMenu(null); return }
     const rect = at.range.getClientRects()[0] ?? lineAt(ref.current!)?.getBoundingClientRect()
     if (!rect) { setMenu(null); return }
-    setMenu((prev) => ({ q: m[1], x: rect.left, y: rect.bottom, i: prev && prev.q === m[1] ? prev.i : 0 }))
+    /* Open upward when there is no room below. The Zone's note panel sits on
+       the floor of the window, so a menu that always drops downward opens off
+       the bottom of the screen and he never sees it. 132px covers the two
+       rows plus padding; being a little pessimistic only means it flips a
+       line early, which costs nothing. */
+    const up = rect.bottom + 132 > window.innerHeight
+    setMenu((prev) => ({
+      q: m[1],
+      x: rect.left,
+      y: up ? window.innerHeight - rect.top : rect.bottom,
+      up,
+      i: prev && prev.q === m[1] ? prev.i : 0,
+    }))
   }
 
   /** Swap the half-typed "/wha" for the real command and leave the caret ready
@@ -639,7 +651,7 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
           {menu && shown.length > 0 && (
             <div
               className="nt-slash"
-              style={{ left: menu.x, top: menu.y + 6 }}
+              style={menu.up ? { left: menu.x, bottom: menu.y + 6 } : { left: menu.x, top: menu.y + 6 }}
               role="listbox"
               aria-label="Commands"
             >

@@ -26,7 +26,6 @@ import { usePomodoro } from './pomodoro'
 import { ZonePlayer } from './zoneplayer'
 import { useStore } from './store'
 import { isEstimated, taskMinutes } from './util'
-import { SPACE_LABELS } from './mock'
 import { spaceFolderId } from './types'
 import { Editor } from './notes'
 import * as Icon from './icons'
@@ -162,7 +161,7 @@ function ZoneTask() {
               and the button's verb already say the state, and in the empty
               case it read "Nothing lined up" directly above a title saying
               the same sentence again. */}
-          <h1 className="znow-title">
+          <h1 className="znow-title" title={title}>
             <PhaseIcon state={phaseState} />
             <span>{title}</span>
           </h1>
@@ -330,13 +329,25 @@ function PlusIcon() {
 
 function ZoneNote() {
   const { space, noteFolders, notes, addNote, updateNote } = useStore()
+  /* Folders, and not workspaces. Notes stopped being filed by workspace on
+     his instruction, and every note is visible from every one of them, so
+     offering him a workspace to "save to" was asking a question that has no
+     consequence and implying a filing that does not happen. What is left is
+     the same choice the Notes page offers: no folder, or one he made. */
   const options = [
-    ...(['personal', 'work', 'offplate', 'corner'] as const).map((s) => ({ id: spaceFolderId(s), name: SPACE_LABELS[s] })),
+    { id: spaceFolderId(space), name: 'No folder' },
     ...noteFolders.map((f) => ({ id: f.id, name: f.name })),
   ]
   const [folderId, setFolderId] = useState(() => {
     try { return localStorage.getItem(FOLDER_KEY) ?? spaceFolderId(space) } catch { return spaceFolderId(space) }
   })
+  /* A folder remembered from before the picker offered workspaces can be
+     another workspace's folder, which is not on the list any more. Left alone
+     the select renders blank and the note quietly files itself somewhere he
+     never chose, so anything off the list falls back to no folder. */
+  useEffect(() => {
+    if (!options.some((o) => o.id === folderId)) setFolderId(spaceFolderId(space))
+  }, [folderId, options, space])
   useEffect(() => { try { localStorage.setItem(FOLDER_KEY, folderId) } catch { /* quota */ } }, [folderId])
 
   const [noteId, setNoteId] = useState<string | null>(null)
@@ -382,7 +393,11 @@ function ZoneNote() {
         </select>
       </div>
       <div className="znote-rich" aria-label={`Zone note, saved to ${folderName}`}>
-        <Editor note={note} onChange={onChange} tools={['bold', 'italic', 'bullet']} plain />
+        {/* The same two commands the Notes page has. A thought worth writing
+            down mid-block is exactly the thought worth putting on the list
+            without leaving the room, which is the whole argument for /task
+            being here rather than only on the page he came from. */}
+        <Editor note={note} onChange={onChange} tools={['bold', 'italic', 'bullet']} plain slashHelp slashTask />
       </div>
       <div className="znote-foot">
         <span className={`znote-status${hasBody ? ' is-saved' : ''}`}>{hasBody ? 'Saved' : 'Empty'}</span>

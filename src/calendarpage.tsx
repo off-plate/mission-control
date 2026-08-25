@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useStore } from './store'
 import { useCalendar, ahead } from './calendar'
 import { Band } from './ui'
 import { meetingNote, meetingUidOf } from './meetingnote'
 import { spaceFolderId } from './types'
-import { localDateKey } from './util'
+import { isoWeekKey, localDateKey } from './util'
 import type { CalEvent } from './ical'
 
 /* A month to point at, and the days themselves to read.
@@ -24,12 +24,35 @@ import type { CalEvent } from './ical'
    Nothing here can edit the calendar. It is a read of somebody else's system
    and it says so by having no way to change anything. */
 
-const HM = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
-const clock = (ms: number) => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-/* The band sets its value large, so a full meeting title ran to three lines at
-   390px and pushed the day off the first screen. The list underneath carries
-   the whole name. */
-const short = (t: string) => (t.length > 30 ? `${t.slice(0, 29).trimEnd()}…` : t)
+/* Minutes from midnight, wrapped: a block that runs past midnight came back
+   from the feed as 1463 and printed itself as 24:23. */
+const HM = (min: number) => {
+  const m = ((min % 1440) + 1440) % 1440
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+}
+
+/* Somebody types a link into a meeting title and the feed hands it over as a
+   hundred and twenty characters of raw URL. Shown whole it wrapped over three
+   lines and was not even clickable. Shown as the host it points at, it is one
+   word and it opens. The full address is on the title attribute. */
+const URL_RE = /https?:\/\/[^\s<>"')\]]+/g
+function linkify(text: string): ReactNode[] {
+  const out: ReactNode[] = []
+  let last = 0
+  URL_RE.lastIndex = 0
+  for (let m = URL_RE.exec(text); m; m = URL_RE.exec(text)) {
+    if (m.index > last) out.push(text.slice(last, m.index))
+    const raw = m[0].replace(/[.,;:]+$/, '')
+    let label = raw
+    try { label = new URL(raw).hostname.replace(/^www\./, '') } catch { /* keep the raw text */ }
+    out.push(
+      <a className="cal-link" key={`${m.index}-${raw}`} href={raw} title={raw} target="_blank" rel="noreferrer">{label} ↗</a>,
+    )
+    last = m.index + m[0].length
+  }
+  if (last < text.length) out.push(text.slice(last))
+  return out.length ? out : [text]
+}
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -45,18 +68,22 @@ function dayLabel(day: string, today: string): string {
 }
 
 /** Six rows of seven, Monday first, covering the month and the days either
- *  side that share its weeks. */
-function monthCells(y: number, m: number): { key: string; d: number; inMonth: boolean }[] {
+ *  side that share its weeks, each row carrying its ISO week number. */
+function monthWeeks(y: number, m: number): { week: string; days: { key: string; d: number; inMonth: boolean; weekend: boolean }[] }[] {
   const first = new Date(y, m, 1)
   /* getDay() is Sunday-first; the grid is Monday-first, which is how a Czech
      calendar is read. */
   const lead = (first.getDay() + 6) % 7
-  const out: { key: string; d: number; inMonth: boolean }[] = []
-  for (let i = 0; i < 42; i++) {
-    const dt = new Date(y, m, 1 - lead + i)
-    out.push({ key: localDateKey(dt), d: dt.getDate(), inMonth: dt.getMonth() === m })
+  const weeks = []
+  for (let w = 0; w < 6; w++) {
+    const days = []
+    for (let i = 0; i < 7; i++) {
+      const dt = new Date(y, m, 1 - lead + w * 7 + i)
+      days.push({ key: localDateKey(dt), d: dt.getDate(), inMonth: dt.getMonth() === m, weekend: i > 4 })
+    }
+    weeks.push({ week: isoWeekKey(new Date(y, m, 1 - lead + w * 7 + 3)).split('-W')[1], days })
   }
-  return out
+  return weeks
 }
 
 export function CalendarPage() {
@@ -131,31 +158,14 @@ export function CalendarPage() {
     setJumpTo(null)
   }, [jumpTo, byDay])
 
-  /* The band names what has not happened yet. The list keeps the meeting that
-     finished within the hour, because he still has to write it up; the band
-     must not lead with it, or the top of the page reports the past. */
+  /* Recomputed each render, and `minute` forces one every minute, so what
+     counts as running moves with the clock while the page is open. */
   const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
-  const next = byDay
-    .flatMap(([, l]) => l)
-    .find((e) => e.day > today || e.start === null || (e.end ?? e.start + 60) > nowMin)
-  const running = next && next.day === today && next.start !== null && next.start <= nowMin
-  const metrics = state.status === 'ok'
-    ? [
-        next
-          ? {
-              v: next.start === null ? short(next.title) : `${HM(next.start)} ${short(next.title)}`,
-              k: running ? 'now' : next.day === today ? 'next today' : dayLabel(next.day, today).toLowerCase(),
-            }
-          : { v: 'clear', k: 'ahead' },
-        { v: clock(state.readAt), k: state.problem ? 'last good read' : 'read at' },
-      ]
-    : undefined
 
   return (
     <div className="page cal-page">
       <Band
         title="Calendar"
-        metrics={metrics}
         actions={<button className="btn btn-quiet" onClick={reload} disabled={reading}>{reading ? 'Reading' : 'Refresh'}</button>}
       />
 
@@ -169,25 +179,34 @@ export function CalendarPage() {
         <div className="cal-split">
           <aside className="cal-rail">
             <div className="cal-mhead">
-              <button className="cal-step" onClick={() => stepMonth(-1)} aria-label="Previous month">‹</button>
               <span className="cal-mname">{new Date(month.y, month.m, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</span>
-              <button className="cal-step" onClick={() => stepMonth(1)} aria-label="Next month">›</button>
+              <span className="cal-steps">
+                <button className="cal-step" onClick={() => stepMonth(-1)} aria-label="Previous month">‹</button>
+                <button className="cal-step" onClick={() => stepMonth(1)} aria-label="Next month">›</button>
+              </span>
             </div>
 
             <div className="cal-grid">
+              <span className="cal-wd" aria-hidden="true" />
               {WEEKDAYS.map((w) => <span className="cal-wd" key={w}>{w}</span>)}
-              {monthCells(month.y, month.m).map((c) => {
-                const cls = ['cal-cell']
-                if (!c.inMonth) cls.push('is-out')
-                if (c.key === today) cls.push('is-today')
-                if (c.key === picked) cls.push('is-picked')
-                if (marked.has(c.key)) cls.push('has-events')
-                return (
-                  <button className={cls.join(' ')} key={c.key} onClick={() => goTo(c.key)} aria-label={c.key}>
-                    <span className="cal-cell-n mono">{c.d}</span>
-                  </button>
-                )
-              })}
+              {monthWeeks(month.y, month.m).map((row) => (
+                <Fragment key={row.week + row.days[0].key}>
+                  <span className="cal-wk mono">{row.week}</span>
+                  {row.days.map((c) => {
+                    const cls = ['cal-cell']
+                    if (!c.inMonth) cls.push('is-out')
+                    if (c.weekend) cls.push('is-weekend')
+                    if (marked.has(c.key)) cls.push('has-events')
+                    if (c.key === picked) cls.push('is-picked')
+                    if (c.key === today) cls.push('is-today')
+                    return (
+                      <button className={cls.join(' ')} key={c.key} onClick={() => goTo(c.key)} aria-label={c.key}>
+                        <span className="cal-cell-n mono">{c.d}</span>
+                      </button>
+                    )
+                  })}
+                </Fragment>
+              ))}
             </div>
 
             <div className="cal-range" role="group" aria-label="How far ahead">
@@ -228,7 +247,7 @@ export function CalendarPage() {
                             {e.allDay ? 'all day' : `${HM(e.start as number)}${e.end ? `–${HM(e.end)}` : ''}`}
                           </span>
                           <span className="cal-what">
-                            <span className="cal-title">{e.title}</span>
+                            <span className="cal-title">{linkify(e.title)}</span>
                             {e.people.length > 0 && (
                               <span className="cal-people">{e.people.slice(0, 4).join(', ')}{e.people.length > 4 ? ` +${e.people.length - 4}` : ''}</span>
                             )}

@@ -2780,7 +2780,7 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
   .habit-list.w7 .habit-note { overflow: visible; text-overflow: clip; white-space: normal; }
   .habit-list .habit-days.is-legend { margin-right: 0; }
 }
-@media (max-width: 1000px) {
+@media (max-width: 1200px) {
   .habit-list .habit-days.is-legend { margin-right: 0; }
 }
 @media (max-width: 700px) {
@@ -4629,62 +4629,88 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .cal-past { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
 
 /* ---------- Calendar ----------
-   A month to point at on the left, the days themselves on the right. The grid
-   is an index: it never shows a meeting, only that a day has one.
+   Half the screen is the month, half is the days. His call, after seeing the
+   first two attempts: the month is not a widget in a corner and the days are
+   never in more than one column.
 
-   Both halves grow with the screen. The first version pinned the grid at 264px
-   and capped the column at 880px, which on his 3440 monitor left two thirds of
-   the page empty with a postage stamp calendar in the corner. So the grid takes
-   a share of the viewport up to 560px, where its cells are 76px and it reads as
-   a wall calendar, and the days run in two columns from 1700px and three from
-   2600px. A wide screen shows more of the week, which is the only thing extra
-   width is good for here. */
+   The month fills its half at every width, so its cells go landscape on a wide
+   screen the way a wall calendar's do, and its rows are sized against the
+   viewport height so the whole month is on screen without scrolling. It stays
+   put while the day column scrolls, which is the point of splitting them.
+
+   The day column is ONE column, always, however wide the screen. Two columns
+   were tried and rejected: it put the 28th beside the 26th and made the reader
+   work out which way to read. */
 .cal-split {
-  display: grid;
-  grid-template-columns: clamp(264px, 21vw, 560px) minmax(0, 1fr);
-  gap: clamp(var(--s8), 2.4vw, var(--s12)); align-items: start;
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(var(--s6), 2.4vw, var(--s12)); align-items: start;
 }
 .cal-rail { position: sticky; top: var(--s4); display: flex; flex-direction: column; gap: var(--s4); }
 
-.cal-mhead { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
-.cal-mname { font-family: var(--font-display); font-size: clamp(var(--text-base), 0.4vw + 0.9rem, var(--text-lg)); color: var(--ink); }
+/* The name on the left, the two steps together on the right. Pushed to
+   opposite edges they were a metre apart on a wide screen and stopped reading
+   as a pair. */
+.cal-mhead { display: flex; align-items: center; gap: var(--s2); }
+.cal-mname { margin-right: auto; }
+.cal-steps { display: flex; gap: var(--s2); }
+.cal-mname { font-family: var(--font-display); font-size: clamp(var(--text-base), 0.4vw + 0.9rem, var(--text-xl)); color: var(--ink); }
 .cal-step {
-  width: 30px; height: 30px; padding: 0; line-height: 1; font-size: 1.125rem;
+  width: 32px; height: 32px; padding: 0; line-height: 1; font-size: 1.25rem;
   background: none; border: 1px solid var(--hairline); border-radius: var(--r-sm);
   color: var(--muted); cursor: pointer; transition: color var(--t-fast), border-color var(--t-fast);
 }
 .cal-step:hover { color: var(--ink); border-color: var(--hairline-strong); }
 
-.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: clamp(2px, 0.2vw, 6px); }
+/* Eight columns: the week number, then the seven days. Six week rows, each as
+   tall as the viewport allows, so the month is one glance and never a scroll. */
+.cal-grid {
+  display: grid;
+  grid-template-columns: minmax(26px, auto) repeat(7, minmax(0, 1fr));
+  grid-template-rows: auto repeat(6, clamp(38px, 8vh, 96px));
+  gap: clamp(2px, 0.2vw, 6px);
+}
 .cal-wd {
   font-size: clamp(0.6875rem, 0.25vw + 0.6rem, 0.875rem);
   letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--faint); text-align: center; padding-bottom: var(--s2);
 }
+/* The week number, so a date said as "week 36" can be found without counting. */
+.cal-wk {
+  display: grid; place-items: center; padding-right: var(--s2);
+  font-size: clamp(0.625rem, 0.2vw + 0.55rem, 0.8125rem);
+  color: var(--faint); font-variant-numeric: tabular-nums;
+}
 .cal-cell {
-  position: relative; aspect-ratio: 1 / 1; display: grid; place-items: center;
+  position: relative; display: grid; place-items: center;
   padding: 0; background: none; border: 1px solid transparent; border-radius: var(--r-sm);
   cursor: pointer; transition: border-color var(--t-fast);
 }
 .cal-cell-n {
-  font-size: clamp(var(--text-xs), 0.55vw + 0.55rem, var(--text-lg));
+  font-size: clamp(var(--text-xs), 0.4vw + 0.6rem, var(--text-lg));
   color: var(--ink); font-variant-numeric: tabular-nums;
 }
 .cal-cell.is-out .cal-cell-n { color: var(--faint); }
+/* Saturday and Sunday, tinted rather than coloured. It is the neutral surface
+   the app already uses for a recessed row, so the week reads at a glance
+   without spending the accent on a fact that repeats every seven days. */
+.cal-cell.is-weekend { background: color-mix(in srgb, var(--surface-2) 50%, transparent); }
 .cal-cell:hover { border-color: var(--hairline-strong); }
 /* A day that has something in it. A dot, because the grid's job is to say
    where to look, and a count here would be a second agenda competing with the
    real one. */
 .cal-cell.has-events::after {
-  content: ''; position: absolute; bottom: clamp(4px, 0.35vw, 9px);
-  width: clamp(3px, 0.22vw, 5px); aspect-ratio: 1; border-radius: 50%; background: var(--accent);
+  content: ''; position: absolute; bottom: clamp(4px, 0.5vh, 10px);
+  width: clamp(3px, 0.22vw, 6px); aspect-ratio: 1; border-radius: 50%; background: var(--accent);
 }
 .cal-cell.is-picked { border-color: var(--hairline-strong); }
 .cal-cell.is-today { background: var(--accent); }
 .cal-cell.is-today .cal-cell-n { color: var(--accent-ink); font-weight: 600; }
 .cal-cell.is-today.has-events::after { background: var(--accent-ink); }
 
-.cal-range { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--hairline); border-radius: var(--r-sm); overflow: hidden; }
+.cal-range {
+  display: grid; grid-template-columns: 1fr 1fr; max-width: 320px;
+  border: 1px solid var(--hairline); border-radius: var(--r-sm); overflow: hidden;
+}
 .cal-rbtn {
   padding: 7px 0; background: none; border: 0; font: inherit; font-size: var(--text-xs);
   color: var(--muted); cursor: pointer;
@@ -4693,20 +4719,8 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .cal-rbtn.is-on { background: var(--surface-2); color: var(--ink); font-weight: 600; }
 .cal-problem { font-size: var(--text-xs); color: var(--warn); margin: 0; }
 
+/* One column. Always. */
 .cal-agenda { display: flex; flex-direction: column; gap: var(--s8); }
-/* Days side by side once there is room for two readable columns. Newspaper
-   columns rather than grid cells: a day runs to whatever height its meetings
-   need, and a grid row would then hold every other day of that row hostage to
-   the tallest one. Twelve meetings tomorrow and three today left half a screen
-   of holes. A day is never split across a column break. */
-@media (min-width: 1700px) {
-  .cal-agenda {
-    display: block; columns: 2;
-    column-gap: clamp(var(--s8), 2.2vw, var(--s12));
-  }
-  .cal-day { break-inside: avoid; margin-bottom: var(--s10); }
-}
-@media (min-width: 2600px) { .cal-agenda { columns: 3; } }
 /* The grid scrolls the column to a day, and a sticky header would otherwise
    land on top of the day it just jumped to. */
 .cal-day { scroll-margin-top: var(--s10); }
@@ -4714,27 +4728,30 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .cal-day-num { font-family: var(--font-display); font-size: var(--text-xl); line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
 .cal-day-name { font-family: var(--font-display); font-size: var(--text-lg); color: var(--ink); }
 .cal-day-mon { font-size: var(--text-xs); color: var(--faint); }
-.cal-day-count { font-size: var(--text-xs); color: var(--faint); margin-left: auto; }
+.cal-day-count { font-size: var(--text-xs); color: var(--faint); }
 .cal-rows { display: flex; flex-direction: column; }
 /* Four columns for three things. The last one is empty on purpose: it takes
    the slack so what a row says and what he can do about it stay next to each
-   other. Pinned to the far edge instead, "Gym: Back" and its button sat nine
-   hundred pixels apart on a laptop. The rule still runs the full width. */
+   other rather than at opposite edges of the column. */
 .cal-row {
-  display: grid; grid-template-columns: 104px minmax(0, 56ch) auto minmax(0, 1fr);
+  display: grid; grid-template-columns: clamp(84px, 6.5vw, 108px) minmax(0, 46ch) auto minmax(0, 1fr);
   gap: var(--s4); align-items: baseline;
   padding: var(--s3) 0; border-bottom: 1px solid var(--hairline);
 }
 .cal-when { font-size: var(--text-xs); color: var(--muted); white-space: nowrap; }
 .cal-what { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .cal-title { font-size: var(--text-base); color: var(--ink); }
+/* A link somebody typed into the title of a meeting. It was arriving as a
+   hundred and twenty characters of raw URL wrapped over three lines, so it is
+   shown by the host it points at and carries the whole address on hover. */
+.cal-link { color: var(--accent-text); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+.cal-link:hover { color: var(--accent-hover); }
 .cal-people { font-size: var(--text-xs); color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cal-do { display: flex; align-items: center; gap: var(--s3); white-space: nowrap; }
-/* Once the row has slack, reserve the width of a full set of actions so the
-   buttons line up. Without it a row carrying "just ended" and a Join link put
-   its button 130px left of the row above, and the column read as ragged. */
-@media (min-width: 1200px) {
-  .cal-do { min-width: 15.5rem; justify-content: flex-end; }
+/* Only once the column is wide enough to have slack: reserve the width of a
+   full set of actions so the buttons line up whether or not a row has a Join. */
+@media (min-width: 1800px) {
+  .cal-do { min-width: 13.5rem; justify-content: flex-end; }
 }
 .cal-written { font-size: 0.625rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--progress); }
 /* The one running now, and the one that finished within the hour it is still
@@ -4745,12 +4762,12 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .cal-ago { font-size: 0.625rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
 
 /* On a phone there is no left and right, and the list is the thing he opened
-   the page for. The month grid keeps its job, jumping to a day, from below it. */
-@media (max-width: 900px) {
+   the page for. The month keeps its job, jumping to a day, from below it. */
+@media (max-width: 1200px) {
   .cal-split { grid-template-columns: 1fr; gap: var(--s8); }
   .cal-rail { position: static; order: 2; }
   .cal-agenda { order: 1; }
-  .cal-grid { max-width: 360px; }
+  .cal-grid { max-width: 420px; grid-template-rows: auto repeat(6, clamp(38px, 7vh, 56px)); }
 }
 @media (max-width: 700px) {
   .cal-row { grid-template-columns: 1fr; gap: var(--s1); }

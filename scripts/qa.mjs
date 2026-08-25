@@ -2385,6 +2385,29 @@ await step('assistant: the answer splits the room and the ask box stops moving',
   /* It stays put because the THREAD scrolls, not the document. */
   const overflow = await page.evaluate(() => document.scrollingElement.scrollHeight - document.scrollingElement.clientHeight)
   if (overflow > 4) throw new Error(`the document itself scrolls by ${overflow}px`)
+  /* And at HIS window, not just at this suite's. The page used to compute its
+     own height from the header's offset read once on mount; on a short wide
+     window the header wrapped, the number was stale, and the document scrolled
+     by the difference. That is the second scrollbar he photographed, and the
+     air above the first message went with it. Checked at three shapes. */
+  for (const [w, h] of [[1560, 606], [1470, 760], [3120, 1200]]) {
+    await page.setViewportSize({ width: w, height: h })
+    await page.waitForTimeout(250)
+    const m = await page.evaluate(() => ({
+      doc: document.scrollingElement.scrollHeight - document.scrollingElement.clientHeight,
+      chat: Math.round(document.querySelector('.as-chat').getBoundingClientRect().width),
+      top: Math.round(document.querySelector('.as-canvas').getBoundingClientRect().top),
+      foot: Math.round(innerHeight - document.querySelector('.as-ask').getBoundingClientRect().bottom),
+    }))
+    if (m.doc > 4) throw new Error(`at ${w}x${h} the document scrolls by ${m.doc}px, which is the extra scrollbar`)
+    if (m.foot < 8) throw new Error(`at ${w}x${h} the ask box is ${m.foot}px off the bottom edge`)
+    if (m.top < 100) throw new Error(`at ${w}x${h} the canvas starts ${m.top}px down, under the navigation`)
+    /* Both halves take the width they are given. Pinned to 620 and 780 they
+       left a third of a wide monitor empty either side of two narrow columns. */
+    if (m.chat < 640) throw new Error(`at ${w}x${h} the chat column is only ${m.chat}px`)
+  }
+  await page.setViewportSize({ width: 1500, height: 1200 })
+  await page.waitForTimeout(200)
   const scrolls = await page.evaluate(() => {
     const t = document.querySelector('.as-thread')
     return t.scrollHeight > t.clientHeight ? 'thread' : 'nothing yet'
@@ -2455,6 +2478,11 @@ await step('assistant: it answers across every workspace, not the one he is stan
      cards: it saw both, and it saw which workspace each one belongs to. */
   if (!/Gate offplate thing/.test(briefed)) throw new Error('the briefing sent to the model was still filtered to one workspace')
   if (!/\[Off-Plate\]/.test(briefed)) throw new Error('the briefing does not tell the model which workspace anything came from')
+  /* His tasks are largely in Czech. That is data, and it was pulling the
+     ANSWER into Czech, on nonsense input especially. English unless he himself
+     writes Czech, and the model is told so in the same breath as the briefing. */
+  if (!/ANSWER IN ENGLISH/.test(briefed)) throw new Error('the model is not told to answer in English by default')
+  if (!/DATA, not a request/.test(briefed)) throw new Error('the model is not told that Czech task titles are not a language request')
 })
 
 await step('assistant: it visibly thinks, and says what to do when the model is gone', async () => {

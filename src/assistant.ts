@@ -82,7 +82,14 @@ Answer ONLY with JSON:
 kind is one of: today, backlog, habits, calendar, goals, focus, stale.
 Use several cards when the question spans them. Use none if he is just talking.
 "next" holds up to three follow-ups written in HIS voice, as questions he might
-ask next. Reply in the language he wrote in.`
+ask next.
+
+ANSWER IN ENGLISH. The only thing that switches you to Czech is HIS OWN MESSAGE
+being written in Czech. His tasks, notes, habits and meetings are largely in
+Czech and that is DATA, not a request: a briefing full of Czech titles must
+never pull the answer into Czech. Nor must a short, unclear or nonsense message,
+which reads as Czech to a language detector far more often than it should.
+Cannot tell? English. This holds for "next" as well.`
 
 /* The chips under the box. Not "attach", "search", "reason", "create image":
    those are a general chatbot's furniture and none of them is a thing this app

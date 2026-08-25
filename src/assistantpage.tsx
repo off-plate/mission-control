@@ -354,26 +354,7 @@ export function AssistantPage() {
      spinner spin. */
   const [live, setLive] = useState('')
   const foot = useRef<HTMLDivElement>(null)
-  const shell = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLTextAreaElement>(null)
-
-  /* The page is exactly the room left under the header, so the thread scrolls
-     inside itself and the ask box does not travel with it. Measured rather than
-     assumed: the header grows a banner some days, and a hardcoded offset would
-     put the box a banner's height off the bottom on exactly those days. */
-  useEffect(() => {
-    const el = shell.current
-    if (!el) return
-    const fit = () => {
-      const top = Math.round(el.getBoundingClientRect().top + window.scrollY)
-      el.style.setProperty('--as-top', `${top}px`)
-    }
-    fit()
-    window.addEventListener('resize', fit)
-    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(fit) : null
-    if (ro && el.parentElement) ro.observe(el.parentElement)
-    return () => { window.removeEventListener('resize', fit); ro?.disconnect() }
-  }, [])
 
   const send = async (text: string) => {
     if (busy) return
@@ -440,7 +421,7 @@ export function AssistantPage() {
   )
 
   return (
-    <div ref={shell} className={`page as-page${empty ? ' is-empty' : ' is-split'}`}>
+    <div className={`page as-page${empty ? ' is-empty' : ' is-split'}`}>
       {/* Before he has asked anything the page is a doorway, not a workspace:
           one mark, one question, one box. The split arrives with the answer. */}
       {empty && (

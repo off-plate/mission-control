@@ -12,13 +12,27 @@
    the more honest contract: nothing here is real unless the model says so
    in words, not a field this code has to trust blindly. */
 
-import { detectLang, getAiKey, groq, stripReasoning } from './ai'
+import { detectLang, getAiKey, groq, MODEL as SHARED_MODEL, stripReasoning } from './ai'
 
+/* compound-mini is an agentic SYSTEM rather than a plain model, and it is
+   chosen for one reason: it can reach for its own web_search when the answer
+   depends on something current. That is worth having.
+
+   What it is not worth is /help dying with it. ai.ts already learned this the
+   hard way when llama-3.3-70b-versatile was retired and every AI feature went
+   quiet at once, and the lesson written there, "named ONCE for the whole app",
+   never reached this file: this constant sat here untouched, so the fix that
+   revived the assistant did nothing for /help. If the system is unavailable,
+   the answer falls back to the model the rest of the app uses. Without the
+   web, but answering. */
 const MODEL = 'groq/compound-mini'
 
 export type HelpResult =
   | { ok: true; text: string }
-  | { ok: false; reason: 'no-key' | 'bad-key' | 'rate-limit' | 'failed' }
+  /** `detail` is whatever Groq actually said. A failure that will not say why
+   *  is indistinguishable from the feature being broken, which is exactly what
+   *  he concluded when every /help came back "That did not go through." */
+  | { ok: false; reason: 'no-key' | 'bad-key' | 'rate-limit' | 'failed'; detail?: string }
 
 function systemFor(lang: 'cs' | 'en'): string {
   return `You help him write inside a personal note. He triggers you by typing "/help <request>" on its own line inside the note; that line is his instruction to you, never content to keep.
@@ -39,23 +53,44 @@ Rules:
 export async function helpWithNote(instruction: string, noteSoFar: string): Promise<HelpResult> {
   const key = getAiKey()
   if (!key) return { ok: false, reason: 'no-key' }
-  try {
-    const res = await groq({
-      model: MODEL,
-      temperature: 0.4,
-      messages: [
-        { role: 'system', content: systemFor(detectLang(instruction || noteSoFar)) },
-        { role: 'user', content: `Note so far, as markdown (may still include the /help line itself; that line is the instruction below, not content):\n\n${noteSoFar}\n\nHis instruction: ${instruction}` },
-      ],
-    }, key)
-    if (res.status === 401 || res.status === 403) return { ok: false, reason: 'bad-key' }
-    if (res.status === 429) return { ok: false, reason: 'rate-limit' }
-    if (!res.ok) return { ok: false, reason: 'failed' }
-    const data = await res.json()
-    const text = stripReasoning(data.choices?.[0]?.message?.content ?? '').trim()
-    if (!text) return { ok: false, reason: 'failed' }
-    return { ok: true, text }
-  } catch {
-    return { ok: false, reason: 'failed' }
+
+  const messages = [
+    { role: 'system', content: systemFor(detectLang(instruction || noteSoFar)) },
+    { role: 'user', content: `Note so far, as markdown (may still include the /help line itself; that line is the instruction below, not content):\n\n${noteSoFar}\n\nHis instruction: ${instruction}` },
+  ]
+
+  /** One attempt against one model. Returns the answer, or why not, in words. */
+  const ask = async (model: string): Promise<HelpResult> => {
+    try {
+      const res = await groq({ model, temperature: 0.4, messages }, key)
+      if (res.status === 401 || res.status === 403) return { ok: false, reason: 'bad-key' }
+      if (res.status === 429) return { ok: false, reason: 'rate-limit' }
+      if (!res.ok) {
+        /* Read what Groq said rather than throwing it away. A retired model
+           answers with a perfectly clear sentence and this used to swallow it. */
+        let said = ''
+        try {
+          const body = await res.json() as { error?: { message?: string } }
+          said = body?.error?.message ?? ''
+        } catch { /* not JSON; the status is still worth reporting */ }
+        return { ok: false, reason: 'failed', detail: `${model}: ${said || `HTTP ${res.status}`}` }
+      }
+      const data = await res.json()
+      const text = stripReasoning(data.choices?.[0]?.message?.content ?? '').trim()
+      if (!text) return { ok: false, reason: 'failed', detail: `${model} answered with nothing` }
+      return { ok: true, text }
+    } catch (e) {
+      return { ok: false, reason: 'failed', detail: e instanceof Error ? e.message : 'unreachable' }
+    }
   }
+
+  const first = await ask(MODEL)
+  /* A bad key or a rate limit will not be cured by asking a different model,
+     so those stand. Anything else gets one more try on the model the rest of
+     the app is already using. */
+  if (first.ok || first.reason === 'bad-key' || first.reason === 'rate-limit') return first
+  if ((MODEL as string) === (SHARED_MODEL as string)) return first
+  const second = await ask(SHARED_MODEL)
+  if (second.ok) return second
+  return { ok: false, reason: 'failed', detail: [first.detail, second.detail].filter(Boolean).join(' / ') }
 }

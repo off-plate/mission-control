@@ -143,6 +143,8 @@ function listen(): void {
 async function send(): Promise<void> {
   clearHush()
   const text = (heard + interim).replace(/\s+/g, ' ').trim()
+  /* enter() sets the phase to listening before handing over an opening
+     question, so the morning brief passes this the same as a spoken one. */
   if (!text || phase !== 'listening') return
   /* Ears off BEFORE the answer exists. This is the line that stops it hearing
      itself, and it has to happen here rather than after the answer arrives. */
@@ -199,7 +201,12 @@ function watchLevel(): void {
 }
 
 /** Turn it on. `ask` sends the question and resolves with the answer's words. */
-export async function enter(ask: (text: string) => Promise<string>): Promise<boolean> {
+export async function enter(
+  ask: (text: string) => Promise<string>,
+  /* Asked on his behalf the moment it opens, for the morning brief. Skips
+     straight to thinking: there is nothing to listen for yet. */
+  opening?: string,
+): Promise<boolean> {
   if (!voiceModeAvailable() || phase !== 'off') return false
   askFn = ask
   phase = 'listening'
@@ -215,7 +222,7 @@ export async function enter(ask: (text: string) => Promise<string>): Promise<boo
     ctx = null
   }
   if (voicePhase() === 'off') { exit(); return false }  // he left during the permission prompt
-  listen()
+  if (opening) { heard = opening; interim = ''; void send() } else listen()
   return true
 }
 

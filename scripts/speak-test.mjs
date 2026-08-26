@@ -67,7 +67,7 @@ if (await page.locator('button', { hasText: /Use this device only/i }).count()) 
 await page.evaluate(() => { window.__spoke = []
   speechSynthesis.speak = (u) => {
     window.__spoke.push({ text: u.text, voice: u.voice ? u.voice.name : null, lang: u.lang })
-    setTimeout(() => u.onend && u.onend(), 50)
+    setTimeout(() => u.onend && u.onend(), 3000)
   }
   speechSynthesis.cancel = () => {}; speechSynthesis.pause = () => {}; speechSynthesis.resume = () => {} })
 
@@ -108,6 +108,32 @@ ok('first play assigns a real voice', spoke[0]?.voice != null,
 const NOVELTY = /^(Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Deranged|Good News|Hysterical|Jester|Junior|Kathy|Organ|Princess|Ralph|Fred|Grandma|Grandpa|Superstar|Trinoids|Whisper|Wobble|Zarvox)\b/i
 ok('the voice is not a novelty voice', !!spoke[0]?.voice && !NOVELTY.test(spoke[0].voice),
    `voice=${spoke[0]?.voice}`)
+
+/* A WAVEFORM ON THE PLAY BUTTON. Voice mode had one and Play did not, and Play
+   is where he hears it most, so "there is no sound wave when the assistant is
+   speaking" was about here.
+
+   The rendered box is measured, not the style attribute. Drawn as styled spans
+   this reported 10px in its style and rendered 2.9px, flat as a dotted line,
+   because a height transition re-targeted every frame never advances. */
+await page.evaluate(() => { window.__spokeSlow = true })
+const wave = page.locator('.as-mini-wave')
+ok('a waveform appears on the button while it reads', await wave.count() === 1, `${await wave.count()} waves`)
+const boxes = await page.evaluate(async () => {
+  const seen = []
+  for (let i = 0; i < 10; i++) {
+    await new Promise((r) => setTimeout(r, 50))
+    const rects = [...document.querySelectorAll('.as-mini-wave rect')]
+    seen.push(rects.map((r) => +r.getBoundingClientRect().height.toFixed(1)))
+  }
+  return seen
+})
+const flat = boxes.map((row) => new Set(row).size)
+ok('its bars are different heights, not a dotted line',
+   Math.max(...flat) > 3, `at most ${Math.max(...flat)} distinct heights in a frame`)
+const newest = boxes.map((row) => row[row.length - 1])
+ok('and they move between frames', new Set(newest.map((n) => Math.round(n))).size > 1,
+   newest.map((n) => Math.round(n)).join(' '))
 
 // --- Gemini path ---
 await page.evaluate(() => localStorage.setItem('mc-gemini-key', 'AIzaTEST'))

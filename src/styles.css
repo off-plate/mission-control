@@ -6059,3 +6059,8 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   background: var(--a-accent-wash);
   color: var(--a-accent-text);
 }
+
+/* The answer being read, on the Play button itself. Small, in the accent, and
+   only present while it is talking: the button says Pause, and this says it
+   out loud. Same shape as the panel's waveform so they read as one idea. */
+.as-mini-wave { display: block; margin-right: 4px; fill: currentColor; }

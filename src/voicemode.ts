@@ -183,7 +183,7 @@ async function send(): Promise<void> {
 
 /* Three frequencies that do not divide into each other, so the pattern does
    not visibly repeat, plus a slow swell for the shape of a sentence. */
-function voiceish(t: number): number {
+export function voiceish(t: number): number {
   const ms = t / 1000
   const swell = 0.55 + 0.45 * Math.sin(ms * 1.7)
   const detail = 0.5 + 0.3 * Math.sin(ms * 11.3) + 0.2 * Math.sin(ms * 27.1)

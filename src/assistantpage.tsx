@@ -4,7 +4,8 @@ import { isMeeting, useCalendar } from './calendar'
 import { SpaceMark } from './ui'
 import { SPACE_LABELS } from './mock'
 import { ask, STARTERS, type Action, type Brief, type Card, type CardKind, type Reply } from './assistant'
-import { engineName, speechState, stop as stopSpeech, subscribe, toggle } from './speech'
+import { engineName, speakingLevel, speechState, stop as stopSpeech, subscribe, toggle } from './speech'
+import { voiceish } from './voicemode'
 import {
   cancel as cancelDictation, dictateState, dictationAvailable, dictationEngine,
   stop as stopDictation, subscribe as subscribeDictation, toggle as toggleDictation,
@@ -429,6 +430,50 @@ function Canvas({ kinds }: { kinds: CardKind[] }) {
   )
 }
 
+/* The answer, drawn while it is being read.
+
+   Voice mode had a waveform and Play did not, and Play is where he hears it
+   most: he presses it on an answer and the only sign anything is happening was
+   the word on the button changing to Pause. "There is no sound wave when the
+   assistant is speaking" was about here.
+
+   It runs its own frame loop rather than leaning on the speech module's
+   subscribe, which only fires when the state changes and would leave the bars
+   frozen through the whole answer. */
+const MINI_BARS = 18
+
+function MiniWave(): JSX.Element {
+  const [, bump] = useState(0)
+  const history = useRef<number[]>(Array.from({ length: MINI_BARS }, () => 0))
+  useEffect(() => {
+    let raf = 0
+    const tick = (): void => {
+      const h = history.current
+      const real = speakingLevel()
+      h.push(real > 0.02 ? real : voiceish(performance.now()))
+      if (h.length > MINI_BARS) h.shift()
+      bump((n) => n + 1)
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [])
+  /* SVG, not styled spans. As spans this drew a flat dotted line: the computed
+     height stayed at its floor while the inline style said ten pixels, because
+     a height transition re-targeted every frame never advances. An SVG rect
+     cannot be clamped by a flex row or held back by a transition, and the
+     geometry is the value rather than a request to lay something out. */
+  const W = MINI_BARS * 3 - 1
+  return (
+    <svg className="as-mini-wave" width={W} height="14" viewBox={`0 0 ${W} 14`} aria-hidden="true">
+      {history.current.map((v, i) => {
+        const h = 2 + Math.min(1, v) * 11
+        return <rect key={i} x={i * 3} y={(14 - h) / 2} width="2" height={h} rx="1" />
+      })}
+    </svg>
+  )
+}
+
 /* Play and pause on an answer, the way it sits under a reply in Claude.
 
    It is deliberately not a row of transport controls. There is no scrubber, no
@@ -450,6 +495,7 @@ function Speak({ id, text }: { id: string; text: string }): JSX.Element {
       aria-label={`${label} this answer, spoken by ${engineName()}`}
       title={`${label}. Read by ${engineName()}.`}
     >
+      {st === 'playing' ? <MiniWave /> : null}
       <span className="as-speak-ico" aria-hidden="true">
         {st === 'playing' ? (
           <Icon.Pause size={12} filled />

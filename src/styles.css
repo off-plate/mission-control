@@ -5061,23 +5061,12 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 /* The bars ARE the microphone. Height is set inline from the live reading, so
    nothing here animates them: CSS only smooths the step between frames, which
    keeps a 60fps signal from looking like a strobe. */
-/* Full width of the box, because a small meter marooned in a wide panel reads
-   as a decoration rather than as the thing that is listening. The bars share
-   the space, so this holds from a phone to an ultrawide without a media query
-   or a resize observer. */
-.as-wave {
-  display: flex; align-items: center; justify-content: center;
-  gap: 2px; height: 48px; width: 100%;
-}
-.as-wave-bar {
-  flex: 1 1 0; min-width: 1px; max-width: 4px;
-  min-height: 2px; border-radius: 2px;
-  background: var(--accent);
-  transition: height 90ms linear;
-}
-/* Thinking has nothing to draw, so it draws nothing. Speaking has the answer
-   itself, so the bars stay in the accent and move with the voice. */
-.as-voice.is-thinking .as-wave-bar { background: var(--faint); }
+/* Full width of the box. The bars are SVG rects now: as flex children with a
+   percentage height they rendered at their 2px floor no matter what the height
+   said, which is a flat dotted line rather than a waveform. */
+.as-wave { display: block; width: 100%; height: 48px; fill: var(--accent); }
+/* Mouth shut and ears shut: nothing to draw, so it draws a line. */
+.as-voice.is-thinking .as-wave { fill: var(--faint); }
 
 .as-voice-heard {
   font-size: var(--text-sm); color: var(--ink);

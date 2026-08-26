@@ -85,7 +85,7 @@ await btn.click(); await page.waitForTimeout(500)
 ok('the ask box becomes the voice panel', await page.locator('.as-voice').count() === 1)
 ok('the textarea is gone while in voice mode', await page.locator('.as-input').count() === 0)
 ok('it says it is listening', (await page.locator('.as-voice-state').textContent())?.includes('Listening'))
-ok('the wave is drawn', await page.locator('.as-wave-bar').count() > 10, `${await page.locator('.as-wave-bar').count()} bars`)
+ok('the wave is drawn', await page.locator('.as-wave rect').count() > 10, `${await page.locator('.as-wave rect').count()} bars`)
 ok('the thread is still on the page, not replaced', await page.locator('.as-page').count() === 1)
 
 // --- speaking a question ---
@@ -153,20 +153,37 @@ await page.evaluate(() => window.__say('and one more thing', true))
 await page.waitForFunction(() => document.querySelector('.as-voice')?.className.includes('is-speaking'),
   null, { timeout: 12000 }).catch(() => {})
 const whileSpeaking = await page.evaluate(async () => {
-  /* The NEWEST bar, not the loudest in the trail. The trail keeps a couple of
-     seconds of history, so its maximum stays pinned to the loudest moment and
-     reports "not moving" no matter what the meter does. */
+  /* MEASURE THE RENDERED BOX, NEVER THE STYLE ATTRIBUTE. This is the whole
+     lesson of five rounds of "there is still no sound wave". The JavaScript was
+     always right: the style attribute said 20.4% of a 48px box while the box
+     itself measured 2.0px, the floor, across all ninety-six bars, because a
+     percentage height with a transition re-targeted every frame never resolves.
+     Every probe that read `style.height` reported a perfect waveform, and he
+     was looking at a flat dotted line. */
+  const heights = () => [...document.querySelectorAll('.as-wave rect')]
+    .map((r) => r.getBoundingClientRect().height)
   const seen = []
   for (let i = 0; i < 20; i++) {
     await new Promise((r) => setTimeout(r, 45))
-    const bars = [...document.querySelectorAll('.as-wave-bar')]
-    const last = bars[bars.length - 1]
-    seen.push(parseFloat(last?.style.height) || 0)
+    const h = heights()
+    /* The NEWEST bar as well as the tallest: the trail keeps a second or two of
+       history, so its maximum stays pinned to the loudest moment and reports
+       "not moving" however lively the meter is. */
+    seen.push({ tallest: Math.max(...h), newest: h[h.length - 1] ?? 0,
+                distinct: new Set(h.map((n) => Math.round(n))).size })
   }
-  return { peak: Math.max(...seen), moved: new Set(seen.map((n) => Math.round(n / 4))).size }
+  return {
+    tallest: Math.max(...seen.map((s) => s.tallest)),
+    distinct: Math.max(...seen.map((s) => s.distinct)),
+    newestMoved: new Set(seen.map((s) => Math.round(s.newest / 2))).size,
+  }
 })
-ok('the bars are not flat while it speaks', whileSpeaking.peak > 10, `peak ${whileSpeaking.peak.toFixed(1)}%`)
-ok('and they move rather than holding one height', whileSpeaking.moved > 1, `${whileSpeaking.moved} distinct heights`)
+ok('the bars actually RENDER taller than their floor while it speaks',
+   whileSpeaking.tallest > 6, `tallest rendered box ${whileSpeaking.tallest.toFixed(1)}px`)
+ok('and they are a wave, not one repeated height',
+   whileSpeaking.distinct > 4, `${whileSpeaking.distinct} distinct rendered heights`)
+ok('and the shape changes over time',
+   whileSpeaking.newestMoved > 1, `${whileSpeaking.newestMoved} distinct peaks across frames`)
 
 /* Same rule in voice mode, and here it hangs up entirely: an assistant left
    listening to an empty room all evening is the version of this feature nobody

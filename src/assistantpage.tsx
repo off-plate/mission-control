@@ -737,17 +737,27 @@ function VoicePanel({ onExit }: { onExit: () => void }): JSX.Element {
         <span className="as-voice-state">{said}</span>
         <button type="button" className="as-voice-exit" onClick={onExit}>Done</button>
       </div>
-      {/* aria-hidden: the bars are the state made visible, and the state is
+      {/* DRAWN AS SVG, and this is the whole reason he saw nothing for five
+          rounds. As styled spans the bars carried a percentage height and a
+          height transition, and neither ever resolved: measured live, the
+          style attribute said 20.4% of a 48px box and the rendered box was
+          2.0px, the floor, across all ninety-six bars. Every probe I wrote
+          read the style attribute and reported a working waveform.
+
+          A rect cannot be clamped by a flex row or held back by a transition
+          that is re-targeted every frame. Its geometry IS the value.
+
+          aria-hidden: the bars are the state made visible, and the state is
           already announced in words beside them. */}
-      <div className="as-wave" aria-hidden="true">
-        {history.current.map((v, i) => (
-          <span
-            key={i}
-            className="as-wave-bar"
-            style={{ height: `${live ? 6 + Math.min(1, v) * 94 : 4}%` }}
-          />
-        ))}
-      </div>
+      <svg
+        className="as-wave" viewBox={`0 0 ${BARS * 3} 48`} preserveAspectRatio="none"
+        aria-hidden="true"
+      >
+        {history.current.map((v, i) => {
+          const h = live ? 2 + Math.min(1, v) * 44 : 2
+          return <rect key={i} x={i * 3} y={(48 - h) / 2} width="2" height={h} rx="1" />
+        })}
+      </svg>
       <p className="as-voice-heard" aria-live="polite">
         {heard || (live ? 'Say something.' : '\u00a0')}
       </p>

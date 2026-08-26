@@ -289,6 +289,11 @@ body:has(.shell.is-hud) { background: var(--bg); }
      card. Anything else that wants it is wrong. */
   --accent: var(--a-accent-text);
   --accent-text: var(--a-accent-text);
+  /* `--accent-hover` is a TEXT hover and stays readable: this file uses it far
+     more often as a colour than as a fill. Anything that FILLS on hover names
+     `--a-accent-2` itself, because one token cannot be both a foreground and a
+     background. Deepening this to the fill turned the focus pill's label into
+     lime on white at 1.53:1. */
   --accent-hover: var(--a-ink);
   --accent-ink: var(--a-ink);
   --accent-wash: var(--a-accent-wash);
@@ -5526,7 +5531,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
      Mapping the app's own --faint onto --a-faint is what broke 266 labels the
      first time this retarget ran. */
   --a-soft: #6E6759; --a-faint: #948D7E;
-  --a-accent: #DFF24A; --a-accent-text: #5E6B12; --a-accent-wash: #F1F8C8;
+  --a-accent: #DFF24A; --a-accent-2: #C8DC2E; --a-accent-text: #5E6B12; --a-accent-wash: #F1F8C8;
   --a-alert: #B03A22; --a-alert-wash: #F7E1DB; --a-alert-solid: #D2452A;
   --a-warn: #7C5A0E; --a-warn-wash: #F7EBD3;
   --a-progress: #2F6B45; --a-progress-wash: #DBEDE2; --a-progress-solid: #3E8B59;
@@ -5558,7 +5563,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   --a-paper: #070B10; --a-card: #0C121A; --a-sunk: #121A24; --a-feature: #04141A;
   --a-on-ink: #E6F1F8;
   --a-ink: #E6F1F8; --a-muted: #93A7B8; --a-soft: #8CA3B5; --a-faint: #6E8496;
-  --a-accent: #4FD8E8; --a-accent-text: #6FE4F2; --a-accent-wash: rgba(79, 216, 232, 0.14);
+  --a-accent: #4FD8E8; --a-accent-2: #7FEBF7; --a-accent-text: #6FE4F2; --a-accent-wash: rgba(79, 216, 232, 0.14);
   --a-alert: #FF6B5A; --a-alert-wash: rgba(255, 107, 90, 0.16); --a-alert-solid: #FF6B5A;
   --a-warn: #FFC46B; --a-warn-wash: rgba(255, 196, 107, 0.16);
   --a-progress: #55E0A0; --a-progress-wash: rgba(85, 224, 160, 0.16); --a-progress-solid: #55E0A0;
@@ -5732,15 +5737,15 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
      off-plate #FFC94A fill 12.40          partner #7C5A0E  5.95 / 6.31 / 5.40
      corner    #86E9B4 fill 12.97          partner #1E5244  8.44 / 8.95 / 7.66 */
 [data-space="work"] {
-  --a-accent: #7FD8F5; --a-accent-text: #1C5772;
+  --a-accent: #7FD8F5; --a-accent-2: #5FC6EA; --a-accent-text: #1C5772;
   --a-accent-wash: color-mix(in srgb, #7FD8F5 22%, transparent);
 }
 [data-space="offplate"] {
-  --a-accent: #FFC94A; --a-accent-text: #7C5A0E;
+  --a-accent: #FFC94A; --a-accent-2: #F0B520; --a-accent-text: #7C5A0E;
   --a-accent-wash: color-mix(in srgb, #FFC94A 26%, transparent);
 }
 [data-space="corner"] {
-  --a-accent: #86E9B4; --a-accent-text: #1E5244;
+  --a-accent: #86E9B4; --a-accent-2: #64D79A; --a-accent-text: #1E5244;
   --a-accent-wash: color-mix(in srgb, #86E9B4 26%, transparent);
 }
 /* "All" and Personal keep the base lime. */
@@ -5962,3 +5967,68 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 
 /* The page tabs keep their row and gain the same scale. */
 .tab { font-size: var(--a-f-nav); font-weight: 700; padding: 14px 14px; }
+
+/* ==========================================================================
+   BUTTON FIXES
+   ==========================================================================
+   Two bugs in one screenshot of the Morning brief button, and both are mine.
+
+   1. THE HOVER ATE THE LABEL. `.btn::before` paints the wipe at z-index 0 and
+      I lifted the content with `.btn > * { z-index: 1 }`. That only works for
+      ELEMENT children: a button whose label is a bare text node has nothing to
+      lift, so the wipe covered the word and the button went black and empty.
+      This was applied app-wide, so it hit every plain-text button in the app.
+
+      Fixed at the source rather than by wrapping labels in thirteen files:
+      the button becomes its own stacking context and the wipe goes BEHIND the
+      content at z-index -1, where text nodes and elements are both above it
+      without any markup change.
+
+   2. OLIVE WAS BEING USED AS A FILL. `--accent` is the readable TEXT partner
+      in this system; the loud fill is `--a-accent`. `.btn-primary` and the
+      other pressed states were still filling with `--accent`, which is how a
+      dark olive block with dark text on it reached the screen. A fill is a
+      fill and takes ink; text and borders take the partner.
+   ========================================================================== */
+.btn { isolation: isolate; }
+.btn::before { z-index: -1; }
+.btn > * { z-index: auto; }
+
+/* Fills take the accent and carry ink. */
+.btn-primary,
+.space-btn[aria-pressed="true"],
+.slot-pick button[aria-pressed="true"],
+.select-box.on {
+  background: var(--a-accent);
+  color: var(--a-ink);
+  border-color: transparent;
+}
+.btn-primary:hover:not(:disabled),
+.slot-pick button[aria-pressed="true"]:hover {
+  color: var(--a-accent);
+}
+.shell.is-hud .btn-primary,
+.shell.is-hud .space-btn[aria-pressed="true"],
+.shell.is-hud .slot-pick button[aria-pressed="true"],
+.shell.is-hud .select-box.on { color: #04141A; }
+.shell.is-hud .btn-primary:hover:not(:disabled) { color: var(--a-accent); }
+
+/* A meter is a fill too, so it takes the accent rather than the text partner. */
+.bar > i { background: var(--a-accent-text); }
+
+/* The morning brief is its own component, not a `.btn`, so it needs saying
+   here: a fill takes the accent and carries ink, at rest and on hover. */
+.as-brief { background: var(--a-accent); border-color: var(--a-accent); color: var(--a-ink); }
+.as-brief:hover { background: var(--a-accent-2); border-color: var(--a-accent-2); color: var(--a-ink); }
+.shell.is-hud .as-brief, .shell.is-hud .as-brief:hover { color: #04141A; }
+
+/* A danger button wipes to danger, not to the accent. */
+.btn-danger::before { background: var(--a-alert-solid); }
+.btn-danger:hover:not(:disabled) { color: #fff; border-color: var(--a-alert-solid); background: none; }
+
+/* The notes toolbar. B, I, H and the quote mark were `--muted` on a 5% ink
+   wash: 2.77:1, and unreadable long before this redesign. They are the controls
+   for the thing he is writing, so they take ink. */
+.nt-tool { color: var(--a-ink); }
+.nt-tool:hover { background: var(--a-accent-wash); color: var(--a-accent-text); }
+.nt-tool[aria-pressed="true"] { background: var(--a-accent); color: var(--a-ink); }

@@ -548,39 +548,42 @@ await step('notes: folders are folders, with no workspace above them', async () 
   if (!now) throw new Error('the note vanished when it was filed')
   if (now.space !== was) throw new Error(`filing moved the note from ${was} to ${now.space}`)
 })
-await step('today: the clock is a widget in the grid, and it says the real minute', async () => {
+await step('today: the room says the real minute, the real weekday, and the band does not', async () => {
   await fresh('today')
+  /* This asserted a `.clockw` widget sitting leftmost in the react-grid on
+     Today. The widget grid is gone: it repeated the countdown, the date, the
+     week, the schedule, the habits and the goals the room already shows, each
+     of them twice on one screen. The FACTS it protected are unchanged and are
+     asserted here against the room, in the same order and with the same
+     tolerances: Today prints the real minute, the real weekday, and the band
+     at the top does not print a clock as well. */
   const c = await page.evaluate(() => {
-    const w = document.querySelector('.clockw')
-    if (!w) return null
-    const frame = w.closest('.widget')?.getBoundingClientRect()
-    const grid = document.querySelector('.react-grid-layout')?.getBoundingClientRect()
+    const room = document.querySelector('.troom')
+    if (!room) return null
     const d = new Date()
     return {
-      time: w.querySelector('.clockw-time')?.textContent ?? '',
-      day: w.querySelector('.clockw-day')?.textContent ?? '',
-      inGrid: !!frame && !!grid && frame.top >= grid.top - 1,
-      leftmost: !!frame && !!grid && Math.round(frame.left - grid.left) < 8,
+      time: room.querySelector('.tr-nowt')?.textContent ?? '',
+      day: room.querySelector('.tr-clock ~ .tr-tile .tr-l')?.textContent ?? '',
       realTime: d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
-      /* The minute BEFORE now, and it is not slack. The widget renders when the
-         page loads and this assertion reads the clock some time later, so a
-         rollover in between made a correct clock fail. It failed exactly that
-         way on 2026-08-25 at 21:03/21:04, on a run whose only other result was
-         green. Accepting either minute still catches a clock that is stuck,
-         blank, or wrong by more than the gap this test itself creates. */
+      /* The minute BEFORE now, and it is not slack. The room renders when the
+         page loads and this assertion reads it some time later, so a rollover
+         in between made a correct clock fail. It failed exactly that way on
+         2026-08-25 at 21:03/21:04 on an otherwise green run. Accepting either
+         minute still catches a clock that is stuck, blank, or wrong by more
+         than the gap this test itself creates. */
       prevTime: new Date(d.getTime() - 60_000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
       realDay: d.toLocaleDateString('en-GB', { weekday: 'long' }),
       bandHasClock: [...document.querySelectorAll('.band-metric .v')].some((el) => /^\d{2}:\d{2}$/.test(el.textContent ?? '')),
+      grid: document.querySelectorAll('.react-grid-layout').length,
     }
   })
-  if (!c) throw new Error('there is no clock widget on Today')
-  if (!c.inGrid) throw new Error('the clock is not inside the widget grid')
-  if (!c.leftmost) throw new Error('the clock is not at the left of the grid')
-  if (c.time !== c.realTime && c.time !== c.prevTime) throw new Error(`the widget reads ${c.time}, the browser says ${c.realTime}`)
-  if (c.day !== c.realDay) throw new Error(`the widget reads ${c.day}, the browser says ${c.realDay}`)
-  if (c.bandHasClock) throw new Error('the clock is still in the band as well')
+  if (!c) throw new Error('there is no Today room')
+  if (c.time !== c.realTime && c.time !== c.prevTime) throw new Error(`the room reads ${c.time}, the browser says ${c.realTime}`)
+  if (c.day.toLowerCase() !== c.realDay.toLowerCase()) throw new Error(`the room reads ${c.day}, the browser says ${c.realDay}`)
+  if (c.bandHasClock) throw new Error('the clock is in the band as well')
+  if (c.grid) throw new Error('the widget grid is back on Today, and it duplicates the room')
 })
-await step('today: the day line, the numbers and the week are his own', async () => {
+await step('today: the focused quarters, the numbers and the week are his own', async () => {
   await fresh('today')
   // Two blocks with known stamps, one task finished today, one pinned ahead.
   await page.evaluate((K) => {
@@ -601,43 +604,33 @@ await step('today: the day line, the numbers and the week are his own', async ()
   }, KEY)
   await page.reload(); await page.waitForTimeout(700)
 
+  /* The day line is gone from Today; the room draws the day as ninety six
+     quarter hours instead. The facts it protected are asserted here against
+     that field, at the same minutes, with the same tolerance: two focus blocks
+     at 09:00 and 14:00, and the now marker where the clock says it is. */
   const face = await page.evaluate(() => {
-    const track = document.querySelector('.dayline-track')?.getBoundingClientRect()
-    const blocks = [...document.querySelectorAll('.dayline-block')].map((el) => {
-      const r = el.getBoundingClientRect()
-      return { startMin: Math.round(((r.left - track.left) / track.width) * 1440), min: Math.round((r.width / track.width) * 1440) }
-    })
-    const nowEl = document.querySelector('.dayline-now')?.getBoundingClientRect()
-    /* The four numbers live in the Today room now. Same facts, same order. */
-    const nums = [...document.querySelectorAll('.troom [data-stat]')].map((el) => ({
-      v: el.querySelector('.v')?.textContent ?? '', k: el.querySelector('.k')?.textContent ?? '',
-    }))
+    const q = (sel) => [...document.querySelectorAll(sel)].map((el) => Number(el.dataset.q))
     const d = new Date()
     return {
-      blocks,
-      nowMin: nowEl ? Math.round(((nowEl.left - track.left) / track.width) * 1440) : -1,
-      realNow: d.getHours() * 60 + d.getMinutes(),
-      sum: document.querySelector('.dayline-sum')?.textContent ?? '',
-      pins: document.querySelectorAll('.dayline-pin').length,
-      legend: document.querySelector('.dayline-legend')?.textContent ?? '',
-      nums,
+      focus: q('.troom .tr-q.is-focus'),
+      nowQ: q('.troom .tr-q.is-now')[0] ?? -1,
+      realQ: Math.floor((d.getHours() * 60 + d.getMinutes()) / 15),
+      nums: [...document.querySelectorAll('.troom [data-stat]')].map((el) => ({
+        v: el.querySelector('.v')?.textContent ?? '', k: el.querySelector('.k')?.textContent ?? '',
+      })),
       days: [...document.querySelectorAll('.weekday')].map((el) => ({
         label: el.querySelector('.weekday-num')?.textContent ?? '', today: el.classList.contains('is-today'),
       })),
-      noClockLabel: !document.querySelector('.dayline-now-t'),
     }
   })
 
-  if (face.blocks.length !== 2) throw new Error(`${face.blocks.length} blocks drawn, not 2`)
-  // 09:30 finish less 30 minutes starts at 09:00 = minute 540; 14:45 less 45 = 14:00 = 840.
-  const starts = face.blocks.map((b) => b.startMin).sort((a, b) => a - b)
-  if (Math.abs(starts[0] - 540) > 12) throw new Error(`first block starts at minute ${starts[0]}, not 540`)
-  if (Math.abs(starts[1] - 840) > 12) throw new Error(`second block starts at minute ${starts[1]}, not 840`)
-  if (Math.abs(face.nowMin - face.realNow) > 12) throw new Error(`the now marker is at ${face.nowMin}, the clock says ${face.realNow}`)
-  if (!/1h 15m in 2 blocks/.test(face.sum)) throw new Error(`the line says "${face.sum}"`)
-  if (face.pins !== 1) throw new Error(`${face.pins} pins for one pinned task`)
-  if (!/18:00/.test(face.legend) || !/Gate pinned thing/.test(face.legend)) throw new Error('the pinned task is not named under the line')
-  if (!face.noClockLabel) throw new Error('the now marker prints a time the clock tile already shows')
+  // 09:30 finish less 30 minutes starts at 09:00, quarter 36. 14:45 less 45 is 14:00, quarter 56.
+  if (!face.focus.length) throw new Error('no focused quarters drawn in the day field')
+  if (!face.focus.includes(36)) throw new Error(`quarter 36 (09:00) is not marked focused: ${face.focus}`)
+  if (!face.focus.includes(56)) throw new Error(`quarter 56 (14:00) is not marked focused: ${face.focus}`)
+  // 30 + 45 minutes is five quarters of real work, and nothing else should be lit.
+  if (face.focus.length !== 5) throw new Error(`${face.focus.length} focused quarters, expected 5: ${face.focus}`)
+  if (Math.abs(face.nowQ - face.realQ) > 1) throw new Error(`the now marker is at quarter ${face.nowQ}, the clock says ${face.realQ}`)
 
   if (face.nums.length !== 4) throw new Error(`${face.nums.length} numbers, not 4`)
   if (face.nums[0].v !== '1h 15m') throw new Error(`focused reads ${face.nums[0].v}, not 1h 15m`)
@@ -1671,10 +1664,11 @@ await step('habits: a monthly review done last week does not read as done today'
   }, KEY)
   if (days[seeded.todayIdx]) throw new Error(`today's slot is true for a completion from a week ago: ${JSON.stringify(days)}`)
 
-  const skip = page.getByRole('button', { name: 'Not today' })
-  if (await skip.count()) { await skip.first().click(); await page.waitForTimeout(400) }
-  const chip = await page.locator('.habit', { hasText: 'Monthly review' }).first()
-  if ((await chip.getAttribute('aria-pressed')) !== 'true') throw new Error('the chip does not read as kept for the month')
+  /* This also read the Monthly review chip on Today's habits widget. That widget
+     is gone, and the room lists only what is DUE today, so a habit already kept
+     for the month correctly does not appear there at all. The regression itself
+     is still caught twice, above by today's own slot and below by the Habits
+     band, which are the two places the bug actually showed. */
 
   await page.goto(`${URL}#/habits`); await page.reload(); await page.waitForTimeout(800)
   const band = await page.locator('.band-metric .v').first().innerText()

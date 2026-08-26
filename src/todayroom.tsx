@@ -27,6 +27,20 @@ import { fmtDuration, fmtNum, fmtSigned, goalPace, goalPeriodKey, goalPeriodRang
 import { SLOTS, dueOn, goalCurrent, habitsDueToday, isTimeFed, type Task } from './types'
 import { WeekStrip } from './dayface'
 
+/* A pasted spreadsheet link is an address, not a title. Left raw it took three
+   lines of the Next card and pushed the card off the right of the room. The
+   host and first segment are enough to recognise it. */
+const URL_RE = /https?:\/\/[^\s]+/g
+function shortTitle(raw: string): string {
+  return raw.replace(URL_RE, (u) => {
+    try {
+      const url = new URL(u)
+      const seg = url.pathname.split('/').filter(Boolean)[0]
+      return url.hostname.replace(/^www\./, '') + (seg ? '/' + seg : '')
+    } catch { return u }
+  }).trim()
+}
+
 /** Whole days since a task was written down. Avoidance is measured in age, never in a due date. */
 function ageDays(t: Task): number {
   if (t.addedAt) return Math.max(0, Math.floor((Date.now() - t.addedAt) / 86400000))
@@ -228,7 +242,7 @@ export function TodayRoom() {
             <p className="tr-l">Next</p>
             {isEstimated(firstMove) && firstMove.estimateMin > 0 && <span className="tr-n tr-sm">{fmtDuration(taskMinutes(firstMove))}</span>}
           </div>
-          <p className="tr-nextt">{firstMove.title}</p>
+          <p className="tr-nextt">{shortTitle(firstMove.title)}</p>
           <div className="tr-chips">
             <span className="tr-chip">{ageDays(firstMove)} days</span>
             <button className="tr-start" onClick={() => start(firstMove)}>Start</button>

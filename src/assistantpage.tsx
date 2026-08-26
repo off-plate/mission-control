@@ -695,11 +695,38 @@ const BRIEF_ASK = 'Give me my morning brief. What is it like out, what is on tod
 /* What the thread shows instead. He pressed a button; that is the thing he did. */
 const BRIEF_LABEL = 'Morning brief'
 
-const BARS = 96
+/* Three layers, deliberately not harmonics of each other: 1.6, 2.7 and 4.3 do
+   not divide evenly, so the curves drift out of step and the shape never
+   visibly repeats. Two of them run backwards, which is what stops it reading
+   as one wave with copies behind it. */
+const RIBBONS = [
+  { freq: 1.6, speed: 1, offset: 0, scale: 1, opacity: 1 },
+  { freq: 2.7, speed: -0.62, offset: 1.7, scale: 0.68, opacity: 0.5 },
+  { freq: 4.3, speed: 0.41, offset: 3.4, scale: 0.4, opacity: 0.28 },
+]
+
+/* One curve across the box. The envelope tapers it to nothing at both ends, so
+   it reads as a ribbon of light rather than a signal cut off by the edges,
+   which is the difference between the reference and a line chart. */
+function ribbon(amp: number, phase: number, freq: number): string {
+  const pts: string[] = []
+  for (let i = 0; i <= 40; i++) {
+    const t = i / 40
+    const env = Math.sin(Math.PI * t) ** 1.5
+    const y = 24 + Math.sin(t * freq * Math.PI * 2 + phase) * amp * env
+    pts.push(`${(t * 300).toFixed(1)},${y.toFixed(2)}`)
+  }
+  return `M${pts.join(' L')}`
+}
+
 
 function VoicePanel({ onExit }: { onExit: () => void }): JSX.Element {
   const [, bump] = useState(0)
-  const history = useRef<number[]>(Array.from({ length: BARS }, () => 0))
+  /* Smoothed, because a meter that jumps frame to frame reads as noise rather
+     than as a voice. It rises fast and falls slowly, which is the shape speech
+     actually has: a syllable arrives at once and decays. */
+  const amp = useRef(0)
+  const drift = useRef(0)
   /* Held in a ref so the subscription is made once. Re-subscribing on every
      frame of the waveform would be a new listener sixty times a second. */
   const exitRef = useRef(onExit)
@@ -711,9 +738,11 @@ function VoicePanel({ onExit }: { onExit: () => void }): JSX.Element {
      a dead microphone behind it. */
   const hungUp = useRef(false)
   useEffect(() => subscribeVoice(() => {
-    const h = history.current
-    h.push(voiceLevel())
-    if (h.length > BARS) h.shift()
+    const want = voiceLevel() * 18
+    amp.current += (want - amp.current) * (want > amp.current ? 0.35 : 0.08)
+    /* The phase only moves while there is something to show, so silence is
+       still rather than a ribbon idling along on its own. */
+    if (amp.current > 0.3) drift.current += 0.09
     /* IT CAN HANG UP BY ITSELF, after six seconds with nothing said. The module
        knows it has stopped; React does not, and without this the panel stayed
        on screen with a dead microphone behind it, looking like it was still
@@ -741,26 +770,34 @@ function VoicePanel({ onExit }: { onExit: () => void }): JSX.Element {
         <span className="as-voice-state">{said}</span>
         <button type="button" className="as-voice-exit" onClick={onExit}>Done</button>
       </div>
-      {/* DRAWN AS SVG, and this is the whole reason he saw nothing for five
-          rounds. As styled spans the bars carried a percentage height and a
-          height transition, and neither ever resolved: measured live, the
-          style attribute said 20.4% of a 48px box and the rendered box was
-          2.0px, the floor, across all ninety-six bars. Every probe I wrote
-          read the style attribute and reported a working waveform.
+      {/* FLUID, NOT AN EQUALISER. He showed me the reference: a light ribbon
+          that moves as one thing, the way Siri does, rather than a row of
+          separate bars. Three curves at different frequencies and phases,
+          drifting past each other, so the shape never quite repeats.
 
-          A rect cannot be clamped by a flex row or held back by a transition
-          that is re-targeted every frame. Its geometry IS the value.
+          Drawn as SVG because as styled divs the bars rendered at their floor
+          no matter what their height said: a percentage height carrying a
+          transition that is re-targeted every frame never resolves. A path's
+          geometry IS the value.
+
+          THE AMPLITUDE IS THE REAL SIGNAL AND NOTHING ELSE. When there is
+          nothing to measure the curves settle into a straight line, which is
+          the honest picture of silence. Nothing here generates a shape.
 
           aria-hidden: the bars are the state made visible, and the state is
           already announced in words beside them. */}
       <svg
-        className="as-wave" viewBox={`0 0 ${BARS * 3} 48`} preserveAspectRatio="none"
+        className="as-wave" viewBox="0 0 300 48" preserveAspectRatio="none"
         aria-hidden="true"
       >
-        {history.current.map((v, i) => {
-          const h = live ? 2 + Math.min(1, v) * 44 : 2
-          return <rect key={i} x={i * 3} y={(48 - h) / 2} width="2" height={h} rx="1" />
-        })}
+        {RIBBONS.map((r, i) => (
+          <path
+            key={i}
+            d={ribbon(amp.current * r.scale, drift.current * r.speed + r.offset, r.freq)}
+            opacity={r.opacity}
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
       </svg>
       <p className="as-voice-heard" aria-live="polite">
         {heard || (live ? 'Say something.' : '\u00a0')}

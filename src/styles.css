@@ -5064,9 +5064,15 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 /* Full width of the box. The bars are SVG rects now: as flex children with a
    percentage height they rendered at their 2px floor no matter what the height
    said, which is a flat dotted line rather than a waveform. */
-.as-wave { display: block; width: 100%; height: 48px; fill: var(--accent); }
+/* Strokes, not fills: the ribbons are lines of light. non-scaling-stroke on the
+   paths keeps them an even weight while the box stretches to the panel width. */
+.as-wave {
+  display: block; width: 100%; height: 48px;
+  fill: none; stroke: var(--accent); stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
 /* Mouth shut and ears shut: nothing to draw, so it draws a line. */
-.as-voice.is-thinking .as-wave { fill: var(--faint); }
+.as-voice.is-thinking .as-wave { stroke: var(--faint); }
 
 .as-voice-heard {
   font-size: var(--text-sm); color: var(--ink);

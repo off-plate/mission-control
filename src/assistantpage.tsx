@@ -4,8 +4,7 @@ import { isMeeting, useCalendar } from './calendar'
 import { SpaceMark } from './ui'
 import { SPACE_LABELS } from './mock'
 import { ask, STARTERS, type Action, type Brief, type Card, type CardKind, type Reply } from './assistant'
-import { engineName, speakingLevel, speechState, stop as stopSpeech, subscribe, toggle } from './speech'
-import { voiceish } from './voicemode'
+import { engineName, speakingLevel, speakingMeasured, speechState, stop as stopSpeech, subscribe, toggle } from './speech'
 import {
   cancel as cancelDictation, dictateState, dictationAvailable, dictationEngine,
   stop as stopDictation, subscribe as subscribeDictation, toggle as toggleDictation,
@@ -449,8 +448,7 @@ function MiniWave(): JSX.Element {
     let raf = 0
     const tick = (): void => {
       const h = history.current
-      const real = speakingLevel()
-      h.push(real > 0.02 ? real : voiceish(performance.now()))
+      h.push(speakingLevel())
       if (h.length > MINI_BARS) h.shift()
       bump((n) => n + 1)
       raf = requestAnimationFrame(tick)
@@ -729,7 +727,13 @@ function VoicePanel({ onExit }: { onExit: () => void }): JSX.Element {
   /* The bars are live while it listens AND while it talks: one is his voice,
      the other is the answer. Only the wait in between is still. */
   const live = phase === 'listening' || phase === 'speaking'
-  const said = phase === 'thinking' ? 'Thinking' : phase === 'speaking' ? 'Reading it out' : 'Listening'
+  /* When it is talking and nothing can be measured, the bars are flat and the
+     label says why. A still meter that looks like a fault, with no explanation,
+     is how a generated wave got written in the first place. */
+  const mute = phase === 'speaking' && !speakingMeasured()
+  const said = phase === 'thinking' ? 'Thinking'
+    : phase === 'speaking' ? (mute ? 'Reading it out, no level from this voice' : 'Reading it out')
+      : 'Listening'
 
   return (
     <div className={`as-voice is-${phase}`}>

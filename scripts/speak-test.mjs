@@ -66,8 +66,17 @@ if (await page.locator('button', { hasText: /Use this device only/i }).count()) 
 // --- Device-voice path (no Gemini key) ---
 await page.evaluate(() => { window.__spoke = []
   speechSynthesis.speak = (u) => {
-    window.__spoke.push({ text: u.text, voice: u.voice ? u.voice.name : null, lang: u.lang })
-    setTimeout(() => u.onend && u.onend(), 3000)
+    window.__spoke.push({ text: u.text, voice: u.voice ? u.voice.name : null, local: u.voice ? u.voice.localService : null, lang: u.lang })
+    /* A LOCAL voice: it reports each word as it begins. That is the only signal
+       the waveform has on this path, and a stub that stays quiet tests a still
+       meter rather than a moving one. */
+    let w = 0
+    const words = String(u.text).split(' ').length
+    const beat = setInterval(() => {
+      if (w++ >= words || !u.onboundary) { clearInterval(beat); return }
+      u.onboundary({ name: 'word', charIndex: w })
+    }, 90)
+    setTimeout(() => { clearInterval(beat); u.onend && u.onend() }, 3000)
   }
   speechSynthesis.cancel = () => {}; speechSynthesis.pause = () => {}; speechSynthesis.resume = () => {} })
 
@@ -103,6 +112,14 @@ ok('device voice actually got the answer text',
 ok('first play assigns a real voice', spoke[0]?.voice != null,
    `voice=${spoke[0]?.voice}`)
 
+/* A LOCAL VOICE, because a remote one reports nothing about its own progress.
+   Chrome fires no `onboundary` for remote voices, and "Google US English" is
+   remote and used to sit at the top of the preference list, so the app chose
+   the one voice that leaves the waveform with no signal to draw. Local now
+   wins over any named remote voice. */
+ok('it picks a voice that reports its own progress',
+   spoke[0]?.local === true, `${spoke[0]?.voice} local=${spoke[0]?.local}`)
+
 /* macOS ships 28 en-US voices and most are jokes. Sorted, the first is Albert,
    so "take any en-US voice" is a coin flip on Boing. */
 const NOVELTY = /^(Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Deranged|Good News|Hysterical|Jester|Junior|Kathy|Organ|Princess|Ralph|Fred|Grandma|Grandpa|Superstar|Trinoids|Whisper|Wobble|Zarvox)\b/i
@@ -129,7 +146,7 @@ const boxes = await page.evaluate(async () => {
   return seen
 })
 const flat = boxes.map((row) => new Set(row).size)
-ok('its bars are different heights, not a dotted line',
+ok('its bars vary in height, so it reads as a wave',
    Math.max(...flat) > 3, `at most ${Math.max(...flat)} distinct heights in a frame`)
 const newest = boxes.map((row) => row[row.length - 1])
 ok('and they move between frames', new Set(newest.map((n) => Math.round(n))).size > 1,

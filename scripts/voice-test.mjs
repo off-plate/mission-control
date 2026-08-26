@@ -43,12 +43,16 @@ await page.addInitScript(() => {
     window.__spoken.push(u.text)
     /* A real utterance fires onboundary as each word starts; the meter is
        driven by those, so a stub that never fires them tests nothing. */
-    let w = 0
-    const words = String(u.text).split(' ').length
-    const beat = setInterval(() => {
-      if (w++ >= words || !u.onboundary) { clearInterval(beat); return }
-      u.onboundary({ name: 'word', charIndex: w })
-    }, 60)
+    /* window.__silent makes this behave like a REMOTE voice: it speaks and
+       reports nothing, which is the case that used to be papered over. */
+    if (!window.__silent) {
+      let w = 0
+      const words = String(u.text).split(' ').length
+      const beat = setInterval(() => {
+        if (w++ >= words || !u.onboundary) { clearInterval(beat); return }
+        u.onboundary({ name: 'word', charIndex: w })
+      }, 60)
+    }
     /* Record whether the ears are OPEN at the instant it starts talking. This is
        the real question. Checking only that recognition was not re-started during
        speech would pass while a recogniser opened earlier was still running and
@@ -204,6 +208,76 @@ ok('and the panel is gone', await page.locator('.as-voice').count() === 0)
 ok('the conversation is still in the thread afterwards', await page.locator('.as-turn').count() >= 4,
    `${await page.locator('.as-turn').count()} turns`)
 ok('the microphone was released', (await page.evaluate(() => window.__recLive)) !== true)
+
+/* ---- THE ANTI-FAKE TEST, on its own page ----
+
+   It matters more than every other assertion here. There was a generator that
+   drew a sine wave whenever no real signal was available, and because the app
+   was choosing a REMOTE voice, which Chrome fires no boundary events for, that
+   generator was the only thing he ever saw: a moving waveform with no
+   relationship to the speech. "You just fake the animation. That's it."
+
+   Its own page, because setting the flag mid-answer measures a sentence that
+   has already finished and passes for the wrong reason. Here the voice reports
+   nothing from the very first word, and the bars must NOT move.
+
+   A still meter that means "no signal" is worth more than a moving one that
+   means nothing. */
+{
+  const page2 = await b.newPage()
+  await page2.addInitScript(() => {
+    class Fake {
+      start() { window.__rec = this; window.__recLive = true }
+      stop() { window.__recLive = false; this.onend && this.onend() }
+      abort() { window.__recLive = false }
+    }
+    window.SpeechRecognition = Fake
+    window.webkitSpeechRecognition = Fake
+    window.__say = (text, isFinal) => {
+      const r = window.__rec
+      if (!r || !r.onresult) return
+      r.onresult({ resultIndex: 0, results: Object.assign([Object.assign([{ transcript: text }], { isFinal })], { length: 1 }) })
+    }
+    /* A remote voice: it speaks, and it tells us nothing about its progress. */
+    speechSynthesis.speak = (u) => { setTimeout(() => u.onend && u.onend(), 6000) }
+    speechSynthesis.cancel = () => {}
+  })
+  await page2.route('**/api.groq.com/openai/v1/chat/completions', (r) => {
+    let st = false
+    try { st = JSON.parse(r.request().postData() || '{}').stream === true } catch { /* default */ }
+    if (st) {
+      const j = JSON.stringify(REPLY); let x = ''
+      for (let i = 0; i < j.length; i += 24) x += `data: ${JSON.stringify({ choices: [{ delta: { content: j.slice(i, i + 24) } }] })}\n\n`
+      return r.fulfill({ status: 200, contentType: 'text/event-stream', body: x + 'data: [DONE]\n\n' })
+    }
+    return r.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ choices: [{ message: { content: JSON.stringify(REPLY) } }] }) })
+  })
+  await page2.goto(URL); await page2.waitForTimeout(600)
+  const l2 = page2.locator('button', { hasText: /Use this device only/i })
+  if (await l2.count()) { await l2.first().click(); await page2.waitForTimeout(900) }
+  await page2.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_test'))
+  await page2.goto(`${URL}/#/assistant`); await page2.reload(); await page2.waitForTimeout(1200)
+  await page2.locator('.as-voice-btn').click(); await page2.waitForTimeout(700)
+  await page2.evaluate(() => window.__say('what is on today', true))
+  await page2.waitForFunction(() => document.querySelector('.as-voice')?.className.includes('is-speaking'),
+    null, { timeout: 14000 })
+  const still = await page2.evaluate(async () => {
+    const seen = []
+    for (let i = 0; i < 14; i++) {
+      await new Promise((r) => setTimeout(r, 45))
+      const h = [...document.querySelectorAll('.as-wave rect')].map((r) => r.getBoundingClientRect().height)
+      seen.push(Math.round(Math.max(...h)))
+    }
+    return { peaks: new Set(seen).size, tallest: Math.max(...seen) }
+  })
+  ok('a voice that reports nothing draws NOTHING, rather than a generated wave',
+     still.peaks <= 1, `${still.peaks} distinct peaks, tallest ${still.tallest}px`)
+  ok('and the panel says why instead of looking broken',
+     (await page2.locator('.as-voice-state').textContent())?.includes('no level from this voice'),
+     await page2.locator('.as-voice-state').textContent())
+  await page2.close()
+}
 
 await b.close()
 console.log(fails.length ? `\n${fails.length} FAILED` : '\nALL PASS')

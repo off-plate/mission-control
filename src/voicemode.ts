@@ -181,15 +181,6 @@ async function send(): Promise<void> {
   listen()
 }
 
-/* Three frequencies that do not divide into each other, so the pattern does
-   not visibly repeat, plus a slow swell for the shape of a sentence. */
-export function voiceish(t: number): number {
-  const ms = t / 1000
-  const swell = 0.55 + 0.45 * Math.sin(ms * 1.7)
-  const detail = 0.5 + 0.3 * Math.sin(ms * 11.3) + 0.2 * Math.sin(ms * 27.1)
-  return Math.max(0.05, Math.min(1, swell * detail))
-}
-
 /* THE METER RUNS WHETHER OR NOT THE MICROPHONE COULD BE TAPPED.
 
    It used to be started from inside the microphone setup and gave up at the
@@ -230,8 +221,10 @@ function watchLevel(): void {
          So a reading of zero falls back to a generated wave. It is activity
          rather than amplitude, and the alternative is a still bar that lies
          about whether anything is happening. */
-      const real = speakingLevel()
-      level = real > 0.02 ? real : voiceish(performance.now())
+      /* Whatever is really there, and nothing when nothing is. The generated
+         wave that used to stand in here was the only thing he ever saw, and it
+         was not the answer: it was a sine wave. */
+      level = speakingLevel()
       emit()
       raf = requestAnimationFrame(tick)
       return

@@ -140,6 +140,25 @@ const b = await chromium.launch()
   await page.close()
 }
 
+// ---- it lets go of the microphone on its own ----
+{
+  /* Its own page on purpose. Run inside the section above it inherits whatever
+     that left behind, and a click that lands on a disabled button reads as "it
+     refused to listen" when the truth is it was never pressed. */
+  const page = await b.newPage()
+  await open(page, { engine: 'browser' })
+  const mic = page.locator('.as-mic')
+  await mic.click(); await page.waitForTimeout(300)
+  ok('it is listening before the silence runs out',
+     (await mic.getAttribute('class'))?.includes('is-listening'), await mic.getAttribute('class'))
+  await page.waitForTimeout(2700)
+  ok('still listening at three seconds', (await mic.getAttribute('class'))?.includes('is-listening'))
+  await page.waitForTimeout(4000)
+  ok('it stops itself after six seconds of nothing',
+     !(await mic.getAttribute('class'))?.includes('is-listening'), await mic.getAttribute('class'))
+  await page.close()
+}
+
 // ---- whisper fallback: no SpeechRecognition, key present ----
 {
   const page = await b.newPage()

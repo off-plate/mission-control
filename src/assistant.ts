@@ -259,26 +259,6 @@ export const STARTERS: { label: string; ask: string }[] = [
   { label: 'Habits today', ask: 'Which habits are still open today?' },
 ]
 
-/** The line under the question on the empty page.
-
- *  Computed HERE, from his own briefing, and never sent to a model. It is the
- *  proactive half of what he asked for, and it costs no request: opening the
- *  page should tell him something true immediately, not spin while a model is
- *  asked what his own log already says. It is also the one place numbers are
- *  allowed in a sentence, because the app is the one counting. */
-export function opener(b: Brief): string {
-  const open = b.planned.flatMap((s) => s.items).filter((i) => !i.done).length
-  const oldest = b.oldest[0]
-  const bits: string[] = []
-  if (open) bits.push(`${open} thing${open === 1 ? '' : 's'} still open today`)
-  if (b.meetings.length) bits.push(`${b.meetings.length} in the calendar`)
-  if (b.habits.due - b.habits.kept > 0) bits.push(`${b.habits.due - b.habits.kept} habit${b.habits.due - b.habits.kept === 1 ? '' : 's'} not kept yet`)
-  const head = bits.length ? `${bits.join(', ')}.` : 'Nothing on the day yet.'
-  return oldest && oldest.days >= 7
-    ? `${head} "${oldest.title}" has been waiting ${oldest.days} days.`
-    : head
-}
-
 /** The opening move, before he has asked anything. */
 export const OPENING_PROMPT =
   'Open the day. Look at the briefing and tell me what deserves attention first, then show it.'

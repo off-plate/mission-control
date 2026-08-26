@@ -132,7 +132,19 @@ await page.waitForTimeout(1500)
 ok('a second question goes through the same loop', await page.locator('.as-turn.is-you').count() === 2,
    `${await page.locator('.as-turn.is-you').count()} spoken turns`)
 
+/* Same rule in voice mode, and here it hangs up entirely: an assistant left
+   listening to an empty room all evening is the version of this feature nobody
+   wants. Only ever armed while nothing has been said; mid-sentence the hush
+   timer owns the timing. */
+await page.waitForTimeout(6800)
+ok('voice mode hangs up after six seconds of nothing said',
+   await page.locator('.as-voice').count() === 0, `${await page.locator('.as-voice').count()} panels`)
+ok('and the ask box comes back on its own', await page.locator('.as-input').count() === 1)
+ok('the microphone was released when it hung up', (await page.evaluate(() => window.__recLive)) !== true)
+
 // --- leaving ---
+/* Back in by hand, so Done is still exercised. */
+await page.locator('.as-voice-btn').click(); await page.waitForTimeout(500)
 await page.locator('.as-voice-exit').click(); await page.waitForTimeout(400)
 ok('Done returns the ask box', await page.locator('.as-input').count() === 1)
 ok('and the panel is gone', await page.locator('.as-voice').count() === 0)

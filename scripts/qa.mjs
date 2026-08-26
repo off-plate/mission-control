@@ -2298,7 +2298,8 @@ const askAssistant = async (text) => {
 
 await step('assistant: the empty page is a doorway, with none of a chatbot’s furniture', async () => {
   await fresh('assistant')
-  if (!(await page.locator('.as-orb').count())) throw new Error('the mark is missing')
+  if (!(await page.locator('.as-mark').count())) throw new Error('the mark is missing')
+  if (await page.locator('.as-mark circle').count()) throw new Error('the mark went back to being a circle')
   const q = await page.locator('.as-hero-q').innerText()
   if (q !== 'What can I help with?') throw new Error(`the question reads "${q}"`)
   const chips = await page.locator('.as-starters .as-chip').count()
@@ -2326,10 +2327,15 @@ await step('assistant: the empty page is a doorway, with none of a chatbot’s f
   const audio = await page.evaluate(() =>
     document.querySelectorAll('.as-page [aria-label*="voice" i], .as-page [aria-label*="mic" i], .as-page audio').length)
   if (audio) throw new Error(`${audio} voice controls on the page`)
-  /* The line under the question is counted by the app, so it says something
-     true the instant the page opens instead of waiting on a model. */
-  const now = await page.locator('.as-hero-now').innerText()
-  if (!now.trim()) throw new Error('the page opens saying nothing about his day')
+  /* The counted line under the question is GONE, struck on his instruction
+     2026-08-26: "Remove this text '12 things still open today, 13 in the
+     calendar, 17 habits not kept yet...'". It was true and it was his own data,
+     and he still did not want to be met by a tally of everything undone before
+     he has asked anything. The doorway is a question and a way in, nothing else. */
+  if (await page.locator('.as-hero-now').count()) throw new Error('the counted line is back under the question')
+  if (/still open today|habits not kept|has been waiting/i.test(text)) {
+    throw new Error(`the page greets him with a tally: ${JSON.stringify(text.slice(0, 160))}`)
+  }
 })
 
 await step('assistant: the answer splits the room and the ask box stops moving', async () => {
@@ -2542,7 +2548,7 @@ await step('assistant: the canvas deals its rows in, and stops moving for a read
   await page.waitForTimeout(200)
   const still = await page.evaluate(() => {
     const names = (sel) => [...document.querySelectorAll(sel)].map((e) => getComputedStyle(e).animationName)
-    return [...names('.as-canvas-body .as-row'), ...names('.as-turn'), ...names('.as-orb'), ...names('.as-canvas-body')]
+    return [...names('.as-canvas-body .as-row'), ...names('.as-turn'), ...names('.as-mark'), ...names('.as-canvas-body')]
   })
   const moving = still.filter((n) => n && n !== 'none')
   if (moving.length) throw new Error(`${moving.length} things still animate under reduced motion: ${[...new Set(moving)].join(', ')}`)

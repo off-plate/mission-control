@@ -22,6 +22,11 @@ const STT_MODEL = 'whisper-large-v3-turbo'
 
 export type DictateState = 'idle' | 'listening' | 'transcribing'
 
+/* A microphone left open is a microphone left open. If nothing has been heard
+   for this long he has finished, or he walked off, and either way the browser
+   should stop listening rather than hold the mic for the rest of the session. */
+const SILENCE = 6000
+
 type Recognition = {
   lang: string
   continuous: boolean
@@ -63,6 +68,7 @@ export function dictationEngine(): 'browser' | 'whisper' | 'none' {
 let state: DictateState = 'idle'
 let rec: Recognition | null = null
 let recorder: MediaRecorder | null = null
+let silence: ReturnType<typeof setTimeout> | null = null
 /* Set when a recording is abandoned rather than finished, so onstop knows not
    to spend a Whisper call on audio nobody is waiting for. */
 let discard = false
@@ -81,6 +87,7 @@ export type OnText = (text: string) => void
 
 /** Stop listening and KEEP what was said. This is the Stop button. */
 export function stop(): void {
+  disarmSilence()
   if (rec) { try { rec.stop() } catch { /* already stopped */ } rec = null }
   if (recorder && recorder.state !== 'inactive') {
     try { recorder.stop() } catch { /* already stopped */ }
@@ -102,6 +109,7 @@ export function stop(): void {
     So the handler is detached before anything else, and abort() is used rather
     than stop() because abort is the one that does not deliver a final result. */
 export function cancel(): void {
+  disarmSilence()
   if (rec) {
     rec.onresult = null
     rec.onend = null
@@ -118,6 +126,14 @@ export function cancel(): void {
   }
   releaseMic()
   set('idle')
+}
+
+function armSilence(): void {
+  if (silence) clearTimeout(silence)
+  silence = setTimeout(() => { if (state === 'listening') stop() }, SILENCE)
+}
+function disarmSilence(): void {
+  if (silence) { clearTimeout(silence); silence = null }
 }
 
 function releaseMic(): void {
@@ -145,6 +161,7 @@ function startBrowser(base: string, onText: OnText): void {
       if (e.results[i].isFinal) finals += alt.transcript
       else interim += alt.transcript
     }
+    armSilence()
     onText((base + finals + interim).replace(/\s+/g, ' ').trimStart())
   }
   /* `no-speech` and `aborted` are ordinary: he opened it and said nothing, or
@@ -152,7 +169,7 @@ function startBrowser(base: string, onText: OnText): void {
   r.onerror = () => { rec = null; set('idle') }
   r.onend = () => { if (rec === r) { rec = null; set('idle') } }
   rec = r
-  try { r.start(); set('listening') } catch { rec = null; set('idle') }
+  try { r.start(); set('listening'); armSilence() } catch { rec = null; set('idle') }
 }
 
 async function startWhisper(base: string, onText: OnText): Promise<void> {
@@ -189,6 +206,7 @@ async function startWhisper(base: string, onText: OnText): Promise<void> {
   recorder = mr
   mr.start()
   set('listening')
+  armSilence()
 }
 
 /** The button's whole behaviour. `base` is what is already in the box. */

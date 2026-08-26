@@ -13,7 +13,7 @@ import { HabitRun, habitHasRun } from './habitrun'
 import { PrecedentCard } from './precedentcard'
 import type { PageId } from './types'
 import { habitsDueToday, GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, dueOn, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, habitGate, habitLocked, isCounted, COUNT_PERIODS, requiredSteps, routineComplete, routineProgress, routineRunsOn, slotMinutes, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
-import { DayLine, WeekStrip } from './dayface'
+import { WeekStrip } from './dayface'
 import { useFirstMove, useOpenToday } from './ui'
 import { estimateFor } from './estimate'
 import { estimateTask } from './ai'
@@ -78,11 +78,18 @@ const shortDay = (key: string): string => {
 /* ---------------- TODAY ---------------- */
 
 export function TodayPage() {
-  const { editing, setEditing } = useStore()
-  const [addOpen, setAddOpen] = useState(false)
   const nextEvent = useNextEvent()
   const open = useOpenToday()
 
+  /* One surface. The paper widget grid that used to sit under the room is gone,
+     and so are its Edit grid and Add widget buttons.
+
+     It was not a styling problem. NOW repeated the countdown, the date and the
+     week; DUE TODAY repeated On the clock; HABITS and GOALS repeated the two
+     figures at the bottom of the room. Michael, seeing it: "why did you not
+     redesign this". He was right, and I had already spotted it and handed the
+     decision back to him instead of making it. Habits, goals and the week are
+     inside the room now, in the room's language, each said once. */
   return (
     <div className="page">
       <Band
@@ -91,34 +98,8 @@ export function TodayPage() {
           { v: nextEvent.v, k: nextEvent.k, tone: 'info' as const },
           { v: String(open.length), k: 'tasks open' },
         ]}
-        actions={
-          <>
-            <button className="btn btn-quiet" aria-pressed={editing} onClick={() => setEditing(!editing)}>
-              {editing ? 'Done' : 'Edit grid'}
-            </button>
-            {editing && <button className="btn btn-quiet" onClick={() => setAddOpen(true)}>Add widget</button>}
-          </>
-        }
       />
-
-      {/* The room carries the day itself: the countdown, the dot field, what is
-          next, the to-do, the clock and what has been standing. Everything that
-          used to sit here in half-empty cards is inside it. The widget grid and
-          the week strip stay below, on paper, because they are not the day. */}
       <TodayRoom />
-
-      {/* Paper again below the slab. The day line stays because it is the one
-          thing the room does not draw: where his focus blocks actually landed
-          in the day, at the minute they happened. */}
-      <div className="today-shell">
-        <div className="today-main">
-          <DayLine />
-          <SpaceGrid />
-          <WeekStrip />
-        </div>
-      </div>
-
-      {addOpen && <AddWidgetInline onClose={() => setAddOpen(false)} />}
     </div>
   )
 }

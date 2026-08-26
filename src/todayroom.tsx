@@ -23,8 +23,9 @@
 import { useEffect, useState } from 'react'
 import { useStore } from './store'
 import { useFirstMove } from './ui'
-import { fmtDuration, fmtSigned, isEstimated, localDateKey, taskMinutes } from './util'
-import { SLOTS, habitsDueToday, type Task } from './types'
+import { fmtDuration, fmtNum, fmtSigned, goalPace, goalPeriodKey, goalPeriodRange, isEstimated, localDateKey, taskMinutes, type GoalTf } from './util'
+import { SLOTS, dueOn, goalCurrent, habitsDueToday, isTimeFed, type Task } from './types'
+import { WeekStrip } from './dayface'
 
 /** Whole days since a task was written down. Avoidance is measured in age, never in a due date. */
 function ageDays(t: Task): number {
@@ -62,7 +63,7 @@ function isoWeek(d: Date): number {
 }
 
 export function TodayRoom() {
-  const { tasks, habits, habitLog, routines, focusSessions, savedMin, todayIndex, inView, setPage, setFocusTaskId, toggleTask } = useStore()
+  const { tasks, habits, habitLog, routines, focusSessions, goals, slips, savedMin, todayIndex, inView, setPage, setFocusTaskId, toggleTask, toggleHabitDay } = useStore()
   const now = useNow()
   const firstMove = useFirstMove()
   const day = localDateKey()
@@ -115,12 +116,47 @@ export function TodayRoom() {
   const finished = tasks.filter((t) => t.done && inView(t.space) && t.doneAt && localDateKey(new Date(t.doneAt)) === day).length
 
   /* Which quarter hours already have something in them, so the day field shows
-     where the work sits rather than only where the clock is. */
+     where the work sits and not only where the clock is. */
   const busy = new Set<number>()
   for (const t of onClock) {
     const i = SLOTS.findIndex((sl) => sl.id === t.slot)
     if (i >= 0) busy.add(Math.floor((SLOTS[i].from ?? 0) * 4))
   }
+
+  /* And where he actually focused. This is the one thing the old day line drew
+     that nothing else did: a block at the minute it happened. `at` is the
+     instant the block FINISHED, so the span runs backwards from it by its own
+     length, which is why the start is `at` less `minutes`. */
+  const focusQ = new Set<number>()
+  for (const f of focusSessions) {
+    if (f.day !== day || !f.at) continue
+    const end = new Date(f.at)
+    if (Number.isNaN(+end)) continue
+    const endMin = end.getHours() * 60 + end.getMinutes()
+    const startMin = endMin - (f.minutes ?? 0)
+    for (let q = Math.floor(startMin / 15); q < Math.ceil(endMin / 15); q++) {
+      if (q >= 0 && q < 96) focusQ.add(q)
+    }
+  }
+
+  /* Habits due today, as rows he can tick, sorted so what is left is on top.
+     `dueOn` and the tick shape come from the Habits page, not from a guess. */
+  const habitRows = visibleHabits
+    .filter((hb) => dueOn(hb, todayIndex, habitLog) && !hb.folderId)
+    .map((hb) => ({ hb, done: !!hb.days[todayIndex] }))
+    .sort((a, b) => Number(a.done) - Number(b.done))
+    .slice(0, 10)
+
+  /* Goals, on the same accurate read GoalsPage uses: a habit-linked goal counts
+     from the dated log inside its OWN period, never the seven-day cache. */
+  const goalRows = goals.filter((g) => !g.closed && inView(g.space)).slice(0, 5).map((g) => {
+    const tf = (g.timeframe ?? 'quarter') as GoalTf
+    const range = goalPeriodRange(tf, g.periodKey ?? goalPeriodKey(tf))
+    const cur = goalCurrent(g, habits, habitLog, range, slips, focusSessions)
+    const fromHabit = habits.find((hb) => hb.id === g.habitId)
+    const off = goalPace(cur, g.target, tf, new Date(), !!fromHabit && !isTimeFed(fromHabit)) === 'behind'
+    return { g, cur, off, pct: g.target > 0 ? Math.min(100, Math.round((cur / g.target) * 100)) : 0 }
+  })
 
   const start = (t: Task) => { setFocusTaskId(t.id); setPage('plan') }
 
@@ -130,10 +166,18 @@ export function TodayRoom() {
       {/* ---- the figures ---- */}
       <section className="troom-hero">
         <div className="tr-card tr-clock">
-          <p className="tr-l">Left of today</p>
-          <div className="tr-n tr-count">
-            {h}<span className="tr-u">h</span>{String(m).padStart(2, '0')}<span className="tr-u">m</span>
-            <span className="tr-hot">{String(s).padStart(2, '0')}</span><span className="tr-u">s</span>
+          <div>
+            <p className="tr-l">Left of today</p>
+            <div className="tr-n tr-count">
+              {h}<span className="tr-u">h</span>{String(m).padStart(2, '0')}<span className="tr-u">m</span>
+              <span className="tr-hot">{String(s).padStart(2, '0')}</span><span className="tr-u">s</span>
+            </div>
+          </div>
+          {/* The wall clock. It carried its own card on the old page; it is a
+              figure about time, so it belongs beside the other one. */}
+          <div className="tr-wall">
+            <p className="tr-l">Now</p>
+            <div className="tr-n tr-nowt">{now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</div>
           </div>
         </div>
         <div className="tr-card tr-tile">
@@ -161,9 +205,13 @@ export function TodayRoom() {
           <p className="tr-l">The day</p>
           <span className="tr-count-inline"><span className="tr-n">{96 - quarter}</span><span className="tr-l">quarters left</span></span>
         </div>
-        <div className="tr-dots" aria-hidden="true">
+        <div className="tr-dots">
           {Array.from({ length: 96 }, (_, i) => (
-            <span key={i} className={`tr-q${i < quarter ? ' is-spent' : i === quarter ? ' is-now' : busy.has(i) ? ' is-busy' : ''}`} />
+            <span
+              key={i}
+              data-q={i}
+              className={`tr-q${focusQ.has(i) ? ' is-focus' : ''}${i < quarter ? ' is-spent' : i === quarter ? ' is-now' : busy.has(i) ? ' is-busy' : ''}`}
+            />
           ))}
         </div>
         <div className="tr-phases">
@@ -254,6 +302,50 @@ export function TodayRoom() {
         <div className="tr-card tr-stat" data-stat="estimates">
           <p className="tr-l k">{savedMin < 0 ? 'Over estimate' : 'Against estimate'}</p>
           <div className={`tr-n v${savedMin < 0 ? ' is-hot' : ''}`}>{savedMin === 0 ? '\u2014' : fmtSigned(savedMin)}</div>
+        </div>
+      </section>
+
+      {/* ---- habits, goals, and the week behind ---- */}
+      <section className="troom-lower">
+        <div className="tr-card">
+          <div className="tr-head"><p className="tr-l">Habits</p><span className="tr-n tr-sm">{kept}<i>/{due}</i></span></div>
+          <div className="tr-rows">
+            {habitRows.length === 0 && <p className="tr-empty">Nothing due today.</p>}
+            {habitRows.map(({ hb, done }) => (
+              <div className={`tr-r${done ? ' is-done' : ''}`} key={hb.id}>
+                <button
+                  className={`tr-box${done ? ' is-on' : ''}`}
+                  role="checkbox"
+                  aria-checked={done}
+                  aria-label={hb.name}
+                  onClick={() => toggleHabitDay(hb.id, todayIndex)}
+                />
+                <span className="tr-t">{hb.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="tr-card">
+          <div className="tr-head"><p className="tr-l">Goals</p><span className="tr-n tr-sm">{goalRows.filter((r) => r.off).length ? `${goalRows.filter((r) => r.off).length} behind` : 'on pace'}</span></div>
+          <div className="tr-goals">
+            {goalRows.length === 0 && <p className="tr-empty">No goals in this space.</p>}
+            {goalRows.map(({ g, cur, off, pct }) => (
+              <div className="tr-goal" key={g.id}>
+                <div className="tr-goalhead">
+                  <span className="tr-t">{g.name}</span>
+                  <span className={`tr-n tr-pct${off ? ' is-hot' : ''}`}>{pct}%</span>
+                </div>
+                <div className="tr-bar"><i className={off ? 'is-off' : ''} style={{ width: `${pct}%` }} /></div>
+                <p className="tr-l tr-of">{fmtNum(cur)} of {fmtNum(g.target)} {g.unit}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="tr-card tr-week">
+          <div className="tr-head"><p className="tr-l">The week behind</p></div>
+          <WeekStrip />
         </div>
       </section>
 

@@ -5283,3 +5283,58 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   .as-mark * { animation: none !important; }
   .as-mark-sweep { opacity: 0; }
 }
+
+/* ---- the room's lower half: habits, goals, the week ---- */
+.tr-clock { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: 24px; }
+.tr-wall { text-align: right; flex: none; }
+.troom .tr-nowt { font-size: clamp(26px, 2.6vw, 40px); margin-top: 12px; }
+
+.troom-lower { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.25fr); gap: 14px; align-items: start; }
+.troom .tr-box.is-on { background: var(--t-hot); border-color: var(--t-hot); position: relative; }
+.troom .tr-box.is-on::after {
+  content: ''; position: absolute; inset: 0;
+  background: no-repeat center / 12px 12px
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23141009' stroke-width='1.467' stroke-linecap='round' stroke-linejoin='round'><g transform='translate(-14.074 -15.916) scale(2.3176)'><path d='M15.5 9L9.41421 15.0858'/><path d='M7 13.0858L9.41422 15.0858'/></g></svg>");
+}
+.tr-goals { display: flex; flex-direction: column; gap: 18px; }
+.tr-goalhead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 9px; }
+.troom .tr-pct { font-size: 21px; }
+.troom .tr-bar i.is-off { background: var(--t-dim); }
+.troom .tr-of { margin-top: 8px; letter-spacing: 0.1em; color: var(--t-dim); }
+
+/* The week strip keeps its own classes, because the gate reads them. Two things
+   change: it loses its own heading, since the card already has one and two
+   titles stacked is the subtitle rule broken in the most literal way, and it is
+   repainted for ink. Every colour is restated, because the paper rules above
+   set them from tokens this card does not use. */
+.tr-week .weekstrip { margin: 0; }
+.tr-week .weekstrip-head { display: none; }
+.tr-week .weekstrip-days { gap: 8px; }
+.troom .tr-week .weekday {
+  background: var(--t-card2); border: 1px solid var(--t-line); color: var(--t-ink);
+  border-radius: 10px; padding: 11px 12px;
+}
+.troom .tr-week .weekday:hover { border-color: var(--t-hot); }
+.troom .tr-week .weekday.is-today { border-color: var(--t-hot); background: var(--t-hotdim); }
+.troom .tr-week .weekday.is-empty { background: none; }
+.troom .tr-week .weekday-name { color: var(--t-muted); }
+.troom .tr-week .weekday.is-today .weekday-name { color: var(--t-hot); }
+.troom .tr-week .weekday-num {
+  color: var(--t-ink); font-family: var(--font-display); font-weight: 800; font-size: 19px;
+}
+.troom .tr-week .weekday-sum, .troom .tr-week .weekday .empty { color: var(--t-dim); }
+.troom .tr-week .weekday-bar { background: rgba(246, 240, 228, 0.13); }
+.troom .tr-week .weekday-bar i { background: var(--t-hot); }
+
+@media (max-width: 1180px) { .troom-lower { grid-template-columns: 1fr; } }
+@media (max-width: 620px) {
+  .tr-clock { flex-direction: column; align-items: stretch; gap: 14px; }
+  .tr-wall { text-align: left; }
+}
+
+/* A quarter hour he actually focused in. It outranks "spent": a spent quarter
+   is one the clock took, a focused one is a quarter he used, and the whole
+   point of drawing the day is telling those two apart. */
+.troom .tr-q.is-focus, .troom .tr-q.is-focus.is-spent {
+  background: var(--t-hot); box-shadow: none; opacity: 0.72;
+}

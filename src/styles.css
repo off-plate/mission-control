@@ -5137,9 +5137,13 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   font: 600 11px/1 var(--font-body); letter-spacing: 0.17em; text-transform: uppercase;
   color: var(--t-muted); margin: 0;
 }
+/* A figure is allowed to be big and is never allowed to leave its tile. The
+   percent and the phase both overflowed on his screen the moment the display
+   face changed width under them. */
 .troom .tr-n {
   font-family: var(--font-display); font-weight: 800; letter-spacing: -0.035em;
   font-variant-numeric: tabular-nums; line-height: 0.9; margin: 0;
+  min-width: 0; max-width: 100%; overflow-wrap: anywhere;
 }
 .troom .tr-n i { font-family: var(--font-body); font-style: normal; font-size: 0.34em; font-weight: 600; color: var(--t-dim); letter-spacing: 0; margin: 0 0.1em 0 0.04em; vertical-align: 0.14em; }
 .troom .tr-n.is-hot { color: var(--t-hot); }
@@ -5152,10 +5156,10 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .tr-count { font-size: clamp(52px, 8vw, 122px); }
 .troom .tr-u { font-size: 0.3em; color: var(--t-dim); margin: 0 0.16em 0 0.05em; vertical-align: 0.34em; letter-spacing: 0; }
 .troom .tr-hot { color: var(--t-hot); }
-.tr-tile .tr-n { font-size: clamp(38px, 4.4vw, 64px); }
+.tr-tile .tr-n { font-size: clamp(28px, 3.6vw, 60px); }
 .troom .tr-mo { font-family: var(--font-body); font-size: 0.29em; font-weight: 600; color: var(--t-dim); letter-spacing: 0.04em; margin-left: 0.14em; vertical-align: 0.42em; }
 .tr-tile.is-hot .tr-n { color: var(--t-hot); }
-.tr-phase { font-size: clamp(28px, 2.9vw, 42px) !important; text-transform: uppercase; }
+.tr-phase { font-size: clamp(20px, 2.4vw, 38px) !important; text-transform: uppercase; }
 .troom .tr-bar { height: 7px; border-radius: 4px; background: rgba(246, 240, 228, 0.11); overflow: hidden; }
 .troom .tr-bar i { display: block; height: 100%; background: var(--t-hot); border-radius: 4px; }
 
@@ -5171,7 +5175,12 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 /* The one glow in the app, and it is a state marker, not atmosphere: 12px on a
    9px dot, so THIS MOMENT is findable at a glance in a field of ninety six.
    Take the glow away and finding now costs a scan every time. */
-.tr-q.is-now { background: var(--t-hot); box-shadow: 0 0 12px rgba(242, 113, 47, 0.85); opacity: 1; } /* slop-lint-ignore neon-glow */
+/* Derived from the accent, never written out. Hardcoding the warm rgba left
+   exactly one orange square burning in the middle of a cyan HUD. */
+.tr-q.is-now {
+  background: var(--t-hot); opacity: 1;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--t-hot) 85%, transparent); /* slop-lint-ignore neon-glow */
+}
 /* Weighted by real hours, so a marker sits under the quarters it owns. */
 .tr-phases { display: flex; gap: 3px; margin-top: 12px; }
 .tr-ph {
@@ -5191,7 +5200,12 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .troom .tr-start:hover { filter: brightness(1.1); }
 
 /* ---- the lists, ten rows deep because three was not worth reading ---- */
-.troom-lists { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; }
+/* One band, not three ragged columns. Each card is the same height and scrolls
+   inside itself, which is what makes this read as a dashboard instead of three
+   lists that happen to sit next to each other. */
+.troom-lists { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
+.troom-lists > .tr-card { display: flex; flex-direction: column; max-height: 46vh; min-height: 300px; }
+.troom-lists .tr-rows { overflow-y: auto; min-height: 0; }
 .tr-rows { display: flex; flex-direction: column; }
 .tr-r { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--t-line); min-height: 44px; }
 .tr-r:last-child { border-bottom: 0; }
@@ -5284,12 +5298,25 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   .as-mark-sweep { opacity: 0; }
 }
 
+/* Scrollbars belong to the room, not to the browser's default light-on-dark. */
+.troom ::-webkit-scrollbar { width: 8px; }
+.troom ::-webkit-scrollbar-track { background: transparent; }
+.troom ::-webkit-scrollbar-thumb { background: var(--t-line); border-radius: 4px; }
+.troom ::-webkit-scrollbar-thumb:hover { background: var(--t-dim); }
+.troom .tr-rows, .troom .tr-goals { scrollbar-width: thin; scrollbar-color: var(--t-line) transparent; }
+
 /* ---- the room's lower half: habits, goals, the week ---- */
 .tr-clock { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: 24px; }
 .tr-wall { text-align: right; flex: none; }
 .troom .tr-nowt { font-size: clamp(26px, 2.6vw, 40px); margin-top: 12px; }
 
-.troom-lower { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.25fr); gap: 14px; align-items: start; }
+/* Habits and goals share a row and match heights; the week strip is seven equal
+   cards and wants the whole width, so it gets its own. Sitting it in a third
+   column left a third of the room empty, which is what he saw. */
+.troom-lower { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: stretch; }
+.troom-lower > .tr-card { display: flex; flex-direction: column; max-height: 42vh; min-height: 260px; }
+.troom-lower .tr-rows, .troom-lower .tr-goals { overflow-y: auto; min-height: 0; }
+.tr-week { grid-column: 1 / -1; max-height: none !important; min-height: 0 !important; }
 .troom .tr-box.is-on { background: var(--t-hot); border-color: var(--t-hot); position: relative; }
 .troom .tr-box.is-on::after {
   content: ''; position: absolute; inset: 0;
@@ -5338,3 +5365,60 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .troom .tr-q.is-focus, .troom .tr-q.is-focus.is-spent {
   background: var(--t-hot); box-shadow: none; opacity: 0.72;
 }
+
+/* ==========================================================================
+   THE ROOM IN HUD MODE
+
+   Michael, with the helmet on: "it's not adjusted to HUD Iron Man mode".
+   He was looking at two dark themes fighting on one screen. The shell had gone
+   cold, navy ground and cyan accent in Michroma and Saira, and the room sat in
+   the middle of it still burning its own warm brown and orange in Bricolage.
+
+   The room does not get to keep a private palette through a mode change. Every
+   `--t-*` token is remapped onto the HUD tokens, so the room is the same room
+   and the mode is the mode. The fonts come from the HUD too: `--font-display`
+   and `--font-body` are already Michroma and Saira there, and the room reads
+   them through those tokens, so nothing here names a family.
+   ========================================================================== */
+.shell.is-hud .troom {
+  --t-ground: #050A0F;
+  --t-card: #0C121A;
+  --t-card2: #121A24;
+  --t-ink: #E6F1F8;
+  --t-muted: #93A7B8;
+  --t-dim: #6E8496;
+  --t-hot: #4FD8E8;
+  --t-hotdim: rgba(79, 216, 232, 0.15);
+  --t-line: rgba(79, 216, 232, 0.16);
+  --t-r: 4px;
+  border-radius: 6px;
+  border: 1px solid rgba(79, 216, 232, 0.2);
+}
+/* Michroma is a WIDE face. Every figure in here was sized for Bricolage, which
+   is narrow, so the same clamp overflowed its tile the moment the mode changed:
+   "34%" and "MORNING" were both cut off on his screen. The display sizes step
+   down, and the letter-spacing goes to zero, because Michroma already carries
+   its own. */
+.shell.is-hud .troom .tr-n { letter-spacing: 0; }
+.shell.is-hud .tr-count { font-size: clamp(30px, 4.4vw, 62px); }
+.shell.is-hud .troom .tr-nowt { font-size: clamp(18px, 1.8vw, 26px); }
+.shell.is-hud .tr-tile .tr-n { font-size: clamp(20px, 2.1vw, 32px); }
+.shell.is-hud .tr-phase { font-size: clamp(13px, 1.25vw, 19px) !important; }
+.shell.is-hud .tr-stat .tr-n { font-size: clamp(20px, 2vw, 30px); }
+.shell.is-hud .tr-nextt { font-size: clamp(15px, 1.5vw, 22px); }
+.shell.is-hud .troom .tr-age { font-size: 17px; min-width: 62px; }
+.shell.is-hud .troom .tr-pct { font-size: 15px; }
+.shell.is-hud .tr-count-inline .tr-n { font-size: 17px; }
+.shell.is-hud .troom .tr-week .weekday-num { font-size: 14px; }
+.shell.is-hud .troom .tr-sm { font-size: 14px; }
+/* Square corners belong to the HUD; the room's 16px pills do not. */
+.shell.is-hud .troom .tr-card,
+.shell.is-hud .troom .tr-chip,
+.shell.is-hud .troom .tr-start,
+.shell.is-hud .troom .tr-box,
+.shell.is-hud .troom .tr-week .weekday { border-radius: 3px; }
+.shell.is-hud .troom .tr-q { border-radius: 0; }
+/* The same single wash as light mode, restated because the token behind it
+   changed. One card is marked live; it is not a hero and not a button. */
+.shell.is-hud .tr-next { background: linear-gradient(180deg, var(--t-hotdim), transparent 62%), var(--t-card); } /* slop-lint-ignore gradient-hero */
+.shell.is-hud .troom .tr-start { color: var(--accent-ink); }

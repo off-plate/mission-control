@@ -5705,3 +5705,158 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 
 /* The nav is the one place the accent is allowed to be the loudest thing. */
 .tabs .tab { font-size: var(--a-f-nav); font-weight: 700; letter-spacing: 0.01em; }
+
+/* ==========================================================================
+   DIRECTION A, APPLIED TO THE PAGES
+   ==========================================================================
+   His report, and it was correct: "none of these pages have the correct
+   design, why did we create website design guidelines when you are not using
+   it". The previous commit retargeted COLOUR TOKENS and the typeface and
+   stopped there, so Plan, Habits and Goals kept their old type scale, their
+   10px chips, their hairline rows and none of the component work from the
+   library. Swapping variables is not applying a system.
+
+   This block applies the library to the classes the app actually uses. It is
+   deliberately one block: the one-edit test only holds if a component is
+   defined in a single place.
+   ========================================================================== */
+
+/* ---- 1. per-space accents, back, in the direction A idiom -----------------
+   He asked for these back: "each of the workspaces still should have slightly
+   different accent colours as it was previously". Each space is a BRIGHT fill
+   that carries ink, plus a dark readable partner for text and borders, because
+   the fill/text split is the rule the contrast pass produced and it holds for
+   every hue, not only lime. Measured against paper, card and sunk:
+     personal  #DFF24A fill 15.33 on ink   partner #5E6B12  5.52 / 5.85 / 5.01
+     work      #7FD8F5 fill 11.80          partner #1C5772  7.46 / 7.91 / 6.76
+     off-plate #FFC94A fill 12.40          partner #7C5A0E  5.95 / 6.31 / 5.40
+     corner    #86E9B4 fill 12.97          partner #1E5244  8.44 / 8.95 / 7.66 */
+[data-space="work"] {
+  --a-accent: #7FD8F5; --a-accent-text: #1C5772;
+  --a-accent-wash: color-mix(in srgb, #7FD8F5 22%, transparent);
+}
+[data-space="offplate"] {
+  --a-accent: #FFC94A; --a-accent-text: #7C5A0E;
+  --a-accent-wash: color-mix(in srgb, #FFC94A 26%, transparent);
+}
+[data-space="corner"] {
+  --a-accent: #86E9B4; --a-accent-text: #1E5244;
+  --a-accent-wash: color-mix(in srgb, #86E9B4 26%, transparent);
+}
+/* "All" and Personal keep the base lime. */
+
+/* ---- 2. the type scale, on the classes that carry text -------------------
+   Nothing in the interface goes below 12px. He reported "everything is small"
+   twice, and the pages he was looking at were still on the old scale. */
+.today-task, .todo-row, .rowitem, .ptask, .subtask-row,
+.habit-row-top, .goal-line, .exception-row, .nt-row {
+  font-size: var(--a-f-row);
+}
+.microcap, .k, .col-head, .bucket-name, .kebab-head {
+  font-size: var(--a-f-label) !important;
+  letter-spacing: var(--a-ls-label);
+  font-weight: 800;
+}
+.habit-freq, .habit-qual, .folder-when, .period-unit,
+.goal-sub, .kpi-sub, .day-lab, .nt-when, .assist-note, .as-hint {
+  font-size: 13px;
+}
+.est-vs-actual, .tot, .trail-day, .habit-avg { font-size: 13.5px; }
+
+/* ---- 3. chip: one component, real size, tones from the system ------------ */
+.chip {
+  font: 700 var(--a-f-chip)/1 var(--font-body);
+  padding: 9px 13px;
+  border-radius: var(--a-r-xs);
+  background: var(--a-sunk);
+  color: var(--a-muted);
+  transition: background var(--a-enter), color var(--a-enter), transform var(--a-exit);
+}
+.chip.tone-accent { background: var(--a-accent); color: var(--a-ink); }
+.chip.tone-info { background: var(--a-accent-wash); color: var(--a-accent-text); }
+.chip.tone-alert { background: var(--a-alert-wash); color: var(--a-alert); }
+.chip.tone-warn { background: var(--a-warn-wash); color: var(--a-warn); }
+.chip.tone-progress { background: var(--a-progress-wash); color: var(--a-progress); }
+.chip.tone-quiet, .chip.is-none { background: var(--a-sunk); color: var(--a-muted); }
+button.chip:hover { background: var(--a-accent); color: var(--a-ink); transform: translateY(-1px); }
+button.chip:active { transform: translateY(0) scale(0.96); }
+.chip.is-src { font-size: 12px; }
+
+/* ---- 4. button: the fill wipes in, and it is one definition -------------- */
+.btn {
+  font: 700 var(--a-f-nav)/1 var(--font-body);
+  border-radius: var(--a-r-sm);
+  padding: 13px 20px;
+  position: relative;
+  overflow: hidden;
+  transition: color var(--a-enter), border-color var(--a-enter), transform var(--a-exit);
+}
+.btn::before {
+  content: ''; position: absolute; inset: 0; background: var(--a-accent);
+  transform: scaleX(0); transform-origin: left; transition: transform var(--a-enter); z-index: 0;
+}
+.btn:hover:not(:disabled)::before { transform: scaleX(1); }
+.btn > * { position: relative; z-index: 1; }
+.btn:active:not(:disabled) { transform: translateY(2px) scale(0.985); }
+.btn-primary::before { background: var(--a-ink); }
+.btn-primary:hover:not(:disabled) { color: var(--a-accent); }
+.btn-quiet, .btn-ghost { border: 1.5px solid var(--a-line-2); background: none; color: var(--a-muted); }
+.btn-quiet:hover:not(:disabled), .btn-ghost:hover:not(:disabled) { color: var(--a-ink); border-color: var(--a-ink); }
+.btn-sm { padding: 9px 14px; font-size: 13.5px; }
+
+/* ---- 5. checkbox: 26px, and the tick is drawn ---------------------------- */
+.checkbox, .routine-check, .goal-ms-check {
+  width: 26px; height: 26px; border-radius: 8px;
+  border: 2px solid var(--a-line-2); background: none;
+  transition: border-color var(--a-enter), background var(--a-enter), transform var(--a-exit);
+}
+.checkbox:hover, .routine-check:hover, .goal-ms-check:hover {
+  border-color: var(--a-accent-text); background: var(--a-accent-wash);
+}
+.checkbox:active, .routine-check:active { transform: scale(0.9); }
+.checkbox[aria-checked="true"], .routine-check[aria-checked="true"], .goal-ms-check[aria-checked="true"] {
+  background: var(--a-progress-solid); border-color: var(--a-progress-solid);
+}
+
+/* ---- 6. rows: hover is the accent, never grey ---------------------------- */
+.today-task, .todo-row, .rowitem, .ptask, .habit-row-top, .exception-row, .nt-row {
+  position: relative; border-radius: var(--a-r-xs);
+}
+.today-task::before, .todo-row::before, .rowitem::before,
+.ptask::before, .habit-row-top::before, .nt-row::before {
+  content: ''; position: absolute; inset: 0 -8px; background: var(--a-accent-wash);
+  border-radius: var(--a-r-xs); transform: scaleX(0); transform-origin: left;
+  transition: transform var(--a-enter); z-index: 0; pointer-events: none;
+}
+.today-task:hover::before, .todo-row:hover::before, .rowitem:hover::before,
+.ptask:hover::before, .habit-row-top:hover::before, .nt-row:hover::before { transform: scaleX(1); }
+.today-task > *, .todo-row > *, .rowitem > *, .ptask > *, .habit-row-top > *, .nt-row > * {
+  position: relative; z-index: 1;
+}
+
+/* ---- 7. surfaces: the system radius, and a lift that answers a pointer ---- */
+.panel, .widget, .card, .goal-card, .routine-card, .habit-card {
+  border-radius: var(--a-r-lg);
+  transition: box-shadow var(--a-enter), transform var(--a-enter), border-color var(--a-enter);
+}
+.goal-card:hover, .routine-card:hover, .habit-card:hover {
+  box-shadow: var(--a-lift); border-color: var(--a-accent-text);
+}
+
+/* ---- 8. meters ----------------------------------------------------------- */
+.bar { height: 10px; border-radius: 999px; background: var(--a-sunk); }
+.bar i { border-radius: 999px; transform-origin: left; animation: a-fill var(--a-land) both; }
+
+/* ---- 9. the status badge, which was 10px and grey ------------------------ */
+.drift {
+  font: 800 12px/1 var(--font-body); letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 7px 11px; border-radius: var(--a-r-xs);
+}
+.drift.ok { background: var(--a-progress-wash); color: var(--a-progress); }
+.drift.off { background: var(--a-warn-wash); color: var(--a-warn); }
+
+/* ---- 10. the space mark carries the space's own accent ------------------- */
+.spacemark.s-personal i { background: #DFF24A; }
+.spacemark.s-work i { background: #7FD8F5; }
+.spacemark.s-offplate i { background: #FFC94A; }
+.spacemark.s-corner i { background: #86E9B4; }

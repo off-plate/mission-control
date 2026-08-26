@@ -81,6 +81,16 @@ await page.evaluate(() => {
 })
 await page.goto(`${URL}/#/assistant`); await page.reload(); await page.waitForTimeout(1600)
 
+/* THE DOORWAY OFFERS THINGS HE DOES, not things he types. Each chip sends a
+   written question on his behalf and shows its own NAME in the thread, the way
+   the brief already did: he pressed a button, and that is the thing he did. */
+const chips = await page.locator('.as-chip').allTextContents()
+ok('the doorway offers five skills beside the brief', chips.length === 5, chips.join(' | '))
+for (const want of ['Evening close', 'What am I avoiding', 'Plan today and tomorrow',
+                    'Where did the week go', 'Clear my head']) {
+  ok(`  ${want} is one of them`, chips.includes(want))
+}
+
 const brief = page.locator('.as-brief')
 ok('the doorway offers a Morning brief button', await brief.count() === 1)
 ok('it is the page\'s one filled control',
@@ -207,6 +217,43 @@ ok('and the contract is restated at the very end of the prompt',
    JSON.stringify(sysMsg.trimEnd().slice(-46)))
 ok('naming one task is now allowed, counts still are not',
    system.includes('YOU MUST NOT STATE COUNTS') && system.includes('TITLES ARE DIFFERENT'))
+
+/* One chip, end to end: the thread shows the name and the model gets the
+   paragraph. Checked on a skill other than the brief, because the brief had its
+   own wiring and this is the shared path now. */
+{
+  const page3 = await b.newPage()
+  let asked3 = null
+  await page3.addInitScript(() => {
+    class F { start() { window.__rec = this } stop() { this.onend && this.onend() } abort() {} }
+    window.SpeechRecognition = F; window.webkitSpeechRecognition = F
+    navigator.mediaDevices = navigator.mediaDevices || {}
+    navigator.mediaDevices.getUserMedia = async () => ({ getTracks: () => [{ stop() {} }] })
+    speechSynthesis.speak = (u) => setTimeout(() => u.onend && u.onend(), 200)
+    speechSynthesis.cancel = () => {}
+  })
+  await page3.route('**/api.groq.com/openai/v1/chat/completions', (r) => {
+    asked3 = r.request().postData()
+    return r.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ choices: [{ message: { content: JSON.stringify({ say: 'Right.', show: [], next: [] }) } }] }) })
+  })
+  await page3.goto(URL); await page3.waitForTimeout(600)
+  const l3 = page3.locator('button', { hasText: /Use this device only/i })
+  if (await l3.count()) { await l3.first().click(); await page3.waitForTimeout(900) }
+  await page3.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_test'))
+  await page3.goto(`${URL}/#/assistant`); await page3.reload(); await page3.waitForTimeout(1200)
+  await page3.locator('.as-chip', { hasText: 'Clear my head' }).click()
+  await page3.waitForSelector('.as-turn.is-you .as-said', { timeout: 15000 })
+  const shown = (await page3.locator('.as-turn.is-you .as-said').first().textContent())?.trim()
+  ok('a skill shows its name in the thread', shown === 'Clear my head', JSON.stringify(shown))
+  const sent3 = JSON.parse(asked3 ?? '{}').messages ?? []
+  ok('and the model still gets the whole question',
+     (sent3.at(-1)?.content ?? '').includes('Turn what I say into tasks'),
+     JSON.stringify((sent3.at(-1)?.content ?? '').slice(0, 50)))
+  const sys3 = sent3.find((m) => m.role === 'system')?.content ?? ''
+  ok('the prompt knows what each skill is for', sys3.includes('CLEAR MY HEAD') && sys3.includes('EVENING CLOSE'))
+  await page3.close()
+}
 
 await b.close()
 console.log(fails.length ? `\n${fails.length} FAILED` : '\nALL PASS')

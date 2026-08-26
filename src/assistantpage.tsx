@@ -920,18 +920,25 @@ export function AssistantPage() {
          touched the day puts the day on the canvas unless it named its own. */
       else if (done?.some((d) => d.ok)) setCanvas(out.reply.do?.some((a) => a.kind === 'habit') ? ['habits'] : ['today'])
     } else {
+      /* A 429 used to fall through to `out.detail`, which for a rate limit is
+         Groq's raw body: an org id, a token count, a billing upsell link, all
+         ending in "Ask again" on a request that was never unreadable. Two
+         questions back to back after a card just wrote something is ordinary
+         traffic, not a fault, and reads that way now. */
       setErr(
         out.reason === 'no-key' ? 'No Groq key yet.'
           : out.reason === 'rejected' ? 'That Groq key was rejected.'
             : out.reason === 'offline' ? 'Could not reach the model.'
-              : out.detail ?? 'The answer came back unreadable.',
+              : out.reason === 'rate-limit' ? 'Too many questions in the last minute.'
+                : out.detail ?? 'The answer came back unreadable.',
       )
       setErrHint(
         out.reason === 'no-key' ? 'Add one in Settings. It is free and it stays on this device.'
           : out.reason === 'rejected' ? 'Check it in Settings, or generate a new one at console.groq.com.'
             : out.reason === 'model-gone' ? 'The model this app used was retired. This build already moved to its replacement, so reload the page.'
               : out.reason === 'offline' ? 'Check the connection and ask again.'
-                : 'Ask again, or rephrase it.',
+                : out.reason === 'rate-limit' ? (out.detail ? `Wait about ${out.detail}s and ask again.` : 'Wait a few seconds and ask again.')
+                  : 'Ask again, or rephrase it.',
       )
     }
     setBusy(false); setLive('')
@@ -1026,26 +1033,31 @@ export function AssistantPage() {
             <h1 className="as-hero-q">What can I help with?</h1>
 
           </div>
-          {/* The one thing he came here to do most mornings, so it is the one
-              thing that looks like a button rather than a suggestion. It opens
-              voice mode and asks for him, because at eight in the morning the
-              ask is the friction. */}
-          {voiceModeAvailable() ? (
+          {/* Six things he does rather than types, in one row, one design.
+              The chip row that used to sit below the ask box is gone: this was
+              two different weights for buttons that all do the same kind of
+              thing, one filled and central, five outlined and stranded under
+              the box. Not gated on voiceModeAvailable() the way the single
+              button used to be, because runSkill() already falls back to a
+              typed send where voice mode does not exist, and a browser
+              without SpeechRecognition should not lose every one-tap skill on
+              the doorway, only the live listening. Not attach, search, reason,
+              create an image. Those are a general chatbot's furniture and none
+              of them is a thing this app does. These are questions about his
+              own week, each answerable from his own log. */}
+          <div className="as-skills">
             <button className="as-brief" onClick={() => void runSkill(MORNING)}>
               <Icon.Waveform size={18} />
               {MORNING.label}
             </button>
-          ) : null}
-          {askBox}
-          {/* Not attach, search, reason, create an image. Those are a general
-              chatbot's furniture and none of them is a thing this app does.
-              These are questions about his own week, each answerable from his
-              own log. */}
-          <div className="as-starters">
             {SKILLS.map((k) => (
-              <button className="as-chip" key={k.label} onClick={() => void runSkill(k)}>{k.label}</button>
+              <button className="as-brief" key={k.label} onClick={() => void runSkill(k)}>
+                <Icon.Waveform size={18} />
+                {k.label}
+              </button>
             ))}
           </div>
+          {askBox}
         </div>
       )}
 

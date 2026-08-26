@@ -77,5 +77,42 @@ const junk = await run('I am afraid I cannot help with that request.', 'prose')
 ok('unparseable prose still shows an error', junk.error === 1, `${junk.error} error blocks`)
 ok('and the error carries what it actually said', (junk.errorText ?? '').includes('cannot help'), JSON.stringify(junk.errorText))
 
+/* THE ONE HE ACTUALLY HIT. Two questions back to back, right after a card
+   just wrote something, is ordinary traffic and it is not rare: Groq's free
+   tier caps at 8000 tokens per minute and a habit or a task write plus a
+   follow-up question clears that easily. The raw 429 body used to reach the
+   screen verbatim: an org id, a service tier, a token count, and a link to
+   upgrade billing, all ending in "Ask again, or rephrase it." on a request
+   that was never unreadable. */
+async function run429() {
+  const b = await chromium.launch()
+  const page = await b.newPage()
+  const rawBody = 'Rate limit reached for model `openai/gpt-oss-120b` in organization '
+    + '`org_01ktjycmq8e0d9xfr4mmt06qmd` service tier `on_demand` on tokens per minute (TPM): '
+    + 'Limit 8000, Used 5439, Requested 5017. Please try again in 18.42s. Need more tokens? '
+    + 'Upgrade to Dev Tier today at https://console.groq.com/settings/billing'
+  await page.route('**/api.groq.com/openai/v1/chat/completions', (r) =>
+    r.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ error: { message: rawBody } }) }))
+  await page.goto(URL); await page.waitForTimeout(600)
+  const local = page.locator('button', { hasText: /Use this device only/i })
+  if (await local.count()) { await local.first().click(); await page.waitForTimeout(900) }
+  await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_test'))
+  await page.goto(`${URL}/#/assistant`); await page.reload(); await page.waitForTimeout(1300)
+  await page.locator('.as-input').fill('is the invoice marked done')
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(1500)
+  const errorText = await page.locator('.as-error').first().innerText().catch(() => null)
+  await b.close()
+  return errorText ?? ''
+}
+
+const limited = await run429()
+ok('a rate limit reads as a clean, short sentence',
+   limited.includes('Too many questions'), JSON.stringify(limited))
+ok('the org id is never shown to him', !limited.includes('org_'), JSON.stringify(limited))
+ok('neither is the billing upsell', !limited.toLowerCase().includes('upgrade'), JSON.stringify(limited))
+ok('the wait time is pulled out and shown plainly',
+   limited.includes('19s') || limited.includes('18s'), JSON.stringify(limited))
+
 console.log(fails.length ? `\n${fails.length} FAILED` : '\nALL PASS')
 process.exit(fails.length ? 1 : 0)

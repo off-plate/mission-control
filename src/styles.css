@@ -13,6 +13,21 @@
    browser would have fetched anyway. */
 /* HUD mode, behind the helmet in the header. Self-hosted with latin-ext, so
    Czech renders in the real face here too. */
+/* Plus Jakarta Sans, self-hosted as a VARIABLE font: one file per subset covers
+   500 to 800, which is why there are two files here and not eight. latin-ext
+   carries the Czech, and half this app's task titles are Czech. */
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  src: url('/mission-control/fonts/plus-jakarta-sans-var-latin-ext.woff2') format('woff2');
+  font-weight: 500 800; font-style: normal; font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  src: url('/mission-control/fonts/plus-jakarta-sans-var-latin.woff2') format('woff2');
+  font-weight: 500 800; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 @font-face {
   font-family: 'Michroma';
   src: url('/mission-control/fonts/michroma-400-latin-ext.woff2') format('woff2');
@@ -5113,54 +5128,64 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
    delete the markup that wanted it.
    ========================================================================== */
 .troom {
-  --t-ground: #141009;
-  --t-card: #1c1710;
-  --t-card2: #221c14;
-  --t-ink: #f6f0e4;
-  --t-muted: #8d8376;
-  --t-dim: #5d554a;
-  --t-hot: #f2712f;
-  --t-hotdim: rgba(242, 113, 47, 0.16);
-  --t-line: rgba(246, 240, 228, 0.1);
-  --t-r: 16px;
+  /* The room owns no colour any more. Every token here points at the direction A
+     system layer at the foot of this file, which is what makes the HUD a token
+     swap instead of a second stylesheet. */
+  --t-ground: var(--a-paper);
+  --t-card: var(--a-card);
+  --t-card2: var(--a-sunk);
+  --t-ink: var(--a-ink);
+  --t-muted: var(--a-muted);
+  --t-dim: var(--a-faint);
+  --t-hot: var(--a-accent);
+  --t-hot-text: var(--a-accent-text);
+  --t-hotdim: var(--a-accent-wash);
+  --t-line: var(--a-line);
+  --t-r: var(--a-r-lg);
   background: var(--t-ground);
   color: var(--t-ink);
-  border-radius: 20px;
-  padding: 16px;
+  border-radius: var(--a-r-lg);
+  padding: var(--s4);
   display: flex;
   flex-direction: column;
   gap: 14px;
   margin-top: var(--s4);
+  font-family: 'Plus Jakarta Sans', var(--font-body);
 }
 /* One label, one figure. The whole room is built from these two. */
 .troom .tr-l {
-  font: 600 11px/1 var(--font-body); letter-spacing: 0.17em; text-transform: uppercase;
-  color: var(--t-muted); margin: 0;
+  font: 800 var(--a-f-label)/1 'Plus Jakarta Sans', var(--font-body);
+  letter-spacing: var(--a-ls-label); text-transform: uppercase; color: var(--t-muted); margin: 0;
 }
 /* A figure is allowed to be big and is never allowed to leave its tile. The
    percent and the phase both overflowed on his screen the moment the display
    face changed width under them. */
 .troom .tr-n {
-  font-family: var(--font-display); font-weight: 800; letter-spacing: -0.035em;
+  font-family: 'Plus Jakarta Sans', var(--font-display); font-weight: 800; letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums; line-height: 0.9; margin: 0;
   min-width: 0; max-width: 100%; overflow-wrap: anywhere;
 }
 .troom .tr-n i { font-family: var(--font-body); font-style: normal; font-size: 0.34em; font-weight: 600; color: var(--t-dim); letter-spacing: 0; margin: 0 0.1em 0 0.04em; vertical-align: 0.14em; }
-.troom .tr-n.is-hot { color: var(--t-hot); }
-.troom .tr-sm { font-size: 19px; }
+.troom .tr-n.is-hot { color: var(--t-hot-text); }
+.troom .tr-sm { font-size: var(--a-f-fig-sm); }
 .troom .tr-card { background: var(--t-card); border: 1px solid var(--t-line); border-radius: var(--t-r); padding: 20px 22px; }
 
 /* ---- the figures ---- */
 .troom-hero { display: grid; grid-template-columns: minmax(0, 1.5fr) repeat(4, minmax(0, 0.42fr)); gap: 14px; }
 .tr-clock, .tr-tile { display: flex; flex-direction: column; justify-content: center; gap: 16px; min-height: 168px; }
-.tr-count { font-size: clamp(52px, 8vw, 122px); }
+.tr-count { font-size: var(--a-f-count); }
 .troom .tr-u { font-size: 0.3em; color: var(--t-dim); margin: 0 0.16em 0 0.05em; vertical-align: 0.34em; letter-spacing: 0; }
-.troom .tr-hot { color: var(--t-hot); }
-.tr-tile .tr-n { font-size: clamp(28px, 3.6vw, 60px); }
+.troom .tr-hot { color: var(--t-hot-text); }
+.tr-tile .tr-n { font-size: clamp(30px, 3.8vw, 62px); }
 .troom .tr-mo { font-family: var(--font-body); font-size: 0.29em; font-weight: 600; color: var(--t-dim); letter-spacing: 0.04em; margin-left: 0.14em; vertical-align: 0.42em; }
-.tr-tile.is-hot .tr-n { color: var(--t-hot); }
-.tr-phase { font-size: clamp(20px, 2.4vw, 38px) !important; text-transform: uppercase; }
-.troom .tr-bar { height: 7px; border-radius: 4px; background: rgba(246, 240, 228, 0.11); overflow: hidden; }
+.tr-tile.is-hot .tr-n { color: var(--t-hot-text); }
+/* "MORNING" is the longest word this tile ever holds and it broke across two
+   lines. It shrinks to fit instead of wrapping. */
+.tr-phase {
+  font-size: clamp(15px, 1.9vw, 30px) !important; text-transform: uppercase;
+  white-space: nowrap; overflow: hidden; text-overflow: clip;
+}
+.troom .tr-bar { height: 7px; border-radius: 4px; background: color-mix(in srgb, var(--t-ink) 11%, transparent); overflow: hidden; }
 .troom .tr-bar i { display: block; height: 100%; background: var(--t-hot); border-radius: 4px; }
 
 /* ---- the day ---- */
@@ -5170,7 +5195,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .tr-count-inline .tr-n { font-size: 26px; }
 .tr-dots { display: grid; grid-template-columns: repeat(96, 1fr); gap: 3px; }
 .tr-q { aspect-ratio: 1; border-radius: 2px; background: var(--t-ink); opacity: 0.85; }
-.tr-q.is-spent { background: none; box-shadow: inset 0 0 0 1px rgba(246, 240, 228, 0.13); opacity: 1; }
+.tr-q.is-spent { background: none; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t-ink) 13%, transparent); opacity: 1; }
 .tr-q.is-busy { background: var(--t-hot); opacity: 0.42; }
 /* The one glow in the app, and it is a state marker, not atmosphere: 12px on a
    9px dot, so THIS MOMENT is findable at a glance in a field of ninety six.
@@ -5187,7 +5212,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   font: 600 11px/1 var(--font-body); letter-spacing: 0.15em; text-transform: uppercase;
   color: var(--t-dim); padding-top: 9px; border-top: 1px solid var(--t-line); min-width: 0; overflow: hidden;
 }
-.tr-ph.is-on { color: var(--t-hot); border-top-color: var(--t-hot); }
+.tr-ph.is-on { color: var(--t-hot-text); border-top-color: var(--t-hot); }
 
 /* ---- next ---- */
 /* The single gradient in the app, and a deliberate one: a short wash that
@@ -5195,8 +5220,23 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .tr-next { background: linear-gradient(180deg, var(--t-hotdim), transparent 62%), var(--t-card); } /* slop-lint-ignore gradient-hero */
 .tr-nextt { font-family: var(--font-display); font-weight: 800; font-size: clamp(24px, 2.5vw, 34px); line-height: 1.06; letter-spacing: -0.03em; margin: 0 0 18px; }
 .tr-chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.troom .tr-chip { font: 600 12px/1 var(--font-body); padding: 8px 11px; border-radius: 8px; background: var(--t-hotdim); color: var(--t-hot); }
-.troom .tr-start { font: 600 15px/1 var(--font-body); background: var(--t-hot); color: #141009; border: 0; border-radius: 9px; padding: 14px 24px; cursor: pointer; margin-left: auto; }
+.troom .tr-chip { font: 700 var(--a-f-chip)/1 'Plus Jakarta Sans', var(--font-body); padding: 9px 14px; border-radius: var(--a-r-xs); background: var(--t-hotdim); color: var(--t-hot-text); }
+.troom .tr-start {
+  font: 700 var(--a-f-nav)/1 'Plus Jakarta Sans', var(--font-body);
+  background: var(--t-hot); color: var(--a-ink); border: 0; border-radius: var(--a-r-sm);
+  padding: 15px 26px; cursor: pointer; margin-left: auto; position: relative; overflow: hidden;
+  transition: color var(--a-enter), transform var(--a-exit);
+}
+.shell.is-hud .troom .tr-start { color: #04141A; }
+/* The fill arrives from the left instead of cross-fading, so a press has a direction. */
+.troom .tr-start::before {
+  content: ''; position: absolute; inset: 0; background: var(--a-ink);
+  transform: scaleX(0); transform-origin: left; transition: transform var(--a-enter);
+}
+.troom .tr-start > * { position: relative; }
+.troom .tr-start:hover::before { transform: scaleX(1); }
+.troom .tr-start:hover { color: var(--t-hot); }
+.troom .tr-start:active { transform: translateY(2px) scale(0.985); }
 .troom .tr-start:hover { filter: brightness(1.1); }
 
 /* ---- the lists, ten rows deep because three was not worth reading ---- */
@@ -5209,16 +5249,24 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .tr-rows { display: flex; flex-direction: column; }
 .tr-r { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--t-line); min-height: 44px; }
 .tr-r:last-child { border-bottom: 0; }
-.tr-t { flex: 1; min-width: 0; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr-t { flex: 1; min-width: 0; font-size: var(--a-f-row); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tr-r.is-done { color: var(--t-dim); }
-.troom .tr-slot { font: 600 11px/1 var(--font-body); letter-spacing: 0.1em; text-transform: uppercase; color: var(--t-muted); min-width: 74px; }
+/* The slot was 11px grey and he called it "very, very, very small". It is its
+   own tag now, at 12.5px bold on an accent wash. */
+.troom .tr-slot {
+  font: 800 var(--a-f-slot)/1 'Plus Jakarta Sans', var(--font-body);
+  letter-spacing: 0.13em; text-transform: uppercase; color: var(--t-hot-text);
+  min-width: 96px; text-align: center; background: var(--t-hotdim);
+  padding: 7px 9px; border-radius: var(--a-r-xs);
+}
+.tr-r.is-done .tr-slot { color: var(--t-dim); background: var(--t-card2); }
 .tr-r.is-done .tr-slot { color: var(--t-dim); }
 .tr-tick { width: 9px; height: 9px; border-radius: 50%; background: var(--t-hot); flex: none; }
 .tr-r.is-done .tr-tick { background: none; box-shadow: inset 0 0 0 1px var(--t-dim); }
-.troom .tr-age { font-family: var(--font-display); font-weight: 800; font-size: 26px; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; min-width: 74px; color: var(--t-hot); }
+.troom .tr-age { font-family: 'Plus Jakarta Sans', var(--font-display); font-weight: 800; font-size: 26px; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; min-width: 74px; color: var(--t-hot-text); }
 .troom .tr-age.is-cool { color: var(--t-dim); }
 .troom .tr-age u { text-decoration: none; font-family: var(--font-body); font-size: 12px; font-weight: 600; color: var(--t-dim); margin-left: 2px; }
-.troom .tr-box { width: 20px; height: 20px; flex: none; border-radius: 6px; border: 1.5px solid rgba(246, 240, 228, 0.28); background: none; cursor: pointer; padding: 0; }
+.troom .tr-box { width: 20px; height: 20px; flex: none; border-radius: 6px; border: 1.5px solid color-mix(in srgb, var(--t-ink) 28%, transparent); background: none; cursor: pointer; padding: 0; }
 .troom .tr-box:hover { border-color: var(--t-hot); }
 .troom .tr-empty { color: var(--t-dim); font-size: 14.5px; margin: 6px 0 0; }
 
@@ -5227,7 +5275,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .tr-stat { display: flex; flex-direction: column; justify-content: center; gap: 14px; min-height: 128px; }
 .tr-stat .tr-n { font-size: clamp(36px, 3.8vw, 52px); }
 .tr-pips { display: flex; gap: 4px; }
-.tr-pips i { flex: 1; height: 9px; border-radius: 2px; background: rgba(246, 240, 228, 0.11); }
+.tr-pips i { flex: 1; height: 9px; border-radius: 2px; background: color-mix(in srgb, var(--t-ink) 11%, transparent); }
 .tr-pips i.is-on { background: var(--t-hot); }
 
 @media (max-width: 1180px) {
@@ -5350,7 +5398,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   color: var(--t-ink); font-family: var(--font-display); font-weight: 800; font-size: 19px;
 }
 .troom .tr-week .weekday-sum, .troom .tr-week .weekday .empty { color: var(--t-dim); }
-.troom .tr-week .weekday-bar { background: rgba(246, 240, 228, 0.13); }
+.troom .tr-week .weekday-bar { background: color-mix(in srgb, var(--t-ink) 13%, transparent); }
 .troom .tr-week .weekday-bar i { background: var(--t-hot); }
 
 @media (max-width: 1180px) { .troom-lower { grid-template-columns: 1fr; } }
@@ -5452,3 +5500,153 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 /* Worth an umbrella, so it is worth the accent. Below this it is noise. */
 .wx-rain.is-wet { color: var(--accent-text); }
 .wx-h-temp { font-size: var(--text-sm); color: var(--ink); }
+
+/* ==========================================================================
+   DIRECTION A, the system layer
+   Signed off from the component library on 2026-08-26. This block is the
+   SOURCE for colour, type, spacing, radius and motion. Everything above it
+   that still names a literal is legacy and gets migrated page by page.
+
+   The rules that came out of the contrast pass, and they are not preferences:
+   - `--accent` lime is 1.17:1 on cream. It is a FILL. It is never text, never
+     a border on white, never an icon. `--accent-text` olive is its readable
+     partner at 5.01:1.
+   - `--faint` is 3.12:1. Disabled and decorative only. Never body text.
+   - `--on-ink` exists because the ink card used to take its foreground from
+     `--paper`, which inverts to dark-on-dark the moment the HUD makes paper
+     dark. A surface carries its own foreground or it cannot change theme.
+   ========================================================================== */
+:root {
+  --a-paper: #FAF8F4; --a-card: #FFFFFF; --a-sunk: #F0EDE6; --a-feature: #12100C;
+  --a-on-ink: #FAF8F4;
+  --a-ink: #12100C; --a-muted: #5F5A4E; --a-faint: #948D7E;
+  --a-accent: #DFF24A; --a-accent-text: #5E6B12; --a-accent-wash: #F1F8C8;
+  --a-alert: #B03A22; --a-alert-wash: #F7E1DB; --a-alert-solid: #D2452A;
+  --a-warn: #7C5A0E; --a-warn-wash: #F7EBD3;
+  --a-progress: #2F6B45; --a-progress-wash: #DBEDE2; --a-progress-solid: #3E8B59;
+  --a-info: #4A6070; --a-info-wash: #E2E9EE;
+  --a-line: rgba(18, 16, 12, 0.11); --a-line-2: rgba(18, 16, 12, 0.22);
+  --a-lift: 0 10px 30px rgba(18, 16, 12, 0.10);
+  --a-lift-2: 0 18px 46px rgba(18, 16, 12, 0.14);
+
+  --a-r-xs: 6px; --a-r-sm: 10px; --a-r-md: 16px; --a-r-lg: 24px;
+
+  /* Nothing in the interface is below 12px. He reported "everything is small"
+     and he was right: the previous scale was set on a 27in monitor. */
+  --a-f-label: 12px; --a-ls-label: 0.15em;
+  --a-f-body: 16.5px; --a-f-row: 16.5px; --a-f-slot: 12.5px;
+  --a-f-chip: 13.5px; --a-f-nav: 15px;
+  --a-f-fig-sm: 24px; --a-f-fig: 44px; --a-f-count: clamp(52px, 7vw, 96px);
+
+  /* Two curves run the interface, and a third for DATA arriving. --a-land used
+     a control point at 1.02, a 2 percent overshoot, which slop-lint reads as
+     bounce easing and which bought nothing anyone could see. A hard ease-out
+     lands just as well and does not need an exception. */
+  --a-enter: 170ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  --a-exit: 120ms cubic-bezier(0.55, 0.06, 0.68, 0.19);
+  --a-land: 520ms cubic-bezier(0.16, 0.84, 0.24, 1);
+}
+/* The HUD is the same system with cold tokens and square corners. Not a second
+   system: every class below reads these variables and nothing else. */
+.shell.is-hud {
+  --a-paper: #070B10; --a-card: #0C121A; --a-sunk: #121A24; --a-feature: #04141A;
+  --a-on-ink: #E6F1F8;
+  --a-ink: #E6F1F8; --a-muted: #93A7B8; --a-faint: #6E8496;
+  --a-accent: #4FD8E8; --a-accent-text: #6FE4F2; --a-accent-wash: rgba(79, 216, 232, 0.14);
+  --a-alert: #FF6B5A; --a-alert-wash: rgba(255, 107, 90, 0.16); --a-alert-solid: #FF6B5A;
+  --a-warn: #FFC46B; --a-warn-wash: rgba(255, 196, 107, 0.16);
+  --a-progress: #55E0A0; --a-progress-wash: rgba(85, 224, 160, 0.16); --a-progress-solid: #55E0A0;
+  --a-info: #7FA6C4; --a-info-wash: rgba(127, 166, 196, 0.16);
+  --a-line: rgba(79, 216, 232, 0.16); --a-line-2: rgba(79, 216, 232, 0.34);
+  --a-r-xs: 2px; --a-r-sm: 3px; --a-r-md: 4px; --a-r-lg: 5px;
+}
+
+
+/* ---- direction A: the room's own components, on the system ---- */
+/* Hover is the accent wiping in from the left with a bar down the edge. It was
+   a grey wash, and he said so plainly. */
+.troom .tr-r { border-radius: var(--a-r-xs); padding: 14px 12px; min-height: 56px; position: relative; }
+.troom .tr-r::before {
+  content: ''; position: absolute; inset: 0; background: var(--t-hotdim);
+  border-radius: var(--a-r-xs); transform: scaleX(0); transform-origin: left;
+  transition: transform var(--a-enter); z-index: 0;
+}
+.troom .tr-r:hover::before { transform: scaleX(1); }
+.troom .tr-r::after {
+  content: ''; position: absolute; left: 0; top: 12%; bottom: 12%; width: 3px;
+  background: var(--t-hot-text); border-radius: 2px; transform: scaleY(0);
+  transition: transform var(--a-enter); z-index: 1;
+}
+.troom .tr-r:hover::after { transform: scaleY(1); }
+.troom .tr-r > * { position: relative; z-index: 1; }
+
+/* Four grounds, one card. Colour is a modifier and never a second component. */
+.troom .tr-card--ink { background: var(--a-feature); color: var(--a-on-ink); border-color: transparent; }
+.troom .tr-card--lime { background: var(--t-hot); color: var(--a-ink); border-color: transparent; position: relative; overflow: hidden; }
+.shell.is-hud .troom .tr-card--lime { color: #04141A; }
+.troom .tr-card--lime .tr-l { color: rgba(18, 16, 12, 0.62); }
+.shell.is-hud .troom .tr-card--lime .tr-l { color: rgba(4, 20, 26, 0.66); }
+/* A fill that large reads as a printing error if it never moves. One bright
+   pass every 3.8s, then a pause. */
+.troom .tr-card--lime::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(108deg, transparent 40%, rgba(255, 255, 255, 0.92) 50%, transparent 60%);
+  transform: translateX(-130%); animation: a-sheen 3.8s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+}
+@keyframes a-sheen { 0%, 42% { transform: translateX(-130%); } 72%, 100% { transform: translateX(130%); } }
+.troom .tr-card--lime .tr-bar { background: rgba(18, 16, 12, 0.16); }
+.troom .tr-card--lime .tr-bar i { background: var(--a-ink); }
+
+/* The now cell. v1 blinked and could not be seen, v2 scaled 1.75x with a 22px
+   glow and was too much in the face. It breathes 8% on a slow count. */
+.troom .tr-q.is-now {
+  animation: a-nowbeat 3.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  box-shadow: 0 0 0 2px var(--t-ground);
+}
+@keyframes a-nowbeat {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 2px var(--t-ground), 0 0 0 0 var(--t-hot); }
+  45% { transform: scale(1.08); box-shadow: 0 0 0 2px var(--t-ground), 0 0 0 7px transparent; }
+}
+/* Meters arrive rather than appear. */
+.troom .tr-bar i { transform-origin: left; animation: a-fill var(--a-land) both; }
+@keyframes a-fill { from { transform: scaleX(0); } }
+.troom .tr-pips i.is-on { animation: a-pop var(--a-land) both; }
+@keyframes a-pop { from { transform: scaleY(0.2); opacity: 0; } }
+.troom .tr-card { transition: box-shadow var(--a-enter), transform var(--a-enter), border-color var(--a-enter); }
+.troom .tr-card--hover:hover { box-shadow: var(--a-lift-2); transform: translateY(-3px); border-color: var(--t-hot-text); }
+@media (prefers-reduced-motion: reduce) {
+  .troom *, .troom *::before, .troom *::after { animation: none !important; transition-duration: 1ms !important; }
+}
+
+
+/* On the ink card lime is a foreground again: 15.33:1 there, against 1.17:1 on
+   paper. The rule is about the surface, not about the colour. */
+.troom .tr-card--ink .tr-hot,
+.troom .tr-card--ink .tr-n.is-hot { color: var(--t-hot); }
+
+
+/* ---- contrast corrections, measured not eyeballed ----
+   Every one of these was found by reading the computed colour of each text node
+   in the room against the surface actually behind it. --t-dim is 3.30:1 and is
+   for DISABLED and DECORATION; the moment it carries a word it is a bug. */
+
+/* Labels and units on the ink card were taking --t-muted, which is 2.77:1 on
+   black. A surface carries its own foreground. */
+.troom .tr-card--ink .tr-l,
+.troom .tr-card--ink .tr-n .tr-u,
+.troom .tr-card--ink .tr-n i { color: color-mix(in srgb, var(--a-on-ink) 72%, transparent); }
+.troom .tr-card--lime .tr-l,
+.troom .tr-card--lime .tr-n i { color: rgba(18, 16, 12, 0.68); }
+.shell.is-hud .troom .tr-card--lime .tr-l,
+.shell.is-hud .troom .tr-card--lime .tr-n i { color: rgba(4, 20, 26, 0.72); }
+
+/* Words that were wearing the disabled colour. */
+.troom .tr-empty,
+.troom .tr-ph,
+.troom .tr-n i,
+.troom .tr-mo,
+.troom .tr-age u,
+.troom .tr-of { color: var(--t-muted); }
+
+/* The week strip printed today's weekday in lime on cream: 1.24:1. */
+.troom .tr-week .weekday.is-today .weekday-name { color: var(--t-hot-text); }

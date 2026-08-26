@@ -89,7 +89,19 @@ let audioCtx: AudioContext | null = null
 let buf: Uint8Array | null = null
 let boundaries = 0
 
-/** 0..1 while it is speaking, and 0 when it is not. */
+/** 0..1 while it is speaking, and 0 when there is nothing real to report.
+
+    NOTHING HERE IS GENERATED. There used to be a fallback that drew a sine
+    wave when no signal was available, and because the app was choosing a remote
+    voice that reports nothing, that generator was the only thing he ever saw:
+    a pretty animation with no relationship to the speech. He called it what it
+    was. A still bar that means "no signal" is worth more than a moving one that
+    means nothing.
+
+    Two real sources. Gemini plays through an audio element, so that is the true
+    amplitude of the voice. The device voice has no node to tap, so the meter is
+    driven by `onboundary`, which fires as each word begins: the real rhythm of
+    what is being said, though not its loudness. */
 export function speakingLevel(): number {
   if (analyser && buf) {
     analyser.getByteTimeDomainData(buf)
@@ -97,15 +109,17 @@ export function speakingLevel(): number {
     for (let i = 0; i < buf.length; i++) { const d = (buf[i] - 128) / 128; sum += d * d }
     return Math.min(1, Math.sqrt(sum / buf.length) * 4)
   }
-  if (state !== 'playing') return 0
-  if (boundaries > 0) {
-    /* A word landed; fall away from it until the next one. */
-    const since = Date.now() - spokenAt
-    return Math.max(0.12, spoken * Math.max(0, 1 - since / 260))
-  }
-  /* No boundary events in this browser. A swell, so the panel says it is
-     talking without claiming to know how loudly. */
-  return 0.35 + 0.2 * Math.sin(Date.now() / 190)
+  if (state !== 'playing' || boundaries === 0) return 0
+  /* A word landed. Fall away from it until the next one, so the shape follows
+     the pace of the sentence: quick words crowd together, a pause flattens. */
+  const since = Date.now() - spokenAt
+  return Math.max(0, spoken * Math.max(0, 1 - since / 320))
+}
+
+/** Whether anything real is being measured right now, so the panel can say so
+ *  rather than drawing a flat line that looks like a fault. */
+export function speakingMeasured(): boolean {
+  return !!(analyser && buf) || (state === 'playing' && boundaries > 0)
 }
 
 /* Tap the audio element so the bars are the actual voice. Once a media element
@@ -232,10 +246,20 @@ async function fetchGemini(text: string, key: string): Promise<Blob | null> {
    coin flip on a joke voice. Only a named preference is safe, and when none of
    them is installed it is better to leave the voice unset and let the OS decide
    than to read the brief in Boing. */
+/* LOCAL VOICES FIRST, and this is not a taste call.
+
+   Chrome fires no `onboundary` events for a REMOTE voice, and "Google US
+   English" is remote. It used to sit at the top of this list, which meant the
+   app chose the one voice that reports nothing about its own progress, and the
+   waveform had no signal to draw. A local voice tells us when each word
+   starts, so the bars move with the speech instead of with a timer.
+
+   Google US English is still here, at the bottom, for a machine with no local
+   voice at all: a good voice with a still waveform beats no voice. */
 const GOOD = [
-  'Google US English',            // Chrome's remote voice, the best of these
   'Samantha', 'Alex', 'Ava', 'Allison', 'Susan', 'Tom',
   'Microsoft Aria', 'Microsoft Jenny', 'Microsoft Guy',
+  'Google US English',
 ]
 /* Named, not pattern-matched: these are jokes, not accents. */
 const NOVELTY = /^(Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Deranged|Good News|Hysterical|Jester|Junior|Kathy|Organ|Princess|Ralph|Fred|Grandma|Grandpa|Superstar|Trinoids|Whisper|Wobble|Zarvox)\b/i
@@ -264,9 +288,14 @@ function voicesReady(): Promise<SpeechSynthesisVoice[]> {
 }
 
 function pickVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
-  for (const name of GOOD) {
-    const hit = voices.find((v) => v.name === name || v.name.startsWith(`${name} `))
-    if (hit) return hit
+  /* Two passes over the same list: anything local before anything remote, so a
+     named remote voice never beats a named local one. */
+  for (const localOnly of [true, false]) {
+    for (const name of GOOD) {
+      const hit = voices.find((v) =>
+        (v.name === name || v.name.startsWith(`${name} `)) && v.localService === localOnly)
+      if (hit) return hit
+    }
   }
   return voices.find((v) => /^en[-_]US/i.test(v.lang) && !NOVELTY.test(v.name))
     ?? voices.find((v) => /^en[-_]/i.test(v.lang) && !NOVELTY.test(v.name))

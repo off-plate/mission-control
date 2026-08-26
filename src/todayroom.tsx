@@ -179,7 +179,7 @@ export function TodayRoom() {
 
       {/* ---- the figures ---- */}
       <section className="troom-hero">
-        <div className="tr-card tr-clock">
+        <div className="tr-card tr-card--ink tr-clock">
           <div>
             <p className="tr-l">Left of today</p>
             <div className="tr-n tr-count">
@@ -194,20 +194,20 @@ export function TodayRoom() {
             <div className="tr-n tr-nowt">{now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</div>
           </div>
         </div>
-        <div className="tr-card tr-tile">
+        <div className="tr-card tr-card--hover tr-tile">
           <p className="tr-l">{now.toLocaleDateString('en-GB', { weekday: 'long' })}</p>
           <div className="tr-n">{now.getDate()}<span className="tr-mo">{now.toLocaleDateString('en-GB', { month: 'short' })}</span></div>
         </div>
-        <div className="tr-card tr-tile">
+        <div className="tr-card tr-card--hover tr-tile">
           <p className="tr-l">Week</p>
           <div className="tr-n">{isoWeek(now)}</div>
         </div>
-        <div className="tr-card tr-tile is-hot">
+        <div className="tr-card tr-card--hover tr-tile is-hot">
           <p className="tr-l">Day gone</p>
           <div className="tr-n">{pct}%</div>
           <div className="tr-bar"><i style={{ width: `${pct}%` }} /></div>
         </div>
-        <div className="tr-card tr-tile is-hot">
+        <div className="tr-card tr-card--hover tr-tile is-hot">
           <p className="tr-l">Phase</p>
           <div className="tr-n tr-phase">{phase.label}</div>
         </div>
@@ -245,7 +245,7 @@ export function TodayRoom() {
           <p className="tr-nextt">{shortTitle(firstMove.title)}</p>
           <div className="tr-chips">
             <span className="tr-chip">{ageDays(firstMove)} days</span>
-            <button className="tr-start" onClick={() => start(firstMove)}>Start</button>
+            <button className="tr-start" onClick={() => start(firstMove)}><span>Start</span></button>
           </div>
         </section>
       )}
@@ -308,7 +308,7 @@ export function TodayRoom() {
             {Array.from({ length: Math.min(Math.max(due, 1), 24) }, (_, i) => <i key={i} className={i < kept ? 'is-on' : ''} />)}
           </div>
         </div>
-        <div className="tr-card tr-stat" data-stat="finished">
+        <div className="tr-card tr-card--lime tr-stat" data-stat="finished">
           <p className="tr-l k">Finished</p>
           <div className="tr-n v">{finished}</div>
           <div className="tr-bar"><i style={{ width: `${Math.min(100, finished * 20)}%` }} /></div>

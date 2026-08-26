@@ -189,18 +189,43 @@ function resolveNote(a: Row, b: Row): Row {
  *  the ticks it was counted from are still right there in habitLog. The side
  *  that has sealed more weeks knows more, whichever side saved last, and the
  *  week strip is the union: a day either side saw kept, was kept. */
-function resolveHabit(win: Row, lose: Row): Row {
+function resolveHabit(win: Row, lose: Row, buried?: Set<string>): Row {
   const out = { ...win }
   const wh = Array.isArray(win.history) ? (win.history as number[]) : []
   const lh = Array.isArray(lose.history) ? (lose.history as number[]) : []
   if (lh.length > wh.length) out.history = lh
   const wd = Array.isArray(win.days) ? (win.days as boolean[]) : []
   const ld = Array.isArray(lose.days) ? (lose.days as boolean[]) : []
-  if (wd.length === 7 && ld.length === 7) out.days = wd.map((v, i) => v || ld[i])
+  /* `days` is a seven-day CACHE of habitLog, and the union below is why an
+     untick would not stick: whichever side still held the day kept handing it
+     back, so unticking could never win no matter which device saved last.
+
+     The union still earns its place. A device that slept through a day would
+     otherwise drop a tick it never saw. So the union stands EXCEPT where the
+     day has been buried: a tombstone is him saying "I did not do this", which
+     is a fact, and it outranks a stale cache on the other side. */
+  if (wd.length === 7 && ld.length === 7) {
+    out.days = wd.map((v, i) => {
+      if (v) return true
+      if (!ld[i]) return false
+      const day = dayOfWeekKeyFor(i)
+      return buried?.has(`habitLog:${String(win.id)}|${day}|`) ? false : true
+    })
+  }
   return out
 }
 
-const RESOLVE: Record<string, (a: Row, b: Row) => Row> = { notes: resolveNote, habits: resolveHabit }
+/** Mon=0..Sun=6 to the date of that day in the current ISO week, matching the
+ *  key habitLog rows are written under. Kept here rather than imported so this
+ *  file stays free of app state and can be tested on its own. */
+function dayOfWeekKeyFor(i: number, now = new Date()): string {
+  const d = new Date(now)
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + i)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
+const RESOLVE: Record<string, (a: Row, b: Row, buried?: Set<string>) => Row> = { notes: resolveNote, habits: resolveHabit }
 
 /** The key a row is buried under, so the store can bury or dig up the same
  *  thing this file will look for. */
@@ -254,7 +279,7 @@ export function mergeStates(a: string, b: string): string {
         if (buried.has(k)) continue
         const have = seen.get(k)
         if (!have) seen.set(k, row)
-        else if (resolve) seen.set(k, resolve(have, row))
+        else if (resolve) seen.set(k, resolve(have, row, buried))
       }
       out[field] = [...seen.values()]
     }

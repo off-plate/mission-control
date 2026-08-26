@@ -1638,9 +1638,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
      not happened yet. Anything that talks about a specific day goes through
      here; the index version below is a thin wrapper for the week strip. */
   const markDayOn = (habitId: string, day: string, value: boolean) => {
+    const gone = habitLog.filter((t) => t.habitId === habitId && t.day === day)
     const without = habitLog.filter((t) => !(t.habitId === habitId && t.day === day))
     const next = value ? [...without, { habitId, day, at: day === todayKey() ? new Date().toISOString() : undefined }] : without
     setHabitLog(next)
+    /* UNTICKING HAS TO SURVIVE A SYNC.
+
+       His report: untick a habit, reload, and it is ticked again. Removing the
+       row from habitLog was never enough, because the merge unites the two
+       sides' logs by row identity: the other device still holds the row, so the
+       union hands it straight back. Every other removal in this file buries its
+       key for exactly this reason, and this one did not.
+
+       A tick digs the key back up, because a tombstone the other device still
+       holds would otherwise re-bury a habit he has just done again. */
+    if (value) {
+      digUp(rowKey('habitLog', { habitId, day }))
+    } else if (gone.length) {
+      bury(...gone.map((t) => rowKey('habitLog', { habitId, day: t.day, src: t.src })))
+    }
     /* days[] is a cache of THIS week only. A day outside it has no cell, and
        writing one would put the mark on the wrong square. */
     if (dayOfWeekKey(dayIndexOf(day)) === day) {

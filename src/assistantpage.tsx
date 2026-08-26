@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from './store'
-import { useCalendar } from './calendar'
+import { isMeeting, useCalendar } from './calendar'
 import { SpaceMark } from './ui'
 import { SPACE_LABELS } from './mock'
 import { ask, STARTERS, type Action, type Brief, type Card, type CardKind, type Reply } from './assistant'
@@ -91,10 +91,14 @@ function useBrief(): Brief {
     const visible = habits.filter((h) => !h.archivedAt)
     const { due, kept } = habitsDueToday(visible, routines, habitLog, todayIndex)
     const open = visible.filter((h) => dueOn(h, todayIndex, habitLog) && !h.days[todayIndex] && !h.folderId).map((h) => h.name)
-    const meetings = cal.status === 'ok'
-      ? cal.events.filter((e) => e.day === day && e.start !== null)
-        .map((e) => ({ at: `${String(Math.floor((e.start as number) / 60)).padStart(2, '0')}:${String((e.start as number) % 60).padStart(2, '0')}`, title: e.title }))
-      : []
+    /* Split, not lumped. isMeeting() reads the guest list rather than the
+       title, so an hour he blocked for himself stops being reported as a
+       meeting he has to attend. */
+    const timed = cal.status === 'ok' ? cal.events.filter((e) => e.day === day && e.start !== null) : []
+    const at = (e: { start: number | null }) =>
+      `${String(Math.floor((e.start as number) / 60)).padStart(2, '0')}:${String((e.start as number) % 60).padStart(2, '0')}`
+    const meetings = timed.filter(isMeeting).map((e) => ({ at: at(e), title: e.title }))
+    const blocks = timed.filter((e) => !isMeeting(e)).map((e) => ({ at: at(e), title: e.title }))
     return {
       now: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
       weekday: dayLabel(),
@@ -104,6 +108,7 @@ function useBrief(): Brief {
       oldest: [...backlog].sort((a, b) => age(b) - age(a)).slice(0, 3).map((t) => ({ title: t.title, days: age(t), space: label(t.space) })),
       habits: { due, kept, open: open.slice(0, 6) },
       meetings,
+      blocks,
       focusToday: focusSessions.filter((f) => f.day === day).reduce((a, f) => a + f.minutes, 0),
       /* NOT `plannedOn === yesterday`. The rollover has already swept these
          into the backlog and cleared plannedOn by the time this runs, so that

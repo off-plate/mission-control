@@ -129,7 +129,11 @@ export interface Brief {
   backlog: { title: string; space: string }[]
   oldest: { title: string; days: number; space: string }[]
   habits: { due: number; kept: number; open: string[] }
+  /* Other people are in these. */
   meetings: { at: string; title: string }[]
+  /* Hours he gave himself: focus, the gym, the timesheet. Time already spent,
+     not time owed to anyone. */
+  blocks: { at: string; title: string }[]
   focusToday: number
   goals: { name: string; pct: number }[]
   /* Planned for yesterday and never ticked. The morning brief walks these and
@@ -232,6 +236,18 @@ a description of it. "add" carries HIS words for the new task, off the message
 he just typed, and nothing invented around them. Leave "min" out unless he gave
 a number: a made-up estimate is a made-up number.
 
+A MEETING AND A BLOCK ARE NOT THE SAME THING, and the briefing marks which is
+which. A meeting has other people in it and he has to turn up. A block is an
+hour he gave HIMSELF: focus, the gym, the timesheet, clearing the inbox.
+
+Never call a block a meeting. "Your morning is full of meetings" about a day
+holding a focus session, the gym and a timesheet is wrong about his life, and
+it is the difference between a day that looks stolen and a day he planned.
+
+Count them differently too. Blocks are the day already working: if he protected
+two hours this morning, that is where the first task goes, not somewhere around
+it. Meetings are the walls to fit the rest between.
+
 Only act when he asked for a change. A question is a question.
 
 THE MORNING BRIEF is the one answer allowed to be longer. It is still ONE JSON
@@ -306,7 +322,8 @@ export function briefText(b: Brief): string {
     b.backlog.length ? `On the list:\n${b.backlog.map((t) => `- [${t.space}] ${t.title}`).join('\n')}` : '',
     b.oldest.length ? `Oldest untouched: ${b.oldest.map((o) => `[${o.space}] ${o.title} (${o.days}d)`).join('; ')}` : 'Nothing is ageing badly',
     `Habits today: ${b.habits.kept} of ${b.habits.due} kept${b.habits.open.length ? `, still open: ${b.habits.open.join('; ')}` : ''}`,
-    b.meetings.length ? `Meetings: ${b.meetings.map((m) => `${m.at} ${m.title}`).join('; ')}` : 'No meetings in the calendar',
+    b.meetings.length ? `Meetings, other people are in these: ${b.meetings.map((m) => `${m.at} ${m.title}`).join('; ')}` : 'No meetings in the calendar',
+    b.blocks.length ? `Blocked out for himself, nobody else invited: ${b.blocks.map((m) => `${m.at} ${m.title}`).join('; ')}` : '',
     `Focus logged today: ${b.focusToday} minutes`,
     b.unfinishedYesterday.length
       ? `LEFT OVER FROM YESTERDAY, still not done:\n${b.unfinishedYesterday.map((t) => `- [${t.space}] ${t.title}`).join('\n')}`

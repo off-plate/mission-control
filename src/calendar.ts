@@ -24,6 +24,7 @@ import { useCallback, useSyncExternalStore } from 'react'
 import { SUPABASE_ENABLED, callFunction } from './supabase'
 import { localDateKey } from './util'
 import type { CalEvent } from './ical'
+export { isMeeting } from './calkind'
 
 export type CalState =
   | { status: 'off' }

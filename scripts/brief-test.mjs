@@ -73,6 +73,7 @@ await page.evaluate(() => {
     { id: 't1', title: 'Draft the Blastburn quote', list: 'today', plannedOn: p(new Date()), slot: 'morning', space: 'work', createdAt: p(new Date()) },
   ]
   s.plan = { ...(s.plan || {}), returnedOn: p(new Date()), returnedIds: ['y1'], returnedCount: 1 }
+
   /* Mark the rollover as already run today, or it runs on mount and rebuilds
      plan from scratch, leaving the fixture at the mercy of what it decides. */
   s.lastRollDay = p(new Date())
@@ -162,6 +163,19 @@ ok("today's own work is not raised as a leftover",
    !!leftovers && !leftovers.includes('Blastburn'), JSON.stringify(leftovers ?? 'section missing'))
 ok("the briefing still carries today's plan",
    briefing.includes('Draft the Blastburn quote'), briefing.includes('Blastburn') ? 'present' : 'MISSING')
+/* The split itself is unit-tested in scripts/calkind-test.ts: the calendar
+   needs a signed-in account this browser test does not have, and a fixture in
+   localStorage does not survive, because a signed-out answer deliberately
+   drops the cached calendar. What is checked HERE is that the briefing keeps
+   the two apart and that the prompt knows the difference. */
+ok('the briefing labels meetings as having other people in them',
+   briefing.includes('Meetings, other people are in these') || briefing.includes('No meetings in the calendar'),
+   JSON.stringify((briefing.match(/(Meetings[^\n]*|No meetings[^\n]*)/) ?? ['none'])[0]))
+ok('the prompt says a block is not a meeting',
+   system.includes('A MEETING AND A BLOCK ARE NOT THE SAME THING'))
+ok('and says what to do with each',
+   system.includes('Blocks are the day already working') && system.includes('Meetings are the walls'))
+
 ok('the prompt tells it to take a position, not to recite',
    system.includes('YOU ARE HIS CHIEF OF STAFF') && system.includes('THE MORNING BRIEF'))
 /* [Michael's Corner] leaked into the prose of a real answer: "start with

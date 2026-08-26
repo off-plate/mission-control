@@ -751,7 +751,9 @@ await step('goals: a promised task ticks from the plan', async () => {
   await page.getByRole('textbox', { name: 'New task' }).fill('Gate promise')
   await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(300)
   await page.goto(`${URL}#/goals`); await page.waitForTimeout(500)
-  const col = page.locator('.goal-col', { hasText: 'This month' }).first()
+  /* The period container is `.goal-band` since the ladder replaced the four
+     cards. Same fact asserted, same rows, new container name. */
+  const col = page.locator('.goal-band', { hasText: 'This month' }).first()
   await col.locator('.ptask-add').click(); await page.waitForTimeout(200)
   await col.locator('.ptask-offer-row', { hasText: 'Gate promise' }).click(); await page.waitForTimeout(300)
   await page.goto(`${URL}#/plan`); await page.waitForTimeout(500)
@@ -760,7 +762,7 @@ await step('goals: a promised task ticks from the plan', async () => {
   await page.locator('.today-task', { hasText: 'Gate promise' }).locator('.checkbox').click()
   await page.locator('.actual-chip').first().click(); await page.waitForTimeout(400)
   await page.goto(`${URL}#/goals`); await page.waitForTimeout(500)
-  const row = page.locator('.goal-col', { hasText: 'This month' }).first().locator('.ptask', { hasText: 'Gate promise' })
+  const row = page.locator('.goal-band', { hasText: 'This month' }).first().locator('.ptask', { hasText: 'Gate promise' })
   if (!(await row.count()) || !(await row.evaluate((el) => el.classList.contains('done')))) throw new Error('promise not marked done')
 })
 await step('habits: a routine is a folder, and its habits tick on their own', async () => {

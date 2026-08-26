@@ -2860,107 +2860,119 @@ export function GoalsPage() {
 
       <LeftBehind />
 
-      <div className="grid-2 goal-cols">
+      {/* THE LADDER, his pick from the redesign artifact on 2026-08-26.
+
+          The four stretches were four cards, each holding whatever it held and
+          each drawing its own header, so no two lines ever aligned and three of
+          them were usually empty. They are BANDS now, week at the top through
+          half year at the bottom, and a goal is a ROW in one shared grid. That
+          is the actual fix for the misalignment he reported: alignment is
+          structural rather than something to keep tidying by hand.
+
+          Everything the cards carried is still here. A row keeps the space
+          mark, the category dot, the pace badge and the menu; the why, the
+          habit link, the milestones and the manual logger drop to a second line
+          under the row that only exists when there is something to put in it. */}
+      <div className="goal-ladder">
         {GOAL_TIMEFRAMES.map((tfr) => {
           const off = tfr.id === 'half' ? 0 : (offsets[tfr.id] ?? 0)
           const shownKey = shiftPeriodKey(tfr.id as GoalTf, off)
-          /* At zero this is exactly the open goals of the running period. Away
-             from zero it is that period's own rows, closed ones included: a
-             finished week shows what it finished on. */
           const inTf = all.filter((g) => (g.timeframe ?? 'quarter') === tfr.id
             && (g.periodKey ?? goalPeriodKey(tfr.id as GoalTf)) === shownKey)
+          const reached = inTf.filter((g) => (g.closed ? g.closed.final : nowOf(g)) >= g.target).length
           return (
-            <div className="panel goal-col" key={tfr.id}>
-              <div className="col-head">
+            <section className="goal-band" key={tfr.id}>
+              <header className="gb-head">
                 {/* Paged away from now, "This week" would be a lie over last
                     week's dates. The label follows the period being shown. */}
-                <span className="microcap">
+                <h2 className="gb-name">
                   {off === 0 ? tfr.label : `${off < 0 ? 'An earlier' : 'A coming'} ${tfr.id === 'weekly' ? 'week' : tfr.id === 'monthly' ? 'month' : 'quarter'}`}
-                </span>
-                <span className="col-tot mono">{periodLabel(tfr.id as GoalTf, shownKey)}</span>
+                </h2>
+                <span className="gb-range">{periodLabel(tfr.id as GoalTf, shownKey)}</span>
+                {inTf.length > 0 && (
+                  <span className="gb-tally">{reached}<i>/{inTf.length}</i> reached</span>
+                )}
                 {tfr.id !== 'half' && (
-                  <span className="goal-nav">
+                  <span className="gb-nav">
                     <button className="goal-nav-btn" aria-label={`Earlier ${tfr.label.toLowerCase()}`} onClick={() => shift(tfr.id, -1)}>‹</button>
                     {off !== 0 && <button className="goal-nav-btn now" onClick={() => setOffsets((o) => ({ ...o, [tfr.id]: 0 }))}>now</button>}
                     <button className="goal-nav-btn" aria-label={`Later ${tfr.label.toLowerCase()}`} onClick={() => shift(tfr.id, 1)}>›</button>
                   </span>
                 )}
-              </div>
-              {inTf.length === 0 && off !== 0 && (
-                <div className="empty">{off < 0 ? 'No goals were set for this one.' : 'Nothing planned here yet.'}</div>
+              </header>
+
+              {inTf.length === 0 && (
+                <p className="gb-none">
+                  {off < 0 ? 'No goals were set for this one.'
+                    : off > 0 ? 'Nothing planned here yet.'
+                      : 'Nothing set for this stretch.'}
+                </p>
               )}
+
               {inTf.map((g) => {
-                // Habit-linked goals count themselves; the rest hold their own number.
                 const current = nowOf(g)
                 const fromHabit = habits.find((h) => h.id === g.habitId)
                 const pct = Math.min(100, Math.round((current / g.target) * 100))
-                // A habit-linked goal that is not fed by hours counts DAYS,
-                // and a day can only ever be earned once.
                 const dailyCap = !!fromHabit && !isTimeFed(fromHabit)
                 const status = goalPace(current, g.target, g.timeframe ?? 'quarter', new Date(), dailyCap)
                 const milestoneDriven = !!g.milestones?.length && g.target === g.milestones.length
-                /* A future period has no pace to be behind on, and a closed one
-                   is a result, not a race. Only the running period gets judged. */
                 const statusLabel = off > 0 ? 'planned'
                   : g.closed ? (g.closed.final >= g.target ? 'reached' : `ended at ${fmtNum(g.closed.final)}`)
                     : status === 'done' ? 'reached' : status === 'behind' ? 'needs a push' : 'on pace'
+                const hasDetail = !!g.why || !!fromHabit || !!g.deadline || !!(g.milestones && g.milestones.length)
                 return (
-                  <div className="goal-card v2" key={g.id}>
-                    <div className="goal-line">
-                      <SpaceMark space={g.space} />
-                      <span className={`cat-dot goalcat-${g.category ?? 'life'}`} aria-hidden="true" />
-                      <span className="grow goal-obj">{g.name}</span>
+                  <div className="goal-item" key={g.id}>
+                    <div className="goal-row">
+                      <span className="gr-name">
+                        <SpaceMark space={g.space} />
+                        <span className={`cat-dot goalcat-${g.category ?? 'life'}`} aria-hidden="true" />
+                        <span className="gr-obj">{g.name}</span>
+                      </span>
+                      <span className="gr-count mono">{fmtNum(current)}<i>/{fmtNum(g.target)}</i></span>
+                      <span className={`bar prog${status === 'behind' ? ' warn' : ''}`}><i style={{ width: `${pct}%` }} /></span>
+                      <span className="gr-pct">{pct}<i>%</i></span>
                       <span className={`goal-status s-${status}`}>{statusLabel}</span>
+                      {!milestoneDriven && !g.habitId ? (
+                        <span className="goal-bump" role="group" aria-label={`Log progress for ${g.name}`}>
+                          <button onClick={() => bumpGoal(g.id, -1)} disabled={current <= 0} aria-label="Less">−</button>
+                          <button onClick={() => bumpGoal(g.id, 1)} disabled={current >= g.target} aria-label="More">+</button>
+                        </span>
+                      ) : <span />}
                       <Dropdown label={`Options for ${g.name}`}>
                         <button role="menuitem" onClick={() => setEditing(g)}>Edit this goal</button>
                         <button role="menuitem" className="danger" onClick={() => deleteGoal(g.id)}>Delete this goal</button>
                       </Dropdown>
                     </div>
-                    {g.why && <p className="goal-why">{g.why}</p>}
-                    <div className={`bar prog${status === 'behind' ? ' warn' : ''}`}><i style={{ width: `${pct}%` }} /></div>
-                    <div className="goal-measure">
-                      <span className="mono meas">{fmtNum(current)} / {fmtNum(g.target)} {g.unit}</span>
-                      <span className="mono pct">{pct}%</span>
-                      {g.deadline && <span className="goal-deadline">by {/^\d{4}-\d{2}-\d{2}$/.test(g.deadline) ? fmtWhen(g.deadline) : g.deadline}</span>}
-                    </div>
-                    {fromHabit && (
-                      <p className="goal-linked">Counts itself from the “{fromHabit.name}” habit.</p>
-                    )}
-                    {g.milestones && g.milestones.length > 0 && (
-                      <ul className="goal-ms">
-                        {g.milestones.map((m) => (
-                          <li className={`goal-ms-item${m.done ? ' done' : ''}`} key={m.id}>
-                            <button
-                              className="goal-ms-check"
-                              role="checkbox"
-                              aria-checked={m.done}
-                              aria-label={`${m.label}, ${m.done ? 'done' : 'not done'}`}
-                              onClick={() => toggleGoalMilestone(g.id, m.id)}
-                            >
-                              {m.done && <Icon.Check size={10} strokeWidth={4.4} />}
-                            </button>
-                            <span>{m.label}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {/* Goals measured in their own milestones advance by ticking those;
-                        anything counted in other units gets a manual logger. */}
-                    {!milestoneDriven && !g.habitId && (
-                      <div className="goal-actions">
-                        <span className="goal-bump" role="group" aria-label={`Log progress for ${g.name}`}>
-                          <button onClick={() => bumpGoal(g.id, -1)} disabled={current <= 0} aria-label="Less">−</button>
-                          <span className="mono">log</span>
-                          <button onClick={() => bumpGoal(g.id, 1)} disabled={current >= g.target} aria-label="More">+</button>
-                        </span>
+                    {hasDetail && (
+                      <div className="goal-detail">
+                        {g.why && <p className="goal-why">{g.why}</p>}
+                        {fromHabit && <p className="goal-linked">Counts itself from the “{fromHabit.name}” habit.</p>}
+                        {g.deadline && <p className="goal-deadline">by {/^\d{4}-\d{2}-\d{2}$/.test(g.deadline) ? fmtWhen(g.deadline) : g.deadline}</p>}
+                        {g.milestones && g.milestones.length > 0 && (
+                          <ul className="goal-ms">
+                            {g.milestones.map((m) => (
+                              <li className={`goal-ms-item${m.done ? ' done' : ''}`} key={m.id}>
+                                <button
+                                  className="goal-ms-check"
+                                  role="checkbox"
+                                  aria-checked={m.done}
+                                  aria-label={`${m.label}, ${m.done ? 'done' : 'not done'}`}
+                                  onClick={() => toggleGoalMilestone(g.id, m.id)}
+                                >
+                                  {m.done && <Icon.Check size={10} strokeWidth={4.4} />}
+                                </button>
+                                <span>{m.label}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                       </div>
                     )}
                   </div>
                 )
               })}
-              {inTf.length === 0 && <p className="empty is-boxed">No goals here yet.</p>}
               <PeriodTasks tf={tfr.id} periodKey={shownKey} />
-            </div>
+            </section>
           )
         })}
       </div>

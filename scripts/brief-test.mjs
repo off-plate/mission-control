@@ -10,7 +10,7 @@ const URL = process.argv[2] || 'http://localhost:4191/mission-control'
 const fails = []
 const ok = (n, c, d = '') => { console.log(`${c ? 'PASS' : 'FAIL'}  ${n}${d ? '  (' + d + ')' : ''}`); if (!c) fails.push(n) }
 
-const REPLY = { say: 'Morning Michael. Start with the VZP letter.', show: [{ kind: 'today' }, { kind: 'backlog' }], next: ['Put it on the morning'] }
+const REPLY = { say: 'Morning, Michael. It is overcast and 7 out.\n\nStart with the VZP letter.', show: [{ kind: 'today' }, { kind: 'backlog' }], next: ['Put it on the morning'] }
 const b = await chromium.launch()
 const page = await b.newPage()
 let sent = null
@@ -87,12 +87,22 @@ ok('it reads Morning brief', (await brief.textContent())?.includes('Morning brie
 await brief.click()
 await page.waitForSelector('.as-turn.is-it .as-said', { timeout: 15000 })
 
+const msgs = JSON.parse(sent ?? '{}').messages ?? []
 ok('it opened voice mode rather than the text box', await page.locator('.as-voice').count() === 1)
-ok('the question was asked for him, in the thread',
-   (await page.locator('.as-turn.is-you .as-said').first().textContent())?.includes('morning brief'),
-   await page.locator('.as-turn.is-you .as-said').first().textContent())
+/* The thread shows the SKILL, not the paragraph the button sends on his behalf.
+   Seeing "Give me my morning brief. What is it like out, what is on today, and
+   what did I not finish yesterday?" in his own bubble is seeing the wiring. */
+const asked = await page.locator('.as-turn.is-you .as-said').first().textContent()
+ok('his turn reads as the skill he pressed', asked?.trim() === 'Morning brief', JSON.stringify(asked))
+ok('the engineered prompt is not shown to him', !asked?.includes('What is it like out'), JSON.stringify(asked))
+ok('but the model was still asked the whole question',
+   (msgs.at(-1)?.content ?? '').includes('what did I not finish yesterday'),
+   JSON.stringify((msgs.at(-1)?.content ?? '').slice(0, 60)))
 ok('the answer is in the thread as text',
    (await page.locator('.as-turn.is-it .as-said').first().textContent())?.includes('VZP'))
+ok('the beats are kept apart rather than run together',
+   await page.evaluate(() => getComputedStyle(document.querySelector('.as-turn.is-it .as-said')).whiteSpace === 'pre-line'),
+   await page.evaluate(() => getComputedStyle(document.querySelector('.as-turn.is-it .as-said')).whiteSpace))
 await page.waitForFunction(() => window.__spoken.length > 0, null, { timeout: 8000 }).catch(() => {})
 ok('and it is read out loud', (await page.evaluate(() => window.__spoken)).length === 1,
    JSON.stringify(await page.evaluate(() => window.__spoken)).slice(0, 60))
@@ -102,7 +112,6 @@ ok('and it is read out loud', (await page.evaluate(() => window.__spoken)).lengt
 /* Parse the request rather than pattern-matching it. The body is JSON, so its
    newlines are escaped, and a regex written against real newlines silently
    matches nothing and reports the section missing when it is right there. */
-const msgs = JSON.parse(sent ?? '{}').messages ?? []
 /* Match the briefing's own opening line. Searching for the word "briefing"
    alone returns the system prompt, which uses the word too, and then every
    assertion below reports the data missing while it is sitting right there. */
@@ -120,6 +129,14 @@ ok("the briefing still carries today's plan",
    briefing.includes('Draft the Blastburn quote'), briefing.includes('Blastburn') ? 'present' : 'MISSING')
 ok('the prompt tells it to take a position, not to recite',
    system.includes('YOU ARE HIS CHIEF OF STAFF') && system.includes('THE MORNING BRIEF'))
+/* [Michael's Corner] leaked into the prose of a real answer: "start with
+   [Michael's Corner] Build a SoMe post generator". The tags are plumbing so the
+   model can tell the workspaces apart, and reading one aloud is reading a
+   database row. */
+ok('the prompt forbids reading a workspace tag out loud',
+   system.includes('NEVER WRITE A WORKSPACE TAG'))
+ok('the brief is specified as separate beats, not one paragraph',
+   system.includes('SHORT LINES SEPARATED BY BLANK LINES'))
 ok('naming one task is now allowed, counts still are not',
    system.includes('YOU MUST NOT STATE COUNTS') && system.includes('TITLES ARE DIFFERENT'))
 

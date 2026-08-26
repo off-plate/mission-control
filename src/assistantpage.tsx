@@ -13,7 +13,7 @@ import {
   enter as enterVoice, exit as exitVoice, subscribe as subscribeVoice,
   voiceHeard, voiceLevel, voiceModeAvailable, voicePhase,
 } from './voicemode'
-import { getWeather, weatherLine } from './weather'
+import { getWeather, weatherLine, type Weather } from './weather'
 import { SLOTS, dueOn, habitsDueToday, goalCurrent, type HabitDef, type PageId, type SpaceId, type Task } from './types'
 import { localDateKey, fmtDuration, goalPeriodKey, goalPeriodRange, type GoalTf } from './util'
 import * as Icon from './icons'
@@ -172,8 +172,10 @@ function Tick() {
   )
 }
 
-/* Where the whole of a card lives, for when only the head of it is shown. */
-const MORE_IN: Record<CardKind, [PageId, string]> = {
+/* Where the whole of a card lives, for when only the head of it is shown.
+   Partial: the weather card has no page behind it and never truncates, so
+   there is nowhere for it to send him and nothing to send him for. */
+const MORE_IN: Partial<Record<CardKind, [PageId, string]>> = {
   today: ['today', 'Today'], backlog: ['plan', 'Plan'], habits: ['habits', 'Habits'],
   calendar: ['calendar', 'Calendar'], goals: ['goals', 'Goals'], focus: ['focus', 'Focus'],
   stale: ['plan', 'Plan'],
@@ -184,15 +186,79 @@ const MORE_IN: Record<CardKind, [PageId, string]> = {
  *  the sentence that introduced them off the top of the screen. */
 function More({ n, kind }: { n: number; kind: CardKind }) {
   const { setPage } = useStore()
-  const [page, name] = MORE_IN[kind]
-  if (n <= 0) return null
+  const where = MORE_IN[kind]
+  if (n <= 0 || !where) return null
+  const [page, name] = where
   return <button className="as-more" onClick={() => setPage(page)}>{n} more in {name}</button>
+}
+
+/* Prague, drawn rather than described.
+
+   The brief used to read the figures out in a sentence, which is the one thing
+   a screen is better at than a voice. So the sky gets a card and the sentence
+   gets to be a remark: "take a coat" is worth saying, "16 degrees and overcast"
+   is already on the wall behind it.
+
+   Every number here is the app's own fetch. The model never touches this. */
+function glyphFor(code: number): (p: Icon.IconProps) => JSX.Element {
+  if (code === 0) return Icon.Sun
+  if (code <= 2) return Icon.CloudSun
+  if (code === 3) return Icon.Cloud
+  if (code <= 48) return Icon.Fog
+  if (code <= 67) return Icon.Rain
+  if (code <= 77) return Icon.Snow
+  if (code <= 86) return Icon.Rain
+  return Icon.Storm
+}
+
+function WeatherCard(): JSX.Element {
+  const [w, setW] = useState<Weather | null>(null)
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    let live = true
+    void getWeather().then((got) => { if (!live) return; if (got) setW(got); else setFailed(true) })
+    return () => { live = false }
+  }, [])
+  if (failed) return <p className="as-empty">Could not reach the forecast.</p>
+  if (!w) return <p className="as-empty">Looking outside…</p>
+  const Now = glyphFor(w.code)
+  return (
+    <div className="wx">
+      <div className="wx-now">
+        <Now size={44} strokeWidth={1.5} />
+        <span className="wx-temp mono">{w.nowC}<span className="wx-deg">°C</span></span>
+        <span className="wx-meta">
+          <span className="wx-sky">{w.sky[0].toUpperCase() + w.sky.slice(1)}</span>
+          <span className="wx-hilo mono">{w.highC}° / {w.lowC}°{w.rainPct > 0 ? ` · ${w.rainPct}% rain` : ''}</span>
+        </span>
+      </div>
+      {w.hours.length ? (
+        /* Scrolls on its own rather than squeezing: eight hours at a readable
+           size beats twelve at an unreadable one. */
+        <div className="wx-hours">
+          {w.hours.map((h) => {
+            const G = glyphFor(h.code)
+            return (
+              <div className="wx-hour" key={h.at}>
+                <span className="wx-at mono">{h.at}</span>
+                <G size={20} strokeWidth={1.6} />
+                <span className={`wx-rain mono${h.rainPct >= 30 ? ' is-wet' : ''}`}>{h.rainPct}%</span>
+                <span className="wx-h-temp mono">{h.tempC}°</span>
+              </div>
+            )
+          })}
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 function CardBody({ kind, limit }: { kind: CardKind; limit?: number }) {
   const { tasks, habits, habitLog, focusSessions, goals, todayIndex, setPage, toggleTask, toggleHabitDay } = useStore()
   const { state: cal } = useCalendar()
   const day = localDateKey()
+
+  if (kind === 'weather') return <WeatherCard />
 
   if (kind === 'today' || kind === 'stale') {
     const all = kind === 'today'
@@ -334,6 +400,7 @@ function CardBody({ kind, limit }: { kind: CardKind; limit?: number }) {
 const TITLES: Record<CardKind, string> = {
   today: 'On the day', backlog: 'The list', habits: 'Habits today',
   calendar: 'Calendar', goals: 'Goals', focus: 'Focus', stale: 'Sitting longest',
+  weather: 'Prague',
 }
 
 /** The canvas. One place, swapped, animated on the swap so the change is
@@ -678,7 +745,12 @@ export function AssistantPage() {
          the outcome and not a prediction of it. */
       const done = out.reply.do?.length ? run(out.reply.do) : undefined
       setTurns((t) => [...t, { who: 'it', text: out.reply.say, reply: out.reply, done }])
-      const kinds = out.reply.show.map((c: Card) => c.kind)
+      let kinds = out.reply.show.map((c: Card) => c.kind)
+      /* The brief ALWAYS draws the sky, whether or not the model remembered to
+         name it. He asked for the weather to be visible, and that is not a
+         thing to leave to whether a sentence came back with the right card in
+         it. The app owns this card's numbers anyway. */
+      if (text === BRIEF_ASK && !kinds.includes('weather')) kinds = ['weather', ...kinds]
       if (kinds.length) setCanvas(kinds.slice(0, 3))
       /* A change he cannot see is a change he will not believe. Anything that
          touched the day puts the day on the canvas unless it named its own. */

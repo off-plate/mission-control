@@ -304,8 +304,15 @@ body:has(.shell.is-hud) { background: var(--bg); }
 
   --alert: var(--a-alert);
   --alert-wash: color-mix(in srgb, var(--alert) 12%, transparent);
-  --progress: var(--a-progress);
-  --progress-wash: color-mix(in srgb, var(--progress) 12%, transparent);
+  /* Green is gone from the interface on his instruction: "still there are
+     existing colours that should have been replaced". `--progress` had 75 uses
+     and patching them one at a time is how the last three rounds went wrong, so
+     it is retargeted here and they all follow. It takes the readable TEXT
+     partner, because this file uses it for text and borders as well as fills;
+     the fills are painted with `--a-accent` by name below, since one token
+     cannot be both a foreground and a background. */
+  --progress: var(--a-accent-text);
+  --progress-wash: var(--a-accent-wash);
 
   /* Semantic layer. Meaning, not decoration:
      accent  = interactive (you can act; also the active space's identity)
@@ -6032,3 +6039,23 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .nt-tool { color: var(--a-ink); }
 .nt-tool:hover { background: var(--a-accent-wash); color: var(--a-accent-text); }
 .nt-tool[aria-pressed="true"] { background: var(--a-accent); color: var(--a-ink); }
+
+/* Everything that FILLS with what used to be green takes the accent, so it also
+   follows the space you are standing in. */
+.bar.prog > i,
+.allclear .dot,
+.status-dot.connected,
+.habit[aria-pressed="true"] .tick,
+.habit-history i.hi,
+.toggle[aria-checked="true"] i,
+.subtask.done .sub-tick,
+.quit-dot.clean,
+.run-dot.on,
+.daydot.full {
+  background: var(--a-accent);
+  border-color: var(--a-accent);
+}
+.drift.ok, .goal-badge.reached, .chip.tone-progress {
+  background: var(--a-accent-wash);
+  color: var(--a-accent-text);
+}

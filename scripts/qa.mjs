@@ -2299,7 +2299,7 @@ await step('assistant: the empty page is a doorway, with none of a chatbot’s f
   const q = await page.locator('.as-hero-q').innerText()
   if (q !== 'What can I help with?') throw new Error(`the question reads "${q}"`)
   const chips = await page.locator('.as-starters .as-chip').count()
-  if (chips !== 6) throw new Error(`${chips} starters, expected 6`)
+  if (chips !== 5) throw new Error(`${chips} starters, expected 5`)
   /* His instruction was, twice over, no voice of any kind, and specifically not
      attach / search / reason / create an image / summarise / translate. Those
      belong to a general chatbot and not one of them is a thing this app does.

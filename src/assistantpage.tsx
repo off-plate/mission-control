@@ -3,7 +3,7 @@ import { useStore } from './store'
 import { isMeeting, useCalendar } from './calendar'
 import { SpaceMark } from './ui'
 import { SPACE_LABELS } from './mock'
-import { ask, STARTERS, type Action, type Brief, type Card, type CardKind, type Reply } from './assistant'
+import { MORNING, SKILLS, ask, type Action, type Brief, type Card, type CardKind, type Reply } from './assistant'
 import { engineName, speakingLevel, speakingMeasured, speechState, stop as stopSpeech, subscribe, toggle } from './speech'
 import {
   cancel as cancelDictation, dictateState, dictationAvailable, dictationEngine,
@@ -72,6 +72,8 @@ function useBrief(): Brief {
   }, [])
   return useMemo(() => {
     const day = localDateKey()
+    const tm = new Date(); tm.setDate(tm.getDate() + 1)
+    const tomorrowKey = localDateKey(tm)
     /* No inView. The briefing is his whole life, because he asked the whole
        life, and a filtered briefing makes the model confident about a day it
        has only seen a third of. */
@@ -115,6 +117,12 @@ function useBrief(): Brief {
          filter finds an empty set every single time and the leftovers never
          reach the model. daily.tsx carries the same warning, having been caught
          by it first. plan.returnedIds is where they went. */
+      tomorrow: tasks
+        .filter((t) => t.list === 'today' && t.plannedOn === tomorrowKey && !t.done)
+        .slice(0, 12).map((t) => ({ title: t.title, space: label(t.space) })),
+      tomorrowMeetings: (cal.status === 'ok'
+        ? cal.events.filter((e) => e.day === tomorrowKey && e.start !== null && isMeeting(e))
+        : []).map((e) => ({ at: at(e), title: e.title })),
       unfinishedYesterday: (plan.returnedOn === day
         ? tasks.filter((t) => new Set(plan.returnedIds ?? []).has(t.id) && !t.done && t.list !== 'today')
         : []
@@ -429,6 +437,118 @@ function Canvas({ kinds }: { kinds: CardKind[] }) {
   )
 }
 
+/* The assistant's mark: a blob that changes shape as it works.
+
+   It replaced a hexagonal reticle, which replaced a blue sphere. His brief for
+   this one: "it should be sort of expanding circle like a blob or something
+   that has different shapes whenever it's being interacted with".
+
+   NOT A MORPH BETWEEN TWO POSES. The outline is generated fresh every frame
+   from a radius that varies around the circle, so it never returns to the same
+   shape twice and never reads as a loop. Three ripples at 2, 3 and 5 lobes,
+   turning at different rates and in different directions, are what stop it
+   settling into a rhythm.
+
+   The points are joined with a closed Catmull-Rom spline converted to cubic
+   Béziers, which is what keeps it liquid: joining them with straight lines, or
+   with arcs, gives a cog rather than a drop of water.
+
+   `state` drives all of it, so the animation IS the status. Idle breathes.
+   Thinking swells and churns, which is the one place motion stands for work
+   rather than for a measurement. Listening and speaking take their amplitude
+   from the real signal, so the blob answers his voice and then its own. */
+export type MarkState = 'idle' | 'thinking' | 'listening' | 'speaking'
+
+/* Base radius, how far the outline strays, and how fast it churns. Idle is
+   almost still on purpose: a mark that writhes while nothing is happening is
+   the same lie as a waveform with no sound behind it. */
+const MOOD: Record<MarkState, { r: number; amp: number; speed: number }> = {
+  idle: { r: 0.56, amp: 0.1, speed: 0.4 },
+  thinking: { r: 0.6, amp: 0.22, speed: 1.8 },
+  listening: { r: 0.58, amp: 0.09, speed: 0.7 },
+  speaking: { r: 0.6, amp: 0.12, speed: 0.9 },
+}
+
+/* Not harmonics of each other, so the lobes never line up into a flower. */
+const RIPPLE = [
+  { lobes: 2, rate: 0.9, phase: 0 },
+  { lobes: 3, rate: -0.61, phase: 2.1 },
+  { lobes: 5, rate: 0.37, phase: 4.3 },
+]
+
+/** A closed outline through points at varying radius, as one smooth path.
+
+    Catmull-Rom to cubic Bézier: each control point is pulled a sixth of the way
+    along the line between its neighbours, which is the standard construction
+    and the reason the curve passes exactly through every point while staying
+    continuous at the joins. */
+function blobPath(t: number, amp: number, radius: number, size: number): string {
+  const c = size / 2
+  const N = 12
+  const pts: [number, number][] = []
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2
+    let r = radius
+    for (const w of RIPPLE) r += amp * Math.sin(w.lobes * a + t * w.rate + w.phase) / w.lobes
+    /* r is a fraction of the RADIUS available, not of the whole box. Times the
+       full size it came out larger than the box and the blob was clipped flat
+       against all four edges. */
+    pts.push([c + Math.cos(a) * r * c, c + Math.sin(a) * r * c])
+  }
+  const at = (i: number): [number, number] => pts[(i + N) % N]
+  let d = `M${at(0)[0].toFixed(2)},${at(0)[1].toFixed(2)}`
+  for (let i = 0; i < N; i++) {
+    const p0 = at(i - 1), p1 = at(i), p2 = at(i + 1), p3 = at(i + 2)
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6]
+    const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6]
+    d += ` C${c1[0].toFixed(2)},${c1[1].toFixed(2)} ${c2[0].toFixed(2)},${c2[1].toFixed(2)} ${p2[0].toFixed(2)},${p2[1].toFixed(2)}`
+  }
+  return `${d}Z`
+}
+
+export function Mark({ state = 'idle', size = 132 }: { state?: MarkState; size?: number }): JSX.Element {
+  const [, bump] = useState(0)
+  const t = useRef(0)
+  const live = useRef(0)
+  useEffect(() => {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
+    let raf = 0
+    let last = performance.now()
+    const tick = (now: number): void => {
+      const dt = Math.min(0.05, (now - last) / 1000)
+      last = now
+      const mood = MOOD[state]
+      t.current += dt * mood.speed * 3
+      /* Listening and speaking borrow the real level, so the blob swells with
+         his voice and then with the answer. Idle and thinking have no signal to
+         borrow and do not pretend to: their motion says "working", not "loud". */
+      const signal = state === 'listening' ? voiceLevel() : state === 'speaking' ? speakingLevel() : 0
+      live.current += (signal - live.current) * 0.15
+      bump((n) => n + 1)
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [state])
+
+  const mood = MOOD[state]
+  const amp = mood.amp + live.current * 0.16
+  const radius = mood.r + live.current * 0.06
+  return (
+    <svg
+      className={`as-mark is-${state}`}
+      width={size} height={size} viewBox={`0 0 ${size} ${size}`}
+      aria-hidden="true"
+    >
+      {/* Three outlines at slightly different times, so the shape trails itself
+          and reads as one soft body rather than a single hard edge. */}
+      <path className="as-mark-far" d={blobPath(t.current - 0.55, amp * 1.12, radius * 1.04, size)} />
+      <path className="as-mark-mid" d={blobPath(t.current - 0.25, amp, radius, size)} />
+      <path className="as-mark-core" d={blobPath(t.current, amp * 0.82, radius * 0.9, size)} />
+    </svg>
+  )
+}
+
 /* The answer, drawn while it is being read.
 
    Voice mode had a waveform and Play did not, and Play is where he hears it
@@ -634,125 +754,6 @@ function Dictate({ base, onText, busy }: { base: string; onText: (t: string) => 
    the microphone is shut, during thinking and speaking, the bars go flat and
    dim, because inventing motion there would be drawing a signal that does not
    exist. */
-/* His words, not a prompt. It is written as he would say it so the answer comes
-   back in the same register, and so the turn in the thread reads like something
-   he asked rather than something the app injected. */
-/* The assistant's mark: a blob that changes shape as it works.
-
-   It replaced a hexagonal reticle, which replaced a blue sphere. His brief for
-   this one: "it should be sort of expanding circle like a blob or something
-   that has different shapes whenever it's being interacted with".
-
-   NOT A MORPH BETWEEN TWO POSES. The outline is generated fresh every frame
-   from a radius that varies around the circle, so it never returns to the same
-   shape twice and never reads as a loop. Three ripples at 2, 3 and 5 lobes,
-   turning at different rates and in different directions, are what stop it
-   settling into a rhythm.
-
-   The points are joined with a closed Catmull-Rom spline converted to cubic
-   Béziers, which is what keeps it liquid: joining them with straight lines, or
-   with arcs, gives a cog rather than a drop of water.
-
-   `state` drives all of it, so the animation IS the status. Idle breathes.
-   Thinking swells and churns, which is the one place motion stands for work
-   rather than for a measurement. Listening and speaking take their amplitude
-   from the real signal, so the blob answers his voice and then its own. */
-export type MarkState = 'idle' | 'thinking' | 'listening' | 'speaking'
-
-/* Base radius, how far the outline strays, and how fast it churns. Idle is
-   almost still on purpose: a mark that writhes while nothing is happening is
-   the same lie as a waveform with no sound behind it. */
-const MOOD: Record<MarkState, { r: number; amp: number; speed: number }> = {
-  idle: { r: 0.56, amp: 0.1, speed: 0.4 },
-  thinking: { r: 0.6, amp: 0.22, speed: 1.8 },
-  listening: { r: 0.58, amp: 0.09, speed: 0.7 },
-  speaking: { r: 0.6, amp: 0.12, speed: 0.9 },
-}
-
-/* Not harmonics of each other, so the lobes never line up into a flower. */
-const RIPPLE = [
-  { lobes: 2, rate: 0.9, phase: 0 },
-  { lobes: 3, rate: -0.61, phase: 2.1 },
-  { lobes: 5, rate: 0.37, phase: 4.3 },
-]
-
-/** A closed outline through points at varying radius, as one smooth path.
-
-    Catmull-Rom to cubic Bézier: each control point is pulled a sixth of the way
-    along the line between its neighbours, which is the standard construction
-    and the reason the curve passes exactly through every point while staying
-    continuous at the joins. */
-function blobPath(t: number, amp: number, radius: number, size: number): string {
-  const c = size / 2
-  const N = 12
-  const pts: [number, number][] = []
-  for (let i = 0; i < N; i++) {
-    const a = (i / N) * Math.PI * 2
-    let r = radius
-    for (const w of RIPPLE) r += amp * Math.sin(w.lobes * a + t * w.rate + w.phase) / w.lobes
-    /* r is a fraction of the RADIUS available, not of the whole box. Times the
-       full size it came out larger than the box and the blob was clipped flat
-       against all four edges. */
-    pts.push([c + Math.cos(a) * r * c, c + Math.sin(a) * r * c])
-  }
-  const at = (i: number): [number, number] => pts[(i + N) % N]
-  let d = `M${at(0)[0].toFixed(2)},${at(0)[1].toFixed(2)}`
-  for (let i = 0; i < N; i++) {
-    const p0 = at(i - 1), p1 = at(i), p2 = at(i + 1), p3 = at(i + 2)
-    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6]
-    const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6]
-    d += ` C${c1[0].toFixed(2)},${c1[1].toFixed(2)} ${c2[0].toFixed(2)},${c2[1].toFixed(2)} ${p2[0].toFixed(2)},${p2[1].toFixed(2)}`
-  }
-  return `${d}Z`
-}
-
-export function Mark({ state = 'idle', size = 132 }: { state?: MarkState; size?: number }): JSX.Element {
-  const [, bump] = useState(0)
-  const t = useRef(0)
-  const live = useRef(0)
-  useEffect(() => {
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
-    let raf = 0
-    let last = performance.now()
-    const tick = (now: number): void => {
-      const dt = Math.min(0.05, (now - last) / 1000)
-      last = now
-      const mood = MOOD[state]
-      t.current += dt * mood.speed * 3
-      /* Listening and speaking borrow the real level, so the blob swells with
-         his voice and then with the answer. Idle and thinking have no signal to
-         borrow and do not pretend to: their motion says "working", not "loud". */
-      const signal = state === 'listening' ? voiceLevel() : state === 'speaking' ? speakingLevel() : 0
-      live.current += (signal - live.current) * 0.15
-      bump((n) => n + 1)
-      raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
-  }, [state])
-
-  const mood = MOOD[state]
-  const amp = mood.amp + live.current * 0.16
-  const radius = mood.r + live.current * 0.06
-  return (
-    <svg
-      className={`as-mark is-${state}`}
-      width={size} height={size} viewBox={`0 0 ${size} ${size}`}
-      aria-hidden="true"
-    >
-      {/* Three outlines at slightly different times, so the shape trails itself
-          and reads as one soft body rather than a single hard edge. */}
-      <path className="as-mark-far" d={blobPath(t.current - 0.55, amp * 1.12, radius * 1.04, size)} />
-      <path className="as-mark-mid" d={blobPath(t.current - 0.25, amp, radius, size)} />
-      <path className="as-mark-core" d={blobPath(t.current, amp * 0.82, radius * 0.9, size)} />
-    </svg>
-  )
-}
-
-const BRIEF_ASK = 'Give me my morning brief. What is it like out, what is on today, '
-  + 'and what did I not finish yesterday?'
-/* What the thread shows instead. He pressed a button; that is the thing he did. */
-const BRIEF_LABEL = 'Morning brief'
 
 /* Three layers, deliberately not harmonics of each other: 1.6, 2.7 and 4.3 do
    not divide evenly, so the curves drift out of step and the shape never
@@ -913,7 +914,7 @@ export function AssistantPage() {
          name it. He asked for the weather to be visible, and that is not a
          thing to leave to whether a sentence came back with the right card in
          it. The app owns this card's numbers anyway. */
-      if (text === BRIEF_ASK && !kinds.includes('weather')) kinds = ['weather', ...kinds]
+      if (text === MORNING.ask && !kinds.includes('weather')) kinds = ['weather', ...kinds]
       if (kinds.length) setCanvas(kinds.slice(0, 3))
       /* A change he cannot see is a change he will not believe. Anything that
          touched the day puts the day on the canvas unless it named its own. */
@@ -968,6 +969,16 @@ export function AssistantPage() {
     )
     if (!ok) setVoice(false)
   }
+  /* One path for every skill on this page, including the brief. It opens voice
+     mode when the browser can do it, because these are things he asks on the
+     way somewhere, and falls back to a typed send when it cannot. Either way
+     the thread shows the skill's NAME, never the paragraph behind it. */
+  const runSkill = async (k: { label: string; ask: string }) => {
+    if (voiceModeAvailable()) { await startVoice(k.ask, k.label); return }
+    cancelDictation(); setQ('')
+    await send(k.ask, k.label)
+  }
+
   const endVoice = () => { exitVoice(); setVoice(false); box.current?.focus() }
   /* Leaving the page hangs up. A microphone left open on a page he has walked
      away from is the worst bug this feature could have. */
@@ -1020,9 +1031,9 @@ export function AssistantPage() {
               voice mode and asks for him, because at eight in the morning the
               ask is the friction. */}
           {voiceModeAvailable() ? (
-            <button className="as-brief" onClick={() => void startVoice(BRIEF_ASK, BRIEF_LABEL)}>
+            <button className="as-brief" onClick={() => void runSkill(MORNING)}>
               <Icon.Waveform size={18} />
-              Morning brief
+              {MORNING.label}
             </button>
           ) : null}
           {askBox}
@@ -1031,8 +1042,8 @@ export function AssistantPage() {
               These are questions about his own week, each answerable from his
               own log. */}
           <div className="as-starters">
-            {STARTERS.map((s) => (
-              <button className="as-chip" key={s.label} onClick={() => void send(s.ask)}>{s.label}</button>
+            {SKILLS.map((k) => (
+              <button className="as-chip" key={k.label} onClick={() => void runSkill(k)}>{k.label}</button>
             ))}
           </div>
         </div>

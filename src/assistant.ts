@@ -134,6 +134,10 @@ export interface Brief {
   /* Hours he gave himself: focus, the gym, the timesheet. Time already spent,
      not time owed to anyone. */
   blocks: { at: string; title: string }[]
+  /* Tomorrow, so "plan today and tomorrow" is answered from his log rather
+     than from an assumption that tomorrow is empty. */
+  tomorrow: { title: string; space: string }[]
+  tomorrowMeetings: { at: string; title: string }[]
   focusToday: number
   goals: { name: string; pct: number }[]
   /* Planned for yesterday and never ticked. The morning brief walks these and
@@ -287,6 +291,35 @@ never pull the answer into Czech. Nor must a short, unclear or nonsense message,
 which reads as Czech to a language detector far more often than it should.
 Cannot tell? English. This holds for "next" as well.
 
+THE OTHER THINGS THE DOORWAY OFFERS. Each is one of the shapes below, and
+each is still two or three sentences unless it says otherwise.
+
+EVENING CLOSE. What actually got done today, what is still open, and then ONE
+question about the single thing most worth deciding: does it go on tomorrow or
+back to the list. Do not list everything left; pick the one that matters and
+ask about that. Show "today".
+
+WHAT AM I AVOIDING. The oldest untouched thing, by name, and your read on WHY
+it is still there: a task with no first step, one that needs someone else, one
+that is bigger than the slot he keeps giving it. Be blunt, he asked you to be.
+Name one. Show "stale".
+
+PLAN TODAY AND TOMORROW. What is already fixed across the two days, what has to
+land before those fixed points, and where the free hours actually are once the
+meetings are taken out. Blocks he set for himself are hours already working, so
+plan INTO them, not around them. Show "today" and "calendar". This one may run
+to four sentences.
+
+WHERE DID THE WEEK GO. Focus, habits and goals, and what the shape of it says
+about the week: where the hours went rather than a scoreboard. Show "focus" and
+"habits".
+
+CLEAR MY HEAD. He is talking at you and it will be unstructured. This is the
+one that ACTS: turn what he said into "do" adds, in the right workspace, using
+HIS words for each task and nothing invented around them. If something is too
+vague to become a task, ask about that one thing rather than guessing. Say what
+you are setting in motion, briefly, and let the line under it carry the fact.
+
 ONE LAST TIME, because all of the above is about WHAT to say and this is about
 HOW to send it: reply with the JSON object and nothing else. No prose in front
 of it, no fence around it, no explanation after it. "say" is a string, and its
@@ -297,13 +330,48 @@ line breaks are \\n inside that string.`
    can do. His words: he wants them to be practices that are useful in THIS
    application. So each one is a question about his own week that the assistant
    can actually answer from his own log, and pressing one asks it. */
-export const STARTERS: { label: string; ask: string }[] = [
-  { label: 'What is on today', ask: 'What is on my plate today? Show me the day.' },
-  { label: 'What am I avoiding', ask: 'What have I been putting off the longest? Show me the oldest things on the list.' },
-  { label: 'Plan my evening', ask: 'It is evening. What is realistic to finish tonight, and what should wait?' },
-  { label: 'How was my week', ask: 'How did this week actually go? Show me the focus and the habits.' },
-  { label: 'What is next', ask: 'What is coming up in the calendar, and does the day still fit?' },
-  { label: 'Habits today', ask: 'Which habits are still open today?' },
+/** What the doorway offers, as things he DOES rather than things he types.
+
+    Each one sends a fully written question on his behalf and shows its own
+    name in the thread, because he pressed a button and that is the thing he
+    did. The paragraph behind it is engineering and he should never see it.
+
+    Every one of these is answerable from his own log. None of them asks the
+    model for anything it would have to invent. */
+export interface Skill { label: string; ask: string }
+
+export const MORNING: Skill = {
+  label: 'Morning brief',
+  ask: 'Give me my morning brief. What is it like out, what is on today, '
+    + 'and what did I not finish yesterday?',
+}
+
+export const SKILLS: Skill[] = [
+  {
+    label: 'Evening close',
+    ask: 'Close out my day. What actually got done, what is still open, and '
+      + 'what should happen with the one thing I did not get to?',
+  },
+  {
+    label: 'What am I avoiding',
+    ask: 'What have I been putting off the longest? Be blunt about which one '
+      + 'I keep carrying and why it is probably still here.',
+  },
+  {
+    label: 'Plan today and tomorrow',
+    ask: 'Help me plan. What is fixed today and tomorrow, what has to land '
+      + 'before those, and where are the free hours?',
+  },
+  {
+    label: 'Where did the week go',
+    ask: 'Where did this week actually go? Focus, habits and goals, and what '
+      + 'that says about how I spent it.',
+  },
+  {
+    label: 'Clear my head',
+    ask: 'I am going to talk at you. Turn what I say into tasks in the right '
+      + 'workspaces, and ask me if anything is unclear.',
+  },
 ]
 
 /** The opening move, before he has asked anything. */
@@ -324,6 +392,8 @@ export function briefText(b: Brief): string {
     `Habits today: ${b.habits.kept} of ${b.habits.due} kept${b.habits.open.length ? `, still open: ${b.habits.open.join('; ')}` : ''}`,
     b.meetings.length ? `Meetings, other people are in these: ${b.meetings.map((m) => `${m.at} ${m.title}`).join('; ')}` : 'No meetings in the calendar',
     b.blocks.length ? `Blocked out for himself, nobody else invited: ${b.blocks.map((m) => `${m.at} ${m.title}`).join('; ')}` : '',
+    b.tomorrow.length ? `Already planned for TOMORROW:\n${b.tomorrow.map((t) => `- [${t.space}] ${t.title}`).join('\n')}` : 'Nothing planned for tomorrow yet',
+    b.tomorrowMeetings.length ? `Tomorrow's meetings: ${b.tomorrowMeetings.map((m) => `${m.at} ${m.title}`).join('; ')}` : '',
     `Focus logged today: ${b.focusToday} minutes`,
     b.unfinishedYesterday.length
       ? `LEFT OVER FROM YESTERDAY, still not done:\n${b.unfinishedYesterday.map((t) => `- [${t.space}] ${t.title}`).join('\n')}`

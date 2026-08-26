@@ -6064,3 +6064,118 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    only present while it is talking: the button says Pause, and this says it
    out loud. Same shape as the panel's waveform so they read as one idea. */
 .as-mini-wave { display: block; margin-right: 4px; fill: currentColor; }
+/* ==========================================================================
+   GOALS, THE LADDER
+   Week at the top through half year at the bottom. A goal is a ROW in one
+   shared grid, which is what makes every line align without being tidied: the
+   four stretches used to be four cards each drawing its own header, so no two
+   ever agreed. An empty stretch now costs one line instead of a whole card,
+   which is where most of the old page's dead space went.
+   ========================================================================== */
+.goal-ladder { display: flex; flex-direction: column; gap: var(--s3); }
+.goal-band {
+  background: var(--a-card); border: 1px solid var(--a-line);
+  border-radius: var(--a-r-lg); padding: var(--s5) var(--s5) var(--s3);
+}
+.gb-head {
+  display: flex; align-items: baseline; gap: var(--s3);
+  padding-bottom: var(--s4); margin-bottom: var(--s2);
+  border-bottom: 1px solid var(--a-line);
+}
+.gb-name { font-size: 21px; font-weight: 800; letter-spacing: -0.026em; margin: 0; }
+.gb-range {
+  font: 800 var(--a-f-label)/1 var(--font-body); letter-spacing: var(--a-ls-label);
+  text-transform: uppercase; color: var(--a-soft);
+}
+.gb-tally {
+  margin-left: auto; font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums;
+}
+.gb-tally i { font-style: normal; color: var(--a-soft); font-weight: 700; }
+/* An empty band has no tally to push the nav right, so the nav pushes itself. */
+.gb-nav { display: inline-flex; gap: 4px; margin-left: auto; }
+.gb-tally + .gb-nav { margin-left: var(--s3); }
+.goal-nav-btn {
+  width: 38px; height: 38px; border: 1.5px solid var(--a-line-2); background: none;
+  border-radius: var(--a-r-sm); cursor: pointer; font-size: 16px; color: var(--a-muted);
+  display: grid; place-items: center;
+  transition: border-color var(--a-enter), color var(--a-enter), background var(--a-enter);
+}
+.goal-nav-btn:hover { border-color: var(--a-ink); color: var(--a-ink); background: var(--a-accent-wash); }
+.goal-nav-btn.now { width: auto; padding: 0 12px; font: 700 13px var(--font-body); }
+.gb-none { color: var(--a-soft); font-size: 15.5px; padding: var(--s3) 0 var(--s4); margin: 0; }
+
+/* One grid for every row in every band. */
+.goal-item + .goal-item { border-top: 1px solid var(--a-line); }
+.goal-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px minmax(140px, 1.6fr) 72px 132px 40px;
+  gap: var(--s4); align-items: center;
+  padding: 15px var(--s3); border-radius: var(--a-r-xs); position: relative;
+}
+.goal-row::before {
+  content: ''; position: absolute; inset: 0; background: var(--a-accent-wash);
+  border-radius: var(--a-r-xs); transform: scaleX(0); transform-origin: left;
+  transition: transform var(--a-enter); z-index: 0;
+}
+.goal-item:hover .goal-row::before { transform: scaleX(1); }
+.goal-row > * { position: relative; z-index: 1; }
+.gr-name { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
+.gr-obj { font-size: var(--a-f-row); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gr-count { font-weight: 800; font-size: 17px; text-align: right; font-variant-numeric: tabular-nums; }
+.gr-count i { font-style: normal; color: var(--a-soft); font-size: 13.5px; font-weight: 700; }
+.goal-row .bar { height: 10px; }
+.gr-pct { font-weight: 800; font-size: 19px; letter-spacing: -0.03em; text-align: right; font-variant-numeric: tabular-nums; }
+.gr-pct i { font-style: normal; font-size: 12.5px; color: var(--a-soft); }
+.goal-status {
+  font: 800 11.5px/1 var(--font-body); letter-spacing: 0.11em; text-transform: uppercase;
+  padding: 8px 10px; border-radius: var(--a-r-xs); text-align: center; white-space: nowrap;
+  background: var(--a-accent-wash); color: var(--a-accent-text);
+}
+.goal-status.s-behind { background: var(--a-warn-wash); color: var(--a-warn); }
+
+/* The second line only exists when there is something to put on it. */
+.goal-detail {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3) var(--s5);
+  padding: 0 var(--s3) 15px calc(var(--s3) + var(--s5));
+}
+.goal-detail p { margin: 0; font-size: 14px; color: var(--a-soft); }
+.goal-detail .goal-ms { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); margin: 0; padding: 0; list-style: none; }
+.goal-detail .goal-ms-item { display: flex; align-items: center; gap: var(--s2); font-size: 14px; }
+.goal-detail .goal-ms-item.done { color: var(--a-soft); text-decoration: line-through; }
+
+@media (max-width: 1100px) {
+  .goal-row { grid-template-columns: minmax(0, 1fr) 84px 68px 40px; }
+  .goal-row .bar, .goal-row .goal-status { display: none; }
+  .goal-detail { padding-left: var(--s3); }
+}
+
+/* The reached badge kept the old green: `.goal-status.s-done` sets its own
+   background at a higher specificity than the base rule, so retargeting the
+   token was not enough and the green came back on one badge. */
+.goal-status.s-done { background: var(--a-accent); color: var(--a-ink); }
+.shell.is-hud .goal-status.s-done { color: #04141A; }
+.goal-status.s-ontrack { background: var(--a-accent-wash); color: var(--a-accent-text); }
+/* A behind bar matches its own badge. It was alert red under an amber badge. */
+.bar.prog.warn > i, .bar.warn > i { background: var(--a-warn); }
+
+/* One motion per bar. There was a width transition AND a scaleX animation
+   running at once, which is why a full bar photographed half full. */
+.goal-row .bar > i { transition: none; }
+
+/* The logger sits in the row. On its own line it doubled the height of nearly
+   every goal, since most of them are not habit-fed. */
+.goal-row { grid-template-columns: minmax(0, 1fr) 92px minmax(140px, 1.6fr) 72px 132px 74px 40px; }
+.goal-row .goal-bump { display: inline-flex; gap: 4px; justify-content: flex-end; }
+.goal-row .goal-bump button {
+  width: 34px; height: 34px; border: 1.5px solid var(--a-line-2); background: none;
+  border-radius: var(--a-r-xs); cursor: pointer; color: var(--a-muted); font-size: 16px;
+  display: grid; place-items: center;
+  transition: border-color var(--a-enter), color var(--a-enter), background var(--a-enter);
+}
+.goal-row .goal-bump button:hover:not(:disabled) {
+  border-color: var(--a-accent-text); color: var(--a-accent-text); background: var(--a-accent-wash);
+}
+.goal-row .goal-bump button:disabled { opacity: 0.35; cursor: not-allowed; }
+@media (max-width: 1100px) {
+  .goal-row { grid-template-columns: minmax(0, 1fr) 84px 68px 74px 40px; }
+}

@@ -576,6 +576,8 @@ export function Mark({ state = 'idle', size = 132 }: { state?: MarkState; size?:
 
 const BRIEF_ASK = 'Give me my morning brief. What is it like out, what is on today, '
   + 'and what did I not finish yesterday?'
+/* What the thread shows instead. He pressed a button; that is the thing he did. */
+const BRIEF_LABEL = 'Morning brief'
 
 const BARS = 96
 
@@ -661,10 +663,14 @@ export function AssistantPage() {
 
   /* Returns the answer's words. The button ignores them and voice mode reads
      them out; an empty string means there was nothing to say. */
-  const send = async (text: string): Promise<string> => {
+  /* `shown` is what goes in the thread when it differs from what is asked. The
+     morning brief is a skill: he pressed a button, so the thread should say
+     "Morning brief", not recite the paragraph the button sends on his behalf.
+     Seeing the engineering is seeing the wiring. */
+  const send = async (text: string, shown?: string): Promise<string> => {
     if (busy) return ''
     setBusy(true); setErr(null); setErrHint(null); setLive('')
-    setTurns((t) => [...t, { who: 'you', text }])
+    setTurns((t) => [...t, { who: 'you', text: shown ?? text }])
     const history = turns.map((t) => ({ role: (t.who === 'you' ? 'user' : 'assistant') as 'user' | 'assistant', content: t.text }))
     const out = await ask(text, brief, history, setLive)
     if (out.ok) {
@@ -717,11 +723,14 @@ export function AssistantPage() {
   /* Voice mode drives the SAME send as the button, so a spoken question is an
      ordinary turn in the thread and the answer it reads out is the answer he
      can also see. */
-  const startVoice = async (opening?: string) => {
+  const startVoice = async (opening?: string, openingLabel?: string) => {
     cancelDictation()
     setQ('')
     setVoice(true)
-    const ok = await enterVoice((text) => send(text), opening)
+    const ok = await enterVoice(
+      (text) => send(text, text === opening ? openingLabel : undefined),
+      opening,
+    )
     if (!ok) setVoice(false)
   }
   const endVoice = () => { exitVoice(); setVoice(false); box.current?.focus() }
@@ -776,7 +785,7 @@ export function AssistantPage() {
               voice mode and asks for him, because at eight in the morning the
               ask is the friction. */}
           {voiceModeAvailable() ? (
-            <button className="as-brief" onClick={() => void startVoice(BRIEF_ASK)}>
+            <button className="as-brief" onClick={() => void startVoice(BRIEF_ASK, BRIEF_LABEL)}>
               <Icon.Waveform size={18} />
               Morning brief
             </button>

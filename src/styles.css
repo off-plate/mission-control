@@ -4814,7 +4814,12 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   background: var(--surface-2); border-radius: var(--r-md);
   padding: var(--s2) var(--s4); font-size: var(--text-sm);
 }
-.as-turn.is-it .as-said { font-size: var(--text-base); line-height: 1.55; max-width: 62ch; }
+/* pre-line, so the blank lines the morning brief writes actually land. Every
+   other answer is one paragraph and looks exactly as it did. */
+.as-turn.is-it .as-said {
+  font-size: var(--text-base); line-height: 1.55; max-width: 62ch;
+  white-space: pre-line;
+}
 /* The sentence while it is still being written. No animation on the text
    itself: the words arrive from the model at their own rate, and dressing that
    up with a second, fake reveal would put the app's guess about the pace on top

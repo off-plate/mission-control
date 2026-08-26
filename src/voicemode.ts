@@ -181,13 +181,38 @@ async function send(): Promise<void> {
   listen()
 }
 
+/* Three frequencies that do not divide into each other, so the pattern does
+   not visibly repeat, plus a slow swell for the shape of a sentence. */
+function voiceish(t: number): number {
+  const ms = t / 1000
+  const swell = 0.55 + 0.45 * Math.sin(ms * 1.7)
+  const detail = 0.5 + 0.3 * Math.sin(ms * 11.3) + 0.2 * Math.sin(ms * 27.1)
+  return Math.max(0.05, Math.min(1, swell * detail))
+}
+
+/* THE METER RUNS WHETHER OR NOT THE MICROPHONE COULD BE TAPPED.
+
+   It used to be started from inside the microphone setup and gave up at the
+   first line if the analyser could not be built. That is one try/catch away
+   from a panel that never redraws in ANY phase, which reads as "the waveform
+   is broken" rather than as "the meter never started". The analyser is
+   optional now; the loop is not. */
 function watchLevel(): void {
-  if (!ctx || !stream) return
-  const src = ctx.createMediaStreamSource(stream)
-  const an = ctx.createAnalyser()
-  an.fftSize = 1024
-  src.connect(an)
-  const buf = new Uint8Array(an.fftSize)
+  let an: AnalyserNode | null = null
+  let buf: Uint8Array | null = null
+  try {
+    if (ctx && stream) {
+      const src = ctx.createMediaStreamSource(stream)
+      an = ctx.createAnalyser()
+      an.fftSize = 1024
+      src.connect(an)
+      buf = new Uint8Array(an.fftSize)
+    }
+  } catch {
+    /* No meter on his voice. The loop still runs, so the panel still lives. */
+    an = null
+    buf = null
+  }
   const tick = (): void => {
     if (phase === 'off') return
     /* WHILE IT TALKS, THE BARS FOLLOW THE ANSWER. The mic stream is still
@@ -195,12 +220,31 @@ function watchLevel(): void {
        voice arriving back through the speakers: a reading of the room, when
        what he wants to see is the sentence being read to him. */
     if (phase === 'speaking') {
-      level = speakingLevel()
+      /* IT MUST NEVER SIT STILL WHILE IT IS TALKING. speakingLevel() is the
+         real thing where a real thing exists: an analyser on Gemini's audio,
+         or the word boundaries the device voice fires. Both can come back with
+         nothing, and they did: a remote voice like "Google US English" fires no
+         boundary events at all in Chrome, and an audio element behind a
+         suspended AudioContext analyses to silence. Either way the bars went
+         flat and it looked broken while he could plainly hear it talking.
+         So a reading of zero falls back to a generated wave. It is activity
+         rather than amplitude, and the alternative is a still bar that lies
+         about whether anything is happening. */
+      const real = speakingLevel()
+      level = real > 0.02 ? real : voiceish(performance.now())
       emit()
       raf = requestAnimationFrame(tick)
       return
     }
     if (phase !== 'listening') {
+      level = 0
+      emit()
+      raf = requestAnimationFrame(tick)
+      return
+    }
+    if (!an || !buf) {
+      /* Listening, with nothing to measure it by. Flat is the honest answer:
+         unlike speaking, there is no evidence anything is happening. */
       level = 0
       emit()
       raf = requestAnimationFrame(tick)
@@ -251,6 +295,9 @@ export async function enter(
     stream = null
     ctx = null
   }
+  /* Started here rather than inside the try, so a microphone that could not be
+     metered does not also cost him the waveform while it speaks. */
+  if (!raf) watchLevel()
   if (voicePhase() === 'off') { exit(); return false }  // he left during the permission prompt
   if (opening) { heard = opening; interim = ''; void send() } else listen()
   return true

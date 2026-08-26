@@ -68,5 +68,57 @@ const ev = (uid: string, start: string, end: string, title: string) =>
      times.length === 1 && times[0] === '09:00', `${got.length} occurrences at ${times.join(', ')}`)
 }
 
+/* ---- invitations he turned down ----
+   Google keeps a declined meeting in the feed. It was being counted, planned
+   around and read out to him: "two lunch orders at 16:30" he had declined. */
+const OWNER = 'michael@rvlt.digital'
+const withOwner = (vevents: string) =>
+  `BEGIN:VCALENDAR\nX-WR-CALNAME:${OWNER}\n${vevents}\nEND:VCALENDAR`
+
+function readOwned(vevents: string) {
+  return parseIcs(withOwner(vevents), new Date('2026-08-25'), new Date('2026-08-28'))
+}
+const invite = (uid: string, title: string, mine: string, theirs = 'ACCEPTED') =>
+  `BEGIN:VEVENT\nUID:${uid}\nDTSTART:20260826T090000Z\nDTEND:20260826T093000Z\n`
+  + `ORGANIZER;CN=Petr:mailto:petr@example.com\n`
+  + `ATTENDEE;CN=Petr;PARTSTAT=${theirs}:mailto:petr@example.com\n`
+  + `ATTENDEE;CN=Michael;PARTSTAT=${mine}:mailto:${OWNER}\n`
+  + `SUMMARY:${title}\nEND:VEVENT`
+
+{
+  const got = readOwned([
+    invite('i1', 'Lunch order', 'DECLINED'),
+    invite('i2', 'Tech alignment', 'ACCEPTED'),
+    invite('i3', 'Weekly status', 'NEEDS-ACTION'),
+    invite('i4', 'Someone else bailed', 'ACCEPTED', 'DECLINED'),
+  ].join('\n'))
+  const titles = got.map((e) => e.title)
+  ok('a meeting he declined is not his day', !titles.includes('Lunch order'), titles.join(', '))
+  ok('one he accepted is', titles.includes('Tech alignment'), titles.join(', '))
+  ok('one he has not answered yet still shows', titles.includes('Weekly status'), titles.join(', '))
+  ok('somebody ELSE declining changes nothing', titles.includes('Someone else bailed'), titles.join(', '))
+}
+
+/* Without an identifiable owner nothing is guessed at, because dropping a real
+   meeting is worse than showing one he declined. The exception is a meeting
+   everybody has declined, which is dead by any reading. */
+{
+  const anon = (v: string) => parseIcs(`BEGIN:VCALENDAR\n${v}\nEND:VCALENDAR`, new Date('2026-08-25'), new Date('2026-08-28'))
+  const someDeclined = anon(invite('j1', 'Still on', 'DECLINED')).map((e) => e.title)
+  ok('with no owner in the feed, one declined line is not enough to drop it',
+     someDeclined.includes('Still on'), someDeclined.join(', '))
+  const allDeclined = anon(invite('j2', 'Dead meeting', 'DECLINED', 'DECLINED')).map((e) => e.title)
+  ok('but a meeting everyone declined is dropped', !allDeclined.includes('Dead meeting'), allDeclined.join(', '))
+}
+
+/* An explicit address wins, for a calendar named something other than it. */
+{
+  const named = parseIcs(
+    `BEGIN:VCALENDAR\nX-WR-CALNAME:Michael Florian\n${invite('k1', 'Lunch order', 'DECLINED')}\nEND:VCALENDAR`,
+    new Date('2026-08-25'), new Date('2026-08-28'), OWNER)
+  ok('an explicit owner address settles it when the feed name is not one',
+     !named.map((e) => e.title).includes('Lunch order'), named.map((e) => e.title).join(', '))
+}
+
 console.log(fails.length ? `\n${fails.length} FAILED` : '\nALL PASS')
 process.exit(fails.length ? 1 : 0)

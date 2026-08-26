@@ -137,6 +137,8 @@ interface Raw {
   people: string[]
   link?: string
   description?: string
+  /** Lower-case address to PARTSTAT, for every attendee that gave one. */
+  replies: Map<string, string>
 }
 
 /** Every VEVENT in the feed, before recurrence is expanded. */
@@ -144,7 +146,7 @@ function readEvents(ics: string): Raw[] {
   const out: Raw[] = []
   let cur: Partial<Raw> | null = null
   for (const line of unfold(ics)) {
-    if (line === 'BEGIN:VEVENT') { cur = { exdates: new Set(), people: [] }; continue }
+    if (line === 'BEGIN:VEVENT') { cur = { exdates: new Set(), people: [] , replies: new Map()}; continue }
     if (line === 'END:VEVENT') {
       if (cur?.start && cur.title) out.push(cur as Raw)
       cur = null
@@ -175,6 +177,16 @@ function readEvents(ics: string): Raw[] {
       case 'ORGANIZER': { const who = person(params, value); if (who) cur.people!.unshift(who); break }
       case 'ATTENDEE': {
         const who = person(params, value)
+        /* HIS OWN ANSWER TO THE INVITATION. A declined meeting is still in the
+           feed, and counting it is how the brief told him about "two lunch
+           orders at 16:30" that he had turned down. Which line is his is
+           settled below against the calendar's own address; every other
+           attendee's status is somebody else's business. */
+        const mail = mailOf(value)
+        if (mail) {
+          const status = (params.PARTSTAT ?? '').toUpperCase()
+          if (status) cur.replies!.set(mail, status)
+        }
         /* Rooms and equipment are resources, not people, and a note that lists
            "Meeting room 2" among the attendees is a note nobody trusts. */
         if (who && (params.CUTYPE ?? 'INDIVIDUAL').toUpperCase() === 'INDIVIDUAL' && !cur.people!.includes(who)) {
@@ -198,6 +210,27 @@ function readEvents(ics: string): Raw[] {
     }
   }
   return out
+}
+
+/** The bare address out of a `mailto:` value, lower-cased, or null. */
+function mailOf(value: string): string | null {
+  const m = /mailto:\s*([^\s;,]+)/i.exec(value)
+  return m ? m[1].trim().toLowerCase() : null
+}
+
+/** Whose calendar this is, so his own reply can be told from everyone else's.
+
+    Read from the feed itself: Google names a personal calendar after the
+    address that owns it, which is exactly the attendee line worth reading. An
+    explicit owner can be passed in when a feed is named something else, and
+    when neither is available nothing is filtered, because dropping a meeting
+    on a guess is worse than showing one he declined. */
+function ownerOf(ics: string, hint?: string): string | null {
+  const given = hint?.trim().toLowerCase()
+  if (given && given.includes('@')) return given
+  const m = /^X-WR-CALNAME:\s*(.+)$/im.exec(ics)
+  const name = m?.[1]?.trim().toLowerCase()
+  return name && name.includes('@') ? name : null
 }
 
 /** A display name for one ATTENDEE or ORGANIZER line. The CN parameter when
@@ -288,10 +321,25 @@ const minutesOf = (d: Date) => { const z = zoned(d); return z.h * 60 + z.mi }
  * Every event between two dates, flattened to one row per day, sorted.
  * All-day events come first within a day, then by start time.
  */
-export function parseIcs(ics: string, from: Date, to: Date): CalEvent[] {
+export function parseIcs(ics: string, from: Date, to: Date, ownerEmail?: string): CalEvent[] {
   const out: CalEvent[] = []
+  const owner = ownerOf(ics, ownerEmail)
   for (const e of readEvents(ics)) {
     if (!e.title) continue
+    /* A MEETING HE TURNED DOWN IS NOT HIS DAY. Google keeps declined events in
+       the feed, so they were being counted, planned around and read out to him:
+       "two lunch orders at 16:30" that he had already declined.
+
+       His own line is the one matching the calendar's own address. Somebody
+       else declining is somebody else's business and changes nothing about
+       whether he has to be there. Where the owner cannot be identified, an
+       event is dropped only if EVERY individual on it has declined, which is a
+       dead meeting by any reading and needs no guess about which line is his. */
+    if (owner) {
+      if (e.replies.get(owner) === 'DECLINED') continue
+    } else if (e.replies.size > 0 && [...e.replies.values()].every((r) => r === 'DECLINED')) {
+      continue
+    }
     const len = e.end ? e.end.getTime() - e.start.getTime() : 0
     for (const at of occurrences(e, from, to)) {
       const end = len > 0 ? new Date(at.getTime() + len) : null

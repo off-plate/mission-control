@@ -125,6 +125,25 @@ export const Square = make(<><rect x="4" y="4" width="16" height="16"/></>, 16, 
    data and this means audio, so they stay two icons. Ink 6-18 across, 5-19
    down, so k = 19.7/14 like the other tall glyphs. */
 export const Waveform = make(<><line x1="6" y1="9" x2="6" y2="15"/><line x1="10" y1="5" x2="10" y2="19"/><line x1="14" y1="7" x2="14" y2="17"/><line x1="18" y1="10" x2="18" y2="14"/></>, 16, { k: 1.4071, x: -4.886, y: -4.886 })
+/* ---- weather ----
+   Drawn to match this set rather than pulled from a weather pack: same 24 box,
+   same stroke, same measured fit, so they sit beside Mic and Waveform without
+   looking borrowed. One glyph per condition GROUP, because a brief does not
+   need to split light drizzle from moderate drizzle. */
+/* sun */
+export const Sun = make(<><circle cx="12" cy="12" r="4.5"/><path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6L18 18M18 6l-1.4 1.4M7.4 16.6L6 18"/></>, 16, { k: 1.1588, x: -1.906, y: -1.906 })
+/* cloud */
+export const Cloud = make(<><path d="M7 18h9.5a4 4 0 0 0 .3-8 5.5 5.5 0 0 0-10.6 1.3A3.4 3.4 0 0 0 7 18Z"/></>, 16, { k: 1.0944, x: -1.133, y: -1.133 })
+/* sun behind cloud */
+export const CloudSun = make(<><circle cx="8.5" cy="8" r="3"/><path d="M8.5 3v1.6M3.5 8h1.6M5 4.5l1.1 1.1M12 4.5l-1.1 1.1"/><path d="M10 18.5h7.5a3.5 3.5 0 0 0 .2-7 4.8 4.8 0 0 0-9.1 1.1A3 3 0 0 0 10 18.5Z"/></>, 16, { k: 1.0368, x: -0.442, y: 0.854 })
+/* rain */
+export const Rain = make(<><path d="M7 15h9.5a4 4 0 0 0 .3-8 5.5 5.5 0 0 0-10.6 1.3A3.4 3.4 0 0 0 7 15Z"/><path d="M8.5 18v3M12 18.5v2.5M15.5 18v3"/></>, 16, { k: 1.0944, x: -1.133, y: -1.681 })
+/* snow */
+export const Snow = make(<><path d="M7 15h9.5a4 4 0 0 0 .3-8 5.5 5.5 0 0 0-10.6 1.3A3.4 3.4 0 0 0 7 15Z"/><path d="M9 19h.01M12 20.5h.01M15 19h.01M10.5 21h.01M13.5 21h.01"/></>, 16, { k: 1.0944, x: -1.133, y: -1.681 })
+/* fog */
+export const Fog = make(<><path d="M7 14h9.5a4 4 0 0 0 .3-8 5.5 5.5 0 0 0-10.6 1.3A3.4 3.4 0 0 0 7 14Z"/><path d="M5 17.5h14M7 20.5h10"/></>, 16, { k: 1.0944, x: -1.133, y: -1.133 })
+/* storm */
+export const Storm = make(<><path d="M7 14h9.5a4 4 0 0 0 .3-8 5.5 5.5 0 0 0-10.6 1.3A3.4 3.4 0 0 0 7 14Z"/><path d="M13 16.5l-3 4h3.5l-2.5 3.5"/></>, 16, { k: 1.0944, x: -1.133, y: -1.954 })
 /* hicon: mic. Fit measured like the rest: ink runs 5.5-18.5 across and 3-21
    down, so k = 19.7/18 and the offsets centre that box. */
 export const Mic = make(<><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"/><line x1="12" y1="18" x2="12" y2="21"/></>, 16, { k: 1.0944, x: -1.133, y: -1.133 })

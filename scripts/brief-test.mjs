@@ -28,8 +28,14 @@ await page.addInitScript(() => {
 await page.route('**/api.open-meteo.com/**', (r) => r.fulfill({
   status: 200, contentType: 'application/json',
   body: JSON.stringify({
-    current: { temperature_2m: 7.4, apparent_temperature: 4.1, weather_code: 3 },
+    current: { time: '2026-08-26T07:00', temperature_2m: 7.4, apparent_temperature: 4.1, weather_code: 3 },
     daily: { temperature_2m_max: [12.2], temperature_2m_min: [5.0], precipitation_probability_max: [55] },
+    hourly: {
+      time: Array.from({ length: 8 }, (_, i) => `2026-08-26T${String(7 + i).padStart(2, '0')}:00`),
+      temperature_2m: [7, 8, 9, 10, 11, 12, 12, 11],
+      precipitation_probability: [55, 40, 20, 10, 5, 5, 0, 0],
+      weather_code: [61, 61, 3, 2, 1, 0, 0, 3],
+    },
   }),
 }))
 await page.route('**/api.groq.com/openai/v1/chat/completions', (r) => {
@@ -110,6 +116,34 @@ ok('and it is read out loud', (await page.evaluate(() => window.__spoken)).lengt
 
 /* What the model was actually told. A brief that reaches the model without
    yesterday's leftovers or the weather still answers, and is worthless. */
+/* THE SKY IS DRAWN, NOT DESCRIBED. He asked for a widget and got the figures
+   read out in a sentence instead. Note the stubbed answer above names only the
+   backlog card: the weather card must appear anyway, because whether he sees
+   the forecast is not a thing to leave to whether the model remembered it. */
+await page.waitForSelector('.wx-hour', { timeout: 10000 }).catch(() => {})
+ok('the brief draws a weather card even though the answer did not name one',
+   await page.locator('.wx').count() === 1, `${await page.locator('.wx').count()} cards`)
+ok('it shows the temperature as a figure', (await page.locator('.wx-temp').textContent())?.startsWith('7'),
+   await page.locator('.wx-temp').textContent())
+ok('with the condition and the day\'s range',
+   (await page.locator('.wx-sky').textContent())?.toLowerCase().includes('overcast')
+   && (await page.locator('.wx-hilo').textContent())?.includes('12'),
+   `${await page.locator('.wx-sky').textContent()} / ${await page.locator('.wx-hilo').textContent()}`)
+ok('and an hour-by-hour strip', await page.locator('.wx-hour').count() === 8,
+   `${await page.locator('.wx-hour').count()} hours`)
+ok('each hour carries an icon, a chance of rain and a temperature',
+   await page.locator('.wx-hour').first().locator('svg').count() === 1
+   && (await page.locator('.wx-hour').first().innerText()).includes('55%')
+   && (await page.locator('.wx-hour').first().innerText()).includes('7'),
+   JSON.stringify(await page.locator('.wx-hour').first().innerText()))
+/* Worth an umbrella is worth the accent; a 5% chance is noise. */
+ok('a wet hour is marked and a dry one is not',
+   await page.locator('.wx-hour').nth(0).locator('.wx-rain.is-wet').count() === 1
+   && await page.locator('.wx-hour').nth(4).locator('.wx-rain.is-wet').count() === 0)
+ok('the strip starts at the current hour, not at midnight',
+   (await page.locator('.wx-at').first().textContent()) === '07:00',
+   await page.locator('.wx-at').first().textContent())
+
 /* Parse the request rather than pattern-matching it. The body is JSON, so its
    newlines are escaped, and a regex written against real newlines silently
    matches nothing and reports the section missing when it is right there. */

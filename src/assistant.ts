@@ -30,6 +30,7 @@ export type CardKind =
   | 'goals'
   | 'focus'      // the week's blocks
   | 'stale'      // what has been sitting too long
+  | 'weather'    // Prague, out the window, drawn by the app
 
 export interface Card { kind: CardKind; note?: string }
 
@@ -116,7 +117,7 @@ export interface Reply {
   do?: Action[]
 }
 
-const KINDS: CardKind[] = ['today', 'backlog', 'habits', 'calendar', 'goals', 'focus', 'stale']
+const KINDS: CardKind[] = ['today', 'backlog', 'habits', 'calendar', 'goals', 'focus', 'stale', 'weather']
 
 /** A compact picture of his day. Titles and counts, nothing private. */
 export interface Brief {
@@ -203,7 +204,7 @@ Answer ONLY with JSON:
 "say" may contain \n for a line break, and the morning brief uses them. Nothing
 else does: an ordinary answer is one short paragraph.
 
-kind is one of: today, backlog, habits, calendar, goals, focus, stale.
+kind is one of: today, backlog, habits, calendar, goals, focus, stale, weather.
 Use several cards when the question spans them. Use none if he is just talking.
 
 "do" IS HOW YOU CHANGE HIS DATA. You do not perform anything yourself: you name
@@ -251,7 +252,10 @@ like this, and nothing outside the object:
 
 {"say":"Morning, Michael. It is overcast and 7 out, up to 12, so take a coat.\\n\\nThe day has the invoice at noon and two meetings after it.\\n\\nStart with the VZP letter. It is the only thing here with a deadline.\\n\\nThe Blastburn quote is still sitting from yesterday. On today, or back to the list?","show":[{"kind":"today"},{"kind":"backlog"}],"next":["On today","Back to the list"]}
 
-Show the "today" card, and "backlog" too when yesterday left something behind.
+Show "weather" first, then "today", and "backlog" too when yesterday left
+something behind. The weather card draws the sky itself, so your first beat is
+a REMARK about it rather than a read-out: "take a coat" earns its place, "16
+degrees and overcast" is already on the screen underneath you.
 
 That last part matters. Leftovers from yesterday are the thing he avoids, so
 the brief is where they get faced, one question at a time, and his answer turns

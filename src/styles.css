@@ -5422,3 +5422,33 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
    changed. One card is marked live; it is not a hero and not a button. */
 .shell.is-hud .tr-next { background: linear-gradient(180deg, var(--t-hotdim), transparent 62%), var(--t-card); } /* slop-lint-ignore gradient-hero */
 .shell.is-hud .troom .tr-start { color: var(--accent-ink); }
+
+/* ---- Prague ----
+   A weather widget on warm paper, not a forecast app: hairlines, one accent,
+   the numbers in the tabular face so the hourly strip lines up in columns. */
+.wx { display: flex; flex-direction: column; gap: var(--s4); }
+.wx-now { display: flex; align-items: center; gap: var(--s4); color: var(--ink); }
+.wx-temp { font-size: 40px; line-height: 1; letter-spacing: -0.02em; }
+.wx-deg { font-size: var(--text-sm); color: var(--muted); margin-left: 2px; }
+.wx-meta { display: flex; flex-direction: column; gap: 2px; margin-left: auto; text-align: right; }
+.wx-sky { font-size: var(--text-sm); }
+.wx-hilo { font-size: var(--text-xs); color: var(--muted); }
+
+/* Scrolls itself rather than squeezing. Eight legible hours beat twelve
+   unreadable ones, and the container is the thing that scrolls so the page
+   never does. */
+.wx-hours {
+  display: flex; gap: var(--s2);
+  overflow-x: auto; scrollbar-width: none;
+  border-top: 1px solid var(--hairline); padding-top: var(--s3);
+}
+.wx-hours::-webkit-scrollbar { display: none; }
+.wx-hour {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  flex: 1 0 auto; min-width: 46px; color: var(--muted);
+}
+.wx-at { font-size: var(--text-xs); }
+.wx-rain { font-size: 11px; color: var(--faint); }
+/* Worth an umbrella, so it is worth the accent. Below this it is noise. */
+.wx-rain.is-wet { color: var(--accent-text); }
+.wx-h-temp { font-size: var(--text-sm); color: var(--ink); }

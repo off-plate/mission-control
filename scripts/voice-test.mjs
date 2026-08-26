@@ -100,6 +100,29 @@ ok('what he is saying shows as he says it',
    (await page.locator('.as-voice-heard').textContent())?.includes('what is on today'),
    await page.locator('.as-voice-heard').textContent())
 
+/* THE SPOKEN LINE SITS IN THE MIDDLE.
+
+   A global `p { max-width: 68ch }` caps this box below the panel width, and a
+   capped block sits at the START of its container, so the text was centred
+   inside a box that was itself 44px left of centre. It only showed in the split
+   layout, where the panel is wide enough for the cap to bite, which is why the
+   doorway looked fine.
+
+   Measured against the PANEL's centre. The box was always centred within
+   itself, which is why this looked correct in every earlier check. */
+const centring = await page.evaluate(() => {
+  const panel = document.querySelector('.as-voice').getBoundingClientRect()
+  const el = document.querySelector('.as-voice-heard')
+  const rng = document.createRange(); rng.selectNodeContents(el)
+  const t = rng.getBoundingClientRect()
+  return { off: +(((t.left + t.right) / 2) - ((panel.left + panel.right) / 2)).toFixed(1),
+           capped: +getComputedStyle(el).maxWidth.replace('px', '') < panel.width }
+})
+ok('the spoken line is centred in the panel', Math.abs(centring.off) < 2,
+   `${centring.off}px from the panel centre`)
+ok('and it is centred even though a readable cap makes the box narrower',
+   centring.capped, 'the 68ch cap is in effect here')
+
 await page.evaluate(() => window.__say('what is on today', true))
 // A final alone must NOT send: he may just be drawing breath.
 await page.waitForTimeout(350)

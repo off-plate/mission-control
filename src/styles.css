@@ -5077,6 +5077,11 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .as-voice-heard {
   font-size: var(--text-sm); color: var(--ink);
   min-height: 1.5em; text-align: center; line-height: 1.5;
+  /* A global `p { max-width: 68ch }` caps this box below the panel width, and a
+     capped block sits at the start rather than in the middle: centred TEXT in a
+     box that is itself 44px left of centre. The cap is right for a long spoken
+     sentence, so the box is centred instead of the cap removed. */
+  margin-inline: auto;
 }
 .as-voice.is-listening .as-voice-heard:empty::before { content: ''; }
 

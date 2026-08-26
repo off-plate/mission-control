@@ -5063,9 +5063,9 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   background: var(--accent);
   transition: height 90ms linear;
 }
-/* Mouth shut, ears shut: flat and faint, because there is no signal to draw. */
-.as-voice.is-thinking .as-wave-bar,
-.as-voice.is-speaking .as-wave-bar { background: var(--faint); }
+/* Thinking has nothing to draw, so it draws nothing. Speaking has the answer
+   itself, so the bars stay in the accent and move with the voice. */
+.as-voice.is-thinking .as-wave-bar { background: var(--faint); }
 
 .as-voice-heard {
   font-size: var(--text-sm); color: var(--ink);

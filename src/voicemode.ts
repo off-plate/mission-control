@@ -15,7 +15,7 @@
    collected and a quiet timer runs; the question is sent when he has stopped
    talking for HUSH, not when the engine decided a phrase ended. */
 
-import { say, stop as stopSpeech } from './speech'
+import { say, speakingLevel, stop as stopSpeech } from './speech'
 
 export type VoicePhase = 'off' | 'listening' | 'thinking' | 'speaking'
 
@@ -190,6 +190,22 @@ function watchLevel(): void {
   const buf = new Uint8Array(an.fftSize)
   const tick = (): void => {
     if (phase === 'off') return
+    /* WHILE IT TALKS, THE BARS FOLLOW THE ANSWER. The mic stream is still
+       open here, so leaving it on the meter would draw the assistant's own
+       voice arriving back through the speakers: a reading of the room, when
+       what he wants to see is the sentence being read to him. */
+    if (phase === 'speaking') {
+      level = speakingLevel()
+      emit()
+      raf = requestAnimationFrame(tick)
+      return
+    }
+    if (phase !== 'listening') {
+      level = 0
+      emit()
+      raf = requestAnimationFrame(tick)
+      return
+    }
     an.getByteTimeDomainData(buf)
     /* RMS around the 128 centre line. */
     let sum = 0

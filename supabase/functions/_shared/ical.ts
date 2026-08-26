@@ -47,7 +47,58 @@ const unescape = (v: string) =>
   v.replace(/\\n/gi, '\n').replace(/\\,/g, ',').replace(/\;/g, ';').replace(/\\\\/g, '\\')
 
 const pad = (n: number) => String(n).padStart(2, '0')
-export const dayKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+/* EVERY TIME HERE IS A PRAGUE TIME.
+
+   This file is parsed in a Supabase Edge Function, where the process timezone
+   is UTC. Every wall-clock reading below used to come from getHours() and
+   getDate(), which meant a nine o'clock meeting sent as 070000Z was reported
+   at 07:00 and an evening event could be filed on the wrong day.
+
+   That is what "I don't have any meeting at 11 nor at 14, it's all confused"
+   was: a feed carrying some events as UTC and some with a TZID, so half the
+   day was two hours out and half was right, which reads as nonsense rather
+   than as an offset.
+
+   Prague is named, not inferred, because inferring it is what broke: the
+   comment below used to say the app runs in Prague, and the code that believed
+   it runs in a datacentre. */
+const ZONE = 'Europe/Prague'
+
+const PARTS = new Intl.DateTimeFormat('en-GB', {
+  timeZone: ZONE, hour12: false,
+  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+})
+
+/** Year, month, day, hour and minute as they read on a clock in Prague. */
+function zoned(d: Date): { y: number; mo: number; d: number; h: number; mi: number } {
+  const f: Record<string, string> = {}
+  for (const p of PARTS.formatToParts(d)) if (p.type !== 'literal') f[p.type] = p.value
+  /* 24 rather than 00 for midnight is an en-GB hour12:false quirk, and it is
+     the difference between midnight and the following midnight. */
+  const h = Number(f.hour) % 24
+  return { y: Number(f.year), mo: Number(f.month), d: Number(f.day), h, mi: Number(f.minute) }
+}
+
+export const dayKey = (d: Date) => {
+  const z = zoned(d)
+  return `${z.y}-${pad(z.mo)}-${pad(z.d)}`
+}
+
+/** A wall-clock time in Prague, as the instant it actually happened.
+
+    Two passes: guess that the wall time is UTC, see how far off Prague reads,
+    then correct by that much. One correction is enough away from the hour a
+    clock changes, and the second pass settles it when it is not. */
+function fromPragueWallClock(y: number, mo: number, d: number, h: number, mi: number, s: number): Date {
+  let at = new Date(Date.UTC(y, mo - 1, d, h, mi, s))
+  for (let i = 0; i < 2; i++) {
+    const z = zoned(at)
+    const drift = (Date.UTC(z.y, z.mo - 1, z.d, z.h, z.mi) - Date.UTC(y, mo - 1, d, h, mi))
+    if (!drift) break
+    at = new Date(at.getTime() - drift)
+  }
+  return at
+}
 
 /** A DTSTART/DTEND value. Dates are floating; datetimes may be UTC (trailing Z)
  *  or carry a TZID. Without a full timezone database the only honest options
@@ -60,14 +111,17 @@ function parseWhen(value: string, params: Record<string, string>): { at: Date; a
   if (dateOnly || params.VALUE === 'DATE') {
     const m = dateOnly ?? /^(\d{4})(\d{2})(\d{2})/.exec(v)
     if (!m) return null
-    return { at: new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])), allDay: true }
+    return { at: fromPragueWallClock(Number(m[1]), Number(m[2]), Number(m[3]), 0, 0, 0), allDay: true }
   }
   const dt = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z)?$/.exec(v)
   if (!dt) return null
   const [, y, mo, d, h, mi, s, z] = dt
+  /* A trailing Z is an instant and needs no help. Anything else is a wall
+     clock, and on a calendar kept in Prague that clock is Prague's, whatever
+     the machine reading it happens to think the time is. */
   const at = z
     ? new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s)))
-    : new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s))
+    : fromPragueWallClock(Number(y), Number(mo), Number(d), Number(h), Number(mi), Number(s))
   return { at, allDay: false }
 }
 
@@ -201,9 +255,14 @@ function occurrences(e: Raw, from: Date, to: Date): Date[] {
       for (const code of byDay) {
         const idx = DAYS.indexOf(code)
         if (idx < 0) continue
-        const d = new Date(monday)
-        d.setDate(monday.getDate() + idx)
-        d.setHours(e.start.getHours(), e.start.getMinutes(), 0, 0)
+        const base = new Date(monday)
+        base.setDate(monday.getDate() + idx)
+        /* Recurrences keep the wall-clock time of the original in Prague, so
+           an 09:00 stand-up stays 09:00 across a clock change rather than
+           sliding to 08:00 for half the year. */
+        const w = zoned(e.start)
+        const on = zoned(base)
+        const d = fromPragueWallClock(on.y, on.mo, on.d, w.h, w.mi, 0)
         if (d < e.start) continue
         if (until && d > until) continue
         if (within(d) && !e.exdates.has(dayKey(d))) out.push(new Date(d))
@@ -223,7 +282,7 @@ function occurrences(e: Raw, from: Date, to: Date): Date[] {
   return out
 }
 
-const minutesOf = (d: Date) => d.getHours() * 60 + d.getMinutes()
+const minutesOf = (d: Date) => { const z = zoned(d); return z.h * 60 + z.mi }
 
 /**
  * Every event between two dates, flattened to one row per day, sorted.

@@ -5547,10 +5547,14 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 /* Habits and goals share a row and match heights; the week strip is seven equal
    cards and wants the whole width, so it gets its own. Sitting it in a third
    column left a third of the room empty, which is what he saw. */
-.troom-lower { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: stretch; }
-.troom-lower > .tr-card { display: flex; flex-direction: column; max-height: 42vh; min-height: 260px; }
-.troom-lower .tr-rows, .troom-lower .tr-goals { overflow-y: auto; min-height: 0; }
-.tr-week { grid-column: 1 / -1; max-height: none !important; min-height: 0 !important; }
+/* One column. Two side by side capped at 42vh clipped the routines strip and
+   the habits under it: the card measured 462px against 769px of content, with
+   `overflow: visible`, so the bottom half was drawn and unreachable. Each of
+   these wants the full width anyway. The routines strip needs it to wrap into
+   fewer rows, and the week strip is seven equal cards. */
+.troom-lower { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.troom-lower > .tr-card { display: flex; flex-direction: column; }
+.troom-lower .tr-goals { min-height: 0; }
 .troom .tr-box.is-on { background: var(--t-hot); border-color: var(--t-hot); position: relative; }
 .troom .tr-box.is-on::after {
   content: ''; position: absolute; inset: 0;
@@ -6352,3 +6356,37 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 @media (max-width: 1100px) {
   .goal-row { grid-template-columns: minmax(0, 1fr) 84px 68px 74px 40px; }
 }
+
+/* ---- Today: routines above, habits below --------------------------------
+   His pick from the artifact. A routine is finished by its steps, so it gets a
+   tile with progress and a way in; a habit is the only thing on this card he
+   ticks directly. The shape says which is which before the heading does. */
+.tr-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+  gap: 9px;
+}
+.troom .tr-rt {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 9px;
+  text-align: left; width: 100%;
+  background: var(--t-card2); border: 1px solid var(--t-line);
+  border-radius: 12px; padding: 14px 15px; cursor: pointer;
+  /* A button does not inherit `color`; without this every tile title renders
+     in the UA default and vanishes on a dark card. */
+  color: inherit; font-family: inherit;
+  transition: border-color var(--a-enter), transform var(--a-enter), background var(--a-enter);
+}
+.troom .tr-rt:hover { border-color: var(--t-hot); transform: translateY(-2px); background: var(--t-hotdim); }
+.troom .tr-rt:focus-visible { outline: 3px solid var(--t-hot-text); outline-offset: 2px; }
+.tr-rtn {
+  font-size: 15px; font-weight: 600; line-height: 1.2; width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tr-rtb { height: 7px; border-radius: 999px; background: rgba(246, 240, 228, 0.14); width: 100%; overflow: hidden; display: block; }
+.shell:not(.is-hud) .tr-rtb { background: var(--a-sunk); }
+.tr-rtb i { display: block; height: 100%; border-radius: 999px; background: var(--t-hot); transform-origin: left; animation: a-fill var(--a-land) both; }
+.tr-rtc { font-weight: 800; font-size: 14.5px; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+/* The denominator is read, so it takes muted. The dim tone is decoration. */
+.tr-rtc i { font-style: normal; color: var(--t-muted); font-weight: 700; }
+.tr-rule { height: 1px; background: var(--t-line); margin: 22px 0 18px; }
+.tr-ritual .tr-rows { overflow: visible; }

@@ -72,7 +72,10 @@ Deno.serve(async (req: Request) => {
     const days = Math.min(31, Math.max(1, Number.isFinite(asked) ? asked : 8))
     const from = new Date(); from.setHours(0, 0, 0, 0)
     const to = new Date(from); to.setDate(from.getDate() + days)
-    const events = parseIcs(text, from, to)
+    /* MC_CALENDAR_EMAIL is optional: the owner is normally read out of the feed
+       itself, and this is the way out when a calendar is named something other
+       than the address that owns it. */
+    const events = parseIcs(text, from, to, Deno.env.get('MC_CALENDAR_EMAIL') ?? undefined)
     return new Response(JSON.stringify({ events }), {
       status: 200,
       headers: {

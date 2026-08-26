@@ -3,7 +3,7 @@ import { useStore } from './store'
 import { useCalendar } from './calendar'
 import { SpaceMark } from './ui'
 import { SPACE_LABELS } from './mock'
-import { ask, STARTERS, opener, type Action, type Brief, type Card, type CardKind, type Reply } from './assistant'
+import { ask, STARTERS, type Action, type Brief, type Card, type CardKind, type Reply } from './assistant'
 import { engineName, speechState, stop as stopSpeech, subscribe, toggle } from './speech'
 import {
   cancel as cancelDictation, dictateState, dictationAvailable, dictationEngine,
@@ -521,6 +521,59 @@ function Dictate({ base, onText, busy }: { base: string; onText: (t: string) => 
 /* His words, not a prompt. It is written as he would say it so the answer comes
    back in the same register, and so the turn in the thread reads like something
    he asked rather than something the app injected. */
+/* The assistant's mark. Angular on purpose, and alive.
+
+   It replaced a blue sphere, on his instruction: "make it more motion graphic
+   and do not use circle at all, it has to look like jarvis". So the geometry is
+   hexagonal and the motion is layered, the way a heads-up display reads: rings
+   of bracket work turning against each other, a sweep going round, telemetry
+   ticks, and a core that beats.
+
+   DRAWN, NOT DOWNLOADED. Every Jarvis kit worth looking at is either a whole
+   dark cyan theme that would fight this app's warm paper, or a dependency to
+   carry for one decoration. This is inline SVG in currentColor, so it costs
+   nothing to load, inherits the accent, and there is no licence to honour.
+
+   `state` drives it. Idle turns slowly; thinking winds up and the sweep comes
+   in; listening beats with the voice; speaking pulses. The animation is the
+   status, which means it is never lying about what the app is doing. */
+export type MarkState = 'idle' | 'thinking' | 'listening' | 'speaking'
+
+export function Mark({ state = 'idle', size = 132 }: { state?: MarkState; size?: number }): JSX.Element {
+  return (
+    <svg
+      className={`as-mark is-${state}`}
+      width={size} height={size} viewBox="0 0 120 120"
+      fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {/* telemetry, turning one way */}
+      <g className="as-mark-ticks">
+        <line x1="60.00" y1="6.00" x2="60.00" y2="0.50" /><line x1="87.00" y1="13.23" x2="88.50" y2="10.64" />
+        <line x1="106.77" y1="33.00" x2="109.36" y2="31.50" /><line x1="114.00" y1="60.00" x2="119.50" y2="60.00" />
+        <line x1="106.77" y1="87.00" x2="109.36" y2="88.50" /><line x1="87.00" y1="106.77" x2="88.50" y2="109.36" />
+        <line x1="60.00" y1="114.00" x2="60.00" y2="119.50" /><line x1="33.00" y1="106.77" x2="31.50" y2="109.36" />
+        <line x1="13.23" y1="87.00" x2="10.64" y2="88.50" /><line x1="6.00" y1="60.00" x2="0.50" y2="60.00" />
+        <line x1="13.23" y1="33.00" x2="10.64" y2="31.50" /><line x1="33.00" y1="13.23" x2="31.50" y2="10.64" />
+      </g>
+      {/* bracket work, turning the other way */}
+      <g className="as-mark-brackets">
+        <path d="M53 8 L60 8 L67 8" /><path d="M101.53 27.94 L105.03 34 L108.53 40.06" />
+        <path d="M108.53 79.94 L105.03 86 L101.53 92.06" /><path d="M67 112 L60 112 L53 112" />
+        <path d="M18.47 92.06 L14.97 86 L11.47 79.94" /><path d="M11.47 40.06 L14.97 34 L18.47 27.94" />
+      </g>
+      {/* the frame */}
+      <polygon className="as-mark-hex" points="60,16 98.11,38 98.11,82 60,104 21.89,82 21.89,38" />
+      <polygon className="as-mark-hex2" points="75,34.02 90,60 75,85.98 45,85.98 30,60 45,34.02" />
+      {/* the sweep: one arm, going round, drawn only when it has something to say */}
+      <line className="as-mark-sweep" x1="60" y1="60" x2="60" y2="18" />
+      {/* the core */}
+      <polygon className="as-mark-core" points="60,46 72.12,53 72.12,67 60,74 47.88,67 47.88,53" />
+      <polygon className="as-mark-pip" points="60,52 68,60 60,68 52,60" />
+    </svg>
+  )
+}
+
 const BRIEF_ASK = 'Give me my morning brief. What is it like out, what is on today, '
   + 'and what did I not finish yesterday?'
 
@@ -529,10 +582,25 @@ const BARS = 96
 function VoicePanel({ onExit }: { onExit: () => void }): JSX.Element {
   const [, bump] = useState(0)
   const history = useRef<number[]>(Array.from({ length: BARS }, () => 0))
+  /* Held in a ref so the subscription is made once. Re-subscribing on every
+     frame of the waveform would be a new listener sixty times a second. */
+  const exitRef = useRef(onExit)
+  exitRef.current = onExit
+  /* Once, and only once. onExit calls exit() again, exit() emits, and this
+     subscriber runs from inside that emit: without the latch it called itself
+     until the stack gave out, and the setVoice(false) that removes this panel
+     sat AFTER the exit() call and so never ran. The panel stayed on screen with
+     a dead microphone behind it. */
+  const hungUp = useRef(false)
   useEffect(() => subscribeVoice(() => {
     const h = history.current
     h.push(voiceLevel())
     if (h.length > BARS) h.shift()
+    /* IT CAN HANG UP BY ITSELF, after six seconds with nothing said. The module
+       knows it has stopped; React does not, and without this the panel stayed
+       on screen with a dead microphone behind it, looking like it was still
+       listening. */
+    if (voicePhase() === 'off' && !hungUp.current) { hungUp.current = true; exitRef.current() }
     bump((n) => n + 1)
   }), [])
 
@@ -699,12 +767,9 @@ export function AssistantPage() {
       {empty && (
         <div className="as-open">
           <div className="as-hero">
-            <span className="as-orb" aria-hidden="true" />
+            <Mark state={voice ? 'listening' : 'idle'} />
             <h1 className="as-hero-q">What can I help with?</h1>
-            {/* Something true the moment the page opens, counted by the app, not
-                asked of a model. This is the only sentence here allowed to carry
-                numbers, because the app is the thing doing the counting. */}
-            <p className="as-hero-now">{opener(brief)}</p>
+
           </div>
           {/* The one thing he came here to do most mornings, so it is the one
               thing that looks like a button rather than a suggestion. It opens
@@ -797,7 +862,7 @@ export function AssistantPage() {
                     )
                     : (
                       <p className="as-thinking" role="status">
-                        <span className="as-orb as-orb-sm" aria-hidden="true" />
+                        <Mark state="thinking" size={22} />
                         <span className="as-dots" aria-hidden="true"><i /><i /><i /></span>
                         <span className="visually-hidden">Reading your day</span>
                       </p>

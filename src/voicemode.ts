@@ -24,6 +24,11 @@ const HUSH = 1100
 /** Chrome ends recognition on its own after a stretch of silence. If we are
     still meant to be listening, start it again rather than going deaf. */
 const RESTART_DELAY = 250
+/* Said nothing at all for this long: he is done, or he walked away. Voice mode
+   hangs up rather than holding the microphone open for the rest of the evening.
+   Only ever armed when NOTHING has been heard; once he starts a sentence, HUSH
+   owns the timing and this stays out of the way. */
+const IDLE_HANGUP = 6000
 
 type Recognition = {
   lang: string
@@ -63,6 +68,7 @@ const PEAK_DECAY = 0.992
 let peak = NOISE * 2
 let rec: Recognition | null = null
 let hush: ReturnType<typeof setTimeout> | null = null
+let idle: ReturnType<typeof setTimeout> | null = null
 let stream: MediaStream | null = null
 let ctx: AudioContext | null = null
 let raf = 0
@@ -86,12 +92,20 @@ function setPhase(p: VoicePhase): void { phase = p; emit() }
 function clearHush(): void {
   if (hush) { clearTimeout(hush); hush = null }
 }
+function clearIdle(): void {
+  if (idle) { clearTimeout(idle); idle = null }
+}
+function armIdle(): void {
+  clearIdle()
+  idle = setTimeout(() => { if (phase === 'listening') exit() }, IDLE_HANGUP)
+}
 
 /* Recognition is torn down handler-first every time. A detached handler cannot
    deliver the trailing result that SpeechRecognition sends after stop(), which
    is the same trap that used to refill the ask box after sending. */
 function killRecognition(): void {
   clearHush()
+  clearIdle()
   if (!rec) return
   rec.onresult = null
   rec.onend = null
@@ -125,7 +139,7 @@ function listen(): void {
     /* Every word he says pushes the send back. The question goes when he
        stops, not when the engine calls a phrase finished. */
     clearHush()
-    if (heard.trim() || interim.trim()) hush = setTimeout(send, HUSH)
+    if (heard.trim() || interim.trim()) { clearIdle(); hush = setTimeout(send, HUSH) }
   }
   r.onerror = () => { /* no-speech and aborted are ordinary; onend handles it */ }
   r.onend = () => {
@@ -137,7 +151,7 @@ function listen(): void {
     }
   }
   rec = r
-  try { r.start(); setPhase('listening') } catch { /* start twice; harmless */ }
+  try { r.start(); setPhase('listening'); armIdle() } catch { /* start twice; harmless */ }
 }
 
 async function send(): Promise<void> {
@@ -228,7 +242,11 @@ export async function enter(
 
 /** Turn it off, from anywhere, at any point in the loop. */
 export function exit(): void {
+  /* Idempotent on purpose. exit() emits, and a listener that reacts to 'off' by
+     calling exit() would otherwise recurse through this every time. */
+  if (phase === 'off' && !rec && !stream && !ctx) return
   phase = 'off'
+  clearIdle()
   killRecognition()
   stopSpeech()
   if (raf) { cancelAnimationFrame(raf); raf = 0 }

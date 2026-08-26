@@ -84,18 +84,22 @@ await page.goto(`${URL}/#/assistant`); await page.reload(); await page.waitForTi
 /* THE DOORWAY OFFERS THINGS HE DOES, not things he types. Each chip sends a
    written question on his behalf and shows its own NAME in the thread, the way
    the brief already did: he pressed a button, and that is the thing he did. */
-const chips = await page.locator('.as-chip').allTextContents()
+/* All six buttons share one class now (.as-brief), so the five skills are
+   everything in that group except the brief itself, not a separate .as-chip
+   selector, which the doorway no longer has at all. */
+const chips = (await page.locator('.as-skills .as-brief').allTextContents())
+  .filter((t) => t !== 'Morning brief')
 ok('the doorway offers five skills beside the brief', chips.length === 5, chips.join(' | '))
 for (const want of ['Evening close', 'What am I avoiding', 'Plan today and tomorrow',
                     'Where did the week go', 'Clear my head']) {
   ok(`  ${want} is one of them`, chips.includes(want))
 }
 
-const brief = page.locator('.as-brief')
+const brief = page.locator('.as-brief', { hasText: 'Morning brief' })
 ok('the doorway offers a Morning brief button', await brief.count() === 1)
-ok('it is the page\'s one filled control',
+ok('it is filled, the same design as the five skills beside it',
    await page.evaluate(() => {
-     const el = document.querySelector('.as-brief')
+     const el = [...document.querySelectorAll('.as-brief')].find((b) => b.textContent.includes('Morning brief'))
      const bg = getComputedStyle(el).backgroundColor
      return bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent'
    }))
@@ -242,7 +246,7 @@ ok('naming one task is now allowed, counts still are not',
   if (await l3.count()) { await l3.first().click(); await page3.waitForTimeout(900) }
   await page3.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_test'))
   await page3.goto(`${URL}/#/assistant`); await page3.reload(); await page3.waitForTimeout(1200)
-  await page3.locator('.as-chip', { hasText: 'Clear my head' }).click()
+  await page3.locator('.as-brief', { hasText: 'Clear my head' }).click()
   await page3.waitForSelector('.as-turn.is-you .as-said', { timeout: 15000 })
   const shown = (await page3.locator('.as-turn.is-you .as-said').first().textContent())?.trim()
   ok('a skill shows its name in the thread', shown === 'Clear my head', JSON.stringify(shown))

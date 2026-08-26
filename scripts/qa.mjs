@@ -2298,8 +2298,12 @@ await step('assistant: the empty page is a doorway, with none of a chatbot’s f
   if (await page.locator('.as-mark circle').count()) throw new Error('the mark went back to being a circle')
   const q = await page.locator('.as-hero-q').innerText()
   if (q !== 'What can I help with?') throw new Error(`the question reads "${q}"`)
-  const chips = await page.locator('.as-starters .as-chip').count()
-  if (chips !== 5) throw new Error(`${chips} starters, expected 5`)
+  /* One design now, not a filled brief button plus five outlined chips below
+     the ask box: all six things he can do live in .as-skills as .as-brief
+     buttons, same style throughout. */
+  const skillButtons = await page.locator('.as-skills .as-brief').count()
+  if (skillButtons !== 6) throw new Error(`${skillButtons} skill buttons, expected 6 (brief plus five)`)
+  if (await page.locator('.as-starters').count()) throw new Error('the old outlined chip row is still on the page')
   /* His instruction was, twice over, no voice of any kind, and specifically not
      attach / search / reason / create an image / summarise / translate. Those
      belong to a general chatbot and not one of them is a thing this app does.

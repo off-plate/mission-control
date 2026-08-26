@@ -493,7 +493,7 @@ function firstObject(text: string): string | null {
 
 export type Outcome =
   | { ok: true; reply: Reply }
-  | { ok: false; reason: 'no-key' | 'rejected' | 'offline' | 'unreadable' | 'model-gone'; detail?: string }
+  | { ok: false; reason: 'no-key' | 'rejected' | 'offline' | 'unreadable' | 'model-gone' | 'rate-limit'; detail?: string }
 
 /** One turn. `history` is the conversation so far, oldest first.
  *  `onSay` makes it stream: the sentence arrives a few words at a time, which
@@ -529,6 +529,23 @@ export async function ask(
     return { ok: false, reason: 'offline' }
   }
   if (res.status === 401 || res.status === 403) return { ok: false, reason: 'rejected' }
+  if (res.status === 429) {
+    /* Groq's 429 body is a wall of text he should never see: an org id, a
+       service tier, a token accounting, and a billing upsell link, ending in
+       "Ask again, or rephrase it." on a request that was never unreadable.
+       Two questions asked back to back after a card just wrote a habit or
+       moved a task is enough to hit an 8000 token-per-minute cap, so this is
+       ordinary traffic, not a fault. Only the number worth keeping - how long
+       to wait - is pulled out, and the rest is dropped. */
+    let wait: number | null = null
+    try {
+      const body = await res.json()
+      const msg = body?.error?.message
+      const m = typeof msg === 'string' ? /try again in ([\d.]+)s/i.exec(msg) : null
+      if (m) wait = Math.ceil(Number(m[1]))
+    } catch { /* keep wait null; the hint still holds without a number */ }
+    return { ok: false, reason: 'rate-limit', detail: wait ? `${wait}` : undefined }
+  }
   if (!res.ok) {
     /* Say WHAT went wrong, in the provider's own words. The model this app used
        was retired on 2026-08-16 and every AI feature died at once, silently,

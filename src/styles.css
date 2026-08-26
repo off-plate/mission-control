@@ -4820,12 +4820,6 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .as-send { margin-left: auto; }
 
 /* ---- chips ---- */
-.as-starters {
-  display: flex; flex-wrap: wrap; gap: var(--s2); justify-content: center;
-  /* Narrower than the box on purpose: at full width six chips came out five on
-     one line and one stranded underneath, which reads as a mistake. */
-  max-width: 620px; margin: var(--s5) auto 0;
-}
 .as-chip {
   border: 1px solid var(--hairline-strong); border-radius: 999px;
   padding: var(--s2) var(--s4); background: none; cursor: pointer;
@@ -5103,14 +5097,28 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   .as-wave-bar { transition: none; }
 }
 
-/* Morning brief: the one thing he does most mornings, so it is the only filled
-   control on the page. It sits above the ask box because the box is what you
-   use when you have a question, and this is for when you do not have one yet. */
+/* The doorway's row of things he does rather than types: the morning brief
+   and the five skills beside it, one design throughout. Filled rather than
+   outlined, because these are buttons, not suggestions, and used to be split
+   into one filled pill above the ask box and five outlined chips stranded
+   below it, which read as two different weights for the same kind of thing. */
+.as-skills {
+  /* A GRID, not flex-wrap. Six buttons this wide do not divide evenly into a
+     row that wraps left to right: at most widths that packed 3+2+1, and the
+     lone sixth button stranded on its own row is the exact mistake the old
+     chip layout's own comment warned about, just recreated one size up. Two
+     fixed columns means three even rows, always, at every width above the
+     phone breakpoint below. */
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s3);
+  max-width: 620px; margin: 0 auto var(--s4);
+}
+.as-skills .as-brief { width: 100%; }
+@media (max-width: 639px) {
+  .as-skills { grid-template-columns: 1fr; }
+}
 .as-brief {
-  /* .as-open is a plain block, so align-self had nothing to align against.
-     fit-content plus auto margins is what actually centres it under the hero. */
   display: flex; align-items: center; justify-content: center; gap: var(--s2);
-  width: fit-content; margin: 0 auto var(--s4);
   border: 1px solid var(--accent); border-radius: var(--r-sm);
   background: var(--accent); color: var(--accent-ink);
   padding: var(--s3) var(--s5);
@@ -5331,26 +5339,6 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   .as-mark-core { opacity: 0.85; }
 }
 
-/* Morning brief: the one thing he does most mornings, so it is the only filled
-   control on the page. It sits above the ask box because the box is what you
-   use when you have a question, and this is for when you do not have one yet. */
-.as-brief {
-  /* .as-open is a plain block, so align-self had nothing to align against.
-     fit-content plus auto margins is what actually centres it under the hero. */
-  display: flex; align-items: center; justify-content: center; gap: var(--s2);
-  width: fit-content; margin: 0 auto var(--s4);
-  border: 1px solid var(--accent); border-radius: var(--r-sm);
-  background: var(--accent); color: var(--accent-ink);
-  padding: var(--s3) var(--s5);
-  font-size: var(--text-base); font-weight: 500;
-  cursor: pointer;
-  transform: translateY(0);
-  transition: background var(--t-fast), transform var(--t-fast);
-}
-/* Darkens on hover, the way btn-primary does. A half-faded accent fill already
-   read as "broken" once on the pages where it is the only colour. */
-.as-brief:hover { background: var(--accent-hover); transform: translateY(-1px); }
-.as-brief:active { transform: translateY(0); transition-duration: 60ms; }
 /* ==========================================================================
    THE TODAY ROOM
    A dark slab inset in the warm paper app. It does not repaint the shell:

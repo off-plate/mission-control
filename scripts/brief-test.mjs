@@ -88,6 +88,7 @@ await brief.click()
 await page.waitForSelector('.as-turn.is-it .as-said', { timeout: 15000 })
 
 const msgs = JSON.parse(sent ?? '{}').messages ?? []
+const sysMsg = msgs.find((m) => m.role === 'system')?.content ?? ''
 ok('it opened voice mode rather than the text box', await page.locator('.as-voice').count() === 1)
 /* The thread shows the SKILL, not the paragraph the button sends on his behalf.
    Seeing "Give me my morning brief. What is it like out, what is on today, and
@@ -135,8 +136,27 @@ ok('the prompt tells it to take a position, not to recite',
    database row. */
 ok('the prompt forbids reading a workspace tag out loud',
    system.includes('NEVER WRITE A WORKSPACE TAG'))
-ok('the brief is specified as separate beats, not one paragraph',
-   system.includes('SHORT LINES SEPARATED BY BLANK LINES'))
+ok('the brief is specified as beats inside the say string',
+   system.includes('the whole brief goes inside the "say" string'))
+/* The template used to be written as a prose shape with placeholders on their
+   own lines, which reads as "write this" rather than "put this in a string",
+   and a model that follows it literally answers in prose and the whole thing
+   comes back unreadable. There is a real JSON example now, and the contract is
+   restated last, closest to the answer. */
+/* THE EXAMPLE MUST ITSELF BE VALID JSON. It was not: written in a TypeScript
+   template literal, \\n is a real newline, so the example the model is told to
+   copy arrived split across actual lines and was not parseable. An invalid
+   example is worse than no example. */
+const example = (sysMsg.match(/\{"say":"Morning, Michael[^\n]*/) ?? [])[0]
+ok('the brief example is on one line', !!example, JSON.stringify(example?.slice(0, 40) ?? 'missing'))
+ok('and the example the model is told to copy is itself valid JSON', (() => {
+  try { return JSON.parse(example).say.split('\n\n').length === 4 } catch { return false }
+})(), (() => { try { return JSON.parse(example).say.split('\n\n').length + ' beats' } catch (e) { return 'NOT JSON: ' + e.message } })())
+/* The SYSTEM message specifically: `system` joins every message, so it ends
+   with his question, not with the prompt. */
+ok('and the contract is restated at the very end of the prompt',
+   sysMsg.trimEnd().endsWith('line breaks are \\n inside that string.'),
+   JSON.stringify(sysMsg.trimEnd().slice(-46)))
 ok('naming one task is now allowed, counts still are not',
    system.includes('YOU MUST NOT STATE COUNTS') && system.includes('TITLES ARE DIFFERENT'))
 

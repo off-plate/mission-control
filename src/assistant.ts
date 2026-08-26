@@ -19,7 +19,7 @@
    money, no note contents. It is what a colleague glancing at the screen would
    see, and nothing that would be a problem if the model logged it. */
 
-import { MODEL, getAiKey, groq } from './ai'
+import { MODEL, getAiKey, groq, stripReasoning } from './ai'
 
 /** What a card shows. The app owns every one of these; the model only names one. */
 export type CardKind =
@@ -233,23 +233,24 @@ a number: a made-up estimate is a made-up number.
 
 Only act when he asked for a change. A question is a question.
 
-THE MORNING BRIEF is the one answer allowed to be longer, and it is written in
-SHORT LINES SEPARATED BY BLANK LINES, not one paragraph. A wall of text read
-aloud is a wall of text. Four beats, in this order, one or two sentences each:
+THE MORNING BRIEF is the one answer allowed to be longer. It is still ONE JSON
+object and the whole brief goes inside the "say" string, with \\n between the
+beats. Four beats, in this order, one or two sentences each:
 
-  Morning, Michael. <what it is like out, in your own words, using the app's
-  figures. A remark is welcome: rain means take the umbrella.>
+  1 greet him by name and say what it is like out, in your own words, using the
+    app's figures. A remark is welcome: rain means take the umbrella.
+  2 what the day already asks of him. Meetings and anything fixed to a time.
+  3 what to start with, and why that one. Name it properly, no workspace tag.
+  4 if something is LEFT OVER FROM YESTERDAY, name ONE and ask whether it goes
+    on today or back to the list. One question, not a list of them, because he
+    answers out loud. If yesterday was clean, say so in four words and stop.
 
-  <What the day already asks of him. Meetings and anything fixed to a time.>
+Do not number the beats in what you write, no headings, no bullets: it is read
+aloud and a heading read aloud is noise. Just \\n\\n between them. Exactly
+like this, and nothing outside the object:
 
-  <Start with X, and why that one. Name it properly, no workspace tag.>
+{"say":"Morning, Michael. It is overcast and 7 out, up to 12, so take a coat.\\n\\nThe day has the invoice at noon and two meetings after it.\\n\\nStart with the VZP letter. It is the only thing here with a deadline.\\n\\nThe Blastburn quote is still sitting from yesterday. On today, or back to the list?","show":[{"kind":"today"},{"kind":"backlog"}],"next":["On today","Back to the list"]}
 
-  <If something is LEFT OVER FROM YESTERDAY: name ONE and ask whether it goes
-  on today or back to the list. One question, not a list of them, because he
-  answers out loud. If yesterday was clean, say so in four words and stop.>
-
-Put a blank line between the beats. Do not number them, do not write headings,
-do not use bullets: it is spoken, and a heading read aloud is noise.
 Show the "today" card, and "backlog" too when yesterday left something behind.
 
 That last part matters. Leftovers from yesterday are the thing he avoids, so
@@ -264,7 +265,12 @@ being written in Czech. His tasks, notes, habits and meetings are largely in
 Czech and that is DATA, not a request: a briefing full of Czech titles must
 never pull the answer into Czech. Nor must a short, unclear or nonsense message,
 which reads as Czech to a language detector far more often than it should.
-Cannot tell? English. This holds for "next" as well.`
+Cannot tell? English. This holds for "next" as well.
+
+ONE LAST TIME, because all of the above is about WHAT to say and this is about
+HOW to send it: reply with the JSON object and nothing else. No prose in front
+of it, no fence around it, no explanation after it. "say" is a string, and its
+line breaks are \\n inside that string.`
 
 /* The chips under the box. Not "attach", "search", "reason", "create image":
    those are a general chatbot's furniture and none of them is a thing this app
@@ -333,6 +339,45 @@ export function partialSay(raw: string): string | null {
       continue
     }
     if (ch === '"') break
+    out += ch
+  }
+  return out
+}
+
+/** The balanced {...} that CONTAINS `"say"`, or null.
+
+    firstObject() takes the first object in the text, which is wrong the moment
+    anything precedes the answer: this model leaks a reasoning block, and a
+    reasoning block full of prose regularly contains a brace. The first object
+    then parses perfectly and has no `say` in it, and the whole answer was
+    thrown away for being unreadable while sitting further down the string. */
+function objectWithSay(text: string): string | null {
+  const k = text.indexOf('"say"')
+  if (k < 0) return null
+  // Walk back to the brace that opens the object this key belongs to.
+  let depth = 0, start = -1
+  for (let i = k; i >= 0; i--) {
+    if (text[i] === '}') depth++
+    else if (text[i] === '{') { if (!depth) { start = i; break } depth-- }
+  }
+  if (start < 0) return null
+  const rest = firstObject(text.slice(start))
+  return rest
+}
+
+/** JSON with real newlines inside its strings, repaired.
+
+    The brief is written in beats, so `say` carries line breaks, and a model
+    asked for \n in a JSON string will sometimes press Enter instead. That is
+    invalid JSON and throws, over an answer that is otherwise perfect. */
+function healNewlines(json: string): string {
+  let out = '', inStr = false, esc = false
+  for (const ch of json) {
+    if (esc) { out += ch; esc = false; continue }
+    if (ch === '\\') { out += ch; esc = true; continue }
+    if (ch === '"') { inStr = !inStr; out += ch; continue }
+    if (inStr && (ch === '\n' || ch === '\r')) { out += '\\n'; continue }
+    if (inStr && ch === '\t') { out += '\\t'; continue }
     out += ch
   }
   return out
@@ -451,42 +496,52 @@ async function readStream(body: ReadableStream<Uint8Array>, onSay: (t: string) =
   return finish(raw)
 }
 
-/** One raw answer, whatever shape it came in, turned into a Reply. */
+/** One raw answer, whatever shape it came in, turned into a Reply.
+
+    A LADDER, not a parse. Every rung below stands for an answer that was
+    actually thrown away and shown to him as "the answer came back unreadable",
+    which is the worst possible outcome: the model did the work, the sentence
+    was fine, and the app binned it. Each rung gives up something (the cards,
+    then the follow-ups) and keeps the sentence, because the sentence is the
+    part he asked for. */
 function finish(raw: string): Outcome {
-  try {
-    /* Parsed out of the text rather than trusting a JSON response mode this
-       model does not document. It answers with an object, sometimes wrapped in
-       a fence or a sentence, so the first balanced {...} is taken and the rest
-       ignored. */
-    const obj = firstObject(raw)
-    /* NOTHING BALANCED CAME BACK, so the object was cut off mid-write. The
-       sentence is usually complete long before the closing brace, and it has
-       already been read out on screen by partialSay while it streamed. Throwing
-       it away to show an error is the worst of both: he watched a good answer
-       arrive and then watched it be replaced. Keep the sentence, drop the cards,
-       because a card that was never named is not a card this app can promise. */
-    if (!obj) {
-      const partial = partialSay(raw)?.trim()
-      if (partial) return { ok: true, reply: { say: partial, show: [], next: [] } }
-      return { ok: false, reason: 'unreadable' }
+  /* The reasoning block comes off FIRST. This model emits one, ai.ts says so,
+     and nothing on this path was removing it. A block of prose containing a
+     single brace was enough to send the parse into the middle of the model's
+     own thinking. */
+  const clean = stripReasoning(raw) || raw
+
+  const attempts = [objectWithSay(clean), firstObject(clean), objectWithSay(raw), firstObject(raw)]
+  for (const obj of attempts) {
+    if (!obj) continue
+    for (const candidate of [obj, healNewlines(obj)]) {
+      try {
+        const parsed = JSON.parse(candidate) as Partial<Reply>
+        const say = typeof parsed.say === 'string' ? parsed.say.trim() : ''
+        if (!say) continue
+        /* Anything it invented outside the card vocabulary is dropped rather
+           than rendered: an unknown card is a card this app cannot promise. */
+        const show = Array.isArray(parsed.show)
+          ? parsed.show.filter((c): c is Card => !!c && KINDS.includes((c as Card).kind)).slice(0, 4)
+          : []
+        const next = Array.isArray(parsed.next)
+          ? parsed.next.filter((n) => typeof n === 'string' && n.trim()).slice(0, 3)
+          : []
+        return { ok: true, reply: { say, show, next, do: cleanActions((parsed as { do?: unknown }).do) } }
+      } catch { /* next candidate */ }
     }
-    const parsed = JSON.parse(obj) as Partial<Reply>
-    const say = typeof parsed.say === 'string' ? parsed.say.trim() : ''
-    if (!say) return { ok: false, reason: 'unreadable' }
-    /* Anything it invented outside the card vocabulary is dropped rather than
-       rendered: an unknown card is a card this app cannot promise is true. */
-    const show = Array.isArray(parsed.show)
-      ? parsed.show.filter((c): c is Card => !!c && KINDS.includes((c as Card).kind)).slice(0, 4)
-      : []
-    const next = Array.isArray(parsed.next)
-      ? parsed.next.filter((n) => typeof n === 'string' && n.trim()).slice(0, 3)
-      : []
-    return { ok: true, reply: { say, show, next, do: cleanActions((parsed as { do?: unknown }).do) } }
-  } catch {
-    /* Balanced but not valid JSON. Same reasoning as above: a sentence beats
-       an error, when the sentence is one he already saw. */
-    const partial = partialSay(raw)?.trim()
-    if (partial) return { ok: true, reply: { say: partial, show: [], next: [] } }
-    return { ok: false, reason: 'unreadable' }
   }
+
+  /* Nothing parsed. The sentence is written before the closing brace and has
+     already streamed onto the screen, so read it straight out of the text.
+     Cards go: one that was never fully named is not one this app can promise. */
+  for (const text of [clean, raw]) {
+    const partial = partialSay(text)?.trim()
+    if (partial) return { ok: true, reply: { say: partial, show: [], next: [] } }
+  }
+
+  /* Genuinely nothing usable. Carry a piece of what did come back, so the next
+     report of this says what it actually was instead of only that it failed. */
+  const peek = clean.replace(/\s+/g, ' ').trim().slice(0, 140)
+  return { ok: false, reason: 'unreadable', detail: peek ? `It answered: ${peek}` : undefined }
 }

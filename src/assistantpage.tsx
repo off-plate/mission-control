@@ -680,7 +680,9 @@ function VoicePanel({ onExit }: { onExit: () => void }): JSX.Element {
 
   const phase = voicePhase()
   const heard = voiceHeard()
-  const live = phase === 'listening'
+  /* The bars are live while it listens AND while it talks: one is his voice,
+     the other is the answer. Only the wait in between is still. */
+  const live = phase === 'listening' || phase === 'speaking'
   const said = phase === 'thinking' ? 'Thinking' : phase === 'speaking' ? 'Reading it out' : 'Listening'
 
   return (

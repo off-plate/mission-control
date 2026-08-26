@@ -70,8 +70,78 @@ function set(id: string | null, s: SpeechState): void {
   emit()
 }
 
+/* HOW LOUD IT IS TALKING, so voice mode can draw the answer as well as hear it.
+
+   Two sources, because there are two engines. Gemini plays through an <audio>
+   element, which can be run through an analyser like any other sound, so that
+   reading is the real waveform of the voice. The device voice plays inside the
+   browser with no node to tap, so the next best real signal is used instead:
+   `onboundary` fires as each word begins, so the meter is driven by the actual
+   rhythm of the speech rather than by a timer pretending to be one.
+
+   Where a browser fires no boundaries at all it falls back to a slow swell.
+   That is activity, not amplitude, and it is marked as such: better an honest
+   "it is talking" than a still bar that reads as broken. */
+let spoken = 0
+let spokenAt = 0
+let analyser: AnalyserNode | null = null
+let audioCtx: AudioContext | null = null
+let buf: Uint8Array | null = null
+let boundaries = 0
+
+/** 0..1 while it is speaking, and 0 when it is not. */
+export function speakingLevel(): number {
+  if (analyser && buf) {
+    analyser.getByteTimeDomainData(buf)
+    let sum = 0
+    for (let i = 0; i < buf.length; i++) { const d = (buf[i] - 128) / 128; sum += d * d }
+    return Math.min(1, Math.sqrt(sum / buf.length) * 4)
+  }
+  if (state !== 'playing') return 0
+  if (boundaries > 0) {
+    /* A word landed; fall away from it until the next one. */
+    const since = Date.now() - spokenAt
+    return Math.max(0.12, spoken * Math.max(0, 1 - since / 260))
+  }
+  /* No boundary events in this browser. A swell, so the panel says it is
+     talking without claiming to know how loudly. */
+  return 0.35 + 0.2 * Math.sin(Date.now() / 190)
+}
+
+/* Tap the audio element so the bars are the actual voice. Once a media element
+   is routed through a graph it only plays through that graph, so it is
+   connected straight back to the speakers. */
+function tap(el: HTMLAudioElement): void {
+  try {
+    const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+    audioCtx = new AC()
+    const src = audioCtx.createMediaElementSource(el)
+    const an = audioCtx.createAnalyser()
+    an.fftSize = 512
+    src.connect(an)
+    an.connect(audioCtx.destination)
+    analyser = an
+    buf = new Uint8Array(an.fftSize)
+  } catch {
+    /* No analyser is a quieter failure than no sound: leave it untapped and
+       let the element play normally. */
+    analyser = null
+    buf = null
+  }
+}
+
+function untap(): void {
+  analyser = null
+  buf = null
+  void audioCtx?.close().catch(() => { /* already closed */ })
+  audioCtx = null
+  boundaries = 0
+  spoken = 0
+}
+
 /** Whatever is talking, stop it. Safe to call when nothing is. */
 export function stop(): void {
+  untap()
   if (audio) {
     audio.pause()
     URL.revokeObjectURL(audio.src)
@@ -221,8 +291,9 @@ async function speakOnDevice(id: string, text: string): Promise<void> {
     u.rate = 1.0
     const pick = pickVoice(voices)
     if (pick) u.voice = pick
-    u.onend = () => { if (current === id) set(null, 'idle') }
-    u.onerror = () => { if (current === id) set(null, 'idle') }
+    u.onboundary = () => { boundaries++; spoken = 1; spokenAt = Date.now() }
+    u.onend = () => { if (current === id) { untap(); set(null, 'idle') } }
+    u.onerror = () => { if (current === id) { untap(); set(null, 'idle') } }
     speechSynthesis.cancel()
     speechSynthesis.speak(u)
     set(id, 'playing')
@@ -261,6 +332,7 @@ export async function toggle(id: string, text: string): Promise<void> {
   if (!blob) { await speakOnDevice(id, clean); return }
 
   const el = new Audio(URL.createObjectURL(blob))
+  tap(el)
   el.onended = () => { if (current === id) stop() }
   el.onerror = () => { if (current === id) void speakOnDevice(id, clean) }
   audio = el

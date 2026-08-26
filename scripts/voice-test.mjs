@@ -13,7 +13,11 @@ const ok = (n, c, d = '') => { console.log(`${c ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
 
 const REPLY = { say: 'Two things are sitting untouched.', show: [{ kind: 'backlog' }], next: ['x'] }
 
-const b = await chromium.launch()
+/* A REAL fake microphone, not a stubbed one. A hand-made object passed to
+   createMediaStreamSource throws, the whole level meter never starts, and the
+   bars sit at their baseline looking like a bug in the waveform rather than a
+   bug in the test. Chromium's own fake device gives a genuine MediaStream. */
+const b = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] })
 const page = await b.newPage()
 await page.addInitScript(() => {
   window.__log = []
@@ -30,8 +34,6 @@ await page.addInitScript(() => {
     r.onresult({ resultIndex: 0, results: Object.assign([Object.assign([{ transcript: text }], { isFinal })], { length: 1 }) })
   }
   // A microphone that exists but reports nothing, plus a speaker we can watch.
-  navigator.mediaDevices = navigator.mediaDevices || {}
-  navigator.mediaDevices.getUserMedia = async () => ({ getTracks: () => [{ stop() {} }] })
   window.__spoken = []
   /* getVoices is deliberately NOT stubbed. utterance.voice only accepts a real
      SpeechSynthesisVoice, so handing it a plain object throws and the speaking
@@ -39,6 +41,14 @@ await page.addInitScript(() => {
      has a real voice list; use it. */
   speechSynthesis.speak = (u) => {
     window.__spoken.push(u.text)
+    /* A real utterance fires onboundary as each word starts; the meter is
+       driven by those, so a stub that never fires them tests nothing. */
+    let w = 0
+    const words = String(u.text).split(' ').length
+    const beat = setInterval(() => {
+      if (w++ >= words || !u.onboundary) { clearInterval(beat); return }
+      u.onboundary({ name: 'word', charIndex: w })
+    }, 60)
     /* Record whether the ears are OPEN at the instant it starts talking. This is
        the real question. Checking only that recognition was not re-started during
        speech would pass while a recogniser opened earlier was still running and
@@ -131,6 +141,32 @@ await page.evaluate(() => window.__say('and after that', true))
 await page.waitForTimeout(1500)
 ok('a second question goes through the same loop', await page.locator('.as-turn.is-you').count() === 2,
    `${await page.locator('.as-turn.is-you').count()} spoken turns`)
+
+/* THE BARS MOVE WHILE IT TALKS. They used to go flat and faint the moment it
+   started speaking, because the microphone was shut and there was nothing to
+   read. There is something to read: the answer itself. The device voice fires
+   `onboundary` as each word begins, so the meter runs on the real rhythm of
+   the speech rather than on a timer pretending to be one. */
+/* Spoken, not typed: in voice mode the panel has replaced the textarea, so
+   there is no .as-input to fill. */
+await page.evaluate(() => window.__say('and one more thing', true))
+await page.waitForFunction(() => document.querySelector('.as-voice')?.className.includes('is-speaking'),
+  null, { timeout: 12000 }).catch(() => {})
+const whileSpeaking = await page.evaluate(async () => {
+  /* The NEWEST bar, not the loudest in the trail. The trail keeps a couple of
+     seconds of history, so its maximum stays pinned to the loudest moment and
+     reports "not moving" no matter what the meter does. */
+  const seen = []
+  for (let i = 0; i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 45))
+    const bars = [...document.querySelectorAll('.as-wave-bar')]
+    const last = bars[bars.length - 1]
+    seen.push(parseFloat(last?.style.height) || 0)
+  }
+  return { peak: Math.max(...seen), moved: new Set(seen.map((n) => Math.round(n / 4))).size }
+})
+ok('the bars are not flat while it speaks', whileSpeaking.peak > 10, `peak ${whileSpeaking.peak.toFixed(1)}%`)
+ok('and they move rather than holding one height', whileSpeaking.moved > 1, `${whileSpeaking.moved} distinct heights`)
 
 /* Same rule in voice mode, and here it hangs up entirely: an assistant left
    listening to an empty room all evening is the version of this feature nobody

@@ -153,13 +153,39 @@ export function TodayRoom() {
     }
   }
 
-  /* Habits due today, as rows he can tick, sorted so what is left is on top.
-     `dueOn` and the tick shape come from the Habits page, not from a guess. */
-  const habitRows = visibleHabits
-    .filter((hb) => dueOn(hb, todayIndex, habitLog) && !hb.folderId)
+  /* A ROUTINE IS NOT A HABIT, and this card used to say it was.
+
+     His report: Morning Preparation, After wake up and the rest were listed as
+     habits with checkboxes beside them. They are routines, and each one is a
+     folder of habits. The old filter dropped the habits INSIDE folders and then
+     kept each routine's OWN habit, which exists only to carry that routine's
+     streak, so the two categories arrived mixed under one heading.
+
+     The split below comes straight from `habitsDueToday`: folders on one side,
+     what it calls `loose` on the other. It matters beyond
+     tidiness, because a routine cannot be ticked. It finishes when its steps
+     do, so it gets progress and a way in, and never a checkbox. */
+  const dueRaw = visibleHabits.filter((hb) => dueOn(hb, todayIndex, habitLog))
+  const ownHabitIds = new Set(routines.map((r) => r.habitId).filter(Boolean) as string[])
+
+  const routineRows = [...new Set(dueRaw.map((hb) => hb.folderId).filter(Boolean) as string[])]
+    .map((id) => {
+      const r = routines.find((x) => x.id === id)
+      // Optional steps never hold a routine open, exactly as the Habits page counts it.
+      const need = dueRaw.filter((hb) => hb.folderId === id && !hb.optional)
+      return { id, name: r?.title ?? 'Routine', total: need.length, done: need.filter((hb) => hb.days[todayIndex]).length }
+    })
+    .filter((r) => r.total > 0)
+    .sort((a, b) => a.done / a.total - b.done / b.total)
+
+  /* Loose: no folder, and not a routine's own streak-carrying habit. These are
+     the only things on this card he ticks directly. */
+  const habitRows = dueRaw
+    .filter((hb) => !hb.folderId && !ownHabitIds.has(hb.id))
     .map((hb) => ({ hb, done: !!hb.days[todayIndex] }))
     .sort((a, b) => Number(a.done) - Number(b.done))
     .slice(0, 10)
+  const routinesDone = routineRows.filter((r) => r.done === r.total).length
 
   /* Goals, on the same accurate read GoalsPage uses: a habit-linked goal counts
      from the dated log inside its OWN period, never the seven-day cache. */
@@ -321,8 +347,22 @@ export function TodayRoom() {
 
       {/* ---- habits, goals, and the week behind ---- */}
       <section className="troom-lower">
-        <div className="tr-card">
-          <div className="tr-head"><p className="tr-l">Habits</p><span className="tr-n tr-sm">{kept}<i>/{due}</i></span></div>
+        <div className="tr-card tr-ritual">
+          <div className="tr-head"><p className="tr-l">Routines</p>
+            <span className="tr-n tr-sm">{routinesDone}<i>/{routineRows.length}</i></span></div>
+          <div className="tr-strip">
+            {routineRows.length === 0 && <p className="tr-empty">No routine is due today.</p>}
+            {routineRows.map((r) => (
+              <button className="tr-rt" key={r.id} onClick={() => setPage('habits')} aria-label={`${r.name}, ${r.done} of ${r.total} done`}>
+                <span className="tr-rtn">{r.name}</span>
+                <span className="tr-rtb"><i style={{ width: `${(r.done / r.total) * 100}%` }} /></span>
+                <span className="tr-rtc">{r.done}<i>/{r.total}</i></span>
+              </button>
+            ))}
+          </div>
+          <div className="tr-rule" />
+          <div className="tr-head"><p className="tr-l">Habits</p>
+            <span className="tr-n tr-sm">{habitRows.filter((h) => h.done).length}<i>/{habitRows.length}</i></span></div>
           <div className="tr-rows">
             {habitRows.length === 0 && <p className="tr-empty">Nothing due today.</p>}
             {habitRows.map(({ hb, done }) => (

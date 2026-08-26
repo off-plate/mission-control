@@ -2464,10 +2464,23 @@ await step('assistant: it visibly thinks, and says what to do when the model is 
   await page.locator('.as-input').fill('take your time')
   await page.locator('.as-input').press('Enter')
   await page.waitForTimeout(350)
-  if (!(await page.locator('.as-dots').isVisible())) throw new Error('nothing on screen says it is working')
-  const bobbing = await page.evaluate(() => getComputedStyle(document.querySelector('.as-dots > i')).animationName)
-  if (!bobbing || bobbing === 'none') throw new Error('the thinking indicator is a still picture')
-  await page.waitForSelector('.as-dots', { state: 'detached', timeout: 6000 })
+  /* The three bobbing dots are gone. A 22px mark beside them was two things
+     saying "working" and neither saying it well, so the blob is the whole
+     indicator now and has to carry it on its own. */
+  if (!(await page.locator('.as-thinking .as-mark').isVisible())) throw new Error('nothing on screen says it is working')
+  /* Its outline is generated per frame rather than animated by CSS, so a
+     computed animationName says nothing. Watch the geometry change instead:
+     a still picture is the failure this guards against. */
+  const shapes = await page.evaluate(async () => {
+    const seen = new Set()
+    for (let i = 0; i < 8; i++) {
+      await new Promise((r) => setTimeout(r, 60))
+      seen.add(document.querySelector('.as-thinking .as-mark path')?.getAttribute('d') ?? '')
+    }
+    return seen.size
+  })
+  if (shapes < 3) throw new Error(`the thinking indicator is a still picture (${shapes} shapes in 8 frames)`)
+  await page.waitForSelector('.as-thinking .as-mark', { state: 'detached', timeout: 6000 })
   if (!(await page.locator('.as-turn.is-it .as-said').count())) throw new Error('it stopped thinking without answering')
   /* The failure that started all of this: the model this app named was retired
      and every AI feature died silently. It must now say so, and say what to do. */

@@ -637,55 +637,114 @@ function Dictate({ base, onText, busy }: { base: string; onText: (t: string) => 
 /* His words, not a prompt. It is written as he would say it so the answer comes
    back in the same register, and so the turn in the thread reads like something
    he asked rather than something the app injected. */
-/* The assistant's mark. Angular on purpose, and alive.
+/* The assistant's mark: a blob that changes shape as it works.
 
-   It replaced a blue sphere, on his instruction: "make it more motion graphic
-   and do not use circle at all, it has to look like jarvis". So the geometry is
-   hexagonal and the motion is layered, the way a heads-up display reads: rings
-   of bracket work turning against each other, a sweep going round, telemetry
-   ticks, and a core that beats.
+   It replaced a hexagonal reticle, which replaced a blue sphere. His brief for
+   this one: "it should be sort of expanding circle like a blob or something
+   that has different shapes whenever it's being interacted with".
 
-   DRAWN, NOT DOWNLOADED. Every Jarvis kit worth looking at is either a whole
-   dark cyan theme that would fight this app's warm paper, or a dependency to
-   carry for one decoration. This is inline SVG in currentColor, so it costs
-   nothing to load, inherits the accent, and there is no licence to honour.
+   NOT A MORPH BETWEEN TWO POSES. The outline is generated fresh every frame
+   from a radius that varies around the circle, so it never returns to the same
+   shape twice and never reads as a loop. Three ripples at 2, 3 and 5 lobes,
+   turning at different rates and in different directions, are what stop it
+   settling into a rhythm.
 
-   `state` drives it. Idle turns slowly; thinking winds up and the sweep comes
-   in; listening beats with the voice; speaking pulses. The animation is the
-   status, which means it is never lying about what the app is doing. */
+   The points are joined with a closed Catmull-Rom spline converted to cubic
+   Béziers, which is what keeps it liquid: joining them with straight lines, or
+   with arcs, gives a cog rather than a drop of water.
+
+   `state` drives all of it, so the animation IS the status. Idle breathes.
+   Thinking swells and churns, which is the one place motion stands for work
+   rather than for a measurement. Listening and speaking take their amplitude
+   from the real signal, so the blob answers his voice and then its own. */
 export type MarkState = 'idle' | 'thinking' | 'listening' | 'speaking'
 
+/* Base radius, how far the outline strays, and how fast it churns. Idle is
+   almost still on purpose: a mark that writhes while nothing is happening is
+   the same lie as a waveform with no sound behind it. */
+const MOOD: Record<MarkState, { r: number; amp: number; speed: number }> = {
+  idle: { r: 0.56, amp: 0.1, speed: 0.4 },
+  thinking: { r: 0.6, amp: 0.22, speed: 1.8 },
+  listening: { r: 0.58, amp: 0.09, speed: 0.7 },
+  speaking: { r: 0.6, amp: 0.12, speed: 0.9 },
+}
+
+/* Not harmonics of each other, so the lobes never line up into a flower. */
+const RIPPLE = [
+  { lobes: 2, rate: 0.9, phase: 0 },
+  { lobes: 3, rate: -0.61, phase: 2.1 },
+  { lobes: 5, rate: 0.37, phase: 4.3 },
+]
+
+/** A closed outline through points at varying radius, as one smooth path.
+
+    Catmull-Rom to cubic Bézier: each control point is pulled a sixth of the way
+    along the line between its neighbours, which is the standard construction
+    and the reason the curve passes exactly through every point while staying
+    continuous at the joins. */
+function blobPath(t: number, amp: number, radius: number, size: number): string {
+  const c = size / 2
+  const N = 12
+  const pts: [number, number][] = []
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2
+    let r = radius
+    for (const w of RIPPLE) r += amp * Math.sin(w.lobes * a + t * w.rate + w.phase) / w.lobes
+    /* r is a fraction of the RADIUS available, not of the whole box. Times the
+       full size it came out larger than the box and the blob was clipped flat
+       against all four edges. */
+    pts.push([c + Math.cos(a) * r * c, c + Math.sin(a) * r * c])
+  }
+  const at = (i: number): [number, number] => pts[(i + N) % N]
+  let d = `M${at(0)[0].toFixed(2)},${at(0)[1].toFixed(2)}`
+  for (let i = 0; i < N; i++) {
+    const p0 = at(i - 1), p1 = at(i), p2 = at(i + 1), p3 = at(i + 2)
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6]
+    const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6]
+    d += ` C${c1[0].toFixed(2)},${c1[1].toFixed(2)} ${c2[0].toFixed(2)},${c2[1].toFixed(2)} ${p2[0].toFixed(2)},${p2[1].toFixed(2)}`
+  }
+  return `${d}Z`
+}
+
 export function Mark({ state = 'idle', size = 132 }: { state?: MarkState; size?: number }): JSX.Element {
+  const [, bump] = useState(0)
+  const t = useRef(0)
+  const live = useRef(0)
+  useEffect(() => {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
+    let raf = 0
+    let last = performance.now()
+    const tick = (now: number): void => {
+      const dt = Math.min(0.05, (now - last) / 1000)
+      last = now
+      const mood = MOOD[state]
+      t.current += dt * mood.speed * 3
+      /* Listening and speaking borrow the real level, so the blob swells with
+         his voice and then with the answer. Idle and thinking have no signal to
+         borrow and do not pretend to: their motion says "working", not "loud". */
+      const signal = state === 'listening' ? voiceLevel() : state === 'speaking' ? speakingLevel() : 0
+      live.current += (signal - live.current) * 0.15
+      bump((n) => n + 1)
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [state])
+
+  const mood = MOOD[state]
+  const amp = mood.amp + live.current * 0.16
+  const radius = mood.r + live.current * 0.06
   return (
     <svg
       className={`as-mark is-${state}`}
-      width={size} height={size} viewBox="0 0 120 120"
-      fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"
+      width={size} height={size} viewBox={`0 0 ${size} ${size}`}
       aria-hidden="true"
     >
-      {/* telemetry, turning one way */}
-      <g className="as-mark-ticks">
-        <line x1="60.00" y1="6.00" x2="60.00" y2="0.50" /><line x1="87.00" y1="13.23" x2="88.50" y2="10.64" />
-        <line x1="106.77" y1="33.00" x2="109.36" y2="31.50" /><line x1="114.00" y1="60.00" x2="119.50" y2="60.00" />
-        <line x1="106.77" y1="87.00" x2="109.36" y2="88.50" /><line x1="87.00" y1="106.77" x2="88.50" y2="109.36" />
-        <line x1="60.00" y1="114.00" x2="60.00" y2="119.50" /><line x1="33.00" y1="106.77" x2="31.50" y2="109.36" />
-        <line x1="13.23" y1="87.00" x2="10.64" y2="88.50" /><line x1="6.00" y1="60.00" x2="0.50" y2="60.00" />
-        <line x1="13.23" y1="33.00" x2="10.64" y2="31.50" /><line x1="33.00" y1="13.23" x2="31.50" y2="10.64" />
-      </g>
-      {/* bracket work, turning the other way */}
-      <g className="as-mark-brackets">
-        <path d="M53 8 L60 8 L67 8" /><path d="M101.53 27.94 L105.03 34 L108.53 40.06" />
-        <path d="M108.53 79.94 L105.03 86 L101.53 92.06" /><path d="M67 112 L60 112 L53 112" />
-        <path d="M18.47 92.06 L14.97 86 L11.47 79.94" /><path d="M11.47 40.06 L14.97 34 L18.47 27.94" />
-      </g>
-      {/* the frame */}
-      <polygon className="as-mark-hex" points="60,16 98.11,38 98.11,82 60,104 21.89,82 21.89,38" />
-      <polygon className="as-mark-hex2" points="75,34.02 90,60 75,85.98 45,85.98 30,60 45,34.02" />
-      {/* the sweep: one arm, going round, drawn only when it has something to say */}
-      <line className="as-mark-sweep" x1="60" y1="60" x2="60" y2="18" />
-      {/* the core */}
-      <polygon className="as-mark-core" points="60,46 72.12,53 72.12,67 60,74 47.88,67 47.88,53" />
-      <polygon className="as-mark-pip" points="60,52 68,60 60,68 52,60" />
+      {/* Three outlines at slightly different times, so the shape trails itself
+          and reads as one soft body rather than a single hard edge. */}
+      <path className="as-mark-far" d={blobPath(t.current - 0.55, amp * 1.12, radius * 1.04, size)} />
+      <path className="as-mark-mid" d={blobPath(t.current - 0.25, amp, radius, size)} />
+      <path className="as-mark-core" d={blobPath(t.current, amp * 0.82, radius * 0.9, size)} />
     </svg>
   )
 }
@@ -1047,8 +1106,12 @@ export function AssistantPage() {
                     )
                     : (
                       <p className="as-thinking" role="status">
-                        <Mark state="thinking" size={22} />
-                        <span className="as-dots" aria-hidden="true"><i /><i /><i /></span>
+                        {/* ONE indicator, not two. A 22px mark beside three dots
+                            was two things saying "working" and neither saying it
+                            well: at that size the blob read as a speck while the
+                            dots did the actual work. The blob is the whole
+                            indicator now, at a size where its churn is legible. */}
+                        <Mark state="thinking" size={34} />
                         <span className="visually-hidden">Reading your day</span>
                       </p>
                     )}

@@ -267,39 +267,39 @@ body:has(.shell.is-hud) { background: var(--bg); }
 }
 
 :root {
-  --bg: #f4efe4;
-  --surface: #fbf8f1;
-  --surface-2: #ece6d8;
-  --ink: #1a1712;
-  --muted: #565040;
-  --faint: #6b6353;
-  --hairline: rgba(26, 23, 18, 0.12);
-  --hairline-strong: rgba(26, 23, 18, 0.44);
+  /* Direction A, applied app-wide on 2026-08-26. These are no longer hexes:
+     every one reads the system layer at the foot of this file, so the palette
+     has exactly one home. The `--a-*` block is the source; this block is the
+     adapter that lets thirteen pages of existing CSS reach it unchanged. */
+  --bg: var(--a-paper);
+  --surface: var(--a-card);
+  --surface-2: var(--a-sunk);
+  --ink: var(--a-ink);
+  --muted: var(--a-muted);
+  --faint: var(--a-soft);
+  --hairline: var(--a-line);
+  --hairline-strong: var(--a-line-2);
 
-  --accent: #d1502a;
-  /* Same orange, dark enough to read. Every `color:` rule uses this; every
-     fill, border and mark keeps --accent. Measured: 5.19:1 on the page. */
-  --accent-text: #b03d1c;
-  --accent-hover: #b8431f;
-  /* Every wash is mixed from its own base, so a colour has ONE hex in this file
-     and changing it recolours its tint, its per-space override and every chip
-     wearing it. They used to be five hand-written rgba triples that had to be
-     kept in agreement by hand. */
-  --accent-ink: #ffffff;
-  --accent-wash: color-mix(in srgb, var(--accent) 10%, transparent);
+  /* THE RULE, and it decides this mapping. Lime is 1.17:1 on cream: it can be a
+     fill and it can never be text or a border. `--accent` is used across this
+     file for text, borders and marks as well as fills, so it takes the OLIVE
+     partner, which is readable everywhere. Lime is painted deliberately, by
+     name, on the handful of surfaces that are meant to shout: the primary
+     button, the active nav pill, the accent chip, the meters, the finished
+     card. Anything else that wants it is wrong. */
+  --accent: var(--a-accent-text);
+  --accent-text: var(--a-accent-text);
+  --accent-hover: var(--a-ink);
+  --accent-ink: var(--a-ink);
+  --accent-wash: var(--a-accent-wash);
+  --accent-fill: var(--a-accent);
 
-  /* Deliberately NOT --accent: every other space override below recolours
-     --accent, and "all" sets it to near-black, which is fine on light
-     surfaces but would make a running Zone ring or its Start pill vanish
-     against the ring card's own always-dark background. Focus is one fixed
-     colour regardless of which space you're standing in when you press
-     Start, the same way a kitchen timer doesn't change colour by room. */
-  --focus: #d1502a;
-  --focus-text: #b03d1c;
+  --focus: var(--a-accent-text);
+  --focus-text: var(--a-accent-text);
 
-  --alert: #9e2b12;
+  --alert: var(--a-alert);
   --alert-wash: color-mix(in srgb, var(--alert) 12%, transparent);
-  --progress: #3f6b46;
+  --progress: var(--a-progress);
   --progress-wash: color-mix(in srgb, var(--progress) 12%, transparent);
 
   /* Semantic layer. Meaning, not decoration:
@@ -322,8 +322,11 @@ body:has(.shell.is-hud) { background: var(--bg); }
 
   --shadow-pop: 0 18px 50px rgba(22, 21, 15, 0.18);
 
-  --font-display: 'Bricolage Grotesque', 'Avenir Next', sans-serif;
-  --font-body: 'Instrument Sans', 'Helvetica Neue', sans-serif;
+  /* Direction A is one family at four weights. Bricolage and Instrument Sans
+     are gone from the light theme; the HUD keeps Michroma and Saira, which he
+     asked to leave alone. */
+  --font-display: 'Plus Jakarta Sans', 'Avenir Next', sans-serif;
+  --font-body: 'Plus Jakarta Sans', 'Helvetica Neue', sans-serif;
   /* The machine's own mono. Nothing is downloaded and no typeface is imposed:
      what this token has to deliver is figures of equal width, which the system
      face already does. It used to resolve to Instrument Sans, so forty call
@@ -379,15 +382,9 @@ html { font-size: 16px; }
 /* Work reads blue, not green. The old #0f5f5a sat in the same family as
    --progress (#3f6b46), so in the Work space "you can click this" and "this
    is done" were the same colour. One meaning per hue. */
-[data-space="work"] {
-  --accent: #1d4e79; --accent-text: #1d4e79; --accent-hover: #163c5d;
-}
-[data-space="offplate"] {
-  --accent: #8a6410; --accent-text: #8a6410; --accent-hover: #6f5009;
-}
-[data-space="corner"] {
-  --accent: #1E5244; --accent-text: #1E5244; --accent-hover: #163f34;
-}
+[data-space="work"] { /* was navy; direction A is one accent, and the space is shown by its own pill, not by repainting the app */ }
+[data-space="offplate"] { /* was gold; direction A is one accent, and the space is shown by its own pill, not by repainting the app */ }
+[data-space="corner"] { /* was green; direction A is one accent, and the space is shown by its own pill, not by repainting the app */ }
 
 /* ---------- base ---------- */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -2522,8 +2519,12 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .goal-status { font-weight: 700; }
 
 /* Titles carry the colour; redundant eyebrow subtitles removed. */
-.band h1 { color: var(--accent-text); }
-.routine-card-title { color: var(--accent-text); }
+/* A page title is not an interactive thing, so it is ink. It read --accent-text
+   because the "all" space used to set that token to near-black; direction A
+   makes it olive, and every page heading turned green. A heading takes the
+   accent only when the accent means something about the heading. */
+.band h1 { color: var(--ink); }
+.routine-card-title { color: var(--ink); }
 
 /* Drop zones are full-width targets, not prose (override the global p measure). */
 .empty.is-boxed { max-width: none; width: 100%; }
@@ -3301,7 +3302,7 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 /* All is a view across the three rooms, so it borrows no room's accent. */
 /* All: the ink itself is the accent, so nothing borrows one profile's colour
    while every profile is on screen. */
-[data-space="all"] { --accent: #15130f; --accent-text: #15130f; --accent-hover: #000; --accent-wash: color-mix(in srgb, var(--accent) 7%, transparent); }
+[data-space="all"] { /* direction A: one accent for every space */ }
 .writeto { padding: 7px 10px; font-size: var(--text-sm); min-width: 110px; }
 
 /* What came back to the list overnight. A fact and a way back, not a scolding. */
@@ -5519,7 +5520,12 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 :root {
   --a-paper: #FAF8F4; --a-card: #FFFFFF; --a-sunk: #F0EDE6; --a-feature: #12100C;
   --a-on-ink: #FAF8F4;
-  --a-ink: #12100C; --a-muted: #5F5A4E; --a-faint: #948D7E;
+  --a-ink: #12100C; --a-muted: #5F5A4E;
+  /* Three readable steps, then one that is not. --a-soft is the third step for
+     small labels; --a-faint is 3.12:1 and exists for DISABLED and DECORATION.
+     Mapping the app's own --faint onto --a-faint is what broke 266 labels the
+     first time this retarget ran. */
+  --a-soft: #6E6759; --a-faint: #948D7E;
   --a-accent: #DFF24A; --a-accent-text: #5E6B12; --a-accent-wash: #F1F8C8;
   --a-alert: #B03A22; --a-alert-wash: #F7E1DB; --a-alert-solid: #D2452A;
   --a-warn: #7C5A0E; --a-warn-wash: #F7EBD3;
@@ -5551,7 +5557,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .shell.is-hud {
   --a-paper: #070B10; --a-card: #0C121A; --a-sunk: #121A24; --a-feature: #04141A;
   --a-on-ink: #E6F1F8;
-  --a-ink: #E6F1F8; --a-muted: #93A7B8; --a-faint: #6E8496;
+  --a-ink: #E6F1F8; --a-muted: #93A7B8; --a-soft: #8CA3B5; --a-faint: #6E8496;
   --a-accent: #4FD8E8; --a-accent-text: #6FE4F2; --a-accent-wash: rgba(79, 216, 232, 0.14);
   --a-alert: #FF6B5A; --a-alert-wash: rgba(255, 107, 90, 0.16); --a-alert-solid: #FF6B5A;
   --a-warn: #FFC46B; --a-warn-wash: rgba(255, 196, 107, 0.16);
@@ -5650,3 +5656,52 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 
 /* The week strip printed today's weekday in lime on cream: 1.24:1. */
 .troom .tr-week .weekday.is-today .weekday-name { color: var(--t-hot-text); }
+
+/* ==========================================================================
+   THE WALL KEEPS ITS OWN SKIN
+   His call: every page moves to direction A except the Why's board. It is the
+   one surface meant to feel like a poster wall rather than an interface, and
+   COLOR.md already sanctions it as the exception. Pinning the tokens here means
+   the wall does not inherit the app-wide retarget above, and does not need a
+   single rule of its own rewritten.
+   ========================================================================== */
+.board-page {
+  --bg: #f4efe4; --surface: #fbf8f1; --surface-2: #ece6d8;
+  --ink: #1a1712; --muted: #565040; --faint: #6b6353;
+  --hairline: rgba(26, 23, 18, 0.12); --hairline-strong: rgba(26, 23, 18, 0.44);
+  --accent: #d1502a; --accent-text: #b03d1c; --accent-hover: #b8431f;
+  --accent-ink: #ffffff; --accent-wash: color-mix(in srgb, var(--accent) 10%, transparent);
+  --font-display: 'Bricolage Grotesque', 'Avenir Next', sans-serif;
+  --font-body: 'Instrument Sans', 'Helvetica Neue', sans-serif;
+  /* Redeclaring the family, not only the token. `body` computes its
+     font-family from the ROOT token once, and everything that does not set its
+     own family inherits that COMPUTED value rather than the variable. The HUD
+     block at the top of this file carries the same note and the same fix; the
+     wall needed it for exactly the same reason. */
+  font-family: var(--font-body);
+}
+.board-page h1, .board-page h2, .board-page h3 { font-family: var(--font-display); }
+
+/* ==========================================================================
+   DIRECTION A, PAINTED BY NAME
+   Lime is a fill and nothing above may reach for it, so the surfaces that are
+   MEANT to shout are listed here and nowhere else.
+   ========================================================================== */
+.btn-primary,
+.pill.is-on,
+.space-btn[aria-pressed="true"],
+.tab.is-on {
+  background: var(--a-accent);
+  color: var(--a-ink);
+  border-color: transparent;
+}
+.btn-primary:hover:not(:disabled) { background: var(--a-ink); color: var(--a-accent); }
+.shell.is-hud .btn-primary { color: #04141A; }
+.shell.is-hud .btn-primary:hover:not(:disabled) { background: var(--a-ink); color: var(--a-accent); }
+
+/* Progress meters read as progress, not as chrome. */
+.bar.prog i, .bar i { background: var(--a-accent-text); }
+.bar.prog.warn i { background: var(--a-alert); }
+
+/* The nav is the one place the accent is allowed to be the loudest thing. */
+.tabs .tab { font-size: var(--a-f-nav); font-weight: 700; letter-spacing: 0.01em; }

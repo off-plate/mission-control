@@ -5860,3 +5860,105 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .spacemark.s-work i { background: #7FD8F5; }
 .spacemark.s-offplate i { background: #FFC94A; }
 .spacemark.s-corner i { background: #86E9B4; }
+
+/* ==========================================================================
+   DIRECTION A, THE TREATMENT
+   ==========================================================================
+   His mockup beside my build: same content, different object. Three concrete
+   gaps, and none of them is colour.
+
+   1. A CARD TITLE IS A TITLE. His reads "On the clock" at 19px bold, sentence
+      case. Mine read "ON THE CLOCK" at 12px uppercase with .15em tracking,
+      which is a LABEL. Both exist in this system and they are not the same
+      thing: a card announces itself with a title, and a figure inside it is
+      annotated with a label.
+   2. Every card in his mockup carries an expand affordance, so a card looks
+      like something you can open.
+   3. His cards breathe. 24px of padding, not 16.
+   ========================================================================== */
+
+/* ---- 1. titles ----------------------------------------------------------- */
+.col-head, .bucket-head, .card-head, .widget-head, .panel > h2, .panel > h3 {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.022em;
+  text-transform: none;
+  color: var(--a-ink);
+  font-family: var(--font-display);
+}
+/* The room's own card titles come with it. */
+.troom .tr-head > .tr-l,
+.troom .tr-card > .tr-l:first-child {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.022em;
+  text-transform: none;
+  color: var(--t-ink);
+}
+.troom .tr-card--ink > .tr-head > .tr-l { color: var(--a-on-ink); }
+.troom .tr-card--lime > .tr-head > .tr-l { color: var(--a-ink); }
+/* A label annotates a figure and keeps its old job. Nothing above changes it. */
+.troom .tr-stat > .tr-l, .troom .tr-tile > .tr-l, .troom .tr-clock .tr-l,
+.microcap, .k, .kebab-head, .tr-ph, .troom .tr-slot {
+  font-size: var(--a-f-label);
+  text-transform: uppercase;
+  letter-spacing: var(--a-ls-label);
+  font-weight: 800;
+}
+
+/* ---- 2. cards breathe, and look openable --------------------------------- */
+.panel, .widget, .goal-card, .routine-card, .habit-card, .troom .tr-card {
+  padding: var(--s5);
+}
+.troom .tr-head { margin-bottom: var(--s4); }
+
+/* ---- 3. the checkbox is ON PALETTE --------------------------------------
+   It was `--a-progress-solid`, a dark green carried over from the old semantic
+   set, and he asked the obvious question: why is it green when green is not in
+   the palette. A ticked box is the ACCENT, so it also takes the colour of the
+   space you are standing in, which is the whole point of having four of them.
+   The tick is ink on the fill, at 15.33:1 on lime and better on the other
+   three. Green survives exactly where COLOR.md still means it: a progress bar. */
+.checkbox[aria-checked="true"],
+.routine-check[aria-checked="true"],
+.goal-ms-check[aria-checked="true"],
+.daydot[aria-checked="true"],
+.daydot.kept,
+.troom .tr-box.is-on {
+  background: var(--a-accent);
+  border-color: var(--a-accent);
+  /* The tick is INK, not `--bg`. Cream on lime is 1.17:1, so the old rule would
+     have drawn an invisible tick the moment the fill stopped being dark green. */
+  color: var(--a-ink);
+}
+.checkbox[aria-checked="true"] svg,
+.routine-check[aria-checked="true"] svg,
+.goal-ms-check[aria-checked="true"] svg,
+.daydot[aria-checked="true"] svg,
+.daydot.kept svg { stroke: var(--a-ink); }
+.daydot:hover { border-color: var(--a-accent-text); }
+
+/* ---- 4. the workspace switcher is a pill group --------------------------
+   His note: make the workspaces pill shaped, and do not remove anything from
+   the navigation. Nothing is removed; every space and every page is still
+   there. Only the shape and the size change. */
+.space-switch, .spaces {
+  background: var(--a-sunk);
+  border-radius: 999px;
+  padding: 5px;
+  gap: 3px;
+}
+.space-btn {
+  border-radius: 999px;
+  padding: 11px 18px;
+  min-height: 42px;
+  font-size: var(--a-f-nav);
+  font-weight: 700;
+  color: var(--a-muted);
+  transition: background var(--a-enter), color var(--a-enter);
+}
+.space-btn:hover { background: var(--a-accent-wash); color: var(--a-accent-text); }
+.space-btn[aria-pressed="true"] { background: var(--a-accent); color: var(--a-ink); font-weight: 800; }
+
+/* The page tabs keep their row and gain the same scale. */
+.tab { font-size: var(--a-f-nav); font-weight: 700; padding: 14px 14px; }

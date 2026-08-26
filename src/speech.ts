@@ -79,9 +79,9 @@ function set(id: string | null, s: SpeechState): void {
    `onboundary` fires as each word begins, so the meter is driven by the actual
    rhythm of the speech rather than by a timer pretending to be one.
 
-   Where a browser fires no boundaries at all it falls back to a slow swell.
-   That is activity, not amplitude, and it is marked as such: better an honest
-   "it is talking" than a still bar that reads as broken. */
+   Where a browser fires no boundaries at all this reports nothing, and the
+   panel says so in words. A generator used to stand in here and it was the
+   only thing he ever saw. */
 let spoken = 0
 let spokenAt = 0
 let analyser: AnalyserNode | null = null

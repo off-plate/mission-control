@@ -46,12 +46,13 @@ await page.addInitScript(() => {
     /* window.__silent makes this behave like a REMOTE voice: it speaks and
        reports nothing, which is the case that used to be papered over. */
     if (!window.__silent) {
+      /* A real voice reports a word for as long as it is talking. A stub that
+         stops after the word count goes quiet mid-utterance, the meter decays
+         to nothing, and a working ribbon measures as flat. */
       let w = 0
-      const words = String(u.text).split(' ').length
-      const beat = setInterval(() => {
-        if (w++ >= words || !u.onboundary) { clearInterval(beat); return }
-        u.onboundary({ name: 'word', charIndex: w })
-      }, 60)
+      const beat = setInterval(() => { u.onboundary && u.onboundary({ name: 'word', charIndex: w++ }) }, 90)
+      const done = u.onend
+      u.onend = () => { clearInterval(beat); done && done() }
     }
     /* Record whether the ears are OPEN at the instant it starts talking. This is
        the real question. Checking only that recognition was not re-started during
@@ -89,7 +90,7 @@ await btn.click(); await page.waitForTimeout(500)
 ok('the ask box becomes the voice panel', await page.locator('.as-voice').count() === 1)
 ok('the textarea is gone while in voice mode', await page.locator('.as-input').count() === 0)
 ok('it says it is listening', (await page.locator('.as-voice-state').textContent())?.includes('Listening'))
-ok('the wave is drawn', await page.locator('.as-wave rect').count() > 10, `${await page.locator('.as-wave rect').count()} bars`)
+ok('the wave is drawn', await page.locator('.as-wave path').count() === 3, `${await page.locator('.as-wave path').count()} ribbons`)
 ok('the thread is still on the page, not replaced', await page.locator('.as-page').count() === 1)
 
 // --- speaking a question ---
@@ -157,37 +158,25 @@ await page.evaluate(() => window.__say('and one more thing', true))
 await page.waitForFunction(() => document.querySelector('.as-voice')?.className.includes('is-speaking'),
   null, { timeout: 12000 }).catch(() => {})
 const whileSpeaking = await page.evaluate(async () => {
-  /* MEASURE THE RENDERED BOX, NEVER THE STYLE ATTRIBUTE. This is the whole
-     lesson of five rounds of "there is still no sound wave". The JavaScript was
-     always right: the style attribute said 20.4% of a 48px box while the box
-     itself measured 2.0px, the floor, across all ninety-six bars, because a
-     percentage height with a transition re-targeted every frame never resolves.
-     Every probe that read `style.height` reported a perfect waveform, and he
-     was looking at a flat dotted line. */
-  const heights = () => [...document.querySelectorAll('.as-wave rect')]
-    .map((r) => r.getBoundingClientRect().height)
+/* How far the ribbon departs from a flat line, in viewBox units. Read off the
+   path data, which is the geometry itself: a flat line is 0 and cannot be
+   faked by a style attribute that never resolved. */
+const spread = () => {
+  const d = document.querySelector('.as-wave path')?.getAttribute('d') ?? ''
+  const ys = d.split(' L').map((seg) => parseFloat(seg.split(',')[1])).filter((n) => !isNaN(n))
+  return ys.length ? Math.max(...ys) - Math.min(...ys) : 0
+}
   const seen = []
   for (let i = 0; i < 20; i++) {
     await new Promise((r) => setTimeout(r, 45))
-    const h = heights()
-    /* The NEWEST bar as well as the tallest: the trail keeps a second or two of
-       history, so its maximum stays pinned to the loudest moment and reports
-       "not moving" however lively the meter is. */
-    seen.push({ tallest: Math.max(...h), newest: h[h.length - 1] ?? 0,
-                distinct: new Set(h.map((n) => Math.round(n))).size })
+    seen.push(spread())
   }
-  return {
-    tallest: Math.max(...seen.map((s) => s.tallest)),
-    distinct: Math.max(...seen.map((s) => s.distinct)),
-    newestMoved: new Set(seen.map((s) => Math.round(s.newest / 2))).size,
-  }
+  return { tallest: Math.max(...seen), moved: new Set(seen.map((n) => Math.round(n / 2))).size }
 })
-ok('the bars actually RENDER taller than their floor while it speaks',
-   whileSpeaking.tallest > 6, `tallest rendered box ${whileSpeaking.tallest.toFixed(1)}px`)
-ok('and they are a wave, not one repeated height',
-   whileSpeaking.distinct > 4, `${whileSpeaking.distinct} distinct rendered heights`)
+ok('the ribbon actually departs from a flat line while it speaks',
+   whileSpeaking.tallest > 6, `${whileSpeaking.tallest.toFixed(1)} units of a 48 unit box`)
 ok('and the shape changes over time',
-   whileSpeaking.newestMoved > 1, `${whileSpeaking.newestMoved} distinct peaks across frames`)
+   whileSpeaking.moved > 1, `${whileSpeaking.moved} distinct shapes across frames`)
 
 /* Same rule in voice mode, and here it hangs up entirely: an assistant left
    listening to an empty room all evening is the version of this feature nobody
@@ -263,16 +252,23 @@ ok('the microphone was released', (await page.evaluate(() => window.__recLive)) 
   await page2.waitForFunction(() => document.querySelector('.as-voice')?.className.includes('is-speaking'),
     null, { timeout: 14000 })
   const still = await page2.evaluate(async () => {
+/* How far the ribbon departs from a flat line, in viewBox units. Read off the
+   path data, which is the geometry itself: a flat line is 0 and cannot be
+   faked by a style attribute that never resolved. */
+const spread = () => {
+  const d = document.querySelector('.as-wave path')?.getAttribute('d') ?? ''
+  const ys = d.split(' L').map((seg) => parseFloat(seg.split(',')[1])).filter((n) => !isNaN(n))
+  return ys.length ? Math.max(...ys) - Math.min(...ys) : 0
+}
     const seen = []
     for (let i = 0; i < 14; i++) {
       await new Promise((r) => setTimeout(r, 45))
-      const h = [...document.querySelectorAll('.as-wave rect')].map((r) => r.getBoundingClientRect().height)
-      seen.push(Math.round(Math.max(...h)))
+      seen.push(spread())
     }
-    return { peaks: new Set(seen).size, tallest: Math.max(...seen) }
+    return { widest: Math.max(...seen) }
   })
-  ok('a voice that reports nothing draws NOTHING, rather than a generated wave',
-     still.peaks <= 1, `${still.peaks} distinct peaks, tallest ${still.tallest}px`)
+  ok('a voice that reports nothing leaves the ribbon FLAT',
+     still.widest < 1, `${still.widest.toFixed(2)} units of departure from flat`)
   ok('and the panel says why instead of looking broken',
      (await page2.locator('.as-voice-state').textContent())?.includes('no level from this voice'),
      await page2.locator('.as-voice-state').textContent())

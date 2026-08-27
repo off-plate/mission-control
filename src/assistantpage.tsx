@@ -920,7 +920,23 @@ export function AssistantPage() {
     setBusy(true); setErr(null); setErrHint(null); setLive('')
     setTurns((t) => [...t, { who: 'you', text: shown ?? text }])
     const history = turns.map((t) => ({ role: (t.who === 'you' ? 'user' : 'assistant') as 'user' | 'assistant', content: t.text }))
-    const out = await ask(text, brief, history, setLive)
+    let out = await ask(text, brief, history, setLive)
+    /* A RATE LIMIT WAITS RATHER THAN FAILS, on his instruction: he would rather
+       stare at the thinking mark for twenty seconds than read an error and
+       have to press Ask again himself. `ask()` already tried Gemini once
+       before ever returning this reason, so a retry here is a second full
+       pass at both providers, not a hammer on the same closed door. Capped at
+       two so a key that is genuinely dead, not just busy, still surfaces the
+       real message instead of a mark that spins forever. Groq's own wait time
+       is used when it parsed one; twenty seconds otherwise, matched to what he
+       said he can live with. `live` stays empty through the wait so the plain
+       thinking mark shows, not a caret with nothing after it. */
+    for (let tries = 0; !out.ok && out.reason === 'rate-limit' && tries < 2; tries++) {
+      const waitS = out.detail ? Math.max(1, Number(out.detail)) : 20
+      setLive('')
+      await new Promise((r) => setTimeout(r, waitS * 1000))
+      out = await ask(text, brief, history, setLive)
+    }
     if (out.ok) {
       /* Performed BEFORE the turn is drawn, so the line under the sentence is
          the outcome and not a prediction of it. */

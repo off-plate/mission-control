@@ -1232,8 +1232,13 @@ select.textinput { flex: 0 0 auto; min-width: 110px; }
   .ledger-list:not(.one-col) { columns: 2; column-gap: var(--s12); }
   .ledger-row { break-inside: avoid; }
 }
-.rowitem.flash, .todo-row.flash, .habit-list.flash { animation: flashrow 2.4s var(--ease); }
+.rowitem.flash, .todo-row.flash { animation: flashrow 2.4s var(--ease); }
 @keyframes flashrow { 0%, 55% { background: var(--accent-wash); box-shadow: inset 0 0 0 1px var(--accent); border-radius: var(--r-sm); } }
+/* Same wash, but for a .panel-shaped flash target: flashrow's --r-sm corner
+   is right for a flat row with none of its own, and wrong here -- it visibly
+   squared off this card's real --r-md corner. */
+.habit-list.flash { animation: flashpanel 2.4s var(--ease); }
+@keyframes flashpanel { 0%, 55% { background: var(--accent-wash); box-shadow: inset 0 0 0 1px var(--accent); border-radius: var(--r-md); } }
 /* Titles are never cut off. Clamped to two lines, a long task read
    "Finish filing up this Mission control..." with no way to see the rest:
    the row was protecting its own tidiness at the cost of the only thing on

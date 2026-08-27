@@ -1337,9 +1337,12 @@ await step('calendar: Big Time only, and it never pretends the day is empty', as
 })
 
 await step('habits: a quitting row keeps its slip button off the day dots', async () => {
-  /* The foot column is a fixed width, so a long "since 12 Apr, 114 best run"
-     used to push the button out of its own column and onto Sunday's dot, at a
-     different x on every row. Measured, because eyeballing it missed it twice. */
+  /* Every row's foot (trend/note/quit-slip) now drops under the name at every
+     panel width, on his instruction (2026-08-27): it used to sit beside the
+     day dots only above ~1240px, so "off the day dots" meant horizontal
+     clearance from that column. Now foot is always its own row below days,
+     so the check is vertical: the slip button must not sit above the bottom
+     of the days row, and it still has to land at the same x on every row. */
   await fresh('habits')
   await page.evaluate((K) => {
     const s = JSON.parse(localStorage.getItem(K))
@@ -1354,7 +1357,7 @@ await step('habits: a quitting row keeps its slip button off the day dots', asyn
     .map((r) => {
       const b = r.querySelector('.quit-slip').getBoundingClientRect()
       const d = r.querySelector('.habit-days')?.getBoundingClientRect()
-      return { left: Math.round(b.left), clear: d ? Math.round(b.left - d.right) : 99 }
+      return { left: Math.round(b.left), clear: d ? Math.round(b.top - d.bottom) : 99 }
     }))
   if (rows.length < 3) throw new Error(`only ${rows.length} quitting rows rendered`)
   const off = rows.find((r) => r.clear < 0)

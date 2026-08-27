@@ -22,7 +22,7 @@ import { goalPeriodKey, goalPeriodRange, habitPeriodRange, periodIsPast, periodK
 /* The shared primitives live in ui.tsx now, the app's one component location.
    Imported and re-exported here so older call sites keep working while they are
    moved over; new code imports from './ui'. */
-import { AutoTextarea, Band, Chip, Dropdown, Empty, SectionHead, Segmented, SpaceMark, WriteTo } from './ui'
+import { AutoTextarea, Band, Chip, Dropdown, Empty, SectionHead, Segmented, Select, SpaceMark, WriteTo } from './ui'
 export { AutoTextarea, Band, Dropdown, SpaceMark, WriteTo }
 
 /* Page helpers, not primitives: these read the mock agenda and this app's own
@@ -1730,30 +1730,28 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
           </div>
           <div>
             <label className="field-label" htmlFor="hfreqq">Check in</label>
-            <select id="hfreqq" className="textinput" style={{ width: '100%' }} value={frequency} disabled={locked}
-              onChange={(e) => setFrequency(e.target.value as HabitFrequency)}>
-              {HABIT_FREQUENCIES.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
-            </select>
+            <Select id="hfreqq" style={{ width: '100%' }} value={frequency} disabled={locked}
+              onChange={(v) => setFrequency(v)}
+              options={HABIT_FREQUENCIES.map((f) => ({ value: f.id, label: f.label }))} />
           </div>
         </div>
       ) : (
         <div className="sheet-grid" style={{ marginTop: 'var(--s4)' }}>
           <div>
             <label className="field-label" htmlFor="hpart">When in the day?</label>
-            <select id="hpart" className="textinput" style={{ width: '100%' }} value={daypart} onChange={(e) => setDaypart(e.target.value as TimeSlot | '')}>
-              {SLOTS.map((s) => <option key={s.id} value={s.id}>{s.label}, {s.hint}</option>)}
-              <option value="">Anytime</option>
-            </select>
+            <Select id="hpart" style={{ width: '100%' }} value={daypart} onChange={(v) => setDaypart(v)}
+              options={[...SLOTS.map((s) => ({ value: s.id as TimeSlot | '', label: `${s.label}, ${s.hint}` })), { value: '' as TimeSlot | '', label: 'Anytime' }]} />
           </div>
           <div>
             {measured ? (
               <>
                 <label className="field-label" htmlFor="hmeasure">Counting what?</label>
-                <select id="hmeasure" className="textinput" style={{ width: '100%' }} value={measure}
-                  onChange={(e) => setMeasure(e.target.value as 'minutes' | 'times')}>
-                  <option value="times">Times you do it</option>
-                  <option value="minutes">Minutes of focus time</option>
-                </select>
+                <Select id="hmeasure" style={{ width: '100%' }} value={measure}
+                  onChange={(v) => setMeasure(v)}
+                  options={[
+                    { value: 'times' as const, label: 'Times you do it' },
+                    { value: 'minutes' as const, label: 'Minutes of focus time' },
+                  ]} />
               </>
             ) : frequency === 'times-per-week' ? (
               <>
@@ -1764,10 +1762,9 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
             ) : (
               <>
                 <label className="field-label" htmlFor="hfreq">How often?</label>
-                <select id="hfreq" className="textinput" style={{ width: '100%' }} value={frequency} disabled={locked}
-                  onChange={(e) => setFrequency(e.target.value as HabitFrequency)}>
-                  {HABIT_FREQUENCIES.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
-                </select>
+                <Select id="hfreq" style={{ width: '100%' }} value={frequency} disabled={locked}
+                  onChange={(v) => setFrequency(v)}
+                  options={HABIT_FREQUENCIES.map((f) => ({ value: f.id, label: f.label }))} />
               </>
             )}
           </div>
@@ -1786,10 +1783,9 @@ function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?:
               </div>
               <div>
                 <label className="field-label" htmlFor="hcper">In what stretch?</label>
-                <select id="hcper" className="textinput" style={{ width: '100%' }} value={per}
-                  onChange={(e) => setPer(e.target.value as CountPeriod)}>
-                  {COUNT_PERIODS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-                </select>
+                <Select id="hcper" style={{ width: '100%' }} value={per}
+                  onChange={(v) => setPer(v)}
+                  options={COUNT_PERIODS.map((o) => ({ value: o.id, label: o.label }))} />
               </div>
             </>
           ) : (
@@ -1970,12 +1966,11 @@ export function HabitsPage() {
         metrics={[{ v: `${doneToday}/${dueCount}`, k: 'done today', tone: (doneToday > 0 ? 'pos' : 'info') as 'pos' | 'info' }]}
         actions={
           <>
-            <select
-              className="textinput rangepick" value={days} aria-label="How far back to look"
-              onChange={(e) => setDays(Number(e.target.value))}
-            >
-              {HABIT_WINDOWS.map((w) => <option key={w.id} value={w.id}>{w.label}</option>)}
-            </select>
+            <Select
+              className="rangepick" value={days} ariaLabel="How far back to look"
+              onChange={(v) => setDays(v)}
+              options={HABIT_WINDOWS.map((w) => ({ value: w.id, label: w.label }))}
+            />
             <WriteTo />
             <button className="btn btn-primary" onClick={() => setAdding(true)}>Add a habit</button>
           </>
@@ -2158,19 +2153,18 @@ function AddRoutineSheet({ onClose }: { onClose: () => void }) {
       <div className="sheet-grid" style={{ marginTop: 'var(--s4)' }}>
         <div>
           <label className="field-label" htmlFor="rcad">How often does it run?</label>
-          <select id="rcad" className="textinput" style={{ width: '100%' }} value={cadence} onChange={(e) => setCadence(e.target.value as RoutineCadence)}>
-            <option value="daily">Every day</option>
-            <option value="prework">Before work, on weekdays</option>
-            <option value="weekly">Once a week</option>
-            <option value="monthly">Once a month</option>
-          </select>
+          <Select id="rcad" style={{ width: '100%' }} value={cadence} onChange={(v) => setCadence(v)}
+            options={[
+              { value: 'daily' as const, label: 'Every day' },
+              { value: 'prework' as const, label: 'Before work, on weekdays' },
+              { value: 'weekly' as const, label: 'Once a week' },
+              { value: 'monthly' as const, label: 'Once a month' },
+            ]} />
         </div>
         <div>
           <label className="field-label" htmlFor="rpart">When in the day?</label>
-          <select id="rpart" className="textinput" style={{ width: '100%' }} value={daypart} onChange={(e) => setDaypart(e.target.value as TimeSlot | '')}>
-            {SLOTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-            <option value="">Anytime</option>
-          </select>
+          <Select id="rpart" style={{ width: '100%' }} value={daypart} onChange={(v) => setDaypart(v)}
+            options={[...SLOTS.map((s) => ({ value: s.id as TimeSlot | '', label: s.label })), { value: '' as TimeSlot | '', label: 'Anytime' }]} />
         </div>
       </div>
 
@@ -2630,15 +2624,12 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals, periodOffsets 
       {tracking && (
         <>
           <label className="field-label" style={{ marginTop: 'var(--s4)' }} htmlFor="ghabit">Which habit?</label>
-          <select id="ghabit" className="textinput" style={{ width: '100%' }} value={d.habitId}
-            onChange={(e) => {
-              const h = linkable.find((x) => x.id === e.target.value)
-              setD({ ...d, habitId: e.target.value, name: namedByHand ? d.name : (h?.name ?? '') })
-            }}>
-            {linkable.map((h) => (
-              <option key={h.id} value={h.id}>{h.name}{h.kind === 'break' ? ' (quitting)' : ''}</option>
-            ))}
-          </select>
+          <Select id="ghabit" style={{ width: '100%' }} value={d.habitId}
+            onChange={(habitId) => {
+              const h = linkable.find((x) => x.id === habitId)
+              setD({ ...d, habitId, name: namedByHand ? d.name : (h?.name ?? '') })
+            }}
+            options={linkable.map((h) => ({ value: h.id, label: `${h.name}${h.kind === 'break' ? ' (quitting)' : ''}` }))} />
           <p className="assist-note" style={{ marginTop: 6 }}>
             {linked ? `Every time “${linked.name}” is kept, this goal moves. Nothing to log twice.` : ''}
           </p>
@@ -2660,10 +2651,9 @@ function GoalSheet({ onClose, goal, presetHabitId, thenGoToGoals, periodOffsets 
          stored default; a goal already knows which space it lives in. */}
       <div style={{ marginTop: 'var(--s4)' }}>
         <label className="field-label" htmlFor="gtf">Timeframe</label>
-        <select id="gtf" className="textinput" style={{ width: '100%' }} value={d.timeframe}
-          onChange={(e) => setD({ ...d, timeframe: e.target.value as GoalTimeframe })}>
-          {GOAL_TIMEFRAMES.map((t) => <option key={t.id} value={t.id}>{t.label} · {periodLabel(t.id as GoalTf)}</option>)}
-        </select>
+        <Select id="gtf" style={{ width: '100%' }} value={d.timeframe}
+          onChange={(v) => setD({ ...d, timeframe: v })}
+          options={GOAL_TIMEFRAMES.map((t) => ({ value: t.id, label: `${t.label} · ${periodLabel(t.id as GoalTf)}` }))} />
       </div>
 
       <div className="sheet-grid" style={{ marginTop: 'var(--s4)' }}>

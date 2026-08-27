@@ -1516,6 +1516,52 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 .kebab-menu button:hover { background: var(--accent-wash); color: var(--accent-text); }
 .kebab-menu button[aria-checked="true"] { color: var(--accent-text); font-weight: 600; }
 
+/* ---------- Select: every dropdown that used to be a native <select> ----------
+   Same floating-panel language as .kebab-menu (surface, hairline-strong,
+   r-md, shadow-pop), because it is the same kind of object: a menu anchored
+   to a trigger. Two things a menu of buttons does not need: a resting look
+   that matches a text field it sits beside, and a mark for which option is
+   the current one. */
+.dd { position: relative; display: inline-flex; min-width: 0; }
+.dd-trigger {
+  display: flex; align-items: center; gap: var(--s2); width: 100%;
+  border: 1px solid var(--hairline-strong); border-radius: var(--r-md);
+  background: var(--bg); padding: var(--s2) var(--s3); min-height: 40px;
+  font-family: var(--font-body); font-size: var(--text-sm); font-weight: 600; color: var(--ink);
+  cursor: pointer; white-space: nowrap; text-align: left;
+}
+.dd-trigger:disabled { opacity: 0.5; cursor: not-allowed; }
+.dd-trigger:hover:not(:disabled) { border-color: var(--accent-text); }
+.dd-trigger:focus { outline: none; border-color: var(--accent-text); }
+.dd-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.dd-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.dd-chevron { flex: none; color: var(--faint); margin-left: auto; transition: transform var(--t-fast); }
+.dd-trigger[aria-expanded="true"] .dd-chevron { transform: rotate(180deg); color: var(--accent-text); }
+.dd-panel {
+  position: absolute; top: 100%; left: 0; z-index: 40; margin-top: 2px;
+  background: var(--surface); border: 1px solid var(--hairline-strong); border-radius: var(--r-md);
+  box-shadow: var(--shadow-pop); padding: var(--s2); list-style: none;
+  min-width: 100%; max-height: 320px; overflow: auto;
+  animation: dd-in var(--t-fast) both;
+}
+.dd-panel.opens-up { top: auto; bottom: 100%; margin-top: 0; margin-bottom: 2px; animation-name: dd-in-up; }
+@keyframes dd-in { from { opacity: 0; transform: translateY(-4px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes dd-in-up { from { opacity: 0; transform: translateY(4px) scale(0.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .dd-panel { animation: none; } }
+.dd-option {
+  position: relative; padding: var(--s2) var(--s3) var(--s2) 18px; border-radius: var(--r-sm);
+  font-size: var(--text-sm); font-weight: 600; color: var(--ink); white-space: nowrap; min-height: 34px;
+  display: flex; align-items: center; cursor: pointer;
+}
+.dd-option.is-active { background: var(--accent-wash); color: var(--accent-text); }
+.dd-option.is-selected { color: var(--accent-text); }
+.dd-option.is-selected::before {
+  content: ''; position: absolute; left: 4px; top: 7px; bottom: 7px; width: 3px;
+  border-radius: 2px; background: var(--accent);
+}
+.rangepick .dd-trigger { min-width: 190px; padding: 7px 12px; font-size: var(--text-sm); }
+.writeto .dd-trigger { padding: 7px 10px; font-size: var(--text-sm); min-width: 110px; }
+
 /* today buckets */
 .bucket { margin-top: var(--s4); padding-top: var(--s4); border-top: 1px solid var(--hairline); }
 .bucket:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
@@ -3242,8 +3288,8 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 
 /* Which window the review covers. Two states, no third. */
 /* The window sits on the title line with the other actions, not above the page
-   pushing its first section down. */
-.rangepick { min-width: 190px; padding: 7px 12px; font-size: var(--text-sm); }
+   pushing its first section down. Sizing itself lives on .dd-trigger now,
+   .rangepick just marks which Select this is. */
 .drag-grip.is-blank { visibility: hidden; }
 /* Below 520px a description beside a description is two words per line. */
 @media (max-width: 519px) { .seg.has-hints { grid-template-columns: 1fr; } }
@@ -3313,7 +3359,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 /* All: the ink itself is the accent, so nothing borrows one profile's colour
    while every profile is on screen. */
 [data-space="all"] { /* direction A: one accent for every space */ }
-.writeto { padding: 7px 10px; font-size: var(--text-sm); min-width: 110px; }
 
 /* What came back to the list overnight. A fact and a way back, not a scolding. */
 .handoff {

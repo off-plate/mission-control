@@ -6693,118 +6693,318 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 
 /* ==========================================================================
    THE TIMELINE: the ladder, the flywheel, and the give-up screen.
-   Two colours. --ink and --a-accent, plus --alert only where a day actually
-   cost him something. Every value is a token, so HUD mode repaints all of it.
-   ========================================================================== */
-.tline { padding-top: var(--s5); }
-.tline .tl-l { font: 600 10px/1 var(--font-body); letter-spacing: 0.17em; text-transform: uppercase; color: var(--muted); margin: 0; }
 
-.tl-bar { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; margin-bottom: var(--s5); }
-.tl-bar h1 { font-family: var(--font-display); font-weight: 800; font-size: var(--text-2xl); letter-spacing: -0.025em; margin: 0; }
-.tl-seg { display: inline-flex; background: var(--a-sunk); border-radius: 999px; padding: 5px; gap: 3px; }
-.tl-seg button { border: 0; background: none; cursor: pointer; border-radius: 999px; min-height: 40px;
-  font: 700 var(--a-f-chip)/1 var(--font-body); color: var(--a-muted); padding: 10px 16px;
+   THE PAGE IS DARK IN BOTH MODES, on his instruction (2026-08-27). It does that
+   by declaring its own `--tl-*` set and using nothing else, so there is exactly
+   one block to remap when the mode changes and no literal anywhere below can
+   escape it. HUD mode remaps every token at the bottom of this file.
+
+   Two colours: ink and one accent, plus --tl-no only where a rung actually cost
+   him something. The dark ground is full bleed, cancelling `main`'s gutter and
+   paying it back as padding, so the band reaches the window edge the way the
+   proposal did instead of floating in a card.
+   ========================================================================== */
+.tline {
+  --tl-bg: #0E0E10;
+  --tl-rung: #16161A;
+  --tl-rung2: #1C1C21;
+  --tl-ink: #F2F0EA;
+  --tl-dim: #8B877E;
+  --tl-faint: #56534A;
+  --tl-hot: #C6F24A;
+  --tl-hotw: rgba(198, 242, 74, 0.13);
+  --tl-no: #E0603A;
+  --tl-now: rgba(224, 96, 58, 0.13);
+  --tl-line: rgba(242, 240, 234, 0.09);
+  --tl-r: 16px;
+
+  position: relative;
+  background: var(--tl-bg);
+  color: var(--tl-ink);
+  margin-inline: calc(var(--gutter) * -1);
+  padding: var(--s5) var(--gutter) 80px;
+  min-height: calc(100vh - 190px);
+}
+/* The shell keeps a strip of its own paper below `main`, which under a dark
+   full-bleed page reads as a cream bar at the foot of the window.
+   A SHADOW, not a pseudo-element: an absolutely positioned block hanging off
+   the bottom grows the document by its own height, so the fix for 48px of
+   cream was 220px of new scroll. A shadow paints and costs nothing. */
+.tline { box-shadow: 0 240px 0 var(--tl-bg); }
+.tline .tl-l { display: block; font: 700 9.5px/1 var(--font-body); letter-spacing: 0.19em;
+  text-transform: uppercase; color: var(--tl-faint); margin: 0; }
+
+/* ---- the one bar ---- */
+.tl-bar { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; margin-bottom: var(--s4); }
+.tl-bar h1 { font-family: var(--font-display); font-weight: 800; font-size: 23px; letter-spacing: -0.025em;
+  margin: 0; color: var(--tl-ink); }
+.tl-seg { display: inline-flex; background: var(--tl-rung); border-radius: 999px; padding: 4px; gap: 3px; }
+.tl-seg button { border: 0; background: none; cursor: pointer; border-radius: 999px; min-height: 38px;
+  font: 700 12.5px/1 var(--font-body); color: var(--tl-dim); padding: 10px 17px;
   transition: background var(--a-enter), color var(--a-enter); }
-.tl-seg button:hover:not(.on) { background: var(--a-accent-wash); color: var(--a-accent-text); }
-.tl-seg button.on { background: var(--a-accent); color: var(--a-ink); font-weight: 800; }
-.tl-mom { display: flex; align-items: baseline; gap: var(--s2); margin-left: auto; }
-.tl-mom b { font-family: var(--font-display); font-weight: 800; font-size: 26px; letter-spacing: -0.04em;
-  font-variant-numeric: tabular-nums; color: var(--a-accent-text); }
-.tl-giveup { border: 0; cursor: pointer; border-radius: 999px; min-height: 40px; padding: 11px 18px;
-  font: 700 var(--a-f-chip)/1 var(--font-body); color: var(--muted); background: var(--a-sunk);
-  transition: background var(--a-enter), color var(--a-enter); }
-.tl-giveup:hover { background: var(--alert-wash); color: var(--alert); }
+.tl-seg button:hover:not(.on) { color: var(--tl-ink); }
+.tl-seg button.on { background: var(--tl-hot); color: #0E0E10; font-weight: 800; }
+
+/* HE PUT EVERY CONTROL ON THE RIGHT. The zoom stays left with the title because
+   it changes what the page IS; these three change where he is going. */
+.tl-right { margin-left: auto; display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+.tl-chain { display: flex; align-items: baseline; gap: 8px; background: var(--tl-hotw);
+  border-radius: 999px; padding: 9px 16px; }
+.tl-chain b { font-family: var(--font-display); font-weight: 800; font-size: 18px; letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums; color: var(--tl-hot); }
+.tl-chain .tl-l { color: var(--tl-dim); }
+.tl-next, .tl-giveup { border: 0; cursor: pointer; border-radius: 999px; min-height: 38px; padding: 11px 18px;
+  font: 700 12.5px/1 var(--font-body); display: inline-flex; align-items: center; gap: 8px;
+  transition: background var(--a-enter), color var(--a-enter), transform var(--a-enter); }
+.tl-next { background: var(--tl-hot); color: #0E0E10; font-weight: 800; }
+.tl-next:hover { transform: translateY(-1px); }
+.tl-giveup { background: var(--tl-rung); color: var(--tl-dim); box-shadow: inset 0 0 0 1px var(--tl-line); }
+.tl-giveup:hover { color: var(--tl-no); box-shadow: inset 0 0 0 1px rgba(224, 96, 58, 0.4); }
+
+/* ---- the promise ---- */
+.tl-promise { margin: 0 0 var(--s4); padding: 18px 22px; border-radius: var(--tl-r); background: var(--tl-rung);
+  display: flex; align-items: center; gap: var(--s5); flex-wrap: wrap; }
+.tl-promise .tl-txt { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.02em;
+  font-size: clamp(15px, 1.7vw, 22px); line-height: 1.25; margin: 0; max-width: 52ch; color: var(--tl-ink); }
+.tl-promise .tl-txt em { font-style: normal; color: var(--tl-hot); }
+.tl-arc { margin-left: auto; display: flex; align-items: flex-end; gap: 4px; height: 52px; }
+.tl-arc i { width: 9px; border-radius: 2px; background: var(--tl-line); }
+.tl-arc i.on { background: var(--tl-hot); }
 
 /* ---- the ladder ---- */
-.tl-head, .tl-rung { display: grid; grid-template-columns: 92px repeat(4, minmax(0, 1fr)) 104px; gap: var(--s3); align-items: center; }
-.tl-head { padding: 0 var(--s4) var(--s2); }
-.tl-rungs { display: flex; flex-direction: column; gap: 7px; }
-.tl-rung { background: var(--surface); border-radius: var(--r-md); padding: var(--s3) var(--s4); min-height: 62px; }
-.tl-rung.is-today { box-shadow: inset 0 0 0 1.5px var(--a-accent); }
-.tl-rung.is-empty { opacity: 0.62; }
-.tl-day { display: flex; align-items: baseline; gap: var(--s2); }
-.tl-day b { font-family: var(--font-display); font-weight: 800; font-size: 21px; letter-spacing: -0.03em; }
+.tl-head, .tl-rung { display: grid;
+  grid-template-columns: 96px repeat(5, minmax(0, 1fr)) 1.7fr 92px; gap: var(--s3); align-items: center; }
+.tl-head { padding: 0 18px var(--s2); }
+.tl-rungs { display: flex; flex-direction: column; gap: 8px; }
+.tl-rung { background: var(--tl-rung); border-radius: var(--tl-r); padding: 14px 18px;
+  transition: background var(--a-enter); }
+.tl-rung:hover { background: var(--tl-rung2); }
+.tl-rung.is-today { box-shadow: inset 0 0 0 1.5px var(--tl-hot); }
+.tl-rung.is-empty { background: var(--tl-now); }
+
+.tl-day { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.tl-day b { font-family: var(--font-display); font-weight: 800; font-size: 21px; letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums; }
+.tl-day .tl-l { white-space: nowrap; }
+
 .tl-cell { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
 .tl-cell b { font-family: var(--font-display); font-weight: 800; font-size: 17px; letter-spacing: -0.025em;
-  font-variant-numeric: tabular-nums; }
-.tl-m { height: 5px; border-radius: 3px; background: var(--hairline); overflow: hidden; }
-.tl-m i { display: block; height: 100%; border-radius: 3px; background: var(--a-accent); }
-.tl-pts { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-.tl-pts b { font-family: var(--font-display); font-weight: 800; font-size: 21px; letter-spacing: -0.03em;
-  font-variant-numeric: tabular-nums; }
-.tl-pts i { font-style: normal; font: 700 11px/1 var(--font-body); color: var(--a-accent-text); font-variant-numeric: tabular-nums; }
-.tl-pts.is-down i { color: var(--alert); }
-.tl-note { margin: var(--s4) 0 0; color: var(--muted); font-size: var(--text-xs); max-width: 78ch; }
+  line-height: 1.1; font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 5px;
+  flex-wrap: wrap; }
+/* THE SMALL TEXT UNDER EVERY FIGURE. He asked for the unit in his own words --
+   "Kč off the debt", "done", "focused" -- because a bare 9 is not a fact. */
+.tl-cell b small { font-family: var(--font-body); font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em;
+  color: var(--tl-faint); white-space: nowrap; }
+.tl-cell .tl-m { height: 5px; border-radius: 3px; background: var(--tl-line); overflow: hidden; }
+.tl-cell .tl-m i { display: block; height: 100%; border-radius: 3px; background: var(--tl-hot);
+  transition: width var(--t-med) var(--ease); }
+.tl-cell.is-muted b { color: var(--tl-faint); }
+
+.tl-hard { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.tl-hard b { font-family: var(--font-display); font-weight: 800; font-size: 14px; letter-spacing: -0.015em;
+  line-height: 1.25; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.tl-tick { width: 22px; height: 22px; border-radius: 7px; flex: none; display: grid; place-items: center;
+  background: var(--tl-hotw); color: var(--tl-hot); font-size: 11px; }
+.tl-tick.no { background: rgba(242, 240, 234, 0.05); color: var(--tl-faint); }
+.tl-rung:has(.tl-tick.no) .tl-hard b { color: var(--tl-faint); font-weight: 700; }
+
+.tl-pts { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.tl-pts b { font-family: var(--font-display); font-weight: 800; font-size: 20px; letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums; color: var(--tl-hot); }
+.tl-pts i { font: 700 11px/1 var(--font-body); font-style: normal; font-variant-numeric: tabular-nums;
+  color: var(--tl-dim); }
+.tl-pts.is-down b { color: var(--tl-no); }
+/* Zero is not a win, so it does not get the accent. */
+.tl-rung.is-blank .tl-pts b, .tl-rung.is-blank .tl-pts i { color: var(--tl-faint); }
+.tl-rung.is-blank.is-empty .tl-pts b, .tl-rung.is-blank.is-empty .tl-pts i { color: var(--tl-no); }
+.tl-pts.is-down i { color: var(--tl-no); }
+
+/* ---- what it adds up to ---- */
+.tl-sum { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; margin-top: var(--s4); }
+.tl-sum > div { background: var(--tl-rung); border-radius: var(--tl-r); padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 9px; }
+.tl-sum b { font-family: var(--font-display); font-weight: 800; font-size: 27px; letter-spacing: -0.035em;
+  line-height: 1; font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 6px; }
+.tl-sum b small { font-family: var(--font-body); font-size: 11px; font-weight: 700; color: var(--tl-faint); }
+.tl-sum > div.win b { color: var(--tl-hot); }
+.tl-sum p { margin: 0; font: 500 12.5px/1.4 var(--font-body); color: var(--tl-dim); }
 
 /* ---- the flywheel ---- */
-.tl-wheelwrap { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: var(--s4); align-items: start; }
-.tl-wheel { position: relative; background: var(--surface); border-radius: 20px; min-height: 520px; height: 100%; overflow: hidden; }
+.tl-wheelwrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 420px); gap: var(--s4); align-items: start; }
+.tl-wheel { position: relative; border-radius: var(--tl-r); background: var(--tl-rung);
+  min-height: 520px; display: grid; place-items: center; overflow: hidden; }
 .tl-wheel canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.tl-wheelread { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; }
-.tl-wheelread b { display: block; font-family: var(--font-display); font-weight: 800; font-size: clamp(46px, 6vw, 88px);
-  letter-spacing: -0.05em; line-height: 0.86; color: var(--a-accent-text); font-variant-numeric: tabular-nums; }
-.tl-wheelread .tl-l { margin-top: var(--s2); }
-.tl-state { display: inline-block; margin-top: var(--s3); font: 700 10.5px/1 var(--font-body);
-  letter-spacing: 0.2em; text-transform: uppercase; padding: 8px 14px; border-radius: 999px;
-  background: var(--a-accent-wash); color: var(--a-accent-text); }
-.tl-wheelnote { position: absolute; left: 0; right: 0; bottom: var(--s4); text-align: center; margin: 0;
-  color: var(--faint); font-size: var(--text-xs); padding: 0 var(--s5); }
-.tl-days { display: flex; flex-direction: column; gap: 7px; max-height: 78vh; overflow-y: auto; }
-.tl-card { background: var(--surface); border-radius: var(--r-md); padding: var(--s3) var(--s4); }
-.tl-card.is-empty { opacity: 0.66; }
-.tl-cardtop { display: flex; align-items: baseline; gap: var(--s2); }
-.tl-delta { margin-left: auto; font: 700 12px/1 var(--font-body); color: var(--a-accent-text); font-variant-numeric: tabular-nums; }
-.tl-card.is-down .tl-delta { color: var(--alert); }
-.tl-cardpts { display: flex; align-items: baseline; gap: 7px; margin-top: var(--s2); }
-.tl-cardpts b { font-family: var(--font-display); font-weight: 800; font-size: 27px; letter-spacing: -0.035em;
+.tl-wheelread { position: relative; z-index: 2; text-align: center; pointer-events: none; }
+.tl-wheelread b { display: block; font-family: var(--font-display); font-weight: 800;
+  font-size: clamp(56px, 8vw, 108px); letter-spacing: -0.05em; line-height: 0.85; color: var(--tl-ink); }
+.tl-wheelread .tl-l { margin-top: 12px; letter-spacing: 0.3em; }
+.tl-state { display: inline-block; margin-top: 18px; padding: 9px 16px; border-radius: 999px;
+  background: var(--tl-hotw); color: var(--tl-hot);
+  font: 700 11px/1 var(--font-body); letter-spacing: 0.2em; text-transform: uppercase; }
+.tl-wheelnote { position: absolute; left: 0; right: 0; bottom: 20px; text-align: center; margin: 0; z-index: 2;
+  font: 700 10.5px/1.5 var(--font-body); letter-spacing: 0.15em; text-transform: uppercase; color: var(--tl-faint); }
+
+/* THE MATHS, on hover and on focus. `:focus-within` would keep it open after a
+   click on the button itself, which on a touch device is every open. */
+.tl-maths { position: absolute; top: 16px; right: 16px; z-index: 4; }
+.tl-maths > button { width: 30px; height: 30px; border: 0; border-radius: 50%; cursor: help;
+  background: var(--tl-rung2); color: var(--tl-dim); box-shadow: inset 0 0 0 1px var(--tl-line);
+  font: 800 13px/1 var(--font-display); transition: background var(--a-enter), color var(--a-enter); }
+.tl-maths:hover > button, .tl-maths:has(:focus-visible) > button { background: var(--tl-hot); color: #0E0E10; }
+.tl-mathsbox { position: absolute; top: calc(100% + 10px); right: 0; width: min(340px, 78vw);
+  background: var(--tl-bg); border-radius: var(--tl-r); box-shadow: inset 0 0 0 1px var(--tl-line), 0 18px 44px rgba(0, 0, 0, 0.5);
+  padding: 16px 18px; opacity: 0; visibility: hidden; transform: translateY(-5px);
+  transition: opacity var(--a-enter), transform var(--a-enter), visibility var(--a-enter); }
+.tl-maths:hover .tl-mathsbox, .tl-maths:has(:focus-visible) .tl-mathsbox { opacity: 1; visibility: visible; transform: none; }
+.tl-mathsbox .tl-l { margin-bottom: 8px; }
+.tl-mathsbox dl + .tl-l { margin-top: 14px; }
+.tl-mathsbox .tl-l + p { margin-top: 0; }
+.tl-mathsbox dl { display: flex; flex-direction: column; gap: 5px; margin: 0 0 14px; }
+.tl-mathsbox dl > div { display: flex; align-items: baseline; gap: 10px; }
+.tl-mathsbox dt { font: 600 12.5px/1.3 var(--font-body); color: var(--tl-ink); }
+.tl-mathsbox dd { margin: 0 0 0 auto; display: flex; align-items: baseline; gap: 6px;
+  font-family: var(--font-display); font-weight: 800; font-size: 14px; color: var(--tl-hot);
   font-variant-numeric: tabular-nums; }
-.tl-cardpts i { font-style: normal; font-size: var(--text-xs); color: var(--faint); }
-.tl-bd { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s3); margin-top: var(--s2); }
-.tl-bd span { font-size: var(--text-xs); color: var(--muted); }
-.tl-bd b { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
-.tl-pen { margin: var(--s2) 0 0; font-size: var(--text-xs); color: var(--alert); }
+.tl-mathsbox dd small { font-family: var(--font-body); font-size: 10px; font-weight: 700; color: var(--tl-faint); }
+.tl-mathsbox dl > div.off dt, .tl-mathsbox dl > div.off dd { color: var(--tl-faint); }
+.tl-mathsbox p { margin: 0 0 12px; font: 500 12.5px/1.5 var(--font-body); color: var(--tl-dim); }
+.tl-mathsbox p:last-child { margin-bottom: 0; }
+.tl-mathsbox p b { color: var(--tl-ink); }
 
-/* ---- two lives ---- */
-.tl-lives { display: flex; flex-direction: column; gap: var(--s4); }
-.tl-panes { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
-.tl-pane { position: relative; border-radius: 20px; padding: var(--s4); min-height: 400px;
-  display: flex; flex-direction: column; gap: var(--s3); overflow: hidden; }
-.tl-pane.is-drift { background: var(--a-sunk); }
-.tl-pane.is-push { background: var(--a-accent-wash); }
-.tl-pill { align-self: flex-start; font: 700 9.5px/1 var(--font-body); letter-spacing: 0.2em;
-  text-transform: uppercase; padding: 8px 12px; border-radius: 999px; }
-.tl-pane.is-drift .tl-pill { background: var(--hairline); color: var(--muted); }
-.tl-pane.is-push .tl-pill { background: var(--a-accent); color: var(--a-ink); }
-/* THE PHOTOGRAPH GOES HERE. One per side per stop. Until his own pictures are
-   in, the slot says what it is rather than faking an image. */
-.tl-shot { flex: 1; border-radius: var(--r-md); background: var(--hairline); position: relative; min-height: 190px; }
-.tl-shot::after { content: 'PHOTO'; position: absolute; inset: 0; display: grid; place-content: center;
-  font: 700 10px/1 var(--font-body); letter-spacing: 0.3em; color: var(--faint); }
-.tl-said { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: clamp(18px, 2.2vw, 27px);
-  line-height: 1.14; letter-spacing: -0.025em; }
-.tl-pane.is-drift .tl-said { color: var(--muted); }
-.tl-gap { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; }
-.tl-gap b { display: block; font-family: var(--font-display); font-weight: 800; font-size: clamp(34px, 5vw, 74px);
-  letter-spacing: -0.045em; line-height: 0.86; font-variant-numeric: tabular-nums; }
-.tl-scrub { display: flex; justify-content: space-between; position: relative; padding: 0 var(--s3); }
-.tl-scrub::before { content: ''; position: absolute; left: var(--s3); right: var(--s3); top: 7px; height: 2px; background: var(--hairline); }
-.tl-scrub button { position: relative; z-index: 2; border: 0; background: none; cursor: pointer; padding: 0;
-  display: flex; flex-direction: column; align-items: center; gap: 9px; }
-.tl-knob { width: 14px; height: 14px; border-radius: 50%; background: var(--surface);
-  box-shadow: 0 0 0 2px var(--hairline-strong); transition: all var(--t-med); }
-.tl-scrub button.past .tl-knob { background: var(--a-accent-text); box-shadow: none; }
-.tl-scrub button.on .tl-knob { background: var(--a-accent); box-shadow: 0 0 0 3px var(--a-accent-wash); transform: scale(1.25); }
-.tl-livesfoot { display: flex; align-items: center; gap: var(--s4); flex-wrap: wrap; }
-.tl-livesfoot p { margin: 0; color: var(--muted); font-size: var(--text-xs); max-width: 66ch; }
+/* ---- one card per day ---- */
+.tl-days { display: flex; flex-direction: column; gap: 8px; max-height: 78vh; overflow-y: auto;
+  padding-right: 4px; }
+.tl-card { background: var(--tl-rung); border-radius: var(--tl-r); padding: 18px 20px; }
+.tl-card.is-down { box-shadow: inset 0 0 0 1px rgba(224, 96, 58, 0.28); }
+.tl-card.is-empty { background: var(--tl-now); }
+.tl-card.is-blank .tl-cardpts b, .tl-card.is-blank .tl-delta { color: var(--tl-faint); }
+.tl-card.is-blank.is-down .tl-cardpts b, .tl-card.is-blank.is-down .tl-delta { color: var(--tl-no); }
+.tl-cardtop { display: flex; align-items: center; gap: var(--s3); }
+.tl-cardday { display: flex; align-items: baseline; gap: 8px; }
+.tl-cardday b { font-family: var(--font-display); font-weight: 800; font-size: 20px; letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums; }
+.tl-delta { margin-left: auto; font: 800 13px/1 var(--font-display); font-variant-numeric: tabular-nums;
+  color: var(--tl-hot); }
+.tl-card.is-down .tl-delta { color: var(--tl-no); }
+.tl-cardpts { margin-top: 12px; display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: baseline; }
+.tl-cardpts b { font-family: var(--font-display); font-weight: 800; font-size: 30px; letter-spacing: -0.04em;
+  line-height: 1; font-variant-numeric: tabular-nums; }
+.tl-cardpts i { font: 700 11.5px/1 var(--font-body); font-style: normal; color: var(--tl-faint); }
+.tl-cardpts .tl-m { grid-column: 1 / -1; height: 5px; border-radius: 3px; background: var(--tl-line); overflow: hidden; }
+.tl-cardpts .tl-m i { display: block; height: 100%; border-radius: 3px; background: var(--tl-hot); }
+.tl-card.is-down .tl-cardpts .tl-m i { background: var(--tl-no); }
+
+.tl-bd { display: flex; flex-direction: column; margin: 16px 0 0; }
+.tl-bd > div { display: flex; align-items: baseline; gap: 8px; padding: 6px 0;
+  border-bottom: 1px solid var(--tl-line); }
+.tl-bd dt { font: 600 12px/1.3 var(--font-body); color: var(--tl-dim); }
+.tl-bd dd { margin: 0 0 0 auto; display: flex; align-items: baseline; gap: 6px; min-width: 0;
+  font-family: var(--font-display); font-weight: 800; font-size: 13.5px; letter-spacing: -0.015em;
+  font-variant-numeric: tabular-nums; text-align: right; }
+.tl-bd dd small { font-family: var(--font-body); font-size: 10px; font-weight: 700; color: var(--tl-faint);
+  white-space: nowrap; }
+.tl-bd > div.off dt, .tl-bd > div.off dd { color: var(--tl-faint); }
+/* THE HARD THING GETS A LINE OF ITS OWN. It is a sentence, not a figure, and
+   in the value column it wrapped in the middle of "the payment plan". */
+.tl-hardrow { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--tl-line);
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.tl-hardrow .tl-l { flex: 1 0 100%; }
+.tl-hardrow b { font-family: var(--font-display); font-weight: 800; font-size: 14px; letter-spacing: -0.015em;
+  line-height: 1.3; }
+.tl-hardrow.off b { color: var(--tl-faint); font-weight: 700; }
+.tl-waited { font: 700 10px/1 var(--font-body); letter-spacing: 0.04em; color: var(--tl-faint); white-space: nowrap; }
+.tl-after { margin: 14px 0 0; font: 500 12.5px/1.4 var(--font-body); color: var(--tl-dim); }
+.tl-after b { color: var(--tl-hot); font-family: var(--font-display); font-weight: 800; }
+.tl-card.is-empty .tl-after { color: var(--tl-no); font-weight: 700; }
+
+/* ---- two lives: over the whole window, on his instruction ---- */
+.tl-lives { position: fixed; inset: 0; z-index: 300; background: #08090A; color: var(--tl-ink);
+  display: grid; grid-template-rows: auto 1fr auto auto; overflow-y: auto;
+  animation: tlrise var(--t-med) var(--ease) both; }
+@keyframes tlrise { from { opacity: 0; transform: scale(0.99); } to { opacity: 1; transform: none; } }
+.tl-livestop { display: flex; align-items: center; gap: var(--s3); padding: 22px clamp(18px, 3vw, 36px) 0; }
+.tl-close { margin-left: auto; width: 38px; height: 38px; border: 0; border-radius: 50%; cursor: pointer;
+  background: rgba(242, 240, 234, 0.06); color: var(--tl-dim); font-size: 14px; }
+.tl-close:hover { background: rgba(242, 240, 234, 0.12); color: var(--tl-ink); }
+.tl-panes { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  padding: 18px clamp(18px, 3vw, 36px); min-height: 0; }
+.tl-pane { border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 14px;
+  background: #101012; }
+.tl-pane.is-push { background: #12160C; }
+.tl-pill { align-self: flex-start; padding: 8px 14px; border-radius: 999px;
+  font: 700 10px/1 var(--font-body); letter-spacing: 0.2em; text-transform: uppercase;
+  background: rgba(242, 240, 234, 0.06); color: var(--tl-dim); }
+.tl-pane.is-push .tl-pill { background: var(--tl-hotw); color: var(--tl-hot); }
+/* The slots are capped rather than greedy: until his footage is in, an empty
+   frame 700px tall is the loudest thing on the screen. */
+.tl-shot { flex: 1; min-height: 150px; max-height: 40vh; border-radius: 14px;
+  background: rgba(242, 240, 234, 0.04); display: grid; place-items: center; }
+.tl-pane.is-push .tl-shot { background: rgba(198, 242, 74, 0.06); }
+.tl-said { margin: 0; font-family: var(--font-display); font-weight: 800; letter-spacing: -0.02em;
+  font-size: clamp(15px, 1.6vw, 21px); line-height: 1.3; }
+.tl-pane.is-drift .tl-said { color: var(--tl-dim); }
+.tl-gap { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center;
+  background: #08090A; border-radius: 999px; padding: 14px 18px; pointer-events: none; }
+.tl-gap b { display: block; font-family: var(--font-display); font-weight: 800; font-size: 26px;
+  letter-spacing: -0.04em; color: var(--tl-hot); font-variant-numeric: tabular-nums; }
+.tl-scrub { display: flex; align-items: center; justify-content: center; gap: clamp(18px, 5vw, 60px);
+  padding: 6px clamp(18px, 3vw, 36px) 10px; }
+.tl-scrub button { border: 0; background: none; cursor: pointer; display: flex; flex-direction: column;
+  align-items: center; gap: 9px; padding: 8px; }
+.tl-knob { width: 12px; height: 12px; border-radius: 50%; background: rgba(242, 240, 234, 0.16);
+  transition: background var(--a-enter), transform var(--a-enter); }
+.tl-scrub button.past .tl-knob { background: var(--tl-dim); }
+.tl-scrub button.on .tl-knob { background: var(--tl-hot); transform: scale(1.5); }
+.tl-scrub button.on .tl-l { color: var(--tl-hot); }
+.tl-livesfoot { display: flex; align-items: center; gap: var(--s4); flex-wrap: wrap;
+  padding: 8px clamp(18px, 3vw, 36px) 26px; }
 .tl-back { border: 0; cursor: pointer; border-radius: 999px; padding: 15px 26px;
-  font: 700 14px/1 var(--font-body); background: var(--a-accent); color: var(--a-ink); }
+  background: var(--tl-hot); color: #08090A; font: 800 14px/1 var(--font-body); }
+.tl-livesfoot p { margin: 0; font: 500 13px/1.5 var(--font-body); color: var(--tl-dim); max-width: 62ch; }
 
-@media (max-width: 1080px) {
-  .tl-wheelwrap { grid-template-columns: 1fr; }
-  .tl-days { max-height: none; }
+/* ---- narrow ---- */
+@media (max-width: 1180px) {
   .tl-head { display: none; }
-  .tl-rung { grid-template-columns: 72px repeat(2, 1fr) 84px; row-gap: var(--s2); }
-  .tl-panes { grid-template-columns: 1fr; }
-  .tl-gap { position: static; transform: none; margin: 0 auto; }
+  .tl-rung { grid-template-columns: 84px repeat(3, minmax(0, 1fr)); row-gap: 14px; }
+  .tl-hard { grid-column: 1 / -1; }
+  .tl-pts { grid-column: 1 / -1; flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 10px; }
+  .tl-wheelwrap { grid-template-columns: 1fr; }
+  .tl-wheel { min-height: 420px; }
+  .tl-days { max-height: none; }
 }
-@media (prefers-reduced-motion: reduce) { .tl-knob { transition: none; } }
+@media (max-width: 700px) {
+  .tl-rung { grid-template-columns: 76px repeat(2, minmax(0, 1fr)); }
+  .tl-bd { grid-template-columns: 1fr; }
+  .tl-panes { grid-template-columns: 1fr; }
+  .tl-gap { position: static; transform: none; justify-self: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tl-lives { animation: none; }
+  .tl-cell .tl-m i { transition: none; }
+}
+
+/* HUD MODE. The page keeps its own tokens; the mode replaces what they mean.
+   Nothing above needs to know the mode exists, which is the whole point of
+   naming them in the first place. */
+.shell.is-hud .tline {
+  --tl-bg: #050A0F;
+  --tl-rung: #0C121A;
+  --tl-rung2: #121A24;
+  --tl-ink: #E6F1F8;
+  --tl-dim: #93A7B8;
+  --tl-faint: #6E8496;
+  --tl-hot: #4FD8E8;
+  --tl-hotw: rgba(79, 216, 232, 0.14);
+  --tl-line: rgba(79, 216, 232, 0.16);
+  --tl-r: 6px;
+}
+.shell.is-hud .tl-seg button.on, .shell.is-hud .tl-next, .shell.is-hud .tl-back { color: #04141A; }
+.shell.is-hud .tl-maths:hover > button, .shell.is-hud .tl-maths:has(:focus-visible) > button { color: #04141A; }
+/* Michroma is a WIDE face and every figure here was sized for Bricolage, so the
+   display sizes step down and the tracking goes to zero: Michroma carries its
+   own, and "Carrying itself" overflowed its pill without this. */
+.shell.is-hud .tline [class^="tl-"] b, .shell.is-hud .tline .tl-day b { letter-spacing: 0; }
+.shell.is-hud .tl-bar h1 { font-size: 19px; }
+.shell.is-hud .tl-promise .tl-txt { font-size: clamp(13px, 1.4vw, 18px); }
+.shell.is-hud .tl-wheelread b { font-size: clamp(44px, 6vw, 84px); }
+.shell.is-hud .tl-state { letter-spacing: 0.1em; }

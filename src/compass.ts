@@ -55,6 +55,12 @@ export interface CompassMoney {
    *  A debt payment has a real date imposed from outside, by a bank, and the
    *  only question worth asking is whether it went. */
   due: { day: number; amount: number; sent: boolean }[]
+  /** Money that actually moved, keyed by the day it moved on.
+   *
+   *  The Timeline asks what the big number DID on a given day, and a monthly
+   *  total cannot answer that. `paid` is debt going down, `saved` is money set
+   *  aside; both are what Compass recorded, never a projection. */
+  byDay: Record<string, { paid: number; saved: number }>
 }
 
 export type CompassState =
@@ -110,6 +116,13 @@ export function summarise(debts: CompassDebt[], tx: CompassTx[]): CompassMoney {
       }))
       .filter((r) => r.amount > 0)
       .sort((a, b) => a.day - b.day),
+    byDay: tx.reduce<Record<string, { paid: number; saved: number }>>((acc, t) => {
+      if (t.kind !== 'debt_payment' && t.kind !== 'saving') return acc
+      const row = (acc[t.occurred_on] ??= { paid: 0, saved: 0 })
+      if (t.kind === 'debt_payment') row.paid += t.amount
+      else row.saved += t.amount
+      return acc
+    }, {}),
   }
 }
 

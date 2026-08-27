@@ -62,19 +62,9 @@ export const APPS: EmbeddedApp[] = [
     icon: <Icon.Bolt size={20} />,
   },
   {
-    id: 'hodina', name: 'Hodina',
-    url: 'https://hodina.netlify.app',
-    icon: <Icon.Clock size={20} />,
-  },
-  {
-    id: 'hunterpart', name: 'Hunterpart',
-    url: 'https://hunterpart.netlify.app',
-    icon: <Icon.Home size={20} />,
-  },
-  {
-    id: 'zepp', name: 'Zepp Health',
-    url: 'https://zepp-health.netlify.app',
-    icon: <Icon.Heart size={20} />,
+    id: 'challengers', name: 'Challengers',
+    url: 'https://challenger-392-service.netlify.app',
+    icon: <Icon.Flag size={20} />,
   },
 ]
 

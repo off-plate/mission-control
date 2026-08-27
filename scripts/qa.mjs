@@ -2200,7 +2200,7 @@ await step('apps: a shelf that embeds nothing until an app is opened', async () 
   if (!mind || mind.tag !== 'A') throw new Error('My Mind is not a link, so it would try to frame a site that refuses framing')
   if (!/access\.mymind\.com/.test(mind.href ?? '')) throw new Error(`My Mind points at ${mind.href}`)
   if (mind.target !== '_blank') throw new Error('My Mind does not open in a new tab')
-  if (shelf.tiles.length !== 7) throw new Error(`${shelf.tiles.length} apps on the shelf`)
+  if (shelf.tiles.length !== 5) throw new Error(`${shelf.tiles.length} apps on the shelf`)
   if (shelf.subs) throw new Error('a tile carries a subtitle')
 })
 

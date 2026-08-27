@@ -6393,6 +6393,22 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    labels with allInnerTexts(), which returns nothing for a display:none tree.
    ========================================================================== */
 @media (min-width: 640px) {
+  /* THE HEADER PAINTS OVER THE ROW, and this rule is the whole reason the
+     drawer reads as a drawer.
+
+     `.topbar` was plain flow content with no position and no z-index, while the
+     row is absolute at z-index 30. A positioned element paints above unpositioned
+     content, so the row travelled ACROSS the face of the header instead of
+     behind it: "the secondary menu flies through the first menu". Giving the
+     header a stacking position above the row, and its own opaque background so
+     nothing shows through it, is what turns the slide into an object emerging
+     from underneath.
+
+     The background must be var(--bg) and not a literal: HUD mode repaints that
+     token, and a hardcoded paper colour would leave a light bar across the
+     dark shell. */
+  .topbar { position: relative; z-index: 40; background: var(--bg); }
+
   /* NO `position: relative` here. `.topstick` is `position: sticky` further up
      this file, and adding relative in this block silently overrode it, which
      un-stuck the header on every page. A sticky element is already a positioned

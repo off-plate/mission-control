@@ -195,12 +195,14 @@ await step('the menu is seven tabs, and what left it is reachable from the heade
      (2026-08-27): six again as the Assistant left the tab row for its own
      header button next to the Zone; seven again as Calendar stopped being
      Big Time's and became a tab in every workspace; six again as Apps left
-     too, for a header dropdown next to Note and Yesterday, seven icons never
-     having earned a tab. Seven since Timeline arrived (2026-08-27), which
-     measures the habit log above a now line and carries the same rate forward
-     below it. #/apps still resolves to the real page, it is just
-     not one of the tabs. The retired addresses still have to resolve, which
-     is asserted below with the other retired ones. */
+     too, for a header dropdown next to Note, seven icons never having earned
+     a tab. #/apps still resolves to the real page, it is just not one of the
+     tabs. Yesterday left the header entirely the same day: the morning offer
+     already covers it and repeating it by hand was not needed. Seven again
+     since Timeline arrived (2026-08-27), which measures the habit log above
+     a now line and carries the same rate forward below it. The retired
+     addresses still have to resolve, which is asserted below with the other
+     retired ones. */
   await fresh('today')
   const tabs = await page.locator('.nav-tab').allInnerTexts()
   if (tabs.length !== 7) throw new Error(`${tabs.length} tabs: ${tabs.join(', ')}`)
@@ -234,10 +236,15 @@ await step('the header opens Notes, and the pill opens Focus', async () => {
   await fresh('today')
   await page.getByRole('button', { name: 'Note', exact: true }).click(); await page.waitForTimeout(600)
   if (!(await page.locator('.nt-app').count())) throw new Error('the Note button did not open Notes')
-  // The pill is the only door to Focus now, and it is on every page.
+  /* The pill is the only door to Focus now, and it is on every page -- but
+     open-history is one of the icons that drops below 2200px so the pill
+     stops covering content underneath it (his report, fixed 2026-08-27).
+     Ultrawide, his own daily screen, is where it is reachable this way. */
+  await page.setViewportSize({ width: 2400, height: 1200 })
   await page.getByRole('button', { name: 'Open the focus history' }).click(); await page.waitForTimeout(600)
   const h1 = await page.locator('h1').first().innerText()
   if (h1 !== 'Focus') throw new Error(`the pill went to ${h1}`)
+  await page.setViewportSize({ width: 1500, height: 1200 })
 })
 await step('the zone: header stays, first move starts it, and the note lands in its folder', async () => {
   await fresh('today')
@@ -1444,11 +1451,6 @@ await step('daily review: offered once, fixes yesterday, and stays shut', async 
   }
   await page.reload(); await page.waitForTimeout(900)
   if (await page.locator('.dr-screen').count()) throw new Error('it came back the same day')
-  // and the header button reopens it, from any page, after it has been walked
-  await page.goto(`${URL}#/habits`); await page.waitForTimeout(600)
-  await page.getByRole('button', { name: 'Yesterday', exact: true }).click(); await page.waitForTimeout(600)
-  if (!(await page.locator('.dr-screen').count())) throw new Error('the header button did not reopen it')
-  await page.keyboard.press('Escape')
 })
 
 await step('daily review: the close screen cannot claim a clean slate it does not have', async () => {
@@ -1547,9 +1549,16 @@ await step('daily review: reopening it starts a new walk, not the old one', asyn
   const first = await toLeft()
   if (!/2 things/.test(first)) throw new Error(`expected two leftovers, got: ${first}`)
   await page.locator('.dr-rowacts .dr-tick').first().click(); await page.waitForTimeout(400)
-  // close, then reopen from the pill
+  // close, then reopen the way he now does: cleared and offered again, not a
+  // header button he asked removed (2026-08-27) since the morning offer
+  // already covers it and he does not need to repeat it by hand.
   await page.locator('.dr-foot .dr-skip').first().click(); await page.waitForTimeout(500)
-  await page.getByRole('button', { name: 'Yesterday', exact: true }).click(); await page.waitForTimeout(600)
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    delete s.dailyDone; delete s.dailySkipped
+    localStorage.setItem(K, JSON.stringify(s))
+  }, KEY)
+  await page.reload(); await page.waitForTimeout(900)
   const second = await toLeft()
   if (!/One thing/.test(second)) throw new Error(`the reopened walk still counted the one he put back: ${second}`)
   // and clearing the last one must not read "0 things did not get done."

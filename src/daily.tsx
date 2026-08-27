@@ -263,7 +263,10 @@ export function DailyReview() {
 
   const everLogged = habitLog.length + routineLog.length + focusSessions.length > 0
   const owed = everLogged && dailyDone !== today && dailySkipped !== today
-  /* Offered once a day, on its own. After that it is his to open. */
+  /* Offered once a day, on its own, and that is the only door now: the header
+     button that used to reopen it by hand left on his instruction
+     (2026-08-27) -- he does not need to repeat something the morning offer
+     already covers. */
   const asked = useRef(false)
   useEffect(() => {
     if (!owed || asked.current) return

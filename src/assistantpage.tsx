@@ -43,6 +43,12 @@ import * as Icon from './icons'
 const dayLabel = () => new Date().toLocaleDateString('en-GB', { weekday: 'long' })
 /** Which workspace a thing came from, in words the model can repeat back. */
 const label = (s?: SpaceId) => (s ? SPACE_LABELS[s] : 'Unfiled')
+/** A URL pasted straight into a task title reads fine as a link on his own
+ *  list, and reads as noise once a sentence has to carry it -- on screen as a
+ *  wall of characters, out loud as a wall of syllables. Stripped here rather
+ *  than asked of the model, so a title with a link in it cannot come back
+ *  verbatim no matter how the model chooses to write the sentence around it. */
+const dropUrl = (title: string) => title.replace(/https?:\/\/\S+/gi, '').replace(/\s{2,}/g, ' ').trim()
 
 /** Wide enough for the split. Below this the canvas would be a column of
  *  nothing, so the cards go back into the thread where there is room for them. */
@@ -82,10 +88,10 @@ function useBrief(): Brief {
     const onDay = tasks.filter((t) => t.list === 'today' && (t.plannedOn ?? day) === day)
     const planned = SLOTS.map((s) => ({
       slot: s.label,
-      items: onDay.filter((t) => t.slot === s.id).map((t) => ({ title: t.title, done: !!t.done, min: t.estimateMin ?? 0, space: label(t.space) })),
+      items: onDay.filter((t) => t.slot === s.id).map((t) => ({ title: dropUrl(t.title) || t.title, done: !!t.done, min: t.estimateMin ?? 0, space: label(t.space) })),
     }))
     const unsorted = onDay.filter((t) => !t.slot)
-    if (unsorted.length) planned.unshift({ slot: 'Unsorted', items: unsorted.map((t) => ({ title: t.title, done: !!t.done, min: t.estimateMin ?? 0, space: label(t.space) })) })
+    if (unsorted.length) planned.unshift({ slot: 'Unsorted', items: unsorted.map((t) => ({ title: dropUrl(t.title) || t.title, done: !!t.done, min: t.estimateMin ?? 0, space: label(t.space) })) })
     const backlog = tasks.filter((t) => t.list === 'backlog' && !t.done)
     const age = (t: Task) => {
       if (!t.createdAt) return 0
@@ -108,8 +114,8 @@ function useBrief(): Brief {
       weekday: dayLabel(),
       planned,
       backlogCount: backlog.length,
-      backlog: backlog.slice(0, 25).map((t) => ({ title: t.title, space: label(t.space) })),
-      oldest: [...backlog].sort((a, b) => age(b) - age(a)).slice(0, 3).map((t) => ({ title: t.title, days: age(t), space: label(t.space) })),
+      backlog: backlog.slice(0, 25).map((t) => ({ title: dropUrl(t.title), space: label(t.space) })).filter((t) => t.title),
+      oldest: [...backlog].sort((a, b) => age(b) - age(a)).slice(0, 3).map((t) => ({ title: dropUrl(t.title), days: age(t), space: label(t.space) })).filter((t) => t.title),
       habits: { due, kept, open: open.slice(0, 6) },
       meetings,
       blocks,
@@ -121,20 +127,23 @@ function useBrief(): Brief {
          by it first. plan.returnedIds is where they went. */
       tomorrow: tasks
         .filter((t) => t.list === 'today' && t.plannedOn === tomorrowKey && !t.done)
-        .slice(0, 12).map((t) => ({ title: t.title, space: label(t.space) })),
+        .slice(0, 12).map((t) => ({ title: dropUrl(t.title), space: label(t.space) })).filter((t) => t.title),
       tomorrowMeetings: (cal.status === 'ok'
         ? cal.events.filter((e) => e.day === tomorrowKey && e.start !== null && isMeeting(e))
         : []).map((e) => ({ at: at(e), title: e.title })),
       unfinishedYesterday: (plan.returnedOn === day
         ? tasks.filter((t) => new Set(plan.returnedIds ?? []).has(t.id) && !t.done && t.list !== 'today')
         : []
-      ).slice(0, 12).map((t) => ({ title: t.title, space: label(t.space) })),
+      ).slice(0, 12).map((t) => ({ title: dropUrl(t.title), space: label(t.space) })).filter((t) => t.title),
       /* By doneAt, not plannedOn: the rollover clears plannedOn off finished
          work on its way to the ledger (see roll.ts), so that field is already
-         gone by the time this runs. doneAt is a real timestamp and survives. */
+         gone by the time this runs. doneAt is a real timestamp and survives.
+         Titles pass through dropUrl and the blank-after-stripping filter, same
+         as every other list here: a task named only a pasted link should not
+         hand the model a bullet with nothing left to say. */
       completedYesterday: tasks
         .filter((t) => t.done && t.doneAt && localDateKey(new Date(t.doneAt)) === yesterdayKey)
-        .slice(0, 12).map((t) => ({ title: t.title, space: label(t.space) })),
+        .slice(0, 12).map((t) => ({ title: dropUrl(t.title), space: label(t.space) })).filter((t) => t.title),
       weather: sky,
       goals: goals.filter((g) => !g.closed).slice(0, 4).map((g) => {
         const tf = (g.timeframe ?? 'quarter') as GoalTf

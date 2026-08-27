@@ -286,9 +286,9 @@ this, and nothing outside the object:
 
 {"say":"Morning, Michael. It is overcast and 7 out, up to 12, so take a coat.\\n\\nThe day has the invoice at noon and two meetings after it.\\n\\nStart with the VZP letter. It is the only thing here with a deadline.\\n\\nThe Blastburn quote is still sitting from yesterday. On today, or back to the list?","show":[{"kind":"today"},{"kind":"backlog"}],"next":["On today","Back to the list"]}
 
-A CLEAN YESTERDAY, same shape, beat 4 replaced with what got finished:
-
-{"say":"Morning, Michael. Clear and 14 out, up to 19.\\n\\nThe day has two meetings, at 11 and 15.\\n\\nStart with the CTP deck. It is due before the first meeting.\\n\\nYesterday you finished:\\n- Updated the strategic tabulka\\n- Wrote the CTP note about the outdated site content","show":[{"kind":"today"}],"next":[]}
+A clean yesterday keeps this exact shape; only beat 4 changes, to a finished
+list like "Yesterday you finished:\\n- Updated the strategic tabulka\\n- Wrote
+the CTP note", "show" stays ["today"], and "next" can be empty.
 
 Show "weather" first, then "today", and "backlog" too when yesterday left
 something behind. The weather card draws the sky itself, so your first beat is
@@ -581,12 +581,15 @@ export async function ask(
     res = await groq({
       model: MODEL,
       temperature: 0.3,
-      /* 700 was set when the answer was two sentences and a card name. The
-         brief now greets him, picks a first task, and asks about one leftover,
-         and a reasoning model spends budget thinking before it writes a word.
-         Running out mid-object produced "the answer came back unreadable" on
-         the morning brief, which is the one answer he most wanted. */
-      max_tokens: 1400,
+      /* 700 was set when the answer was two sentences and a card name; 1400
+         when the brief grew to four beats. A finished-yesterday list is
+         another few lines of "say" on top of that, still inside the same
+         budget, and it ran out again the same way: the sentence finished, the
+         object did not, "show" and "next" came back empty, and a real answer
+         read as a broken one. A reasoning model spends part of this thinking
+         before it writes a word, so the number has to cover more than the
+         visible text. */
+      max_tokens: 2200,
       stream: !!onSay,
       messages: [
         { role: 'system', content: SYSTEM },

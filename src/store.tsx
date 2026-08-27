@@ -159,6 +159,10 @@ interface Store extends PersistedState {
   editing: boolean
   setEditing: (v: boolean) => void
   focusTaskId: string | null
+  /** Same handoff, for a routine: which one Today wants open and in view on
+   *  the Routines page. Clears itself once read, same as focusTaskId. */
+  focusRoutineId: string | null
+  setFocusRoutineId: (id: string | null) => void
   /** A note another page wants opened, handed over once. The Notes page owns
    *  which note is on screen; this is only how a link from elsewhere says
    *  "that one", and it clears itself the moment it is read so a later visit
@@ -1278,6 +1282,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const setPageState = (p: PageId) => setRoute({ page: p, day: null })
   const [editing, setEditing] = useState(false)
   const [focusTaskId, setFocusTaskId] = useState<string | null>(null)
+  const [focusRoutineId, setFocusRoutineId] = useState<string | null>(null)
   const [noteToOpen, setNoteToOpen] = useState<string | null>(null)
 
   useEffect(() => {
@@ -1890,6 +1895,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     page, setPage, dayKey, openDay,
     editing, setEditing,
     focusTaskId, setFocusTaskId,
+    focusRoutineId, setFocusRoutineId,
     noteToOpen, openNote: setNoteToOpen,
 
     reorderSpace: (sp, order) =>

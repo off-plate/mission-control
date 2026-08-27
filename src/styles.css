@@ -2772,6 +2772,16 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
   .habit-list.w7 .habit-foot {
     justify-content: flex-start; text-align: left;
     flex-wrap: wrap; white-space: normal;
+    /* Lines up under the habit name rather than the caret to its left,
+       the same offset .habit-run already uses for the same reason. */
+    padding-left: calc(18px + var(--s2));
+  }
+  /* All-workspaces view only: the space badge sits between the caret and the
+     name, adding its own fixed width (3px bar + 6px gap + a 1ch letter,
+     ~16px) before the name starts. Without this the line above still lands
+     under the badge instead of the name, measured ~24px short. */
+  .habit-list.w7 .habit-row:has(.habit-row-top .spacemark) .habit-foot {
+    padding-left: calc(18px + var(--s2) + 16px + var(--s2));
   }
   /* Stacked, there is room to read them, so they stop being clipped. */
   .habit-list.w7 .habit-foot .habit-weeks,
@@ -4299,7 +4309,8 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   width: 100%; display: flex; align-items: center; gap: var(--s3);
   background: none; border: none; text-align: left; cursor: pointer; min-height: 44px;
 }
-.folder-caret { color: var(--faint); font-size: 0.9rem; width: 12px; flex: none; }
+.folder-caret { color: var(--faint); width: 12px; flex: none; transition: transform var(--t-fast); }
+.folder-head[aria-expanded="true"] .folder-caret { transform: rotate(90deg); }
 .folder-head:hover .folder-name { color: var(--accent-text); }
 .folder-name {
   font-family: var(--font-display); font-weight: 700; font-size: var(--text-base);
@@ -4325,9 +4336,11 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
    into the 264px foot column, which is where a two-sentence description used to
    go to be ellipsised after four words. */
 .run-caret {
-  flex: none; width: 18px; align-self: center; padding: 0; cursor: pointer;
-  font-family: var(--font-mono); font-size: 0.8125rem; line-height: 1; color: var(--faint);
+  flex: none; width: 18px; display: flex; align-items: center; justify-content: center;
+  align-self: center; padding: 0; cursor: pointer; color: var(--faint);
 }
+.run-caret svg { transition: transform var(--t-fast); }
+.run-caret[aria-expanded="true"] svg { transform: rotate(90deg); }
 .run-caret:hover { color: var(--ink); }
 .run-caret.is-blank { cursor: default; }
 .habit-run {

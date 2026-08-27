@@ -268,7 +268,7 @@ function PhonePages({ tabs, page, setPage }: {
 }
 
 export default function App() {
-  const { space, view, setView, page, setPage, tasks, routines, goals, openDaily, setFocusAppId } = useStore()
+  const { space, view, setView, page, setPage, tasks, routines, goals, setFocusAppId } = useStore()
   // The dot follows the alerts: money and admin count from any profile.
   const exceptions = space === 'personal'
     ? exceptionsFor(space, { tasks, routines, goals })
@@ -445,12 +445,6 @@ export default function App() {
           >
             <Icon.Note size={18} />
             <span className="btn-label">Note</span>
-          </button>
-          {/* Yesterday, on demand. It offers itself once a morning; after that
-              it is his to open, from any page, without hunting for a pill. */}
-          <button className="btn btn-ghost" onClick={openDaily} aria-label="Yesterday" title="Walk yesterday and today">
-            <Icon.Rewind size={18} />
-            <span className="btn-label">Yesterday</span>
           </button>
           {/* Apps, a shelf now rather than a page: seven icons never filled a
               tab's worth of room, and this is the same one-click-from-anywhere

@@ -13,7 +13,7 @@
 import type { CalEvent } from './ical'
 
 /** 24. 8., the way a Czech calendar writes it. */
-function shortDate(day: string): string {
+export function shortDate(day: string): string {
   const [y, m, d] = day.split('-').map(Number)
   return new Date(y, m - 1, d).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })
 }
@@ -54,36 +54,36 @@ export function meetingNote(e: CalEvent): string {
 }
 
 /** Which meeting the app should surface, right now.
- *  Running > about to start > the one just finished.
+ *  Running, or next. Always one of the two, never neither: that is the point.
  *
  *  It used to drop any meeting he had already written up, so the row vanished
  *  the moment he pressed the button. He asked for the opposite on 2026-08-27:
  *  the row is worth having because it tells him WHICH MEETING HE IS IN, and
  *  that is still true after the note exists. So the written-up set is gone from
  *  the selection entirely, and what changes is the button: write it up, or open
- *  the one that is already there. */
+ *  the one that is already there.
+ *
+ *  The 30-minute cap on "next" and the "just finished" state both went the
+ *  same day, on his instruction: a two-hour gap before a meeting showed
+ *  nothing at all, and a meeting he had already left was still the one on
+ *  screen for another hour while the next one crept up on him. Now it is
+ *  always the one running, or the very next timed one on the calendar,
+ *  however far off that is -- the moment a meeting ends, the row is already
+ *  the next one, not a stale "just finished" for its own sake. */
 export function meetingToWriteUp(
   events: CalEvent[],
   now: Date,
-): { event: CalEvent; state: 'now' | 'next' | 'just-ended' } | null {
+): { event: CalEvent; state: 'now' | 'next' } | null {
   const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   const mins = now.getHours() * 60 + now.getMinutes()
-  const todays = events
-    .filter((e) => e.day === day && !e.allDay && e.start !== null)
-    .sort((a, b) => (a.start as number) - (b.start as number))
+  const timed = events.filter((e) => !e.allDay && e.start !== null)
 
-  const running = todays.find((e) => (e.start as number) <= mins && mins < (e.end ?? (e.start as number) + 60))
+  const running = timed.find((e) => e.day === day && (e.start as number) <= mins && mins < (e.end ?? (e.start as number) + 60))
   if (running) return { event: running, state: 'now' }
-  /* Half an hour ahead: far enough to prepare, close enough that it is the
-     meeting he is actually thinking about. */
-  const soon = todays.find((e) => (e.start as number) > mins && (e.start as number) - mins <= 30)
-  if (soon) return { event: soon, state: 'next' }
-  /* And the one that just ended, because writing it up afterwards is the other
-     half of the problem he described. */
-  const ended = [...todays].reverse().find((e) => {
-    const end = e.end ?? (e.start as number) + 60
-    return end <= mins && mins - end <= 30
-  })
-  if (ended) return { event: ended, state: 'just-ended' }
+
+  const upcoming = timed
+    .filter((e) => e.day > day || (e.day === day && (e.start as number) > mins))
+    .sort((a, b) => (a.day === b.day ? (a.start as number) - (b.start as number) : a.day < b.day ? -1 : 1))
+  if (upcoming[0]) return { event: upcoming[0], state: 'next' }
   return null
 }

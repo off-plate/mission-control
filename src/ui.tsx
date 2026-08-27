@@ -55,6 +55,121 @@ export function AutoTextarea({
   )
 }
 
+export type SelectOption<T extends string | number> = { value: T; label: React.ReactNode }
+
+/* Every <select> on desktop opened the OS picker instead of the app, on his
+   instruction (2026-08-27): "no dropdown on the website will trigger the
+   Apple dropdown UI element besides on phone." This is what every one of
+   them is rebuilt on, one component so they all open, close and navigate the
+   same way. .phone-space keeps the native element on purpose, on phone only.
+
+   Same flip-up-near-the-bottom and outside-click mechanics as Dropdown
+   above, plus the keyboard nav and selected-state marking a listbox needs
+   that a menu of buttons does not. */
+export function Select<T extends string | number>({
+  id, className = '', value, onChange, options, disabled, ariaLabel, style,
+}: {
+  id?: string
+  className?: string
+  value: T
+  onChange: (value: T) => void
+  options: SelectOption<T>[]
+  disabled?: boolean
+  ariaLabel?: string
+  style?: React.CSSProperties
+}) {
+  const [open, setOpen] = useState(false)
+  const [up, setUp] = useState(false)
+  const selectedIndex = options.findIndex((o) => o.value === value)
+  const [activeIndex, setActiveIndex] = useState(Math.max(0, selectedIndex))
+  const ref = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const btn = ref.current?.getBoundingClientRect()
+    const panel = ref.current?.querySelector('.dd-panel') as HTMLElement | null
+    if (btn && panel) {
+      const need = panel.offsetHeight + 12
+      setUp(btn.bottom + need > window.innerHeight && btn.top > need)
+    }
+    setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0)
+    const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  useEffect(() => {
+    if (open) listRef.current?.querySelector('.is-active')?.scrollIntoView({ block: 'nearest' })
+  }, [activeIndex, open])
+
+  const commit = (i: number) => {
+    const opt = options[i]
+    if (!opt) return
+    onChange(opt.value)
+    setOpen(false)
+  }
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (disabled) return
+    if (!open) {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault()
+        setOpen(true)
+      }
+      return
+    }
+    if (e.key === 'Escape') { e.preventDefault(); setOpen(false) }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIndex((i) => Math.min(options.length - 1, i + 1)) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIndex((i) => Math.max(0, i - 1)) }
+    else if (e.key === 'Home') { e.preventDefault(); setActiveIndex(0) }
+    else if (e.key === 'End') { e.preventDefault(); setActiveIndex(options.length - 1) }
+    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); commit(activeIndex) }
+    else if (e.key === 'Tab') setOpen(false)
+  }
+
+  const current = options[selectedIndex]
+  const activeId = `${id ?? 'dd'}-opt-${activeIndex}`
+
+  return (
+    <div className={`dd ${className}`.trim()} ref={ref} style={style}>
+      <button
+        id={id}
+        type="button"
+        className="dd-trigger"
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={ariaLabel}
+        aria-activedescendant={open ? activeId : undefined}
+        onClick={() => setOpen((v) => !v)}
+        onKeyDown={onKeyDown}
+      >
+        <span className="dd-value">{current?.label ?? ''}</span>
+        <Icon.ChevronDown size={14} className="dd-chevron" />
+      </button>
+      {open && (
+        <ul className={`dd-panel${up ? ' opens-up' : ''}`} role="listbox" ref={listRef} aria-label={ariaLabel}>
+          {options.map((o, i) => (
+            <li
+              key={String(o.value)}
+              id={`${id ?? 'dd'}-opt-${i}`}
+              role="option"
+              aria-selected={o.value === value}
+              className={`dd-option${o.value === value ? ' is-selected' : ''}${i === activeIndex ? ' is-active' : ''}`}
+              onMouseEnter={() => setActiveIndex(i)}
+              onClick={() => commit(i)}
+            >
+              {o.label}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 /* A dropdown that opens upward when there is no room below it. Menus near the
    bottom of the page were opening off-screen with no way to reach the items. */
 export function Dropdown({ label, children, className = '' }: { label: string; children: React.ReactNode; className?: string }) {
@@ -110,18 +225,15 @@ export function WriteTo() {
   const { view, space, setSpace } = useStore()
   if (view !== 'all') return null
   return (
-    <select
-      className="textinput writeto" value={space} aria-label="Which profile this goes to"
-      onChange={(e) => setSpace(e.target.value as SpaceId)}
-    >
-      {/* It sits where a filter sits and it is not one: it decides where a NEW
+    <Select
+      className="writeto" value={space} ariaLabel="Which profile this goes to"
+      onChange={(v) => setSpace(v)}
+      /* It sits where a filter sits and it is not one: it decides where a NEW
           thing gets written. Saying so in the option is cheaper than teaching
           him that "All" up top and "Personal" here are not contradicting each
-          other. */}
-      {(Object.keys(SPACE_LABELS) as SpaceId[]).map((s) => (
-        <option key={s} value={s}>Add to {SPACE_LABELS[s]}</option>
-      ))}
-    </select>
+          other. */
+      options={(Object.keys(SPACE_LABELS) as SpaceId[]).map((s) => ({ value: s, label: `Add to ${SPACE_LABELS[s]}` }))}
+    />
   )
 }
 

@@ -1833,7 +1833,7 @@ const HABIT_WINDOWS = [
 ]
 
 export function HabitsPage() {
-  const { habits, goals, space, deleteHabit, togglePauseHabit, routines, stepTicks, habitLog, todayIndex, inView } = useStore()
+  const { habits, goals, space, deleteHabit, togglePauseHabit, routines, stepTicks, habitLog, todayIndex, inView, focusRoutineId, setFocusRoutineId } = useStore()
   const [days, setDays] = useState(7)
   const [adding, setAdding] = useState(false)
   // Opening the goal sheet from a habit is the "set a goal on this" path.
@@ -1946,6 +1946,22 @@ export function HabitsPage() {
     next.has(id) ? next.delete(id) : next.add(id)
     return next
   })
+  /* Today's routine strip hands a routine over here the same way it hands a
+     task to Plan: open its folder if he had shut it, scroll to it, flash it,
+     then forget it -- clicking "Before work routine" on Today should not
+     just land on this page, it should land ON that folder. */
+  const [flashFolderId, setFlashFolderId] = useState<string | null>(null)
+  useEffect(() => {
+    if (!focusRoutineId) return
+    setShutFolders((prev) => { const next = new Set(prev); next.delete(focusRoutineId); return next })
+    setFlashFolderId(focusRoutineId)
+    setFocusRoutineId(null)
+    const el = document.querySelector(`[data-routine-id="${focusRoutineId}"]`)
+    el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    const timer = window.setTimeout(() => setFlashFolderId(null), 2600)
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusRoutineId])
 
   return (
     <div className="page">
@@ -1975,7 +1991,7 @@ export function HabitsPage() {
       <div className="habit-cols">
       {cols.map((c) => (
         <section className="habit-section" key={c.id}>
-          <div className={`panel habit-list${days === 7 ? ' w7' : ''}`}>
+          <div className={`panel habit-list${days === 7 ? ' w7' : ''}${flashFolderId === c.id ? ' flash' : ''}`} data-routine-id={c.folder ? c.id : undefined}>
             {c.folder ? (
               /* A folder: the routine's name, how far through today it is, and
                  a disclosure. Collapsed by default is wrong here, so it opens

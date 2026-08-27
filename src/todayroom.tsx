@@ -79,7 +79,7 @@ function isoWeek(d: Date): number {
 }
 
 export function TodayRoom() {
-  const { tasks, habits, habitLog, routines, focusSessions, goals, slips, savedMin, todayIndex, inView, setPage, setFocusTaskId, toggleTask, toggleHabitDay } = useStore()
+  const { tasks, habits, habitLog, routines, focusSessions, goals, slips, savedMin, todayIndex, inView, setPage, setFocusTaskId, setFocusRoutineId, toggleTask, toggleHabitDay } = useStore()
   const now = useNow()
   const firstMove = useFirstMove()
   const day = localDateKey()
@@ -367,7 +367,7 @@ export function TodayRoom() {
           <div className="tr-strip">
             {routineRows.length === 0 && <p className="tr-empty">No routine is due today.</p>}
             {routineRows.map((r) => (
-              <button className="tr-rt" key={r.id} onClick={() => setPage('habits')} aria-label={`${r.name}, ${r.done} of ${r.total} done`}>
+              <button className="tr-rt" key={r.id} onClick={() => { setFocusRoutineId(r.id); setPage('routines') }} aria-label={`${r.name}, ${r.done} of ${r.total} done`}>
                 <span className="tr-rtn">{r.name}</span>
                 <span className="tr-rtb"><i style={{ width: `${(r.done / r.total) * 100}%` }} /></span>
                 <span className="tr-rtc">{r.done}<i>/{r.total}</i></span>

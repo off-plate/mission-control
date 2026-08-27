@@ -1526,9 +1526,16 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
   background: var(--surface); border: 1px solid var(--hairline-strong); border-radius: var(--r-md);
   box-shadow: var(--shadow-pop); padding: var(--s2); display: flex; flex-direction: column; min-width: 210px; max-width: 280px;
 }
-.kebab-menu button { text-align: left; padding: var(--s2) var(--s3); border-radius: var(--r-sm); font-size: var(--text-sm); color: var(--ink); white-space: nowrap; min-height: 34px; }
-.kebab-menu button:hover { background: var(--accent-wash); color: var(--accent-text); }
+.kebab-menu button, .kebab-menu a {
+  display: flex; align-items: center; gap: var(--s2);
+  text-align: left; padding: var(--s2) var(--s3); border-radius: var(--r-sm);
+  font-size: var(--text-sm); color: var(--ink); white-space: nowrap; min-height: 34px;
+}
+.kebab-menu button:hover, .kebab-menu a:hover { background: var(--accent-wash); color: var(--accent-text); }
 .kebab-menu button[aria-checked="true"] { color: var(--accent-text); font-weight: 600; }
+.apps-shelf-menu .kebab-menu { min-width: 190px; }
+.apps-shelf-menu .kebab-menu svg { flex: none; color: var(--faint); }
+.apps-shelf-menu .kebab-menu button:hover svg, .apps-shelf-menu .kebab-menu a:hover svg { color: var(--accent-text); }
 
 /* ---------- Select: every dropdown that used to be a native <select> ----------
    Same floating-panel language as .kebab-menu (surface, hairline-strong,

@@ -27,8 +27,9 @@ Nothing gets deployed or shown to Michael as "ready" until the release team retu
   Interface Icons (MIT, credited in `LICENSES.md`), 24x24, stroke 2, `currentColor`.
   Never inline a new `<svg>` in a page: add the icon to `icons.tsx` or reuse the one
   that already means what you mean. Two exports doing the same job are one icon.
-  Five house glyphs in that file (table, add-row, add-column, clear-formatting, the
-  drag grip) exist only because Hicon has no equivalent, and are labelled.
+  Six house glyphs in that file (table, add-row, add-column, clear-formatting, the
+  drag grip, the apps-launcher grid) exist only because Hicon has no sourced
+  equivalent, and are labelled.
   Exempt, and not icons: the Iron Man helmet, the logo mark,
   the Zone timer ring, the sparkline, the board art.
 - **Light only.** There is no dark mode and no `data-theme` anywhere in the CSS. Do not write docs, tokens or review notes that assume one; if dark mode is ever wanted, it is a project, not an afterthought. The Zone being dark is not a theme: it repaints itself on one page, it does not switch one.

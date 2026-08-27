@@ -18,8 +18,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import * as Icon from './icons'
+import { useStore } from './store'
 
-interface EmbeddedApp {
+export interface EmbeddedApp {
   id: string
   name: string
   url: string
@@ -33,7 +34,7 @@ interface EmbeddedApp {
 /* House glyphs rather than an icon library: one stroke weight, one geometry,
    drawn for these six. See DESIGN.md on Lucide-at-default-weight. */
 
-const APPS: EmbeddedApp[] = [
+export const APPS: EmbeddedApp[] = [
   {
     /* Moved off the header on his instruction. It opens in a TAB, not a frame,
        and that is not a preference: mymind answers with frame-ancestors 'none',
@@ -85,6 +86,17 @@ export function AppsPage() {
      itself comes back to its front door. */
   const [reload, setReload] = useState(0)
   const open = APPS.find((a) => a.id === openId) ?? null
+
+  /* The header shelf hands over which app to open the same way Today hands a
+     routine to Habits: a one-shot signal, read once and cleared, so landing
+     here from the shelf opens straight into the frame instead of the grid. */
+  const { focusAppId, setFocusAppId } = useStore()
+  useEffect(() => {
+    if (!focusAppId) return
+    setOpenId(focusAppId)
+    setFocusAppId(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusAppId])
 
   /* Escape closes the app, the way it closes everything else here.
 

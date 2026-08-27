@@ -163,6 +163,10 @@ interface Store extends PersistedState {
    *  the Routines page. Clears itself once read, same as focusTaskId. */
   focusRoutineId: string | null
   setFocusRoutineId: (id: string | null) => void
+  /** Same handoff again, for an app: which one the header shelf wants opened
+   *  straight into its frame rather than landing him back on the grid. */
+  focusAppId: string | null
+  setFocusAppId: (id: string | null) => void
   /** A note another page wants opened, handed over once. The Notes page owns
    *  which note is on screen; this is only how a link from elsewhere says
    *  "that one", and it clears itself the moment it is read so a later visit
@@ -1283,6 +1287,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [editing, setEditing] = useState(false)
   const [focusTaskId, setFocusTaskId] = useState<string | null>(null)
   const [focusRoutineId, setFocusRoutineId] = useState<string | null>(null)
+  const [focusAppId, setFocusAppId] = useState<string | null>(null)
   const [noteToOpen, setNoteToOpen] = useState<string | null>(null)
 
   useEffect(() => {
@@ -1896,6 +1901,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     editing, setEditing,
     focusTaskId, setFocusTaskId,
     focusRoutineId, setFocusRoutineId,
+    focusAppId, setFocusAppId,
     noteToOpen, openNote: setNoteToOpen,
 
     reorderSpace: (sp, order) =>

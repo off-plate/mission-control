@@ -172,7 +172,16 @@ export function Select<T extends string | number>({
 
 /* A dropdown that opens upward when there is no room below it. Menus near the
    bottom of the page were opening off-screen with no way to reach the items. */
-export function Dropdown({ label, children, className = '' }: { label: string; children: React.ReactNode; className?: string }) {
+export function Dropdown({ label, children, className = '', trigger }: {
+  label: string
+  children: React.ReactNode
+  className?: string
+  /** Overrides the default three-dot kebab for a header action that needs
+   *  its own icon and a visible label, not the anonymous "options for this
+   *  row" trigger. Gets the same open state every other call site drives
+   *  off `.kebab` internally. */
+  trigger?: (p: { onClick: () => void; open: boolean }) => React.ReactNode
+}) {
   const [open, setOpen] = useState(false)
   const [up, setUp] = useState(false)
   const ref = useRef<HTMLSpanElement>(null)
@@ -194,11 +203,13 @@ export function Dropdown({ label, children, className = '' }: { label: string; c
 
   return (
     <span className={`kebab-wrap ${className}`} ref={ref}>
-      {/* Drawn, not typed. The midline-ellipsis character sits wherever the
-          font puts it, which is why it never looked centred in a circle. */}
-      <button className="kebab" aria-label={label} aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-        <Icon.More size={17} />
-      </button>
+      {trigger ? trigger({ onClick: () => setOpen((v) => !v), open }) : (
+        /* Drawn, not typed. The midline-ellipsis character sits wherever the
+            font puts it, which is why it never looked centred in a circle. */
+        <button className="kebab" aria-label={label} aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+          <Icon.More size={17} />
+        </button>
+      )}
       {open && (
         <div className={`kebab-menu${up ? ' opens-up' : ''}`} role="menu" onClick={() => setOpen(false)}>
           {children}

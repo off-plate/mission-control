@@ -29,7 +29,14 @@ const CSS = `
 .bg-guide .sh span{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
 
 /* swatches */
-.bg-guide .sw{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+/* minmax(230px, 1fr) has no ceiling: Surfaces/Ink have 3 swatches each,
+   Meaning has 5, so at 3440px auto-fit was correctly adding columns (up to
+   13, measured), but a 3-item section only has 3 items to put in them --
+   each stretched to fill its share of the row instead, ~1071px for one
+   small colour square and a line of text. A concrete max keeps the grid
+   adding columns as space allows without individual cards growing past a
+   sensible size. */
+.bg-guide .sw{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,320px));gap:14px}
 /* This reuses the app-wide .chip name (a small inline tag: white-space:
    nowrap, padding 1px 6px), which was never meant for a swatch card and
    leaked in by accident -- the row layout below was really that base
@@ -44,7 +51,10 @@ const CSS = `
 .bg-guide .chip .us{font-size:12.5px;color:var(--muted);line-height:1.4;margin-top:3px;white-space:normal}
 
 /* type */
-.bg-guide .spec{border:1px solid var(--line);border-radius:16px;background:var(--card);padding:26px;margin-bottom:14px}
+/* A type specimen is read, not spread across a monitor -- no cap meant it
+   sat top-left of whatever the page's own width was, empty past a few
+   hundred px of real content. */
+.bg-guide .spec{border:1px solid var(--line);border-radius:16px;background:var(--card);padding:26px;margin-bottom:14px;max-width:900px}
 .bg-guide .spec .role{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
 .bg-guide .spec .big{margin:6px 0 10px;letter-spacing:-.02em}
 .bg-guide .spec .use{font-size:13.5px;color:var(--muted)}

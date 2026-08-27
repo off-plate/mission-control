@@ -345,8 +345,10 @@ function EditTaskSheet({ task, onClose }: { task: Task; onClose: () => void }) {
   )
 }
 
-/** Inline "how long did it take?" logger shown when you finish a task or subtask. */
-function ActualLog({ est, tracked, onLog, onSkip }: { est: number; tracked?: number | null; onLog: (m: number) => void; onSkip: () => void }) {
+/** Inline "how long did it take?" logger shown when you finish a task or subtask.
+ *  Also used by the assistant, under its own "Done: X" line, so this is the one
+ *  place that ever asks the question -- not a second version of it there. */
+export function ActualLog({ est, tracked, onLog, onSkip }: { est: number; tracked?: number | null; onLog: (m: number) => void; onSkip: () => void }) {
   const [custom, setCustom] = useState('')
   /* The timer already knows. Guesses off the estimate were the only offer here,
      so a block plus the ten minutes he extended it by got thrown away the moment

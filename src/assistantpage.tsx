@@ -15,7 +15,8 @@ import {
 } from './voicemode'
 import { getWeather, weatherLine, type Weather } from './weather'
 import { SLOTS, dueOn, habitsDueToday, goalCurrent, type HabitDef, type PageId, type SpaceId, type Task } from './types'
-import { localDateKey, fmtDuration, goalPeriodKey, goalPeriodRange, type GoalTf } from './util'
+import { localDateKey, fmtDuration, taskMinutes, goalPeriodKey, goalPeriodRange, type GoalTf } from './util'
+import { ActualLog } from './pages1'
 import * as Icon from './icons'
 
 /* The assistant, as a room of its own.
@@ -165,7 +166,16 @@ function useBrief(): Brief {
    `ok` is what actually changed. `no` is a change that could not be made, and
    it says why in the same breath, because "Added it" over a task that was never
    added is the failure this whole mechanism exists to prevent. */
-export interface Done { ok: boolean; text: string }
+export interface Done {
+  ok: boolean
+  text: string
+  /** Set only for a 'done' action on a task with no actual time logged yet.
+   *  The thread renders the same "how long did it take?" prompt the task list
+   *  itself shows, rather than marking it done and moving on: he asked for
+   *  this specifically because a task he finishes by telling the assistant
+   *  was going in with no actual time recorded, and no page open to fix it. */
+  needsActual?: { taskId: string; est: number }
+}
 
 /** Loose enough to find "the noon testing task" from "test testing website",
  *  strict enough to refuse when two rows could both be meant. Accents are
@@ -694,7 +704,11 @@ function useDoer() {
         case 'done':
           if (row.done) { out.push({ ok: true, text: `${row.title} was already done` }); break }
           s2.toggleTask(row.id)
-          out.push({ ok: true, text: `Done: ${row.title}` })
+          out.push({
+            ok: true,
+            text: `Done: ${row.title}`,
+            needsActual: row.actualMin == null ? { taskId: row.id, est: taskMinutes(row) } : undefined,
+          })
           break
         case 'undone':
           if (!row.done) { out.push({ ok: true, text: `${row.title} was already open` }); break }
@@ -889,6 +903,7 @@ export function AssistantPage() {
   const brief = useBrief()
   const split = useSplit()
   const run = useDoer()
+  const { logActual } = useStore()
   const [turns, setTurns] = useState<Turn[]>([])
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
@@ -977,6 +992,20 @@ export function AssistantPage() {
     setBusy(false); setLive('')
     box.current?.focus()
     return out.ok ? out.reply.say : ''
+  }
+
+  /* Answers the "how long did it take?" prompt under a 'done' line. "Skip"
+   *  here is HIS word for it, from asking for this feature: it means the same
+   *  time as the estimate, not the task-list page's own "skip", which leaves
+   *  no time logged at all and asks again later. Two different buttons in two
+   *  different places are allowed to mean two different things; this one
+   *  means what he asked it to mean. */
+  const logTaskActual = (turnIndex: number, doneIndex: number, taskId: string, minutes: number) => {
+    logActual(taskId, minutes)
+    setTurns((prev) => prev.map((t, ti) => (ti !== turnIndex
+      ? t
+      : { ...t, done: t.done?.map((d, di) => (di !== doneIndex ? d : { ...d, text: `${d.text} — ${fmtDuration(minutes)}`, needsActual: undefined })) }
+    )))
   }
 
   useEffect(() => { foot.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }) }, [turns, busy])
@@ -1110,6 +1139,13 @@ export function AssistantPage() {
                         <li className={d.ok ? 'is-ok' : 'is-no'} key={k}>
                           {d.ok ? null : <span className="as-did-head">Nothing changed, </span>}
                           {d.text}
+                          {d.needsActual ? (
+                            <ActualLog
+                              est={d.needsActual.est}
+                              onLog={(m) => logTaskActual(i, k, d.needsActual!.taskId, m)}
+                              onSkip={() => logTaskActual(i, k, d.needsActual!.taskId, d.needsActual!.est)}
+                            />
+                          ) : null}
                         </li>
                       ))}
                     </ul>

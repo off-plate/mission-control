@@ -92,6 +92,7 @@ interface BlobState {
   removedSeeds?: string[]
   graveyard?: Tomb[]
   twoLives?: Record<string, string>
+  reels?: string[]
   [k: string]: unknown
 }
 
@@ -300,6 +301,19 @@ export function mergeStates(a: string, b: string): string {
        link added on the phone must survive a laptop save that never saw it, and
        when both sides hold the same key the newer side's link wins. */
     if (older.twoLives || newer.twoLives) out.twoLives = { ...(older.twoLives ?? {}), ...(newer.twoLives ?? {}) }
+
+    /* THE REEL LIBRARY UNIONS, and it unions by string rather than by clip
+       identity, because this file must not know what a YouTube URL is. The
+       screen de-duplicates by identity when it reads the pool. Fifty links
+       pasted on the phone survive a laptop save that never saw them, which a
+       newer-wins field would have thrown away. */
+    if (older.reels || newer.reels) {
+      const seen = new Set<string>()
+      out.reels = [...(newer.reels ?? []), ...(older.reels ?? [])].filter((u) => {
+        if (typeof u !== 'string' || !u || seen.has(u)) return false
+        seen.add(u); return true
+      })
+    }
 
     /* The daily review's two once-a-day flags are dates, and the later date is
        the true one whichever side is carrying it. Letting them follow the newer

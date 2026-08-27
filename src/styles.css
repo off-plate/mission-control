@@ -6660,6 +6660,11 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    a click, and the lesson is cheap to reapply here.
    ========================================================================== */
 .tline { --tl-gut: 92px; }
+/* The band needs air above it. Shipped flush against the page top, so with the
+   nav row revealed the zoom pills sat directly on the tab pills with nothing
+   between them: two pill groups touching, which reads as one broken control.
+   Reported 2026-08-27. */
+.tline { padding-top: var(--s5); }
 .tline .tl-band { display: flex; align-items: center; gap: var(--s4); flex-wrap: wrap; margin-bottom: var(--s4); }
 .tline .tl-band h1 { font-family: var(--font-display); font-weight: 800; font-size: var(--text-2xl); letter-spacing: -0.025em; margin: 0; }
 .tline .tl-l { font: 600 10.5px/1 var(--font-body); letter-spacing: 0.17em; text-transform: uppercase; color: var(--muted); margin: 0; }

@@ -23,14 +23,17 @@ await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_test'))
 
 // Seed a task done yesterday, by doneAt, with plannedOn already cleared the way
 // the real rollover leaves it -- exactly the state briefText() has to work from.
+// One title carries a real pasted URL, and one is a URL with nothing else, the
+// two shapes Michael actually hit in production.
 await page.evaluate((K) => {
   const s = JSON.parse(localStorage.getItem(K))
   const yd = new Date(); yd.setDate(yd.getDate() - 1)
   s.tasks = [
     { id: 'fy-t1', title: 'Updated the strategic tabulka', source: 'mc', estimateMin: 20, done: true, doneAt: yd.toISOString(), space: 'personal', list: 'backlog', category: 'admin', createdAt: 'x' },
-    { id: 'fy-t2', title: 'Wrote the CTP note', source: 'mc', estimateMin: 20, done: true, doneAt: yd.toISOString(), space: 'work', list: 'backlog', category: 'admin', createdAt: 'x' },
+    { id: 'fy-t2', title: 'Build a website for this barber: https://www.masdos8.com/galerie', source: 'mc', estimateMin: 20, done: true, doneAt: yd.toISOString(), space: 'offplate', list: 'backlog', category: 'admin', createdAt: 'x' },
+    { id: 'fy-t3', title: 'https://noah-restaurant.com/', source: 'mc', estimateMin: 20, done: true, doneAt: yd.toISOString(), space: 'offplate', list: 'backlog', category: 'admin', createdAt: 'x' },
     // A task done TODAY must not show up as yesterday's.
-    { id: 'fy-t3', title: 'Should not appear as yesterday', source: 'mc', estimateMin: 20, done: true, doneAt: new Date().toISOString(), space: 'personal', list: 'backlog', category: 'admin', createdAt: 'x' },
+    { id: 'fy-t4', title: 'Should not appear as yesterday', source: 'mc', estimateMin: 20, done: true, doneAt: new Date().toISOString(), space: 'personal', list: 'backlog', category: 'admin', createdAt: 'x' },
   ]
   localStorage.setItem(K, JSON.stringify(s))
 }, KEY)
@@ -41,7 +44,13 @@ await page.keyboard.press('Enter')
 await page.waitForTimeout(900)
 
 ok('the system prompt carries a FINISHED YESTERDAY section', /FINISHED YESTERDAY/.test(lastSystemMsg), lastSystemMsg.slice(0, 40))
-ok('both of yesterday\'s real completions are named', lastSystemMsg.includes('Updated the strategic tabulka') && lastSystemMsg.includes('Wrote the CTP note'))
+ok('a plain-title completion is named', lastSystemMsg.includes('Updated the strategic tabulka'))
+ok('a title with a pasted URL keeps its words and loses the link',
+  lastSystemMsg.includes('Build a website for this barber') && !lastSystemMsg.includes('masdos8.com'),
+  lastSystemMsg.split('\n').find((l) => l.includes('barber')))
+ok('a title that was ONLY a URL never reaches the model as an empty bullet',
+  !/FINISHED YESTERDAY:[\s\S]*?\n- \n/.test(lastSystemMsg) && !lastSystemMsg.includes('noah-restaurant.com'),
+  lastSystemMsg.slice(lastSystemMsg.indexOf('FINISHED YESTERDAY'), lastSystemMsg.indexOf('FINISHED YESTERDAY') + 200))
 ok('a task finished today is not counted as yesterday', !/FINISHED YESTERDAY:[^\n]*Should not appear/.test(lastSystemMsg))
 
 // --- Nothing finished yesterday: the section should say so plainly, not omit itself ---

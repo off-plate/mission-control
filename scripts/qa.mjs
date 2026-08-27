@@ -196,12 +196,14 @@ await step('the menu is seven tabs, and what left it is reachable from the heade
      ones. */
   await fresh('today')
   const tabs = await page.locator('.nav-tab').allInnerTexts()
-  if (tabs.length !== 7) throw new Error(`${tabs.length} tabs: ${tabs.join(', ')}`)
+  /* Eight since 2026-08-27: Calendar stopped being Big Time's and became a tab
+     in every workspace. */
+  if (tabs.length !== 8) throw new Error(`${tabs.length} tabs: ${tabs.join(', ')}`)
   if (!tabs.some((t) => /apps/i.test(t))) throw new Error('Apps is not a tab')
   if (tabs.some((t) => /routines/i.test(t))) throw new Error('Routines is still a tab')
-  /* Calendar left this list when it became a real page. It is still not a tab
-     HERE, because this test runs in Personal and Calendar is Big Time only;
-     the calendar test above owns that rule. */
+  /* Calendar IS in this list now, in Personal like everywhere else. The
+     calendar test below owns that rule. */
+  if (!tabs.some((t) => /calendar/i.test(t))) throw new Error('Calendar is not a tab')
   for (const gone of ['Avoidance', 'Assistant', 'Notes', 'Focus', 'Money', 'Reflect', 'Achievements']) {
     if (tabs.includes(gone)) throw new Error(`${gone} is still a tab`)
   }
@@ -1323,21 +1325,22 @@ await step('notes: a slash command inside a list takes one bullet, not the list'
   if (!/<li[^>]*>[^<]*Budget na pristi rok/.test(html)) throw new Error('the task line stopped being a bullet')
 })
 
-await step('calendar: Big Time only, and it never pretends the day is empty', async () => {
-  /* The first menu item that is not in every workspace. It earns that: it is
-     not a view of his own data with a filter on it, it is a read of somebody
-     else's system that exists for one workspace, and an empty Calendar in
-     Personal would advertise something that cannot work there. */
+await step('calendar: in every workspace, and it never pretends the day is empty', async () => {
+  /* It was Big Time only until 2026-08-27, on the argument that it reads
+     somebody else's system. He overruled it: one feed, one page, reachable
+     from every workspace, because the day does not change when he switches
+     which part of his life he is looking at. This asserts the new rule in
+     every workspace rather than just dropping the old assertion. */
   await fresh('today')
   const tabsIn = async (label) => {
     await page.locator('.space-btn', { hasText: label }).first().click()
     await page.waitForTimeout(600)
     return (await page.locator('.nav-tab').allInnerTexts()).map((t) => t.trim().toUpperCase())
   }
-  const personal = await tabsIn('Personal')
-  if (personal.includes('CALENDAR')) throw new Error(`Calendar showed in Personal: ${personal.join(', ')}`)
-  const work = await tabsIn('Big Time')
-  if (!work.includes('CALENDAR')) throw new Error(`Calendar missing in Big Time: ${work.join(', ')}`)
+  for (const ws of ['Personal', 'Big Time', 'Off-Plate']) {
+    const t = await tabsIn(ws)
+    if (!t.includes('CALENDAR')) throw new Error(`Calendar missing in ${ws}: ${t.join(', ')}`)
+  }
 
   /* And with no feed reachable it says so, rather than rendering an empty week.
      "Nothing scheduled" over a day full of meetings is the most expensive thing

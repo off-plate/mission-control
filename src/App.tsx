@@ -129,14 +129,19 @@ const NAV: { id: PageId; label: string }[] = [
   { id: 'assistant', label: 'Assistant' },
 ]
 
-/** Pages that belong to one workspace. */
-const SPACE_ONLY: Partial<Record<PageId, SpaceId>> = { calendar: 'work' }
+/* Calendar used to be Big Time only, on the argument that it reads somebody
+   else's system and an empty Calendar in Personal would advertise something
+   that could not work there. He overruled that on 2026-08-27: one calendar,
+   reachable from every workspace, because the day does not change when he
+   switches which part of his life he is looking at.
 
-function navFor(view: ViewId): { id: PageId; label: string }[] {
-  const extra = (Object.entries(SPACE_ONLY) as [PageId, SpaceId][])
-    .filter(([, sp]) => view === sp)
-    .map(([id]) => ({ id, label: id === 'calendar' ? 'Calendar' : id }))
-  return [...NAV, ...extra]
+   There is still exactly ONE feed and ONE page. This is not a calendar per
+   workspace; it is the same calendar, no longer hidden behind a workspace.
+
+   It stays LAST in the row deliberately. Every other tab keeps the position it
+   has had, so nothing he already reaches for by muscle memory moves. */
+function navFor(_view: ViewId): { id: PageId; label: string }[] {
+  return [...NAV, { id: 'calendar' as PageId, label: 'Calendar' }]
 }
 
 

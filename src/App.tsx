@@ -126,8 +126,11 @@ const NAV: { id: PageId; label: string }[] = [
      still resolves so a bookmark or an old link lands on Habits rather than on
      nothing: see the redirect where the pages are chosen. */
   { id: 'goals', label: 'Goals' },
-  { id: 'timeline', label: 'Timeline' },
   { id: 'board', label: 'Why’s' },
+  /* Timeline sits LAST of the real pages, immediately before Calendar, on his
+     instruction (2026-08-27). It is where he goes to look back, so it belongs
+     at the end of the row rather than in the middle of the working tabs. */
+  { id: 'timeline', label: 'Timeline' },
   /* Apps left the menu on his instruction (2026-08-27): seven icons and an
      otherwise empty page did not earn a tab next to Habits and Goals. It is
      a header dropdown now, next to Note and Yesterday -- see AppsShelf

@@ -2735,6 +2735,81 @@ if (SHOTS_DIR) {
   })
 }
 
+/* THE TIMELINE. Three views behind one tab, added 2026-08-27 and revised the
+   same day after he read the first build. What is asserted here is the shape he
+   asked for by name -- his five columns, the day/week/month switch, the chain,
+   the maths, and a give-up screen that covers the window -- because every one
+   of those was missing from a build that otherwise passed. */
+await step('timeline: his columns, in his words, on a page that is dark in both modes', async () => {
+  await fresh('timeline')
+  const cols = await page.locator('.tl-head .tl-l').allInnerTexts()
+  for (const want of ['Finances', 'Health', 'Habits', 'Tasks', 'Focus', 'Hard thing', 'Points']) {
+    if (!cols.some((c) => c.toLowerCase() === want.toLowerCase())) throw new Error(`no ${want} column: ${cols.join(', ')}`)
+  }
+  /* "Held clean" was his own complaint: the words meant nothing to him and the
+     column was never in the brief. It does not come back. */
+  if (/held clean|\bclean\b/i.test(await page.locator('.tline').innerText())) throw new Error('the page still says clean')
+  const bg = await page.evaluate(() => getComputedStyle(document.querySelector('.tline')).backgroundColor)
+  const [r, g, bl] = bg.match(/\d+/g).map(Number)
+  if (r + g + bl > 120) throw new Error(`the timeline is not dark: ${bg}`)
+  // Every colour on it is a token, so HUD mode has something to remap.
+  const hot = await page.evaluate(() => getComputedStyle(document.querySelector('.tline')).getPropertyValue('--tl-hot').trim())
+  if (!hot) throw new Error('the timeline declares no palette of its own')
+})
+
+await step('timeline: days, weeks and months are three different reads', async () => {
+  await fresh('timeline')
+  const labels = await page.locator('.tl-seg button').allInnerTexts()
+  if (labels.join(',') !== 'Days,Weeks,Months') throw new Error(`zoom reads ${labels.join(',')}`)
+  const days = await page.locator('.tl-rung').count()
+  await page.locator('.tl-seg button').nth(1).click(); await page.waitForTimeout(400)
+  const weeks = await page.locator('.tl-rung').count()
+  const wk = await page.locator('.tl-rung .tl-day b').first().innerText()
+  if (!/^Wk/.test(wk)) throw new Error(`the weeks view still shows ${wk}`)
+  if (weeks >= days) throw new Error(`${weeks} weeks against ${days} days`)
+  await page.locator('.tl-seg button').nth(2).click(); await page.waitForTimeout(400)
+  const months = await page.locator('.tl-rung').count()
+  if (months >= weeks) throw new Error(`${months} months against ${weeks} weeks`)
+})
+
+await step('timeline: the chain is counted, and the promise is arithmetic about it', async () => {
+  await fresh('timeline')
+  const n = Number(await page.locator('.tl-chain b').innerText())
+  if (!Number.isFinite(n)) throw new Error('the chain is not a number')
+  const line = await page.locator('.tl-promise .tl-txt').innerText()
+  if (!/chain|kept day/i.test(line)) throw new Error(`the promise says: ${line}`)
+})
+
+await step('timeline: the wheel is a read-out, and it shows its own arithmetic', async () => {
+  await fresh('timeline')
+  await page.locator('.tl-next').click(); await page.waitForTimeout(600)
+  if (!(await page.locator('.tl-wheel canvas').count())) throw new Error('no wheel')
+  if (!(await page.locator('.tl-card').count())) throw new Error('no card per day beside it')
+  /* Nothing on this view may push the wheel. It reads the log or it is a toy. */
+  const buttons = await page.locator('.tl-wheel button').allInnerTexts()
+  if (buttons.some((b) => /push|add|start|spin/i.test(b))) throw new Error(`the wheel has a ${buttons.join(',')} button`)
+  await page.locator('.tl-maths > button').hover(); await page.waitForTimeout(400)
+  const box = await page.locator('.tl-mathsbox')
+  if (await box.evaluate((el) => getComputedStyle(el).visibility) !== 'visible') throw new Error('the maths never opened')
+  const said = await box.innerText()
+  for (const want of ['habit', 'task', 'focus', 'hard thing', '50%']) {
+    if (!said.toLowerCase().includes(want)) throw new Error(`the maths never mentions ${want}`)
+  }
+})
+
+await step('timeline: giving up takes the whole window, and Escape gives it back', async () => {
+  await fresh('timeline')
+  await page.locator('.tl-giveup').click(); await page.waitForTimeout(600)
+  const box = await page.locator('.tl-lives').evaluate((el) => {
+    const r = el.getBoundingClientRect()
+    return { t: r.top, l: r.left, w: r.width, h: r.height, vw: innerWidth, vh: innerHeight }
+  })
+  if (box.t > 0 || box.l > 0 || box.w < box.vw || box.h < box.vh) throw new Error(`two lives is ${box.w}x${box.h} at ${box.l},${box.t}`)
+  await page.keyboard.press('Escape'); await page.waitForTimeout(400)
+  if (await page.locator('.tl-lives').count()) throw new Error('Escape did not close it')
+  if (await page.evaluate(() => getComputedStyle(document.body).overflow) === 'hidden') throw new Error('the page is still locked')
+})
+
 await page.unroute('https://api.groq.com/**').catch(() => {})
 
 await b.close(); server.close(); rmSync(SNAP, { recursive: true, force: true })

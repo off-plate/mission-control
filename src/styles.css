@@ -5272,6 +5272,8 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .tr-r { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--t-line); min-height: 44px; }
 .tr-r:last-child { border-bottom: 0; }
 .tr-t { flex: 1; min-width: 0; font-size: var(--a-f-row); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The workspace, spelled out, only when this row's name collides with another visible one. */
+.tr-qual { font-family: var(--font-mono); font-size: 0.625rem; font-weight: 600; color: var(--t-dim); margin-left: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
 .tr-r.is-done { color: var(--t-dim); }
 /* The slot was 11px grey and he called it "very, very, very small". It is its
    own tag now, at 12.5px bold on an accent wash. */

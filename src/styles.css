@@ -5648,30 +5648,17 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
    down, and the letter-spacing goes to zero, because Michroma already carries
    its own. */
 .shell.is-hud .troom .tr-n { letter-spacing: 0; }
-/* Bigger than the original HUD pass, on his instruction: "same size as the
-   normal version". Matching it exactly does not survive contact with
-   Michroma, though - verified by actually rendering it, not by eye. Full
-   Bricolage-tuned sizes clip "Afternoon" at 98px of available width needing
-   225px, at every desktop width from 1200px up, because .tr-count, .tr-tile
-   .tr-n and .tr-phase all share one flex row and growing any of them steals
-   the phase tile's space. Even halfway still clipped.
-
-   .tr-tile .tr-n stays where it was: it is the one sharing that row with
-   .tr-phase, and a fresh HUD pass would have to redesign the row itself
-   (a fixed width or its own flex-basis for the phase tile) to let that one
-   grow safely, which is a bigger change than a font-size number. Everything
-   else here lives in an independent part of the room and had real headroom:
-   these are the largest sizes that stayed clean across 375-1920px, checked
-   against every label in the room, not only the ones being changed. */
-.shell.is-hud .tr-count { font-size: clamp(38px, 5.5vw, 79px); }
-.shell.is-hud .troom .tr-nowt { font-size: clamp(18px, 1.8vw, 26px); }
-.shell.is-hud .tr-tile .tr-n { font-size: clamp(20px, 2.1vw, 32px); }
-.shell.is-hud .tr-phase { font-size: clamp(13px, 1.25vw, 19px) !important; }
-.shell.is-hud .tr-stat .tr-n { font-size: clamp(23px, 2.36vw, 34px); }
-.shell.is-hud .tr-nextt { font-size: clamp(16.8px, 1.7vw, 24.4px); }
-.shell.is-hud .troom .tr-age { font-size: 17px; min-width: 62px; }
-.shell.is-hud .troom .tr-pct { font-size: 15px; }
-.shell.is-hud .tr-count-inline .tr-n { font-size: 19px; }
+/* No HUD-specific font-size overrides here on purpose: he wants the day strip
+   one-to-one with the normal room, so it reads the same clamp()s the normal
+   room does. That used to clip "Afternoon" against Michroma's extra width,
+   but that was a symptom of the normal room's OWN sizing at the time, which
+   shrank the Phase tile's font instead of letting it wrap. Michael's own fix
+   the same day (e3874e2, "Today room: wrap AFTERNOON, don't shrink it") moved
+   the normal room to a bigger font plus white-space: normal, and that
+   wrapping behavior is inherited here for free, so the size can now match
+   without clipping. Verified by rendering both modes side by side at
+   375-1920px: same font-size, same wrap, only Michroma's own letterform
+   differs. */
 .shell.is-hud .troom .tr-week .weekday-num { font-size: 14px; }
 .shell.is-hud .troom .tr-sm { font-size: 14px; }
 /* Square corners belong to the HUD; the room's 16px pills do not. */

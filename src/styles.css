@@ -6393,26 +6393,47 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    labels with allInnerTexts(), which returns nothing for a display:none tree.
    ========================================================================== */
 @media (min-width: 640px) {
-  .topstick { position: relative; }
+  /* NO `position: relative` here. `.topstick` is `position: sticky` further up
+     this file, and adding relative in this block silently overrode it, which
+     un-stuck the header on every page. A sticky element is already a positioned
+     element, so it is the containing block for the absolute row below without
+     any help. Broke it 2026-08-26, he spotted it the same day. */
+  /* It is a DRAWER, not a popup. The row slides out from behind the header and
+     is clipped while it travels, so what you see is one object emerging from
+     under another. The first version faded a floating bar in over 10px, which
+     is too little travel to read as movement, and it ran opacity for 140ms
+     against transform for 200ms: the bar reached full opacity 60ms before it
+     stopped moving, which is the "clicky" pop.
+
+     So: no opacity in the transition at all, one duration, one curve, and the
+     clip and the slide move together. */
   .topstick > .nav {
     position: absolute; left: 0; right: 0; top: 100%; z-index: 30;
     background: var(--bg);
-    box-shadow: 0 8px 20px rgba(26, 23, 18, 0.09);
-    transform: translateY(-10px);
-    opacity: 0;
+    box-shadow: 0 10px 24px rgba(26, 23, 18, 0.10);
+    transform: translateY(-100%);
+    clip-path: inset(0 0 100% 0);
     pointer-events: none;
-    transition: transform var(--t-med) cubic-bezier(0.4, 0, 0.2, 1), opacity var(--t-fast);
+    /* Leaving: a shade quicker and easing IN, because a thing going away should
+       not linger. */
+    transition: transform 190ms cubic-bezier(0.4, 0.0, 0.9, 0.6),
+                clip-path 190ms cubic-bezier(0.4, 0.0, 0.9, 0.6);
   }
-  .topstick.is-navopen > .nav { transform: none; opacity: 1; pointer-events: auto; }
-  /* Keyboard reaches it the moment focus lands inside, so tabbing through the
-     app never walks into an invisible row.
-
-     `:has(:focus-visible)` and NOT `:focus-within`: clicking a tab leaves that
-     tab focused, and plain focus-within then pinned the row open for the rest
-     of the session. focus-visible is only set for keyboard focus, which is the
-     case that actually needs the help. */
-  .topstick:has(:focus-visible) > .nav { transform: none; opacity: 1; pointer-events: auto; }
+  .topstick.is-navopen > .nav,
+  .topstick:has(:focus-visible) > .nav {
+    transform: none;
+    clip-path: inset(0 0 0 0);
+    pointer-events: auto;
+    /* Arriving: longer, and easing OUT hard so it decelerates into place
+       instead of stopping dead. */
+    /* --ease is this file's own cubic-bezier(0.16, 1, 0.3, 1). */
+    transition: transform 300ms var(--ease), clip-path 300ms var(--ease);
+  }
+  /* `:has(:focus-visible)` and NOT `:focus-within`, and it is folded into the
+     open rule above: clicking a tab leaves that tab focused, and focus-within
+     pinned the row open for the rest of the session. focus-visible is set for
+     keyboard focus only, which is the case that needs the help. */
 }
 @media (prefers-reduced-motion: reduce) {
-  .topstick > .nav { transition: opacity 0.01s; transform: none; }
+  .topstick > .nav, .topstick.is-navopen > .nav { transition: none; }
 }

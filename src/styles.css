@@ -736,15 +736,6 @@ main { padding-inline: var(--gutter); }
 }
 .nav-tab:hover { color: var(--ink); }
 .nav-tab[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent-text); }
-.nav-tab.attention::after {
-  content: '';
-  display: inline-block;
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: var(--alert);
-  margin-left: 6px;
-  vertical-align: 2px;
-}
 
 .btn {
   display: inline-flex;

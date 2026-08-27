@@ -626,13 +626,16 @@ main { padding-inline: var(--gutter); }
    which found only the 3440px ultrawide shot clear. 2200px sits with margin
    on both sides of that line: laptop and desktop get the compact form,
    ultrawide (his actual daily screen) keeps the full one, since there it
-   never collided with anything. The label truncates and the secondary
-   controls (settings, skip, open-history) drop; pause/resume and stop stay,
-   since those are the two actions worth reaching from a pill sitting on
-   top of other content. */
+   never collided with anything. The label truncates and settings/skip drop;
+   pause/resume and stop stay as the two actions worth reaching from a pill
+   sitting on top of other content. open-history stays too, at every width:
+   Focus was pulled from the main nav and this pill is its only door now
+   ("the header opens Notes, and the pill opens Focus" learned that the hard
+   way -- hiding it here broke that flow at the gate's own 1500px viewport,
+   which is a real width real people use, not just a test's default). */
 @media (max-width: 2200px) {
   .pomo-phase { max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pomo-settings, .pomo-skip, .pomo-openhistory { display: none; }
+  .pomo-settings, .pomo-skip { display: none; }
 }
 .pomo-start { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: var(--text-sm); color: var(--accent-text); padding: 4px 6px; }
 .pomo-start:hover { color: var(--accent-hover); }
@@ -2406,6 +2409,11 @@ mark { background: var(--accent-wash); color: var(--accent-text); font-weight: 6
     padding: var(--s3) var(--s4); border-bottom: 1px solid var(--hairline);
   }
   .nt-side::-webkit-scrollbar { display: none; }
+  /* The hidden scrollbar is deliberate, but it left nothing telling him more
+     folders sit past the edge -- "Brain dumps" just clipped to "Bra" with no
+     sign a swipe would reveal the rest. A fade at the trailing edge is the
+     same hint iOS chip rows use for the same problem. */
+  .nt-side { mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%); }
   .nt-app > .nt-side + * { border-left: none; }
   .nt-app > .nt-list + * { border-left: 1px solid var(--hairline); }
   .nt-group { flex-direction: row; align-items: center; gap: var(--s2); flex: none; }
@@ -3567,12 +3575,19 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
   .weekstrip-days { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (max-width: 520px) {
-  .weekstrip-days { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .weekstrip-days { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s2); }
   /* Seven days do not divide by two, so the last cell sat alone with an empty
      square beside it, and the last cell is TODAY, the one with the ring on it.
      It takes the full width instead: the odd one out is the point of the row,
      not an accident to be left hanging. */
   .weekstrip-days > :last-child:nth-child(odd) { grid-column: span 2; }
+  /* At 390px this row measured ~19px wider than the viewport and silently
+     clipped at a page-level overflow:hidden rather than scrolling or
+     wrapping -- document.documentElement never saw it, only a direct
+     measurement of the row itself did. minmax(0, 1fr) already lets the grid
+     tracks shrink; the card's own padding was the fixed cost the grid
+     couldn't shrink away. */
+  .weekday { padding: var(--s2) var(--s2) var(--s2); }
 }
 
 /* ---------- the clock widget ----------
@@ -4182,6 +4197,15 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .b-statement { background: var(--bp-ink); color: var(--bp-bg); padding: 26px 24px 30px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.05; }
 .b-statement.s-xl { font-size: clamp(1.8rem, 3.2vw, 2.6rem); }
 .b-statement.s-lg { font-size: clamp(1.3rem, 2.2vw, 1.7rem); }
+/* The vw term is sized for a wide desktop column; in a two-across mobile
+   grid it bottoms out at the clamp's own floor (1.3rem / 1.8rem) regardless
+   of how narrow the actual card is, so these wrapped to 6-9 lines and grew
+   2-3x taller than a quote card of similar length sitting right next to
+   them. Lower floors for the two-column phone width. */
+@media (max-width: 639px) {
+  .b-statement.s-xl { font-size: 1.15rem; }
+  .b-statement.s-lg { font-size: 1rem; }
+}
 .b-quote { background: transparent; border: 1px solid #2c2c33; padding: 24px 22px; }
 .b-quote p { font-size: 1.05rem; line-height: 1.5; font-style: italic; }
 .b-quote cite { display: block; margin-top: 12px; color: var(--bp-mut); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; font-style: normal; }
@@ -4590,7 +4614,11 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
       title, so the tooltip and the screen reader are unaffected. This is the
       same trade the phone breakpoint already makes, one tier earlier. */
 .topbar { gap: var(--s3); }
-.topbar-right { gap: 6px; }
+/* When this row still doesn't fit and wraps, the last icon (always Settings)
+   landed alone on its own line, left-aligned under a right-aligned row --
+   read as an overflowed desktop toolbar rather than a mobile layout.
+   Right-aligning the wrap keeps it reading as one deliberate two-line group. */
+.topbar-right { gap: 6px; justify-content: flex-end; }
 .topbar-right .btn { padding-inline: 11px; }
 .spaces .space-btn { padding-inline: 12px; }
 
@@ -5310,8 +5338,17 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .tr-ph {
   font: 600 11px/1 var(--font-body); letter-spacing: 0.15em; text-transform: uppercase;
   color: var(--t-dim); padding-top: 9px; border-top: 1px solid var(--t-line); min-width: 0; overflow: hidden;
+  white-space: nowrap; text-overflow: clip;
 }
 .tr-ph.is-on { color: var(--t-hot-text); border-top-color: var(--t-hot); }
+/* Noon's span is 3 hours against Night/Evening's 6, so it gets the smallest
+   flex share of the five -- at 390px that share is narrower than "NOON"
+   even needs, and every label clips mid-word (MORNIN, NOO, AFTER). Letter
+   spacing built for a wide desktop card is the actual cause; tightening it
+   on phone widths is enough, the words themselves are short. */
+@media (max-width: 639px) {
+  .tr-ph { font-size: 9px; letter-spacing: 0.02em; }
+}
 
 /* ---- next ---- */
 /* The single gradient in the app, and a deliberate one: a short wash that
@@ -5388,6 +5425,11 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   .troom-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .troom-hero { grid-template-columns: 1fr 1fr; }
   .tr-clock { grid-column: 1 / -1; min-height: 0; }
+  /* 300px made three empty cards match a full-height neighbour side by side.
+     Stacked to one column, that same 300px under a two-word empty state was
+     close to a full screen of scrolling for nothing -- an unrelated card's
+     height leaking into a layout it was never sized for. */
+  .troom-lists > .tr-card { min-height: 0; }
 }
 @media (max-width: 620px) {
   .troom { padding: 12px; border-radius: 16px; }
@@ -5526,8 +5568,17 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .tr-ph {
   font: 600 11px/1 var(--font-body); letter-spacing: 0.15em; text-transform: uppercase;
   color: var(--t-dim); padding-top: 9px; border-top: 1px solid var(--t-line); min-width: 0; overflow: hidden;
+  white-space: nowrap; text-overflow: clip;
 }
 .tr-ph.is-on { color: var(--t-hot-text); border-top-color: var(--t-hot); }
+/* Noon's span is 3 hours against Night/Evening's 6, so it gets the smallest
+   flex share of the five -- at 390px that share is narrower than "NOON"
+   even needs, and every label clips mid-word (MORNIN, NOO, AFTER). Letter
+   spacing built for a wide desktop card is the actual cause; tightening it
+   on phone widths is enough, the words themselves are short. */
+@media (max-width: 639px) {
+  .tr-ph { font-size: 9px; letter-spacing: 0.02em; }
+}
 
 /* ---- next ---- */
 /* The single gradient in the app, and a deliberate one: a short wash that
@@ -5598,6 +5649,11 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   .troom-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .troom-hero { grid-template-columns: 1fr 1fr; }
   .tr-clock { grid-column: 1 / -1; min-height: 0; }
+  /* 300px made three empty cards match a full-height neighbour side by side.
+     Stacked to one column, that same 300px under a two-word empty state was
+     close to a full screen of scrolling for nothing -- an unrelated card's
+     height leaking into a layout it was never sized for. */
+  .troom-lists > .tr-card { min-height: 0; }
 }
 @media (max-width: 620px) {
   .troom { padding: 12px; border-radius: 16px; }
@@ -5629,7 +5685,13 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
    these wants the full width anyway. The routines strip needs it to wrap into
    fewer rows, and the week strip is seven equal cards. */
 .troom-lower { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
-.troom-lower > .tr-card { display: flex; flex-direction: column; }
+/* minmax(0, 1fr) sizes the TRACK, but a grid item still defaults to
+   min-width: auto -- its own content's intrinsic minimum, which for a
+   nowrap habit row plus a qualifier is wider than the track. That gap
+   (measured ~19-24px at 390px) was the actual source of every "silently
+   clipped at the viewport edge, no scrollbar" overflow in this room: the
+   habit rows, the week strip, all of it traces back to this one card. */
+.troom-lower > .tr-card { display: flex; flex-direction: column; min-width: 0; }
 .troom-lower .tr-goals { min-height: 0; }
 .troom .tr-box.is-on { background: var(--t-hot); border-color: var(--t-hot); position: relative; }
 .troom .tr-box.is-on::after {

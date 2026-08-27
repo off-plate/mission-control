@@ -3590,6 +3590,14 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 /* The header comes into the room rather than sitting on it as a strip of
    warm paper. Transparent, not repainted, so it is the same water. */
 .shell.in-zone .topstick { background: transparent; box-shadow: none; }
+/* .topbar itself, not just .topstick around it. Above 640px .topbar carries
+   its OWN opaque `background: var(--bg)`, set so a sliding sub-nav row cannot
+   show through the header (see that rule's own comment). --bg is never
+   redefined inside .shell.in-zone the way it is for HUD mode, so this painted
+   a warm-paper strip across the water regardless of the room underneath: the
+   exact "hardcoded paper colour" failure that rule's own comment warned
+   about, just arrived at through a variable instead of a literal. */
+.shell.in-zone .topbar { background: transparent; }
 .shell.in-zone .brand,
 .shell.in-zone .brand-name { color: var(--z-bone); }
 .shell.in-zone .brand svg { color: var(--z-ice); }

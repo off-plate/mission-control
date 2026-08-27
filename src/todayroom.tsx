@@ -26,6 +26,7 @@ import { useFirstMove } from './ui'
 import { fmtDuration, fmtNum, fmtSigned, goalPace, goalPeriodKey, goalPeriodRange, isEstimated, localDateKey, taskMinutes, type GoalTf } from './util'
 import { SLOTS, dueOn, goalCurrent, habitsDueToday, isTimeFed, type Task } from './types'
 import { WeekStrip } from './dayface'
+import { SpaceMark } from './ui'
 import { SPACE_LABELS } from './mock'
 
 /* A pasted spreadsheet link is an address, not a title. Left raw it took three
@@ -381,6 +382,7 @@ export function TodayRoom() {
                   aria-label={hb.name}
                   onClick={() => toggleHabitDay(hb.id, todayIndex)}
                 />
+                <SpaceMark space={hb.space} />
                 <span className="tr-t">
                   {hb.name}
                   {(habitNameCount.get(hb.name) ?? 0) > 1 && <span className="tr-qual">{SPACE_LABELS[hb.space]}</span>}

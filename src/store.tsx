@@ -2019,9 +2019,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           horizonKey: horizon ? (key ?? goalPeriodKey(horizon as GoalTf)) : undefined,
         }
         : t))),
+    /* The to-do list sorts newest-added first, so a task sent back to it needs
+       a fresh addedAt or it reappears wherever its ORIGINAL creation time
+       ranked it -- his report: send it back after adding ten other things,
+       and it lands 11th, not first. Coming back to the pool is a fresh arrival
+       on the list, same as if he'd just typed it. */
     moveTaskList: (id, list, day) =>
       setTasks((prev) => prev.map((t) => (t.id === id
-        ? { ...t, list, plannedOn: list === 'today' ? (day ?? todayKey()) : undefined }
+        ? { ...t, list, plannedOn: list === 'today' ? (day ?? todayKey()) : undefined, addedAt: list === 'backlog' ? Date.now() : t.addedAt }
         : t))),
     moveTasksToToday: (ids, day) =>
       setTasks((prev) => prev.map((t) => (ids.includes(t.id) ? { ...t, list: 'today', slot: undefined, plannedOn: day ?? todayKey() } : t))),

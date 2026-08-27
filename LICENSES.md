@@ -7,9 +7,12 @@ obtained through [svgrepo.com](https://www.svgrepo.com/collection/hicon-circular
 and released under the **MIT Licence**. The icons live in `src/icons.tsx`,
 redrawn as React components on a shared 24x24 grid; the geometry is unchanged.
 
-Five glyphs in that file are **not** from Hicon and are marked as house glyphs:
+Six glyphs in that file are **not** from Hicon and are marked as house glyphs:
 the table, add-row, add-column and clear-formatting marks in the notes toolbar,
-and the drag grip. Hicon has no equivalent for any of them.
+the drag grip, and the apps-launcher grid. Hicon has no sourced equivalent for
+any of them (the apps grid is a placeholder for one that likely exists in the
+Hicon set but wasn't reachable when it was added -- see the comment in
+`icons.tsx`).
 
 The Iron Man helmet in `src/helmet.tsx` and the Mission Control logo mark in
 `src/App.tsx` are ours and are not part of any icon set.

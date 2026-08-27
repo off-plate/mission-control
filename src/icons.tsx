@@ -188,6 +188,12 @@ export const Table = make(<><rect x="3" y="4" width="18" height="16" rx="2" /><p
 export const TableRowAdd = make(<><rect x="3" y="4" width="18" height="8" rx="1.6" /><path d="M12 15v6M9 18h6" /></>, 16, { k: 1.0944, x: -1.133, y: -1.681 })
 export const TableColAdd = make(<><rect x="4" y="3" width="8" height="18" rx="1.6" /><path d="M18 9v6M15 12h6" /></>, 16, { k: 1.0944, x: -1.681, y: -1.133 })
 
+/* A launcher: four app tiles. Hicon's `grid`/`layout` (see Table, above) are
+   the likely real equivalent but svgrepo was rate-limiting when this was
+   added, so this is a placeholder in the same house-glyph shape. Swap it for
+   the sourced Hicon path the next time anyone is in here. */
+export const AppsGrid = make(<><rect x="3" y="3" width="8" height="8" rx="1.6" /><rect x="13" y="3" width="8" height="8" rx="1.6" /><rect x="3" y="13" width="8" height="8" rx="1.6" /><rect x="13" y="13" width="8" height="8" rx="1.6" /></>, 16, { k: 1.0944, x: -1.133, y: -1.133 })
+
 /* Clear formatting. The Tx glyph is the convention every editor uses and
    Hicon has no eraser, so borrowing `x` alone would lose the meaning. */
 export const ClearFormat = make(<><path d="M6 5h13M9.5 5L7 19M14 12l6 7M20 12l-6 7" /></>, 16, { k: 1.4071, x: -6.293, y: -4.886 })

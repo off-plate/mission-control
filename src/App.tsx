@@ -9,7 +9,8 @@ import { DailyReview } from './daily'
 import { BrandPage } from './brand'
 import { DayPage } from './day'
 import { BoardPage } from './board'
-import { AppsPage } from './apps'
+import { AppsPage, APPS } from './apps'
+import { Dropdown } from './ui'
 import { CalendarPage } from './calendarpage'
 import { AssistantPage } from './assistantpage'
 import { Helmet } from './helmet'
@@ -125,7 +126,14 @@ const NAV: { id: PageId; label: string }[] = [
      nothing: see the redirect where the pages are chosen. */
   { id: 'goals', label: 'Goals' },
   { id: 'board', label: 'Why’s' },
-  { id: 'apps', label: 'Apps' },
+  /* Apps left the menu on his instruction (2026-08-27): seven icons and an
+     otherwise empty page did not earn a tab next to Habits and Goals. It is
+     a header dropdown now, next to Note and Yesterday -- see AppsShelf
+     below. The address still resolves so a bookmark still lands somewhere
+     real, same as Routines above. */
+  /* Assistant left the menu the same day, for the same reason a page he
+     starts something from belongs to the header, not a tab he has to
+     switch into -- it is its own primary button now, next to the Zone. */
 ]
 
 /* Calendar used to be Big Time only, on the argument that it reads somebody
@@ -258,7 +266,7 @@ function PhonePages({ tabs, page, setPage }: {
 }
 
 export default function App() {
-  const { space, view, setView, page, setPage, tasks, routines, goals, openDaily } = useStore()
+  const { space, view, setView, page, setPage, tasks, routines, goals, openDaily, setFocusAppId } = useStore()
   // The dot follows the alerts: money and admin count from any profile.
   const exceptions = space === 'personal'
     ? exceptionsFor(space, { tasks, routines, goals })
@@ -442,6 +450,35 @@ export default function App() {
             <Icon.Rewind size={18} />
             <span className="btn-label">Yesterday</span>
           </button>
+          {/* Apps, a shelf now rather than a page: seven icons never filled a
+              tab's worth of room, and this is the same one-click-from-anywhere
+              shape as Note and Yesterday beside it. Opening a framed app still
+              lands on the Apps page -- it needs the room -- so the item hands
+              the choice over via focusAppId rather than doing it inline. */}
+          <Dropdown
+            label="Apps"
+            className="apps-shelf-menu"
+            trigger={({ onClick, open }) => (
+              <button className={`btn btn-ghost${page === 'apps' ? ' is-on' : ''}`} onClick={onClick} aria-expanded={open} aria-label="Apps" title="Apps">
+                <Icon.AppsGrid size={18} />
+                <span className="btn-label">Apps</span>
+              </button>
+            )}
+          >
+            {APPS.map((a) => (
+              a.external ? (
+                <a key={a.id} href={a.url} target="_blank" rel="noreferrer" role="menuitem">
+                  <span aria-hidden="true">{a.icon}</span>
+                  {a.name}
+                </a>
+              ) : (
+                <button key={a.id} role="menuitem" onClick={() => { setFocusAppId(a.id); setPage('apps') }}>
+                  <span aria-hidden="true">{a.icon}</span>
+                  {a.name}
+                </button>
+              )
+            ))}
+          </Dropdown>
           {/* Assistant left this list the same way the Zone did: it is its own
               button now, not a tab, so the picker has nothing to say about it. */}
           {page !== 'zone' && page !== 'assistant' && <PhonePages tabs={tabs} page={page} setPage={setPage} />}

@@ -188,20 +188,21 @@ await step('focus: timer start writes state', async () => {
   if (p.phase !== 'focus') throw new Error(`phase ${p.phase}`)
   await page.locator('.focus-live').getByRole('button', { name: 'Stop' }).click()
 })
-await step('the menu is seven tabs, and what left it is reachable from the header', async () => {
+await step('the menu is six tabs, and what left it is reachable from the header', async () => {
   /* Five since Routines became a folder inside Habits (his instruction,
      2026-08-11); six since Apps joined after Why's (2026-08-23); seven since
-     the Assistant got a page of its own (2026-08-25); six again since the
-     Assistant left the tab row for its own header button, first and next to
-     the Zone; seven again the same day (2026-08-27) since Calendar stopped
-     being Big Time's and became a tab in every workspace -- two changes
-     landing the same day, cancelling out in the count but not in the
-     content. The retired addresses still have to resolve, which is asserted
-     below with the other retired ones. */
+     the Assistant got a page of its own (2026-08-25). Then, all the same day
+     (2026-08-27): six again as the Assistant left the tab row for its own
+     header button next to the Zone; seven again as Calendar stopped being
+     Big Time's and became a tab in every workspace; six again as Apps left
+     too, for a header dropdown next to Note and Yesterday, seven icons never
+     having earned a tab. #/apps still resolves to the real page, it is just
+     not one of the tabs. The retired addresses still have to resolve, which
+     is asserted below with the other retired ones. */
   await fresh('today')
   const tabs = await page.locator('.nav-tab').allInnerTexts()
-  if (tabs.length !== 7) throw new Error(`${tabs.length} tabs: ${tabs.join(', ')}`)
-  if (!tabs.some((t) => /apps/i.test(t))) throw new Error('Apps is not a tab')
+  if (tabs.length !== 6) throw new Error(`${tabs.length} tabs: ${tabs.join(', ')}`)
+  if (tabs.some((t) => /apps/i.test(t))) throw new Error('Apps is still a tab')
   if (tabs.some((t) => /routines/i.test(t))) throw new Error('Routines is still a tab')
   /* Calendar IS in this list now, in Personal like everywhere else. The
      calendar test below owns that rule. */

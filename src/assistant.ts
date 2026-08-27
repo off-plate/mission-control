@@ -20,6 +20,7 @@
    see, and nothing that would be a problem if the model logged it. */
 
 import { MODEL, getAiKey, groq, stripReasoning } from './ai'
+import { getTtsKey, hasTtsKey } from './speech'
 
 /** What a card shows. The app owns every one of these; the model only names one. */
 export type CardKind =
@@ -498,6 +499,52 @@ export type Outcome =
 /** One turn. `history` is the conversation so far, oldest first.
  *  `onSay` makes it stream: the sentence arrives a few words at a time, which
  *  is the difference between watching it think and watching a spinner. */
+/* Gemini's own OpenAI-compatible surface, verified against this app's actual
+   domain: streaming works, the message shapes match exactly, and the response
+   carries `access-control-allow-origin` for off-plate.github.io specifically,
+   not a wildcard that happened to work in a test. Groq-only extras (reasoning
+   mode, response_format) are left off on purpose: this is the plain shape
+   every OpenAI-compatible provider is guaranteed to understand, because the
+   one thing this call cannot afford is a 400 from a flag Gemini does not
+   recognise. */
+const GEMINI_MODEL = 'gemini-3.6-flash'
+const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
+
+async function askGemini(
+  question: string,
+  brief: Brief,
+  history: { role: 'user' | 'assistant'; content: string }[],
+  onSay?: (partial: string) => void,
+): Promise<Outcome | null> {
+  const key = getTtsKey()
+  try {
+    const res = await fetch(GEMINI_ENDPOINT, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: GEMINI_MODEL,
+        temperature: 0.3,
+        stream: !!onSay,
+        messages: [
+          { role: 'system', content: SYSTEM },
+          { role: 'system', content: `Today's briefing, read from his own log:\n${briefText(brief)}` },
+          ...history.slice(-8),
+          { role: 'user', content: question },
+        ],
+      }),
+    })
+    /* Not ok: Gemini is having its own bad day, or this key is not the right
+       shape for chat. Either way, that is not news he needs; the caller falls
+       through to the ordinary "Groq is busy" message as if this never ran. */
+    if (!res.ok) return null
+    if (onSay && res.body) return await readStream(res.body, onSay)
+    const data = await res.json()
+    return finish(String(data?.choices?.[0]?.message?.content ?? ''))
+  } catch {
+    return null
+  }
+}
+
 export async function ask(
   question: string,
   brief: Brief,
@@ -530,6 +577,26 @@ export async function ask(
   }
   if (res.status === 401 || res.status === 403) return { ok: false, reason: 'rejected' }
   if (res.status === 429) {
+    /* GROQ SAYS NO. Before he sees a word about it, try Gemini with the exact
+       same question, because he probably already has the key: it is the same
+       one the voice reads answers with, stored by speech.ts, verified live and
+       CORS-clean against this app's own domain before a line of this was
+       written. He never had to know Groq was full, and he never has to know
+       Gemini answered instead. This is the same shape LiteLLM (github.com/
+       BerriAI/litellm) calls "retry/fallback logic across multiple
+       deployments", except LiteLLM is a server you would have to run and this
+       app has no server: two providers, one browser, no proxy in between.
+
+       Falls through to the clean rate-limit message below only when there is
+       no Gemini key, or Gemini also fails. It never shows the WAIT for the
+       real answer he was already given a chance at. */
+    const fallback = hasTtsKey() ? await askGemini(question, brief, history, onSay) : null
+    /* Only a REAL answer is worth using. A failed fallback returns an Outcome
+       too, {ok:false,...}, and that object is truthy: returning it unchecked
+       would surface Gemini's own confusing failure instead of falling through
+       to the one message he already understands. */
+    if (fallback?.ok) return fallback
+
     /* Groq's 429 body is a wall of text he should never see: an org id, a
        service tier, a token accounting, and a billing upsell link, ending in
        "Ask again, or rephrase it." on a request that was never unreadable.

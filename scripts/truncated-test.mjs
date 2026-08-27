@@ -114,5 +114,68 @@ ok('neither is the billing upsell', !limited.toLowerCase().includes('upgrade'), 
 ok('the wait time is pulled out and shown plainly',
    limited.includes('19s') || limited.includes('18s'), JSON.stringify(limited))
 
+/* THE FALLBACK. Groq says no, and if he has a Gemini key (the same one that
+   already reads answers out loud), the same question goes there instead, so
+   he never sees a wait at all for an answer he could have had immediately. */
+async function run429WithFallback({ geminiKey, geminiOk }) {
+  const b = await chromium.launch()
+  const page = await b.newPage()
+  let geminiWasCalled = false
+  await page.route('**/api.groq.com/openai/v1/chat/completions', (r) =>
+    r.fulfill({ status: 429, contentType: 'application/json',
+      body: JSON.stringify({ error: { message: 'Rate limit reached. Please try again in 5.0s.' } }) }))
+  await page.route('**/generativelanguage.googleapis.com/v1beta/openai/chat/completions', (r) => {
+    geminiWasCalled = true
+    if (!geminiOk) return r.fulfill({ status: 429, contentType: 'application/json', body: '{"error":{"message":"also busy"}}' })
+    /* The real call streams (askGemini passes stream: !!onSay, and onSay is
+       always truthy from the assistant page), so the stub has to answer in
+       the same SSE shape or readStream() finds no data: lines and the fallback
+       "succeeds" with an empty, unreadable answer. */
+    let streaming = false
+    try { streaming = JSON.parse(r.request().postData() || '{}').stream === true } catch { /* default */ }
+    const j = JSON.stringify(WHOLE_PARSED)
+    if (streaming) {
+      let x = ''
+      for (let i = 0; i < j.length; i += 24) x += `data: ${JSON.stringify({ choices: [{ delta: { content: j.slice(i, i + 24) } }] })}\n\n`
+      return r.fulfill({ status: 200, contentType: 'text/event-stream', body: x + 'data: [DONE]\n\n' })
+    }
+    return r.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ choices: [{ message: { content: j } }] }) })
+  })
+  await page.goto(URL); await page.waitForTimeout(600)
+  const local = page.locator('button', { hasText: /Use this device only/i })
+  if (await local.count()) { await local.first().click(); await page.waitForTimeout(900) }
+  await page.evaluate((k) => {
+    localStorage.setItem('mc-groq-key', 'gsk_test')
+    if (k) localStorage.setItem('mc-gemini-key', k)
+  }, geminiKey)
+  await page.goto(`${URL}/#/assistant`); await page.reload(); await page.waitForTimeout(1300)
+  await page.locator('.as-input').fill('is the invoice marked done')
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(1800)
+  const answer = await page.locator('.as-turn.is-it .as-said').first().textContent().catch(() => null)
+  const errorText = await page.locator('.as-error').first().innerText().catch(() => null)
+  await b.close()
+  return { answer, errorText, geminiWasCalled }
+}
+
+const WHOLE_PARSED = { say: SENTENCE, show: [{ kind: 'today' }], next: [] }
+
+const withKeyAndGeminiUp = await run429WithFallback({ geminiKey: 'AIzaFakeButPresent', geminiOk: true })
+ok('with a Gemini key on hand, the real answer arrives instead of a wait',
+   (withKeyAndGeminiUp.answer ?? '').includes('VZP letter'), JSON.stringify(withKeyAndGeminiUp.answer))
+ok('and no rate-limit message is shown at all', !withKeyAndGeminiUp.errorText, JSON.stringify(withKeyAndGeminiUp.errorText))
+ok('Gemini was actually the one asked', withKeyAndGeminiUp.geminiWasCalled === true)
+
+const noKey = await run429WithFallback({ geminiKey: null, geminiOk: true })
+ok('with no Gemini key, behaviour is exactly as before: the clean rate-limit message',
+   (noKey.errorText ?? '').includes('Too many questions'), JSON.stringify(noKey.errorText))
+ok('and Gemini is never even called without a key', noKey.geminiWasCalled === false)
+
+const bothDown = await run429WithFallback({ geminiKey: 'AIzaFakeButPresent', geminiOk: false })
+ok('when the fallback ALSO fails, the same clean rate-limit message shows',
+   (bothDown.errorText ?? '').includes('Too many questions'), JSON.stringify(bothDown.errorText))
+ok('the fallback was at least tried before giving up', bothDown.geminiWasCalled === true)
+
 console.log(fails.length ? `\n${fails.length} FAILED` : '\nALL PASS')
 process.exit(fails.length ? 1 : 0)

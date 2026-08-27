@@ -342,12 +342,23 @@ export default function App() {
           phone has no nav row at all, it has the hamburger. */}
       <div
         className={`topstick${nav.open ? ' is-navopen' : ''}`}
-        onMouseEnter={nav.show}
         onMouseLeave={nav.hideSoon}
         onFocus={nav.show}
         onBlur={nav.hideSoon}
       >
       <header className="topbar">
+        {/* Only this cluster (name, workspace) triggers the reveal on hover,
+            on his instruction: the right side (sync, Assistant, Zone, the
+            helmet, Note, Yesterday, the page menu, Settings) is stuff he
+            reaches for directly, not a place a passing cursor should open a
+            second row underneath. Leaving here still bubbles up to the
+            topstick's onMouseLeave same as before, so once open, moving the
+            cursor anywhere else in the header -- this cluster, the right
+            side, the row itself -- keeps it open; only this cluster can
+            start it. Keyboard focus is untouched: tabbing to any control up
+            here still reveals the row, since a keyboard user has no hover
+            preview to rely on for orientation. */}
+        <div className="topbar-left" onMouseEnter={nav.show}>
         {/* The name is the way home, on his instruction: back to All and
             Today from wherever he is. It was decoration before. */}
         <button
@@ -390,6 +401,7 @@ export default function App() {
             ))}
           </nav>
         )}
+        </div>
         <div className="topbar-right">
           {/* Status before actions, and not in the Zone: that room is one thing
               at a time and a sync line is not the thing. */}

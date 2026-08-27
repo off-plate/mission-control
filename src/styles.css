@@ -705,6 +705,11 @@ main { padding-inline: var(--gutter); }
 /* ---------- Break it down: pull the eye with the icon ---------- */
 .btn-breakdown svg { opacity: 0.9; }
 
+/* Just the hover-trigger boundary for the nav reveal (App.tsx) -- same gap
+   .topbar already used for these children directly, so wrapping them here
+   doesn't change their spacing, just scopes which part of the header can
+   open the row underneath. */
+.topbar-left { display: flex; align-items: center; gap: var(--s4); min-width: 0; }
 .topbar-right { margin-left: auto; display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
 
 /* nav tabs */

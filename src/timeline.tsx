@@ -25,11 +25,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from './store'
 import { useCompass, type CompassMoney } from './compass'
+import { reelPool, reelKind, parseReels, dedupe } from './reels'
+import { localDateKey } from './util'
 import {
   momentumRun, momentumNow, stateFor, chainOf, rollUp,
   POINTS, CAPS, HABIT_TARGET, TASK_TARGET, FOCUS_TARGET_MIN, HARD_MIN_DAYS,
-  EMPTY_WIPE, KEPT_AT, GAIN, FRICTION, CEILING, curveFor,
-  type DayScore, type Period, type Zoom,
+  EMPTY_WIPE, KEPT_AT, GAIN, FRICTION, CEILING, curveFor, project, daysBetween,
+  type DayScore, type Period, type Zoom, type Future,
 } from './momentum'
 
 type View = 'ladder' | 'wheel'
@@ -93,7 +95,7 @@ export function TimelinePage() {
       {view === 'ladder' && <Ladder rows={shown} zoom={zoom} money={money} run={run} chain={chain} now={now} />}
       {view === 'wheel' && <Flywheel rows={shown} zoom={zoom} now={now} money={money} run={run} />}
 
-      {lives && <TwoLives onBack={() => setLives(false)} now={now} chain={chain} />}
+      {lives && <TwoLives onBack={() => setLives(false)} run={run} chain={chain} />}
     </div>
   )
 }
@@ -535,45 +537,160 @@ function DayCard({ p, zoom, money }: {
 /* -------------------------------------------------------------- two lives */
 /* THE SCREEN HE OPENS WHEN HE WANTS TO STOP.
 
-   His layout, 2026-08-27: one portrait reel down the left half, WITH SOUND,
-   and the right half split into two rows. Top is the life where he does it
-   anyway, bottom is the life where he skips. THE FOOTAGE IS ON THE LEFT ONLY,
-   so there is one thing to fill in per stop rather than two, and the right side
-   is nothing but the two futures in words.
+   His layout: one portrait reel down the left half WITH SOUND, and the right
+   half split into two rows, the life he keeps on top and the one he lets go
+   underneath.
 
-   SOUND IS ON. A Goggins clip with the audio muted is a screensaver. A real
-   file is asked to play unmuted first and only falls back to muted if the
-   browser refuses, with a button that turns it back on; an embed carries
-   mute=0 and the same button remounts it. */
-const STOPS = [
-  { at: 'Today', gap: 0,
-    drift: 'The same man, twice. Nothing has happened yet.',
-    push: 'The same man, twice. Nothing has happened yet.' },
-  { at: '1 month', gap: 22,
-    drift: 'The chain is still what it was. It was that in July too.',
-    push: 'Thirty six days unbroken, and it stopped being a decision.' },
-  { at: '6 months', gap: 139,
-    drift: 'The post has been drafted for two hundred and eighty days.',
-    push: 'Twenty four posts out. The first three clients signed.' },
-  { at: '1 year', gap: 287,
-    drift: 'Same weight, same debt. The year passed either way.',
-    push: 'The body and the balance moved together, all year.' },
-  { at: '3 years', gap: 864,
-    drift: 'You are still explaining the plan to her.',
-    push: 'Debt free, and you never had to explain it again.' },
+   THE STOPS ARE NOT FIVE HAND-WRITTEN MILESTONES ANY MORE. He asked for a
+   scrubber that runs day by day, week by week and month by month to the goal
+   he is actually working towards, and for both futures to be worked out rather
+   than written. So the range is today to the horizon, the grain is his to
+   choose, and every figure on both sides comes out of `project()`, which runs
+   his own recent rate forward through the same model that scored the past.
+
+   THE HORIZON IS END OF FEBRUARY 2027, which is the goal he named. A real goal
+   deadline further out than that moves it, because his own data outranks a
+   constant, and the screen says which of the two it is using. */
+const DECLARED_HORIZON = '2027-02-28'
+
+type Grain = 'd' | 'w' | 'm'
+const GRAINS: { id: Grain; label: string; step: number }[] = [
+  { id: 'd', label: 'Days', step: 1 },
+  { id: 'w', label: 'Weeks', step: 7 },
+  { id: 'm', label: 'Months', step: 30 },
 ]
 
-const YT = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{6,})/
-const VIMEO = /vimeo\.com\/(?:video\/)?(\d+)/
-const VIDEO_FILE = /\.(mp4|webm|mov|m4v)(\?|#|$)/i
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const dayAfter = (n: number) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + n); return d }
+const longDate = (d: Date) => `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`
 
-/** What a pasted link is, decided once so the reel does not guess twice. */
-function mediaKind(url: string): 'video' | 'embed' | 'image' | null {
-  if (!url) return null
-  if (VIDEO_FILE.test(url)) return 'video'
-  if (YT.test(url) || VIMEO.test(url)) return 'embed'
-  return 'image'
+/** "Six months", "Eleven weeks", "Four days". The unit follows the grain he
+ *  is scrubbing in, because "182 days" is not how anyone hears half a year. */
+function spanWords(days: number, grain: Grain): string {
+  if (days === 0) return 'Today'
+  if (grain === 'm' && days >= 30) { const n = Math.round(days / 30); return `${n} month${n === 1 ? '' : 's'}` }
+  if (grain !== 'd' && days >= 7) { const n = Math.round(days / 7); return `${n} week${n === 1 ? '' : 's'}` }
+  return `${days} day${days === 1 ? '' : 's'}`
 }
+
+/* ---- the reel ---- */
+function useReelPool(): string[] {
+  const { reels, twoLives } = useStore()
+  return useMemo(() => {
+    /* Anything set under the old one-link-per-stop shape joins the library
+       rather than being stranded in a field nothing reads any more. */
+    const old = Object.values(twoLives ?? {}).filter(Boolean)
+    return reelPool([...(reels ?? []), ...old])
+  }, [reels, twoLives])
+}
+
+function Reel({ url, count, onOpenLibrary, onNext }: {
+  url: string; count: number; onOpenLibrary: () => void; onNext: () => void
+}) {
+  const vid = useRef<HTMLVideoElement>(null)
+  const [sound, setSound] = useState(true)
+  const [failed, setFailed] = useState(false)
+  const kind = url ? reelKind(url) : null
+
+  useEffect(() => { setFailed(false); setSound(true) }, [url])
+  useEffect(() => {
+    const v = vid.current
+    if (!v || kind !== 'file') return
+    v.muted = false
+    /* Unmuted autoplay is refused unless the browser trusts this origin. Rather
+       than guess, ask for sound and take muted playback over no playback. */
+    v.play().catch(() => { v.muted = true; setSound(false); v.play().catch(() => setFailed(true)) })
+  }, [url, kind])
+
+  const hear = () => { const v = vid.current; if (v) { v.muted = false; void v.play() } setSound(true) }
+
+  return (
+    <div className={`tl-reel${kind && !failed ? ' has-media' : ''}`}>
+      {!failed && kind === 'file' && (
+        <video ref={vid} className="tl-media" src={url} autoPlay loop playsInline onError={() => setFailed(true)} />
+      )}
+      {!failed && (kind === 'youtube' || kind === 'vimeo') && (
+        <iframe key={`${url}|${sound}`} className="tl-media" src={embedSrc(url, sound)} title="Reel"
+          allow="autoplay; encrypted-media" frameBorder="0" />
+      )}
+      {!failed && kind === 'other' && <img className="tl-media" src={url} alt="" onError={() => setFailed(true)} />}
+
+      {!kind && (
+        <div className="tl-reelempty">
+          <p className="tl-l">The reel is empty</p>
+          <p>Paste your links and one plays here every time, full height, with sound.
+          A wall of YouTube links is fine: the panel pulls the URLs out of it.</p>
+        </div>
+      )}
+      {failed && (
+        <div className="tl-reelempty is-bad">
+          <p className="tl-l">That link would not load</p>
+          <p className="tl-url">{url}</p>
+          <p>It is still in the library. Skip to the next one, or take it out.</p>
+        </div>
+      )}
+
+      <div className="tl-reelbar">
+        <button className="tl-setshot" onClick={onOpenLibrary}>
+          {count ? `${count} reel${count === 1 ? '' : 's'}` : 'Add reels'}
+        </button>
+        {count > 1 && <button className="tl-setshot" onClick={onNext}>Next</button>}
+        {kind && kind !== 'other' && !failed && !sound && (
+          <button className="tl-setshot is-hot" onClick={hear}>Sound on</button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ---- the library ---- */
+/* A PROMPT CANNOT TAKE THREE HUNDRED LINKS, which is what he asked for. This
+   is a textarea he can paste a page into: every URL in it is pulled out, the
+   same clip under four different YouTube spellings counts once, and the panel
+   says what it took before he saves. */
+function ReelLibrary({ pool, onClose }: { pool: string[]; onClose: () => void }) {
+  const { reels, setReels } = useStore()
+  const [text, setText] = useState(() => (reels ?? []).join('\n'))
+  const parsed = useMemo(() => parseReels(text), [text])
+  const counts = useMemo(() => {
+    const c = { youtube: 0, vimeo: 0, file: 0, other: 0 }
+    for (const u of parsed) c[reelKind(u)]++
+    return c
+  }, [parsed])
+  const curated = pool.length - dedupe(reels ?? []).length
+
+  return (
+    <div className="tl-lib" role="dialog" aria-modal="true" aria-label="Reel library">
+      <div className="tl-libbox">
+        <header>
+          <span className="tl-l">The reel library</span>
+          <button className="tl-close" onClick={onClose} aria-label="Close">✕</button>
+        </header>
+        <p className="tl-libsay">
+          Paste as many links as you like. One per line, separated by commas, or a whole page
+          with links in it: every URL gets pulled out and the same clip twice counts once.
+        </p>
+        <textarea value={text} onChange={(e) => setText(e.target.value)} spellCheck={false}
+          placeholder={'https://www.youtube.com/watch?v=...\nhttps://youtu.be/...\nhttps://youtube.com/shorts/...'} />
+        <div className="tl-libcount">
+          <span><b>{parsed.length}</b> link{parsed.length === 1 ? '' : 's'}</span>
+          <span><b>{counts.youtube}</b> YouTube</span>
+          <span><b>{counts.vimeo}</b> Vimeo</span>
+          <span><b>{counts.file}</b> file{counts.file === 1 ? '' : 's'}</span>
+          {counts.other > 0 && <span className="off"><b>{counts.other}</b> not recognised</span>}
+          {curated > 0 && <span className="off"><b>{curated}</b> already shipped</span>}
+        </div>
+        <div className="tl-libfoot">
+          <button className="tl-back" onClick={() => { setReels(parsed); onClose() }}>Save the library</button>
+          <button className="tl-setshot" onClick={onClose}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const YT = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([\w-]{6,})/i
+const VIMEO = /vimeo\.com\/(?:video\/)?(\d+)/i
 function embedSrc(url: string, sound: boolean): string {
   const y = url.match(YT)
   if (y) return `https://www.youtube-nocookie.com/embed/${y[1]}?autoplay=1&mute=${sound ? 0 : 1}&loop=1&controls=0&playsinline=1&rel=0&playlist=${y[1]}`
@@ -582,127 +699,119 @@ function embedSrc(url: string, sound: boolean): string {
   return url
 }
 
-/** The reel: one portrait clip down the left, and every way it can fail said
- *  out loud. A link that will not load used to render as an empty pane, which
- *  is indistinguishable from a link that was never saved. */
-function Reel({ url, onSet }: { url: string; onSet: (u: string) => void }) {
-  const vid = useRef<HTMLVideoElement>(null)
-  const [sound, setSound] = useState(true)
-  const [failed, setFailed] = useState(false)
-  const kind = mediaKind(url)
+/* ---- the screen ---- */
+function TwoLives({ onBack, run, chain }: { onBack: () => void; run: DayScore[]; chain: ReturnType<typeof chainOf> }) {
+  const { goals, inView } = useStore()
+  const pool = useReelPool()
+  const [grain, setGrain] = useState<Grain>('m')
+  const [at, setAt] = useState(0)
+  const [lib, setLib] = useState(false)
+  const [skip, setSkip] = useState(0)
 
-  useEffect(() => { setFailed(false); setSound(true) }, [url])
-  useEffect(() => {
-    const v = vid.current
-    if (!v || kind !== 'video') return
-    v.muted = false
-    /* Unmuted autoplay is refused unless the browser trusts this origin. Rather
-       than guess, ask for sound and take muted playback over no playback. */
-    v.play().catch(() => { v.muted = true; setSound(false); v.play().catch(() => setFailed(true)) })
-  }, [url, kind])
+  /* The horizon he named, unless one of his own open goals reaches further. */
+  const horizon = useMemo(() => {
+    const deadlines = goals
+      .filter((g) => inView(g.space) && !g.closed && g.deadline)
+      .map((g) => g.deadline as string)
+    const furthest = deadlines.sort().pop()
+    return furthest && furthest > DECLARED_HORIZON ? { day: furthest, own: true } : { day: DECLARED_HORIZON, own: false }
+  }, [goals, inView])
 
-  const ask = () => {
-    const next = window.prompt(
-      'Link for the reel.\n\nAn .mp4 or .webm plays looped with sound. A YouTube, Shorts or Vimeo link is embedded. Anything else is treated as a still.\nLeave it empty to clear.',
-      url,
-    )
-    if (next !== null) onSet(next)
-  }
-  const hear = () => {
-    const v = vid.current
-    if (v) { v.muted = false; void v.play() }
-    setSound(true)
-  }
-
-  return (
-    <div className={`tl-reel${kind && !failed ? ' has-media' : ''}`}>
-      {!failed && kind === 'video' && (
-        <video ref={vid} className="tl-media" src={url} autoPlay loop playsInline onError={() => setFailed(true)} />
-      )}
-      {!failed && kind === 'embed' && (
-        <iframe key={String(sound)} className="tl-media" src={embedSrc(url, sound)} title="Reel"
-          allow="autoplay; encrypted-media" frameBorder="0" />
-      )}
-      {!failed && kind === 'image' && (
-        <img className="tl-media" src={url} alt="" onError={() => setFailed(true)} />
-      )}
-
-      {!kind && (
-        <div className="tl-reelempty">
-          <p className="tl-l">The reel</p>
-          <p>Paste a link and it plays here, full height, with sound. A file, a YouTube video, a Short, or a Vimeo link.</p>
-        </div>
-      )}
-      {failed && (
-        <div className="tl-reelempty is-bad">
-          <p className="tl-l">That link would not load</p>
-          <p className="tl-url">{url}</p>
-          <p>It is still saved. A direct .mp4 or .webm, or a YouTube or Vimeo link, is what plays here.</p>
-        </div>
-      )}
-
-      <div className="tl-reelbar">
-        <button className="tl-setshot" onClick={ask} title={url || 'Nothing set'}>{kind ? 'Change reel' : 'Add reel'}</button>
-        {kind && kind !== 'image' && !failed && !sound && (
-          <button className="tl-setshot is-hot" onClick={hear}>Sound on</button>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function TwoLives({ onBack, now, chain }: { onBack: () => void; now: number; chain: ReturnType<typeof chainOf> }) {
-  const { twoLives, setTwoLives } = useStore()
-  const [i, setI] = useState(0)
-  const s = STOPS[i]
-  /* The reel used to be two slots, one per side. Anything set under the old
-     keys still opens rather than reading as empty. */
-  const url = twoLives?.[`${i}`] ?? twoLives?.[`${i}-push`] ?? twoLives?.[`${i}-drift`] ?? ''
+  const span = Math.max(1, daysBetween(localDateKey(), horizon.day))
+  const step = GRAINS.find((g) => g.id === grain)!.step
+  /* Snap to the grain, and never past the horizon. THE LAST STOP IS THE
+     HORIZON ITSELF: 184 days does not divide by 30, so snapping alone left the
+     end of the slider four days short of the date printed beside it. */
+  const days = at >= span - step / 2 ? span : Math.min(span, Math.round(at / step) * step)
+  const when = dayAfter(days)
+  const p = project(run, chain.current, days)
+  const url = pool.length ? pool[(skip + Math.floor(days / Math.max(1, step))) % pool.length] : ''
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onBack()
-      if (e.key === 'ArrowRight') setI((v) => Math.min(STOPS.length - 1, v + 1))
-      if (e.key === 'ArrowLeft') setI((v) => Math.max(0, v - 1))
+      if (e.key === 'Escape') { if (lib) setLib(false); else onBack() }
+      /* NOT WHEN THE SLIDER ITSELF HAS FOCUS. A range input already walks on
+         the arrow keys, so this handler moved it a second step on top of the
+         browser's own and the handle jumped two at a time. */
+      if ((e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.tagName === 'TEXTAREA') return
+      if (e.key === 'ArrowRight') setAt((v) => Math.min(span, v + step))
+      if (e.key === 'ArrowLeft') setAt((v) => Math.max(0, v - step))
     }
     addEventListener('keydown', k)
-    /* It covers the window, so the page behind it must not scroll under it. */
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => { removeEventListener('keydown', k); document.body.style.overflow = prev }
-  }, [onBack])
+  }, [onBack, span, step, lib])
 
   return (
     <div className="tl-lives" role="dialog" aria-modal="true" aria-label="Two lives">
       <div className="tl-stage">
-        <Reel url={url} onSet={(u) => setTwoLives(`${i}`, u)} />
+        <Reel url={url} count={pool.length} onOpenLibrary={() => setLib(true)} onNext={() => setSkip((s) => s + 1)} />
         <div className="tl-sides">
           <section className="tl-side is-push">
             <span className="tl-pill">If you do it anyway</span>
-            <p className="tl-said">{s.push}</p>
+            <p className="tl-said">{days === 0 ? 'Today. Nothing has happened yet.' : `${spanWords(days, grain)} of keeping it.`}</p>
+            <Figures f={p.push} days={days} />
+            <p className="tl-under">
+              {p.assumed
+                ? 'There is no rate of yours to run forward yet, so this is a full day, every day.'
+                : `At your own rate of the last ${p.from} days: ${Math.round(p.rate * 100)}% of a full day.`}
+            </p>
           </section>
           <section className="tl-side is-drift">
             <span className="tl-pill">If you skip it</span>
-            <p className="tl-said">{s.drift}</p>
+            <p className="tl-said">{days === 0 ? 'Today. Nothing has happened yet.' : `${spanWords(days, grain)} of not.`}</p>
+            <Figures f={p.drift} days={days} dead />
+            <p className="tl-under">
+              {days === 0
+                ? 'Both men are the same man this morning.'
+                : `The wheel reads zero on day ${p.stoppedOn}. Everything after that is the same day again.`}
+            </p>
           </section>
-          <div className="tl-gap"><b>{s.gap}</b><span className="tl-l">days apart</span></div>
+          <div className="tl-gap">
+            <b>{days === 0 ? 'Today' : longDate(when).replace(/ \d{4}$/, '')}</b>
+            <span className="tl-l">{days === 0 ? 'right now' : `${days} days out`}</span>
+          </div>
         </div>
       </div>
 
       <button className="tl-close" onClick={onBack} aria-label="Close">✕</button>
 
       <footer className="tl-livesfoot">
-        <div className="tl-scrub">
-          {STOPS.map((x, k) => (
-            <button key={x.at} className={k === i ? 'on' : k < i ? 'past' : ''} onClick={() => setI(k)}>
-              <span className="tl-knob" /><span className="tl-l">{x.at}</span>
-            </button>
+        <div className="tl-grain" role="group" aria-label="Grain">
+          {GRAINS.map((g) => (
+            <button key={g.id} className={grain === g.id ? 'on' : ''} aria-pressed={grain === g.id}
+              onClick={() => setGrain(g.id)}>{g.label}</button>
           ))}
         </div>
-        <p>Both men leave tomorrow morning with your name, a momentum of {Math.round(now)} and
-        a {chain.current} day chain.</p>
+        <label className="tl-slider">
+          <input type="range" min={0} max={span} step={step} value={Math.min(at, span)}
+            aria-label={`How far out: ${days} days`}
+            onChange={(e) => setAt(Number(e.target.value))} />
+          <span className="tl-l">
+            Now {'→'} {longDate(new Date(`${horizon.day}T00:00:00`))}
+            {horizon.own ? ', your furthest goal' : ''}
+          </span>
+        </label>
         <button className="tl-back" onClick={onBack}>Ok. Let&rsquo;s go.</button>
       </footer>
+
+      {lib && <ReelLibrary pool={pool} onClose={() => setLib(false)} />}
     </div>
+  )
+}
+
+function Figures({ f, days, dead }: { f: Future; days: number; dead?: boolean }) {
+  const rows: [string, string][] = [
+    ['Momentum', String(Math.round(f.momentum))],
+    ['Chain', `${f.chain}`],
+    ['Tasks', `${f.tasks}`],
+    ['Focused', `${Math.round(f.focusMin / 60)}h`],
+  ]
+  if (days === 0) return null
+  return (
+    <dl className={`tl-figs${dead ? ' is-dead' : ''}`}>
+      {rows.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
+    </dl>
   )
 }

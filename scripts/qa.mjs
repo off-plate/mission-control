@@ -2824,25 +2824,85 @@ await step('timeline: the wheel is a read-out, and it shows its own arithmetic',
    which is exactly the case that earns a permanent test rather than a look. It
    drives the real control, reloads the browser, and asserts the link is in the
    blob AND back on the screen. */
-await step('timeline: a reel he set is still there after a reload', async () => {
+/* HE ASKED FOR HUNDREDS OF LINKS, pasted in bulk, and he reported a reel going
+   missing on a reload, which I could not reproduce. Both earn a permanent test:
+   this pastes a wall of text at the real control and reloads the browser. */
+await step('timeline: a library of hundreds, pasted in bulk and still there after a reload', async () => {
   await fresh('timeline')
   await page.locator('.tl-giveup').click(); await page.waitForTimeout(500)
-  const link = 'https://example.com/reel-under-test.mp4'
-  page.once('dialog', (d) => d.accept(link))
-  await page.locator('.tl-setshot').click(); await page.waitForTimeout(600)
-  const stored = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).twoLives, KEY)
-  if (JSON.stringify(stored ?? {}).indexOf(link) < 0) throw new Error(`the blob holds ${JSON.stringify(stored)}`)
-  await page.reload(); await page.waitForTimeout(900)
-  const after = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).twoLives, KEY)
-  if (JSON.stringify(after ?? {}).indexOf(link) < 0) throw new Error('the reel did not survive the reload')
+  await page.locator('.tl-reelbar button').first().click(); await page.waitForTimeout(400)
+  /* One clip under four spellings, a Vimeo, a file, and a line of prose that is
+     not a link at all: the panel has to take 202 and say so. */
+  const bulk = [
+    ...Array.from({ length: 200 }, (_, i) => `https://www.youtube.com/watch?v=QA${String(i).padStart(5, '0')}`),
+    'https://youtu.be/QA00000',
+    'https://www.youtube.com/watch?v=QA00001&t=42s',
+    'https://youtube.com/shorts/QA00002',
+    'https://vimeo.com/987654',
+    'https://cdn.example.com/reel.mp4',
+    'this line is not a link',
+  ].join('\n')
+  await page.locator('.tl-libbox textarea').fill(bulk); await page.waitForTimeout(500)
+  const counted = await page.locator('.tl-libcount').innerText()
+  if (!/\b202\b/.test(counted)) throw new Error(`the panel counted: ${counted.replace(/\n/g, ' ')}`)
+  await page.locator('.tl-libbox .tl-back').click(); await page.waitForTimeout(700)
+  const stored = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).reels, KEY)
+  if (!Array.isArray(stored) || stored.length !== 202) throw new Error(`the blob holds ${stored?.length} links`)
+  await page.reload(); await page.waitForTimeout(1000)
+  const after = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).reels, KEY)
+  if (after?.length !== 202) throw new Error('the library did not survive the reload')
+  await page.locator('.tl-giveup').click(); await page.waitForTimeout(600)
+  const label = await page.locator('.tl-reelbar button').first().innerText()
+  if (!/202/.test(label)) throw new Error(`the control reads "${label}", so the page did not read the library back`)
+  /* One of them is playing, unmuted, and scrubbing moves to a different one. */
+  const src = () => page.evaluate(() => document.querySelector('iframe.tl-media, video.tl-media')?.getAttribute('src') ?? '')
+  const first = await src()
+  if (!first) throw new Error('nothing is playing with 202 reels in the library')
+  if (/mute=1|muted=1/.test(first)) throw new Error('the reel is muted')
+  await page.locator('.tl-slider input').focus()
+  await page.keyboard.press('Home'); await page.waitForTimeout(300)
+  await page.keyboard.press('ArrowRight'); await page.waitForTimeout(400)
+  if (await src() === first) throw new Error('scrubbing plays the same clip')
+  await page.keyboard.press('Escape'); await page.waitForTimeout(300)
+})
+
+/* THE STOPS ARE THE RANGE TO HIS GOAL, at a grain he picks, and both futures
+   are worked out rather than written. */
+await step('timeline: the scrubber runs to his horizon, day, week or month', async () => {
+  await fresh('timeline')
   await page.locator('.tl-giveup').click(); await page.waitForTimeout(500)
-  const label = await page.locator('.tl-setshot').first().innerText()
-  if (!/change/i.test(label)) throw new Error(`the control reads "${label}", so the page did not read the link back`)
-  /* A link that cannot load has to SAY so. Rendering nothing is what makes a
-     bad link and a lost one look identical. */
-  if (!(await page.locator('.tl-reelempty.is-bad').count())) throw new Error('a dead link renders as an empty screen')
-  const said = await page.locator('.tl-reelempty.is-bad').innerText()
-  if (!said.includes(link)) throw new Error('the failure does not show which link failed')
+  const grains = await page.locator('.tl-grain button').allInnerTexts()
+  if (grains.join(',') !== 'Days,Weeks,Months') throw new Error(`the grain reads ${grains.join(',')}`)
+  const horizon = await page.locator('.tl-slider .tl-l').innerText()
+  if (!/2027/.test(horizon)) throw new Error(`the range reads "${horizon}"`)
+  const steps = []
+  for (const [i, want] of [[0, 1], [1, 7], [2, 30]]) {
+    await page.locator('.tl-grain button').nth(i).click(); await page.waitForTimeout(300)
+    const s = await page.locator('.tl-slider input').getAttribute('step')
+    steps.push(Number(s))
+    if (Number(s) !== want) throw new Error(`grain ${i} steps by ${s}, not ${want}`)
+  }
+  const span = Number(await page.locator('.tl-slider input').getAttribute('max'))
+  if (span < 30) throw new Error(`the horizon is only ${span} days out`)
+  /* One press, one step. The screen's own arrow handler used to move it a
+     second time on top of the browser's. */
+  await page.locator('.tl-slider input').focus()
+  await page.keyboard.press('Home'); await page.waitForTimeout(300)
+  await page.keyboard.press('ArrowRight'); await page.waitForTimeout(300)
+  if (Number(await page.locator('.tl-slider input').inputValue()) !== 30) throw new Error('one press did not move exactly one month')
+  /* Both sides carry the same four figures, and the drift side is all noughts:
+     that contrast is the whole argument of the screen. */
+  await page.keyboard.press('End'); await page.waitForTimeout(400)
+  const push = await page.locator('.tl-side.is-push .tl-figs').innerText()
+  const drift = await page.locator('.tl-side.is-drift .tl-figs').innerText()
+  for (const k of ['MOMENTUM', 'CHAIN', 'TASKS', 'FOCUSED']) {
+    if (!push.toUpperCase().includes(k) || !drift.toUpperCase().includes(k)) throw new Error(`${k} is missing from a side`)
+  }
+  if (/[1-9]/.test(drift.replace(/[A-Z ]/gi, ''))) throw new Error(`the give-up side is not all noughts: ${drift.replace(/\n/g, ' ')}`)
+  if (!/[1-9]/.test(push.replace(/[A-Z ]/gi, ''))) throw new Error('the keep-going side has nothing in it')
+  /* And the last stop is the horizon itself, not the last whole month short. */
+  const at = await page.locator('.tl-gap').innerText()
+  if (!new RegExp(String(span)).test(at)) throw new Error(`the end of the slider reads "${at.replace(/\n/g, ' ')}" against a ${span} day span`)
   await page.keyboard.press('Escape'); await page.waitForTimeout(300)
 })
 
@@ -2869,7 +2929,8 @@ await step('timeline: giving up takes the whole window, and Escape gives it back
   if (Math.abs(shape.reelH - shape.vh) > 2) throw new Error(`the reel is ${shape.reelH} tall in a ${shape.vh} window`)
   if (shape.sides !== 2 || shape.pushTop >= shape.driftTop) throw new Error('the two futures are not stacked, keep on top')
   if (!/anyway/i.test(shape.pills[0]) || !/skip/i.test(shape.pills[1])) throw new Error(`the rows read ${shape.pills.join(' then ')}`)
-  if (await page.locator('.tl-setshot').count() !== 1) throw new Error('there is not exactly one reel slot')
+  if (await page.locator('.tl-reel').count() !== 1) throw new Error('there is not exactly one reel')
+  if (!(await page.locator('.tl-reelbar button').count())) throw new Error('no way into the reel library')
   if (await page.locator('.tl-shot, .tl-pane').count()) throw new Error('the old two-pane footage frames are back')
   const clash = await page.evaluate(() => {
     const r = (e) => e.getBoundingClientRect()

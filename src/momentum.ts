@@ -382,3 +382,102 @@ export function stateFor(m: number): string {
   for (const x of STATES) if (m >= x.at) s = x.label
   return s
 }
+
+
+/* ------------------------------------------------------------- projection */
+
+/* THE TWO FUTURES ARE COMPUTED, NOT WRITTEN.
+
+   The give-up screen used five hand-written stops, which meant the same five
+   sentences whatever he had actually been doing. Both lives are now run
+   forward from HIS rate through the same model that scores the past, so the
+   difference on the screen is the difference his own log implies and nothing
+   else. If he improves, the good side improves. If he has been coasting, it
+   says so, and the screen is worth less to him, which is correct.
+
+   THE DRIFT SIDE COMES FROM THE SAME MODEL. It is the empty-day rule applied
+   day after day: friction, then half of what is left. */
+
+export type Future = {
+  momentum: number
+  chain: number
+  tasks: number
+  focusMin: number
+  hard: number
+}
+
+export type Projection = {
+  days: number
+  /** His own recent share of a full day, 0..1. The engine of the good side. */
+  rate: number
+  /** How many days of log the rate was taken from. Zero means no evidence. */
+  from: number
+  push: Future
+  drift: Future
+  /** The day the wheel reads zero if he stops. 0 when it already does. */
+  stoppedOn: number
+  /** True when there is no rate to run forward and the good side is showing
+   *  what a FULL day every day would build instead of what he has been doing.
+   *  The screen has to say so; a projection off no evidence presented as his
+   *  own is the one lie this file could tell. */
+  assumed: boolean
+}
+
+/**
+ * Run both lives forward `days` from today.
+ *
+ * `window` is how far back the rate is read from. Twenty eight days is long
+ * enough that one bad week cannot define him and short enough that a month he
+ * has left behind does not flatter him.
+ */
+export function project(run: DayScore[], chainNow: number, days: number, window = 28): Projection {
+  const recent = run.slice(-window)
+  const from = recent.length
+  const mean = (f: (r: DayScore) => number) => (from ? recent.reduce((a, r) => a + f(r), 0) / from : 0)
+  const rate = mean((r) => r.ratio)
+  const tasksPerDay = mean((r) => r.counts.tasks)
+  const focusPerDay = mean((r) => r.counts.focusMin)
+  const hardPerDay = mean((r) => (r.hard ? 1 : 0))
+  const keptShare = from ? recent.filter((r) => r.kept).length / from : 0
+
+  /* NO RATE, NO PROJECTION OF HIS OWN. On a fresh log both sides come out as
+     noughts and the screen says nothing at all, which is worst on exactly the
+     day he most needs it. Below a floor of evidence the good side shows a full
+     day every day instead, and `assumed` makes the screen admit it. */
+  const assumed = rate < 0.05
+  const useRate = assumed ? 1 : rate
+  const useKept = assumed ? 1 : keptShare
+  const useTasks = assumed ? TASK_TARGET : tasksPerDay
+  const useFocus = assumed ? FOCUS_TARGET_MIN : focusPerDay
+  const useHard = assumed ? HARD_TARGET : hardPerDay
+
+  const start = momentumNow(run)
+  let up = start, down = start, stoppedOn = down < 0.5 ? 0 : -1
+  for (let d = 1; d <= days; d++) {
+    up = Math.max(0, Math.min(CEILING, up * FRICTION + GAIN * curveFor(useRate)))
+    down = Math.max(0, down * FRICTION * EMPTY_WIPE)
+    if (stoppedOn < 0 && down < 0.5) stoppedOn = d
+  }
+
+  return {
+    days, rate, from, assumed,
+    push: {
+      momentum: +up.toFixed(1),
+      /* Days kept, not days elapsed: at his own rate the chain grows by the
+         share of days he actually keeps, and claiming every one of them would
+         be the only invented figure on the screen. */
+      chain: chainNow + Math.round(days * useKept),
+      tasks: Math.round(useTasks * days),
+      focusMin: Math.round(useFocus * days),
+      hard: Math.round(useHard * days),
+    },
+    drift: { momentum: +down.toFixed(1), chain: 0, tasks: 0, focusMin: 0, hard: 0 },
+    stoppedOn: stoppedOn < 0 ? days : stoppedOn,
+  }
+}
+
+/** Whole days between two local date keys. */
+export function daysBetween(from: string, to: string): number {
+  const a = new Date(`${from}T00:00:00`), b = new Date(`${to}T00:00:00`)
+  return Math.round((b.getTime() - a.getTime()) / 86400000)
+}

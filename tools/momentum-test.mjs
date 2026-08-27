@@ -179,5 +179,49 @@ t('a week with blank days reads worse than one without', () => {
   if (!(good[0].ratio > patchy[0].ratio)) throw new Error('patchy week did not read worse')
 })
 
+/* ---- the projection, which is what the give-up screen argues with ---- */
+t('the good side runs HIS rate forward, not a wish', () => {
+  const strong = M.project(run({ fullDays: 30, hard: true, days: 30 }), 5, 90)
+  const weak = M.project(run({ fullDays: 30, hard: true, tasksPerDay: 0, habitsPerDay: 1, focusPerDay: 20, days: 30 }), 5, 90)
+  if (!(strong.push.momentum > weak.push.momentum)) throw new Error('a better log did not project better')
+  if (!(strong.rate > weak.rate)) throw new Error('the rate is not read off the log')
+})
+t('the give-up side goes to zero and says which day', () => {
+  const p = M.project(run({ fullDays: 30, hard: true, days: 30 }), 5, 180)
+  eq(p.drift.momentum, 0)
+  eq(p.drift.chain, 0); eq(p.drift.tasks, 0); eq(p.drift.focusMin, 0)
+  if (!(p.stoppedOn > 0 && p.stoppedOn < 20)) throw new Error('the wheel stops on day ' + p.stoppedOn)
+})
+t('the chain grows by days KEPT, never by days elapsed', () => {
+  /* Fourteen full days inside a twenty eight day window: half of them were
+     kept, so a projection claiming all hundred would be the one invented
+     figure on the screen. */
+  const p = M.project(run({ fullDays: 14, hard: true, days: 28 }), 5, 100)
+  if (p.push.chain >= 100) throw new Error('it claimed every day: ' + p.push.chain)
+  if (p.push.chain <= 20) throw new Error('it claimed almost none: ' + p.push.chain)
+})
+t('a log of nothing but full days does claim every day, and that is right', () => {
+  const p = M.project(run({ fullDays: 28, hard: true, days: 28 }), 5, 100)
+  eq(p.push.chain, 105)
+})
+t('an empty log projects a FULL day and admits it', () => {
+  const p = M.project(M.momentumRun({ habits, habitLog: [], tasks: [], focusSessions: [], inView }, 30, TODAY), 0, 90)
+  eq(p.assumed, true)
+  if (p.push.tasks <= 0 || p.push.focusMin <= 0) throw new Error('nothing to show on day one')
+  if (!(p.push.momentum > 20)) throw new Error('a full day every day should build the wheel')
+})
+t('a real rate is never marked as assumed', () => {
+  eq(M.project(run({ fullDays: 30, hard: true, days: 30 }), 5, 90).assumed, false)
+})
+t('zero days out is today: both lives are the same man', () => {
+  const p = M.project(run({ fullDays: 30, hard: true, days: 30 }), 5, 0)
+  eq(p.push.momentum, p.drift.momentum)
+  eq(p.push.tasks, 0); eq(p.drift.tasks, 0)
+})
+t('daysBetween counts whole local days', () => {
+  eq(M.daysBetween('2026-08-28', '2027-02-28'), 184)
+  eq(M.daysBetween('2026-08-28', '2026-08-28'), 0)
+})
+
 console.log(`\n${fail ? 'FAIL' : 'PASS'} ${pass}/${pass + fail}`)
 process.exit(fail ? 1 : 0)

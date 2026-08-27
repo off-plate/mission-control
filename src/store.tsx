@@ -140,6 +140,10 @@ interface PersistedState {
    *  because the screen he opens when he wants to quit has to be the same
    *  screen on the phone at midnight as on the laptop at noon. */
   twoLives?: Record<string, string>
+  /** THE REEL LIBRARY he pasted in. Hundreds of links, merged with the curated
+   *  list in `reels.ts` at read time. In the synced blob because a library he
+   *  built on the laptop has to be there on the phone at midnight. */
+  reels?: string[]
 }
 
 /** A delete you can still take back: what it was, and how to put it back. */
@@ -148,6 +152,8 @@ export interface Undoable { id: string; label: string; restore: () => void }
 interface Store extends PersistedState {
   /** Set or clear one Two Lives link. An empty string removes the key. */
   setTwoLives: (key: string, url: string) => void
+  /** Replace the reel library with this list, already parsed and deduplicated. */
+  setReels: (list: string[]) => void
   /** What he is looking at. 'all' shows every space at once. */
   view: ViewId
   setView: (v: ViewId) => void
@@ -1241,6 +1247,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [twoLives, setTwoLivesRaw] = useState<Record<string, string>>(persisted?.twoLives ?? {})
   /* An empty link is a removal, not a blank entry, so the key does not linger
      and win a merge against a device that still holds the real one. */
+  const [reels, setReelsRaw] = useState<string[]>(persisted?.reels ?? [])
+  const setReels = (list: string[]) => setReelsRaw(list)
   const setTwoLives = (key: string, url: string) =>
     setTwoLivesRaw((m) => { const n = { ...m }; if (url.trim()) n[key] = url.trim(); else delete n[key]; return n })
   const bury = (...keys: string[]) =>
@@ -1349,7 +1357,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       notes, noteFolders,
       savedAt: Date.now(), lastWrite: { dev: deviceId(), name: deviceName(), at: Date.now() },
       weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
-      habitLog, routineLog, slips, stepLog, stepTicks, dailyDone, dailySkipped, spaceGuessed, graveyard, twoLives, lastRollDay: lastRollDay ?? localDateKey(),
+      habitLog, routineLog, slips, stepLog, stepTicks, dailyDone, dailySkipped, spaceGuessed, graveyard, twoLives, reels, lastRollDay: lastRollDay ?? localDateKey(),
     }
     const json = JSON.stringify(state)
     /* His own writing is the one thing that makes "updated from your iPhone"
@@ -1371,7 +1379,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { outbox.push(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dailyDone, dailySkipped, graveyard, twoLives])
+  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dailyDone, dailySkipped, graveyard, twoLives, reels])
 
   /* ---- state that arrived from somewhere else ----
      Another tab of this browser, or this account on another device. Merged in,
@@ -1427,6 +1435,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (p.removedSeeds) setRemovedSeeds(p.removedSeeds)
     if (p.graveyard) setGraveyard(p.graveyard)
     if (p.twoLives) setTwoLivesRaw(p.twoLives)
+    /* An array, not truthiness: clearing the library on one device has to
+       arrive here too, and an empty list is a real answer. */
+    if (Array.isArray(p.reels)) setReelsRaw(p.reels)
   }
 
   /* Another tab of the same browser. It writes localStorage; this fires there
@@ -1876,7 +1887,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     spaces, tasks, habits, goals, ledger, social, sources, plan, review, routines, ideas,
     focusSessions, habitLog, routineLog, slips, stepLog, stepTicks,
     view, setView, inView,
-    twoLives, setTwoLives,
+    twoLives, setTwoLives, reels, setReels,
     /* A finished block is recorded once, and everything that cares reads from
        here: measured habits fill from it, and the ledger gets it so focus time
        counts toward estimate accuracy instead of vanishing. */

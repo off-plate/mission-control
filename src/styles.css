@@ -5205,10 +5205,11 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .tr-tile .tr-n { font-size: clamp(30px, 3.8vw, 62px); }
 .troom .tr-mo { font-family: var(--font-body); font-size: 0.29em; font-weight: 600; color: var(--t-dim); letter-spacing: 0.04em; margin-left: 0.14em; vertical-align: 0.42em; }
 .tr-tile.is-hot .tr-n { color: var(--t-hot-text); }
-/* "MORNING" is the longest word this tile ever holds and it broke across two
-   lines. It shrinks to fit instead of wrapping. */
+/* "AFTERNOON" is the longest word this tile ever holds, not "MORNING" as this
+   comment used to claim -- that miscount is why the tile clipped it. It shrinks
+   to fit instead of wrapping. */
 .tr-phase {
-  font-size: clamp(15px, 1.9vw, 30px) !important; text-transform: uppercase;
+  font-size: clamp(13px, 1.3vw, 22px) !important; text-transform: uppercase;
   white-space: nowrap; overflow: hidden; text-overflow: clip;
 }
 .troom .tr-bar { height: 7px; border-radius: 4px; background: color-mix(in srgb, var(--t-ink) 11%, transparent); overflow: hidden; }
@@ -5419,10 +5420,11 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .tr-tile .tr-n { font-size: clamp(30px, 3.8vw, 62px); }
 .troom .tr-mo { font-family: var(--font-body); font-size: 0.29em; font-weight: 600; color: var(--t-dim); letter-spacing: 0.04em; margin-left: 0.14em; vertical-align: 0.42em; }
 .tr-tile.is-hot .tr-n { color: var(--t-hot-text); }
-/* "MORNING" is the longest word this tile ever holds and it broke across two
-   lines. It shrinks to fit instead of wrapping. */
+/* "AFTERNOON" is the longest word this tile ever holds, not "MORNING" as this
+   comment used to claim -- that miscount is why the tile clipped it. It shrinks
+   to fit instead of wrapping. */
 .tr-phase {
-  font-size: clamp(15px, 1.9vw, 30px) !important; text-transform: uppercase;
+  font-size: clamp(13px, 1.3vw, 22px) !important; text-transform: uppercase;
   white-space: nowrap; overflow: hidden; text-overflow: clip;
 }
 .troom .tr-bar { height: 7px; border-radius: 4px; background: color-mix(in srgb, var(--t-ink) 11%, transparent); overflow: hidden; }

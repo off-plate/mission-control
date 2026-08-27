@@ -2703,7 +2703,7 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
    habit name, the most important thing on the row, was squeezed into whatever
    was left after a FIXED 264px of secondary text, and wrapped to five lines
    while truncated fragments sat beside it. */
-.habit-list { container-type: inline-size; container-name: habitlist; }
+.habit-list { container-type: inline-size; container-name: habitlist; padding-left: var(--s3); padding-right: var(--s3); }
 .habit-list .col-head { margin-bottom: var(--s2); }
 .habit-list .col-head .col-tot { margin-left: 0; }
 .habit-line { border-top: 1px solid var(--hairline); }

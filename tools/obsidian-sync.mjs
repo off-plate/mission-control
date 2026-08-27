@@ -68,6 +68,8 @@ const STATE_DIR = path.join(os.homedir(), '.mc-obsidian')
 const SESSION_FILE = path.join(STATE_DIR, 'session.json')
 const LEDGER_FILE = path.join(STATE_DIR, 'ledger.json')
 const LOG_FILE = path.join(STATE_DIR, 'sync.log')
+const LOCK_FILE = path.join(STATE_DIR, 'run.lock')
+const FAILS_FILE = path.join(STATE_DIR, 'consecutive-failures')
 
 /* This job, as a device. The app's merge treats two copies carrying the SAME
    device as one device catching up with itself and never raises a conflict
@@ -87,6 +89,52 @@ const args = new Set(process.argv.slice(2))
 const DRY = args.has('--dry')
 const STATUS = args.has('--status')
 const LOGIN = args.has('--login')
+
+/* ---- one run at a time ----------------------------------------------------
+   This is what broke the mirror for two days without saying so.
+
+   launchd fires this every 120 seconds and does not care whether the last one
+   finished. Once the vault had a dozen files and the network was slow, runs
+   began to overlap, and overlapping runs are poison here for one specific
+   reason: a Supabase refresh token ROTATES. Run A refreshes, gets a new token
+   and banks it; run B, started while A was still going, is holding the old one,
+   tries to refresh with a token that has already been spent, and is told it is
+   not signed in. Both of them write session.json and ledger.json at the same
+   time, so those files get torn and the next read of one fails outright.
+
+   The log for 2026-08-25 21:44 through 2026-08-27 20:52 is exactly that
+   shape: 697 read failures, 242 "not signed in", and 293 runs that found
+   nothing because they could not see anything. He noticed because his notes
+   stopped moving; nothing else told him.
+
+   A lock is the whole fix. Stale locks are cleared by age, so a run killed
+   mid-flight cannot wedge the job forever. */
+const LOCK_STALE_MS = 10 * 60_000
+
+async function takeLock() {
+  await fsp.mkdir(STATE_DIR, { recursive: true, mode: 0o700 })
+  try {
+    const held = await fsp.readFile(LOCK_FILE, 'utf8')
+    const at = Number(held) || 0
+    if (Date.now() - at < LOCK_STALE_MS) return false
+    /* Older than any honest run: whoever held it is gone. */
+  } catch { /* no lock file, which is the ordinary case */ }
+  await fsp.writeFile(LOCK_FILE, String(Date.now()))
+  return true
+}
+
+async function releaseLock() {
+  try { await fsp.rm(LOCK_FILE, { force: true }) } catch { /* nothing to release */ }
+}
+
+/** Write through a temp file and rename. Rename is atomic, so a reader can
+ *  never catch this half written, which is the other half of what two
+ *  concurrent runs were doing to session.json and ledger.json. */
+async function writeAtomic(file, text, mode) {
+  const tmp = `${file}.${process.pid}.tmp`
+  await fsp.writeFile(tmp, text, mode ? { mode } : undefined)
+  await fsp.rename(tmp, file)
+}
 
 /* ---- small shared helpers ------------------------------------------------- */
 
@@ -191,12 +239,12 @@ function client() {
 
 async function saveSession(session) {
   await fsp.mkdir(STATE_DIR, { recursive: true, mode: 0o700 })
-  await fsp.writeFile(SESSION_FILE, JSON.stringify({
+  await writeAtomic(SESSION_FILE, JSON.stringify({
     access_token: session.access_token,
     refresh_token: session.refresh_token,
     email: session.user?.email ?? '',
     saved: new Date().toISOString(),
-  }, null, 2), { mode: 0o600 })
+  }, null, 2), 0o600)
   await fsp.chmod(SESSION_FILE, 0o600)
 }
 
@@ -278,7 +326,7 @@ async function readLedger() {
 }
 async function writeLedger(l) {
   await fsp.mkdir(STATE_DIR, { recursive: true, mode: 0o700 })
-  await fsp.writeFile(LEDGER_FILE, JSON.stringify(l, null, 2))
+  await writeAtomic(LEDGER_FILE, JSON.stringify(l, null, 2))
 }
 
 /* ---- reading the vault ---------------------------------------------------- */
@@ -312,8 +360,22 @@ async function readVault() {
          job never reads one back in, or a resolved conflict would return. */
       if (/ \(conflict [\d-]+ [\d-]+\)\.md$/.test(e.name)) continue
       const full = path.join(dir, e.name)
-      const stat = await fsp.stat(full)
-      const text = await fsp.readFile(full, 'utf8')
+      /* One file that will not read used to throw out of here and abort the
+         entire run, so a single sulking iCloud file stopped every other note
+         from syncing. iCloud does not only park undownloaded files under the
+         .icloud name: a file can carry its real name and still fail to read
+         while the content is being fetched. Either way the answer is the same
+         as for a placeholder: it exists, it is not here yet, leave it alone
+         this run and sync everything else. */
+      let stat, text
+      try {
+        stat = await fsp.stat(full)
+        text = await fsp.readFile(full, 'utf8')
+      } catch (err) {
+        pending.push(e.name)
+        say(`  could not read ${e.name} (${err?.code ?? err?.message ?? 'unknown'}); skipping it this run`)
+        continue
+      }
       const { fm, body } = parseFile(text)
       files.push({ name: e.name, full, where, mtimeMs: stat.mtimeMs, id: fm.mc || null, body })
     }
@@ -665,14 +727,66 @@ async function run() {
   say(total ? `done: ${total} change(s).` : 'done.')
 }
 
+/* Two days of failing every two minutes, and the only place that said so was a
+   log file he has no reason to open. A mirror that stops mirroring has to be
+   able to say it out loud, once, rather than once every two minutes. */
+const NAG_AFTER = 3
+
+async function noteOutcome(failed, detail) {
+  if (DRY || STATUS) return
+  let count = 0
+  try { count = Number(await fsp.readFile(FAILS_FILE, 'utf8')) || 0 } catch { /* first run */ }
+  if (!failed) {
+    if (count >= NAG_AFTER) {
+      await notify('Obsidian sync is working again', 'Your notes and the vault are back in step.')
+    }
+    try { await fsp.rm(FAILS_FILE, { force: true }) } catch { /* nothing to clear */ }
+    return
+  }
+  count += 1
+  try { await writeAtomic(FAILS_FILE, String(count)) } catch { /* best effort */ }
+  /* Exactly on the threshold, so it says it once and then stops nagging. */
+  if (count === NAG_AFTER) {
+    await notify('Obsidian sync has stopped', `${count} runs in a row failed. ${detail ?? ''}`.trim())
+  }
+}
+
+/** A real macOS notification, because the log is not a place he looks. */
+async function notify(title, message) {
+  try {
+    const { promisify } = await import('node:util')
+    const { execFile } = await import('node:child_process')
+    const esc = (t) => String(t).replace(/["\\]/g, '')
+    await promisify(execFile)('osascript', ['-e',
+      `display notification "${esc(message)}" with title "${esc(title)}"`])
+  } catch { /* a notification is a nicety, never the reason a run fails */ }
+}
+
 const isEntry = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href
 
-if (isEntry) try {
-  if (LOGIN) await login()
-  else await run()
-} catch (e) {
-  say(`FAILED: ${e instanceof Error ? e.message : String(e)}`)
-  process.exitCode = 1
-} finally {
-  await flushLog()
+if (isEntry) {
+  /* --login is interactive and he is sitting in front of it, and --status and
+     --dry change nothing, so none of those need the lock. */
+  const needsLock = !LOGIN && !STATUS && !DRY
+  const got = needsLock ? await takeLock() : true
+  if (!got) {
+    say('another run is still going; leaving this one to it.')
+  } else {
+    try {
+      if (LOGIN) await login()
+      else await run()
+      await noteOutcome(false)
+    } catch (e) {
+      /* The stack, not just the message. "Unknown system error -11, read" told
+         nobody which file or which line, and that cost two days. */
+      const msg = e instanceof Error ? e.message : String(e)
+      say(`FAILED: ${e instanceof Error ? (e.stack ?? msg) : msg}`)
+      await noteOutcome(true, msg)
+      process.exitCode = 1
+    } finally {
+      if (needsLock) await releaseLock()
+      await flushLog()
+    }
+  }
+  if (!got) await flushLog()
 }

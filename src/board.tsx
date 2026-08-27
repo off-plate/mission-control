@@ -183,21 +183,22 @@ function useMasonry(count: number) {
   return ref
 }
 
-/** One photograph. Two WebP widths, its own height reserved up front, and the
- *  24px blur standing in until the file lands. Everything below the first
- *  screen loads only when it is scrolled to. */
+/** One photograph. Two WebP widths and its own height reserved up front.
+ *  Loads eagerly: the wall is 13 photos, small enough that deferring the
+ *  ones below the fold bought nothing at first paint but made every one of
+ *  them pop in behind its blur placeholder as he scrolled, on his instruction
+ *  (2026-08-27): "I don't think lazy loading is good for this page." */
 function Photo({
-  card, style, eager,
+  card, style,
 }: {
   card: Extract<Card, { kind: 'image' }>
   style: React.CSSProperties
-  eager: boolean
 }) {
   const img = card.photo ? wallImage(card.photo) : undefined
   if (!img) {
     return (
       <figure className="bcard b-image" style={style}>
-        <img src={card.src} alt={card.caption ?? ''} loading="lazy" decoding="async" />
+        <img src={card.src} alt={card.caption ?? ''} decoding="async" />
         {card.caption && <figcaption className="mono">{card.caption}</figcaption>}
       </figure>
     )
@@ -215,8 +216,6 @@ function Photo({
         width={img.w}
         height={img.h}
         alt={card.caption ?? ''}
-        loading={eager ? 'eager' : 'lazy'}
-        fetchPriority={eager ? 'high' : 'auto'}
         decoding="async"
       />
       {card.caption && <figcaption className="mono">{card.caption}</figcaption>}
@@ -225,10 +224,6 @@ function Photo({
 }
 
 export function BoardPage() {
-  /* Only what is on screen at the top loads straight away. Everything after
-     the second photograph waits for the scroll, which is what keeps a wall of
-     photographs off the first paint. */
-  let shown = 0
   const wall = useMasonry(WALL.length)
   return (
     <div className="board-page">
@@ -240,8 +235,7 @@ export function BoardPage() {
           const tilt = TILT[i % TILT.length]
           const style = { ['--tilt' as string]: `${tilt}deg` } as React.CSSProperties
           if (c.kind === 'image') {
-            shown += 1
-            return <Photo card={c} style={style} eager={shown <= 2} key={i} />
+            return <Photo card={c} style={style} key={i} />
           }
           if (c.kind === 'quote') {
             return (

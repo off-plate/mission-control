@@ -186,12 +186,11 @@ function useNavReveal() {
 }
 
 function PageNav({
-  tabs, page, setPage, attention,
+  tabs, page, setPage,
 }: {
   tabs: { id: PageId; label: string }[]
   page: PageId
   setPage: (p: PageId) => void
-  attention: boolean
 }) {
   const activeRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
@@ -203,7 +202,7 @@ function PageNav({
         <button
           key={t.id}
           ref={page === t.id ? activeRef : undefined}
-          className={`nav-tab${t.id === 'today' && attention ? ' attention' : ''}`}
+          className="nav-tab"
           aria-current={page === t.id ? 'page' : undefined}
           onClick={() => setPage(t.id)}
         >
@@ -508,7 +507,7 @@ export default function App() {
           into the room. Keeping them lit alongside a running countdown was
           the exact "still just a dashboard page" problem the room exists to
           not be. */}
-      {page !== 'zone' && <PageNav tabs={tabs} page={page} setPage={setPage} attention={exceptions.length > 0} />}
+      {page !== 'zone' && <PageNav tabs={tabs} page={page} setPage={setPage} />}
       </div>
 
       {isReadOnly() && (

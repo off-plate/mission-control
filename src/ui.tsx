@@ -264,11 +264,14 @@ export function SpaceMark({ space, always }: { space?: SpaceId; always?: boolean
 }
 
 export function Band({
-  title, metrics, actions,
+  title, metrics, actions, leading,
 }: {
   title: string
   metrics?: { v: string; k: string; tone?: 'pos' | 'urgent' | 'info' }[]
   actions?: React.ReactNode
+  /** Sits before the metrics, not after them: for a control the page wants
+   *  read first in that corner, ahead of the number it sits beside. */
+  leading?: React.ReactNode
 }) {
   return (
     <div className="band">
@@ -276,6 +279,7 @@ export function Band({
         <h1>{title}</h1>
       </div>
       <div className="band-status">
+        {leading}
         {metrics?.map((m) => (
           <div className="band-metric" key={m.k}>
             <span className={`v${m.tone ? ' val-' + m.tone : ''}`}>{m.v}</span>

@@ -1340,6 +1340,10 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
     return (
       <div className="habit-row is-count">
         <div className="habit-row-top">
+          {/* Every row's name starts at the same indent, caret or none, so the
+              foot row under it -- padded to clear a caret's width -- lines up
+              with the name instead of drifting right of it. */}
+          <span className="run-caret is-blank" aria-hidden="true" />
           <SpaceMark space={h.space} />
           <span className="habit-name">{h.name}{qualify && <span className="habit-qual">{qualify}</span>}</span>
           <span className="habit-count mono">
@@ -1382,6 +1386,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
     return (
       <div className="habit-row is-count">
         <div className="habit-row-top">
+          <span className="run-caret is-blank" aria-hidden="true" />
           <SpaceMark space={h.space} />
           <span className="habit-name">{h.name}{qualify && <span className="habit-qual">{qualify}</span>}</span>
           <span className="habit-count mono">
@@ -1416,6 +1421,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
     return (
       <div className="habit-row is-measured">
         <div className="habit-row-top">
+          <span className="run-caret is-blank" aria-hidden="true" />
           <SpaceMark space={h.space} />
           <span className="habit-name">{h.name}{qualify && <span className="habit-qual">{qualify}</span>}</span>
           <span className="habit-count mono">
@@ -1459,6 +1465,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
     return (
       <div className="habit-row is-quit">
         <div className="habit-row-top">
+          <span className="run-caret is-blank" aria-hidden="true" />
           <SpaceMark space={h.space} />
           <span className="habit-name">{h.name}{qualify && <span className="habit-qual">{qualify}</span>}</span>
           <span className="habit-count mono">{clean}<span className="habit-freq">{clean === 1 ? 'day' : 'days'} clean</span></span>
@@ -1518,9 +1525,13 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
         {window === 7 && (
           <span className="habit-count mono">
             {/* A monthly habit is kept in a MONTH. Reading the week's cache
-                let the word say "not yet" over a filled month. */}
+                let the word say "not yet" over a filled month. "kept" on its
+                own read as a stray word next to the weekday legend built for
+                the daily rows; that legend is gone for these now, and "done"
+                pairs with the period-cell strip's own "months"/"weeks" label
+                below it instead of repeating it. */}
             {periodic
-              ? (periodCells[periodCells.length - 1]?.kept ? 'kept' : 'not yet')
+              ? (periodCells[periodCells.length - 1]?.kept ? 'done' : 'not yet')
               : `${kept}/${target}`}
             {timesToday > 1 && <span className="habit-freq">{timesToday}x today</span>}
           </span>
@@ -1922,9 +1933,15 @@ export function HabitsPage() {
   const looseList = spaceHabits
     .filter((h) => !h.folderId && !folderHabitIds.has(h.id))
     .sort((a, b) => rank(a) - rank(b))
+  /* A thing you are quitting reads nothing like a thing you are building --
+     no target, no streak, a slip button instead of a week of dots. Mixed
+     into one list they broke its rhythm; split, each list is one shape. */
+  const looseBuild = looseList.filter((h) => h.kind !== 'break')
+  const looseQuit = looseList.filter((h) => h.kind === 'break')
   const cols: { id: string; label: string; folder?: Routine; list: HabitDef[] }[] = [
     ...folderGroups,
-    ...(looseList.length ? [{ id: 'loose', label: 'On their own', list: looseList }] : []),
+    ...(looseBuild.length ? [{ id: 'loose', label: 'On their own', list: looseBuild }] : []),
+    ...(looseQuit.length ? [{ id: 'quitting', label: 'Quitting', list: looseQuit }] : []),
   ]
   /* How far through a folder today is. Optional habits never hold it open, so
      a folder of five with one optional reads 4/4 when the four that matter are
@@ -1944,6 +1961,12 @@ export function HabitsPage() {
     next.has(id) ? next.delete(id) : next.add(id)
     return next
   })
+  /* One click to shut every routine and see only the ones he reopens by hand,
+     for a workspace with enough of them that scrolling past open ones to find
+     the one he wants is the actual problem. Any open -> shut them all first;
+     only once they are all already shut does the same control open them. */
+  const allShut = folderGroups.length > 0 && folderGroups.every((g) => shutFolders.has(g.id))
+  const toggleAllFolders = () => setShutFolders(allShut ? new Set() : new Set(folderGroups.map((g) => g.id)))
   /* Today's routine strip hands a routine over here the same way it hands a
      task to Plan: open its folder if he had shut it, scroll to it, flash it,
      then forget it -- clicking "Before work routine" on Today should not
@@ -1965,6 +1988,11 @@ export function HabitsPage() {
     <div className="page">
       <Band
         title="Habits"
+        leading={folderGroups.length > 0 && (
+          <button className="btn btn-ghost band-collapseall" onClick={toggleAllFolders}>
+            {allShut ? 'Expand all' : 'Collapse all'}
+          </button>
+        )}
         metrics={[{ v: `${doneToday}/${dueCount}`, k: 'done today', tone: (doneToday > 0 ? 'pos' : 'info') as 'pos' | 'info' }]}
         actions={
           <>
@@ -2020,8 +2048,13 @@ export function HabitsPage() {
               </div>
             )}
             {/* The weekday letters ride the same grid as the rows, so they can
-                never drift out of line with the dots underneath them. */}
-            {days === 7 && !(c.folder && shutFolders.has(c.id)) && (
+                never drift out of line with the dots underneath them. A
+                weekly/monthly routine has no Mondays either -- the legend
+                printed seven weekday letters over a folder of period-cell
+                rows regardless, which is where the unclickable-looking grid
+                on "Invoicing routine" came from. */}
+            {days === 7 && !(c.folder && shutFolders.has(c.id))
+              && !(c.folder && (c.list[0]?.frequency === 'weekly' || c.list[0]?.frequency === 'monthly')) && (
               <div className="habit-row is-legend" aria-hidden="true">
                 <span className="habit-row-top" />
                 <span className="habit-days">

@@ -1503,7 +1503,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
             aria-expanded={open}
             aria-label={open ? `Close ${h.name}` : `Open ${h.name}`}
             onClick={() => setOpen((v) => !v)}
-          >{open ? '˅' : '›'}</button>
+          ><Icon.ChevronRight size={12} /></button>
         ) : <span className="run-caret is-blank" aria-hidden="true" />}
         <SpaceMark space={h.space} />
         <span className="habit-name">{h.name}{qualify && <span className="habit-qual">{qualify}</span>}</span>
@@ -1985,7 +1985,7 @@ export function HabitsPage() {
                 aria-expanded={!shutFolders.has(c.id)}
                 onClick={() => toggleFolder(c.id)}
               >
-                <span className="folder-caret" aria-hidden="true">{shutFolders.has(c.id) ? '\u203A' : '\u02C5'}</span>
+                <Icon.ChevronRight size={12} className="folder-caret" />
                 <span className="folder-name">{c.label}</span>
                 <span className="folder-when microcap">{habitFrequencyLabel({ frequency: c.list[0]?.frequency } as HabitDef)}</span>
                 {(() => {

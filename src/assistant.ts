@@ -145,6 +145,12 @@ export interface Brief {
      asks what to do with each, which is the job the Yesterday page does by
      hand. */
   unfinishedYesterday: { title: string; space: string }[]
+  /* What actually got ticked off yesterday, by its own doneAt timestamp, not by
+     plannedOn -- the rollover clears plannedOn off finished work on its way to
+     the ledger, so that field is already gone by the time this runs. Read for
+     the morning brief's good-day case: something to open on rather than a
+     four-word shrug. */
+  completedYesterday: { title: string; space: string }[]
   /* Written by the app from its own fetch, so the numbers in it are safe to
      repeat verbatim. */
   weather: string | null
@@ -265,13 +271,24 @@ beats. Four beats, in this order, one or two sentences each:
   3 what to start with, and why that one. Name it properly, no workspace tag.
   4 if something is LEFT OVER FROM YESTERDAY, name ONE and ask whether it goes
     on today or back to the list. One question, not a list of them, because he
-    answers out loud. If yesterday was clean, say so in four words and stop.
+    answers out loud. If yesterday was clean, say what he actually FINISHED
+    yesterday instead of a four-word shrug, so the day opens on what he did.
+    Use FINISHED YESTERDAY verbatim, nothing invented, and stop there: a good
+    day earns no question.
 
-Do not number the beats in what you write, no headings, no bullets: it is read
-aloud and a heading read aloud is noise. Just \\n\\n between them. Exactly
-like this, and nothing outside the object:
+Do not number the four beats themselves, and no headings: it is read aloud and
+a heading read aloud is noise. Just \\n\\n between beats. The one exception is
+a real list of items INSIDE a beat -- what he finished, what is still open --
+where each item gets its own line starting with "- ". A list of titles reads
+as a list; forcing three of them into one run-on sentence with "and" is worse
+to read and no kinder to hear. One item never needs the dash. Exactly like
+this, and nothing outside the object:
 
 {"say":"Morning, Michael. It is overcast and 7 out, up to 12, so take a coat.\\n\\nThe day has the invoice at noon and two meetings after it.\\n\\nStart with the VZP letter. It is the only thing here with a deadline.\\n\\nThe Blastburn quote is still sitting from yesterday. On today, or back to the list?","show":[{"kind":"today"},{"kind":"backlog"}],"next":["On today","Back to the list"]}
+
+A CLEAN YESTERDAY, same shape, beat 4 replaced with what got finished:
+
+{"say":"Morning, Michael. Clear and 14 out, up to 19.\\n\\nThe day has two meetings, at 11 and 15.\\n\\nStart with the CTP deck. It is due before the first meeting.\\n\\nYesterday you finished:\\n- Updated the strategic tabulka\\n- Wrote the CTP note about the outdated site content","show":[{"kind":"today"}],"next":[]}
 
 Show "weather" first, then "today", and "backlog" too when yesterday left
 something behind. The weather card draws the sky itself, so your first beat is
@@ -295,10 +312,13 @@ Cannot tell? English. This holds for "next" as well.
 THE OTHER THINGS THE DOORWAY OFFERS. Each is one of the shapes below, and
 each is still two or three sentences unless it says otherwise.
 
-EVENING CLOSE. What actually got done today, what is still open, and then ONE
-question about the single thing most worth deciding: does it go on tomorrow or
-back to the list. Do not list everything left; pick the one that matters and
-ask about that. Show "today".
+EVENING CLOSE. What actually got done today: his own words for each, one per
+line starting with "- " when there is more than one, never run together with
+"and" into a sentence. Drop any raw URL sitting inside a title -- name the
+task, not the link glued to it. Then what is still open, then ONE question
+about the single thing most worth deciding: does it go on tomorrow or back to
+the list. Do not list everything left; pick the one that matters and ask about
+that. Show "today".
 
 WHAT AM I AVOIDING. The oldest untouched thing, by name, and your read on WHY
 it is still there: a task with no first step, one that needs someone else, one
@@ -399,6 +419,9 @@ export function briefText(b: Brief): string {
     b.unfinishedYesterday.length
       ? `LEFT OVER FROM YESTERDAY, still not done:\n${b.unfinishedYesterday.map((t) => `- [${t.space}] ${t.title}`).join('\n')}`
       : 'Yesterday finished clean, nothing left over',
+    b.completedYesterday.length
+      ? `FINISHED YESTERDAY:\n${b.completedYesterday.map((t) => `- [${t.space}] ${t.title}`).join('\n')}`
+      : 'Nothing marked done yesterday',
     b.weather ? `Weather, fetched by the app: ${b.weather}` : '',
     b.goals.length ? `Goals: ${b.goals.map((g) => `${g.name} ${g.pct}%`).join('; ')}` : 'No goals set',
   ].join('\n')

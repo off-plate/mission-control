@@ -126,7 +126,6 @@ const NAV: { id: PageId; label: string }[] = [
   { id: 'goals', label: 'Goals' },
   { id: 'board', label: 'Why’s' },
   { id: 'apps', label: 'Apps' },
-  { id: 'assistant', label: 'Assistant' },
 ]
 
 /* Calendar used to be Big Time only, on the argument that it reads somebody
@@ -385,6 +384,20 @@ export default function App() {
           {/* Status before actions, and not in the Zone: that room is one thing
               at a time and a sync line is not the thing. */}
           {page !== 'zone' && <SyncPip />}
+          {/* First in the group and next to the Zone, on his instruction: these
+              two are where he actually starts something, so they carry the
+              same vibrant weight and stand apart from the plain ghost buttons
+              beside them. */}
+          <button
+            className={`btn btn-primary${page === 'assistant' ? ' is-on' : ''}`}
+            onClick={() => setPage('assistant')}
+            aria-pressed={page === 'assistant'}
+            title="Assistant"
+            aria-label="Assistant"
+          >
+            <Icon.Waveform size={18} />
+            <span className="btn-label">Assistant</span>
+          </button>
           {/* The one thing running, full screen. Filled with the accent so it
               reads as the button that starts something, not a place he browses.
               It is a toggle: pressing it again puts him back on the page he
@@ -397,7 +410,7 @@ export default function App() {
             title={page === 'zone' ? 'Leave the Zone' : 'The Zone'}
             aria-label={page === 'zone' ? 'Leave the Zone' : 'The Zone'}
           >
-            <Icon.Star size={18} />
+            <Icon.Focus size={18} />
             <span className="btn-label">The Zone</span>
           </button>
           {/* The helmet. Its eyes light when the mode is on, so the icon IS the
@@ -429,7 +442,9 @@ export default function App() {
             <Icon.Rewind size={18} />
             <span className="btn-label">Yesterday</span>
           </button>
-          {page !== 'zone' && <PhonePages tabs={tabs} page={page} setPage={setPage} />}
+          {/* Assistant left this list the same way the Zone did: it is its own
+              button now, not a tab, so the picker has nothing to say about it. */}
+          {page !== 'zone' && page !== 'assistant' && <PhonePages tabs={tabs} page={page} setPage={setPage} />}
           <button
             className={`btn btn-ghost${page === 'settings' ? ' is-on' : ''}${needsSignIn ? ' has-dot' : ''}`}
             onClick={() => setPage('settings')}

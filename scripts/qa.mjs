@@ -191,14 +191,16 @@ await step('focus: timer start writes state', async () => {
 await step('the menu is seven tabs, and what left it is reachable from the header', async () => {
   /* Five since Routines became a folder inside Habits (his instruction,
      2026-08-11); six since Apps joined after Why's (2026-08-23); seven since
-     the Assistant got a page of its own (2026-08-25). The retired addresses
-     still have to resolve, which is asserted below with the other retired
-     ones. */
+     the Assistant got a page of its own (2026-08-25); six again since the
+     Assistant left the tab row for its own header button, first and next to
+     the Zone; seven again the same day (2026-08-27) since Calendar stopped
+     being Big Time's and became a tab in every workspace -- two changes
+     landing the same day, cancelling out in the count but not in the
+     content. The retired addresses still have to resolve, which is asserted
+     below with the other retired ones. */
   await fresh('today')
   const tabs = await page.locator('.nav-tab').allInnerTexts()
-  /* Eight since 2026-08-27: Calendar stopped being Big Time's and became a tab
-     in every workspace. */
-  if (tabs.length !== 8) throw new Error(`${tabs.length} tabs: ${tabs.join(', ')}`)
+  if (tabs.length !== 7) throw new Error(`${tabs.length} tabs: ${tabs.join(', ')}`)
   if (!tabs.some((t) => /apps/i.test(t))) throw new Error('Apps is not a tab')
   if (tabs.some((t) => /routines/i.test(t))) throw new Error('Routines is still a tab')
   /* Calendar IS in this list now, in Personal like everywhere else. The
@@ -209,7 +211,7 @@ await step('the menu is seven tabs, and what left it is reachable from the heade
   }
   /* My Mind left the header for the Apps shelf on his instruction. The apps
      test below owns it now, and Achievements left the header entirely. */
-  for (const name of ['Note']) {
+  for (const name of ['Note', 'Assistant']) {
     if (!(await page.getByRole('button', { name, exact: true }).count()) && !(await page.getByRole('link', { name }).count())) {
       throw new Error(`no ${name} in the header`)
     }

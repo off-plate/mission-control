@@ -125,6 +125,11 @@ export const Square = make(<><rect x="4" y="4" width="16" height="16"/></>, 16, 
    data and this means audio, so they stay two icons. Ink 6-18 across, 5-19
    down, so k = 19.7/14 like the other tall glyphs. */
 export const Waveform = make(<><line x1="6" y1="9" x2="6" y2="15"/><line x1="10" y1="5" x2="10" y2="19"/><line x1="14" y1="7" x2="14" y2="17"/><line x1="18" y1="10" x2="18" y2="14"/></>, 16, { k: 1.4071, x: -4.886, y: -4.886 })
+/* Not from Hicon: the set has no target/reticle glyph, so this one is hand
+   drawn to the same rule as the rest -- centred, same fit as the other
+   circle-based icons (Clock, Compass), stroke only, no fill. Two rings read
+   as a target without needing a third element to say what it means. */
+export const Focus = make(<><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></>, 16, { k: 1.0944, x: -1.133, y: -1.133 })
 /* ---- weather ----
    Drawn to match this set rather than pulled from a weather pack: same 24 box,
    same stroke, same measured fit, so they sit beside Mic and Waveform without

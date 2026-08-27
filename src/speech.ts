@@ -20,6 +20,11 @@ const TTS_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models'
 /* Charon reads level and unhurried. The alternative presets are showier and a
    daily brief is not a performance. */
 const TTS_VOICE = 'Charon'
+/* A brief he can read in two seconds is not worth a fifteen-second wait for a
+   nicer voice. Past this, the device voice takes over and whatever Gemini
+   eventually returns is thrown away for this click -- it is still cached, so
+   a replay right after is instant and full quality. */
+const GEMINI_TIMEOUT_MS = 6000
 /* How it should sound, not what it should say. The model is being asked to
    perform his own words here, never to write any. */
 const DIRECTION =
@@ -209,7 +214,8 @@ async function fetchGemini(text: string, key: string): Promise<Blob | null> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: `${DIRECTION}\n\n${text}` }] }],
+        systemInstruction: { parts: [{ text: DIRECTION }] },
+        contents: [{ parts: [{ text }] }],
         generationConfig: {
           responseModalities: ['AUDIO'],
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: TTS_VOICE } } },
@@ -331,6 +337,15 @@ async function speakOnDevice(id: string, text: string): Promise<void> {
   }
 }
 
+/* Bullets earn their keep on screen -- a finished-tasks list reads as a list,
+   not a run-on sentence -- but a "-" at the start of a line is not a word,
+   and both engines will say "dash" if it is left in. Stripped here, once, on
+   the way to either voice, so the visible text and the spoken text can differ
+   without a second copy of the brief to keep in sync. */
+function speakable(text: string): string {
+  return text.split('\n').map((line) => line.replace(/^\s*-\s+/, '')).join('\n')
+}
+
 /** The button's whole behaviour: play, pause, resume, or switch to a new answer. */
 export async function toggle(id: string, text: string): Promise<void> {
   // Same answer, already talking: pause it.
@@ -347,14 +362,22 @@ export async function toggle(id: string, text: string): Promise<void> {
   }
 
   stop()
-  const clean = text.trim()
+  const clean = speakable(text.trim())
   if (!clean) return
 
   const key = getTtsKey()
   if (!key) { await speakOnDevice(id, clean); return }
 
   set(id, 'loading')
-  const blob = await fetchGemini(clean, key)
+  /* Raced against a clock, not just awaited. A slow answer used to hold the
+     button on "Loading" for fifteen, twenty seconds -- Gemini's real time for
+     even two short sentences -- which reads as broken, not slow. Losing the
+     race does not cancel the fetch: it keeps running and still populates the
+     cache, so pressing Play again right after this is instant. */
+  const blob = await Promise.race([
+    fetchGemini(clean, key),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), GEMINI_TIMEOUT_MS)),
+  ])
   /* He clicked something else while this was in flight. Whatever we just
      fetched is no longer wanted, and playing it would talk over the new one. */
   if (current !== id) return

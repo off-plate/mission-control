@@ -74,6 +74,8 @@ function useBrief(): Brief {
     const day = localDateKey()
     const tm = new Date(); tm.setDate(tm.getDate() + 1)
     const tomorrowKey = localDateKey(tm)
+    const yd = new Date(); yd.setDate(yd.getDate() - 1)
+    const yesterdayKey = localDateKey(yd)
     /* No inView. The briefing is his whole life, because he asked the whole
        life, and a filtered briefing makes the model confident about a day it
        has only seen a third of. */
@@ -127,6 +129,12 @@ function useBrief(): Brief {
         ? tasks.filter((t) => new Set(plan.returnedIds ?? []).has(t.id) && !t.done && t.list !== 'today')
         : []
       ).slice(0, 12).map((t) => ({ title: t.title, space: label(t.space) })),
+      /* By doneAt, not plannedOn: the rollover clears plannedOn off finished
+         work on its way to the ledger (see roll.ts), so that field is already
+         gone by the time this runs. doneAt is a real timestamp and survives. */
+      completedYesterday: tasks
+        .filter((t) => t.done && t.doneAt && localDateKey(new Date(t.doneAt)) === yesterdayKey)
+        .slice(0, 12).map((t) => ({ title: t.title, space: label(t.space) })),
       weather: sky,
       goals: goals.filter((g) => !g.closed).slice(0, 4).map((g) => {
         const tf = (g.timeframe ?? 'quarter') as GoalTf

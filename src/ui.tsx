@@ -202,7 +202,7 @@ export function Dropdown({ label, children, className = '', trigger }: {
   }, [open])
 
   return (
-    <span className={`kebab-wrap ${className}`} ref={ref}>
+    <span className={`kebab-wrap ${className}${open ? ' is-open' : ''}`} ref={ref}>
       {trigger ? trigger({ onClick: () => setOpen((v) => !v), open }) : (
         /* Drawn, not typed. The midline-ellipsis character sits wherever the
             font puts it, which is why it never looked centred in a circle. */

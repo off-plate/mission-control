@@ -6182,11 +6182,20 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    menu opened near the top of a list could lose to a chip two rows down.
    His report -- "Break it down" sliced through by a later row's estimate
    chip. The menu's own z-index of 40 never got a say; it only outranks
-   siblings inside ITS row's stacking context, not another row's. Raising
-   just the trigger (not the whole row) past that shared layer is enough:
-   nothing else in a row needs to escape it. */
-.today-task > .kebab-wrap, .todo-row > .kebab-wrap, .rowitem > .kebab-wrap,
-.ptask > .kebab-wrap, .habit-row-top > .kebab-wrap, .nt-row > .kebab-wrap {
+   siblings inside ITS row's stacking context, not another row's.
+
+   First pass raised the trigger's z-index unconditionally, on every row,
+   open or shut. That fixed the chip/text overlap but left the small "..."
+   trigger itself still doing it: every row's trigger was now tied at the
+   SAME z-index as the open one, so a later row's shut trigger still won
+   the DOM-order tiebreak and its "..." icon kept peeking through the open
+   menu -- his second report, smaller but the same bug one layer up.
+
+   Only the OPEN trigger needs to escape the shared layer; a shut one is
+   just a small icon with nothing riding past its own row's bounds, so it
+   can stay at the ambient z-index 1 with everyone else. */
+.today-task > .kebab-wrap.is-open, .todo-row > .kebab-wrap.is-open, .rowitem > .kebab-wrap.is-open,
+.ptask > .kebab-wrap.is-open, .habit-row-top > .kebab-wrap.is-open, .nt-row > .kebab-wrap.is-open {
   z-index: 2;
 }
 

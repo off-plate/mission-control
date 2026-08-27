@@ -26,6 +26,7 @@ import { useFirstMove } from './ui'
 import { fmtDuration, fmtNum, fmtSigned, goalPace, goalPeriodKey, goalPeriodRange, isEstimated, localDateKey, taskMinutes, type GoalTf } from './util'
 import { SLOTS, dueOn, goalCurrent, habitsDueToday, isTimeFed, type Task } from './types'
 import { WeekStrip } from './dayface'
+import { SPACE_LABELS } from './mock'
 
 /* A pasted spreadsheet link is an address, not a title. Left raw it took three
    lines of the Next card and pushed the card off the right of the room. The
@@ -185,6 +186,12 @@ export function TodayRoom() {
     .map((hb) => ({ hb, done: !!hb.days[todayIndex] }))
     .sort((a, b) => Number(a.done) - Number(b.done))
     .slice(0, 10)
+  /* Three habits can share a name across spaces ("Focus for 30 minutes" kept
+     once each for Work, Off-Plate and Corner). The Habits page and the
+     dashboard widget already say which one this is when a name collides;
+     this room did not, so three identical rows sat here unlabelled. */
+  const habitNameCount = new Map<string, number>()
+  for (const { hb } of habitRows) habitNameCount.set(hb.name, (habitNameCount.get(hb.name) ?? 0) + 1)
   const routinesDone = routineRows.filter((r) => r.done === r.total).length
 
   /* Goals, on the same accurate read GoalsPage uses: a habit-linked goal counts
@@ -374,7 +381,10 @@ export function TodayRoom() {
                   aria-label={hb.name}
                   onClick={() => toggleHabitDay(hb.id, todayIndex)}
                 />
-                <span className="tr-t">{hb.name}</span>
+                <span className="tr-t">
+                  {hb.name}
+                  {(habitNameCount.get(hb.name) ?? 0) > 1 && <span className="tr-qual">{SPACE_LABELS[hb.space]}</span>}
+                </span>
               </div>
             ))}
           </div>

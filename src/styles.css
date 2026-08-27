@@ -3488,7 +3488,10 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .weekday.is-today { border-color: var(--ink); }
 .weekday.is-empty { background: transparent; }
 .weekday-head { display: flex; align-items: baseline; gap: var(--s2); min-width: 0; }
-.weekday-name { font-size: var(--text-xs); color: var(--muted); text-transform: lowercase; }
+/* Uppercase, on his instruction 2026-08-27. The tracking comes with it: every
+   other micro-label in the app is uppercase WITH letter-spacing, and uppercase
+   at --text-xs with none set reads as a cramped block. */
+.weekday-name { font-size: var(--text-xs); color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
 .weekday-num { font-size: var(--text-base); font-weight: 700; margin-left: auto; font-variant-numeric: tabular-nums; }
 .weekday.is-today .weekday-name { color: var(--ink); font-weight: 600; }
 .weekday-bar { display: block; height: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }

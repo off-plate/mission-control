@@ -2878,23 +2878,18 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .section-count { margin-left: auto; font-size: var(--text-xs); color: var(--faint); }
 .habit-line > * { min-width: 0; }
 /* Very wide: two lists side by side rather than one list stretched across a
-   screen where the strip and the name sit half a metre apart. */
-/* Very wide: two columns, packed by height rather than laid out in rows. A
-   grid put the tall group in row one and left the third group waiting under a
-   thousand pixels of nothing. */
+   screen where the strip and the name sit half a metre apart. Routines on
+   the left, everything loose on the right -- fixed by what a section IS,
+   not by height. A CSS multi-column flow balanced the two columns by their
+   TOTAL height instead, so opening one routine changed the balance and
+   could shift a section further down the page into the other column
+   outright: "Monthly review" jumping sides from opening "Morning
+   Preparation" above it, his report. Two real columns, each its own block
+   flow, can only ever move a section within its own side. */
 @media (min-width: 1800px) {
-  .habit-cols { columns: 2; column-gap: var(--s5); }
-  .habit-section { break-inside: avoid; }
+  .habit-cols { display: flex; align-items: flex-start; gap: var(--s5); }
+  .habit-col { flex: 1 1 0; min-width: 0; }
   .habit-section + .habit-section { margin-top: var(--s5); }
-}
-/* Two columns stayed two all the way to 3440px, so each one kept growing
-   with the screen well past where a habit row needs the room -- the row's
-   own name/days grid has a fr-sized name column, so a too-wide column reads
-   as a gap between the habit description and where the day checkboxes
-   start. A third column at 2600px+ keeps individual columns closer to the
-   width the row was actually designed for. */
-@media (min-width: 2600px) {
-  .habit-cols { columns: 3; }
 }
 /* A weekday-only habit does not expect the weekend. */
 .daydot.off-day { opacity: 0.4; }

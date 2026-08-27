@@ -1938,8 +1938,15 @@ export function HabitsPage() {
      into one list they broke its rhythm; split, each list is one shape. */
   const looseBuild = looseList.filter((h) => h.kind !== 'break')
   const looseQuit = looseList.filter((h) => h.kind === 'break')
-  const cols: { id: string; label: string; folder?: Routine; list: HabitDef[] }[] = [
-    ...folderGroups,
+  /* Routines on the left, loose habits on the right, and neither side moves
+     when the other changes height. A single CSS multi-column flow balanced
+     both by total height, so opening one routine could shift every section
+     after it into the other column -- "Monthly review" jumping sides just
+     from opening "Morning Preparation" above it. Two real, independent
+     columns fix that: each one is its own block flow, so a routine's open
+     state can only ever move things within its own column. */
+  const routineCols: { id: string; label: string; folder?: Routine; list: HabitDef[] }[] = folderGroups
+  const looseCols: { id: string; label: string; folder?: Routine; list: HabitDef[] }[] = [
     ...(looseBuild.length ? [{ id: 'loose', label: 'On their own', list: looseBuild }] : []),
     ...(looseQuit.length ? [{ id: 'quitting', label: 'Quitting', list: looseQuit }] : []),
   ]
@@ -2014,8 +2021,24 @@ export function HabitsPage() {
           The weekday letters are printed once at the top of the list instead of
           once per row, which is where 112 of them came from. */}
       <div className="habit-cols">
-      {cols.map((c) => (
-        <section className="habit-section" key={c.id}>
+        <div className="habit-col">{routineCols.map(renderCol)}</div>
+        <div className="habit-col">{looseCols.map(renderCol)}</div>
+      </div>
+      {routineCols.length === 0 && looseCols.length === 0 && <div className="empty">No habits in this space yet. Add one from the button above.</div>}
+
+      {adding && <HabitSheet onClose={() => setAdding(false)} />}
+      {editHabit && <HabitSheet habit={editHabit} drivenBy={drivenBy.get(editHabit.id)} onClose={() => setEditHabit(null)} />}
+      {goalFor && <GoalSheet presetHabitId={goalFor} thenGoToGoals onClose={() => setGoalFor(null)} />}
+    </div>
+  )
+
+  /* One render for either side of the split: a routine's folder card and a
+     loose list's plain header differ only in what c.folder holds. Declared a
+     function (not const), so its hoisting lets the JSX above call it before
+     this point in the file reads as its definition. */
+  function renderCol(c: { id: string; label: string; folder?: Routine; list: HabitDef[] }) {
+    return (
+      <section className="habit-section" key={c.id}>
           <div className={`panel habit-list${days === 7 ? ' w7' : ''}${flashFolderId === c.id ? ' flash' : ''}`} data-routine-id={c.folder ? c.id : undefined}>
             {c.folder ? (
               /* A folder: the routine's name, how far through today it is, and
@@ -2089,16 +2112,8 @@ export function HabitsPage() {
             ))}
           </div>
         </section>
-      ))}
-      </div>
-      {cols.length === 0 && <div className="empty">No habits in this space yet. Add one from the button above.</div>}
-
-
-      {adding && <HabitSheet onClose={() => setAdding(false)} />}
-      {editHabit && <HabitSheet habit={editHabit} drivenBy={drivenBy.get(editHabit.id)} onClose={() => setEditHabit(null)} />}
-      {goalFor && <GoalSheet presetHabitId={goalFor} thenGoToGoals onClose={() => setGoalFor(null)} />}
-    </div>
-  )
+    )
+  }
 }
 
 /* ---------------- ROUTINES ---------------- */

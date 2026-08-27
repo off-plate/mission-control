@@ -775,6 +775,10 @@ export function NotesPage() {
      decided by which workspace he happens to be standing in. */
   const [openFolder, setOpenFolder] = useState<string>(ALL)
   const [openId, setOpenId] = useState<string | null>(null)
+  /* A note the handoff below just opened, briefly. Same flash-then-fade the
+     habit folders use, so a note landing in a list of many is easy to pick
+     out without changing what he is looking at. */
+  const [flashNoteId, setFlashNoteId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [tag, setTag] = useState<string | null>(null)
   const [searching, setSearching] = useState(false)
@@ -878,21 +882,42 @@ export function NotesPage() {
      openFolder (and by search, if a query or tag was active). A note the
      meeting prompt hands over after it has been ticked done lives in Done
      now, not wherever openFolder still points, so it was never in shown and
-     got silently swapped back out the instant it was swapped in. Point
-     openFolder at wherever the note actually is, and drop any search that
-     would exclude it the same way. */
+     got silently swapped back out the instant it was swapped in.
+
+     But jumping folders is only warranted when the current view genuinely
+     cannot show the note -- his report, 2026-08-27: standing in All notes,
+     which already shows everything not done, opening a note with no folder
+     of its own was narrowing him into "No folder" for that one space
+     instead of leaving him where he already was. So the folder only moves
+     when shown does not already contain the note; either way a brief flash
+     marks which row it is, the same language the habit folders use. */
   useEffect(() => {
     if (!noteToOpen) return
     const n = notes.find((x) => x.id === noteToOpen)
-    if (n) {
+    if (n && !shown.some((x) => x.id === n.id)) {
       setOpenFolder(n.done ? DONE : (n.folderId ?? spaceFolderId(n.space)))
       setQuery('')
       setTag(null)
     }
     setOpenId(noteToOpen)
     setFresh(noteToOpen)
+    setFlashNoteId(noteToOpen)
     openNote(null)
-  }, [noteToOpen, openNote, notes])
+    const el = document.querySelector(`[data-note-id="${noteToOpen}"]`)
+    el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [noteToOpen, openNote, notes, shown])
+
+  /* The auto-clear, kept in its own effect keyed only on flashNoteId: typing
+     into the note (or anything else that changes notes/shown) was re-running
+     the effect above, which tore down its setTimeout on every keystroke and
+     never got to rearm one once noteToOpen had already been cleared to null
+     -- the flash never faded, it just stuck. */
+  useEffect(() => {
+    if (!flashNoteId) return
+    const id = flashNoteId
+    const timer = window.setTimeout(() => setFlashNoteId((cur) => (cur === id ? null : cur)), 2600)
+    return () => window.clearTimeout(timer)
+  }, [flashNoteId])
 
   const open = notes.find((n) => n.id === openId) ?? null
 
@@ -1138,8 +1163,9 @@ export function NotesPage() {
                       <Icon.Check size={13} strokeWidth={3.4} />
                     </button>
                     <button
-                      className={`nt-row has-tick${n.id === openId ? ' on' : ''}${n.done ? ' is-done' : ''}`}
+                      className={`nt-row has-tick${n.id === openId ? ' on' : ''}${n.done ? ' is-done' : ''}${n.id === flashNoteId ? ' flash' : ''}`}
                       aria-current={n.id === openId ? 'true' : undefined}
+                      data-note-id={n.id}
                       onClick={() => { setOpenId(n.id); if (phone) window.scrollTo({ top: 0 }) }}
                     >
                       {/* No dot. His words: "in the notes it should not have

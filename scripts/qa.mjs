@@ -2820,6 +2820,32 @@ await step('timeline: the wheel is a read-out, and it shows its own arithmetic',
   if (!/friction/i.test(said)) throw new Error('the maths never mentions what the wheel loses')
 })
 
+/* HE REPORTED THE REEL DISAPPEARING ON A RELOAD, and I could not reproduce it,
+   which is exactly the case that earns a permanent test rather than a look. It
+   drives the real control, reloads the browser, and asserts the link is in the
+   blob AND back on the screen. */
+await step('timeline: a reel he set is still there after a reload', async () => {
+  await fresh('timeline')
+  await page.locator('.tl-giveup').click(); await page.waitForTimeout(500)
+  const link = 'https://example.com/reel-under-test.mp4'
+  page.once('dialog', (d) => d.accept(link))
+  await page.locator('.tl-setshot').click(); await page.waitForTimeout(600)
+  const stored = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).twoLives, KEY)
+  if (JSON.stringify(stored ?? {}).indexOf(link) < 0) throw new Error(`the blob holds ${JSON.stringify(stored)}`)
+  await page.reload(); await page.waitForTimeout(900)
+  const after = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).twoLives, KEY)
+  if (JSON.stringify(after ?? {}).indexOf(link) < 0) throw new Error('the reel did not survive the reload')
+  await page.locator('.tl-giveup').click(); await page.waitForTimeout(500)
+  const label = await page.locator('.tl-setshot').first().innerText()
+  if (!/change/i.test(label)) throw new Error(`the control reads "${label}", so the page did not read the link back`)
+  /* A link that cannot load has to SAY so. Rendering nothing is what makes a
+     bad link and a lost one look identical. */
+  if (!(await page.locator('.tl-reelempty.is-bad').count())) throw new Error('a dead link renders as an empty screen')
+  const said = await page.locator('.tl-reelempty.is-bad').innerText()
+  if (!said.includes(link)) throw new Error('the failure does not show which link failed')
+  await page.keyboard.press('Escape'); await page.waitForTimeout(300)
+})
+
 await step('timeline: giving up takes the whole window, and Escape gives it back', async () => {
   await fresh('timeline')
   await page.locator('.tl-giveup').click(); await page.waitForTimeout(600)
@@ -2828,18 +2854,30 @@ await step('timeline: giving up takes the whole window, and Escape gives it back
     return { t: r.top, l: r.left, w: r.width, h: r.height, vw: innerWidth, vh: innerHeight }
   })
   if (box.t > 0 || box.l > 0 || box.w < box.vw || box.h < box.vh) throw new Error(`two lives is ${box.w}x${box.h} at ${box.l},${box.t}`)
-  /* HE SUPPLIES THE FOOTAGE, so there has to be a way in on every pane, and no
-     empty frame pretending to be one. */
-  if (await page.locator('.tl-setshot').count() !== 2) throw new Error('no way to set footage on both panes')
-  if (await page.locator('.tl-shot').count()) throw new Error('the empty photo frames are back')
+  /* HIS LAYOUT: one reel down the left half, the two futures stacked on the
+     right, the life he keeps on top. ONE slot per stop, and no footage on the
+     right at all. */
+  const shape = await page.evaluate(() => {
+    const r = (e) => e.getBoundingClientRect()
+    const reel = r(document.querySelector('.tl-reel'))
+    const push = r(document.querySelector('.tl-side.is-push')), drift = r(document.querySelector('.tl-side.is-drift'))
+    return { reelLeft: reel.left, reelW: reel.width, reelH: reel.height, vw: innerWidth, vh: innerHeight,
+      pushTop: push.top, driftTop: drift.top, sides: document.querySelectorAll('.tl-side').length,
+      pills: [...document.querySelectorAll('.tl-side .tl-pill')].map((e) => e.textContent) }
+  })
+  if (shape.reelLeft > 1 || Math.abs(shape.reelW - shape.vw / 2) > 2) throw new Error(`the reel is ${shape.reelW}px at ${shape.reelLeft}`)
+  if (Math.abs(shape.reelH - shape.vh) > 2) throw new Error(`the reel is ${shape.reelH} tall in a ${shape.vh} window`)
+  if (shape.sides !== 2 || shape.pushTop >= shape.driftTop) throw new Error('the two futures are not stacked, keep on top')
+  if (!/anyway/i.test(shape.pills[0]) || !/skip/i.test(shape.pills[1])) throw new Error(`the rows read ${shape.pills.join(' then ')}`)
+  if (await page.locator('.tl-setshot').count() !== 1) throw new Error('there is not exactly one reel slot')
+  if (await page.locator('.tl-shot, .tl-pane').count()) throw new Error('the old two-pane footage frames are back')
   const clash = await page.evaluate(() => {
     const r = (e) => e.getBoundingClientRect()
     const hit = (a, z) => !(a.right <= z.left || a.left >= z.right || a.bottom <= z.top || a.top >= z.bottom)
     const foot = r(document.querySelector('.tl-livesfoot')), close = r(document.querySelector('.tl-close'))
-    return [...document.querySelectorAll('.tl-said')].some((e) => hit(r(e), foot))
-      || [...document.querySelectorAll('.tl-setshot')].some((e) => hit(r(e), close))
+    return [...document.querySelectorAll('.tl-said, .tl-setshot')].some((e) => hit(r(e), foot) || hit(r(e), close))
   })
-  if (clash) throw new Error('the copy or the footage button runs under the chrome')
+  if (clash) throw new Error('the copy or the reel control runs under the chrome')
   await page.keyboard.press('Escape'); await page.waitForTimeout(400)
   if (await page.locator('.tl-lives').count()) throw new Error('Escape did not close it')
   if (await page.evaluate(() => getComputedStyle(document.body).overflow) === 'hidden') throw new Error('the page is still locked')

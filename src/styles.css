@@ -6936,76 +6936,71 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .tl-after b { color: var(--tl-hot); font-family: var(--font-display); font-weight: 800; }
 .tl-card.is-empty .tl-after { color: var(--tl-no); font-weight: 700; }
 
-/* ---- two lives: the footage IS the screen ---- */
+/* ---- two lives: one reel on the left, two futures on the right ---- */
 .tl-lives { position: fixed; inset: 0; z-index: 300; background: #08090A; color: var(--tl-ink);
-  display: grid; grid-template-rows: 1fr; overflow: hidden;
-  animation: tlrise var(--t-med) var(--ease) both; }
+  overflow: hidden; animation: tlrise var(--t-med) var(--ease) both; }
 @keyframes tlrise { from { opacity: 0; transform: scale(0.99); } to { opacity: 1; transform: none; } }
 
-.tl-panes { position: relative; display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
-/* NO FRAME AROUND THE FOOTAGE. An empty pane is the sentence, set large, and
-   nothing else: a grey rectangle waiting for media was the loudest thing here
-   and said nothing at all. */
-/* The bottom padding clears the footer, which floats over the panes rather
-   than taking a row from them. Without it the last line of the sentence ran
-   under the scrubber. */
-.tl-pane { position: relative; overflow: hidden; display: flex; flex-direction: column;
-  justify-content: flex-end; isolation: isolate;
-  padding: clamp(22px, 3.4vw, 54px);
-  padding-bottom: clamp(112px, 13vh, 168px); }
-.tl-pane.is-drift { background: radial-gradient(120% 90% at 20% 10%, #131315, #0A0A0B 70%); }
-.tl-pane.is-push { background: radial-gradient(120% 90% at 80% 10%, #191F0D, #0B0D06 70%); }
-.tl-media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
-  border: 0; z-index: -2; }
-/* The sentence has to hold over anything he pastes, so the pane keeps a scrim
-   whose weight is fixed rather than hoping the footage is dark. */
-.tl-pane.has-media::after { content: ''; position: absolute; inset: 0; z-index: -1;
-  background: linear-gradient(180deg, rgba(8, 9, 10, 0.55) 0%, rgba(8, 9, 10, 0.2) 42%, rgba(8, 9, 10, 0.86) 100%); }
-.tl-pane.is-push.has-media::after {
-  background: linear-gradient(180deg, rgba(8, 12, 4, 0.5) 0%, rgba(10, 14, 5, 0.16) 42%, rgba(6, 9, 3, 0.86) 100%); }
-
-/* The pill and the way to set footage sit together on the LEFT. On the right
-   the second pane's button landed under the close cross. */
-.tl-panehead { position: absolute; top: clamp(22px, 3.4vw, 54px); left: clamp(22px, 3.4vw, 54px);
-  right: 72px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; z-index: 2; }
-.tl-pill { padding: 9px 15px; border-radius: 999px; font: 700 10px/1 var(--font-body);
-  letter-spacing: 0.2em; text-transform: uppercase;
-  background: #17181A; color: var(--tl-dim); box-shadow: inset 0 0 0 1px rgba(242, 240, 234, 0.09); }
-.tl-pane.is-push .tl-pill { background: #1B2109; color: var(--tl-hot); box-shadow: inset 0 0 0 1px rgba(198, 242, 74, 0.28); }
-.tl-setshot { border: 0; cursor: pointer; padding: 9px 15px; border-radius: 999px;
+/* HALF AND HALF. The reel is a portrait clip in a landscape half, so it is
+   cropped rather than letterboxed: black bars either side of a talking head
+   are the opposite of what this screen is for. */
+.tl-stage { position: absolute; inset: 0; display: grid; grid-template-columns: 1fr 1fr; }
+.tl-reel { position: relative; overflow: hidden; background: #0B0B0C; display: grid; place-items: center; }
+.tl-media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border: 0; }
+.tl-reelempty { position: relative; z-index: 2; max-width: 34ch; padding: 30px; text-align: center; }
+.tl-reelempty p { margin: 10px 0 0; font: 500 13.5px/1.5 var(--font-body); color: var(--tl-faint); }
+.tl-reelempty .tl-l { color: var(--tl-dim); }
+.tl-reelempty.is-bad .tl-l { color: var(--tl-no); }
+.tl-url { word-break: break-all; font-family: var(--font-body); font-size: 12px !important;
+  color: var(--tl-dim) !important; }
+/* TOP LEFT, not bottom. The footer runs the width of the window and its
+   scrubber starts bottom left, which swallowed the click on this. */
+.tl-reelbar { position: absolute; left: 22px; top: 20px; z-index: 3; display: flex; gap: 8px; flex-wrap: wrap; }
+.tl-setshot { border: 0; cursor: pointer; padding: 10px 16px; border-radius: 999px;
   font: 700 10px/1 var(--font-body); letter-spacing: 0.16em; text-transform: uppercase;
-  background: #17181A; box-shadow: inset 0 0 0 1px rgba(242, 240, 234, 0.09); color: var(--tl-faint);
-  opacity: 0; transition: opacity var(--a-enter), color var(--a-enter), background var(--a-enter); }
-.tl-pane:hover .tl-setshot, .tl-setshot:focus-visible { opacity: 1; }
-/* Until there is anything to change, the way in cannot be hidden behind a
-   hover: on a pane with no footage it stands there and asks. */
-.tl-pane:not(.has-media) .tl-setshot { opacity: 1; background: #1E1F22; color: var(--tl-dim); }
+  background: #17181A; box-shadow: inset 0 0 0 1px rgba(242, 240, 234, 0.09); color: var(--tl-dim);
+  transition: background var(--a-enter), color var(--a-enter); }
 .tl-setshot:hover { background: var(--tl-hot); color: #08090A; }
+.tl-setshot.is-hot { background: var(--tl-hot); color: #08090A; }
 
-.tl-said { margin: 0; max-width: 20ch; font-family: var(--font-display); font-weight: 800;
-  letter-spacing: -0.03em; line-height: 1.06; font-size: clamp(24px, 3.6vw, 58px); }
-.tl-pane.is-drift .tl-said { color: var(--tl-dim); }
-.tl-pane.is-push .tl-said { color: var(--tl-ink); }
+/* THE RIGHT HALF IS TWO ROWS, top the life he keeps, bottom the one he lets
+   go. No footage here on his instruction: one thing to fill in per stop. */
+.tl-sides { position: relative; display: grid; grid-template-rows: 1fr 1fr; }
+.tl-side { position: relative; display: flex; flex-direction: column; justify-content: center;
+  gap: 18px; padding: clamp(24px, 3.2vw, 52px); padding-bottom: clamp(24px, 3.2vw, 52px); }
+.tl-side.is-push { background: radial-gradient(120% 130% at 80% 0%, #1A210C, #0C0F06 72%); }
+.tl-side.is-drift { background: radial-gradient(120% 130% at 80% 100%, #141416, #0A0A0B 72%);
+  border-top: 1px solid rgba(242, 240, 234, 0.07); }
+.tl-sides > .tl-side:last-of-type { padding-bottom: clamp(96px, 12vh, 150px); }
+.tl-pill { align-self: flex-start; padding: 9px 15px; border-radius: 999px;
+  font: 700 10px/1 var(--font-body); letter-spacing: 0.2em; text-transform: uppercase;
+  background: #17181A; color: var(--tl-dim); box-shadow: inset 0 0 0 1px rgba(242, 240, 234, 0.09); }
+.tl-side.is-push .tl-pill { background: #1B2109; color: var(--tl-hot);
+  box-shadow: inset 0 0 0 1px rgba(198, 242, 74, 0.28); }
+.tl-said { margin: 0; max-width: 18ch; font-family: var(--font-display); font-weight: 800;
+  letter-spacing: -0.03em; line-height: 1.08; font-size: clamp(21px, 2.5vw, 42px); }
+.tl-side.is-drift .tl-said { color: var(--tl-dim); }
+.tl-side.is-push .tl-said { color: var(--tl-ink); }
 
-.tl-gap { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center;
-  background: #08090A; border-radius: 999px; padding: 16px 20px; pointer-events: none; z-index: 3;
-  box-shadow: 0 0 0 1px rgba(242, 240, 234, 0.08); }
-.tl-gap b { display: block; font-family: var(--font-display); font-weight: 800; font-size: 26px;
+/* On the seam between the two futures, which is what the number measures. */
+.tl-gap { position: absolute; left: clamp(24px, 3.2vw, 52px); top: 50%; transform: translateY(-50%);
+  text-align: center; background: #08090A; border-radius: 999px; padding: 14px 18px;
+  pointer-events: none; z-index: 3; box-shadow: 0 0 0 1px rgba(242, 240, 234, 0.1); }
+.tl-gap b { display: block; font-family: var(--font-display); font-weight: 800; font-size: 24px;
   letter-spacing: -0.04em; color: var(--tl-hot); font-variant-numeric: tabular-nums; }
 
-/* The chrome floats over the footage rather than stealing a row from it. */
-.tl-livestop { position: absolute; top: 0; left: 0; right: 0; z-index: 4;
-  display: flex; align-items: center; gap: var(--s3); padding: 20px 22px; pointer-events: none; }
-.tl-livestop .tl-l { display: none; }
-.tl-close { margin-left: auto; width: 40px; height: 40px; border: 0; border-radius: 50%; cursor: pointer;
-  pointer-events: auto; background: #17181A; color: var(--tl-dim); font-size: 14px;
+.tl-close { position: absolute; top: 20px; right: 22px; z-index: 5;
+  width: 40px; height: 40px; border: 0; border-radius: 50%; cursor: pointer;
+  background: #17181A; color: var(--tl-dim); font-size: 14px;
   box-shadow: inset 0 0 0 1px rgba(242, 240, 234, 0.09); }
 .tl-close:hover { background: rgba(242, 240, 234, 0.14); color: var(--tl-ink); }
 
 .tl-livesfoot { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
   display: flex; align-items: center; gap: clamp(14px, 2.4vw, 34px); flex-wrap: wrap;
   padding: 18px clamp(18px, 3vw, 36px) 22px;
-  background: linear-gradient(180deg, transparent, rgba(8, 9, 10, 0.92) 55%); }
+  /* A SOLID BAR, not a fade. The reel underneath can be anything, and a white
+     frame turned the fade into an unreadable strip of grey on white. */
+  background: #08090A; box-shadow: 0 -1px 0 rgba(242, 240, 234, 0.08); }
 .tl-scrub { display: flex; align-items: center; gap: clamp(14px, 3.2vw, 44px); }
 .tl-scrub button { border: 0; background: none; cursor: pointer; display: flex; flex-direction: column;
   align-items: center; gap: 8px; padding: 6px 2px; }
@@ -7014,7 +7009,7 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .tl-scrub button.past .tl-knob { background: var(--tl-dim); }
 .tl-scrub button.on .tl-knob { background: var(--tl-hot); transform: scale(1.5); }
 .tl-scrub button.on .tl-l { color: var(--tl-hot); }
-.tl-livesfoot p { margin: 0; font: 500 12.5px/1.5 var(--font-body); color: var(--tl-dim); max-width: 46ch; }
+.tl-livesfoot p { margin: 0; font: 500 12.5px/1.5 var(--font-body); color: var(--tl-dim); max-width: 44ch; }
 .tl-back { margin-left: auto; border: 0; cursor: pointer; border-radius: 999px; padding: 15px 26px;
   background: var(--tl-hot); color: #08090A; font: 800 14px/1 var(--font-body); }
 
@@ -7030,8 +7025,13 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 @media (max-width: 700px) {
   .tl-rung { grid-template-columns: 76px repeat(2, minmax(0, 1fr)); }
   .tl-bd { grid-template-columns: 1fr; }
-  .tl-panes { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
-  .tl-said { font-size: clamp(19px, 5.4vw, 30px); max-width: 24ch; }
+  /* The reel keeps the top half of a phone and the two futures share the
+     bottom: side by side at this width neither would be readable. */
+  .tl-stage { grid-template-columns: 1fr; grid-template-rows: 42vh 1fr; }
+  .tl-said { font-size: clamp(18px, 5vw, 26px); max-width: 24ch; }
+  .tl-side { gap: 12px; }
+  .tl-gap { left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 10px 14px; }
+  .tl-gap b { font-size: 19px; }
   .tl-livesfoot { flex-direction: column; align-items: flex-start; gap: 12px; }
   .tl-back { margin-left: 0; }
 }

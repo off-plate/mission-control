@@ -535,15 +535,16 @@ function DayCard({ p, zoom, money }: {
 /* -------------------------------------------------------------- two lives */
 /* THE SCREEN HE OPENS WHEN HE WANTS TO STOP.
 
-   Over the whole window, and the footage is the screen rather than a frame
-   inside it: each life is a full-bleed layer with the sentence over it. Two
-   grey rectangles waiting for media were the loudest thing on the page and said
-   nothing, so an empty pane is now the SENTENCE, set large, and nothing else.
+   His layout, 2026-08-27: one portrait reel down the left half, WITH SOUND,
+   and the right half split into two rows. Top is the life where he does it
+   anyway, bottom is the life where he skips. THE FOOTAGE IS ON THE LEFT ONLY,
+   so there is one thing to fill in per stop rather than two, and the right side
+   is nothing but the two futures in words.
 
-   HE SUPPLIES THE FOOTAGE. Paste a link per pane per stop: an mp4 or webm plays
-   muted and looped, an image holds still, a YouTube or Vimeo link is embedded.
-   The links live in the synced blob, so what he set on the phone is there on
-   the laptop. Nothing is bundled and nothing is invented. */
+   SOUND IS ON. A Goggins clip with the audio muted is a screensaver. A real
+   file is asked to play unmuted first and only falls back to muted if the
+   browser refuses, with a button that turns it back on; an embed carries
+   mute=0 and the same button remounts it. */
 const STOPS = [
   { at: 'Today', gap: 0,
     drift: 'The same man, twice. Nothing has happened yet.',
@@ -562,50 +563,91 @@ const STOPS = [
     push: 'Debt free, and you never had to explain it again.' },
 ]
 
-const YT = /(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{6,})/
+const YT = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{6,})/
 const VIMEO = /vimeo\.com\/(?:video\/)?(\d+)/
 const VIDEO_FILE = /\.(mp4|webm|mov|m4v)(\?|#|$)/i
 
-/** What a pasted link is, decided once so the pane does not guess twice. */
+/** What a pasted link is, decided once so the reel does not guess twice. */
 function mediaKind(url: string): 'video' | 'embed' | 'image' | null {
   if (!url) return null
   if (VIDEO_FILE.test(url)) return 'video'
   if (YT.test(url) || VIMEO.test(url)) return 'embed'
   return 'image'
 }
-function embedSrc(url: string): string {
+function embedSrc(url: string, sound: boolean): string {
   const y = url.match(YT)
-  if (y) return `https://www.youtube-nocookie.com/embed/${y[1]}?autoplay=1&mute=1&loop=1&controls=0&playsinline=1&playlist=${y[1]}`
+  if (y) return `https://www.youtube-nocookie.com/embed/${y[1]}?autoplay=1&mute=${sound ? 0 : 1}&loop=1&controls=0&playsinline=1&rel=0&playlist=${y[1]}`
   const v = url.match(VIMEO)
-  if (v) return `https://player.vimeo.com/video/${v[1]}?autoplay=1&muted=1&loop=1&background=1`
+  if (v) return `https://player.vimeo.com/video/${v[1]}?autoplay=1&muted=${sound ? 0 : 1}&loop=1`
   return url
 }
 
-function Pane({ side, label, said, url, onSet }: {
-  side: 'drift' | 'push'; label: string; said: string; url: string
-  onSet: (url: string) => void
-}) {
+/** The reel: one portrait clip down the left, and every way it can fail said
+ *  out loud. A link that will not load used to render as an empty pane, which
+ *  is indistinguishable from a link that was never saved. */
+function Reel({ url, onSet }: { url: string; onSet: (u: string) => void }) {
+  const vid = useRef<HTMLVideoElement>(null)
+  const [sound, setSound] = useState(true)
+  const [failed, setFailed] = useState(false)
   const kind = mediaKind(url)
+
+  useEffect(() => { setFailed(false); setSound(true) }, [url])
+  useEffect(() => {
+    const v = vid.current
+    if (!v || kind !== 'video') return
+    v.muted = false
+    /* Unmuted autoplay is refused unless the browser trusts this origin. Rather
+       than guess, ask for sound and take muted playback over no playback. */
+    v.play().catch(() => { v.muted = true; setSound(false); v.play().catch(() => setFailed(true)) })
+  }, [url, kind])
+
   const ask = () => {
     const next = window.prompt(
-      `Link for the “${label}” side.\n\nAn .mp4 or .webm plays muted and looped. A YouTube or Vimeo link is embedded. Anything else is treated as a still.\nLeave it empty to clear.`,
+      'Link for the reel.\n\nAn .mp4 or .webm plays looped with sound. A YouTube, Shorts or Vimeo link is embedded. Anything else is treated as a still.\nLeave it empty to clear.',
       url,
     )
     if (next !== null) onSet(next)
   }
+  const hear = () => {
+    const v = vid.current
+    if (v) { v.muted = false; void v.play() }
+    setSound(true)
+  }
+
   return (
-    <section className={`tl-pane is-${side}${kind ? ' has-media' : ''}`}>
-      {kind === 'video' && <video className="tl-media" src={url} autoPlay muted loop playsInline />}
-      {kind === 'embed' && <iframe className="tl-media" src={embedSrc(url)} title={label} allow="autoplay; encrypted-media" frameBorder="0" />}
-      {kind === 'image' && <img className="tl-media" src={url} alt="" />}
-      <div className="tl-panehead">
-        <span className="tl-pill">{label}</span>
-        <button className="tl-setshot" onClick={ask} title={url || 'No footage yet'}>
-          {kind ? 'Change footage' : 'Add footage'}
-        </button>
+    <div className={`tl-reel${kind && !failed ? ' has-media' : ''}`}>
+      {!failed && kind === 'video' && (
+        <video ref={vid} className="tl-media" src={url} autoPlay loop playsInline onError={() => setFailed(true)} />
+      )}
+      {!failed && kind === 'embed' && (
+        <iframe key={String(sound)} className="tl-media" src={embedSrc(url, sound)} title="Reel"
+          allow="autoplay; encrypted-media" frameBorder="0" />
+      )}
+      {!failed && kind === 'image' && (
+        <img className="tl-media" src={url} alt="" onError={() => setFailed(true)} />
+      )}
+
+      {!kind && (
+        <div className="tl-reelempty">
+          <p className="tl-l">The reel</p>
+          <p>Paste a link and it plays here, full height, with sound. A file, a YouTube video, a Short, or a Vimeo link.</p>
+        </div>
+      )}
+      {failed && (
+        <div className="tl-reelempty is-bad">
+          <p className="tl-l">That link would not load</p>
+          <p className="tl-url">{url}</p>
+          <p>It is still saved. A direct .mp4 or .webm, or a YouTube or Vimeo link, is what plays here.</p>
+        </div>
+      )}
+
+      <div className="tl-reelbar">
+        <button className="tl-setshot" onClick={ask} title={url || 'Nothing set'}>{kind ? 'Change reel' : 'Add reel'}</button>
+        {kind && kind !== 'image' && !failed && !sound && (
+          <button className="tl-setshot is-hot" onClick={hear}>Sound on</button>
+        )}
       </div>
-      <p className="tl-said">{said}</p>
-    </section>
+    </div>
   )
 }
 
@@ -613,6 +655,10 @@ function TwoLives({ onBack, now, chain }: { onBack: () => void; now: number; cha
   const { twoLives, setTwoLives } = useStore()
   const [i, setI] = useState(0)
   const s = STOPS[i]
+  /* The reel used to be two slots, one per side. Anything set under the old
+     keys still opens rather than reading as empty. */
+  const url = twoLives?.[`${i}`] ?? twoLives?.[`${i}-push`] ?? twoLives?.[`${i}-drift`] ?? ''
+
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onBack()
@@ -628,18 +674,22 @@ function TwoLives({ onBack, now, chain }: { onBack: () => void; now: number; cha
 
   return (
     <div className="tl-lives" role="dialog" aria-modal="true" aria-label="Two lives">
-      <div className="tl-panes">
-        <Pane side="drift" label="If you skip" said={s.drift}
-          url={twoLives?.[`${i}-drift`] ?? ''} onSet={(u) => setTwoLives(`${i}-drift`, u)} />
-        <Pane side="push" label="If you do it anyway" said={s.push}
-          url={twoLives?.[`${i}-push`] ?? ''} onSet={(u) => setTwoLives(`${i}-push`, u)} />
-        <div className="tl-gap"><b>{s.gap}</b><span className="tl-l">days apart</span></div>
+      <div className="tl-stage">
+        <Reel url={url} onSet={(u) => setTwoLives(`${i}`, u)} />
+        <div className="tl-sides">
+          <section className="tl-side is-push">
+            <span className="tl-pill">If you do it anyway</span>
+            <p className="tl-said">{s.push}</p>
+          </section>
+          <section className="tl-side is-drift">
+            <span className="tl-pill">If you skip it</span>
+            <p className="tl-said">{s.drift}</p>
+          </section>
+          <div className="tl-gap"><b>{s.gap}</b><span className="tl-l">days apart</span></div>
+        </div>
       </div>
 
-      <header className="tl-livestop">
-        <span className="tl-l">If you stop now</span>
-        <button className="tl-close" onClick={onBack} aria-label="Close">✕</button>
-      </header>
+      <button className="tl-close" onClick={onBack} aria-label="Close">✕</button>
 
       <footer className="tl-livesfoot">
         <div className="tl-scrub">

@@ -100,6 +100,23 @@ On the note as `conflict`, which the app already renders, and as
 `Name (conflict 2026-08-25 14-30).md` beside the file. A conflict sibling is
 never read back in, so resolving one by deleting it is final.
 
+## One run at a time, and it says when it stops
+
+`~/.mc-obsidian/run.lock`. launchd fires every 120 seconds and does not care
+whether the last run finished, and two runs at once broke this badly on
+2026-08-25: a Supabase refresh token rotates, so the second run refreshes with a
+token the first already spent and is told it is not signed in, while both write
+`session.json` and `ledger.json` at the same time and tear them. It failed every
+two minutes for two days, and the only thing that said so was a log file he has
+no reason to open. He found out because his notes stopped moving.
+
+So: one run at a time, locks older than ten minutes are treated as abandoned so
+a killed run cannot wedge it forever, `session.json` and `ledger.json` are
+written through a temp file and renamed, and after three consecutive failures it
+raises a macOS notification and then stops nagging. A file that will not read is
+skipped with its name in the log instead of aborting the whole run, because one
+sulking iCloud file used to stop every other note from syncing.
+
 ## What stops it eating a folder
 
 `MAX_VANISHED = 3`. iCloud evicting the folder looks exactly like him deleting

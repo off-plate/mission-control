@@ -871,13 +871,28 @@ export function NotesPage() {
   }, [phone, shown, openId])
 
   /* A note another page asked for, taken once and cleared, so coming back to
-     Notes later does not reopen something he has since closed. */
+     Notes later does not reopen something he has since closed.
+
+     Setting openId alone was not enough: the very next effect resets openId
+     to shown[0] whenever it is not IN shown, and shown is filtered by
+     openFolder (and by search, if a query or tag was active). A note the
+     meeting prompt hands over after it has been ticked done lives in Done
+     now, not wherever openFolder still points, so it was never in shown and
+     got silently swapped back out the instant it was swapped in. Point
+     openFolder at wherever the note actually is, and drop any search that
+     would exclude it the same way. */
   useEffect(() => {
     if (!noteToOpen) return
+    const n = notes.find((x) => x.id === noteToOpen)
+    if (n) {
+      setOpenFolder(n.done ? DONE : (n.folderId ?? spaceFolderId(n.space)))
+      setQuery('')
+      setTag(null)
+    }
     setOpenId(noteToOpen)
     setFresh(noteToOpen)
     openNote(null)
-  }, [noteToOpen, openNote])
+  }, [noteToOpen, openNote, notes])
 
   const open = notes.find((n) => n.id === openId) ?? null
 

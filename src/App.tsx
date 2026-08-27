@@ -14,6 +14,7 @@ import { Dropdown } from './ui'
 import { CalendarPage } from './calendarpage'
 import { AssistantPage } from './assistantpage'
 import { Helmet } from './helmet'
+import { TimelinePage } from './timeline'
 import * as Icon from './icons'
 import { FocusPage } from './focus'
 import { ZonePage, useZoneDepth } from './zone'
@@ -125,6 +126,7 @@ const NAV: { id: PageId; label: string }[] = [
      still resolves so a bookmark or an old link lands on Habits rather than on
      nothing: see the redirect where the pages are chosen. */
   { id: 'goals', label: 'Goals' },
+  { id: 'timeline', label: 'Timeline' },
   { id: 'board', label: 'Why’s' },
   /* Apps left the menu on his instruction (2026-08-27): seven icons and an
      otherwise empty page did not earn a tab next to Habits and Goals. It is
@@ -516,6 +518,7 @@ export default function App() {
         {page === 'plan' && <PlanPage />}
         {(page === 'habits' || page === 'routines') && <HabitsPage />}
         {page === 'goals' && <GoalsPage />}
+        {page === 'timeline' && <TimelinePage />}
         {page === 'focus' && <FocusPage />}
         {page === 'board' && <BoardPage />}
         {page === 'apps' && <AppsPage />}

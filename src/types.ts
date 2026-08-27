@@ -38,6 +38,8 @@ export type PageId =
   | 'zone'
   /** The work calendar, read from the feed. Big Time only: see NAV. */
   | 'calendar'
+  /** Measured history above a now line, and the same rate carried forward. */
+  | 'timeline'
   /** The assistant: asks about the day, and shows real cards rather than
    *  writing numbers into a sentence. */
   | 'assistant'

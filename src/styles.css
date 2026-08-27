@@ -6649,3 +6649,98 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 @media (prefers-reduced-motion: reduce) {
   .topstick > .nav, .topstick.is-navopen > .nav { transition: none; }
 }
+
+/* ==========================================================================
+   THE TIMELINE
+   A spine with measured history above the now line and the same rate carried
+   forward below it. Scoped to `.tline`; nothing here leaks.
+
+   The reveal is a transform and an opacity on the same duration and the same
+   curve. Splitting them across two durations is what made the nav row read as
+   a click, and the lesson is cheap to reapply here.
+   ========================================================================== */
+.tline { --tl-gut: 92px; }
+.tline .tl-band { display: flex; align-items: center; gap: var(--s4); flex-wrap: wrap; margin-bottom: var(--s4); }
+.tline .tl-band h1 { font-family: var(--font-display); font-weight: 800; font-size: var(--text-2xl); letter-spacing: -0.025em; margin: 0; }
+.tline .tl-l { font: 600 10.5px/1 var(--font-body); letter-spacing: 0.17em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.tline .tl-n { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.035em; font-variant-numeric: tabular-nums; line-height: .9; }
+.tline .tl-rate { margin-left: auto; display: flex; align-items: baseline; gap: var(--s2); }
+.tline .tl-rate .tl-n { font-size: 22px; }
+
+.tline .tl-zoom { display: inline-flex; background: var(--a-sunk); border-radius: 999px; padding: 5px; gap: 3px; }
+.tline .tl-zoom button {
+  border: 0; background: none; cursor: pointer; border-radius: 999px;
+  font: 700 var(--a-f-chip)/1 var(--font-body); color: var(--a-muted); padding: 10px 16px; min-height: 40px;
+  transition: background var(--a-enter), color var(--a-enter);
+}
+.tline .tl-zoom button:hover:not(.on) { background: var(--a-accent-wash); color: var(--a-accent-text); }
+.tline .tl-zoom button.on { background: var(--a-accent); color: var(--a-ink); font-weight: 800; }
+
+.tline .tl-gap { margin: 0 0 var(--s5); font-size: var(--text-base); color: var(--muted); max-width: 74ch; }
+.tline .tl-gap b { font-family: var(--font-display); font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
+.tline .tl-delta { display: block; margin-top: 4px; color: var(--accent-text); font-weight: 600; }
+.tline .tl-empty { color: var(--muted); max-width: 60ch; }
+
+/* ---- the spine ---- */
+.tline .tl-wrap { position: relative; padding-bottom: var(--s6); }
+.tline .tl-spine {
+  position: absolute; left: 50%; top: 0; bottom: var(--s6); width: 2px; transform: translateX(-1px);
+  background: var(--hairline-strong);
+}
+.tline .tl-row {
+  position: relative; display: grid; grid-template-columns: 1fr var(--tl-gut) 1fr; align-items: center;
+  margin-bottom: var(--s4); opacity: 0; transform: translateY(22px);
+  transition: opacity 320ms var(--ease), transform 320ms var(--ease);
+}
+.tline .tl-row.in { opacity: 1; transform: none; }
+.tline .tl-card {
+  background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-md);
+  padding: var(--s3) var(--s4); max-width: 430px;
+}
+.tline .tl-row.left .tl-card { grid-column: 1; margin-left: auto; text-align: right; }
+.tline .tl-row.right .tl-card { grid-column: 3; margin-right: auto; }
+.tline .tl-card h2 { font-family: var(--font-display); font-weight: 800; font-size: var(--text-base); letter-spacing: -0.02em; margin: 0 0 var(--s2); }
+.tline .tl-meter { height: 6px; border-radius: 3px; background: var(--hairline); overflow: hidden; }
+.tline .tl-meter i { display: block; height: 100%; background: var(--a-accent); border-radius: 3px; }
+.tline .tl-fig { display: flex; align-items: baseline; gap: 7px; margin: var(--s2) 0 0; }
+.tline .tl-row.left .tl-fig { justify-content: flex-end; }
+.tline .tl-fig .tl-n { font-size: 26px; }
+.tline .tl-of { font-size: var(--text-xs); color: var(--muted); }
+.tline .tl-extra { display: flex; gap: var(--s2); margin: var(--s2) 0 0; font-size: var(--text-xs); color: var(--muted); flex-wrap: wrap; }
+.tline .tl-row.left .tl-extra { justify-content: flex-end; }
+
+/* A future row is drawn as a forecast, never as a record. */
+.tline .tl-row.future .tl-card { background: none; border-style: dashed; }
+.tline .tl-row.future .tl-card h2 { color: var(--muted); }
+.tline .tl-row.future .tl-meter i { background: color-mix(in srgb, var(--a-accent) 55%, transparent); }
+
+.tline .tl-node {
+  grid-column: 2; justify-self: center; width: 13px; height: 13px; border-radius: 50%;
+  background: var(--bg); border: 2px solid var(--hairline-strong); z-index: 2;
+}
+.tline .tl-row.full .tl-node { background: var(--ink); border-color: var(--ink); }
+.tline .tl-row.empty .tl-node { border-style: dashed; }
+.tline .tl-row.future .tl-node { border-color: var(--hairline); }
+
+.tline .tl-now { display: grid; grid-template-columns: 1fr var(--tl-gut) 1fr; margin: var(--s4) 0 var(--s5); }
+.tline .tl-nowdot {
+  grid-column: 2; justify-self: center; z-index: 3;
+  background: var(--a-accent); color: var(--a-ink); border-radius: 999px;
+  font: 800 10.5px/1 var(--font-body); letter-spacing: 0.14em; padding: 9px 13px;
+}
+.tline .tl-foot { margin: var(--s5) 0 0; text-align: center; color: var(--faint); font-size: var(--text-xs); }
+
+/* Phone: one column, the spine moves to the left margin. */
+@media (max-width: 700px) {
+  .tline { --tl-gut: 40px; }
+  .tline .tl-spine { left: 20px; }
+  .tline .tl-row, .tline .tl-now { grid-template-columns: var(--tl-gut) 1fr; }
+  .tline .tl-row.left .tl-card, .tline .tl-row.right .tl-card {
+    grid-column: 2; margin: 0; text-align: left; max-width: none;
+  }
+  .tline .tl-row.left .tl-fig, .tline .tl-row.left .tl-extra { justify-content: flex-start; }
+  .tline .tl-node, .tline .tl-nowdot { grid-column: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tline .tl-row { transition: none; opacity: 1; transform: none; }
+}

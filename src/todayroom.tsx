@@ -243,7 +243,13 @@ export function TodayRoom() {
         </div>
         <div className="tr-card tr-card--hover tr-tile is-hot">
           <p className="tr-l">Phase</p>
-          <div className="tr-n tr-phase">{phase.label}</div>
+          <div className="tr-n tr-phase">
+            {/* AFTERNOON is the only label that ever needs a second row, and
+                a plain wrap breaks it wherever the pixel happens to run out
+                (AFTERN / OON). A <wbr/> at the real word seam breaks it the
+                way a person would: AFTER / NOON. */}
+            {phase.label === 'Afternoon' ? <>After<wbr />noon</> : phase.label}
+          </div>
         </div>
       </section>
 

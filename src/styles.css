@@ -5205,12 +5205,13 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .tr-tile .tr-n { font-size: clamp(30px, 3.8vw, 62px); }
 .troom .tr-mo { font-family: var(--font-body); font-size: 0.29em; font-weight: 600; color: var(--t-dim); letter-spacing: 0.04em; margin-left: 0.14em; vertical-align: 0.42em; }
 .tr-tile.is-hot .tr-n { color: var(--t-hot-text); }
-/* "AFTERNOON" is the longest word this tile ever holds, not "MORNING" as this
-   comment used to claim -- that miscount is why the tile clipped it. It shrinks
-   to fit instead of wrapping. */
+/* AFTERNOON is the longest word this tile ever holds and does not fit on one
+   line at a size worth reading. It wraps onto two rows instead of shrinking
+   small enough to stay on one -- Michael's call, 2026-08-27: bring the size
+   back, wrap it instead. */
 .tr-phase {
-  font-size: clamp(13px, 1.3vw, 22px) !important; text-transform: uppercase;
-  white-space: nowrap; overflow: hidden; text-overflow: clip;
+  font-size: clamp(15px, 1.9vw, 30px) !important; text-transform: uppercase;
+  white-space: normal; line-height: 1.05;
 }
 .troom .tr-bar { height: 7px; border-radius: 4px; background: color-mix(in srgb, var(--t-ink) 11%, transparent); overflow: hidden; }
 .troom .tr-bar i { display: block; height: 100%; background: var(--t-hot); border-radius: 4px; }
@@ -5420,12 +5421,13 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .tr-tile .tr-n { font-size: clamp(30px, 3.8vw, 62px); }
 .troom .tr-mo { font-family: var(--font-body); font-size: 0.29em; font-weight: 600; color: var(--t-dim); letter-spacing: 0.04em; margin-left: 0.14em; vertical-align: 0.42em; }
 .tr-tile.is-hot .tr-n { color: var(--t-hot-text); }
-/* "AFTERNOON" is the longest word this tile ever holds, not "MORNING" as this
-   comment used to claim -- that miscount is why the tile clipped it. It shrinks
-   to fit instead of wrapping. */
+/* AFTERNOON is the longest word this tile ever holds and does not fit on one
+   line at a size worth reading. It wraps onto two rows instead of shrinking
+   small enough to stay on one -- Michael's call, 2026-08-27: bring the size
+   back, wrap it instead. */
 .tr-phase {
-  font-size: clamp(13px, 1.3vw, 22px) !important; text-transform: uppercase;
-  white-space: nowrap; overflow: hidden; text-overflow: clip;
+  font-size: clamp(15px, 1.9vw, 30px) !important; text-transform: uppercase;
+  white-space: normal; line-height: 1.05;
 }
 .troom .tr-bar { height: 7px; border-radius: 4px; background: color-mix(in srgb, var(--t-ink) 11%, transparent); overflow: hidden; }
 .troom .tr-bar i { display: block; height: 100%; background: var(--t-hot); border-radius: 4px; }

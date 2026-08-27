@@ -620,6 +620,20 @@ main { padding-inline: var(--gutter); }
 .pomo-clock { font-family: var(--font-display); font-weight: 800; font-size: 1.3rem; letter-spacing: -0.01em; min-width: 4.2ch; text-align: center; }
 .pomo-icon { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); font-size: 0.8rem; }
 .pomo-icon:hover { color: var(--ink); background: var(--surface-2); }
+/* An unbounded task label plus four icon buttons made this pill wide enough
+   to fully cover a section, header and drop zone both, at both 390px phone
+   and 1440px laptop -- confirmed by the release gate's screenshot panel,
+   which found only the 3440px ultrawide shot clear. 2200px sits with margin
+   on both sides of that line: laptop and desktop get the compact form,
+   ultrawide (his actual daily screen) keeps the full one, since there it
+   never collided with anything. The label truncates and the secondary
+   controls (settings, skip, open-history) drop; pause/resume and stop stay,
+   since those are the two actions worth reaching from a pill sitting on
+   top of other content. */
+@media (max-width: 2200px) {
+  .pomo-phase { max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pomo-settings, .pomo-skip, .pomo-openhistory { display: none; }
+}
 .pomo-start { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: var(--text-sm); color: var(--accent-text); padding: 4px 6px; }
 .pomo-start:hover { color: var(--accent-hover); }
 .pomo-setup {

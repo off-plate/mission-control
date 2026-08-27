@@ -377,7 +377,7 @@ function PomodoroBadge() {
 
   const open = (
     <button
-      className={`pomo-icon${page === 'focus' ? ' is-on' : ''}`}
+      className={`pomo-icon pomo-openhistory${page === 'focus' ? ' is-on' : ''}`}
       onClick={() => setPage('focus')}
       aria-label="Open the focus history"
       title="Open Focus"
@@ -401,7 +401,7 @@ function PomodoroBadge() {
         {/* Minutes, not blocks: he asked what today amounts to, and three
             blocks says nothing about whether they were ten minutes or fifty. */}
         {today > 0 && <span className="pomo-cycles mono" title="Focused today">{fmtDuration(today)} today</span>}
-        <button className="pomo-icon" aria-label="Timer settings" aria-expanded={setupOpen} onClick={() => setSetupOpen((v) => !v)}>
+        <button className="pomo-icon pomo-settings" aria-label="Timer settings" aria-expanded={setupOpen} onClick={() => setSetupOpen((v) => !v)}>
           <Icon.Sliders size={17} />
         </button>
         {open}
@@ -423,7 +423,7 @@ function PomodoroBadge() {
           <Icon.Play size={17} filled />
         )}
       </button>
-      <button className="pomo-icon" onClick={p.skip} aria-label={p.phase === 'focus' ? 'Skip to the break' : 'End the break'}>
+      <button className="pomo-icon pomo-skip" onClick={p.skip} aria-label={p.phase === 'focus' ? 'Skip to the break' : 'End the break'}>
         <Icon.SkipNext size={17} filled />
       </button>
       <button className="pomo-icon" onClick={p.stop} aria-label="Stop this block">

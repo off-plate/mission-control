@@ -135,12 +135,19 @@ interface PersistedState {
   spaceGuessed?: number
   /** Keys of rows deliberately deleted, so a merge cannot resurrect them. */
   graveyard?: Tomb[]
+  /** THE TWO LIVES FOOTAGE. One link per pane per stop, keyed `<stop>-drift`
+   *  or `<stop>-push`. It lives in the synced blob rather than on the device
+   *  because the screen he opens when he wants to quit has to be the same
+   *  screen on the phone at midnight as on the laptop at noon. */
+  twoLives?: Record<string, string>
 }
 
 /** A delete you can still take back: what it was, and how to put it back. */
 export interface Undoable { id: string; label: string; restore: () => void }
 
 interface Store extends PersistedState {
+  /** Set or clear one Two Lives link. An empty string removes the key. */
+  setTwoLives: (key: string, url: string) => void
   /** What he is looking at. 'all' shows every space at once. */
   view: ViewId
   setView: (v: ViewId) => void
@@ -1231,6 +1238,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [dailyDone, setDailyDone] = useState<string | undefined>(persisted?.dailyDone)
   const [dailySkipped, setDailySkipped] = useState<string | undefined>(persisted?.dailySkipped)
   const [graveyard, setGraveyard] = useState<Tomb[]>(persisted?.graveyard ?? [])
+  const [twoLives, setTwoLivesRaw] = useState<Record<string, string>>(persisted?.twoLives ?? {})
+  /* An empty link is a removal, not a blank entry, so the key does not linger
+     and win a merge against a device that still holds the real one. */
+  const setTwoLives = (key: string, url: string) =>
+    setTwoLivesRaw((m) => { const n = { ...m }; if (url.trim()) n[key] = url.trim(); else delete n[key]; return n })
   const bury = (...keys: string[]) =>
     setGraveyard((g) => [...g.filter((t) => !keys.includes(t.k)), ...keys.map((k) => ({ k, at: Date.now() }))].slice(-900))
   /* Not a removal: a dated opposite. Another device that still holds the
@@ -1337,7 +1349,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       notes, noteFolders,
       savedAt: Date.now(), lastWrite: { dev: deviceId(), name: deviceName(), at: Date.now() },
       weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
-      habitLog, routineLog, slips, stepLog, stepTicks, dailyDone, dailySkipped, spaceGuessed, graveyard, lastRollDay: lastRollDay ?? localDateKey(),
+      habitLog, routineLog, slips, stepLog, stepTicks, dailyDone, dailySkipped, spaceGuessed, graveyard, twoLives, lastRollDay: lastRollDay ?? localDateKey(),
     }
     const json = JSON.stringify(state)
     /* His own writing is the one thing that makes "updated from your iPhone"
@@ -1359,7 +1371,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { outbox.push(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dailyDone, dailySkipped, graveyard])
+  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dailyDone, dailySkipped, graveyard, twoLives])
 
   /* ---- state that arrived from somewhere else ----
      Another tab of this browser, or this account on another device. Merged in,
@@ -1414,6 +1426,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (p.records) setRecords(p.records)
     if (p.removedSeeds) setRemovedSeeds(p.removedSeeds)
     if (p.graveyard) setGraveyard(p.graveyard)
+    if (p.twoLives) setTwoLivesRaw(p.twoLives)
   }
 
   /* Another tab of the same browser. It writes localStorage; this fires there
@@ -1863,6 +1876,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     spaces, tasks, habits, goals, ledger, social, sources, plan, review, routines, ideas,
     focusSessions, habitLog, routineLog, slips, stepLog, stepTicks,
     view, setView, inView,
+    twoLives, setTwoLives,
     /* A finished block is recorded once, and everything that cares reads from
        here: measured habits fill from it, and the ledger gets it so focus time
        counts toward estimate accuracy instead of vanishing. */

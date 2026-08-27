@@ -2788,6 +2788,25 @@ await step('timeline: the wheel is a read-out, and it shows its own arithmetic',
   /* Nothing on this view may push the wheel. It reads the log or it is a toy. */
   const buttons = await page.locator('.tl-wheel button').allInnerTexts()
   if (buttons.some((b) => /push|add|start|spin/i.test(b))) throw new Error(`the wheel has a ${buttons.join(',')} button`)
+  /* BOTH COLUMNS TAKE THE REST OF THE WINDOW, and the card column scrolls with
+     no bar down the middle of the page. Both were his, in those words. */
+  const fill = await page.evaluate(() => {
+    const w = document.querySelector('.tl-wheelwrap'), d = document.querySelector('.tl-days')
+    const r = w.getBoundingClientRect()
+    return { below: innerHeight - r.bottom, wheel: Math.round(document.querySelector('.tl-wheel').getBoundingClientRect().height),
+      days: Math.round(d.getBoundingClientRect().height), bar: d.offsetWidth - d.clientWidth }
+  })
+  if (fill.below > 60) throw new Error(`${Math.round(fill.below)}px of dead window under the wheel`)
+  if (Math.abs(fill.wheel - fill.days) > 2) throw new Error(`wheel ${fill.wheel} against cards ${fill.days}`)
+  if (fill.bar > 0) throw new Error(`the card column shows a ${fill.bar}px scrollbar`)
+  /* The figure and the word under it are one stack; negative tracking used to
+     push the number half a step off centre. */
+  const centres = await page.evaluate(() => {
+    const b = document.querySelector('.tl-wheelread b').getBoundingClientRect()
+    const l = document.querySelector('.tl-wheelread .tl-l').getBoundingClientRect()
+    return [b.left + b.width / 2, l.left + l.width / 2]
+  })
+  if (Math.abs(centres[0] - centres[1]) > 1) throw new Error(`the figure is ${(centres[0] - centres[1]).toFixed(1)}px off centre`)
   await page.locator('.tl-maths > button').hover(); await page.waitForTimeout(400)
   const box = await page.locator('.tl-mathsbox')
   if (await box.evaluate((el) => getComputedStyle(el).visibility) !== 'visible') throw new Error('the maths never opened')
@@ -2795,6 +2814,10 @@ await step('timeline: the wheel is a read-out, and it shows its own arithmetic',
   for (const want of ['habit', 'task', 'focus', 'hard thing', '50%']) {
     if (!said.toLowerCase().includes(want)) throw new Error(`the maths never mentions ${want}`)
   }
+  /* His question, in his words: 128 points is how much MOMENTUM? The box has to
+     answer it in momentum, not only in points. */
+  if (!/\+\d+\.\d\d/.test(said)) throw new Error('the maths never says what a day is worth in momentum')
+  if (!/friction/i.test(said)) throw new Error('the maths never mentions what the wheel loses')
 })
 
 await step('timeline: giving up takes the whole window, and Escape gives it back', async () => {
@@ -2805,6 +2828,18 @@ await step('timeline: giving up takes the whole window, and Escape gives it back
     return { t: r.top, l: r.left, w: r.width, h: r.height, vw: innerWidth, vh: innerHeight }
   })
   if (box.t > 0 || box.l > 0 || box.w < box.vw || box.h < box.vh) throw new Error(`two lives is ${box.w}x${box.h} at ${box.l},${box.t}`)
+  /* HE SUPPLIES THE FOOTAGE, so there has to be a way in on every pane, and no
+     empty frame pretending to be one. */
+  if (await page.locator('.tl-setshot').count() !== 2) throw new Error('no way to set footage on both panes')
+  if (await page.locator('.tl-shot').count()) throw new Error('the empty photo frames are back')
+  const clash = await page.evaluate(() => {
+    const r = (e) => e.getBoundingClientRect()
+    const hit = (a, z) => !(a.right <= z.left || a.left >= z.right || a.bottom <= z.top || a.top >= z.bottom)
+    const foot = r(document.querySelector('.tl-livesfoot')), close = r(document.querySelector('.tl-close'))
+    return [...document.querySelectorAll('.tl-said')].some((e) => hit(r(e), foot))
+      || [...document.querySelectorAll('.tl-setshot')].some((e) => hit(r(e), close))
+  })
+  if (clash) throw new Error('the copy or the footage button runs under the chrome')
   await page.keyboard.press('Escape'); await page.waitForTimeout(400)
   if (await page.locator('.tl-lives').count()) throw new Error('Escape did not close it')
   if (await page.evaluate(() => getComputedStyle(document.body).overflow) === 'hidden') throw new Error('the page is still locked')

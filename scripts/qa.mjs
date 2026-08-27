@@ -6,7 +6,7 @@
    selectors, and fails loudly on any console error. */
 import { chromium } from 'playwright'
 import { createServer } from 'http'
-import { readFileSync, existsSync, cpSync, rmSync, mkdtempSync } from 'fs'
+import { readFileSync, existsSync, cpSync, rmSync, mkdtempSync, mkdirSync } from 'fs'
 import { tmpdir } from 'os'
 import { fileURLToPath } from 'url'
 import { dirname, resolve, join, extname } from 'path'
@@ -43,6 +43,17 @@ await new Promise((ok) => server.listen(0, ok))
 const PORT = server.address().port
 const URL = `http://localhost:${PORT}/mission-control/?noremote`
 const KEY = 'mission-control-demo-v12'
+/* The 2026-08-02 rewrite dropped screenshot capture entirely -- QA_OUT was
+   read nowhere, so the release gate's critic and persona panel had nothing
+   to look at, forever. Set QA_OUT to a directory (the gate sets it to
+   .qa-shots) to get the app itself, light-only, screenshotted; leave it
+   unset for a fast functional-only run with no filesystem writes. */
+const QA_OUT = process.env.QA_OUT
+const SHOTS_DIR = QA_OUT ? resolve(QA_OUT) : null
+if (SHOTS_DIR) {
+  rmSync(SHOTS_DIR, { recursive: true, force: true })
+  mkdirSync(SHOTS_DIR, { recursive: true })
+}
 
 let pass = 0, fail = 0
 const errors = []
@@ -85,6 +96,12 @@ const fresh = async (route = '') => {
   await page.evaluate((K) => { localStorage.removeItem(K); localStorage.removeItem('qa-stream') }, KEY)
   await page.goto(`${URL}#/${route}`); await page.reload(); await page.waitForTimeout(700)
 }
+/* A no-op when QA_OUT is unset, so a flow that calls this stays free to run
+   without a directory to write into. */
+const shoot = async (name) => {
+  if (!SHOTS_DIR) return
+  await page.screenshot({ path: join(SHOTS_DIR, `${name}.png`), fullPage: true })
+}
 
 await step('plan: add, estimate visible, complete via chips', async () => {
   await fresh('plan')
@@ -95,6 +112,7 @@ await step('plan: add, estimate visible, complete via chips', async () => {
   await page.locator('.today-task', { hasText: 'Gate task' }).first().locator('.checkbox').click()
   await page.locator('.actual-chip').first().click()
   await page.waitForTimeout(400)
+  await shoot('flow-plan-task-completed')
   const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
   if (!s.tasks.find((t) => t.title === 'Gate task')?.done) throw new Error('not completed')
 })
@@ -134,6 +152,7 @@ await step('habits: tick a build habit and persist', async () => {
   const dot = page.locator('.habit-line', { hasText: 'Meditation' }).first().locator('.daydot:not([disabled])').last()
   await dot.click(); await page.waitForTimeout(400)
   await page.reload(); await page.waitForTimeout(600)
+  await shoot('flow-habit-ticked')
   const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
   if (!s.habitLog.some((t) => t.habitId === 'h-meditation')) throw new Error('tick not persisted')
 })
@@ -2446,6 +2465,7 @@ await step('assistant: it answers across every workspace, not the one he is stan
   await page.reload(); await page.waitForTimeout(800)
   await askAssistant('what is on today')
   await page.waitForSelector('.as-canvas', { timeout: 4000 })
+  await shoot('flow-assistant-cross-workspace')
   const canvas = await page.locator('.as-canvas').innerText()
   if (!/Gate personal thing/.test(canvas)) throw new Error('the Personal task is missing from the canvas')
   if (!/Gate offplate thing/.test(canvas)) throw new Error('standing in Personal hid the Off-Plate task, which is the whole bug')
@@ -2669,6 +2689,33 @@ await step('assistant: it ticks, moves, estimates and keeps a habit, on his real
   if (after.slot !== 'evening') throw new Error(`the task is in ${after.slot}, not evening`)
   if (after.min !== 45) throw new Error(`the estimate is ${after.min}, not 45`)
 })
+
+/* The systematic matrix the critic and persona panel actually judge: the
+   app's real pages (App.tsx's page switch, not the QA flow names above,
+   which are steps, not routes), each at the three widths that matter --
+   laptop, his 3440px ultrawide, and 390px phone. No light/dark split: the
+   app is light-only, no data-theme anywhere in the CSS (Jarvis DESIGN.md,
+   Mission Control CLAUDE.md), so a "dark" variant would be a duplicate of
+   the light one, not a second thing to check. */
+if (SHOTS_DIR) {
+  await step('screenshots: the page matrix for the release panel', async () => {
+    const VIEWPORTS = [
+      { id: 'laptop', width: 1440, height: 900 },
+      { id: 'uwide', width: 3440, height: 1440 },
+      { id: 'phone', width: 390, height: 844 },
+    ]
+    const PAGES = ['today', 'plan', 'habits', 'goals', 'focus', 'notes']
+    for (const p of PAGES) {
+      await fresh(p)
+      for (const vp of VIEWPORTS) {
+        await page.setViewportSize({ width: vp.width, height: vp.height })
+        await page.waitForTimeout(250)
+        await shoot(`${p}-${vp.id}`)
+      }
+    }
+    await page.setViewportSize({ width: 1500, height: 1200 })
+  })
+}
 
 await page.unroute('https://api.groq.com/**').catch(() => {})
 

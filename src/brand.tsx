@@ -30,12 +30,18 @@ const CSS = `
 
 /* swatches */
 .bg-guide .sw{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
-.bg-guide .chip{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card)}
-.bg-guide .chip .col{height:78px;display:flex;align-items:flex-end;padding:10px 12px}
+/* This reuses the app-wide .chip name (a small inline tag: white-space:
+   nowrap, padding 1px 6px), which was never meant for a swatch card and
+   leaked in by accident -- the row layout below was really that base
+   rule's inline-flex, and the description was really its nowrap, which
+   is why it hard-clipped mid-word with no ellipsis rather than wrapping.
+   Made explicit here instead of staying accidentally dependent on it. */
+.bg-guide .chip{display:flex;align-items:stretch;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card);white-space:normal}
+.bg-guide .chip .col{height:78px;display:flex;align-items:flex-end;padding:10px 12px;flex:none}
 .bg-guide .chip .hex{font-family:var(--mono);font-size:11px;background:rgba(255,255,255,.82);color:#1a1712;padding:3px 7px;border-radius:5px}
-.bg-guide .chip .cb{padding:12px 14px}
+.bg-guide .chip .cb{padding:12px 14px;min-width:0}
 .bg-guide .chip .nm{font-weight:700;font-size:14px}
-.bg-guide .chip .us{font-size:12.5px;color:var(--muted);line-height:1.4;margin-top:3px}
+.bg-guide .chip .us{font-size:12.5px;color:var(--muted);line-height:1.4;margin-top:3px;white-space:normal}
 
 /* type */
 .bg-guide .spec{border:1px solid var(--line);border-radius:16px;background:var(--card);padding:26px;margin-bottom:14px}

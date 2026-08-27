@@ -53,18 +53,23 @@ export function meetingNote(e: CalEvent): string {
   return lines.join('\n')
 }
 
-/** Which meeting the app should offer to write up, right now.
- *  Running > about to start > the one just finished, and nothing at all if he
- *  has already written that one up. */
+/** Which meeting the app should surface, right now.
+ *  Running > about to start > the one just finished.
+ *
+ *  It used to drop any meeting he had already written up, so the row vanished
+ *  the moment he pressed the button. He asked for the opposite on 2026-08-27:
+ *  the row is worth having because it tells him WHICH MEETING HE IS IN, and
+ *  that is still true after the note exists. So the written-up set is gone from
+ *  the selection entirely, and what changes is the button: write it up, or open
+ *  the one that is already there. */
 export function meetingToWriteUp(
   events: CalEvent[],
-  writtenUids: Set<string>,
   now: Date,
 ): { event: CalEvent; state: 'now' | 'next' | 'just-ended' } | null {
   const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   const mins = now.getHours() * 60 + now.getMinutes()
   const todays = events
-    .filter((e) => e.day === day && !e.allDay && e.start !== null && !writtenUids.has(e.uid))
+    .filter((e) => e.day === day && !e.allDay && e.start !== null)
     .sort((a, b) => (a.start as number) - (b.start as number))
 
   const running = todays.find((e) => (e.start as number) <= mins && mins < (e.end ?? (e.start as number) + 60))

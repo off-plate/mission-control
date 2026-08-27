@@ -1045,7 +1045,9 @@ export function NotesPage() {
             meeting worth naming. Everywhere else it renders nothing at all. It
             sits at the head of the LIST, which is where he already looks when
             he is about to start writing something. */}
-        {space === 'work' && <MeetingPrompt />}
+        {/* Every workspace, on his instruction. The meeting is happening whichever
+            part of his life he happens to be looking at. */}
+        <MeetingPrompt />
         <div className="nt-listhead">
           <div className="nt-headmain">
             <h1>{finding ? 'Everything' : nameOf(openFolder)}</h1>

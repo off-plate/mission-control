@@ -22,16 +22,19 @@ export function MeetingPrompt() {
   const { notes, addNote, openNote, space } = useStore()
   const { state } = useCalendar()
 
-  const written = useMemo(() => {
-    const s = new Set<string>()
-    for (const n of notes) { const uid = meetingUidOf(n.body); if (uid) s.add(uid) }
-    return s
-  }, [notes])
-
   const found = useMemo(
-    () => (state.status === 'ok' ? meetingToWriteUp(state.events, written, new Date()) : null),
-    [state, written],
+    () => (state.status === 'ok' ? meetingToWriteUp(state.events, new Date()) : null),
+    [state],
   )
+
+  /* The note for THIS meeting, if he has already made it. Matched on the uid
+     buried in the body, which is what ties a note to a meeting across renames:
+     he can retitle the note to anything and this still finds it. */
+  const already = useMemo(
+    () => (found ? notes.find((n) => meetingUidOf(n.body) === found.event.uid) : undefined),
+    [notes, found],
+  )
+
   if (!found) return null
 
   const { event: e, state: when } = found
@@ -44,10 +47,13 @@ export function MeetingPrompt() {
     <div className="meet-prompt">
       <span className="meet-when mono">{when === 'now' ? 'now' : when === 'next' ? 'next' : 'just ended'}</span>
       <span className="meet-what">{said}</span>
+      {/* One button, two jobs, and it names the one it is doing. Writing it up
+          does not make the row disappear any more, so the second press has to
+          take him to the note, and never silently make a duplicate. */}
       <button
         className="btn btn-primary meet-go"
-        onClick={() => openNote(addNote(spaceFolderId(space), meetingNote(e)))}
-      >Write it up</button>
+        onClick={() => (already ? openNote(already.id) : openNote(addNote(spaceFolderId(space), meetingNote(e))))}
+      >{already ? 'Open the note' : 'Write it up'}</button>
     </div>
   )
 }

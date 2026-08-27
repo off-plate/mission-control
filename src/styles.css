@@ -2719,11 +2719,12 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
   /* Every column fixed but the name: an "auto" menu column measured itself per
      row, so the legend row (which has no menu) sat 41px to the right of the
      dots it was labelling. */
-  /* The name takes nearly twice what the secondary column does, rather than
-     the leftovers after a fixed 264px. His order of importance, in his words:
-     the name first, the week second, and everything on the right last. */
-  grid-template-columns: minmax(0, 1.7fr) var(--daystrip) minmax(0, 1fr) var(--habit-menu-col);
-  grid-template-areas: 'name days foot menu';
+  /* Always stacked: his call, 2026-08-27. A side-by-side foot column read as
+     its own unrelated line, off in a strip next to the dots instead of under
+     the name it describes. The trend/goal/note text now always drops under
+     the habit name, at every panel width, rather than only below 1240px. */
+  grid-template-columns: minmax(0, 1fr) var(--daystrip) var(--habit-menu-col);
+  grid-template-areas: 'name days menu' 'foot foot foot';
   padding: var(--s2) 0;
 }
 .habit-actions { display: flex; align-items: center; gap: var(--s2); }
@@ -2737,20 +2738,30 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .habit-list.w7 .habit-days { grid-area: days; margin-top: 0; justify-content: space-between; }
 .habit-list.w7 .count-bar { grid-area: days; margin: 0; }
 .habit-list.w7 .habit-foot {
-  grid-area: foot; margin-top: 0; justify-content: flex-end; text-align: right;
-  flex-wrap: nowrap; white-space: nowrap; gap: var(--s2); min-width: 0;
+  grid-area: foot; margin-top: 0; justify-content: flex-start; text-align: left;
+  flex-wrap: wrap; white-space: normal; gap: var(--s2); min-width: 0;
+  /* Lines up under the habit name rather than the caret to its left,
+     the same offset .habit-run already uses for the same reason. */
+  padding-left: calc(18px + var(--s2));
+}
+/* All-workspaces view only: the space badge sits between the caret and the
+   name, adding its own fixed width (3px bar + 6px gap + a 1ch letter,
+   ~16px) before the name starts. Without this the line above still lands
+   under the badge instead of the name, measured ~24px short. */
+.habit-list.w7 .habit-row:has(.habit-row-top .spacemark) .habit-foot {
+  padding-left: calc(18px + var(--s2) + 16px + var(--s2));
 }
 /* A quitting row carries an ACTION and a STAT in one slot. The button takes the
    left edge of the column, so every I slipped today lines up down the page
    instead of floating to wherever that row's sentence happened to end, and the
    sentence takes what is left and shrinks rather than spilling over the dots. */
 .habit-list.w7 .habit-foot .quit-slip { flex: none; margin-right: auto; }
-.habit-list.w7 .habit-foot .habit-weeks { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.habit-list.w7 .habit-foot .habit-weeks { min-width: 0; overflow: visible; text-overflow: clip; white-space: normal; }
 .habit-list.w7 .habit-foot .habit-weeks { margin-left: 0; }
 /* The goal link is a child of .habit-foot now, not a second element competing
    for the same `foot` cell. Two elements in one grid area stack, which is
    what drew "Feeding X" on top of "averaging N of 7 a week". */
-.habit-list.w7 .habit-goal { margin-top: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.habit-list.w7 .habit-goal { margin-top: 0; min-width: 0; overflow: visible; text-overflow: clip; }
 /* The legend is a row of the same grid, so it cannot drift out of line. */
 .habit-list .habit-row.is-legend { padding: 0 0 var(--s1); }
 .habit-list .habit-row.is-legend .day-lab { width: 26px; text-align: center; }
@@ -2761,34 +2772,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 /* A dot the routine owns is not his to press, so it does not draw as one. */
 .daydot.is-locked { border-style: dotted; opacity: 0.75; }
 
-/* Below this the row cannot hold three columns of text without squeezing the
-   name, so the secondary line drops underneath and gets the full width. It
-   reads as what it is, a footnote to the row, and nothing is truncated. */
-@container habitlist (max-width: 1240px) {
-  .habit-list.w7 .habit-row {
-    grid-template-columns: minmax(0, 1fr) var(--daystrip) var(--habit-menu-col);
-    grid-template-areas: 'name days menu' 'foot foot foot';
-  }
-  .habit-list.w7 .habit-foot {
-    justify-content: flex-start; text-align: left;
-    flex-wrap: wrap; white-space: normal;
-    /* Lines up under the habit name rather than the caret to its left,
-       the same offset .habit-run already uses for the same reason. */
-    padding-left: calc(18px + var(--s2));
-  }
-  /* All-workspaces view only: the space badge sits between the caret and the
-     name, adding its own fixed width (3px bar + 6px gap + a 1ch letter,
-     ~16px) before the name starts. Without this the line above still lands
-     under the badge instead of the name, measured ~24px short. */
-  .habit-list.w7 .habit-row:has(.habit-row-top .spacemark) .habit-foot {
-    padding-left: calc(18px + var(--s2) + 16px + var(--s2));
-  }
-  /* Stacked, there is room to read them, so they stop being clipped. */
-  .habit-list.w7 .habit-foot .habit-weeks,
-  .habit-list.w7 .habit-goal,
-  .habit-list.w7 .habit-note { overflow: visible; text-overflow: clip; white-space: normal; }
-  .habit-list .habit-days.is-legend { margin-right: 0; }
-}
 @media (max-width: 1200px) {
   .habit-list .habit-days.is-legend { margin-right: 0; }
 }
@@ -4334,7 +4317,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
    yields to the numbers beside it rather than pushing them off the row. */
 .habit-note {
   font-size: var(--text-xs); color: var(--muted); min-width: 0;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  overflow: visible; text-overflow: clip; white-space: normal;
 }
 
 /* ---------- What a habit can DO ----------

@@ -139,6 +139,35 @@ function navFor(view: ViewId): { id: PageId; label: string }[] {
   return [...NAV, ...extra]
 }
 
+
+/* THE PAGE ROW REVEALS ON HOVER, on his instruction (2026-08-26): the second
+   row is hidden, the WHOLE header is the trigger, and leaving both waits a beat
+   before it goes.
+
+   Why the whole header and not a control: an earlier draft put a 30px arrow
+   next to the workspace pills. Reaching Plan then cost two pointer moves and a
+   wait, where a visible row costs one move to a large target. Making the header
+   itself the trigger means no aiming at all, and the row returns to the exact
+   place it already lives, so nothing he knows changes.
+
+   The grace period is what stops it flickering when he crosses the header on
+   the way somewhere else. He asked for a second; two felt slow to him.
+
+   Focus opens it too, or the row is unreachable from the keyboard. */
+const NAV_HIDE_MS = 1000
+
+function useNavReveal() {
+  const [open, setOpen] = useState(false)
+  const timer = useRef<number | undefined>(undefined)
+  const clear = () => { if (timer.current !== undefined) { clearTimeout(timer.current); timer.current = undefined } }
+  useEffect(() => clear, [])
+  return {
+    open,
+    show: () => { clear(); setOpen(true) },
+    hideSoon: () => { clear(); timer.current = window.setTimeout(() => setOpen(false), NAV_HIDE_MS) },
+  }
+}
+
 function PageNav({
   tabs, page, setPage, attention,
 }: {
@@ -279,6 +308,7 @@ export default function App() {
     try { localStorage.setItem('mc:hud', hud ? '1' : '0') } catch { /* private mode */ }
   }, [hud])
 
+  const nav = useNavReveal()
   const backFromZone = useRef<PageId>('today')
   useEffect(() => { if (page !== 'zone') backFromZone.current = page }, [page])
 
@@ -293,7 +323,16 @@ export default function App() {
       style={page === 'zone' ? ({ '--depth': zoneDepth } as React.CSSProperties) : undefined}
     >
       <a className="skiplink" href="#main">Skip to the page</a>
-      <div className="topstick">
+      {/* Hover anywhere in here, header or row, and the row stays. Leaving both
+          starts the grace period. Touch never fires these, which is correct: a
+          phone has no nav row at all, it has the hamburger. */}
+      <div
+        className={`topstick${nav.open ? ' is-navopen' : ''}`}
+        onMouseEnter={nav.show}
+        onMouseLeave={nav.hideSoon}
+        onFocus={nav.show}
+        onBlur={nav.hideSoon}
+      >
       <header className="topbar">
         {/* The name is the way home, on his instruction: back to All and
             Today from wherever he is. It was decoration before. */}

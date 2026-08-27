@@ -6378,3 +6378,41 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .tr-rtc i { font-style: normal; color: var(--t-muted); font-weight: 700; }
 .tr-rule { height: 1px; background: var(--t-line); margin: 22px 0 18px; }
 .tr-ritual .tr-rows { overflow: visible; }
+
+/* ==========================================================================
+   THE PAGE ROW, REVEALED ON HOVER
+   His instruction, 2026-08-26: hide the second row, make the whole first row
+   the trigger, and wait a second before hiding so crossing the header on the
+   way somewhere else does not make it flicker.
+
+   It OVERLAYS rather than pushes. Pushing would jump the whole page 47px every
+   time the pointer crossed the header, which costs more than the 47px it buys.
+
+   `opacity` and not `display: none`, deliberately: the tabs must stay in the
+   accessibility tree and in the DOM's text, and `scripts/qa.mjs` reads their
+   labels with allInnerTexts(), which returns nothing for a display:none tree.
+   ========================================================================== */
+@media (min-width: 640px) {
+  .topstick { position: relative; }
+  .topstick > .nav {
+    position: absolute; left: 0; right: 0; top: 100%; z-index: 30;
+    background: var(--bg);
+    box-shadow: 0 8px 20px rgba(26, 23, 18, 0.09);
+    transform: translateY(-10px);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform var(--t-med) cubic-bezier(0.4, 0, 0.2, 1), opacity var(--t-fast);
+  }
+  .topstick.is-navopen > .nav { transform: none; opacity: 1; pointer-events: auto; }
+  /* Keyboard reaches it the moment focus lands inside, so tabbing through the
+     app never walks into an invisible row.
+
+     `:has(:focus-visible)` and NOT `:focus-within`: clicking a tab leaves that
+     tab focused, and plain focus-within then pinned the row open for the rest
+     of the session. focus-visible is only set for keyboard focus, which is the
+     case that actually needs the help. */
+  .topstick:has(:focus-visible) > .nav { transform: none; opacity: 1; pointer-events: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .topstick > .nav { transition: opacity 0.01s; transform: none; }
+}

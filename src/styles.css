@@ -6137,7 +6137,42 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .space-btn:hover { background: var(--a-accent-wash); color: var(--a-accent-text); }
 .space-btn[aria-pressed="true"] { background: var(--a-accent); color: var(--a-ink); font-weight: 800; }
 
-/* The page tabs keep their row and gain the same scale. */
+/* ---- the page tabs are a pill group too ---------------------------------
+   His note, 2026-08-26: "make it pill shaped as it's the main menu". Same
+   tokens as the workspace switcher above, so the two rows are one language and
+   a change to the accent moves both.
+
+   They keep their uppercase and their letter-spacing, deliberately. Shape is
+   what he asked to match; type is what still tells the two apart. Drop the
+   micro-caps as well and the pages become visually identical to the
+   workspaces, which do a completely different job, and the only thing left
+   distinguishing them is the words. */
+.nav {
+  background: var(--a-sunk);
+  border-radius: 999px;
+  padding: 5px;
+  gap: 3px;
+  border-block: 0;
+  width: max-content;
+}
+.nav-tab {
+  border-radius: 999px;
+  padding: 11px 18px;
+  min-height: 42px;
+  font-size: var(--a-f-chip);
+  font-weight: 700;
+  color: var(--a-muted);
+  border-bottom: 0;
+  margin-bottom: 0;
+  transition: background var(--a-enter), color var(--a-enter);
+}
+.nav-tab:hover { background: var(--a-accent-wash); color: var(--a-accent-text); }
+.nav-tab[aria-current="page"] {
+  background: var(--a-accent);
+  color: var(--a-ink);
+  font-weight: 800;
+  border-bottom-color: transparent;
+}
 .tab { font-size: var(--a-f-nav); font-weight: 700; padding: 14px 14px; }
 
 /* ==========================================================================
@@ -6424,9 +6459,18 @@ button.chip:active { transform: translateY(0) scale(0.96); }
      So: no opacity in the transition at all, one duration, one curve, and the
      clip and the slide move together. */
   .topstick > .nav {
-    position: absolute; left: 0; right: 0; top: 100%; z-index: 30;
-    background: var(--bg);
-    box-shadow: 0 10px 24px rgba(26, 23, 18, 0.10);
+    /* A group, not a bar. It used to stretch edge to edge with the page
+       background behind it; as a pill that reads as a bar with a lozenge
+       stranded in it, so it now hangs at the gutter and is only as wide as its
+       own tabs. */
+    position: absolute; left: var(--gutter); right: auto; top: calc(100% + 8px);
+    max-width: calc(100% - var(--gutter) * 2);
+    padding-inline: 5px;
+    z-index: 30;
+    /* NO box-shadow. `clip-path` clips an element AND its shadow to the inset
+       RECTANGLE, so a shadow on a 999px pill came out sliced into a hard square
+       block past the rounded end. The workspace switcher it now matches has no
+       shadow either: the sunk background is what separates it from the page. */
     transform: translateY(-100%);
     clip-path: inset(0 0 100% 0);
     pointer-events: none;

@@ -6175,6 +6175,20 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .today-task > *, .todo-row > *, .rowitem > *, .ptask > *, .habit-row-top > *, .nt-row > * {
   position: relative; z-index: 1;
 }
+/* A row's own content sits above its own hover wash at z-index 1 -- every
+   row's content, at the same z-index, which is fine until one of them is a
+   dropdown. Its menu reaches down past its own row's height into the rows
+   below, and at equal z-index the LATER row in the DOM paints on top: a
+   menu opened near the top of a list could lose to a chip two rows down.
+   His report -- "Break it down" sliced through by a later row's estimate
+   chip. The menu's own z-index of 40 never got a say; it only outranks
+   siblings inside ITS row's stacking context, not another row's. Raising
+   just the trigger (not the whole row) past that shared layer is enough:
+   nothing else in a row needs to escape it. */
+.today-task > .kebab-wrap, .todo-row > .kebab-wrap, .rowitem > .kebab-wrap,
+.ptask > .kebab-wrap, .habit-row-top > .kebab-wrap, .nt-row > .kebab-wrap {
+  z-index: 2;
+}
 
 /* ---- 7. surfaces: the system radius, and a lift that answers a pointer ---- */
 .panel, .widget, .card, .goal-card, .routine-card, .habit-card {

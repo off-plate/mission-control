@@ -91,6 +91,7 @@ interface BlobState {
   records?: Record<string, number>
   removedSeeds?: string[]
   graveyard?: Tomb[]
+  twoLives?: Record<string, string>
   [k: string]: unknown
 }
 
@@ -294,6 +295,11 @@ export function mergeStates(a: string, b: string): string {
       if (typeof v === 'number' && typeof records[k] === 'number') records[k] = Math.max(records[k], v)
     }
     out.records = records
+
+    /* The Two Lives links union rather than following the newer blob whole: a
+       link added on the phone must survive a laptop save that never saw it, and
+       when both sides hold the same key the newer side's link wins. */
+    if (older.twoLives || newer.twoLives) out.twoLives = { ...(older.twoLives ?? {}), ...(newer.twoLives ?? {}) }
 
     /* The daily review's two once-a-day flags are dates, and the later date is
        the true one whichever side is carrying it. Letting them follow the newer

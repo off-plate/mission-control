@@ -6830,19 +6830,29 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .tl-sum p { margin: 0; font: 500 12.5px/1.4 var(--font-body); color: var(--tl-dim); }
 
 /* ---- the flywheel ---- */
-.tl-wheelwrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 420px); gap: var(--s4); align-items: start; }
+/* BOTH COLUMNS TAKE WHAT IS LEFT OF THE WINDOW. --tl-fill is measured on mount
+   and on resize from the wrap's own top, because the header above it is two
+   rows on a laptop and four on a phone: any constant here is wrong on one. */
+.tl-wheelwrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 430px);
+  gap: var(--s3); align-items: stretch; height: var(--tl-fill, 620px); }
 .tl-wheel { position: relative; border-radius: var(--tl-r); background: var(--tl-rung);
-  min-height: 520px; display: grid; place-items: center; overflow: hidden; }
+  height: 100%; display: grid; place-items: center; overflow: hidden; }
 .tl-wheel canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .tl-wheelread { position: relative; z-index: 2; text-align: center; pointer-events: none; }
+/* NEGATIVE TRACKING IS NOT FREE. Letter-spacing is added after every glyph,
+   the last one included, so a centred line of it sits half a tracking step
+   right of true centre: at this size that is a visible 3px against the word
+   under it. The padding is exactly the tracking, which moves it back half. */
 .tl-wheelread b { display: block; font-family: var(--font-display); font-weight: 800;
-  font-size: clamp(56px, 8vw, 108px); letter-spacing: -0.05em; line-height: 0.85; color: var(--tl-ink); }
+  font-size: clamp(56px, 8vw, 112px); letter-spacing: -0.05em; padding-right: 0.05em;
+  line-height: 0.85; color: var(--tl-ink); font-variant-numeric: tabular-nums; }
 .tl-wheelread .tl-l { margin-top: 12px; letter-spacing: 0.3em; }
+/* Over the spokes, so it needs a ground of its own rather than a wash that
+   lets the metal through the letterforms. */
 .tl-state { display: inline-block; margin-top: 18px; padding: 9px 16px; border-radius: 999px;
-  background: var(--tl-hotw); color: var(--tl-hot);
+  background: var(--tl-rung); box-shadow: inset 0 0 0 1px var(--tl-hotw), 0 6px 20px rgba(0, 0, 0, 0.45);
+  color: var(--tl-hot);
   font: 700 11px/1 var(--font-body); letter-spacing: 0.2em; text-transform: uppercase; }
-.tl-wheelnote { position: absolute; left: 0; right: 0; bottom: 20px; text-align: center; margin: 0; z-index: 2;
-  font: 700 10.5px/1.5 var(--font-body); letter-spacing: 0.15em; text-transform: uppercase; color: var(--tl-faint); }
 
 /* THE MATHS, on hover and on focus. `:focus-within` would keep it open after a
    click on the button itself, which on a touch device is every open. */
@@ -6851,7 +6861,8 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   background: var(--tl-rung2); color: var(--tl-dim); box-shadow: inset 0 0 0 1px var(--tl-line);
   font: 800 13px/1 var(--font-display); transition: background var(--a-enter), color var(--a-enter); }
 .tl-maths:hover > button, .tl-maths:has(:focus-visible) > button { background: var(--tl-hot); color: #0E0E10; }
-.tl-mathsbox { position: absolute; top: calc(100% + 10px); right: 0; width: min(340px, 78vw);
+.tl-mathsbox { position: absolute; top: calc(100% + 10px); right: 0; width: min(370px, 80vw);
+  max-height: min(70vh, 620px); overflow-y: auto; scrollbar-width: none;
   background: var(--tl-bg); border-radius: var(--tl-r); box-shadow: inset 0 0 0 1px var(--tl-line), 0 18px 44px rgba(0, 0, 0, 0.5);
   padding: 16px 18px; opacity: 0; visibility: hidden; transform: translateY(-5px);
   transition: opacity var(--a-enter), transform var(--a-enter), visibility var(--a-enter); }
@@ -6867,13 +6878,21 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   font-variant-numeric: tabular-nums; }
 .tl-mathsbox dd small { font-family: var(--font-body); font-size: 10px; font-weight: 700; color: var(--tl-faint); }
 .tl-mathsbox dl > div.off dt, .tl-mathsbox dl > div.off dd { color: var(--tl-faint); }
+.tl-mathsbox dl > div.bad dd { color: var(--tl-no); }
+.tl-mathsbox dt { display: flex; align-items: baseline; gap: 7px; }
+.tl-mathsbox dt small { font-size: 10px; font-weight: 700; color: var(--tl-faint); }
+.tl-cold { padding: 10px 12px; border-radius: 10px; background: var(--tl-now); color: var(--tl-ink) !important; }
+.tl-cold b { color: var(--tl-no); }
 .tl-mathsbox p { margin: 0 0 12px; font: 500 12.5px/1.5 var(--font-body); color: var(--tl-dim); }
 .tl-mathsbox p:last-child { margin-bottom: 0; }
 .tl-mathsbox p b { color: var(--tl-ink); }
 
 /* ---- one card per day ---- */
-.tl-days { display: flex; flex-direction: column; gap: 8px; max-height: 78vh; overflow-y: auto;
-  padding-right: 4px; }
+/* NO VISIBLE SCROLLBAR. A grey track down the middle of the page was the first
+   thing the eye went to, and the cards already say there are more below. */
+.tl-days { display: flex; flex-direction: column; gap: 8px; height: 100%; overflow-y: auto;
+  scrollbar-width: none; -ms-overflow-style: none; overscroll-behavior: contain; }
+.tl-days::-webkit-scrollbar { width: 0; height: 0; display: none; }
 .tl-card { background: var(--tl-rung); border-radius: var(--tl-r); padding: 18px 20px; }
 .tl-card.is-down { box-shadow: inset 0 0 0 1px rgba(224, 96, 58, 0.28); }
 .tl-card.is-empty { background: var(--tl-now); }
@@ -6917,50 +6936,87 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .tl-after b { color: var(--tl-hot); font-family: var(--font-display); font-weight: 800; }
 .tl-card.is-empty .tl-after { color: var(--tl-no); font-weight: 700; }
 
-/* ---- two lives: over the whole window, on his instruction ---- */
+/* ---- two lives: the footage IS the screen ---- */
 .tl-lives { position: fixed; inset: 0; z-index: 300; background: #08090A; color: var(--tl-ink);
-  display: grid; grid-template-rows: auto 1fr auto auto; overflow-y: auto;
+  display: grid; grid-template-rows: 1fr; overflow: hidden;
   animation: tlrise var(--t-med) var(--ease) both; }
 @keyframes tlrise { from { opacity: 0; transform: scale(0.99); } to { opacity: 1; transform: none; } }
-.tl-livestop { display: flex; align-items: center; gap: var(--s3); padding: 22px clamp(18px, 3vw, 36px) 0; }
-.tl-close { margin-left: auto; width: 38px; height: 38px; border: 0; border-radius: 50%; cursor: pointer;
-  background: rgba(242, 240, 234, 0.06); color: var(--tl-dim); font-size: 14px; }
-.tl-close:hover { background: rgba(242, 240, 234, 0.12); color: var(--tl-ink); }
-.tl-panes { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-  padding: 18px clamp(18px, 3vw, 36px); min-height: 0; }
-.tl-pane { border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 14px;
-  background: #101012; }
-.tl-pane.is-push { background: #12160C; }
-.tl-pill { align-self: flex-start; padding: 8px 14px; border-radius: 999px;
-  font: 700 10px/1 var(--font-body); letter-spacing: 0.2em; text-transform: uppercase;
-  background: rgba(242, 240, 234, 0.06); color: var(--tl-dim); }
-.tl-pane.is-push .tl-pill { background: var(--tl-hotw); color: var(--tl-hot); }
-/* The slots are capped rather than greedy: until his footage is in, an empty
-   frame 700px tall is the loudest thing on the screen. */
-.tl-shot { flex: 1; min-height: 150px; max-height: 40vh; border-radius: 14px;
-  background: rgba(242, 240, 234, 0.04); display: grid; place-items: center; }
-.tl-pane.is-push .tl-shot { background: rgba(198, 242, 74, 0.06); }
-.tl-said { margin: 0; font-family: var(--font-display); font-weight: 800; letter-spacing: -0.02em;
-  font-size: clamp(15px, 1.6vw, 21px); line-height: 1.3; }
+
+.tl-panes { position: relative; display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
+/* NO FRAME AROUND THE FOOTAGE. An empty pane is the sentence, set large, and
+   nothing else: a grey rectangle waiting for media was the loudest thing here
+   and said nothing at all. */
+/* The bottom padding clears the footer, which floats over the panes rather
+   than taking a row from them. Without it the last line of the sentence ran
+   under the scrubber. */
+.tl-pane { position: relative; overflow: hidden; display: flex; flex-direction: column;
+  justify-content: flex-end; isolation: isolate;
+  padding: clamp(22px, 3.4vw, 54px);
+  padding-bottom: clamp(112px, 13vh, 168px); }
+.tl-pane.is-drift { background: radial-gradient(120% 90% at 20% 10%, #131315, #0A0A0B 70%); }
+.tl-pane.is-push { background: radial-gradient(120% 90% at 80% 10%, #191F0D, #0B0D06 70%); }
+.tl-media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  border: 0; z-index: -2; }
+/* The sentence has to hold over anything he pastes, so the pane keeps a scrim
+   whose weight is fixed rather than hoping the footage is dark. */
+.tl-pane.has-media::after { content: ''; position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(180deg, rgba(8, 9, 10, 0.55) 0%, rgba(8, 9, 10, 0.2) 42%, rgba(8, 9, 10, 0.86) 100%); }
+.tl-pane.is-push.has-media::after {
+  background: linear-gradient(180deg, rgba(8, 12, 4, 0.5) 0%, rgba(10, 14, 5, 0.16) 42%, rgba(6, 9, 3, 0.86) 100%); }
+
+/* The pill and the way to set footage sit together on the LEFT. On the right
+   the second pane's button landed under the close cross. */
+.tl-panehead { position: absolute; top: clamp(22px, 3.4vw, 54px); left: clamp(22px, 3.4vw, 54px);
+  right: 72px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; z-index: 2; }
+.tl-pill { padding: 9px 15px; border-radius: 999px; font: 700 10px/1 var(--font-body);
+  letter-spacing: 0.2em; text-transform: uppercase;
+  background: #17181A; color: var(--tl-dim); box-shadow: inset 0 0 0 1px rgba(242, 240, 234, 0.09); }
+.tl-pane.is-push .tl-pill { background: #1B2109; color: var(--tl-hot); box-shadow: inset 0 0 0 1px rgba(198, 242, 74, 0.28); }
+.tl-setshot { border: 0; cursor: pointer; padding: 9px 15px; border-radius: 999px;
+  font: 700 10px/1 var(--font-body); letter-spacing: 0.16em; text-transform: uppercase;
+  background: #17181A; box-shadow: inset 0 0 0 1px rgba(242, 240, 234, 0.09); color: var(--tl-faint);
+  opacity: 0; transition: opacity var(--a-enter), color var(--a-enter), background var(--a-enter); }
+.tl-pane:hover .tl-setshot, .tl-setshot:focus-visible { opacity: 1; }
+/* Until there is anything to change, the way in cannot be hidden behind a
+   hover: on a pane with no footage it stands there and asks. */
+.tl-pane:not(.has-media) .tl-setshot { opacity: 1; background: #1E1F22; color: var(--tl-dim); }
+.tl-setshot:hover { background: var(--tl-hot); color: #08090A; }
+
+.tl-said { margin: 0; max-width: 20ch; font-family: var(--font-display); font-weight: 800;
+  letter-spacing: -0.03em; line-height: 1.06; font-size: clamp(24px, 3.6vw, 58px); }
 .tl-pane.is-drift .tl-said { color: var(--tl-dim); }
+.tl-pane.is-push .tl-said { color: var(--tl-ink); }
+
 .tl-gap { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center;
-  background: #08090A; border-radius: 999px; padding: 14px 18px; pointer-events: none; }
+  background: #08090A; border-radius: 999px; padding: 16px 20px; pointer-events: none; z-index: 3;
+  box-shadow: 0 0 0 1px rgba(242, 240, 234, 0.08); }
 .tl-gap b { display: block; font-family: var(--font-display); font-weight: 800; font-size: 26px;
   letter-spacing: -0.04em; color: var(--tl-hot); font-variant-numeric: tabular-nums; }
-.tl-scrub { display: flex; align-items: center; justify-content: center; gap: clamp(18px, 5vw, 60px);
-  padding: 6px clamp(18px, 3vw, 36px) 10px; }
+
+/* The chrome floats over the footage rather than stealing a row from it. */
+.tl-livestop { position: absolute; top: 0; left: 0; right: 0; z-index: 4;
+  display: flex; align-items: center; gap: var(--s3); padding: 20px 22px; pointer-events: none; }
+.tl-livestop .tl-l { display: none; }
+.tl-close { margin-left: auto; width: 40px; height: 40px; border: 0; border-radius: 50%; cursor: pointer;
+  pointer-events: auto; background: #17181A; color: var(--tl-dim); font-size: 14px;
+  box-shadow: inset 0 0 0 1px rgba(242, 240, 234, 0.09); }
+.tl-close:hover { background: rgba(242, 240, 234, 0.14); color: var(--tl-ink); }
+
+.tl-livesfoot { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
+  display: flex; align-items: center; gap: clamp(14px, 2.4vw, 34px); flex-wrap: wrap;
+  padding: 18px clamp(18px, 3vw, 36px) 22px;
+  background: linear-gradient(180deg, transparent, rgba(8, 9, 10, 0.92) 55%); }
+.tl-scrub { display: flex; align-items: center; gap: clamp(14px, 3.2vw, 44px); }
 .tl-scrub button { border: 0; background: none; cursor: pointer; display: flex; flex-direction: column;
-  align-items: center; gap: 9px; padding: 8px; }
-.tl-knob { width: 12px; height: 12px; border-radius: 50%; background: rgba(242, 240, 234, 0.16);
+  align-items: center; gap: 8px; padding: 6px 2px; }
+.tl-knob { width: 11px; height: 11px; border-radius: 50%; background: rgba(242, 240, 234, 0.18);
   transition: background var(--a-enter), transform var(--a-enter); }
 .tl-scrub button.past .tl-knob { background: var(--tl-dim); }
 .tl-scrub button.on .tl-knob { background: var(--tl-hot); transform: scale(1.5); }
 .tl-scrub button.on .tl-l { color: var(--tl-hot); }
-.tl-livesfoot { display: flex; align-items: center; gap: var(--s4); flex-wrap: wrap;
-  padding: 8px clamp(18px, 3vw, 36px) 26px; }
-.tl-back { border: 0; cursor: pointer; border-radius: 999px; padding: 15px 26px;
+.tl-livesfoot p { margin: 0; font: 500 12.5px/1.5 var(--font-body); color: var(--tl-dim); max-width: 46ch; }
+.tl-back { margin-left: auto; border: 0; cursor: pointer; border-radius: 999px; padding: 15px 26px;
   background: var(--tl-hot); color: #08090A; font: 800 14px/1 var(--font-body); }
-.tl-livesfoot p { margin: 0; font: 500 13px/1.5 var(--font-body); color: var(--tl-dim); max-width: 62ch; }
 
 /* ---- narrow ---- */
 @media (max-width: 1180px) {
@@ -6968,15 +7024,16 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   .tl-rung { grid-template-columns: 84px repeat(3, minmax(0, 1fr)); row-gap: 14px; }
   .tl-hard { grid-column: 1 / -1; }
   .tl-pts { grid-column: 1 / -1; flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 10px; }
-  .tl-wheelwrap { grid-template-columns: 1fr; }
-  .tl-wheel { min-height: 420px; }
-  .tl-days { max-height: none; }
+  .tl-wheelwrap { grid-template-columns: 1fr; height: auto; grid-template-rows: 460px auto; }
+  .tl-days { height: auto; overflow: visible; }
 }
 @media (max-width: 700px) {
   .tl-rung { grid-template-columns: 76px repeat(2, minmax(0, 1fr)); }
   .tl-bd { grid-template-columns: 1fr; }
-  .tl-panes { grid-template-columns: 1fr; }
-  .tl-gap { position: static; transform: none; justify-self: center; }
+  .tl-panes { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+  .tl-said { font-size: clamp(19px, 5.4vw, 30px); max-width: 24ch; }
+  .tl-livesfoot { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .tl-back { margin-left: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .tl-lives { animation: none; }

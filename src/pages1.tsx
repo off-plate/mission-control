@@ -746,6 +746,38 @@ export function PlanPage() {
   const [goal, setGoal] = useState('')
   const [busy, setBusy] = useState(false)
   const [dropKey, setDropKey] = useState<string | null>(null)
+  /* DRAG A TASK, HOVER A DAY, IT OPENS ITSELF. His ask, 2026-08-29: sorting a
+     few tasks across a few days meant a full click-drag-click-drag lap per
+     task, because the only way onto Wednesday was to click its pill BEFORE
+     picking the task up. Now the pill itself is a target: hold a drag over it
+     for a second and this panel steps onto that day without letting go of
+     what he is carrying, the same "spring-loaded folder" a file manager does.
+     A plain click still switches instantly; this is additive, not a
+     replacement. Touch has no drag to hover with, so it keeps the "Plan for a
+     day" kebab shortcut built the same day. */
+  const [armingDay, setArmingDay] = useState<number | null>(null)
+  const armTimer = useRef<number | null>(null)
+  const clearArm = () => {
+    if (armTimer.current != null) { window.clearTimeout(armTimer.current); armTimer.current = null }
+    setArmingDay(null)
+  }
+  const armDay = (n: number) => {
+    if (n === dayOffset) return                 // already standing on it
+    if (armingDay === n) return                  // already counting down to it
+    clearArm()
+    setArmingDay(n)
+    armTimer.current = window.setTimeout(() => { setDayOffset(n); clearArm() }, 1000)
+  }
+  /* A drag can end mid-air over the pill without a dragleave ever firing (he
+     drops right there, or the browser cancels it), which would otherwise
+     leave the countdown running for a switch nobody is dragging toward any
+     more. One window listener catches every way a drag can end. */
+  useEffect(() => {
+    const onEnd = () => clearArm()
+    window.addEventListener('dragend', onEnd)
+    window.addEventListener('drop', onEnd)
+    return () => { window.removeEventListener('dragend', onEnd); window.removeEventListener('drop', onEnd) }
+  }, [])
   const [logging, setLogging] = useState<string | null>(null)
   const [flashId, setFlashId] = useState<string | null>(null)
   const [flashIds, setFlashIds] = useState<string[]>([])
@@ -1014,7 +1046,15 @@ export function PlanPage() {
                 Tomorrow always did. */}
             <span className="day-switch" role="group" aria-label="Which day to plan">
               {Array.from({ length: PLAN_AHEAD_DAYS + 1 }, (_, n) => n).map((n) => (
-                <button key={n} className="microcap" aria-pressed={dayOffset === n} onClick={() => setDayOffset(n)}>
+                <button
+                  key={n}
+                  className={`microcap${armingDay === n ? ' is-arming' : ''}`}
+                  aria-pressed={dayOffset === n}
+                  onClick={() => setDayOffset(n)}
+                  onDragEnter={() => armDay(n)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDragLeave={() => { if (armingDay === n) clearArm() }}
+                >
                   {offsetWord(n)}{offsetDate(n) && <i>{offsetDate(n)}</i>}
                 </button>
               ))}

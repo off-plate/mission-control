@@ -784,6 +784,59 @@ await step('plan: tomorrow holds its own day', async () => {
    days ahead... I can plan it ahead for each day." The switcher used to be
    two words; it is seven pills now, each one a real day he can lay tasks onto
    the same way Today always worked. */
+/* HIS SECOND ASK THE SAME DAY: sorting a few tasks across a few days meant a
+   full click-drag-click-drag lap per task, because the switcher could only be
+   changed BEFORE a task was picked up. Now a drag held over a pill for a
+   second steps this panel onto that day without letting go of what is being
+   carried. Driven with real DragEvent objects rather than Playwright's
+   drag-and-drop helper, because that helper drops in one motion and this is
+   specifically about the pause in the middle of one. */
+await step('plan: holding a drag over a day pill steps the panel onto it', async () => {
+  await fresh('plan')
+  await page.getByRole('textbox', { name: 'New task' }).fill('Gate hover-arm task')
+  await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(300)
+  const row = page.locator('.todo-row', { hasText: 'Gate hover-arm' })
+  const taskId = await row.evaluate((el) => el.closest('[data-todo-id]').dataset.todoId)
+
+  const pill = (i) => page.locator('.day-switch .microcap').nth(i)
+  // A drag that leaves before a second is up must not switch anything.
+  await pill(5).evaluate((el, id) => {
+    const dt = new DataTransfer(); dt.setData('text/plain', id)
+    el.dispatchEvent(new DragEvent('dragenter', { dataTransfer: dt, bubbles: true, cancelable: true }))
+  }, taskId)
+  if (!(await pill(5).evaluate((el) => el.classList.contains('is-arming')))) throw new Error('the pill never armed')
+  await page.waitForTimeout(400)
+  await pill(5).evaluate((el) => el.dispatchEvent(new DragEvent('dragleave', { bubbles: true, cancelable: true })))
+  await page.waitForTimeout(800)
+  if (await pill(5).getAttribute('aria-pressed') === 'true') throw new Error('a cancelled hover switched the day anyway')
+  if (await pill(5).evaluate((el) => el.classList.contains('is-arming'))) throw new Error('the fill kept running after dragleave')
+
+  // Held for the full second: the panel steps onto that day, still mid-drag.
+  await pill(5).evaluate((el, id) => {
+    const dt = new DataTransfer(); dt.setData('text/plain', id)
+    el.dispatchEvent(new DragEvent('dragenter', { dataTransfer: dt, bubbles: true, cancelable: true }))
+  }, taskId)
+  await page.waitForTimeout(550)
+  if (await pill(5).getAttribute('aria-pressed') === 'true') throw new Error('it switched before a second was up')
+  await page.waitForTimeout(650)
+  if (await pill(5).getAttribute('aria-pressed') !== 'true') throw new Error('it did not switch after holding a full second')
+  if (await pill(5).evaluate((el) => el.classList.contains('is-arming'))) throw new Error('the arming mark is still showing after the switch')
+
+  // The drag is still alive: drop it into the day now on screen.
+  const bucket = page.locator('.bucket', { hasText: 'Morning' })
+  await bucket.evaluate((el, id) => {
+    const dt = new DataTransfer(); dt.setData('text/plain', id)
+    el.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }))
+    el.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }))
+  }, taskId)
+  await page.waitForTimeout(400)
+  const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
+  const t = s.tasks.find((x) => x.id === taskId)
+  const wanted = await page.evaluate(() => { const d = new Date(); d.setDate(d.getDate() + 5); const z = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}` })
+  if (t.plannedOn !== wanted || t.slot !== 'morning') throw new Error(`landed on ${t.plannedOn}/${t.slot}, wanted ${wanted}/morning`)
+  if (!(await page.locator('.today-task', { hasText: 'Gate hover-arm' }).count())) throw new Error('the task is not shown on the day it was armed onto')
+})
+
 await step('plan: the day switcher reaches six days out, one real day each', async () => {
   await fresh('plan')
   const pills = await page.locator('.day-switch .microcap').allInnerTexts()

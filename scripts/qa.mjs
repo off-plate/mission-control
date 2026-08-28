@@ -780,6 +780,85 @@ await step('plan: tomorrow holds its own day', async () => {
   await page.locator('.day-switch .microcap', { hasText: 'Today' }).click(); await page.waitForTimeout(300)
   if (await page.locator('.today-task', { hasText: 'Gate tomorrow' }).count()) throw new Error('leaked into today')
 })
+/* HIS ASK, 2026-08-28: "instead of today, tomorrow... it can show... seven
+   days ahead... I can plan it ahead for each day." The switcher used to be
+   two words; it is seven pills now, each one a real day he can lay tasks onto
+   the same way Today always worked. */
+await step('plan: the day switcher reaches six days out, one real day each', async () => {
+  await fresh('plan')
+  const pills = await page.locator('.day-switch .microcap').allInnerTexts()
+  if (pills.length !== 7) throw new Error(`${pills.length} pills: ${pills.join(', ')}`)
+  if (!/Today/i.test(pills[0]) || !/Tomorrow/i.test(pills[1])) throw new Error(`starts ${pills[0]}, ${pills[1]}`)
+  // The sixth pill out is a real date six days from now, not a fixed word.
+  const sixOut = await page.evaluate(() => { const d = new Date(); d.setDate(d.getDate() + 6); return d.getDate() })
+  if (!pills[6].includes(String(sixOut))) throw new Error(`day 6 reads "${pills[6]}", not ${sixOut}`)
+  // Stepping onto Wednesday plans onto Wednesday, not onto today.
+  const wedPill = page.locator('.day-switch .microcap').nth(5)
+  await wedPill.click(); await page.waitForTimeout(300)
+  if ((await wedPill.getAttribute('aria-pressed')) !== 'true') throw new Error('the fifth pill did not become the active day')
+  await page.getByRole('textbox', { name: 'New task' }).fill('Gate five-out task')
+  await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(300)
+  await page.locator('.todo-row', { hasText: 'Gate five-out' }).getByRole('button', { name: /Options/ }).click()
+  await page.waitForTimeout(200)
+  // The kebab's own "Plan for a day" list reaches the same six days.
+  const moveItems = await page.locator('[role="menuitem"]', { hasText: /^Move to/ }).allInnerTexts()
+  if (moveItems.length !== 7) throw new Error(`kebab offers ${moveItems.length} days: ${moveItems.join(', ')}`)
+  await page.keyboard.press('Escape')
+  // Dropping straight into a slot lands it on the day currently on screen (Wed), not today.
+  await page.locator('.todo-row', { hasText: 'Gate five-out' }).getByRole('button', { name: /Options/ }).click()
+  await page.locator('[role="menuitem"]', { hasText: 'Morning' }).click(); await page.waitForTimeout(400)
+  if (!(await page.locator('.today-task', { hasText: 'Gate five-out' }).count())) throw new Error('did not land on the day shown')
+  const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
+  const t = s.tasks.find((x) => x.title === 'Gate five-out task')
+  const wed = await page.evaluate(() => { const d = new Date(); d.setDate(d.getDate() + 5); const z = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}` })
+  if (t.plannedOn !== wed || t.slot !== 'morning') throw new Error(`stored ${t.plannedOn}/${t.slot}, wanted ${wed}/morning`)
+  // Today's own view does not show a task planned five days out.
+  await page.locator('.day-switch .microcap').first().click(); await page.waitForTimeout(300)
+  if (await page.locator('.today-task', { hasText: 'Gate five-out' }).count()) throw new Error('leaked back into today')
+})
+
+/* HIS SECOND ASK THE SAME DAY: a widget below the day panel, Monday to Sunday,
+   morning/noon/afternoon/evening down each column, so the whole week is one
+   look rather than seven trips through the switcher above. */
+await step('plan: the week widget is a real Monday-to-Sunday, not the switcher again', async () => {
+  await fresh('plan')
+  if (!(await page.locator('.weekplan').count())) throw new Error('no week widget on the page')
+  const names = await page.locator('.weekplan-dayname').allInnerTexts()
+  if (names.join(',').toUpperCase() !== 'MON,TUE,WED,THU,FRI,SAT,SUN') throw new Error(`columns read ${names.join(',')}`)
+  // It does not track the day switcher's offset: moving the switcher must not move it.
+  const before = await page.locator('.weekplan .col-tot').innerText()
+  await page.locator('.day-switch .microcap').nth(4).click(); await page.waitForTimeout(300)
+  const after = await page.locator('.weekplan .col-tot').innerText()
+  if (before !== after) throw new Error(`the week range moved with the switcher: ${before} -> ${after}`)
+  // A task planned onto a day, with a slot, shows up in that day's column, in that slot.
+  await page.locator('.day-switch .microcap').first().click(); await page.waitForTimeout(300)
+  await page.getByRole('textbox', { name: 'New task' }).fill('Gate week widget task')
+  await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(300)
+  await page.locator('.todo-row', { hasText: 'Gate week widget' }).getByRole('button', { name: /Options/ }).click()
+  await page.locator('[role="menuitem"]', { hasText: 'Afternoon' }).click(); await page.waitForTimeout(400)
+  const todayCol = page.locator('.weekplan-day.is-today')
+  if (!(await todayCol.count())) throw new Error("no column is marked today's")
+  const cell = todayCol.locator('.weekplan-slot', { hasText: 'Afternoon' })
+  if (!(await cell.getByText('Gate week widget task', { exact: false }).count())) throw new Error('the task is not in its slot in the week widget')
+  // Clicking a day within reach of the switcher steps the switcher onto it,
+  // rather than navigating away from the page.
+  const cols = page.locator('.weekplan-day')
+  const n = await cols.count()
+  let forwardIdx = -1
+  for (let i = 0; i < n; i++) { if (!(await cols.nth(i).evaluate((el) => el.className.includes('is-past')))) { forwardIdx = i; break } }
+  await cols.nth(Math.min(forwardIdx + 1, n - 1)).locator('.weekplan-daybtn').click(); await page.waitForTimeout(400)
+  if (page.url().includes('/day/')) throw new Error('a forward day navigated away instead of stepping the switcher')
+  const pressed = await page.locator('.day-switch .microcap[aria-pressed="true"]').count()
+  if (pressed !== 1) throw new Error('no single pill is active after the click')
+  // Clicking a day that has already happened opens its record instead.
+  await page.goto(`${URL}#/plan`); await page.waitForTimeout(500)
+  if (forwardIdx > 0) {
+    await page.locator('.weekplan-day').first().locator('.weekplan-daybtn').click(); await page.waitForTimeout(600)
+    if (!page.url().includes('/day/')) throw new Error('a past day did not open its record')
+    if (!(await page.locator('h1').count())) throw new Error('the record page did not render')
+  }
+})
+
 await step('goals: a promised task ticks from the plan', async () => {
   await fresh('plan')
   await page.getByRole('textbox', { name: 'New task' }).fill('Gate promise')

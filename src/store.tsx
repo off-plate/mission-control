@@ -1996,10 +1996,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ? { ...x, done: true, doneAt: x.doneAt ?? new Date().toISOString(), actualMin, subtasks: x.subtasks?.map((sub) => ({ ...sub, done: true })) }
         : x)))
       if (t && t.actualMin === undefined) {
+        const lid = newId('l')
         setLedger((prev) => [
-          { id: newId('l'), title: t.title, category: t.category, estimateMin: t.estimateMin, actualMin, when: todayKey(), space: t.space, weekKey: isoWeekKey() },
+          { id: lid, title: t.title, category: t.category, estimateMin: t.estimateMin, actualMin, when: todayKey(), space: t.space, weekKey: isoWeekKey() },
           ...prev,
         ])
+        /* Real time on a task is real time whether or not the Pomodoro timer
+           ran for it. His report: he often works a task with Focus never
+           started, then logs the true minutes when he ticks it off, and
+           every counter that reads focusSessions -- Today, the measured
+           habits, Goals fed by one -- was blind to that time because this
+           path never wrote one. Sharing lid keeps the block attached to the
+           same ledger row logActual already writes, rather than a second,
+           orphaned one. */
+        const next = [{ id: newId('f'), day: todayKey(), minutes: actualMin, label: t.title, space: t.space, ledgerId: lid, at: new Date().toISOString() }, ...focusSessions]
+        setFocusSessions(next)
+        autoFrom(next, 0)
       }
     },
 
@@ -2096,10 +2108,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (parent && allDone && !parent.done) {
         const est = subs.reduce((a, s) => a + s.estimateMin, 0)
         const act = subs.reduce((a, s) => a + (s.actualMin ?? s.estimateMin), 0)
+        const lid = newId('l')
         setLedger((prev) => [
-          { id: newId('l'), title: parent.title, category: parent.category, estimateMin: est, actualMin: act, when: todayKey(), space: parent.space, weekKey: isoWeekKey() },
+          { id: lid, title: parent.title, category: parent.category, estimateMin: est, actualMin: act, when: todayKey(), space: parent.space, weekKey: isoWeekKey() },
           ...prev,
         ])
+        /* Same as the flat-task path in logActual: the steps' real minutes
+           count as focus even when Focus was never started for them. */
+        const next = [{ id: newId('f'), day: todayKey(), minutes: act, label: parent.title, space: parent.space, ledgerId: lid, at: new Date().toISOString() }, ...focusSessions]
+        setFocusSessions(next)
+        autoFrom(next, 0)
       }
     },
     deleteTask: (id) => {

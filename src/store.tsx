@@ -269,7 +269,9 @@ interface Store extends PersistedState {
   toggleGoalMilestone: (goalId: string, milestoneId: string) => void
   deleteGoal: (id: string) => void
   /** Start the same goal again for the current period. */
-  repeatGoal: (id: string) => void
+  /** Returns the id of the goal now sitting in the current period, whether
+   *  freshly made or already there from an earlier click. */
+  repeatGoal: (id: string) => string | null
 
   setSocial: (entries: SocialEntry[]) => void
   toggleSource: (id: string) => void
@@ -2258,19 +2260,32 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     /** Set the same goal again for the period we are in now. */
     repeatGoal: (id) => {
       const g = goals.find((x) => x.id === id)
-      if (!g) return
+      if (!g) return null
       const tf = (g.timeframe ?? 'quarter') as GoalTf
-      setGoals((prev) => [...prev, {
+      const periodKey = goalPeriodKey(tf)
+      /* A second click must not multiply the goal. The button gave no sign a
+         first click had landed -- same page, same list, nothing visibly
+         changed -- so a dozen clicks made a dozen "Tracking my calories"
+         goals before he noticed. If this period already has one repeated
+         from the same finished goal, hand back its id instead of making
+         another; the caller flashes it either way, so a repeat click still
+         reads as "yes, it's here." */
+      const already = goals.find((x) => !x.closed && x.space === g.space
+        && (x.timeframe ?? 'quarter') === tf && x.periodKey === periodKey && x.name === g.name)
+      if (already) return already.id
+      const next = {
         ...g,
         id: newId('g'),
-        periodKey: goalPeriodKey(tf),
+        periodKey,
         current: 0,
         closed: undefined,
         createdAt: todayKey(),
         touchedAt: todayKey(),
         milestones: g.milestones?.map((m) => ({ ...m, done: false })),
-      }])
+      }
+      setGoals((prev) => [...prev, next])
       setPageState('goals')
+      return next.id
     },
     /* Editing a goal is how a habit gets attached to one that already exists.
        Clearing the link keeps whatever the habit had counted, so the number

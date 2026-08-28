@@ -52,18 +52,23 @@ function useNextEvent(): { v: string; k: string } {
 
 /** Yesterday's date. Stepping the calendar day, not subtracting 24 hours, so
  *  the clocks changing does not land it on the wrong day twice a year. */
-const prevDay = (): string => {
+const prevDay = (): string => dayPlus(-1)
+
+/** Tomorrow's date, stepped the same careful way. */
+const nextDay = (): string => dayPlus(1)
+
+/** Any date `n` days from today, local calendar, careful about DST and month
+ *  ends the same way every other date arithmetic in this file already is. */
+function dayPlus(n: number): string {
   const d = new Date()
-  d.setDate(d.getDate() - 1)
+  d.setDate(d.getDate() + n)
   return localDateKey(d)
 }
 
-/** Tomorrow's date, stepped the same careful way. */
-const nextDay = (): string => {
-  const d = new Date()
-  d.setDate(d.getDate() + 1)
-  return localDateKey(d)
-}
+/** How far he can step the day panel forward: today plus this many days. His
+ *  ask, 2026-08-28: "instead of today, tomorrow... it would show... seven
+ *  days ahead." Today is the first of the seven, so six more follow it. */
+const PLAN_AHEAD_DAYS = 6
 
 const dateLine = () =>
   new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -72,6 +77,31 @@ const dateLine = () =>
 const shortDay = (key: string): string => {
   const [y, m, d] = key.split('-').map(Number)
   return new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
+/** 'Mon 24 – Sun 30 Aug', or 'Mon 31 Aug – Sun 6 Sep' across a month end: the
+ *  month is dropped from the first date only when it would just repeat the
+ *  second one right next to it. */
+const weekRangeLabel = (from: string, to: string): string => {
+  const [, fm] = from.split('-')
+  const [, tm] = to.split('-')
+  const first = shortDay(from)
+  return `${fm === tm ? first.replace(/ \w+$/, '') : first} – ${shortDay(to)}`
+}
+
+/** 'Today', 'Tomorrow', or 'Fri': the word for a pill in the day switcher. */
+const offsetWord = (n: number): string => {
+  if (n === 0) return 'Today'
+  if (n === 1) return 'Tomorrow'
+  const [y, m, d] = dayPlus(n).split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'short' })
+}
+/** The date under the word, blank for Today/Tomorrow where the word already
+ *  says enough and a number under it would be noise. */
+const offsetDate = (n: number): string => {
+  if (n <= 1) return ''
+  const [, , d] = dayPlus(n).split('-')
+  return String(Number(d))
 }
 
 
@@ -617,12 +647,14 @@ export function PlanPage() {
      as 0, and keep their existing order below anything newly added, which is
      already newest-first because the store prepends. */
   const backlogSorted = [...backlogOpen].sort((a, b) => (b.addedAt ?? 0) - (a.addedAt ?? 0))
-  /* Which day the right hand column is laying out. Sunday evening is exactly
-     when a week gets planned, and until now the app could only ever mean today,
-     so Monday could not be touched until Monday. One step forward is all this
-     is: today, or tomorrow. */
-  const [ahead, setAhead] = useState(false)
-  const planDay = ahead ? nextDay() : localDateKey()
+  /* Which day the right hand column is laying out. This used to be a single
+     step, today or tomorrow, on the argument that Sunday evening is exactly
+     when a week gets planned and Monday could not be touched until Monday. He
+     asked for the rest of the week the same way (2026-08-28): PLAN_AHEAD_DAYS
+     more days he can step onto and lay out, one at a time, the same panel he
+     already knows. offset 0 is today, 1 is tomorrow, up to 6 days out. */
+  const [dayOffset, setDayOffset] = useState(0)
+  const planDay = dayPlus(dayOffset)
   const onDay = (t: Task) => t.list === 'today' && (t.plannedOn ?? localDateKey()) === planDay
   const todayAll = spaceTasks.filter(onDay)                      // the day incl. finished (they stay, struck)
   const todayTasks = todayAll.filter((t) => !t.done)             // still to do
@@ -633,13 +665,15 @@ export function PlanPage() {
      work he chose rather than a wall of things the app put there. The moment it
      starts it files itself under the time he started it: this list is a record
      of the day, not a plan for it. */
-  /* Tomorrow's weekend is not today's: a Sunday planning Monday must not hide
-     the work routines it is planning. */
-  const dayIdx = ahead ? (todayIdx + 1) % 7 : todayIdx
+  /* A day ahead's weekend is not today's: planning a Friday from a Tuesday must
+     not hide the work routines it is planning. */
+  const dayIdx = (todayIdx + dayOffset) % 7
   const isWeekend = dayIdx >= 5
   const today = localDateKey()
+  const ahead = dayOffset > 0
   /* Started counts as on today only. A routine cannot have been started on a day
-     that has not happened, so tomorrow shows exactly what he has planned onto it.
+     that has not happened, so a day ahead shows exactly what he has planned
+     onto it.
 
      "Started" has to mean started TODAY, not merely started at some point in
      the period still running. This read `!!r.startedAt`, and startedAt is only
@@ -795,12 +829,41 @@ export function PlanPage() {
     assignSlot(id, undefined)
   }
 
+  /* THE WEEK, on his instruction (2026-08-28): not the seven days ahead of the
+     switcher above, which follows him and always starts on whichever day he
+     opens the app, but the calendar week he is actually standing in, Monday to
+     Sunday, so a Wednesday still shows what Monday looked like. Its own state:
+     it does not track dayOffset, and stepping it does not move the day panel.
+
+     READ ONLY BY DESIGN. The day panel above is already the tool for placing a
+     task into a time of day; asking this grid to be forty nine more drop zones
+     would make one job two half-built tools instead of one whole one. A day's
+     header is the one thing here that does anything: click it and the day
+     panel steps onto that day if it can, or opens that day's record if it
+     already happened. */
+  const [weekShift, setWeekShift] = useState(0)
+  const weekAnchor = dayPlus(weekShift * 7)
+  const weekDays = Array.from({ length: 7 }, (_, i) => dayOfWeekKey(i, new Date(`${weekAnchor}T12:00:00`)))
+  const weekTasks = spaceTasks.filter((t) => t.list === 'today')
+  /* How far a date sits from today, so a click knows whether to step the day
+     panel (it can reach today plus PLAN_AHEAD_DAYS) or open the record of a
+     day already gone. */
+  const daysOut = (iso: string) => Math.round(
+    (new Date(`${iso}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86400000,
+  )
+  const jumpToDay = (iso: string) => {
+    const out = daysOut(iso)
+    if (out < 0) { openDay(iso); return }
+    setDayOffset(Math.min(out, PLAN_AHEAD_DAYS))
+    document.querySelector('.day-switch')?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }
+
   return (
     <div className="page">
       <Band
         title="Plan the day"
         metrics={[
-          { v: fmtDuration(plannedMin), k: ahead ? 'planned tomorrow' : 'planned today', tone: 'info' as const },
+          { v: fmtDuration(plannedMin), k: `planned ${dayOffset === 0 ? 'today' : offsetWord(dayOffset).toLowerCase()}`, tone: 'info' as const },
           { v: pool.length ? `${donePct}%` : '—', k: pool.length ? 'of planned time done' : 'no tasks yet', tone: (pool.length && donePct > 0 ? 'pos' : 'info') as 'pos' | 'info' },
           ...(loggedAny ? [{ v: savedToday >= 0 ? fmtSigned(savedToday) : fmtDuration(-savedToday), k: savedToday >= 0 ? 'saved today' : 'over your estimates', tone: (savedToday >= 0 ? 'pos' : 'urgent') as 'pos' | 'urgent' }] : []),
         ]}
@@ -828,7 +891,7 @@ export function PlanPage() {
           {/* Re-choosing them is the point of the rollover; re-dragging them one
               by one is just its tax. One press puts all of them back on today,
               unsorted, still his to place. */}
-          <button className="btn btn-primary" onClick={() => { moveTasksToToday(returnedLeft); setAhead(false) }}>
+          <button className="btn btn-primary" onClick={() => { moveTasksToToday(returnedLeft); setDayOffset(0) }}>
             Replan {returnedLeft.length === 1 ? 'it' : `all ${returnedLeft.length}`} for today
           </button>
         </div>
@@ -899,9 +962,17 @@ export function PlanPage() {
                   <Dropdown label={`Options for ${t.title}`}>
                     <button role="menuitem" onClick={() => setEditingTask(t)}>Edit</button>
                     <button role="menuitem" onClick={() => setBreakdownFor(t)}>Break it down</button>
-                    <button role="menuitem" onClick={() => moveTasksToToday([t.id])}>Move to today</button>
-                    <button role="menuitem" onClick={() => { moveTasksToToday([t.id], nextDay()); setAhead(true) }}>Move to tomorrow</button>
-                    {/* Straight into a part of the day: today-then-slot used to
+                    {/* One trip per day, not one trip to today plus a drag
+                        for everything else. The seven-day picker below still
+                        drags one task at a time; this is for choosing the
+                        whole day at once. */}
+                    <span className="kebab-head">Plan for a day</span>
+                    {Array.from({ length: PLAN_AHEAD_DAYS + 1 }, (_, n) => n).map((n) => (
+                      <button key={n} role="menuitem" onClick={() => { moveTasksToToday([t.id], dayPlus(n)); setDayOffset(n) }}>
+                        Move to {n <= 1 ? offsetWord(n).toLowerCase() : shortDay(dayPlus(n))}
+                      </button>
+                    ))}
+                    {/* Straight into a part of today: today-then-slot used to
                         be two separate trips through this same menu. */}
                     <span className="kebab-head">Straight into today</span>
                     {SLOTS.map((sl) => (
@@ -929,9 +1000,16 @@ export function PlanPage() {
           <div className="col-head">
             {/* Which day this column lays out. Two days is the whole range: the
                 one he is in, and the one he is about to be in. */}
+            {/* Seven pills, not two. He asked (2026-08-28) to lay out a
+                week ahead rather than only the day right in front of him: each
+                one steps this same panel onto that day, the way Today and
+                Tomorrow always did. */}
             <span className="day-switch" role="group" aria-label="Which day to plan">
-              <button className="microcap" aria-pressed={!ahead} onClick={() => setAhead(false)}>Today</button>
-              <button className="microcap" aria-pressed={ahead} onClick={() => setAhead(true)}>Tomorrow</button>
+              {Array.from({ length: PLAN_AHEAD_DAYS + 1 }, (_, n) => n).map((n) => (
+                <button key={n} className="microcap" aria-pressed={dayOffset === n} onClick={() => setDayOffset(n)}>
+                  {offsetWord(n)}{offsetDate(n) && <i>{offsetDate(n)}</i>}
+                </button>
+              ))}
             </span>
             <span className="col-tot mono">{shortDay(planDay)}</span>
             {(() => {
@@ -1178,6 +1256,65 @@ export function PlanPage() {
               <span className="only-touch">Use a task's ⋯ menu to put it into a time of day, or send it back to the list.</span>
             </p>
           )}
+        </div>
+      </div>
+
+      {/* THE WEEK. Below the day panel, its own panel, on his instruction: not a
+          third column squeezed in beside the to-do list, a full width row of
+          its own so seven days actually have room to be read. */}
+      <div className="panel weekplan">
+        <div className="col-head">
+          <span className="microcap">The week</span>
+          <span className="col-tot mono">{weekRangeLabel(weekDays[0], weekDays[6])}</span>
+          <span className="weekplan-nav">
+            <button className="goal-nav-btn" aria-label="Previous week" onClick={() => setWeekShift((n) => n - 1)}>‹</button>
+            {weekShift !== 0 && <button className="goal-nav-btn now" onClick={() => setWeekShift(0)}>This week</button>}
+            <button className="goal-nav-btn" aria-label="Next week" onClick={() => setWeekShift((n) => n + 1)}>›</button>
+          </span>
+        </div>
+        <div className="weekplan-grid">
+          {weekDays.map((iso) => {
+            const [, , dnum] = iso.split('-')
+            const name = new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short' })
+            const dayTasks = weekTasks.filter((t) => (t.plannedOn ?? today) === iso)
+            const unsorted = dayTasks.filter((t) => !t.slot && !t.done).length
+            const totalMin = dayTasks.filter((t) => !t.done).reduce((a, t) => a + taskMinutes(t), 0)
+            const out = daysOut(iso)
+            const reachable = out >= 0 && out <= PLAN_AHEAD_DAYS
+            return (
+              <div className={`weekplan-day${iso === today ? ' is-today' : ''}${out < 0 ? ' is-past' : ''}`} key={iso}>
+                <button
+                  className="weekplan-daybtn"
+                  onClick={() => jumpToDay(iso)}
+                  title={reachable ? `Plan ${name} ${Number(dnum)}` : out < 0 ? `See ${name} ${Number(dnum)}` : undefined}
+                >
+                  <span className="weekplan-dayname">{name}</span>
+                  <span className="weekplan-daynum mono">{Number(dnum)}</span>
+                </button>
+                <span className="weekplan-daymeta mono">
+                  {totalMin > 0 ? fmtDuration(totalMin) : ''}
+                  {unsorted > 0 && <i>+{unsorted} unsorted</i>}
+                </span>
+                {SLOTS.map((sl) => {
+                  const here = dayTasks.filter((t) => t.slot === sl.id)
+                  const shown = here.slice(0, 3)
+                  const rest = here.length - shown.length
+                  return (
+                    <div className="weekplan-slot" key={sl.id}>
+                      <span className="weekplan-slotname">{sl.label}</span>
+                      {shown.map((t) => (
+                        <span className={`weekplan-item${t.done ? ' is-done' : ''}`} key={t.id} title={t.title}>
+                          <span className={`cat-dot ${t.category}`} aria-hidden="true" />
+                          {t.title}
+                        </span>
+                      ))}
+                      {rest > 0 && <span className="weekplan-more">+{rest} more</span>}
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })}
         </div>
       </div>
 

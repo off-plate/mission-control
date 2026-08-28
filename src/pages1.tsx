@@ -70,6 +70,11 @@ function dayPlus(n: number): string {
  *  days ahead." Today is the first of the seven, so six more follow it. */
 const PLAN_AHEAD_DAYS = 6
 
+/** What the week card's ring calls a full day: four hours planned, the same
+ *  reachable shape the momentum work on Timeline settled on rather than a
+ *  number invented fresh here. */
+const WEEK_CAPACITY_MIN = 240
+
 const dateLine = () =>
   new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
 
@@ -414,6 +419,25 @@ export function ActualLog({ est, tracked, onLog, onSkip }: { est: number; tracke
   )
 }
 
+
+/** The week card's load ring: a plain stroke circle with an accent arc laid
+ *  over it for the share of a full day that is planned. Radius and stroke
+ *  scale with the ring's own box so one component serves every card size. */
+function WeekRing({ pct, size = 34 }: { pct: number; size?: number }) {
+  const sw = Math.max(3, Math.round(size * 0.12))
+  const r = size / 2 - sw
+  const c = 2 * Math.PI * r
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--hairline-strong)" strokeWidth={sw} />
+      <circle
+        cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--accent-text)" strokeWidth={sw}
+        strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)} strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+      />
+    </svg>
+  )
+}
 
 /* The estimate is a number you can argue with. Click it and type your own; the
    generated one is a starting point, not a verdict. */
@@ -882,6 +906,19 @@ export function PlanPage() {
      panel steps onto that day if it can, or opens that day's record if it
      already happened. */
   const [weekShift, setWeekShift] = useState(0)
+  /* THE ALMANAC. He picked this shape from three variants shown as artifacts,
+     2026-08-30: a card per day with a ring for how full it is and its tasks
+     grouped into slot chips, over the flat hairline table it replaces.
+
+     THE CAP IS THE OTHER HALF OF THAT PICK. A second artifact answered the
+     question the first one couldn't: what does a sixteen-task day do to a
+     card widget? Nothing, as long as every slot caps itself at two and the
+     rest are counted rather than rendered. WEEK_EXPANDED is the one switch
+     that un-caps the whole week at once; it defaults off every time the panel
+     mounts, on purpose, because a week that remembered being left open would
+     make the FIRST look at it the one day density actually matters. */
+  const WEEK_CAP = 2
+  const [weekExpanded, setWeekExpanded] = useState(false)
   const weekAnchor = dayPlus(weekShift * 7)
   const weekDays = Array.from({ length: 7 }, (_, i) => dayOfWeekKey(i, new Date(`${weekAnchor}T12:00:00`)))
   const weekTasks = spaceTasks.filter((t) => t.list === 'today')
@@ -1318,6 +1355,15 @@ export function PlanPage() {
             {weekShift !== 0 && <button className="goal-nav-btn now" onClick={() => setWeekShift(0)}>This week</button>}
             <button className="goal-nav-btn" aria-label="Next week" onClick={() => setWeekShift((n) => n + 1)}>›</button>
           </span>
+          {/* The density switch. One for the whole week, off by default every
+              time this mounts: see the note where weekExpanded is declared. */}
+          <button
+            className={`weekplan-expand${weekExpanded ? ' is-on' : ''}`}
+            aria-pressed={weekExpanded}
+            onClick={() => setWeekExpanded((v) => !v)}
+          >
+            {weekExpanded ? 'Show fewer tasks' : 'Show every task'}
+          </button>
         </div>
         <div className="weekplan-grid">
           {weekDays.map((iso) => {
@@ -1326,8 +1372,10 @@ export function PlanPage() {
             const dayTasks = weekTasks.filter((t) => (t.plannedOn ?? today) === iso)
             const unsorted = dayTasks.filter((t) => !t.slot && !t.done).length
             const totalMin = dayTasks.filter((t) => !t.done).reduce((a, t) => a + taskMinutes(t), 0)
+            const pct = Math.min(100, Math.round((totalMin / WEEK_CAPACITY_MIN) * 100))
             const out = daysOut(iso)
             const reachable = out >= 0 && out <= PLAN_AHEAD_DAYS
+            const anySlots = SLOTS.some((sl) => dayTasks.some((t) => t.slot === sl.id))
             return (
               <div className={`weekplan-day${iso === today ? ' is-today' : ''}${out < 0 ? ' is-past' : ''}`} key={iso}>
                 <button
@@ -1335,16 +1383,18 @@ export function PlanPage() {
                   onClick={() => jumpToDay(iso)}
                   title={reachable ? `Plan ${name} ${Number(dnum)}` : out < 0 ? `See ${name} ${Number(dnum)}` : undefined}
                 >
-                  <span className="weekplan-dayname">{name}</span>
-                  <span className="weekplan-daynum mono">{Number(dnum)}</span>
+                  <WeekRing pct={pct} />
+                  <span className="weekplan-daylabel">
+                    <span className="weekplan-dayname">{name}</span>
+                    <span className="weekplan-daynum mono">{Number(dnum)}</span>
+                  </span>
+                  <span className="weekplan-daymeta mono">{totalMin > 0 ? fmtDuration(totalMin) : '—'}</span>
                 </button>
-                <span className="weekplan-daymeta mono">
-                  {totalMin > 0 ? fmtDuration(totalMin) : ''}
-                  {unsorted > 0 && <i>+{unsorted} unsorted</i>}
-                </span>
-                {SLOTS.map((sl) => {
+                {unsorted > 0 && <span className="weekplan-unsorted">+{unsorted} unsorted</span>}
+                {anySlots ? SLOTS.map((sl) => {
                   const here = dayTasks.filter((t) => t.slot === sl.id)
-                  const shown = here.slice(0, 3)
+                  if (!here.length) return null
+                  const shown = weekExpanded ? here : here.slice(0, WEEK_CAP)
                   const rest = here.length - shown.length
                   return (
                     <div className="weekplan-slot" key={sl.id}>
@@ -1358,7 +1408,7 @@ export function PlanPage() {
                       {rest > 0 && <span className="weekplan-more">+{rest} more</span>}
                     </div>
                   )
-                })}
+                }) : <span className="weekplan-empty">Nothing planned</span>}
               </div>
             )
           })}

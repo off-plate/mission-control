@@ -2905,6 +2905,20 @@ export function GoalsPage() {
   const done = spaceGoals.filter((g) => nowOf(g) >= g.target).length
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<Goal | null>(null)
+  /* "Set it again" used to give no sign a click had landed -- same page,
+     same list, nothing visibly changed -- so he clicked it a dozen times
+     and got a dozen duplicate goals before he noticed. Flashing the goal
+     it lands on (new or already there) is the fix he asked for: it does
+     not have to disappear from Finished periods, there just has to be a
+     visible answer to "did that work." */
+  const [flashGoalId, setFlashGoalId] = useState<string | null>(null)
+  const setAgain = (id: string) => {
+    const landedId = repeatGoal(id)
+    if (!landedId) return
+    setFlashGoalId(landedId)
+    document.querySelector(`[data-goal-id="${landedId}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    window.setTimeout(() => setFlashGoalId((cur) => (cur === landedId ? null : cur)), 2600)
+  }
 
   return (
     <div className="page">
@@ -2977,7 +2991,7 @@ export function GoalsPage() {
                     : status === 'done' ? 'reached' : status === 'behind' ? 'needs a push' : 'on pace'
                 const hasDetail = !!g.why || !!fromHabit || !!g.deadline || !!(g.milestones && g.milestones.length)
                 return (
-                  <div className="goal-item" key={g.id}>
+                  <div className={`goal-item${flashGoalId === g.id ? ' flash' : ''}`} key={g.id} data-goal-id={g.id}>
                     <div className="goal-row">
                       <span className="gr-name">
                         <SpaceMark space={g.space} />
@@ -3052,7 +3066,7 @@ export function GoalsPage() {
                     <span className="grow">{g.name}</span>
                     <span className="meta">{label}</span>
                     <span className={`mono ${hit ? 'val-pos' : 'val-urgent'}`}>{fmtNum(g.closed!.final)} of {fmtNum(g.target)}</span>
-                    <button className="btn btn-quiet" onClick={() => repeatGoal(g.id)}>Set it again</button>
+                    <button className="btn btn-quiet" onClick={() => setAgain(g.id)}>Set it again</button>
                     <Dropdown label={`Options for ${g.name}`}>
                       <button role="menuitem" className="danger" onClick={() => deleteGoal(g.id)}>Delete this goal</button>
                     </Dropdown>

@@ -79,6 +79,14 @@ const shortDay = (key: string): string => {
   return new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
 }
 
+/** 'Friday, 28 August', for the title of the day panel. He asked (2026-08-28)
+ *  for the date OUT of the day switcher's own header and onto the page title
+ *  instead, in words rather than the switcher's short numerals. */
+const longDay = (key: string): string => {
+  const [y, m, d] = key.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+}
+
 /** 'Mon 24 – Sun 30 Aug', or 'Mon 31 Aug – Sun 6 Sep' across a month end: the
  *  month is dropped from the first date only when it would just repeat the
  *  second one right next to it. */
@@ -861,7 +869,7 @@ export function PlanPage() {
   return (
     <div className="page">
       <Band
-        title="Plan the day"
+        title={`Plan ${longDay(planDay)}`}
         metrics={[
           { v: fmtDuration(plannedMin), k: `planned ${dayOffset === 0 ? 'today' : offsetWord(dayOffset).toLowerCase()}`, tone: 'info' as const },
           { v: pool.length ? `${donePct}%` : '—', k: pool.length ? 'of planned time done' : 'no tasks yet', tone: (pool.length && donePct > 0 ? 'pos' : 'info') as 'pos' | 'info' },
@@ -1011,7 +1019,6 @@ export function PlanPage() {
                 </button>
               ))}
             </span>
-            <span className="col-tot mono">{shortDay(planDay)}</span>
             {(() => {
               const shown = BUCKETS.filter((b) => b.id !== 'unsorted' || todayAll.some((t) => !t.slot && !t.done)).map((b) => b.id)
               const allShut = shown.length > 0 && shown.every((id) => shutSlots.has(id))

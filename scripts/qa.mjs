@@ -912,6 +912,52 @@ await step('plan: the week widget is a real Monday-to-Sunday, not the switcher a
   }
 })
 
+/* THE ALMANAC, on his pick from three artifacts, and the density rule from a
+   second one: a day with far more than a slot's share of tasks must not tower
+   over the quiet day beside it, and the rule has to be provable with a real
+   sixteen-task day rather than trusted on the strength of two or three. */
+await step('plan: the week card caps a heavy slot, and one switch un-caps the whole week', async () => {
+  await fresh('plan')
+  /* TODAY, not "tomorrow": a day out can land past Sunday and off the grid
+     entirely depending which weekday this runs on, and today is always
+     inside its own week by definition. roll() only sweeps a plannedOn that is
+     BEFORE today, so today's own tasks are never touched by it either. */
+  await page.evaluate((K) => {
+    // A view left over from an earlier step in the suite must not hide a
+    // 'personal' task: fresh() clears the app's own state but not this.
+    localStorage.setItem('mc-view', 'all')
+    const s = JSON.parse(localStorage.getItem(K))
+    const today = new Date(); const z = (n) => String(n).padStart(2, '0')
+    const day = `${today.getFullYear()}-${z(today.getMonth() + 1)}-${z(today.getDate())}`
+    const tasks = Array.from({ length: 5 }, (_, i) => ({
+      id: `heavy-${i}`, title: `Heavy morning task ${i}`, source: 'mc', estimateMin: 10, done: false,
+      space: 'personal', list: 'today', category: 'quick', plannedOn: day, slot: 'morning', addedAt: Date.now(),
+    }))
+    s.tasks = [...(s.tasks ?? []), ...tasks]
+    localStorage.setItem(K, JSON.stringify(s))
+  }, KEY)
+  await page.reload(); await page.waitForTimeout(900)
+  const heavy = page.locator('.weekplan-day.is-today')
+  if (!(await heavy.count())) throw new Error("no card is marked today's")
+  // Collapsed: only the cap shows, the rest are counted.
+  let shown = await heavy.locator('.weekplan-item').count()
+  if (shown !== 2) throw new Error(`the card shows ${shown} of 5, not the 2-task cap`)
+  const more = await heavy.locator('.weekplan-more').innerText()
+  if (!/\+3 more/.test(more)) throw new Error(`the overflow reads "${more}", not +3 more`)
+  // A quiet day beside it is not stretched to match the heavy one's height.
+  const heights = await page.evaluate(() => [...document.querySelectorAll('.weekplan-day')].map((el) => Math.round(el.getBoundingClientRect().height)))
+  if (Math.max(...heights) - Math.min(...heights) < 20) throw new Error('every card reads the same height, the cards are being stretched')
+  // The one switch un-caps every slot in every card at once.
+  await page.locator('.weekplan-expand').click(); await page.waitForTimeout(300)
+  shown = await heavy.locator('.weekplan-item').count()
+  if (shown !== 5) throw new Error(`the switch revealed ${shown} of 5 tasks, not all of them`)
+  if (await heavy.locator('.weekplan-more').count()) throw new Error('an overflow tag is still showing once expanded')
+  // And it defaults back to capped, not to whatever was left open.
+  await page.locator('.weekplan-expand').click(); await page.waitForTimeout(300)
+  shown = await heavy.locator('.weekplan-item').count()
+  if (shown !== 2) throw new Error(`collapsing again shows ${shown}, not back to the cap`)
+})
+
 await step('goals: a promised task ticks from the plan', async () => {
   await fresh('plan')
   await page.getByRole('textbox', { name: 'New task' }).fill('Gate promise')

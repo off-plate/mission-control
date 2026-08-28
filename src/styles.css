@@ -1654,50 +1654,64 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 .fold-all:hover { color: var(--accent-text); border-color: var(--accent-text); }
 
 /* ==========================================================================
-   THE WEEK, on the Plan page. His own widget, 2026-08-28: Monday to Sunday,
-   read mostly, a day's header is the one thing in it that does something.
-   Reuses the page's own tokens throughout, so it needs nothing from HUD mode
-   to repaint correctly and nothing here is a new palette.
-   ========================================================================== */
+   THE WEEK, on the Plan page. THE ALMANAC, on his pick, 2026-08-30: a card
+   per day with a load ring and its tasks grouped into slot chips, chosen from
+   three variants shown as artifacts over the flat hairline table this
+   replaces. Reuses the page's own tokens throughout, so it needs nothing from
+   HUD mode to repaint correctly and nothing here is a new palette.
+
+   THE DENSITY RULE, from the second artifact: every slot caps itself at
+   WEEK_CAP and counts the rest rather than rendering them, so the sixteen-task
+   day sits at the same card height as the quiet one next to it. One switch in
+   the header un-caps the whole week; see weekExpanded in pages1.tsx for why it
+   resets to off on every mount rather than remembering being left open. */
 .weekplan { margin-top: var(--s5); }
 .weekplan-nav { margin-left: auto; display: flex; align-items: center; gap: var(--s2); }
-.weekplan-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--s2); }
+.weekplan-expand {
+  border: 1px solid var(--hairline-strong); background: var(--surface); color: var(--ink);
+  cursor: pointer; border-radius: 999px; padding: 5px 13px;
+  font: 600 0.6875rem/1 var(--font-body); white-space: nowrap;
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+}
+.weekplan-expand:hover { border-color: var(--accent-text); }
+.weekplan-expand.is-on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+.weekplan-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--s2); align-items: start; }
 .weekplan-day {
-  display: flex; flex-direction: column; gap: 3px;
-  border: 1px solid var(--hairline); border-radius: var(--r-md); padding: var(--s2);
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-md); padding: var(--s3);
   min-width: 0;
 }
-.weekplan-day.is-today { border-color: var(--accent-text); background: var(--accent-wash); }
+.weekplan-day.is-today { border-color: var(--accent-text); box-shadow: 0 0 0 1px var(--accent-text); }
 .weekplan-day.is-past { opacity: 0.62; }
-.weekplan-daybtn {
-  display: flex; align-items: baseline; gap: 6px; align-self: flex-start;
-  font-family: var(--font-body); color: var(--ink); padding: 0;
-}
-.weekplan-daybtn:hover { color: var(--accent-text); }
-.weekplan-dayname { font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
-.weekplan-daynum { font-size: var(--text-xs); color: var(--muted); }
+.weekplan-daybtn { display: flex; align-items: center; gap: 8px; text-align: left; font-family: var(--font-body); color: var(--ink); padding: 0; min-width: 0; }
+.weekplan-daybtn svg { flex: none; }
+.weekplan-daybtn:hover .weekplan-dayname { color: var(--accent-text); }
+.weekplan-daylabel { min-width: 0; }
+.weekplan-dayname { display: block; font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.weekplan-daynum { display: block; font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); line-height: 1.1; margin-top: 1px; }
 .weekplan-day.is-today .weekplan-dayname { color: var(--accent-text); }
-/* What the day adds up to, right under its name: the one figure that answers
+/* What the day adds up to, right beside its name: the one figure that answers
    "is this day already full" without opening it to find out. */
-.weekplan-daymeta { display: flex; align-items: baseline; gap: 6px; font-size: 0.6875rem; color: var(--muted); min-height: 14px; margin-bottom: 2px; }
-.weekplan-daymeta i { font-style: normal; color: var(--urgent); }
-.weekplan-slot { padding-top: 4px; border-top: 1px solid var(--hairline); min-height: 20px; }
-.weekplan-slot + .weekplan-slot { margin-top: 4px; }
-.weekplan-slotname { display: block; font-size: 0.625rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--faint); margin-bottom: 2px; }
+.weekplan-daymeta { margin-left: auto; font-size: 0.6875rem; color: var(--faint); }
+.weekplan-unsorted { font-size: 0.6875rem; color: var(--urgent); margin-top: -4px; }
+.weekplan-slot { display: flex; flex-direction: column; gap: 5px; }
+.weekplan-slotname { display: block; font-size: 0.5625rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
 .weekplan-item {
-  display: flex; align-items: center; gap: 5px;
-  font-size: var(--text-xs); line-height: 1.4; color: var(--ink);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: flex; align-items: flex-start; gap: 5px;
+  background: var(--surface-2); border-radius: 6px; padding: 4px 7px;
+  font-size: var(--text-xs); line-height: 1.35; color: var(--ink);
 }
-.weekplan-item .cat-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; flex: none; }
-.weekplan-item.is-done { color: var(--faint); text-decoration: line-through; }
-.weekplan-more { display: block; font-size: 0.6875rem; color: var(--faint); }
+.weekplan-item .cat-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; flex: none; margin-top: 3px; }
+.weekplan-item.is-done { color: var(--faint); }
+.weekplan-item.is-done { text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
+.weekplan-more { display: block; font-size: 0.625rem; font-weight: 600; color: var(--faint); padding-left: 1px; }
+.weekplan-empty { font-size: 0.6875rem; color: var(--faint); }
 @media (max-width: 1180px) {
-  .weekplan-grid { grid-template-columns: repeat(7, minmax(120px, 1fr)); overflow-x: auto; padding-bottom: var(--s2); }
+  .weekplan-grid { grid-template-columns: repeat(4, minmax(180px, 1fr)); }
 }
 @media (max-width: 640px) {
-  .weekplan-grid { grid-template-columns: repeat(7, minmax(100px, 1fr)); gap: var(--s1); }
-  .weekplan-day { padding: var(--s1); }
+  .weekplan-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); gap: var(--s2); }
 }
 
 .bucket-name { font-family: var(--font-display); font-weight: 700; font-size: var(--text-base); }

@@ -1634,6 +1634,19 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
    already says which day it is. */
 .day-switch .microcap i { font-style: normal; font-family: var(--font-mono); font-size: 0.6875rem; color: var(--faint); margin-left: 3px; }
 .day-switch .microcap[aria-pressed='true'] i { color: var(--accent-text); }
+
+/* THE SPRING-LOADED PILL. Hold a drag over one for a second and the fill
+   below it runs out; when it does, this panel steps onto that day without
+   the drag ever letting go. A different mark from the active pill's own
+   underline on purpose: mid-fill and "already standing here" are different
+   facts and must not look like the same line. */
+.day-switch .microcap.is-arming { color: var(--ink); }
+.day-switch .microcap.is-arming::after {
+  content: ''; display: block; height: 2px; border-radius: 2px; margin-top: 3px;
+  background: var(--accent); width: 0%; animation: dayarm 1s linear forwards;
+}
+@keyframes dayarm { from { width: 0%; } to { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .day-switch .microcap.is-arming::after { animation: none; width: 100%; } }
 .fold-all {
   margin-left: auto; font-family: var(--font-mono); font-size: 0.6875rem;
   color: var(--info); border: 1px solid var(--hairline-strong); border-radius: 3px; padding: 1px 6px;

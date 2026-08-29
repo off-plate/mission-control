@@ -350,6 +350,16 @@ export interface StepEntry {
   value: number
 }
 
+/** How a single day's plan actually went, stamped once at rollover, before the
+ *  leftover tasks lose their day and become un-attributable backlog. Written
+ *  going forward only -- there is nothing to backfill for a day that already
+ *  rolled before this existed. */
+export interface DayTaskLog {
+  date: string
+  planned: number
+  done: number
+}
+
 /** Every run of one step, oldest first. It used to keep one per day, so a second
  *  attempt the same morning erased the first one. */
 export function stepSeries(log: StepEntry[], routineId: string, stepId: string): StepEntry[] {

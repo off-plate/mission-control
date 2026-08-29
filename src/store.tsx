@@ -48,6 +48,7 @@ import type {
   AssistantEntry,
   CoachFacts,
   CoachSession,
+  DayTaskLog,
   Goal,
   Idea,
   Note,
@@ -120,6 +121,10 @@ interface PersistedState {
   slips?: HabitSlip[]
   /** Every number a routine step recorded, dated. `records` keeps only the best. */
   stepLog?: StepEntry[]
+  /** How each day's plan actually went: planned vs. done, stamped at
+   *  rollover before the leftovers lose their day. Written going forward
+   *  only; nothing before this existed can be backfilled. */
+  dayLog?: DayTaskLog[]
   /** Every step ticked, dated. The routine's own doneStepIds is wiped at
    *  rollover, so this is the only thing that can say a routine was HALF done
    *  on a day that is no longer today. */
@@ -349,6 +354,7 @@ interface Store extends PersistedState {
   slips: HabitSlip[]
   stepLog: StepEntry[]
   stepTicks: StepTick[]
+  dayLog: DayTaskLog[]
 
   /* Where the copy on screen last came from, when that was another device.
      Null means this one, which is the ordinary case and needs no words. */
@@ -1245,6 +1251,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [routineLog, setRoutineLog] = useState<RoutineDone[]>(persisted?.routineLog ?? [])
   const [slips, setSlips] = useState<HabitSlip[]>(persisted?.slips ?? [])
   const [stepLog, setStepLog] = useState<StepEntry[]>(persisted?.stepLog ?? [])
+  const [dayLog, setDayLog] = useState<DayTaskLog[]>(persisted?.dayLog ?? [])
   const [stepTicks, setStepTicks] = useState<StepTick[]>(persisted?.stepTicks ?? [])
   /* What he deliberately deleted. Every collection is united across devices
      now, so a row missing here is only "not seen yet" unless something says
@@ -1367,7 +1374,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       notes, noteFolders,
       savedAt: Date.now(), lastWrite: { dev: deviceId(), name: deviceName(), at: Date.now() },
       weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
-      habitLog, routineLog, slips, stepLog, stepTicks, dailyDone, dailySkipped, spaceGuessed, graveyard, twoLives, reels, lastRollDay: lastRollDay ?? localDateKey(),
+      habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, spaceGuessed, graveyard, twoLives, reels, lastRollDay: lastRollDay ?? localDateKey(),
     }
     const json = JSON.stringify(state)
     /* His own writing is the one thing that makes "updated from your iPhone"
@@ -1389,7 +1396,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { outbox.push(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dailyDone, dailySkipped, graveyard, twoLives, reels])
+  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels])
 
   /* ---- state that arrived from somewhere else ----
      Another tab of this browser, or this account on another device. Merged in,
@@ -1431,6 +1438,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (p.routineLog) setRoutineLog(p.routineLog)
     if (p.slips) setSlips(p.slips)
     if (p.stepLog) setStepLog(p.stepLog)
+    if (p.dayLog) setDayLog(p.dayLog)
     if (Array.isArray(p.stepTicks)) setStepTicks(p.stepTicks)
     /* The latest day either way: a review walked on the phone must not be
        re-offered on the laptop, and a skip must not undo a walk. */
@@ -1924,7 +1932,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const value: Store = {
     version: 3,
     spaces, tasks, habits, goals, ledger, social, sources, plan, review, routines, ideas,
-    focusSessions, habitLog, routineLog, slips, stepLog, stepTicks,
+    focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog,
     view, setView, inView,
     twoLives, setTwoLives, reels, setReels,
     /* A finished block is recorded once, and everything that cares reads from

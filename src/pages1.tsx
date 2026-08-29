@@ -423,7 +423,11 @@ export function ActualLog({ est, tracked, onLog, onSkip }: { est: number; tracke
 /** The week card's load ring: a plain stroke circle with an accent arc laid
  *  over it for the share of a full day that is planned. Radius and stroke
  *  scale with the ring's own box so one component serves every card size. */
-function WeekRing({ pct, size = 34 }: { pct: number; size?: number }) {
+/* Two different questions, same shape of ring. Today and future days ask "how
+   full is this day" against WEEK_CAPACITY_MIN, in the section's lime accent.
+   Past days ask "how much of what I planned actually got done", in green --
+   his instruction (2026-08-31): a past day is a record, not a load. */
+function WeekRing({ pct, size = 34, good = false }: { pct: number; size?: number; good?: boolean }) {
   const sw = Math.max(3, Math.round(size * 0.12))
   const r = size / 2 - sw
   const c = 2 * Math.PI * r
@@ -431,7 +435,7 @@ function WeekRing({ pct, size = 34 }: { pct: number; size?: number }) {
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--wk-line-2)" strokeWidth={sw} />
       <circle
-        cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--wk-hot)" strokeWidth={sw}
+        cx={size / 2} cy={size / 2} r={r} fill="none" stroke={good ? 'var(--wk-good)' : 'var(--wk-hot)'} strokeWidth={sw}
         strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)} strokeLinecap="round"
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
       />
@@ -656,7 +660,7 @@ export function PlanPage() {
   const pomo = usePomodoro()
   const { startFocus } = pomo
   const { routines, habits } = useStore()
-  const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId, setTaskAt, plan, setPage, openDay, view, inView, focusSessions } = useStore()
+  const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId, setTaskAt, plan, setPage, openDay, view, inView, focusSessions, dayLog } = useStore()
 
   const spaceTasks = tasks.filter((t) => inView(t.space))
   const backlogOpen = spaceTasks.filter((t) => !t.done && t.list === 'backlog') // the to-do pool
@@ -1045,6 +1049,18 @@ export function PlanPage() {
               ? spaceTasks.filter((t) => t.done && t.doneAt?.slice(0, 10) === iso)
               : []
             const doneCount = doneItems.length
+            /* Today and future ask "how full is this day" (pct above, against
+               WEEK_CAPACITY_MIN). A past day asks something else: "of what I
+               planned, how much actually got done" -- his instruction
+               (2026-08-31). dayLog has the real ratio for any day sealed since
+               this shipped; a day that rolled before it existed has no
+               planned-count left to compare against (roll.ts already wiped
+               it), so it falls back to counting only what's still knowable --
+               full green if anything was finished, empty if nothing was. */
+            const sealed = out < 0 ? dayLog.find((d) => d.date === iso) : undefined
+            const ringPct = out < 0
+              ? (sealed ? (sealed.planned > 0 ? Math.round((sealed.done / sealed.planned) * 100) : 0) : (doneCount > 0 ? 100 : 0))
+              : pct
             const reachable = out >= 0 && out <= PLAN_AHEAD_DAYS
             /* Unsorted is a fifth group now, not a count he cannot read. His
                words: "it doesn't mean if it's unsorted... you still have to
@@ -1064,7 +1080,7 @@ export function PlanPage() {
                   onClick={() => jumpToDay(iso)}
                   title={reachable ? `Plan ${name} ${Number(dnum)}` : out < 0 ? `See ${name} ${Number(dnum)}` : undefined}
                 >
-                  <WeekRing pct={pct} />
+                  <WeekRing pct={ringPct} good={out < 0} />
                   <span className="weekplan-daylabel">
                     <span className="weekplan-dayname">{name}</span>
                     <span className="weekplan-daynum mono">{Number(dnum)}</span>

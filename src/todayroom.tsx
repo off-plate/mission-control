@@ -23,9 +23,9 @@
 import { useEffect, useState } from 'react'
 import { useStore } from './store'
 import { useFirstMove } from './ui'
-import { fmtDuration, fmtNum, fmtSigned, goalPace, goalPeriodKey, goalPeriodRange, isEstimated, localDateKey, taskMinutes, type GoalTf } from './util'
+import { dayOfWeekKey, fmtDuration, fmtNum, fmtSigned, goalPace, goalPeriodKey, goalPeriodRange, isEstimated, localDateKey, taskMinutes, type GoalTf } from './util'
 import { SLOTS, dueOn, goalCurrent, habitsDueToday, isTimeFed, type Task } from './types'
-import { WeekStrip } from './dayface'
+import { PLAN_AHEAD_DAYS, WeekGrid, dayPlus, weekRangeLabel } from './weekgrid'
 import { SpaceMark } from './ui'
 import { SPACE_LABELS } from './mock'
 
@@ -79,7 +79,7 @@ function isoWeek(d: Date): number {
 }
 
 export function TodayRoom() {
-  const { tasks, habits, habitLog, routines, focusSessions, goals, slips, savedMin, todayIndex, inView, setPage, setFocusTaskId, setFocusRoutineId, toggleTask, toggleHabitDay } = useStore()
+  const { tasks, habits, habitLog, routines, focusSessions, goals, slips, savedMin, todayIndex, inView, setPage, setFocusTaskId, setFocusRoutineId, toggleTask, toggleHabitDay, dayLog, openDay } = useStore()
   const now = useNow()
   const firstMove = useFirstMove()
   const day = localDateKey()
@@ -94,6 +94,21 @@ export function TodayRoom() {
   const phase = PHASES.find((p) => now.getHours() >= p.from && now.getHours() < p.to) ?? PHASES[0]
 
   const mine = tasks.filter((t) => inView(t.space))
+  /* The week, full-size and always open here -- his instruction (2026-08-31):
+     replaces "The week behind" (a bare 7-day focus/habit strip) with the same
+     Almanac Plan uses, minus the fold. Today has no day-switcher of its own,
+     so a click steps straight to a day's record if it already happened, or
+     over to Plan to work on it otherwise -- there is no local day to land on
+     here the way Plan's jumpToDay can step its own switcher. */
+  const weekDays = Array.from({ length: 7 }, (_, i) => dayOfWeekKey(i, new Date(`${day}T12:00:00`)))
+  const weekTasks = mine.filter((t) => t.list === 'today')
+  const weekDaysOut = (iso: string) => Math.round(
+    (new Date(`${iso}T00:00:00`).getTime() - new Date(`${day}T00:00:00`).getTime()) / 86400000,
+  )
+  const weekDayClick = (iso: string) => {
+    if (weekDaysOut(iso) < 0) openDay(iso)
+    else setPage('plan')
+  }
   /* On the clock: what he actually put into today, in the order the day runs. */
   const slotRank = Object.fromEntries(SLOTS.map((sl, i) => [sl.id, i])) as Record<string, number>
   const onClock = mine
@@ -334,6 +349,24 @@ export function TodayRoom() {
         </div>
       </section>
 
+      {/* ---- the week, full size, always open -- his instruction (2026-08-31) ---- */}
+      <div className="panel weekplan is-open is-fixed">
+        <div className="weekplan-bar is-static">
+          <span className="weekplan-title">
+            <span className="microcap">The week</span>
+            <span className="weekplan-range mono">{weekRangeLabel(weekDays[0], weekDays[6])}</span>
+          </span>
+        </div>
+        <div className="weekplan-collapse">
+          <div className="weekplan-collapse-inner">
+            <WeekGrid
+              weekDays={weekDays} weekTasks={weekTasks} spaceTasks={mine} dayLog={dayLog}
+              today={day} daysOut={weekDaysOut} reachableMax={PLAN_AHEAD_DAYS} onDayClick={weekDayClick}
+            />
+          </div>
+        </div>
+      </div>
+
       {/* ---- the four numbers ---- */}
       <section className="troom-stats">
         <div className="tr-card tr-stat" data-stat="focused">
@@ -413,11 +446,6 @@ export function TodayRoom() {
               </div>
             ))}
           </div>
-        </div>
-
-        <div className="tr-card tr-week">
-          <div className="tr-head"><p className="tr-l">The week behind</p></div>
-          <WeekStrip />
         </div>
       </section>
 

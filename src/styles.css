@@ -1856,12 +1856,20 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 /* What the day adds up to, right beside its name: the one figure that answers
    "is this day already full" without opening it to find out. */
 .weekplan-daymeta { margin-left: auto; font-size: 0.6875rem; color: var(--wk-faint); }
-.weekplan-slot { display: flex; flex-direction: column; gap: 5px; }
+.weekplan-slot { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .weekplan-slotname { display: block; font-size: 0.5625rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--wk-faint); }
 .weekplan-item {
-  display: flex; align-items: flex-start; gap: 5px;
+  display: flex; align-items: flex-start; gap: 5px; min-width: 0;
   background: var(--wk-card2); border-radius: 6px; padding: 4px 7px;
   font-size: var(--text-xs); line-height: 1.35; color: var(--wk-item-ink);
+  /* A pasted URL or any other long unbroken string was never actually
+     wrapping -- every flex box up the chain (this one included) defaults to
+     min-width: auto, which refuses to shrink below its content's own
+     intrinsic width no matter how narrow the column gets. Only showed up on
+     Today because that layout gives the grid less room than Plan's full-
+     width page does; the bug was there on both, Today just had less slack
+     to hide it in. */
+  overflow-wrap: anywhere; word-break: break-word;
 }
 .weekplan-item .cat-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; flex: none; margin-top: 3px; }
 .weekplan-item.is-done { opacity: 0.6; color: var(--wk-item-faint); text-decoration: line-through; text-decoration-color: var(--wk-item-faint); }

@@ -1382,6 +1382,13 @@ export function PlanPage() {
             const totalMin = dayTasks.filter((t) => !t.done).reduce((a, t) => a + taskMinutes(t), 0)
             const pct = Math.min(100, Math.round((totalMin / WEEK_CAPACITY_MIN) * 100))
             const out = daysOut(iso)
+            /* Past days lose plannedOn on roll (see roll.ts), so their tasks
+               drop out of dayTasks entirely once the day turns over. doneAt
+               survives that sweep, so it's the only honest source left for
+               "how much did I actually finish that day". */
+            const doneCount = out < 0
+              ? spaceTasks.filter((t) => t.done && t.doneAt?.slice(0, 10) === iso).length
+              : 0
             const reachable = out >= 0 && out <= PLAN_AHEAD_DAYS
             /* Unsorted is a fifth group now, not a count he cannot read. His
                words: "it doesn't mean if it's unsorted... you still have to
@@ -1403,7 +1410,11 @@ export function PlanPage() {
                     <span className="weekplan-dayname">{name}</span>
                     <span className="weekplan-daynum mono">{Number(dnum)}</span>
                   </span>
-                  <span className="weekplan-daymeta mono">{totalMin > 0 ? fmtDuration(totalMin) : '—'}</span>
+                  <span className="weekplan-daymeta mono">
+                    {out < 0
+                      ? (doneCount > 0 ? `${doneCount} done` : '—')
+                      : (totalMin > 0 ? fmtDuration(totalMin) : '—')}
+                  </span>
                 </button>
                 {groups.length ? groups.map(({ slot: sl, here }) => {
                   const shown = weekExpanded ? here : here.slice(0, WEEK_CAP)
@@ -1420,7 +1431,11 @@ export function PlanPage() {
                       {rest > 0 && <span className="weekplan-more">+{rest} more</span>}
                     </div>
                   )
-                }) : <span className="weekplan-empty">Nothing planned</span>}
+                }) : (
+                  <span className="weekplan-empty">
+                    {out < 0 && doneCount > 0 ? `${doneCount} task${doneCount === 1 ? '' : 's'} done, nothing else logged` : 'Nothing planned'}
+                  </span>
+                )}
               </div>
             )
           })}

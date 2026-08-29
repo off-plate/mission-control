@@ -1695,10 +1695,17 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
      of sitting here -- .panel's padding would leave a dead band top and
      bottom of the bar that LOOKS like part of the dark strip but isn't part
      of its own clickable box, which was the bug: the bar only opened or
-     closed from roughly its middle. */
-  padding: 0;
+     closed from roughly its middle.
+
+     padding:0 alone lost this fight: a later, more general ".panel { padding:
+     var(--s5) }" rule elsewhere in this file (the card system every panel
+     shares) has the same specificity and comes after this one in the file, so
+     it kept winning the cascade and silently restoring the 20px inset this
+     rule was trying to remove -- .weekplan needed the higher-specificity
+     .panel.weekplan below to actually beat it. */
   background: var(--wk-bg); border-color: transparent; color: var(--wk-ink);
 }
+.panel.weekplan { padding: 0; }
 .weekplan .microcap { color: var(--wk-muted); }
 
 /* The whole folded/unfolded bar. A plain flex row that opens and closes the
@@ -1779,7 +1786,17 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
   transition: padding-top 340ms cubic-bezier(0.22, 1, 0.36, 1), padding-bottom 340ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .weekplan.is-open .weekplan-collapse-inner { padding-top: var(--s5); padding-bottom: var(--s5); }
-.weekplan-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--s2); align-items: start; min-height: 220px; }
+/* The row-count tween alone left a real artifact on close: the LAST pixel or
+   two of height before it hit exactly 0 still had real content behind it, so
+   the day cards' own top edges flashed through as thin lines right at the
+   end. Fading the grid out well inside the same 340ms -- fully gone by 200ms,
+   height doesn't finish collapsing until 340ms -- means nothing is left to
+   flash by the time the box gets that small. */
+.weekplan-grid {
+  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--s2); align-items: start; min-height: 220px;
+  opacity: 0; transition: opacity 200ms ease-in;
+}
+.weekplan.is-open .weekplan-grid { opacity: 1; transition: opacity 200ms ease-out; }
 /* A week with nothing planned yet (browsing ahead) must not collapse the
    section and yank the rest of the page up with it -- floor it at roughly
    one day's worth of real content instead. */

@@ -1693,15 +1693,30 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
   margin-top: var(--s5);
   background: var(--wk-bg); border-color: transparent; color: var(--wk-ink);
 }
-.weekplan > .microcap { color: var(--wk-muted); }
+.weekplan .microcap { color: var(--wk-muted); }
 
-.col-head:has(.weekplan-title) { flex-wrap: wrap; row-gap: var(--s2); align-items: center; }
+/* The whole folded/unfolded bar. A plain flex row that opens and closes the
+   section on its own click -- see the component note by weekOpen for why
+   this is a div with role="button" and not a real <button>. */
+.weekplan-bar {
+  display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; row-gap: var(--s2);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.weekplan-bar:hover .weekplan-title .microcap, .weekplan-bar:hover .weekplan-sentence { color: var(--wk-hot); }
+.weekplan-bar:focus-visible { outline: 2px solid var(--wk-hot); outline-offset: 4px; border-radius: 4px; }
 /* The label and the range it describes are one left-aligned unit now, not a
    label on the far left with the date it belongs to floating alone in the
    middle of the row. */
-.weekplan-title { display: flex; align-items: baseline; gap: 10px; }
-.weekplan-title .microcap { margin-bottom: 0; }
+.weekplan-title { display: flex; align-items: baseline; gap: 10px; flex: none; }
+.weekplan-title .microcap { margin-bottom: 0; transition: color var(--t-fast); }
 .weekplan-range { font-size: 0.75rem; color: var(--wk-muted); }
+/* His dynamic sentence, in both states: what the collapsed bar is FOR, and
+   the one line that still explains the day once it's open. */
+.weekplan-sentence {
+  flex: 1 1 240px; min-width: 0; font-size: 0.8125rem; color: var(--wk-muted);
+  transition: color var(--t-fast);
+}
+.weekplan-sentence strong { color: var(--wk-ink); font-weight: 700; }
 
 .weekplan-nav { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 /* ONE HEIGHT FOR EVERY CONTROL IN THIS ROW, arrows and the density switch
@@ -1723,6 +1738,18 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 .wk-navbtn:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
 .wk-navbtn.is-on { background: var(--wk-hot); color: #0E0E10; border-color: var(--wk-hot); }
 
+/* The fold. grid-template-rows 0fr -> 1fr tweens to whatever height the real
+   content needs, at any density, instead of a max-height guess that snaps
+   open or stops short partway. The grid stays mounted in both states so
+   there's always something to measure and clicking inside it can never
+   bubble up to weekplan-bar's own onClick -- only the bar folds this shut. */
+.weekplan-collapse {
+  display: grid; grid-template-rows: 0fr;
+  transition: grid-template-rows 340ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.weekplan.is-open .weekplan-collapse { grid-template-rows: 1fr; }
+.weekplan-collapse-inner { overflow: hidden; min-height: 0; padding-top: 0; transition: padding-top 340ms cubic-bezier(0.22, 1, 0.36, 1); }
+.weekplan.is-open .weekplan-collapse-inner { padding-top: var(--s5); }
 .weekplan-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--s2); align-items: start; min-height: 220px; }
 /* A week with nothing planned yet (browsing ahead) must not collapse the
    section and yank the rest of the page up with it -- floor it at roughly

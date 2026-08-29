@@ -876,6 +876,8 @@ await step('plan: the day switcher reaches six days out, one real day each', asy
 await step('plan: the week widget is a real Monday-to-Sunday, not the switcher again', async () => {
   await fresh('plan')
   if (!(await page.locator('.weekplan').count())) throw new Error('no week widget on the page')
+  // Folded shut on load; open it before touching anything inside.
+  await page.locator('.weekplan-bar').click(); await page.waitForTimeout(400)
   const names = await page.locator('.weekplan-dayname').allInnerTexts()
   if (names.join(',').toUpperCase() !== 'MON,TUE,WED,THU,FRI,SAT,SUN') throw new Error(`columns read ${names.join(',')}`)
   // It does not track the day switcher's offset: moving the switcher must not move it.
@@ -906,6 +908,7 @@ await step('plan: the week widget is a real Monday-to-Sunday, not the switcher a
   // Clicking a day that has already happened opens its record instead.
   await page.goto(`${URL}#/plan`); await page.waitForTimeout(500)
   if (forwardIdx > 0) {
+    await page.locator('.weekplan-bar').click(); await page.waitForTimeout(400)
     await page.locator('.weekplan-day').first().locator('.weekplan-daybtn').click(); await page.waitForTimeout(600)
     if (!page.url().includes('/day/')) throw new Error('a past day did not open its record')
     if (!(await page.locator('h1').count())) throw new Error('the record page did not render')
@@ -937,6 +940,8 @@ await step('plan: a heavy day shows every task uncapped, and This week stays put
     localStorage.setItem(K, JSON.stringify(s))
   }, KEY)
   await page.reload(); await page.waitForTimeout(900)
+  // Folded shut on load; open it before touching anything inside.
+  await page.locator('.weekplan-bar').click(); await page.waitForTimeout(400)
   const heavy = page.locator('.weekplan-day.is-today')
   if (!(await heavy.count())) throw new Error("no card is marked today's")
   // No cap, no toggle: every seeded task renders straight away.
@@ -955,6 +960,49 @@ await step('plan: a heavy day shows every task uncapped, and This week stays put
   await page.locator('.weekplan-nav .wk-navbtn').first().click(); await page.waitForTimeout(300)
   if (!(await thisWeekBtn.count())) throw new Error('"This week" disappeared after paging away, it should stay in place')
   if (await thisWeekBtn.isDisabled()) throw new Error('"This week" should be clickable once off the current week')
+})
+
+/* Moved above the day panel and folded shut by default on his instruction
+   (2026-08-31, from his own mockup): the bar opens and closes on its own
+   click, the toggle icon on the right swaps job and shape with it, and a
+   click that lands inside the open grid must never fold it back up -- only
+   the bar itself does that. */
+await step('plan: the week bar folds shut by default, and only the bar itself opens or closes it', async () => {
+  await fresh('plan')
+  const panel = page.locator('.weekplan')
+  if ((await panel.getAttribute('class'))?.includes('is-open')) throw new Error('the week starts open; it should be folded shut on load')
+  const collapseHeight = await page.locator('.weekplan-collapse').evaluate((el) => el.getBoundingClientRect().height)
+  if (collapseHeight > 4) throw new Error(`the folded section still measures ${collapseHeight}px tall`)
+  if ((await page.locator('.weekplan-toggle').getAttribute('aria-label')) !== 'Show the week') throw new Error('the toggle should read as an expand affordance while shut')
+  // Clicking anywhere on the bar (not just the toggle icon) opens it.
+  await page.locator('.weekplan-title').click(); await page.waitForTimeout(400)
+  if (!((await panel.getAttribute('class'))?.includes('is-open'))) throw new Error('clicking the bar did not open the week')
+  if ((await page.locator('.weekplan-collapse').evaluate((el) => el.getBoundingClientRect().height)) < 100) throw new Error('open, but the grid never actually grew')
+  if ((await page.locator('.weekplan-toggle').getAttribute('aria-label')) !== 'Next week') throw new Error('open, the same icon slot should now read as the next-week control')
+  // A click inside the now-open grid must not fold it back up.
+  await page.locator('.weekplan-grid').click({ position: { x: 5, y: 5 } })
+  await page.waitForTimeout(300)
+  if (!((await panel.getAttribute('class'))?.includes('is-open'))) throw new Error('a click inside the grid closed the week; only the bar should be able to do that')
+  // The repurposed toggle pages the week forward instead of closing it.
+  const rangeBefore = await page.locator('.weekplan-range').innerText()
+  await page.locator('.weekplan-toggle').click(); await page.waitForTimeout(300)
+  if (!((await panel.getAttribute('class'))?.includes('is-open'))) throw new Error('clicking the open-state toggle closed the week instead of paging it')
+  if ((await page.locator('.weekplan-range').innerText()) === rangeBefore) throw new Error('the open-state toggle did not page the week forward')
+  // The bar itself closes it again.
+  await page.locator('.weekplan-title').click(); await page.waitForTimeout(400)
+  if ((await panel.getAttribute('class'))?.includes('is-open')) throw new Error('clicking the bar again did not close the week')
+  // The dynamic sentence: singular/plural and a real duration, not his mockup's "9hours" typo.
+  await page.evaluate((K) => {
+    localStorage.setItem('mc-view', 'all')
+    const s = JSON.parse(localStorage.getItem(K))
+    const today = new Date(); const z = (n) => String(n).padStart(2, '0')
+    const day = `${today.getFullYear()}-${z(today.getMonth() + 1)}-${z(today.getDate())}`
+    s.tasks = [...(s.tasks ?? []), { id: 'sentence-gate', title: 'Sentence gate task', source: 'mc', estimateMin: 45, done: false, space: 'personal', list: 'today', category: 'quick', plannedOn: day, addedAt: Date.now() }]
+    localStorage.setItem(K, JSON.stringify(s))
+  }, KEY)
+  await page.reload(); await page.waitForTimeout(900)
+  const sentence = await page.locator('.weekplan-sentence').innerText()
+  if (!/^You have 1 task planned for today, taking 45m of your day\.$/.test(sentence)) throw new Error(`the sentence reads "${sentence}"`)
 })
 
 await step('goals: a promised task ticks from the plan', async () => {

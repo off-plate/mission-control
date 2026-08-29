@@ -906,6 +906,11 @@ export function PlanPage() {
      panel steps onto that day if it can, or opens that day's record if it
      already happened. */
   const [weekShift, setWeekShift] = useState(0)
+  /* Folded shut on load, every time: the week is context for the day he's
+     planning, not the first thing the page shows. His own mockup put it
+     right under the header, above the to-do list and day panel, collapsed
+     to one bar until he opens it. */
+  const [weekOpen, setWeekOpen] = useState(false)
   /* THE ALMANAC. He picked this shape from three variants shown as artifacts,
      2026-08-30: a card per day with a ring for how full it is and its tasks
      grouped into slot chips, over the flat hairline table it replaces. A
@@ -941,6 +946,153 @@ export function PlanPage() {
            from here, and from there one arrow at a time. */
         actions={<button className="btn btn-ghost" onClick={() => openDay(prevDay())}>Yesterday</button>}
       />
+      {/* THE WEEK. Moved above the to-do list and day panel on his instruction
+          (2026-08-31, from his own mockup): folded to one bar by default, the
+          week is context for the day he's about to plan, not the first thing
+          the page shows in full. */}
+      <div className={`panel weekplan${weekOpen ? ' is-open' : ''}`}>
+        {/* The whole bar opens AND closes it -- one handler, both directions.
+            The nav row (This week / prev) stops its own clicks from reaching
+            this so paging a week doesn't also fold the thing shut. */}
+        {/* A div, not a button: it holds real <button> nav controls inside it,
+            and a button cannot nest inside a button -- the browser would just
+            close the outer one early and break the layout. role+tabIndex give
+            it the same keyboard reach a button would have. */}
+        <div
+          className="weekplan-bar"
+          role="button"
+          tabIndex={0}
+          aria-expanded={weekOpen}
+          onClick={() => setWeekOpen((v) => !v)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setWeekOpen((v) => !v) }
+          }}
+        >
+          <span className="weekplan-title">
+            <span className="microcap">The week</span>
+            <span className="weekplan-range mono">{weekRangeLabel(weekDays[0], weekDays[6])}</span>
+          </span>
+          {/* His sentence, verbatim in shape, tightened in wording: "9hours and
+              10 minutes" read as a typo more than a choice, and this app
+              already spells every other duration as fmtDuration does (Band's
+              own "9h 10m" sits three lines above this bar on the same page). */}
+          <span className="weekplan-sentence">
+            {todayTasks.length === 0 ? (
+              'Nothing planned for today yet.'
+            ) : (
+              <>
+                You have <strong>{todayTasks.length} {todayTasks.length === 1 ? 'task' : 'tasks'}</strong> planned
+                for today, taking <strong>{fmtDuration(plannedMin)}</strong> of your day.
+              </>
+            )}
+          </span>
+          <span className="weekplan-nav" onClick={(e) => e.stopPropagation()}>
+            {weekOpen && (
+              <button className="wk-navbtn" aria-label="Previous week" onClick={() => setWeekShift((n) => n - 1)}>
+                <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 L6 8 L10 13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </button>
+            )}
+            {weekOpen && (
+              <button
+                className="wk-navbtn is-word"
+                disabled={weekShift === 0}
+                aria-current={weekShift === 0 ? 'true' : undefined}
+                onClick={() => setWeekShift(0)}
+              >
+                This week
+              </button>
+            )}
+            {/* Same slot, two jobs. Shut, it's a redundant affordance for what
+                the whole bar already does -- his words, "more of a show off
+                than functional". Open, it becomes the real next-week arrow,
+                which is why the icon swaps from a down chevron to a right one
+                the moment the fold opens. */}
+            <button
+              className="wk-navbtn weekplan-toggle"
+              aria-label={weekOpen ? 'Next week' : 'Show the week'}
+              onClick={() => (weekOpen ? setWeekShift((n) => n + 1) : setWeekOpen(true))}
+            >
+              {weekOpen ? (
+                <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3 L10 8 L6 13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6 L8 10 L13 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              )}
+            </button>
+          </span>
+        </div>
+        {/* A CSS grid-rows tween, not a max-height guess: it animates to
+            however tall the real content is, at any density, instead of
+            snapping open or stopping short. The grid itself stays mounted
+            through both states so the tween always has something to measure
+            and a click inside it can never bubble up to the bar and fold it
+            shut -- only the bar's own onClick can do that. */}
+        <div className="weekplan-collapse" aria-hidden={!weekOpen}>
+        <div className="weekplan-collapse-inner">
+        <div className="weekplan-grid">
+          {weekDays.map((iso) => {
+            const [, , dnum] = iso.split('-')
+            const name = new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short' })
+            const dayTasks = weekTasks.filter((t) => (t.plannedOn ?? today) === iso)
+            const totalMin = dayTasks.filter((t) => !t.done).reduce((a, t) => a + taskMinutes(t), 0)
+            const pct = Math.min(100, Math.round((totalMin / WEEK_CAPACITY_MIN) * 100))
+            const out = daysOut(iso)
+            /* Past days lose plannedOn on roll (see roll.ts), so their tasks
+               drop out of dayTasks entirely once the day turns over. doneAt
+               survives that sweep, so it's the only honest source left for
+               what actually got finished that day -- and he wants the tasks
+               themselves crossed out here, not a count standing in for them. */
+            const doneItems = out < 0
+              ? spaceTasks.filter((t) => t.done && t.doneAt?.slice(0, 10) === iso)
+              : []
+            const doneCount = doneItems.length
+            const reachable = out >= 0 && out <= PLAN_AHEAD_DAYS
+            /* Unsorted is a fifth group now, not a count he cannot read. His
+               words: "it doesn't mean if it's unsorted... you still have to
+               show" it. Same shape as the other four, same cap, first in the
+               list the way the day panel above already orders its own BUCKETS.
+               Done is the sixth, past days only, built from doneItems instead
+               of dayTasks since roll.ts already emptied that for these days. */
+            const groups = [{ id: 'unsorted', label: 'Unsorted' }, ...SLOTS].map((sl) => ({
+              slot: sl,
+              here: dayTasks.filter((t) => (sl.id === 'unsorted' ? !t.slot : t.slot === sl.id)),
+            })).filter((g) => g.here.length)
+            if (doneItems.length) groups.push({ slot: { id: 'done', label: 'Done' }, here: doneItems })
+            return (
+              <div className={`weekplan-day${iso === today ? ' is-today' : ''}${out < 0 ? ' is-past' : ''}`} key={iso}>
+                <button
+                  className="weekplan-daybtn"
+                  onClick={() => jumpToDay(iso)}
+                  title={reachable ? `Plan ${name} ${Number(dnum)}` : out < 0 ? `See ${name} ${Number(dnum)}` : undefined}
+                >
+                  <WeekRing pct={pct} />
+                  <span className="weekplan-daylabel">
+                    <span className="weekplan-dayname">{name}</span>
+                    <span className="weekplan-daynum mono">{Number(dnum)}</span>
+                  </span>
+                  <span className="weekplan-daymeta mono">
+                    {out < 0
+                      ? (doneCount > 0 ? `${doneCount} done` : '—')
+                      : (totalMin > 0 ? fmtDuration(totalMin) : '—')}
+                  </span>
+                </button>
+                {groups.length ? groups.map(({ slot: sl, here }) => (
+                  <div className="weekplan-slot" key={sl.id}>
+                    <span className="weekplan-slotname">{sl.label}</span>
+                    {here.map((t) => (
+                      <span className={`weekplan-item${t.done ? ' is-done' : ''}`} key={t.id} title={t.title}>
+                        <span className={`cat-dot ${t.category}`} aria-hidden="true" />
+                        {t.title}
+                      </span>
+                    ))}
+                  </div>
+                )) : <span className="weekplan-empty">Nothing planned</span>}
+              </div>
+            )
+          })}
+        </div>
+        </div>
+        </div>
+      </div>
       {/* What came back overnight. Said once, on the day it happened, with the
           count and a way to take it back in one move. The alternative was work
           quietly vanishing from the day, which is worse than a wall of it. */}
@@ -1336,102 +1488,6 @@ export function PlanPage() {
         </div>
       </div>
 
-      {/* THE WEEK. Below the day panel, its own panel, on his instruction: not a
-          third column squeezed in beside the to-do list, a full width row of
-          its own so seven days actually have room to be read. */}
-      <div className="panel weekplan">
-        <div className="col-head">
-          {/* One left-aligned block, on his instruction (2026-08-30): the
-              range used to float alone in the middle of the row, between a
-              label it belonged to and controls it had nothing to do with. */}
-          <span className="weekplan-title">
-            <span className="microcap">The week</span>
-            <span className="weekplan-range mono">{weekRangeLabel(weekDays[0], weekDays[6])}</span>
-          </span>
-          <span className="weekplan-nav">
-            <button className="wk-navbtn" aria-label="Previous week" onClick={() => setWeekShift((n) => n - 1)}>
-              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 L6 8 L10 13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            </button>
-            {/* Rendered on every week, not just the ones he's paged away from
-                -- an arrow click that makes this button appear or disappear
-                is the middle of the row jumping width mid-click. Current week
-                gets it too, just inert, so the row measures the same always. */}
-            <button
-              className="wk-navbtn is-word"
-              disabled={weekShift === 0}
-              aria-current={weekShift === 0 ? 'true' : undefined}
-              onClick={() => setWeekShift(0)}
-            >
-              This week
-            </button>
-            <button className="wk-navbtn" aria-label="Next week" onClick={() => setWeekShift((n) => n + 1)}>
-              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3 L10 8 L6 13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            </button>
-          </span>
-        </div>
-        <div className="weekplan-grid">
-          {weekDays.map((iso) => {
-            const [, , dnum] = iso.split('-')
-            const name = new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short' })
-            const dayTasks = weekTasks.filter((t) => (t.plannedOn ?? today) === iso)
-            const totalMin = dayTasks.filter((t) => !t.done).reduce((a, t) => a + taskMinutes(t), 0)
-            const pct = Math.min(100, Math.round((totalMin / WEEK_CAPACITY_MIN) * 100))
-            const out = daysOut(iso)
-            /* Past days lose plannedOn on roll (see roll.ts), so their tasks
-               drop out of dayTasks entirely once the day turns over. doneAt
-               survives that sweep, so it's the only honest source left for
-               what actually got finished that day -- and he wants the tasks
-               themselves crossed out here, not a count standing in for them. */
-            const doneItems = out < 0
-              ? spaceTasks.filter((t) => t.done && t.doneAt?.slice(0, 10) === iso)
-              : []
-            const doneCount = doneItems.length
-            const reachable = out >= 0 && out <= PLAN_AHEAD_DAYS
-            /* Unsorted is a fifth group now, not a count he cannot read. His
-               words: "it doesn't mean if it's unsorted... you still have to
-               show" it. Same shape as the other four, same cap, first in the
-               list the way the day panel above already orders its own BUCKETS.
-               Done is the sixth, past days only, built from doneItems instead
-               of dayTasks since roll.ts already emptied that for these days. */
-            const groups = [{ id: 'unsorted', label: 'Unsorted' }, ...SLOTS].map((sl) => ({
-              slot: sl,
-              here: dayTasks.filter((t) => (sl.id === 'unsorted' ? !t.slot : t.slot === sl.id)),
-            })).filter((g) => g.here.length)
-            if (doneItems.length) groups.push({ slot: { id: 'done', label: 'Done' }, here: doneItems })
-            return (
-              <div className={`weekplan-day${iso === today ? ' is-today' : ''}${out < 0 ? ' is-past' : ''}`} key={iso}>
-                <button
-                  className="weekplan-daybtn"
-                  onClick={() => jumpToDay(iso)}
-                  title={reachable ? `Plan ${name} ${Number(dnum)}` : out < 0 ? `See ${name} ${Number(dnum)}` : undefined}
-                >
-                  <WeekRing pct={pct} />
-                  <span className="weekplan-daylabel">
-                    <span className="weekplan-dayname">{name}</span>
-                    <span className="weekplan-daynum mono">{Number(dnum)}</span>
-                  </span>
-                  <span className="weekplan-daymeta mono">
-                    {out < 0
-                      ? (doneCount > 0 ? `${doneCount} done` : '—')
-                      : (totalMin > 0 ? fmtDuration(totalMin) : '—')}
-                  </span>
-                </button>
-                {groups.length ? groups.map(({ slot: sl, here }) => (
-                  <div className="weekplan-slot" key={sl.id}>
-                    <span className="weekplan-slotname">{sl.label}</span>
-                    {here.map((t) => (
-                      <span className={`weekplan-item${t.done ? ' is-done' : ''}`} key={t.id} title={t.title}>
-                        <span className={`cat-dot ${t.category}`} aria-hidden="true" />
-                        {t.title}
-                      </span>
-                    ))}
-                  </div>
-                )) : <span className="weekplan-empty">Nothing planned</span>}
-              </div>
-            )
-          })}
-        </div>
-      </div>
 
       {breakdownFor && <BreakdownSheet task={breakdownFor} onClose={() => setBreakdownFor(null)} />}
       {editingTask && <EditTaskSheet task={editingTask} onClose={() => setEditingTask(null)} />}

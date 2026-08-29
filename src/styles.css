@@ -1687,14 +1687,6 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
   --wk-ink: #FFFFFF; --wk-muted: rgba(255, 255, 255, 0.78); --wk-faint: rgba(255, 255, 255, 0.48);
   --wk-item-ink: #17161B; --wk-item-faint: rgba(23, 22, 27, 0.5);
   --wk-hot: #C6F24A; --wk-hotw: rgba(198, 242, 74, 0.14);
-  /* A past day's ring answers a different question than today's -- see the
-     WeekRing component note. It's green, on his instruction, but NOT an
-     invented one: checkboxes, kept-dots and the meter bar were all moved off
-     literal green onto the space's own accent a while back (COLOR.md: "why is
-     it green when green is not in the palette"), so the only real green left
-     in this codebase is the otherwise-unused --a-progress-solid HUD value.
-     Reusing that instead of picking a fresh hex. */
-  --wk-good: #55E0A0;
   --wk-line: rgba(255, 255, 255, 0.4); --wk-line-2: rgba(255, 255, 255, 0.5);
   --wk-r: 16px; --wk-ctrl-h: 34px;
 
@@ -1855,7 +1847,6 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
   --wk-ink: #FFFFFF; --wk-muted: rgba(255, 255, 255, 0.78); --wk-faint: rgba(255, 255, 255, 0.48);
   --wk-item-ink: #08141A; --wk-item-faint: rgba(8, 20, 26, 0.5);
   --wk-hot: #4FD8E8; --wk-hotw: rgba(79, 216, 232, 0.14);
-  --wk-good: #55E0A0;
   --wk-line: rgba(255, 255, 255, 0.4); --wk-line-2: rgba(255, 255, 255, 0.5);
   --wk-r: 6px;
 }

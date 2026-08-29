@@ -1708,10 +1708,13 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
    strip -- not just its vertical middle -- opens or closes it. */
 .weekplan-bar {
   display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; row-gap: var(--s2);
-  padding: var(--s5);
+  /* Vertical inset shrunk back down on his word -- he wanted the strip's
+     height back to what it was, not the roomier padding this briefly grew
+     into. Horizontal stays at s5 so the text still clears the card's rounded
+     corners. */
+  padding: var(--s3) var(--s5);
   cursor: pointer; -webkit-tap-highlight-color: transparent;
 }
-.weekplan-bar:hover .weekplan-title .microcap, .weekplan-bar:hover .weekplan-sentence { color: var(--wk-hot); }
 .weekplan-bar:focus-visible { outline: 2px solid var(--wk-hot); outline-offset: 4px; border-radius: 4px; }
 /* The label and the range it describes are one left-aligned unit now, not a
    label on the far left with the date it belongs to floating alone in the
@@ -1721,15 +1724,16 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
    uses. This is the one thing on the page that has to read from a glance,
    folded or not, so it gets its own larger size rather than inheriting the
    label default. */
-.weekplan-title .microcap { margin-bottom: 0; font-size: 0.875rem; transition: color var(--t-fast); }
+.weekplan-title .microcap { margin-bottom: 0; font-size: 0.875rem; }
 .weekplan-range { font-size: 0.9375rem; color: var(--wk-muted); }
 /* His dynamic sentence, in both states: what the collapsed bar is FOR, and
-   the one line that still explains the day once it's open. */
+   the one line that still explains the day once it's open. The task count
+   and duration stay lime always -- his instruction was that they read as
+   color permanently, not only while hovering the bar. */
 .weekplan-sentence {
   flex: 1 1 240px; min-width: 0; font-size: 1rem; color: var(--wk-muted);
-  transition: color var(--t-fast);
 }
-.weekplan-sentence strong { color: var(--wk-ink); font-weight: 700; }
+.weekplan-sentence strong { color: var(--wk-hot); font-weight: 700; }
 
 .weekplan-nav { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 /* ONE HEIGHT FOR EVERY CONTROL IN THIS ROW, arrows and the density switch

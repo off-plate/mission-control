@@ -1385,19 +1385,24 @@ export function PlanPage() {
             /* Past days lose plannedOn on roll (see roll.ts), so their tasks
                drop out of dayTasks entirely once the day turns over. doneAt
                survives that sweep, so it's the only honest source left for
-               "how much did I actually finish that day". */
-            const doneCount = out < 0
-              ? spaceTasks.filter((t) => t.done && t.doneAt?.slice(0, 10) === iso).length
-              : 0
+               what actually got finished that day -- and he wants the tasks
+               themselves crossed out here, not a count standing in for them. */
+            const doneItems = out < 0
+              ? spaceTasks.filter((t) => t.done && t.doneAt?.slice(0, 10) === iso)
+              : []
+            const doneCount = doneItems.length
             const reachable = out >= 0 && out <= PLAN_AHEAD_DAYS
             /* Unsorted is a fifth group now, not a count he cannot read. His
                words: "it doesn't mean if it's unsorted... you still have to
                show" it. Same shape as the other four, same cap, first in the
-               list the way the day panel above already orders its own BUCKETS. */
+               list the way the day panel above already orders its own BUCKETS.
+               Done is the sixth, past days only, built from doneItems instead
+               of dayTasks since roll.ts already emptied that for these days. */
             const groups = [{ id: 'unsorted', label: 'Unsorted' }, ...SLOTS].map((sl) => ({
               slot: sl,
               here: dayTasks.filter((t) => (sl.id === 'unsorted' ? !t.slot : t.slot === sl.id)),
             })).filter((g) => g.here.length)
+            if (doneItems.length) groups.push({ slot: { id: 'done', label: 'Done' }, here: doneItems })
             return (
               <div className={`weekplan-day${iso === today ? ' is-today' : ''}${out < 0 ? ' is-past' : ''}`} key={iso}>
                 <button
@@ -1431,11 +1436,7 @@ export function PlanPage() {
                       {rest > 0 && <span className="weekplan-more">+{rest} more</span>}
                     </div>
                   )
-                }) : (
-                  <span className="weekplan-empty">
-                    {out < 0 && doneCount > 0 ? `${doneCount} task${doneCount === 1 ? '' : 's'} done, nothing else logged` : 'Nothing planned'}
-                  </span>
-                )}
+                }) : <span className="weekplan-empty">Nothing planned</span>}
               </div>
             )
           })}

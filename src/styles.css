@@ -1726,7 +1726,11 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
   min-width: 0;
 }
 .weekplan-day.is-today { border-color: var(--wk-hot); box-shadow: 0 0 0 1px var(--wk-hot); }
-.weekplan-day.is-past { opacity: 0.6; }
+/* THIS USED TO DIM PAST DAYS TO 60% OPACITY, and that was the bug he caught:
+   dimming the WHOLE card fades the outline and the date along with it, so
+   "white" read as grey on every day except today and tomorrow. His words
+   were "should be white", full stop, on every day -- past days keep their
+   white text and white outline and are told apart some other way instead. */
 .weekplan-daybtn { display: flex; align-items: center; gap: 8px; text-align: left; font-family: var(--font-body); color: var(--wk-ink); padding: 0; min-width: 0; }
 .weekplan-daybtn svg { flex: none; }
 .weekplan-daybtn:hover .weekplan-dayname { color: var(--wk-hot); }

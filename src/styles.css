@@ -1707,6 +1707,24 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 }
 .panel.weekplan { padding: 0; }
 .weekplan .microcap { color: var(--wk-muted); }
+/* Today's instance only, on his instruction (2026-08-31): it sat as the one
+   dark card in a room where every sibling (To-do, On the clock, Standing) is
+   a plain white card, and he wanted it to match them instead of standing out
+   as the odd dark one. Plan keeps the dark version -- this is a second set of
+   values for the same tokens, not a new component, so every rule below still
+   works unchanged. Reuses the app's own real light tokens (a-card, a-sunk,
+   a-ink...) rather than inventing fresh colors for a one-off variant.
+   --wk-hot retargets to a-accent-text, not literal lime: lime reads at
+   1.17:1 on a light surface and this token paints a border and a day-name as
+   well as the ring, so it needs to stay readable everywhere it's used, not
+   just where a meter would tolerate it. */
+.weekplan.is-light {
+  --wk-bg: var(--a-card); --wk-card: var(--a-sunk); --wk-card2: var(--a-card);
+  --wk-ink: var(--a-ink); --wk-muted: var(--a-muted); --wk-faint: var(--a-faint);
+  --wk-item-ink: var(--a-ink); --wk-item-faint: var(--a-faint);
+  --wk-hot: var(--a-accent-text); --wk-hotw: var(--a-accent-wash);
+  --wk-line: var(--a-line); --wk-line-2: var(--a-line-2);
+}
 
 /* The whole folded/unfolded bar. A plain flex row that opens and closes the
    section on its own click -- see the component note by weekOpen for why

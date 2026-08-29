@@ -350,7 +350,7 @@ export function TodayRoom() {
       </section>
 
       {/* ---- the week, full size, always open -- his instruction (2026-08-31) ---- */}
-      <div className="panel weekplan is-open is-fixed">
+      <div className="panel weekplan is-open is-fixed is-light">
         <div className="weekplan-bar is-static">
           <span className="weekplan-title">
             <span className="microcap">The week</span>

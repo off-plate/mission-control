@@ -429,9 +429,9 @@ function WeekRing({ pct, size = 34 }: { pct: number; size?: number }) {
   const c = 2 * Math.PI * r
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--hairline-strong)" strokeWidth={sw} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--wk-line-2)" strokeWidth={sw} />
       <circle
-        cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--accent-text)" strokeWidth={sw}
+        cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--wk-hot)" strokeWidth={sw}
         strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)} strokeLinecap="round"
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
       />
@@ -1348,17 +1348,26 @@ export function PlanPage() {
           its own so seven days actually have room to be read. */}
       <div className="panel weekplan">
         <div className="col-head">
-          <span className="microcap">The week</span>
-          <span className="col-tot mono">{weekRangeLabel(weekDays[0], weekDays[6])}</span>
+          {/* One left-aligned block, on his instruction (2026-08-30): the
+              range used to float alone in the middle of the row, between a
+              label it belonged to and controls it had nothing to do with. */}
+          <span className="weekplan-title">
+            <span className="microcap">The week</span>
+            <span className="weekplan-range mono">{weekRangeLabel(weekDays[0], weekDays[6])}</span>
+          </span>
           <span className="weekplan-nav">
-            <button className="goal-nav-btn" aria-label="Previous week" onClick={() => setWeekShift((n) => n - 1)}>‹</button>
-            {weekShift !== 0 && <button className="goal-nav-btn now" onClick={() => setWeekShift(0)}>This week</button>}
-            <button className="goal-nav-btn" aria-label="Next week" onClick={() => setWeekShift((n) => n + 1)}>›</button>
+            <button className="wk-navbtn" aria-label="Previous week" onClick={() => setWeekShift((n) => n - 1)}>
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 L6 8 L10 13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </button>
+            {weekShift !== 0 && <button className="wk-navbtn is-word" onClick={() => setWeekShift(0)}>This week</button>}
+            <button className="wk-navbtn" aria-label="Next week" onClick={() => setWeekShift((n) => n + 1)}>
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3 L10 8 L6 13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </button>
           </span>
           {/* The density switch. One for the whole week, off by default every
               time this mounts: see the note where weekExpanded is declared. */}
           <button
-            className={`weekplan-expand${weekExpanded ? ' is-on' : ''}`}
+            className={`wk-navbtn is-word weekplan-expand${weekExpanded ? ' is-on' : ''}`}
             aria-pressed={weekExpanded}
             onClick={() => setWeekExpanded((v) => !v)}
           >
@@ -1370,12 +1379,18 @@ export function PlanPage() {
             const [, , dnum] = iso.split('-')
             const name = new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short' })
             const dayTasks = weekTasks.filter((t) => (t.plannedOn ?? today) === iso)
-            const unsorted = dayTasks.filter((t) => !t.slot && !t.done).length
             const totalMin = dayTasks.filter((t) => !t.done).reduce((a, t) => a + taskMinutes(t), 0)
             const pct = Math.min(100, Math.round((totalMin / WEEK_CAPACITY_MIN) * 100))
             const out = daysOut(iso)
             const reachable = out >= 0 && out <= PLAN_AHEAD_DAYS
-            const anySlots = SLOTS.some((sl) => dayTasks.some((t) => t.slot === sl.id))
+            /* Unsorted is a fifth group now, not a count he cannot read. His
+               words: "it doesn't mean if it's unsorted... you still have to
+               show" it. Same shape as the other four, same cap, first in the
+               list the way the day panel above already orders its own BUCKETS. */
+            const groups = [{ id: 'unsorted', label: 'Unsorted' }, ...SLOTS].map((sl) => ({
+              slot: sl,
+              here: dayTasks.filter((t) => (sl.id === 'unsorted' ? !t.slot : t.slot === sl.id)),
+            })).filter((g) => g.here.length)
             return (
               <div className={`weekplan-day${iso === today ? ' is-today' : ''}${out < 0 ? ' is-past' : ''}`} key={iso}>
                 <button
@@ -1390,10 +1405,7 @@ export function PlanPage() {
                   </span>
                   <span className="weekplan-daymeta mono">{totalMin > 0 ? fmtDuration(totalMin) : '—'}</span>
                 </button>
-                {unsorted > 0 && <span className="weekplan-unsorted">+{unsorted} unsorted</span>}
-                {anySlots ? SLOTS.map((sl) => {
-                  const here = dayTasks.filter((t) => t.slot === sl.id)
-                  if (!here.length) return null
+                {groups.length ? groups.map(({ slot: sl, here }) => {
                   const shown = weekExpanded ? here : here.slice(0, WEEK_CAP)
                   const rest = here.length - shown.length
                   return (

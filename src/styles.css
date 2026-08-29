@@ -1708,12 +1708,16 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
    label on the far left with the date it belongs to floating alone in the
    middle of the row. */
 .weekplan-title { display: flex; align-items: baseline; gap: 10px; flex: none; }
-.weekplan-title .microcap { margin-bottom: 0; transition: color var(--t-fast); }
-.weekplan-range { font-size: 0.75rem; color: var(--wk-muted); }
+/* His word: barely readable at the size every other .microcap in the app
+   uses. This is the one thing on the page that has to read from a glance,
+   folded or not, so it gets its own larger size rather than inheriting the
+   label default. */
+.weekplan-title .microcap { margin-bottom: 0; font-size: 0.875rem; transition: color var(--t-fast); }
+.weekplan-range { font-size: 0.9375rem; color: var(--wk-muted); }
 /* His dynamic sentence, in both states: what the collapsed bar is FOR, and
    the one line that still explains the day once it's open. */
 .weekplan-sentence {
-  flex: 1 1 240px; min-width: 0; font-size: 0.8125rem; color: var(--wk-muted);
+  flex: 1 1 240px; min-width: 0; font-size: 1rem; color: var(--wk-muted);
   transition: color var(--t-fast);
 }
 .weekplan-sentence strong { color: var(--wk-ink); font-weight: 700; }
@@ -1723,20 +1727,29 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
    alike, and the arrows are inline SVG rather than the glyphs '‹ ›', whose
    vertical metrics sit off-centre in the body face and cannot be fixed by
    centring the box around them. */
+/* Same wipe every other button in the app uses (see "4. button: the fill
+   wipes in" further down) -- a ::before that scales in from the left on
+   hover, rather than an instant color swap that was the odd one out here. */
 .wk-navbtn {
   height: var(--wk-ctrl-h); width: var(--wk-ctrl-h); min-width: var(--wk-ctrl-h); padding: 0;
   display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  position: relative; overflow: hidden;
   border: 1px solid var(--wk-line-2); background: none; color: var(--wk-muted);
   border-radius: 999px; cursor: pointer;
-  transition: border-color var(--t-fast), color var(--t-fast), background var(--t-fast);
+  transition: border-color var(--t-fast), color var(--a-enter);
 }
+.wk-navbtn::before {
+  content: ''; position: absolute; inset: 0; background: var(--wk-hot);
+  transform: scaleX(0); transform-origin: left; transition: transform var(--a-enter); z-index: 0;
+}
+.wk-navbtn:hover:not(:disabled)::before { transform: scaleX(1); }
+.wk-navbtn > * { position: relative; z-index: 1; }
 .wk-navbtn svg { display: block; }
-.wk-navbtn:hover { background: var(--wk-hot); border-color: var(--wk-hot); color: #0E0E10; }
+.wk-navbtn:hover:not(:disabled) { border-color: var(--wk-hot); color: #0E0E10; }
 .wk-navbtn.is-word { width: auto; min-width: 0; padding: 0 14px; font: 600 0.6875rem/1 var(--font-body); white-space: nowrap; }
 /* "This week" stays in the row on every week now, not just the ones paged
    away from -- inert here rather than hidden, so the row never resizes. */
 .wk-navbtn:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
-.wk-navbtn.is-on { background: var(--wk-hot); color: #0E0E10; border-color: var(--wk-hot); }
 
 /* The fold. grid-template-rows 0fr -> 1fr tweens to whatever height the real
    content needs, at any density, instead of a max-height guess that snaps
@@ -1804,7 +1817,7 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
   --wk-line: rgba(255, 255, 255, 0.4); --wk-line-2: rgba(255, 255, 255, 0.5);
   --wk-r: 6px;
 }
-.shell.is-hud .wk-navbtn:hover, .shell.is-hud .wk-navbtn.is-on { color: #04141A; }
+.shell.is-hud .wk-navbtn:hover:not(:disabled) { color: #04141A; }
 
 .bucket-name { font-family: var(--font-display); font-weight: 700; font-size: var(--text-base); }
 .bucket-head .tot { margin-left: auto; font-family: var(--font-mono); font-size: 0.6875rem; color: var(--info); }

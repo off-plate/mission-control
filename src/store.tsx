@@ -256,6 +256,14 @@ interface Store extends PersistedState {
    *  because a lost write must never be a permanent lie. */
   assertRoutineDay: (habitId: string, dayIndex: number) => void
   markHabitDay: (id: string, day: number, value: boolean) => void
+  /** Same write, dated rather than weekday-indexed, for a day outside the
+   *  current week -- a Hevy backfill reaching six months back, say. Days
+   *  inside the current week still update the days[] cache; older ones
+   *  land only in habitLog, which is where a habit's real history lives. */
+  markHabitDayOn: (id: string, day: string, value: boolean) => void
+  /** Many dates on one habit, one state update. See markDaysOn's own comment
+   *  for why a loop of markHabitDayOn calls is not the same thing. */
+  markHabitDaysOn: (id: string, days: string[], value: boolean) => void
   addHabit: (input: { name: string; daypart?: import('./types').TimeSlot; frequency: import('./types').HabitFrequency; targetPerWeek?: number; kind?: import('./types').HabitKind; dailyTargetMin?: number; measure?: 'minutes' | 'times'; per?: import('./types').CountPeriod; targetCount?: number; source?: import('./types').HabitSource; quitSince?: string; startedOn?: string }) => void
   /** Record a slip on a habit you are trying to stop; resets the clean run. */
   logSlip: (id: string) => void
@@ -1708,6 +1716,35 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (h?.folderId && h.srcStepId && day === todayKey()) syncRoutineFromHabits(h.folderId, next)
   }
 
+  /** The same write as markDayOn, for many dates on one habit in a single
+   *  state update. markDayOn calls setHabitLog(next) off the CLOSED-OVER
+   *  habitLog, which is exactly right for one call and wrong for several in
+   *  a row: each iteration would read the same pre-loop snapshot, so only
+   *  the last of a batch would actually stick. Found live doing a Hevy
+   *  backfill -- four workout days in, only the oldest survived. This is
+   *  the one-pass version a backfill needs; markDayOn is untouched because
+   *  every other call site really is one date at a time. */
+  const markDaysOn = (habitId: string, days: string[], value: boolean) => {
+    if (!days.length) return
+    const set = new Set(days)
+    const gone = habitLog.filter((t) => t.habitId === habitId && set.has(t.day))
+    const without = habitLog.filter((t) => !(t.habitId === habitId && set.has(t.day)))
+    const next = value
+      ? [...without, ...days.map((day) => ({ habitId, day, at: day === todayKey() ? new Date().toISOString() : undefined }))]
+      : without
+    setHabitLog(next)
+    if (value) digUp(...days.map((day) => rowKey('habitLog', { habitId, day })))
+    else if (gone.length) bury(...gone.map((t) => rowKey('habitLog', { habitId, day: t.day, src: t.src })))
+    const thisWeek = new Map(days.filter((day) => dayOfWeekKey(dayIndexOf(day)) === day).map((day) => [dayIndexOf(day), value]))
+    if (thisWeek.size) {
+      setHabits((prev) => prev.map((h) => (h.id === habitId
+        ? { ...h, days: h.days.map((d, k) => (thisWeek.has(k) ? thisWeek.get(k)! : d)) }
+        : h)))
+    }
+    const h2 = habits.find((x) => x.id === habitId)
+    if (h2?.folderId && h2.srcStepId && set.has(todayKey())) syncRoutineFromHabits(h2.folderId, next)
+  }
+
   /* The routine card and the habit folder are two views of one morning, so a
      tick on either side settles both. Written out here rather than routed
      through applyRoutine on purpose: that path writes the habit log back from
@@ -2146,6 +2183,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       markDay(id, day, !h.days[day])
     },
     markHabitDay: (id, day, value) => markDay(id, day, value),
+    markHabitDayOn: (id, day, value) => markDayOn(id, day, value),
+    markHabitDaysOn: (id, days, value) => markDaysOn(id, days, value),
     logHabitNumber: (habitId, value) => {
       const h = habits.find((x) => x.id === habitId)
       const key = h && habitStepKey(h)

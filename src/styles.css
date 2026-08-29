@@ -1723,6 +1723,10 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
   cursor: pointer; -webkit-tap-highlight-color: transparent;
 }
 .weekplan-bar:focus-visible { outline: 2px solid var(--wk-hot); outline-offset: 4px; border-radius: 4px; }
+/* Today's week is always open and has nothing to toggle -- a label, not a
+   control, so it loses the pointer cursor and the click affordance the
+   folding version on Plan needs. */
+.weekplan-bar.is-static { cursor: default; }
 /* The label and the range it describes are one left-aligned unit now, not a
    label on the far left with the date it belongs to floating alone in the
    middle of the row. */

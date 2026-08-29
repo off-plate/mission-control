@@ -187,18 +187,19 @@ function useNavReveal() {
 }
 
 function PageNav({
-  tabs, page, setPage,
+  tabs, page, setPage, onMouseEnter,
 }: {
   tabs: { id: PageId; label: string }[]
   page: PageId
   setPage: (p: PageId) => void
+  onMouseEnter?: () => void
 }) {
   const activeRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     activeRef.current?.scrollIntoView({ inline: 'center', block: 'nearest' })
   }, [page])
   return (
-    <nav className="nav" aria-label="Pages">
+    <nav className="nav" aria-label="Pages" onMouseEnter={onMouseEnter}>
       {tabs.map((t) => (
         <button
           key={t.id}
@@ -526,7 +527,14 @@ export default function App() {
           into the room. Keeping them lit alongside a running countdown was
           the exact "still just a dashboard page" problem the room exists to
           not be. */}
-      {page !== 'zone' && <PageNav tabs={tabs} page={page} setPage={setPage} />}
+      {/* The row sits 8px below the header (the drawer travel distance), and
+          that gap is not part of topstick's own box -- an absolutely
+          positioned child doesn't extend its parent's layout rect. Crossing
+          it on the way down from the header genuinely leaves topstick for a
+          moment, which starts the hide timer, and nothing was cancelling it
+          again once the pointer landed on the row itself: it closed a second
+          later out from under a cursor that never actually left it. */}
+      {page !== 'zone' && <PageNav tabs={tabs} page={page} setPage={setPage} onMouseEnter={nav.show} />}
       </div>
 
       {isReadOnly() && (

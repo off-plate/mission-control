@@ -26,10 +26,19 @@
    fires once a month. Scoring it would spike the wheel on the 15th for
    something he did in March, which is the opposite of a consistency measure.
 
-   HEALTH IS NOT SCORED YET. This app holds no session data; Hevy syncs into
-   Jarvis. `POINTS.workout` is wired and weighted and always scores zero, left
-   visible rather than hidden so the baseline is honest about what it is not
-   counting.
+   HEALTH IS READ, NOT SCORED, same as finances (2026-08-29). The Workout /
+   Gym / Fitness habit now has a real second source -- Hevy, synced into
+   this app directly, ticks it the same way a manual click does, backfilling
+   its history on connect -- so the column shows a real day rather than
+   "not connected". `POINTS.workout` stays reserved and `parts.workout`
+   stays zero deliberately: 25 free points landing on the wheel the moment
+   he connects a fitness tracker is a real weighting decision, on the same
+   system another session is actively tuning today, and neither is his to
+   make from this column alone. Read off habitLog, not off Hevy directly,
+   so a day ticked by hand -- the ~20% of his workouts that never reach
+   Hevy -- shows exactly the same as a day Hevy found for him. Matched by
+   the habit's name, same as the sync itself; see TARGET_HABIT_NAME in
+   hevy.ts.
 
    BREAK HABITS ARE GONE from the model, on his instruction the same day: the
    "held clean" column meant nothing to him and was never in the brief. They
@@ -37,6 +46,7 @@
    is what made the empty-day rule so awkward to get right the first time. */
 import { localDateKey } from './util'
 import { type HabitDef, type HabitTick, type FocusSession, type SpaceId, type Task } from './types'
+import { TARGET_HABIT_NAME } from './hevy'
 
 /** What one of each thing is worth, and the most any of them can be worth in a day. */
 export const POINTS = {
@@ -96,7 +106,7 @@ export type DayScore = {
   baseline: number
   ratio: number
   parts: { habits: number; tasks: number; focus: number; hard: number; workout: number }
-  counts: { habits: number; habitTarget: number; tasks: number; focusMin: number }
+  counts: { habits: number; habitTarget: number; tasks: number; focusMin: number; workout: boolean }
   hard: HardThing | null
   /** What this day did to the wheel, in momentum points. Negative is a penalty. */
   delta: number
@@ -171,6 +181,17 @@ export function momentumRun(input: Input, days = 60, today = new Date()): DaySco
     focusByDay.set(f.day, (focusByDay.get(f.day) ?? 0) + f.minutes)
   }
 
+  /* Read-only, like Finances: which days had the Workout / Gym / Fitness
+     habit kept, from any source -- Hevy or his own click, habitLog does
+     not say which and the column should not care. Not gated on inView by
+     space the way build habits are, because a workout is not a workspace;
+     it is scoped to the habit by name instead. */
+  const workoutIds = new Set(habits.filter((h) => h.name.trim().toLowerCase() === TARGET_HABIT_NAME).map((h) => h.id))
+  const workoutByDay = new Set<string>()
+  if (workoutIds.size) {
+    for (const t of habitLog) if (workoutIds.has(t.habitId)) workoutByDay.add(t.day)
+  }
+
   /* What a full day asks of him. Fixed across the window so a day is scored
      against the same bar every time, and a day is never easier just because he
      happened to finish fewer tasks that week. */
@@ -208,7 +229,7 @@ export function momentumRun(input: Input, days = 60, today = new Date()): DaySco
 
     out.push({
       day, earned, baseline, ratio, parts, hard,
-      counts: { habits: hkRaw, habitTarget, tasks: doneByDay.get(day) ?? 0, focusMin: focusByDay.get(day) ?? 0 },
+      counts: { habits: hkRaw, habitTarget, tasks: doneByDay.get(day) ?? 0, focusMin: focusByDay.get(day) ?? 0, workout: workoutByDay.has(day) },
       delta: +(m - before).toFixed(2),
       momentum: +m.toFixed(2),
       empty: earned === 0,
@@ -272,7 +293,7 @@ export type Period = {
   earned: number
   baseline: number
   ratio: number
-  counts: { habits: number; habitTarget: number; tasks: number; focusMin: number }
+  counts: { habits: number; habitTarget: number; tasks: number; focusMin: number; workoutDays: number }
   /** How many hard things were done across the period, and the biggest one. */
   hardCount: number
   hard: HardThing | null
@@ -305,7 +326,7 @@ function dayToPeriod(r: DayScore): Period {
     label: String(d.getDate()),
     sub: WD[d.getDay()],
     earned: r.earned, baseline: r.baseline, ratio: r.ratio,
-    counts: r.counts,
+    counts: { habits: r.counts.habits, habitTarget: r.counts.habitTarget, tasks: r.counts.tasks, focusMin: r.counts.focusMin, workoutDays: r.counts.workout ? 1 : 0 },
     hardCount: r.hard ? 1 : 0, hard: r.hard,
     keptDays: r.kept ? 1 : 0, totalDays: 1,
     delta: r.delta, momentum: r.momentum,
@@ -354,6 +375,7 @@ export function rollUp(run: DayScore[], zoom: Zoom): Period[] {
         habitTarget: days[0].counts.habitTarget * days.length,
         tasks: days.reduce((a, r) => a + r.counts.tasks, 0),
         focusMin: days.reduce((a, r) => a + r.counts.focusMin, 0),
+        workoutDays: days.filter((r) => r.counts.workout).length,
       },
       hardCount: hardDays.length,
       hard: biggest,

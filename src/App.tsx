@@ -18,6 +18,7 @@ import { TimelinePage } from './timeline'
 import * as Icon from './icons'
 import { FocusPage } from './focus'
 import { ZonePage, useZoneDepth } from './zone'
+import { hasHevyKey, syncedToday, syncHevy } from './hevy'
 import { useStore } from './store'
 import { ago, describe, useSyncStatus } from './sync'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange } from './supabase'
@@ -270,7 +271,7 @@ function PhonePages({ tabs, page, setPage }: {
 }
 
 export default function App() {
-  const { space, view, setView, page, setPage, tasks, routines, goals, setFocusAppId } = useStore()
+  const { space, view, setView, page, setPage, tasks, routines, goals, habits, markHabitDaysOn, setFocusAppId } = useStore()
   // The dot follows the alerts: money and admin count from any profile.
   const exceptions = space === 'personal'
     ? exceptionsFor(space, { tasks, routines, goals })
@@ -306,6 +307,24 @@ export default function App() {
     void currentAccount().then((a) => setNeedsSignIn(!a))
     return onAccountChange((a) => setNeedsSignIn(!a))
   }, [])
+  /* His pick, 2026-08-29: once a day around 23:00 rather than on a short
+     interval -- he is usually still at the laptop then, and a day's Hevy
+     data does not change again after it. Checked every few minutes rather
+     than scheduled for the exact minute, since the tab may not be open (or
+     focused) at 23:00:00 sharp; the first check to land inside the hour
+     that has not already synced today does it. Never fires twice in one
+     day: syncedToday() reads the stamp syncHevy() itself just wrote. */
+  useEffect(() => {
+    const maybeSync = () => {
+      if (!hasHevyKey() || syncedToday()) return
+      if (new Date().getHours() !== 23) return
+      void syncHevy(habits, markHabitDaysOn)
+    }
+    maybeSync()
+    const id = window.setInterval(maybeSync, 5 * 60_000)
+    return () => window.clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [habits])
   /* How far into the running block he is, for the Zone's water. Read here
      rather than inside the room because the shell is what paints it. */
   const zoneDepth = useZoneDepth()

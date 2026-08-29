@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Band } from './pages1'
 import { useStore } from './store'
 import { getAiKey, hasAiKey, setAiKey } from './ai'
+import { getHevyKey, getHevyLastSync, hasHevyKey, setHevyKey, syncHevy } from './hevy'
 import { getTtsKey, hasTtsKey, setTtsKey } from './speech'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange, sendSignInCode, signInWithCode, signOutAccount, type Account } from './supabase'
 import { describe, useSyncStatus } from './sync'
@@ -202,6 +203,79 @@ function VoiceKeyField() {
   )
 }
 
+/** How long ago, in the same short words the rest of the app uses for a
+ *  stamp ("2m ago", "3h ago"), never "just now" -- that phrasing is what
+ *  the header sync indicator already owns, and reusing it here would read
+ *  as the whole app having just synced rather than only Hevy. */
+function timeAgo(at: number): string {
+  const s = Math.max(0, Math.round((Date.now() - at) / 1000))
+  if (s < 60) return `${s}s ago`
+  const m = Math.round(s / 60)
+  if (m < 60) return `${m}m ago`
+  const h = Math.round(m / 60)
+  if (h < 24) return `${h}h ago`
+  return `${Math.round(h / 24)}d ago`
+}
+
+function HevyKeyField() {
+  const { habits, markHabitDaysOn } = useStore()
+  const [key, setKey] = useState(getHevyKey())
+  const [saved, setSaved] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [why, setWhy] = useState('')
+  const [lastSync, setLastSync] = useState(getHevyLastSync())
+  const live = hasHevyKey()
+
+  const sync = async () => {
+    if (busy) return
+    setBusy(true)
+    setWhy('')
+    const res = await syncHevy(habits, markHabitDaysOn)
+    if (res.ok) {
+      setLastSync(getHevyLastSync())
+    } else {
+      setWhy(
+        res.reason === 'no-key' ? 'No Hevy key yet.'
+        : res.reason === 'bad-key' ? 'That Hevy key was rejected. Check it above.'
+        : res.reason === 'rate-limit' ? 'Hevy is rate limiting right now. Try again shortly.'
+        : res.reason === 'no-habit' ? 'No habit named "Workout / Gym / Fitness" to tick.'
+        : 'Hevy could not be reached just now.')
+    }
+    setBusy(false)
+  }
+
+  return (
+    <div className="ai-key">
+      <div className="source-row">
+        <span className={`status-dot ${live ? 'connected' : 'off'}`} />
+        <span className="info">
+          <span className="name">Hevy, for ticking Workout / Gym / Fitness on its own</span>
+          <span className="detail" style={{ display: 'block' }}>
+            {live
+              ? (lastSync ? `Connected. Last synced ${timeAgo(lastSync)}.` : 'Connected. Not synced yet -- use Sync now.')
+              : 'Not set. The habit stays fully manual until a key is added.'}
+          </span>
+        </span>
+        <a className="btn btn-quiet" href="https://hevy.com/settings?developer" target="_blank" rel="noreferrer">Get your key ↗</a>
+      </div>
+      <div className="formrow" style={{ marginTop: 'var(--s2)', marginBottom: 0 }}>
+        <input
+          className="textinput grow" type="password" placeholder="Hevy API key…" value={key}
+          onChange={(e) => { setKey(e.target.value); setSaved(false) }}
+          aria-label="Hevy API key"
+        />
+        <button className="btn btn-primary" onClick={() => { setHevyKey(key); setSaved(true) }}>Save</button>
+        <button className="btn btn-quiet" disabled={!live || busy} onClick={() => { void sync() }}>{busy ? 'Syncing…' : 'Sync now'}</button>
+      </div>
+      {why && <p className="sheet-warn" style={{ marginTop: 6 }}>{why}</p>}
+      <p className="assist-note" style={{ marginTop: 6 }}>
+        {saved ? 'Saved on this device.'
+          : 'This browser only, never synced, never in the code. A workout day PROPOSES a tick -- clicking the day yourself always still wins, on or off. Also syncs on its own once a day, around 23:00, while this device has a tab open.'}
+      </p>
+    </div>
+  )
+}
+
 export function SettingsPage() {
   const { resetDemo, setPage } = useStore()
   return (
@@ -216,6 +290,8 @@ export function SettingsPage() {
           <span className="microcap" style={{ marginTop: 24, display: 'block' }}>AI</span>
           <AiKeyField />
           <VoiceKeyField />
+          <span className="microcap" style={{ marginTop: 24, display: 'block' }}>Fitness</span>
+          <HevyKeyField />
           <span className="microcap" style={{ marginTop: 24, display: 'block' }}>Design</span>
           <div className="source-row">
             <span className="info"><span className="name">Brand &amp; guidelines</span><span className="detail" style={{ display: 'block' }}>The colours, type and rules this app is built on</span></span>

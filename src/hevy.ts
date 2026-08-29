@@ -25,7 +25,7 @@ const MAX_PAGES = 60
  *  named it in the request and there is no per-habit "wire this to Hevy"
  *  toggle in the UI (yet) to point at instead. Case-loose so a small rename
  *  does not silently disconnect it. */
-const TARGET_HABIT_NAME = 'workout / gym / fitness'
+export const TARGET_HABIT_NAME = 'workout / gym / fitness'
 
 export function getHevyKey(): string {
   try { return localStorage.getItem(KEY_STORE) ?? '' } catch { return '' }

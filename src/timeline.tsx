@@ -20,8 +20,11 @@
      FINANCES  real, from Compass, and not scored. A debt payment is a standing
                order that fires monthly; scoring it would spike the wheel on the
                15th for a decision he made in March.
-     HEALTH    empty until Hevy reaches this app. It shows a dash, never a zero,
-               because a zero looks like a fact about his week. */
+     HEALTH    real now (2026-08-29), off the Workout / Gym / Fitness habit --
+               Hevy syncs into this app directly and ticks it, the same as a
+               manual click. Not scored: see the note in momentum.ts for why
+               a 25-point bonus landing on the wheel the day he connects a
+               tracker is not a call this column gets to make alone. */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from './store'
 import { useCompass, type CompassMoney } from './compass'
@@ -207,8 +210,12 @@ function Rung({ p, zoom, money, today }: { p: Period; zoom: Zoom; money: Compass
             ? <Cell figure={kc(fin.saved)} unit="Kč set aside" pct={1} />
             : <Cell figure="—" unit="nothing moved" pct={0} muted />}
 
-      {/* HEALTH. A dash, not a zero: a zero would read as a fact about his week. */}
-      <Cell figure="—" unit="not connected" pct={0} muted />
+      {/* HEALTH. Read off the Workout / Gym / Fitness habit, from either
+          source that ticks it -- Hevy or his own click, this cell does not
+          know which. Not scored; see the note in momentum.ts for why. */}
+      {dayUnit
+        ? <Cell figure={p.counts.workoutDays ? '✓' : '—'} unit={p.counts.workoutDays ? 'worked out' : 'no workout'} pct={p.counts.workoutDays ? 1 : 0} muted={!p.counts.workoutDays} />
+        : <Cell figure={String(p.counts.workoutDays)} unit={`of ${p.totalDays} days`} pct={p.counts.workoutDays / p.totalDays} muted={p.counts.workoutDays === 0} />}
 
       <Cell figure={String(p.counts.habits)} unit={`of ${p.counts.habitTarget}`} pct={p.counts.habits / Math.max(1, p.counts.habitTarget)} />
       <Cell figure={String(p.counts.tasks)} unit="done" pct={p.counts.tasks / (TASK_TARGET * p.totalDays)} />
@@ -459,7 +466,7 @@ function Maths({ run, now }: { run: DayScore[]; now: number }) {
               <dd>{s.pts}<small>{s.each}</small></dd>
             </div>
           ))}
-          <div className="off"><dt>A workout</dt><dd>{POINTS.workout}<small>not connected</small></dd></div>
+          <div className="off"><dt>A workout</dt><dd>{POINTS.workout}<small>read, not scored</small></dd></div>
           <div className="off"><dt>Finances</dt><dd>{'—'}<small>read, not scored</small></dd></div>
         </dl>
 
@@ -515,7 +522,13 @@ function DayCard({ p, zoom, money }: {
         <div><dt>Tasks</dt><dd>{p.counts.tasks}<small>done</small></dd></div>
         <div><dt>Focus</dt><dd>{hm(p.counts.focusMin)}<small>{zoom === 'd' ? 'today' : 'in total'}</small></dd></div>
         <div className={fin ? '' : 'off'}><dt>Finances</dt><dd>{fin ? kc(fin) : '—'}<small>{fin ? 'Kč moved' : money ? 'nothing moved' : 'no Compass'}</small></dd></div>
-        <div className="off"><dt>Health</dt><dd>{'—'}<small>not connected</small></dd></div>
+        <div className={p.counts.workoutDays ? '' : 'off'}>
+          <dt>Health</dt>
+          <dd>
+            {zoom === 'd' ? (p.counts.workoutDays ? '✓' : '—') : p.counts.workoutDays}
+            <small>{zoom === 'd' ? (p.counts.workoutDays ? 'worked out' : 'no workout') : `of ${p.totalDays} days`}</small>
+          </dd>
+        </div>
       </dl>
       <div className={`tl-hardrow${p.hard ? '' : ' off'}`}>
         <span className="tl-l">Hard thing</span>

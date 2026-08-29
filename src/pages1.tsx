@@ -908,17 +908,10 @@ export function PlanPage() {
   const [weekShift, setWeekShift] = useState(0)
   /* THE ALMANAC. He picked this shape from three variants shown as artifacts,
      2026-08-30: a card per day with a ring for how full it is and its tasks
-     grouped into slot chips, over the flat hairline table it replaces.
-
-     THE CAP IS THE OTHER HALF OF THAT PICK. A second artifact answered the
-     question the first one couldn't: what does a sixteen-task day do to a
-     card widget? Nothing, as long as every slot caps itself at two and the
-     rest are counted rather than rendered. WEEK_EXPANDED is the one switch
-     that un-caps the whole week at once; it defaults off every time the panel
-     mounts, on purpose, because a week that remembered being left open would
-     make the FIRST look at it the one day density actually matters. */
-  const WEEK_CAP = 2
-  const [weekExpanded, setWeekExpanded] = useState(false)
+     grouped into slot chips, over the flat hairline table it replaces. A
+     density cap with a "show every task" switch shipped first, then came
+     out again on his word: he always wants every task visible, so there is
+     no toggle left to default shut. */
   const weekAnchor = dayPlus(weekShift * 7)
   const weekDays = Array.from({ length: 7 }, (_, i) => dayOfWeekKey(i, new Date(`${weekAnchor}T12:00:00`)))
   const weekTasks = spaceTasks.filter((t) => t.list === 'today')
@@ -1359,20 +1352,22 @@ export function PlanPage() {
             <button className="wk-navbtn" aria-label="Previous week" onClick={() => setWeekShift((n) => n - 1)}>
               <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 L6 8 L10 13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </button>
-            {weekShift !== 0 && <button className="wk-navbtn is-word" onClick={() => setWeekShift(0)}>This week</button>}
+            {/* Rendered on every week, not just the ones he's paged away from
+                -- an arrow click that makes this button appear or disappear
+                is the middle of the row jumping width mid-click. Current week
+                gets it too, just inert, so the row measures the same always. */}
+            <button
+              className="wk-navbtn is-word"
+              disabled={weekShift === 0}
+              aria-current={weekShift === 0 ? 'true' : undefined}
+              onClick={() => setWeekShift(0)}
+            >
+              This week
+            </button>
             <button className="wk-navbtn" aria-label="Next week" onClick={() => setWeekShift((n) => n + 1)}>
               <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3 L10 8 L6 13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </button>
           </span>
-          {/* The density switch. One for the whole week, off by default every
-              time this mounts: see the note where weekExpanded is declared. */}
-          <button
-            className={`wk-navbtn is-word weekplan-expand${weekExpanded ? ' is-on' : ''}`}
-            aria-pressed={weekExpanded}
-            onClick={() => setWeekExpanded((v) => !v)}
-          >
-            {weekExpanded ? 'Show fewer tasks' : 'Show every task'}
-          </button>
         </div>
         <div className="weekplan-grid">
           {weekDays.map((iso) => {
@@ -1421,24 +1416,17 @@ export function PlanPage() {
                       : (totalMin > 0 ? fmtDuration(totalMin) : '—')}
                   </span>
                 </button>
-                {groups.length ? groups.map(({ slot: sl, here }) => {
-                  /* Done is never capped: it's the historical record of what
-                     actually got finished, not something to page through. */
-                  const shown = weekExpanded || sl.id === 'done' ? here : here.slice(0, WEEK_CAP)
-                  const rest = here.length - shown.length
-                  return (
-                    <div className="weekplan-slot" key={sl.id}>
-                      <span className="weekplan-slotname">{sl.label}</span>
-                      {shown.map((t) => (
-                        <span className={`weekplan-item${t.done ? ' is-done' : ''}`} key={t.id} title={t.title}>
-                          <span className={`cat-dot ${t.category}`} aria-hidden="true" />
-                          {t.title}
-                        </span>
-                      ))}
-                      {rest > 0 && <span className="weekplan-more">+{rest} more</span>}
-                    </div>
-                  )
-                }) : <span className="weekplan-empty">Nothing planned</span>}
+                {groups.length ? groups.map(({ slot: sl, here }) => (
+                  <div className="weekplan-slot" key={sl.id}>
+                    <span className="weekplan-slotname">{sl.label}</span>
+                    {here.map((t) => (
+                      <span className={`weekplan-item${t.done ? ' is-done' : ''}`} key={t.id} title={t.title}>
+                        <span className={`cat-dot ${t.category}`} aria-hidden="true" />
+                        {t.title}
+                      </span>
+                    ))}
+                  </div>
+                )) : <span className="weekplan-empty">Nothing planned</span>}
               </div>
             )
           })}

@@ -1718,6 +1718,9 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 .wk-navbtn svg { display: block; }
 .wk-navbtn:hover { background: var(--wk-hot); border-color: var(--wk-hot); color: #0E0E10; }
 .wk-navbtn.is-word { width: auto; min-width: 0; padding: 0 14px; font: 600 0.6875rem/1 var(--font-body); white-space: nowrap; }
+/* "This week" stays in the row on every week now, not just the ones paged
+   away from -- inert here rather than hidden, so the row never resizes. */
+.wk-navbtn:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
 .wk-navbtn.is-on { background: var(--wk-hot); color: #0E0E10; border-color: var(--wk-hot); }
 
 .weekplan-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--s2); align-items: start; min-height: 220px; }

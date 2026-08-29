@@ -1714,16 +1714,29 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
    values for the same tokens, not a new component, so every rule below still
    works unchanged. Reuses the app's own real light tokens (a-card, a-sunk,
    a-ink...) rather than inventing fresh colors for a one-off variant.
-   --wk-hot retargets to a-accent-text, not literal lime: lime reads at
-   1.17:1 on a light surface and this token paints a border and a day-name as
-   well as the ring, so it needs to stay readable everywhere it's used, not
-   just where a meter would tolerate it. */
+
+   --wk-hot is DELIBERATELY ABSENT here: his correction, same day -- one
+   accent color in this whole section, the section's own neon lime, always,
+   never a second "readable" substitute invented for a light background. Not
+   setting it here means it falls through to the literal #C6F24A the base
+   .weekplan rule already declares, same lime Plan's dark version paints. */
 .weekplan.is-light {
-  --wk-bg: var(--a-card); --wk-card: var(--a-sunk); --wk-card2: var(--a-card);
+  --wk-bg: var(--a-card); --wk-card2: var(--a-card);
   --wk-ink: var(--a-ink); --wk-muted: var(--a-muted); --wk-faint: var(--a-faint);
   --wk-item-ink: var(--a-ink); --wk-item-faint: var(--a-faint);
-  --wk-hot: var(--a-accent-text); --wk-hotw: var(--a-accent-wash);
   --wk-line: var(--a-line); --wk-line-2: var(--a-line-2);
+}
+/* His second correction, same message: only the day CARDS go dark, not the
+   whole section -- "the light one is fine" otherwise. Scoped to
+   .weekplan-day so it cascades to everything drawn inside one (name, number,
+   meta, slot labels, the ring's track) without touching the header bar,
+   which stays on the light values above. Dark values match Plan's own
+   day-card palette exactly, so a day card reads the same dark card whichever
+   page it's on -- only the header wrapped around it differs. */
+.weekplan.is-light .weekplan-day {
+  --wk-card: #16161A;
+  --wk-ink: #FFFFFF; --wk-muted: rgba(255, 255, 255, 0.78); --wk-faint: rgba(255, 255, 255, 0.48);
+  --wk-line: rgba(255, 255, 255, 0.4); --wk-line-2: rgba(255, 255, 255, 0.5);
 }
 
 /* The whole folded/unfolded bar. A plain flex row that opens and closes the

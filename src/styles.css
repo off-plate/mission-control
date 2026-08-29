@@ -1690,16 +1690,25 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
   --wk-line: rgba(255, 255, 255, 0.4); --wk-line-2: rgba(255, 255, 255, 0.5);
   --wk-r: 16px; --wk-ctrl-h: 34px;
 
-  margin-top: var(--s5);
+  margin-top: var(--s5); margin-bottom: var(--s5);
+  /* Padding moves onto weekplan-bar and weekplan-collapse-inner below instead
+     of sitting here -- .panel's padding would leave a dead band top and
+     bottom of the bar that LOOKS like part of the dark strip but isn't part
+     of its own clickable box, which was the bug: the bar only opened or
+     closed from roughly its middle. */
+  padding: 0;
   background: var(--wk-bg); border-color: transparent; color: var(--wk-ink);
 }
 .weekplan .microcap { color: var(--wk-muted); }
 
 /* The whole folded/unfolded bar. A plain flex row that opens and closes the
    section on its own click -- see the component note by weekOpen for why
-   this is a div with role="button" and not a real <button>. */
+   this is a div with role="button" and not a real <button>. Its own padding
+   IS the visible black strip now, edge to edge, so a click anywhere in that
+   strip -- not just its vertical middle -- opens or closes it. */
 .weekplan-bar {
   display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; row-gap: var(--s2);
+  padding: var(--s5);
   cursor: pointer; -webkit-tap-highlight-color: transparent;
 }
 .weekplan-bar:hover .weekplan-title .microcap, .weekplan-bar:hover .weekplan-sentence { color: var(--wk-hot); }
@@ -1761,8 +1770,11 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
   transition: grid-template-rows 340ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .weekplan.is-open .weekplan-collapse { grid-template-rows: 1fr; }
-.weekplan-collapse-inner { overflow: hidden; min-height: 0; padding-top: 0; transition: padding-top 340ms cubic-bezier(0.22, 1, 0.36, 1); }
-.weekplan.is-open .weekplan-collapse-inner { padding-top: var(--s5); }
+.weekplan-collapse-inner {
+  overflow: hidden; min-height: 0; padding: 0 var(--s5);
+  transition: padding-top 340ms cubic-bezier(0.22, 1, 0.36, 1), padding-bottom 340ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.weekplan.is-open .weekplan-collapse-inner { padding-top: var(--s5); padding-bottom: var(--s5); }
 .weekplan-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--s2); align-items: start; min-height: 220px; }
 /* A week with nothing planned yet (browsing ahead) must not collapse the
    section and yank the rest of the page up with it -- floor it at roughly

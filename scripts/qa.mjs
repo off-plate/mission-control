@@ -879,9 +879,9 @@ await step('plan: the week widget is a real Monday-to-Sunday, not the switcher a
   const names = await page.locator('.weekplan-dayname').allInnerTexts()
   if (names.join(',').toUpperCase() !== 'MON,TUE,WED,THU,FRI,SAT,SUN') throw new Error(`columns read ${names.join(',')}`)
   // It does not track the day switcher's offset: moving the switcher must not move it.
-  const before = await page.locator('.weekplan .col-tot').innerText()
+  const before = await page.locator('.weekplan-range').innerText()
   await page.locator('.day-switch .microcap').nth(4).click(); await page.waitForTimeout(300)
-  const after = await page.locator('.weekplan .col-tot').innerText()
+  const after = await page.locator('.weekplan-range').innerText()
   if (before !== after) throw new Error(`the week range moved with the switcher: ${before} -> ${after}`)
   // A task planned onto a day, with a slot, shows up in that day's column, in that slot.
   await page.locator('.day-switch .microcap').first().click(); await page.waitForTimeout(300)

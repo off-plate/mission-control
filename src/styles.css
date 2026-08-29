@@ -1657,62 +1657,115 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
    THE WEEK, on the Plan page. THE ALMANAC, on his pick, 2026-08-30: a card
    per day with a load ring and its tasks grouped into slot chips, chosen from
    three variants shown as artifacts over the flat hairline table this
-   replaces. Reuses the page's own tokens throughout, so it needs nothing from
-   HUD mode to repaint correctly and nothing here is a new palette.
+   replaces.
 
-   THE DENSITY RULE, from the second artifact: every slot caps itself at
+   ITS OWN DARK GROUND, on his instruction the same day: not the page's own
+   theme, a fixed dark section the way the Timeline already is, so this reads
+   the same whichever mode the rest of the app is in. Own --wk-* tokens
+   throughout for exactly that reason -- nothing here is a literal, so HUD
+   mode is still one block away at the bottom of this section.
+
+   THE DENSITY RULE, from a second artifact: every slot caps itself at
    WEEK_CAP and counts the rest rather than rendering them, so the sixteen-task
-   day sits at the same card height as the quiet one next to it. One switch in
-   the header un-caps the whole week; see weekExpanded in pages1.tsx for why it
-   resets to off on every mount rather than remembering being left open. */
-.weekplan { margin-top: var(--s5); }
-.weekplan-nav { margin-left: auto; display: flex; align-items: center; gap: var(--s2); }
-.weekplan-expand {
-  border: 1px solid var(--hairline-strong); background: var(--surface); color: var(--ink);
-  cursor: pointer; border-radius: 999px; padding: 5px 13px;
-  font: 600 0.6875rem/1 var(--font-body); white-space: nowrap;
-  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+   day sits at whatever height its own content needs rather than forcing every
+   quiet day next to it to match. One switch in the header un-caps the whole
+   week; see weekExpanded in pages1.tsx for why it resets to off on every
+   mount rather than remembering being left open.
+
+   UNSORTED IS A FIFTH GROUP now, on his instruction: a count told him ten
+   things were waiting and nothing else. His words: "it doesn't mean if it's
+   unsorted... you still have to show" it. Same shape, same cap, same order
+   the day panel's own BUCKETS already uses above it. */
+.weekplan {
+  /* His pass, same day: white text, white card outlines, white task chips.
+     Only the lime "today" ring stays lime -- everything else in the section
+     is white at varying opacity rather than the warm greys the first version
+     used, on his instruction. --wk-item-ink is new: a chip that is white
+     needs a DARK label on it, and --wk-ink is white now, so the chip's own
+     text needed a token of its own rather than inheriting the section's. */
+  --wk-bg: #0E0E10; --wk-card: #16161A; --wk-card2: #FFFFFF;
+  --wk-ink: #FFFFFF; --wk-muted: rgba(255, 255, 255, 0.78); --wk-faint: rgba(255, 255, 255, 0.48);
+  --wk-item-ink: #17161B; --wk-item-faint: rgba(23, 22, 27, 0.5);
+  --wk-hot: #C6F24A; --wk-hotw: rgba(198, 242, 74, 0.14);
+  --wk-line: rgba(255, 255, 255, 0.4); --wk-line-2: rgba(255, 255, 255, 0.5);
+  --wk-r: 16px; --wk-ctrl-h: 34px;
+
+  margin-top: var(--s5);
+  background: var(--wk-bg); border-color: transparent; color: var(--wk-ink);
 }
-.weekplan-expand:hover { border-color: var(--accent-text); }
-.weekplan-expand.is-on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.weekplan > .microcap { color: var(--wk-muted); }
+
+.col-head:has(.weekplan-title) { flex-wrap: wrap; row-gap: var(--s2); }
+/* The label and the range it describes are one left-aligned unit now, not a
+   label on the far left with the date it belongs to floating alone in the
+   middle of the row. */
+.weekplan-title { display: flex; align-items: baseline; gap: 10px; }
+.weekplan-title .microcap { margin-bottom: 0; }
+.weekplan-range { font-size: 0.75rem; color: var(--wk-muted); }
+
+.weekplan-nav { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+/* ONE HEIGHT FOR EVERY CONTROL IN THIS ROW, arrows and the density switch
+   alike, and the arrows are inline SVG rather than the glyphs '‹ ›', whose
+   vertical metrics sit off-centre in the body face and cannot be fixed by
+   centring the box around them. */
+.wk-navbtn {
+  height: var(--wk-ctrl-h); min-width: var(--wk-ctrl-h); padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--wk-line-2); background: none; color: var(--wk-muted);
+  border-radius: 999px; cursor: pointer;
+  transition: border-color var(--t-fast), color var(--t-fast), background var(--t-fast);
+}
+.wk-navbtn:hover { border-color: var(--wk-hot); color: var(--wk-hot); }
+.wk-navbtn.is-word { width: auto; min-width: 0; padding: 0 14px; font: 600 0.6875rem/1 var(--font-body); white-space: nowrap; }
+.wk-navbtn.is-on { background: var(--wk-hot); color: #0E0E10; border-color: var(--wk-hot); }
 
 .weekplan-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--s2); align-items: start; }
 .weekplan-day {
   display: flex; flex-direction: column; gap: 8px;
-  background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-md); padding: var(--s3);
+  background: var(--wk-card); border: 1px solid var(--wk-line); border-radius: var(--wk-r); padding: var(--s3);
   min-width: 0;
 }
-.weekplan-day.is-today { border-color: var(--accent-text); box-shadow: 0 0 0 1px var(--accent-text); }
-.weekplan-day.is-past { opacity: 0.62; }
-.weekplan-daybtn { display: flex; align-items: center; gap: 8px; text-align: left; font-family: var(--font-body); color: var(--ink); padding: 0; min-width: 0; }
+.weekplan-day.is-today { border-color: var(--wk-hot); box-shadow: 0 0 0 1px var(--wk-hot); }
+.weekplan-day.is-past { opacity: 0.6; }
+.weekplan-daybtn { display: flex; align-items: center; gap: 8px; text-align: left; font-family: var(--font-body); color: var(--wk-ink); padding: 0; min-width: 0; }
 .weekplan-daybtn svg { flex: none; }
-.weekplan-daybtn:hover .weekplan-dayname { color: var(--accent-text); }
+.weekplan-daybtn:hover .weekplan-dayname { color: var(--wk-hot); }
 .weekplan-daylabel { min-width: 0; }
-.weekplan-dayname { display: block; font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
-.weekplan-daynum { display: block; font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); line-height: 1.1; margin-top: 1px; }
-.weekplan-day.is-today .weekplan-dayname { color: var(--accent-text); }
+.weekplan-dayname { display: block; font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--wk-muted); }
+.weekplan-daynum { display: block; font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); line-height: 1.1; margin-top: 1px; color: var(--wk-ink); }
+.weekplan-day.is-today .weekplan-dayname { color: var(--wk-hot); }
 /* What the day adds up to, right beside its name: the one figure that answers
    "is this day already full" without opening it to find out. */
-.weekplan-daymeta { margin-left: auto; font-size: 0.6875rem; color: var(--faint); }
-.weekplan-unsorted { font-size: 0.6875rem; color: var(--urgent); margin-top: -4px; }
+.weekplan-daymeta { margin-left: auto; font-size: 0.6875rem; color: var(--wk-faint); }
 .weekplan-slot { display: flex; flex-direction: column; gap: 5px; }
-.weekplan-slotname { display: block; font-size: 0.5625rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
+.weekplan-slotname { display: block; font-size: 0.5625rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--wk-faint); }
 .weekplan-item {
   display: flex; align-items: flex-start; gap: 5px;
-  background: var(--surface-2); border-radius: 6px; padding: 4px 7px;
-  font-size: var(--text-xs); line-height: 1.35; color: var(--ink);
+  background: var(--wk-card2); border-radius: 6px; padding: 4px 7px;
+  font-size: var(--text-xs); line-height: 1.35; color: var(--wk-item-ink);
 }
 .weekplan-item .cat-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; flex: none; margin-top: 3px; }
-.weekplan-item.is-done { color: var(--faint); }
-.weekplan-item.is-done { text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
-.weekplan-more { display: block; font-size: 0.625rem; font-weight: 600; color: var(--faint); padding-left: 1px; }
-.weekplan-empty { font-size: 0.6875rem; color: var(--faint); }
+.weekplan-item.is-done { color: var(--wk-item-faint); text-decoration: line-through; text-decoration-color: var(--wk-item-faint); }
+.weekplan-more { display: block; font-size: 0.625rem; font-weight: 600; color: var(--wk-faint); padding-left: 1px; }
+.weekplan-empty { font-size: 0.6875rem; color: var(--wk-faint); }
 @media (max-width: 1180px) {
   .weekplan-grid { grid-template-columns: repeat(4, minmax(180px, 1fr)); }
 }
 @media (max-width: 640px) {
   .weekplan-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); gap: var(--s2); }
+  .weekplan-nav { flex-wrap: wrap; }
 }
+/* HUD mode. The section keeps its own tokens; the mode only says what they
+   mean, the same pattern the Timeline page already uses one file up. */
+.shell.is-hud .weekplan {
+  --wk-bg: #050A0F; --wk-card: #0C121A; --wk-card2: #FFFFFF;
+  --wk-ink: #FFFFFF; --wk-muted: rgba(255, 255, 255, 0.78); --wk-faint: rgba(255, 255, 255, 0.48);
+  --wk-item-ink: #08141A; --wk-item-faint: rgba(8, 20, 26, 0.5);
+  --wk-hot: #4FD8E8; --wk-hotw: rgba(79, 216, 232, 0.14);
+  --wk-line: rgba(255, 255, 255, 0.4); --wk-line-2: rgba(255, 255, 255, 0.5);
+  --wk-r: 6px;
+}
+.shell.is-hud .wk-navbtn.is-on { color: #04141A; }
 
 .bucket-name { font-family: var(--font-display); font-weight: 700; font-size: var(--text-base); }
 .bucket-head .tot { margin-left: auto; font-family: var(--font-mono); font-size: 0.6875rem; color: var(--info); }

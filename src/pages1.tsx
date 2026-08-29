@@ -1422,7 +1422,9 @@ export function PlanPage() {
                   </span>
                 </button>
                 {groups.length ? groups.map(({ slot: sl, here }) => {
-                  const shown = weekExpanded ? here : here.slice(0, WEEK_CAP)
+                  /* Done is never capped: it's the historical record of what
+                     actually got finished, not something to page through. */
+                  const shown = weekExpanded || sl.id === 'done' ? here : here.slice(0, WEEK_CAP)
                   const rest = here.length - shown.length
                   return (
                     <div className="weekplan-slot" key={sl.id}>

@@ -29,6 +29,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from './store'
 import { useCompass, type CompassMoney } from './compass'
 import { reelPool, reelKind, parseReels, dedupe } from './reels'
+import { getHevyStatsForDay } from './hevy'
 import { localDateKey } from './util'
 import {
   momentumRun, momentumNow, stateFor, chainOf, rollUp,
@@ -49,6 +50,26 @@ const ROWS: Record<Zoom, number> = { d: 21, w: 12, m: 6 }
 
 const hm = (min: number) => `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, '0')}m`
 const kc = (n: number) => Math.round(n).toLocaleString('cs-CZ')
+/** A workout is usually under an hour; hm()'s "0h 52m" is the wrong shape
+ *  for it. Drops the hour entirely when there is none. */
+const wm = (min: number) => (min >= 60 ? `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, '0')}m` : `${Math.round(min)}m`)
+
+/** Length and volume for a stretch of days, from this device's own Hevy
+ *  cache -- see the note on STATS_STORE in hevy.ts for why that cache is
+ *  device-local rather than synced. Days ticked by hand rather than by
+ *  Hevy contribute nothing here, which is exactly right: there is no
+ *  length or volume to report for them. */
+function hevyDetail(days: string[]): { minutes: number; volumeKg: number } | null {
+  let minutes = 0, volumeKg = 0, hit = false
+  for (const day of days) {
+    const s = getHevyStatsForDay(day)
+    if (!s) continue
+    hit = true
+    minutes += s.minutes
+    volumeKg += s.volumeKg
+  }
+  return hit ? { minutes, volumeKg } : null
+}
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
 
 export function TimelinePage() {
@@ -212,10 +233,19 @@ function Rung({ p, zoom, money, today }: { p: Period; zoom: Zoom; money: Compass
 
       {/* HEALTH. Read off the Workout / Gym / Fitness habit, from either
           source that ticks it -- Hevy or his own click, this cell does not
-          know which. Not scored; see the note in momentum.ts for why. */}
-      {dayUnit
-        ? <Cell figure={p.counts.workoutDays ? '✓' : '—'} unit={p.counts.workoutDays ? 'worked out' : 'no workout'} pct={p.counts.workoutDays ? 1 : 0} muted={!p.counts.workoutDays} />
-        : <Cell figure={String(p.counts.workoutDays)} unit={`of ${p.totalDays} days`} pct={p.counts.workoutDays / p.totalDays} muted={p.counts.workoutDays === 0} />}
+          know which. Not scored; see the note in momentum.ts for why.
+          Length and volume ride along when Hevy is the source: hevyDetail
+          reads nothing for a day ticked by hand, which is exactly right,
+          there is no length or volume to report for one. */}
+      {(() => {
+        const detail = hevyDetail(p.days.map((d) => d.day))
+        if (dayUnit) {
+          if (detail) return <Cell figure={wm(detail.minutes)} unit={detail.volumeKg > 0 ? `${kc(detail.volumeKg)}kg lifted` : 'worked out'} pct={1} />
+          return <Cell figure={p.counts.workoutDays ? '✓' : '—'} unit={p.counts.workoutDays ? 'worked out' : 'no workout'} pct={p.counts.workoutDays ? 1 : 0} muted={!p.counts.workoutDays} />
+        }
+        if (detail) return <Cell figure={wm(detail.minutes)} unit={detail.volumeKg > 0 ? `${kc(detail.volumeKg)}kg, ${p.counts.workoutDays} of ${p.totalDays}d` : `${p.counts.workoutDays} of ${p.totalDays} days`} pct={p.counts.workoutDays / p.totalDays} />
+        return <Cell figure={String(p.counts.workoutDays)} unit={`of ${p.totalDays} days`} pct={p.counts.workoutDays / p.totalDays} muted={p.counts.workoutDays === 0} />
+      })()}
 
       <Cell figure={String(p.counts.habits)} unit={`of ${p.counts.habitTarget}`} pct={p.counts.habits / Math.max(1, p.counts.habitTarget)} />
       <Cell figure={String(p.counts.tasks)} unit="done" pct={p.counts.tasks / (TASK_TARGET * p.totalDays)} />
@@ -522,13 +552,24 @@ function DayCard({ p, zoom, money }: {
         <div><dt>Tasks</dt><dd>{p.counts.tasks}<small>done</small></dd></div>
         <div><dt>Focus</dt><dd>{hm(p.counts.focusMin)}<small>{zoom === 'd' ? 'today' : 'in total'}</small></dd></div>
         <div className={fin ? '' : 'off'}><dt>Finances</dt><dd>{fin ? kc(fin) : '—'}<small>{fin ? 'Kč moved' : money ? 'nothing moved' : 'no Compass'}</small></dd></div>
-        <div className={p.counts.workoutDays ? '' : 'off'}>
-          <dt>Health</dt>
-          <dd>
-            {zoom === 'd' ? (p.counts.workoutDays ? '✓' : '—') : p.counts.workoutDays}
-            <small>{zoom === 'd' ? (p.counts.workoutDays ? 'worked out' : 'no workout') : `of ${p.totalDays} days`}</small>
-          </dd>
-        </div>
+        {(() => {
+          const detail = hevyDetail(p.days.map((d) => d.day))
+          const dayFigure = zoom === 'd' ? (p.counts.workoutDays ? '✓' : '—') : p.counts.workoutDays
+          const dayUnitText = zoom === 'd' ? (p.counts.workoutDays ? 'worked out' : 'no workout') : `of ${p.totalDays} days`
+          return (
+            <div className={p.counts.workoutDays ? '' : 'off'}>
+              <dt>Health</dt>
+              <dd>
+                {detail ? wm(detail.minutes) : dayFigure}
+                <small>
+                  {detail
+                    ? (detail.volumeKg > 0 ? `${kc(detail.volumeKg)}kg lifted` : 'worked out')
+                    : dayUnitText}
+                </small>
+              </dd>
+            </div>
+          )
+        })()}
       </dl>
       <div className={`tl-hardrow${p.hard ? '' : ' off'}`}>
         <span className="tl-l">Hard thing</span>

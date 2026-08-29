@@ -1753,7 +1753,8 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
   font-size: var(--text-xs); line-height: 1.35; color: var(--wk-item-ink);
 }
 .weekplan-item .cat-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; flex: none; margin-top: 3px; }
-.weekplan-item.is-done { color: var(--wk-item-faint); text-decoration: line-through; text-decoration-color: var(--wk-item-faint); }
+.weekplan-item.is-done { opacity: 0.6; color: var(--wk-item-faint); text-decoration: line-through; text-decoration-color: var(--wk-item-faint); }
+.weekplan-item.is-done .cat-dot { opacity: 0.6; }
 .weekplan-more { display: block; font-size: 0.625rem; font-weight: 600; color: var(--wk-faint); padding-left: 1px; }
 .weekplan-empty { font-size: 0.6875rem; color: var(--wk-faint); }
 @media (max-width: 1180px) {

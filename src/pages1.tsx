@@ -423,11 +423,14 @@ export function ActualLog({ est, tracked, onLog, onSkip }: { est: number; tracke
 /** The week card's load ring: a plain stroke circle with an accent arc laid
  *  over it for the share of a full day that is planned. Radius and stroke
  *  scale with the ring's own box so one component serves every card size. */
-/* Two different questions, same shape of ring. Today and future days ask "how
-   full is this day" against WEEK_CAPACITY_MIN, in the section's lime accent.
-   Past days ask "how much of what I planned actually got done", in green --
-   his instruction (2026-08-31): a past day is a record, not a load. */
-function WeekRing({ pct, size = 34, good = false }: { pct: number; size?: number; good?: boolean }) {
+/* Two different questions, same ring, same color. Today and future days ask
+   "how full is this day" against WEEK_CAPACITY_MIN; past days ask "how much
+   of what I planned actually got done" (his instruction 2026-08-31: a past
+   day is a record, not a load). A green variant for past days shipped first
+   and came right back out on his word -- one ring color everywhere, the
+   section's own lime accent, no second color to tell the two questions apart
+   by sight. */
+function WeekRing({ pct, size = 34 }: { pct: number; size?: number }) {
   const sw = Math.max(3, Math.round(size * 0.12))
   const r = size / 2 - sw
   const c = 2 * Math.PI * r
@@ -435,7 +438,7 @@ function WeekRing({ pct, size = 34, good = false }: { pct: number; size?: number
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--wk-line-2)" strokeWidth={sw} />
       <circle
-        cx={size / 2} cy={size / 2} r={r} fill="none" stroke={good ? 'var(--wk-good)' : 'var(--wk-hot)'} strokeWidth={sw}
+        cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--wk-hot)" strokeWidth={sw}
         strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)} strokeLinecap="round"
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
       />
@@ -1080,7 +1083,7 @@ export function PlanPage() {
                   onClick={() => jumpToDay(iso)}
                   title={reachable ? `Plan ${name} ${Number(dnum)}` : out < 0 ? `See ${name} ${Number(dnum)}` : undefined}
                 >
-                  <WeekRing pct={ringPct} good={out < 0} />
+                  <WeekRing pct={ringPct} />
                   <span className="weekplan-daylabel">
                     <span className="weekplan-dayname">{name}</span>
                     <span className="weekplan-daynum mono">{Number(dnum)}</span>

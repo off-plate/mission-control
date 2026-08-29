@@ -1687,6 +1687,12 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
   --wk-ink: #FFFFFF; --wk-muted: rgba(255, 255, 255, 0.78); --wk-faint: rgba(255, 255, 255, 0.48);
   --wk-item-ink: #17161B; --wk-item-faint: rgba(23, 22, 27, 0.5);
   --wk-hot: #C6F24A; --wk-hotw: rgba(198, 242, 74, 0.14);
+  /* A past day's ring answers a different question than today's -- see the
+     WeekRing component note -- and it's green regardless of workspace accent
+     or HUD mode, the same fixed green a kept habit uses everywhere else in
+     the app (COLOR.md: green is reserved for exactly this, a completion
+     record, not decoration). */
+  --wk-good: #4ADE80;
   --wk-line: rgba(255, 255, 255, 0.4); --wk-line-2: rgba(255, 255, 255, 0.5);
   --wk-r: 16px; --wk-ctrl-h: 34px;
 
@@ -1847,6 +1853,7 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
   --wk-ink: #FFFFFF; --wk-muted: rgba(255, 255, 255, 0.78); --wk-faint: rgba(255, 255, 255, 0.48);
   --wk-item-ink: #08141A; --wk-item-faint: rgba(8, 20, 26, 0.5);
   --wk-hot: #4FD8E8; --wk-hotw: rgba(79, 216, 232, 0.14);
+  --wk-good: #4ADE80;
   --wk-line: rgba(255, 255, 255, 0.4); --wk-line-2: rgba(255, 255, 255, 0.5);
   --wk-r: 6px;
 }

@@ -1,5 +1,5 @@
 import { goalPeriodRange, isoWeekKey, localDateKey } from './util'
-import type { HabitDef, HabitTick, PlanState, Task } from './types'
+import type { DayTaskLog, HabitDef, HabitTick, PlanState, Task } from './types'
 
 /**
  * Sealing the days that have passed since the app was last open.
@@ -21,7 +21,13 @@ export interface Rollable {
   habits?: HabitDef[]
   habitLog?: HabitTick[]
   plan?: PlanState
+  /** How each day's plan actually went, one entry per sealed day, written
+   *  here rather than backfilled -- see DayTaskLog. */
+  dayLog?: DayTaskLog[]
 }
+
+/** Twelve weeks of days, the same horizon the habit history already keeps. */
+const MAX_DAY_LOG = 84
 
 /** A laptop untouched for years must not spin here; twelve weeks is all history keeps. */
 const MAX_WEEKS = 520
@@ -90,6 +96,26 @@ export function roll<T extends Rollable>(p: T, now = new Date()): T {
      is in the list, and Plan says how many came back so it is not a silent
      disappearance. Finished work leaves the day list and lives in the ledger,
      which already carries its date. */
+  /* Tallied BEFORE the sweep below clears plannedOn, because that is the last
+     moment a leftover task still says which day it belonged to. One entry per
+     distinct day being sealed, not just "yesterday": a multi-day gap seals
+     several days in this single pass, same as the habit walk above. */
+  const dayTally = new Map<string, { planned: number; done: number }>()
+  for (const t of p.tasks ?? []) {
+    if (t.list !== 'today') continue
+    const on = t.plannedOn ?? today
+    if (on >= today) continue
+    const cur = dayTally.get(on) ?? { planned: 0, done: 0 }
+    cur.planned += 1
+    if (t.done) cur.done += 1
+    dayTally.set(on, cur)
+  }
+  if (dayTally.size) {
+    const kept = (p.dayLog ?? []).filter((d) => !dayTally.has(d.date))
+    const fresh = Array.from(dayTally, ([date, v]) => ({ date, ...v }))
+    p.dayLog = [...kept, ...fresh].sort((a, b) => a.date.localeCompare(b.date)).slice(-MAX_DAY_LOG)
+  }
+
   const returned: string[] = []
   p.tasks = (p.tasks ?? []).map((t) => {
     if (t.list !== 'today') return t

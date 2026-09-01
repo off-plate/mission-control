@@ -227,6 +227,12 @@ export function BillsPage() {
           <button className="bq-out" onClick={() => setEditRecurring('new')}>+ Bill</button>
         </div>
 
+        {/* His correction, pointed straight at Plan: two real columns, the
+            same shape as Plan's to-do list beside its day panel -- one
+            persistent overview column, one column of stacked, actionable
+            sections -- not a repeating grid of small paired-up cards. */}
+        <div className="bills-cols">
+        <div className="bills-leftcol">
         <div className="card bills-snapshot">
           <span className="overline">Monthly snapshot</span>
           <div className="bs-row"><span className="bs-dot" style={{ background: 'var(--positive-subtle)', color: 'var(--positive)' }}>↙</span><span className="bs-lbl">Coming in</span><span className="bs-val pos">{money(free.comingIn)}</span></div>
@@ -240,13 +246,25 @@ export function BillsPage() {
           <div className="bills-foot">Check items off as you pay them, or cross them to skip. Totals update live.</div>
         </div>
 
-        {/* His correction: this app already pairs things up two-across on a
-            normal desktop (Today, Plan, Habits all do), and a real bills page
-            with a dozen-plus rows read as one very long strip instead of
-            using that width. Paired by what actually goes together: the two
-            simpler ledgers, then the two checklists, Unreasonable full width
-            since there's nothing left to pair it with evenly. */}
-        <div className="bills-grid2">
+        <div className="bills-debtcard">
+          <div className="bd-top"><span className="overline">Debt freedom</span></div>
+          <div className="bd-figure">{money(freedom.owed)}</div>
+          <div className="bd-cap">still owed</div>
+          <div className="bd-right">
+            <div className="bd-month">{freeView.freeDate ? freeView.freeDate.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : '—'}</div>
+            <div className="bd-pct">{Math.round(freedom.pct * 100)}% free · {money(freedom.paid)} paid</div>
+          </div>
+          <div className="bd-bar"><i style={{ width: `${Math.max(2, Math.round(freedom.pct * 100))}%` }} /></div>
+          {freeView.stalled.length > 0 && (
+            <div className="bd-warn">{freeView.stalled.map((d) => d.name).join(', ')} — raise the payment to clear it, the current amount doesn't cover interest.</div>
+          )}
+          {nextRelief && (
+            <div className="bd-tip">{nextRelief.debtName} clears {nextRelief.date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}, freeing {money(nextRelief.freed)}/mo.</div>
+          )}
+        </div>
+        </div>
+
+        <div className="bills-rightcol">
           <BillsSection title="Income" onAdd={() => setEditIncome('new')}>
             {groups.income.length === 0 ? (
               <p className="bills-emptyrow">Income varies month to month, so set what you actually earn each cycle. Add each source (salary, side gig) as its own entry.</p>
@@ -288,40 +306,24 @@ export function BillsPage() {
                 onEdit={() => { const p = data.planned.find((x) => x.id === i.link.planned_id); if (p) setEditPlanned(p) }} />
             ))}
           </BillsSection>
+
+          <BillsSection title="Unreasonable" sub={groups.unreasonable.length ? `${money(free.unreasonableOut)} left` : undefined} onAdd={() => setEditUnreasonable('new')}>
+            {groups.unreasonable.length === 0 ? (
+              <p className="bills-emptyrow">Impulse buys you didn't plan for. Log them as you go and they count against this cycle right away. Tap one to edit; tap the tag to mark it a regret. Never rolls into next cycle.</p>
+            ) : groups.unreasonable.map((i) => (
+              <div key={i.id} className="bills-prow">
+                <button className="bills-prowmain" onClick={() => { const p = data.planned.find((x) => x.id === i.link.planned_id); if (p) setEditUnreasonable(p) }}>
+                  <span className="bp-name">{i.name}</span>
+                </button>
+                <span className="bp-amt">{money(i.amount)}</span>
+                <button className={`bills-tagchip ${i.tag === 'regret' ? 'is-regret' : 'is-needed'}`}
+                  onClick={() => { const p = data.planned.find((x) => x.id === i.link.planned_id); if (p) void toggleTag(p) }}>
+                  {i.tag === 'regret' ? 'Regret' : 'Needed'}
+                </button>
+              </div>
+            ))}
+          </BillsSection>
         </div>
-
-        <BillsSection title="Unreasonable" sub={groups.unreasonable.length ? `${money(free.unreasonableOut)} left` : undefined} onAdd={() => setEditUnreasonable('new')}>
-          {groups.unreasonable.length === 0 ? (
-            <p className="bills-emptyrow">Impulse buys you didn't plan for. Log them as you go and they count against this cycle right away. Tap one to edit; tap the tag to mark it a regret. Never rolls into next cycle.</p>
-          ) : groups.unreasonable.map((i) => (
-            <div key={i.id} className="bills-prow">
-              <button className="bills-prowmain" onClick={() => { const p = data.planned.find((x) => x.id === i.link.planned_id); if (p) setEditUnreasonable(p) }}>
-                <span className="bp-name">{i.name}</span>
-              </button>
-              <span className="bp-amt">{money(i.amount)}</span>
-              <button className={`bills-tagchip ${i.tag === 'regret' ? 'is-regret' : 'is-needed'}`}
-                onClick={() => { const p = data.planned.find((x) => x.id === i.link.planned_id); if (p) void toggleTag(p) }}>
-                {i.tag === 'regret' ? 'Regret' : 'Needed'}
-              </button>
-            </div>
-          ))}
-        </BillsSection>
-
-        <div className="bills-debtcard">
-          <div className="bd-top"><span className="overline">Debt freedom</span></div>
-          <div className="bd-figure">{money(freedom.owed)}</div>
-          <div className="bd-cap">still owed</div>
-          <div className="bd-right">
-            <div className="bd-month">{freeView.freeDate ? freeView.freeDate.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : '—'}</div>
-            <div className="bd-pct">{Math.round(freedom.pct * 100)}% free · {money(freedom.paid)} paid</div>
-          </div>
-          <div className="bd-bar"><i style={{ width: `${Math.max(2, Math.round(freedom.pct * 100))}%` }} /></div>
-          {freeView.stalled.length > 0 && (
-            <div className="bd-warn">{freeView.stalled.map((d) => d.name).join(', ')} — raise the payment to clear it, the current amount doesn't cover interest.</div>
-          )}
-          {nextRelief && (
-            <div className="bd-tip">{nextRelief.debtName} clears {nextRelief.date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}, freeing {money(nextRelief.freed)}/mo.</div>
-          )}
         </div>
       </div>
 

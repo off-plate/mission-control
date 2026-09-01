@@ -321,19 +321,33 @@ function Stepper({ label, value, set, min, max }: { label: string; value: number
    pieces dock.tsx assembles: a compact glanceable chip for the collapsed
    row, and the full control surface for when that chip is tapped open. */
 
-/* The compact read on the timer: nothing to press, just what's true right
-   now, sized to sit beside other chips in one row. A live block gets the
-   ticking clock; idle gets the bare icon, since there is nothing running to
-   report. */
-export function PomodoroChip() {
+/* Focus lives IN the dock menu, not behind it -- his correction (2026-09-01)
+   of the round after this: a first pass had the menu's Focus item either
+   auto-start a block on tap or open a separate popover, and he wanted
+   neither. "It's gonna live within that menu and be operated within that
+   menu": name, the time, one play/pause button, all in the same row the
+   menu already shows, nothing else to open. The circular icon next to it
+   goes back to what it always did on the old pill -- opens the Focus
+   history page -- since the timer itself no longer needs a door of its own. */
+export function PomodoroInline() {
   const p = usePomodoro()
-  if (p.phase === 'idle') return <ClockIcon />
-  const state = p.phase === 'await' ? 'await' : !p.running ? 'paused' : p.phase
+  const idle = p.phase === 'idle'
+  const timeText = idle ? `${p.focusMin}m` : p.phase === 'await' ? 'Done' : mmss(p.secondsLeft)
+  const name = idle ? 'Focus' : p.phase === 'break' ? 'Break' : p.phase === 'await' ? 'Focus' : (p.focusLabel ?? 'Focus')
+  const showPause = !idle && p.phase !== 'await' && p.running
+  const press = () => { if (idle) p.startFocus(); else p.toggle() }
   return (
-    <span className={`dock-chip-live ${state}`}>
-      <i className="dock-chip-dot" aria-hidden="true" />
-      <span className="mono">{p.phase === 'await' ? 'done' : mmss(p.secondsLeft)}</span>
-    </span>
+    <>
+      <span className="dock-focus-name">{name}</span>
+      <span className="dock-focus-time mono">{timeText}</span>
+      <button
+        className="dock-icon"
+        onClick={(e) => { e.stopPropagation(); press() }}
+        aria-label={showPause ? 'Pause' : idle ? `Start a ${p.focusMin} minute focus` : 'Resume'}
+      >
+        {showPause ? <Icon.Pause size={16} filled /> : <Icon.Play size={16} filled />}
+      </button>
+    </>
   )
 }
 

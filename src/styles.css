@@ -716,6 +716,7 @@ main { padding-inline: var(--gutter); }
 .dock-menu .dock-item:nth-child(3) { animation-delay: 140ms; }
 @keyframes dock-item-in { from { transform: translateY(10px) scale(0.9); opacity: 0; } }
 .dock-item-label {
+  display: inline-flex; align-items: center; gap: 8px;
   background: var(--surface); border: 1px solid var(--hairline-strong); color: var(--ink);
   border-radius: 12px; padding: 9px 16px; font-weight: 600; font-size: var(--text-sm);
   box-shadow: var(--shadow-pop); white-space: nowrap;
@@ -730,12 +731,15 @@ main { padding-inline: var(--gutter); }
 .dock-item-avatar--note { background: var(--surface-2); }
 .dock-item-avatar--media { background: var(--surface-2); }
 .dock-chip-art { width: 100%; height: 100%; object-fit: cover; }
-.dock-chip-live { display: flex; align-items: center; gap: 5px; font-size: 0.625rem; font-weight: 700; }
-.dock-chip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex: none; }
-.dock-chip-live.focus .dock-chip-dot { background: var(--accent-text); animation: pomo-pulse 1.6s var(--ease-loop) infinite; }
-.dock-chip-live.break .dock-chip-dot { background: var(--progress); }
-.dock-chip-live.paused .dock-chip-dot { background: var(--warn); }
-.dock-chip-live.await .dock-chip-dot { background: var(--progress); }
+
+/* Focus's row: not a button (see the component note in dock.tsx), so hover
+   never gets the label-highlight treatment the button-based rows above do
+   -- it has its own real controls to hover instead. Name, live time, one
+   play/pause button, in that order, "and that's it" (his words). */
+.dock-item--focus { cursor: default; }
+.dock-focus-name { font-weight: 600; }
+.dock-focus-time { color: var(--muted); min-width: 2.6ch; }
+.dock-item-label--focus .dock-icon { width: 26px; height: 26px; margin: -4px -6px -4px 0; }
 
 .dock-face {
   width: min(560px, 92vw); max-height: min(64vh, 640px); min-height: 220px;
@@ -744,13 +748,6 @@ main { padding-inline: var(--gutter); }
   border-radius: 20px; box-shadow: var(--shadow-pop); overflow: hidden;
   animation: dock-rise var(--t-med);
 }
-/* Focus only shows here at all once a block is actually running (idle
-   starts straight from the menu, no sheet involved) -- PomodoroBadge is one
-   line, and stretching it to the Note sheet's fixed 560x220 shape read as
-   broken, not small: a real "Focus 25m" control sitting in a mostly-empty
-   card, his catch. Sized to its own content instead, the shape it has
-   always been. */
-.dock-face.is-compact { width: auto; min-width: 320px; min-height: 0; max-height: none; }
 @keyframes dock-rise { from { transform: translateY(24px) scale(0.97); opacity: 0; } }
 .dock-facebar {
   flex: none; display: flex; align-items: center; gap: 2px;

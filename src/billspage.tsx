@@ -261,8 +261,6 @@ export function BillsPage() {
           <div className="bs-row"><span className="bs-dot" style={{ background: 'var(--highlight-subtle)', color: 'var(--highlight)' }}>⚡</span><span className="bs-lbl">Unexpected this cycle ({groups.unexpected.length})</span><span className="bs-val neg">−{money(free.unexpectedOut)}</span></div>
           <div className="bs-row"><span className="bs-dot" style={{ background: 'var(--negative-subtle)', color: 'var(--negative)' }}>🔥</span><span className="bs-lbl">Unreasonable ({groups.unreasonable.length})</span><span className="bs-val neg">−{money(free.unreasonableOut)}</span></div>
           <div className="bills-leftover"><span className="l">Left over</span><span className={`v ${free.free < 0 ? 'is-neg' : ''}`}>{money(free.free)}</span></div>
-          {free.free < 0 && <div className="bills-warn">Your income doesn't cover your bills and debt this month. Trim spending or raise income to close the gap.</div>}
-          <div className="bills-foot">Check items off as you pay them, or cross them to skip. Totals update live.</div>
         </div>
 
         <div className="bills-debtcard">

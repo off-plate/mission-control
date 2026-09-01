@@ -7715,8 +7715,6 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .bills-leftover .l { font: 600 14px var(--font-body); }
 .bills-leftover .v { font: 700 22px var(--font-display); color: var(--positive); font-variant-numeric: tabular-nums; }
 .bills-leftover .v.is-neg { color: var(--negative); }
-.bills-warn { margin: 0 14px 10px; padding: 10px 12px; border-radius: 12px; background: var(--highlight-subtle); color: var(--highlight); font-size: 12.5px; }
-.bills-foot { font-size: 11.5px; color: var(--ink-3); padding: 10px 14px 6px; }
 
 /* Two real columns, the same shape as Plan's to-do list beside its day
    panel: one persistent overview column (snapshot, debt freedom), one

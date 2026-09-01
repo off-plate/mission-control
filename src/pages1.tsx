@@ -2210,16 +2210,19 @@ export function HabitsPage() {
      he would never run two at once, and a second surface would be a second
      answer to "where am I". */
   const [running, setRunning] = useState<string | null>(null)
-  /* Which routine cards are OPEN. Stored the positive way round on purpose:
-     the old set held what was SHUT, and an empty set on a fresh device meant
-     nothing was shut, so every card opened itself and the page became the wall
-     of fifty rows the card exists to replace. Shut is the resting state. */
-  const [shutFolders, setShutFolders] = useState<Set<string>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('mc:open-routines') ?? '[]') as string[]) } catch { return new Set() }
-  })
+  /* Which routine cards are open, for this visit only.
+     His instruction, 2026-08-26: "either everything closed or everything
+     opened, I would prefer it closed." It used to be remembered, so the page
+     came back however he had left it days ago: three open, five shut, for a
+     reason he could not reconstruct and did not choose. Every visit now starts
+     with all of them shut, which is a rule he can hold in his head. Opening one
+     is a thing he does now, not a setting he has to maintain. */
+  const [shutFolders, setShutFolders] = useState<Set<string>>(() => new Set())
   useEffect(() => {
-    try { localStorage.setItem('mc:open-routines', JSON.stringify([...shutFolders])) } catch { /* private mode */ }
-  }, [shutFolders])
+    /* The remembered state is gone; take its leftovers with it rather than
+       stranding a key on every device that ever loaded the old build. */
+    try { localStorage.removeItem('mc:open-routines'); localStorage.removeItem('mc:shut-folders') } catch { /* private mode */ }
+  }, [])
   const toggleFolder = (id: string) => setShutFolders((prev) => {
     const next = new Set(prev)
     next.has(id) ? next.delete(id) : next.add(id)

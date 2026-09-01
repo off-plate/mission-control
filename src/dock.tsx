@@ -30,6 +30,59 @@ const CLOSE_MS = 200
 // The entrance's own longest total (last item's delay + its duration,
 // styles.css) -- how long the stack takes to fully finish opening.
 const ENTER_MS = 340
+// Reaching the full page: a normal click still opens the quick popup, and
+// holding the same item down for HOLD_MS instead. Matches CSS
+// .dock-item.is-holding's own transition-duration exactly (styles.css) --
+// the one JS/CSS coupling in this file that's a literal, not a var(),
+// since threading a CSS custom property through just to avoid one repeated
+// number was the worse trade for something this small.
+const HOLD_MS = 520
+
+/* His pick (2026-09-03), from three options laid out for him: reaching a
+   full page today costs a hover and TWO clicks -- one to open the item's
+   quick popup, a second on the popup's own door-out button. A held press on
+   the stack item itself jumps straight there instead, one hover and one
+   press, while a normal click keeps opening the popup exactly as it always
+   has. Chosen over the alternatives -- splitting the row into two targets
+   (extending what Focus's row already does), or a small corner badge --
+   because a hidden gesture, unlike those two, adds literally nothing new to
+   look at on a menu that already works hard to stay small. The real cost of
+   that choice is discoverability, so is-holding (styles.css) fills the
+   label and avatar's border into the same accent color a hover already
+   uses, timed to finish exactly when the hold does -- the one visible
+   sign, the first time, that holding does something. */
+function useHoldForFull(onFull: () => void) {
+  const timer = useRef<number | undefined>(undefined)
+  const fired = useRef(false)
+  const [holding, setHolding] = useState(false)
+  const clear = () => { if (timer.current !== undefined) { clearTimeout(timer.current); timer.current = undefined } }
+  useEffect(() => clear, [])
+  const start = () => {
+    fired.current = false
+    clear()
+    timer.current = window.setTimeout(() => {
+      timer.current = undefined
+      fired.current = true
+      setHolding(false)
+      onFull()
+    }, HOLD_MS)
+    setHolding(true)
+  }
+  const cancel = () => { clear(); setHolding(false) }
+  return {
+    holding,
+    handlers: {
+      onMouseDown: start, onMouseUp: cancel, onMouseLeave: cancel,
+      onTouchStart: start, onTouchEnd: cancel, onTouchCancel: cancel,
+      // The hold already fired and navigated away by the time mouseup/
+      // touchend would otherwise let a click through -- this is a backstop
+      // for the rare case that DOM removal doesn't win the race, not the
+      // primary guard (cancel() on mouseup already stops a normal click
+      // from being treated as a hold).
+      onClickCapture: (e: React.MouseEvent) => { if (fired.current) { e.preventDefault(); e.stopPropagation(); fired.current = false } },
+    },
+  }
+}
 
 function useDockMenu() {
   const [mode, setMode] = useState<Mode>('closed')
@@ -131,6 +184,12 @@ export function Dock() {
   const { page, setPage } = useStore()
   const mo = useMundiOpus()
   const { mode, closing, entered, go, closeMenu, hover } = useDockMenu()
+  // Fixed, not looped over panels: hooks can't vary in count between
+  // renders, and only Note and Bills have a full page to hold for -- the
+  // player has none (see PanelFace/Mode above), so it never gets one.
+  const noteHold = useHoldForFull(() => { setPage('notes'); go('closed') })
+  const billsHold = useHoldForFull(() => { setPage('bills'); go('closed') })
+  const holdFor: Partial<Record<PanelFace, ReturnType<typeof useHoldForFull>>> = { note: noteHold, bills: billsHold }
 
   /* The Zone already shows the timer, the player and a place to write at
      full size. A second, smaller copy of the same facts in the corner is
@@ -177,12 +236,20 @@ export function Dock() {
       >
         {open && (
           <div className="dock-menu">
-            {panels.map((t) => (
-              <button key={t.id} className="dock-item" onClick={() => go(t.id)}>
-                <span className="dock-item-label">{t.label}</span>
-                <span className={`dock-item-avatar dock-item-avatar--${t.id}`}>{t.chip}</span>
-              </button>
-            ))}
+            {panels.map((t) => {
+              const hold = holdFor[t.id]
+              return (
+                <button
+                  key={t.id}
+                  className={`dock-item${hold?.holding ? ' is-holding' : ''}`}
+                  onClick={() => go(t.id)}
+                  {...hold?.handlers}
+                >
+                  <span className="dock-item-label">{t.label}</span>
+                  <span className={`dock-item-avatar dock-item-avatar--${t.id}`}>{t.chip}</span>
+                </button>
+              )
+            })}
             {/* Not a button: it holds two real controls of its own
                 (play/pause, and the icon below), and a button can't nest
                 inside a button -- see the same note on weekplan-bar in

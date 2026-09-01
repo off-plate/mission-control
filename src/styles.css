@@ -812,6 +812,16 @@ body:has(.shell.is-hud) .dock-face { border-radius: var(--a-r-lg); }
   box-shadow: var(--shadow-pop); white-space: nowrap;
 }
 .dock-item:hover .dock-item-label { border-color: var(--accent-text); color: var(--accent-text); }
+/* Holding Note or Bills jumps straight to its full page instead of opening
+   the quick popup a plain click still does -- his pick, from three options
+   (dock.tsx has the fuller account). The one thing that makes an otherwise
+   invisible gesture legible the first time: the border fills to the same
+   accent a hover already uses, timed with transition-duration to land
+   exactly when the hold actually fires (HOLD_MS, dock.tsx -- kept as a
+   literal here rather than threaded through as a custom property, since
+   that's more wiring than one repeated number earns). */
+.dock-item.is-holding .dock-item-label { border-color: var(--accent-text); color: var(--accent-text); transition: border-color 520ms linear, color 520ms linear; }
+.dock-item.is-holding .dock-item-avatar { border-color: var(--accent-text); transition: border-color 520ms linear; }
 .dock-item-avatar {
   width: var(--dock-circle); height: var(--dock-circle); border-radius: 50%; flex: none; overflow: hidden;
   display: grid; place-items: center; color: var(--ink);

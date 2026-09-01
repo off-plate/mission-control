@@ -680,9 +680,13 @@ main { padding-inline: var(--gutter); }
    so the 56px FAB visibly jumped left the instant the box widened to fit
    the menu -- his catch. flex-end keeps every child pinned to the same
    right edge regardless of how wide the box gets. */
-.dock { position: fixed; right: 20px; bottom: 20px; z-index: 61; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+/* One size for every circle in this thing -- the FAB, the X it becomes, and
+   each item's own icon circle -- read off one variable so they can't drift
+   apart again the way the FAB (56px) and the item avatars (44px) already
+   had once, his catch. */
+.dock { --dock-circle: 56px; position: fixed; right: 20px; bottom: 20px; z-index: 61; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
 .dock-fab {
-  width: 56px; height: 56px; border-radius: 50%; padding: 0; flex: none;
+  width: var(--dock-circle); height: var(--dock-circle); border-radius: 50%; padding: 0; flex: none;
   display: grid; place-items: center;
   /* The real accent, by name -- not --accent, which resolves to the muted
      olive text-safe partner everywhere else in this app and read as "why is
@@ -718,7 +722,7 @@ main { padding-inline: var(--gutter); }
 }
 .dock-item:hover .dock-item-label { border-color: var(--accent-text); color: var(--accent-text); }
 .dock-item-avatar {
-  width: 44px; height: 44px; border-radius: 50%; flex: none; overflow: hidden;
+  width: var(--dock-circle); height: var(--dock-circle); border-radius: 50%; flex: none; overflow: hidden;
   display: grid; place-items: center; color: var(--ink);
   background: var(--surface); border: 1px solid var(--hairline-strong); box-shadow: var(--shadow-pop);
 }
@@ -740,6 +744,13 @@ main { padding-inline: var(--gutter); }
   border-radius: 20px; box-shadow: var(--shadow-pop); overflow: hidden;
   animation: dock-rise var(--t-med);
 }
+/* Focus only shows here at all once a block is actually running (idle
+   starts straight from the menu, no sheet involved) -- PomodoroBadge is one
+   line, and stretching it to the Note sheet's fixed 560x220 shape read as
+   broken, not small: a real "Focus 25m" control sitting in a mostly-empty
+   card, his catch. Sized to its own content instead, the shape it has
+   always been. */
+.dock-face.is-compact { width: auto; min-width: 320px; min-height: 0; max-height: none; }
 @keyframes dock-rise { from { transform: translateY(24px) scale(0.97); opacity: 0; } }
 .dock-facebar {
   flex: none; display: flex; align-items: center; gap: 2px;

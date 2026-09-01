@@ -2250,14 +2250,12 @@ export function HabitsPage() {
     <div className="page">
       <Band
         title="Habits & Goals"
-        leading={<>
-          <HabitsGoalsSwitch on="habits" />
-          {folderGroups.length > 0 && (
-            <button className="btn btn-ghost band-collapseall" onClick={toggleAllFolders}>
-              {allShut ? 'Expand all' : 'Collapse all'}
-            </button>
-          )}
-        </>}
+        beside={<HabitsGoalsSwitch on="habits" />}
+        leading={folderGroups.length > 0 && (
+          <button className="btn btn-ghost band-collapseall" onClick={toggleAllFolders}>
+            {allShut ? 'Expand all' : 'Collapse all'}
+          </button>
+        )}
         metrics={[{ v: `${doneToday}/${dueCount}`, k: 'done today', tone: (doneToday > 0 ? 'pos' : 'info') as 'pos' | 'info' }]}
         actions={
           <>
@@ -3212,7 +3210,7 @@ export function GoalsPage() {
     <div className="page">
       <Band
         title="Habits & Goals"
-        leading={<HabitsGoalsSwitch on="goals" />}
+        beside={<HabitsGoalsSwitch on="goals" />}
         metrics={[{ v: `${done}/${spaceGoals.length}`, k: 'reached', tone: (done > 0 ? 'pos' : 'info') as 'pos' | 'info' }]}
         actions={<><WriteTo /><button className="btn btn-primary" onClick={() => setAdding(true)}>Add a goal</button></>}
       />

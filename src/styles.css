@@ -8084,3 +8084,47 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .rtc.is-open .rtc-open .folder-caret { transform: rotate(90deg); }
 .rtc.is-open { border-color: var(--a-line-2); }
 .rtc-steps { margin-top: var(--s3); padding-top: var(--s2); border-top: 1px solid var(--a-line); }
+
+/* ==========================================================================
+   QUITTING: THE WALL
+   ==========================================================================
+   Direction A of the three he was shown. Ranked by how long each has held,
+   because that is the scoreboard. Each card carries the run, the next
+   milestone with his own best run marked on the SAME bar so the two are
+   comparable without holding one in his head, and ninety days as a strip so a
+   bad patch reads as a shape rather than a number.
+   ========================================================================== */
+.qwall { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--s4); }
+.qcard {
+  border: 1px solid var(--a-line); border-radius: var(--a-r-sm); padding: var(--s5);
+  display: flex; flex-direction: column; gap: var(--s3);
+  transition: border-color var(--a-enter), box-shadow var(--a-enter);
+}
+.qcard:hover { border-color: var(--a-line-2); box-shadow: var(--a-lift); }
+.qcard-top { display: flex; align-items: baseline; gap: var(--s2); }
+.qwall { --qcard-min: 320px; }
+.qcard-n { font-family: var(--font-display); font-size: var(--a-f-fig); line-height: 1; font-weight: 800; color: var(--a-progress); }
+/* Slipped today is not a failure state to shout about, it is a fact. Amber,
+   which this app already uses for at-risk, never the alert red. */
+.qcard-n.is-broken { color: var(--a-warn); }
+.qcard-u { color: var(--a-soft); }
+.qcard-name { font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+.qcard-top .habit-kebab { flex: none; align-self: center; margin-left: auto; }
+.qcard-line { font-size: var(--a-f-chip); color: var(--a-soft); }
+
+.qmile { display: flex; flex-direction: column; gap: 5px; }
+.qmile-bar { position: relative; height: 7px; border-radius: 4px; background: var(--a-sunk); overflow: hidden; }
+.qmile-bar i { display: block; height: 100%; background: var(--a-progress-solid); transition: width var(--a-enter); }
+/* The best run, on the same scale as the milestone. Deliberately a hairline
+   mark and not a second bar: it is a reference, not a competing quantity. */
+.qmile-bar u { position: absolute; top: -1px; bottom: -1px; width: 2px; background: var(--a-line-2); }
+.qmile-lab { display: flex; justify-content: space-between; gap: var(--s2); color: var(--a-soft); }
+
+/* Ninety cells inside a 300px card is a 1px bar and a 2px gap, which reads as a
+   barcode rather than as a run of days. One pixel of gap gives the cell three
+   times the ink and the shape survives. */
+.qstrip { display: flex; gap: 1px; }
+.qstrip i { flex: 1 1 auto; min-width: 2px; height: 20px; border-radius: 1px; background: var(--a-progress-wash); }
+.qstrip i.is-slip { background: var(--a-alert-solid); }
+.qstrip i.is-before { background: var(--a-sunk); }
+.qcard-slip { align-self: flex-start; }

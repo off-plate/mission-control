@@ -1641,12 +1641,15 @@ await step('calendar: in every workspace, and it never pretends the day is empty
   await page.waitForTimeout(400)
 })
 
-await step('habits: a quitting habit has no day dots at all, only a count and a slip', async () => {
+await step('quitting: its own face, no day dots, a count and a slip on every card', async () => {
   /* This used to check that the slip button cleared the day dots, because a
      quit row was a build row with a button bolted under it. It is a CARD now
      (2026-08-26): the win is absence, so there is nothing to tick and the
      stronger assertion is that no tickable dot exists on it at all. A row of
-     empty circles told him he was failing on the days he was succeeding. */
+     empty circles told him he was failing on the days he was succeeding.
+     And the cards left the Habits face for their own pill the same day, so the
+     test follows them there and checks the wall's own parts: the milestone and
+     the ninety-day strip. */
   await fresh('habits')
   await openRoutines()
   await page.evaluate((K) => {
@@ -1657,12 +1660,18 @@ await step('habits: a quitting habit has no day dots at all, only a count and a 
     localStorage.setItem(K, JSON.stringify(s))
   }, KEY)
   await page.reload(); await page.waitForTimeout(900)
-  const cards = await page.evaluate(() => [...document.querySelectorAll('.hg-quit')].map((c) => {
+  /* Quits are not on Habits any more; that is the point of the pill. */
+  if (await page.locator('.qcard').count()) throw new Error('quitting cards are still on the Habits face')
+  await page.locator('.hg-pill', { hasText: 'Quitting' }).click(); await page.waitForTimeout(700)
+  if ((await page.evaluate(() => location.hash)) !== '#/quitting') throw new Error('the Quitting pill did not move the address')
+  const cards = await page.evaluate(() => [...document.querySelectorAll('.qcard')].map((c) => {
     const slip = [...c.querySelectorAll('button')].find((b) => /slipped/i.test(b.textContent))
     return {
-      name: (c.querySelector('.hg-quit-name')?.textContent ?? '').trim(),
-      days: Number((c.querySelector('.hg-quit-n')?.textContent ?? '').trim()),
+      name: (c.querySelector('.qcard-name')?.textContent ?? '').trim(),
+      days: Number((c.querySelector('.qcard-n')?.textContent ?? '').trim()),
       dots: c.querySelectorAll('.daydot').length,
+      strip: c.querySelectorAll('.qstrip i').length,
+      milestone: !!c.querySelector('.qmile-bar'),
       slipLeft: slip ? Math.round(slip.getBoundingClientRect().left) : null,
     }
   }))
@@ -1675,7 +1684,14 @@ await step('habits: a quitting habit has no day dots at all, only a count and a 
      it must read in the hundreds and never zero. */
   const smoking = cards.find((c) => c.name === 'Smoking')
   if (!smoking || !(smoking.days > 100)) throw new Error(`Smoking reads ${smoking ? smoking.days : 'nothing'} clean days`)
-  if (new Set(cards.map((c) => c.slipLeft)).size !== 1) throw new Error(`the slip buttons do not line up: ${cards.map((c) => c.slipLeft).join(', ')}`)
+  /* The wall's own two parts, on every card. */
+  const noStrip = cards.find((c) => c.strip !== 90)
+  if (noStrip) throw new Error(`"${noStrip.name}" shows ${noStrip.strip} days instead of ninety`)
+  const noMile = cards.find((c) => !c.milestone)
+  if (noMile) throw new Error(`"${noMile.name}" has no milestone bar`)
+  /* Ranked by how long each has held, which is the whole ordering rule. */
+  const runs = cards.map((c) => c.days)
+  if (runs.join() !== [...runs].sort((a, b) => b - a).join()) throw new Error(`not ranked by run: ${runs.join(', ')}`)
 })
 
 await step('daily review: offered once, fixes yesterday, and stays shut', async () => {

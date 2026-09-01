@@ -2,7 +2,7 @@ import { Component, useEffect, useRef, useState, type ReactNode } from 'react'
 import { exceptionsFor, globalExceptions } from './exceptions'
 import { useDockBadge } from './desktop'
 import { SPACE_LABELS } from './mock'
-import { GoalsPage, HabitsPage, PlanPage, TodayPage } from './pages1'
+import { GoalsPage, HabitsPage, PlanPage, TodayPage, QuittingPage } from './pages1'
 import { SettingsPage } from './pages2'
 import { NotesPage } from './notes'
 import { BillsPage } from './billspage'
@@ -553,6 +553,7 @@ export default function App() {
         {page === 'plan' && <PlanPage />}
         {(page === 'habits' || page === 'routines') && <HabitsPage />}
         {page === 'goals' && <GoalsPage />}
+        {page === 'quitting' && <QuittingPage />}
         {page === 'timeline' && <TimelinePage />}
         {page === 'focus' && <FocusPage />}
         {page === 'board' && <BoardPage />}

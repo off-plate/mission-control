@@ -13,7 +13,7 @@ import { HabitRun, habitHasRun } from './habitrun'
 import { PrecedentCard } from './precedentcard'
 import type { PageId } from './types'
 import { PLAN_AHEAD_DAYS, WeekGrid, dayPlus, shortDay, weekRangeLabel } from './weekgrid'
-import { habitsDueToday, GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, dueOn, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, habitGate, habitLocked, isCounted, COUNT_PERIODS, requiredSteps, routineComplete, routineProgress, routineRunsOn, slotMinutes, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type DayTaskLog, type HabitKind, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
+import { habitsDueToday, GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, dueOn, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, habitGate, habitLocked, isCounted, COUNT_PERIODS, requiredSteps, routineComplete, routineProgress, routineRunsOn, slotMinutes, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type DayTaskLog, type HabitKind, type HabitSlip, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
 import { useFirstMove, useOpenToday } from './ui'
 import { estimateFor } from './estimate'
 import { estimateTask } from './ai'
@@ -1461,7 +1461,7 @@ function HabitTrail({ h, days }: { h: HabitDef; days: number }) {
    the other, because each page keeps its own band metrics, its own add button
    and its own state. The menu shows one tab; the address of each half still
    resolves, so bookmarks and every existing setPage('goals') keep working. */
-function HabitsGoalsSwitch({ on }: { on: 'habits' | 'goals' }) {
+function HabitsGoalsSwitch({ on }: { on: 'habits' | 'goals' | 'quitting' }) {
   const { setPage } = useStore()
   return (
     <span className="hg-switch" role="group" aria-label="Habits or goals">
@@ -1475,6 +1475,11 @@ function HabitsGoalsSwitch({ on }: { on: 'habits' | 'goals' }) {
         aria-pressed={on === 'goals'}
         onClick={() => setPage('goals')}
       >Goals</button>
+      <button
+        className={`hg-pill${on === 'quitting' ? ' is-on' : ''}`}
+        aria-pressed={on === 'quitting'}
+        onClick={() => setPage('quitting')}
+      >Quitting</button>
     </span>
   )
 }
@@ -2522,29 +2527,6 @@ export function HabitsPage() {
             </div>
           )}
 
-          {looseQuit.length > 0 && (
-            <div className="panel hg-panel">
-              <div className="hg-head"><span className="microcap">Quitting</span></div>
-              <div className="hg-quits">
-                {looseQuit.map((h) => {
-                  const clean = daysClean(h, slips) ?? 0
-                  const slippedToday = slipDays(slips, h.id).has(localDateKey())
-                  return (
-                    <div className="hg-quit" key={h.id}>
-                      <span className={`hg-quit-n mono${slippedToday ? ' is-broken' : ''}`}>{clean}</span>
-                      <span className="microcap">{clean === 1 ? 'clean day' : 'clean days'}</span>
-                      <span className="hg-quit-name">{h.name}</span>
-                      <span className="hg-quit-do">
-                        <button className="btn btn-sm btn-quiet" onClick={() => logSlip(h.id)}>{slippedToday ? 'Slipped today' : 'I slipped today'}</button>
-                        <button className="btn btn-sm btn-quiet" onClick={() => setGiveUp(h)}>I wanna give up</button>
-                        {kebab(h)}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
         </div>
       </div>
       {routineCols.length === 0 && looseCols.length === 0 && <div className="empty">No habits in this space yet. Add one from the button above.</div>}
@@ -3335,6 +3317,148 @@ function PeriodTasks({ tf, periodKey }: { tf: GoalTimeframe; periodKey: string }
           {term && <button className="btn btn-quiet ptask-new" onClick={create}>Add “{q.trim()}” as a new task</button>}
         </div>
       )}
+    </div>
+  )
+}
+
+/* ---------------- QUITTING ----------------
+
+   The third face of Habits & Goals, and it earns its own page: a quit is not a
+   habit you tick and not a goal you reach. It is a count of days something has
+   been true, and it needs nothing from him except on the day it stops being
+   true. Sitting as a section under a page about doing things, it read as one
+   more list of chores.
+
+   Direction A of three he was shown, and the one he picked: the wall. Ranked by
+   how long each has held, because that IS the scoreboard, with the next
+   milestone and his own best run drawn on the same bar so the two are
+   comparable at a glance, and ninety days as a strip so a bad patch shows
+   without reading a number.
+
+   Everything here is arithmetic on two stored things, `quitSince` and the slip
+   dates. There is nothing else in the record, so there is nothing else on the
+   page: no reason, no trigger, no time of day. Anything that implied otherwise
+   would be the screen inventing data. */
+
+/** The ladder a run is measured against. Mine, not his and not stored; the
+ *  ordinary ones people count in. Changing them changes only this line. */
+const QUIT_MILESTONES = [7, 30, 90, 100, 180, 365]
+const nextMilestone = (days: number): number | null => QUIT_MILESTONES.find((m) => m > days) ?? null
+
+/** The last `n` days, each one before the quit began, slipped, or clean. */
+function quitStrip(h: HabitDef, slips: HabitSlip[], n = 90): ('before' | 'slip' | 'clean')[] {
+  const slipped = slipDays(slips, h.id)
+  const out: ('before' | 'slip' | 'clean')[] = []
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i)
+    const key = localDateKey(d)
+    out.push(!h.quitSince || key < h.quitSince ? 'before' : slipped.has(key) ? 'slip' : 'clean')
+  }
+  return out
+}
+
+const shortDate = (key: string): string => {
+  const [y, m, d] = key.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
+export function QuittingPage() {
+  const { habits, inView, slips, logSlip, deleteHabit, togglePauseHabit } = useStore()
+  const [adding, setAdding] = useState(false)
+  const [editHabit, setEditHabit] = useState<HabitDef | null>(null)
+
+  /* Ranked by how long it has held. That is the scoreboard, and a page that
+     ordered them any other way would be hiding the only number that matters. */
+  const quits = habits
+    .filter((h) => h.kind === 'break' && !h.archivedAt && inView(h.space))
+    .map((h) => ({ h, clean: daysClean(h, slips) ?? 0, best: bestCleanRun(h, slips), slipped: slipCount(h, slips) }))
+    .sort((a, b) => b.clean - a.clean)
+
+  const standing = quits.reduce((a, q) => a + q.clean, 0)
+  const cleanToday = quits.filter((q) => !slipDays(slips, q.h.id).has(localDateKey())).length
+
+  return (
+    <div className="page">
+      <Band
+        title="Habits & Goals"
+        beside={<HabitsGoalsSwitch on="quitting" />}
+        metrics={quits.length ? [{ v: `${cleanToday}/${quits.length}`, k: 'clean today', tone: (cleanToday === quits.length ? 'pos' : 'info') as 'pos' | 'info' }] : undefined}
+        actions={<><WriteTo /><button className="btn btn-primary" onClick={() => setAdding(true)}>Add a habit</button></>}
+      />
+
+      {quits.length === 0 && <div className="empty">Nothing you are quitting in this workspace. Add a habit and set it to something you are stopping.</div>}
+
+      {quits.length > 0 && (
+        <div className="panel hg-panel">
+          <div className="hg-head">
+            <span className="microcap">{quits.length === 1 ? 'One thing you are not doing' : `${quits.length} things you are not doing`}</span>
+            <span className="hg-n mono">{standing} clean days standing</span>
+          </div>
+          <div className="qwall">
+            {quits.map(({ h, clean, best, slipped }) => {
+              const next = nextMilestone(clean)
+              const slippedToday = slipDays(slips, h.id).has(localDateKey())
+              const strip = quitStrip(h, slips)
+              return (
+                <div className="qcard" key={h.id}>
+                  {/* The number owns the first line and the name owns the
+                      second. Squeezed onto the right of the figure, "No YouTube
+                      besides music" wrapped to two lines against a 44px digit
+                      and read as a caption on the number rather than the name
+                      of the thing. */}
+                  <div className="qcard-top">
+                    <span className={`qcard-n mono${slippedToday ? ' is-broken' : ''}`}>{clean}</span>
+                    <span className="microcap qcard-u">{clean === 1 ? 'clean day' : 'clean days'}</span>
+                    <Dropdown label={`Options for ${h.name}`} className="habit-kebab">
+                      <button role="menuitem" onClick={() => setEditHabit(h)}>Edit this habit</button>
+                      <button role="menuitem" onClick={() => togglePauseHabit(h.id)}>{h.paused ? 'Resume it' : 'Pause it'}</button>
+                      <span className="kebab-sep" />
+                      <button role="menuitem" className="danger" onClick={() => deleteHabit(h.id)}>Delete this habit</button>
+                    </Dropdown>
+                  </div>
+
+                  <div className="qcard-name">{h.name}</div>
+
+                  <div className="qcard-line">
+                    {h.quitSince ? `since ${shortDate(h.quitSince)}` : 'no start date'}
+                    {best > 0 && ` · best ${best}`}
+                    {` · ${slipped} ${slipped === 1 ? 'slip' : 'slips'}`}
+                  </div>
+
+                  {/* The next rung, with his own best run marked on the same bar.
+                      Two numbers about the same run belong on one scale, or he
+                      has to hold one in his head to read the other. */}
+                  <div className="qmile">
+                    <div className="qmile-bar">
+                      <i style={{ width: `${next ? Math.min(100, Math.round((clean / next) * 100)) : 100}%` }} />
+                      {next && best > 0 && best < next && (
+                        <u style={{ left: `${Math.round((best / next) * 100)}%` }} title={`best run, ${best} days`} />
+                      )}
+                    </div>
+                    <div className="qmile-lab microcap">
+                      <span>{next ? `${next - clean} to ${next}` : 'past every milestone'}</span>
+                      <span>{best > 0 ? `best ${best}` : 'no run yet'}</span>
+                    </div>
+                  </div>
+
+                  {/* Ninety days. A bad patch is a shape, and a shape does not
+                      have to be read the way a number does. */}
+                  <div className="qstrip" aria-hidden="true">
+                    {strip.map((k, i) => <i className={`is-${k}`} key={i} />)}
+                  </div>
+
+                  <button className="btn btn-sm btn-quiet qcard-slip" onClick={() => logSlip(h.id)}>
+                    {slippedToday ? 'Slipped today' : 'I slipped today'}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {adding && <HabitSheet onClose={() => setAdding(false)} />}
+      {editHabit && <HabitSheet habit={editHabit} onClose={() => setEditHabit(null)} />}
     </div>
   )
 }

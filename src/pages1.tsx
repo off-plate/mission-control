@@ -145,6 +145,7 @@ function AddWidgetInline({ onClose }: { onClose: () => void }) {
 
 import { WIDGET_DEFS } from './mock'
 import * as Icon from './icons'
+import { RoutineRunner } from './runner'
 import { TodayRoom } from './todayroom'
 import { GiveUpMode } from './giveupmode'
 const WIDGET_DEFS_LIST = WIDGET_DEFS
@@ -2163,6 +2164,10 @@ export function HabitsPage() {
     const need = list.filter((h) => !h.optional)
     return { done: need.filter((h) => h.days[todayIndex]).length, total: need.length }
   }
+  /* Which routine is being RUN, as opposed to read. Only ever one: he told me
+     he would never run two at once, and a second surface would be a second
+     answer to "where am I". */
+  const [running, setRunning] = useState<string | null>(null)
   const [shutFolders, setShutFolders] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem('mc:shut-folders') ?? '[]') as string[]) } catch { return new Set() }
   })
@@ -2226,6 +2231,19 @@ export function HabitsPage() {
           of each group in a row of its own, and gave nothing on the page a rank.
           The weekday letters are printed once at the top of the list instead of
           once per row, which is where 112 of them came from. */}
+      {(() => {
+        if (!running) return null
+        const col = routineCols.find((c) => c.id === running)
+        if (!col?.folder || col.list.length === 0) return null
+        return (
+          <RoutineRunner
+            folder={col.folder}
+            list={col.list}
+            todayIndex={todayIndex}
+            onClose={() => setRunning(null)}
+          />
+        )
+      })()}
       <div className="habit-cols">
         <div className="habit-col">{routineCols.map(renderCol)}</div>
         <div className="habit-col">{looseCols.map(renderCol)}</div>
@@ -2247,9 +2265,12 @@ export function HabitsPage() {
       <section className="habit-section" key={c.id}>
           <div className={`panel habit-list${days === 7 ? ' w7' : ''}${flashFolderId === c.id ? ' flash' : ''}`} data-routine-id={c.folder ? c.id : undefined}>
             {c.folder ? (
-              /* A folder: the routine's name, how far through today it is, and
-                 a disclosure. Collapsed by default is wrong here, so it opens
-                 and he shuts what he does not want to look at. */
+              /* A folder: the routine's name, how far through today it is, a
+                 disclosure, and the button that runs it. Start sits OUTSIDE
+                 the disclosure rather than inside it, because a button inside
+                 a button is not a thing, and because opening a routine to read
+                 it and starting it are two different intentions. */
+              <div className="folder-bar">
               <button
                 className="col-head folder-head"
                 aria-expanded={!shutFolders.has(c.id)}
@@ -2270,6 +2291,20 @@ export function HabitsPage() {
                   )
                 })()}
               </button>
+              {(() => {
+                const { done, total } = folderDone(c.list)
+                const finished = total > 0 && done === total
+                return (
+                  <button
+                    className={`btn btn-sm folder-start${finished ? ' btn-quiet' : ' btn-primary'}`}
+                    onClick={() => setRunning(running === c.id ? null : c.id)}
+                    aria-pressed={running === c.id}
+                  >
+                    {running === c.id ? 'Running' : finished ? 'Run again' : 'Start'}
+                  </button>
+                )
+              })()}
+              </div>
             ) : (
               <div className="col-head">
                 <span className="microcap">{c.label}</span>

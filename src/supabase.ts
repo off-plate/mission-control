@@ -204,6 +204,57 @@ export async function readRows<T>(table: string, columns: string): Promise<T[] |
   return (data ?? []) as T[]
 }
 
+/* Write access into the same other-app tables (Compass), for Bills living in
+   Mission Control's own header rather than a page of its own. Same shape as
+   Compass's own insert/update/remove in its useStore.ts: user_id is stamped
+   on insert, RLS is what actually stops anyone touching a row that isn't
+   theirs (there's no need to filter update/delete by user_id client-side,
+   Compass's own store doesn't either). Throwing on error rather than
+   swallowing it is deliberate -- a silent failure on real bill data reads as
+   "it saved" when it didn't. */
+export async function insertRow<T>(table: string, row: Record<string, unknown>): Promise<T> {
+  const c = db()
+  const me = await currentAccount()
+  if (!c || !me) throw new Error('Not signed in')
+  const { data, error } = await c.from(table).insert({ ...row, user_id: me.id }).select().single()
+  if (error) throw new Error(error.message)
+  return data as T
+}
+
+export async function updateRow<T>(table: string, id: string, patch: Record<string, unknown>): Promise<T> {
+  const c = db()
+  const me = await currentAccount()
+  if (!c || !me) throw new Error('Not signed in')
+  const { data, error } = await c.from(table).update(patch).eq('id', id).select().single()
+  if (error) throw new Error(error.message)
+  return data as T
+}
+
+export async function deleteRow(table: string, id: string): Promise<void> {
+  const c = db()
+  const me = await currentAccount()
+  if (!c || !me) throw new Error('Not signed in')
+  const { error } = await c.from(table).delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+/** compass_profile is keyed by user_id, not id -- its own upsert shape.
+ *  settings is merged one level deep against the CALLER's own copy, same as
+ *  Compass's own saveProfile: two concurrent callers can race and clobber
+ *  each other's settings write, which is Compass's real behavior today, not
+ *  a bug introduced here. */
+export async function upsertCompassProfile<T>(currentSettings: Record<string, unknown>, patch: Record<string, unknown> & { settings?: Record<string, unknown> }): Promise<T> {
+  const c = db()
+  const me = await currentAccount()
+  if (!c || !me) throw new Error('Not signed in')
+  const mergedSettings = patch.settings ? { settings: { ...currentSettings, ...patch.settings } } : {}
+  const { data, error } = await c.from('compass_profile')
+    .upsert({ user_id: me.id, ...patch, ...mergedSettings, updated_at: new Date().toISOString() })
+    .select().single()
+  if (error) throw new Error(error.message)
+  return data as T
+}
+
 /** Clear the saved state (used by Reset). */
 export async function deleteRemoteState(): Promise<void> {
   const c = db()

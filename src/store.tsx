@@ -1128,7 +1128,7 @@ function routeFromHash(): { page: PageId; day: string | null } {
   /* Achievements, Money and Reflect were removed. Their addresses land on Today
      rather than on nothing, the same courtesy braindump gets above. */
   if (h === 'achievements' || h === 'money' || h === 'review' || h === 'stats') return { page: 'today', day: null }
-  const pages: PageId[] = ['today', 'plan', 'habits', 'routines', 'goals', 'settings', 'brand', 'notes', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant', 'timeline']
+  const pages: PageId[] = ['today', 'plan', 'habits', 'routines', 'goals', 'settings', 'brand', 'notes', 'bills', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant', 'timeline']
   return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
 }
 

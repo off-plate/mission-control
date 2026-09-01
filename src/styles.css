@@ -662,6 +662,58 @@ main { padding-inline: var(--gutter); }
   #main { padding-bottom: 128px; }
 }
 
+/* ---------- Note dock: a second door into Notes, next to the Focus pill --
+   his ask (2026-09-01). The pill sits 84px up from the corner so it clears a
+   single Focus pill without needing to know its live height; the panel drops
+   back to the same 20px the Focus dock uses once open, since a wide sheet
+   sitting over a small pill in the same corner is the normal shape of this
+   pattern (a chat launcher does the same), not a collision to solve. */
+.notedock { position: fixed; right: 20px; bottom: 84px; z-index: 61; }
+.notedock.is-open { bottom: 20px; }
+.notedock-pill {
+  display: flex; align-items: center; gap: 7px;
+  background: var(--surface); border: 1px solid var(--hairline-strong); color: var(--ink);
+  border-radius: 999px; padding: 9px 16px 9px 13px; box-shadow: var(--shadow-pop);
+  font-weight: 600; font-size: var(--text-sm);
+}
+.notedock-pill:hover { border-color: var(--accent-text); color: var(--accent-text); }
+.notedock-panel {
+  width: min(560px, 92vw); height: min(64vh, 640px); min-height: 360px;
+  display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--hairline-strong);
+  border-radius: 16px; box-shadow: var(--shadow-pop);
+  animation: notedock-rise var(--t-med) var(--ease);
+}
+@keyframes notedock-rise { from { transform: translateY(24px) scale(0.98); opacity: 0; } }
+.notedock-head {
+  flex: none; display: flex; align-items: center; gap: 6px;
+  padding: var(--s2) var(--s2) var(--s2) var(--s3);
+  border-bottom: 1px solid var(--hairline);
+}
+.notedock-switch {
+  flex: 1; min-width: 0; border: none; background: none; color: var(--ink);
+  font-weight: 600; font-size: var(--text-sm); font-family: inherit;
+}
+.notedock-icon {
+  flex: none; width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center; color: var(--muted);
+}
+.notedock-icon:hover { color: var(--ink); background: var(--surface-2); }
+.notedock-body { flex: 1; min-height: 0; overflow-y: auto; padding: var(--s3) var(--s4) var(--s4); }
+.notedock-title {
+  width: 100%; border: none; background: none; resize: none;
+  font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg);
+  color: var(--ink); padding: 0; margin-bottom: var(--s2);
+}
+.notedock-title:focus { outline: none; }
+.notedock-empty { color: var(--muted); font-size: var(--text-sm); }
+@media (max-width: 639px) {
+  .notedock { right: 12px; }
+  .notedock:not(.is-open) { bottom: max(76px, calc(env(safe-area-inset-bottom) + 76px)); }
+  .notedock.is-open { bottom: max(12px, env(safe-area-inset-bottom)); }
+  .notedock-panel { width: 94vw; height: min(70vh, 640px); }
+}
+
 /* ---------- Assistant (dictation) ---------- */
 .assist-input { position: relative; margin-top: var(--s3); }
 .assist-textarea { width: 100%; resize: vertical; line-height: 1.5; padding-right: 52px; }

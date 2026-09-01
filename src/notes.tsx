@@ -41,9 +41,9 @@ const tagsOf = (t: string) => (t.match(TAG_RE) ?? []).map((x) => x.toLowerCase()
 /* Czech, so accents are not a wall: "ukol" finds "úkol", "risa" finds "Říša". */
 const flat = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
 
-const headOf = (body: string) => (body.split('\n')[0] ?? '').replace(/^\s*#{1,3}\s+/, '')
-const restOf = (body: string) => body.split('\n').slice(1).join('\n')
-const join = (head: string, rest: string) => (rest ? `${head}\n${rest}` : head)
+export const headOf = (body: string) => (body.split('\n')[0] ?? '').replace(/^\s*#{1,3}\s+/, '')
+export const restOf = (body: string) => body.split('\n').slice(1).join('\n')
+export const join = (head: string, rest: string) => (rest ? `${head}\n${rest}` : head)
 
 /* ---- the editor ---------------------------------------------------------- */
 

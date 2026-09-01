@@ -21,6 +21,11 @@ export type PageId =
   | 'habits'
   | 'routines'
   | 'goals'
+  /* The third face of Habits & Goals. A quit is not a habit you tick and not a
+     goal you reach: it is a count of days something has been true, so it gets
+     its own pill and its own address rather than a section on a page about
+     doing things. */
+  | 'quitting'
   | 'settings'
   | 'brand'
   | 'notes'

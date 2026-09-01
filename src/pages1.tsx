@@ -89,6 +89,7 @@ const offsetDate = (n: number): string => {
 export function TodayPage() {
   const nextEvent = useNextEvent()
   const open = useOpenToday()
+  const [giveUp, setGiveUp] = useState(false)
 
   /* One surface. The paper widget grid that used to sit under the room is gone,
      and so are its Edit grid and Add widget buttons.
@@ -107,7 +108,9 @@ export function TodayPage() {
           { v: nextEvent.v, k: nextEvent.k, tone: 'info' as const },
           { v: String(open.length), k: 'tasks open' },
         ]}
+        actions={<button className="btn btn-ghost giveup-launch" onClick={() => setGiveUp(true)}>I wanna give up</button>}
       />
+      {giveUp && <GiveUpMode onClose={() => setGiveUp(false)} />}
       <TodayRoom />
     </div>
   )
@@ -143,6 +146,7 @@ function AddWidgetInline({ onClose }: { onClose: () => void }) {
 import { WIDGET_DEFS } from './mock'
 import * as Icon from './icons'
 import { TodayRoom } from './todayroom'
+import { GiveUpMode } from './giveupmode'
 const WIDGET_DEFS_LIST = WIDGET_DEFS
 
 /* ---------------- PLAN ---------------- */
@@ -1469,6 +1473,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
 }) {
   const { toggleHabitDay, assertRoutineDay, logSlip, logCount, setPage, focusSessions, habitLog, slips, stepLog, inView } = useStore()
   const [open, setOpen] = useState(false)
+  const [giveUp, setGiveUp] = useState(false)
   /* The block on the clock counts toward today, so an hour reached while the
      timer is still running shows here rather than after it stops. */
   const pomo = usePomodoro()
@@ -1660,6 +1665,8 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
     const slipsSoFar = slipCount(h, slips)
     const best = bestCleanRun(h, slips)
     return (
+      <>
+      {giveUp && <GiveUpMode habitName={h.name} onClose={() => setGiveUp(false)} />}
       <div className="habit-row is-quit">
         <div className="habit-row-top">
           <span className="run-caret is-blank" aria-hidden="true" />
@@ -1679,6 +1686,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
         )}
         <div className="habit-foot">{stateTag && <span className={`col-tot mono${stateTag === 'done today' ? ' val-pos' : ''}`}>{stateTag}</span>}
           <button className="quit-slip" onClick={() => logSlip(h.id)}>I slipped today</button>
+          <button className="quit-giveup" onClick={() => setGiveUp(true)}>I wanna give up</button>
           <span className="habit-weeks">
             {h.quitSince ? `since ${fmtWhen(h.quitSince)}` : ''}
             {slipsSoFar > 0 ? `, ${slipsSoFar} slip${slipsSoFar === 1 ? '' : 's'}` : ''}
@@ -1686,6 +1694,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
           </span>
         </div>
       </div>
+      </>
     )
   }
 

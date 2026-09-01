@@ -246,7 +246,15 @@ export function Dock() {
                   {...hold?.handlers}
                 >
                   <span className="dock-item-label">{t.label}</span>
-                  <span className={`dock-item-avatar dock-item-avatar--${t.id}`}>{t.chip}</span>
+                  {/* The ring lives on this wrapper, not on .dock-item-avatar
+                     itself -- the avatar's own overflow:hidden (there to
+                     mask album art into the circle) was silently clipping
+                     it away, invisible in a real browser despite every
+                     computed style reading correctly. See the note on
+                     .dock-item-avatar-ring in styles.css. */}
+                  <span className="dock-item-avatar-ring">
+                    <span className={`dock-item-avatar dock-item-avatar--${t.id}`}>{t.chip}</span>
+                  </span>
                 </button>
               )
             })}

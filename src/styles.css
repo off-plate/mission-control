@@ -816,34 +816,40 @@ body:has(.shell.is-hud) .dock-face { border-radius: var(--a-r-lg); }
   width: var(--dock-circle); height: var(--dock-circle); border-radius: 50%; flex: none; overflow: hidden;
   display: grid; place-items: center; color: var(--ink);
   background: var(--surface); border: 1px solid var(--hairline-strong); box-shadow: var(--shadow-pop);
-  position: relative;
 }
 /* Holding Note or Bills jumps straight to its full page instead of opening
    the quick popup a plain click still does -- his pick, from three options
    (dock.tsx has the fuller account, including the artifact that first
    showed a ring growing in during the hold -- on the icon circle only,
    never the label pill next to it, its "one target, two gestures" demo
-   never put a ring on anything else). First pass here put the ring on
-   BOTH the label and the avatar; his correction (2026-09-03): he wanted it
-   on the circle, matching what the artifact actually showed him, not a
-   second ring on the name reading as visual noise beside it. Also fixed a
-   real specificity bug that first pass had on the avatar specifically --
-   `body:not(:has(.shell.is-hud)) .dock-item-avatar`'s own border (the
-   "dark ring for legibility on light backgrounds" fix from an earlier
-   round) outspecifies a bare .dock-item.is-holding one, (0,3,1) beats
-   (0,3,0), so a border-color-only attempt was silently losing there. A
-   ring on its own layer (::after, box-shadow -- a property nothing else
-   here touches) can't lose that fight. Grows from a tight, transparent
-   ring to a full one, timed with transition-duration to land exactly when
-   the hold actually fires (HOLD_MS, dock.tsx -- kept as a literal rather
-   than threaded through as a custom property, since that's more wiring
-   than one repeated number earns). */
-.dock-item-avatar::after {
-  content: ''; position: absolute; inset: -4px; border-radius: inherit;
+   never put a ring on anything else).
+
+   Third pass at this ring, each catching a real bug the last one didn't:
+   1. A border-color tint lost a specificity fight to
+      `body:not(:has(.shell.is-hud)) .dock-item-avatar`'s own border (the
+      "dark ring for legibility on light backgrounds" fix from an earlier
+      round) -- (0,3,1) beats (0,3,0).
+   2. Moved to a ring on its own layer (box-shadow via ::after, directly on
+      .dock-item-avatar) to dodge that fight entirely -- but that element
+      has overflow:hidden (there to mask album art into the circle,
+      .dock-chip-art below), which clips ANY descendant that paints past
+      its own edge, box-shadow included, no matter its z-index or position.
+      Every computed style read correctly (opacity, transform, the shadow
+      itself) because those are just property values -- overflow clipping
+      happens at paint time, after the values are already "correct", which
+      is exactly why checking computed style output isn't sufficient on
+      its own; a screenshot at real DPI or the actual browser is the only
+      thing that catches this class of bug.
+   3. Ring moved to .dock-item-avatar-ring, a plain wrapper around the
+      avatar with no overflow -- dock.tsx now nests the avatar one level
+      deeper for exactly this. Nothing clips it here. */
+.dock-item-avatar-ring { position: relative; display: inline-flex; }
+.dock-item-avatar-ring::after {
+  content: ''; position: absolute; inset: -4px; border-radius: 50%;
   box-shadow: 0 0 0 2px var(--accent-text); opacity: 0; transform: scale(0.9);
   pointer-events: none;
 }
-.dock-item.is-holding .dock-item-avatar::after {
+.dock-item.is-holding .dock-item-avatar-ring::after {
   opacity: 1; transform: scale(1);
   transition: opacity 100ms ease, transform 520ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }

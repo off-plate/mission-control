@@ -69,13 +69,17 @@ export function NotePanel({ dockControls }: { dockControls?: ReactNode }) {
         <button className="dock-icon" onClick={newNote} aria-label="New note" title="New note">
           <Icon.Plus size={16} />
         </button>
+        {/* Bright on purpose, unlike the quiet icon buttons beside it -- his
+           ask (2026-09-02): the same accent fill the Zone and Assistant
+           buttons wear in the header, so the one control that leaves the
+           note behind entirely is never mistaken for a quiet toggle. */}
         <button
-          className="dock-icon"
+          className="notedock-open"
           onClick={() => { if (active) openNote(active.id); setPage('notes') }}
-          aria-label="Open in Notes"
           title="Open in Notes"
         >
-          <Icon.ExternalLink size={15} />
+          <Icon.ExternalLink size={13} />
+          Notes
         </button>
         {/* The dock's own switch/close controls, folded into this same row
            on his correction (2026-09-01): they used to sit in a separate

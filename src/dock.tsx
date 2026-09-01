@@ -92,24 +92,44 @@ export function Dock() {
   }
 
   const other = panels.filter((t) => t.id !== mode)
+  const switchButtons = (
+    <>
+      {/* Jumping straight to the other panel, not just back to the menu: the
+          menu is one tap away, this is the one he'll reach for more. */}
+      {other.map((t) => (
+        <button key={t.id} className="dock-icon" onClick={() => setMode(t.id)} aria-label={`Switch to ${t.label}`} title={t.label}>
+          {t.switchIcon}
+        </button>
+      ))}
+      <button className="dock-icon" onClick={() => setMode('closed')} aria-label="Close" title="Close">
+        <Icon.Close size={17} />
+      </button>
+    </>
+  )
+
+  /* Note builds its own single head row -- the switcher, new, open-in-Notes,
+     and now these switch/close controls all together, on his correction
+     (2026-09-01): a near-empty bar sitting above a full one read as two
+     rows for one job. Media has no head row of its own to fold these into
+     yet, so it keeps the standalone bar above it for now. */
+  if (mode === 'note') {
+    return (
+      <div className="dock">
+        <div className="dock-face">
+          <NotePanel dockControls={switchButtons} />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="dock">
       <div className="dock-face">
         <div className="dock-facebar">
-          {/* Jumping straight to the other panel, not just back to the menu:
-              the menu is one tap away, this is the one he'll reach for more. */}
-          {other.map((t) => (
-            <button key={t.id} className="dock-icon" onClick={() => setMode(t.id)} aria-label={`Switch to ${t.label}`} title={t.label}>
-              {t.switchIcon}
-            </button>
-          ))}
           <span className="dock-facebar-grow" />
-          <button className="dock-icon" onClick={() => setMode('closed')} aria-label="Close" title="Close">
-            <Icon.Close size={17} />
-          </button>
+          {switchButtons}
         </div>
-        {mode === 'media' && <MediaBadge />}
-        {mode === 'note' && <NotePanel />}
+        <MediaBadge />
       </div>
     </div>
   )

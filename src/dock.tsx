@@ -27,10 +27,30 @@ import * as Icon from './icons'
    'closed' -- one real close animation, not two different behaviors. */
 const HOVER_HIDE_MS = 1000
 const CLOSE_MS = 200
+// The entrance's own longest total (last item's delay + its duration,
+// styles.css) -- how long the stack takes to fully finish opening.
+const ENTER_MS = 340
 
 function useDockMenu() {
   const [mode, setMode] = useState<Mode>('closed')
   const [closing, setClosing] = useState(false)
+  /* His second report (2026-09-03): canceling a close mid-collapse (hover
+     back in before it finishes) played the WHOLE entrance a second time --
+     "another animation going through, all the buttons kinda click." Cause:
+     .is-closing switches .dock-item's animation-name to dock-item-out;
+     removing that class on cancel reverts it to dock-item-in, and changing
+     an element's animation-name restarts that animation from scratch even
+     though dock-item-in had already played and finished once before the
+     close attempt began -- confirmed directly by tracing animationstart
+     events through exactly this sequence (open, leave past the grace
+     period so the close actually starts, return mid-collapse): dock-item-in
+     fired a second time for all three items, ~1.5s after the first.
+     `entered` tracks whether THIS open's entrance has already finished --
+     once true, .dock gets is-open instead of is-entering, which turns the
+     item's animation off entirely, so there is nothing left for a
+     cancelled close to revert BACK to. Reset only when mode actually
+     leaves 'menu', so the next fresh open still gets the real entrance. */
+  const [entered, setEntered] = useState(false)
   // Mirrors `mode` for the timers below to read synchronously -- they must
   // never act on a setState *updater's* side effect (React can invoke those
   // more than once), so reading current mode happens off this ref instead.
@@ -39,6 +59,12 @@ function useDockMenu() {
   const timer = useRef<number | undefined>(undefined)
   const clear = () => { if (timer.current !== undefined) { clearTimeout(timer.current); timer.current = undefined } }
   useEffect(() => clear, [])
+
+  useEffect(() => {
+    if (mode !== 'menu') { setEntered(false); return }
+    const id = window.setTimeout(() => setEntered(true), ENTER_MS)
+    return () => window.clearTimeout(id)
+  }, [mode])
 
   // Plays the collapse, then flips to 'closed' once it's done. Safe to call
   // more than once mid-animation (a second X click, or the hover timer
@@ -71,7 +97,7 @@ function useDockMenu() {
     },
   }
 
-  return { mode, closing, go, closeMenu, hover }
+  return { mode, closing, entered, go, closeMenu, hover }
 }
 
 /* THE DOCK: a Material speed-dial FAB (his reference, 2026-09-01). Closed,
@@ -104,7 +130,7 @@ type Mode = 'closed' | 'menu' | PanelFace
 export function Dock() {
   const { page, setPage } = useStore()
   const mo = useMundiOpus()
-  const { mode, closing, go, closeMenu, hover } = useDockMenu()
+  const { mode, closing, entered, go, closeMenu, hover } = useDockMenu()
 
   /* The Zone already shows the timer, the player and a place to write at
      full size. A second, smaller copy of the same facts in the corner is
@@ -144,7 +170,11 @@ export function Dock() {
     // React patches its class/icon/handler in place, never touches the node.
     const open = mode === 'menu'
     return (
-      <div className={`dock${closing ? ' is-closing' : ''}`} onMouseEnter={hover.onMouseEnter} onMouseLeave={hover.onMouseLeave}>
+      <div
+        className={`dock${closing ? ' is-closing' : entered ? ' is-open' : ''}`}
+        onMouseEnter={hover.onMouseEnter}
+        onMouseLeave={hover.onMouseLeave}
+      >
         {open && (
           <div className="dock-menu">
             {panels.map((t) => (

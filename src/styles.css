@@ -794,6 +794,17 @@ body:has(.shell.is-hud) .dock-face { border-radius: var(--a-r-lg); }
 .dock.is-closing .dock-menu .dock-item:nth-child(2) { animation-delay: 30ms; }
 .dock.is-closing .dock-menu .dock-item:nth-child(3) { animation-delay: 0ms; }
 @keyframes dock-item-out { to { transform: translateY(10px) scale(0.9); opacity: 0; } }
+/* His second catch: canceling a close mid-collapse (hover back in before it
+   finished) replayed the WHOLE entrance a second time. Changing an
+   element's animation-name restarts it even if that same name already
+   played and finished once before -- .is-closing swaps .dock-item's
+   animation to dock-item-out, and simply removing that class reverts it to
+   dock-item-in above, which is a fresh instance as far as the animation
+   engine is concerned. .is-open (dock.tsx, once this open's entrance has
+   had time to actually finish) turns the animation off entirely, so a
+   cancelled close has nothing left to revert BACK to -- it just lands on
+   its normal resting styles with no keyframes involved at all. */
+.dock.is-open .dock-item { animation: none; }
 .dock-item-label {
   display: inline-flex; align-items: center; gap: 8px;
   background: var(--surface); border: 1px solid var(--hairline-strong); color: var(--ink);

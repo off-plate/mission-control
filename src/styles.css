@@ -7678,3 +7678,72 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .bills-form p { font-size: 13px; color: var(--ink-3); line-height: 1.5; margin: 0; }
 .bills-delete { color: var(--negative); background: none; border: none; font: 600 13px var(--font-body); cursor: pointer; padding: 4px 0; }
 .bills-endrow { display: flex; gap: 10px; justify-content: flex-end; }
+
+   THE ROUTINE RUNNER
+   ==========================================================================
+   His brief, verbatim: "open it up, find the relevant routine, start it up, go
+   through it, close it. Usually that's it." A checklist cannot do that. This
+   is the routine as one moving surface, one step at a time.
+
+   It is the app's FEATURE ground rather than a card, because running a routine
+   is a mode and it has to look unlike the page it sits on. Not a full-screen
+   takeover: the Zone is the app's one room you disappear into, and a morning
+   routine is not that. He wants the day still visible behind it and closing to
+   cost one click.
+   ========================================================================== */
+.runner {
+  background: var(--a-feature);
+  color: var(--a-on-ink);
+  border-radius: var(--a-r-md);
+  padding: var(--s5);
+  margin-bottom: var(--s5);
+  display: flex; flex-direction: column; gap: var(--s4);
+  box-shadow: var(--a-lift-2);
+}
+.runner-top { display: flex; align-items: baseline; gap: var(--s3); }
+.runner .microcap { color: rgba(250, 248, 244, 0.62); margin: 0; }
+.runner-count { margin-left: auto; font-size: var(--a-f-chip); color: rgba(250, 248, 244, 0.62); }
+
+.runner-bar { height: 5px; border-radius: 3px; background: rgba(250, 248, 244, 0.18); overflow: hidden; }
+/* Lime is a FILL and never text, which is exactly what a progress bar wants. */
+.runner-bar i { display: block; height: 100%; background: var(--a-accent); transition: width var(--a-enter); }
+
+.runner-step { display: flex; flex-direction: column; gap: var(--s3); }
+.runner-title {
+  font-family: var(--font-display);
+  font-size: clamp(22px, 2.4vw, 30px); font-weight: 700;
+  letter-spacing: -0.01em; line-height: 1.2; margin: 0; text-wrap: balance;
+}
+.runner-note { margin: 0; font-size: var(--a-f-chip); color: rgba(250, 248, 244, 0.72); max-width: 62ch; }
+.runner-already { margin: 0; font-size: var(--a-f-chip); color: var(--a-accent); }
+.runner-link {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--a-f-chip); font-weight: 700; color: var(--a-accent);
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.runner-link:hover { color: var(--a-accent-2); }
+
+/* The step's own body, kept: today's paragraphs, the twisters, the typing gate,
+   the either-or. Those components are written for the light card, so the dark
+   surface hands them a light panel to live on instead of restyling each one. */
+.runner-body {
+  background: var(--a-card); color: var(--a-ink);
+  border-radius: var(--a-r-sm); padding: var(--s4);
+}
+
+.runner-foot { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+.runner-foot .btn-quiet { color: var(--a-on-ink); border-color: rgba(250, 248, 244, 0.34); }
+.runner-foot .btn-quiet:hover { border-color: var(--a-on-ink); }
+.runner-kept { margin-left: auto; font-size: var(--a-f-chip); color: rgba(250, 248, 244, 0.62); }
+.runner-close { margin-left: var(--s2); }
+@media (max-width: 620px) {
+  .runner-kept { margin-left: 0; width: 100%; order: 9; }
+  .runner-close { margin-left: auto; }
+}
+
+/* The folder head and its Start button share one line. Start is outside the
+   disclosure: a button inside a button is not a thing, and reading a routine
+   and running it are two different intentions. */
+.folder-bar { display: flex; align-items: center; gap: var(--s3); }
+.folder-bar .col-head { flex: 1 1 auto; margin-bottom: 0; min-width: 0; }
+.folder-start { flex: none; white-space: nowrap; }

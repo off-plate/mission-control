@@ -8155,3 +8155,39 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .qstrip i.is-slip { background: var(--a-alert-solid); }
 .qstrip i.is-before { background: var(--a-sunk); }
 .qcard-slip { align-self: flex-start; }
+
+/* ==========================================================================
+   NO VISIBLE SCROLLBARS, ANYWHERE
+   ==========================================================================
+   His instruction, 2026-08-26: remove the visible scrollbar across the whole
+   site. Scrolling is untouched; only the bar is. Wheel, trackpad, keyboard,
+   touch and programmatic scrolling all behave exactly as before.
+
+   Written as one universal rule plus a short list of the places that had
+   deliberately asked for a visible one. Those are named rather than edited in
+   place: they belong to other work in flight, and a rule appended here cannot
+   collide with an edit made up there. A class selector on a scrollbar
+   pseudo-element outranks the bare one, so naming them is also the only thing
+   that actually wins.
+
+   What this costs, said plainly: on a panel that scrolls, the bar was the only
+   thing announcing there was more below. Three places already solved that with
+   a fade or a count, and the rest rely on content being cut off mid-row, which
+   is a weaker signal. If a panel ever reads as finished when it is not, this
+   rule is the first suspect. */
+* { scrollbar-width: none; -ms-overflow-style: none; }
+*::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+/* The ones that had asked for a bar by name. */
+.dd-panel,
+.troom .tr-rows, .troom .tr-goals,
+.as-thread, .as-canvas-body,
+.widget-body, .widget-body.scroll,
+.vsched,
+.grid-4 > .panel .rowlist { scrollbar-width: none; }
+.dd-panel::-webkit-scrollbar,
+.dd-panel::-webkit-scrollbar-track,
+.dd-panel::-webkit-scrollbar-thumb,
+.troom ::-webkit-scrollbar,
+.troom ::-webkit-scrollbar-track,
+.troom ::-webkit-scrollbar-thumb { width: 0; height: 0; display: none; background: none; }

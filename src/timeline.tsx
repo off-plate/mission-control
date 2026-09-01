@@ -41,7 +41,7 @@ import {
 
 type View = 'ladder' | 'wheel'
 
-const WINDOW = 120
+export const WINDOW = 120
 const ZOOMS: { id: Zoom; label: string }[] = [
   { id: 'd', label: 'Days' },
   { id: 'w', label: 'Weeks' },
@@ -130,20 +130,28 @@ export function TimelinePage() {
    future. It is arithmetic, not encouragement: the number in it is how many
    more days at this rate beat the record, and when there is no record worth
    beating it says something true instead of something nice. */
+/* Exported for timelinedock.tsx (the floating dock's compact summary,
+   2026-09-03) -- the exact wording, not a second copy of it. This is
+   content generation, not just a number, so letting it drift between the
+   full page and the dock would read as two different products disagreeing
+   about the same chain. */
+export function chainPromiseLine(chain: ReturnType<typeof chainOf>): React.ReactNode {
+  if (chain.longest === 0) {
+    return <>Nothing is on a run yet. <em>One kept day</em> starts the chain, and a kept day is half of a full one.</>
+  }
+  if (chain.current === 0) {
+    return <>The chain broke. Your longest was <em>{chain.longest} days</em>, and it starts again the first day you keep.</>
+  }
+  if (chain.current >= chain.longest) {
+    return <><em>{chain.current} days.</em> The chain is the longest it has ever been. Every day from here is a new record.</>
+  }
+  return <>Keep this rate for <em>{chain.toBeat} more {chain.toBeat === 1 ? 'day' : 'days'}</em> and the chain is the longest it has ever been.</>
+}
+
 function Promise({ chain, periods, zoom }: { chain: ReturnType<typeof chainOf>; periods: Period[]; zoom: Zoom }) {
   const arc = [...periods].slice(0, 14).reverse()
   const unit = zoom === 'd' ? 'day' : zoom === 'w' ? 'week' : 'month'
-
-  let line: React.ReactNode
-  if (chain.longest === 0) {
-    line = <>Nothing is on a run yet. <em>One kept day</em> starts the chain, and a kept day is half of a full one.</>
-  } else if (chain.current === 0) {
-    line = <>The chain broke. Your longest was <em>{chain.longest} days</em>, and it starts again the first day you keep.</>
-  } else if (chain.current >= chain.longest) {
-    line = <><em>{chain.current} days.</em> The chain is the longest it has ever been. Every day from here is a new record.</>
-  } else {
-    line = <>Keep this rate for <em>{chain.toBeat} more {chain.toBeat === 1 ? 'day' : 'days'}</em> and the chain is the longest it has ever been.</>
-  }
+  const line = chainPromiseLine(chain)
 
   return (
     <div className="tl-promise">

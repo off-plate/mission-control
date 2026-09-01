@@ -4,6 +4,7 @@ import { useMundiOpus } from './mundiplayer'
 import { MediaBadge, MediaChip, PomodoroInline } from './pomodoro'
 import { NoteChip, NotePanel } from './notedock'
 import { BillsChip, BillsPanel } from './billsdock'
+import { TimelineChip, TimelinePanel } from './timelinedock'
 import * as Icon from './icons'
 
 /* Hover opens the dial now, on his instruction (2026-09-02) -- the same
@@ -177,7 +178,7 @@ function useDockMenu() {
    the notes store) and only hands this file what it needs to render.
    Rendered from inside PomodoroProvider (see pomodoro.tsx), which is what
    puts it inside both the Pomodoro context and the Store context it needs. */
-type PanelFace = 'media' | 'note' | 'bills'
+type PanelFace = 'media' | 'note' | 'bills' | 'timeline'
 type Mode = 'closed' | 'menu' | PanelFace
 
 export function Dock() {
@@ -185,11 +186,13 @@ export function Dock() {
   const mo = useMundiOpus()
   const { mode, closing, entered, go, closeMenu, hover } = useDockMenu()
   // Fixed, not looped over panels: hooks can't vary in count between
-  // renders, and only Note and Bills have a full page to hold for -- the
-  // player has none (see PanelFace/Mode above), so it never gets one.
+  // renders, and only Note, Bills and Timeline have a full page to hold
+  // for -- the player has none (see PanelFace/Mode above), so it never
+  // gets one.
   const noteHold = useHoldForFull(() => { setPage('notes'); go('closed') })
   const billsHold = useHoldForFull(() => { setPage('bills'); go('closed') })
-  const holdFor: Partial<Record<PanelFace, ReturnType<typeof useHoldForFull>>> = { note: noteHold, bills: billsHold }
+  const timelineHold = useHoldForFull(() => { setPage('timeline'); go('closed') })
+  const holdFor: Partial<Record<PanelFace, ReturnType<typeof useHoldForFull>>> = { note: noteHold, bills: billsHold, timeline: timelineHold }
 
   /* The Zone already shows the timer, the player and a place to write at
      full size. A second, smaller copy of the same facts in the corner is
@@ -197,18 +200,20 @@ export function Dock() {
      exists to make dominant. */
   if (page === 'zone') return null
 
-  /* Note on top, Bills under it, Focus at the bottom, his order -- closest
-     to the corner is the one he reaches for most. The player, when it
-     exists at all, sits above both: rarest to need, so furthest from the
-     thumb. Bills landed here (2026-09-02) as a compact read-mostly summary,
-     not the full page -- see billsdock.tsx for why: 700+ lines of sign-in,
-     six edit sheets and per-item actions is a much bigger, worse-fitting
-     build for a 560px popup than a glanceable free-to-spend figure with a
+  /* Note on top, then Bills, then Timeline, Focus at the bottom, his order
+     -- closest to the corner is the one he reaches for most. The player,
+     when it exists at all, sits above both: rarest to need, so furthest
+     from the thumb. Bills and Timeline both land here as compact
+     read-mostly summaries, not their full pages -- see billsdock.tsx and
+     timelinedock.tsx for why: hundreds of lines of sign-in, edit sheets,
+     a canvas flywheel view and video reels are a much bigger, worse-
+     fitting build for a 560px popup than a glanceable headline with a
      door out to the real page. */
   const panels: { id: PanelFace; label: string; chip: React.ReactNode; switchIcon: React.ReactNode }[] = [
     ...(mo.started ? [{ id: 'media' as const, label: 'Player', chip: <MediaChip />, switchIcon: <Icon.Waveform size={15} /> }] : []),
     { id: 'note' as const, label: 'Note', chip: <NoteChip />, switchIcon: <Icon.Note size={15} /> },
     { id: 'bills' as const, label: 'Bills', chip: <BillsChip />, switchIcon: <Icon.Wallet size={15} /> },
+    { id: 'timeline' as const, label: 'Timeline', chip: <TimelineChip />, switchIcon: <Icon.Rewind size={15} /> },
   ]
 
   if (mode === 'closed' || mode === 'menu') {
@@ -343,6 +348,16 @@ export function Dock() {
       <div className="dock">
         <div className="dock-face">
           <BillsPanel dockControls={switchButtons} onOpenFull={() => go('closed')} />
+        </div>
+      </div>
+    )
+  }
+
+  if (mode === 'timeline') {
+    return (
+      <div className="dock">
+        <div className="dock-face">
+          <TimelinePanel dockControls={switchButtons} onOpenFull={() => go('closed')} />
         </div>
       </div>
     )

@@ -810,7 +810,6 @@ body:has(.shell.is-hud) .dock-face { border-radius: var(--a-r-lg); }
   background: var(--surface); border: 1px solid var(--hairline-strong); color: var(--ink);
   border-radius: 12px; padding: 9px 16px; font-weight: 600; font-size: var(--text-sm);
   box-shadow: var(--shadow-pop); white-space: nowrap;
-  position: relative;
 }
 .dock-item:hover .dock-item-label { border-color: var(--accent-text); color: var(--accent-text); }
 .dock-item-avatar {
@@ -822,28 +821,29 @@ body:has(.shell.is-hud) .dock-face { border-radius: var(--a-r-lg); }
 /* Holding Note or Bills jumps straight to its full page instead of opening
    the quick popup a plain click still does -- his pick, from three options
    (dock.tsx has the fuller account, including the artifact that first
-   showed a ring growing in during the hold). First pass here just tinted
-   the label/avatar's existing border to the accent color, which turned out
-   invisible in practice for two reasons: it read as indistinguishable from
-   the plain :hover tint already on the label above, and on the avatar
-   specifically it was actively losing to `body:not(:has(.shell.is-hud))
-   .dock-item-avatar`'s own border two sections up -- a body-scoped
-   selector outspecifies a bare .dock-item.is-holding one, so the "dark
-   ring for legibility on light backgrounds" fix from an earlier round was
-   silently overriding it. A ring on its own layer (::after, a different
-   property entirely) can't lose that fight -- nothing else here touches
-   box-shadow on these elements. Grows from a tight, transparent ring to a
-   full one exactly matching the artifact's own demo, timed with
-   transition-duration to land exactly when the hold actually fires
-   (HOLD_MS, dock.tsx -- kept as a literal rather than threaded through as
-   a custom property, since that's more wiring than one repeated number
-   earns). */
-.dock-item-label::after, .dock-item-avatar::after {
+   showed a ring growing in during the hold -- on the icon circle only,
+   never the label pill next to it, its "one target, two gestures" demo
+   never put a ring on anything else). First pass here put the ring on
+   BOTH the label and the avatar; his correction (2026-09-03): he wanted it
+   on the circle, matching what the artifact actually showed him, not a
+   second ring on the name reading as visual noise beside it. Also fixed a
+   real specificity bug that first pass had on the avatar specifically --
+   `body:not(:has(.shell.is-hud)) .dock-item-avatar`'s own border (the
+   "dark ring for legibility on light backgrounds" fix from an earlier
+   round) outspecifies a bare .dock-item.is-holding one, (0,3,1) beats
+   (0,3,0), so a border-color-only attempt was silently losing there. A
+   ring on its own layer (::after, box-shadow -- a property nothing else
+   here touches) can't lose that fight. Grows from a tight, transparent
+   ring to a full one, timed with transition-duration to land exactly when
+   the hold actually fires (HOLD_MS, dock.tsx -- kept as a literal rather
+   than threaded through as a custom property, since that's more wiring
+   than one repeated number earns). */
+.dock-item-avatar::after {
   content: ''; position: absolute; inset: -4px; border-radius: inherit;
   box-shadow: 0 0 0 2px var(--accent-text); opacity: 0; transform: scale(0.9);
   pointer-events: none;
 }
-.dock-item.is-holding .dock-item-label::after, .dock-item.is-holding .dock-item-avatar::after {
+.dock-item.is-holding .dock-item-avatar::after {
   opacity: 1; transform: scale(1);
   transition: opacity 100ms ease, transform 520ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }

@@ -94,6 +94,16 @@ body:has(.shell.is-hud) {
   --accent-text: #6FE4F2;
   --accent-hover: #7FEBF7;
   --accent-ink: #04141A;
+  /* Missing from this block entirely until now, not just unreachable from a
+     fixed sibling: --accent-wash is declared exactly once in the whole
+     file, at :root, as var(--a-accent-wash) -- and a var() reference is
+     resolved once, at the element that declares it. :root can't see this
+     body-level block (a descendant overriding an ancestor's own lookup
+     doesn't flow backward), so --accent-wash was permanently the light
+     value for every element in the app, HUD or not, and would have stayed
+     that way even with --a-accent-wash itself corrected below. Declared
+     directly here instead, the same way --accent itself already is. */
+  --accent-wash: rgba(79, 216, 232, 0.14);
   --focus: #4FD8E8;
   --focus-text: #6FE4F2;
   --alert: #FF6B5A;
@@ -104,6 +114,24 @@ body:has(.shell.is-hud) {
   --cat-admin: #7FA6C4;
   --cat-deep: #C89BF0;
   --cat-quick: #4FD8E8;
+  /* The dock's own FAB was fixed to read var(--a-accent)/var(--a-ink)
+     directly (2026-09-01) rather than the adapter names above, because
+     --accent resolves to the muted olive text-safe partner everywhere else
+     in the app and a FAB this size needs the literal shout colour. That
+     fix, done before this same-day HUD pass, only covered the adapter
+     layer for .dock -- the raw --a-* names it actually reads were still
+     unreachable, same "fixed sibling of .shell" gap this whole block
+     exists to close. Redeclared here too so the FAB (and anything else
+     that ever needs the un-adapted accent) gets the real HUD cyan instead
+     of silently falling back to the light theme's lime. */
+  --a-accent: #4FD8E8; --a-accent-2: #7FEBF7; --a-accent-text: #6FE4F2; --a-accent-wash: rgba(79, 216, 232, 0.14);
+  --a-ink: #E6F1F8;
+  /* Same gap, the radius tokens instead of the colour ones: --a-r-sm was
+     only ever redefined inside .shell.is-hud (2px there), so a fixed
+     sibling reading it fell back to the base :root value (10px) and the
+     square-corner HUD identity silently didn't apply outside the shell
+     either. */
+  --a-r-xs: 2px; --a-r-sm: 3px; --a-r-md: 4px; --a-r-lg: 5px;
   --shadow-pop: 0 18px 50px rgba(0, 0, 0, 0.65);
   --font-display: 'Michroma', 'Eurostile', sans-serif;
   --font-body: 'Saira', 'Helvetica Neue', sans-serif;
@@ -701,6 +729,29 @@ main { padding-inline: var(--gutter); }
 .dock-fab:hover { background: var(--a-accent-2); }
 .dock-fab:active { transform: scale(0.94); }
 @keyframes dock-pop { from { transform: scale(0.8); opacity: 0; } }
+/* His ask, separately: in the normal theme the lime FAB and the near-white
+   item avatars can read as blending into a similarly light (or similarly
+   lime) section behind them -- "it sometimes disappears within the
+   sections." A dark ring gives every circle here a defined edge no matter
+   what's under it. Scoped to normal mode only: HUD's own near-black ground
+   never had this problem, and a dark ring on a dark theme would just be
+   another low-contrast edge. */
+body:not(:has(.shell.is-hud)) .dock-fab,
+body:not(:has(.shell.is-hud)) .dock-item-avatar {
+  border: 2px solid rgba(0, 0, 0, 0.28);
+}
+
+/* Ironman/Jarvis mode, his name for it: .dock is a fixed sibling of .shell,
+   not a descendant (same gap the "focus pill, undo bar, sheets and the
+   daily review" comment above already documents for this exact class of
+   bug), so it reads the shared body:has(.shell.is-hud) block above for its
+   colour tokens already -- --surface, --ink, --accent and the rest all
+   resolve correctly there with no extra work. Shape doesn't follow tokens
+   the same way: HUD's signature is cold tokens AND square corners, and this
+   file hardcodes its own radii instead of reading --a-r-*, so the pill and
+   the open face stayed rounded even in HUD. Squared off here to match. */
+body:has(.shell.is-hud) .dock-item-label { border-radius: var(--a-r-sm); }
+body:has(.shell.is-hud) .dock-face { border-radius: var(--a-r-lg); }
 
 /* The stack: labelled pills growing upward from the FAB. .dock's own gap
    (above) now supplies the space between the stack and the FAB below it,

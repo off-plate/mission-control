@@ -1,9 +1,13 @@
 /* The moment he's about to quit something, not a page for later. Loads its
    own visible YouTube player (loadYouTubeApi is shared with Mundi Opus, the
    player itself is not -- this one is meant to be watched, Mundi Opus is
-   meant to be background). Loops the current video by default instead of
-   auto-advancing, and opens on a random pick from the queue every time, so
-   two visits in one bad week don't play the same clip twice in a row. */
+   meant to be background). Plays as a continuous, shuffled playlist by
+   default: one video ends, a different one starts right away, on its own --
+   repeat is a manual choice, not the default. Opens on a random pick from the
+   queue every time, so two visits in one bad week don't open on the same
+   clip. Picking a horizon on the right never touches this: track and horizon
+   are separate state, and the player is built once, so nothing on the right
+   side can restart or swap what's playing on the left. */
 
 import { useEffect, useRef, useState } from 'react'
 import { GIVEUP_QUEUE, giveUpHorizons } from './giveup'
@@ -26,7 +30,7 @@ export function GiveUpMode({ habitName, onClose }: { habitName?: string; onClose
   const playerRef = useRef<any>(null)
   const [track, setTrack] = useState(() => randomIndex(GIVEUP_QUEUE.length))
   const [ready, setReady] = useState(false)
-  const [loop, setLoop] = useState(true)
+  const [loop, setLoop] = useState(false)
   const [shuffle, setShuffle] = useState(true)
   const loopRef = useRef(loop)
   const shuffleRef = useRef(shuffle)
@@ -46,8 +50,8 @@ export function GiveUpMode({ habitName, onClose }: { habitName?: string; onClose
           onReady: () => { setReady(true); playerRef.current?.playVideo() },
           onStateChange: (e: { data: number }) => {
             if (e.data !== 0) return
-            // ENDED: repeat replays what just finished (the default), otherwise
-            // move on myself, shuffled or not -- never YouTube's own related-next.
+            // ENDED: by default move on myself to a shuffled pick, straight
+            // away -- never YouTube's own related-next. Repeat is opt-in.
             if (loopRef.current) {
               playerRef.current?.seekTo(0, true)
               playerRef.current?.playVideo()

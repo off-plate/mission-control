@@ -853,18 +853,29 @@ body:has(.shell.is-hud) .dock-face { border-radius: var(--a-r-lg); }
   font-weight: 600; font-size: var(--text-sm); color: var(--ink);
 }
 .notedock-switch .dd-trigger:hover:not(:disabled) { color: var(--accent-text); }
-/* Bright, on purpose: the same --accent/--accent-ink fill the Zone and
-   Assistant buttons wear in the header (btn-primary), not the quiet
-   --muted icon-button treatment everything else in this row gets -- his
-   ask (2026-09-02), so the control that leaves the note behind entirely for
-   the full Notes page reads clearly instead of blending into the row. */
-.notedock-open {
-  flex: none; height: 30px; padding: 0 var(--s3); border-radius: 999px; border: none;
-  background: var(--accent); color: var(--accent-ink); font-weight: 600; font-size: var(--text-sm);
-  display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+/* The real .btn-primary fill (see the note in notedock.tsx for why it isn't
+   a hand-rolled background) -- this override is sizing only, to sit at the
+   same 30px weight as the icon buttons and the switcher beside it in this
+   one compact row. The descendant selector out-specifies .btn-primary's own
+   38px/13px-20px sizing without needing !important. */
+.notedock-head .notedock-open {
+  flex: none; min-height: 30px; padding: 0 var(--s3); gap: 5px; white-space: nowrap;
 }
-.notedock-open:hover { background: var(--accent-hover); }
 .notedock-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 var(--s4) var(--s4); }
+/* His report: a long note wouldn't scroll at all. The shared <Editor> (see
+   notes.tsx) brings its own .nt-panebody wrapper along -- on the real Notes
+   page that IS the scroll container, and overscroll-behavior:contain there
+   is deliberate, stopping a scroll at its end from also dragging the whole
+   page. In the dock it's nested one level deeper, inside .notedock-body
+   (the actual scrollable region here), with no height of its own to fill --
+   its content and its own box are the same height, so it never scrolls
+   itself, but `contain` still blocks the wheel event from chaining up to
+   the container that DOES need it. Confirmed directly: scrollTop moved fine
+   on a direct assignment, proving .notedock-body itself was never the
+   problem, but a real wheel event over the text left it at 0. Neutralised
+   here, scoped to the dock only -- the standalone Notes page keeps its own
+   .nt-panebody scrolling exactly as before. */
+.notedock-body .nt-panebody { overflow-y: visible; overscroll-behavior: auto; }
 .notedock-title {
   width: 100%; border: none; background: none; resize: none;
   font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg);

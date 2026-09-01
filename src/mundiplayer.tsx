@@ -25,7 +25,9 @@ declare global {
 }
 
 let apiPromise: Promise<void> | null = null
-function loadYouTubeApi(): Promise<void> {
+/** Shared with giveup.tsx: one script tag, one onYouTubeIframeAPIReady chain,
+ *  whichever visible or off-canvas player asks for it first. */
+export function loadYouTubeApi(): Promise<void> {
   if (window.YT?.Player) return Promise.resolve()
   if (apiPromise) return apiPromise
   apiPromise = new Promise((resolve) => {

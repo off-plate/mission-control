@@ -948,6 +948,13 @@ body:has(.shell.is-hud) .dock-face { border-radius: var(--a-r-lg); }
 .bds-row:first-child { border-top: none; }
 .bds-label { width: 90px; height: 12px; }
 .bds-value { width: 55px; height: 12px; }
+/* His follow-up (2026-09-03): cache the last-seen summary instead of
+   skeletoning every open (see LAST_KEY in billsdock.tsx) -- this is the
+   ONE tell that what's on screen is last known rather than freshly
+   confirmed. A steady dim, not another pomo-pulse: the numbers are already
+   real and readable, a second thing pulsing on top of them would read as
+   noise rather than "wait". */
+.is-stale { opacity: 0.55; }
 
 @media (max-width: 639px) {
   .dock { right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); }

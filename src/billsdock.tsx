@@ -11,14 +11,26 @@
    Reads through useCompassAccount/useBillsData, exported from billspage.tsx
    for exactly this -- this is a second face on the same data, not a second
    copy of the Supabase plumbing or the cycle math (compassCalc.ts). */
-import { useMemo, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useStore } from './store'
 import { useCompassAccount, useBillsData } from './billspage'
-import { activeCycleKey, cycleChecklist, cycleFree, cycleForKey, resolveCycleIncome } from './compassCalc'
+import { activeCycleKey, cycleChecklist, cycleFree, cycleForKey, resolveCycleIncome, type CycleFree } from './compassCalc'
 import { SUPABASE_ENABLED } from './supabase'
 import * as Icon from './icons'
 
 const money = (n: number): string => `${new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 0 }).format(Math.round(n))} Kč`
+
+/* His follow-up (2026-09-03): the skeleton is right for a genuine first
+   load -- there's no getting a real network round trip to zero -- but it
+   was showing every single time, because nothing this panel loaded ever
+   stuck around. LAST_KEY mirrors LAST_KEY in notedock.tsx: the last summary
+   he actually saw, kept in localStorage, shown INSTANTLY the next time the
+   panel opens while the real fetch happens quietly behind it. Only a cold
+   browser with nothing cached yet ever sees the skeleton now; every open
+   after that first one is immediate, dimmed slightly (.is-stale) until the
+   fresh numbers confirm or correct it. */
+const LAST_KEY = 'mc-billsdock-last'
+interface CachedSummary { cycleLabel: string; income: number; free: CycleFree }
 
 export function BillsChip() {
   return <Icon.Wallet size={16} />
@@ -47,6 +59,27 @@ function BillsSkeleton() {
   )
 }
 
+/* The actual numbers, factored out so the live path and the cached-while-
+   refreshing path (BillsPanel below) render identically -- one definition
+   of what this summary looks like, not two copies that could drift. */
+function BillsSummary({ income, free, stale }: { income: number; free: CycleFree; stale?: boolean }) {
+  return (
+    <div className={stale ? 'is-stale' : undefined}>
+      <div className={`billsdock-hero${free.free < 0 ? ' is-neg' : ''}`}>{money(free.free)}</div>
+      <div className="billsdock-sub">
+        {income > 0 ? (free.free >= 0 ? 'free to spend this cycle' : 'short this cycle') : 'no income logged yet'}
+      </div>
+      <div className="billsdock-rows">
+        <div className="bdr"><span>Coming in</span><span className="mono pos">{money(free.comingIn)}</span></div>
+        <div className="bdr"><span>Recurring bills</span><span className="mono neg">−{money(free.recurringOut)}</span></div>
+        <div className="bdr"><span>Debt payments</span><span className="mono neg">−{money(free.debtOut)}</span></div>
+        {free.unexpectedOut > 0 && <div className="bdr"><span>Unexpected</span><span className="mono neg">−{money(free.unexpectedOut)}</span></div>}
+        {free.unreasonableOut > 0 && <div className="bdr"><span>Unreasonable</span><span className="mono neg">−{money(free.unreasonableOut)}</span></div>}
+      </div>
+    </div>
+  )
+}
+
 export function BillsPanel({ dockControls, onOpenFull }: { dockControls?: ReactNode; onOpenFull?: () => void }) {
   const { setPage } = useStore()
   const signedIn = useCompassAccount()
@@ -64,12 +97,26 @@ export function BillsPanel({ dockControls, onOpenFull }: { dockControls?: ReactN
   const chk = data ? cycleChecklist(data.recurring, data.planned, data.debts, data.transactions, cycle, income, dismissed) : null
   const free = data ? cycleFree(data.recurring, data.planned, data.debts, data.transactions, cycle, income, skips, dismissed, carryIn) : null
 
+  const [cached, setCached] = useState<CachedSummary | null>(() => {
+    try { const raw = localStorage.getItem(LAST_KEY); return raw ? (JSON.parse(raw) as CachedSummary) : null } catch { return null }
+  })
+  // Only overwrites the cache once a REAL load actually succeeds -- a
+  // stale value sitting there from before is always better than losing it
+  // to a transient loading or error render.
+  useEffect(() => {
+    if (!free) return
+    const snap: CachedSummary = { cycleLabel: cycle.label, income, free }
+    setCached(snap)
+    try { localStorage.setItem(LAST_KEY, JSON.stringify(snap)) } catch { /* private mode */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [free])
+
   const openFull = () => { setPage('bills'); onOpenFull?.() }
 
   return (
     <div className="billsdock-panel">
       <div className="billsdock-head">
-        <span className="billsdock-title">{cycle.label}</span>
+        <span className="billsdock-title">{free ? cycle.label : (cached?.cycleLabel ?? cycle.label)}</span>
         {/* Same real .btn-primary classes as Notes' door out -- see the note
            there on why this isn't a hand-rolled background. */}
         <button className="btn btn-primary dock-open-btn" onClick={openFull} title="Open Bills">
@@ -81,31 +128,22 @@ export function BillsPanel({ dockControls, onOpenFull }: { dockControls?: ReactN
       <div className="billsdock-body">
         {/* Same order the full page checks these in: sync off, still
            resolving who's signed in, not signed in, a load error, still
-           loading the actual rows -- only then the real summary. */}
+           loading the actual rows -- only then the real summary. The two
+           loading moments show the cached last-seen summary instead of the
+           skeleton whenever one exists (dimmed via is-stale) -- only a
+           browser with nothing cached yet, ever, actually sees it. */}
         {!SUPABASE_ENABLED ? (
           <p className="billsdock-empty">Sync is off in this build (running with <code>?noremote</code>), so Bills has nothing to read here.</p>
         ) : signedIn === null ? (
-          <BillsSkeleton />
+          cached ? <BillsSummary income={cached.income} free={cached.free} stale /> : <BillsSkeleton />
         ) : !signedIn ? (
           <p className="billsdock-empty">Sign in on the full Bills page to see your numbers here.</p>
         ) : error ? (
           <p className="billsdock-empty">Couldn't load Bills: {error}</p>
         ) : !data || !chk || !free ? (
-          <BillsSkeleton />
+          cached ? <BillsSummary income={cached.income} free={cached.free} stale /> : <BillsSkeleton />
         ) : (
-          <>
-            <div className={`billsdock-hero${free.free < 0 ? ' is-neg' : ''}`}>{money(free.free)}</div>
-            <div className="billsdock-sub">
-              {income > 0 ? (free.free >= 0 ? 'free to spend this cycle' : 'short this cycle') : 'no income logged yet'}
-            </div>
-            <div className="billsdock-rows">
-              <div className="bdr"><span>Coming in</span><span className="mono pos">{money(free.comingIn)}</span></div>
-              <div className="bdr"><span>Recurring bills</span><span className="mono neg">−{money(free.recurringOut)}</span></div>
-              <div className="bdr"><span>Debt payments</span><span className="mono neg">−{money(free.debtOut)}</span></div>
-              {free.unexpectedOut > 0 && <div className="bdr"><span>Unexpected</span><span className="mono neg">−{money(free.unexpectedOut)}</span></div>}
-              {free.unreasonableOut > 0 && <div className="bdr"><span>Unreasonable</span><span className="mono neg">−{money(free.unreasonableOut)}</span></div>}
-            </div>
-          </>
+          <BillsSummary income={income} free={free} />
         )}
       </div>
     </div>

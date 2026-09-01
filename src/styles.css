@@ -7990,9 +7990,12 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 
 /* A routine: a card you open and run. Never a box you tick. */
 .rtc-list { display: flex; flex-direction: column; gap: var(--s2); }
+/* A COLUMN: the head on one full-width line, the steps under it. It was a row,
+   so .rtc-top shrank to its own content and the count and Start clustered up
+   against the name instead of sitting at the card's right edge. */
 .rtc {
-  display: flex; align-items: center; gap: var(--s3);
-  padding: var(--s4); border: 1px solid var(--a-line); border-radius: var(--a-r-sm);
+  display: flex; flex-direction: column;
+  padding: var(--s4) var(--s5); border: 1px solid var(--a-line); border-radius: var(--a-r-sm);
   transition: border-color var(--a-enter), box-shadow var(--a-enter);
 }
 .rtc:hover { border-color: var(--a-line-2); box-shadow: var(--a-lift); }
@@ -8054,7 +8057,8 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    a step's own work stays reachable: a typing gate, an either-or, a link, and a
    past day he may want to correct. Shut by default so the page stays a list of
    routines rather than a wall of fifty rows. */
-.rtc-top { display: flex; align-items: center; gap: var(--s3); }
+.rtc-top { display: flex; align-items: center; gap: var(--s3); width: 100%; }
+.rtc-id { flex: 1 1 auto; }
 .rtc-open {
   flex: none; width: 26px; height: 26px; padding: 0; display: grid; place-items: center;
   border: 0; background: none; color: var(--a-soft); cursor: pointer; border-radius: var(--a-r-xs);

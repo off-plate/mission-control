@@ -2083,7 +2083,12 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
    folded or not, so it gets its own larger size rather than inheriting the
    label default. */
 .weekplan-title .microcap { margin-bottom: 0; font-size: 0.875rem; }
-.weekplan-range { font-size: 0.9375rem; color: var(--wk-muted); }
+/* font-family overrides .mono's (Instrument Sans) so the date range reads in
+   the same face as the title and the sentence beside it -- three different
+   typefaces in one row (label, range, sentence) was the actual complaint.
+   .mono still carries tabular-nums, which is the only thing it was doing
+   here that was worth keeping. */
+.weekplan-range { font-size: 0.9375rem; color: var(--wk-muted); font-family: var(--font-body); }
 /* His dynamic sentence, in both states: what the collapsed bar is FOR, and
    the one line that still explains the day once it's open. The task count
    and duration stay lime always -- his instruction was that they read as

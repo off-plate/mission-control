@@ -89,7 +89,6 @@ const offsetDate = (n: number): string => {
 export function TodayPage() {
   const nextEvent = useNextEvent()
   const open = useOpenToday()
-  const [giveUp, setGiveUp] = useState(false)
 
   /* One surface. The paper widget grid that used to sit under the room is gone,
      and so are its Edit grid and Add widget buttons.
@@ -108,9 +107,7 @@ export function TodayPage() {
           { v: nextEvent.v, k: nextEvent.k, tone: 'info' as const },
           { v: String(open.length), k: 'tasks open' },
         ]}
-        actions={<button className="btn btn-ghost giveup-launch" onClick={() => setGiveUp(true)}>I wanna give up</button>}
       />
-      {giveUp && <GiveUpMode onClose={() => setGiveUp(false)} />}
       <TodayRoom />
     </div>
   )

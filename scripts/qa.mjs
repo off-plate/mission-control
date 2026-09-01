@@ -1077,10 +1077,25 @@ await step('habits: a routine is a folder, and its habits tick on their own', as
     await wake.locator('.rtc-open').click(); await page.waitForTimeout(400)
   }
   // Its steps are habits inside it, in the order he wrote them.
-  const inside = await wake.locator('.habit-name').allInnerTexts()
+  /* Every row says its workspace since the three faces stopped being split by
+     one (2026-08-26), and the label lives inside the name node, so a test that
+     matches by name has to read the name without it. */
+  const nameOf = (el) => {
+    const q = el.querySelector('.habit-qual')
+    return (el.textContent ?? '').replace(q ? q.textContent : '', '').trim()
+  }
+  const inside = await wake.evaluate((w, ) => [...w.querySelectorAll('.habit-name')].map((e) => {
+    const q = e.querySelector('.habit-qual')
+    return (e.textContent ?? '').replace(q ? q.textContent : '', '').trim()
+  }))
+  void nameOf
   if (inside.length < 2) throw new Error(`the folder holds ${inside.length} habits`)
   // And a habit inside a folder is his to tick, which it was not before.
-  const firstName = (await wake.locator('.habit-name').first().innerText()).trim()
+  const firstName = await wake.evaluate((w) => {
+    const e = w.querySelector('.habit-name')
+    const q = e.querySelector('.habit-qual')
+    return (e.textContent ?? '').replace(q ? q.textContent : '', '').trim()
+  })
   const dot = wake.locator('.habit-line').first().locator('.day-cell.is-today .daydot').first()
   if (await dot.isDisabled()) throw new Error('a habit inside a folder is still locked')
   await dot.click(); await page.waitForTimeout(600)

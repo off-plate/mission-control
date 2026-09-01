@@ -2103,7 +2103,14 @@ export function HabitsPage() {
   const [editHabit, setEditHabit] = useState<HabitDef | null>(null)
   const [giveUp, setGiveUp] = useState<HabitDef | null>(null)
   const goalOn = new Map(goals.filter((g) => g.habitId).map((g) => [g.habitId as string, g]))
-  const spaceHabits = habits.filter((h) => inView(h.space) && !h.archivedAt)
+/* Habits, Goals and Quitting ignore the workspace switcher, on his instruction
+   2026-08-26: "all of them should have all of the habits, goals and quitting.
+   No separation. It's not needed." A habit is a thing he does with his own
+   body and hours; which company it was filed under was a distinction the rest
+   of the app needs and these three pages never did. The workspace is still
+   STORED on every one of them and still said on the row, so nothing is lost
+   and nothing has to be moved. */
+  const spaceHabits = habits.filter((h) => !h.archivedAt)
   // A habit a routine drives cannot be deleted from here, or the routine would
   // mirror into nothing. Pausing stays available.
   /* Ownership needs something to own: a routine with no steps cannot be
@@ -2156,19 +2163,18 @@ export function HabitsPage() {
     (h.auto?.from === 'focus' || h.kind === 'measured') ? 'clock' : drivenBy.has(h.id) ? 'routine' : 'you'
   const rank = (h: HabitDef) =>
     (h.paused ? 2 : h.days[todayIndex] ? 1 : 0) * 10 + (DAYPART_RANK[h.daypart ?? 'anytime'] ?? 4)
-  /* Three habits called "Focus for 30 minutes" differed by a coloured bar and a
-     single letter. In All they are indistinguishable, so the workspace gets
-     said. */
-  const nameCount = new Map<string, number>()
-  for (const h of spaceHabits) nameCount.set(h.name, (nameCount.get(h.name) ?? 0) + 1)
-  const qualifyOf = (h: HabitDef) => ((nameCount.get(h.name) ?? 0) > 1 ? SPACE_LABELS[h.space] : undefined)
+  /* The workspace is said on every row now, not only when two names collide.
+     One list holds all four, so "Focus for 30 minutes" is three rows and the
+     label is the only thing that places them; and a row he cannot place is a
+     row he cannot trust. */
+  const qualifyOf = (h: HabitDef) => SPACE_LABELS[h.space]
   /* Folders first, then whatever is loose. His model: a routine IS a folder of
      habits, and "if a habit doesn't have a folder it is basically just the
      habit". Inside a folder the sequence he wrote is the order, because a
      morning routine is a running order, not a ranked list; loose habits keep
      the old open-first ranking, which is what a flat list wants. */
   const folderGroups = routines
-    .filter((r) => !r.archivedAt && inView(r.space))
+    .filter((r) => !r.archivedAt)
     .map((r) => ({
       id: r.id,
       label: r.title,
@@ -2501,7 +2507,7 @@ export function HabitsPage() {
                     {firedRows.map(({ r, h }) => (
                       <div className="hg-row" key={h.id}>
                         <span className="hg-what">
-                          <span className="hg-title">{h.name}</span>
+                          <span className="hg-title">{h.name}<span className="habit-qual">{SPACE_LABELS[h.space]}</span></span>
                           {/* The OVERVIEW he asked for by name: how many times he
                               has actually run this thing. Restating "fires when
                               you finish X" on every row said nothing the card in
@@ -3370,7 +3376,7 @@ export function QuittingPage() {
   /* Ranked by how long it has held. That is the scoreboard, and a page that
      ordered them any other way would be hiding the only number that matters. */
   const quits = habits
-    .filter((h) => h.kind === 'break' && !h.archivedAt && inView(h.space))
+    .filter((h) => h.kind === 'break' && !h.archivedAt)
     .map((h) => ({ h, clean: daysClean(h, slips) ?? 0, best: bestCleanRun(h, slips), slipped: slipCount(h, slips) }))
     .sort((a, b) => b.clean - a.clean)
 
@@ -3420,6 +3426,7 @@ export function QuittingPage() {
                   <div className="qcard-name">{h.name}</div>
 
                   <div className="qcard-line">
+                    <span className="habit-qual qcard-space">{SPACE_LABELS[h.space]}</span>
                     {h.quitSince ? `since ${shortDate(h.quitSince)}` : 'no start date'}
                     {best > 0 && ` · best ${best}`}
                     {` · ${slipped} ${slipped === 1 ? 'slip' : 'slips'}`}
@@ -3465,7 +3472,7 @@ export function QuittingPage() {
 
 export function GoalsPage() {
   const { space, goals, habits, habitLog, focusSessions, slips, bumpGoal, toggleGoalMilestone, deleteGoal, repeatGoal, inView } = useStore()
-  const all = goals.filter((g) => inView(g.space))
+  const all = goals
   /* A goal belongs to a period. The ones whose period has ended are not deleted
      and do not keep counting: they sit below with the number they finished on. */
   const spaceGoals = all.filter((g) => !g.closed)

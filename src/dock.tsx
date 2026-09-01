@@ -1,9 +1,38 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from './store'
 import { useMundiOpus } from './mundiplayer'
 import { MediaBadge, MediaChip, PomodoroInline } from './pomodoro'
 import { NoteChip, NotePanel } from './notedock'
 import * as Icon from './icons'
+
+/* Hover opens the dial now, on his instruction (2026-09-02) -- the same
+   show/hide-with-a-grace-period pattern the header's nav row already uses
+   (see useNavReveal in App.tsx), not a second thing to maintain. Hovering
+   the FAB, the stack, an icon or a label all count as "still here": they're
+   all plain flow children of one .dock, so a single enter/leave pair on the
+   wrapper covers every one of them without the gap-in-the-hitbox problem
+   the nav row hit once (that was an absolutely positioned child rendered
+   outside its parent's own box; nothing here is). Leaving starts a one
+   second timer, same as the nav row, before folding back to the bare FAB --
+   a click on the FAB or the X still acts immediately, this is additive. */
+const HOVER_HIDE_MS = 1000
+function useHoverMenu(setMode: React.Dispatch<React.SetStateAction<Mode>>) {
+  const timer = useRef<number | undefined>(undefined)
+  const clear = () => { if (timer.current !== undefined) { clearTimeout(timer.current); timer.current = undefined } }
+  useEffect(() => clear, [])
+  return {
+    // Functional updates throughout: the timeout below fires well after this
+    // closure was created, so it has to read whatever mode is CURRENT at
+    // that moment, not whatever it was when the mouse first left -- a click
+    // into a panel in the meantime must not get yanked back to closed by a
+    // stale timer.
+    onMouseEnter: () => { clear(); setMode((m) => (m === 'closed' ? 'menu' : m)) },
+    onMouseLeave: () => {
+      clear()
+      timer.current = window.setTimeout(() => setMode((m) => (m === 'menu' ? 'closed' : m)), HOVER_HIDE_MS)
+    },
+  }
+}
 
 /* THE DOCK: a Material speed-dial FAB (his reference, 2026-09-01). Closed,
    one round button. Tapping it fans a labelled item out per tool, stacked
@@ -36,6 +65,7 @@ export function Dock() {
   const { page, setPage } = useStore()
   const mo = useMundiOpus()
   const [mode, setMode] = useState<Mode>('closed')
+  const hover = useHoverMenu(setMode)
 
   /* The Zone already shows the timer, the player and a place to write at
      full size. A second, smaller copy of the same facts in the corner is
@@ -53,7 +83,7 @@ export function Dock() {
 
   if (mode === 'closed') {
     return (
-      <div className="dock">
+      <div className="dock" onMouseEnter={hover.onMouseEnter} onMouseLeave={hover.onMouseLeave}>
         <button className="dock-fab" onClick={() => setMode('menu')} aria-label="Open quick tools">
           <Icon.Plus size={22} />
         </button>
@@ -63,7 +93,7 @@ export function Dock() {
 
   if (mode === 'menu') {
     return (
-      <div className="dock">
+      <div className="dock" onMouseEnter={hover.onMouseEnter} onMouseLeave={hover.onMouseLeave}>
         <div className="dock-menu">
           {panels.map((t) => (
             <button key={t.id} className="dock-item" onClick={() => setMode(t.id)}>

@@ -2096,6 +2096,7 @@ export function HabitsPage() {
   // Opening the goal sheet from a habit is the "set a goal on this" path.
   const [goalFor, setGoalFor] = useState<string | null>(null)
   const [editHabit, setEditHabit] = useState<HabitDef | null>(null)
+  const [giveUp, setGiveUp] = useState<HabitDef | null>(null)
   const goalOn = new Map(goals.filter((g) => g.habitId).map((g) => [g.habitId as string, g]))
   const spaceHabits = habits.filter((h) => inView(h.space) && !h.archivedAt)
   // A habit a routine drives cannot be deleted from here, or the routine would
@@ -2532,6 +2533,7 @@ export function HabitsPage() {
                       <span className="hg-quit-name">{h.name}</span>
                       <span className="hg-quit-do">
                         <button className="btn btn-sm btn-quiet" onClick={() => logSlip(h.id)}>{slippedToday ? 'Slipped today' : 'I slipped today'}</button>
+                        <button className="btn btn-sm btn-quiet" onClick={() => setGiveUp(h)}>I wanna give up</button>
                         {kebab(h)}
                       </span>
                     </div>
@@ -2547,6 +2549,7 @@ export function HabitsPage() {
       {adding && <HabitSheet onClose={() => setAdding(false)} />}
       {editHabit && <HabitSheet habit={editHabit} drivenBy={drivenBy.get(editHabit.id)} onClose={() => setEditHabit(null)} />}
       {goalFor && <GoalSheet presetHabitId={goalFor} thenGoToGoals onClose={() => setGoalFor(null)} />}
+      {giveUp && <GiveUpMode habitName={giveUp.name} onClose={() => setGiveUp(null)} />}
     </div>
   )
 

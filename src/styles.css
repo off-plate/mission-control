@@ -7570,12 +7570,23 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   --ink: #261B15; --ink-2: #68574B; --ink-3: #8E7969;
   background: var(--bg); color: var(--ink); font-family: var(--font-body); min-height: 100%;
 }
-.bills-wrap { max-width: 1180px; margin: 0 auto; padding: 28px 24px 90px; }
-/* The site's own nav row (Today/Plan/Habits/...) is disabled outright on
-   this page now (see useNavReveal in App.tsx) rather than patched here --
-   it overlaid this exact header (cycle arrows, End cycle) whenever it
-   opened, since none of its pills point at Bills anyway. */
-.bills-head { display: flex; align-items: flex-start; justify-content: space-between; padding: 4px 0 18px; }
+/* Full-bleed like every other page -- main already carries the --gutter
+   padding-inline. The old max-width: 1180px + margin: 0 auto stranded Bills
+   in a narrow centered column while Today/Plan/Habits run edge to edge. */
+.bills-wrap { padding: 28px 0 90px; }
+/* The site's own nav row (Today/Plan/Habits/...) opens the same way here as
+   on every other page (hover the logo/workspace cluster, or tab to it) --
+   it does not get a special case on Bills. It's an absolutely positioned
+   overlay that lands right at the top of the content column
+   (.topstick > .nav in styles.css), which is exactly where this header's
+   own cycle arrows and End cycle button sit, so this header needs a real
+   stacking position above it. Beating the row's own z-index (30) is not
+   enough: .nav's z-index is scoped to the stacking context .topstick
+   creates (z-index: 50), so .nav can never outrank anything above
+   .topstick's OWN rank at the root context no matter what its local
+   z-index says. This has to beat 50, not 30 -- confirmed by hit-testing
+   the actual cascade in a real browser, not by reasoning about it. */
+.bills-head { display: flex; align-items: flex-start; justify-content: space-between; padding: 4px 0 18px; position: relative; z-index: 51; }
 .bills-cyc { display: flex; align-items: center; gap: 10px; }
 .bills-iconbtn {
   width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center;

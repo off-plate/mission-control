@@ -3133,15 +3133,41 @@ await step('timeline: a library of hundreds, pasted in bulk and still there afte
   await page.locator('.tl-giveup').click(); await page.waitForTimeout(600)
   const label = await page.locator('.tl-reelbar button').first().innerText()
   if (!/202/.test(label)) throw new Error(`the control reads "${label}", so the page did not read the library back`)
-  /* One of them is playing, unmuted, and scrubbing moves to a different one. */
+  /* Playback itself, and whether the slider is allowed near it, is a separate
+     concern with its own test below -- 202 synthetic ids prove counting and
+     persistence, not which one happens to autoplay. */
+  await page.keyboard.press('Escape'); await page.waitForTimeout(300)
+})
+
+await step('timeline: the reel answers to Next, never to the slider', async () => {
+  await fresh('timeline')
+  /* Three real, verified clips (David Goggins, Eric Thomas, Jocko Willink --
+     the same library the give-up mode ships with) so this checks actual
+     playback, not just that an element with a src exists. The horizon
+     slider used to be folded into the same index as the reel, so dragging
+     it silently swapped the clip; it answers to skip alone now. */
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K) || '{}')
+    s.reels = [
+      'https://www.youtube.com/watch?v=OM3H1J8Ht2o',
+      'https://www.youtube.com/watch?v=yRfK5-7B-SU',
+      'https://www.youtube.com/watch?v=Cw0hZQ8Na_Y',
+    ]
+    localStorage.setItem(K, JSON.stringify(s))
+  }, KEY)
+  await page.reload(); await page.waitForTimeout(700)
+  await page.locator('.tl-giveup').click(); await page.waitForTimeout(2000)
   const src = () => page.evaluate(() => document.querySelector('iframe.tl-media, video.tl-media')?.getAttribute('src') ?? '')
   const first = await src()
-  if (!first) throw new Error('nothing is playing with 202 reels in the library')
+  if (!first) throw new Error('nothing is playing with three real reels in the library')
   if (/mute=1|muted=1/.test(first)) throw new Error('the reel is muted')
   await page.locator('.tl-slider input').focus()
   await page.keyboard.press('Home'); await page.waitForTimeout(300)
   await page.keyboard.press('ArrowRight'); await page.waitForTimeout(400)
-  if (await src() === first) throw new Error('scrubbing plays the same clip')
+  await page.keyboard.press('End'); await page.waitForTimeout(400)
+  if (await src() !== first) throw new Error('the slider changed the clip -- it is supposed to leave it alone')
+  await page.locator('.tl-setshot', { hasText: 'Next' }).click(); await page.waitForTimeout(1500)
+  if (await src() === first) throw new Error('Next did not change the clip')
   await page.keyboard.press('Escape'); await page.waitForTimeout(300)
 })
 

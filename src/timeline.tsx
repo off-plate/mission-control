@@ -29,6 +29,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from './store'
 import { useCompass, type CompassMoney } from './compass'
 import { reelPool, reelKind, parseReels, dedupe } from './reels'
+import { loadYouTubeApi } from './mundiplayer'
 import { getHevyStatsForDay } from './hevy'
 import { localDateKey } from './util'
 import {
@@ -660,10 +661,18 @@ function Reel({ url, count, onOpenLibrary, onNext }: {
 
   return (
     <div className={`tl-reel${kind && !failed ? ' has-media' : ''}`}>
+      {/* A clip that ends is a clip that hands off to another one, straight
+          away, the same way he stops one habit for another instead of sitting
+          in the gap. `loop` on the file, and `loop=1` in the YouTube/Vimeo
+          embed, both used to replay the SAME clip forever -- so nothing here
+          ever advanced on its own, only the manual Next button did. */}
       {!failed && kind === 'file' && (
-        <video ref={vid} className="tl-media" src={url} autoPlay loop playsInline onError={() => setFailed(true)} />
+        <video ref={vid} className="tl-media" src={url} autoPlay playsInline onEnded={onNext} onError={() => setFailed(true)} />
       )}
-      {!failed && (kind === 'youtube' || kind === 'vimeo') && (
+      {!failed && kind === 'youtube' && (
+        <YouTubeReel url={url} sound={sound} onEnded={onNext} onFail={() => setFailed(true)} />
+      )}
+      {!failed && kind === 'vimeo' && (
         <iframe key={`${url}|${sound}`} className="tl-media" src={embedSrc(url, sound)} title="Reel"
           allow="autoplay; encrypted-media" frameBorder="0" />
       )}
@@ -695,6 +704,52 @@ function Reel({ url, count, onOpenLibrary, onNext }: {
       </div>
     </div>
   )
+}
+
+/** A YouTube clip through the real IFrame API, not a static embed: the raw
+ *  iframe had no way to know when a clip ended, so `loop=1` was the only
+ *  option and the same thirty seconds played forever. This one calls onEnded
+ *  the moment the clip finishes, the same pattern Mundi Opus already uses. */
+function YouTubeReel({ url, sound, onEnded, onFail }: {
+  url: string; sound: boolean; onEnded: () => void; onFail: () => void
+}) {
+  const mountRef = useRef<HTMLDivElement>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const playerRef = useRef<any>(null)
+  const onEndedRef = useRef(onEnded)
+  useEffect(() => { onEndedRef.current = onEnded }, [onEnded])
+  const id = url.match(YT)?.[1] ?? ''
+
+  useEffect(() => {
+    if (!id) { onFail(); return }
+    let alive = true
+    void loadYouTubeApi().then(() => {
+      if (!alive || !mountRef.current) return
+      playerRef.current = new window.YT!.Player(mountRef.current, {
+        videoId: id,
+        playerVars: { autoplay: 1, mute: sound ? 0 : 1, controls: 0, playsinline: 1, rel: 0 },
+        events: {
+          onStateChange: (e: { data: number }) => { if (e.data === 0) onEndedRef.current() },
+          onError: () => onFail(),
+        },
+      })
+    })
+    return () => { alive = false; playerRef.current?.destroy?.(); playerRef.current = null }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
+
+  useEffect(() => {
+    const p = playerRef.current
+    if (!p?.mute) return
+    if (sound) p.unMute?.()
+    else p.mute?.()
+  }, [sound])
+
+  /* Given a real element (not a string id), the IFrame API replaces this div
+     in place with its generated iframe and carries the className over, so
+     tl-media -- the fill rule every other reel kind already answers to --
+     lands on the real playing element with no extra wrapper or CSS. */
+  return <div ref={mountRef} className="tl-media" />
 }
 
 /* ---- the library ---- */
@@ -760,7 +815,20 @@ function TwoLives({ onBack, run, chain }: { onBack: () => void; run: DayScore[];
   const [grain, setGrain] = useState<Grain>('m')
   const [at, setAt] = useState(0)
   const [lib, setLib] = useState(false)
-  const [skip, setSkip] = useState(0)
+  /* A different reel each time this screen opens, not always the first one in
+     the library. */
+  const [skip, setSkip] = useState(() => (pool.length ? Math.floor(Math.random() * pool.length) : 0))
+  /* Advance to a genuinely different reel -- his own words were "shuffled
+     every time... including the sorting of all the different videos that
+     will come next", not just a different opening pick. Used for the manual
+     Next button and for a clip ending on its own. */
+  const advanceReel = () => setSkip((s) => {
+    if (pool.length <= 1) return s
+    const cur = s % pool.length
+    let i = cur
+    while (i === cur) i = Math.floor(Math.random() * pool.length)
+    return i
+  })
 
   /* The horizon he named, unless one of his own open goals reaches further. */
   const horizon = useMemo(() => {
@@ -779,7 +847,11 @@ function TwoLives({ onBack, run, chain }: { onBack: () => void; run: DayScore[];
   const days = at >= span - step / 2 ? span : Math.min(span, Math.round(at / step) * step)
   const when = dayAfter(days)
   const p = project(run, chain.current, days)
-  const url = pool.length ? pool[(skip + Math.floor(days / Math.max(1, step))) % pool.length] : ''
+  /* The reel is what plays while he reads the two futures, not a second way
+     to read the slider: it used to fold the horizon into the same index
+     (`skip + days/step`), so dragging Days/Weeks/Months to a new point
+     silently swapped the clip too. It answers to skip alone now. */
+  const url = pool.length ? pool[skip % pool.length] : ''
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
@@ -800,7 +872,7 @@ function TwoLives({ onBack, run, chain }: { onBack: () => void; run: DayScore[];
   return (
     <div className="tl-lives" role="dialog" aria-modal="true" aria-label="Two lives">
       <div className="tl-stage">
-        <Reel url={url} count={pool.length} onOpenLibrary={() => setLib(true)} onNext={() => setSkip((s) => s + 1)} />
+        <Reel url={url} count={pool.length} onOpenLibrary={() => setLib(true)} onNext={advanceReel} />
         <div className="tl-sides">
           <section className="tl-side is-push">
             <span className="tl-pill">If you do it anyway</span>

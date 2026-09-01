@@ -96,6 +96,17 @@ const fresh = async (route = '') => {
   await page.evaluate((K) => { localStorage.removeItem(K); localStorage.removeItem('qa-stream') }, KEY)
   await page.goto(`${URL}#/${route}`); await page.reload(); await page.waitForTimeout(700)
 }
+
+/* Routine cards rest SHUT (2026-08-26): the page is a list of routines you run,
+   and its steps live behind the card's disclosure. Any test that reaches for a
+   step has to open them first, the same way he would. */
+const openRoutines = async () => {
+  const all = page.locator('.band-collapseall')
+  if (await all.count() && /expand/i.test(await all.innerText())) {
+    await all.click(); await page.waitForTimeout(500)
+  }
+}
+
 /* A no-op when QA_OUT is unset, so a flow that calls this stays free to run
    without a directory to write into. */
 const shoot = async (name) => {
@@ -149,6 +160,7 @@ await step('breakdown: his own steps, his own minutes', async () => {
 
 await step('habits: tick a build habit and persist', async () => {
   await fresh('habits')
+  await openRoutines()
   const dot = page.locator('.habit-line', { hasText: 'Meditation' }).first().locator('.daydot:not([disabled])').last()
   await dot.click(); await page.waitForTimeout(400)
   await page.reload(); await page.waitForTimeout(600)
@@ -161,6 +173,7 @@ await step('habits: a step with two ways to answer it stays ONE habit', async ()
      as a single habit carrying both alternatives, which is the one shape of
      step that would have been wrong to split. */
   await fresh('habits')
+  await openRoutines()
   const found = await page.evaluate((K) => {
     const st = JSON.parse(localStorage.getItem(K))
     const withAlts = (st.habits ?? []).filter((h) => Array.isArray(h.alts) && h.alts.length > 1)
@@ -1049,6 +1062,7 @@ await step('habits: a routine is a folder, and its habits tick on their own', as
      habits... each item in the routine will be a new habit". So the folder is
      the routine, the rows are its habits, and a habit is his to tick. */
   await fresh('habits')
+  await openRoutines()
   await page.locator('.space-btn', { hasText: 'All' }).click(); await page.waitForTimeout(500)
   /* The folder is a routine CARD now (2026-08-26, proposal C): Start is its
      primary action and the steps sit behind a disclosure. Same model, and the
@@ -1085,6 +1099,7 @@ await step('habits: the folder counts only what it still needs', async () => {
   /* The head reads how far through today the folder is. Optional habits never
      hold it open, or a folder with one optional in it could never read full. */
   await fresh('habits')
+  await openRoutines()
   await page.locator('.space-btn', { hasText: 'All' }).click(); await page.waitForTimeout(500)
   /* The count lives on the routine card now and reads "N of M". */
   const head = await page.locator('.rtc').first().locator('.rtc-count').innerText()
@@ -1107,6 +1122,7 @@ await step('habits: a gated habit stays locked until the day\'s number clears it
      which left a box he could tick on a warm-up. His words: "there's no way
      that you will tell me that something doesn't work or doesn't live." */
   await fresh('habits')
+  await openRoutines()
   await page.locator('.space-btn', { hasText: 'All' }).click(); await page.waitForTimeout(500)
   const row = page.locator('.habit-line').filter({ has: page.locator('.habit-name', { hasText: 'Typing test' }) }).first()
   if (!(await row.count())) throw new Error('no Typing test habit on the page')
@@ -1139,6 +1155,7 @@ await step('habits: picking either answer of a two-way habit keeps the day', asy
      picking the other answer afterwards is a change of mind, not a second
      thing done: the day stays kept either way. */
   await fresh('habits')
+  await openRoutines()
   await page.locator('.space-btn', { hasText: 'All' }).click(); await page.waitForTimeout(500)
   const row = page.locator('.habit-line').filter({ has: page.locator('.habit-name', { hasText: 'Move or caffeine' }) }).first()
   if (!(await row.count())) throw new Error('no "Move or caffeine" habit on the page')
@@ -1165,6 +1182,7 @@ await step('habits: the two content steps still generate today\'s real body', as
      their whole job was content the app built fresh each morning. A habit
      with only a note where that used to be is a habit with the work removed. */
   await fresh('habits')
+  await openRoutines()
   await page.locator('.space-btn', { hasText: 'All' }).click(); await page.waitForTimeout(500)
   const pron = page.locator('.habit-line').filter({ has: page.locator('.habit-name', { hasText: 'Pronunciation test' }) }).first()
   await pron.locator('.run-caret').click(); await page.waitForTimeout(600)
@@ -1630,6 +1648,7 @@ await step('habits: a quitting habit has no day dots at all, only a count and a 
      stronger assertion is that no tickable dot exists on it at all. A row of
      empty circles told him he was failing on the days he was succeeding. */
   await fresh('habits')
+  await openRoutines()
   await page.evaluate((K) => {
     const s = JSON.parse(localStorage.getItem(K))
     const mk = (id, name, since) => ({ id, space: 'personal', name, kind: 'break', frequency: 'daily', days: [false, false, false, false, false, false, false], history: [], quitSince: since })
@@ -2370,6 +2389,7 @@ await step('habits: the Compass link survived the move onto its habit', async ()
      are habits now, and he asked for exactly this to survive: "there is links
      for typing tests, so there should be link to that still". */
   await fresh('habits')
+  await openRoutines()
   await page.locator('.space-btn', { hasText: 'All' }).click(); await page.waitForTimeout(500)
   const stored = await page.evaluate((K) => {
     const st = JSON.parse(localStorage.getItem(K))

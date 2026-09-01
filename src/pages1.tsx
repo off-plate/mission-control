@@ -2090,7 +2090,7 @@ const HABIT_WINDOWS = [
 ]
 
 export function HabitsPage() {
-  const { habits, goals, space, deleteHabit, togglePauseHabit, routines, stepTicks, habitLog, todayIndex, inView, focusRoutineId, setFocusRoutineId, toggleHabitDay, slips, logSlip } = useStore()
+  const { habits, goals, space, deleteHabit, togglePauseHabit, routines, stepTicks, habitLog, todayIndex, inView, focusRoutineId, setFocusRoutineId, toggleHabitDay, slips, logSlip, focusSessions } = useStore()
   const [days, setDays] = useState(7)
   const [adding, setAdding] = useState(false)
   // Opening the goal sheet from a habit is the "set a goal on this" path.
@@ -2209,11 +2209,15 @@ export function HabitsPage() {
      he would never run two at once, and a second surface would be a second
      answer to "where am I". */
   const [running, setRunning] = useState<string | null>(null)
+  /* Which routine cards are OPEN. Stored the positive way round on purpose:
+     the old set held what was SHUT, and an empty set on a fresh device meant
+     nothing was shut, so every card opened itself and the page became the wall
+     of fifty rows the card exists to replace. Shut is the resting state. */
   const [shutFolders, setShutFolders] = useState<Set<string>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('mc:shut-folders') ?? '[]') as string[]) } catch { return new Set() }
+    try { return new Set(JSON.parse(localStorage.getItem('mc:open-routines') ?? '[]') as string[]) } catch { return new Set() }
   })
   useEffect(() => {
-    try { localStorage.setItem('mc:shut-folders', JSON.stringify([...shutFolders])) } catch { /* private mode */ }
+    try { localStorage.setItem('mc:open-routines', JSON.stringify([...shutFolders])) } catch { /* private mode */ }
   }, [shutFolders])
   const toggleFolder = (id: string) => setShutFolders((prev) => {
     const next = new Set(prev)
@@ -2224,8 +2228,8 @@ export function HabitsPage() {
      for a workspace with enough of them that scrolling past open ones to find
      the one he wants is the actual problem. Any open -> shut them all first;
      only once they are all already shut does the same control open them. */
-  const allShut = folderGroups.length > 0 && folderGroups.every((g) => shutFolders.has(g.id))
-  const toggleAllFolders = () => setShutFolders(allShut ? new Set() : new Set(folderGroups.map((g) => g.id)))
+  const allShut = folderGroups.length > 0 && folderGroups.every((g) => !shutFolders.has(g.id))
+  const toggleAllFolders = () => setShutFolders(allShut ? new Set(folderGroups.map((g) => g.id)) : new Set())
   /* Today's routine strip hands a routine over here the same way it hands a
      task to Plan: open its folder if he had shut it, scroll to it, flash it,
      then forget it -- clicking "Before work routine" on Today should not
@@ -2258,7 +2262,11 @@ export function HabitsPage() {
     .filter((r) => r.habitId && !r.archivedAt && r.steps.length > 0)
     .map((r) => ({ r, h: spaceHabits.find((x) => x.id === r.habitId) }))
     .filter((x): x is { r: Routine; h: HabitDef } => !!x.h)
-  const autoRows = looseBuild.filter((h) => isHevyHabit(h) || h.auto?.from === 'focus' || h.kind === 'measured')
+  /* The gym leads: it is the one with a button, and a control belongs at the
+     top of the list it acts on rather than under three rows that have none. */
+  const autoRows = looseBuild
+    .filter((h) => isHevyHabit(h) || h.auto?.from === 'focus' || h.kind === 'measured')
+    .sort((a, b) => Number(isHevyHabit(b)) - Number(isHevyHabit(a)))
   const manualRows = looseBuild.filter((h) => !autoRows.includes(h))
   const folderIsDone = (c: { list: HabitDef[] }) => { const d = folderDone(c.list); return d.total > 0 && d.done === d.total }
 
@@ -2289,7 +2297,7 @@ export function HabitsPage() {
     const { done, total } = folderDone(c.list)
     const finished = folderIsDone(c)
     const isRunning = running === c.id
-    const open = !shutFolders.has(c.id)
+    const open = shutFolders.has(c.id)
     return (
       <div className={`rtc${finished ? ' is-done' : ''}${isRunning ? ' is-running' : ''}${open ? ' is-open' : ''}`} key={c.id}>
         <div className="rtc-top">
@@ -2335,11 +2343,14 @@ export function HabitsPage() {
     )
   }
 
-  const meter = (now: number, target: number) => {
+  /* A reading says what it counts. Minutes today for anything with a daily
+     minute target, days kept this week for everything else; showing "1 / 7" for
+     a habit whose target is an hour a day was measuring the wrong thing. */
+  const meter = (now: number, target: number, unit = '', suffix = '') => {
     const met = target > 0 && now >= target
     return (
       <span className={`hg-read${met ? ' is-met' : ''}`}>
-        <span className="hg-read-n mono">{now} / {target}</span>
+        <span className="hg-read-n mono">{now}{unit} / {target}{unit}{suffix ? ` ${suffix}` : ''}</span>
         <span className="hg-meter"><i style={{ width: `${target > 0 ? Math.min(100, Math.round((now / target) * 100)) : 0}%` }} /></span>
       </span>
     )
@@ -2457,7 +2468,17 @@ export function HabitsPage() {
                       <span className="hg-note">{isHevyHabit(h) ? 'Hevy' : 'from your focus blocks'}</span>
                     </span>
                     <span className="hg-do">
-                      {meter(keptThisWeek(h), Math.max(1, habitTarget(h)))}
+                      {(() => {
+                        /* A minute target lives in two places: auto.minutes on a
+                           habit the focus blocks keep, dailyTargetMin on one he
+                           measures himself. Either way the honest reading is
+                           minutes TODAY; "1 / 7" for a habit whose target is an
+                           hour a day was measuring the wrong thing entirely. */
+                        const mins = h.auto?.from === 'focus' ? h.auto.minutes : h.dailyTargetMin
+                        return mins
+                          ? meter(focusMinutesOn(focusSessions, localDateKey(), h.space), mins, 'm')
+                          : meter(keptThisWeek(h), Math.max(1, habitTarget(h)), '', 'this week')
+                      })()}
                       {isHevyHabit(h) && <HevySync />}
                       {kebab(h)}
                     </span>
@@ -2533,101 +2554,10 @@ export function HabitsPage() {
      loose list's plain header differ only in what c.folder holds. Declared a
      function (not const), so its hoisting lets the JSX above call it before
      this point in the file reads as its definition. */
-  function renderCol(c: { id: string; label: string; folder?: Routine; list: HabitDef[] }) {
-    return (
-      <section className="habit-section" key={c.id}>
-          <div className={`panel habit-list${days === 7 ? ' w7' : ''}${flashFolderId === c.id ? ' flash' : ''}`} data-routine-id={c.folder ? c.id : undefined}>
-            {c.folder ? (
-              /* A folder: the routine's name, how far through today it is, a
-                 disclosure, and the button that runs it. Start sits OUTSIDE
-                 the disclosure rather than inside it, because a button inside
-                 a button is not a thing, and because opening a routine to read
-                 it and starting it are two different intentions. */
-              <div className="folder-bar">
-              <button
-                className="col-head folder-head"
-                aria-expanded={!shutFolders.has(c.id)}
-                onClick={() => toggleFolder(c.id)}
-              >
-                <Icon.ChevronRight size={12} className="folder-caret" />
-                <span className="folder-name">{c.label}</span>
-                <span className="folder-when microcap">{habitFrequencyLabel({ frequency: c.list[0]?.frequency } as HabitDef)}</span>
-                {(() => {
-                  const { done, total } = folderDone(c.list)
-                  const own = c.folder?.habitId ? habits.find((h) => h.id === c.folder!.habitId) : undefined
-                  const streak = own ? currentStreak(habitLog, own.id) : 0
-                  return (
-                    <>
-                      {streak > 1 && <span className="folder-streak mono" title={`${streak} in a row`}>{streak}</span>}
-                      <span className={`col-tot mono${done === total && total > 0 ? ' val-pos' : ''}`}>{done}/{total}</span>
-                    </>
-                  )
-                })()}
-              </button>
-              {(() => {
-                const { done, total } = folderDone(c.list)
-                const finished = total > 0 && done === total
-                return (
-                  <button
-                    className={`btn btn-sm folder-start${finished ? ' btn-quiet' : ' btn-primary'}`}
-                    onClick={() => setRunning(running === c.id ? null : c.id)}
-                    aria-pressed={running === c.id}
-                  >
-                    {running === c.id ? 'Running' : finished ? 'Run again' : 'Start'}
-                  </button>
-                )
-              })()}
-              </div>
-            ) : (
-              <div className="col-head">
-                <span className="microcap">{c.label}</span>
-                <span className="col-tot mono">{c.list.length}</span>
-              </div>
-            )}
-            {/* The weekday letters ride the same grid as the rows, so they can
-                never drift out of line with the dots underneath them. A
-                weekly/monthly routine has no Mondays either -- the legend
-                printed seven weekday letters over a folder of period-cell
-                rows regardless, which is where the unclickable-looking grid
-                on "Invoicing routine" came from. */}
-            {days === 7 && !(c.folder && shutFolders.has(c.id))
-              && !(c.folder && (c.list[0]?.frequency === 'weekly' || c.list[0]?.frequency === 'monthly')) && (
-              <div className="habit-row is-legend" aria-hidden="true">
-                <span className="habit-row-top" />
-                <span className="habit-days">
-                  {DAY_LABELS.map((d, i) => (
-                    <span className={`day-lab${i === todayIndex ? ' today' : ''}`} key={i}>{d[0]}</span>
-                  ))}
-                </span>
-              </div>
-            )}
-            {(c.folder && shutFolders.has(c.id) ? [] : c.list).map((h) => (
-              <div className={`habit-line is-${h.kind ?? 'build'}${h.paused ? ' is-paused' : ''}`} key={h.id}>
-                <HabitRow h={h} todayIndex={todayIndex} days={days} qualify={qualifyOf(h)} drivenBy={drivenBy.get(h.id)} progress={progressFor.get(h.id)} partOn={partFor.get(h.id)} goal={goalOn.get(h.id)} sealed={isHevyHabit(h) ? 'Hevy keeps this one. Press sync to pull it.' : undefined} footLead={isHevyHabit(h) ? <HevySync /> : undefined} stateTag={h.paused ? 'paused' : h.days[todayIndex] ? 'done today' : null} actions={
-                  <>
-                  <Dropdown label={`Options for ${h.name}`} className="habit-kebab">
-                    <button role="menuitem" onClick={() => setEditHabit(h)}>Edit this habit</button>
-                    <button role="menuitem" onClick={() => togglePauseHabit(h.id)}>{h.paused ? 'Resume it' : 'Pause it'}</button>
-                    {goalOn.has(h.id) ? (
-                      <span className="kebab-note">Goal: {goalOn.get(h.id)!.name}</span>
-                    ) : (
-                      <button role="menuitem" onClick={() => setGoalFor(h.id)}>Set a goal on this</button>
-                    )}
-                    <span className="kebab-sep" />
-                    {drivenBy.has(h.id) ? (
-                      <span className="kebab-note">Deleted with “{drivenBy.get(h.id)}”</span>
-                    ) : (
-                      <button role="menuitem" className="danger" onClick={() => deleteHabit(h.id)}>Delete this habit</button>
-                    )}
-                  </Dropdown>
-                  </>
-                } />
-              </div>
-            ))}
-          </div>
-        </section>
-    )
-  }
+  /* renderCol is gone with the old page. It rendered a folder panel with a
+     week of dots on every row, which the routine card and its disclosure
+     replaced; leaving it behind would have been a second, unreachable idea
+     of what a habit list looks like. */
 }
 
 /* ---------------- ROUTINES ---------------- */

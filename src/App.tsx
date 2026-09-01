@@ -176,14 +176,28 @@ function navFor(_view: ViewId): { id: PageId; label: string }[] {
    Focus opens it too, or the row is unreachable from the keyboard. */
 const NAV_HIDE_MS = 1000
 
-function useNavReveal() {
+/* Bills opts out entirely (2026-09-01), rather than fixing the row's own
+   overlay behavior app-wide: none of its pills point at Bills anyway, since
+   it's reached from the header like Notes and the Zone, not the workspace
+   nav. The row is position:absolute on .topstick -- opening it overlays
+   page content instead of pushing it down, landing in a fixed band near the
+   top of the viewport. That band is exactly where Bills' own header (the
+   cycle arrows, End cycle) sits on load, so a stray hover that opened the
+   row here left it sitting on top of controls he was actively trying to
+   use, re-arming its own hide timer for as long as his mouse stayed near
+   the top of the page -- which is exactly where Bills' primary controls
+   live. Disabling the reveal outright on this one page is the fix that
+   can't reintroduce that collision, rather than trusting a z-index to hold
+   it back everywhere the two might overlap. */
+function useNavReveal(disabled = false) {
   const [open, setOpen] = useState(false)
   const timer = useRef<number | undefined>(undefined)
   const clear = () => { if (timer.current !== undefined) { clearTimeout(timer.current); timer.current = undefined } }
   useEffect(() => clear, [])
+  useEffect(() => { if (disabled) { clear(); setOpen(false) } }, [disabled])
   return {
-    open,
-    show: () => { clear(); setOpen(true) },
+    open: disabled ? false : open,
+    show: () => { if (disabled) return; clear(); setOpen(true) },
     hideSoon: () => { clear(); timer.current = window.setTimeout(() => setOpen(false), NAV_HIDE_MS) },
   }
 }
@@ -338,7 +352,7 @@ export default function App() {
     try { localStorage.setItem('mc:hud', hud ? '1' : '0') } catch { /* private mode */ }
   }, [hud])
 
-  const nav = useNavReveal()
+  const nav = useNavReveal(page === 'bills')
   const backFromZone = useRef<PageId>('today')
   useEffect(() => { if (page !== 'zone') backFromZone.current = page }, [page])
 

@@ -806,9 +806,14 @@ body:has(.shell.is-hud) .dock-face { border-radius: var(--a-r-lg); }
   display: grid; place-items: center; color: var(--ink);
   background: var(--surface); border: 1px solid var(--hairline-strong); box-shadow: var(--shadow-pop);
 }
+/* His catch (2026-09-03): Note and Media got --surface-2 when they were
+   built, Focus got --accent-wash since it's the one "live" item (a running
+   timer, not a static shortcut) -- but Bills never got a rule at all when
+   it was added, so it silently fell back to the base --surface above and
+   read as a random fourth color with no logic behind it. Bills now matches
+   Note and Media; the wash stays Focus-only, on purpose. */
 .dock-item-avatar--focus { background: var(--accent-wash); }
-.dock-item-avatar--note { background: var(--surface-2); }
-.dock-item-avatar--media { background: var(--surface-2); }
+.dock-item-avatar--note, .dock-item-avatar--bills, .dock-item-avatar--media { background: var(--surface-2); }
 .dock-chip-art { width: 100%; height: 100%; object-fit: cover; }
 
 /* Focus's row: not a button (see the component note in dock.tsx), so hover

@@ -86,7 +86,7 @@ export function NotePanel({ dockControls, onOpenFull }: { dockControls?: ReactNo
            door OUT to the full Notes page, not a bookmark to leave sitting
            open behind it once he's actually there working. */}
         <button
-          className="btn btn-primary notedock-open"
+          className="btn btn-primary dock-open-btn"
           onClick={() => { if (active) openNote(active.id); setPage('notes'); onOpenFull?.() }}
           title="Open in Notes"
         >

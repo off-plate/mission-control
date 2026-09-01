@@ -462,18 +462,11 @@ export default function App() {
           >
             <Helmet lit={hud} />
           </button>
-          {/* Notes, one click from any screen. It left the menu because he
-              reaches for it mid-thought, not by navigating to it. */}
-          <button
-            className={`btn btn-ghost${page === 'notes' ? ' is-on' : ''}`}
-            onClick={() => setPage('notes')}
-            aria-pressed={page === 'notes'}
-            title="Notes"
-            aria-label="Note"
-          >
-            <Icon.Note size={18} />
-            <span className="btn-label">Note</span>
-          </button>
+          {/* Notes' own header button retired (2026-09-02): the floating
+             dock (see dock.tsx) reaches it in fewer moves than this bar
+             ever did, from any page, with no navigation at all for a quick
+             note. The page itself is untouched -- setPage('notes') below
+             still renders it, this was only ever the shortcut in. */}
           {/* Bills, ported from Compass (2026-09-01): the same shape as Note
               beside it, on his instruction -- not a workspace page, not
               filtered by the space switcher, reached from the header only. */}

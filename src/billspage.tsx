@@ -29,7 +29,7 @@ const money = (n: number): string => `${new Intl.NumberFormat('cs-CZ', { maximum
 
 /* ---------------- data ---------------- */
 
-interface BillsData {
+export interface BillsData {
   profile: CompassProfile | null
   debts: CompassDebt[]
   recurring: CompassRecurring[]
@@ -38,7 +38,11 @@ interface BillsData {
   cycleIncome: CompassCycleIncome[]
 }
 
-function useCompassAccount() {
+/* Exported for billsdock.tsx (the dock's compact summary, 2026-09-02) --
+   the same account/data plumbing this page uses, not a second copy of it.
+   The dock reads real financial data too, so it goes through the one place
+   that already talks to Supabase correctly rather than re-deriving it. */
+export function useCompassAccount() {
   const [signedIn, setSignedIn] = useState<boolean | null>(null)
   useEffect(() => {
     let alive = true
@@ -49,7 +53,7 @@ function useCompassAccount() {
   return signedIn
 }
 
-function useBillsData(signedIn: boolean | null) {
+export function useBillsData(signedIn: boolean | null) {
   const [data, setData] = useState<BillsData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [reloadTick, setReloadTick] = useState(0)

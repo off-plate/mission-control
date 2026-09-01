@@ -856,9 +856,11 @@ body:has(.shell.is-hud) .dock-face { border-radius: var(--a-r-lg); }
 /* The real .btn-primary fill (see the note in notedock.tsx for why it isn't
    a hand-rolled background) -- this override is sizing only, to sit at the
    same 30px weight as the icon buttons and the switcher beside it in this
-   one compact row. The descendant selector out-specifies .btn-primary's own
-   38px/13px-20px sizing without needing !important. */
-.notedock-head .notedock-open {
+   one compact row. Shared by Note and Bills (2026-09-02) -- both panels'
+   "open the full page" button, so scoped to .dock-face rather than either
+   panel's own head class, and a descendant selector to out-specify
+   .btn-primary's own 38px/13px-20px sizing without needing !important. */
+.dock-face .dock-open-btn {
   flex: none; min-height: 30px; padding: 0 var(--s3); gap: 5px; white-space: nowrap;
 }
 .notedock-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 var(--s4) var(--s4); }
@@ -883,6 +885,28 @@ body:has(.shell.is-hud) .dock-face { border-radius: var(--a-r-lg); }
 }
 .notedock-title:focus { outline: none; }
 .notedock-empty { color: var(--muted); font-size: var(--text-sm); padding: 0 var(--s4); }
+
+/* THE BILLS SUMMARY, same shell shape as Note's own head/body split. His
+   scope call (2026-09-02): a glance, not the page -- free-to-spend and where
+   it's going this cycle, nothing editable. Named tokens directly
+   (--progress/--alert, not billspage.tsx's --positive/--negative) because
+   those aliases only exist inside .bills-page -- this panel lives in the
+   dock, a fixed sibling of it, and reaching for the alias here would be the
+   exact "adapter token unreachable outside its own scope" mistake this file
+   already paid for once on HUD mode. */
+.billsdock-panel { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.billsdock-head { flex: none; display: flex; align-items: center; gap: 6px; padding: var(--s2); border-bottom: 1px solid var(--hairline); }
+.billsdock-title { flex: 1; min-width: 0; font-weight: 600; font-size: var(--text-sm); color: var(--muted); padding: 0 var(--s1); }
+.billsdock-body { flex: 1; min-height: 0; overflow-y: auto; padding: var(--s2) var(--s4) var(--s4); }
+.billsdock-empty { color: var(--muted); font-size: var(--text-sm); padding: var(--s2) 0; }
+.billsdock-hero { font-family: var(--font-display); font-weight: 800; font-size: 34px; letter-spacing: -0.01em; color: var(--progress); font-variant-numeric: tabular-nums; }
+.billsdock-hero.is-neg { color: var(--alert); }
+.billsdock-sub { color: var(--muted); font-size: var(--text-sm); margin-bottom: var(--s3); }
+.billsdock-rows { display: flex; flex-direction: column; }
+.bdr { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); padding: 8px 0; border-top: 1px solid var(--hairline); font-size: var(--text-sm); }
+.bdr:first-child { border-top: none; }
+.bdr .pos { color: var(--progress); }
+.bdr .neg { color: var(--alert); }
 
 @media (max-width: 639px) {
   .dock { right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); }

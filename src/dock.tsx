@@ -3,6 +3,7 @@ import { useStore } from './store'
 import { useMundiOpus } from './mundiplayer'
 import { MediaBadge, MediaChip, PomodoroInline } from './pomodoro'
 import { NoteChip, NotePanel } from './notedock'
+import { BillsChip, BillsPanel } from './billsdock'
 import * as Icon from './icons'
 
 /* Hover opens the dial now, on his instruction (2026-09-02) -- the same
@@ -97,7 +98,7 @@ function useDockMenu() {
    the notes store) and only hands this file what it needs to render.
    Rendered from inside PomodoroProvider (see pomodoro.tsx), which is what
    puts it inside both the Pomodoro context and the Store context it needs. */
-type PanelFace = 'media' | 'note'
+type PanelFace = 'media' | 'note' | 'bills'
 type Mode = 'closed' | 'menu' | PanelFace
 
 export function Dock() {
@@ -111,12 +112,18 @@ export function Dock() {
      exists to make dominant. */
   if (page === 'zone') return null
 
-  /* Note on top, Focus at the bottom, his order -- closest to the corner is
-     the one he reaches for most. The player, when it exists at all, sits
-     above both: rarest to need, so furthest from the thumb. */
+  /* Note on top, Bills under it, Focus at the bottom, his order -- closest
+     to the corner is the one he reaches for most. The player, when it
+     exists at all, sits above both: rarest to need, so furthest from the
+     thumb. Bills landed here (2026-09-02) as a compact read-mostly summary,
+     not the full page -- see billsdock.tsx for why: 700+ lines of sign-in,
+     six edit sheets and per-item actions is a much bigger, worse-fitting
+     build for a 560px popup than a glanceable free-to-spend figure with a
+     door out to the real page. */
   const panels: { id: PanelFace; label: string; chip: React.ReactNode; switchIcon: React.ReactNode }[] = [
     ...(mo.started ? [{ id: 'media' as const, label: 'Player', chip: <MediaChip />, switchIcon: <Icon.Waveform size={15} /> }] : []),
     { id: 'note' as const, label: 'Note', chip: <NoteChip />, switchIcon: <Icon.Note size={15} /> },
+    { id: 'bills' as const, label: 'Bills', chip: <BillsChip />, switchIcon: <Icon.Wallet size={15} /> },
   ]
 
   if (mode === 'closed' || mode === 'menu') {
@@ -218,6 +225,19 @@ export function Dock() {
              only for the speed-dial stack, so this stays consistent with
              that rather than inventing a second closing style. */}
           <NotePanel dockControls={switchButtons} onOpenFull={() => go('closed')} />
+        </div>
+      </div>
+    )
+  }
+
+  /* Bills gets the same single-row head as Note, for the same reason --
+     it's the same door-out button (see billsdock.tsx), so the same
+     near-empty-bar-above-a-full-one problem would just repeat here. */
+  if (mode === 'bills') {
+    return (
+      <div className="dock">
+        <div className="dock-face">
+          <BillsPanel dockControls={switchButtons} onOpenFull={() => go('closed')} />
         </div>
       </div>
     )

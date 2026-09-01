@@ -13,25 +13,64 @@ import * as Icon from './icons'
    wrapper covers every one of them without the gap-in-the-hitbox problem
    the nav row hit once (that was an absolutely positioned child rendered
    outside its parent's own box; nothing here is). Leaving starts a one
-   second timer, same as the nav row, before folding back to the bare FAB --
-   a click on the FAB or the X still acts immediately, this is additive. */
+   second timer, same as the nav row, before the close itself begins.
+
+   Closing was a second gap he caught right after: the menu only ever had an
+   entrance animation (dock-item-in, plays once on mount), so both a click on
+   the X and the hover timer just unmounted it instantly -- no exit motion
+   either way. He read the click as "having" one anyway because it's a
+   direct action; the same snap after a full second of waiting read as
+   broken. Fixed by routing both paths through closeMenu below, which holds
+   the menu mounted with an .is-closing class (dock-item-out, the reverse of
+   the entrance keyframe) for CLOSE_MS before the state actually flips to
+   'closed' -- one real close animation, not two different behaviors. */
 const HOVER_HIDE_MS = 1000
-function useHoverMenu(setMode: React.Dispatch<React.SetStateAction<Mode>>) {
+const CLOSE_MS = 200
+
+function useDockMenu() {
+  const [mode, setMode] = useState<Mode>('closed')
+  const [closing, setClosing] = useState(false)
+  // Mirrors `mode` for the timers below to read synchronously -- they must
+  // never act on a setState *updater's* side effect (React can invoke those
+  // more than once), so reading current mode happens off this ref instead.
+  const modeRef = useRef<Mode>('closed')
+  useEffect(() => { modeRef.current = mode }, [mode])
   const timer = useRef<number | undefined>(undefined)
   const clear = () => { if (timer.current !== undefined) { clearTimeout(timer.current); timer.current = undefined } }
   useEffect(() => clear, [])
-  return {
-    // Functional updates throughout: the timeout below fires well after this
-    // closure was created, so it has to read whatever mode is CURRENT at
-    // that moment, not whatever it was when the mouse first left -- a click
-    // into a panel in the meantime must not get yanked back to closed by a
-    // stale timer.
-    onMouseEnter: () => { clear(); setMode((m) => (m === 'closed' ? 'menu' : m)) },
+
+  // Plays the collapse, then flips to 'closed' once it's done. Safe to call
+  // more than once mid-animation (a second X click, or the hover timer
+  // firing after a click already started it) -- it just restarts the same
+  // wait, never stacks two.
+  const closeMenu = () => {
+    clear()
+    setClosing(true)
+    timer.current = window.setTimeout(() => {
+      timer.current = undefined
+      setClosing(false)
+      setMode('closed')
+    }, CLOSE_MS)
+  }
+  // Any deliberate move to a different mode (a panel, or back open) cancels
+  // whatever close was pending -- a stale timer firing later must not yank
+  // a panel he already switched to back to 'closed'.
+  const go = (next: Mode) => { clear(); setClosing(false); setMode(next) }
+
+  const hover = {
+    onMouseEnter: () => { clear(); setClosing(false); setMode((m) => (m === 'closed' ? 'menu' : m)) },
     onMouseLeave: () => {
       clear()
-      timer.current = window.setTimeout(() => setMode((m) => (m === 'menu' ? 'closed' : m)), HOVER_HIDE_MS)
+      timer.current = window.setTimeout(() => {
+        timer.current = undefined
+        // Only the menu hover-closes, and only if it's still open by the
+        // time this fires (a click may have moved it to a panel already).
+        if (modeRef.current === 'menu') closeMenu()
+      }, HOVER_HIDE_MS)
     },
   }
+
+  return { mode, closing, go, closeMenu, hover }
 }
 
 /* THE DOCK: a Material speed-dial FAB (his reference, 2026-09-01). Closed,
@@ -64,8 +103,7 @@ type Mode = 'closed' | 'menu' | PanelFace
 export function Dock() {
   const { page, setPage } = useStore()
   const mo = useMundiOpus()
-  const [mode, setMode] = useState<Mode>('closed')
-  const hover = useHoverMenu(setMode)
+  const { mode, closing, go, closeMenu, hover } = useDockMenu()
 
   /* The Zone already shows the timer, the player and a place to write at
      full size. A second, smaller copy of the same facts in the corner is
@@ -81,41 +119,68 @@ export function Dock() {
     { id: 'note' as const, label: 'Note', chip: <NoteChip />, switchIcon: <Icon.Note size={15} /> },
   ]
 
-  if (mode === 'closed') {
+  if (mode === 'closed' || mode === 'menu') {
+    // One <button> for the FAB/X across both states, always the wrapper's
+    // last child -- his first flicker report. Two separate returns used to
+    // put a plain <button className="dock-fab"> at position 0 when closed,
+    // and, once open, an unrelated <div className="dock-menu"> at position 0
+    // with the X as a brand NEW button at position 1: React reconciles
+    // children by position, saw two different element types at 0, and
+    // destroyed/recreated the FAB every single open or close even though it
+    // never actually moves on screen. Removing a DOM node out from under a
+    // resting cursor fires a native mouseout that bubbles as a React
+    // mouseleave on .dock -- which the hover machinery reads as "he left" --
+    // so opening or closing could silently reschedule (or cancel) a hover
+    // timer no real mouse movement asked for. That's what the disappearing
+    // first hover and the reopening mid-close both traced back to. Now the
+    // menu is just an optional sibling ahead of one persistent button --
+    // React patches its class/icon/handler in place, never touches the node.
+    const open = mode === 'menu'
     return (
-      <div className="dock" onMouseEnter={hover.onMouseEnter} onMouseLeave={hover.onMouseLeave}>
-        <button className="dock-fab" onClick={() => setMode('menu')} aria-label="Open quick tools">
-          <Icon.Plus size={22} />
-        </button>
-      </div>
-    )
-  }
-
-  if (mode === 'menu') {
-    return (
-      <div className="dock" onMouseEnter={hover.onMouseEnter} onMouseLeave={hover.onMouseLeave}>
-        <div className="dock-menu">
-          {panels.map((t) => (
-            <button key={t.id} className="dock-item" onClick={() => setMode(t.id)}>
-              <span className="dock-item-label">{t.label}</span>
-              <span className={`dock-item-avatar dock-item-avatar--${t.id}`}>{t.chip}</span>
-            </button>
-          ))}
-          {/* Not a button: it holds two real controls of its own (play/pause,
-              and the icon below), and a button can't nest inside a button --
-              see the same note on weekplan-bar in styles.css from an earlier
-              fix of the identical mistake. */}
-          <div className="dock-item dock-item--focus">
-            <span className="dock-item-label dock-item-label--focus">
-              <PomodoroInline />
-            </span>
-            <button className="dock-item-avatar dock-item-avatar--focus" onClick={() => setPage('focus')} aria-label="Open the focus history" title="Open Focus">
-              <Icon.BarChart size={18} />
-            </button>
+      <div className={`dock${closing ? ' is-closing' : ''}`} onMouseEnter={hover.onMouseEnter} onMouseLeave={hover.onMouseLeave}>
+        {open && (
+          <div className="dock-menu">
+            {panels.map((t) => (
+              <button key={t.id} className="dock-item" onClick={() => go(t.id)}>
+                <span className="dock-item-label">{t.label}</span>
+                <span className={`dock-item-avatar dock-item-avatar--${t.id}`}>{t.chip}</span>
+              </button>
+            ))}
+            {/* Not a button: it holds two real controls of its own
+                (play/pause, and the icon below), and a button can't nest
+                inside a button -- see the same note on weekplan-bar in
+                styles.css from an earlier fix of the identical mistake. */}
+            <div className="dock-item dock-item--focus">
+              <span className="dock-item-label dock-item-label--focus">
+                <PomodoroInline />
+              </span>
+              <button className="dock-item-avatar dock-item-avatar--focus" onClick={() => setPage('focus')} aria-label="Open the focus history" title="Open Focus">
+                <Icon.BarChart size={18} />
+              </button>
+            </div>
           </div>
-        </div>
-        <button className="dock-fab is-close" onClick={() => setMode('closed')} aria-label="Close quick tools">
-          <Icon.Close size={20} />
+        )}
+        <button
+          className={`dock-fab${open ? ' is-close' : ''}`}
+          onClick={() => (open ? closeMenu() : go('menu'))}
+          aria-label={open ? 'Close quick tools' : 'Open quick tools'}
+        >
+          {/* Both icons stay mounted always -- a second layer of the same
+              node-identity bug the button itself just got fixed for. Even
+              with one stable <button>, swapping which icon lives inside it
+              (Plus vs Close, two different components) destroys and
+              recreates an SVG sitting exactly where the cursor rests -- and
+              proved by direct event tracing to fire a phantom mouseenter on
+              .dock when the browser redoes hit-testing under that mutation.
+              With mode='closed' already committed, that phantom read as "he
+              just hovered back in" and reopened the menu a beat after it had
+              correctly closed; the same mechanism firing a phantom leave
+              right after a real hover-open explains his first report, the
+              menu vanishing on an early hover with no real mouse movement to
+              cause it. CSS opacity on two always-present icons swaps the
+              glyph without ever touching the DOM under the pointer. */}
+          <Icon.Plus size={22} className={`dock-fab-icon${open ? ' is-hidden' : ''}`} />
+          <Icon.Close size={20} className={`dock-fab-icon${open ? '' : ' is-hidden'}`} />
         </button>
       </div>
     )
@@ -127,11 +192,11 @@ export function Dock() {
       {/* Jumping straight to the other panel, not just back to the menu: the
           menu is one tap away, this is the one he'll reach for more. */}
       {other.map((t) => (
-        <button key={t.id} className="dock-icon" onClick={() => setMode(t.id)} aria-label={`Switch to ${t.label}`} title={t.label}>
+        <button key={t.id} className="dock-icon" onClick={() => go(t.id)} aria-label={`Switch to ${t.label}`} title={t.label}>
           {t.switchIcon}
         </button>
       ))}
-      <button className="dock-icon" onClick={() => setMode('closed')} aria-label="Close" title="Close">
+      <button className="dock-icon" onClick={() => go('closed')} aria-label="Close" title="Close">
         <Icon.Close size={17} />
       </button>
     </>

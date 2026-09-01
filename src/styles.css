@@ -729,6 +729,12 @@ main { padding-inline: var(--gutter); }
 .dock-fab:hover { background: var(--a-accent-2); }
 .dock-fab:active { transform: scale(0.94); }
 @keyframes dock-pop { from { transform: scale(0.8); opacity: 0; } }
+/* Both the + and the X live in the button at once now (see dock.tsx for
+   why); grid's implicit single cell already stacks them on the same spot,
+   this just cross-fades between them and keeps the hidden one out of the
+   tab order and click area. */
+.dock-fab-icon { grid-area: 1 / 1; transition: opacity var(--t-fast), transform var(--t-fast); }
+.dock-fab-icon.is-hidden { opacity: 0; transform: scale(0.6); pointer-events: none; }
 /* His ask, separately: in the normal theme the lime FAB and the near-white
    item avatars can read as blending into a similarly light (or similarly
    lime) section behind them -- "it sometimes disappears within the
@@ -766,6 +772,18 @@ body:has(.shell.is-hud) .dock-face { border-radius: var(--a-r-lg); }
 .dock-menu .dock-item:nth-child(2) { animation-delay: 90ms; }
 .dock-menu .dock-item:nth-child(3) { animation-delay: 140ms; }
 @keyframes dock-item-in { from { transform: translateY(10px) scale(0.9); opacity: 0; } }
+/* Closing plays the same motion in reverse, on his catch: leaving on hover
+   used to just snap the whole stack away with nothing running -- a click on
+   the X had the identical gap, it just read as intentional. .is-closing
+   (set for CLOSE_MS in dock.tsx, both paths funnel through the same
+   closeMenu) overrides the entrance rule above with dock-item-out. Reverse
+   stagger too: the item that finished opening last (closest to the FAB,
+   nth-child(1)) is the first thing his eye left, so it leads the collapse. */
+.dock.is-closing .dock-item { animation: dock-item-out 140ms var(--ease) forwards; }
+.dock.is-closing .dock-menu .dock-item:nth-child(1) { animation-delay: 60ms; }
+.dock.is-closing .dock-menu .dock-item:nth-child(2) { animation-delay: 30ms; }
+.dock.is-closing .dock-menu .dock-item:nth-child(3) { animation-delay: 0ms; }
+@keyframes dock-item-out { to { transform: translateY(10px) scale(0.9); opacity: 0; } }
 .dock-item-label {
   display: inline-flex; align-items: center; gap: 8px;
   background: var(--surface); border: 1px solid var(--hairline-strong); color: var(--ink);

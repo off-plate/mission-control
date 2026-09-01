@@ -7555,7 +7555,14 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    app's own --font-display/--font-body instead of Compass's Bricolage
    Grotesque/Hanken Grotesk/Space Grotesk. */
 .bills-page {
-  --bg: #FAEDE1; --bg-subtle: #F4E4D5; --surface: #FFFAF4; --surface-2: #FAF1E6; --border: #EBDBCB;
+  /* His word: the page background read as "completely fucked up" -- the
+     saturated peach Compass runs its own page on (#FAEDE1) next to the
+     near-white cards was too strong a contrast once seen full-size, rather
+     than the small artifact preview. Pulled the outer background down to
+     the same neutral warm paper the rest of this app already uses, and left
+     every card/accent/semantic color (the actual "Compass, unchanged" part
+     he approved) exactly as they were. */
+  --bg: #FAF8F4; --bg-subtle: #F1ECE3; --surface: #FFFAF4; --surface-2: #FAF1E6; --border: #EBDBCB;
   --accent: #B84A2C; --accent-subtle: #FAE0D2;
   --positive: #168054; --positive-subtle: #D6EEE2;
   --highlight: #C48A30; --highlight-subtle: #FAE9CC;
@@ -7564,7 +7571,21 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   background: var(--bg); color: var(--ink); font-family: var(--font-body); min-height: 100%;
 }
 .bills-wrap { max-width: 1180px; margin: 0 auto; padding: 28px 24px 90px; }
-.bills-head { display: flex; align-items: flex-start; justify-content: space-between; padding: 4px 0 18px; }
+/* His report: the site's own nav row (Today/Plan/Habits/...) was getting
+   stuck open on this page and nowhere else. Root cause: that row is
+   position:absolute on .topstick (it overlays rather than pushing content
+   down) and lands in a fixed band near the top of the viewport, roughly
+   where .bills-head already sits on load, before any scroll -- the cycle
+   arrows and End cycle button. .topstick is z-index 50 and Bills had no
+   stacking context of its own, so if the nav ever opened, his own header
+   sat UNDERNEATH it with no way to out-rank it: hovering his own prev/next
+   arrows was also hovering the nav row's own hover listener sitting on top
+   of them, which kept re-arming its hide timer for as long as his mouse
+   stayed near the top of the page -- exactly where Bills' primary controls
+   live. Giving this its own higher stacking context stops the collision:
+   his header now paints and receives events above that overlay instead of
+   being trapped beneath it. */
+.bills-head { position: relative; z-index: 60; display: flex; align-items: flex-start; justify-content: space-between; padding: 4px 0 18px; }
 .bills-cyc { display: flex; align-items: center; gap: 10px; }
 .bills-iconbtn {
   width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
@@ -7617,6 +7638,8 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .bills-warn { margin: 0 14px 10px; padding: 10px 12px; border-radius: 12px; background: var(--highlight-subtle); color: var(--highlight); font-size: 12.5px; }
 .bills-foot { font-size: 11.5px; color: var(--ink-3); padding: 10px 14px 6px; }
 
+.bills-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+@media (max-width: 900px) { .bills-grid2 { grid-template-columns: 1fr; } }
 .bills-section { margin-bottom: 16px; }
 .bills-shead { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
 .bills-shead .t { display: flex; align-items: baseline; gap: 10px; }

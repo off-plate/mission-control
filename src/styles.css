@@ -933,6 +933,21 @@ body:has(.shell.is-hud) .dock-face { border-radius: var(--a-r-lg); }
 .bdr:first-child { border-top: none; }
 .bdr .pos { color: var(--progress); }
 .bdr .neg { color: var(--alert); }
+/* His catch (2026-09-03): a blank body while the account check and the
+   Supabase round trip were in flight read as broken, not loading. Shaped
+   to match the real content's own layout (billsdock-hero/-sub/-rows above)
+   so nothing jumps in height when the numbers actually land -- reuses
+   pomo-pulse (pomo.tsx's mic, the await ring), the app's existing rhythm
+   for "something is happening, wait", not a new one invented here. */
+.billsdock-skeleton { animation: pomo-pulse 1.3s var(--ease-loop) infinite; }
+.bds-bar { background: var(--surface-2); border-radius: 4px; }
+.bds-hero { width: 120px; height: 34px; margin-bottom: 10px; }
+.bds-sub { width: 150px; height: 13px; margin-bottom: var(--s3); }
+.bds-rows { display: flex; flex-direction: column; }
+.bds-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--hairline); }
+.bds-row:first-child { border-top: none; }
+.bds-label { width: 90px; height: 12px; }
+.bds-value { width: 55px; height: 12px; }
 
 @media (max-width: 639px) {
   .dock { right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); }

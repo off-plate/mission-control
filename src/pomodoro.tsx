@@ -5,6 +5,7 @@ import { thumbUrl, useMundiOpus } from './mundiplayer'
 import { MUNDI_OPUS_QUEUE } from './mundiopus'
 import { isDesktop, notify as nativeNotify } from './desktop'
 import * as Icon from './icons'
+import { Dock } from './dock'
 
 /* A global Pomodoro that lives above the whole app: a bottom-right badge you
    see on every tab, a corner ambient glow that shows the state at a glance,
@@ -269,7 +270,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
       {children}
       <PomodoroAmbient />
       {phase === 'await' && <FocusDoneModal />}
-      <PomodoroDock />
+      <Dock />
     </Ctx.Provider>
   )
 }
@@ -313,28 +314,40 @@ function Stepper({ label, value, set, min, max }: { label: string; value: number
   )
 }
 
-/* The corner as a whole: the timer badge, and above it, Mundi Opus if he has
-   actually touched it this session. "It should keep going and be an
-   extension of the floating focus badge with media controls," his words
-   after the music stopped dead the moment he left the Zone tile that used
-   to own the only iframe. The player itself lives in mundiplayer.tsx now,
-   so leaving the Zone no longer touches it; this is just where it surfaces
-   when he is not looking at the big version. */
-function PomodoroDock() {
-  const { page } = useStore()
-  /* The room already shows the timer and the player at full size. A second,
-     smaller copy of the same facts in the corner is not a safety net, it is
-     noise competing with the one thing the room exists to make dominant. */
-  if (page === 'zone') return null
+/* Focus and the player used to each mount their own fixed pill in the
+   corner, stacked. His word (2026-09-01): one dynamic island, not several
+   stuck-together boxes -- see dock.tsx, which now owns the corner and the
+   fixed positioning both. This file keeps the timer state and the two
+   pieces dock.tsx assembles: a compact glanceable chip for the collapsed
+   row, and the full control surface for when that chip is tapped open. */
+
+/* The compact read on the timer: nothing to press, just what's true right
+   now, sized to sit beside other chips in one row. A live block gets the
+   ticking clock; idle gets the bare icon, since there is nothing running to
+   report. */
+export function PomodoroChip() {
+  const p = usePomodoro()
+  if (p.phase === 'idle') return <ClockIcon />
+  const state = p.phase === 'await' ? 'await' : !p.running ? 'paused' : p.phase
   return (
-    <div className="pomo-dock">
-      <MediaBadge />
-      <PomodoroBadge />
-    </div>
+    <span className={`dock-chip-live ${state}`}>
+      <i className="dock-chip-dot" aria-hidden="true" />
+      <span className="mono">{p.phase === 'await' ? 'done' : mmss(p.secondsLeft)}</span>
+    </span>
   )
 }
 
-function MediaBadge() {
+/* The compact read on the player: just the art, so the row stays a row of
+   equal-sized chips rather than one wide media strip crowding the others
+   out. Nothing renders until he has actually pressed play once. */
+export function MediaChip() {
+  const mo = useMundiOpus()
+  if (!mo.started) return null
+  const current = MUNDI_OPUS_QUEUE[mo.track]
+  return <img className="dock-chip-art" src={thumbUrl(current.id)} alt="" />
+}
+
+export function MediaBadge() {
   const mo = useMundiOpus()
   /* Nothing shows until he has actually pressed play once: a player he has
      never touched has nothing to say in a corner he looks at constantly. */
@@ -366,7 +379,7 @@ function MediaBadge() {
    the break, stop, and open the history. The glyph buttons it used to carry
    (❚❚ ▸ ⤼ ✕) were characters at whatever size the font felt like; these are
    drawn, and they hit a 30px target. */
-function PomodoroBadge() {
+export function PomodoroBadge() {
   const p = usePomodoro()
   const { setPage, page, focusSessions } = useStore()
   const [setupOpen, setSetupOpen] = useState(false)

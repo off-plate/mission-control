@@ -5,7 +5,6 @@ import { SPACE_LABELS } from './mock'
 import { GoalsPage, HabitsPage, PlanPage, TodayPage } from './pages1'
 import { SettingsPage } from './pages2'
 import { NotesPage } from './notes'
-import { NoteDock } from './notedock'
 import { DailyReview } from './daily'
 import { BrandPage } from './brand'
 import { DayPage } from './day'
@@ -567,11 +566,6 @@ export default function App() {
         {page === 'zone' && <ZonePage />}
         </PageBoundary>
       </main>
-
-      {/* One mount for the whole app, same reasoning as DailyReview above: a
-          note started on Today should still be there if the next click lands
-          on Plan. */}
-      <NoteDock />
 
     </div>
   )

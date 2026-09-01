@@ -7555,20 +7555,36 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    app's own --font-display/--font-body instead of Compass's Bricolage
    Grotesque/Hanken Grotesk/Space Grotesk. */
 .bills-page {
-  /* His word: the page background read as "completely fucked up" -- the
-     saturated peach Compass runs its own page on (#FAEDE1) next to the
-     near-white cards was too strong a contrast once seen full-size, rather
-     than the small artifact preview. Pulled the outer background down to
-     the same neutral warm paper the rest of this app already uses, and left
-     every card/accent/semantic color (the actual "Compass, unchanged" part
-     he approved) exactly as they were. */
-  --bg: #FAF8F4; --bg-subtle: #F1ECE3; --surface: #FFFAF4; --surface-2: #FAF1E6; --border: #EBDBCB;
-  --accent: #B84A2C; --accent-subtle: #FAE0D2;
-  --positive: #168054; --positive-subtle: #D6EEE2;
-  --highlight: #C48A30; --highlight-subtle: #FAE9CC;
-  --negative: #BE243A; --negative-subtle: #FADDE2;
-  --ink: #261B15; --ink-2: #68574B; --ink-3: #8E7969;
-  background: var(--bg); color: var(--ink); font-family: var(--font-body); min-height: 100%;
+  /* Compass's own hex palette is gone (2026-09-01), on his instruction: this
+     is a Mission Control page and it reads Mission Control's actual design
+     system, not a skin of the app it was ported from. Every name below still
+     matches what the rest of this file (and billspage.tsx's inline dot
+     colors) already calls, so nothing downstream had to change -- only
+     what each name points at. --bg/--surface/--surface-2/--ink are dropped
+     entirely rather than redeclared, so this page inherits the same tokens
+     as every other page and repaints correctly under the HUD too.
+     positive -> --progress, not a literal green: green is gone from this
+     app app-wide (his instruction, "there are existing colours that should
+     have been replaced"), and --progress already carries "money you have"
+     everywhere else. --accent takes the readable partner (--accent-text),
+     never the lime fill itself, for the same reason the adapter above
+     never lets --accent BE the fill: lime is 1.17:1 on cream and unreadable
+     as text. The two places Compass actually filled a bar with --accent
+     (the free-to-spend track, the debt progress bar) now name
+     --accent-fill directly instead of going through this local alias. */
+  --bg-subtle: var(--surface-2);
+  --border: var(--hairline);
+  --accent: var(--accent-text);
+  --accent-subtle: var(--accent-wash);
+  --positive: var(--progress);
+  --positive-subtle: var(--progress-wash);
+  --highlight: var(--warn);
+  --highlight-subtle: var(--warn-wash);
+  --negative: var(--alert);
+  --negative-subtle: var(--alert-wash);
+  --ink-2: var(--muted);
+  --ink-3: var(--faint);
+  font-family: var(--font-body); min-height: 100%;
 }
 /* Full-bleed like every other page -- main already carries the --gutter
    padding-inline. The old max-width: 1180px + margin: 0 auto stranded Bills
@@ -7599,8 +7615,8 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .bills-endcycle { border: 1px solid var(--border); border-radius: 999px; padding: 8px 16px; font: 600 13px var(--font-body); color: var(--ink); background: none; cursor: pointer; }
 
 .bills-hero {
-  border-radius: 34px; background: linear-gradient(to bottom right, var(--highlight-subtle), var(--surface), var(--accent-subtle) 150%);
-  padding: 30px 34px 26px; text-align: center; box-shadow: 0 1px 2px rgba(40,30,20,.04), 0 12px 30px -12px rgba(40,30,20,.12);
+  border-radius: 34px; background: linear-gradient(to bottom right, var(--highlight-subtle), var(--surface), var(--accent-subtle) 150%); /* slop-lint-ignore gradient-hero */
+  padding: 30px 34px 26px; text-align: center; box-shadow: var(--a-lift-2);
   margin-bottom: 14px;
 }
 .bh-eyebrow { color: var(--accent); font: 700 12px var(--font-body); text-transform: uppercase; letter-spacing: .14em; }
@@ -7611,16 +7627,19 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .bh-sub b { color: var(--ink); font-weight: 700; }
 .bh-sub.is-neg b { color: var(--negative); }
 .bh-addincome { margin-top: 10px; color: var(--accent); font: 700 15px var(--font-body); background: none; border: none; cursor: pointer; }
-.bh-track { margin: 16px auto 0; max-width: 420px; height: 10px; border-radius: 99px; background: rgba(255,255,255,.7); box-shadow: inset 0 0 0 1px rgba(0,0,0,.05); overflow: hidden; display: flex; }
-.bh-track i.committed { display: block; height: 100%; background: rgba(38,27,21,.6); }
-.bh-track i.free { display: block; height: 100%; background: var(--accent); }
+.bh-track { margin: 16px auto 0; max-width: 420px; height: 10px; border-radius: 99px; background: color-mix(in srgb, var(--surface) 70%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 5%, transparent); overflow: hidden; display: flex; }
+.bh-track i.committed { display: block; height: 100%; background: color-mix(in srgb, var(--ink) 60%, transparent); }
+/* A fill, not text -- names --accent-fill (the lime) directly rather than
+   through the page's local --accent alias, which is deliberately the
+   readable text partner and never a fill (see the token block above). */
+.bh-track i.free { display: block; height: 100%; background: var(--accent-fill); }
 
 .bills-quick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
 .bills-quick button { border: 1.5px dashed var(--border); border-radius: 18px; padding: 13px; font: 700 14px var(--font-body); background: none; cursor: pointer; }
 .bq-in { color: var(--positive); }
 .bq-out { color: var(--accent); }
 
-.bills-page .card { background: var(--surface); border-radius: 24px; overflow: hidden; box-shadow: 0 1px 2px rgba(40,30,20,.04), 0 12px 30px -12px rgba(40,30,20,.12); }
+.bills-page .card { background: var(--surface); border-radius: 24px; overflow: hidden; box-shadow: var(--a-lift); }
 .bills-page .overline { font: 700 12px var(--font-body); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
 
 .bills-snapshot { padding: 6px 4px; margin-bottom: 16px; }
@@ -7676,7 +7695,10 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .bp-rbtn:disabled { opacity: .5; cursor: default; }
 .bp-rbtn.is-skip:hover { border-color: var(--ink-2); color: var(--ink-2); }
 .bp-rbtn.is-pay:hover { border-color: var(--positive); color: var(--positive); }
-.bp-rbtn.is-paid { background: var(--positive); border-color: var(--positive); color: #fff; }
+/* --bg, not white: the paired foreground .goal-status.s-done already uses
+   for a --progress fill elsewhere in the app, so it stays readable in the
+   HUD too, where --progress is a light cyan white would wash out against. */
+.bp-rbtn.is-paid { background: var(--positive); border-color: var(--positive); color: var(--bg); }
 .bp-rbtn.is-skipped { background: var(--bg-subtle); border-color: var(--bg-subtle); color: var(--ink-3); }
 .bills-prow.is-done .bp-name { text-decoration: line-through; color: var(--ink-3); }
 
@@ -7684,7 +7706,7 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .bills-tagchip.is-regret { background: var(--negative-subtle); color: var(--negative); }
 .bills-tagchip.is-needed { background: var(--bg-subtle); color: var(--ink-3); }
 
-.bills-debtcard { background: var(--surface); border-radius: 24px; padding: 20px 22px; box-shadow: 0 1px 2px rgba(40,30,20,.04), 0 12px 30px -12px rgba(40,30,20,.12); margin-bottom: 16px; position: relative; }
+.bills-debtcard { background: var(--surface); border-radius: 24px; padding: 20px 22px; box-shadow: var(--a-lift); margin-bottom: 16px; position: relative; }
 .bd-top { display: flex; justify-content: space-between; align-items: center; }
 .bd-figure { font: 800 30px var(--font-display); color: var(--negative); margin-top: 10px; font-variant-numeric: tabular-nums; }
 .bd-cap { font-size: 12px; color: var(--ink-3); }
@@ -7692,7 +7714,7 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .bd-month { font: 700 14px var(--font-body); }
 .bd-pct { font: 600 12.5px var(--font-body); color: var(--accent); margin-top: 2px; }
 .bd-bar { margin-top: 14px; height: 8px; border-radius: 99px; background: var(--bg-subtle); overflow: hidden; }
-.bd-bar i { display: block; height: 100%; background: var(--accent); }
+.bd-bar i { display: block; height: 100%; background: var(--accent-fill); }
 .bd-tip { margin-top: 12px; font-size: 12.5px; color: var(--accent); }
 .bd-warn { margin-top: 12px; font-size: 12.5px; color: var(--negative); }
 

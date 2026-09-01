@@ -23,7 +23,7 @@ export function NoteChip() {
   return <Icon.Note size={17} />
 }
 
-export function NotePanel({ dockControls }: { dockControls?: ReactNode }) {
+export function NotePanel({ dockControls, onOpenFull }: { dockControls?: ReactNode; onOpenFull?: () => void }) {
   const { space, inView, notes, addNote, updateNote, openNote, setPage } = useStore()
   const [activeId, setActiveId] = useState<string | null>(() => {
     try { return localStorage.getItem(LAST_KEY) } catch { return null }
@@ -79,10 +79,15 @@ export function NotePanel({ dockControls }: { dockControls?: ReactNode }) {
            styles.css): --accent is deliberately the muted, readable-as-TEXT
            partner, and only --a-accent is the loud literal fill. .btn-primary
            already carries the fix (and the hover wipe, and HUD's own text
-           colour) -- reinventing it here just reintroduced the same bug. */}
+           colour) -- reinventing it here just reintroduced the same bug.
+
+           onOpenFull (from dock.tsx) folds the dock back to the bare FAB the
+           moment this fires -- his ask (2026-09-02): this button is a quick
+           door OUT to the full Notes page, not a bookmark to leave sitting
+           open behind it once he's actually there working. */}
         <button
           className="btn btn-primary notedock-open"
-          onClick={() => { if (active) openNote(active.id); setPage('notes') }}
+          onClick={() => { if (active) openNote(active.id); setPage('notes'); onOpenFull?.() }}
           title="Open in Notes"
         >
           <Icon.ExternalLink size={13} />

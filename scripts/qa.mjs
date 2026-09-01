@@ -652,8 +652,12 @@ await step('today: the focused quarters, the numbers and the week are his own', 
       nums: [...document.querySelectorAll('.troom [data-stat]')].map((el) => ({
         v: el.querySelector('.v')?.textContent ?? '', k: el.querySelector('.k')?.textContent ?? '',
       })),
-      days: [...document.querySelectorAll('.weekday')].map((el) => ({
-        label: el.querySelector('.weekday-num')?.textContent ?? '', today: el.classList.contains('is-today'),
+      // The bare focus/habit strip this used to be is gone: Today now shows
+      // the same Almanac week widget Plan uses (.weekplan-day), always open,
+      // Monday to Sunday of the current week -- not the last-seven-days strip
+      // where today was always the final card.
+      days: [...document.querySelectorAll('.weekplan-day')].map((el) => ({
+        label: el.querySelector('.weekplan-daynum')?.textContent ?? '', today: el.classList.contains('is-today'), past: el.classList.contains('is-past'),
       })),
     }
   })
@@ -671,17 +675,23 @@ await step('today: the focused quarters, the numbers and the week are his own', 
   if (!/^\d+\/\d+$/.test(face.nums[1].v)) throw new Error(`habits kept reads ${face.nums[1].v}`)
   if (face.nums[2].v !== '1') throw new Error(`finished reads ${face.nums[2].v}, not 1`)
 
-  if (face.days.length !== 7) throw new Error(`${face.days.length} days in the week strip`)
-  if (!face.days[6].today) throw new Error('the last card in the strip is not today')
-  if (face.days.filter((d) => d.today).length !== 1) throw new Error('more than one day is marked today')
+  if (face.days.length !== 7) throw new Error(`${face.days.length} days in the week widget`)
+  // Today can land on any of the 7 cards depending which weekday this runs
+  // on -- Monday to Sunday of the real week, not a fixed last slot.
+  if (face.days.filter((d) => d.today).length !== 1) throw new Error('exactly one day should be marked today')
 
-  // A day card is a way into that day's record. The morning review offers
-  // itself over the top of the page, so it is answered first rather than
-  // swallowing the click.
+  // A day card is a way into that day's record, for a day already gone --
+  // the new widget steps future/today cards onto Plan instead, so this only
+  // holds for a genuinely past card. The morning review offers itself over
+  // the top of the page, so it is answered first rather than swallowing the
+  // click.
   const notNow = page.getByRole('button', { name: 'Not today' })
   if (await notNow.count()) { await notNow.first().click(); await page.waitForTimeout(400) }
-  await page.locator('.weekday').first().click({ timeout: 5000 }); await page.waitForTimeout(500)
-  if (!/#\/day\/\d{4}-\d{2}-\d{2}/.test(page.url())) throw new Error(`a day card went to ${page.url()}`)
+  const pastCard = page.locator('.weekplan-day.is-past .weekplan-daybtn').first()
+  if (await pastCard.count()) {
+    await pastCard.click({ timeout: 5000 }); await page.waitForTimeout(500)
+    if (!/#\/day\/\d{4}-\d{2}-\d{2}/.test(page.url())) throw new Error(`a past day card went to ${page.url()}`)
+  }
 })
 await step('today: a task finished right after midnight still counts as finished today', async () => {
   /* His own report, indirectly: the app is in Prague (UTC+1/+2), and doneAt
@@ -905,10 +915,13 @@ await step('plan: the week widget is a real Monday-to-Sunday, not the switcher a
   if (page.url().includes('/day/')) throw new Error('a forward day navigated away instead of stepping the switcher')
   const pressed = await page.locator('.day-switch .microcap[aria-pressed="true"]').count()
   if (pressed !== 1) throw new Error('no single pill is active after the click')
-  // Clicking a day that has already happened opens its record instead.
-  await page.goto(`${URL}#/plan`); await page.waitForTimeout(500)
+  // Clicking a day that has already happened opens its record instead. No
+  // re-navigation needed here -- `page.goto` to the SAME hash is a no-op in
+  // this hash-routed SPA (no unmount, no reload), so it never actually reset
+  // anything; it just left the fold open from earlier while looking like a
+  // fresh page, and the next click landed on whatever state was already
+  // there. The fold is still open and the week still current from above.
   if (forwardIdx > 0) {
-    await page.locator('.weekplan-bar').click(); await page.waitForTimeout(400)
     await page.locator('.weekplan-day').first().locator('.weekplan-daybtn').click(); await page.waitForTimeout(600)
     if (!page.url().includes('/day/')) throw new Error('a past day did not open its record')
     if (!(await page.locator('h1').count())) throw new Error('the record page did not render')

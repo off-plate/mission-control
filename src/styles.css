@@ -1859,8 +1859,8 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
   cursor: pointer; -webkit-tap-highlight-color: transparent;
 }
 .weekplan-bar:focus-visible { outline: 2px solid var(--wk-hot); outline-offset: 4px; border-radius: 4px; }
-/* Today's week is always open and has nothing to toggle -- a label, not a
-   control, so it loses the pointer cursor and the click affordance the
+/* Today's week is always open and has nothing to toggle, so its bar reads as
+   a plain label here -- loses the pointer cursor and click affordance the
    folding version on Plan needs. */
 .weekplan-bar.is-static { cursor: default; }
 /* The label and the range it describes are one left-aligned unit now, not a
@@ -1907,8 +1907,8 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 .wk-navbtn svg { display: block; }
 .wk-navbtn:hover:not(:disabled) { border-color: var(--wk-hot); color: #0E0E10; }
 .wk-navbtn.is-word { width: auto; min-width: 0; padding: 0 14px; font: 600 0.6875rem/1 var(--font-body); white-space: nowrap; }
-/* "This week" stays in the row on every week now, not just the ones paged
-   away from -- inert here rather than hidden, so the row never resizes. */
+/* "This week" stays in the row for every week, always rendered and simply
+   inert while already on the current one, so the row never resizes. */
 .wk-navbtn:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
 
 /* The fold. grid-template-rows 0fr -> 1fr tweens to whatever height the real
@@ -3928,50 +3928,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
   .daynums { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .daynum:nth-child(3) { border-left: none; }
   .daynum:nth-child(n+3) { border-top: 1px solid var(--hairline); }
-}
-
-/* The week behind him, each day a way into that day's record. */
-.weekstrip { margin-top: var(--s5); }
-.weekstrip-head { margin-bottom: var(--s3); }
-.weekstrip-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--s3); }
-.weekday {
-  display: flex; flex-direction: column; gap: var(--s2); min-width: 0; text-align: left;
-  padding: var(--s3) var(--s3) var(--s3);
-  background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-md);
-  cursor: pointer;
-}
-.weekday:hover { border-color: var(--accent-text); }
-.weekday.is-today { border-color: var(--ink); }
-.weekday.is-empty { background: transparent; }
-.weekday-head { display: flex; align-items: baseline; gap: var(--s2); min-width: 0; }
-/* Uppercase, on his instruction 2026-08-27. The tracking comes with it: every
-   other micro-label in the app is uppercase WITH letter-spacing, and uppercase
-   at --text-xs with none set reads as a cramped block. */
-.weekday-name { font-size: var(--text-xs); color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
-.weekday-num { font-size: var(--text-base); font-weight: 700; margin-left: auto; font-variant-numeric: tabular-nums; }
-.weekday.is-today .weekday-name { color: var(--ink); font-weight: 600; }
-.weekday-bar { display: block; height: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
-.weekday-bar i { display: block; height: 100%; background: var(--progress); }
-.weekday-facts { display: flex; flex-wrap: wrap; gap: 2px var(--s2); font-size: 0.625rem; color: var(--muted); }
-.weekday-facts .none { color: var(--faint); }
-.weekday-facts .focus { color: var(--progress); }
-@media (max-width: 900px) {
-  .weekstrip-days { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-}
-@media (max-width: 520px) {
-  .weekstrip-days { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s2); }
-  /* Seven days do not divide by two, so the last cell sat alone with an empty
-     square beside it, and the last cell is TODAY, the one with the ring on it.
-     It takes the full width instead: the odd one out is the point of the row,
-     not an accident to be left hanging. */
-  .weekstrip-days > :last-child:nth-child(odd) { grid-column: span 2; }
-  /* At 390px this row measured ~19px wider than the viewport and silently
-     clipped at a page-level overflow:hidden rather than scrolling or
-     wrapping -- document.documentElement never saw it, only a direct
-     measurement of the row itself did. minmax(0, 1fr) already lets the grid
-     tracks shrink; the card's own padding was the fixed cost the grid
-     couldn't shrink away. */
-  .weekday { padding: var(--s2) var(--s2) var(--s2); }
 }
 
 /* ---------- the clock widget ----------
@@ -6089,30 +6045,6 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .troom .tr-bar i.is-off { background: var(--t-dim); }
 .troom .tr-of { margin-top: 8px; letter-spacing: 0.1em; color: var(--t-dim); }
 
-/* The week strip keeps its own classes, because the gate reads them. Two things
-   change: it loses its own heading, since the card already has one and two
-   titles stacked is the subtitle rule broken in the most literal way, and it is
-   repainted for ink. Every colour is restated, because the paper rules above
-   set them from tokens this card does not use. */
-.tr-week .weekstrip { margin: 0; }
-.tr-week .weekstrip-head { display: none; }
-.tr-week .weekstrip-days { gap: 8px; }
-.troom .tr-week .weekday {
-  background: var(--t-card2); border: 1px solid var(--t-line); color: var(--t-ink);
-  border-radius: 10px; padding: 11px 12px;
-}
-.troom .tr-week .weekday:hover { border-color: var(--t-hot); }
-.troom .tr-week .weekday.is-today { border-color: var(--t-hot); background: var(--t-hotdim); }
-.troom .tr-week .weekday.is-empty { background: none; }
-.troom .tr-week .weekday-name { color: var(--t-muted); }
-.troom .tr-week .weekday.is-today .weekday-name { color: var(--t-hot); }
-.troom .tr-week .weekday-num {
-  color: var(--t-ink); font-family: var(--font-display); font-weight: 800; font-size: 19px;
-}
-.troom .tr-week .weekday-sum, .troom .tr-week .weekday .empty { color: var(--t-dim); }
-.troom .tr-week .weekday-bar { background: color-mix(in srgb, var(--t-ink) 13%, transparent); }
-.troom .tr-week .weekday-bar i { background: var(--t-hot); }
-
 @media (max-width: 1180px) { .troom-lower { grid-template-columns: 1fr; } }
 @media (max-width: 620px) {
   .tr-clock { flex-direction: column; align-items: stretch; gap: 14px; }
@@ -6171,14 +6103,12 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
    without clipping. Verified by rendering both modes side by side at
    375-1920px: same font-size, same wrap, only Michroma's own letterform
    differs. */
-.shell.is-hud .troom .tr-week .weekday-num { font-size: 14px; }
 .shell.is-hud .troom .tr-sm { font-size: 14px; }
 /* Square corners belong to the HUD; the room's 16px pills do not. */
 .shell.is-hud .troom .tr-card,
 .shell.is-hud .troom .tr-chip,
 .shell.is-hud .troom .tr-start,
-.shell.is-hud .troom .tr-box,
-.shell.is-hud .troom .tr-week .weekday { border-radius: 3px; }
+.shell.is-hud .troom .tr-box { border-radius: 3px; }
 .shell.is-hud .troom .tr-q { border-radius: 0; }
 /* The same single wash as light mode, restated because the token behind it
    changed. One card is marked live; it is not a hero and not a button. */
@@ -6366,9 +6296,6 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .troom .tr-mo,
 .troom .tr-age u,
 .troom .tr-of { color: var(--t-muted); }
-
-/* The week strip printed today's weekday in lime on cream: 1.24:1. */
-.troom .tr-week .weekday.is-today .weekday-name { color: var(--t-hot-text); }
 
 /* ==========================================================================
    THE WALL KEEPS ITS OWN SKIN

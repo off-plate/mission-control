@@ -467,19 +467,11 @@ export default function App() {
              ever did, from any page, with no navigation at all for a quick
              note. The page itself is untouched -- setPage('notes') below
              still renders it, this was only ever the shortcut in. */}
-          {/* Bills, ported from Compass (2026-09-01): the same shape as Note
-              beside it, on his instruction -- not a workspace page, not
-              filtered by the space switcher, reached from the header only. */}
-          <button
-            className={`btn btn-ghost${page === 'bills' ? ' is-on' : ''}`}
-            onClick={() => setPage('bills')}
-            aria-pressed={page === 'bills'}
-            title="Bills"
-            aria-label="Bills"
-          >
-            <Icon.Wallet size={18} />
-            <span className="btn-label">Bills</span>
-          </button>
+          {/* Bills' own header button retired (2026-09-03), the same way
+             Notes' was above: the floating dock's Bills summary (see
+             billsdock.tsx) plus its hold-for-the-full-page shortcut cover
+             this in fewer moves than the header ever did. The page itself
+             is untouched -- setPage('bills') below still renders it. */}
           {/* Apps, a shelf now rather than a page: seven icons never filled a
               tab's worth of room, and this is the same one-click-from-anywhere
               shape as Note and Yesterday beside it. Opening a framed app still

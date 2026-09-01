@@ -5,6 +5,7 @@ import { SPACE_LABELS } from './mock'
 import { GoalsPage, HabitsPage, PlanPage, TodayPage } from './pages1'
 import { SettingsPage } from './pages2'
 import { NotesPage } from './notes'
+import { BillsPage } from './billspage'
 import { DailyReview } from './daily'
 import { BrandPage } from './brand'
 import { DayPage } from './day'
@@ -480,6 +481,19 @@ export default function App() {
             <Icon.Note size={18} />
             <span className="btn-label">Note</span>
           </button>
+          {/* Bills, ported from Compass (2026-09-01): the same shape as Note
+              beside it, on his instruction -- not a workspace page, not
+              filtered by the space switcher, reached from the header only. */}
+          <button
+            className={`btn btn-ghost${page === 'bills' ? ' is-on' : ''}`}
+            onClick={() => setPage('bills')}
+            aria-pressed={page === 'bills'}
+            title="Bills"
+            aria-label="Bills"
+          >
+            <Icon.Wallet size={18} />
+            <span className="btn-label">Bills</span>
+          </button>
           {/* Apps, a shelf now rather than a page: seven icons never filled a
               tab's worth of room, and this is the same one-click-from-anywhere
               shape as Note and Yesterday beside it. Opening a framed app still
@@ -560,6 +574,7 @@ export default function App() {
         {page === 'calendar' && <CalendarPage />}
         {page === 'assistant' && <AssistantPage />}
         {page === 'notes' && <NotesPage />}
+        {page === 'bills' && <BillsPage />}
         {page === 'settings' && <SettingsPage />}
         {page === 'brand' && <BrandPage />}
         {page === 'day' && <DayPage />}

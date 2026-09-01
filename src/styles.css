@@ -7545,3 +7545,136 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .giveup-up .microcap { color: var(--progress); }
 .giveup-down { background: var(--alert-wash); border: 1px solid var(--alert); }
 .giveup-down .microcap { color: var(--alert); }
+
+/* ==========================================================================
+   BILLS, ported from Compass (2026-09-01). Reached from the header, not a
+   workspace page -- see App.tsx's PageId comment. Its own fixed token scope,
+   same pattern as .weekplan/.troom: Compass's own "Warm Clay" palette
+   travels over unchanged (colors, shadows, radii, copy all reviewed against
+   an artifact first), and only the two font variables below pull from this
+   app's own --font-display/--font-body instead of Compass's Bricolage
+   Grotesque/Hanken Grotesk/Space Grotesk. */
+.bills-page {
+  --bg: #FAEDE1; --bg-subtle: #F4E4D5; --surface: #FFFAF4; --surface-2: #FAF1E6; --border: #EBDBCB;
+  --accent: #B84A2C; --accent-subtle: #FAE0D2;
+  --positive: #168054; --positive-subtle: #D6EEE2;
+  --highlight: #C48A30; --highlight-subtle: #FAE9CC;
+  --negative: #BE243A; --negative-subtle: #FADDE2;
+  --ink: #261B15; --ink-2: #68574B; --ink-3: #8E7969;
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); min-height: 100%;
+}
+.bills-wrap { max-width: 1180px; margin: 0 auto; padding: 28px 24px 90px; }
+.bills-head { display: flex; align-items: flex-start; justify-content: space-between; padding: 4px 0 18px; }
+.bills-cyc { display: flex; align-items: center; gap: 10px; }
+.bills-iconbtn {
+  width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  color: var(--ink-2); background: none; border: none; font-size: 16px; cursor: pointer;
+}
+.bills-iconbtn:hover { background: var(--bg-subtle); }
+.bills-head h1 { font: 800 20px var(--font-display); letter-spacing: -0.01em; margin: 0; }
+.bills-range { font-size: 12px; color: var(--ink-3); margin-top: 3px; }
+.bills-today { font: 600 13px var(--font-body); color: var(--accent); background: none; border: none; cursor: pointer; }
+.bills-endcycle { border: 1px solid var(--border); border-radius: 999px; padding: 8px 16px; font: 600 13px var(--font-body); color: var(--ink); background: none; cursor: pointer; }
+
+.bills-hero {
+  border-radius: 34px; background: linear-gradient(to bottom right, var(--highlight-subtle), var(--surface), var(--accent-subtle) 150%);
+  padding: 30px 34px 26px; text-align: center; box-shadow: 0 1px 2px rgba(40,30,20,.04), 0 12px 30px -12px rgba(40,30,20,.12);
+  margin-bottom: 14px;
+}
+.bh-eyebrow { color: var(--accent); font: 700 12px var(--font-body); text-transform: uppercase; letter-spacing: .14em; }
+.bh-figure { font: 800 56px var(--font-display); color: var(--positive); margin: 12px 0 6px; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.bh-figure.is-neg { color: var(--negative); }
+.bh-sub { color: var(--ink-2); font-size: 14px; }
+.bh-sub.is-neg { color: var(--negative); }
+.bh-sub b { color: var(--ink); font-weight: 700; }
+.bh-sub.is-neg b { color: var(--negative); }
+.bh-addincome { margin-top: 10px; color: var(--accent); font: 700 15px var(--font-body); background: none; border: none; cursor: pointer; }
+.bh-track { margin: 16px auto 0; max-width: 420px; height: 10px; border-radius: 99px; background: rgba(255,255,255,.7); box-shadow: inset 0 0 0 1px rgba(0,0,0,.05); overflow: hidden; display: flex; }
+.bh-track i.committed { display: block; height: 100%; background: rgba(38,27,21,.6); }
+.bh-track i.free { display: block; height: 100%; background: var(--accent); }
+
+.bills-quick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.bills-quick button { border: 1.5px dashed var(--border); border-radius: 18px; padding: 13px; font: 700 14px var(--font-body); background: none; cursor: pointer; }
+.bq-in { color: var(--positive); }
+.bq-out { color: var(--accent); }
+
+.bills-page .card { background: var(--surface); border-radius: 24px; overflow: hidden; box-shadow: 0 1px 2px rgba(40,30,20,.04), 0 12px 30px -12px rgba(40,30,20,.12); }
+.bills-page .overline { font: 700 12px var(--font-body); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+
+.bills-snapshot { padding: 6px 4px; margin-bottom: 16px; }
+.bills-snapshot .overline { padding: 10px 12px 0; display: block; }
+.bs-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--border); }
+.bs-row:first-of-type { border-top: none; }
+.bs-dot { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; flex: none; }
+.bs-lbl { flex: 1; font: 600 13.5px var(--font-body); }
+.bs-val { font: 700 14px var(--font-mono); font-variant-numeric: tabular-nums; }
+.bs-val.pos { color: var(--positive); }
+.bs-val.neg { color: var(--negative); }
+.bills-leftover { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 4px; border-top: 1px solid var(--border); margin-top: 2px; }
+.bills-leftover .l { font: 600 14px var(--font-body); }
+.bills-leftover .v { font: 700 22px var(--font-display); color: var(--positive); font-variant-numeric: tabular-nums; }
+.bills-leftover .v.is-neg { color: var(--negative); }
+.bills-warn { margin: 0 14px 10px; padding: 10px 12px; border-radius: 12px; background: var(--highlight-subtle); color: var(--highlight); font-size: 12.5px; }
+.bills-foot { font-size: 11.5px; color: var(--ink-3); padding: 10px 14px 6px; }
+
+.bills-section { margin-bottom: 16px; }
+.bills-shead { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+.bills-shead .t { display: flex; align-items: baseline; gap: 10px; }
+.bills-sub { font-size: 12.5px; color: var(--ink-3); }
+.bills-add { font: 700 13px var(--font-body); color: var(--accent); background: none; border: none; cursor: pointer; }
+.bills-card { padding: 6px 4px; }
+.bills-emptyrow { padding: 12px 14px; margin: 0; font-size: 13px; color: var(--ink-3); line-height: 1.5; font-style: italic; }
+
+.bills-irow { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--border); width: 100%; background: none; border-left: none; border-right: none; border-bottom: none; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.bills-irow:first-of-type { border-top: none; }
+.bi-circle { width: 32px; height: 32px; border-radius: 50%; background: var(--positive-subtle); color: var(--positive); display: flex; align-items: center; justify-content: center; font-size: 14px; flex: none; }
+.bi-name { font: 600 14px var(--font-body); display: flex; flex-direction: column; }
+.bi-sub { font-size: 12px; color: var(--ink-3); font-weight: 500; }
+.bi-amt { margin-left: auto; font: 700 14px var(--font-mono); color: var(--positive); font-variant-numeric: tabular-nums; }
+.bi-pencil { color: var(--ink-3); margin-left: 6px; }
+
+.bills-prow { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--border); }
+.bills-prow:first-of-type { border-top: none; }
+.bills-prowmain { flex: 1; min-width: 0; text-align: left; background: none; border: none; cursor: pointer; padding: 0; display: flex; flex-direction: column; font: inherit; color: inherit; }
+.bills-prowmain:disabled { cursor: default; }
+.bp-name { font: 600 14px var(--font-body); }
+.bp-status { font-size: 12px; color: var(--ink-3); margin-top: 1px; }
+.bp-status.is-overdue { color: var(--negative); font-weight: 700; }
+.bp-amt { font: 700 14px var(--font-mono); margin-right: 6px; font-variant-numeric: tabular-nums; }
+.bp-btns { display: flex; gap: 6px; flex: none; }
+.bp-rbtn { width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 13px; background: none; cursor: pointer; }
+.bp-rbtn:disabled { opacity: .5; cursor: default; }
+.bp-rbtn.is-skip:hover { border-color: var(--ink-2); color: var(--ink-2); }
+.bp-rbtn.is-pay:hover { border-color: var(--positive); color: var(--positive); }
+.bp-rbtn.is-paid { background: var(--positive); border-color: var(--positive); color: #fff; }
+.bp-rbtn.is-skipped { background: var(--bg-subtle); border-color: var(--bg-subtle); color: var(--ink-3); }
+.bills-prow.is-done .bp-name { text-decoration: line-through; color: var(--ink-3); }
+
+.bills-tagchip { padding: 5px 11px; border-radius: 999px; font: 700 11.5px var(--font-body); border: none; cursor: pointer; }
+.bills-tagchip.is-regret { background: var(--negative-subtle); color: var(--negative); }
+.bills-tagchip.is-needed { background: var(--bg-subtle); color: var(--ink-3); }
+
+.bills-debtcard { background: var(--surface); border-radius: 24px; padding: 20px 22px; box-shadow: 0 1px 2px rgba(40,30,20,.04), 0 12px 30px -12px rgba(40,30,20,.12); margin-bottom: 16px; position: relative; }
+.bd-top { display: flex; justify-content: space-between; align-items: center; }
+.bd-figure { font: 800 30px var(--font-display); color: var(--negative); margin-top: 10px; font-variant-numeric: tabular-nums; }
+.bd-cap { font-size: 12px; color: var(--ink-3); }
+.bd-right { position: absolute; top: 20px; right: 22px; text-align: right; }
+.bd-month { font: 700 14px var(--font-body); }
+.bd-pct { font: 600 12.5px var(--font-body); color: var(--accent); margin-top: 2px; }
+.bd-bar { margin-top: 14px; height: 8px; border-radius: 99px; background: var(--bg-subtle); overflow: hidden; }
+.bd-bar i { display: block; height: 100%; background: var(--accent); }
+.bd-tip { margin-top: 12px; font-size: 12.5px; color: var(--accent); }
+.bd-warn { margin-top: 12px; font-size: 12.5px; color: var(--negative); }
+
+.bills-empty { max-width: 1180px; margin: 60px auto; padding: 0 24px; color: var(--ink-3); font-size: 14px; }
+
+.bills-signin { max-width: 380px; margin: 60px auto; padding: 0 24px; display: flex; flex-direction: column; gap: 12px; text-align: center; }
+.bills-signin h1 { font: 800 24px var(--font-display); }
+.bills-signin p { color: var(--ink-3); font-size: 13.5px; margin: 0 0 8px; }
+.bills-signin-err { color: var(--negative); font-size: 13px; }
+
+.bills-form { display: flex; flex-direction: column; gap: 14px; padding: 4px 2px; }
+.bills-form label { display: flex; flex-direction: column; gap: 6px; font: 600 13px var(--font-body); color: var(--ink-2); }
+.bills-form p { font-size: 13px; color: var(--ink-3); line-height: 1.5; margin: 0; }
+.bills-delete { color: var(--negative); background: none; border: none; font: 600 13px var(--font-body); cursor: pointer; padding: 4px 0; }
+.bills-endrow { display: flex; gap: 10px; justify-content: flex-end; }

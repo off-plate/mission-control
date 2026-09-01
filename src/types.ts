@@ -36,6 +36,10 @@ export type PageId =
   | 'day'
   /** Full-screen focus room. Reached from the header only, never a nav tab. */
   | 'zone'
+  /** Bills, ported from Compass. Reached from the header, next to Note --
+   *  not a workspace page, not filtered by space, same shape as Notes and
+   *  the Zone. */
+  | 'bills'
   /** The work calendar, read from the feed. Big Time only: see NAV. */
   | 'calendar'
   /** Measured history above a now line, and the same rate carried forward. */

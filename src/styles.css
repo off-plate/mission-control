@@ -7603,46 +7603,50 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 }
 /* Full-bleed like every other page -- main already carries the --gutter
    padding-inline. The old max-width: 1180px + margin: 0 auto stranded Bills
-   in a narrow centered column while Today/Plan/Habits run edge to edge. */
-.bills-wrap { padding: 28px 0 90px; }
-/* The site's own nav row (Today/Plan/Habits/...) opens the same way here as
-   on every other page (hover the logo/workspace cluster, or tab to it) --
-   it does not get a special case on Bills. It's an absolutely positioned
-   overlay that lands right at the top of the content column
-   (.topstick > .nav in styles.css), which is exactly where this header's
-   own cycle arrows and End cycle button sit.
+   in a narrow centered column while Today/Plan/Habits run edge to edge.
 
-   Round 1 of this fix put position: relative; z-index: 51 on .bills-head
-   itself, the whole flex row. That elevated the row's ENTIRE bounding
-   box -- .bills-head is `display: flex; justify-content: space-between`,
-   so its box spans the full content width, including the empty space
-   between the cycle title and End cycle where the nav row's own tabs
-   (Plan, Habits & Goals, ...) land when it opens. Nothing painted there on
-   Bills' side, so the tabs stayed visible -- painted by .nav, one z-index
-   below -- but an invisible, unpainted, z:51 box now sat on top of them
-   app-wide, silently eating every click meant for a tab, and the visible
-   title text ITSELF sat in that same elevated box, so it painted over the
-   open row's pill instead of the reverse. Two different-looking bugs,
-   the exact same cause.
+   The 80px top padding (was 28px) is the nav-collision fix, round three.
+   Rounds one and two both fought the nav row's own overlay with z-index --
+   first on .bills-head as a whole (which elevated its entire flex box,
+   including the empty space between the title and End cycle where the
+   row's own tabs land, silently eating clicks meant for them), then on
+   just the two controls (.bills-iconbtn, .bills-endcycle). That second
+   version passed hit-testing for the one geometry it was tested against,
+   but broke worse than either bug it replaced: those two controls are in
+   normal document flow, so they scroll up and pass BEHIND the sticky
+   header as the page scrolls, same as everything else on the page --
+   except now they were elevated above the header's own z-index (50), so
+   for the moment they were passing through its band they painted on TOP
+   of the header's own buttons (Apps, Settings) instead of neatly
+   disappearing behind it. Two more screenshots, same root mistake: fixing
+   a geometric overlap with stacking order instead of removing the overlap.
 
-   The fix is to elevate only the two actual controls (the arrow buttons,
-   the End cycle button), not the row that contains them and the empty
-   space around them. Confirmed by hit-testing the real cascade again: with
-   only these two elevated, forcing the nav open and clicking a tab in the
-   middle of the header band now reaches the tab, and the title is free to
-   sit behind the open row exactly like every other page's title does. */
+   The nav row is an overlay on .topstick, which is position: sticky --
+   its open band sits at a FIXED distance from the viewport top no matter
+   how far the page has scrolled (confirmed by measuring it directly: 52px
+   tall, landing at 147-200px from the top at this header's height). Bills'
+   own header is ordinary flow content, so it only shares that fixed band
+   with the nav at the very top of the page, before any scrolling -- the
+   one moment someone could plausibly open the nav AND still be looking at
+   these controls. Past that, they've scrolled out of the band entirely and
+   there is nothing left to collide with. So instead of fighting for
+   stacking order, this just gives the header enough top clearance that it
+   never sits in that band in the first place: no z-index anywhere near
+   .bills-head, nothing to leak through the real header on scroll, and the
+   title is free to sit wherever it naturally falls, covered by the open
+   row exactly like every other page's title is. */
+.bills-wrap { padding: 80px 0 90px; }
 .bills-head { display: flex; align-items: flex-start; justify-content: space-between; padding: 4px 0 18px; }
 .bills-cyc { display: flex; align-items: center; gap: 10px; }
 .bills-iconbtn {
   width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
   color: var(--ink-2); background: none; border: none; font-size: 16px; cursor: pointer;
-  position: relative; z-index: 51;
 }
 .bills-iconbtn:hover { background: var(--bg-subtle); }
 .bills-head h1 { font: 800 20px var(--font-display); letter-spacing: -0.01em; margin: 0; }
 .bills-range { font-size: 12px; color: var(--ink-3); margin-top: 3px; }
 .bills-today { font: 600 13px var(--font-body); color: var(--accent); background: none; border: none; cursor: pointer; }
-.bills-endcycle { border: 1px solid var(--border); border-radius: 999px; padding: 8px 16px; font: 600 13px var(--font-body); color: var(--ink); background: none; cursor: pointer; position: relative; z-index: 51; }
+.bills-endcycle { border: 1px solid var(--border); border-radius: 999px; padding: 8px 16px; font: 600 13px var(--font-body); color: var(--ink); background: none; cursor: pointer; }
 
 .bills-hero {
   border-radius: 34px; background: linear-gradient(to bottom right, var(--highlight-subtle), var(--surface), var(--accent-subtle) 150%); /* slop-lint-ignore gradient-hero */
@@ -7760,6 +7764,22 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .bills-form p { font-size: 13px; color: var(--ink-3); line-height: 1.5; margin: 0; }
 .bills-delete { color: var(--negative); background: none; border: none; font: 600 13px var(--font-body); cursor: pointer; padding: 4px 0; }
 .bills-endrow { display: flex; gap: 10px; justify-content: flex-end; }
+
+/* The list behind each section's Edit button. Reuses .bi-name/.bi-sub/
+   .bi-pencil (already Income's row look) rather than a new set of names --
+   this IS that same "tap a row to edit it" pattern, just listing every row
+   in the section instead of only the ones due this cycle. .bi-amt on its
+   own is coloured --positive for Income specifically; a debt or a bill
+   here isn't money coming in, so it's neutralised back to plain ink. */
+.bills-managelist { display: flex; flex-direction: column; gap: 2px; }
+.bills-manage-row {
+  display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-top: 1px solid var(--border);
+  width: 100%; background: none; border-left: none; border-right: none; border-bottom: none;
+  text-align: left; cursor: pointer; font: inherit; color: inherit;
+}
+.bills-manage-row:first-of-type { border-top: none; }
+.bills-manage-row .bi-amt { color: var(--ink); }
+.bills-manage-addnew { margin-top: 10px; }
 
    THE ROUTINE RUNNER
    ==========================================================================

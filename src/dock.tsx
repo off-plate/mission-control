@@ -211,7 +211,13 @@ export function Dock() {
     return (
       <div className="dock">
         <div className="dock-face">
-          <NotePanel dockControls={switchButtons} />
+          {/* His ask (2026-09-02): clicking through to the full Notes page
+             should leave the dock behind, not sit open on the note he just
+             left. go('closed') is the same plain close the panel's own X
+             already uses -- no animation was ever built for closing a face,
+             only for the speed-dial stack, so this stays consistent with
+             that rather than inventing a second closing style. */}
+          <NotePanel dockControls={switchButtons} onOpenFull={() => go('closed')} />
         </div>
       </div>
     )

@@ -146,6 +146,7 @@ function AddWidgetInline({ onClose }: { onClose: () => void }) {
 import { WIDGET_DEFS } from './mock'
 import * as Icon from './icons'
 import { RoutineRunner } from './runner'
+import { HevySync, isHevyHabit } from './hevysync'
 import { TodayRoom } from './todayroom'
 import { GiveUpMode } from './giveupmode'
 const WIDGET_DEFS_LIST = WIDGET_DEFS
@@ -1450,9 +1451,45 @@ function HabitTrail({ h, days }: { h: HabitDef; days: number }) {
   )
 }
 
-function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy, progress, partOn, goal, qualify }: {
+/* Habits and Goals are one page with two faces.
+
+   His idea, 2026-08-26: "make habits and goals one page, with pill shaped
+   things that I can change between the goals and the habits, but they would
+   live under one page in Mission Control." He is right that they belong
+   together: a goal here is mostly a reflection over a habit ("14 night
+   routines this month"), and having to leave the page to see whether the
+   habit is feeding it made the two read as unrelated systems.
+
+   Implemented as one switcher in both bands rather than one page swallowing
+   the other, because each page keeps its own band metrics, its own add button
+   and its own state. The menu shows one tab; the address of each half still
+   resolves, so bookmarks and every existing setPage('goals') keep working. */
+function HabitsGoalsSwitch({ on }: { on: 'habits' | 'goals' }) {
+  const { setPage } = useStore()
+  return (
+    <span className="hg-switch" role="group" aria-label="Habits or goals">
+      <button
+        className={`hg-pill${on === 'habits' ? ' is-on' : ''}`}
+        aria-pressed={on === 'habits'}
+        onClick={() => setPage('habits')}
+      >Habits</button>
+      <button
+        className={`hg-pill${on === 'goals' ? ' is-on' : ''}`}
+        aria-pressed={on === 'goals'}
+        onClick={() => setPage('goals')}
+      >Goals</button>
+    </span>
+  )
+}
+
+function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy, progress, partOn, goal, qualify, sealed }: {
   h: HabitDef
   todayIndex: number
+  /* Why this habit cannot be ticked by hand at all, on any day. The gym habit
+     is the only one: Hevy knows which workouts happened and he does not want a
+     box he could tick by mistake. Correcting a day is a re-sync, because the
+     correction has to come from where the truth does. */
+  sealed?: string
   /** The workspace, spelled out, when another visible habit has the same name. */
   qualify?: string
   /** "done today" / "paused". It goes in the foot column where words fit; in
@@ -1777,7 +1814,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
                  two-way habit needs picked. A day already gone is his to
                  correct, because a lost write must never become a permanent lie
                  about what he did. */
-              disabled={i > todayIndex || (todayHeld && i === todayIndex)}
+              disabled={!!sealed || i > todayIndex || (todayHeld && i === todayIndex)}
               aria-label={
                 i !== todayIndex
                   ? (drivenBy ? `${h.name}, ${d}, correct this day by hand` : `${h.name}, ${d}`)
@@ -1787,7 +1824,8 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
                         : `${h.name}, ${d}`
               }
               title={
-                i !== todayIndex
+                sealed ? sealed
+                : i !== todayIndex
                   ? (drivenBy ? `Done via ${drivenBy}? Set the record straight.` : undefined)
                   : drivenBy ? `Set by the ${drivenBy} routine`
                     : locked ? `Hit ${gate!.target} ${gate!.unit} to keep this today`
@@ -2205,12 +2243,15 @@ export function HabitsPage() {
   return (
     <div className="page">
       <Band
-        title="Habits"
-        leading={folderGroups.length > 0 && (
-          <button className="btn btn-ghost band-collapseall" onClick={toggleAllFolders}>
-            {allShut ? 'Expand all' : 'Collapse all'}
-          </button>
-        )}
+        title="Habits & Goals"
+        leading={<>
+          <HabitsGoalsSwitch on="habits" />
+          {folderGroups.length > 0 && (
+            <button className="btn btn-ghost band-collapseall" onClick={toggleAllFolders}>
+              {allShut ? 'Expand all' : 'Collapse all'}
+            </button>
+          )}
+        </>}
         metrics={[{ v: `${doneToday}/${dueCount}`, k: 'done today', tone: (doneToday > 0 ? 'pos' : 'info') as 'pos' | 'info' }]}
         actions={
           <>
@@ -2330,8 +2371,11 @@ export function HabitsPage() {
             )}
             {(c.folder && shutFolders.has(c.id) ? [] : c.list).map((h) => (
               <div className={`habit-line is-${h.kind ?? 'build'}${h.paused ? ' is-paused' : ''}`} key={h.id}>
-                <HabitRow h={h} todayIndex={todayIndex} days={days} qualify={qualifyOf(h)} drivenBy={drivenBy.get(h.id)} progress={progressFor.get(h.id)} partOn={partFor.get(h.id)} goal={goalOn.get(h.id)} stateTag={h.paused ? 'paused' : h.days[todayIndex] ? 'done today' : null} actions={
+                <HabitRow h={h} todayIndex={todayIndex} days={days} qualify={qualifyOf(h)} drivenBy={drivenBy.get(h.id)} progress={progressFor.get(h.id)} partOn={partFor.get(h.id)} goal={goalOn.get(h.id)} sealed={isHevyHabit(h) ? 'Hevy keeps this one. Press sync to pull it.' : undefined} stateTag={h.paused ? 'paused' : h.days[todayIndex] ? 'done today' : null} actions={
                   <>
+                  {/* The gym habit's own sync, on the row it updates rather
+                      than four clicks away in Settings. */}
+                  {isHevyHabit(h) && <HevySync />}
                   <Dropdown label={`Options for ${h.name}`} className="habit-kebab">
                     <button role="menuitem" onClick={() => setEditHabit(h)}>Edit this habit</button>
                     <button role="menuitem" onClick={() => togglePauseHabit(h.id)}>{h.paused ? 'Resume it' : 'Pause it'}</button>
@@ -3164,7 +3208,8 @@ export function GoalsPage() {
   return (
     <div className="page">
       <Band
-        title="Goals"
+        title="Habits & Goals"
+        leading={<HabitsGoalsSwitch on="goals" />}
         metrics={[{ v: `${done}/${spaceGoals.length}`, k: 'reached', tone: (done > 0 ? 'pos' : 'info') as 'pos' | 'info' }]}
         actions={<><WriteTo /><button className="btn btn-primary" onClick={() => setAdding(true)}>Add a goal</button></>}
       />

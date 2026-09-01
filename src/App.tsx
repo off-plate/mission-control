@@ -19,7 +19,6 @@ import { TimelinePage } from './timeline'
 import * as Icon from './icons'
 import { FocusPage } from './focus'
 import { ZonePage, useZoneDepth } from './zone'
-import { hasHevyKey, syncedToday, syncHevy } from './hevy'
 import { useStore } from './store'
 import { ago, describe, useSyncStatus } from './sync'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange } from './supabase'
@@ -123,11 +122,13 @@ function Logo() {
 const NAV: { id: PageId; label: string }[] = [
   { id: 'today', label: 'Today' },
   { id: 'plan', label: 'Plan' },
-  { id: 'habits', label: 'Habits' },
-  /* Routines left the menu when it became a folder inside Habits. The address
-     still resolves so a bookmark or an old link lands on Habits rather than on
-     nothing: see the redirect where the pages are chosen. */
-  { id: 'goals', label: 'Goals' },
+  /* One tab for both, on his instruction 2026-08-26. Goals here are mostly a
+     reflection over habits, so they switch inside the page on a pill pair
+     rather than sitting in the menu as a second destination. Routines left the
+     menu earlier for the same kind of reason. Every address still resolves, so
+     a bookmark and every existing setPage('goals') still land somewhere real:
+     see the redirect where the pages are chosen. */
+  { id: 'habits', label: 'Habits & Goals' },
   { id: 'board', label: 'Why’s' },
   /* Timeline sits LAST of the real pages, immediately before Calendar, on his
      instruction (2026-08-27). It is where he goes to look back, so it belongs
@@ -309,24 +310,16 @@ export default function App() {
     void currentAccount().then((a) => setNeedsSignIn(!a))
     return onAccountChange((a) => setNeedsSignIn(!a))
   }, [])
-  /* His pick, 2026-08-29: once a day around 23:00 rather than on a short
-     interval -- he is usually still at the laptop then, and a day's Hevy
-     data does not change again after it. Checked every few minutes rather
-     than scheduled for the exact minute, since the tab may not be open (or
-     focused) at 23:00:00 sharp; the first check to land inside the hour
-     that has not already synced today does it. Never fires twice in one
-     day: syncedToday() reads the stamp syncHevy() itself just wrote. */
-  useEffect(() => {
-    const maybeSync = () => {
-      if (!hasHevyKey() || syncedToday()) return
-      if (new Date().getHours() !== 23) return
-      void syncHevy(habits, markHabitDaysOn)
-    }
-    maybeSync()
-    const id = window.setInterval(maybeSync, 5 * 60_000)
-    return () => window.clearInterval(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [habits])
+  /* The once-a-day Hevy sync is GONE, on his instruction, 2026-08-26: "the
+     23:00 sync doesn't work, so I would kill that automatic sync and put there
+     a button". It only ever fired if the app happened to be open and focused
+     inside that one hour, which on most days it was not, so the habit was
+     filled by him going to Settings and pressing Sync now. A scheduled job
+     that runs on a coin flip is worse than no job: it makes the data look
+     automatic while quietly leaving days out.
+
+     The pull now lives on the gym habit's own row (src/hevysync.tsx) and in
+     Settings, and both call the same syncHevy. */
   /* How far into the running block he is, for the Zone's water. Read here
      rather than inside the room because the shell is what paints it. */
   const zoneDepth = useZoneDepth()

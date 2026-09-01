@@ -13,6 +13,7 @@ import { useStore } from './store'
 import { useCompass } from './compass'
 import { chainOf, momentumRun, momentumNow, stateFor, HARD_MIN_DAYS } from './momentum'
 import { chainPromiseLine, WINDOW } from './timeline'
+import { SPACE_LABELS } from './mock'
 import * as Icon from './icons'
 
 const hm = (min: number) => `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, '0')}m`
@@ -23,8 +24,20 @@ export function TimelineChip() {
 }
 
 export function TimelinePanel({ dockControls, onOpenFull }: { dockControls?: ReactNode; onOpenFull?: () => void }) {
-  const { setPage, habits, habitLog, tasks, focusSessions, inView } = useStore()
+  const { setPage, view, habits, habitLog, tasks, focusSessions, inView } = useStore()
   const compass = useCompass().state
+  /* His report (2026-09-03): the same real chain/momentum read as
+     "not real" and swung wildly between two checks minutes apart. Traced
+     it with an isolated test against the real momentumRun/chainOf
+     (synthetic multi-space data, no live account touched): the space
+     filter itself is correct -- a space with no activity in view
+     genuinely scores zero, same as it should. What's missing is that this
+     panel never says WHICH space it's reading. The full Timeline page
+     sits right under the visible space tabs, so which one is active is
+     never in question there; the dock floats over everything with no
+     such cue, so the exact same real numbers looked "wrong" purely
+     because which workspace they belonged to wasn't shown anywhere. */
+  const spaceLabel = view === 'all' ? 'All' : SPACE_LABELS[view]
 
   const run = useMemo(
     () => momentumRun({ habits, habitLog, tasks, focusSessions, inView }, WINDOW),
@@ -46,7 +59,10 @@ export function TimelinePanel({ dockControls, onOpenFull }: { dockControls?: Rea
     // this small, not something specific to Bills despite the class names.
     <div className="billsdock-panel">
       <div className="billsdock-head">
-        <span className="billsdock-title">Timeline</span>
+        {/* Which space this reads, spelled out -- see the note above on why
+           an otherwise-correct, space-filtered number read as broken
+           without this. */}
+        <span className="billsdock-title">Timeline <span className="tldock-unit">&middot; {spaceLabel}</span></span>
         {/* Same real .btn-primary classes as Notes' and Bills' door out --
            see the note on notedock.tsx for why this isn't a hand-rolled
            background. */}

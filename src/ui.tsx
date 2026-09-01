@@ -264,7 +264,7 @@ export function SpaceMark({ space, always }: { space?: SpaceId; always?: boolean
 }
 
 export function Band({
-  title, metrics, actions, leading,
+  title, metrics, actions, leading, beside,
 }: {
   title: string
   metrics?: { v: string; k: string; tone?: 'pos' | 'urgent' | 'info' }[]
@@ -272,11 +272,16 @@ export function Band({
   /** Sits before the metrics, not after them: for a control the page wants
    *  read first in that corner, ahead of the number it sits beside. */
   leading?: React.ReactNode
+  /** Sits against the TITLE, not in the far corner. For a control that says
+   *  which of a page's faces you are looking at: it belongs to the name, and
+   *  across the band with the buttons it read as one more button. */
+  beside?: React.ReactNode
 }) {
   return (
     <div className="band">
       <div className="band-day">
         <h1>{title}</h1>
+        {beside}
       </div>
       <div className="band-status">
         {leading}

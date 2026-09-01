@@ -950,14 +950,20 @@ body:has(.shell.is-hud) .dock-face { border-radius: var(--a-r-lg); }
 .btn-danger:hover { border-color: var(--alert); background: var(--alert-wash); }
 
 /* ---------- console band (page header) ---------- */
+/* Centred, not bottom-aligned. Every control in the right-hand cluster used to
+   hang off the BOTTOM edge of a 36px title, which is why the buttons sat low
+   against it and he said so. The title is the tallest thing in the row, so
+   centring is what makes the row read as one line. */
 .band {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: var(--s6);
   padding: var(--s6) 0 var(--s5);
   flex-wrap: wrap;
 }
-.band-day { display: flex; align-items: baseline; gap: var(--s4); }
+/* The title and anything that belongs TO the title. Centred for the same
+   reason: a pill next to a 36px word is not sitting on its baseline. */
+.band-day { display: flex; align-items: center; gap: var(--s4); flex-wrap: wrap; min-width: 0; }
 .band h1 {
   font-family: var(--font-display);
   font-weight: 800;

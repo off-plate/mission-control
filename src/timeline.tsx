@@ -129,7 +129,7 @@ export function TimelinePage() {
       {view === 'ladder' && <Ladder rows={shown} zoom={zoom} money={money} run={run} chain={chain} now={now} />}
       {view === 'wheel' && <Flywheel rows={shown} zoom={zoom} now={now} money={money} run={run} />}
 
-      {lives && <TwoLives onBack={() => setLives(false)} run={run} chain={chain} />}
+      {lives && <TwoLives onBack={() => setLives(false)} run={run} chain={chain} money={money} />}
     </div>
   )
 }
@@ -825,9 +825,84 @@ function embedSrc(url: string, sound: boolean): string {
   return url
 }
 
+/* ---- what it costs, what it pays ---- */
+/* Neither side is written from nowhere. Both read off what is actually true
+   right now: his real momentum figures, his real open habits and goals, his
+   real Compass balance if he is signed in. Nothing here is invented, and
+   nothing personal that lives outside this app (what he has told Claude
+   about his life, his relationships, his exact numbers) gets typed into
+   public source -- only what this app already knows about him, live, from
+   his own account. The push side stays a reward. The drift side does not
+   pull punches: his words, not softened. */
+interface NarrativeCtx {
+  money: CompassMoney | null
+  anchorHabit?: string
+  quitHabit?: string
+  goalName?: string
+}
+
+/** 1 = this week, 2 = a few weeks, 3 = a month or two, 4 = a season,
+ *  5 = half a year+, 6 = the long haul. Day 0 is handled separately, on
+ *  purpose: at nine in the morning nothing has actually happened yet, and
+ *  dramatizing that would be the one lie this screen could tell. */
+function tierOf(days: number): 1 | 2 | 3 | 4 | 5 | 6 {
+  if (days < 7) return 1
+  if (days < 30) return 2
+  if (days < 90) return 3
+  if (days < 180) return 4
+  if (days < 365) return 5
+  return 6
+}
+
+function pushNarrative(days: number, f: Future, c: NarrativeCtx): string {
+  const debts = c.money && c.money.openDebts > 0
+  switch (tierOf(days)) {
+    case 1:
+      return `Momentum is already climbing toward ${Math.round(f.momentum)}. Nothing dramatic yet -- just ${Math.round(f.tasks)} things off the list and ${hm(f.focusMin)} where the phone lost. That's the whole trick: you don't feel it happening. You just wake up on day seven not having quit.`
+    case 2:
+      return `${Math.round(f.tasks)} things closed, ${hm(f.focusMin)} of real focus, a chain running ${f.chain} deep${c.anchorHabit ? ` because ${c.anchorHabit} stopped being optional and started being just who you are` : ''}. Most people call this a good stretch. You're starting to notice it's just Tuesday.`
+    case 3:
+      return `${f.chain} days deep, ${f.hard} things you'd been carrying for a week or more finally put down. ${debts ? `The payment on ${c.money!.openDebts === 1 ? 'the debt' : `all ${c.money!.openDebts} debts`} still lands whether you flinch or not -- except now it's the guy who decided to be here making it, not the guy hoping it clears.` : 'The pile of half-finished things is finally just finished.'}`
+    case 4:
+      return `${c.goalName ? `"${c.goalName}" stops being a note in an app and starts being a fact about your life.` : 'The thing you kept saying you would get to has an actual date attached to it now.'} ${Math.round(f.focusMin / 60)} hours of your attention, spent on purpose instead of leaking out through your phone one scroll at a time.`
+    case 5:
+      return `${c.quitHabit ? `${c.quitHabit} isn't a fight anymore. It's just something you don't do.` : 'The thing that used to take everything you had now takes nothing at all.'} Momentum sits at ${Math.round(f.momentum)}. You don't get a number like that from trying hard for a week. You get it from being a different person for half a year straight.`
+    default:
+      return `${debts ? `Whatever was on Compass when you first opened this screen is either gone or close enough to see the end of it.` : 'Whatever weight you were carrying the first time you opened this screen is gone.'} ${f.chain} days. Not because you never had a bad day -- because a bad day stopped being a reason to have two.`
+  }
+}
+
+function driftNarrative(days: number, stoppedOn: number, c: NarrativeCtx): string {
+  const debts = c.money && c.money.openDebts > 0
+  switch (tierOf(days)) {
+    case 1:
+      return `${stoppedOn <= 1 ? 'The wheel is already dead. It was never turning fast enough to survive this' : `The wheel is dead by day ${stoppedOn}. Not behind -- dead`}. Zero. ${c.quitHabit ? `${c.quitHabit} doesn't care that you were "doing so well." It was never impressed.` : 'Whatever you told yourself you were building just stopped being built.'}`
+    case 2:
+      return `${spanWords(days, 'd')} of nothing, and the person who opened this screen today is a stranger you used to be. Zero chain. Zero tasks you can point to. ${debts ? `${c.money!.openDebts} debts you're still carrying, and not one of them got smaller because you had a good reason.` : 'Nothing moved. Nothing ever moves on its own.'}`
+    case 3:
+      return `A month or two of "tomorrow," and tomorrow never actually shows up -- it's always still tomorrow. ${c.anchorHabit ? `${c.anchorHabit} goes back to being a thing you used to do, and you get to explain that to yourself again, every day it doesn't happen.` : 'Whatever you were building goes quiet, and quiet starts to feel normal.'}`
+    case 4:
+      return `${c.goalName ? `"${c.goalName}" is still sitting there. Closed date getting closer. You getting no closer to it.` : 'The date you set for yourself keeps arriving whether you showed up or not.'} A season is long enough to build something real. You spent it proving to yourself that you don't, actually, when it's hard.`
+    case 5:
+      return `${c.quitHabit ? `${c.quitHabit} isn't a slip at this point. It's just what you do. You stopped even being disappointed about it.` : 'The thing you were "about to fix" for half a year is now just how things are.'} Half a year is not a bad week. Half a year is a pattern, and you are the one running it.`
+    default:
+      return `${debts ? `The debt is still there. Bigger, because it doesn't wait for you to feel ready -- it compounds while you do.` : 'Whatever you owed yourself a year ago, you owe double now, at interest that doesn’t show up on any statement.'} A year from here this isn't a bad week you remember, motherfucker. It's a pattern you recognize in yourself and can't explain to anyone -- why you always start and never finish. That's the cost. Not the number. You.`
+  }
+}
+
 /* ---- the screen ---- */
-function TwoLives({ onBack, run, chain }: { onBack: () => void; run: DayScore[]; chain: ReturnType<typeof chainOf> }) {
-  const { goals } = useStore()
+function TwoLives({ onBack, run, chain, money }: {
+  onBack: () => void; run: DayScore[]; chain: ReturnType<typeof chainOf>; money: CompassMoney | null
+}) {
+  const { habits, goals } = useStore()
+  /* Same rule as the rest of this page: one dataset, not filtered by
+     whichever workspace tab happens to be open -- see inAllSpaces above. */
+  const narrCtx: NarrativeCtx = useMemo(() => {
+    const build = habits.filter((h) => !h.archivedAt && !h.paused && h.kind !== 'break')
+    const quit = habits.filter((h) => !h.archivedAt && h.kind === 'break')
+    const open = goals.filter((g) => !g.closed)
+    return { money, anchorHabit: build[0]?.name, quitHabit: quit[0]?.name, goalName: open[0]?.name }
+  }, [habits, goals, money])
   const pool = useReelPool()
   const [grain, setGrain] = useState<Grain>('m')
   const [at, setAt] = useState(0)
@@ -861,8 +936,13 @@ function TwoLives({ onBack, run, chain }: { onBack: () => void; run: DayScore[];
   const step = GRAINS.find((g) => g.id === grain)!.step
   /* Snap to the grain, and never past the horizon. THE LAST STOP IS THE
      HORIZON ITSELF: 184 days does not divide by 30, so snapping alone left the
-     end of the slider four days short of the date printed beside it. */
-  const days = at >= span - step / 2 ? span : Math.min(span, Math.round(at / step) * step)
+     end of the slider four days short of the date printed beside it. The
+     threshold is a full step, not half of one: the End key (and, in some
+     browsers, dragging to the physical end) clamps the raw value to the
+     nearest step BELOW max when max is not a step multiple -- span=179 at
+     step=30 lands the native input on 150, a full 29 days short, which a
+     half-step threshold never catches. */
+  const days = at >= span - step ? span : Math.min(span, Math.round(at / step) * step)
   const when = dayAfter(days)
   const p = project(run, chain.current, days)
   /* The reel is what plays while he reads the two futures, not a second way
@@ -897,9 +977,11 @@ function TwoLives({ onBack, run, chain }: { onBack: () => void; run: DayScore[];
             <p className="tl-said">{days === 0 ? 'Today. Nothing has happened yet.' : `${spanWords(days, grain)} of keeping it.`}</p>
             <Figures f={p.push} days={days} />
             <p className="tl-under">
-              {p.assumed
-                ? 'There is no rate of yours to run forward yet, so this is a full day, every day.'
-                : `At your own rate of the last ${p.from} days: ${Math.round(p.rate * 100)}% of a full day.`}
+              {days === 0
+                ? (p.assumed
+                  ? 'There is no rate of yours to run forward yet, so this is a full day, every day.'
+                  : `At your own rate of the last ${p.from} days: ${Math.round(p.rate * 100)}% of a full day.`)
+                : pushNarrative(days, p.push, narrCtx)}
             </p>
           </section>
           <section className="tl-side is-drift">
@@ -907,9 +989,7 @@ function TwoLives({ onBack, run, chain }: { onBack: () => void; run: DayScore[];
             <p className="tl-said">{days === 0 ? 'Today. Nothing has happened yet.' : `${spanWords(days, grain)} of not.`}</p>
             <Figures f={p.drift} days={days} dead />
             <p className="tl-under">
-              {days === 0
-                ? 'Both men are the same man this morning.'
-                : `The wheel reads zero on day ${p.stoppedOn}. Everything after that is the same day again.`}
+              {days === 0 ? 'Both men are the same man this morning.' : driftNarrative(days, p.stoppedOn, narrCtx)}
             </p>
           </section>
           <div className="tl-gap">

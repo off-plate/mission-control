@@ -72,9 +72,16 @@ export function NotePanel({ dockControls }: { dockControls?: ReactNode }) {
         {/* Bright on purpose, unlike the quiet icon buttons beside it -- his
            ask (2026-09-02): the same accent fill the Zone and Assistant
            buttons wear in the header, so the one control that leaves the
-           note behind entirely is never mistaken for a quiet toggle. */}
+           note behind entirely is never mistaken for a quiet toggle. The
+           real .btn.btn-primary classes, not a hand-rolled background --
+           his first pass at this button read as dark olive instead of lime
+           for the exact reason the FAB once did (see the --accent note in
+           styles.css): --accent is deliberately the muted, readable-as-TEXT
+           partner, and only --a-accent is the loud literal fill. .btn-primary
+           already carries the fix (and the hover wipe, and HUD's own text
+           colour) -- reinventing it here just reintroduced the same bug. */}
         <button
-          className="notedock-open"
+          className="btn btn-primary notedock-open"
           onClick={() => { if (active) openNote(active.id); setPage('notes') }}
           title="Open in Notes"
         >

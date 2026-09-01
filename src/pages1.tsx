@@ -2093,7 +2093,7 @@ const HABIT_WINDOWS = [
 ]
 
 export function HabitsPage() {
-  const { habits, goals, space, deleteHabit, togglePauseHabit, routines, stepTicks, habitLog, todayIndex, inView, focusRoutineId, setFocusRoutineId } = useStore()
+  const { habits, goals, space, deleteHabit, togglePauseHabit, routines, stepTicks, habitLog, todayIndex, inView, focusRoutineId, setFocusRoutineId, toggleHabitDay, slips, logSlip } = useStore()
   const [days, setDays] = useState(7)
   const [adding, setAdding] = useState(false)
   // Opening the goal sheet from a habit is the "set a goal on this" path.
@@ -2246,6 +2246,108 @@ export function HabitsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusRoutineId])
 
+  /* ---------- the page he approved, built ----------
+     Proposal C, "Run and watch". Left column is everything that needs his
+     hands: the routines he opens and runs, then the handful he ticks. Right
+     column is everything the app keeps for him, and the only thing clickable
+     over there is the Hevy pull. The split is the point: it answers "what do I
+     owe" and "what is already true" without mixing them into one list of fifty
+     rows that all look the same.
+
+     Four groups, derived from what is already stored rather than from a new
+     field: a habit a routine's completion feeds, a habit the app measures, a
+     habit he is quitting, and everything else. */
+  const firedRows = routines
+    .filter((r) => r.habitId && !r.archivedAt && r.steps.length > 0)
+    .map((r) => ({ r, h: spaceHabits.find((x) => x.id === r.habitId) }))
+    .filter((x): x is { r: Routine; h: HabitDef } => !!x.h)
+  const autoRows = looseBuild.filter((h) => isHevyHabit(h) || h.auto?.from === 'focus' || h.kind === 'measured')
+  const manualRows = looseBuild.filter((h) => !autoRows.includes(h))
+  const folderIsDone = (c: { list: HabitDef[] }) => { const d = folderDone(c.list); return d.total > 0 && d.done === d.total }
+
+  /* Kept days this week over what the habit asks for. One measure for every
+     automatic row, so the gym and the focus blocks read the same way. */
+  const weekFrom = dayOfWeekKey(0)
+  const weekTo = dayOfWeekKey(6)
+  const keptThisWeek = (h: HabitDef) => keptDaysIn(habitLog, h.id, weekFrom, weekTo).size
+
+  const kebab = (h: HabitDef) => (
+    <Dropdown label={`Options for ${h.name}`} className="habit-kebab">
+      <button role="menuitem" onClick={() => setEditHabit(h)}>Edit this habit</button>
+      <button role="menuitem" onClick={() => togglePauseHabit(h.id)}>{h.paused ? 'Resume it' : 'Pause it'}</button>
+      {goalOn.has(h.id)
+        ? <span className="kebab-note">Goal: {goalOn.get(h.id)!.name}</span>
+        : <button role="menuitem" onClick={() => setGoalFor(h.id)}>Set a goal on this</button>}
+      <span className="kebab-sep" />
+      {drivenBy.has(h.id)
+        ? <span className="kebab-note">Deleted with the routine</span>
+        : <button role="menuitem" className="danger" onClick={() => deleteHabit(h.id)}>Delete this habit</button>}
+    </Dropdown>
+  )
+
+  /* A routine is a card you open and run. Finished ones sink, because he will
+     not run one twice in a day and a done routine in the way is one he has to
+     read past. */
+  const routineCard = (c: { id: string; label: string; folder?: Routine; list: HabitDef[] }) => {
+    const { done, total } = folderDone(c.list)
+    const finished = folderIsDone(c)
+    const isRunning = running === c.id
+    const open = !shutFolders.has(c.id)
+    return (
+      <div className={`rtc${finished ? ' is-done' : ''}${isRunning ? ' is-running' : ''}${open ? ' is-open' : ''}`} key={c.id}>
+        <div className="rtc-top">
+          {/* Start is the primary action and the reason the card exists. The
+              caret is the secondary one, and it has to be here: a step carries
+              a typing gate, an either-or, a link, and a day he may want to
+              correct, and none of that is reachable from a card that only
+              offers Start. Shut by default, so the page stays a list of
+              routines rather than a wall of fifty rows. */}
+          <button
+            className="rtc-open"
+            aria-expanded={open}
+            aria-label={`${open ? 'Hide' : 'Show'} the steps of ${c.label}`}
+            onClick={() => toggleFolder(c.id)}
+          ><Icon.ChevronRight size={12} className="folder-caret" /></button>
+          <span className="rtc-id">
+            <span className="rtc-name">{c.label}</span>
+            <span className="rtc-when microcap">{habitFrequencyLabel({ frequency: c.list[0]?.frequency } as HabitDef)}</span>
+          </span>
+          <span className="rtc-count mono">{finished ? 'done today' : `${done} of ${total}`}</span>
+          <button
+            className={`btn btn-sm rtc-start${finished ? ' btn-quiet' : ' btn-primary'}`}
+            onClick={() => setRunning(isRunning ? null : c.id)}
+            aria-pressed={isRunning}
+          >{isRunning ? 'Running' : finished ? 'Run again' : 'Start'}</button>
+        </div>
+        {open && (
+          <div className="rtc-steps habit-list w7">
+            {c.list.map((h) => (
+              <div className={`habit-line is-${h.kind ?? 'build'}${h.paused ? ' is-paused' : ''}`} key={h.id}>
+                <HabitRow
+                  h={h} todayIndex={todayIndex} days={days} qualify={qualifyOf(h)}
+                  drivenBy={drivenBy.get(h.id)} progress={progressFor.get(h.id)}
+                  partOn={partFor.get(h.id)} goal={goalOn.get(h.id)}
+                  stateTag={h.paused ? 'paused' : h.days[todayIndex] ? 'done today' : null}
+                  actions={kebab(h)}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const meter = (now: number, target: number) => {
+    const met = target > 0 && now >= target
+    return (
+      <span className={`hg-read${met ? ' is-met' : ''}`}>
+        <span className="hg-read-n mono">{now} / {target}</span>
+        <span className="hg-meter"><i style={{ width: `${target > 0 ? Math.min(100, Math.round((now / target) * 100)) : 0}%` }} /></span>
+      </span>
+    )
+  }
+
   return (
     <div className="page">
       <Band
@@ -2289,9 +2391,138 @@ export function HabitsPage() {
           />
         )
       })()}
-      <div className="habit-cols">
-        <div className="habit-col">{routineCols.map(renderCol)}</div>
-        <div className="habit-col">{looseCols.map(renderCol)}</div>
+      <div className="hg-two">
+        <div className="hg-col">
+          {routineCols.length > 0 && (
+            <div className="panel hg-panel">
+              <div className="hg-head">
+                <span className="microcap">Routines</span>
+                <span className="hg-n">{routineCols.filter(folderIsDone).length} of {routineCols.length} done today</span>
+              </div>
+              <div className="rtc-list">{routineCols.filter((c) => !folderIsDone(c)).map(routineCard)}</div>
+              {routineCols.some(folderIsDone) && (
+                <>
+                  <div className="microcap hg-sub">Done today</div>
+                  <div className="rtc-list">{routineCols.filter(folderIsDone).map(routineCard)}</div>
+                </>
+              )}
+            </div>
+          )}
+
+          {manualRows.length > 0 && (
+            <div className="panel hg-panel">
+              <div className="hg-head">
+                <span className="microcap">Yours to tick</span>
+                <span className="hg-n mono">{manualRows.filter((h) => h.days[todayIndex]).length}/{manualRows.length}</span>
+              </div>
+              <div className="hg-rows">
+                {[...manualRows].sort((a, b) => Number(a.days[todayIndex]) - Number(b.days[todayIndex])).map((h) => (
+                  <div className={`hg-row${h.days[todayIndex] ? ' is-done' : ''}`} key={h.id}>
+                    <span className="hg-what">
+                      <span className="hg-title">{h.name}{qualifyOf(h) && <span className="habit-qual">{qualifyOf(h)}</span>}</span>
+                      {h.note && <span className="hg-note">{h.note}</span>}
+                    </span>
+                    <span className="hg-do">
+                      {kebab(h)}
+                      <button
+                        className="daydot" role="checkbox" aria-checked={h.days[todayIndex]} aria-label={h.name}
+                        onClick={() => toggleHabitDay(h.id, todayIndex)}
+                      />
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="hg-col">
+          <div className="panel hg-panel">
+            <div className="hg-head"><span className="microcap">Today</span></div>
+            <div className="hg-tally">
+              <span className="hg-fig"><b className="mono">{routineCols.filter(folderIsDone).length}/{routineCols.length}</b><i className="microcap">routines run</i></span>
+              <span className="hg-fig"><b className="mono">{manualRows.filter((h) => h.days[todayIndex]).length}/{manualRows.length}</b><i className="microcap">manual ticks</i></span>
+              <span className="hg-fig"><b className="mono">{looseQuit.filter((h) => !slipDays(slips, h.id).has(localDateKey())).length}/{looseQuit.length}</b><i className="microcap">quits clean</i></span>
+            </div>
+          </div>
+
+          {(autoRows.length > 0 || firedRows.length > 0) && (
+            <div className="panel hg-panel">
+              <div className="hg-head">
+                <span className="microcap">Kept without you</span>
+                <span className="hg-n">no tick, on purpose</span>
+              </div>
+              <div className="hg-rows">
+                {autoRows.map((h) => (
+                  <div className="hg-row" key={h.id}>
+                    <span className="hg-what">
+                      <span className="hg-title">{h.name}{qualifyOf(h) && <span className="habit-qual">{qualifyOf(h)}</span>}</span>
+                      <span className="hg-note">{isHevyHabit(h) ? 'Hevy' : 'from your focus blocks'}</span>
+                    </span>
+                    <span className="hg-do">
+                      {meter(keptThisWeek(h), Math.max(1, habitTarget(h)))}
+                      {isHevyHabit(h) && <HevySync />}
+                      {kebab(h)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {firedRows.length > 0 && (
+                <>
+                  <div className="microcap hg-sub">Ticked by finishing a routine</div>
+                  <div className="hg-rows">
+                    {firedRows.map(({ r, h }) => (
+                      <div className="hg-row" key={h.id}>
+                        <span className="hg-what">
+                          <span className="hg-title">{h.name}</span>
+                          {/* The OVERVIEW he asked for by name: how many times he
+                              has actually run this thing. Restating "fires when
+                              you finish X" on every row said nothing the card in
+                              the left column had not already said. */}
+                          <span className="hg-note">
+                            {(() => {
+                              const streak = currentStreak(habitLog, h.id)
+                              const month = keptDaysIn(habitLog, h.id, localDateKey(new Date(new Date().getFullYear(), new Date().getMonth(), 1)), localDateKey()).size
+                              if (!month) return `not yet this month, from ${r.title}`
+                              return `${month} this month${streak > 1 ? `, ${streak} in a row` : ''}`
+                            })()}
+                          </span>
+                        </span>
+                        <span className="hg-do">
+                          <span className="microcap hg-auto">automatic</span>
+                          <button className="daydot is-auto" role="checkbox" aria-checked={h.days[todayIndex]} disabled aria-label={`${h.name}, set by ${r.title}`} />
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {looseQuit.length > 0 && (
+            <div className="panel hg-panel">
+              <div className="hg-head"><span className="microcap">Quitting</span></div>
+              <div className="hg-quits">
+                {looseQuit.map((h) => {
+                  const clean = daysClean(h, slips) ?? 0
+                  const slippedToday = slipDays(slips, h.id).has(localDateKey())
+                  return (
+                    <div className="hg-quit" key={h.id}>
+                      <span className={`hg-quit-n mono${slippedToday ? ' is-broken' : ''}`}>{clean}</span>
+                      <span className="microcap">{clean === 1 ? 'clean day' : 'clean days'}</span>
+                      <span className="hg-quit-name">{h.name}</span>
+                      <span className="hg-quit-do">
+                        <button className="btn btn-sm btn-quiet" onClick={() => logSlip(h.id)}>{slippedToday ? 'Slipped today' : 'I slipped today'}</button>
+                        {kebab(h)}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
       {routineCols.length === 0 && looseCols.length === 0 && <div className="empty">No habits in this space yet. Add one from the button above.</div>}
 

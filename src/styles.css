@@ -7895,3 +7895,100 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 }
 .hg-pill:hover { background: var(--a-accent-wash); color: var(--a-accent-text); }
 .hg-pill.is-on { background: var(--a-accent); color: var(--a-ink); font-weight: 800; }
+
+/* ==========================================================================
+   HABITS & GOALS: RUN AND WATCH
+   ==========================================================================
+   The layout he picked out of three prototypes. Left is everything that needs
+   his hands, right is everything the app keeps for him, and the split is the
+   point: it answers "what do I owe today" and "what is already true" without
+   mixing them into one list of fifty rows that all look the same.
+
+   Nothing in the right column is clickable except the Hevy pull and the slip
+   button, on purpose.
+   ========================================================================== */
+.hg-two { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--s5); align-items: start; }
+@media (max-width: 1100px) { .hg-two { grid-template-columns: 1fr; } }
+.hg-col { display: flex; flex-direction: column; gap: var(--s5); min-width: 0; }
+.hg-panel { display: flex; flex-direction: column; gap: var(--s3); }
+.hg-head { display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap; }
+.hg-head .microcap { margin: 0; }
+.hg-n { margin-left: auto; font-size: var(--a-f-chip); color: var(--a-soft); }
+.hg-sub { margin-top: var(--s4); }
+
+/* A routine: a card you open and run. Never a box you tick. */
+.rtc-list { display: flex; flex-direction: column; gap: var(--s2); }
+.rtc {
+  display: flex; align-items: center; gap: var(--s3);
+  padding: var(--s4); border: 1px solid var(--a-line); border-radius: var(--a-r-sm);
+  transition: border-color var(--a-enter), box-shadow var(--a-enter);
+}
+.rtc:hover { border-color: var(--a-line-2); box-shadow: var(--a-lift); }
+.rtc.is-running { border-color: var(--a-accent-text); }
+/* Finished ones sink: he will not run one twice in a day, and a done routine
+   in the way is a done routine he has to read past. */
+.rtc.is-done { background: var(--a-sunk); border-color: transparent; box-shadow: none; }
+.rtc-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rtc-name { font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+.rtc.is-done .rtc-name { color: var(--a-soft); }
+.rtc-when { color: var(--a-soft); }
+.rtc-count { margin-left: auto; font-size: var(--a-f-chip); color: var(--a-muted); white-space: nowrap; }
+.rtc-start { flex: none; }
+
+/* A row: one line, one thing it says, one thing you can do about it. */
+.hg-rows { display: flex; flex-direction: column; }
+.hg-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s4);
+  align-items: center; padding: var(--s3) 0; border-bottom: 1px solid var(--a-line);
+}
+.hg-row:last-child { border-bottom: 0; }
+.hg-what { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hg-title { font-size: var(--a-f-row); }
+.hg-row.is-done .hg-title { color: var(--a-soft); }
+.hg-note { font-size: var(--a-f-chip); color: var(--a-soft); }
+.hg-do { display: flex; align-items: center; gap: var(--s3); white-space: nowrap; }
+.hg-auto { color: var(--a-soft); }
+
+/* A reading, not a control. */
+.hg-read { display: inline-flex; align-items: center; gap: var(--s2); }
+.hg-read-n { font-weight: 700; font-size: var(--a-f-chip); }
+.hg-read.is-met .hg-read-n { color: var(--a-progress); }
+.hg-meter { width: 74px; height: 6px; border-radius: 3px; background: var(--a-sunk); overflow: hidden; }
+.hg-meter i { display: block; height: 100%; background: var(--a-info); transition: width var(--a-enter); }
+.hg-read.is-met .hg-meter i { background: var(--a-progress-solid); }
+
+/* The tally: what today already is, in three figures. */
+.hg-tally { display: flex; gap: var(--s6); flex-wrap: wrap; }
+.hg-fig { display: flex; flex-direction: column; gap: 2px; }
+.hg-fig b { font-family: var(--font-display); font-size: var(--a-f-fig-sm); font-weight: 800; line-height: 1; }
+.hg-fig i { font-style: normal; color: var(--a-soft); }
+
+/* Quitting: a count of the days it has already been true, and one honest
+   button. Never a row of empty circles to tick, because the win is absence. */
+.hg-quits { display: flex; flex-direction: column; gap: var(--s3); }
+.hg-quit {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px var(--s4);
+  grid-template-areas: 'n name' 'u do';
+  align-items: baseline;
+  padding: var(--s4); border: 1px solid var(--a-line); border-radius: var(--a-r-sm);
+}
+.hg-quit-n { grid-area: n; font-family: var(--font-display); font-size: var(--a-f-fig); font-weight: 800; line-height: 1; color: var(--a-progress); }
+.hg-quit-n.is-broken { color: var(--a-warn); }
+.hg-quit .microcap { grid-area: u; color: var(--a-soft); }
+.hg-quit-name { grid-area: name; font-size: var(--a-f-chip); color: var(--a-muted); align-self: center; }
+.hg-quit-do { grid-area: do; display: flex; align-items: center; gap: var(--s2); justify-self: start; }
+
+/* The card's disclosure. Start is the reason the card exists; the caret is how
+   a step's own work stays reachable: a typing gate, an either-or, a link, and a
+   past day he may want to correct. Shut by default so the page stays a list of
+   routines rather than a wall of fifty rows. */
+.rtc-top { display: flex; align-items: center; gap: var(--s3); }
+.rtc-open {
+  flex: none; width: 26px; height: 26px; padding: 0; display: grid; place-items: center;
+  border: 0; background: none; color: var(--a-soft); cursor: pointer; border-radius: var(--a-r-xs);
+}
+.rtc-open:hover { color: var(--a-ink); background: var(--a-sunk); }
+.rtc-open .folder-caret { transition: transform var(--a-enter); }
+.rtc.is-open .rtc-open .folder-caret { transform: rotate(90deg); }
+.rtc.is-open { border-color: var(--a-line-2); }
+.rtc-steps { margin-top: var(--s3); padding-top: var(--s2); border-top: 1px solid var(--a-line); }

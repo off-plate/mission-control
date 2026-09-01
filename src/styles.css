@@ -818,14 +818,23 @@ body:has(.shell.is-hud) .dock-face { border-radius: var(--a-r-lg); }
   padding: var(--s2) var(--s4) var(--s4);
 }
 
-/* The note face: what used to be notedock's own floating sheet is now just
-   the content under the shared facebar above. */
+/* The note face is its own full head row now, not content sitting under a
+   near-empty facebar -- his correction (2026-09-01). Same padding/border
+   .dock-facebar used, since this row now does that row's job too (the
+   switch/close controls arrive as dockControls, folded in at the end). */
 .notedock-panel { display: flex; flex-direction: column; min-height: 0; flex: 1; }
-.notedock-head { flex: none; display: flex; align-items: center; gap: 6px; padding: 0 var(--s3) var(--s2); }
-.notedock-switch {
-  flex: 1; min-width: 0; border: none; background: none; color: var(--ink);
-  font-weight: 600; font-size: var(--text-sm); font-family: inherit;
+.notedock-head { flex: none; display: flex; align-items: center; gap: 6px; padding: var(--s2); border-bottom: 1px solid var(--hairline); }
+/* The app's own dropdown (Select, from ui.tsx), not the OS one the native
+   <select> here used to open -- his rule: nothing here is ever a default
+   macOS control. Trimmed down from Select's normal 40px form-field size to
+   sit at the same visual weight as the icon buttons beside it in this one
+   compact row. */
+.notedock-switch { flex: 1; min-width: 0; }
+.notedock-switch .dd-trigger {
+  min-height: 30px; border: none; background: none; padding: 0 var(--s1);
+  font-weight: 600; font-size: var(--text-sm); color: var(--ink);
 }
+.notedock-switch .dd-trigger:hover:not(:disabled) { color: var(--accent-text); }
 .notedock-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 var(--s4) var(--s4); }
 .notedock-title {
   width: 100%; border: none; background: none; resize: none;

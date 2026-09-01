@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useStore } from './store'
 import { Editor, headOf, join, restOf } from './notes'
-import { AutoTextarea } from './ui'
+import { AutoTextarea, Select } from './ui'
 import { spaceFolderId } from './types'
 import * as Icon from './icons'
 
@@ -23,7 +23,7 @@ export function NoteChip() {
   return <Icon.Note size={17} />
 }
 
-export function NotePanel() {
+export function NotePanel({ dockControls }: { dockControls?: ReactNode }) {
   const { space, inView, notes, addNote, updateNote, openNote, setPage } = useStore()
   const [activeId, setActiveId] = useState<string | null>(() => {
     try { return localStorage.getItem(LAST_KEY) } catch { return null }
@@ -55,15 +55,17 @@ export function NotePanel() {
   return (
     <div className="notedock-panel">
       <div className="notedock-head">
-        <select
+        {/* The app's own custom dropdown, never the OS one -- the house rule
+           the native <select> here was quietly breaking. Same component
+           WriteTo and everything else in Notes already builds its pickers
+           from. */}
+        <Select
           className="notedock-switch"
           value={active?.id ?? ''}
-          onChange={(e) => persist(e.target.value)}
-          aria-label="Switch note"
-        >
-          {mine.length === 0 && <option value="">Untitled</option>}
-          {mine.map((n) => <option key={n.id} value={n.id}>{headOf(n.body) || 'Untitled'}</option>)}
-        </select>
+          onChange={(id) => persist(id)}
+          options={mine.length ? mine.map((n) => ({ value: n.id, label: headOf(n.body) || 'Untitled' })) : [{ value: '', label: 'Untitled' }]}
+          ariaLabel="Switch note"
+        />
         <button className="dock-icon" onClick={newNote} aria-label="New note" title="New note">
           <Icon.Plus size={16} />
         </button>
@@ -75,6 +77,10 @@ export function NotePanel() {
         >
           <Icon.ExternalLink size={15} />
         </button>
+        {/* The dock's own switch/close controls, folded into this same row
+           on his correction (2026-09-01): they used to sit in a separate
+           bar above this one, nearly empty on its own. */}
+        {dockControls}
       </div>
       <div className="notedock-body">
         {active ? (

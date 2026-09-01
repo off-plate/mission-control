@@ -2083,10 +2083,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
        ranked it -- his report: send it back after adding ten other things,
        and it lands 11th, not first. Coming back to the pool is a fresh arrival
        on the list, same as if he'd just typed it. */
-    moveTaskList: (id, list, day) =>
+    moveTaskList: (id, list, day) => {
       setTasks((prev) => prev.map((t) => (t.id === id
         ? { ...t, list, plannedOn: list === 'today' ? (day ?? todayKey()) : undefined, addedAt: list === 'backlog' ? Date.now() : t.addedAt }
-        : t))),
+        : t)))
+      /* His report: replan a returned task, decide mid-day it's not
+         happening, send it back to the list yourself -- and the "you did not
+         finish this" banner comes right back, even though you just handled
+         it. returnedIds is stamped once at the overnight rollover and never
+         touched again, so a task cycling backlog -> today -> backlog the
+         same day still matches that morning's stale set the moment it lands
+         back in backlog. A deliberate move by him is not a fresh miss, so it
+         drops out of the set for good -- the NEXT rollover is what decides
+         whether it counts as carried again, same as it always did. */
+      if (list === 'backlog') {
+        setPlan((p) => {
+          if (!p.returnedIds?.includes(id)) return p
+          const returnedIds = p.returnedIds.filter((x) => x !== id)
+          return { ...p, returnedIds, returnedCount: returnedIds.length }
+        })
+      }
+    },
     moveTasksToToday: (ids, day) =>
       setTasks((prev) => prev.map((t) => (ids.includes(t.id) ? { ...t, list: 'today', slot: undefined, plannedOn: day ?? todayKey() } : t))),
     assignSlot: (id, slot) =>

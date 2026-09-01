@@ -20,11 +20,14 @@ export interface CompassProfile {
   settings: Record<string, unknown>
 }
 
+export type DebtKind = 'structured' | 'unstructured' | 'personal' | 'tax'
+
 export interface CompassDebt {
   id: string
   user_id: string
   name: string
   creditor: string | null
+  kind: DebtKind
   original_amount: number | null
   principal_start: number
   start_on: string

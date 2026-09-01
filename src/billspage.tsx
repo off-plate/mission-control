@@ -22,7 +22,7 @@ import {
   activeCycleKey, addMonthsToKey, cycleChecklist, cycleFree, cycleForKey, debtFreeView, debtFreedom, debtRunway,
   iso, relativeDay, resolveCycleIncome, todayISO,
   type CompassCycleIncome, type CompassDebt, type CompassPlanned, type CompassProfile, type CompassRecurring,
-  type CompassTransaction, type CycleItem,
+  type CompassTransaction, type CycleItem, type DebtKind,
 } from './compassCalc'
 
 const money = (n: number): string => `${new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 0 }).format(Math.round(n))} Kč`
@@ -91,6 +91,13 @@ export function BillsPage() {
   const [editPlanned, setEditPlanned] = useState<CompassPlanned | 'new' | null>(null)
   const [editUnreasonable, setEditUnreasonable] = useState<CompassPlanned | 'new' | null>(null)
   const [editIncome, setEditIncome] = useState<CompassCycleIncome | 'new' | null>(null)
+  const [editDebt, setEditDebt] = useState<CompassDebt | 'new' | null>(null)
+  /* Which section's manage sheet is open, on his instruction (2026-09-01):
+     "ditch the ADD button and just have an edit button in there, which
+     you're gonna do editing, rewriting, adding, removing" -- one entry
+     point per section that lists everything in it, not just a shortcut to
+     add one more. */
+  const [managing, setManaging] = useState<'income' | 'recurring' | 'debt' | 'unexpected' | 'unreasonable' | null>(null)
   const [ending, setEnding] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -197,28 +204,31 @@ export function BillsPage() {
           )}
         </div>
 
+        {/* The figure itself is unconditional, matching Compass's own
+            FreeToSpendHero exactly: only the eyebrow and the line under the
+            figure change when there's no income yet, never the number.
+            This page had it backwards -- the whole hero collapsed to just
+            the eyebrow and an "add income" button, dropping the actual
+            surplus/shortfall figure entirely, which is the one thing he
+            open this page to see. Recurring bills and debt payments still
+            commit money against a cycle with no income logged yet, so
+            `free.free` is real and worth showing (usually a stark negative)
+            even before he's told it what's coming in. */}
         <div className="bills-hero">
-          {income === 0 ? (
-            <>
-              <div className="bh-eyebrow">Let's set up this cycle</div>
-              <button className="bh-addincome" onClick={() => setEditIncome('new')}>Add your income to begin →</button>
-            </>
+          <div className="bh-eyebrow">{income > 0 ? 'Free to spend this cycle' : "Let's set up this cycle"}</div>
+          <div className={`bh-figure${free.free < 0 ? ' is-neg' : ''}`}>{money(free.free)}</div>
+          {income <= 0 ? (
+            <button className="bh-addincome" onClick={() => setEditIncome('new')}>Add your income to begin →</button>
+          ) : free.free >= 0 ? (
+            <div className="bh-sub">after <b>{money(free.committed)}</b> in bills this cycle</div>
           ) : (
-            <>
-              <div className="bh-eyebrow">Free to spend this cycle</div>
-              <div className={`bh-figure${free.free < 0 ? ' is-neg' : ''}`}>{money(free.free)}</div>
-              {free.free >= 0 ? (
-                <div className="bh-sub">after <b>{money(free.committed)}</b> in bills this cycle</div>
-              ) : (
-                <div className="bh-sub is-neg">you're <b>{money(-free.free)}</b> short this cycle</div>
-              )}
-              {free.free >= 0 && (
-                <div className="bh-track">
-                  <i className="committed" style={{ width: `${Math.min(100, (free.committed / (free.committed + Math.max(free.free, 1))) * 100)}%` }} />
-                  <i className="free" style={{ width: `${Math.min(100, (free.free / (free.committed + Math.max(free.free, 1))) * 100)}%` }} />
-                </div>
-              )}
-            </>
+            <div className="bh-sub is-neg">you're <b>{money(-free.free)}</b> short this cycle</div>
+          )}
+          {income > 0 && (
+            <div className="bh-track">
+              <i className="committed" style={{ width: `${Math.min(100, (free.committed / Math.max(income, free.committed, 1)) * 100)}%` }} />
+              <i className="free" style={{ width: `${Math.max(0, Math.min(100, (free.free / Math.max(income, free.committed, 1)) * 100))}%` }} />
+            </div>
           )}
         </div>
 
@@ -265,7 +275,7 @@ export function BillsPage() {
         </div>
 
         <div className="bills-rightcol">
-          <BillsSection title="Income" onAdd={() => setEditIncome('new')}>
+          <BillsSection title="Income" onManage={() => setManaging('income')}>
             {groups.income.length === 0 ? (
               <p className="bills-emptyrow">Income varies month to month, so set what you actually earn each cycle. Add each source (salary, side gig) as its own entry.</p>
             ) : groups.income.map((ci) => (
@@ -278,16 +288,21 @@ export function BillsPage() {
             ))}
           </BillsSection>
 
-          <BillsSection title="Debt payments" sub={groups.debt.length ? `${money(free.debtOut)} left` : undefined}>
+          {/* Debt payments used to be read-only here ("manage your debts from
+              Compass directly for now") -- a deliberate first-pass scope cut,
+              overruled on his instruction (2026-09-01): every section here
+              needs the same edit path. */}
+          <BillsSection title="Debt payments" sub={groups.debt.length ? `${money(free.debtOut)} left` : undefined} onManage={() => setManaging('debt')}>
             {groups.debt.length === 0 ? (
-              <p className="bills-emptyrow">No debt payments due this cycle. Manage your debts' amounts and rates from Compass directly for now.</p>
+              <p className="bills-emptyrow">No debt payments due this cycle.</p>
             ) : groups.debt.map((i) => (
               <PayableRow key={i.id} item={i} skipped={skips.includes(i.id)} busy={busy}
-                onPay={() => markPaid(i)} onUndo={() => undoPaid(i)} onSkip={() => toggleSkip(i.id)} onEdit={() => {}} noEdit />
+                onPay={() => markPaid(i)} onUndo={() => undoPaid(i)} onSkip={() => toggleSkip(i.id)}
+                onEdit={() => { const d = data.debts.find((x) => `debt:${x.id}` === i.id); if (d) setEditDebt(d) }} />
             ))}
           </BillsSection>
 
-          <BillsSection title="Recurring bills" sub={groups.recurring.length ? `${money(free.recurringOut)} left` : undefined} onAdd={() => setEditRecurring('new')}>
+          <BillsSection title="Recurring bills" sub={groups.recurring.length ? `${money(free.recurringOut)} left` : undefined} onManage={() => setManaging('recurring')}>
             {groups.recurring.length === 0 ? (
               <p className="bills-emptyrow">No recurring bills yet. Tap "Bill" up top to add rent, subscriptions and anything you pay every month.</p>
             ) : groups.recurring.map((i) => (
@@ -297,7 +312,7 @@ export function BillsPage() {
             ))}
           </BillsSection>
 
-          <BillsSection title="Unexpected this cycle" sub={groups.unexpected.length ? `${money(free.unexpectedOut)} left` : undefined} onAdd={() => setEditPlanned('new')}>
+          <BillsSection title="Unexpected this cycle" sub={groups.unexpected.length ? `${money(free.unexpectedOut)} left` : undefined} onManage={() => setManaging('unexpected')}>
             {groups.unexpected.length === 0 ? (
               <p className="bills-emptyrow">One-off payments you know are coming this cycle (a repair, a gift, an annual fee). Add one and check it off when paid.</p>
             ) : groups.unexpected.map((i) => (
@@ -307,7 +322,7 @@ export function BillsPage() {
             ))}
           </BillsSection>
 
-          <BillsSection title="Unreasonable" sub={groups.unreasonable.length ? `${money(free.unreasonableOut)} left` : undefined} onAdd={() => setEditUnreasonable('new')}>
+          <BillsSection title="Unreasonable" sub={groups.unreasonable.length ? `${money(free.unreasonableOut)} left` : undefined} onManage={() => setManaging('unreasonable')}>
             {groups.unreasonable.length === 0 ? (
               <p className="bills-emptyrow">Impulse buys you didn't plan for. Log them as you go and they count against this cycle right away. Tap one to edit; tap the tag to mark it a regret. Never rolls into next cycle.</p>
             ) : groups.unreasonable.map((i) => (
@@ -331,6 +346,49 @@ export function BillsPage() {
       {editPlanned && <PlannedSheet item={editPlanned === 'new' ? null : editPlanned} cycleKey={cycle.key} onClose={() => setEditPlanned(null)} onSaved={reload} />}
       {editUnreasonable && <UnreasonableSheet item={editUnreasonable === 'new' ? null : editUnreasonable} cycleKey={cycle.key} onClose={() => setEditUnreasonable(null)} onSaved={reload} />}
       {editIncome && <IncomeSheet item={editIncome === 'new' ? null : editIncome} cycle={cycle} onClose={() => setEditIncome(null)} onSaved={reload} />}
+      {editDebt && <DebtSheet item={editDebt === 'new' ? null : editDebt} onClose={() => setEditDebt(null)} onSaved={reload} />}
+
+      {managing === 'income' && (
+        <ManageSheet title="Income" addLabel="+ Add income"
+          onAddNew={() => { setManaging(null); setEditIncome('new') }} onClose={() => setManaging(null)}
+          rows={groups.income.map((ci) => ({
+            id: ci.id, name: ci.label || 'Income', sub: 'this cycle', amount: money(ci.expected_income),
+            onEdit: () => { setManaging(null); setEditIncome(ci) },
+          }))} />
+      )}
+      {managing === 'recurring' && (
+        <ManageSheet title="Recurring bills" addLabel="+ Add a bill"
+          onAddNew={() => { setManaging(null); setEditRecurring('new') }} onClose={() => setManaging(null)}
+          rows={data.recurring.filter((r) => r.is_active).map((r) => ({
+            id: r.id, name: r.name, sub: r.cadence, amount: money(r.amount),
+            onEdit: () => { setManaging(null); setEditRecurring(r) },
+          }))} />
+      )}
+      {managing === 'debt' && (
+        <ManageSheet title="Debts" addLabel="+ Add a debt"
+          onAddNew={() => { setManaging(null); setEditDebt('new') }} onClose={() => setManaging(null)}
+          rows={data.debts.map((d) => ({
+            id: d.id, name: d.name, sub: d.creditor ?? undefined, amount: `${money(d.monthly_payment)}/mo`,
+            onEdit: () => { setManaging(null); setEditDebt(d) },
+          }))} />
+      )}
+      {managing === 'unexpected' && (
+        <ManageSheet title="Unexpected this cycle" addLabel="+ Add a one-off"
+          onAddNew={() => { setManaging(null); setEditPlanned('new') }} onClose={() => setManaging(null)}
+          rows={groups.unexpected.map((i) => ({
+            id: i.id, name: i.name, sub: i.dueOn ? relativeDay(i.dueOn) : undefined, amount: money(i.amount),
+            onEdit: () => { const p = data.planned.find((x) => x.id === i.link.planned_id); if (p) { setManaging(null); setEditPlanned(p) } },
+          }))} />
+      )}
+      {managing === 'unreasonable' && (
+        <ManageSheet title="Unreasonable" addLabel="+ Log one"
+          onAddNew={() => { setManaging(null); setEditUnreasonable('new') }} onClose={() => setManaging(null)}
+          rows={groups.unreasonable.map((i) => ({
+            id: i.id, name: i.name, sub: i.tag === 'regret' ? 'Regret' : 'Needed', amount: money(i.amount),
+            onEdit: () => { const p = data.planned.find((x) => x.id === i.link.planned_id); if (p) { setManaging(null); setEditUnreasonable(p) } },
+          }))} />
+      )}
+
       {ending && (
         <Sheet title={`End this cycle and move to ${cycleForKey(addMonthsToKey(activeCycleKey(data.profile), 1)).label}?`} onClose={() => setEnding(false)}>
           <EndCycleForm suggested={free.free} busy={busy} onCancel={() => setEnding(false)} onConfirm={(v) => { setBusy(true); void endCycle(v).finally(() => { setBusy(false); setEnding(false) }) }} />
@@ -379,26 +437,57 @@ function BillsSignIn() {
   )
 }
 
-function BillsSection({ title, sub, onAdd, children }: { title: string; sub?: string; onAdd?: () => void; children: React.ReactNode }) {
+function BillsSection({ title, sub, onManage, children }: { title: string; sub?: string; onManage?: () => void; children: React.ReactNode }) {
   return (
     <div className="bills-section">
       <div className="bills-shead">
         <span className="t"><span className="overline">{title}</span>{sub && <span className="bills-sub">{sub}</span>}</span>
-        {onAdd && <button className="bills-add" onClick={onAdd}>+ Add</button>}
+        {onManage && <button className="bills-add" onClick={onManage}>✎ Edit</button>}
       </div>
       <div className="card bills-card">{children}</div>
     </div>
   )
 }
 
-function PayableRow({ item, skipped, busy, onPay, onUndo, onSkip, onEdit, noEdit }: {
+/* One "Edit" button per section opens this instead of jumping straight to
+   an add form, on his instruction (2026-09-01): a single entry point that
+   lists everything already in the section, edits any one of them, and adds
+   a new one, rather than a shortcut that only ever added. Rows here reuse
+   whatever single-item sheet the section already had (RecurringSheet,
+   PlannedSheet, IncomeSheet, DebtSheet) for the actual edit/add/delete
+   work -- this is a picker in front of them, not a second editor. */
+function ManageSheet({ title, rows, addLabel, onAddNew, onClose }: {
+  title: string
+  rows: { id: string; name: string; sub?: string; amount: string; onEdit: () => void }[]
+  addLabel: string
+  onAddNew: () => void
+  onClose: () => void
+}) {
+  return (
+    <Sheet title={title} onClose={onClose}>
+      <div className="bills-managelist">
+        {rows.length === 0 && <p className="bills-emptyrow">Nothing here yet.</p>}
+        {rows.map((r) => (
+          <button key={r.id} className="bills-manage-row" onClick={r.onEdit}>
+            <span className="bi-name">{r.name}{r.sub && <span className="bi-sub">{r.sub}</span>}</span>
+            <span className="bi-amt">{r.amount}</span>
+            <span className="bi-pencil">✎</span>
+          </button>
+        ))}
+        <button className="btn btn-secondary bills-manage-addnew" onClick={onAddNew}>{addLabel}</button>
+      </div>
+    </Sheet>
+  )
+}
+
+function PayableRow({ item, skipped, busy, onPay, onUndo, onSkip, onEdit }: {
   item: CycleItem; skipped: boolean; busy: boolean
-  onPay: () => void; onUndo: () => void; onSkip: () => void; onEdit: () => void; noEdit?: boolean
+  onPay: () => void; onUndo: () => void; onSkip: () => void; onEdit: () => void
 }) {
   const status = item.paid ? 'Paid' : skipped ? 'Skipped' : item.overdue ? 'Overdue' : item.dueOn ? relativeDay(item.dueOn) : 'this cycle'
   return (
     <div className={`bills-prow${item.paid || skipped ? ' is-done' : ''}`}>
-      <button className="bills-prowmain" onClick={onEdit} disabled={noEdit}>
+      <button className="bills-prowmain" onClick={onEdit}>
         <span className="bp-name">{item.name}</span>
         <span className={`bp-status${item.overdue ? ' is-overdue' : ''}`}>{status}</span>
       </button>
@@ -556,6 +645,70 @@ function IncomeSheet({ item, cycle, onClose, onSaved }: { item: CompassCycleInco
         <label>Amount<input className="textinput" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
         <button className="btn btn-primary" disabled={!valid || busy} onClick={() => void save()}>{item ? 'Save' : 'Add income'}</button>
         {item && <button className="bills-delete" disabled={busy} onClick={() => void del()}>🗑 Delete</button>}
+      </div>
+    </Sheet>
+  )
+}
+
+const DEBT_KIND_LABEL: Record<DebtKind, string> = { structured: 'Loan', unstructured: 'Overdue', personal: 'Personal', tax: 'Tax' }
+
+/* Mirrors Compass's own DebtForm (src/pages/Debts.tsx) field for field and
+   validation for validation, on his instruction to make debts editable here
+   too (2026-09-01) -- this writes to the same compass_debts table Compass's
+   own payoff math reads, so the payload shape matches exactly rather than
+   guessing at one. The remaining balance itself is never a field: it's
+   principal_start minus every debt_payment transaction since, computed
+   elsewhere (compassCalc's debtView) -- editing it directly here would
+   silently disagree with that math the next time a payment posts. */
+function DebtSheet({ item, onClose, onSaved }: { item: CompassDebt | null; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(item?.name ?? '')
+  const [creditor, setCreditor] = useState(item?.creditor ?? '')
+  const [kind, setKind] = useState<DebtKind>(item?.kind ?? 'structured')
+  const [principal, setPrincipal] = useState(item ? String(item.principal_start) : '')
+  const [monthly, setMonthly] = useState(item ? String(item.monthly_payment) : '')
+  const [rate, setRate] = useState(item ? String(item.interest_rate) : '')
+  const [dueDay, setDueDay] = useState(item?.due_day != null ? String(item.due_day) : '')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const principalNum = Number(principal.replace(',', '.')) || 0
+  const monthlyNum = Number(monthly.replace(',', '.')) || 0
+  const valid = name.trim().length > 0 && principalNum > 0 && monthlyNum > 0
+  const save = async () => {
+    if (!name.trim()) { setErr('Give the debt a name'); return }
+    if (principalNum <= 0) { setErr('Balance owed must be greater than 0'); return }
+    if (monthlyNum <= 0) { setErr('Set a monthly payment so it has a payoff date'); return }
+    setErr(null); setBusy(true)
+    const dayParsed = Number(dueDay)
+    const patch = {
+      name: name.trim(), creditor: creditor.trim() || null, kind,
+      principal_start: principalNum, monthly_payment: monthlyNum,
+      interest_rate: Number(rate.replace(',', '.')) || 0,
+      due_day: dueDay && Number.isFinite(dayParsed) ? Math.min(31, Math.max(1, dayParsed)) : null,
+    }
+    try {
+      if (item) await updateRow('compass_debts', item.id, patch)
+      else await insertRow('compass_debts', { ...patch, original_amount: patch.principal_start, start_on: todayISO(), status: 'active' })
+      onSaved(); onClose()
+    } finally { setBusy(false) }
+  }
+  const del = async () => {
+    if (!item) return
+    setBusy(true)
+    try { await deleteRow('compass_debts', item.id); onSaved(); onClose() } finally { setBusy(false) }
+  }
+  return (
+    <Sheet title={item ? 'Edit debt' : 'Add a debt'} onClose={onClose}>
+      <div className="bills-form">
+        <label>Name<input className="textinput" value={name} onChange={(e) => setName(e.target.value)} placeholder="Credit card…" autoFocus /></label>
+        <label>Lender<input className="textinput" value={creditor} onChange={(e) => setCreditor(e.target.value)} placeholder="Bank…" /></label>
+        <Segmented label="Type" value={kind} onPick={setKind} options={(Object.keys(DEBT_KIND_LABEL) as DebtKind[]).map((k) => ({ id: k, label: DEBT_KIND_LABEL[k] }))} />
+        <label>Balance owed<input className="textinput" type="number" value={principal} onChange={(e) => setPrincipal(e.target.value)} placeholder="0" /></label>
+        <label>Monthly payment<input className="textinput" type="number" value={monthly} onChange={(e) => setMonthly(e.target.value)} placeholder="0" /></label>
+        <label>Day of month it's due (optional)<input className="textinput" type="number" min={1} max={31} value={dueDay} onChange={(e) => setDueDay(e.target.value)} /></label>
+        <label>Interest % per year (optional)<input className="textinput" type="number" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="0" /></label>
+        {err && <p className="bills-signin-err">{err}</p>}
+        <button className="btn btn-primary" disabled={!valid || busy} onClick={() => void save()}>{item ? 'Save changes' : 'Add debt'}</button>
+        {item && <button className="bills-delete" disabled={busy} onClick={() => void del()}>🗑 Delete this debt</button>}
       </div>
     </Sheet>
   )

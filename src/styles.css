@@ -660,38 +660,64 @@ main { padding-inline: var(--gutter); }
   #main { padding-bottom: 128px; }
 }
 
-/* ---------- The Dock: one dynamic island, not three stacked pills -- his
-   correction (2026-09-01) of the Focus pill and the note pill sitting as two
-   separate stuck-together boxes. Collapsed, it's a single row of equal-sized
-   chips, one per tool that currently has something to show; open, the same
-   box becomes whichever tool's full surface, with a shared bar across the
-   top to jump straight to a different tool or collapse back to the row.
+/* ---------- The Dock: a Material speed-dial FAB, per his own reference
+   image (2026-09-01) -- a first pass built one morphing pill instead, and
+   missed it. Closed, it's one round button. Tapping it fans a labelled item
+   out per tool, stacked upward from the same corner, and the FAB itself
+   becomes the X at the bottom of that stack; the X is the only thing that
+   closes it back down, matching the reference exactly (a tool item is for
+   opening that tool, not for closing the dial). Tapping a tool item opens
+   its full surface in the same corner instead -- see .dock-face below,
+   unchanged from the first pass -- with its own bar to jump straight to a
+   different tool or close outright.
+
    Each tool still owns its own state and logic in its own file (usePomodoro,
-   the notes store) -- this is only the shell they render into. The box
-   itself transitions on open/close (width/height/radius); the content inside
-   plays its own small entrance animation rather than popping in instantly,
-   which is what makes the swap read as one object changing shape rather
-   than two states with a cut between them. */
+   the notes store) -- this is only the shell they render into. */
 .dock { position: fixed; right: 20px; bottom: 20px; z-index: 61; }
-.dock-row {
-  display: flex; align-items: center; gap: 8px;
-  background: var(--surface); border: 1px solid var(--hairline-strong);
-  border-radius: 999px; padding: 6px; box-shadow: var(--shadow-pop);
+.dock-fab {
+  width: 56px; height: 56px; border-radius: 50%; padding: 0;
+  display: grid; place-items: center;
+  background: var(--accent); color: var(--accent-ink);
+  box-shadow: var(--shadow-pop);
   animation: dock-pop var(--t-fast);
 }
-.dock-chip {
-  width: 38px; height: 38px; border-radius: 50%; flex: none; padding: 0;
-  display: grid; place-items: center; color: var(--ink); overflow: hidden;
+.dock-fab:hover { background: var(--accent-hover); }
+.dock-fab.is-close { margin-top: 10px; }
+@keyframes dock-pop { from { transform: scale(0.8); opacity: 0; } }
+
+/* The stack: labelled pills growing upward from the FAB, last in the DOM
+   sitting closest to the fixed corner so the box grows up rather than down
+   as tools are added here later. */
+.dock-menu { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.dock-item {
+  display: flex; align-items: center; gap: 10px; padding: 0;
+  animation: dock-item-in 200ms var(--ease) backwards;
 }
-.dock-chip:hover { background: var(--surface-2); }
+.dock-menu .dock-item:nth-child(1) { animation-delay: 40ms; }
+.dock-menu .dock-item:nth-child(2) { animation-delay: 90ms; }
+.dock-menu .dock-item:nth-child(3) { animation-delay: 140ms; }
+@keyframes dock-item-in { from { transform: translateY(10px) scale(0.9); opacity: 0; } }
+.dock-item-label {
+  background: var(--surface); border: 1px solid var(--hairline-strong); color: var(--ink);
+  border-radius: 12px; padding: 9px 16px; font-weight: 600; font-size: var(--text-sm);
+  box-shadow: var(--shadow-pop); white-space: nowrap;
+}
+.dock-item:hover .dock-item-label { border-color: var(--accent-text); color: var(--accent-text); }
+.dock-item-avatar {
+  width: 44px; height: 44px; border-radius: 50%; flex: none; overflow: hidden;
+  display: grid; place-items: center; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--hairline-strong); box-shadow: var(--shadow-pop);
+}
+.dock-item-avatar--focus { background: var(--accent-wash); }
+.dock-item-avatar--note { background: var(--surface-2); }
+.dock-item-avatar--media { background: var(--surface-2); }
 .dock-chip-art { width: 100%; height: 100%; object-fit: cover; }
-.dock-chip-live { display: flex; align-items: center; gap: 5px; font-size: 0.6875rem; font-weight: 700; }
+.dock-chip-live { display: flex; align-items: center; gap: 5px; font-size: 0.625rem; font-weight: 700; }
 .dock-chip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex: none; }
 .dock-chip-live.focus .dock-chip-dot { background: var(--accent-text); animation: pomo-pulse 1.6s var(--ease-loop) infinite; }
 .dock-chip-live.break .dock-chip-dot { background: var(--progress); }
 .dock-chip-live.paused .dock-chip-dot { background: var(--warn); }
 .dock-chip-live.await .dock-chip-dot { background: var(--progress); }
-@keyframes dock-pop { from { transform: scale(0.9); opacity: 0; } }
 
 .dock-face {
   width: min(560px, 92vw); max-height: min(64vh, 640px); min-height: 220px;

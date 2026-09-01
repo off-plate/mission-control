@@ -7776,7 +7776,10 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    reachable checkbox. A tick he can make by hand is a tick he can make by
    mistake, and then the number is worth nothing.
    ========================================================================== */
-.hevy-sync { display: inline-flex; align-items: center; gap: var(--s2); white-space: nowrap; }
+/* In the FOOT, which spans the row and wraps. It was in `actions` once: that
+   is a 34px column sized for a kebab, and a 30px button plus a stamp burst
+   straight out of the panel. Never put anything with words in that column. */
+.hevy-sync { display: inline-flex; align-items: center; gap: var(--s2); min-width: 0; flex-wrap: wrap; }
 .hevy-btn {
   width: 30px; height: 30px; padding: 0; display: grid; place-items: center;
   border-radius: 50%; border: 1px solid var(--hairline-strong);
@@ -7792,7 +7795,8 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    spinner. Stopped entirely under reduced motion, where the word beside it
    already says what is happening. */
 @media (prefers-reduced-motion: reduce) { .hevy-btn.is-spinning svg { animation: none; } }
-.hevy-when { font-size: var(--a-f-chip); color: var(--faint); }
+.hevy-btn { flex: none; }
+.hevy-when { font-size: var(--a-f-chip); color: var(--faint); min-width: 0; overflow-wrap: anywhere; }
 .hevy-when.is-stale { color: var(--warn); }
 .hevy-none { font-size: var(--a-f-chip); color: var(--faint); }
 /* A sealed habit's dots are a record, not a control: no pointer, no hover. */

@@ -1482,7 +1482,7 @@ function HabitsGoalsSwitch({ on }: { on: 'habits' | 'goals' }) {
   )
 }
 
-function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy, progress, partOn, goal, qualify, sealed }: {
+function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy, progress, partOn, goal, qualify, sealed, footLead }: {
   h: HabitDef
   todayIndex: number
   /* Why this habit cannot be ticked by hand at all, on any day. The gym habit
@@ -1490,6 +1490,11 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
      box he could tick by mistake. Correcting a day is a re-sync, because the
      correction has to come from where the truth does. */
   sealed?: string
+  /* An action that belongs to the row rather than to its menu: the Hevy pull.
+     It goes in the FOOT, which spans the row and wraps, and never in `actions`,
+     which is a 34px column sized for a kebab and nothing else. Put there it
+     burst straight out of the panel. */
+  footLead?: React.ReactNode
   /** The workspace, spelled out, when another visible habit has the same name. */
   qualify?: string
   /** "done today" / "paused". It goes in the foot column where words fit; in
@@ -1609,7 +1614,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
             )
           })}
         </div>
-        <div className="habit-foot">{stateTag && <span className={`col-tot mono${stateTag === 'done today' ? ' val-pos' : ''}`}>{stateTag}</span>}
+        <div className="habit-foot">{footLead}{stateTag && <span className={`col-tot mono${stateTag === 'done today' ? ' val-pos' : ''}`}>{stateTag}</span>}
           <span className="habit-weeks">{kept7} of 7 this week</span>
           <button className="habit-auto" onClick={() => setPage('focus')}>Open Focus</button>
         </div>
@@ -1637,7 +1642,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
         <div className="count-bar" aria-hidden="true">
           <span style={{ width: `${Math.min(100, Math.round((have / target) * 100))}%` }} />
         </div>
-        <div className="habit-foot">{stateTag && <span className={`col-tot mono${stateTag === 'done today' ? ' val-pos' : ''}`}>{stateTag}</span>}
+        <div className="habit-foot">{footLead}{stateTag && <span className={`col-tot mono${stateTag === 'done today' ? ' val-pos' : ''}`}>{stateTag}</span>}
           <span className="count-do">
             <button className="btn btn-primary count-add" onClick={() => logCount(h.id, 1)}>
               Did it
@@ -1685,7 +1690,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
             )
           })}
         </div>
-        <div className="habit-foot">{stateTag && <span className={`col-tot mono${stateTag === 'done today' ? ' val-pos' : ''}`}>{stateTag}</span>}
+        <div className="habit-foot">{footLead}{stateTag && <span className={`col-tot mono${stateTag === 'done today' ? ' val-pos' : ''}`}>{stateTag}</span>}
           <button className="habit-auto" onClick={() => setPage('plan')}>Fills itself from your focus blocks</button>
           <span className="habit-weeks">{fmtDuration(weekMin)} this week</span>
         </div>
@@ -1722,7 +1727,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
             ))}
           </div>
         )}
-        <div className="habit-foot">{stateTag && <span className={`col-tot mono${stateTag === 'done today' ? ' val-pos' : ''}`}>{stateTag}</span>}
+        <div className="habit-foot">{footLead}{stateTag && <span className={`col-tot mono${stateTag === 'done today' ? ' val-pos' : ''}`}>{stateTag}</span>}
           <button className="quit-slip" onClick={() => logSlip(h.id)}>I slipped today</button>
           <button className="quit-giveup" onClick={() => setGiveUp(true)}>I wanna give up</button>
           <span className="habit-weeks">
@@ -1850,6 +1855,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
           stack: "Feeding X" was drawn straight on top of "averaging N of 7
           a week", which is the overlapping text he reported. */}
       <div className="habit-foot">
+        {footLead}
         {stateTag
           ? <span className={`col-tot mono${stateTag === 'done today' ? ' val-pos' : ''}`}>{stateTag}</span>
           : progress && progress.total > 1 && progress.done > 0 && progress.done < progress.total
@@ -2371,11 +2377,8 @@ export function HabitsPage() {
             )}
             {(c.folder && shutFolders.has(c.id) ? [] : c.list).map((h) => (
               <div className={`habit-line is-${h.kind ?? 'build'}${h.paused ? ' is-paused' : ''}`} key={h.id}>
-                <HabitRow h={h} todayIndex={todayIndex} days={days} qualify={qualifyOf(h)} drivenBy={drivenBy.get(h.id)} progress={progressFor.get(h.id)} partOn={partFor.get(h.id)} goal={goalOn.get(h.id)} sealed={isHevyHabit(h) ? 'Hevy keeps this one. Press sync to pull it.' : undefined} stateTag={h.paused ? 'paused' : h.days[todayIndex] ? 'done today' : null} actions={
+                <HabitRow h={h} todayIndex={todayIndex} days={days} qualify={qualifyOf(h)} drivenBy={drivenBy.get(h.id)} progress={progressFor.get(h.id)} partOn={partFor.get(h.id)} goal={goalOn.get(h.id)} sealed={isHevyHabit(h) ? 'Hevy keeps this one. Press sync to pull it.' : undefined} footLead={isHevyHabit(h) ? <HevySync /> : undefined} stateTag={h.paused ? 'paused' : h.days[todayIndex] ? 'done today' : null} actions={
                   <>
-                  {/* The gym habit's own sync, on the row it updates rather
-                      than four clicks away in Settings. */}
-                  {isHevyHabit(h) && <HevySync />}
                   <Dropdown label={`Options for ${h.name}`} className="habit-kebab">
                     <button role="menuitem" onClick={() => setEditHabit(h)}>Edit this habit</button>
                     <button role="menuitem" onClick={() => togglePauseHabit(h.id)}>{h.paused ? 'Resume it' : 'Pause it'}</button>

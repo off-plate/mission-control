@@ -768,17 +768,27 @@ body:has(.shell.is-hud) .dock-face { border-radius: var(--a-r-lg); }
   display: flex; align-items: center; gap: 10px; padding: 0;
   animation: dock-item-in 200ms var(--ease) backwards;
 }
-.dock-menu .dock-item:nth-child(1) { animation-delay: 40ms; }
+/* nth-child(1) is the TOP of the stack (Note, first in DOM), not the
+   bottom -- .dock-menu lays out top-to-bottom and the FAB sits below it as
+   a separate sibling, so the LAST child (Focus) is the one actually
+   closest to the FAB. Delay grows from nth-child(1) down to the last
+   child, on his catch (2026-09-03): items were completing top-first, which
+   read as the stack loading downward away from the FAB. He wanted the
+   opposite -- Focus, then Bills, then Note, growing UP out of the FAB it
+   springs from -- so the item closest to the FAB now gets the shortest
+   delay and leads, same direction the closing stagger below already used. */
+.dock-menu .dock-item:nth-child(1) { animation-delay: 140ms; }
 .dock-menu .dock-item:nth-child(2) { animation-delay: 90ms; }
-.dock-menu .dock-item:nth-child(3) { animation-delay: 140ms; }
+.dock-menu .dock-item:nth-child(3) { animation-delay: 40ms; }
 @keyframes dock-item-in { from { transform: translateY(10px) scale(0.9); opacity: 0; } }
 /* Closing plays the same motion in reverse, on his catch: leaving on hover
    used to just snap the whole stack away with nothing running -- a click on
    the X had the identical gap, it just read as intentional. .is-closing
    (set for CLOSE_MS in dock.tsx, both paths funnel through the same
    closeMenu) overrides the entrance rule above with dock-item-out. Reverse
-   stagger too: the item that finished opening last (closest to the FAB,
-   nth-child(1)) is the first thing his eye left, so it leads the collapse. */
+   stagger too: the item closest to the FAB (the last child, Focus) is the
+   first thing his eye left, so it leads the collapse -- already the same
+   direction the opening stagger above was corrected to match. */
 .dock.is-closing .dock-item { animation: dock-item-out 140ms var(--ease) forwards; }
 .dock.is-closing .dock-menu .dock-item:nth-child(1) { animation-delay: 60ms; }
 .dock.is-closing .dock-menu .dock-item:nth-child(2) { animation-delay: 30ms; }

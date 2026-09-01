@@ -673,21 +673,35 @@ main { padding-inline: var(--gutter); }
 
    Each tool still owns its own state and logic in its own file (usePomodoro,
    the notes store) -- this is only the shell they render into. */
-.dock { position: fixed; right: 20px; bottom: 20px; z-index: 61; }
+/* flex + align-items: flex-end is load-bearing, not decoration: .dock has no
+   explicit width, so it shrink-wraps to its widest child -- the FAB alone
+   when closed, the whole label+avatar row once the menu is showing. Without
+   this, a plain block child stays LEFT-aligned inside that box by default,
+   so the 56px FAB visibly jumped left the instant the box widened to fit
+   the menu -- his catch. flex-end keeps every child pinned to the same
+   right edge regardless of how wide the box gets. */
+.dock { position: fixed; right: 20px; bottom: 20px; z-index: 61; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
 .dock-fab {
-  width: 56px; height: 56px; border-radius: 50%; padding: 0;
+  width: 56px; height: 56px; border-radius: 50%; padding: 0; flex: none;
   display: grid; place-items: center;
-  background: var(--accent); color: var(--accent-ink);
+  /* The real accent, by name -- not --accent, which resolves to the muted
+     olive text-safe partner everywhere else in this app and read as "why is
+     the button dark green" on a FAB this size. A FAB is exactly one of the
+     surfaces COLOR.md carves out for literal accent by name (the checkbox
+     tick uses the identical background/color pairing), and --a-accent is
+     the one that already changes with whichever space he's standing in. */
+  background: var(--a-accent); color: var(--a-ink);
   box-shadow: var(--shadow-pop);
-  animation: dock-pop var(--t-fast);
+  transition: transform var(--t-fast);
 }
-.dock-fab:hover { background: var(--accent-hover); }
-.dock-fab.is-close { margin-top: 10px; }
+.dock-fab:hover { background: var(--a-accent-2); }
+.dock-fab:active { transform: scale(0.94); }
 @keyframes dock-pop { from { transform: scale(0.8); opacity: 0; } }
 
-/* The stack: labelled pills growing upward from the FAB, last in the DOM
-   sitting closest to the fixed corner so the box grows up rather than down
-   as tools are added here later. */
+/* The stack: labelled pills growing upward from the FAB. .dock's own gap
+   (above) now supplies the space between the stack and the FAB below it,
+   so the FAB's size and position never change between the closed and open
+   states -- only what's stacked above it does. */
 .dock-menu { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
 .dock-item {
   display: flex; align-items: center; gap: 10px; padding: 0;

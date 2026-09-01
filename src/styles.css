@@ -7595,24 +7595,39 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    it does not get a special case on Bills. It's an absolutely positioned
    overlay that lands right at the top of the content column
    (.topstick > .nav in styles.css), which is exactly where this header's
-   own cycle arrows and End cycle button sit, so this header needs a real
-   stacking position above it. Beating the row's own z-index (30) is not
-   enough: .nav's z-index is scoped to the stacking context .topstick
-   creates (z-index: 50), so .nav can never outrank anything above
-   .topstick's OWN rank at the root context no matter what its local
-   z-index says. This has to beat 50, not 30 -- confirmed by hit-testing
-   the actual cascade in a real browser, not by reasoning about it. */
-.bills-head { display: flex; align-items: flex-start; justify-content: space-between; padding: 4px 0 18px; position: relative; z-index: 51; }
+   own cycle arrows and End cycle button sit.
+
+   Round 1 of this fix put position: relative; z-index: 51 on .bills-head
+   itself, the whole flex row. That elevated the row's ENTIRE bounding
+   box -- .bills-head is `display: flex; justify-content: space-between`,
+   so its box spans the full content width, including the empty space
+   between the cycle title and End cycle where the nav row's own tabs
+   (Plan, Habits & Goals, ...) land when it opens. Nothing painted there on
+   Bills' side, so the tabs stayed visible -- painted by .nav, one z-index
+   below -- but an invisible, unpainted, z:51 box now sat on top of them
+   app-wide, silently eating every click meant for a tab, and the visible
+   title text ITSELF sat in that same elevated box, so it painted over the
+   open row's pill instead of the reverse. Two different-looking bugs,
+   the exact same cause.
+
+   The fix is to elevate only the two actual controls (the arrow buttons,
+   the End cycle button), not the row that contains them and the empty
+   space around them. Confirmed by hit-testing the real cascade again: with
+   only these two elevated, forcing the nav open and clicking a tab in the
+   middle of the header band now reaches the tab, and the title is free to
+   sit behind the open row exactly like every other page's title does. */
+.bills-head { display: flex; align-items: flex-start; justify-content: space-between; padding: 4px 0 18px; }
 .bills-cyc { display: flex; align-items: center; gap: 10px; }
 .bills-iconbtn {
   width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
   color: var(--ink-2); background: none; border: none; font-size: 16px; cursor: pointer;
+  position: relative; z-index: 51;
 }
 .bills-iconbtn:hover { background: var(--bg-subtle); }
 .bills-head h1 { font: 800 20px var(--font-display); letter-spacing: -0.01em; margin: 0; }
 .bills-range { font-size: 12px; color: var(--ink-3); margin-top: 3px; }
 .bills-today { font: 600 13px var(--font-body); color: var(--accent); background: none; border: none; cursor: pointer; }
-.bills-endcycle { border: 1px solid var(--border); border-radius: 999px; padding: 8px 16px; font: 600 13px var(--font-body); color: var(--ink); background: none; cursor: pointer; }
+.bills-endcycle { border: 1px solid var(--border); border-radius: 999px; padding: 8px 16px; font: 600 13px var(--font-body); color: var(--ink); background: none; cursor: pointer; position: relative; z-index: 51; }
 
 .bills-hero {
   border-radius: 34px; background: linear-gradient(to bottom right, var(--highlight-subtle), var(--surface), var(--accent-subtle) 150%); /* slop-lint-ignore gradient-hero */

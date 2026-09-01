@@ -894,17 +894,17 @@ export function PlanPage() {
         actions={<button className="btn btn-ghost" onClick={() => openDay(prevDay())}>Yesterday</button>}
       />
       {/* THE WEEK. Moved above the to-do list and day panel on his instruction
-          (2026-08-31, from his own mockup): folded to one bar by default, the
-          week is context for the day he's about to plan, not the first thing
-          the page shows in full. */}
+          (2026-08-31, from his own mockup): folded to one bar by default,
+          giving context for the day he's about to plan without taking over
+          the page in full. */}
       <div className={`panel weekplan${weekOpen ? ' is-open' : ''}`}>
         {/* The whole bar opens AND closes it -- one handler, both directions.
             The nav row (This week / prev) stops its own clicks from reaching
             this so paging a week doesn't also fold the thing shut. */}
-        {/* A div, not a button: it holds real <button> nav controls inside it,
-            and a button cannot nest inside a button -- the browser would just
-            close the outer one early and break the layout. role+tabIndex give
-            it the same keyboard reach a button would have. */}
+        {/* A div carrying role="button": it holds real <button> nav controls
+            inside it, and a button cannot nest inside a button -- the browser
+            would just close the outer one early and break the layout.
+            role+tabIndex give it the same keyboard reach a button would have. */}
         <div
           className="weekplan-bar"
           role="button"

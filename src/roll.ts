@@ -98,8 +98,8 @@ export function roll<T extends Rollable>(p: T, now = new Date()): T {
      which already carries its date. */
   /* Tallied BEFORE the sweep below clears plannedOn, because that is the last
      moment a leftover task still says which day it belonged to. One entry per
-     distinct day being sealed, not just "yesterday": a multi-day gap seals
-     several days in this single pass, same as the habit walk above. */
+     distinct day being sealed -- a multi-day gap seals several days in this
+     single pass, same as the habit walk above. */
   const dayTally = new Map<string, { planned: number; done: number }>()
   for (const t of p.tasks ?? []) {
     if (t.list !== 'today') continue

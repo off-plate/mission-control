@@ -13,7 +13,7 @@
    financial data on a shared production database. */
 import { useEffect, useMemo, useState } from 'react'
 import { Sheet } from './modals'
-import { Segmented } from './ui'
+import { Band, Segmented } from './ui'
 import {
   currentAccount, deleteRow, insertRow, onAccountChange, readRows, sendSignInCode, signInWithCode,
   updateRow, upsertCompassProfile, SUPABASE_ENABLED,
@@ -189,11 +189,20 @@ export function BillsPage() {
   return (
     <div className="page bills-page">
       <div className="bills-wrap">
+        {/* Every other page names itself here with Band -- Today, Plan,
+            Habits, Goals, Settings. Bills never had one: the cycle-nav row
+            below was standing in for it, but that row had to move down
+            (see .bills-wrap's padding history) to clear the nav overlay,
+            which left the space where a page's name normally sits empty.
+            Band supplies its own top clearance, so .bills-wrap's own
+            padding-top comes back down to nothing here -- Band plus the
+            cycle row's own spacing is what clears the overlay now. */}
+        <Band title="Bills" />
         <div className="bills-head">
           <div className="bills-cyc">
             <button className="bills-iconbtn" onClick={() => setCycleOffset((n) => n - 1)} aria-label="Previous cycle">‹</button>
             <div>
-              <h1>{cycleTitle}</h1>
+              <h2>{cycleTitle}</h2>
               <div className="bills-range">{cycle.label}</div>
             </div>
             <button className="bills-iconbtn" onClick={() => setCycleOffset((n) => n + 1)} aria-label="Next cycle">›</button>
@@ -265,9 +274,6 @@ export function BillsPage() {
             <div className="bd-pct">{Math.round(freedom.pct * 100)}% free · {money(freedom.paid)} paid</div>
           </div>
           <div className="bd-bar"><i style={{ width: `${Math.max(2, Math.round(freedom.pct * 100))}%` }} /></div>
-          {freeView.stalled.length > 0 && (
-            <div className="bd-warn">{freeView.stalled.map((d) => d.name).join(', ')} — raise the payment to clear it, the current amount doesn't cover interest.</div>
-          )}
           {nextRelief && (
             <div className="bd-tip">{nextRelief.debtName} clears {nextRelief.date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}, freeing {money(nextRelief.freed)}/mo.</div>
           )}

@@ -1050,10 +1050,18 @@ await step('habits: a routine is a folder, and its habits tick on their own', as
      the routine, the rows are its habits, and a habit is his to tick. */
   await fresh('habits')
   await page.locator('.space-btn', { hasText: 'All' }).click(); await page.waitForTimeout(500)
-  const heads = await page.locator('.folder-head').allInnerTexts()
-  if (heads.length < 3) throw new Error(`${heads.length} folders on Habits, expected the routines to be folders`)
-  const wake = page.locator('.habit-section').filter({ has: page.locator('.folder-name', { hasText: 'After wake up' }) }).first()
-  if (!(await wake.count())) throw new Error(`no "After wake up" folder, heads were: ${heads.join(' | ')}`)
+  /* The folder is a routine CARD now (2026-08-26, proposal C): Start is its
+     primary action and the steps sit behind a disclosure. Same model, and the
+     assertion below is the same one, so a step must still be his to tick. */
+  const heads = await page.locator('.rtc-name').allInnerTexts()
+  if (heads.length < 3) throw new Error(`${heads.length} routine cards on Habits, expected the routines to be cards`)
+  const wake = page.locator('.rtc').filter({ has: page.locator('.rtc-name', { hasText: 'After wake up' }) }).first()
+  if (!(await wake.count())) throw new Error(`no "After wake up" card, names were: ${heads.join(' | ')}`)
+  if (!(await wake.locator('.rtc-start').count())) throw new Error('the card cannot be run')
+  /* Open it: shut by default is the whole point of the card. */
+  if (!(await wake.locator('.habit-line').count())) {
+    await wake.locator('.rtc-open').click(); await page.waitForTimeout(400)
+  }
   // Its steps are habits inside it, in the order he wrote them.
   const inside = await wake.locator('.habit-name').allInnerTexts()
   if (inside.length < 2) throw new Error(`the folder holds ${inside.length} habits`)
@@ -1078,9 +1086,10 @@ await step('habits: the folder counts only what it still needs', async () => {
      hold it open, or a folder with one optional in it could never read full. */
   await fresh('habits')
   await page.locator('.space-btn', { hasText: 'All' }).click(); await page.waitForTimeout(500)
-  const head = await page.locator('.folder-head').first().innerText()
-  const m = head.replace(/\s+/g, ' ').match(/(\d+)\/(\d+)\s*$/)
-  if (!m) throw new Error(`a folder head shows no count: "${head.replace(/\n/g, ' ')}"`)
+  /* The count lives on the routine card now and reads "N of M". */
+  const head = await page.locator('.rtc').first().locator('.rtc-count').innerText()
+  const m = head.replace(/\s+/g, ' ').match(/(\d+)\s*of\s*(\d+)/)
+  if (!m) throw new Error(`a routine card shows no count: "${head.replace(/\n/g, ' ')}"`)
   const [, done, total] = m.map(Number)
   if (!(total > 0)) throw new Error(`folder total is ${total}`)
   if (done > total) throw new Error(`folder reads ${done}/${total}`)
@@ -1614,13 +1623,12 @@ await step('calendar: in every workspace, and it never pretends the day is empty
   await page.waitForTimeout(400)
 })
 
-await step('habits: a quitting row keeps its slip button off the day dots', async () => {
-  /* Every row's foot (trend/note/quit-slip) now drops under the name at every
-     panel width, on his instruction (2026-08-27): it used to sit beside the
-     day dots only above ~1240px, so "off the day dots" meant horizontal
-     clearance from that column. Now foot is always its own row below days,
-     so the check is vertical: the slip button must not sit above the bottom
-     of the days row, and it still has to land at the same x on every row. */
+await step('habits: a quitting habit has no day dots at all, only a count and a slip', async () => {
+  /* This used to check that the slip button cleared the day dots, because a
+     quit row was a build row with a button bolted under it. It is a CARD now
+     (2026-08-26): the win is absence, so there is nothing to tick and the
+     stronger assertion is that no tickable dot exists on it at all. A row of
+     empty circles told him he was failing on the days he was succeeding. */
   await fresh('habits')
   await page.evaluate((K) => {
     const s = JSON.parse(localStorage.getItem(K))
@@ -1629,18 +1637,26 @@ await step('habits: a quitting row keeps its slip button off the day dots', asyn
     s.slips = [{ habitId: 'q1', day: '2026-07-30' }]
     localStorage.setItem(K, JSON.stringify(s))
   }, KEY)
-  await page.reload(); await page.waitForTimeout(800)
-  const rows = await page.evaluate(() => [...document.querySelectorAll('.habit-row')]
-    .filter((r) => r.querySelector('.quit-slip'))
-    .map((r) => {
-      const b = r.querySelector('.quit-slip').getBoundingClientRect()
-      const d = r.querySelector('.habit-days')?.getBoundingClientRect()
-      return { left: Math.round(b.left), clear: d ? Math.round(b.top - d.bottom) : 99 }
-    }))
-  if (rows.length < 3) throw new Error(`only ${rows.length} quitting rows rendered`)
-  const off = rows.find((r) => r.clear < 0)
-  if (off) throw new Error(`the slip button sits ${-off.clear}px over the day dots`)
-  if (new Set(rows.map((r) => r.left)).size !== 1) throw new Error(`the buttons do not line up: ${rows.map((r) => r.left).join(', ')}`)
+  await page.reload(); await page.waitForTimeout(900)
+  const cards = await page.evaluate(() => [...document.querySelectorAll('.hg-quit')].map((c) => {
+    const slip = [...c.querySelectorAll('button')].find((b) => /slipped/i.test(b.textContent))
+    return {
+      name: (c.querySelector('.hg-quit-name')?.textContent ?? '').trim(),
+      days: Number((c.querySelector('.hg-quit-n')?.textContent ?? '').trim()),
+      dots: c.querySelectorAll('.daydot').length,
+      slipLeft: slip ? Math.round(slip.getBoundingClientRect().left) : null,
+    }
+  }))
+  if (cards.length < 3) throw new Error(`only ${cards.length} quitting cards rendered`)
+  const tickable = cards.find((c) => c.dots > 0)
+  if (tickable) throw new Error(`"${tickable.name}" still offers ${tickable.dots} dots to tick`)
+  const noSlip = cards.find((c) => c.slipLeft === null)
+  if (noSlip) throw new Error(`"${noSlip.name}" has no slip button`)
+  /* Every quit says how long it has been true. Smoking was quit in April, so
+     it must read in the hundreds and never zero. */
+  const smoking = cards.find((c) => c.name === 'Smoking')
+  if (!smoking || !(smoking.days > 100)) throw new Error(`Smoking reads ${smoking ? smoking.days : 'nothing'} clean days`)
+  if (new Set(cards.map((c) => c.slipLeft)).size !== 1) throw new Error(`the slip buttons do not line up: ${cards.map((c) => c.slipLeft).join(', ')}`)
 })
 
 await step('daily review: offered once, fixes yesterday, and stays shut', async () => {

@@ -240,47 +240,55 @@ export function BillsPage() {
           <div className="bills-foot">Check items off as you pay them, or cross them to skip. Totals update live.</div>
         </div>
 
-        <BillsSection title="Income" onAdd={() => setEditIncome('new')}>
-          {groups.income.length === 0 ? (
-            <p className="bills-emptyrow">Income varies month to month, so set what you actually earn each cycle. Add each source (salary, side gig) as its own entry.</p>
-          ) : groups.income.map((ci) => (
-            <button key={ci.id} className="bills-irow" onClick={() => setEditIncome(ci)}>
-              <span className="bi-circle">↙</span>
-              <span className="bi-name">{ci.label || 'Income'}<span className="bi-sub">this cycle</span></span>
-              <span className="bi-amt">{money(ci.expected_income)}</span>
-              <span className="bi-pencil">✎</span>
-            </button>
-          ))}
-        </BillsSection>
+        {/* His correction: this app already pairs things up two-across on a
+            normal desktop (Today, Plan, Habits all do), and a real bills page
+            with a dozen-plus rows read as one very long strip instead of
+            using that width. Paired by what actually goes together: the two
+            simpler ledgers, then the two checklists, Unreasonable full width
+            since there's nothing left to pair it with evenly. */}
+        <div className="bills-grid2">
+          <BillsSection title="Income" onAdd={() => setEditIncome('new')}>
+            {groups.income.length === 0 ? (
+              <p className="bills-emptyrow">Income varies month to month, so set what you actually earn each cycle. Add each source (salary, side gig) as its own entry.</p>
+            ) : groups.income.map((ci) => (
+              <button key={ci.id} className="bills-irow" onClick={() => setEditIncome(ci)}>
+                <span className="bi-circle">↙</span>
+                <span className="bi-name">{ci.label || 'Income'}<span className="bi-sub">this cycle</span></span>
+                <span className="bi-amt">{money(ci.expected_income)}</span>
+                <span className="bi-pencil">✎</span>
+              </button>
+            ))}
+          </BillsSection>
 
-        <BillsSection title="Recurring bills" sub={groups.recurring.length ? `${money(free.recurringOut)} left` : undefined} onAdd={() => setEditRecurring('new')}>
-          {groups.recurring.length === 0 ? (
-            <p className="bills-emptyrow">No recurring bills yet. Tap "Bill" up top to add rent, subscriptions and anything you pay every month.</p>
-          ) : groups.recurring.map((i) => (
-            <PayableRow key={i.id} item={i} skipped={skips.includes(i.id)} busy={busy}
-              onPay={() => markPaid(i)} onUndo={() => undoPaid(i)} onSkip={() => toggleSkip(i.id)}
-              onEdit={() => { const r = data.recurring.find((x) => x.id === i.link.recurring_id); if (r) setEditRecurring(r) }} />
-          ))}
-        </BillsSection>
+          <BillsSection title="Debt payments" sub={groups.debt.length ? `${money(free.debtOut)} left` : undefined}>
+            {groups.debt.length === 0 ? (
+              <p className="bills-emptyrow">No debt payments due this cycle. Manage your debts' amounts and rates from Compass directly for now.</p>
+            ) : groups.debt.map((i) => (
+              <PayableRow key={i.id} item={i} skipped={skips.includes(i.id)} busy={busy}
+                onPay={() => markPaid(i)} onUndo={() => undoPaid(i)} onSkip={() => toggleSkip(i.id)} onEdit={() => {}} noEdit />
+            ))}
+          </BillsSection>
 
-        <BillsSection title="Debt payments" sub={groups.debt.length ? `${money(free.debtOut)} left` : undefined}>
-          {groups.debt.length === 0 ? (
-            <p className="bills-emptyrow">No debt payments due this cycle. Manage your debts' amounts and rates from Compass directly for now.</p>
-          ) : groups.debt.map((i) => (
-            <PayableRow key={i.id} item={i} skipped={skips.includes(i.id)} busy={busy}
-              onPay={() => markPaid(i)} onUndo={() => undoPaid(i)} onSkip={() => toggleSkip(i.id)} onEdit={() => {}} noEdit />
-          ))}
-        </BillsSection>
+          <BillsSection title="Recurring bills" sub={groups.recurring.length ? `${money(free.recurringOut)} left` : undefined} onAdd={() => setEditRecurring('new')}>
+            {groups.recurring.length === 0 ? (
+              <p className="bills-emptyrow">No recurring bills yet. Tap "Bill" up top to add rent, subscriptions and anything you pay every month.</p>
+            ) : groups.recurring.map((i) => (
+              <PayableRow key={i.id} item={i} skipped={skips.includes(i.id)} busy={busy}
+                onPay={() => markPaid(i)} onUndo={() => undoPaid(i)} onSkip={() => toggleSkip(i.id)}
+                onEdit={() => { const r = data.recurring.find((x) => x.id === i.link.recurring_id); if (r) setEditRecurring(r) }} />
+            ))}
+          </BillsSection>
 
-        <BillsSection title="Unexpected this cycle" sub={groups.unexpected.length ? `${money(free.unexpectedOut)} left` : undefined} onAdd={() => setEditPlanned('new')}>
-          {groups.unexpected.length === 0 ? (
-            <p className="bills-emptyrow">One-off payments you know are coming this cycle (a repair, a gift, an annual fee). Add one and check it off when paid.</p>
-          ) : groups.unexpected.map((i) => (
-            <PayableRow key={i.id} item={i} skipped={skips.includes(i.id)} busy={busy}
-              onPay={() => markPaid(i)} onUndo={() => undoPaid(i)} onSkip={() => toggleSkip(i.id)}
-              onEdit={() => { const p = data.planned.find((x) => x.id === i.link.planned_id); if (p) setEditPlanned(p) }} />
-          ))}
-        </BillsSection>
+          <BillsSection title="Unexpected this cycle" sub={groups.unexpected.length ? `${money(free.unexpectedOut)} left` : undefined} onAdd={() => setEditPlanned('new')}>
+            {groups.unexpected.length === 0 ? (
+              <p className="bills-emptyrow">One-off payments you know are coming this cycle (a repair, a gift, an annual fee). Add one and check it off when paid.</p>
+            ) : groups.unexpected.map((i) => (
+              <PayableRow key={i.id} item={i} skipped={skips.includes(i.id)} busy={busy}
+                onPay={() => markPaid(i)} onUndo={() => undoPaid(i)} onSkip={() => toggleSkip(i.id)}
+                onEdit={() => { const p = data.planned.find((x) => x.id === i.link.planned_id); if (p) setEditPlanned(p) }} />
+            ))}
+          </BillsSection>
+        </div>
 
         <BillsSection title="Unreasonable" sub={groups.unreasonable.length ? `${money(free.unreasonableOut)} left` : undefined} onAdd={() => setEditUnreasonable('new')}>
           {groups.unreasonable.length === 0 ? (

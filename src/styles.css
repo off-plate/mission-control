@@ -7770,3 +7770,47 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .folder-bar { display: flex; align-items: center; gap: var(--s3); }
 .folder-bar .col-head { flex: 1 1 auto; margin-bottom: 0; min-width: 0; }
 .folder-start { flex: none; white-space: nowrap; }
+
+/* ==========================================================================
+   THE HEVY PULL, ON THE HABIT IT FILLS
+   ==========================================================================
+   His instruction, 2026-08-26: kill the once-a-day sync, which only fired if
+   the app happened to be open inside one hour, and put a button on the habit.
+   And: "I shouldn't be able to click them", so the gym row has a sync and no
+   reachable checkbox. A tick he can make by hand is a tick he can make by
+   mistake, and then the number is worth nothing.
+   ========================================================================== */
+.hevy-sync { display: inline-flex; align-items: center; gap: var(--s2); white-space: nowrap; }
+.hevy-btn {
+  width: 30px; height: 30px; padding: 0; display: grid; place-items: center;
+  border-radius: 50%; border: 1px solid var(--hairline-strong);
+  background: none; color: var(--muted); cursor: pointer;
+  transition: color var(--a-enter), border-color var(--a-enter);
+}
+.hevy-btn:hover:not(:disabled) { color: var(--ink); border-color: var(--ink); }
+.hevy-btn:disabled { cursor: progress; }
+.hevy-btn.is-spinning svg { animation: hevy-spin 900ms linear infinite; }
+@keyframes hevy-spin { to { transform: rotate(360deg); } }
+/* One exception to the app's motion rules, and it earns it: a spinner has to
+   be linear or it reads as stuttering, and it has to loop or it is not a
+   spinner. Stopped entirely under reduced motion, where the word beside it
+   already says what is happening. */
+@media (prefers-reduced-motion: reduce) { .hevy-btn.is-spinning svg { animation: none; } }
+.hevy-when { font-size: var(--a-f-chip); color: var(--faint); }
+.hevy-when.is-stale { color: var(--warn); }
+.hevy-none { font-size: var(--a-f-chip); color: var(--faint); }
+/* A sealed habit's dots are a record, not a control: no pointer, no hover. */
+.daydot:disabled { cursor: default; }
+
+/* One page, two faces. The same pill language as the workspace switcher and
+   the menu, one size down, because this is a switch INSIDE a page and must
+   not compete with the row of pages above it. */
+.hg-switch { display: inline-flex; background: var(--a-sunk); border-radius: 999px; padding: 4px; gap: 3px; }
+.hg-pill {
+  font: inherit; font-size: var(--a-f-chip); font-weight: 700;
+  border: 0; background: none; color: var(--a-muted); cursor: pointer;
+  padding: 7px 15px; min-height: 34px; border-radius: 999px;
+  transition: background var(--a-enter), color var(--a-enter);
+}
+.hg-pill:hover { background: var(--a-accent-wash); color: var(--a-accent-text); }
+.hg-pill.is-on { background: var(--a-accent); color: var(--a-ink); font-weight: 800; }

@@ -188,7 +188,7 @@ await step('focus: timer start writes state', async () => {
   if (p.phase !== 'focus') throw new Error(`phase ${p.phase}`)
   await page.locator('.focus-live').getByRole('button', { name: 'Stop' }).click()
 })
-await step('the menu is seven tabs, and what left it is reachable from the header', async () => {
+await step('the menu is six tabs, and what left it is reachable from the header', async () => {
   /* Five since Routines became a folder inside Habits (his instruction,
      2026-08-11); six since Apps joined after Why's (2026-08-23); seven since
      the Assistant got a page of its own (2026-08-25). Then, all the same day
@@ -202,11 +202,16 @@ await step('the menu is seven tabs, and what left it is reachable from the heade
      since Timeline arrived (2026-08-27), which measures the habit log above
      a now line and carries the same rate forward below it. The retired
      addresses still have to resolve, which is asserted below with the other
-     retired ones. */
+     retired ones. SIX since Habits and Goals became one tab (2026-08-26): a
+     goal here is mostly a reflection over a habit, so the two switch inside
+     the page on a pill pair instead of being two destinations. #/goals still
+     resolves and lands on the Goals face, asserted with the retired ones. */
   await fresh('today')
   const tabs = await page.locator('.nav-tab').allInnerTexts()
-  if (tabs.length !== 7) throw new Error(`${tabs.length} tabs: ${tabs.join(', ')}`)
+  if (tabs.length !== 6) throw new Error(`${tabs.length} tabs: ${tabs.join(', ')}`)
   if (tabs.some((t) => /apps/i.test(t))) throw new Error('Apps is still a tab')
+  if (!tabs.some((t) => /habits & goals/i.test(t))) throw new Error(`no merged tab: ${tabs.join(', ')}`)
+  if (tabs.filter((t) => /goals/i.test(t)).length !== 1) throw new Error('Goals is still a tab of its own')
   if (tabs.some((t) => /routines/i.test(t))) throw new Error('Routines is still a tab')
   /* Calendar IS in this list now, in Personal like everywhere else. The
      calendar test below owns that rule. */

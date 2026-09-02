@@ -14,6 +14,14 @@ any of them (the apps grid is a placeholder for one that likely exists in the
 Hicon set but wasn't reachable when it was added -- see the comment in
 `icons.tsx`).
 
+Four more -- `DockNote`, `DockWallet`, `DockHistory`, `DockChartBar`, used only
+in the floating dock (Note, Bills, Timeline and Focus) -- come from
+**Tabler Icons** by Paweł Kuna, obtained from
+[github.com/tabler/tabler-icons](https://github.com/tabler/tabler-icons) and
+released under the **MIT Licence**, on his instruction (2026-09-04) after
+svgrepo blocked automated access. See the comment above them in `icons.tsx`
+for why this file otherwise draws from exactly one set.
+
 The Iron Man helmet in `src/helmet.tsx` and the Mission Control logo mark in
 `src/App.tsx` are ours and are not part of any icon set.
 
@@ -38,3 +46,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+The MIT Licence above (Hicon's own text) is byte-identical to Tabler's, aside
+from the copyright holder's name -- one licence block covers both sets.
+Tabler's own copyright line: `Copyright (c) 2020-2026 Paweł Kuna`.

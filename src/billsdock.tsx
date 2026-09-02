@@ -33,7 +33,7 @@ const LAST_KEY = 'mc-billsdock-last'
 interface CachedSummary { cycleLabel: string; income: number; free: CycleFree }
 
 export function BillsChip() {
-  return <Icon.Wallet size={22} />
+  return <Icon.DockWallet size={22} />
 }
 
 /* His catch (2026-09-03): the panel showed nothing at all -- a blank white

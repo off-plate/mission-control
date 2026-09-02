@@ -212,26 +212,19 @@ export function Dock() {
 
      Icons sized up across the row (2026-09-04): the chip circles are 56px
      and were carrying a 16-18px glyph, a lot of empty ring around not much
-     ink. His ask was also for genuinely DIFFERENT, better icons via
-     svgrepo -- couldn't do that part. svgrepo blocked every automated
-     fetch (collection pages, the author page, individual icon pages, all
-     429) while unrelated sites answered fine, so it reads as deliberate
-     bot protection, not a fluke worth retrying. Icons.tsx's own header is
-     also explicit that this file draws from exactly one source (Hicon
-     Circular Interface Icons) on purpose -- "two exports that do the same
-     job... is how a set stops being a set" -- so pulling in a different
-     family to route around the block was the wrong fix even if it had
-     worked. The two already-in-file icons that would have fit Timeline
-     better (Hourglass, Clock) are both already spoken for elsewhere for a
-     different meaning (a task's time estimate; the focus timer), so
-     swapping either in here would have created the exact "one icon, two
-     jobs" confusion that rule exists to prevent. Real icon research still
-     needs svgrepo actually reachable -- next move there is his call. */
+     ink -- now 22px (17px for the switch icons, inside the smaller open-
+     panel header). Note, Bills and Timeline's chips (and Focus's avatar
+     below) also moved to DockNote/DockWallet/DockHistory/DockChartBar --
+     see icons.tsx for why those four are a deliberate, scoped exception to
+     this file's one-icon-set rule: svgrepo blocked every automated request
+     that round, confirmed twice, and his answer once told was "any other
+     library... doesn't matter". Tabler (MIT), fetched straight from its
+     own repo rather than routed through svgrepo. */
   const panels: { id: PanelFace; label: string; chip: React.ReactNode; switchIcon: React.ReactNode }[] = [
     ...(mo.started ? [{ id: 'media' as const, label: 'Player', chip: <MediaChip />, switchIcon: <Icon.Waveform size={17} /> }] : []),
-    { id: 'note' as const, label: 'Note', chip: <NoteChip />, switchIcon: <Icon.Note size={17} /> },
-    { id: 'bills' as const, label: 'Bills', chip: <BillsChip />, switchIcon: <Icon.Wallet size={17} /> },
-    { id: 'timeline' as const, label: 'Timeline', chip: <TimelineChip />, switchIcon: <Icon.Rewind size={17} /> },
+    { id: 'note' as const, label: 'Note', chip: <NoteChip />, switchIcon: <Icon.DockNote size={17} /> },
+    { id: 'bills' as const, label: 'Bills', chip: <BillsChip />, switchIcon: <Icon.DockWallet size={17} /> },
+    { id: 'timeline' as const, label: 'Timeline', chip: <TimelineChip />, switchIcon: <Icon.DockHistory size={17} /> },
   ]
 
   if (mode === 'closed' || mode === 'menu') {
@@ -290,7 +283,7 @@ export function Dock() {
                 <PomodoroInline />
               </span>
               <button className="dock-item-avatar dock-item-avatar--focus" onClick={() => setPage('focus')} aria-label="Open the focus history" title="Open Focus">
-                <Icon.BarChart size={22} />
+                <Icon.DockChartBar size={22} />
               </button>
             </div>
           </div>

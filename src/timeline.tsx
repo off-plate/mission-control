@@ -866,63 +866,96 @@ export interface Domain { label: string; value: string; line: string; rows?: str
 
 function pushDomains(days: number, f: Future, c: NarrativeCtx): Domain[] {
   const t = tierOf(days)
-  const debts = c.money && c.money.openDebts > 0
-  const finances: [string, string][] = [
-    ['Tracked', "You know exactly where it's going."],
-    ['First payment', 'Made on purpose, not out of guilt.'],
-    [debts ? `${c.money!.openDebts} debts, moving` : 'Moving', "The number's actually shrinking now."],
-    ['Real progress', 'Payments that actually landed, on schedule.'],
-    ['Known, on purpose', "You could say the real number out loud."],
-    [debts ? 'Close to zero' : 'Clear', 'Or close enough to see the bottom of it.'],
-  ]
-  const body: [string, string][] = [
-    ['Moving', 'Nothing dramatic. Just started.'],
-    ['Down, slightly', "The number's finally going the other way."],
-    ['Visibly different', "Sleep's easier. So is everything else."],
-    ['Real change', 'The mirror actually shows it now.'],
-    ['A new baseline', 'This is just what your body does now.'],
-    ['Unrecognizable', 'From the guy who opened this screen the first time.'],
-  ]
-  const work: [string, string][] = [
-    [`${Math.round(f.tasks)} done`, 'Real ones, off the real list.'],
-    [hm(f.focusMin), 'Actual focus. Phone lost.'],
-    [`${f.chain} days`, "Deep. The pile's finally shrinking."],
-    [`${Math.round(f.focusMin / 60)}h`, 'Spent on your own thing, on purpose.'],
-    [`${f.chain} days`, "A chain a year long doesn't happen by accident."],
-    [`${f.chain} days`, "Not because every day was easy. Because a bad one stopped meaning two."],
-  ]
-  const discipline: [string, string][] = [
-    [`${Math.round(f.momentum)}`, 'Climbing. You can feel it starting.'],
-    [`${Math.round(f.momentum)}`, "You don't get this from one good week."],
-    [`${Math.round(f.momentum)}`, 'This is what showing up looks like as a number.'],
-    [`${Math.round(f.momentum)}`, 'Six months of proof, not promises.'],
-    [`${Math.round(f.momentum)}`, 'A year of keeping your own word.'],
-    [`${Math.round(f.momentum)} / 100`, "The version of you that doesn't need convincing anymore."],
-  ]
-  const freedom: [string, string][] = [
-    ['Open', 'Still fully yours to build.'],
-    ['Widening', 'One less thing owns your attention.'],
-    ['Real options', "Choices that weren't there three months ago."],
-    ['Room to move', 'Half a year of not being stuck.'],
-    ['Actual freedom', 'A year of decisions nobody forced.'],
-    ['Yours', "Nobody's schedule, nobody's debt, nobody's permission."],
-  ]
-  const relationships: [string, string][] = [
-    ['Present', "You showed up. That's the whole thing this week."],
-    ['More there', 'People notice before you say anything.'],
-    ['Trusted', "Your word's starting to mean something again."],
-    ['Closer', 'Half a year of actually being present.'],
-    ['Solid', 'A year of showing up instead of explaining why you didn’t.'],
-    ['Real', 'Built on actions they watched, not promises they heard.'],
-  ]
-  const i = t - 1
+
+  const finances: Omit<Domain, 'label'> = [
+    { value: '€0 so far', line: 'Nothing banked yet. This week starts the habit.' },
+    {
+      value: '€300–€1,000',
+      rows: ['€300/mo saved', '€500/mo saved', '€1,000/mo saved'],
+      line: 'Actually set aside. Not spent, not guessed at.',
+    },
+    {
+      value: '€900–€3,000',
+      rows: ['3mo @ €300/mo: €900', '3mo @ €500/mo: €1,500', '3mo @ €1,000/mo: €3,000'],
+      line: 'Real money, actually moved into savings.',
+    },
+    {
+      value: '€1,800–€6,000',
+      rows: ['6mo @ €300/mo: €1,800', '6mo @ €500/mo: €3,000', '6mo @ €1,000/mo: €6,000'],
+      line: 'Compounding. The other direction now.',
+    },
+    {
+      value: '€3,600–€12,000',
+      rows: ['€300/mo = €3,600/yr', '€500/mo = €6,000/yr', '€1,000/mo = €12,000/yr'],
+      line: 'A year of actually paying yourself first.',
+    },
+    {
+      value: '€10,800 → €120,000+',
+      rows: ['3yr @ €300–1,000/mo: €10,800–€36,000', '10yr, direct only: €36,000–€120,000', '20yr @ €500/mo: €120,000, before growth'],
+      line: 'The exact same math. Running the other way.',
+    },
+  ][t - 1]
+
+  const body: Omit<Domain, 'label'> = [
+    { value: '~89kg', line: 'Down a kilo. That’s what week one actually looks like.' },
+    { value: '86–87kg', line: 'Down 3–4kg. Real, not water-weight hope.' },
+    { value: '81–83kg', line: 'Down 7–9kg. Clothes fit different.' },
+    { value: '74–77kg', line: 'Down 13–16kg. Conditioning, not just the scale.' },
+    { value: '68–72kg', line: 'Down 18–22kg. A year of actually showing up.' },
+    { value: '~68kg, holding', line: 'Not still dropping. Just what your body is now.' },
+  ][t - 1]
+
+  const work: Omit<Domain, 'label'> = [
+    { value: `${Math.round(f.tasks)} done`, line: 'Real ones, off the real list.' },
+    { value: hm(f.focusMin), line: 'Actual focus. Phone lost.' },
+    { value: `${f.chain} days`, line: "Deep. The pile's finally shrinking." },
+    { value: `${Math.round(f.focusMin / 60)}h`, line: 'Spent on your own thing, on purpose.' },
+    { value: `${f.chain} days`, line: "A chain a year long doesn't happen by accident." },
+    { value: `${f.chain} days`, line: "Not because every day was easy. Because a bad one stopped meaning two." },
+  ][t - 1]
+
+  const discipline: Omit<Domain, 'label'> = [
+    { value: `${Math.round(f.momentum)}`, line: 'Climbing. You can feel it starting.' },
+    { value: `${Math.round(f.momentum)}`, line: "You don't get this from one good week." },
+    { value: `${Math.round(f.momentum)}`, line: 'This is what showing up looks like as a number.' },
+    { value: `${Math.round(f.momentum)}`, line: 'Six months of proof, not promises.' },
+    { value: `${Math.round(f.momentum)}`, line: 'A year of keeping your own word.' },
+    { value: `${Math.round(f.momentum)} / 100`, line: "The version of you that doesn't need convincing anymore." },
+  ][t - 1]
+
+  const freedom: Omit<Domain, 'label'> = [
+    { value: 'Untouched', line: 'No new constraints yet. Still fully yours.' },
+    { value: `${f.chain}-day streak`, line: 'One thing off the leash, on purpose.' },
+    { value: `${f.chain} days, no debt added`, line: "Real options opening. Nothing closed off." },
+    { value: `${f.chain} days`, line: 'Half a year of not being stuck to the same routine.' },
+    {
+      value: 'All of it',
+      rows: ['Leave the job: yes', 'Start a business: yes', 'Invest, move, travel: yes'],
+      line: 'A year of decisions nobody forced on you.',
+    },
+    {
+      value: 'Still all of it',
+      rows: ['Leave the job: yes', 'Start a business: yes', 'Invest, move, travel: yes'],
+      line: "Nobody's schedule, nobody's debt, nobody's permission.",
+    },
+  ][t - 1]
+
+  const relationships: Omit<Domain, 'label'> = [
+    { value: 'Unchanged', line: "Same as last week. This one's just the start." },
+    { value: 'Noticed', line: "One month in, and she's already noticed. Not a speech. Just showing up." },
+    { value: 'Trusted more', line: "Three months. Your word's starting to mean something again." },
+    { value: `${f.chain} days`, line: 'Half a year of actually being present.' },
+    { value: 'A year of it', line: "Showing up instead of explaining why you didn't." },
+    { value: 'Built, not promised', line: 'Years of actions she watched, not promises she heard.' },
+  ][t - 1]
+
   return [
-    { label: 'Finances', value: finances[i][0], line: finances[i][1] },
-    { label: 'Body', value: body[i][0], line: body[i][1] },
-    { label: 'Work', value: work[i][0], line: work[i][1] },
-    { label: 'Discipline', value: discipline[i][0], line: discipline[i][1] },
-    { label: 'Freedom', value: freedom[i][0], line: freedom[i][1] },
-    { label: 'Relationships', value: relationships[i][0], line: relationships[i][1] },
+    { label: 'Finances', ...finances },
+    { label: 'Body', ...body },
+    { label: 'Work', ...work },
+    { label: 'Discipline', ...discipline },
+    { label: 'Freedom', ...freedom },
+    { label: 'Relationships', ...relationships },
   ]
 }
 
@@ -947,7 +980,7 @@ function driftDomains(days: number): Domain[] {
     { value: 'Untouched', line: 'Existing pressure, existing obligations. Limited room for mistakes.' },
     { value: 'First reminder', line: 'Potential arrears, fees, interest already possible.' },
     { value: 'Juggling begins', line: 'Between obligations. Quietly, before it looks like a problem.' },
-    { value: 'Collection risk', line: 'Missed payments, arrears, fees -- already escalating.' },
+    { value: 'In collection', line: "Missed payments, arrears, fees. Not a risk file anymore -- an active one." },
     {
       value: '€3,600–€12,000',
       rows: ['€300/mo = €3,600/yr', '€500/mo = €6,000/yr', '€1,000/mo = €12,000/yr'],
@@ -1006,9 +1039,9 @@ function driftDomains(days: number): Domain[] {
 
   const relationships: Omit<Domain, 'label'> = [
     { value: 'Unchanged', line: "You're still just as present. Today." },
-    { value: 'Barely', line: "Nothing's visible yet. That's exactly the trap." },
-    { value: 'A little thinner', line: 'More tired, some days. Not enough to notice.' },
-    { value: 'Noticed', line: "Half a year. Something's different, and you both know it." },
+    { value: 'Noticed', line: "One month in, and she's already noticed. Not a rupture -- a pattern starting." },
+    { value: 'Naming it', line: "Three months. She's said something about it more than once." },
+    { value: 'Pulling back', line: "Half a year. She brings it up less. That's not peace, that's tired." },
     { value: 'More tired', line: 'Less present, more distracted. His own words for a year of this.' },
     {
       value: 'Weaker, or gone',

@@ -7535,20 +7535,32 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 
 /* THE RIGHT HALF IS TWO ROWS, top the life he keeps, bottom the one he lets
    go. No footage here on his instruction: one thing to fill in per stop. */
-.tl-sides { position: relative; display: grid; grid-template-rows: 1fr 1fr; }
+/* Was an even 1fr/1fr grid, which is right when both sides are a caption
+   long. The narrative reads much longer now, and a fixed half-height row
+   only ever had one way to handle text taller than that: clip it, silently,
+   at the bottom of whichever screen was short enough to trigger it (a
+   1440x900 laptop, not just a phone). Flex with flex-shrink:0 lets a side
+   grow past its 50% share when its own content needs it, and the column
+   scrolls as one unit instead of clipping either half. */
+/* The footer sits fixed over the bottom of this column (see .tl-livesfoot),
+   so whatever ends up scrolled to the very end has to clear it -- that
+   reserve now lives on the scroll container itself, not on "whichever side
+   happens to render last", since the two are no longer the same thing once
+   either side can outgrow its 50% share. */
+.tl-sides { position: relative; height: 100%; overflow-y: auto; display: flex; flex-direction: column;
+  padding-bottom: clamp(96px, 12vh, 150px); }
 .tl-side { position: relative; display: flex; flex-direction: column; justify-content: center;
-  gap: 18px; padding: clamp(24px, 3.2vw, 52px); padding-bottom: clamp(24px, 3.2vw, 52px); }
+  flex: 0 0 50%; gap: 18px; padding: clamp(24px, 3.2vw, 52px); }
 .tl-side.is-push { background: radial-gradient(120% 130% at 80% 0%, #1A210C, #0C0F06 72%); }
 .tl-side.is-drift { background: radial-gradient(120% 130% at 80% 100%, #141416, #0A0A0B 72%);
   border-top: 1px solid rgba(242, 240, 234, 0.07); }
-.tl-sides > .tl-side:last-of-type { padding-bottom: clamp(96px, 12vh, 150px); }
 .tl-pill { align-self: flex-start; padding: 9px 15px; border-radius: 999px;
   font: 700 10px/1 var(--font-body); letter-spacing: 0.2em; text-transform: uppercase;
   background: #17181A; color: var(--tl-dim); box-shadow: inset 0 0 0 1px rgba(242, 240, 234, 0.09); }
 .tl-side.is-push .tl-pill { background: #1B2109; color: var(--tl-hot);
   box-shadow: inset 0 0 0 1px rgba(198, 242, 74, 0.28); }
 .tl-said { margin: 0; max-width: 18ch; font-family: var(--font-display); font-weight: 800;
-  letter-spacing: -0.03em; line-height: 1.08; font-size: clamp(20px, 2.3vw, 38px); }
+  letter-spacing: -0.03em; line-height: 1.08; font-size: clamp(20px, 2.3vw, 38px); color: var(--tl-ink); }
 
 /* THE SAME FOUR FIGURES ON BOTH SIDES, which is the whole argument: one column
    of what his own rate produces, one column of noughts. */
@@ -7559,14 +7571,25 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .tl-figs dd { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: clamp(20px, 2vw, 30px);
   letter-spacing: -0.035em; line-height: 1; font-variant-numeric: tabular-nums; color: var(--tl-hot); }
 .tl-figs.is-dead dd { color: var(--tl-no); }
-.tl-under { margin: 0; font: 500 12px/1.5 var(--font-body); color: var(--tl-faint); max-width: 42ch; }
-.tl-side.is-drift .tl-said { color: var(--tl-dim); }
-.tl-side.is-push .tl-said { color: var(--tl-ink); }
+/* The argument itself, not a caption under one: this is the text the whole
+   screen exists to make him read, so it reads like it, not like a footnote.
+   White on both sides on purpose -- the background and the words carry the
+   difference between the two futures, not a dimmer color standing in for
+   "this one matters less." */
+.tl-under { margin: 0; font: 600 clamp(16px, 1.7vw, 21px)/1.44 var(--font-body); letter-spacing: -0.006em;
+  color: var(--tl-ink); max-width: 54ch; }
 
 /* On the seam between the two futures, which is what the number measures. */
-.tl-gap { position: absolute; left: clamp(24px, 3.2vw, 52px); top: 50%; transform: translateY(-50%);
-  text-align: center; background: #08090A; border-radius: 999px; padding: 14px 18px;
-  pointer-events: none; z-index: 3; box-shadow: 0 0 0 1px rgba(242, 240, 234, 0.1); }
+/* Used to float at the vertical center of an even 1fr/1fr split, which was
+   always exactly the seam between the two futures. Now that either side can
+   grow past its 50% share and the column scrolls, "centered in the column"
+   and "the seam" are no longer the same point -- a floating pill landed on
+   whatever text happened to be at that fixed offset. It sits in normal flow
+   between the two <section>s instead, which is where the seam actually is
+   regardless of how long either side's text runs. */
+.tl-gap { position: relative; flex: none; align-self: flex-start;
+  margin: 0 0 0 clamp(24px, 3.2vw, 52px); text-align: center; background: #08090A;
+  border-radius: 999px; padding: 14px 18px; z-index: 3; box-shadow: 0 0 0 1px rgba(242, 240, 234, 0.1); }
 .tl-gap b { display: block; font-family: var(--font-display); font-weight: 800; font-size: 21px;
   letter-spacing: -0.03em; color: var(--tl-hot); white-space: nowrap; }
 
@@ -7643,15 +7666,26 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 @media (max-width: 700px) {
   .tl-rung { grid-template-columns: 76px repeat(2, minmax(0, 1fr)); }
   .tl-bd { grid-template-columns: 1fr; }
-  /* The reel keeps the top half of a phone and the two futures share the
-     bottom: side by side at this width neither would be readable. */
-  .tl-stage { grid-template-columns: 1fr; grid-template-rows: 42vh 1fr; }
+  /* The reel keeps the top of a phone and the two futures share the rest.
+     Was 42vh: real text taking priority over the video is the entire point
+     of this screen, and 42vh of the reel plus a footer that stacks into
+     three rows left barely 80px for the words -- the actual argument this
+     screen exists to make. */
+  .tl-stage { grid-template-columns: 1fr; grid-template-rows: 26vh 1fr; }
   .tl-said { font-size: clamp(18px, 5vw, 26px); max-width: 24ch; }
+  .tl-under { font-size: clamp(15px, 4.2vw, 18px); max-width: none; }
   .tl-side { gap: 12px; }
-  .tl-gap { left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 10px 14px; }
+  .tl-gap { margin-left: clamp(16px, 5vw, 24px); padding: 10px 14px; }
   .tl-gap b { font-size: 19px; }
-  .tl-livesfoot { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .tl-livesfoot { flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px 16px; }
   .tl-back { margin-left: 0; }
+  /* The footer is fixed over the bottom of this column and stacks into three
+     rows here, which is real height a percentage-based .tl-sides can't see
+     coming -- padding at the end of a scrollable region only helps once
+     scrolled there, and the unscrolled view is what actually loads. Its own
+     box has to end where the footer begins instead, a measured value at this
+     one breakpoint rather than a guess. */
+  .tl-sides { height: calc(100% - 400px); }
 }
 @media (prefers-reduced-motion: reduce) {
   .tl-lives { animation: none; }

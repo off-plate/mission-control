@@ -862,7 +862,7 @@ function tierOf(days: number): 1 | 2 | 3 | 4 | 5 | 6 {
    to 0%, his own words for each rung); on the push side it's his actual
    momentum, the same number everywhere else on this page, climbing instead of
    given a name. */
-export interface Domain { label: string; value: string; line: string }
+export interface Domain { label: string; value: string; line: string; rows?: string[] }
 
 function pushDomains(days: number, f: Future, c: NarrativeCtx): Domain[] {
   const t = tierOf(days)
@@ -936,64 +936,94 @@ function pushDomains(days: number, f: Future, c: NarrativeCtx): Domain[] {
    as written, specifics included, fully aware this file is public. Discipline
    here is his own SELF-RESPECT scale, verbatim: 100/80/60/40/20/0%, each with
    the line he wrote for that rung. */
+/** Every figure below is his own, copied off the actual document rather than
+ *  rounded into a single softer number -- the thing he called out. Where he
+ *  gave three scenarios at once (300 / 500 / 1,000 a month, say) the card
+ *  carries all three as a short breakdown instead of one averaged line. */
 function driftDomains(days: number): Domain[] {
   const t = tierOf(days)
-  const finances: [string, string][] = [
-    ['€0', 'Still untouched. For now.'],
-    ['+1 fee', 'First reminder just landed.'],
-    ['Juggling', "Between what you owe and what's left."],
-    ['Compounding', "Interest doesn't wait for you to notice."],
-    ['€3.6K–€12K', 'Never saved. Just never spent on anything, either.'],
-    ['€10K → €120K+', 'Missed and compounding, gone for good.'],
-  ]
-  const body: [string, string][] = [
-    ['~90kg', "Nothing's visibly changed. Yet."],
-    ['90 → 92kg', 'A little more, everywhere.'],
-    ['92–94kg', 'Standards dropping without deciding to.'],
-    ['94–97kg', 'Conditioning: worse. Sleep: worse.'],
-    ['97–101kg', "A year, and this is what you'd show for it."],
-    ['102 → 115+kg', "The gap stops closing on its own."],
-  ]
-  const work: [string, string][] = [
-    ['0 hrs', "On the thing with your name on it."],
-    ['0 hrs', 'Still. Thirty days in.'],
-    ['Same cycle', 'Start, fatigue, quit, restart.'],
-    ['~130 hrs', "On your own thing. In six months, total."],
-    ['365 days', 'Gone. What did you actually ship?'],
-    ['52,000 hrs', "Ten years. Starting late costs more than starting did."],
-  ]
-  const discipline: [string, string][] = [
-    ['100%', '"When I tell myself something, I do it."'],
-    ['80%', '"I occasionally fail."'],
-    ['60%', '"I need to try harder."'],
-    ['40%', '"I’ve said this so many times."'],
-    ['20%', '"Maybe this is just who I am."'],
-    ['0%', 'You stop trusting your own word.'],
-  ]
-  const freedom: [string, string][] = [
-    ['Full', "Nothing's cost you anything. Yet."],
-    ['Shrinking', 'Quietly. Not visible yet.'],
-    ['Narrower', 'Options closing without a decision.'],
-    ['Tied to the job', "It's what's funding the wait."],
-    ['Formal demand', 'Arrears just became a letter.'],
-    ['None', 'The debt decides. Not you.'],
-  ]
-  const relationships: [string, string][] = [
-    ['Unchanged', "You're still just as present. Today."],
-    ['A little thinner', "More tired. Less there, even when you're there."],
-    ['Noticed', 'Something is "always more important" now.'],
-    ['Straining', 'Unresolved things start piling up.'],
-    ['Quiet distance', "You can feel it, and you're not saying so."],
-    ['Some just gone', 'Worn down by years of repeated absence.'],
-  ]
-  const i = t - 1
+
+  const finances: Omit<Domain, 'label'> = [
+    { value: 'Untouched', line: 'Existing pressure, existing obligations. Limited room for mistakes.' },
+    { value: 'First reminder', line: 'Potential arrears, fees, interest already possible.' },
+    { value: 'Juggling begins', line: 'Between obligations. Quietly, before it looks like a problem.' },
+    { value: 'Collection risk', line: 'Missed payments, arrears, fees -- already escalating.' },
+    {
+      value: '€3,600–€12,000',
+      rows: ['€300/mo = €3,600/yr', '€500/mo = €6,000/yr', '€1,000/mo = €12,000/yr'],
+      line: 'Never saved. Debt: possible formal demands, legal proceedings.',
+    },
+    {
+      value: '€10,800 → €120,000+',
+      rows: ['3yr @ €300–1,000/mo: €10,800–€36,000', '10yr, direct only: €36,000–€120,000', '20yr @ €500/mo: €120,000, before growth'],
+      line: 'None of it recoverable. Thirty years of missed compounding.',
+    },
+  ][t - 1]
+
+  const body: Omit<Domain, 'label'> = [
+    { value: '~90kg', line: 'Excess fat, particularly the stomach. Poor condition.' },
+    { value: '90 → 91–92kg', line: "Almost nothing looks different. That's the trap." },
+    { value: '~92–94kg', line: 'Less movement, worse conditioning, standards dropping.' },
+    { value: '~94–97kg', line: 'Half a year. Less movement, worse conditioning.' },
+    { value: '~97–101kg', line: "A year gone. This is what you'd have to show for it." },
+    { value: '102 → 120+kg', line: 'Older body eventually. Harder recovery, decades of neglect.' },
+  ][t - 1]
+
+  const work: Omit<Domain, 'label'> = [
+    { value: '0 hrs', line: 'On the thing with your name on it.' },
+    { value: '0 hrs', line: 'Still. Thirty days in, nothing shipped.' },
+    { value: 'Same cycle', line: 'Motivation, plan, intense start, fatigue, missed days, restart.' },
+    { value: '~130 hrs', line: "On your own thing. Five hours a week, if that, six months in." },
+    { value: '365 days', line: 'Gone. What did you actually ship?' },
+    {
+      value: '~52,000 hrs',
+      rows: ['Deep work, 10yr: 2,600 hrs lost', 'Workouts, 10yr: 1,560 hrs lost', '10 years = 3,650 days total'],
+      line: 'Starting late costs more than starting on time ever would have.',
+    },
+  ][t - 1]
+
+  const discipline: Omit<Domain, 'label'> = [
+    { value: '100%', line: '"When I tell myself something, I do it."' },
+    { value: '80%', line: '"I occasionally fail."' },
+    { value: '60%', line: '"I need to try harder."' },
+    { value: '40%', line: '"I’ve said this so many times."' },
+    { value: '20%', line: '"Maybe this is just who I am."' },
+    { value: '0%', line: 'You stop trusting your own word.' },
+  ][t - 1]
+
+  const freedom: Omit<Domain, 'label'> = [
+    { value: 'Full', line: "Nothing's cost you anything. Yet." },
+    { value: 'Shrinking', line: 'Quietly. Not visible yet.' },
+    { value: 'Narrower', line: 'Options closing without a decision.' },
+    { value: 'Tied to the job', line: "It's what's funding the wait." },
+    { value: 'Formal demand', line: 'Debt starts making decisions, not just costing money.' },
+    {
+      value: 'None of it',
+      rows: ['Leave the job: no', 'Start a business: no', 'Invest, move, travel: no'],
+      line: "Debt decides what you can say no to. Not you.",
+    },
+  ][t - 1]
+
+  const relationships: Omit<Domain, 'label'> = [
+    { value: 'Unchanged', line: "You're still just as present. Today." },
+    { value: 'Barely', line: "Nothing's visible yet. That's exactly the trap." },
+    { value: 'A little thinner', line: 'More tired, some days. Not enough to notice.' },
+    { value: 'Noticed', line: "Half a year. Something's different, and you both know it." },
+    { value: 'More tired', line: 'Less present, more distracted. His own words for a year of this.' },
+    {
+      value: 'Weaker, or gone',
+      rows: ['+3yr: always something more important', '+5yr: unresolved things pile up, stress rises', '+10yr: some relationships weaker, or gone'],
+      line: 'Repeated absence. Not one rupture, a pattern.',
+    },
+  ][t - 1]
+
   return [
-    { label: 'Finances', value: finances[i][0], line: finances[i][1] },
-    { label: 'Body', value: body[i][0], line: body[i][1] },
-    { label: 'Work', value: work[i][0], line: work[i][1] },
-    { label: 'Discipline', value: discipline[i][0], line: discipline[i][1] },
-    { label: 'Freedom', value: freedom[i][0], line: freedom[i][1] },
-    { label: 'Relationships', value: relationships[i][0], line: relationships[i][1] },
+    { label: 'Finances', ...finances },
+    { label: 'Body', ...body },
+    { label: 'Work', ...work },
+    { label: 'Discipline', ...discipline },
+    { label: 'Freedom', ...freedom },
+    { label: 'Relationships', ...relationships },
   ]
 }
 
@@ -1138,9 +1168,15 @@ function Domains({ items, dead }: { items: Domain[]; dead?: boolean }) {
   return (
     <dl className={`tl-domains${dead ? ' is-dead' : ''}`}>
       {items.map((d) => (
-        <div className="tl-domain" key={d.label}>
+        <div className={`tl-domain${d.rows ? ' has-rows' : ''}`} key={d.label}>
           <dt className="tl-l">{d.label}</dt>
           <dd>{d.value}</dd>
+          {/* Some of his own numbers only make the actual point stated three
+              ways at once (300 vs 500 vs 1,000 a month, say) -- rounding
+              that down to one figure was exactly the imprecision he called
+              out, so a card that needs it gets a short breakdown instead of
+              a single line. */}
+          {d.rows && <ul className="tl-domain-rows">{d.rows.map((r) => <li key={r}>{r}</li>)}</ul>}
           <p>{d.line}</p>
         </div>
       ))}

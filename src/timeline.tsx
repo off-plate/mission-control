@@ -72,17 +72,26 @@ function hevyDetail(days: string[]): { minutes: number; volumeKg: number } | nul
   return hit ? { minutes, volumeKg } : null
 }
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
+/* His instruction (2026-09-03), after the space switcher made the same real
+   chain and momentum score read as "not one real thing" depending which
+   tab happened to be active: Timeline is one page and one dataset, full
+   stop, never split by workspace regardless of where the space switcher
+   sits. Used in place of the store's own space-aware `inView` everywhere
+   on this page (the momentum run below, and the goals list inside
+   TwoLives further down) -- not a second inView with different rules, a
+   deliberate opt-out of the concept entirely for this one page. */
+export const inAllSpaces = () => true
 
 export function TimelinePage() {
-  const { habits, habitLog, tasks, focusSessions, inView } = useStore()
+  const { habits, habitLog, tasks, focusSessions } = useStore()
   const [view, setView] = useState<View>('ladder')
   const [zoom, setZoom] = useState<Zoom>('d')
   const [lives, setLives] = useState(false)
   const compass = useCompass().state
 
   const run = useMemo(
-    () => momentumRun({ habits, habitLog, tasks, focusSessions, inView }, WINDOW),
-    [habits, habitLog, tasks, focusSessions, inView],
+    () => momentumRun({ habits, habitLog, tasks, focusSessions, inView: inAllSpaces }, WINDOW),
+    [habits, habitLog, tasks, focusSessions],
   )
   const now = momentumNow(run)
   const chain = chainOf(run)
@@ -818,7 +827,7 @@ function embedSrc(url: string, sound: boolean): string {
 
 /* ---- the screen ---- */
 function TwoLives({ onBack, run, chain }: { onBack: () => void; run: DayScore[]; chain: ReturnType<typeof chainOf> }) {
-  const { goals, inView } = useStore()
+  const { goals } = useStore()
   const pool = useReelPool()
   const [grain, setGrain] = useState<Grain>('m')
   const [at, setAt] = useState(0)
@@ -840,12 +849,13 @@ function TwoLives({ onBack, run, chain }: { onBack: () => void; run: DayScore[];
 
   /* The horizon he named, unless one of his own open goals reaches further. */
   const horizon = useMemo(() => {
+    // No inView(g.space) here on purpose -- see inAllSpaces above.
     const deadlines = goals
-      .filter((g) => inView(g.space) && !g.closed && g.deadline)
+      .filter((g) => !g.closed && g.deadline)
       .map((g) => g.deadline as string)
     const furthest = deadlines.sort().pop()
     return furthest && furthest > DECLARED_HORIZON ? { day: furthest, own: true } : { day: DECLARED_HORIZON, own: false }
-  }, [goals, inView])
+  }, [goals])
 
   const span = Math.max(1, daysBetween(localDateKey(), horizon.day))
   const step = GRAINS.find((g) => g.id === grain)!.step

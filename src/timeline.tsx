@@ -854,22 +854,76 @@ function tierOf(days: number): 1 | 2 | 3 | 4 | 5 | 6 {
   return 6
 }
 
-function pushNarrative(days: number, f: Future, c: NarrativeCtx): string {
+/* SIX CATEGORIES, ONE CARD EACH, EVERY HORIZON: the paragraph version made him
+   read to find the point. A category is the point, sitting right there --
+   label, a real value, one short line under it. His own words, "not hard
+   sentences, little ones", "percentage or calculations". Discipline runs his
+   own SELF-RESPECT ladder from The Negative Road on the drift side (100% down
+   to 0%, his own words for each rung); on the push side it's his actual
+   momentum, the same number everywhere else on this page, climbing instead of
+   given a name. */
+export interface Domain { label: string; value: string; line: string }
+
+function pushDomains(days: number, f: Future, c: NarrativeCtx): Domain[] {
+  const t = tierOf(days)
   const debts = c.money && c.money.openDebts > 0
-  switch (tierOf(days)) {
-    case 1:
-      return `Momentum is already climbing toward ${Math.round(f.momentum)}. Nothing dramatic yet, just ${Math.round(f.tasks)} things off the list and ${hm(f.focusMin)} where your phone lost a fight it usually wins. Nobody claps for day three. Nobody's supposed to. You're not doing this to be seen doing it. Wake up on day seven and notice you never had to decide today at all. That's the whole game, and you just started winning it.`
-    case 2:
-      return `${Math.round(f.tasks)} things closed, ${hm(f.focusMin)} of real focus, a chain running ${f.chain} deep${c.anchorHabit ? ` because ${c.anchorHabit} stopped being optional and started being just who you are` : ''}. This is where most people fold, not from pain, from boredom, because it stopped feeling like an event and started feeling like Tuesday. Good. That's not you losing interest. That's you becoming someone this doesn't cost anymore.`
-    case 3:
-      return `${f.chain} days deep, ${f.hard} things you'd been dragging around for a week or more finally off your chest, off the list, off your mind at 2am. ${debts ? `The payment on ${c.money!.openDebts === 1 ? 'the debt' : `all ${c.money!.openDebts} debts`} still lands whether you flinch or not, except now it's the guy who decided to be here watching the number actually move, not the guy hoping it clears itself.` : 'The pile of half-finished things is finally just finished.'} Your body runs different. Sleep gets easier when the day actually earned it.`
-    case 4:
-      return `${c.goalName ? `"${c.goalName}" stops being a note in an app and starts being a fact about your life.` : 'The thing you kept saying you would get to has an actual date attached to it now.'} ${Math.round(f.focusMin / 60)} hours of your attention, spent on purpose instead of leaking out through your phone one scroll at a time. People who know you start noticing something's different before you say a word about it. You just look like someone who isn't lying to himself anymore.`
-    case 5:
-      return `${c.quitHabit ? `${c.quitHabit} isn't a fight anymore. It's just something you don't do.` : 'The thing that used to take everything you had now takes nothing at all.'} Momentum sits at ${Math.round(f.momentum)}. You don't get a number like that from a good week. You get it from being someone else for half a year straight, the guy who shows up on the days he doesn't feel like it, which by now is most of them, and it doesn't even register as a decision anymore.`
-    default:
-      return `${debts ? `Whatever was sitting on Compass the first time you opened this screen is either gone, or close enough to see the bottom of it.` : 'Whatever weight you were carrying the first time you opened this screen is gone.'} ${f.chain} days. Not because you never had a bad one, because a bad day stopped being a reason to have two. This is what the other side of the thing you keep almost starting actually looks like: quieter than you thought, and completely yours.`
-  }
+  const finances: [string, string][] = [
+    ['Tracked', "You know exactly where it's going."],
+    ['First payment', 'Made on purpose, not out of guilt.'],
+    [debts ? `${c.money!.openDebts} debts, moving` : 'Moving', "The number's actually shrinking now."],
+    ['Real progress', 'Payments that actually landed, on schedule.'],
+    ['Known, on purpose', "You could say the real number out loud."],
+    [debts ? 'Close to zero' : 'Clear', 'Or close enough to see the bottom of it.'],
+  ]
+  const body: [string, string][] = [
+    ['Moving', 'Nothing dramatic. Just started.'],
+    ['Down, slightly', "The number's finally going the other way."],
+    ['Visibly different', "Sleep's easier. So is everything else."],
+    ['Real change', 'The mirror actually shows it now.'],
+    ['A new baseline', 'This is just what your body does now.'],
+    ['Unrecognizable', 'From the guy who opened this screen the first time.'],
+  ]
+  const work: [string, string][] = [
+    [`${Math.round(f.tasks)} done`, 'Real ones, off the real list.'],
+    [hm(f.focusMin), 'Actual focus. Phone lost.'],
+    [`${f.chain} days`, "Deep. The pile's finally shrinking."],
+    [`${Math.round(f.focusMin / 60)}h`, 'Spent on your own thing, on purpose.'],
+    [`${f.chain} days`, "A chain a year long doesn't happen by accident."],
+    [`${f.chain} days`, "Not because every day was easy. Because a bad one stopped meaning two."],
+  ]
+  const discipline: [string, string][] = [
+    [`${Math.round(f.momentum)}`, 'Climbing. You can feel it starting.'],
+    [`${Math.round(f.momentum)}`, "You don't get this from one good week."],
+    [`${Math.round(f.momentum)}`, 'This is what showing up looks like as a number.'],
+    [`${Math.round(f.momentum)}`, 'Six months of proof, not promises.'],
+    [`${Math.round(f.momentum)}`, 'A year of keeping your own word.'],
+    [`${Math.round(f.momentum)} / 100`, "The version of you that doesn't need convincing anymore."],
+  ]
+  const freedom: [string, string][] = [
+    ['Open', 'Still fully yours to build.'],
+    ['Widening', 'One less thing owns your attention.'],
+    ['Real options', "Choices that weren't there three months ago."],
+    ['Room to move', 'Half a year of not being stuck.'],
+    ['Actual freedom', 'A year of decisions nobody forced.'],
+    ['Yours', "Nobody's schedule, nobody's debt, nobody's permission."],
+  ]
+  const relationships: [string, string][] = [
+    ['Present', "You showed up. That's the whole thing this week."],
+    ['More there', 'People notice before you say anything.'],
+    ['Trusted', "Your word's starting to mean something again."],
+    ['Closer', 'Half a year of actually being present.'],
+    ['Solid', 'A year of showing up instead of explaining why you didn’t.'],
+    ['Real', 'Built on actions they watched, not promises they heard.'],
+  ]
+  const i = t - 1
+  return [
+    { label: 'Finances', value: finances[i][0], line: finances[i][1] },
+    { label: 'Body', value: body[i][0], line: body[i][1] },
+    { label: 'Work', value: work[i][0], line: work[i][1] },
+    { label: 'Discipline', value: discipline[i][0], line: discipline[i][1] },
+    { label: 'Freedom', value: freedom[i][0], line: freedom[i][1] },
+    { label: 'Relationships', value: relationships[i][0], line: relationships[i][1] },
+  ]
 }
 
 /* THE NEGATIVE ROAD, his own document, his own numbers, adjusted to fit the
@@ -879,22 +933,68 @@ function pushNarrative(days: number, f: Future, c: NarrativeCtx): string {
    pressure, debt, poor habits, insufficient exercise, fragmented attention,
    repeatedly restarting instead of staying the course. Every number in it is
    illustrative, his own word for it, not guaranteed. He asked for it exactly
-   as written, specifics included, fully aware this file is public. */
-function driftNarrative(days: number, stoppedOn: number): string {
-  switch (tierOf(days)) {
-    case 1:
-      return `Nothing terrible happens in a week. That's the trap, and you already know it. The wheel's dead by day ${stoppedOn <= 1 ? 'one' : stoppedOn} -- not behind, dead -- but nothing LOOKS different yet. The scale still says something close to 90kg. The 9 to 10 hours a day are still the 9 to 10 hours a day. One skipped workout, one evening lost to the phone, the hookah, whatever cheap stimulation was closest, instead of the ten minutes it would have taken to just start. You already know the promise. You've heard yourself make it before.`
-    case 2:
-      return `A month gone, and almost nothing looks different, which is exactly the problem. 90kg edges toward 91, 92. A little more around the stomach. Slightly worse on the stairs. The debt hasn't moved except that now there's a reminder attached to it, a fee that wasn't there before. Thirty days you don't get back, spent on the version of you that keeps promising to start tomorrow.`
-    case 3:
-      return `Three months in, and your own standards start slipping without you ever deciding to lower them. 92, 93, 94kg. Less movement, worse conditioning. The cycle runs the same way it always does: motivation, a plan, an intense start, fatigue, missed days, guilt, restart. Every broken promise to yourself costs something that isn't the workout. It's the trust. The juggling between what you owe and what you actually have starts here too, quietly, before it's a real problem yet.`
-    case 4:
-      return `Half a year gone. 94 to 97kg. Something like 1,100 hours spent at the job that isn't the thing you actually want to build, and maybe 130 hours total on the thing that is -- five hours a week, if that, for the project with your name on it. Whatever you didn't ship in that time doesn't wait for you either: the debt sits there, accumulating whatever debt accumulates when nobody's watching it.`
-    case 5:
-      return `A full year disappeared. 97 to 101kg. Do the actual math on whatever you're not setting aside: 300 euros a month is 3,600 gone for the year, 500 is 6,000, 1,000 is 12,000 -- never spent on anything, just never saved either. The debt has had twelve full months to become arrears, fees, maybe a formal demand. 365 days, and you could list, right now, exactly what you have to show for them.`
-    default:
-      return `Three years and the gap stops being close: 102 to 108kg, tens of thousands never saved, hundreds of hours on things with your name on them that never happened, while other people spent that exact time building expertise, relationships, a portfolio, income. Five years in, you become the person you said you would never become: no real reserve, no invested capital, still fully dependent on a paycheck, and the debt now quietly decides things for you -- what job you can leave, what you can start, what you get to say no to because you can't afford to. Ten years is 3,650 days, about 52,000 hours, and starting late is more expensive than starting on time ever would have been. Twenty years and your past decisions are running your present, full stop. Thirty years and the bill is due: you cannot get back three decades of compounding, of relationships, of the person you could have built, and the only question left standing is the one you already know the answer to. What did you actually build, motherfucker? Not a dramatic collapse. Just a functional life, and the quiet, permanent knowledge that you could have been so much more.`
-  }
+   as written, specifics included, fully aware this file is public. Discipline
+   here is his own SELF-RESPECT scale, verbatim: 100/80/60/40/20/0%, each with
+   the line he wrote for that rung. */
+function driftDomains(days: number): Domain[] {
+  const t = tierOf(days)
+  const finances: [string, string][] = [
+    ['€0', 'Still untouched. For now.'],
+    ['+1 fee', 'First reminder just landed.'],
+    ['Juggling', "Between what you owe and what's left."],
+    ['Compounding', "Interest doesn't wait for you to notice."],
+    ['€3.6K–€12K', 'Never saved. Just never spent on anything, either.'],
+    ['€10K → €120K+', 'Missed and compounding, gone for good.'],
+  ]
+  const body: [string, string][] = [
+    ['~90kg', "Nothing's visibly changed. Yet."],
+    ['90 → 92kg', 'A little more, everywhere.'],
+    ['92–94kg', 'Standards dropping without deciding to.'],
+    ['94–97kg', 'Conditioning: worse. Sleep: worse.'],
+    ['97–101kg', "A year, and this is what you'd show for it."],
+    ['102 → 115+kg', "The gap stops closing on its own."],
+  ]
+  const work: [string, string][] = [
+    ['0 hrs', "On the thing with your name on it."],
+    ['0 hrs', 'Still. Thirty days in.'],
+    ['Same cycle', 'Start, fatigue, quit, restart.'],
+    ['~130 hrs', "On your own thing. In six months, total."],
+    ['365 days', 'Gone. What did you actually ship?'],
+    ['52,000 hrs', "Ten years. Starting late costs more than starting did."],
+  ]
+  const discipline: [string, string][] = [
+    ['100%', '"When I tell myself something, I do it."'],
+    ['80%', '"I occasionally fail."'],
+    ['60%', '"I need to try harder."'],
+    ['40%', '"I’ve said this so many times."'],
+    ['20%', '"Maybe this is just who I am."'],
+    ['0%', 'You stop trusting your own word.'],
+  ]
+  const freedom: [string, string][] = [
+    ['Full', "Nothing's cost you anything. Yet."],
+    ['Shrinking', 'Quietly. Not visible yet.'],
+    ['Narrower', 'Options closing without a decision.'],
+    ['Tied to the job', "It's what's funding the wait."],
+    ['Formal demand', 'Arrears just became a letter.'],
+    ['None', 'The debt decides. Not you.'],
+  ]
+  const relationships: [string, string][] = [
+    ['Unchanged', "You're still just as present. Today."],
+    ['A little thinner', "More tired. Less there, even when you're there."],
+    ['Noticed', 'Something is "always more important" now.'],
+    ['Straining', 'Unresolved things start piling up.'],
+    ['Quiet distance', "You can feel it, and you're not saying so."],
+    ['Some just gone', 'Worn down by years of repeated absence.'],
+  ]
+  const i = t - 1
+  return [
+    { label: 'Finances', value: finances[i][0], line: finances[i][1] },
+    { label: 'Body', value: body[i][0], line: body[i][1] },
+    { label: 'Work', value: work[i][0], line: work[i][1] },
+    { label: 'Discipline', value: discipline[i][0], line: discipline[i][1] },
+    { label: 'Freedom', value: freedom[i][0], line: freedom[i][1] },
+    { label: 'Relationships', value: relationships[i][0], line: relationships[i][1] },
+  ]
 }
 
 /* ---- the screen ---- */
@@ -982,14 +1082,15 @@ function TwoLives({ onBack, run, chain, money }: {
           <section className="tl-side is-push">
             <span className="tl-pill">If you do it anyway</span>
             <p className="tl-said">{days === 0 ? 'Today. Nothing has happened yet.' : `${spanWords(days, grain)} of keeping it.`}</p>
-            <Figures f={p.push} days={days} />
-            <p className="tl-under">
-              {days === 0
-                ? (p.assumed
+            {days === 0 ? (
+              <p className="tl-under">
+                {p.assumed
                   ? 'There is no rate of yours to run forward yet, so this is a full day, every day.'
-                  : `At your own rate of the last ${p.from} days: ${Math.round(p.rate * 100)}% of a full day.`)
-                : pushNarrative(days, p.push, narrCtx)}
-            </p>
+                  : `At your own rate of the last ${p.from} days: ${Math.round(p.rate * 100)}% of a full day.`}
+              </p>
+            ) : (
+              <Domains items={pushDomains(days, p.push, narrCtx)} />
+            )}
           </section>
           <div className="tl-gap">
             <b>{days === 0 ? 'Today' : longDate(when).replace(/ \d{4}$/, '')}</b>
@@ -998,10 +1099,11 @@ function TwoLives({ onBack, run, chain, money }: {
           <section className="tl-side is-drift">
             <span className="tl-pill">If you skip it</span>
             <p className="tl-said">{days === 0 ? 'Today. Nothing has happened yet.' : `${spanWords(days, grain)} of not.`}</p>
-            <Figures f={p.drift} days={days} dead />
-            <p className="tl-under">
-              {days === 0 ? 'Both men are the same man this morning.' : driftNarrative(days, p.stoppedOn)}
-            </p>
+            {days === 0 ? (
+              <p className="tl-under">Both men are the same man this morning.</p>
+            ) : (
+              <Domains items={driftDomains(days)} dead />
+            )}
           </section>
         </div>
       </div>
@@ -1032,17 +1134,16 @@ function TwoLives({ onBack, run, chain, money }: {
   )
 }
 
-function Figures({ f, days, dead }: { f: Future; days: number; dead?: boolean }) {
-  const rows: [string, string][] = [
-    ['Momentum', String(Math.round(f.momentum))],
-    ['Chain', `${f.chain}`],
-    ['Tasks', `${f.tasks}`],
-    ['Focused', `${Math.round(f.focusMin / 60)}h`],
-  ]
-  if (days === 0) return null
+function Domains({ items, dead }: { items: Domain[]; dead?: boolean }) {
   return (
-    <dl className={`tl-figs${dead ? ' is-dead' : ''}`}>
-      {rows.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
+    <dl className={`tl-domains${dead ? ' is-dead' : ''}`}>
+      {items.map((d) => (
+        <div className="tl-domain" key={d.label}>
+          <dt className="tl-l">{d.label}</dt>
+          <dd>{d.value}</dd>
+          <p>{d.line}</p>
+        </div>
+      ))}
     </dl>
   )
 }

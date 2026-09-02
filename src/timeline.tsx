@@ -858,17 +858,17 @@ function pushNarrative(days: number, f: Future, c: NarrativeCtx): string {
   const debts = c.money && c.money.openDebts > 0
   switch (tierOf(days)) {
     case 1:
-      return `Momentum is already climbing toward ${Math.round(f.momentum)}. Nothing dramatic yet -- just ${Math.round(f.tasks)} things off the list and ${hm(f.focusMin)} where the phone lost. That's the whole trick: you don't feel it happening. You just wake up on day seven not having quit.`
+      return `Momentum is already climbing toward ${Math.round(f.momentum)}. Nothing dramatic yet, just ${Math.round(f.tasks)} things off the list and ${hm(f.focusMin)} where your phone lost a fight it usually wins. Nobody claps for day three. Nobody's supposed to. You're not doing this to be seen doing it. Wake up on day seven and notice you never had to decide today at all. That's the whole game, and you just started winning it.`
     case 2:
-      return `${Math.round(f.tasks)} things closed, ${hm(f.focusMin)} of real focus, a chain running ${f.chain} deep${c.anchorHabit ? ` because ${c.anchorHabit} stopped being optional and started being just who you are` : ''}. Most people call this a good stretch. You're starting to notice it's just Tuesday.`
+      return `${Math.round(f.tasks)} things closed, ${hm(f.focusMin)} of real focus, a chain running ${f.chain} deep${c.anchorHabit ? ` because ${c.anchorHabit} stopped being optional and started being just who you are` : ''}. This is where most people fold, not from pain, from boredom, because it stopped feeling like an event and started feeling like Tuesday. Good. That's not you losing interest. That's you becoming someone this doesn't cost anymore.`
     case 3:
-      return `${f.chain} days deep, ${f.hard} things you'd been carrying for a week or more finally put down. ${debts ? `The payment on ${c.money!.openDebts === 1 ? 'the debt' : `all ${c.money!.openDebts} debts`} still lands whether you flinch or not -- except now it's the guy who decided to be here making it, not the guy hoping it clears.` : 'The pile of half-finished things is finally just finished.'}`
+      return `${f.chain} days deep, ${f.hard} things you'd been dragging around for a week or more finally off your chest, off the list, off your mind at 2am. ${debts ? `The payment on ${c.money!.openDebts === 1 ? 'the debt' : `all ${c.money!.openDebts} debts`} still lands whether you flinch or not, except now it's the guy who decided to be here watching the number actually move, not the guy hoping it clears itself.` : 'The pile of half-finished things is finally just finished.'} Your body runs different. Sleep gets easier when the day actually earned it.`
     case 4:
-      return `${c.goalName ? `"${c.goalName}" stops being a note in an app and starts being a fact about your life.` : 'The thing you kept saying you would get to has an actual date attached to it now.'} ${Math.round(f.focusMin / 60)} hours of your attention, spent on purpose instead of leaking out through your phone one scroll at a time.`
+      return `${c.goalName ? `"${c.goalName}" stops being a note in an app and starts being a fact about your life.` : 'The thing you kept saying you would get to has an actual date attached to it now.'} ${Math.round(f.focusMin / 60)} hours of your attention, spent on purpose instead of leaking out through your phone one scroll at a time. People who know you start noticing something's different before you say a word about it. You just look like someone who isn't lying to himself anymore.`
     case 5:
-      return `${c.quitHabit ? `${c.quitHabit} isn't a fight anymore. It's just something you don't do.` : 'The thing that used to take everything you had now takes nothing at all.'} Momentum sits at ${Math.round(f.momentum)}. You don't get a number like that from trying hard for a week. You get it from being a different person for half a year straight.`
+      return `${c.quitHabit ? `${c.quitHabit} isn't a fight anymore. It's just something you don't do.` : 'The thing that used to take everything you had now takes nothing at all.'} Momentum sits at ${Math.round(f.momentum)}. You don't get a number like that from a good week. You get it from being someone else for half a year straight, the guy who shows up on the days he doesn't feel like it, which by now is most of them, and it doesn't even register as a decision anymore.`
     default:
-      return `${debts ? `Whatever was on Compass when you first opened this screen is either gone or close enough to see the end of it.` : 'Whatever weight you were carrying the first time you opened this screen is gone.'} ${f.chain} days. Not because you never had a bad day -- because a bad day stopped being a reason to have two.`
+      return `${debts ? `Whatever was sitting on Compass the first time you opened this screen is either gone, or close enough to see the bottom of it.` : 'Whatever weight you were carrying the first time you opened this screen is gone.'} ${f.chain} days. Not because you never had a bad one, because a bad day stopped being a reason to have two. This is what the other side of the thing you keep almost starting actually looks like: quieter than you thought, and completely yours.`
   }
 }
 
@@ -876,17 +876,17 @@ function driftNarrative(days: number, stoppedOn: number, c: NarrativeCtx): strin
   const debts = c.money && c.money.openDebts > 0
   switch (tierOf(days)) {
     case 1:
-      return `${stoppedOn <= 1 ? 'The wheel is already dead. It was never turning fast enough to survive this' : `The wheel is dead by day ${stoppedOn}. Not behind -- dead`}. Zero. ${c.quitHabit ? `${c.quitHabit} doesn't care that you were "doing so well." It was never impressed.` : 'Whatever you told yourself you were building just stopped being built.'}`
+      return `${stoppedOn <= 1 ? 'The wheel is already dead. It was never turning fast enough to survive this' : `The wheel is dead by day ${stoppedOn}. Not behind -- dead`}. Zero. ${c.quitHabit ? `${c.quitHabit} doesn't care that you were "doing so well" for six days. It was never impressed, and it isn't disappointed either. It just doesn't know your name.` : 'Whatever you told yourself you were building just stopped being built.'} You didn't have a bad week. You had the first week of the thing you always do.`
     case 2:
-      return `${spanWords(days, 'd')} of nothing, and the person who opened this screen today is a stranger you used to be. Zero chain. Zero tasks you can point to. ${debts ? `${c.money!.openDebts} debts you're still carrying, and not one of them got smaller because you had a good reason.` : 'Nothing moved. Nothing ever moves on its own.'}`
+      return `${spanWords(days, 'd')} of nothing, and the guy who opened this screen today is basically a stranger to you now. ${debts ? `${c.money!.openDebts} debts you're still carrying, and not one of them got smaller because you had a good reason. Debt doesn't read your excuses.` : 'Nothing moved. Nothing ever moves on its own.'} Your body knows before your head does, tired in a way sleep doesn't fix, because the tired isn't physical. It's the tired of watching yourself not show up.`
     case 3:
-      return `A month or two of "tomorrow," and tomorrow never actually shows up -- it's always still tomorrow. ${c.anchorHabit ? `${c.anchorHabit} goes back to being a thing you used to do, and you get to explain that to yourself again, every day it doesn't happen.` : 'Whatever you were building goes quiet, and quiet starts to feel normal.'}`
+      return `A month or two of "tomorrow," and tomorrow never actually shows up, it's always still tomorrow. ${c.anchorHabit ? `${c.anchorHabit} goes back to being a thing you used to do, and you get to explain that to yourself again, every single day it doesn't happen, out loud or not. You know exactly what you're telling yourself.` : 'Whatever you were building goes quiet, and quiet starts to feel normal.'} You start avoiding your own reflection a little. Not dramatically. Just enough that you notice you're doing it.`
     case 4:
-      return `${c.goalName ? `"${c.goalName}" is still sitting there. Closed date getting closer. You getting no closer to it.` : 'The date you set for yourself keeps arriving whether you showed up or not.'} A season is long enough to build something real. You spent it proving to yourself that you don't, actually, when it's hard.`
+      return `${c.goalName ? `"${c.goalName}" is still sitting there. Closed date getting closer. You getting no closer to it.` : 'The date you set for yourself keeps arriving whether you showed up or not.'} A season is long enough to become someone. You spent it proving, in detail, that you're not who you told people you were becoming. That's not a failure that happened to you. That's a decision you made ninety separate times.`
     case 5:
-      return `${c.quitHabit ? `${c.quitHabit} isn't a slip at this point. It's just what you do. You stopped even being disappointed about it.` : 'The thing you were "about to fix" for half a year is now just how things are.'} Half a year is not a bad week. Half a year is a pattern, and you are the one running it.`
+      return `${c.quitHabit ? `${c.quitHabit} isn't a slip at this point. It's just what you do. You stopped even being disappointed in yourself about it, which is worse than the thing itself.` : 'The thing you were "about to fix" for half a year is now just how things are.'} Half a year is not a bad stretch. Half a year is a personality. Your body is paying rent on the version of you that gave up: less energy, worse sleep, a lower ceiling on everything else, because this is the thing sitting underneath all of it, unaddressed.`
     default:
-      return `${debts ? `The debt is still there. Bigger, because it doesn't wait for you to feel ready -- it compounds while you do.` : 'Whatever you owed yourself a year ago, you owe double now, at interest that doesn’t show up on any statement.'} A year from here this isn't a bad week you remember, motherfucker. It's a pattern you recognize in yourself and can't explain to anyone -- why you always start and never finish. That's the cost. Not the number. You.`
+      return `${debts ? `The debt is still there. Bigger, because it never once cared whether you felt ready, it just compounded while you waited to feel like it.` : "Whatever you owed yourself a year ago, you owe double now, at interest that doesn't show up on any statement."} A year from here this isn't a bad week you remember, motherfucker. It's a pattern you recognize in yourself and can't explain to anyone: why you always start and never finish, why the guy who talks about changing never actually becomes him. That's the real cost. Not the number on Compass. You. The version of you that was available, and you didn't take him.`
   }
 }
 
@@ -984,6 +984,10 @@ function TwoLives({ onBack, run, chain, money }: {
                 : pushNarrative(days, p.push, narrCtx)}
             </p>
           </section>
+          <div className="tl-gap">
+            <b>{days === 0 ? 'Today' : longDate(when).replace(/ \d{4}$/, '')}</b>
+            <span className="tl-l">{days === 0 ? 'right now' : `${days} days out`}</span>
+          </div>
           <section className="tl-side is-drift">
             <span className="tl-pill">If you skip it</span>
             <p className="tl-said">{days === 0 ? 'Today. Nothing has happened yet.' : `${spanWords(days, grain)} of not.`}</p>
@@ -992,10 +996,6 @@ function TwoLives({ onBack, run, chain, money }: {
               {days === 0 ? 'Both men are the same man this morning.' : driftNarrative(days, p.stoppedOn, narrCtx)}
             </p>
           </section>
-          <div className="tl-gap">
-            <b>{days === 0 ? 'Today' : longDate(when).replace(/ \d{4}$/, '')}</b>
-            <span className="tl-l">{days === 0 ? 'right now' : `${days} days out`}</span>
-          </div>
         </div>
       </div>
 

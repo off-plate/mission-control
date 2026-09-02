@@ -7590,6 +7590,13 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   font-size: clamp(16px, 1.5vw, 21px); letter-spacing: -0.02em; line-height: 1.15; color: var(--tl-hot); }
 .tl-domains.is-dead .tl-domain dd { color: var(--tl-no); }
 .tl-domain p { margin: 0; font: 500 12.5px/1.4 var(--font-body); color: var(--tl-dim); }
+/* A card carrying his own multi-scenario numbers (300 vs 500 vs 1,000 a
+   month, say) needs the full row's width to read as numbers rather than
+   wrap into an unreadable column -- the one card per horizon that actually
+   needs it spans both, the rest stay a normal two-up grid. */
+.tl-domain.has-rows { grid-column: 1 / -1; }
+.tl-domain-rows { list-style: none; margin: 2px 0 6px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.tl-domain-rows li { font: 600 12.5px/1.35 var(--font-mono); color: var(--tl-ink); }
 /* Day zero's own honest line still needs somewhere to sit -- the one case
    with nothing to put in a category yet. */
 .tl-under { margin: 0; font: 600 clamp(16px, 1.7vw, 21px)/1.44 var(--font-body); letter-spacing: -0.006em;

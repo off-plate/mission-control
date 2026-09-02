@@ -1075,17 +1075,31 @@ function driftDomains(days: number): Domain[] {
     },
   ][t - 1]
 
+  /* ONE ARC, NOT SIX UNRELATED LABELS: this used to switch whose behavior
+     it was even describing partway through (her noticing, then suddenly
+     his own distraction quoted back at tier 5) and closed on a hedge
+     ("weaker, or gone") that never actually arrives anywhere. He called
+     that nonsense. It is a single relationship, deteriorating in a
+     straight line, and it ends at an actual breakup -- not a maybe. */
+  /* COMPRESSED TO FIT HIS OWN GOAL HORIZON: it used to take a full year-plus
+     to reach the breakup, which sat behind a longer horizon than he has a
+     real goal for -- reachable in the code, not on the actual slider. His
+     own horizon is roughly six months out, so the whole arc runs its
+     course inside that: "Unchanged" is gone as its own stage, the actual
+     breakup is the last CURRENTLY reachable stop, and the aftermath
+     (unreachable today, real the moment a goal pushes the horizon past a
+     year) is what is left for the tiers beyond it. */
   const relationships: Omit<Domain, 'label'> = [
-    { value: 'Unchanged', line: "You're still just as present. Today." },
-    { value: 'Noticed', line: "One month in, and she's already noticed. Not a rupture -- a pattern starting." },
-    { value: 'Naming it', line: "Three months. She's said something about it more than once." },
-    { value: 'Pulling back', line: "Half a year. She brings it up less. That's not peace, that's tired." },
-    { value: 'More tired', line: 'Less present, more distracted. His own words for a year of this.' },
+    { value: 'Noticed', line: "This week, and she's already noticed. Not a rupture -- a pattern starting." },
+    { value: 'Pulling away', line: "One month. She's stopped bringing it up as often. That's not calm, that's distance." },
+    { value: 'Fighting about it', line: "Three months. The ‘we need to talk’ conversations have started." },
     {
-      value: 'Weaker, or gone',
+      value: 'Breakup',
       rows: ['+3yr: always something more important', '+5yr: unresolved things pile up, stress rises', '+10yr: some relationships weaker, or gone'],
-      line: 'Repeated absence. Not one rupture, a pattern.',
+      line: 'Half a year. Not one fight that ends it -- a slow walk out the door, one skipped moment at a time.',
     },
+    { value: 'Gone', line: "A year on your own. She's not looking back -- she already left." },
+    { value: "Someone else's", line: 'Years alone with it. The version of you that never tried to fix it.' },
   ][t - 1]
 
   return [

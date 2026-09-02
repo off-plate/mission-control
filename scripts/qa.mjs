@@ -3226,16 +3226,19 @@ await step('timeline: the scrubber runs to his horizon, day, week or month', asy
   await page.keyboard.press('Home'); await page.waitForTimeout(300)
   await page.keyboard.press('ArrowRight'); await page.waitForTimeout(300)
   if (Number(await page.locator('.tl-slider input').inputValue()) !== 30) throw new Error('one press did not move exactly one month')
-  /* Both sides carry the same four figures, and the drift side is all noughts:
-     that contrast is the whole argument of the screen. */
+  /* Both sides carry the same six categories, and Discipline reads two
+     different kinds of number on purpose: his real momentum on the push
+     side, his own declining self-respect percentage on the drift side. */
   await page.keyboard.press('End'); await page.waitForTimeout(400)
-  const push = await page.locator('.tl-side.is-push .tl-figs').innerText()
-  const drift = await page.locator('.tl-side.is-drift .tl-figs').innerText()
-  for (const k of ['MOMENTUM', 'CHAIN', 'TASKS', 'FOCUSED']) {
+  const push = await page.locator('.tl-side.is-push .tl-domains').innerText()
+  const drift = await page.locator('.tl-side.is-drift .tl-domains').innerText()
+  for (const k of ['FINANCES', 'BODY', 'WORK', 'DISCIPLINE', 'FREEDOM', 'RELATIONSHIPS']) {
     if (!push.toUpperCase().includes(k) || !drift.toUpperCase().includes(k)) throw new Error(`${k} is missing from a side`)
   }
-  if (/[1-9]/.test(drift.replace(/[A-Z ]/gi, ''))) throw new Error(`the give-up side is not all noughts: ${drift.replace(/\n/g, ' ')}`)
-  if (!/[1-9]/.test(push.replace(/[A-Z ]/gi, ''))) throw new Error('the keep-going side has nothing in it')
+  const pushDiscipline = await page.locator('.tl-side.is-push .tl-domain', { hasText: 'Discipline' }).locator('dd').innerText()
+  const driftDiscipline = await page.locator('.tl-side.is-drift .tl-domain', { hasText: 'Discipline' }).locator('dd').innerText()
+  if (!/^\d+%$/.test(driftDiscipline)) throw new Error(`drift discipline should read a percentage, got "${driftDiscipline}"`)
+  if (/%$/.test(pushDiscipline)) throw new Error(`push discipline should be his real momentum, not a percentage, got "${pushDiscipline}"`)
   /* And the last stop is the horizon itself, not the last whole month short. */
   const at = await page.locator('.tl-gap').innerText()
   if (!new RegExp(String(span)).test(at)) throw new Error(`the end of the slider reads "${at.replace(/\n/g, ' ')}" against a ${span} day span`)

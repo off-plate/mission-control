@@ -7630,25 +7630,23 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .tl-close:hover { background: rgba(242, 240, 234, 0.14); color: var(--tl-ink); }
 
 .tl-livesfoot { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
-  display: flex; align-items: center; gap: clamp(14px, 2.4vw, 34px); flex-wrap: wrap;
-  padding: 18px clamp(18px, 3vw, 36px) 22px;
+  display: flex; align-items: center; gap: clamp(14px, 2.4vw, 34px);
+  padding: 16px clamp(18px, 3vw, 36px) 20px;
   /* A SOLID BAR, not a fade. The reel underneath can be anything, and a white
      frame turned the fade into an unreadable strip of grey on white. */
   background: #08090A; box-shadow: 0 -1px 0 rgba(242, 240, 234, 0.08); }
-/* FIVE FIXED DOTS BECAME A SCRUBBER. Six months day by day is 184 stops, and
-   184 dots is not a control. The grain snaps the slider's step, so the same
-   handle walks days, weeks or months. */
-.tl-grain { display: inline-flex; background: #131316; border-radius: 999px; padding: 4px; gap: 3px; flex: none; }
-.tl-grain button { border: 0; background: none; cursor: pointer; border-radius: 999px; min-height: 34px;
-  font: 700 11.5px/1 var(--font-body); color: var(--tl-dim); padding: 9px 15px;
-  transition: background var(--a-enter), color var(--a-enter); }
-.tl-grain button.on { background: var(--tl-hot); color: #08090A; font-weight: 800; }
+/* FIVE FIXED DOTS BECAME A SCRUBBER, then the scrubber grew a Days/Weeks/
+   Months toggle that only changed the drag increment -- the six futures
+   underneath are the same six tiers regardless of grain (see tierOf), so
+   switching it at rest, or dragging inside a tier, visibly did nothing. The
+   handle now always drags a day at a time, and the stops underneath are the
+   points that actually change the picture: tap one to jump straight there. */
+.tl-scrub { flex: 1 1 420px; min-width: 220px; display: flex; flex-direction: column; gap: 10px; }
 
 /* The focus ring goes on the WRAPPER. An outline around a 4px track renders as
    a lime pill the width of the window, which reads as a component rather than
    as focus. */
-.tl-slider { flex: 1 1 260px; min-width: 200px; display: flex; flex-direction: column; gap: 12px;
-  padding: 10px 12px; border-radius: 12px; }
+.tl-slider { display: flex; flex-direction: column; gap: 10px; padding: 10px 12px 0; border-radius: 12px; }
 .tl-slider:has(input:focus-visible) { box-shadow: inset 0 0 0 2px var(--tl-hot); }
 .tl-slider input { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 3px;
   background: rgba(242, 240, 234, 0.16); cursor: pointer; }
@@ -7657,6 +7655,11 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .tl-slider input::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%;
   background: var(--tl-hot); border: 0; cursor: grab; }
 .tl-slider input:focus-visible { outline: none; }
+.tl-stops { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px; }
+.tl-stops button { border: 0; background: #131316; cursor: pointer; border-radius: 999px;
+  font: 700 11px/1 var(--font-body); color: var(--tl-dim); padding: 8px 13px; white-space: nowrap;
+  transition: background var(--a-enter), color var(--a-enter); }
+.tl-stops button.on { background: var(--tl-hot); color: #08090A; font-weight: 800; }
 
 /* ---- the library ---- */
 .tl-lib { position: fixed; inset: 0; z-index: 320; background: rgba(4, 5, 6, 0.82);
@@ -7711,14 +7714,19 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   .tl-gap { margin-left: clamp(16px, 5vw, 24px); padding: 10px 14px; }
   .tl-gap b { font-size: 19px; }
   .tl-livesfoot { flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px 16px; }
+  /* .tl-scrub's 420px flex-basis means WIDTH on the desktop row layout --
+     column layout here flips the main axis to vertical, so that same 420px
+     became a HEIGHT basis and the footer tried to be 420px of scrub block
+     alone. Content decides the height on this axis instead. */
+  .tl-scrub { flex: 0 1 auto; }
   .tl-back { margin-left: 0; }
-  /* The footer is fixed over the bottom of this column and stacks into three
+  /* The footer is fixed over the bottom of this column and stacks into
      rows here, which is real height a percentage-based .tl-sides can't see
      coming -- padding at the end of a scrollable region only helps once
      scrolled there, and the unscrolled view is what actually loads. Its own
      box has to end where the footer begins instead, a measured value at this
      one breakpoint rather than a guess. */
-  .tl-sides { height: calc(100% - 400px); }
+  .tl-sides { height: calc(100% - 260px); }
 }
 @media (prefers-reduced-motion: reduce) {
   .tl-lives { animation: none; }

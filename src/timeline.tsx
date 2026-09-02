@@ -634,24 +634,52 @@ function DayCard({ p, zoom, money }: {
    constant, and the screen says which of the two it is using. */
 const DECLARED_HORIZON = '2027-02-28'
 
-type Grain = 'd' | 'w' | 'm'
-const GRAINS: { id: Grain; label: string; step: number }[] = [
-  { id: 'd', label: 'Days', step: 1 },
-  { id: 'w', label: 'Weeks', step: 7 },
-  { id: 'm', label: 'Months', step: 30 },
+/* Six tiers, one boundary list -- tierOf (below, next to the domains it
+   gates) reads the same array. A stop's day-value is the boundary minus
+   one, which is what guarantees "+1 month" can never land a day inside
+   tier 3 and show three months of numbers under a one-month header again:
+   there is only one place "30" is written down. */
+const TIER_BOUNDS = [7, 30, 90, 180, 365]
+
+/* THE SLIDER USED TO CARRY A SEPARATE Days/Weeks/Months TOGGLE that only
+   changed the drag increment -- the six futures underneath are the same six
+   tiers regardless (see tierOf), so switching grain at rest, or dragging
+   inside a tier, visibly did nothing. He called that dead. The handle now
+   always drags a full day at a time, and these are the stops that actually
+   change the picture -- tap one to jump straight there, or drag freely
+   between them. */
+const TIER_LABELS = ['This week', '+1 month', '+3 months', '+6 months', '+1 year']
+const TIER_STOPS: { label: string; days: number }[] = [
+  { label: 'Today', days: 0 },
+  ...TIER_LABELS.map((label, i) => ({ label, days: TIER_BOUNDS[i] - 1 })),
 ]
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const dayAfter = (n: number) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + n); return d }
 const longDate = (d: Date) => `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`
 
-/** "Six months", "Eleven weeks", "Four days". The unit follows the grain he
- *  is scrubbing in, because "182 days" is not how anyone hears half a year. */
-function spanWords(days: number, grain: Grain): string {
+/** "Six months", "Eleven weeks", "Four days" -- the unit scales itself to
+ *  the number, because "182 days" is not how anyone hears half a year. */
+function spanWords(days: number): string {
   if (days === 0) return 'Today'
-  if (grain === 'm' && days >= 30) { const n = Math.round(days / 30); return `${n} month${n === 1 ? '' : 's'}` }
-  if (grain !== 'd' && days >= 7) { const n = Math.round(days / 7); return `${n} week${n === 1 ? '' : 's'}` }
+  if (days >= 28) { const n = Math.round(days / 30); return `${n} month${n === 1 ? '' : 's'}` }
+  if (days >= 10) { const n = Math.round(days / 7); return `${n} week${n === 1 ? '' : 's'}` }
   return `${days} day${days === 1 ? '' : 's'}`
+}
+
+/** The tier stops he can tap, clipped to however far his own horizon
+ *  actually reaches -- a stop past the horizon is not a real stop, it is
+ *  the same handle position wearing a second label. The horizon itself is
+ *  always the last one, under its own short date. */
+function buildStops(span: number, horizonLabel: string): { label: string; days: number }[] {
+  const out: { label: string; days: number }[] = []
+  for (const s of TIER_STOPS) {
+    if (s.days >= span) break
+    if (out.length && s.days - out[out.length - 1].days < 2) continue
+    out.push(s)
+  }
+  out.push({ label: horizonLabel, days: span })
+  return out
 }
 
 /* ---- the reel ---- */
@@ -854,12 +882,13 @@ interface NarrativeCtx {
  *  5 = half a year+, 6 = the long haul. Day 0 is handled separately, on
  *  purpose: at nine in the morning nothing has actually happened yet, and
  *  dramatizing that would be the one lie this screen could tell. */
+/* Six tiers, one boundary list. The tap-stops on the footer's scrubber name
+   these same six tiers -- they read this array too (see TIER_STOPS) instead
+   of carrying their own copy of "30", "90", "180"... a second copy is
+   exactly how a stop labelled "+1 month" ended up landing one day inside
+   tier 3 and showing three months of numbers under a one-month header. */
 function tierOf(days: number): 1 | 2 | 3 | 4 | 5 | 6 {
-  if (days < 7) return 1
-  if (days < 30) return 2
-  if (days < 90) return 3
-  if (days < 180) return 4
-  if (days < 365) return 5
+  for (let i = 0; i < TIER_BOUNDS.length; i++) if (days < TIER_BOUNDS[i]) return (i + 1) as 1 | 2 | 3 | 4 | 5
   return 6
 }
 
@@ -1083,7 +1112,6 @@ function TwoLives({ onBack, run, chain, money }: {
     return { money, anchorHabit: build[0]?.name, quitHabit: quit[0]?.name, goalName: open[0]?.name }
   }, [habits, goals, money])
   const pool = useReelPool()
-  const [grain, setGrain] = useState<Grain>('m')
   const [at, setAt] = useState(0)
   const [lib, setLib] = useState(false)
   /* A different reel each time this screen opens, not always the first one in
@@ -1112,23 +1140,23 @@ function TwoLives({ onBack, run, chain, money }: {
   }, [goals])
 
   const span = Math.max(1, daysBetween(localDateKey(), horizon.day))
-  const step = GRAINS.find((g) => g.id === grain)!.step
-  /* Snap to the grain, and never past the horizon. THE LAST STOP IS THE
-     HORIZON ITSELF: 184 days does not divide by 30, so snapping alone left the
-     end of the slider four days short of the date printed beside it. The
-     threshold is a full step, not half of one: the End key (and, in some
-     browsers, dragging to the physical end) clamps the raw value to the
-     nearest step BELOW max when max is not a step multiple -- span=179 at
-     step=30 lands the native input on 150, a full 29 days short, which a
-     half-step threshold never catches. */
-  const days = at >= span - step ? span : Math.min(span, Math.round(at / step) * step)
+  /* The handle drags a full day at a time now -- min/max/step=1 on the input
+     itself already clamps and rounds, so there is no snapping left to do
+     here. */
+  const days = Math.min(at, span)
   const when = dayAfter(days)
   const p = project(run, chain.current, days)
   /* The reel is what plays while he reads the two futures, not a second way
      to read the slider: it used to fold the horizon into the same index
-     (`skip + days/step`), so dragging Days/Weeks/Months to a new point
-     silently swapped the clip too. It answers to skip alone now. */
+     (`skip + days/step`), so dragging the slider to a new point silently
+     swapped the clip too. It answers to skip alone now. */
   const url = pool.length ? pool[skip % pool.length] : ''
+  const horizonShort = longDate(new Date(`${horizon.day}T00:00:00`)).replace(/^\d+ /, '')
+  const stops = useMemo(() => buildStops(span, horizonShort), [span, horizonShort])
+  /* A keyboard step of a single day is technically correct and practically
+     useless across a six-month range -- roughly thirty presses end to end,
+     regardless of how far the horizon actually is. */
+  const kbStep = Math.max(1, Math.round(span / 30))
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
@@ -1137,14 +1165,14 @@ function TwoLives({ onBack, run, chain, money }: {
          the arrow keys, so this handler moved it a second step on top of the
          browser's own and the handle jumped two at a time. */
       if ((e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.tagName === 'TEXTAREA') return
-      if (e.key === 'ArrowRight') setAt((v) => Math.min(span, v + step))
-      if (e.key === 'ArrowLeft') setAt((v) => Math.max(0, v - step))
+      if (e.key === 'ArrowRight') setAt((v) => Math.min(span, v + kbStep))
+      if (e.key === 'ArrowLeft') setAt((v) => Math.max(0, v - kbStep))
     }
     addEventListener('keydown', k)
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => { removeEventListener('keydown', k); document.body.style.overflow = prev }
-  }, [onBack, span, step, lib])
+  }, [onBack, span, kbStep, lib])
 
   return (
     <div className="tl-lives" role="dialog" aria-modal="true" aria-label="Two lives">
@@ -1153,7 +1181,7 @@ function TwoLives({ onBack, run, chain, money }: {
         <div className="tl-sides">
           <section className="tl-side is-push">
             <span className="tl-pill">If you do it anyway</span>
-            <p className="tl-said">{days === 0 ? 'Today. Nothing has happened yet.' : `${spanWords(days, grain)} of keeping it.`}</p>
+            <p className="tl-said">{days === 0 ? 'Today. Nothing has happened yet.' : `${spanWords(days)} of keeping it.`}</p>
             {days === 0 ? (
               <p className="tl-under">
                 {p.assumed
@@ -1170,7 +1198,7 @@ function TwoLives({ onBack, run, chain, money }: {
           </div>
           <section className="tl-side is-drift">
             <span className="tl-pill">If you skip it</span>
-            <p className="tl-said">{days === 0 ? 'Today. Nothing has happened yet.' : `${spanWords(days, grain)} of not.`}</p>
+            <p className="tl-said">{days === 0 ? 'Today. Nothing has happened yet.' : `${spanWords(days)} of not.`}</p>
             {days === 0 ? (
               <p className="tl-under">Both men are the same man this morning.</p>
             ) : (
@@ -1183,21 +1211,23 @@ function TwoLives({ onBack, run, chain, money }: {
       <button className="tl-close" onClick={onBack} aria-label="Close">✕</button>
 
       <footer className="tl-livesfoot">
-        <div className="tl-grain" role="group" aria-label="Grain">
-          {GRAINS.map((g) => (
-            <button key={g.id} className={grain === g.id ? 'on' : ''} aria-pressed={grain === g.id}
-              onClick={() => setGrain(g.id)}>{g.label}</button>
-          ))}
+        <div className="tl-scrub">
+          <label className="tl-slider">
+            <input type="range" min={0} max={span} step={1} value={days}
+              aria-label={`How far out: ${days} days`}
+              onChange={(e) => setAt(Number(e.target.value))} />
+            <span className="tl-l">
+              Now {'→'} {longDate(new Date(`${horizon.day}T00:00:00`))}
+              {horizon.own ? ', your furthest goal' : ''}
+            </span>
+          </label>
+          <div className="tl-stops" role="group" aria-label="Jump to">
+            {stops.map((s) => (
+              <button key={s.label} className={days === s.days ? 'on' : ''} aria-pressed={days === s.days}
+                onClick={() => setAt(s.days)}>{s.label}</button>
+            ))}
+          </div>
         </div>
-        <label className="tl-slider">
-          <input type="range" min={0} max={span} step={step} value={Math.min(at, span)}
-            aria-label={`How far out: ${days} days`}
-            onChange={(e) => setAt(Number(e.target.value))} />
-          <span className="tl-l">
-            Now {'→'} {longDate(new Date(`${horizon.day}T00:00:00`))}
-            {horizon.own ? ', your furthest goal' : ''}
-          </span>
-        </label>
         <button className="tl-back" onClick={onBack}>Ok. Let&rsquo;s go.</button>
       </footer>
 

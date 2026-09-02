@@ -348,6 +348,34 @@ export default function App() {
   const backFromZone = useRef<PageId>('today')
   useEffect(() => { if (page !== 'zone') backFromZone.current = page }, [page])
 
+  /* His catch (2026-09-04): the drawer hangs at a flat `left: var(--gutter)`
+     (styles.css, .topstick > .nav), the same edge .topbar itself starts
+     at -- but .spaces, what it's actually supposed to line up under,
+     starts well past that, after the brand mark and name. A fixed extra
+     offset can't stand in for the gap between them: --gutter is its own
+     clamp(1rem, 2.2vw, 3rem), so it grows with the viewport, and
+     .brand-name disappears entirely between 640 and 1039px (styles.css),
+     which alone swings the real gap from about 16px to about 190px.
+     Measured both live rather than guessing a single number that would
+     only ever be right at one width. Read on mount, on resize, and on
+     every page change -- Zone hides .spaces and this row together, so
+     leaving Zone needs a fresh measurement waiting for it, not last
+     session's. */
+  const topstickRef = useRef<HTMLDivElement>(null)
+  const spacesRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const measure = () => {
+      const topstick = topstickRef.current
+      const spaces = spacesRef.current
+      if (!topstick || !spaces) return
+      const offset = spaces.getBoundingClientRect().left - topstick.getBoundingClientRect().left
+      topstick.style.setProperty('--nav-align', `${offset}px`)
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [page])
+
   return (
     /* The Zone is a room, not a dark card: the shell carries the class so the
        header goes under the water with everything else, instead of leaving a
@@ -363,6 +391,7 @@ export default function App() {
           starts the grace period. Touch never fires these, which is correct: a
           phone has no nav row at all, it has the hamburger. */}
       <div
+        ref={topstickRef}
         className={`topstick${nav.open ? ' is-navopen' : ''}`}
         onMouseLeave={nav.hideSoon}
         onFocus={nav.show}
@@ -410,7 +439,7 @@ export default function App() {
           </label>
         )}
         {page !== 'zone' && (
-          <nav className="spaces" aria-label="Spaces">
+          <nav ref={spacesRef} className="spaces" aria-label="Spaces">
             {(['all', ...Object.keys(SPACE_LABELS)] as ViewId[]).map((s) => (
               <button
                 key={s}

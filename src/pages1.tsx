@@ -1461,6 +1461,57 @@ function HabitTrail({ h, days }: { h: HabitDef; days: number }) {
    the other, because each page keeps its own band metrics, its own add button
    and its own state. The menu shows one tab; the address of each half still
    resolves, so bookmarks and every existing setPage('goals') keep working. */
+/* ---- a routine's own record, at the grain its cadence deserves ----
+
+   The window is shared across the panel; the GRAIN follows the routine. A
+   monthly routine drawn in days is thirteen empty cells and one full one for a
+   perfect score, which reads as near-total failure. Drawn in months it reads
+   as what it is. So Year means fifty-two weeks for a daily routine and twelve
+   months for a monthly one: different lengths, same meaning.
+
+   Everything here reads the folder's own habit, which the store already ticks
+   when the last step of a routine is kept. */
+type HistWin = 'week' | 'month' | 'year'
+const GRAIN: Record<HistWin, Record<'day' | 'week' | 'month', { n: number; unit: string }>> = {
+  week: { day: { n: 7, unit: 'days' }, week: { n: 1, unit: 'week' }, month: { n: 1, unit: 'month' } },
+  month: { day: { n: 30, unit: 'days' }, week: { n: 4, unit: 'weeks' }, month: { n: 1, unit: 'month' } },
+  year: { day: { n: 52, unit: 'weeks' }, week: { n: 52, unit: 'weeks' }, month: { n: 12, unit: 'months' } },
+}
+/** Which unit a routine is counted in, from the cadence of the habits in it. */
+function grainOf(freq: HabitFrequency | undefined, win: HistWin): { step: 'day' | 'week' | 'month'; n: number; unit: string } {
+  const base: 'day' | 'week' | 'month' = freq === 'monthly' ? 'month' : freq === 'weekly' ? 'week' : 'day'
+  /* A daily routine over a year is counted in weeks, or it is 365 numbers
+     nobody reads and a bar that means the same either way. */
+  const step: 'day' | 'week' | 'month' = base === 'day' && win === 'year' ? 'week' : base
+  const g = GRAIN[win][base]
+  return { step, n: g.n, unit: g.unit }
+}
+const startOfDay = (back: number, step: 'day' | 'week' | 'month'): Date => {
+  const d = new Date(); d.setHours(0, 0, 0, 0)
+  if (step === 'day') d.setDate(d.getDate() - back)
+  else if (step === 'week') { d.setDate(d.getDate() - ((d.getDay() + 6) % 7) - back * 7) }
+  else { d.setDate(1); d.setMonth(d.getMonth() - back) }
+  return d
+}
+/** Kept and due across the window. Weekends never count against a Mon-to-Fri
+ *  routine, or a perfect week reads as five out of seven. */
+function routineRecord(kept: Set<string>, freq: HabitFrequency | undefined, win: HistWin): { hit: number; due: number; unit: string } {
+  const { step, n, unit } = grainOf(freq, win)
+  let hit = 0, due = 0
+  for (let i = 0; i < n; i++) {
+    const from = startOfDay(i, step)
+    const to = new Date(from)
+    if (step === 'day') { /* one day */ }
+    else if (step === 'week') to.setDate(to.getDate() + 6)
+    else { to.setMonth(to.getMonth() + 1); to.setDate(0) }
+    if (step === 'day' && freq === 'weekdays' && (from.getDay() === 0 || from.getDay() === 6)) continue
+    due++
+    const a = localDateKey(from), b = localDateKey(to)
+    for (const k of kept) { if (k >= a && k <= b) { hit++; break } }
+  }
+  return { hit, due, unit }
+}
+
 function HabitsGoalsSwitch({ on }: { on: 'habits' | 'goals' | 'quitting' }) {
   const { setPage } = useStore()
   return (
@@ -2221,6 +2272,12 @@ export function HabitsPage() {
      he would never run two at once, and a second surface would be a second
      answer to "where am I". */
   const [running, setRunning] = useState<string | null>(null)
+  /* One window for the whole panel, never one per card: two rows disagreeing
+     about what "this month" means is how a page quietly stops being trusted.
+     Not remembered between visits, for the same reason the cards are always
+     shut when he arrives: a setting he did not choose today should not be
+     shaping what he reads today. */
+  const [histWin, setHistWin] = useState<'week' | 'month' | 'year'>('month')
   /* Which routine cards are open, for this visit only.
      His instruction, 2026-08-26: "either everything closed or everything
      opened, I would prefer it closed." It used to be remembered, so the page
@@ -2313,15 +2370,16 @@ export function HabitsPage() {
     const finished = folderIsDone(c)
     const isRunning = running === c.id
     const open = shutFolders.has(c.id)
+    const freq = c.list[0]?.frequency
+    const period = freq === 'monthly' ? 'this month' : freq === 'weekly' ? 'this week' : 'today'
+    /* The folder's own habit is the record of having finished it, and the store
+       already writes it. Without one there is no history to draw, so the bar
+       stays out rather than drawing a convincing empty one. */
+    const ownId = c.folder?.habitId
+    const rec = ownId ? routineRecord(new Set(habitLog.filter((t) => t.habitId === ownId).map((t) => t.day)), freq, histWin) : null
     return (
-      <div className={`rtc${finished ? ' is-done' : ''}${isRunning ? ' is-running' : ''}${open ? ' is-open' : ''}`} key={c.id}>
+      <div className={`rtc${finished ? ' done' : ''}${isRunning ? ' is-running' : ''}${open ? ' is-open' : ''}`} key={c.id}>
         <div className="rtc-top">
-          {/* Start is the primary action and the reason the card exists. The
-              caret is the secondary one, and it has to be here: a step carries
-              a typing gate, an either-or, a link, and a day he may want to
-              correct, and none of that is reachable from a card that only
-              offers Start. Shut by default, so the page stays a list of
-              routines rather than a wall of fifty rows. */}
           <button
             className="rtc-open"
             aria-expanded={open}
@@ -2330,9 +2388,29 @@ export function HabitsPage() {
           ><Icon.ChevronRight size={12} className="folder-caret" /></button>
           <span className="rtc-id">
             <span className="rtc-name">{c.label}</span>
-            <span className="rtc-when microcap">{habitFrequencyLabel({ frequency: c.list[0]?.frequency } as HabitDef)}</span>
+            <span className="rtc-when microcap">{habitFrequencyLabel({ frequency: freq } as HabitDef)}</span>
           </span>
-          <span className="rtc-count mono">{finished ? 'done today' : `${done} of ${total}`}</span>
+
+          {/* The six hundred pixels that were doing nothing. The bar is the
+              record of a window that has already happened; TODAY is the ring
+              beside it, deliberately not part of the bar. Folding today in
+              would let a day he has not started tick the bar forward, and an
+              unfinished day would read at a glance as a finished one. */}
+          {rec && rec.due > 0 && (
+            <span className="rtc-run">
+              <span className="rtc-meter"><i style={{ width: `${Math.round((rec.hit / rec.due) * 100)}%` }} /></span>
+              <span
+                className={`rtc-today${finished ? ' is-on' : done > 0 ? ' is-part' : ''}`}
+                title={finished ? `finished ${period}` : done > 0 ? 'started, not finished' : `not yet ${period}`}
+                aria-label={finished ? `finished ${period}` : done > 0 ? 'started, not finished' : `not yet ${period}`}
+              />
+              <span className="rtc-tally"><b className="mono">{rec.hit}/{rec.due}</b> {rec.unit}</span>
+            </span>
+          )}
+
+          {finished
+            ? <span className="microcap rtc-donetag">done {period}</span>
+            : <span className="rtc-count mono">{done} of {total}</span>}
           <button
             className={`btn btn-sm rtc-start${finished ? ' btn-quiet' : ' btn-primary'}`}
             onClick={() => setRunning(isRunning ? null : c.id)}
@@ -2358,9 +2436,6 @@ export function HabitsPage() {
     )
   }
 
-  /* A reading says what it counts. Minutes today for anything with a daily
-     minute target, days kept this week for everything else; showing "1 / 7" for
-     a habit whose target is an hour a day was measuring the wrong thing. */
   const meter = (now: number, target: number, unit = '', suffix = '') => {
     const met = target > 0 && now >= target
     return (
@@ -2420,6 +2495,14 @@ export function HabitsPage() {
             <div className="panel hg-panel">
               <div className="hg-head">
                 <span className="microcap">Routines</span>
+                <span className="hist-win" role="group" aria-label="How far back the bars look">
+                  {(['week', 'month', 'year'] as const).map((w) => (
+                    <button
+                      key={w} className={`hist-btn${histWin === w ? ' is-on' : ''}`}
+                      aria-pressed={histWin === w} onClick={() => setHistWin(w)}
+                    >{w}</button>
+                  ))}
+                </span>
                 <span className="hg-n">{routineCols.filter(folderIsDone).length} of {routineCols.length} done today</span>
               </div>
               <div className="rtc-list">{routineCols.filter((c) => !folderIsDone(c)).map(routineCard)}</div>
@@ -2500,36 +2583,6 @@ export function HabitsPage() {
                   </div>
                 ))}
               </div>
-              {firedRows.length > 0 && (
-                <>
-                  <div className="microcap hg-sub">Ticked by finishing a routine</div>
-                  <div className="hg-rows">
-                    {firedRows.map(({ r, h }) => (
-                      <div className="hg-row" key={h.id}>
-                        <span className="hg-what">
-                          <span className="hg-title">{h.name}<span className="habit-qual">{SPACE_LABELS[h.space]}</span></span>
-                          {/* The OVERVIEW he asked for by name: how many times he
-                              has actually run this thing. Restating "fires when
-                              you finish X" on every row said nothing the card in
-                              the left column had not already said. */}
-                          <span className="hg-note">
-                            {(() => {
-                              const streak = currentStreak(habitLog, h.id)
-                              const month = keptDaysIn(habitLog, h.id, localDateKey(new Date(new Date().getFullYear(), new Date().getMonth(), 1)), localDateKey()).size
-                              if (!month) return `not yet this month, from ${r.title}`
-                              return `${month} this month${streak > 1 ? `, ${streak} in a row` : ''}`
-                            })()}
-                          </span>
-                        </span>
-                        <span className="hg-do">
-                          <span className="microcap hg-auto">automatic</span>
-                          <button className="daydot is-auto" role="checkbox" aria-checked={h.days[todayIndex]} disabled aria-label={`${h.name}, set by ${r.title}`} />
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
             </div>
           )}
 

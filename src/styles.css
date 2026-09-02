@@ -8221,7 +8221,7 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    past day he may want to correct. Shut by default so the page stays a list of
    routines rather than a wall of fifty rows. */
 .rtc-top { display: flex; align-items: center; gap: var(--s3); width: 100%; }
-.rtc-id { flex: 1 1 auto; }
+.rtc-id { flex: 0 1 auto; min-width: 0; max-width: 34%; }
 .rtc-open {
   flex: none; width: 26px; height: 26px; padding: 0; display: grid; place-items: center;
   border: 0; background: none; color: var(--a-soft); cursor: pointer; border-radius: var(--a-r-xs);
@@ -8311,3 +8311,80 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .troom ::-webkit-scrollbar,
 .troom ::-webkit-scrollbar-track,
 .troom ::-webkit-scrollbar-thumb { width: 0; height: 0; display: none; background: none; }
+
+/* ==========================================================================
+   THE ROUTINE CARD'S OWN RECORD
+   ==========================================================================
+   His read, and it was right: the card is about 1030px wide and roughly 600 of
+   them were doing nothing between the name and the count, while a whole section
+   in the right column repeated the same routines to say one thing the card did
+   not. That section is gone and its history lives here.
+
+   A bar, not cells. He picked it, and it is the quieter answer: one proportion
+   instead of thirty marks. What a bar cannot say is anything about the day you
+   are standing in, so TODAY is a ring beside it and never part of it. Folding
+   today into the bar would let a day he has not started tick it forward, and an
+   unfinished day would read at a glance as a finished one.
+   ========================================================================== */
+.rtc-run { flex: 1 1 auto; display: flex; align-items: center; gap: var(--s3); min-width: 0; }
+.rtc-meter { flex: 1 1 auto; min-width: 60px; height: 10px; border-radius: 5px; background: var(--a-sunk); overflow: hidden; }
+.rtc-meter i { display: block; height: 100%; background: var(--a-progress-solid); transition: width var(--a-enter); }
+/* Empty ring, open. Half, started. Filled with a tick, finished. */
+.rtc-today {
+  flex: none; width: 14px; height: 14px; border-radius: 50%; position: relative;
+  box-shadow: inset 0 0 0 2px var(--a-line-2);
+}
+.rtc-today.is-part { box-shadow: inset 0 0 0 2px var(--a-accent-text); background: var(--a-accent-wash); }
+.rtc-today.is-on { background: var(--a-progress-solid); box-shadow: none; }
+.rtc-today.is-on::after {
+  content: ''; position: absolute; left: 4px; top: 3px; width: 5px; height: 8px;
+  border-right: 2px solid #fff; border-bottom: 2px solid #fff; transform: rotate(40deg);
+}
+/* Every fixed column on this row is width the bar does not get. Trimmed to what
+   the text actually needs: the tally is at most "19/30 days" and the count at
+   most "0 of 8". */
+.rtc-tally { flex: none; min-width: 86px; text-align: right; font-size: var(--a-f-chip); color: var(--a-soft); white-space: nowrap; }
+.rtc-tally b { color: var(--a-ink); font-weight: 700; }
+.rtc-donetag { flex: none; color: var(--a-progress); white-space: nowrap; }
+
+/* One window for the whole panel, never one per card: two rows disagreeing
+   about what "this month" means is how a page stops being trusted. */
+.hist-win { display: inline-flex; background: var(--a-sunk); border-radius: 999px; padding: 3px; gap: 2px; }
+.hist-btn {
+  font: inherit; font-size: var(--a-f-label); letter-spacing: .06em; text-transform: uppercase;
+  font-weight: 700; border: 0; background: none; color: var(--a-muted);
+  padding: 5px 11px; border-radius: 999px; cursor: pointer;
+  transition: background var(--a-enter), color var(--a-enter);
+}
+.hist-btn:hover { background: var(--a-accent-wash); color: var(--a-accent-text); }
+.hist-btn.is-on { background: var(--a-accent); color: var(--a-ink); font-weight: 800; }
+
+/* Finished: struck across the WHOLE card, edge to edge. His call and the right
+   one. A line through the name is a typographic detail; a line across a
+   thousand pixels is the card being closed. Everything steps back to half so
+   the line is the loudest thing on the row, except the button, which still has
+   to be readable and pressable through it. */
+.rtc.done { position: relative; }
+.rtc.done .rtc-top > * { opacity: .5; }
+/* The button sits ABOVE the line and carries the card's own ground, so the
+   strike appears to pass behind it. A struck-through control reads as
+   disabled, and this one is the way back. */
+.rtc.done .rtc-top > .btn { opacity: 1; position: relative; z-index: 2; background: var(--a-sunk); }
+.rtc.done .rtc-top > .btn:hover { background: var(--a-card); }
+.rtc.done::after {
+  content: ''; position: absolute; left: var(--s5); right: var(--s5); top: 50%; height: 2px;
+  background: var(--a-soft); border-radius: 2px; pointer-events: none;
+  transform-origin: left; animation: rtc-strike 260ms cubic-bezier(.22, .61, .36, 1) both;
+}
+@keyframes rtc-strike { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+/* An open card has nothing to strike, and a struck one that is open for editing
+   would draw the line through its own steps. */
+.rtc.done.is-open::after { display: none; }
+.rtc.done.is-open .rtc-top > * { opacity: .5; }
+@media (prefers-reduced-motion: reduce) { .rtc.done::after { animation: none; } }
+
+@media (max-width: 900px) {
+  /* No room for a bar beside the name; the count and the ring still fit. */
+  .rtc-run { flex: 1 1 100%; order: 9; margin-top: var(--s2); }
+  .rtc-top { flex-wrap: wrap; }
+}

@@ -8,7 +8,12 @@
 
    `filled` exists for the transport controls only. They were filled shapes before
    this set arrived and an outlined play triangle at 13px reads as an empty box, so
-   the geometry comes from Hicon and the weight stays where it was. */
+   the geometry comes from Hicon and the weight stays where it was.
+
+   One deliberate exception, at the bottom of this file: the Dock* icons are
+   Tabler (MIT), his explicit call (2026-09-04) after svgrepo blocked every
+   automated request that day. Scoped to the floating dock alone -- see the
+   comment down there before reaching for a third source. */
 import type { ReactNode } from 'react'
 
 /* Hicon draws its glyphs with wildly uneven padding: measured on the real paths,
@@ -198,6 +203,25 @@ export const AppsGrid = make(<><rect x="3" y="3" width="8" height="8" rx="1.6" /
 /* Clear formatting. The Tx glyph is the convention every editor uses and
    Hicon has no eraser, so borrowing `x` alone would lose the meaning. */
 export const ClearFormat = make(<><path d="M6 5h13M9.5 5L7 19M14 12l6 7M20 12l-6 7" /></>, 16, { k: 1.4071, x: -6.293, y: -4.886 })
+
+/* THE DOCK'S OWN FOUR, an explicit exception to the one-set rule above, on
+   his instruction (2026-09-04). svgrepo -- where every other icon in this
+   file comes from -- blocked every automated request that day (HTTP 429 on
+   the homepage itself, not just a specific page), confirmed a second time
+   before this was written: not a fluke worth working around inside Hicon.
+   Asked him directly rather than quietly reaching for a different family
+   on my own judgment; his answer was "any other library... doesn't matter
+   if commercial or not." These four are Tabler Icons (MIT licensed,
+   github.com/tabler/tabler-icons, fetched straight from its raw source),
+   picked specifically for Note, Bills, Timeline and Focus in the floating
+   dock and nowhere else -- the rest of the app keeps reading Hicon
+   unchanged. Already properly proportioned in their own 24x24 box by
+   Tabler's own convention, so fit is the identity transform, not
+   measured the way Hicon's own uneven padding required above. */
+export const DockNote = make(<><path d="M5 5a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2l0 -14" /><path d="M9 7l6 0" /><path d="M9 11l6 0" /><path d="M9 15l4 0" /></>, 16, { k: 1, x: 0, y: 0 })
+export const DockWallet = make(<><path d="M17 8v-3a1 1 0 0 0 -1 -1h-10a2 2 0 0 0 0 4h12a1 1 0 0 1 1 1v3m0 4v3a1 1 0 0 1 -1 1h-12a2 2 0 0 1 -2 -2v-12" /><path d="M20 12v4h-4a2 2 0 0 1 0 -4h4" /></>, 16, { k: 1, x: 0, y: 0 })
+export const DockHistory = make(<><path d="M12 8l0 4l2 2" /><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5" /></>, 16, { k: 1, x: 0, y: 0 })
+export const DockChartBar = make(<><path d="M3 13a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -6" /><path d="M15 9a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -10" /><path d="M9 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -14" /><path d="M4 20h14" /></>, 16, { k: 1, x: 0, y: 0 })
 
 /* The drag grip. Not an icon: a texture that says "this row moves", which is
    why it is dots on a 6x16 field rather than anything on the 24 grid. */

@@ -7072,10 +7072,23 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .goal-row::before {
   content: ''; position: absolute; inset: 0; background: var(--a-accent-wash);
   border-radius: var(--a-r-xs); transform: scaleX(0); transform-origin: left;
-  transition: transform var(--a-enter); z-index: 0;
+  transition: transform var(--a-enter); z-index: -1;
 }
 .goal-item:hover .goal-row::before { transform: scaleX(1); }
-.goal-row > * { position: relative; z-index: 1; }
+/* z-index: auto, not a number -- the exact bug the BUTTON FIXES block above
+   already caught and fixed once for .btn. A specified z-index (even 1) on a
+   positioned element opens its OWN stacking context, which traps anything
+   inside it -- .kebab-wrap's real z-index:40 dropdown menu (styles.css,
+   .kebab-menu) included. Every row's dropdown was silently capped at "z-index
+   1 relative to its own row", so two rows' content compared by DOCUMENT
+   ORDER instead: whichever goal-row came later in the list always painted
+   over an earlier row's open menu, his catch, no matter how high the menu's
+   own z-index claimed to be. auto keeps the wipe-lifting behavior (content
+   in normal flow already paints above the ::before's now-negative z-index)
+   without creating a context of its own, so .kebab-menu's z-index: 40
+   finally resolves against the real page, the same fix -- isolate the wipe,
+   never the content -- .btn already uses. */
+.goal-row > * { position: relative; z-index: auto; }
 .gr-name { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
 .gr-obj { font-size: var(--a-f-row); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gr-count { font-weight: 800; font-size: 17px; text-align: right; font-variant-numeric: tabular-nums; }

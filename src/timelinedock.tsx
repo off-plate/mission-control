@@ -19,7 +19,7 @@ const hm = (min: number) => `${Math.floor(min / 60)}h ${String(Math.round(min % 
 const kc = (n: number) => Math.round(n).toLocaleString('cs-CZ')
 
 export function TimelineChip() {
-  return <Icon.Rewind size={16} />
+  return <Icon.Rewind size={22} />
 }
 
 export function TimelinePanel({ dockControls, onOpenFull }: { dockControls?: ReactNode; onOpenFull?: () => void }) {

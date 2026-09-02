@@ -20,7 +20,7 @@ const LAST_KEY = 'mc-notedock-last'
    fact the way a running timer has a countdown, so the collapsed chip
    doesn't try to invent one. */
 export function NoteChip() {
-  return <Icon.Note size={17} />
+  return <Icon.Note size={22} />
 }
 
 export function NotePanel({ dockControls, onOpenFull }: { dockControls?: ReactNode; onOpenFull?: () => void }) {

@@ -3202,30 +3202,41 @@ await step('timeline: the reel answers to Next, never to the slider', async () =
   await page.keyboard.press('Escape'); await page.waitForTimeout(300)
 })
 
-/* THE STOPS ARE THE RANGE TO HIS GOAL, at a grain he picks, and both futures
-   are worked out rather than written. */
-await step('timeline: the scrubber runs to his horizon, day, week or month', async () => {
+/* THE STOPS UNDER THE SLIDER ARE THE SIX TIERS, clipped to his own horizon --
+   tapping one is a real jump every time, not sometimes a no-op. The old
+   Days/Weeks/Months toggle only ever changed the drag increment, so
+   switching it at rest (or dragging inside a tier) visibly changed nothing;
+   he called that dead and it is gone. */
+await step('timeline: the scrubber runs to his horizon, and its stops actually change the picture', async () => {
   await fresh('timeline')
   await page.locator('.tl-giveup').click(); await page.waitForTimeout(500)
-  const grains = await page.locator('.tl-grain button').allInnerTexts()
-  if (grains.join(',') !== 'Days,Weeks,Months') throw new Error(`the grain reads ${grains.join(',')}`)
   const horizon = await page.locator('.tl-slider .tl-l').innerText()
   if (!/2027/.test(horizon)) throw new Error(`the range reads "${horizon}"`)
-  const steps = []
-  for (const [i, want] of [[0, 1], [1, 7], [2, 30]]) {
-    await page.locator('.tl-grain button').nth(i).click(); await page.waitForTimeout(300)
-    const s = await page.locator('.tl-slider input').getAttribute('step')
-    steps.push(Number(s))
-    if (Number(s) !== want) throw new Error(`grain ${i} steps by ${s}, not ${want}`)
-  }
   const span = Number(await page.locator('.tl-slider input').getAttribute('max'))
   if (span < 30) throw new Error(`the horizon is only ${span} days out`)
-  /* One press, one step. The screen's own arrow handler used to move it a
-     second time on top of the browser's. */
+  if (Number(await page.locator('.tl-slider input').getAttribute('step')) !== 1) {
+    throw new Error('the handle no longer drags a day at a time')
+  }
+  const stops = await page.locator('.tl-stops button').allInnerTexts()
+  if (stops[0] !== 'Today') throw new Error(`the first stop reads "${stops[0]}", not Today`)
+  if (stops.length < 3) throw new Error(`only ${stops.length} stops -- the tiers collapsed`)
+  if (stops[stops.length - 1] === 'Today') throw new Error('the horizon has no stop of its own')
+  /* Tapping a stop is the fix itself: at rest, picking a different one used
+     to be a no-op. Day zero has no .tl-domains at all (it is the one-line
+     "nothing has happened yet" state), so the comparison is stop-to-stop,
+     not rest-to-stop. */
+  await page.locator('.tl-stops button').nth(1).click(); await page.waitForTimeout(300)
+  if (Number(await page.locator('.tl-slider input').inputValue()) === 0) throw new Error('the stop did not move the slider')
+  const atStop1 = await page.locator('.tl-side.is-push .tl-domains').innerText()
+  await page.locator('.tl-stops button').last().click(); await page.waitForTimeout(300)
+  const atLastStop = await page.locator('.tl-side.is-push .tl-domains').innerText()
+  if (atLastStop === atStop1) throw new Error('tapping a different stop changed nothing')
+  /* And it still free-drags a day at a time between stops. */
   await page.locator('.tl-slider input').focus()
   await page.keyboard.press('Home'); await page.waitForTimeout(300)
   await page.keyboard.press('ArrowRight'); await page.waitForTimeout(300)
-  if (Number(await page.locator('.tl-slider input').inputValue()) !== 30) throw new Error('one press did not move exactly one month')
+  const oneRight = Number(await page.locator('.tl-slider input').inputValue())
+  if (oneRight <= 0 || oneRight >= span) throw new Error(`one press landed on ${oneRight} of a ${span} day span`)
   /* Both sides carry the same six categories, and Discipline reads two
      different kinds of number on purpose: his real momentum on the push
      side, his own declining self-respect percentage on the drift side. */

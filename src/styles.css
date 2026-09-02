@@ -7336,13 +7336,20 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .tl-chain b { font-family: var(--font-display); font-weight: 800; font-size: 18px; letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums; color: var(--tl-hot); }
 .tl-chain .tl-l { color: var(--tl-dim); }
-.tl-next, .tl-giveup { border: 0; cursor: pointer; border-radius: 999px; min-height: 38px; padding: 11px 18px;
+.tl-next, .tl-giveup, .tl-why { border: 0; cursor: pointer; border-radius: 999px; min-height: 38px; padding: 11px 18px;
   font: 700 12.5px/1 var(--font-body); display: inline-flex; align-items: center; gap: 8px;
   transition: background var(--a-enter), color var(--a-enter), transform var(--a-enter); }
 .tl-next { background: var(--tl-hot); color: #0E0E10; font-weight: 800; }
 .tl-next:hover { transform: translateY(-1px); }
 .tl-giveup { background: var(--tl-rung); color: var(--tl-dim); box-shadow: inset 0 0 0 1px var(--tl-line); }
 .tl-giveup:hover { color: var(--tl-no); box-shadow: inset 0 0 0 1px rgba(224, 96, 58, 0.4); }
+/* Quiet, like give-up beside it, not hot like the flywheel toggle -- both
+   Why and give-up are reflective moments, not the page's main forward
+   action, and a bold pill here would visually compete with the flywheel's
+   own. Its own hover, not give-up's alarming red: this button is the
+   opposite of a warning. */
+.tl-why { background: var(--tl-rung); color: var(--tl-dim); box-shadow: inset 0 0 0 1px var(--tl-line); }
+.tl-why:hover { color: var(--tl-hot); box-shadow: inset 0 0 0 1px var(--tl-hot); }
 
 /* ---- the promise ---- */
 .tl-promise { margin: 0 0 var(--s4); padding: 18px 22px; border-radius: var(--tl-r); background: var(--tl-rung);

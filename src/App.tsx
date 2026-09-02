@@ -129,12 +129,17 @@ const NAV: { id: PageId; label: string }[] = [
      a bookmark and every existing setPage('goals') still land somewhere real:
      see the redirect where the pages are chosen. */
   { id: 'habits', label: 'Habits & Goals' },
-  { id: 'board', label: 'Why’s' },
   /* Timeline's own tab retired (2026-09-04), the same way Notes' and Bills'
      header shortcuts were: the floating dock's Timeline summary (see
      timelinedock.tsx) plus its hold-for-the-full-page shortcut cover this
      now. The page itself is untouched -- setPage('timeline') still renders
      it, this was only ever the tab in. */
+  /* Why's tab retired the same day, differently: not moved to the dock like
+     Timeline, but into Timeline's OWN header instead, on his instruction --
+     a "Why" button between the flywheel toggle and "I want to give up"
+     (see timeline.tsx). The moment he's weighing whether to quit is exactly
+     the moment his own reasons should be one tap away. setPage('board')
+     still renders the real page, only this tab in is gone. */
   /* Apps left the menu on his instruction (2026-08-27): seven icons and an
      otherwise empty page did not earn a tab next to Habits and Goals. It is
      a header dropdown now, next to Note and Yesterday -- see AppsShelf

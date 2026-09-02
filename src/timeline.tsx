@@ -83,7 +83,7 @@ const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
 export const inAllSpaces = () => true
 
 export function TimelinePage() {
-  const { habits, habitLog, tasks, focusSessions } = useStore()
+  const { habits, habitLog, tasks, focusSessions, setPage } = useStore()
   const [view, setView] = useState<View>('ladder')
   const [zoom, setZoom] = useState<Zoom>('d')
   const [lives, setLives] = useState(false)
@@ -120,6 +120,15 @@ export function TimelinePage() {
             {view === 'ladder' ? 'The flywheel' : 'The ladder'}
             <span aria-hidden="true">{view === 'ladder' ? '→' : '←'}</span>
           </button>
+          {/* Why's own tab retired (2026-09-04), the same way Notes',
+             Bills' and Timeline's were: not moved to the floating dock
+             like those three, but placed here instead, on his instruction
+             -- between the flywheel and "I want to give up" specifically,
+             so the moment he's looking at whether to quit is the same
+             moment his own reasons are one tap away, not a menu away. The
+             page itself is untouched -- setPage('board') still renders it,
+             this was only ever the tab in. */}
+          <button className="tl-why" onClick={() => setPage('board')}>Why</button>
           <button className="tl-giveup" onClick={() => setLives(true)}>I want to give up</button>
         </div>
       </header>

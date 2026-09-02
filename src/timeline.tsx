@@ -872,21 +872,28 @@ function pushNarrative(days: number, f: Future, c: NarrativeCtx): string {
   }
 }
 
-function driftNarrative(days: number, stoppedOn: number, c: NarrativeCtx): string {
-  const debts = c.money && c.money.openDebts > 0
+/* THE NEGATIVE ROAD, his own document, his own numbers, adjusted to fit the
+   six horizons this screen already has rather than his original nine
+   milestones -- not a prediction, a worst-case trajectory built from
+   continuing the current pattern: inconsistency, procrastination, financial
+   pressure, debt, poor habits, insufficient exercise, fragmented attention,
+   repeatedly restarting instead of staying the course. Every number in it is
+   illustrative, his own word for it, not guaranteed. He asked for it exactly
+   as written, specifics included, fully aware this file is public. */
+function driftNarrative(days: number, stoppedOn: number): string {
   switch (tierOf(days)) {
     case 1:
-      return `${stoppedOn <= 1 ? 'The wheel is already dead. It was never turning fast enough to survive this' : `The wheel is dead by day ${stoppedOn}. Not behind -- dead`}. Zero. ${c.quitHabit ? `${c.quitHabit} doesn't care that you were "doing so well" for six days. It was never impressed, and it isn't disappointed either. It just doesn't know your name.` : 'Whatever you told yourself you were building just stopped being built.'} You didn't have a bad week. You had the first week of the thing you always do.`
+      return `Nothing terrible happens in a week. That's the trap, and you already know it. The wheel's dead by day ${stoppedOn <= 1 ? 'one' : stoppedOn} -- not behind, dead -- but nothing LOOKS different yet. The scale still says something close to 90kg. The 9 to 10 hours a day are still the 9 to 10 hours a day. One skipped workout, one evening lost to the phone, the hookah, whatever cheap stimulation was closest, instead of the ten minutes it would have taken to just start. You already know the promise. You've heard yourself make it before.`
     case 2:
-      return `${spanWords(days, 'd')} of nothing, and the guy who opened this screen today is basically a stranger to you now. ${debts ? `${c.money!.openDebts} debts you're still carrying, and not one of them got smaller because you had a good reason. Debt doesn't read your excuses.` : 'Nothing moved. Nothing ever moves on its own.'} Your body knows before your head does, tired in a way sleep doesn't fix, because the tired isn't physical. It's the tired of watching yourself not show up.`
+      return `A month gone, and almost nothing looks different, which is exactly the problem. 90kg edges toward 91, 92. A little more around the stomach. Slightly worse on the stairs. The debt hasn't moved except that now there's a reminder attached to it, a fee that wasn't there before. Thirty days you don't get back, spent on the version of you that keeps promising to start tomorrow.`
     case 3:
-      return `A month or two of "tomorrow," and tomorrow never actually shows up, it's always still tomorrow. ${c.anchorHabit ? `${c.anchorHabit} goes back to being a thing you used to do, and you get to explain that to yourself again, every single day it doesn't happen, out loud or not. You know exactly what you're telling yourself.` : 'Whatever you were building goes quiet, and quiet starts to feel normal.'} You start avoiding your own reflection a little. Not dramatically. Just enough that you notice you're doing it.`
+      return `Three months in, and your own standards start slipping without you ever deciding to lower them. 92, 93, 94kg. Less movement, worse conditioning. The cycle runs the same way it always does: motivation, a plan, an intense start, fatigue, missed days, guilt, restart. Every broken promise to yourself costs something that isn't the workout. It's the trust. The juggling between what you owe and what you actually have starts here too, quietly, before it's a real problem yet.`
     case 4:
-      return `${c.goalName ? `"${c.goalName}" is still sitting there. Closed date getting closer. You getting no closer to it.` : 'The date you set for yourself keeps arriving whether you showed up or not.'} A season is long enough to become someone. You spent it proving, in detail, that you're not who you told people you were becoming. That's not a failure that happened to you. That's a decision you made ninety separate times.`
+      return `Half a year gone. 94 to 97kg. Something like 1,100 hours spent at the job that isn't the thing you actually want to build, and maybe 130 hours total on the thing that is -- five hours a week, if that, for the project with your name on it. Whatever you didn't ship in that time doesn't wait for you either: the debt sits there, accumulating whatever debt accumulates when nobody's watching it.`
     case 5:
-      return `${c.quitHabit ? `${c.quitHabit} isn't a slip at this point. It's just what you do. You stopped even being disappointed in yourself about it, which is worse than the thing itself.` : 'The thing you were "about to fix" for half a year is now just how things are.'} Half a year is not a bad stretch. Half a year is a personality. Your body is paying rent on the version of you that gave up: less energy, worse sleep, a lower ceiling on everything else, because this is the thing sitting underneath all of it, unaddressed.`
+      return `A full year disappeared. 97 to 101kg. Do the actual math on whatever you're not setting aside: 300 euros a month is 3,600 gone for the year, 500 is 6,000, 1,000 is 12,000 -- never spent on anything, just never saved either. The debt has had twelve full months to become arrears, fees, maybe a formal demand. 365 days, and you could list, right now, exactly what you have to show for them.`
     default:
-      return `${debts ? `The debt is still there. Bigger, because it never once cared whether you felt ready, it just compounded while you waited to feel like it.` : "Whatever you owed yourself a year ago, you owe double now, at interest that doesn't show up on any statement."} A year from here this isn't a bad week you remember, motherfucker. It's a pattern you recognize in yourself and can't explain to anyone: why you always start and never finish, why the guy who talks about changing never actually becomes him. That's the real cost. Not the number on Compass. You. The version of you that was available, and you didn't take him.`
+      return `Three years and the gap stops being close: 102 to 108kg, tens of thousands never saved, hundreds of hours on things with your name on them that never happened, while other people spent that exact time building expertise, relationships, a portfolio, income. Five years in, you become the person you said you would never become: no real reserve, no invested capital, still fully dependent on a paycheck, and the debt now quietly decides things for you -- what job you can leave, what you can start, what you get to say no to because you can't afford to. Ten years is 3,650 days, about 52,000 hours, and starting late is more expensive than starting on time ever would have been. Twenty years and your past decisions are running your present, full stop. Thirty years and the bill is due: you cannot get back three decades of compounding, of relationships, of the person you could have built, and the only question left standing is the one you already know the answer to. What did you actually build, motherfucker? Not a dramatic collapse. Just a functional life, and the quiet, permanent knowledge that you could have been so much more.`
   }
 }
 
@@ -993,7 +1000,7 @@ function TwoLives({ onBack, run, chain, money }: {
             <p className="tl-said">{days === 0 ? 'Today. Nothing has happened yet.' : `${spanWords(days, grain)} of not.`}</p>
             <Figures f={p.drift} days={days} dead />
             <p className="tl-under">
-              {days === 0 ? 'Both men are the same man this morning.' : driftNarrative(days, p.stoppedOn, narrCtx)}
+              {days === 0 ? 'Both men are the same man this morning.' : driftNarrative(days, p.stoppedOn)}
             </p>
           </section>
         </div>

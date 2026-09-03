@@ -712,7 +712,13 @@ main { padding-inline: var(--gutter); }
    each item's own icon circle -- read off one variable so they can't drift
    apart again the way the FAB (56px) and the item avatars (44px) already
    had once, his catch. */
-.dock { --dock-circle: 56px; position: fixed; right: 20px; bottom: 20px; z-index: 61; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.dock { --dock-circle: 56px; position: fixed; right: 20px; bottom: 20px; z-index: 61; display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+  transition: opacity var(--t-fast), transform var(--t-fast); }
+/* Faded, not removed, while the page is moving underneath it -- see
+   useHideOnScroll in dock.tsx. pointer-events: none so a scroll-then-tap
+   that lands here reaches whatever real control is under it instead of the
+   now-invisible circle. */
+.dock.is-scroll-hidden { opacity: 0; transform: translateY(8px) scale(0.9); pointer-events: none; }
 .dock-fab {
   width: var(--dock-circle); height: var(--dock-circle); border-radius: 50%; padding: 0; flex: none;
   display: grid; place-items: center;
@@ -1217,15 +1223,7 @@ body:has(.shell.is-hud) .dock-face { border-radius: var(--a-r-lg); }
 }
 .allclear .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--progress); }
 
-/* ---------- grid & widget chrome ---------- */
-.grid-wrap { margin-top: var(--s2); }
-
-.react-grid-item.react-grid-placeholder {
-  background: var(--accent-wash) !important;
-  border: 1px dashed var(--accent);
-  border-radius: var(--r-md);
-  opacity: 1;
-}
+/* ---------- widget chrome ---------- */
 
 .widget {
   height: 100%;
@@ -4126,73 +4124,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 @keyframes pomo-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
 .pomo-badge.await .pomo-phase { color: var(--progress); }
 
-/* ---------- Today: the face of the day ----------
-   Taken from a dashboard he sent: a band across the top, big numbers under it,
-   a calendar strip. What that mockup fills them with is a purple gradient, a
-   soft shadow on everything and invented data. Here: hairlines, one accent per
-   mark, and only figures the app can prove. */
-
-.dayline { margin-bottom: var(--s4); }
-.dayline-head { display: flex; align-items: baseline; gap: var(--s3); margin-bottom: var(--s3); }
-.dayline-sum { margin-left: auto; font-size: var(--text-xs); color: var(--faint); }
-
-/* The 24 hours, as one line. Nothing is centred and nothing is decorative: a
-   mark's position IS its time. */
-.dayline-track {
-  position: relative; height: 54px;
-  background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-md);
-}
-.dayline-tick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--hairline); }
-.dayline-tick:first-child { background: transparent; }
-.dayline-tick .mono {
-  position: absolute; bottom: 3px; left: 4px;
-  font-size: 0.625rem; color: var(--faint); line-height: 1;
-}
-/* A block he actually ran. Green is the app's word for progress, so it is the
-   right word here. */
-.dayline-block {
-  position: absolute; top: 8px; height: 22px; border-radius: 2px;
-  background: var(--progress); opacity: 0.9;
-}
-.dayline-block:hover { opacity: 1; }
-/* A task he pinned to a clock time: ahead of him, so it is a mark rather than
-   a filled span. */
-.dayline-pin { position: absolute; top: 6px; bottom: 18px; width: 1px; background: var(--accent); }
-.dayline-pin-dot {
-  position: absolute; top: -3px; left: -2.5px; width: 6px; height: 6px;
-  border-radius: 50%; background: var(--accent);
-}
-/* Now. The strongest mark on the line, because it is the only one that moves. */
-.dayline-now { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); }
-.dayline-now-dot {
-  position: absolute; top: -4px; left: -2px; width: 6px; height: 6px;
-  border-radius: 50%; background: var(--ink);
-}
-.dayline-legend { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); margin-top: var(--s3); }
-.dayline-legend-item { display: flex; gap: var(--s2); font-size: var(--text-xs); color: var(--muted); }
-.dayline-legend-item .mono { color: var(--accent-text); }
-.dayline-legend-more { font-size: var(--text-xs); color: var(--faint); }
-
-/* Four numbers, divided by rules rather than boxed in four cards. */
-.daynums {
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
-  border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline);
-  margin-bottom: var(--s5);
-}
-.daynum { display: flex; flex-direction: column; gap: 2px; padding: var(--s4) var(--s5); min-width: 0; }
-.daynum + .daynum { border-left: 1px solid var(--hairline); }
-.daynum .v {
-  font-size: clamp(1.5rem, 2.4vw, 2rem); font-weight: 700; line-height: 1.05;
-  letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
-}
-.daynum .v .of { font-size: 0.55em; font-weight: 600; color: var(--faint); }
-.daynum .k { font-size: var(--text-xs); color: var(--muted); }
-@media (max-width: 760px) {
-  .daynums { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .daynum:nth-child(3) { border-left: none; }
-  .daynum:nth-child(n+3) { border-top: 1px solid var(--hairline); }
-}
-
 /* ---------- the clock widget ----------
    The time carries the widget, so it is set at display size with tabular
    figures; nothing under it repeats what it already says. */
@@ -5072,7 +5003,19 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   }
   .phone-pages { display: inline-flex; }
   .phone-burger { gap: 6px; }
-  .phone-burger .btn-label { display: inline; font-size: var(--text-xs); }
+  /* Measured 2026-09-04 at 390px: this label is the only one in the row that
+     shows real text ("Habits & Goals" vs. every other button's bare icon),
+     and at 140px wide it alone pushes the six-button row from 358px
+     available to 404px needed -- just enough to wrap the last icon
+     (Settings) onto its own line. The label itself matters (it's the one
+     thing standing in for a visible active nav tab on a phone, see
+     PhonePages above), so it stays, just capped and truncated instead of
+     removed -- "Habits & Goals" reads as "Habits & G..." rather than
+     costing the whole row its second line. */
+  .phone-burger .btn-label {
+    display: inline; font-size: var(--text-xs); max-width: 46px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
   /* The page menu is the widest thing in the header, so it opens flush to the
      right edge rather than running off it. */
   .phone-pages .kebab-menu { right: 0; left: auto; min-width: 168px; }
@@ -6968,6 +6911,16 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .shell.is-hud .slot-pick button[aria-pressed="true"],
 .shell.is-hud .select-box.on { color: #04141A; }
 .shell.is-hud .btn-primary:hover:not(:disabled) { color: var(--a-accent); }
+/* Same bug, five more call sites: each pairs `background: var(--a-accent)`
+   with `color: var(--a-ink)`, and --a-ink was redefined pale (#E6F1F8, for the
+   dock FAB's icon) for HUD mode -- so pale text sat on the bright cyan fill at
+   ~1.5:1. Measured 2026-09-04. Same #04141A fix as the four above. */
+.shell.is-hud .nav-tab[aria-current="page"],
+.shell.is-hud .hg-pill.is-on,
+.shell.is-hud .chip.tone-accent,
+.shell.is-hud .nt-tool[aria-pressed="true"],
+.shell.is-hud .hist-btn.is-on { color: #04141A; }
+.shell.is-hud button.chip:hover { color: #04141A; }
 
 /* A meter is a fill too, so it takes the accent rather than the text partner. */
 .bar > i { background: var(--a-accent-text); }
@@ -7150,6 +7103,29 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   .goal-row { grid-template-columns: minmax(0, 1fr) 84px 68px 74px 40px; }
 }
 
+/* Measured 2026-09-04 on a real 390px phone: even the 5-track layout above
+   doesn't fit next to the row's own padding and gaps -- computed
+   grid-template-columns came back "0px 84px 68px 74px 40px", so the name
+   floored to zero width and every goal on a phone was nameless. Rather than
+   shave the fixed tracks thinner (the count and pct are real Kč/day figures,
+   they need their width), the name gets its own full-width line and the
+   count/pct/bump/kebab share a compact second line below it, auto-sized to
+   their own content instead of a fixed budget that has to add up exactly. */
+@media (max-width: 520px) {
+  .goal-row {
+    grid-template-columns: auto auto auto 1fr auto;
+    grid-template-areas:
+      "name  name  name  name  name"
+      "count pct   bump  .     kebab";
+    row-gap: 6px;
+  }
+  .goal-row .gr-name { grid-area: name; }
+  .goal-row .gr-count { grid-area: count; }
+  .goal-row .gr-pct { grid-area: pct; }
+  .goal-row .goal-bump { grid-area: bump; justify-content: flex-start; }
+  .goal-row .kebab-wrap { grid-area: kebab; }
+}
+
 /* ---- Today: routines above, habits below --------------------------------
    His pick from the artifact. A routine is finished by its steps, so it gets a
    tile with progress and a way in; a habit is the only thing on this card he
@@ -7327,8 +7303,13 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    the bottom grows the document by its own height, so the fix for 48px of
    cream was 220px of new scroll. A shadow paints and costs nothing. */
 .tline { box-shadow: 0 240px 0 var(--tl-bg); }
+/* --tl-faint (#56534A) measured at 2.4-2.5:1 against --tl-bg/--tl-rung/--tl-rung2 --
+   below WCAG AA's 4.5:1 for this 9.5px text, and this label sits on the page by
+   default (Timeline is permanently dark, not a toggle). --tl-dim already clears
+   AA against the same three surfaces and is the token this file already reaches
+   for when a .tl-l needs to stay legible (see .tl-chain .tl-l below). */
 .tline .tl-l { display: block; font: 700 9.5px/1 var(--font-body); letter-spacing: 0.19em;
-  text-transform: uppercase; color: var(--tl-faint); margin: 0; }
+  text-transform: uppercase; color: var(--tl-dim); margin: 0; }
 
 /* ---- the one bar ---- */
 .tl-bar { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; margin-bottom: var(--s4); }

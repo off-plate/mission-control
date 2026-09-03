@@ -154,6 +154,42 @@ function useDockMenu() {
   return { mode, closing, entered, go, closeMenu, hover }
 }
 
+/* His QA catch (2026-09-04): the closed FAB is position:fixed over a
+   body-scrolling page (there's no sub-container to carve a reserved gutter
+   out of -- main scrolls at the window level), so it can end up sitting
+   directly on top of whatever the page renders in that same 56px corner --
+   confirmed with elementFromPoint landing on the FAB instead of a real
+   habit row's Start button at 390px. The overlapping content sat well
+   inside the document (Today measured 3887px of scrollable content against
+   an 844px viewport), not near the page's true end, so padding at the
+   bottom of the page can't pull it out of the way -- nothing already laid
+   out moves for padding added after it. Fading the FAB out while the page
+   is actually moving -- the same rule Material's own FAB guidance gives for
+   a bottom-corner button over a scrolling list -- clears it from whatever's
+   mid-scroll; it settles back the moment scrolling stops. Scoped to the
+   closed circle only (an open menu or panel should never vanish out from
+   under an interaction already in progress) and to narrow viewports only --
+   desktop, with its hover-driven reveal and far more room, never reported
+   this. */
+function useHideOnScroll(active: boolean) {
+  const [hidden, setHidden] = useState(false)
+  useEffect(() => {
+    if (!active || !window.matchMedia('(max-width: 720px)').matches) { setHidden(false); return }
+    let timer: number | undefined
+    const onScroll = () => {
+      setHidden(true)
+      if (timer !== undefined) window.clearTimeout(timer)
+      timer = window.setTimeout(() => setHidden(false), 250)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      if (timer !== undefined) window.clearTimeout(timer)
+    }
+  }, [active])
+  return hidden
+}
+
 /* THE DOCK: a Material speed-dial FAB (his reference, 2026-09-01). Closed,
    one round button. Tapping it fans a labelled item out per tool, stacked
    upward -- Note on top, Focus closest to the corner, his order -- and the
@@ -193,6 +229,7 @@ export function Dock() {
   const billsHold = useHoldForFull(() => { setPage('bills'); go('closed') })
   const timelineHold = useHoldForFull(() => { setPage('timeline'); go('closed') })
   const holdFor: Partial<Record<PanelFace, ReturnType<typeof useHoldForFull>>> = { note: noteHold, bills: billsHold, timeline: timelineHold }
+  const scrollHidden = useHideOnScroll(mode === 'closed')
 
   /* The Zone already shows the timer, the player and a place to write at
      full size. A second, smaller copy of the same facts in the corner is
@@ -246,7 +283,7 @@ export function Dock() {
     const open = mode === 'menu'
     return (
       <div
-        className={`dock${closing ? ' is-closing' : entered ? ' is-open' : ''}`}
+        className={`dock${closing ? ' is-closing' : entered ? ' is-open' : ''}${scrollHidden ? ' is-scroll-hidden' : ''}`}
         onMouseEnter={hover.onMouseEnter}
         onMouseLeave={hover.onMouseLeave}
       >

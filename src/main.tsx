@@ -1,6 +1,5 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import 'react-grid-layout/css/styles.css'
 import './styles.css'
 import App from './App'
 import { StoreProvider, STORAGE_KEY } from './store'

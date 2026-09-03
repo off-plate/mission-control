@@ -1457,29 +1457,51 @@ export function StoreProvider({ children }: { children: ReactNode }) {
        arrive here too, and an empty list is a real answer. */
     if (Array.isArray(p.reels)) setReelsRaw(p.reels)
   }
+  /* applyExternal itself is a plain closure rebuilt every render (it reads
+     dailyDone/dailySkipped by value, not by ref) but the two effects below
+     now mount once and never rebuild. Route them through a ref that's kept
+     current every render, so they always call this render's applyExternal
+     instead of freezing the one from mount. */
+  const applyExternalRef = useRef(applyExternal)
+  applyExternalRef.current = applyExternal
 
   /* Another tab of the same browser. It writes localStorage; this fires there
-     and nowhere else, which is exactly the signal needed. */
+     and nowhere else, which is exactly the signal needed.
+
+     Empty deps on purpose: this listener is registered once, for the life of
+     the provider. It used to have no deps array at all, which meant React
+     tore it down and re-added it on every render -- harmless here since
+     addEventListener is idempotent per-instance, but see the pull effect
+     below for why that pattern is not always free. */
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key !== STORAGE_KEY || !e.newValue || futureBlob) return
-      applyExternal(e.newValue)
+      applyExternalRef.current(e.newValue)
     }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
-  })
+  }, [])
 
   /* Another device. A tab left open all afternoon held a copy of the morning
      and would eventually push it; now it catches up whenever he looks at it,
-     and once a minute while he is looking. */
+     and once a minute while he is looking.
+
+     Found 2026-09-04: this had no deps array, so StoreProvider re-rendering
+     for ANY reason (every keystroke in a note, every habit tick) tore the
+     interval down and started a fresh one -- the 60s pull almost never
+     survived long enough to fire, and the in-flight pull's result was
+     discarded by the `if (stop) return` on teardown. Empty deps now, so this
+     sets up exactly once. futureBlob can flip true after mount (loading a
+     blob from a newer app version), so it's checked fresh inside pull()
+     itself rather than only once here at setup. */
   useEffect(() => {
-    if (!SUPABASE_ENABLED || futureBlob) return
+    if (!SUPABASE_ENABLED) return
     let stop = false
     const pull = async () => {
-      if (document.visibilityState !== 'visible') return
+      if (futureBlob || document.visibilityState !== 'visible') return
       const remote = await loadRemoteState()
       if (stop) return
-      if (remote) applyExternal(remote)
+      if (remote) applyExternalRef.current(remote)
       /* And the other direction. Without this, work done offline never leaves the
          device: applyExternal finds local is already a superset of the stale
          remote, changes no state, and so never fires the save effect. The device
@@ -1500,7 +1522,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('focus', onWake)
       window.clearInterval(id)
     }
-  })
+  }, [])
 
   /* The auto pass follows the sessions: history that predates the rule, blocks
      edited elsewhere, or a merge that brought rows back all resolve on the next

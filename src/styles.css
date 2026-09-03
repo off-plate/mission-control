@@ -7770,10 +7770,92 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    readable text partner and never a fill (see the token block above). */
 .bh-track i.free { display: block; height: 100%; background: var(--accent-fill); }
 
-.bills-quick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
-.bills-quick button { border: 1.5px dashed var(--border); border-radius: 18px; padding: 13px; font: 700 14px var(--font-body); background: none; cursor: pointer; }
-.bq-in { color: var(--positive); }
-.bq-out { color: var(--accent); }
+/* THE CYCLE RAIL. Replaced the two dashed "+ Income / + Bill" buttons
+   (2026-09-03): the same two actions are still here, at the foot and taller,
+   but the space above them now carries the month itself. Everything below
+   names the page's own aliases (--negative/--positive/--border/--ink-3), which
+   .bills-page maps onto the real system tokens -- this section only ever
+   renders inside that page. */
+.cyclerail { padding: 20px 22px 18px; margin-bottom: 14px; }
+.cr-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 2px; }
+.cr-meta { font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.cr-meta b { color: var(--ink); font-weight: 700; }
+
+/* Thirty columns do not fit a phone. The rail scrolls inside its own box so
+   the page body never does. */
+.cr-scroll { overflow-x: auto; margin: 0 -2px; padding: 2px; }
+.cr-rail { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(21px, 1fr); min-width: 640px; }
+.cr-day {
+  display: grid; grid-template-rows: 15px 96px auto 34px; position: relative;
+  border: none; background: none; padding: 0; cursor: pointer; font: inherit; color: inherit; min-width: 0;
+}
+/* A weekend is context, not data: at --bg-subtle it read as a highlighted column. */
+.cr-day.is-we { background: color-mix(in srgb, var(--ink) 3.2%, transparent); }
+.cr-day.is-on { background: var(--accent-subtle); }
+.cr-day:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.cr-dow { font: 700 9px var(--font-body); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); text-align: center; }
+.cr-up { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding-bottom: 2px; }
+.cr-dn { display: flex; flex-direction: column; justify-content: flex-start; align-items: center; padding-top: 2px; }
+.cr-num { font: 600 10.5px var(--font-body); color: var(--ink-3); text-align: center; font-variant-numeric: tabular-nums;
+  padding-top: 7px; border-top: 1.5px solid var(--hairline-strong); }
+.cr-day.is-today .cr-num { color: var(--ink); font-weight: 800; }
+.cr-bar { width: 100%; max-width: 16px; min-height: 4px; border-radius: 4px 4px 0 0; background: var(--negative); }
+.cr-bar.is-paid { background: var(--border); }
+.cr-bar.is-late { background: var(--highlight); }
+.cr-bar.is-in { border-radius: 0 0 4px 4px; background: var(--accent-fill); }
+.cr-cap { font: 700 9.5px var(--font-body); color: var(--negative); text-align: center; white-space: nowrap;
+  font-variant-numeric: tabular-nums; margin-bottom: 3px; }
+.cr-cap.is-paid { color: var(--ink-3); }
+.cr-cap.is-in { color: var(--accent); margin: 3px 0 0; }
+.cr-nowline { position: absolute; top: 15px; bottom: 34px; left: 50%; width: 2px; margin-left: -1px;
+  background: var(--ink); border-radius: 2px; pointer-events: none; }
+.cr-nowtag { position: absolute; top: 9px; left: 50%; transform: translateX(-50%); font: 800 9px var(--font-body);
+  letter-spacing: .08em; text-transform: uppercase; font-style: normal; color: var(--surface); background: var(--ink);
+  padding: 2px 6px; border-radius: 99px; white-space: nowrap; pointer-events: none; z-index: 1; }
+
+.cr-read { display: flex; align-items: center; gap: 12px; margin-top: 14px; padding: 10px 12px;
+  background: var(--bg-subtle); border-radius: 14px; min-height: 54px; }
+.cr-rday { font: 800 12.5px var(--font-body); color: var(--accent); background: var(--surface); border-radius: 8px;
+  padding: 6px 10px; white-space: nowrap; font-variant-numeric: tabular-nums; flex: none; }
+.cr-rlist { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-width: 0; font-size: 13.5px; color: var(--ink-2); }
+.cr-read.is-empty .cr-rlist { color: var(--ink-3); }
+.cr-rrow { display: inline-flex; align-items: baseline; gap: 7px; border: none; background: none; padding: 2px 0;
+  font: 600 13.5px var(--font-body); color: var(--ink); cursor: pointer; }
+.cr-rrow:hover { color: var(--accent); }
+.cr-rrow.is-paid { color: var(--ink-3); }
+.cr-rnum { color: var(--negative); font-weight: 700; font-variant-numeric: tabular-nums; }
+.cr-rnum.is-in { color: var(--accent); }
+.cr-rrow.is-paid .cr-rnum { color: var(--ink-3); }
+.cr-rtag { font: 700 10px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); }
+.cr-rtag.is-late { color: var(--highlight); }
+
+.cr-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.cr-lg { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink-2); }
+.cr-lgd { width: 9px; height: 9px; border-radius: 99px; }
+.cr-lgd.is-out { background: var(--negative); }
+.cr-lgd.is-paid { background: var(--border); }
+.cr-lgd.is-in { background: var(--accent-fill); }
+
+.cr-tray { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.cr-traylbl { font: 700 11px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); }
+.cr-chip { display: inline-flex; align-items: baseline; gap: 7px; background: var(--bg-subtle); border: none;
+  border-radius: 99px; padding: 6px 12px; font: 600 12.5px var(--font-body); color: var(--ink); cursor: pointer; }
+.cr-chip:hover { background: var(--accent-subtle); }
+.cr-chip.is-paid { color: var(--ink-3); }
+.cr-chipamt { color: var(--negative); font-weight: 700; font-variant-numeric: tabular-nums; }
+.cr-chipamt.is-in { color: var(--accent); }
+.cr-chip.is-paid .cr-chipamt { color: var(--ink-3); }
+
+/* The two actions the dashed strip used to be, kept and made taller on his
+   instruction. */
+.cr-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.cr-act { border: none; border-radius: 14px; padding: 15px 16px; font: 700 14.5px var(--font-body);
+  background: var(--bg-subtle); color: var(--ink); cursor: pointer; transition: background var(--a-enter), transform var(--a-enter); }
+.cr-act:hover { background: var(--border); }
+.cr-act:active { transform: scale(.985); }
+.cr-act.is-in { background: var(--accent-fill); color: var(--a-ink); }
+.cr-act.is-in:hover { background: var(--a-accent-2); }
+@media (max-width: 620px) { .cyclerail { padding: 16px 14px 14px; } .cr-acts { grid-template-columns: 1fr; } }
 
 .bills-page .card { background: var(--surface); border-radius: 24px; overflow: hidden; box-shadow: var(--a-lift); }
 .bills-page .overline { font: 700 12px var(--font-body); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }

@@ -4,6 +4,7 @@
    and pages1.tsx already imports TodayRoom from there -- pulling WeekGrid the
    other way (todayroom.tsx importing pages1.tsx) would have made the two
    files import each other. */
+import { useMemo } from 'react'
 import { SLOTS, type DayTaskLog, type Task } from './types'
 import { fmtDuration, localDateKey, taskMinutes } from './util'
 
@@ -84,11 +85,25 @@ export function WeekGrid({
   reachableMax: number
   onDayClick: (iso: string) => void
 }) {
+  /* Today's card renders this from TodayRoom, which re-renders once a
+     second off its own clock (see useNow in todayroom.tsx) -- with the
+     dnum/name pair recomputed inline, that was 7 `new Date` constructions
+     and 7 Intl.DateTimeFormat calls a second for a date that only actually
+     changes at midnight. weekDays itself is a fresh array every one of
+     those renders (TodayRoom builds it with Array.from, not memoized), so
+     the dependency here is the dates' own content, not the array's
+     identity -- otherwise this would never hit its cache. */
+  const dayMeta = useMemo(
+    () => new Map(weekDays.map((iso) => [
+      iso,
+      { dnum: iso.split('-')[2], name: new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short' }) },
+    ])),
+    [weekDays.join(',')],
+  )
   return (
     <div className="weekplan-grid">
       {weekDays.map((iso) => {
-        const [, , dnum] = iso.split('-')
-        const name = new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short' })
+        const { dnum, name } = dayMeta.get(iso)!
         const dayTasks = weekTasks.filter((t) => (t.plannedOn ?? today) === iso)
         const totalMin = dayTasks.filter((t) => !t.done).reduce((a, t) => a + taskMinutes(t), 0)
         const pct = Math.min(100, Math.round((totalMin / WEEK_CAPACITY_MIN) * 100))

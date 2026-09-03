@@ -1570,6 +1570,29 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
      timer is still running shows here rather than after it stops. */
   const pomo = usePomodoro()
   const liveFocusMin = pomo.phase === 'focus' && pomo.running ? Math.max(0, Math.floor((pomo.blockMin * 60 - pomo.secondsLeft) / 60)) : 0
+  /* usePomodoro() ticks every 500ms while a block runs, and every row reads
+     it (not just the one habit actually being timed) since a habit can only
+     tell it's the live one once it's already rendering. That re-renders
+     every row in the list twice a second regardless of kind. The two
+     memos below don't stop the re-render -- they stop it from redoing a
+     full scan of habitLog/focusSessions each time. Both are pure indexes
+     of the data itself (which day was kept, how many minutes landed on
+     each day), never of "today", so which day IS today is still read
+     fresh via dayOfWeekKey()/localDateKey() at every actual lookup below --
+     memoizing that part would be the real risk, the store.tsx sync effect
+     was exactly this class of bug (2026-09-04). */
+  const keptDaysForHabit = useMemo(
+    () => new Set(habitLog.filter((t) => t.habitId === h.id).map((t) => t.day)),
+    [habitLog, h.id],
+  )
+  const focusMinutesByDay = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const s of focusSessions) {
+      if (s.space !== h.space) continue
+      m.set(s.day, (m.get(s.day) ?? 0) + s.minutes)
+    }
+    return m
+  }, [focusSessions, h.space])
   const kept = h.days.filter(Boolean).length
   const target = habitTarget(h)
   /* Once a week or once a month: a row of weekdays is the wrong instrument
@@ -1629,8 +1652,8 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
      is keeping it, so a tick he cannot press never reads as a tick that failed. */
   if (h.auto?.from === 'focus') {
     const need = h.auto.minutes
-    const todayMin = focusMinutesOn(focusSessions, localDateKey(), h.space) + liveFocusMin
-    const kept7 = keptDaysIn(habitLog, h.id, dayOfWeekKey(0), dayOfWeekKey(6)).size
+    const todayMin = (focusMinutesByDay.get(localDateKey()) ?? 0) + liveFocusMin
+    const kept7 = [0, 1, 2, 3, 4, 5, 6].filter((i) => keptDaysForHabit.has(dayOfWeekKey(i))).length
     return (
       <div className="habit-row is-count">
         <div className="habit-row-top">
@@ -1650,7 +1673,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
             zero four times. */}
         <div className="habit-days">
           {DAY_LABELS.map((d, i) => {
-            const on = keptDaysIn(habitLog, h.id, dayOfWeekKey(i), dayOfWeekKey(i)).size > 0
+            const on = keptDaysForHabit.has(dayOfWeekKey(i))
             const isToday = i === todayIndex
             return (
               <span className={`day-cell${isToday ? ' is-today' : ''}`} key={i}>
@@ -1710,8 +1733,8 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
 
   if (h.kind === 'measured') {
     const target = h.dailyTargetMin ?? 60
-    const todayMin = focusMinutesOn(focusSessions, localDateKey(), h.space)
-    const weekMin = DAY_LABELS.reduce((a, _, i) => a + focusMinutesOn(focusSessions, dayOfWeekKey(i), h.space), 0)
+    const todayMin = focusMinutesByDay.get(localDateKey()) ?? 0
+    const weekMin = DAY_LABELS.reduce((a, _, i) => a + (focusMinutesByDay.get(dayOfWeekKey(i)) ?? 0), 0)
     return (
       <div className="habit-row is-measured">
         <div className="habit-row-top">
@@ -1725,7 +1748,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
         <span className="habit-actions">{actions}</span>
         <div className="habit-days">
           {DAY_LABELS.map((d, i) => {
-            const mins = focusMinutesOn(focusSessions, dayOfWeekKey(i), h.space)
+            const mins = focusMinutesByDay.get(dayOfWeekKey(i)) ?? 0
             const pct = Math.min(100, Math.round((mins / target) * 100))
             return (
               <span className={`day-cell${i === todayIndex ? ' is-today' : ''}`} key={i}>

@@ -21,6 +21,21 @@ const BUILD = (() => {
 export default defineConfig({
   plugins: [react()],
   base: '/mission-control/',
-  build: { outDir: 'docs' },
+  build: {
+    outDir: 'docs',
+    rollupOptions: {
+      output: {
+        /* React and Supabase are 40% of the bundle (142kB + 214kB raw) and only
+           change when a dependency gets bumped -- everything else changes on
+           nearly every deploy. Without this split, one 891kB file re-hashes
+           and re-downloads whole on every redeploy, even for a returning
+           visitor whose React/Supabase copy hasn't changed. Measured 2026-09-04. */
+        manualChunks: {
+          vendor_react: ['react', 'react-dom'],
+          vendor_supabase: ['@supabase/supabase-js'],
+        },
+      },
+    },
+  },
   define: { __BUILD__: JSON.stringify(BUILD) },
 })

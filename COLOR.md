@@ -54,9 +54,32 @@ Set via `data-space` on `<html>`. The app is light only: there is no dark mode a
 - No fifth functional color. More color comes from the muted category set, never the functional set.
 - No purple/indigo/violet, no gradients, no glass. Richness = many quiet hues on warm paper, the opposite aesthetic.
 
-## The Wall (Why's) — the sanctioned exception
+## The deliberately dark surfaces
 
-The Why's board is a dark poster wall with its own highlight colour. That is
-deliberate art direction, not drift: it is the one surface meant to feel like
-a different room. Do not "fix" it back to the light palette, and do not use
-it as precedent for dark surfaces anywhere else.
+The app's own pages (Today, Plan, Habits & Goals, Calendar, Goals) are light
+only — no `data-theme`, no light/dark toggle on the main chrome. That said,
+by 2026-09 there are five surfaces that ARE dark on purpose, each its own
+documented, scoped exception. Do not "fix" any of them back to the light
+palette, and do not treat any one of them as precedent for making some OTHER
+surface dark — each earned its own case:
+
+- **The Wall (Why's)** — a dark poster wall with its own highlight colour,
+  the original exception here: deliberate art direction, meant to feel like
+  a different room.
+- **The Zone** — its own `--z-*` tokens, always dark regardless of theme.
+- **Timeline** — its own `--tl-*` tokens (`styles.css`), always dark. Its
+  faint-label tone (`--tl-faint`) failed WCAG AA against its own background
+  (~2.5:1) until fixed 2026-09-04 — a reminder that "dark surface" still
+  owes every text token a real contrast check against ITS OWN background,
+  not the light palette's.
+- **Today's `.troom` slab** — a dark card inset into the otherwise-light
+  Today page.
+- **HUD mode** (`.shell.is-hud`, toggled via the helmet icon, persisted in
+  `localStorage['mc:hud']`) — a real, separate opt-in dark skin that remaps
+  color tokens app-wide. Any component that pairs `background: var(--a-accent)`
+  with `color: var(--a-ink)` needs an explicit `.shell.is-hud` override to
+  `#04141A` (see `styles.css` around `.shell.is-hud .btn-primary`) — `--a-ink`
+  is redefined pale for HUD's own FAB icon, so without that override an
+  active-state fill silently goes near-invisible (~1.5:1), which is exactly
+  what happened to the active nav tab and the active Habits/Goals toggle
+  until fixed 2026-09-04.

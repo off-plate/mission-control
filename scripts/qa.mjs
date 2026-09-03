@@ -95,6 +95,16 @@ const fresh = async (route = '') => {
   await page.goto(URL); await page.waitForTimeout(300)
   await page.evaluate((K) => { localStorage.removeItem(K); localStorage.removeItem('qa-stream') }, KEY)
   await page.goto(`${URL}#/${route}`); await page.reload(); await page.waitForTimeout(700)
+  /* Found 2026-09-04: whatever the previous test's last click was, the
+     cursor is still resting there. The dock's FAB sits at a fixed
+     bottom-right screen position (dock.tsx/.dock), so a prior test that
+     ended near there has the cursor sitting exactly on top of the FAB when
+     it re-renders after this reload -- .dock's onMouseEnter reads that as a
+     real hover and opens the menu before the next test's own actions run,
+     with no mouse movement of its own to blame. Parking the cursor
+     somewhere the dock never renders keeps every test starting from the
+     dock's real default (closed) state. */
+  await page.mouse.move(20, 20)
 }
 
 /* Routine cards rest SHUT (2026-08-26): the page is a list of routines you run,
@@ -195,8 +205,13 @@ await step('goals: add with milestones, tick one on the card', async () => {
   if (!g || g.milestones?.length !== 1 || g.target !== 1) throw new Error('milestones not saved')
 })
 await step('focus: timer start writes state', async () => {
+  /* .pomo-start (the old standalone Focus pill, PomodoroBadge) was retired
+     with the dock rebuild (2026-09-01/02) and PomodoroBadge is dead code as
+     of 2026-09-04 -- starting a block now goes through PomodoroInline inside
+     the dock's Focus row (dock.tsx). */
   await fresh('focus')
-  await page.locator('.pomo-start').click(); await page.waitForTimeout(400)
+  await page.getByRole('button', { name: 'Open quick tools' }).click(); await page.waitForTimeout(400)
+  await page.getByRole('button', { name: /^Start a \d+ minute focus$/ }).click(); await page.waitForTimeout(400)
   const p = await page.evaluate(() => JSON.parse(localStorage.getItem('mc-pomodoro')))
   if (p.phase !== 'focus') throw new Error(`phase ${p.phase}`)
   await page.locator('.focus-live').getByRole('button', { name: 'Stop' }).click()
@@ -219,9 +234,18 @@ await step('the menu is six tabs, and what left it is reachable from the header'
      goal here is mostly a reflection over a habit, so the two switch inside
      the page on a pill pair instead of being two destinations. #/goals still
      resolves and lands on the Goals face, asserted with the retired ones. */
+  /* FOUR since 2026-09-04: Timeline's own tab retired the same way Notes' and
+     Bills' header shortcuts already had (2026-09-01/02) -- the floating dock's
+     Note/Bills/Timeline summaries plus their hold-for-the-full-page gesture
+     cover all three now (see timelinedock.tsx, billsdock.tsx, notedock.tsx),
+     and the "Why" page lost its tab the same day, folded into a button inside
+     Timeline's own header instead (App.tsx's NAV array carries the full
+     history in its own comments). setPage('timeline') and setPage('board')
+     still render their real pages -- asserted below, same as the older
+     retired addresses. */
   await fresh('today')
   const tabs = await page.locator('.nav-tab').allInnerTexts()
-  if (tabs.length !== 6) throw new Error(`${tabs.length} tabs: ${tabs.join(', ')}`)
+  if (tabs.length !== 4) throw new Error(`${tabs.length} tabs: ${tabs.join(', ')}`)
   if (tabs.some((t) => /apps/i.test(t))) throw new Error('Apps is still a tab')
   if (!tabs.some((t) => /habits & goals/i.test(t))) throw new Error(`no merged tab: ${tabs.join(', ')}`)
   if (tabs.filter((t) => /goals/i.test(t)).length !== 1) throw new Error('Goals is still a tab of its own')
@@ -229,40 +253,75 @@ await step('the menu is six tabs, and what left it is reachable from the header'
   /* Calendar IS in this list now, in Personal like everywhere else. The
      calendar test below owns that rule. */
   if (!tabs.some((t) => /calendar/i.test(t))) throw new Error('Calendar is not a tab')
-  if (!tabs.some((t) => /timeline/i.test(t))) throw new Error('Timeline is not a tab')
-  for (const gone of ['Avoidance', 'Assistant', 'Notes', 'Focus', 'Money', 'Reflect', 'Achievements']) {
+  for (const gone of ['Avoidance', 'Assistant', 'Notes', 'Focus', 'Money', 'Reflect', 'Achievements', 'Timeline', "Why's", 'Why']) {
     if (tabs.includes(gone)) throw new Error(`${gone} is still a tab`)
   }
-  /* My Mind left the header for the Apps shelf on his instruction. The apps
-     test below owns it now, and Achievements left the header entirely. */
-  for (const name of ['Note', 'Assistant']) {
-    if (!(await page.getByRole('button', { name, exact: true }).count()) && !(await page.getByRole('link', { name }).count())) {
-      throw new Error(`no ${name} in the header`)
-    }
+  /* Note left the header entirely for the dock (2026-09-01/02) -- it is
+     checked below by opening the dock and reading its item labels, not as a
+     header button any more. Assistant is the one page that kept its own
+     header button through the whole dock rebuild. */
+  if (!(await page.getByRole('button', { name: 'Assistant', exact: true }).count())) {
+    throw new Error('no Assistant in the header')
   }
+  const dockOpen = page.getByRole('button', { name: 'Open quick tools' })
+  await dockOpen.click(); await page.waitForTimeout(400)
+  const dockLabels = await page.locator('.dock-item-label').allInnerTexts()
+  for (const want of ['Note', 'Bills', 'Timeline']) {
+    if (!dockLabels.some((l) => l.trim() === want)) throw new Error(`${want} is not in the dock (${dockLabels.join(', ')})`)
+  }
+  await page.getByRole('button', { name: 'Close quick tools' }).click(); await page.waitForTimeout(400)
+  /* The FAB sits fixed bottom-right; the cursor is still resting there right
+     after this click, and the same spot re-renders the closed FAB on every
+     reload below -- .dock's onMouseEnter (dock.tsx) reads that as a real
+     hover and reopens the menu before the next test's own actions get a
+     chance to run. Move the mouse away, the same lesson dock.tsx's own
+     comments already draw about a resting cursor and a node changing under
+     it. */
+  await page.mouse.move(20, 20)
   // Every old address still lands somewhere real.
   /* 'assistant' left this list when it became a real page of its own. It used
      to be a dead address walking to Today, back when the assistant was a rail
-     that was removed. */
+     that was removed. 'timeline' and 'board' left this list 2026-09-04 for
+     the same reason -- both still render their own real page now that they
+     are reached through the dock/Timeline-header instead of a tab, so they
+     get their own real-heading assertions rather than the Today fallback. */
   for (const [route, heading] of [['coach', 'Today'], ['money', 'Today'], ['review', 'Today'], ['stats', 'Today'], ['achievements', 'Today']]) {
     await page.goto(`${URL}#/${route}`); await page.reload(); await page.waitForTimeout(500)
     const h1 = await page.locator('h1').first().innerText()
     if (h1 !== heading) throw new Error(`#/${route} landed on ${h1}, not ${heading}`)
   }
+  await page.goto(`${URL}#/timeline`); await page.reload(); await page.waitForTimeout(500)
+  if (!(await page.locator('.tl-why').count())) throw new Error('#/timeline did not render the Timeline page')
 })
-await step('the header opens Notes, and the pill opens Focus', async () => {
+await step('the dock opens Notes (click for the popup, hold for the full page), and its Focus row opens Focus', async () => {
+  /* Rewritten 2026-09-04: Note's header button and the old Focus pill both
+     left for the floating dock during the dock rebuild (2026-09-01/02). A
+     click on a dock item opens its compact popup; holding it ~520ms (see
+     HOLD_MS in dock.tsx) jumps straight to the full page and closes the
+     dock -- his pick from a 3-option artifact comparison. */
   await fresh('today')
-  await page.getByRole('button', { name: 'Note', exact: true }).click(); await page.waitForTimeout(600)
-  if (!(await page.locator('.nt-app').count())) throw new Error('the Note button did not open Notes')
-  /* The pill is the only door to Focus now, and it is on every page -- but
-     open-history is one of the icons that drops below 2200px so the pill
-     stops covering content underneath it (his report, fixed 2026-08-27).
-     Ultrawide, his own daily screen, is where it is reachable this way. */
-  await page.setViewportSize({ width: 2400, height: 1200 })
+  const openDock = page.getByRole('button', { name: 'Open quick tools' })
+  await openDock.waitFor({ state: 'visible', timeout: 10000 })
+  await openDock.click(); await page.waitForTimeout(400)
+  const noteItem = page.locator('.dock-item').filter({ hasText: 'Note' })
+  await noteItem.click(); await page.waitForTimeout(400)
+  if (!(await page.locator('.notedock-panel').count())) throw new Error('a click on the Note dock item did not open the quick popup')
+  // A click on a panel takes the dock straight to mode: 'note', not back to
+  // 'menu' or 'closed' -- its own Close button (not the FAB) gets it there.
+  await page.getByRole('button', { name: 'Close', exact: true }).click(); await page.waitForTimeout(400)
+
+  await page.getByRole('button', { name: 'Open quick tools' }).click(); await page.waitForTimeout(400)
+  const box = await noteItem.boundingBox()
+  if (!box) throw new Error('no Note dock item to hold')
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down(); await page.waitForTimeout(650); await page.mouse.up()
+  await page.waitForTimeout(400)
+  if (!(await page.locator('.nt-app').count())) throw new Error('holding the Note dock item did not open the full Notes page')
+
+  await page.getByRole('button', { name: 'Open quick tools' }).click(); await page.waitForTimeout(400)
   await page.getByRole('button', { name: 'Open the focus history' }).click(); await page.waitForTimeout(600)
   const h1 = await page.locator('h1').first().innerText()
-  if (h1 !== 'Focus') throw new Error(`the pill went to ${h1}`)
-  await page.setViewportSize({ width: 1500, height: 1200 })
+  if (h1 !== 'Focus') throw new Error(`the dock's Focus avatar went to ${h1}`)
 })
 await step('the zone: header stays, first move starts it, and the note lands in its folder', async () => {
   await fresh('today')
@@ -508,19 +567,30 @@ await step('mundi opus: leaving the zone does not stop the music, and the corner
   // Leaving the room: the same play state has to survive, not reset because
   // the tile that used to own the iframe is gone.
   await page.goto(`${URL}#/today`); await page.waitForTimeout(600)
+  /* Rewritten 2026-09-04: the dock rebuild (2026-09-01/02) turned the
+     always-visible corner pill into a dock item that only exists once
+     mo.started (see the panels array in dock.tsx) -- Player now has to be
+     opened from the dock like Note/Bills/Timeline, it does not sit exposed
+     on its own any more. The claim under test is unchanged (leaving the
+     zone does not stop the music, and the SAME queue is reachable from
+     wherever he is), only the door to it moved. */
+  await page.getByRole('button', { name: 'Open quick tools' }).click(); await page.waitForTimeout(400)
+  const playerItem = page.locator('.dock-item').filter({ hasText: 'Player' })
+  if (!(await playerItem.count())) throw new Error('the dock has no Player item once he has pressed play')
+  await playerItem.click(); await page.waitForTimeout(400)
   const media = page.locator('.pomo-media')
-  if (!(await media.count())) throw new Error('the corner never picked up the player once he pressed play')
-  if ((await media.locator('.pomo-media-title').innerText()) !== trackBefore) throw new Error('the corner is not showing the track that was actually playing')
+  if (!(await media.count())) throw new Error('the dock never picked up the player once he pressed play')
+  if ((await media.locator('.pomo-media-title').innerText()) !== trackBefore) throw new Error('the dock is not showing the track that was actually playing')
   const pausePresent = await media.getByRole('button', { name: 'Pause' }).count()
-  if (!pausePresent) throw new Error('the music stopped when the zone tile unmounted (corner still shows Play, not Pause)')
+  if (!pausePresent) throw new Error('the music stopped when the zone tile unmounted (dock still shows Play, not Pause)')
 
-  // The corner's own next button moves the SAME queue Zone reads, not a
+  // The dock's own next button moves the SAME queue Zone reads, not a
   // second independent player.
   await media.getByRole('button', { name: 'Next track' }).click(); await page.waitForTimeout(400)
   const trackAfterCornerSkip = await media.locator('.pomo-media-title').innerText()
-  if (trackAfterCornerSkip === trackBefore) throw new Error('the corner\'s next button did not change the track')
+  if (trackAfterCornerSkip === trackBefore) throw new Error('the dock\'s next button did not change the track')
   await page.goto(`${URL}#/zone`); await page.waitForTimeout(600)
-  if ((await page.locator('.zplayer-title').innerText()) !== trackAfterCornerSkip) throw new Error('the zone and the corner disagree about what is playing')
+  if ((await page.locator('.zplayer-title').innerText()) !== trackAfterCornerSkip) throw new Error('the zone and the dock disagree about what is playing')
 })
 await step('the zone: the note takes real formatting, not a plain textarea', async () => {
   await fresh('zone')
@@ -1265,9 +1335,13 @@ await step('focus: stopping mid-block banks the elapsed minutes', async () => {
   await cp.goto(URL); await cp.waitForTimeout(300)
   await cp.evaluate((K) => { localStorage.removeItem(K); localStorage.removeItem('mc-pomodoro') }, KEY)
   await cp.goto(`${URL}#/focus`); await cp.reload(); await cp.waitForTimeout(600)
-  await cp.locator('.pomo-start').click(); await cp.waitForTimeout(300)
+  /* .pomo-start/.pomo-badge (PomodoroBadge) are dead as of 2026-09-04 -- the
+     dock's Focus row starts it now, and the Stop control lives on the Focus
+     page's own .focus-live panel (unchanged by the dock rebuild). */
+  await cp.getByRole('button', { name: 'Open quick tools' }).click(); await cp.waitForTimeout(300)
+  await cp.getByRole('button', { name: /^Start a \d+ minute focus$/ }).click(); await cp.waitForTimeout(300)
   await cp.clock.fastForward('20:00'); await cp.waitForTimeout(600)
-  await cp.locator('.pomo-badge button[aria-label="Stop this block"]').click(); await cp.waitForTimeout(500)
+  await cp.locator('.focus-live').getByRole('button', { name: 'Stop' }).click(); await cp.waitForTimeout(500)
   const s = await cp.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
   const total = (s.focusSessions ?? []).reduce((a, f) => a + f.minutes, 0)
   if (total < 19 || total > 21) throw new Error(`banked ${total}m of a stopped 20m block`)

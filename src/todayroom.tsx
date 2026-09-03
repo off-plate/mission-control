@@ -55,12 +55,33 @@ function ageDays(t: Task): number {
    markers under the dot field are weighted by these, so a marker sits under
    the quarter hours it owns instead of under an equal fifth of the row. */
 const PHASES = [
-  { id: 'night', label: 'Night', from: 0, to: 6 },
-  { id: 'morning', label: 'Morning', from: 6, to: 11 },
-  { id: 'noon', label: 'Noon', from: 11, to: 14 },
-  { id: 'afternoon', label: 'Afternoon', from: 14, to: 18 },
-  { id: 'evening', label: 'Evening', from: 18, to: 24 },
+  { id: 'night', label: 'Night', short: 'Night', from: 0, to: 6 },
+  { id: 'morning', label: 'Morning', short: 'Morn', from: 6, to: 11 },
+  { id: 'noon', label: 'Noon', short: 'Noon', from: 11, to: 14 },
+  { id: 'afternoon', label: 'Afternoon', short: 'After', from: 14, to: 18 },
+  { id: 'evening', label: 'Evening', short: 'Eve', from: 18, to: 24 },
 ]
+
+/* Measured 2026-09-04 at 390px: Noon (3 of 24 hours) gets a 35px flex share
+   and needs 46px even for "Noon" alone; Afternoon (47px share) needs 93px
+   for "Afternoon". overflow:hidden clips each one silently mid-word with no
+   ellipsis, and because the clipped edge lands hard against the next
+   label's own clipped edge, two truncations read as one garbled word --
+   "MORNIN" + "NOO" as "MORNINNOO". Tightening font-size and letter-spacing
+   (already tried, see .tr-ph below) only shrinks the deficit, it can't
+   close a 93-vs-47px gap. Below 640px the row drops the hour-weighted
+   share (illegible at this width regardless) for five equal columns and
+   short labels sized to actually fit the tightest of them. */
+function useNarrowPhaseRow(): boolean {
+  const [narrow, setNarrow] = useState(() => window.matchMedia('(max-width: 639px)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)')
+    const onChange = () => setNarrow(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  return narrow
+}
 
 /** Ticks once a second, because a countdown that only moves by the minute is a clock. */
 function useNow(): Date {
@@ -92,6 +113,7 @@ export function TodayRoom() {
   const m = Math.floor((msLeft % 3600000) / 60000)
   const s = Math.floor((msLeft % 60000) / 1000)
   const phase = PHASES.find((p) => now.getHours() >= p.from && now.getHours() < p.to) ?? PHASES[0]
+  const narrowPhaseRow = useNarrowPhaseRow()
 
   const mine = tasks.filter((t) => inView(t.space))
   /* The week, full-size and always open here -- his instruction (2026-08-31):
@@ -285,7 +307,9 @@ export function TodayRoom() {
         </div>
         <div className="tr-phases">
           {PHASES.map((p) => (
-            <span key={p.id} className={`tr-ph${p.id === phase.id ? ' is-on' : ''}`} style={{ flex: p.to - p.from }}>{p.label}</span>
+            <span key={p.id} className={`tr-ph${p.id === phase.id ? ' is-on' : ''}`} style={{ flex: narrowPhaseRow ? 1 : p.to - p.from }}>
+              {narrowPhaseRow ? p.short : p.label}
+            </span>
           ))}
         </div>
       </section>

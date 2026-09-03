@@ -428,7 +428,7 @@ function BillsSignIn() {
   return (
     <div className="bills-signin">
       <h1>Bills</h1>
-      <p>Sign in with the same account Compass uses — it's the same data.</p>
+      <p>Sign in with the same account Compass uses. It's the same data.</p>
       {!sent ? (
         <>
           <input className="textinput" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />

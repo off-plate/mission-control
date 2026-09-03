@@ -13,6 +13,7 @@
    financial data on a shared production database. */
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { Sheet } from './modals'
+import { CycleRail, type RailIncome } from './cyclerail'
 import { parseDebtLines } from './debtimport'
 import { Band, Segmented } from './ui'
 import {
@@ -173,6 +174,14 @@ export function BillsPage() {
   const skips = allSkips[cycle.key] ?? []
   const dismissed = useMemo(() => new Set(Object.values(allSkips).flat()), [allSkips])
   const carryIn = ((data?.profile?.settings as { carryover?: Record<string, number> } | undefined)?.carryover?.[cycle.key]) ?? 0
+  /* WHICH DAY THE MONEY ARRIVES. compass_cycle_income carries cycle_start and
+     expected_income and nothing else -- a month bucket with no date -- so the
+     rail had no way to place a salary. Kept in profile.settings rather than a
+     new column: this is a shared production database and settings is already
+     the blob holding skips, carryover and active_cycle. Keyed by income row,
+     because he can have more than one source and they need not land together.
+     An entry with no day is not given one; it sits in the rail's tray. */
+  const incomeDays = (data?.profile?.settings as { income_day?: Record<string, number> } | undefined)?.income_day ?? {}
 
   const income = data ? resolveCycleIncome(cycle, data.cycleIncome).amount : 0
   const chk = data ? cycleChecklist(data.recurring, data.planned, data.debts, data.transactions, cycle, income, dismissed) : null
@@ -213,6 +222,19 @@ export function BillsPage() {
     unexpected: groups.unexpected.filter((i) => !i.paid && !skips.includes(i.id)).length,
     unreasonable: groups.unreasonable.filter((i) => !i.paid && !skips.includes(i.id)).length,
   } : null
+
+  /* The rail's readout and tray open the row they name, so the mapping from a
+     checklist item back to the sheet that edits it lives here once instead of
+     being repeated at every call site. */
+  const openItem = (i: CycleItem) => {
+    if (!data) return
+    if (i.debtId) { const d = data.debts.find((x) => x.id === i.debtId); if (d) { setEditDebt(d); return } }
+    if (i.link.recurring_id) { const r = data.recurring.find((x) => x.id === i.link.recurring_id); if (r) { setEditRecurring(r); return } }
+    if (i.link.planned_id) {
+      const p = data.planned.find((x) => x.id === i.link.planned_id)
+      if (p) { if (i.source === 'unreasonable') setEditUnreasonable(p); else setEditPlanned(p); return }
+    }
+  }
 
   /* ---- actions, mirroring Compass's own Bills.tsx/useStore.ts exactly ---- */
 
@@ -325,10 +347,18 @@ export function BillsPage() {
           )}
         </div>
 
-        <div className="bills-quick">
-          <button className="bq-in" onClick={() => setEditIncome('new')}>+ Income</button>
-          <button className="bq-out" onClick={() => setEditRecurring('new')}>+ Bill</button>
-        </div>
+        <CycleRail
+          cycle={cycle}
+          isNow={cycleOffset === 0}
+          items={chk.items.filter((i) => !skips.includes(i.id))}
+          incomes={groups.income.map((ci): RailIncome => ({
+            id: ci.id, label: ci.label || 'Income', amount: ci.expected_income, day: incomeDays[ci.id] ?? null,
+          }))}
+          onOpenItem={openItem}
+          onOpenIncome={(id) => { const ci = data.cycleIncome.find((x) => x.id === id); if (ci) setEditIncome(ci) }}
+          onAddIncome={() => setEditIncome('new')}
+          onAddBill={() => setEditRecurring('new')}
+        />
 
         {/* His correction, pointed straight at Plan: two real columns, the
             same shape as Plan's to-do list beside its day panel -- one
@@ -473,7 +503,9 @@ export function BillsPage() {
       {editRecurring && <RecurringSheet item={editRecurring === 'new' ? null : editRecurring} onClose={() => setEditRecurring(null)} onSaved={reload} />}
       {editPlanned && <PlannedSheet item={editPlanned === 'new' ? null : editPlanned} cycleKey={cycle.key} onClose={() => setEditPlanned(null)} onSaved={reload} />}
       {editUnreasonable && <UnreasonableSheet item={editUnreasonable === 'new' ? null : editUnreasonable} cycleKey={cycle.key} onClose={() => setEditUnreasonable(null)} onSaved={reload} />}
-      {editIncome && <IncomeSheet item={editIncome === 'new' ? null : editIncome} cycle={cycle} onClose={() => setEditIncome(null)} onSaved={reload} />}
+      {editIncome && <IncomeSheet item={editIncome === 'new' ? null : editIncome} cycle={cycle}
+        settings={(data.profile?.settings ?? {}) as Record<string, unknown>}
+        onClose={() => setEditIncome(null)} onSaved={reload} />}
       {editDebt && <DebtSheet item={editDebt === 'new' ? null : editDebt} onClose={() => setEditDebt(null)} onSaved={reload} />}
       {importDebts && <DebtImportSheet existing={data.debts} onClose={() => setImportDebts(false)} onSaved={reload} />}
 
@@ -748,17 +780,36 @@ function UnreasonableSheet({ item, cycleKey, onClose, onSaved }: { item: Compass
   )
 }
 
-function IncomeSheet({ item, cycle, onClose, onSaved }: { item: CompassCycleIncome | null; cycle: { start: Date }; onClose: () => void; onSaved: () => void }) {
+function IncomeSheet({ item, cycle, settings, onClose, onSaved }: {
+  item: CompassCycleIncome | null; cycle: { start: Date }
+  settings: Record<string, unknown>; onClose: () => void; onSaved: () => void
+}) {
   const [label, setLabel] = useState(item?.label ?? '')
   const [amount, setAmount] = useState(item ? String(item.expected_income) : '')
+  const days = (settings.income_day as Record<string, number> | undefined) ?? {}
+  const [day, setDay] = useState(item && days[item.id] ? String(days[item.id]) : '')
   const [busy, setBusy] = useState(false)
   const valid = Number(amount) > 0
   const save = async () => {
     setBusy(true)
     const patch = { label: label.trim() || null, expected_income: Number(amount), cycle_start: iso(cycle.start) }
     try {
-      if (item) await updateRow('compass_cycle_income', item.id, patch)
-      else await insertRow('compass_cycle_income', patch)
+      const row = item
+        ? (await updateRow<CompassCycleIncome>('compass_cycle_income', item.id, patch))
+        : (await insertRow<CompassCycleIncome>('compass_cycle_income', patch))
+      /* The day is not a column on this table, so it goes in the profile blob
+         beside skips and carryover, keyed by the row it belongs to. Written
+         only when it actually changed: this upsert touches the whole settings
+         object and two sessions saving at once would otherwise trade blanks. */
+      const id = row?.id ?? item?.id
+      const want = Number(day)
+      const has = id ? days[id] : undefined
+      const next = Number.isFinite(want) && want >= 1 && want <= 31 ? Math.round(want) : undefined
+      if (id && next !== has) {
+        const map = { ...days }
+        if (next === undefined) delete map[id]; else map[id] = next
+        await upsertCompassProfile(settings, { settings: { income_day: map } })
+      }
       onSaved(); onClose()
     } finally { setBusy(false) }
   }
@@ -772,6 +823,13 @@ function IncomeSheet({ item, cycle, onClose, onSaved }: { item: CompassCycleInco
       <div className="bills-form">
         <label>Name<input className="textinput" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Salary, side gig…" autoFocus /></label>
         <label>Amount<input className="textinput" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
+        <label>Day it lands
+          <select className="textinput" value={day} onChange={(e) => setDay(e.target.value)}>
+            <option value="">Not set</option>
+            {Array.from({ length: 31 }, (_, n) => n + 1).map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+          <span className="bills-hint">Puts it on the timeline. Left unset, it sits in "any time this cycle" rather than being placed on a day it might not arrive.</span>
+        </label>
         <button className="btn btn-primary" disabled={!valid || busy} onClick={() => void save()}>{item ? 'Save' : 'Add income'}</button>
         {item && <button className="bills-delete" disabled={busy} onClick={() => void del()}>🗑 Delete</button>}
       </div>

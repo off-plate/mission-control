@@ -1,4 +1,5 @@
 import { Component, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { exceptionsFor, globalExceptions } from './exceptions'
 import { useDockBadge } from './desktop'
 import { SPACE_LABELS } from './mock'
@@ -211,23 +212,74 @@ function PageNav({
   setPage: (p: PageId) => void
   onMouseEnter?: () => void
 }) {
+  const { projects, view, setSpace, enterProject } = useStore()
   const activeRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     activeRef.current?.scrollIntoView({ inline: 'center', block: 'nearest' })
   }, [page])
+
+  /* A preview, not a menu: hovering Projects jumps straight into one without
+     a click, but the pill itself still only ever navigates to the directory
+     -- clicking it is untouched. No "view all" or "add" row here on purpose;
+     those already live one click away, on the page this is a shortcut past.
+
+     Portalled to the body rather than nested under .nav: .nav clips to its
+     OWN box while revealing (clip-path: inset(0), part of its slide-down
+     animation), so a normal absolutely-positioned child anchored below it
+     was invisible -- present in the DOM, computed as visible, painted
+     nowhere. Fixed position, measured from the trigger's own rect, is the
+     way out of an ancestor that clips by design. */
+  const [hoverOpen, setHoverOpen] = useState(false)
+  const [hoverRect, setHoverRect] = useState<{ top: number; left: number } | null>(null)
+  const hoverTimer = useRef<number | undefined>(undefined)
+  const wrapRef = useRef<HTMLSpanElement>(null)
+  const showHover = () => {
+    window.clearTimeout(hoverTimer.current)
+    const r = wrapRef.current?.getBoundingClientRect()
+    if (r) setHoverRect({ top: r.bottom + 6, left: r.left })
+    setHoverOpen(true)
+  }
+  const hideHoverSoon = () => { hoverTimer.current = window.setTimeout(() => setHoverOpen(false), 350) }
+  const hoverProjects = view === 'all' ? projects : projects.filter((p) => p.space === view)
+
   return (
     <nav className="nav" aria-label="Pages" onMouseEnter={onMouseEnter}>
-      {tabs.map((t) => (
-        <button
-          key={t.id}
-          ref={page === t.id ? activeRef : undefined}
-          className="nav-tab"
-          aria-current={page === t.id ? 'page' : undefined}
-          onClick={() => setPage(t.id)}
-        >
-          {t.label}
-        </button>
-      ))}
+      {tabs.map((t) => {
+        const button = (
+          <button
+            key={t.id}
+            ref={page === t.id ? activeRef : undefined}
+            className="nav-tab"
+            aria-current={page === t.id ? 'page' : undefined}
+            onClick={() => setPage(t.id)}
+          >
+            {t.label}
+          </button>
+        )
+        if (t.id !== 'projects' || hoverProjects.length === 0) return button
+        return (
+          <span className="kebab-wrap" key={t.id} ref={wrapRef} onMouseEnter={showHover} onMouseLeave={hideHoverSoon}>
+            {button}
+            {hoverOpen && hoverRect && createPortal(
+              <div
+                className="kebab-menu"
+                role="menu"
+                aria-label="Projects"
+                style={{ position: 'fixed', top: hoverRect.top, left: hoverRect.left, right: 'auto' }}
+                onMouseEnter={showHover}
+                onMouseLeave={hideHoverSoon}
+              >
+                {hoverProjects.map((p) => (
+                  <button key={p.id} role="menuitem" onClick={() => { setSpace(p.space); enterProject(p.id); setHoverOpen(false) }}>
+                    {p.name}
+                  </button>
+                ))}
+              </div>,
+              document.body,
+            )}
+          </span>
+        )
+      })}
     </nav>
   )
 }

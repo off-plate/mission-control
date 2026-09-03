@@ -356,8 +356,6 @@ export function BillsPage() {
           }))}
           onOpenItem={openItem}
           onOpenIncome={(id) => { const ci = data.cycleIncome.find((x) => x.id === id); if (ci) setEditIncome(ci) }}
-          onAddIncome={() => setEditIncome('new')}
-          onAddBill={() => setEditRecurring('new')}
         />
 
         {/* His correction, pointed straight at Plan: two real columns, the

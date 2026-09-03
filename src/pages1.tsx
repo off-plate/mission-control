@@ -1417,24 +1417,22 @@ function ProjectCard({ p, onOpen }: { p: Project; onOpen: () => void }) {
   )
 }
 
+/* Which Space it's for is never asked: the "+ New project" tile that opens
+   this already lives inside one Space's own section, in Projects and in
+   every grouping under All alike, so the answer is already known. */
 function NewProjectSheet({ space, onClose }: { space: SpaceId; onClose: () => void }) {
   const { addProject } = useStore()
   const [name, setName] = useState('')
-  const [sp, setSp] = useState<SpaceId>(space)
-  const save = () => { if (!name.trim()) return; addProject(name.trim(), sp); onClose() }
+  const save = () => { if (!name.trim()) return; addProject(name.trim(), space); onClose() }
   return (
-    <Sheet title="New project" onClose={onClose}>
+    <Sheet title={`New project in ${SPACE_LABELS[space]}`} onClose={onClose}>
       <label className="field-label" htmlFor="np-name">Name</label>
       <input
-        id="np-name" className="textinput" style={{ width: '100%', marginBottom: 'var(--s4)' }}
+        id="np-name" className="textinput" style={{ width: '100%' }}
         value={name} autoFocus placeholder="e.g. a client name, a workstream…"
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) save() }}
       />
-      <label className="field-label" htmlFor="np-space">Space</label>
-      <select id="np-space" className="textinput" style={{ width: '100%' }} value={sp} onChange={(e) => setSp(e.target.value as SpaceId)}>
-        {SPACES.map((s) => <option key={s} value={s}>{SPACE_LABELS[s]}</option>)}
-      </select>
       <div className="sheet-actions">
         <button className="btn btn-quiet" onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" disabled={!name.trim()} onClick={save}>Create project</button>

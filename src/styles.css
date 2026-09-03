@@ -7840,6 +7840,49 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .bd-tip { margin-top: 12px; font-size: 12.5px; color: var(--accent); }
 .bd-warn { margin-top: 12px; font-size: 12.5px; color: var(--negative); }
 
+/* Every active debt, inside the Debt freedom card. Before this the card was a
+   single total with nothing behind it: the creditors were only reachable via
+   the Debt payments section's Edit list, and that lists only what is due this
+   cycle -- so a debt with no payment plan was invisible everywhere. Two lines
+   per row (name/amount, then bar/detail) keeps eight of them readable in a
+   half-width column. */
+.bd-list { margin-top: 16px; border-top: 1px solid var(--border); }
+.bd-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 12px; align-items: center;
+  width: 100%; padding: 10px 0; border: none; border-bottom: 1px solid var(--border);
+  background: none; text-align: left; cursor: pointer; font: inherit; color: inherit;
+}
+.bd-row:last-child { border-bottom: none; }
+.bd-row:hover { background: var(--bg-subtle); }
+.bd-rname { font: 600 13.5px var(--font-body); display: flex; align-items: baseline; gap: 7px; min-width: 0; }
+.bd-rname > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bd-rkind { font: 600 10.5px var(--font-body); text-transform: uppercase; letter-spacing: .07em; color: var(--ink-3); flex: none; }
+.bd-ramt { font: 700 13.5px var(--font-body); color: var(--negative); font-variant-numeric: tabular-nums; }
+.bd-rbar { height: 4px; border-radius: 99px; background: var(--bg-subtle); overflow: hidden; align-self: center; }
+.bd-rbar i { display: block; height: 100%; background: var(--accent-fill); }
+.bd-rsub { font-size: 11.5px; color: var(--ink-3); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bd-acts { display: flex; gap: 18px; margin-top: 14px; }
+
+/* Pasting the list. Rows preview before anything is written -- this writes to
+   his real balances, so nothing is saved on a guess about what a line meant. */
+.bd-imp-text { font: 400 13px var(--font-mono); line-height: 1.6; resize: vertical; min-height: 130px; }
+.bd-imp { display: flex; flex-direction: column; }
+.bd-imp-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+.bd-imp-count { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.bd-imp-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--border); }
+.bd-imp-row.is-off { opacity: .5; }
+.bd-imp-name { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; font: 600 13.5px var(--font-body); }
+.bd-imp-name > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bd-imp-sub { font: 400 11.5px var(--font-body); color: var(--ink-3); }
+.bd-imp-kind { font: 600 12px var(--font-body); color: var(--ink); background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 8px; padding: 4px 6px; flex: none; }
+.bd-imp-amt { font: 700 13px var(--font-body); color: var(--negative); font-variant-numeric: tabular-nums; flex: none; }
+.bd-imp-skip { font: 600 12px var(--font-body); color: var(--ink-3); background: none; border: none; cursor: pointer; flex: none; width: 38px; text-align: right; padding: 0; }
+.bd-imp-skip:hover { color: var(--ink); }
+.bd-imp-warn { font-size: 12px; color: var(--highlight); margin: 8px 0 0; }
+.bd-imp-total { display: flex; align-items: baseline; justify-content: space-between; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.bd-imp-total .v { font: 800 20px var(--font-display); color: var(--negative); font-variant-numeric: tabular-nums; }
+.bills-hint { font: 400 11.5px var(--font-body); color: var(--ink-3); line-height: 1.5; }
+
 .bills-empty { max-width: 1180px; margin: 60px auto; padding: 0 24px; color: var(--ink-3); font-size: 14px; }
 
 .bills-signin { max-width: 380px; margin: 60px auto; padding: 0 24px; display: flex; flex-direction: column; gap: 12px; text-align: center; }

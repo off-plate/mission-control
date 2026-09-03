@@ -13,13 +13,14 @@
    financial data on a shared production database. */
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { Sheet } from './modals'
+import { parseDebtLines } from './debtimport'
 import { Band, Segmented } from './ui'
 import {
   currentAccount, deleteRow, insertRow, onAccountChange, readRows, sendSignInCode, signInWithCode,
   updateRow, upsertCompassProfile, SUPABASE_ENABLED,
 } from './supabase'
 import {
-  activeCycleKey, addMonthsToKey, cycleChecklist, cycleFree, cycleForKey, debtFreeView, debtFreedom, debtRunway,
+  activeCycleKey, addMonthsToKey, cycleChecklist, cycleFree, cycleForKey, debtFreeView, debtFreedom, debtRunway, debtView,
   iso, relativeDay, resolveCycleIncome, todayISO,
   type CompassCycleIncome, type CompassDebt, type CompassPlanned, type CompassProfile, type CompassRecurring,
   type CompassTransaction, type CycleItem, type DebtKind,
@@ -87,6 +88,7 @@ function publishBills(next: { data: BillsData | null; error: string | null }): v
   billsView = next
   for (const f of [...billsListeners]) f()
 }
+
 
 function refreshBills(signedIn: boolean | null, force = false): Promise<void> {
   if (!signedIn) { publishBills({ data: null, error: null }); return Promise.resolve() }
@@ -158,6 +160,7 @@ export function BillsPage() {
      point per section that lists everything in it, not just a shortcut to
      add one more. */
   const [managing, setManaging] = useState<'income' | 'recurring' | 'debt' | 'unexpected' | 'unreasonable' | null>(null)
+  const [importDebts, setImportDebts] = useState(false)
   const [ending, setEnding] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -177,6 +180,14 @@ export function BillsPage() {
   const freedom = data ? debtFreedom(data.debts, data.transactions) : null
   const freeView = data ? debtFreeView(data.debts, data.transactions) : null
   const runway = data ? debtRunway(data.debts, data.transactions) : null
+  /* The Debt freedom card was one aggregate figure with no way behind it: his
+     eight creditors were only reachable through the Debt payments section's
+     Edit list, and only the ones with a payment due this cycle showed at all.
+     Every active debt is listed in the card now, largest first. */
+  const debtRows = useMemo(
+    () => (data ? data.debts.filter((d) => d.status === 'active').map((d) => debtView(d, data.transactions)).sort((a, b) => b.remaining - a.remaining) : []),
+    [data],
+  )
   const nextRelief = runway?.milestones.find((m) => m.monthIndex <= 3) ?? null
 
   const cycleTitle = cycleOffset === 0 ? 'This cycle' : cycleOffset === 1 ? 'Next cycle' : cycleOffset === -1 ? 'Last cycle'
@@ -326,15 +337,48 @@ export function BillsPage() {
         <div className="bills-debtcard">
           <div className="bd-top"><span className="overline">Debt freedom</span></div>
           <div className="bd-figure">{money(freedom.owed)}</div>
-          <div className="bd-cap">still owed</div>
+          <div className="bd-cap">{freedom.baseline > freedom.owed ? `still owed of ${money(freedom.baseline)}` : 'still owed'}</div>
           <div className="bd-right">
             <div className="bd-month">{freeView.freeDate ? freeView.freeDate.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : '—'}</div>
-            <div className="bd-pct">{Math.round(freedom.pct * 100)}% free · {money(freedom.paid)} paid</div>
+            {/* Nothing entered is not 100% free. The card used to congratulate
+                him for an empty table, full bar and all. */}
+            <div className="bd-pct">{freedom.baseline > 0 ? `${Math.round(freedom.pct * 100)}% free · ${money(freedom.paid)} paid` : 'nothing entered yet'}</div>
           </div>
-          <div className="bd-bar"><i style={{ width: `${Math.max(2, Math.round(freedom.pct * 100))}%` }} /></div>
+          <div className="bd-bar"><i style={{ width: `${freedom.baseline > 0 ? Math.max(2, Math.round(freedom.pct * 100)) : 0}%` }} /></div>
           {nextRelief && (
             <div className="bd-tip">{nextRelief.debtName} clears {nextRelief.date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}, freeing {money(nextRelief.freed)}/mo.</div>
           )}
+          {/* A bare "—" where the free date goes says nothing. There is no date
+              because something is not being paid down, and that is the fact
+              worth reading. */}
+          {freeView.stalled.length > 0 && (
+            <div className="bd-warn">No date yet: {freeView.stalled.length === 1 ? 'one debt has' : `${freeView.stalled.length} debts have`} no payment plan.</div>
+          )}
+
+          {debtRows.length > 0 && (
+            <div className="bd-list">
+              {debtRows.map((v) => {
+                const base = v.debt.original_amount ?? v.debt.principal_start
+                const pct = Math.round(v.progress * 100)
+                return (
+                  <button key={v.debt.id} className="bd-row" onClick={() => setEditDebt(v.debt)}>
+                    <span className="bd-rname">{v.debt.name}<span className="bd-rkind">{DEBT_KIND_LABEL[v.debt.kind]}</span></span>
+                    <span className="bd-ramt">{money(v.remaining)}</span>
+                    <span className="bd-rbar"><i style={{ width: `${pct}%` }} /></span>
+                    <span className="bd-rsub">
+                      {pct > 0 ? `${pct}% of ${money(base)}` : `from ${money(base)}`}
+                      {v.debt.monthly_payment > 0 ? ` · ${money(v.debt.monthly_payment)}/mo` : ' · no plan yet'}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          <div className="bd-acts">
+            <button className="bills-add" onClick={() => setEditDebt('new')}>+ Add a debt</button>
+            <button className="bills-add" onClick={() => setImportDebts(true)}>Paste a list</button>
+          </div>
         </div>
         </div>
 
@@ -411,6 +455,7 @@ export function BillsPage() {
       {editUnreasonable && <UnreasonableSheet item={editUnreasonable === 'new' ? null : editUnreasonable} cycleKey={cycle.key} onClose={() => setEditUnreasonable(null)} onSaved={reload} />}
       {editIncome && <IncomeSheet item={editIncome === 'new' ? null : editIncome} cycle={cycle} onClose={() => setEditIncome(null)} onSaved={reload} />}
       {editDebt && <DebtSheet item={editDebt === 'new' ? null : editDebt} onClose={() => setEditDebt(null)} onSaved={reload} />}
+      {importDebts && <DebtImportSheet existing={data.debts} onClose={() => setImportDebts(false)} onSaved={reload} />}
 
       {managing === 'income' && (
         <ManageSheet title="Income" addLabel="+ Add income"
@@ -729,6 +774,7 @@ function DebtSheet({ item, onClose, onSaved }: { item: CompassDebt | null; onClo
   const [creditor, setCreditor] = useState(item?.creditor ?? '')
   const [kind, setKind] = useState<DebtKind>(item?.kind ?? 'structured')
   const [principal, setPrincipal] = useState(item ? String(item.principal_start) : '')
+  const [baseline, setBaseline] = useState(item ? String(item.original_amount ?? item.principal_start) : '')
   const [monthly, setMonthly] = useState(item ? String(item.monthly_payment) : '')
   const [rate, setRate] = useState(item ? String(item.interest_rate) : '')
   const [dueDay, setDueDay] = useState(item?.due_day != null ? String(item.due_day) : '')
@@ -736,22 +782,29 @@ function DebtSheet({ item, onClose, onSaved }: { item: CompassDebt | null; onClo
   const [err, setErr] = useState<string | null>(null)
   const principalNum = Number(principal.replace(',', '.')) || 0
   const monthlyNum = Number(monthly.replace(',', '.')) || 0
-  const valid = name.trim().length > 0 && principalNum > 0 && monthlyNum > 0
+  const baselineNum = Number(baseline.replace(',', '.')) || 0
+  /* A monthly payment used to be required. Half of what he owes has no payment
+     plan agreed yet -- that is the actual situation, and refusing to record it
+     was the reason those debts were missing from the card entirely. A debt with
+     no payment reads as "no plan yet" and is left out of the free date. */
+  const valid = name.trim().length > 0 && principalNum > 0
   const save = async () => {
     if (!name.trim()) { setErr('Give the debt a name'); return }
     if (principalNum <= 0) { setErr('Balance owed must be greater than 0'); return }
-    if (monthlyNum <= 0) { setErr('Set a monthly payment so it has a payoff date'); return }
     setErr(null); setBusy(true)
     const dayParsed = Number(dueDay)
     const patch = {
       name: name.trim(), creditor: creditor.trim() || null, kind,
       principal_start: principalNum, monthly_payment: monthlyNum,
+      // A baseline under the balance would read as negative progress, so an
+      // empty or nonsense figure falls back to the balance.
+      original_amount: baselineNum >= principalNum ? baselineNum : principalNum,
       interest_rate: Number(rate.replace(',', '.')) || 0,
       due_day: dueDay && Number.isFinite(dayParsed) ? Math.min(31, Math.max(1, dayParsed)) : null,
     }
     try {
       if (item) await updateRow('compass_debts', item.id, patch)
-      else await insertRow('compass_debts', { ...patch, original_amount: patch.principal_start, start_on: todayISO(), status: 'active' })
+      else await insertRow('compass_debts', { ...patch, start_on: todayISO(), status: 'active' })
       onSaved(); onClose()
     } finally { setBusy(false) }
   }
@@ -767,12 +820,113 @@ function DebtSheet({ item, onClose, onSaved }: { item: CompassDebt | null; onClo
         <label>Lender<input className="textinput" value={creditor} onChange={(e) => setCreditor(e.target.value)} placeholder="Bank…" /></label>
         <Segmented label="Type" value={kind} onPick={setKind} options={(Object.keys(DEBT_KIND_LABEL) as DebtKind[]).map((k) => ({ id: k, label: DEBT_KIND_LABEL[k] }))} />
         <label>Balance owed<input className="textinput" type="number" value={principal} onChange={(e) => setPrincipal(e.target.value)} placeholder="0" /></label>
-        <label>Monthly payment<input className="textinput" type="number" value={monthly} onChange={(e) => setMonthly(e.target.value)} placeholder="0" /></label>
+        <label>Started at
+          <input className="textinput" type="number" value={baseline} onChange={(e) => setBaseline(e.target.value)} placeholder={principal || 'same as the balance'} />
+          <span className="bills-hint">What it was before you paid anything. Every "% free" on this card is measured from here. Leave it matching the balance to start counting from today.</span>
+        </label>
+        <label>Monthly payment (leave 0 if there is no plan yet)<input className="textinput" type="number" value={monthly} onChange={(e) => setMonthly(e.target.value)} placeholder="0" /></label>
         <label>Day of month it's due (optional)<input className="textinput" type="number" min={1} max={31} value={dueDay} onChange={(e) => setDueDay(e.target.value)} /></label>
         <label>Interest % per year (optional)<input className="textinput" type="number" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="0" /></label>
         {err && <p className="bills-signin-err">{err}</p>}
         <button className="btn btn-primary" disabled={!valid || busy} onClick={() => void save()}>{item ? 'Save changes' : 'Add debt'}</button>
         {item && <button className="bills-delete" disabled={busy} onClick={() => void del()}>🗑 Delete this debt</button>}
+      </div>
+    </Sheet>
+  )
+}
+
+/* Eight creditors, one paste. Each line is "name then amount"; a name already
+   on the account updates that debt rather than adding a second one with the
+   same name, which is what typing them in one at a time kept producing.
+
+   It writes principal_start AND original_amount, because the whole "% free"
+   figure is measured from original_amount and there was no way to set it. It
+   also moves start_on to today: the pasted figure is what is owed now, so
+   counting older payments against it again would show progress twice. */
+function DebtImportSheet({ existing, onClose, onSaved }: { existing: CompassDebt[]; onClose: () => void; onSaved: () => void }) {
+  const [text, setText] = useState('')
+  const [kinds, setKinds] = useState<Record<number, DebtKind>>({})
+  const [skipped, setSkipped] = useState<Record<number, boolean>>({})
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  /* A paste is typed by hand, so case and stray spacing must not be what
+     decides between updating a debt and creating a duplicate. */
+  const byName = useMemo(() => {
+    const m = new Map<string, CompassDebt>()
+    for (const d of existing) if (d.status === 'active') m.set(d.name.toLowerCase().replace(/\s+/g, ' ').trim(), d)
+    return m
+  }, [existing])
+
+  const rows = useMemo(() => parseDebtLines(text).map((r, i) => {
+    const match = byName.get(r.name.toLowerCase().replace(/\s+/g, ' ').trim()) ?? null
+    return { ...r, match, kind: kinds[i] ?? match?.kind ?? 'unstructured', skip: skipped[i] ?? false, i }
+  }), [text, byName, kinds, skipped])
+
+  const usable = rows.filter((r) => r.amount !== null && !r.skip)
+  const total = usable.reduce((sum, r) => sum + (r.amount ?? 0), 0)
+  const unreadable = rows.filter((r) => r.amount === null).length
+
+  const save = async () => {
+    if (!usable.length) return
+    setErr(null); setBusy(true)
+    try {
+      for (const r of usable) {
+        const amount = r.amount as number
+        if (r.match) {
+          await updateRow('compass_debts', r.match.id, {
+            principal_start: amount, original_amount: amount, kind: r.kind, start_on: todayISO(),
+          })
+        } else {
+          await insertRow('compass_debts', {
+            name: r.name, creditor: null, kind: r.kind,
+            principal_start: amount, original_amount: amount,
+            monthly_payment: 0, interest_rate: 0, due_day: null,
+            start_on: todayISO(), status: 'active',
+          })
+        }
+      }
+      onSaved(); onClose()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Could not save. Check your connection and try again.')
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <Sheet title="Paste your debts" onClose={onClose}>
+      <div className="bills-form">
+        <p>One debt per line, name then amount. This sets the balance and the baseline every "% free" is measured from, counting from today. Monthly payments stay at zero until you set them.</p>
+        <textarea
+          className="textinput bd-imp-text" rows={7} spellCheck={false} autoFocus
+          value={text} onChange={(e) => setText(e.target.value)}
+          placeholder={'Credit card: 45 000 Kč\nCar loan: 120 000\nBrother — 20 000'}
+        />
+        {rows.length > 0 && (
+          <div className="bd-imp">
+            <div className="bd-imp-head"><span className="overline">What will be saved</span><span className="bd-imp-count">{usable.length} of {rows.length}</span></div>
+            {rows.map((r) => (
+              <div key={`${r.raw}-${r.i}`} className={`bd-imp-row${r.amount === null || r.skip ? ' is-off' : ''}`}>
+                <span className="bd-imp-name">{r.name}<span className="bd-imp-sub">{r.amount === null ? 'no amount on this line' : r.match ? `updates ${r.match.name}` : 'new debt'}</span></span>
+                {r.amount !== null && (
+                  <>
+                    <select className="bd-imp-kind" aria-label={`Type for ${r.name}`} value={r.kind}
+                      onChange={(e) => setKinds((k) => ({ ...k, [r.i]: e.target.value as DebtKind }))}>
+                      {(Object.keys(DEBT_KIND_LABEL) as DebtKind[]).map((k) => <option key={k} value={k}>{DEBT_KIND_LABEL[k]}</option>)}
+                    </select>
+                    <span className="bd-imp-amt">{money(r.amount)}</span>
+                    <button className="bd-imp-skip" onClick={() => setSkipped((x) => ({ ...x, [r.i]: !r.skip }))}>{r.skip ? 'Undo' : 'Skip'}</button>
+                  </>
+                )}
+              </div>
+            ))}
+            {unreadable > 0 && <p className="bd-imp-warn">{unreadable} line{unreadable === 1 ? '' : 's'} had no readable amount and will be left out.</p>}
+            <div className="bd-imp-total"><span className="overline">Baseline total</span><span className="v">{money(total)}</span></div>
+          </div>
+        )}
+        {err && <p className="bills-signin-err">{err}</p>}
+        <button className="btn btn-primary" disabled={!usable.length || busy} onClick={() => void save()}>
+          {busy ? 'Saving…' : `Save ${usable.length || ''} debt${usable.length === 1 ? '' : 's'}`}
+        </button>
       </div>
     </Sheet>
   )

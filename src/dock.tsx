@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from './store'
 import { useMundiOpus } from './mundiplayer'
-import { MediaBadge, MediaChip, PomodoroInline } from './pomodoro'
+import { MediaBadge, MediaChip, PomodoroInline, usePomodoro } from './pomodoro'
 import { NoteChip, NotePanel } from './notedock'
 import { BillsChip, BillsPanel } from './billsdock'
 import { TimelineChip, TimelinePanel } from './timelinedock'
@@ -190,6 +190,39 @@ function useHideOnScroll(active: boolean) {
   return hidden
 }
 
+const FOCUS_TOAST_MS = 2200
+const FOCUS_TOAST_EXIT_MS = 200
+
+/* His report (2026-09-04): starting a block from a task's own Start button
+   (Today, Plan) or from the Zone gave no sign it caught -- the dock's own
+   Focus row only ever showed anything while he'd already opened the dock by
+   hand, and the ambient edge glow (.pomo-ambient in pomodoro.tsx) reads as
+   too quiet to stand in for it. startFocus's third argument marks exactly
+   those starts (not the dock's own play button, and not resuming from idle
+   there either -- both are already looking straight at the thing that's
+   about to change, see pomodoro.tsx). This turns that signal into a few
+   seconds of the SAME focus row the open menu shows, closed dock only --
+   his ask was "just the part with the focus," not the whole speed-dial. */
+function useFocusToast(announcedAt: number, dockIsClosed: boolean): 'hidden' | 'shown' | 'hiding' {
+  const [phase, setPhase] = useState<'hidden' | 'shown' | 'hiding'>('hidden')
+  const seen = useRef(announcedAt)
+  const closedRef = useRef(dockIsClosed)
+  useEffect(() => { closedRef.current = dockIsClosed }, [dockIsClosed])
+  useEffect(() => {
+    if (announcedAt === seen.current) return
+    seen.current = announcedAt
+    /* Already looking at the real menu -- it shows this same row live the
+       moment it's open, so a toast on top of it would just be a second
+       copy of the same fact fighting for the same corner. */
+    if (!closedRef.current) return
+    setPhase('shown')
+    const hideTimer = window.setTimeout(() => setPhase('hiding'), FOCUS_TOAST_MS)
+    const goneTimer = window.setTimeout(() => setPhase('hidden'), FOCUS_TOAST_MS + FOCUS_TOAST_EXIT_MS)
+    return () => { window.clearTimeout(hideTimer); window.clearTimeout(goneTimer) }
+  }, [announcedAt])
+  return phase
+}
+
 /* THE DOCK: a Material speed-dial FAB (his reference, 2026-09-01). Closed,
    one round button. Tapping it fans a labelled item out per tool, stacked
    upward -- Note on top, Focus closest to the corner, his order -- and the
@@ -230,6 +263,8 @@ export function Dock() {
   const timelineHold = useHoldForFull(() => { setPage('timeline'); go('closed') })
   const holdFor: Partial<Record<PanelFace, ReturnType<typeof useHoldForFull>>> = { note: noteHold, bills: billsHold, timeline: timelineHold }
   const scrollHidden = useHideOnScroll(mode === 'closed')
+  const pomo = usePomodoro()
+  const toastPhase = useFocusToast(pomo.announcedAt, mode === 'closed')
 
   /* The Zone already shows the timer, the player and a place to write at
      full size. A second, smaller copy of the same facts in the corner is
@@ -281,6 +316,23 @@ export function Dock() {
     // menu is just an optional sibling ahead of one persistent button --
     // React patches its class/icon/handler in place, never touches the node.
     const open = mode === 'menu'
+    /* Pulled out so the toast below (his ask, 2026-09-04: some sign a block
+       actually started when he pressed it from a task, not just from
+       hovering here) shows the exact same row the real menu does, rather
+       than a second, drifting copy of it. Not a button: it holds two real
+       controls of its own (play/pause, and the icon below), and a button
+       can't nest inside a button -- see the same note on weekplan-bar in
+       styles.css from an earlier fix of the identical mistake. */
+    const focusRow = (
+      <div className="dock-item dock-item--focus">
+        <span className="dock-item-label dock-item-label--focus">
+          <PomodoroInline />
+        </span>
+        <button className="dock-item-avatar dock-item-avatar--focus" onClick={() => setPage('focus')} aria-label="Open the focus history" title="Open Focus">
+          <Icon.DockChartBar size={22} />
+        </button>
+      </div>
+    )
     return (
       <div
         className={`dock${closing ? ' is-closing' : entered ? ' is-open' : ''}${scrollHidden ? ' is-scroll-hidden' : ''}`}
@@ -311,18 +363,17 @@ export function Dock() {
                 </button>
               )
             })}
-            {/* Not a button: it holds two real controls of its own
-                (play/pause, and the icon below), and a button can't nest
-                inside a button -- see the same note on weekplan-bar in
-                styles.css from an earlier fix of the identical mistake. */}
-            <div className="dock-item dock-item--focus">
-              <span className="dock-item-label dock-item-label--focus">
-                <PomodoroInline />
-              </span>
-              <button className="dock-item-avatar dock-item-avatar--focus" onClick={() => setPage('focus')} aria-label="Open the focus history" title="Open Focus">
-                <Icon.DockChartBar size={22} />
-              </button>
-            </div>
+            {focusRow}
+          </div>
+        )}
+        {/* Not open: either nothing, or the toast -- never both. A block
+           started elsewhere (a task's own Start button, the Zone) gets a
+           few seconds of this exact row, unprompted, then it's gone; the
+           real menu already shows the same row live the moment he opens it
+           by hand, so there is never a reason to stack one on the other. */}
+        {!open && toastPhase !== 'hidden' && (
+          <div className={`dock-toast${toastPhase === 'hiding' ? ' is-hiding' : ''}`}>
+            {focusRow}
           </div>
         )}
         <button

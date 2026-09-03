@@ -27,7 +27,18 @@ interface Pomo {
   blockMin: number
   breakMin: number
   cyclesDone: number
-  startFocus: (minutes?: number, label?: string) => void
+  /** `announce`, his ask (2026-09-04): starting a block from a task's own Start
+   *  button or the Zone gave no sign it caught, since the dock's Focus row was
+   *  only ever visible once he'd already opened the dock by hand. Set true to
+   *  bump `announcedAt`, which the dock reads to show that row briefly on its
+   *  own, closed-dock only -- see useFocusToast in dock.tsx. Never set from the
+   *  dock's own play button or its idle-resume path in `toggle` below; both are
+   *  already looking straight at the thing that's about to change. */
+  startFocus: (minutes?: number, label?: string, announce?: boolean) => void
+  /** Epoch ms of the last `announce`-true startFocus, 0 before the first one
+   *  this session. A counter would do the same job; a timestamp also answers
+   *  "how long ago" for free, if that's ever useful. */
+  announcedAt: number
   /** What this focus block is for, when it was started from a task. */
   focusLabel: string | null
   toggle: () => void
@@ -229,7 +240,8 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
 
   /* Started from a task, the block runs for that task's own estimate and carries
      its name, so the badge says what you are actually doing. */
-  const startFocus = (minutes?: number, label?: string) => {
+  const [announcedAt, setAnnouncedAt] = useState(0)
+  const startFocus = (minutes?: number, label?: string, announce?: boolean) => {
     /* The desktop app needs no permission prompt: macOS asks once, itself, the
        first time it actually posts one. */
     if (!isDesktop() && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission()
@@ -238,6 +250,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     setStartedAt(Date.now())
     setFocusLabel(label ?? null)
     setPhase('focus'); setEndsAt(Date.now() + mins * 60 * 1000); setPausedLeft(null)
+    if (announce) setAnnouncedAt(Date.now())
   }
   const toggle = () => {
     if (phase === 'idle') { startFocus(); return }
@@ -264,7 +277,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   const extend = (min: number) => { setPhase('focus'); setBlockMin(min); setStartedAt(Date.now()); setEndsAt(Date.now() + min * 60 * 1000); setPausedLeft(null) }
   const dismiss = () => { setPhase('idle'); setEndsAt(null); setPausedLeft(null); setFocusLabel(null) }
 
-  const value: Pomo = { phase, running, secondsLeft, focusMin, blockMin, breakMin, cyclesDone, focusLabel, startFocus, toggle, skip, stop, startBreak, extend, dismiss, setFocusMin, setBreakMin }
+  const value: Pomo = { phase, running, secondsLeft, focusMin, blockMin, breakMin, cyclesDone, focusLabel, startFocus, announcedAt, toggle, skip, stop, startBreak, extend, dismiss, setFocusMin, setBreakMin }
   return (
     <Ctx.Provider value={value}>
       {children}

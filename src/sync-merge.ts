@@ -115,6 +115,7 @@ const ENTITY_KEYS: Record<string, (r: Row) => string> = {
   habits: (r) => `habits:${r.id}`,
   goals: (r) => `goals:${r.id}`,
   routines: (r) => `routines:${r.id}`,
+  projects: (r) => `projects:${r.id}`,
   ideas: (r) => `ideas:${r.id}`,
   notes: (r) => `notes:${r.id}`,
   noteFolders: (r) => `noteFolders:${r.id}`,

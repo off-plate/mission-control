@@ -2,7 +2,7 @@ import { Component, Suspense, lazy, useEffect, useRef, useState, type ReactNode 
 import { exceptionsFor, globalExceptions } from './exceptions'
 import { useDockBadge } from './desktop'
 import { SPACE_LABELS } from './mock'
-import { GoalsPage, HabitsPage, PlanPage, TodayPage, QuittingPage } from './pages1'
+import { GoalsPage, HabitsPage, PlanPage, ProjectsPage, TodayPage, QuittingPage } from './pages1'
 import { NotesPage } from './notes'
 import { BillsPage } from './billspage'
 import { DailyReview } from './daily'
@@ -130,6 +130,7 @@ function Logo() {
 const NAV: { id: PageId; label: string }[] = [
   { id: 'today', label: 'Today' },
   { id: 'plan', label: 'Plan' },
+  { id: 'projects', label: 'Projects' },
   /* One tab for both, on his instruction 2026-08-26. Goals here are mostly a
      reflection over habits, so they switch inside the page on a pill pair
      rather than sitting in the menu as a second destination. Routines left the
@@ -587,6 +588,7 @@ export default function App() {
         <Suspense fallback={null}>
         {page === 'today' && <TodayPage />}
         {page === 'plan' && <PlanPage />}
+        {page === 'projects' && <ProjectsPage />}
         {(page === 'habits' || page === 'routines') && <HabitsPage />}
         {page === 'goals' && <GoalsPage />}
         {page === 'quitting' && <QuittingPage />}

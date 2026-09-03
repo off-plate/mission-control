@@ -9,7 +9,7 @@ import { Linkify } from './widgets'
 import { HabitRun, habitHasRun } from './habitrun'
 import type { PageId } from './types'
 import { PLAN_AHEAD_DAYS, WeekGrid, dayPlus, shortDay, weekRangeLabel } from './weekgrid'
-import { habitsDueToday, GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, dueOn, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, habitGate, habitLocked, isCounted, COUNT_PERIODS, requiredSteps, routineComplete, routineProgress, routineRunsOn, slotMinutes, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type DayTaskLog, type HabitKind, type HabitSlip, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
+import { habitsDueToday, GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, dueOn, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, habitGate, habitLocked, isCounted, COUNT_PERIODS, requiredSteps, routineComplete, routineProgress, routineRunsOn, slotMinutes, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type DayTaskLog, type HabitKind, type HabitSlip, type Project, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
 import { useFirstMove, useOpenToday } from './ui'
 import { estimateFor } from './estimate'
 import { estimateTask } from './ai'
@@ -603,8 +603,15 @@ export function PlanPage() {
   const { startFocus } = pomo
   const { routines, habits } = useStore()
   const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId, setTaskAt, plan, setPage, openDay, view, inView, focusSessions, dayLog } = useStore()
+  const { projects, openProjectId, setOpenProject } = useStore()
+  /* A project is a room inside a Space, not a second store: this is the one
+     line that scopes Plan to it. Everything below (backlog, the day, the
+     progress bar) is derived from spaceTasks, so nothing downstream has to
+     know a project was ever involved. */
+  const activeProject = openProjectId ? projects.find((p) => p.id === openProjectId) ?? null : null
+  const addSpace = activeProject ? activeProject.space : space
 
-  const spaceTasks = tasks.filter((t) => inView(t.space))
+  const spaceTasks = tasks.filter((t) => inView(t.space) && (!openProjectId || t.projectId === openProjectId))
   const backlogOpen = spaceTasks.filter((t) => !t.done && t.list === 'backlog') // the to-do pool
   /* In All the three rooms would otherwise interleave into one undifferentiated
      pile. Grouped by room, in the order of the switcher above, so the list reads
@@ -882,15 +889,23 @@ export function PlanPage() {
   return (
     <div className="page">
       <Band
-        title={`Plan ${longDay(planDay)}`}
+        title={activeProject ? activeProject.name : `Plan ${longDay(planDay)}`}
+        /* Which room this is, against the title itself, not off in the far
+           corner with the buttons: see Band's own note on `beside`. */
+        beside={activeProject
+          ? <span className="crumb">{SPACE_LABELS[activeProject.space]}</span>
+          : undefined}
         metrics={[
           { v: fmtDuration(plannedMin), k: `planned ${dayOffset === 0 ? 'today' : offsetWord(dayOffset).toLowerCase()}`, tone: 'info' as const },
           { v: pool.length ? `${donePct}%` : '—', k: pool.length ? 'of planned time done' : 'no tasks yet', tone: (pool.length && donePct > 0 ? 'pos' : 'info') as 'pos' | 'info' },
           ...(loggedAny ? [{ v: savedToday >= 0 ? fmtSigned(savedToday) : fmtDuration(-savedToday), k: savedToday >= 0 ? 'saved today' : 'over your estimates', tone: (savedToday >= 0 ? 'pos' : 'urgent') as 'pos' | 'urgent' }] : []),
         ]}
-        /* The way back into the record. Every day before this one is addressable
-           from here, and from there one arrow at a time. */
-        actions={<button className="btn btn-ghost" onClick={() => openDay(prevDay())}>Yesterday</button>}
+        /* The way back into the record, or the way back out of a project into
+           its own room's Plan. Never both: a project already has Yesterday
+           one tap further, through Projects then the Space's own Plan. */
+        actions={activeProject
+          ? <button className="btn btn-ghost" onClick={() => { setOpenProject(null); setPage('projects') }}>&larr; Projects</button>
+          : <button className="btn btn-ghost" onClick={() => openDay(prevDay())}>Yesterday</button>}
       />
       {/* THE WEEK. Moved above the to-do list and day panel on his instruction
           (2026-08-31, from his own mockup): folded to one bar by default,
@@ -1037,10 +1052,10 @@ export function PlanPage() {
               placeholder="Add something to the list…"
               value={quick}
               onChange={(e) => setQuick(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && quick.trim()) { addTask({ title: quick.trim(), source: 'mc', estimateMin: 0, space, list: 'backlog', category: 'quick' }); setQuick('') } }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && quick.trim()) { addTask({ title: quick.trim(), source: 'mc', estimateMin: 0, space: addSpace, list: 'backlog', category: 'quick', projectId: openProjectId ?? undefined }); setQuick('') } }}
               aria-label="New task"
             />
-            <button className="btn btn-quiet" disabled={!quick.trim()} onClick={() => { addTask({ title: quick.trim(), source: 'mc', estimateMin: 0, space, list: 'backlog', category: 'quick' }); setQuick('') }}>Add</button>
+            <button className="btn btn-quiet" disabled={!quick.trim()} onClick={() => { addTask({ title: quick.trim(), source: 'mc', estimateMin: 0, space: addSpace, list: 'backlog', category: 'quick', projectId: openProjectId ?? undefined }); setQuick('') }}>Add</button>
           </div>
           {backlogSorted.map((t) => {
             const isExp = expanded.has(t.id)
@@ -1380,6 +1395,83 @@ export function PlanPage() {
       {breakdownFor && <BreakdownSheet task={breakdownFor} onClose={() => setBreakdownFor(null)} />}
       {editingTask && <EditTaskSheet task={editingTask} onClose={() => setEditingTask(null)} />}
 
+    </div>
+  )
+}
+
+/* ---------------- PROJECTS ----------------
+   A directory, not a filter. Every card here is a door into Plan, pre-scoped
+   to one project on the way in; Plan itself does the filtering (see
+   `openProjectId` in PlanPage above), so this page owns no task data of its
+   own. Today, Calendar, Habits, and Goals never find out a project exists. */
+
+function ProjectCard({ p, onOpen }: { p: Project; onOpen: () => void }) {
+  const { tasks } = useStore()
+  const own = tasks.filter((t) => t.projectId === p.id)
+  const waiting = own.filter((t) => t.list === 'backlog' && !t.done).length
+  return (
+    <button className={`projcard s-${p.space}`} onClick={onOpen}>
+      <h3>{p.name}</h3>
+      <div className="proj-stats"><span><b>{waiting}</b> waiting</span><span><b>{own.length}</b> total</span></div>
+    </button>
+  )
+}
+
+function NewProjectSheet({ space, onClose }: { space: SpaceId; onClose: () => void }) {
+  const { addProject } = useStore()
+  const [name, setName] = useState('')
+  const [sp, setSp] = useState<SpaceId>(space)
+  const save = () => { if (!name.trim()) return; addProject(name.trim(), sp); onClose() }
+  return (
+    <Sheet title="New project" onClose={onClose}>
+      <label className="field-label" htmlFor="np-name">Name</label>
+      <input
+        id="np-name" className="textinput" style={{ width: '100%', marginBottom: 'var(--s4)' }}
+        value={name} autoFocus placeholder="e.g. a client name, a workstream…"
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) save() }}
+      />
+      <label className="field-label" htmlFor="np-space">Space</label>
+      <select id="np-space" className="textinput" style={{ width: '100%' }} value={sp} onChange={(e) => setSp(e.target.value as SpaceId)}>
+        {SPACES.map((s) => <option key={s} value={s}>{SPACE_LABELS[s]}</option>)}
+      </select>
+      <div className="sheet-actions">
+        <button className="btn btn-quiet" onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" disabled={!name.trim()} onClick={save}>Create project</button>
+      </div>
+    </Sheet>
+  )
+}
+
+export function ProjectsPage() {
+  const { projects, view, setSpace, setOpenProject, setPage } = useStore()
+  const [addingIn, setAddingIn] = useState<SpaceId | null>(null)
+
+  const openProject = (p: Project) => {
+    setSpace(p.space)
+    setOpenProject(p.id)
+    setPage('plan')
+  }
+  const bySpace = (sp: SpaceId) => projects.filter((p) => p.space === sp)
+  const grid = (sp: SpaceId) => (
+    <div className="projgrid">
+      {bySpace(sp).map((p) => <ProjectCard key={p.id} p={p} onOpen={() => openProject(p)} />)}
+      <button className="projcard projcard-new" onClick={() => setAddingIn(sp)}>+ New project</button>
+    </div>
+  )
+
+  return (
+    <div className="page">
+      <Band title="Projects" />
+      {view === 'all'
+        ? SPACES.map((sp) => (
+          <div className="projsection" key={sp}>
+            <div className="projsection-head"><SpaceMark space={sp} /><span className="microcap">{SPACE_LABELS[sp]}</span></div>
+            {grid(sp)}
+          </div>
+        ))
+        : grid(view)}
+      {addingIn && <NewProjectSheet space={addingIn} onClose={() => setAddingIn(null)} />}
     </div>
   )
 }

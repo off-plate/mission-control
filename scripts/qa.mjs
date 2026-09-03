@@ -2570,21 +2570,16 @@ await step('apps: a shelf that embeds nothing until an app is opened', async () 
     subs: document.querySelectorAll('.apps-what').length,
   }))
   if (shelf.frames !== 0) throw new Error(`${shelf.frames} iframe(s) mounted on the shelf; nothing should load unasked`)
-  /* My Mind sits first, and it is the one app on this shelf that opens in a
-     tab rather than a frame: mymind answers with frame-ancestors 'none', so a
-     panel inside this page is not something the app is allowed to build.
-     Asserted as a real link with a real target, because a tile that silently
-     did nothing would look identical to one that worked. */
-  if (shelf.tiles[0] !== 'My Mind') throw new Error(`first app is ${shelf.tiles[0]}`)
+  /* My Mind and Compass left the shelf on his instruction (2026-09-04). My
+     Mind was this shelf's only `external: true` app -- mymind answers with
+     frame-ancestors 'none', so a panel inside this page was never something
+     it could build, and that's WHY the `external` flag/new-tab-link path in
+     apps.tsx exists at all. No app on the current shelf uses it, so that
+     path has no live test subject here until one does again. */
   if (!shelf.tiles.includes('Watchless')) throw new Error(`Watchless left the shelf: ${shelf.tiles.join(', ')}`)
-  const mind = await page.evaluate(() => {
-    const el = [...document.querySelectorAll('.apps-tile')].find((t) => /My Mind/.test(t.textContent))
-    return el ? { tag: el.tagName, href: el.getAttribute('href'), target: el.getAttribute('target') } : null
-  })
-  if (!mind || mind.tag !== 'A') throw new Error('My Mind is not a link, so it would try to frame a site that refuses framing')
-  if (!/access\.mymind\.com/.test(mind.href ?? '')) throw new Error(`My Mind points at ${mind.href}`)
-  if (mind.target !== '_blank') throw new Error('My Mind does not open in a new tab')
-  if (shelf.tiles.length !== 5) throw new Error(`${shelf.tiles.length} apps on the shelf`)
+  if (shelf.tiles.includes('My Mind')) throw new Error('My Mind is still on the shelf')
+  if (shelf.tiles.includes('Compass')) throw new Error('Compass is still on the shelf')
+  if (shelf.tiles.length !== 3) throw new Error(`${shelf.tiles.length} apps on the shelf: ${shelf.tiles.join(', ')}`)
   if (shelf.subs) throw new Error('a tile carries a subtitle')
 })
 

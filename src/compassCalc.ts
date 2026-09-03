@@ -141,11 +141,37 @@ export function monthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
+/* THE CYCLE RUNS 14th TO 14th, not calendar month to calendar month (his
+   correction, 2026-09-04). Every figure on Bills is "this cycle", and his money
+   actually turns over on the 14th: on a month boundary the rent and the salary
+   that pays it landed in different cycles, so free-to-spend was answering a
+   question about a month he does not live in.
+
+   The key stays YYYY-MM and names the month the cycle STARTS in, so 2026-09 is
+   14 Sep to 14 Oct. Nothing keyed by it had to change: skips, carryover and
+   active_cycle all still address one cycle, that cycle is just a different
+   fortnight-and-a-half of the year now.
+
+   occurrenceInWindow already looked in BOTH the start month and the end month
+   for a day-of-month, so a window spanning two months was anticipated there. */
+export const CYCLE_START_DAY = 14
+
 export function cycleForKey(key: string): Cycle {
   const [y, m] = key.split('-').map(Number)
-  const start = new Date(y, m - 1, 1)
-  const end = new Date(y, m, 1)
-  return { start, end, key, label: start.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) }
+  const start = new Date(y, m - 1, clampDay(y, m - 1, CYCLE_START_DAY))
+  const end = new Date(y, m, clampDay(y, m, CYCLE_START_DAY))
+  const dm = (d: Date) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  const label = start.getFullYear() === end.getFullYear()
+    ? `${dm(start)} – ${dm(end)} ${end.getFullYear()}`
+    : `${dm(start)} ${start.getFullYear()} – ${dm(end)} ${end.getFullYear()}`
+  return { start, end, key, label }
+}
+
+/** Which cycle a date falls in. Before the 14th you are still spending the
+ *  cycle that opened last month. */
+export function cycleKeyOn(d: Date): string {
+  const anchor = new Date(d.getFullYear(), d.getMonth(), clampDay(d.getFullYear(), d.getMonth(), CYCLE_START_DAY))
+  return iso(d) < iso(anchor) ? monthKey(new Date(d.getFullYear(), d.getMonth() - 1, 1)) : monthKey(d)
 }
 
 export function addMonthsToKey(key: string, n: number): string {
@@ -155,7 +181,7 @@ export function addMonthsToKey(key: string, n: number): string {
 
 export function activeCycleKey(profile: CompassProfile | null): string {
   const stored = (profile?.settings as Record<string, unknown> | undefined)?.active_cycle
-  return typeof stored === 'string' && /^\d{4}-\d{2}$/.test(stored) ? stored : monthKey(new Date())
+  return typeof stored === 'string' && /^\d{4}-\d{2}$/.test(stored) ? stored : cycleKeyOn(new Date())
 }
 
 function occurrenceInWindow(c: Cycle, day: number): Date | null {
@@ -247,7 +273,11 @@ export function cycleChecklist(
 
   for (const p of planned) {
     if (p.due_on) continue
-    if ((p.cycle_start || '').slice(0, 7) !== c.key) continue
+    /* Was a month-prefix compare against the key, which cannot describe a
+       window spanning two months. Same window test the dated rows above use,
+       which also files a row saved under the old calendar-month scheme into
+       the cycle that actually contains its date. */
+    if (!p.cycle_start || p.cycle_start < s || p.cycle_start >= e) continue
     const matches = tx.filter((t) => t.planned_id === p.id)
     items.push({
       id: p.id, source: 'unreasonable', name: p.name, amount: p.amount, kind: 'expense',

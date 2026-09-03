@@ -16,7 +16,7 @@
    has no date and is not given one: it sits in the tray under the rail,
    labelled for what it is. */
 import { useState } from 'react'
-import type { CycleItem } from './compassCalc'
+import { iso, type Cycle, type CycleItem } from './compassCalc'
 
 export interface RailIncome { id: string; label: string; amount: number; day: number | null }
 
@@ -25,7 +25,7 @@ const money = (n: number): string => `${new Intl.NumberFormat('cs-CZ', { maximum
 const short = (n: number): string => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(Math.round(n)))
 
 export function CycleRail({ cycle, items, incomes, isNow, onOpenItem, onOpenIncome }: {
-  cycle: { start: Date; end: Date; key: string }
+  cycle: Cycle
   items: CycleItem[]
   incomes: RailIncome[]
   /** Only the cycle he is standing in gets a Today line. */
@@ -33,37 +33,51 @@ export function CycleRail({ cycle, items, incomes, isNow, onOpenItem, onOpenInco
   onOpenItem: (i: CycleItem) => void
   onOpenIncome: (id: string) => void
 }) {
-  const [picked, setPicked] = useState<number | null>(null)
+  const [picked, setPicked] = useState<string | null>(null)
 
-  const days = new Date(cycle.start.getFullYear(), cycle.start.getMonth() + 1, 0).getDate()
-  const today = isNow ? new Date().getDate() : null
-  const monthLabel = cycle.start.toLocaleDateString('en-GB', { month: 'short' })
+  /* The cycle runs 14th to 14th, so this is a window of dates across two
+     months, not 1..daysInMonth. Every column is a real date and everything is
+     matched on its ISO string: a day NUMBER would be ambiguous the moment the
+     window stopped starting on the 1st. */
+  const dates: Date[] = []
+  for (const d = new Date(cycle.start); d < cycle.end; d.setDate(d.getDate() + 1)) dates.push(new Date(d))
+  const todayIso = isNow ? iso(new Date()) : null
+  const inCycle = (day: string) => day >= iso(cycle.start) && day < iso(cycle.end)
 
-  /* Day of month straight off the ISO string. `new Date('2026-09-15')` is
-     parsed as UTC midnight, which in Prague is still the 14th for two hours --
-     the same trap compassCalc documents for its own due dates. */
-  const dayOf = (iso: string | null): number | null => (iso ? Number(iso.slice(8, 10)) || null : null)
+  /* A day-of-month off the settings blob is placed on whichever of the two
+     months the window actually covers -- the same both-months lookup
+     compassCalc's occurrenceInWindow does for a bill's day. */
+  const dateForDay = (day: number): string | null => {
+    const hit = dates.find((d) => d.getDate() === day)
+    return hit ? iso(hit) : null
+  }
 
-  const dated = items.filter((i) => dayOf(i.dueOn) !== null)
-  const undated = items.filter((i) => dayOf(i.dueOn) === null)
-  const datedIncome = incomes.filter((c) => c.day !== null && c.day >= 1 && c.day <= days)
-  const undatedIncome = incomes.filter((c) => c.day === null || c.day < 1 || c.day > days)
+  const dated = items.filter((i) => i.dueOn && inCycle(i.dueOn))
+  const undated = items.filter((i) => !i.dueOn || !inCycle(i.dueOn))
+  const incomeOn = new Map<string, RailIncome[]>()
+  const undatedIncome: RailIncome[] = []
+  for (const c of incomes) {
+    const at = c.day === null ? null : dateForDay(c.day)
+    if (at) incomeOn.set(at, [...(incomeOn.get(at) ?? []), c])
+    else undatedIncome.push(c)
+  }
 
-  const outOn = (d: number) => dated.filter((i) => dayOf(i.dueOn) === d)
-  const inOn = (d: number) => datedIncome.filter((c) => c.day === d)
-  const outSum = (d: number) => outOn(d).reduce((s, i) => s + i.amount, 0)
-  const inSum = (d: number) => inOn(d).reduce((s, c) => s + c.amount, 0)
+  const outOn = (day: string) => dated.filter((i) => i.dueOn === day)
+  const inOn = (day: string) => incomeOn.get(day) ?? []
+  const outSum = (day: string) => outOn(day).reduce((s, i) => s + i.amount, 0)
+  const inSum = (day: string) => inOn(day).reduce((s, c) => s + c.amount, 0)
 
-  const maxOut = Math.max(1, ...Array.from({ length: days }, (_, n) => outSum(n + 1)))
-  const maxIn = Math.max(1, ...Array.from({ length: days }, (_, n) => inSum(n + 1)))
+  const maxOut = Math.max(1, ...dates.map((d) => outSum(iso(d))))
+  const maxIn = Math.max(1, ...dates.map((d) => inSum(iso(d))))
 
   const totalIn = incomes.reduce((s, c) => s + c.amount, 0)
   const totalOut = items.reduce((s, i) => s + i.amount, 0)
 
-  const shown = picked ?? today
+  const shown = picked ?? todayIso
   const shownOut = shown ? outOn(shown) : []
   const shownIn = shown ? inOn(shown) : []
   const hasReadout = shownOut.length > 0 || shownIn.length > 0
+  const dayMonth = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 
   return (
     /* Hovering a column previews it; the readout holds so its rows can be
@@ -72,32 +86,35 @@ export function CycleRail({ cycle, items, incomes, isNow, onOpenItem, onOpenInco
        for the rest of the session. */
     <div className="card cyclerail" onMouseLeave={() => setPicked(null)}>
       <div className="cr-head">
-        <span className="overline">{cycle.start.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</span>
+        <span className="overline">{cycle.label}</span>
         <span className="cr-meta"><b>{money(totalIn)}</b> in · <b>{money(totalOut)}</b> out</span>
       </div>
 
       <div className="cr-scroll">
         <div className="cr-rail">
-          {Array.from({ length: days }, (_, n) => {
-            const d = n + 1
-            const date = new Date(cycle.start.getFullYear(), cycle.start.getMonth(), d)
+          {dates.map((date, n) => {
+            const day = iso(date)
+            const d = date.getDate()
             const weekend = date.getDay() === 0 || date.getDay() === 6
-            const out = outSum(d), inc = inSum(d)
-            const allPaid = out > 0 && outOn(d).every((i) => i.paid)
-            const overdue = outOn(d).some((i) => i.overdue && !i.paid)
+            /* The window crosses a month. Mark where, or a run of 28, 29, 30,
+               1, 2 reads as a glitch. */
+            const newMonth = n > 0 && d === 1
+            const out = outSum(day), inc = inSum(day)
+            const allPaid = out > 0 && outOn(day).every((i) => i.paid)
+            const overdue = outOn(day).some((i) => i.overdue && !i.paid)
             return (
               <button
-                key={d}
+                key={day}
                 type="button"
-                className={`cr-day${weekend ? ' is-we' : ''}${d === today ? ' is-today' : ''}${shown === d ? ' is-on' : ''}`}
-                aria-label={`${d} ${monthLabel}${out ? `, ${money(out)} out` : ''}${inc ? `, ${money(inc)} in` : ''}`}
-                onMouseEnter={() => setPicked(d)}
-                onFocus={() => setPicked(d)}
-                onClick={() => setPicked(d)}
+                className={`cr-day${weekend ? ' is-we' : ''}${day === todayIso ? ' is-today' : ''}${shown === day ? ' is-on' : ''}${newMonth ? ' is-newmonth' : ''}`}
+                aria-label={`${dayMonth(day)}${out ? `, ${money(out)} out` : ''}${inc ? `, ${money(inc)} in` : ''}`}
+                onMouseEnter={() => setPicked(day)}
+                onFocus={() => setPicked(day)}
+                onClick={() => setPicked(day)}
               >
-                <span className="cr-dow">{date.getDay() === 1 ? 'Mo' : ''}</span>
+                <span className="cr-dow">{n === 0 || newMonth ? date.toLocaleDateString('en-GB', { month: 'short' }) : date.getDay() === 1 ? 'Mo' : ''}</span>
                 <span className="cr-up">
-                  {d === today && <><i className="cr-nowline" /><i className="cr-nowtag">Today</i></>}
+                  {day === todayIso && <><i className="cr-nowline" /><i className="cr-nowtag">Today</i></>}
                   {out > 0 && <>
                     <span className={`cr-cap${allPaid ? ' is-paid' : ''}`}>{short(out)}</span>
                     <span className={`cr-bar${allPaid ? ' is-paid' : ''}${overdue ? ' is-late' : ''}`}
@@ -121,7 +138,7 @@ export function CycleRail({ cycle, items, incomes, isNow, onOpenItem, onOpenInco
           carry names, and a tooltip cannot be tapped. Each row here opens the
           thing it names. */}
       <div className={`cr-read${hasReadout ? '' : ' is-empty'}`}>
-        <span className="cr-rday">{shown ? `${shown} ${monthLabel}` : '—'}</span>
+        <span className="cr-rday">{shown ? dayMonth(shown) : '—'}</span>
         <span className="cr-rlist">
           {!shown && 'Point at a day.'}
           {shown && !hasReadout && 'Nothing on this day.'}

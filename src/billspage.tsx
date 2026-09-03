@@ -499,8 +499,8 @@ export function BillsPage() {
       </div>
 
       {editRecurring && <RecurringSheet item={editRecurring === 'new' ? null : editRecurring} onClose={() => setEditRecurring(null)} onSaved={reload} />}
-      {editPlanned && <PlannedSheet item={editPlanned === 'new' ? null : editPlanned} cycleKey={cycle.key} onClose={() => setEditPlanned(null)} onSaved={reload} />}
-      {editUnreasonable && <UnreasonableSheet item={editUnreasonable === 'new' ? null : editUnreasonable} cycleKey={cycle.key} onClose={() => setEditUnreasonable(null)} onSaved={reload} />}
+      {editPlanned && <PlannedSheet item={editPlanned === 'new' ? null : editPlanned} cycleStart={iso(cycle.start)} onClose={() => setEditPlanned(null)} onSaved={reload} />}
+      {editUnreasonable && <UnreasonableSheet item={editUnreasonable === 'new' ? null : editUnreasonable} cycleStart={iso(cycle.start)} onClose={() => setEditUnreasonable(null)} onSaved={reload} />}
       {editIncome && <IncomeSheet item={editIncome === 'new' ? null : editIncome} cycle={cycle}
         settings={(data.profile?.settings ?? {}) as Record<string, unknown>}
         onClose={() => setEditIncome(null)} onSaved={reload} />}
@@ -710,7 +710,7 @@ function RecurringSheet({ item, onClose, onSaved }: { item: CompassRecurring | n
   )
 }
 
-function PlannedSheet({ item, cycleKey, onClose, onSaved }: { item: CompassPlanned | null; cycleKey: string; onClose: () => void; onSaved: () => void }) {
+function PlannedSheet({ item, cycleStart, onClose, onSaved }: { item: CompassPlanned | null; cycleStart: string; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(item?.name ?? '')
   const [amount, setAmount] = useState(item ? String(item.amount) : '')
   const [priority, setPriority] = useState<'mandatory' | 'optional'>(item?.priority ?? 'mandatory')
@@ -719,7 +719,7 @@ function PlannedSheet({ item, cycleKey, onClose, onSaved }: { item: CompassPlann
   const valid = name.trim().length > 0 && Number(amount) > 0
   const save = async () => {
     setBusy(true)
-    const patch = { name: name.trim(), amount: Number(amount), kind: 'expense', priority, due_on: dueOn, cycle_start: `${cycleKey}-01` }
+    const patch = { name: name.trim(), amount: Number(amount), kind: 'expense', priority, due_on: dueOn, cycle_start: cycleStart }
     try {
       if (item) await updateRow('compass_planned', item.id, patch)
       else await insertRow('compass_planned', patch)
@@ -745,7 +745,7 @@ function PlannedSheet({ item, cycleKey, onClose, onSaved }: { item: CompassPlann
   )
 }
 
-function UnreasonableSheet({ item, cycleKey, onClose, onSaved }: { item: CompassPlanned | null; cycleKey: string; onClose: () => void; onSaved: () => void }) {
+function UnreasonableSheet({ item, cycleStart, onClose, onSaved }: { item: CompassPlanned | null; cycleStart: string; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(item?.name ?? '')
   const [amount, setAmount] = useState(item ? String(item.amount) : '')
   const [tag, setTag] = useState<'functional' | 'regret'>(item?.tag ?? 'functional')
@@ -753,7 +753,7 @@ function UnreasonableSheet({ item, cycleKey, onClose, onSaved }: { item: Compass
   const valid = name.trim().length > 0 && Number(amount) > 0
   const save = async () => {
     setBusy(true)
-    const patch = { name: name.trim(), amount: Number(amount), kind: 'expense', priority: 'optional', due_on: null, cycle_start: `${cycleKey}-01`, tag }
+    const patch = { name: name.trim(), amount: Number(amount), kind: 'expense', priority: 'optional', due_on: null, cycle_start: cycleStart, tag }
     try {
       if (item) await updateRow('compass_planned', item.id, patch)
       else await insertRow('compass_planned', patch)

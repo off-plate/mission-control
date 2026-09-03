@@ -18,6 +18,9 @@ export const ON_TRACK_PCT = 50
 export type PageId =
   | 'today'
   | 'plan'
+  /** A directory of Projects, scoped by the active Space. Opening one sets
+   *  openProjectId and lands on Plan, filtered; it is not its own data. */
+  | 'projects'
   | 'habits'
   | 'routines'
   | 'goals'
@@ -138,6 +141,11 @@ export interface Task {
   space: SpaceId
   list: 'today' | 'backlog'
   category: TaskCategory
+  /** Which Project it belongs to, if any. A project is a room inside a Space,
+   *  not a filter: this is the same standing as `space`, not a tag on top of
+   *  it. Plan already reads every task in the active Space, so a task with a
+   *  projectId shows up there and in All's Plan the same as any other. */
+  projectId?: string
   /** Which time-of-day bucket on the Today plan; undefined = not yet placed. */
   slot?: TimeSlot
   /** Optional breakdown; the task's real estimate is the sum of these when present. */
@@ -169,6 +177,16 @@ export interface Task {
    *  one as though he had planned it there. */
   horizon?: GoalTimeframe
   horizonKey?: string
+}
+
+/** A room inside a Space: Off-Plate holds clients, Corner holds workstreams,
+ *  Personal holds Home and Car. It only ever scopes Plan. Today, Calendar,
+ *  Habits, and Goals never learn this exists. */
+export interface Project {
+  id: string
+  name: string
+  space: SpaceId
+  createdAt: string
 }
 
 /** One of the ways a step can be answered. Which one he picked is worth keeping:

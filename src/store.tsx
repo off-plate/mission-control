@@ -58,6 +58,7 @@ import type {
   LedgerEntry,
   PageId,
   PlanState,
+  Project,
   ReviewState,
   SizeKey,
   SocialEntry,
@@ -85,6 +86,9 @@ interface PersistedState {
   tasks: Task[]
   habits: HabitDef[]
   goals: Goal[]
+  /** Rooms inside a Space. Optional so an old saved blob without any still
+   *  reads as an empty list rather than failing to parse. */
+  projects?: Project[]
   ledger: LedgerEntry[]
   social: SocialEntry[]
   sources: SourceState[]
@@ -171,6 +175,15 @@ interface Store extends PersistedState {
   inView: (s?: SpaceId) => boolean
   page: PageId
   setPage: (p: PageId) => void
+  projects: Project[]
+  addProject: (name: string, space: SpaceId) => void
+  deleteProject: (id: string) => void
+  /** Which Project's Plan is open, or null for the Space's own Plan. Set by
+   *  the Projects page on the way into Plan; cleared by "back to Projects".
+   *  Deliberately not persisted: a project stays a room you walk into, not a
+   *  mode that survives a reload. */
+  openProjectId: string | null
+  setOpenProject: (id: string | null) => void
   /** The day being looked back at, when the route names one. */
   dayKey: string | null
   openDay: (iso: string) => void
@@ -1128,7 +1141,7 @@ function routeFromHash(): { page: PageId; day: string | null } {
   /* Achievements, Money and Reflect were removed. Their addresses land on Today
      rather than on nothing, the same courtesy braindump gets above. */
   if (h === 'achievements' || h === 'money' || h === 'review' || h === 'stats') return { page: 'today', day: null }
-  const pages: PageId[] = ['today', 'plan', 'habits', 'routines', 'goals', 'quitting', 'settings', 'brand', 'notes', 'bills', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant', 'timeline']
+  const pages: PageId[] = ['today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting', 'settings', 'brand', 'notes', 'bills', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant', 'timeline']
   return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
 }
 
@@ -1230,6 +1243,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState(persisted?.tasks ?? MOCK_TASKS)
   const [habits, setHabits] = useState(persisted?.habits ?? seededHabits)
   const [goals, setGoals] = useState(persisted?.goals ?? seededGoals)
+  const [projects, setProjects] = useState<Project[]>(persisted?.projects ?? [])
   const [ledger, setLedger] = useState(persisted?.ledger ?? MOCK_LEDGER)
   const [social, setSocialState] = useState(persisted?.social ?? MOCK_SOCIAL)
   const [sources, setSources] = useState(persisted?.sources ?? MOCK_SOURCES)
@@ -1323,6 +1337,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const setPageState = (p: PageId) => setRoute({ page: p, day: null })
   const [editing, setEditing] = useState(false)
   const [focusTaskId, setFocusTaskId] = useState<string | null>(null)
+  const [openProjectId, setOpenProject] = useState<string | null>(null)
   const [focusRoutineId, setFocusRoutineId] = useState<string | null>(null)
   const [focusAppId, setFocusAppId] = useState<string | null>(null)
   const [noteToOpen, setNoteToOpen] = useState<string | null>(null)
@@ -1370,7 +1385,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (futureBlob) return
 
     const state: PersistedState = {
-      version: 3, spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
+      version: 3, spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
       notes, noteFolders,
       savedAt: Date.now(), lastWrite: { dev: deviceId(), name: deviceName(), at: Date.now() },
       weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
@@ -1953,7 +1968,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value: Store = {
     version: 3,
-    spaces, tasks, habits, goals, ledger, social, sources, plan, review, routines, ideas,
+    spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, routines, ideas,
+    openProjectId, setOpenProject,
+    addProject: (name, sp) => {
+      const trimmed = name.trim()
+      if (!trimmed) return
+      setProjects((prev) => [...prev, { id: newId('proj'), name: trimmed, space: sp, createdAt: todayKey() }])
+    },
+    deleteProject: (id) => {
+      const before = projects
+      const gone = projects.find((p) => p.id === id)
+      setProjects((prev) => prev.filter((p) => p.id !== id))
+      bury(rowKey('projects', { id }))
+      if (openProjectId === id) setOpenProject(null)
+      armUndo(gone ? `Deleted project "${gone.name}"` : 'Project deleted', () => { setProjects(before); digUp(rowKey('projects', { id })) })
+    },
     focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog,
     view, setView, inView,
     twoLives, setTwoLives, reels, setReels,

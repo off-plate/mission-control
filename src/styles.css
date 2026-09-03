@@ -1118,6 +1118,9 @@ body:has(.shell.is-hud) .dock-face { border-radius: var(--a-r-lg); }
 /* The title and anything that belongs TO the title. Centred for the same
    reason: a pill next to a 36px word is not sitting on its baseline. */
 .band-day { display: flex; align-items: center; gap: var(--s4); flex-wrap: wrap; min-width: 0; }
+/* Which Space a project's Plan belongs to, set against the title itself:
+   Off-Plate's Masér Jiří reads as "Masér Jiří, Off-Plate", not a filter chip. */
+.band .crumb { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); white-space: nowrap; }
 .band h1 {
   font-family: var(--font-display);
   font-weight: 800;
@@ -6578,11 +6581,11 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 }
 
 /* ---- 7. surfaces: the system radius, and a lift that answers a pointer ---- */
-.panel, .widget, .card, .goal-card, .routine-card, .habit-card {
+.panel, .widget, .card, .goal-card, .routine-card, .habit-card, .projcard {
   border-radius: var(--a-r-lg);
   transition: box-shadow var(--a-enter), transform var(--a-enter), border-color var(--a-enter);
 }
-.goal-card:hover, .routine-card:hover, .habit-card:hover {
+.goal-card:hover, .routine-card:hover, .habit-card:hover, .projcard:hover {
   box-shadow: var(--a-lift); border-color: var(--a-accent-text);
 }
 
@@ -6603,6 +6606,30 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .spacemark.s-work i { background: #7FD8F5; }
 .spacemark.s-offplate i { background: #FFC94A; }
 .spacemark.s-corner i { background: #86E9B4; }
+
+/* ---- 11. Projects: a directory of rooms inside a Space, not a filter ----
+   A card here is a door into Plan, pre-scoped to one project on the way in.
+   The colour bar names which Space it's a room of, same four colours the
+   space mark already uses, so this reads as one language rather than a
+   second identity system. */
+.projsection { margin-bottom: var(--s6); }
+.projsection-head { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s3); }
+.projgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--s3); }
+.projcard {
+  position: relative; text-align: left; background: var(--surface); border: 1px solid var(--hairline);
+  padding: var(--s4) var(--s4) var(--s4) calc(var(--s4) + 8px); box-shadow: var(--a-lift); cursor: pointer;
+}
+.projcard.s-personal { --mark: #DFF24A; } .projcard.s-work { --mark: #7FD8F5; }
+.projcard.s-offplate { --mark: #FFC94A; } .projcard.s-corner { --mark: #86E9B4; }
+.projcard::before { content: ''; position: absolute; left: var(--s2); top: 14px; bottom: 14px; width: 3px; border-radius: 2px; background: var(--mark, var(--hairline-strong)); }
+.projcard h3 { margin: 0 0 6px; font-size: 0.9375rem; font-weight: 700; }
+.proj-stats { display: flex; gap: var(--s3); font-size: 0.75rem; color: var(--faint); }
+.proj-stats b { color: var(--soft); font-weight: 600; }
+.projcard-new {
+  background: none; border: 1.5px dashed var(--hairline-strong); box-shadow: none;
+  display: flex; align-items: center; justify-content: center; min-height: 64px; color: var(--faint); font-weight: 600; padding-left: var(--s4);
+}
+.projcard-new:hover { border-color: var(--a-accent-text); color: var(--a-accent-text); box-shadow: none; }
 
 /* ==========================================================================
    DIRECTION A, THE TREATMENT

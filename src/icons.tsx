@@ -80,7 +80,6 @@ export const ExternalLink = make(<><line x1="10.8492" y1="13.0606" x2="19.435" y
 /* hicon: video */
 export const Video = make(<><rect x="4" y="8" width="11" height="8" rx="1"/><path d="M15 11.2L20 8V16L15 12.8V11.2Z"/><path d="M11.1 7H11"/></>, 16, { k: 1.2312, x: -2.775, y: -2.159 })
 /* hicon: compass */
-export const Compass = make(<><path d="M13.5921 13.5L16.5 7.5L10.5 10.4079"/><path d="M10.4079 10.5L7.5 16.5L13.5 13.5921"/><rect x="3" y="3" width="18" height="18" rx="9"/></>, 16, { k: 1.0944, x: -1.133, y: -1.133 })
 /* hicon: zap-on */
 export const Bolt = make(<><path d="M12.0933 10.7226L20.2542 13.8051L7.2411 21.3182L11.1782 14.1376"/><path d="M11.201 14.1243L3.55392 9.87915L16.5671 2.36601L12.0933 10.7225"/></>, 16, { k: 1.0396, x: -0.371, y: -0.314 })
 /* hicon: clock-1 */

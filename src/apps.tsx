@@ -36,25 +36,9 @@ export interface EmbeddedApp {
 
 export const APPS: EmbeddedApp[] = [
   {
-    /* Moved off the header on his instruction. It opens in a TAB, not a frame,
-       and that is not a preference: mymind answers with frame-ancestors 'none',
-       so a panel inside this page is not something the app is allowed to build.
-       That constraint used to be written above the header button; it moves here
-       with the app it describes. */
-    id: 'mymind', name: 'My Mind',
-    url: 'https://access.mymind.com/everything',
-    external: true,
-    icon: <Icon.ExternalLink size={20} />,
-  },
-  {
     id: 'watchless', name: 'Watchless',
     url: 'https://watchless.netlify.app',
     icon: <Icon.Video size={20} />,
-  },
-  {
-    id: 'compass', name: 'Compass',
-    url: 'https://compass-money.netlify.app',
-    icon: <Icon.Compass size={20} />,
   },
   {
     id: 'forge', name: 'Forge',

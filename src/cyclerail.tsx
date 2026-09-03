@@ -24,7 +24,7 @@ const money = (n: number): string => `${new Intl.NumberFormat('cs-CZ', { maximum
 /* Above a bar there is room for four characters, not nine. */
 const short = (n: number): string => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(Math.round(n)))
 
-export function CycleRail({ cycle, items, incomes, isNow, onOpenItem, onOpenIncome, onAddIncome, onAddBill }: {
+export function CycleRail({ cycle, items, incomes, isNow, onOpenItem, onOpenIncome }: {
   cycle: { start: Date; end: Date; key: string }
   items: CycleItem[]
   incomes: RailIncome[]
@@ -32,8 +32,6 @@ export function CycleRail({ cycle, items, incomes, isNow, onOpenItem, onOpenInco
   isNow: boolean
   onOpenItem: (i: CycleItem) => void
   onOpenIncome: (id: string) => void
-  onAddIncome: () => void
-  onAddBill: () => void
 }) {
   const [picked, setPicked] = useState<number | null>(null)
 
@@ -163,11 +161,6 @@ export function CycleRail({ cycle, items, incomes, isNow, onOpenItem, onOpenInco
           ))}
         </div>
       )}
-
-      <div className="cr-acts">
-        <button type="button" className="cr-act is-in" onClick={onAddIncome}>↙ Add income</button>
-        <button type="button" className="cr-act" onClick={onAddBill}>+ Add a bill</button>
-      </div>
     </div>
   )
 }

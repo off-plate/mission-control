@@ -7846,16 +7846,11 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .cr-chipamt.is-in { color: var(--accent); }
 .cr-chip.is-paid .cr-chipamt { color: var(--ink-3); }
 
-/* The two actions the dashed strip used to be, kept and made taller on his
-   instruction. */
-.cr-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
-.cr-act { border: none; border-radius: 14px; padding: 15px 16px; font: 700 14.5px var(--font-body);
-  background: var(--bg-subtle); color: var(--ink); cursor: pointer; transition: background var(--a-enter), transform var(--a-enter); }
-.cr-act:hover { background: var(--border); }
-.cr-act:active { transform: scale(.985); }
-.cr-act.is-in { background: var(--accent-fill); color: var(--a-ink); }
-.cr-act.is-in:hover { background: var(--a-accent-2); }
-@media (max-width: 620px) { .cyclerail { padding: 16px 14px 14px; } .cr-acts { grid-template-columns: 1fr; } }
+/* The rail carried the old strip's "+ Income / + Bill" pair at its foot for one
+   round and he took them straight back out (2026-09-04). Both actions are still
+   a click away where they belong: each section's own Edit opens a list that adds
+   as well as edits. */
+@media (max-width: 620px) { .cyclerail { padding: 16px 14px 14px; } }
 
 .bills-page .card { background: var(--surface); border-radius: 24px; overflow: hidden; box-shadow: var(--a-lift); }
 .bills-page .overline { font: 700 12px var(--font-body); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }

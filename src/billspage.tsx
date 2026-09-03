@@ -362,7 +362,7 @@ export function BillsPage() {
                 const pct = Math.round(v.progress * 100)
                 return (
                   <button key={v.debt.id} className="bd-row" onClick={() => setEditDebt(v.debt)}>
-                    <span className="bd-rname">{v.debt.name}<span className="bd-rkind">{DEBT_KIND_LABEL[v.debt.kind]}</span></span>
+                    <span className="bd-rname"><span>{v.debt.name}</span><span className="bd-rkind">{DEBT_KIND_LABEL[v.debt.kind]}</span></span>
                     <span className="bd-ramt">{money(v.remaining)}</span>
                     <span className="bd-rbar"><i style={{ width: `${pct}%` }} /></span>
                     <span className="bd-rsub">

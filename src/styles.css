@@ -810,6 +810,18 @@ body:has(.shell.is-hud) .dock-face { border-radius: var(--a-r-lg); }
    cancelled close has nothing left to revert BACK to -- it just lands on
    its normal resting styles with no keyframes involved at all. */
 .dock.is-open .dock-item { animation: none; }
+/* His ask (2026-09-04): starting a block from a task's own Start button, or
+   the Zone, gave no sign it caught. This wraps the exact same .dock-item
+   dock-item--focus row the open menu shows, as a sibling of .dock-menu and
+   .dock-fab -- .dock's own flex-column stacks it directly above the FAB, the
+   same spot Focus sits at the bottom of the real stack, with no positioning
+   of its own to maintain. Not .dock-menu: a second .dock-item there would
+   pull in the stagger and nth-child rules above meant for three items
+   growing together. The entrance is already free from the base .dock-item
+   rule above (dock-item-in); only the exit needs its own trigger, since
+   nothing here ever gets .dock-menu's sibling context (.dock.is-closing /
+   .dock.is-open) to read animation state off of. */
+.dock-toast.is-hiding .dock-item { animation: dock-item-out 140ms var(--ease) forwards; }
 .dock-item-label {
   display: inline-flex; align-items: center; gap: 8px;
   background: var(--surface); border: 1px solid var(--hairline-strong); color: var(--ink);

@@ -1247,7 +1247,7 @@ export function PlanPage() {
                               {isExp ? '▾' : '▸'} {doneSubs}/{t.subtasks!.length}
                             </button>
                           )}
-                          {!t.done && <TaskActions task={t} onFocus={() => startFocus(taskMinutes(t), t.title)} />}
+                          {!t.done && <TaskActions task={t} onFocus={() => startFocus(taskMinutes(t), t.title, true)} />}
                           <Dropdown label={`Options for ${t.title}`}>
                             {!t.done && <button role="menuitem" onClick={() => setBreakdownFor(t)}>Break it down</button>}
                             {!t.done && <span className="kebab-sep" />}
@@ -1318,7 +1318,7 @@ export function PlanPage() {
                                     className="task-act task-focus sub-focus"
                                     aria-label={`Focus on ${s.title} for ${s.estimateMin} minutes`}
                                     title={`Focus ${s.estimateMin}m on this step`}
-                                    onClick={() => startFocus(s.estimateMin, s.title)}
+                                    onClick={() => startFocus(s.estimateMin, s.title, true)}
                                   >
                                     <Icon.Play size={17} />
                                   </button>

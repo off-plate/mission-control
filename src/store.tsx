@@ -178,12 +178,16 @@ interface Store extends PersistedState {
   projects: Project[]
   addProject: (name: string, space: SpaceId) => void
   deleteProject: (id: string) => void
-  /** Which Project's Plan is open, or null for the Space's own Plan. Set by
-   *  the Projects page on the way into Plan; cleared by "back to Projects".
+  /** Which Project's Plan is open, or null for the Space's own Plan.
    *  Deliberately not persisted: a project stays a room you walk into, not a
-   *  mode that survives a reload. */
+   *  mode that survives a reload. Cleared automatically by setPage and
+   *  setView, since every nav tab and every Space is a top-level destination
+   *  a project scope should never survive navigating away to. */
   openProjectId: string | null
   setOpenProject: (id: string | null) => void
+  /** The one way in: opens a project's Plan without the id being wiped by
+   *  setPage's own clearing (see setPage's note). */
+  enterProject: (id: string) => void
   /** The day being looked back at, when the route names one. */
   dayKey: string | null
   openDay: (iso: string) => void
@@ -1326,7 +1330,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // In a single space, new things land there. In All he picks, and the pick sticks.
   const space: SpaceId = isSpace(view) ? view : writeSpace
   const setSpace = (s: SpaceId) => setWriteSpace(s)
-  const setView = (v: ViewId) => { setViewState(v); if (isSpace(v)) setWriteSpace(v) }
+  const setView = (v: ViewId) => { setViewState(v); if (isSpace(v)) setWriteSpace(v); setOpenProject(null) }
   /* A record belongs to exactly one space. The old form treated a space-less row
      as belonging to all three at once, so the same ledger row was counted in
      Personal AND Work AND Off-Plate and every time-saved figure was wrong. Rows
@@ -1368,9 +1372,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const setPage = (p: PageId) => {
+    /* Every tab in the nav is a top-level destination, Plan included: the ONLY
+       way into a project's Plan is enterProject, below. Without this, clicking
+       Plan while standing inside a project did nothing (already on 'plan'),
+       which read as the nav lying about where he was and left no fast way out. */
+    setOpenProject(null)
     location.hash = `/${p}`
     setRoute({ page: p, day: null })
     window.scrollTo({ top: 0 })
+  }
+  /** The one door into a project's Plan. Order matters: setPage clears
+   *  openProjectId as part of leaving wherever he was, so the id has to be set
+   *  AFTER, not before, or it would be wiped by its own navigation. */
+  const enterProject = (id: string) => {
+    setPage('plan')
+    setOpenProject(id)
   }
   /** Open one day of the record. Today goes to Today, which is the live one. */
   const openDay = (iso: string) => {
@@ -1411,7 +1427,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { outbox.push(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels])
+  }, [spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels])
 
   /* ---- state that arrived from somewhere else ----
      Another tab of this browser, or this account on another device. Merged in,
@@ -1441,6 +1457,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (p.tasks) setTasks(p.tasks)
     if (p.habits) setHabits(p.habits)
     if (p.goals) setGoals(p.goals)
+    if (p.projects) setProjects(p.projects)
     if (p.routines) setRoutines(p.routines)
     if (p.ideas) setIdeas(p.ideas)
     /* Arrays, not truthiness: deleting the last note on the other device has to
@@ -1969,7 +1986,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const value: Store = {
     version: 3,
     spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, routines, ideas,
-    openProjectId, setOpenProject,
+    openProjectId, setOpenProject, enterProject,
     addProject: (name, sp) => {
       const trimmed = name.trim()
       if (!trimmed) return

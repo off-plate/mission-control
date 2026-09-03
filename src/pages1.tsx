@@ -603,7 +603,7 @@ export function PlanPage() {
   const { startFocus } = pomo
   const { routines, habits } = useStore()
   const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId, setTaskAt, plan, setPage, openDay, view, inView, focusSessions, dayLog } = useStore()
-  const { projects, openProjectId, setOpenProject } = useStore()
+  const { projects, openProjectId } = useStore()
   /* A project is a room inside a Space, not a second store: this is the one
      line that scopes Plan to it. Everything below (backlog, the day, the
      progress bar) is derived from spaceTasks, so nothing downstream has to
@@ -904,7 +904,7 @@ export function PlanPage() {
            its own room's Plan. Never both: a project already has Yesterday
            one tap further, through Projects then the Space's own Plan. */
         actions={activeProject
-          ? <button className="btn btn-ghost" onClick={() => { setOpenProject(null); setPage('projects') }}>&larr; Projects</button>
+          ? <button className="btn btn-ghost" onClick={() => setPage('projects')}>&larr; Projects</button>
           : <button className="btn btn-ghost" onClick={() => openDay(prevDay())}>Yesterday</button>}
       />
       {/* THE WEEK. Moved above the to-do list and day panel on his instruction
@@ -1442,13 +1442,12 @@ function NewProjectSheet({ space, onClose }: { space: SpaceId; onClose: () => vo
 }
 
 export function ProjectsPage() {
-  const { projects, view, setSpace, setOpenProject, setPage } = useStore()
+  const { projects, view, setSpace, enterProject } = useStore()
   const [addingIn, setAddingIn] = useState<SpaceId | null>(null)
 
   const openProject = (p: Project) => {
     setSpace(p.space)
-    setOpenProject(p.id)
-    setPage('plan')
+    enterProject(p.id)
   }
   const bySpace = (sp: SpaceId) => projects.filter((p) => p.space === sp)
   const grid = (sp: SpaceId) => (

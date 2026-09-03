@@ -11,7 +11,7 @@
    close to verbatim as this codebase's conventions allow, and checked
    against known values there, because this reads and writes his real
    financial data on a shared production database. */
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { Sheet } from './modals'
 import { Band, Segmented } from './ui'
 import {
@@ -41,47 +41,103 @@ export interface BillsData {
 /* Exported for billsdock.tsx (the dock's compact summary, 2026-09-02) --
    the same account/data plumbing this page uses, not a second copy of it.
    The dock reads real financial data too, so it goes through the one place
-   that already talks to Supabase correctly rather than re-deriving it. */
-export function useCompassAccount() {
-  const [signedIn, setSignedIn] = useState<boolean | null>(null)
-  useEffect(() => {
-    let alive = true
-    void currentAccount().then((a) => { if (alive) setSignedIn(!!a) })
-    const off = onAccountChange((a) => setSignedIn(!!a))
-    return () => { alive = false; off() }
-  }, [])
-  return signedIn
+   that already talks to Supabase correctly rather than re-deriving it.
+
+   Both used to be plain per-component hooks: with the dock's Bills summary
+   AND the full Bills page both mounted (open the dock, hold Bills for the
+   full page), that was two currentAccount() calls and two 6-table
+   Promise.all reads of the same financial data on the same screen. Shared
+   module-level stores now, the same pattern calendar.ts and compass.ts
+   already use -- one account subscription, one fetch, every caller sees
+   the same answer. */
+
+let accountView: boolean | null = null
+const accountListeners = new Set<() => void>()
+let accountUnsub: (() => void) | null = null
+
+function publishAccount(a: boolean | null): void {
+  accountView = a
+  for (const f of [...accountListeners]) f()
 }
 
-export function useBillsData(signedIn: boolean | null) {
-  const [data, setData] = useState<BillsData | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [reloadTick, setReloadTick] = useState(0)
-  const reload = () => setReloadTick((n) => n + 1)
+function subscribeAccount(f: () => void): () => void {
+  accountListeners.add(f)
+  if (accountListeners.size === 1) {
+    void currentAccount().then((a) => publishAccount(!!a))
+    accountUnsub = onAccountChange((a) => publishAccount(!!a))
+  }
+  return () => {
+    accountListeners.delete(f)
+    if (accountListeners.size === 0) { accountUnsub?.(); accountUnsub = null }
+  }
+}
 
-  useEffect(() => {
-    if (!signedIn) { setData(null); return }
-    let alive = true
-    setError(null)
-    Promise.all([
-      readRows<CompassProfile>('compass_profile', '*'),
-      readRows<CompassDebt>('compass_debts', '*'),
-      readRows<CompassRecurring>('compass_recurring', '*'),
-      readRows<CompassTransaction>('compass_transactions', '*'),
-      readRows<CompassPlanned>('compass_planned', '*'),
-      readRows<CompassCycleIncome>('compass_cycle_income', '*'),
-    ]).then(([profileRows, debts, recurring, transactions, planned, cycleIncome]) => {
-      if (!alive) return
-      setData({
+const getAccountSnapshot = () => accountView
+
+export function useCompassAccount() {
+  return useSyncExternalStore(subscribeAccount, getAccountSnapshot, getAccountSnapshot)
+}
+
+let billsView: { data: BillsData | null; error: string | null } = { data: null, error: null }
+const billsListeners = new Set<() => void>()
+let billsInFlight: Promise<void> | null = null
+let billsForAccount: boolean | null = null
+
+function publishBills(next: { data: BillsData | null; error: string | null }): void {
+  billsView = next
+  for (const f of [...billsListeners]) f()
+}
+
+function refreshBills(signedIn: boolean | null, force = false): Promise<void> {
+  if (!signedIn) { publishBills({ data: null, error: null }); return Promise.resolve() }
+  /* Shared unconditionally, force included -- the same rule calendar.ts's
+     refreshCalendar uses. force only skips the "already have this account's
+     data" short-circuit below; a manual reload that lands mid-fetch still
+     joins the fetch already in flight instead of doubling it. */
+  if (billsInFlight) return billsInFlight
+  if (!force && billsView.data && billsForAccount === signedIn) return Promise.resolve()
+  billsForAccount = signedIn
+  billsInFlight = Promise.all([
+    readRows<CompassProfile>('compass_profile', '*'),
+    readRows<CompassDebt>('compass_debts', '*'),
+    readRows<CompassRecurring>('compass_recurring', '*'),
+    readRows<CompassTransaction>('compass_transactions', '*'),
+    readRows<CompassPlanned>('compass_planned', '*'),
+    readRows<CompassCycleIncome>('compass_cycle_income', '*'),
+  ]).then(([profileRows, debts, recurring, transactions, planned, cycleIncome]) => {
+    publishBills({
+      data: {
         profile: profileRows?.[0] ?? null,
         debts: debts ?? [], recurring: recurring ?? [], transactions: transactions ?? [],
         planned: planned ?? [], cycleIncome: cycleIncome ?? [],
-      })
-    }).catch((e) => { if (alive) setError(e instanceof Error ? e.message : String(e)) })
-    return () => { alive = false }
-  }, [signedIn, reloadTick])
+      },
+      error: null,
+    })
+  }).catch((e) => {
+    publishBills({ data: billsView.data, error: e instanceof Error ? e.message : String(e) })
+  }).finally(() => { billsInFlight = null })
+  return billsInFlight
+}
 
-  return { data, error, reload }
+function subscribeBills(f: () => void): () => void {
+  billsListeners.add(f)
+  return () => { billsListeners.delete(f) }
+}
+
+const getBillsSnapshot = () => billsView
+
+/* refreshBills is called from an effect here, once per caller, but its own
+   billsInFlight/billsForAccount guards mean two callers mounting together
+   (the dock's Bills summary and the full page, both open at once) still
+   land on ONE fetch -- the second call sees the first already in flight
+   and shares it, exactly like the subscribe-driven dedup in compass.ts and
+   calendar.ts, just triggered by the signedIn prop instead of listener
+   count since this store's data depends on which account it's for. */
+export function useBillsData(signedIn: boolean | null) {
+  const view = useSyncExternalStore(subscribeBills, getBillsSnapshot, getBillsSnapshot)
+  useEffect(() => { void refreshBills(signedIn) }, [signedIn])
+  const reload = useCallback(() => { void refreshBills(signedIn, true) }, [signedIn])
+  return { data: view.data, error: view.error, reload }
 }
 
 /* ---------------- the page ---------------- */

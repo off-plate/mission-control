@@ -12,7 +12,7 @@
    No figure is ever hardcoded here. This repo is public; every number arrives
    at runtime, over an authenticated session, or the panel says it has none. */
 
-import { useEffect, useState } from 'react'
+import { useCallback, useSyncExternalStore } from 'react'
 import { SUPABASE_ENABLED, readRows } from './supabase'
 
 interface CompassDebt {
@@ -139,18 +139,57 @@ export async function readCompass(): Promise<CompassState> {
   }
 }
 
-/** Reads once when the page opens, and again on demand. */
+/* ---------------- one shared read, not one per caller ----------------
+   The Timeline page and the dock's Timeline summary (timelinedock.tsx) both
+   call this on the same screen, and each used to run its own readCompass --
+   two reads of compass_debts and compass_transactions for one page, against
+   his real financial data. Same pattern as calendar.ts's useCalendar: a
+   single module-level store, one in-flight read shared by every caller. No
+   localStorage cache here, unlike calendar.ts -- this file's own header
+   comment is "no figure is ever hardcoded", and debt/transaction figures
+   are not worth persisting to disk for the sake of one screen's dedup. */
+
+/** Re-read in the background at this age, on mount or on demand -- the same
+ *  120s his calendar store uses, long enough that two components mounting
+ *  together on one page share a single read, short enough that coming back
+ *  to the page later still sees a real refresh, not an hour-old balance. */
+const STALE_MS = 120_000
+
+let view: CompassState = SUPABASE_ENABLED ? { status: 'loading' } : { status: 'off' }
+let readAt = 0
+const listeners = new Set<() => void>()
+
+function publish(next: CompassState): void {
+  view = next
+  readAt = Date.now()
+  for (const f of [...listeners]) f()
+}
+
+let inFlight: Promise<void> | null = null
+
+function refresh(force = false): Promise<void> {
+  if (inFlight) return inFlight
+  if (!SUPABASE_ENABLED) { if (view.status !== 'off') publish({ status: 'off' }); return Promise.resolve() }
+  if (!force && view.status !== 'loading' && view.status !== 'off' && Date.now() - readAt < STALE_MS) return Promise.resolve()
+  publish({ status: 'loading' })
+  inFlight = readCompass()
+    .then((s) => { publish(s) })
+    .finally(() => { inFlight = null })
+  return inFlight
+}
+
+function subscribe(f: () => void): () => void {
+  listeners.add(f)
+  if (listeners.size === 1) queueMicrotask(() => { void refresh() })
+  return () => { listeners.delete(f) }
+}
+
+const getSnapshot = () => view
+
+/** Reads once for the whole app (shared across every caller on screen), and
+ *  again on demand. */
 export function useCompass(): { state: CompassState; reload: () => void } {
-  const [state, setState] = useState<CompassState>(SUPABASE_ENABLED ? { status: 'loading' } : { status: 'off' })
-  const [n, setN] = useState(0)
-
-  useEffect(() => {
-    if (!SUPABASE_ENABLED) return
-    let alive = true
-    setState({ status: 'loading' })
-    void readCompass().then((s) => { if (alive) setState(s) })
-    return () => { alive = false }
-  }, [n])
-
-  return { state, reload: () => setN((x) => x + 1) }
+  const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  const reload = useCallback(() => { void refresh(true) }, [])
+  return { state, reload }
 }

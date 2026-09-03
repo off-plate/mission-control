@@ -1,24 +1,32 @@
-import { Component, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Component, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react'
 import { exceptionsFor, globalExceptions } from './exceptions'
 import { useDockBadge } from './desktop'
 import { SPACE_LABELS } from './mock'
 import { GoalsPage, HabitsPage, PlanPage, TodayPage, QuittingPage } from './pages1'
-import { SettingsPage } from './pages2'
 import { NotesPage } from './notes'
 import { BillsPage } from './billspage'
 import { DailyReview } from './daily'
-import { BrandPage } from './brand'
-import { DayPage } from './day'
-import { BoardPage } from './board'
 import { AppsPage, APPS } from './apps'
 import { Dropdown } from './ui'
-import { CalendarPage } from './calendarpage'
-import { AssistantPage } from './assistantpage'
 import { Helmet } from './helmet'
 import { TimelinePage } from './timeline'
 import * as Icon from './icons'
-import { FocusPage } from './focus'
 import { ZonePage, useZoneDepth } from './zone'
+/* These seven are never the first thing on screen (boot always lands on
+   Today) and, unlike Notes/Bills/Timeline, nothing outside App.tsx reaches
+   into them -- confirmed 2026-09-04, each has exactly one importer. Lazy
+   here is a pure win: 111kB off the chunk everyone downloads on first
+   paint, for pages most sessions never even open. Suspense fallback is
+   null, not a spinner -- these chunks are a few KB to 50KB on the same
+   origin, well under what a loading state is worth drawing for (see the
+   as-speak comment in styles.css making the same call for a slow reply). */
+const SettingsPage = lazy(() => import('./pages2').then((m) => ({ default: m.SettingsPage })))
+const BrandPage = lazy(() => import('./brand').then((m) => ({ default: m.BrandPage })))
+const DayPage = lazy(() => import('./day').then((m) => ({ default: m.DayPage })))
+const BoardPage = lazy(() => import('./board').then((m) => ({ default: m.BoardPage })))
+const CalendarPage = lazy(() => import('./calendarpage').then((m) => ({ default: m.CalendarPage })))
+const AssistantPage = lazy(() => import('./assistantpage').then((m) => ({ default: m.AssistantPage })))
+const FocusPage = lazy(() => import('./focus').then((m) => ({ default: m.FocusPage })))
 import { useStore } from './store'
 import { ago, describe, useSyncStatus } from './sync'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange } from './supabase'
@@ -576,6 +584,7 @@ export default function App() {
 
       <main id="main" tabIndex={-1}>
         <PageBoundary page={page}>
+        <Suspense fallback={null}>
         {page === 'today' && <TodayPage />}
         {page === 'plan' && <PlanPage />}
         {(page === 'habits' || page === 'routines') && <HabitsPage />}
@@ -593,6 +602,7 @@ export default function App() {
         {page === 'brand' && <BrandPage />}
         {page === 'day' && <DayPage />}
         {page === 'zone' && <ZonePage />}
+        </Suspense>
         </PageBoundary>
       </main>
 

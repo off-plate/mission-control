@@ -289,7 +289,13 @@ function PhonePages({ tabs, page, setPage }: {
 }
 
 export default function App() {
-  const { space, view, setView, page, setPage, tasks, routines, goals, habits, markHabitDaysOn, setFocusAppId } = useStore()
+  const { space, view, setView, page, setPage, openProjectId, tasks, routines, goals, habits, markHabitDaysOn, setFocusAppId } = useStore()
+  /* A project's Plan is still page 'plan' underneath (see enterProject in the
+     store), but the nav has to say Projects, not Plan, or it reads as lying
+     about where he is the moment the Band above it already says the project's
+     name. This is ONLY the nav's own idea of which tab is lit; setPage below
+     still gets the real page id. */
+  const navPage: PageId = openProjectId ? 'projects' : page
   // The dot follows the alerts: money and admin count from any profile.
   const exceptions = space === 'personal'
     ? exceptionsFor(space, { tasks, routines, goals })
@@ -547,7 +553,7 @@ export default function App() {
           </Dropdown>
           {/* Assistant left this list the same way the Zone did: it is its own
               button now, not a tab, so the picker has nothing to say about it. */}
-          {page !== 'zone' && page !== 'assistant' && <PhonePages tabs={tabs} page={page} setPage={setPage} />}
+          {page !== 'zone' && page !== 'assistant' && <PhonePages tabs={tabs} page={navPage} setPage={setPage} />}
           <button
             className={`btn btn-ghost${page === 'settings' ? ' is-on' : ''}${needsSignIn ? ' has-dot' : ''}`}
             onClick={() => setPage('settings')}
@@ -570,7 +576,7 @@ export default function App() {
           moment, which starts the hide timer, and nothing was cancelling it
           again once the pointer landed on the row itself: it closed a second
           later out from under a cursor that never actually left it. */}
-      {page !== 'zone' && <PageNav tabs={tabs} page={page} setPage={setPage} onMouseEnter={nav.show} />}
+      {page !== 'zone' && <PageNav tabs={tabs} page={navPage} setPage={setPage} onMouseEnter={nav.show} />}
       </div>
 
       {isReadOnly() && (

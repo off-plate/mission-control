@@ -201,6 +201,19 @@ export function BillsPage() {
     unreasonable: chk.items.filter((i) => i.source === 'unreasonable'),
   } : null
 
+  /* The snapshot counts what is STILL to pay, not how many rows exist. A cycle
+     with the rent already paid read "Recurring bills (2) −800 Kč": two bills,
+     one bill's worth of money, because the total left paid items out and the
+     count did not. The sections below still list everything, paid included,
+     since that is where a payment gets undone. Skipped items are out of both,
+     the same rule cycleFree uses. */
+  const stillDue = groups ? {
+    recurring: groups.recurring.filter((i) => !i.paid && !skips.includes(i.id)).length,
+    debt: groups.debt.filter((i) => !i.paid && !skips.includes(i.id)).length,
+    unexpected: groups.unexpected.filter((i) => !i.paid && !skips.includes(i.id)).length,
+    unreasonable: groups.unreasonable.filter((i) => !i.paid && !skips.includes(i.id)).length,
+  } : null
+
   /* ---- actions, mirroring Compass's own Bills.tsx/useStore.ts exactly ---- */
 
   const markPaid = async (i: CycleItem) => {
@@ -255,7 +268,7 @@ export function BillsPage() {
   if (signedIn === null) return <div className="page bills-page" />
   if (!signedIn) return <div className="page bills-page"><BillsSignIn /></div>
   if (error) return <div className="page bills-page"><div className="bills-empty">Couldn't load Bills: {error}</div></div>
-  if (!data || !chk || !free || !freedom || !freeView || !groups) return <div className="page bills-page" />
+  if (!data || !chk || !free || !freedom || !freeView || !groups || !stillDue) return <div className="page bills-page" />
 
   return (
     <div className="page bills-page">
@@ -325,13 +338,20 @@ export function BillsPage() {
         <div className="bills-leftcol">
         <div className="card bills-snapshot">
           <span className="overline">Monthly snapshot</span>
-          <div className="bs-row"><span className="bs-dot" style={{ background: 'var(--positive-subtle)', color: 'var(--positive)' }}>↙</span><span className="bs-lbl">Coming in</span><span className="bs-val pos">{money(free.comingIn)}</span></div>
+          {/* comingIn is income MINUS everything already paid, so this row read
+              "Coming in −23 500 Kč" on a cycle whose salary was positive: what
+              had gone out was hidden inside the one row that says money is
+              arriving. The income stands on its own line now and what is paid
+              gets its own, which is also the only way this column adds up to
+              Left over on the page rather than only in the arithmetic. */}
+          <div className="bs-row"><span className="bs-dot" style={{ background: 'var(--positive-subtle)', color: 'var(--positive)' }}>↙</span><span className="bs-lbl">Coming in</span><span className="bs-val pos">{money(free.income)}</span></div>
           {carryIn !== 0 && <div className="bs-row"><span className="bs-dot" style={{ background: 'var(--positive-subtle)', color: 'var(--positive)' }}>💼</span><span className="bs-lbl">From last cycle</span><span className={`bs-val ${carryIn >= 0 ? 'pos' : 'neg'}`}>{money(carryIn)}</span></div>}
-          <div className="bs-row"><span className="bs-dot" style={{ background: 'var(--bg-subtle)', color: 'var(--ink-2)' }}>↻</span><span className="bs-lbl">Recurring bills ({groups.recurring.length})</span><span className="bs-val neg">−{money(free.recurringOut)}</span></div>
-          <div className="bs-row"><span className="bs-dot" style={{ background: 'var(--negative-subtle)', color: 'var(--negative)' }}>🏛</span><span className="bs-lbl">Debt payments ({groups.debt.length})</span><span className="bs-val neg">−{money(free.debtOut)}</span></div>
-          <div className="bs-row"><span className="bs-dot" style={{ background: 'var(--highlight-subtle)', color: 'var(--highlight)' }}>⚡</span><span className="bs-lbl">Unexpected this cycle ({groups.unexpected.length})</span><span className="bs-val neg">−{money(free.unexpectedOut)}</span></div>
-          <div className="bs-row"><span className="bs-dot" style={{ background: 'var(--negative-subtle)', color: 'var(--negative)' }}>🔥</span><span className="bs-lbl">Unreasonable ({groups.unreasonable.length})</span><span className="bs-val neg">−{money(free.unreasonableOut)}</span></div>
-          <div className="bills-leftover"><span className="l">Left over</span><span className={`v ${free.free < 0 ? 'is-neg' : ''}`}>{money(free.free)}</span></div>
+          {free.paidTotal > 0 && <div className="bs-row"><span className="bs-dot" style={{ background: 'var(--bg-subtle)', color: 'var(--ink-2)' }}>✓</span><span className="bs-lbl">Already paid</span><span className="bs-val neg">−{money(free.paidTotal)}</span></div>}
+          <div className="bs-row"><span className="bs-dot" style={{ background: 'var(--bg-subtle)', color: 'var(--ink-2)' }}>↻</span><span className="bs-lbl">Recurring bills ({stillDue.recurring})</span><span className={`bs-val ${free.recurringOut > 0 ? 'neg' : ''}`}>{free.recurringOut > 0 ? '−' : ''}{money(free.recurringOut)}</span></div>
+          <div className="bs-row"><span className="bs-dot" style={{ background: 'var(--negative-subtle)', color: 'var(--negative)' }}>🏛</span><span className="bs-lbl">Debt payments ({stillDue.debt})</span><span className={`bs-val ${free.debtOut > 0 ? 'neg' : ''}`}>{free.debtOut > 0 ? '−' : ''}{money(free.debtOut)}</span></div>
+          <div className="bs-row"><span className="bs-dot" style={{ background: 'var(--highlight-subtle)', color: 'var(--highlight)' }}>⚡</span><span className="bs-lbl">Unexpected this cycle ({stillDue.unexpected})</span><span className={`bs-val ${free.unexpectedOut > 0 ? 'neg' : ''}`}>{free.unexpectedOut > 0 ? '−' : ''}{money(free.unexpectedOut)}</span></div>
+          <div className="bs-row"><span className="bs-dot" style={{ background: 'var(--negative-subtle)', color: 'var(--negative)' }}>🔥</span><span className="bs-lbl">Unreasonable ({stillDue.unreasonable})</span><span className={`bs-val ${free.unreasonableOut > 0 ? 'neg' : ''}`}>{free.unreasonableOut > 0 ? '−' : ''}{money(free.unreasonableOut)}</span></div>
+          <div className="bills-leftover"><span className="l">Left over</span><span className={`v ${free.free < 0 ? 'is-neg' : ''}`}>{free.free < 0 ? '−' : ''}{money(Math.abs(free.free))}</span></div>
         </div>
 
         <div className="bills-debtcard">

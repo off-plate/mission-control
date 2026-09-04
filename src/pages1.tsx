@@ -603,13 +603,32 @@ export function PlanPage() {
   const { startFocus } = pomo
   const { routines, habits } = useStore()
   const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId, setTaskAt, plan, setPage, openDay, view, inView, focusSessions, dayLog } = useStore()
-  const { projects, openProjectId } = useStore()
+  const { projects, openProjectId, setTaskProject } = useStore()
   /* A project is a room inside a Space, not a second store: this is the one
      line that scopes Plan to it. Everything below (backlog, the day, the
      progress bar) is derived from spaceTasks, so nothing downstream has to
      know a project was ever involved. */
   const activeProject = openProjectId ? projects.find((p) => p.id === openProjectId) ?? null : null
   const addSpace = activeProject ? activeProject.space : space
+
+  /* Moving a task between a project and the Space's own Plan is the same
+     move either direction: set or clear projectId. A task's own space never
+     changes, so the only projects on offer are the ones already in ITS
+     space, never the view's -- this menu still makes sense from All. */
+  const projectMenu = (t: Task) => {
+    const inSpace = projects.filter((p) => p.space === t.space)
+    if (inSpace.length === 0) return null
+    return (
+      <>
+        <span className="kebab-sep" />
+        <span className="kebab-head">Project</span>
+        {t.projectId && <button role="menuitem" onClick={() => setTaskProject(t.id, undefined)}>Move to Plan</button>}
+        {inSpace.filter((p) => p.id !== t.projectId).map((p) => (
+          <button key={p.id} role="menuitem" onClick={() => setTaskProject(t.id, p.id)}>Move to {p.name}</button>
+        ))}
+      </>
+    )
+  }
 
   const spaceTasks = tasks.filter((t) => inView(t.space) && (!openProjectId || t.projectId === openProjectId))
   const backlogOpen = spaceTasks.filter((t) => !t.done && t.list === 'backlog') // the to-do pool
@@ -1103,6 +1122,7 @@ export function PlanPage() {
                     {SLOTS.map((sl) => (
                       <button key={sl.id} role="menuitem" onClick={() => dropTo(sl.id, t.id)}>{sl.label}</button>
                     ))}
+                    {projectMenu(t)}
                     <span className="kebab-sep" />
                     <button role="menuitem" className="danger" onClick={() => deleteTask(t.id)}>Delete</button>
                   </Dropdown>
@@ -1306,6 +1326,7 @@ export function PlanPage() {
                                 <button role="menuitem" onClick={() => { moveTaskList(t.id, 'backlog'); assignSlot(t.id, undefined); setTaskAt(t.id, undefined) }}>Back to the list</button>
                               </>
                             )}
+                            {!t.done && projectMenu(t)}
                             <button role="menuitem" className="danger" onClick={() => deleteTask(t.id)}>Delete</button>
                           </Dropdown>
                         </div>
@@ -1405,15 +1426,63 @@ export function PlanPage() {
    `openProjectId` in PlanPage above), so this page owns no task data of its
    own. Today, Calendar, Habits, and Goals never find out a project exists. */
 
-function ProjectCard({ p, onOpen }: { p: Project; onOpen: () => void }) {
+function ProjectCard({ p, onOpen, onRename, onDelete }: { p: Project; onOpen: () => void; onRename: () => void; onDelete: () => void }) {
   const { tasks } = useStore()
   const own = tasks.filter((t) => t.projectId === p.id)
   const waiting = own.filter((t) => t.list === 'backlog' && !t.done).length
   return (
-    <button className={`projcard s-${p.space}`} onClick={onOpen}>
-      <h3>{p.name}</h3>
-      <div className="proj-stats"><span><b>{waiting}</b> waiting</span><span><b>{own.length}</b> total</span></div>
-    </button>
+    <div className={`projcard s-${p.space}`}>
+      <button className="projcard-open" onClick={onOpen}>
+        <h3>{p.name}</h3>
+        <div className="proj-stats"><span><b>{waiting}</b> waiting</span><span><b>{own.length}</b> total</span></div>
+      </button>
+      <Dropdown label={`Options for ${p.name}`} className="projcard-kebab">
+        <button role="menuitem" onClick={onRename}>Rename</button>
+        <button role="menuitem" className="danger" onClick={onDelete}>Delete</button>
+      </Dropdown>
+    </div>
+  )
+}
+
+function RenameProjectSheet({ project, onClose }: { project: Project; onClose: () => void }) {
+  const { renameProject } = useStore()
+  const [name, setName] = useState(project.name)
+  const save = () => { if (!name.trim()) return; renameProject(project.id, name); onClose() }
+  return (
+    <Sheet title="Rename project" onClose={onClose}>
+      <label className="field-label" htmlFor="rp-name">Name</label>
+      <input
+        id="rp-name" className="textinput" style={{ width: '100%' }}
+        value={name} autoFocus
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) save() }}
+      />
+      <div className="sheet-actions">
+        <button className="btn btn-quiet" onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" disabled={!name.trim()} onClick={save}>Save</button>
+      </div>
+    </Sheet>
+  )
+}
+
+/** Deleting a project with nothing in it just deletes it -- there's nothing to
+ *  ask about. One with tasks in it needs a real choice: those tasks already
+ *  live in the Space's own Plan too, so "move" is just dropping the tag,
+ *  never a data move, but "delete" is real and needs to say so plainly. */
+function DeleteProjectSheet({ project, count, onClose }: { project: Project; count: number; onClose: () => void }) {
+  const { deleteProject } = useStore()
+  const go = (mode: 'move' | 'delete') => { deleteProject(project.id, mode); onClose() }
+  return (
+    <Sheet title={`Delete "${project.name}"?`} onClose={onClose}>
+      <p style={{ margin: '0 0 var(--s4)', color: 'var(--muted)', fontSize: 'var(--text-sm)' }}>
+        {count} {count === 1 ? 'task is' : 'tasks are'} tagged to this project. They can stay, filed as ordinary tasks in {SPACE_LABELS[project.space]}'s own Plan, or go with the project.
+      </p>
+      <div className="sheet-actions" style={{ justifyContent: 'flex-start', flexWrap: 'wrap' }}>
+        <button className="btn btn-quiet" onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" onClick={() => go('move')}>Keep the tasks, delete the project</button>
+        <button className="btn btn-danger" onClick={() => go('delete')}>Delete the project and its tasks</button>
+      </div>
+    </Sheet>
   )
 }
 
@@ -1442,17 +1511,26 @@ function NewProjectSheet({ space, onClose }: { space: SpaceId; onClose: () => vo
 }
 
 export function ProjectsPage() {
-  const { projects, view, setSpace, enterProject } = useStore()
+  const { projects, tasks, view, setSpace, enterProject, deleteProject } = useStore()
   const [addingIn, setAddingIn] = useState<SpaceId | null>(null)
+  const [renaming, setRenaming] = useState<Project | null>(null)
+  const [deleting, setDeleting] = useState<Project | null>(null)
 
   const openProject = (p: Project) => {
     setSpace(p.space)
     enterProject(p.id)
   }
+  const askDelete = (p: Project) => {
+    const count = tasks.filter((t) => t.projectId === p.id).length
+    if (count === 0) deleteProject(p.id, 'move')
+    else setDeleting(p)
+  }
   const bySpace = (sp: SpaceId) => projects.filter((p) => p.space === sp)
   const grid = (sp: SpaceId) => (
     <div className="projgrid">
-      {bySpace(sp).map((p) => <ProjectCard key={p.id} p={p} onOpen={() => openProject(p)} />)}
+      {bySpace(sp).map((p) => (
+        <ProjectCard key={p.id} p={p} onOpen={() => openProject(p)} onRename={() => setRenaming(p)} onDelete={() => askDelete(p)} />
+      ))}
       <button className="projcard projcard-new" onClick={() => setAddingIn(sp)}>+ New project</button>
     </div>
   )
@@ -1469,6 +1547,8 @@ export function ProjectsPage() {
         ))
         : grid(view)}
       {addingIn && <NewProjectSheet space={addingIn} onClose={() => setAddingIn(null)} />}
+      {renaming && <RenameProjectSheet project={renaming} onClose={() => setRenaming(null)} />}
+      {deleting && <DeleteProjectSheet project={deleting} count={tasks.filter((t) => t.projectId === deleting.id).length} onClose={() => setDeleting(null)} />}
     </div>
   )
 }

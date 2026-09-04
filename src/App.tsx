@@ -262,7 +262,7 @@ function PageNav({
             {button}
             {hoverOpen && hoverRect && createPortal(
               <div
-                className="kebab-menu"
+                className="projnav-menu"
                 role="menu"
                 aria-label="Projects"
                 style={{ position: 'fixed', top: hoverRect.top, left: hoverRect.left, right: 'auto' }}

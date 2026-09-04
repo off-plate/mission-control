@@ -1,4 +1,4 @@
-import{u as n,j as e}from"./index-D2jwhM8Y.js";import"./vendor_react-BRnhmgIC.js";import"./vendor_supabase-DECvRwsC.js";const r=`
+import{u as n,j as e}from"./index-DhSFVvew.js";import"./vendor_react-BRnhmgIC.js";import"./vendor_supabase-DECvRwsC.js";const r=`
 @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap');
 .bg-guide{
   --bg:#f4efe4;--card:#fbf8f1;--surf2:#ece6d8;--ink:#1a1712;--muted:#6d6656;--faint:#9a9282;

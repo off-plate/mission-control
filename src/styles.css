@@ -1890,6 +1890,15 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 @media (prefers-reduced-motion: reduce) {
   .projnav-menu, .projnav-menu.is-open { transition: none; }
 }
+/* A resting .nav-tab is transparent, on purpose, everywhere else: the row
+   above it is the pill housing, and one item stands out as ACTIVE against
+   it. Stacked vertically with nothing active, that reads as one plain box
+   with two lines of text instead of a list of things to click. Each row
+   gets its own resting fill here, and only here -- the real top-level tabs
+   are untouched, this is scoped to this one container. */
+.projnav-menu .nav-tab {
+  background: var(--a-card);
+}
 .apps-shelf-menu .kebab-menu button:hover svg, .apps-shelf-menu .kebab-menu a:hover svg { color: var(--accent-text); }
 
 /* ---------- Select: every dropdown that used to be a native <select> ----------

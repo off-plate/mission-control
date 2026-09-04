@@ -1872,13 +1872,6 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
    actually different here. */
 .projnav-menu {
   position: fixed; z-index: 40; flex-direction: column; width: max-content;
-  /* Not a tray: .nav's own sunk background and padding read as a container
-     with the pills inside it -- a grey panel behind them, showing through
-     the gap, framing the group. There is no group here, only individual
-     rooms to jump into, so the wrapper carries no fill and no padding of
-     its own; each row below is what actually floats. */
-  background: none;
-  padding: 0;
   gap: 8px;
   /* The identical drawer reveal .topstick > .nav uses below, copied rather
      than shared: that selector can't reach a portalled element outside
@@ -1888,6 +1881,19 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
   pointer-events: none;
   transition: transform 190ms cubic-bezier(0.4, 0.0, 0.9, 0.6),
               clip-path 190ms cubic-bezier(0.4, 0.0, 0.9, 0.6);
+}
+/* .nav{background:var(--a-sunk)} (the pill redesign, further down this file)
+   is the SAME specificity as .projnav-menu alone and sits later in the
+   cascade, so a plain override here was silently losing to it -- verified
+   by sampling the actual pixel between the two pills and finding it was
+   .projnav-menu painting the sunk grey, not a shadow or anything else. The
+   compound selector below outranks it for real, rather than relying on
+   source order. Not a tray: that background read as a container behind the
+   pills, framing them as a group, when there is no group, only separate
+   rooms to jump into. */
+.nav.projnav-menu {
+  background: none;
+  padding: 0;
 }
 .projnav-menu.is-open {
   transform: none;

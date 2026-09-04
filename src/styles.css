@@ -1872,11 +1872,13 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
    actually different here. */
 .projnav-menu {
   position: fixed; z-index: 40; flex-direction: column; width: max-content;
-  /* .nav's shared 3px gap reads fine between tabs sitting in a row, next to
-     each other's straight edges. Stacked, each pill is fully rounded top
-     and bottom (999px radius on a ~43px row is a full semicircle cap), and
-     3px isn't enough tray colour between two caps to read as a gap at all
-     -- it looked like one stadium shape with a seam, not two pills. */
+  /* Not a tray: .nav's own sunk background and padding read as a container
+     with the pills inside it -- a grey panel behind them, showing through
+     the gap, framing the group. There is no group here, only individual
+     rooms to jump into, so the wrapper carries no fill and no padding of
+     its own; each row below is what actually floats. */
+  background: none;
+  padding: 0;
   gap: 8px;
   /* The identical drawer reveal .topstick > .nav uses below, copied rather
      than shared: that selector can't reach a portalled element outside
@@ -1898,12 +1900,13 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 }
 /* A resting .nav-tab is transparent, on purpose, everywhere else: the row
    above it is the pill housing, and one item stands out as ACTIVE against
-   it. Stacked vertically with nothing active, that reads as one plain box
-   with two lines of text instead of a list of things to click. Each row
-   gets its own resting fill here, and only here -- the real top-level tabs
-   are untouched, this is scoped to this one container. */
+   it. Here there is no housing any more, so each row needs its own fill
+   AND its own shadow to read as one floating object rather than plain text
+   sitting with nothing behind or under it -- only the real top-level tabs
+   keep the plain transparent-until-hovered look. */
 .projnav-menu .nav-tab {
   background: var(--a-card);
+  box-shadow: var(--a-lift);
 }
 .apps-shelf-menu .kebab-menu button:hover svg, .apps-shelf-menu .kebab-menu a:hover svg { color: var(--accent-text); }
 

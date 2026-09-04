@@ -260,17 +260,25 @@ function PageNav({
         return (
           <span className="kebab-wrap" key={t.id} ref={wrapRef} onMouseEnter={showHover} onMouseLeave={hideHoverSoon}>
             {button}
-            {hoverOpen && hoverRect && createPortal(
+            {hoverRect && createPortal(
+              /* Same object as .nav itself (same background, radius, padding,
+                 gap, same .nav-tab rows), just turned on its side, and the
+                 SAME drawer reveal .topstick > .nav uses (clip-path closing
+                 over a translate, not a fade) -- copied rather than shared
+                 because this one has to animate on its own class, outside
+                 .topstick's DOM, where that selector can't reach it. Stays
+                 mounted once first opened so closing gets the same
+                 transition as opening, instead of vanishing instantly. */
               <div
-                className="projnav-menu"
+                className={`nav projnav-menu${hoverOpen ? ' is-open' : ''}`}
                 role="menu"
                 aria-label="Projects"
-                style={{ position: 'fixed', top: hoverRect.top, left: hoverRect.left, right: 'auto' }}
+                style={{ top: hoverRect.top, left: hoverRect.left }}
                 onMouseEnter={showHover}
                 onMouseLeave={hideHoverSoon}
               >
                 {hoverProjects.map((p) => (
-                  <button key={p.id} role="menuitem" onClick={() => { setSpace(p.space); enterProject(p.id); setHoverOpen(false) }}>
+                  <button key={p.id} className="nav-tab" role="menuitem" onClick={() => { setSpace(p.space); enterProject(p.id); setHoverOpen(false) }}>
                     {p.name}
                   </button>
                 ))}

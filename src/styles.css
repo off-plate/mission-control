@@ -1865,23 +1865,31 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 .apps-shelf-menu .kebab-menu { min-width: 190px; }
 .apps-shelf-menu .kebab-menu svg { flex: none; color: var(--faint); }
 
-/* The Projects hover preview: a project name is a proper noun, the same
-   standing as a Space name, so each row is its own pill, same recipe as
-   .space-btn and .nav-tab (see "the workspace switcher is a pill group"
-   above), not a small-radius kebab-menu row -- this is a shortcut into a
-   room, not an options menu. */
+/* The Projects hover preview: the exact .nav object (its background, its
+   radius, its padding and gap, its .nav-tab rows), on its side. Not a menu
+   borrowed from the kebab pattern -- a second .nav, because the pills going
+   under each other instead of next to each other is the only thing that's
+   actually different here. */
 .projnav-menu {
-  z-index: 40; background: var(--surface); border: 1px solid var(--hairline-strong);
-  border-radius: var(--a-r-lg); box-shadow: var(--shadow-pop); padding: 6px;
-  display: flex; flex-direction: column; gap: 3px; min-width: 180px;
+  position: fixed; z-index: 40; flex-direction: column; width: max-content;
+  /* The identical drawer reveal .topstick > .nav uses below, copied rather
+     than shared: that selector can't reach a portalled element outside
+     .topstick's own DOM, so this carries its own open/close class instead. */
+  transform: translateY(-100%);
+  clip-path: inset(0 0 100% 0);
+  pointer-events: none;
+  transition: transform 190ms cubic-bezier(0.4, 0.0, 0.9, 0.6),
+              clip-path 190ms cubic-bezier(0.4, 0.0, 0.9, 0.6);
 }
-.projnav-menu button {
-  border-radius: 999px; padding: 10px 16px; min-height: 40px;
-  font-family: var(--font-body); font-size: var(--a-f-nav); font-weight: 700;
-  color: var(--muted); text-align: left; white-space: nowrap;
-  transition: background var(--a-enter), color var(--a-enter);
+.projnav-menu.is-open {
+  transform: none;
+  clip-path: inset(0 0 0 0);
+  pointer-events: auto;
+  transition: transform 300ms var(--ease), clip-path 300ms var(--ease);
 }
-.projnav-menu button:hover { background: var(--a-accent-wash); color: var(--a-accent-text); }
+@media (prefers-reduced-motion: reduce) {
+  .projnav-menu, .projnav-menu.is-open { transition: none; }
+}
 .apps-shelf-menu .kebab-menu button:hover svg, .apps-shelf-menu .kebab-menu a:hover svg { color: var(--accent-text); }
 
 /* ---------- Select: every dropdown that used to be a native <select> ----------

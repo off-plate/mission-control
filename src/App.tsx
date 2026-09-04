@@ -236,7 +236,7 @@ function PageNav({
   const showHover = () => {
     window.clearTimeout(hoverTimer.current)
     const r = wrapRef.current?.getBoundingClientRect()
-    if (r) setHoverRect({ top: r.bottom + 6, left: r.left })
+    if (r) setHoverRect({ top: r.bottom + 12, left: r.left })
     setHoverOpen(true)
   }
   const hideHoverSoon = () => { hoverTimer.current = window.setTimeout(() => setHoverOpen(false), 350) }

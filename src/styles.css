@@ -1864,6 +1864,24 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 .kebab-menu button[aria-checked="true"] { color: var(--accent-text); font-weight: 600; }
 .apps-shelf-menu .kebab-menu { min-width: 190px; }
 .apps-shelf-menu .kebab-menu svg { flex: none; color: var(--faint); }
+
+/* The Projects hover preview: a project name is a proper noun, the same
+   standing as a Space name, so each row is its own pill, same recipe as
+   .space-btn and .nav-tab (see "the workspace switcher is a pill group"
+   above), not a small-radius kebab-menu row -- this is a shortcut into a
+   room, not an options menu. */
+.projnav-menu {
+  z-index: 40; background: var(--surface); border: 1px solid var(--hairline-strong);
+  border-radius: var(--a-r-lg); box-shadow: var(--shadow-pop); padding: 6px;
+  display: flex; flex-direction: column; gap: 3px; min-width: 180px;
+}
+.projnav-menu button {
+  border-radius: 999px; padding: 10px 16px; min-height: 40px;
+  font-family: var(--font-body); font-size: var(--a-f-nav); font-weight: 700;
+  color: var(--muted); text-align: left; white-space: nowrap;
+  transition: background var(--a-enter), color var(--a-enter);
+}
+.projnav-menu button:hover { background: var(--a-accent-wash); color: var(--a-accent-text); }
 .apps-shelf-menu .kebab-menu button:hover svg, .apps-shelf-menu .kebab-menu a:hover svg { color: var(--accent-text); }
 
 /* ---------- Select: every dropdown that used to be a native <select> ----------

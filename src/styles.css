@@ -1911,20 +1911,14 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 }
 /* A resting .nav-tab is transparent, on purpose, everywhere else: the row
    above it is the pill housing, and one item stands out as ACTIVE against
-   it. Here there is no housing any more, so each row needs its own fill
-   AND its own shadow to read as one floating object rather than plain text
-   sitting with nothing behind or under it -- only the real top-level tabs
-   keep the plain transparent-until-hovered look. */
+   it. Here there is no housing any more, so each row needs its own fill to
+   read as a separate thing -- but no shadow: nothing else in this app, not
+   a button, not the real nav, drops one, and adding one just here was
+   inventing a new visual language for one menu instead of using the one
+   that's already everywhere. The fill and the gap do the separating. */
 .projnav-menu .nav-tab {
   background: var(--a-card);
-  /* Not --a-lift: its 30px blur and 10px drop are sized for a card with
-     real space around it, and bled straight across an 8px gap onto the
-     pill below -- the exact grey smudge "cutting through both pills" this
-     was supposed to fix, just moved from a shared background into a
-     shared shadow. Small chip, small shadow. */
-  box-shadow: 0 2px 6px rgba(18, 16, 12, 0.14);
 }
-.shell.is-hud .projnav-menu .nav-tab { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); }
 .apps-shelf-menu .kebab-menu button:hover svg, .apps-shelf-menu .kebab-menu a:hover svg { color: var(--accent-text); }
 
 /* ---------- Select: every dropdown that used to be a native <select> ----------

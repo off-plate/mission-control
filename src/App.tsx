@@ -28,6 +28,7 @@ const BoardPage = lazy(() => import('./board').then((m) => ({ default: m.BoardPa
 const CalendarPage = lazy(() => import('./calendarpage').then((m) => ({ default: m.CalendarPage })))
 const AssistantPage = lazy(() => import('./assistantpage').then((m) => ({ default: m.AssistantPage })))
 const FocusPage = lazy(() => import('./focus').then((m) => ({ default: m.FocusPage })))
+const ContactsPage = lazy(() => import('./contactspage').then((m) => ({ default: m.ContactsPage })))
 import { useStore } from './store'
 import { ago, describe, useSyncStatus } from './sync'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange } from './supabase'
@@ -659,6 +660,7 @@ export default function App() {
         {page === 'goals' && <GoalsPage />}
         {page === 'quitting' && <QuittingPage />}
         {page === 'timeline' && <TimelinePage />}
+        {page === 'contacts' && <ContactsPage />}
         {page === 'focus' && <FocusPage />}
         {page === 'board' && <BoardPage />}
         {page === 'apps' && <AppsPage />}

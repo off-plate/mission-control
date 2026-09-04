@@ -38,6 +38,8 @@ import { isSpace, SPACES, spaceFolderId } from './types'
 import type { HabitFrequency } from './types'
 import type {
   ViewId,
+  Contact,
+  ContactActivity,
   FocusSession,
   HabitSlip,
   HabitTick,
@@ -89,6 +91,11 @@ interface PersistedState {
   /** Rooms inside a Space. Optional so an old saved blob without any still
    *  reads as an empty list rather than failing to parse. */
   projects?: Project[]
+  /** People. Optional for the same reason projects is. */
+  contacts?: Contact[]
+  /** Every logged touch, dated. Its own collection rather than nested on
+   *  Contact -- see the type's own note in types.ts. */
+  contactActivity?: ContactActivity[]
   ledger: LedgerEntry[]
   social: SocialEntry[]
   sources: SourceState[]
@@ -192,6 +199,14 @@ interface Store extends PersistedState {
    *  a project scope should never survive navigating away to. */
   openProjectId: string | null
   setOpenProject: (id: string | null) => void
+  /** People. Not filtered by Space or by inView, same as habits/goals --
+   *  see the type's own note in types.ts for why. */
+  contacts: Contact[]
+  contactActivity: ContactActivity[]
+  addContact: (name: string) => string
+  updateContact: (id: string, patch: Partial<Pick<Contact, 'name' | 'tag' | 'phone' | 'email' | 'company' | 'role' | 'next' | 'notes' | 'projectId'>>) => void
+  deleteContact: (id: string) => void
+  logContactActivity: (id: string, type: ContactActivity['type'], note?: string) => void
   /** The one way in: opens a project's Plan without the id being wiped by
    *  setPage's own clearing (see setPage's note). */
   enterProject: (id: string) => void
@@ -1152,7 +1167,7 @@ function routeFromHash(): { page: PageId; day: string | null } {
   /* Achievements, Money and Reflect were removed. Their addresses land on Today
      rather than on nothing, the same courtesy braindump gets above. */
   if (h === 'achievements' || h === 'money' || h === 'review' || h === 'stats') return { page: 'today', day: null }
-  const pages: PageId[] = ['today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting', 'settings', 'brand', 'notes', 'bills', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant', 'timeline']
+  const pages: PageId[] = ['today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting', 'settings', 'brand', 'notes', 'bills', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant', 'timeline', 'contacts']
   return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
 }
 
@@ -1255,6 +1270,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [habits, setHabits] = useState(persisted?.habits ?? seededHabits)
   const [goals, setGoals] = useState(persisted?.goals ?? seededGoals)
   const [projects, setProjects] = useState<Project[]>(persisted?.projects ?? [])
+  const [contacts, setContacts] = useState<Contact[]>(persisted?.contacts ?? [])
+  const [contactActivity, setContactActivity] = useState<ContactActivity[]>(persisted?.contactActivity ?? [])
   const [ledger, setLedger] = useState(persisted?.ledger ?? MOCK_LEDGER)
   const [social, setSocialState] = useState(persisted?.social ?? MOCK_SOCIAL)
   const [sources, setSources] = useState(persisted?.sources ?? MOCK_SOURCES)
@@ -1408,7 +1425,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (futureBlob) return
 
     const state: PersistedState = {
-      version: 3, spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
+      version: 3, spaces, tasks, habits, goals, projects, contacts, contactActivity, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
       notes, noteFolders,
       savedAt: Date.now(), lastWrite: { dev: deviceId(), name: deviceName(), at: Date.now() },
       weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
@@ -1434,7 +1451,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { outbox.push(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels])
+  }, [spaces, tasks, habits, goals, projects, contacts, contactActivity, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels])
 
   /* ---- state that arrived from somewhere else ----
      Another tab of this browser, or this account on another device. Merged in,
@@ -1465,6 +1482,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (p.habits) setHabits(p.habits)
     if (p.goals) setGoals(p.goals)
     if (p.projects) setProjects(p.projects)
+    if (p.contacts) setContacts(p.contacts)
+    if (p.contactActivity) setContactActivity(p.contactActivity)
     if (p.routines) setRoutines(p.routines)
     if (p.ideas) setIdeas(p.ideas)
     /* Arrays, not truthiness: deleting the last note on the other device has to
@@ -1992,7 +2011,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value: Store = {
     version: 3,
-    spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, routines, ideas,
+    spaces, tasks, habits, goals, projects, contacts, contactActivity, ledger, social, sources, plan, review, routines, ideas,
     openProjectId, setOpenProject, enterProject,
     addProject: (name, sp) => {
       const trimmed = name.trim()
@@ -2028,6 +2047,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       armUndo(label, () => { setProjects(beforeProjects); setTasks(beforeTasks); digUp(...keys) })
     },
     setTaskProject: (id, projectId) => setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, projectId } : t))),
+    addContact: (name) => {
+      const trimmed = name.trim()
+      const id = newId('contact')
+      if (!trimmed) return id
+      setContacts((prev) => [...prev, { id, name: trimmed, tag: '', createdAt: new Date().toISOString() }])
+      return id
+    },
+    updateContact: (id, patch) => setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c))),
+    deleteContact: (id) => {
+      const beforeContacts = contacts
+      const beforeActivity = contactActivity
+      const gone = contacts.find((c) => c.id === id)
+      const theirs = contactActivity.filter((a) => a.contactId === id)
+      const keys = [rowKey('contacts', { id }), ...theirs.map((a) => rowKey('contactActivity', { id: a.id }))]
+      setContacts((prev) => prev.filter((c) => c.id !== id))
+      setContactActivity((prev) => prev.filter((a) => a.contactId !== id))
+      bury(...keys)
+      armUndo(gone ? `Deleted "${gone.name}"` : 'Contact deleted', () => { setContacts(beforeContacts); setContactActivity(beforeActivity); digUp(...keys) })
+    },
+    logContactActivity: (id, type, note) => setContactActivity((prev) => [{ id: newId('act'), contactId: id, type, at: new Date().toISOString(), note }, ...prev]),
     focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog,
     view, setView, inView,
     twoLives, setTwoLives, reels, setReels,

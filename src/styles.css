@@ -981,6 +981,19 @@ body:has(.shell.is-hud) .dock-face { border-radius: var(--a-r-lg); }
 .billsdock-hero { font-family: var(--font-display); font-weight: 800; font-size: 34px; letter-spacing: -0.01em; color: var(--progress); font-variant-numeric: tabular-nums; }
 .billsdock-hero.is-neg { color: var(--alert); }
 .billsdock-sub { color: var(--muted); font-size: var(--text-sm); margin-bottom: var(--s3); }
+
+/* Contacts' dock glance, same shell as Bills'. */
+.contactsdock-panel { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.contactsdock-head { flex: none; display: flex; align-items: center; gap: 6px; padding: var(--s2); border-bottom: 1px solid var(--hairline); }
+.contactsdock-title { flex: 1; min-width: 0; font-weight: 600; font-size: var(--text-sm); color: var(--muted); padding: 0 var(--s1); }
+.contactsdock-body { flex: 1; min-height: 0; overflow-y: auto; padding: var(--s2) var(--s4) var(--s4); }
+.contactsdock-empty { color: var(--muted); font-size: var(--text-sm); padding: var(--s2) 0; }
+.contactsdock-row { display: flex; align-items: center; gap: var(--s2); padding: var(--s2) 0; border-top: 1px solid var(--hairline); font-size: var(--text-sm); }
+.contactsdock-row:first-of-type { border-top: none; }
+.contactsdock-name { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+.contactsdock-days { font-size: var(--text-xs); color: var(--alert); font-variant-numeric: tabular-nums; }
+.contactsdock-touch { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--surface-2); color: var(--soft); display: grid; place-items: center; }
+.contactsdock-touch:hover { color: var(--accent-text); background: var(--accent-wash); }
 .billsdock-rows { display: flex; flex-direction: column; }
 .bdr { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); padding: 8px 0; border-top: 1px solid var(--hairline); font-size: var(--text-sm); }
 .bdr:first-child { border-top: none; }
@@ -6695,6 +6708,64 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   display: flex; align-items: center; justify-content: center; min-height: 64px; color: var(--faint); font-weight: 600; padding: var(--s4);
 }
 .projcard-new:hover { border-color: var(--a-accent-text); color: var(--a-accent-text); box-shadow: none; }
+
+/* ==== Contacts: a status board, not a filed list -- see the page's own
+   note in contactspage.tsx on why status is the organising axis instead of
+   a Space. Same shape .drift already gives Goals' own pace badge, not
+   reused directly since .drift is a two-state (ok/off) class and this is
+   three -- copied rather than shared so a change meant for one never
+   silently reaches the other. */
+.statusbadge { display: inline-flex; align-items: center; gap: 6px; font: 800 12px/1 var(--font-body); letter-spacing: 0.12em; text-transform: uppercase; padding: 7px 11px; border-radius: var(--a-r-xs); white-space: nowrap; }
+.statusbadge.s-track { background: var(--a-accent-wash); color: var(--a-accent-text); }
+.statusbadge.s-soon { background: var(--a-warn-wash); color: var(--a-warn); }
+.statusbadge.s-quiet { background: var(--a-alert-wash); color: var(--a-alert); }
+
+.cpage-head { display: flex; align-items: center; margin-bottom: var(--s4); }
+.cboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s4); align-items: start; }
+@media (max-width: 860px) { .cboard { grid-template-columns: 1fr; } }
+.ccol-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s3); }
+.ccol-count { font-size: var(--text-xs); color: var(--faint); font-variant-numeric: tabular-nums; }
+.ccol-empty { color: var(--faint); font-size: var(--text-sm); }
+.ccard {
+  display: block; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--hairline);
+  border-radius: var(--a-r-lg); box-shadow: var(--a-lift); padding: var(--s3) var(--s4); margin-bottom: var(--s3); cursor: pointer;
+}
+.ccard:hover { border-color: var(--a-accent-text); box-shadow: var(--a-lift-2); }
+.ccard b { display: block; font-size: 0.9375rem; }
+.ccard-sub { color: var(--faint); font-size: 0.75rem; margin-top: 2px; }
+.ccard-foot { margin-top: var(--s2); }
+.ccard-lasttouch { font-size: var(--text-xs); color: var(--faint); }
+
+/* The table view: same sortable-header recipe used nowhere else yet, so
+   this is the one place it's spelled out rather than copied. */
+.ctable-wrap { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--a-r-lg); overflow: hidden; }
+.ctable { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+.ctable th {
+  text-align: left; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+  padding: var(--s3) var(--s4); border-bottom: 1px solid var(--hairline-strong); cursor: pointer; white-space: nowrap; user-select: none;
+}
+.ctable th:hover { color: var(--ink); }
+.ctable th .arrow { opacity: 0.5; font-size: 10px; margin-left: 3px; }
+.ctable td { padding: var(--s3) var(--s4); border-bottom: 1px solid var(--hairline); vertical-align: middle; }
+.ctable tr:last-child td { border-bottom: none; }
+.ctable tbody tr { cursor: pointer; }
+.ctable tbody tr:hover { background: var(--surface-2); }
+.ctable td.name b { display: block; font-size: 0.9375rem; }
+.ctable td.name span { color: var(--faint); font-size: var(--text-xs); }
+.ctable td.ellipsis { color: var(--soft); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 720px) { .ctable-wrap { overflow-x: auto; } .ctable { min-width: 640px; } }
+
+/* The detail sheet's own fields. */
+.contact-toprow { display: flex; align-items: center; gap: var(--s3); margin-bottom: var(--s4); flex-wrap: wrap; }
+.contact-lasttouch { font-size: var(--text-sm); color: var(--faint); }
+.contact-infogrid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); margin-bottom: var(--s3); }
+.contact-projectlink { display: flex; align-items: center; gap: var(--s2); font-size: var(--text-sm); color: var(--soft); margin-bottom: var(--s4); }
+.contact-projectlink b { color: var(--ink); }
+.contact-logrow { display: flex; gap: var(--s2); flex-wrap: wrap; margin-bottom: var(--s4); }
+.contact-activity { display: flex; flex-direction: column; gap: var(--s3); }
+.contact-activity-row { display: flex; gap: var(--s3); font-size: var(--text-sm); }
+.contact-activity-icon { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--surface-2); display: grid; place-items: center; color: var(--soft); font-weight: 700; font-size: var(--text-xs); }
+.contact-activity-when { color: var(--faint); font-size: var(--text-xs); }
 
 /* ==========================================================================
    DIRECTION A, THE TREATMENT

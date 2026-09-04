@@ -8,7 +8,7 @@ import { BreakdownSheet, Sheet } from './modals'
 import { Linkify } from './widgets'
 import { HabitRun, habitHasRun } from './habitrun'
 import type { PageId } from './types'
-import { PLAN_AHEAD_DAYS, WeekGrid, dayPlus, shortDay, weekRangeLabel } from './weekgrid'
+import { PLAN_AHEAD_DAYS, WeekGrid, dayPlus, weekRangeLabel } from './weekgrid'
 import { habitsDueToday, GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, dueOn, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, habitGate, habitLocked, isCounted, COUNT_PERIODS, requiredSteps, routineComplete, routineProgress, routineRunsOn, slotMinutes, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type DayTaskLog, type HabitKind, type HabitSlip, type Project, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
 import { useFirstMove, useOpenToday } from './ui'
 import { estimateFor } from './estimate'
@@ -1106,22 +1106,6 @@ export function PlanPage() {
                   <Dropdown label={`Options for ${t.title}`}>
                     <button role="menuitem" onClick={() => setEditingTask(t)}>Edit</button>
                     <button role="menuitem" onClick={() => setBreakdownFor(t)}>Break it down</button>
-                    {/* One trip per day, not one trip to today plus a drag
-                        for everything else. The seven-day picker below still
-                        drags one task at a time; this is for choosing the
-                        whole day at once. */}
-                    <span className="kebab-head">Plan for a day</span>
-                    {Array.from({ length: PLAN_AHEAD_DAYS + 1 }, (_, n) => n).map((n) => (
-                      <button key={n} role="menuitem" onClick={() => { moveTasksToToday([t.id], dayPlus(n)); setDayOffset(n) }}>
-                        Move to {n <= 1 ? offsetWord(n).toLowerCase() : shortDay(dayPlus(n))}
-                      </button>
-                    ))}
-                    {/* Straight into a part of today: today-then-slot used to
-                        be two separate trips through this same menu. */}
-                    <span className="kebab-head">Straight into today</span>
-                    {SLOTS.map((sl) => (
-                      <button key={sl.id} role="menuitem" onClick={() => dropTo(sl.id, t.id)}>{sl.label}</button>
-                    ))}
                     {projectMenu(t)}
                     <span className="kebab-sep" />
                     <button role="menuitem" className="danger" onClick={() => deleteTask(t.id)}>Delete</button>

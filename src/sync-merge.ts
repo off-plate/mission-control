@@ -106,6 +106,7 @@ const LOG_KEYS: Record<string, (r: Row) => string> = {
   stepLog: (r) => `stepLog:${r.routineId}|${r.stepId}|${r.at ?? r.day}`,
   stepTicks: (r) => `stepTicks:${r.routineId}|${r.stepId}|${r.day}`,
   slips: (r) => `slips:${r.habitId}|${r.day}`,
+  contactActivity: (r) => `contactActivity:${r.id}`,
 }
 
 /** Identity per collection of things he made. Everything here is created with a
@@ -116,6 +117,11 @@ const ENTITY_KEYS: Record<string, (r: Row) => string> = {
   goals: (r) => `goals:${r.id}`,
   routines: (r) => `routines:${r.id}`,
   projects: (r) => `projects:${r.id}`,
+  /* The row itself only, never its activity -- that's contactActivity above,
+     unioned by its own id like every other dated log, so two devices
+     logging different touches on the same person between syncs never lose
+     either entry to a wholesale "newer row wins" replacement. */
+  contacts: (r) => `contacts:${r.id}`,
   ideas: (r) => `ideas:${r.id}`,
   notes: (r) => `notes:${r.id}`,
   noteFolders: (r) => `noteFolders:${r.id}`,

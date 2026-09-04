@@ -1894,6 +1894,11 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 .nav.projnav-menu {
   background: none;
   padding: 0;
+  /* The section is not a pill; only the rows inside it are. --a-r-lg (or
+     999px, on .nav's own pill redesign) doesn't render anything visible on
+     a background-less, border-less, shadow-less box, but it has no business
+     being declared here either. */
+  border-radius: 0;
 }
 .projnav-menu.is-open {
   transform: none;

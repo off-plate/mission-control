@@ -1906,8 +1906,14 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
    keep the plain transparent-until-hovered look. */
 .projnav-menu .nav-tab {
   background: var(--a-card);
-  box-shadow: var(--a-lift);
+  /* Not --a-lift: its 30px blur and 10px drop are sized for a card with
+     real space around it, and bled straight across an 8px gap onto the
+     pill below -- the exact grey smudge "cutting through both pills" this
+     was supposed to fix, just moved from a shared background into a
+     shared shadow. Small chip, small shadow. */
+  box-shadow: 0 2px 6px rgba(18, 16, 12, 0.14);
 }
+.shell.is-hud .projnav-menu .nav-tab { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); }
 .apps-shelf-menu .kebab-menu button:hover svg, .apps-shelf-menu .kebab-menu a:hover svg { color: var(--accent-text); }
 
 /* ---------- Select: every dropdown that used to be a native <select> ----------

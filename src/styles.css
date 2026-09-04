@@ -1872,6 +1872,12 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
    actually different here. */
 .projnav-menu {
   position: fixed; z-index: 40; flex-direction: column; width: max-content;
+  /* .nav's shared 3px gap reads fine between tabs sitting in a row, next to
+     each other's straight edges. Stacked, each pill is fully rounded top
+     and bottom (999px radius on a ~43px row is a full semicircle cap), and
+     3px isn't enough tray colour between two caps to read as a gap at all
+     -- it looked like one stadium shape with a seam, not two pills. */
+  gap: 8px;
   /* The identical drawer reveal .topstick > .nav uses below, copied rather
      than shared: that selector can't reach a portalled element outside
      .topstick's own DOM, so this carries its own open/close class instead. */

@@ -1872,7 +1872,6 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
    actually different here. */
 .projnav-menu {
   position: fixed; z-index: 40; flex-direction: column; width: max-content;
-  gap: 8px;
   /* The identical drawer reveal .topstick > .nav uses below, copied rather
      than shared: that selector can't reach a portalled element outside
      .topstick's own DOM, so this carries its own open/close class instead. */
@@ -1894,6 +1893,12 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 .nav.projnav-menu {
   background: none;
   padding: 0;
+  /* Same fix as background/padding below: .nav's OWN gap:3px (further down
+     this file, the pill redesign) is equal specificity and later in the
+     cascade, so a plain .projnav-menu{gap:8px} was silently losing to it --
+     the exact "not fixed" pattern from the background bug, just on a
+     different property. Compound selector, not source order, this time. */
+  gap: 8px;
   /* The section is not a pill; only the rows inside it are. --a-r-lg (or
      999px, on .nav's own pill redesign) doesn't render anything visible on
      a background-less, border-less, shadow-less box, but it has no business

@@ -177,7 +177,14 @@ interface Store extends PersistedState {
   setPage: (p: PageId) => void
   projects: Project[]
   addProject: (name: string, space: SpaceId) => void
-  deleteProject: (id: string) => void
+  renameProject: (id: string, name: string) => void
+  /** 'move' (default meaning, always pass explicitly) clears projectId on its
+   *  tasks and leaves them in the Space's own Plan; 'delete' removes them too. */
+  deleteProject: (id: string, mode: 'move' | 'delete') => void
+  /** Move a task into a project, or out of one back to the Space's own Plan
+   *  with undefined. The task's own space never changes; a project only
+   *  ever holds tasks that already belonged to it. */
+  setTaskProject: (id: string, projectId: string | undefined) => void
   /** Which Project's Plan is open, or null for the Space's own Plan.
    *  Deliberately not persisted: a project stays a room you walk into, not a
    *  mode that survives a reload. Cleared automatically by setPage and
@@ -1992,14 +1999,35 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (!trimmed) return
       setProjects((prev) => [...prev, { id: newId('proj'), name: trimmed, space: sp, createdAt: todayKey() }])
     },
-    deleteProject: (id) => {
-      const before = projects
-      const gone = projects.find((p) => p.id === id)
-      setProjects((prev) => prev.filter((p) => p.id !== id))
-      bury(rowKey('projects', { id }))
-      if (openProjectId === id) setOpenProject(null)
-      armUndo(gone ? `Deleted project "${gone.name}"` : 'Project deleted', () => { setProjects(before); digUp(rowKey('projects', { id })) })
+    renameProject: (id, name) => {
+      const trimmed = name.trim()
+      if (!trimmed) return
+      setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, name: trimmed } : p)))
     },
+    /** 'move' keeps the project's tasks -- they just lose the projectId and
+     *  stand as ordinary tasks in the Space's own Plan, exactly where they'd
+     *  already have been showing up all along. 'delete' takes them with it. */
+    deleteProject: (id, mode) => {
+      const beforeProjects = projects
+      const beforeTasks = tasks
+      const gone = projects.find((p) => p.id === id)
+      const theirs = tasks.filter((t) => t.projectId === id)
+      const keys = [rowKey('projects', { id }), ...(mode === 'delete' ? theirs.map((t) => rowKey('tasks', { id: t.id })) : [])]
+
+      setProjects((prev) => prev.filter((p) => p.id !== id))
+      if (mode === 'delete') setTasks((prev) => prev.filter((t) => t.projectId !== id))
+      else setTasks((prev) => prev.map((t) => (t.projectId === id ? { ...t, projectId: undefined } : t)))
+      bury(...keys)
+      if (openProjectId === id) setOpenProject(null)
+
+      const label = gone
+        ? mode === 'delete' && theirs.length
+          ? `Deleted "${gone.name}" and ${theirs.length} ${theirs.length === 1 ? 'task' : 'tasks'}`
+          : `Deleted project "${gone.name}"`
+        : 'Project deleted'
+      armUndo(label, () => { setProjects(beforeProjects); setTasks(beforeTasks); digUp(...keys) })
+    },
+    setTaskProject: (id, projectId) => setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, projectId } : t))),
     focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog,
     view, setView, inView,
     twoLives, setTwoLives, reels, setReels,

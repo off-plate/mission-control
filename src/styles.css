@@ -6642,18 +6642,23 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .projsection-head { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s3); }
 .projgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--s3); }
 .projcard {
-  position: relative; text-align: left; background: var(--surface); border: 1px solid var(--hairline);
-  padding: var(--s4) var(--s4) var(--s4) calc(var(--s4) + 8px); box-shadow: var(--a-lift); cursor: pointer;
+  position: relative; background: var(--surface); border: 1px solid var(--hairline); box-shadow: var(--a-lift);
 }
 .projcard.s-personal { --mark: #DFF24A; } .projcard.s-work { --mark: #7FD8F5; }
 .projcard.s-offplate { --mark: #FFC94A; } .projcard.s-corner { --mark: #86E9B4; }
-.projcard::before { content: ''; position: absolute; left: var(--s2); top: 14px; bottom: 14px; width: 3px; border-radius: 2px; background: var(--mark, var(--hairline-strong)); }
+.projcard::before { content: ''; position: absolute; left: var(--s2); top: 14px; bottom: 14px; width: 3px; border-radius: 2px; background: var(--mark, var(--hairline-strong)); z-index: 1; }
+/* The card's own open button: everything but the kebab in the corner. */
+.projcard-open {
+  display: block; width: 100%; text-align: left; background: none; border: none; cursor: pointer;
+  padding: var(--s4) calc(var(--s5) + 8px) var(--s4) calc(var(--s4) + 8px);
+}
 .projcard h3 { margin: 0 0 6px; font-size: 0.9375rem; font-weight: 700; }
 .proj-stats { display: flex; gap: var(--s3); font-size: 0.75rem; color: var(--faint); }
 .proj-stats b { color: var(--soft); font-weight: 600; }
+.projcard-kebab { position: absolute; top: 6px; right: 6px; z-index: 1; }
 .projcard-new {
-  background: none; border: 1.5px dashed var(--hairline-strong); box-shadow: none;
-  display: flex; align-items: center; justify-content: center; min-height: 64px; color: var(--faint); font-weight: 600; padding-left: var(--s4);
+  background: none; border: 1.5px dashed var(--hairline-strong); box-shadow: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; min-height: 64px; color: var(--faint); font-weight: 600; padding: var(--s4);
 }
 .projcard-new:hover { border-color: var(--a-accent-text); color: var(--a-accent-text); box-shadow: none; }
 

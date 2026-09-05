@@ -6720,7 +6720,9 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .statusbadge.s-soon { background: var(--a-warn-wash); color: var(--a-warn); }
 .statusbadge.s-quiet { background: var(--a-alert-wash); color: var(--a-alert); }
 
-.cpage-head { display: flex; align-items: center; margin-bottom: var(--s4); }
+.cpage-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); flex-wrap: wrap; margin-bottom: var(--s4); }
+.cpage-filter { width: 200px; }
+@media (max-width: 520px) { .cpage-filter { width: 100%; } }
 .cboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s4); align-items: start; }
 @media (max-width: 860px) { .cboard { grid-template-columns: 1fr; } }
 .ccol-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s3); }

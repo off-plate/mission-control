@@ -1,7 +1,6 @@
-import { useState, type DragEvent } from 'react'
+import { useEffect, useState, type DragEvent, type ReactNode } from 'react'
 import { useStore } from './store'
-import { AutoTextarea, Band, Segmented, Select, SpaceMark, type SelectOption } from './ui'
-import { Sheet } from './modals'
+import { AutoTextarea, Band, Select, SpaceMark, type SelectOption } from './ui'
 import {
   contactDaysSince, contactStatus, stageDaysSince, PIPELINE_STAGES, STAGE_LABEL,
   type Contact, type ContactStatus, type PipelineStage,
@@ -9,13 +8,20 @@ import {
 
 const STATUS_LABEL: Record<ContactStatus, string> = { quiet: 'Gone Quiet', soon: 'Reach Out Soon', track: 'On Track' }
 const STATUS_ORDER: ContactStatus[] = ['quiet', 'soon', 'track']
+/* Column colour, not badge colour -- s-quiet/s-soon/s-track (badges, tables)
+   stay put; this is the top-stripe-and-dot treatment the board now shares
+   with the pipeline board below it. */
+const STATUS_COLOR: Record<ContactStatus, string> = { quiet: 'var(--alert)', soon: 'var(--warn)', track: 'var(--accent-text)' }
+const STAGE_COLOR: Record<PipelineStage, string> = {
+  reach_out: 'var(--info)', contacted: 'var(--warn)', conversation: 'var(--accent-text)', acquired: 'var(--accent)', lost: 'var(--alert)',
+}
 const LOG_TYPES = ['call', 'text', 'email', 'meeting'] as const
 const LOG_LABEL: Record<string, string> = { call: 'Call', text: 'Text', email: 'Email', meeting: 'Meeting' }
 
 /* The one closed set a relationship can be. Closed on purpose: this field
    doubles as the CRM's only filter, and a filter over freeform text is not
    a filter. A contact saved before this shipped can still hold a value
-   outside this list -- ContactDetailSheet adds it back in as an extra
+   outside this list -- ContactDetailPanel adds it back in as an extra
    option rather than silently discarding it on the next open. */
 const RELATIONSHIPS = ['Client', 'Potential client', 'Vendor', 'Family', 'Partner', 'Friend', 'Colleague', 'Accountant', 'Co-founder', 'Advisor'] as const
 
@@ -30,7 +36,54 @@ function ageLabel(d: number): string {
   return months === 1 ? '1 month ago' : `${months} months ago`
 }
 
-function ContactDetailSheet({ contact, onClose }: { contact: Contact; onClose: () => void }) {
+/* Six muted, already-in-use hues (the four category dots plus two of the
+   same family) rather than a fresh palette -- a person's colour has no
+   meaning of its own here, it only has to be stable and not fight the
+   accent, and reusing what .cat-dot already established does both. */
+const AV_COLORS = ['var(--cat-call)', 'var(--cat-admin)', 'var(--cat-deep)', 'var(--cat-quick)', 'var(--av-5)', 'var(--av-6)']
+function initials(name: string): string {
+  return name.trim().split(/\s+/).slice(0, 2).map((w) => w[0] ?? '').join('').toUpperCase() || '?'
+}
+function avColor(name: string): string {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
+  return AV_COLORS[h % AV_COLORS.length]
+}
+function Avatar({ name, size = 38 }: { name: string; size?: number }) {
+  return (
+    <span className="avatar" style={{ width: size, height: size, fontSize: size * 0.36, background: avColor(name) }} aria-hidden="true">
+      {initials(name)}
+    </span>
+  )
+}
+
+/* Replaces Sheet for this page only: a right-edge slide-in instead of a
+   centred card, so a full CRM record (fields, log, activity) has room to
+   breathe instead of scrolling inside a small box. Sheet itself is untouched
+   and still what every other sheet in the app uses -- this is a deliberate,
+   reviewed exception for Contacts, not a replacement for it. */
+function ContactPanel({ title, avatarName, onClose, children }: { title: string; avatarName?: string; onClose: () => void; children: ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  return (
+    <>
+      <div className="cpanel-scrim" onClick={onClose} />
+      <div className="cpanel" role="dialog" aria-modal="true" aria-label={title}>
+        <div className="cpanel-head">
+          {avatarName && <Avatar name={avatarName} size={46} />}
+          <h2>{title}</h2>
+          <button className="cpanel-close" onClick={onClose} aria-label="Close">×</button>
+        </div>
+        <div className="cpanel-body">{children}</div>
+      </div>
+    </>
+  )
+}
+
+function ContactDetailPanel({ contact, onClose }: { contact: Contact; onClose: () => void }) {
   const { projects, contactActivity, updateContact, deleteContact, logContactActivity, setContactStage } = useStore()
   const [name, setName] = useState(contact.name)
   const [tag, setTag] = useState(contact.tag)
@@ -43,9 +96,9 @@ function ContactDetailSheet({ contact, onClose }: { contact: Contact; onClose: (
   const [lostReason, setLostReason] = useState(contact.lostReason ?? '')
 
   /* Every field commits the moment it's left, not on a single "Save" at the
-     end -- Sheet's own Escape key and a backdrop click both call this same
-     onClose, so a save that only happened there would be skippable. Losing
-     a field to a stray click is worse than a few extra writes. */
+     end -- the panel's own Escape key and a backdrop click both call this
+     same onClose, so a save that only happened there would be skippable.
+     Losing a field to a stray click is worse than a few extra writes. */
   const commit = (patch: Partial<Contact>) => updateContact(contact.id, patch)
 
   const mine = contactActivity.filter((a) => a.contactId === contact.id).sort((a, b) => b.at.localeCompare(a.at))
@@ -60,19 +113,19 @@ function ContactDetailSheet({ contact, onClose }: { contact: Contact; onClose: (
   ]
 
   return (
-    <Sheet title={contact.name || 'New contact'} onClose={onClose} steady>
-      <div className="contact-toprow">
-        <span className={`statusbadge s-${status}`}>{STATUS_LABEL[status]}</span>
-        <span className="contact-lasttouch">Last touch: {ageLabel(days)}</span>
-      </div>
-
+    <ContactPanel title={contact.name || 'New contact'} avatarName={contact.name || '?'} onClose={onClose}>
       {contact.stage ? (
-        <div className="contact-stagerow">
-          <Select className="contact-stagepick" ariaLabel="Pipeline stage" value={contact.stage}
-            onChange={(v) => setContactStage(contact.id, v as PipelineStage)}
-            options={PIPELINE_STAGES.map((s) => ({ value: s, label: STAGE_LABEL[s] }))} />
-          <span className="contact-stageage">{ageLabel(stageDaysSince(contact))} in stage</span>
-        </div>
+        <>
+          <span className="field-label">Stage</span>
+          <div className="stagepick">
+            {PIPELINE_STAGES.map((s) => (
+              <button key={s} className={`stagepick-btn${s === contact.stage ? ' is-active' : ''}`}
+                style={s === contact.stage ? { background: STAGE_COLOR[s], color: s === 'acquired' ? 'var(--ink)' : '#fff', borderColor: 'transparent' } : undefined}
+                onClick={() => setContactStage(contact.id, s)}>{STAGE_LABEL[s]}</button>
+            ))}
+          </div>
+          <div className="contact-stageage">{ageLabel(stageDaysSince(contact))} in this stage</div>
+        </>
       ) : (
         <button className="btn btn-quiet" style={{ marginBottom: 'var(--s3)' }}
           onClick={() => setContactStage(contact.id, 'reach_out')}>Add to pipeline</button>
@@ -80,11 +133,16 @@ function ContactDetailSheet({ contact, onClose }: { contact: Contact; onClose: (
       {contact.stage === 'lost' && (
         <>
           <label className="field-label" htmlFor="ct-lostreason">Why</label>
-          <AutoTextarea id="ct-lostreason" className="textinput" style={{ width: '100%', marginBottom: 'var(--s4)' }}
+          <AutoTextarea id="ct-lostreason" className="textinput cpanel-whybox" style={{ width: '100%', marginBottom: 'var(--s4)' }}
             placeholder="Said no, went quiet, or got disqualified -- their words where possible."
             value={lostReason} onChange={(e) => setLostReason(e.target.value)} onBlur={() => commit({ lostReason: lostReason.trim() })} />
         </>
       )}
+
+      <div className="contact-toprow">
+        <span className={`statusbadge s-${status}`}>{STATUS_LABEL[status]}</span>
+        <span className="contact-lasttouch">Last touch: {ageLabel(days)}</span>
+      </div>
 
       <label className="field-label" htmlFor="ct-name">Name</label>
       <input id="ct-name" className="textinput" style={{ width: '100%', marginBottom: 'var(--s3)' }}
@@ -119,7 +177,7 @@ function ContactDetailSheet({ contact, onClose }: { contact: Contact; onClose: (
       <label className="field-label">Log a touch</label>
       <div className="contact-logrow">
         {LOG_TYPES.map((t) => (
-          <button key={t} className="btn btn-quiet" onClick={() => logContactActivity(contact.id, t)}>{LOG_LABEL[t]}</button>
+          <button key={t} className="logbtn" onClick={() => logContactActivity(contact.id, t)}>{LOG_LABEL[t]}</button>
         ))}
       </div>
 
@@ -136,51 +194,58 @@ function ContactDetailSheet({ contact, onClose }: { contact: Contact; onClose: (
         )) : <p className="empty">Nothing logged yet.</p>}
       </div>
 
-      <div className="sheet-actions">
+      <div className="cpanel-actions">
         <button className="btn btn-danger" onClick={() => { deleteContact(contact.id); onClose() }}>Delete</button>
         <button className="btn btn-primary" onClick={onClose}>Done</button>
       </div>
-    </Sheet>
+    </ContactPanel>
   )
 }
 
-function NewContactSheet({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
+function NewContactPanel({ kind, onClose, onCreated }: { kind: 'people' | 'pipeline'; onClose: () => void; onCreated: (id: string) => void }) {
   const { addContact } = useStore()
   const [name, setName] = useState('')
   const save = () => { if (!name.trim()) return; const id = addContact(name); onClose(); onCreated(id) }
   return (
-    <Sheet title="New contact" onClose={onClose}>
+    <ContactPanel title={kind === 'pipeline' ? 'New prospect' : 'New contact'} onClose={onClose}>
       <label className="field-label" htmlFor="nc-name">Name</label>
       <input id="nc-name" className="textinput" style={{ width: '100%' }} value={name} autoFocus
         onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) save() }} />
-      <div className="sheet-actions">
+      <div className="cpanel-actions">
         <button className="btn btn-quiet" onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" disabled={!name.trim()} onClick={save}>Add</button>
       </div>
-    </Sheet>
+    </ContactPanel>
   )
 }
 
-function ContactCard({ c, days, status, onOpen }: { c: Contact; days: number; status: ContactStatus; onOpen: () => void }) {
+function ContactCard({ c, days, onOpen }: { c: Contact; days: number; onOpen: () => void }) {
   return (
-    <button className="ccard" onClick={onOpen}>
-      <b>{c.name}</b>
-      <div className="ccard-sub">{c.tag || '—'}</div>
-      <div className="ccard-foot">
-        <span className="ccard-lasttouch">{ageLabel(days)}</span>
+    <button className="leadcard" onClick={onOpen}>
+      <div className="leadcard-top">
+        <Avatar name={c.name} />
+        <div><div className="leadcard-name">{c.name}</div><div className="leadcard-sub">{c.tag || '—'}</div></div>
       </div>
+      <div className="leadcard-foot"><span className="leadcard-age">{ageLabel(days)}</span></div>
     </button>
   )
 }
 
 function PipelineCard({ c, onOpen, onDragStart }: { c: Contact; onOpen: () => void; onDragStart: (e: DragEvent<HTMLDivElement>) => void }) {
+  const days = stageDaysSince(c)
+  const stale = c.stage === 'contacted' && days > 14
   return (
-    <div className="ccard" role="button" tabIndex={0} draggable onDragStart={onDragStart}
+    <div className="leadcard" role="button" tabIndex={0} draggable onDragStart={onDragStart}
       onClick={onOpen} onKeyDown={(e) => { if (e.key === 'Enter') onOpen() }}>
-      <b>{c.name}</b>
-      {(c.company || c.role) && <div className="ccard-sub">{[c.company, c.role].filter(Boolean).join(' · ')}</div>}
-      <div className="ccard-foot">
-        <span className="ccard-lasttouch">{ageLabel(stageDaysSince(c))} in stage</span>
+      <div className="leadcard-top">
+        <Avatar name={c.name} />
+        <div><div className="leadcard-name">{c.name}</div>
+          {(c.company || c.role) && <div className="leadcard-sub">{[c.company, c.role].filter(Boolean).join(' · ')}</div>}
+        </div>
+      </div>
+      <div className="leadcard-foot">
+        <span className={`leadcard-age${stale ? ' is-stale' : ''}`}>{ageLabel(days)} in stage</span>
+        {c.next && <span className="leadcard-next" title={c.next}>{c.next}</span>}
       </div>
     </div>
   )
@@ -264,19 +329,25 @@ export function ContactsPage() {
 
   return (
     <div className="page">
-      <Band title="Contacts" />
-      <div className="cpage-head">
-        <div className="cpage-head-left">
-          <Segmented value={kind} onPick={setKind} label="Kind" size="sm"
-            options={[{ id: 'people', label: 'People' }, { id: 'pipeline', label: 'Pipeline' }]} />
-          <Segmented value={view} onPick={setView} label="View" size="sm"
-            options={[{ id: 'board', label: 'Board' }, { id: 'table', label: 'Table' }]} />
+      <Band title="Contacts" metrics={[{ v: String(kind === 'pipeline' ? prospects.length : people.length), k: kind === 'pipeline' ? 'in pipeline' : 'people' }]} />
+
+      <div className="kindrow">
+        <div className="kind" role="tablist" aria-label="Kind">
+          <button aria-pressed={kind === 'people'} onClick={() => setKind('people')}>People</button>
+          <button aria-pressed={kind === 'pipeline'} onClick={() => setKind('pipeline')}>Pipeline</button>
         </div>
-        {kind === 'people' && relOptions.length > 0 && (
-          <Select className="cpage-filter" ariaLabel="Filter by relationship" value={relFilter} onChange={setRelFilter}
-            options={[{ value: '', label: 'All relationships' }, ...relOptions.map((r) => ({ value: r, label: r }))]} />
-        )}
+        <div className="cpage-subrow">
+          <div className="seg seg-sm" role="group" aria-label="View">
+            <button aria-pressed={view === 'board'} onClick={() => setView('board')}><b>Board</b></button>
+            <button aria-pressed={view === 'table'} onClick={() => setView('table')}><b>Table</b></button>
+          </div>
+          {kind === 'people' && relOptions.length > 0 && (
+            <Select className="cpage-filter" ariaLabel="Filter by relationship" value={relFilter} onChange={setRelFilter}
+              options={[{ value: '', label: 'All relationships' }, ...relOptions.map((r) => ({ value: r, label: r }))]} />
+          )}
+        </div>
       </div>
+
       <div className="formrow" style={{ marginBottom: 'var(--s4)' }}>
         <input className="textinput" placeholder={kind === 'pipeline' ? 'Add a prospect…' : 'Add a person…'} readOnly onClick={() => setAdding(true)} />
         <button className="btn btn-quiet" onClick={() => setAdding(true)}>Add</button>
@@ -292,10 +363,10 @@ export function ContactsPage() {
             {STATUS_ORDER.map((st) => {
               const list = filteredRows.filter((r) => r.status === st).sort((a, b) => b.days - a.days)
               return (
-                <div className="ccol" key={st}>
-                  <div className="ccol-head"><span className={`statusbadge s-${st}`}>{STATUS_LABEL[st]}</span><span className="ccol-count">{list.length}</span></div>
+                <div className="ccol" key={st} style={{ ['--stage-c' as string]: STATUS_COLOR[st] }}>
+                  <div className="ccol-head"><span className="ccol-dot" /><span className="ccol-name">{STATUS_LABEL[st]}</span><span className="ccol-count">{list.length}</span></div>
                   {list.length ? list.map((r) => (
-                    <ContactCard key={r.c.id} c={r.c} days={r.days} status={r.status} onOpen={() => setOpenId(r.c.id)} />
+                    <ContactCard key={r.c.id} c={r.c} days={r.days} onOpen={() => setOpenId(r.c.id)} />
                   )) : <p className="ccol-empty">Nobody here.</p>}
                 </div>
               )
@@ -314,7 +385,7 @@ export function ContactsPage() {
               <tbody>
                 {sortedRows.map((r) => (
                   <tr key={r.c.id} onClick={() => setOpenId(r.c.id)}>
-                    <td className="name"><b>{r.c.name}</b><span>{r.c.tag}</span></td>
+                    <td className="name"><div className="namecell"><Avatar name={r.c.name} size={30} /><div><b>{r.c.name}</b><span>{r.c.tag}</span></div></div></td>
                     <td><span className={`statusbadge s-${r.status}`}>{STATUS_LABEL[r.status]}</span></td>
                     <td className="ellipsis">{[r.c.company, r.c.role].filter(Boolean).join(' · ') || '—'}</td>
                     <td>{ageLabel(r.days)}</td>
@@ -333,7 +404,7 @@ export function ContactsPage() {
             const list = prospectRows.filter((r) => r.c.stage === stage).sort((a, b) => b.days - a.days)
             const isFolded = folded.has(stage)
             return (
-              <div className={`ccol drop-zone${dropStage === stage ? ' drop-over' : ''}`} key={stage}
+              <div className={`ccol drop-zone${dropStage === stage ? ' drop-over' : ''}`} key={stage} style={{ ['--stage-c' as string]: STAGE_COLOR[stage] }}
                 onDragOver={(e) => { e.preventDefault(); setDropStage(stage) }}
                 onDragLeave={() => setDropStage((s) => (s === stage ? null : s))}
                 onDrop={(e) => {
@@ -342,11 +413,10 @@ export function ContactsPage() {
                   if (id) { setContactStage(id, stage); if (stage === 'lost') setOpenId(id) }
                   setDropStage(null)
                 }}>
-                <button className="ccol-head foldable" aria-expanded={!isFolded} onClick={() => toggleFold(stage)}>
-                  <span className={`fold-caret${isFolded ? ' is-shut' : ''}`} aria-hidden="true" />
-                  <span className={`statusbadge st-${stage}`}>{STAGE_LABEL[stage]}</span>
-                  <span className="ccol-count">{list.length}</span>
-                </button>
+                <div className="ccol-head">
+                  <span className="ccol-dot" /><span className="ccol-name">{STAGE_LABEL[stage]}</span><span className="ccol-count">{list.length}</span>
+                  <button className="ccol-fold" onClick={() => toggleFold(stage)}>{isFolded ? 'Show' : 'Hide'}</button>
+                </div>
                 {!isFolded && (list.length ? list.map((r) => (
                   <PipelineCard key={r.c.id} c={r.c} onOpen={() => setOpenId(r.c.id)}
                     onDragStart={(e) => { e.dataTransfer.setData('text/plain', r.c.id); e.dataTransfer.effectAllowed = 'move' }} />
@@ -368,7 +438,7 @@ export function ContactsPage() {
             <tbody>
               {pSortedRows.map((r) => (
                 <tr key={r.c.id} onClick={() => setOpenId(r.c.id)}>
-                  <td className="name"><b>{r.c.name}</b><span>{r.c.tag}</span></td>
+                  <td className="name"><div className="namecell"><Avatar name={r.c.name} size={30} /><div><b>{r.c.name}</b></div></div></td>
                   <td><span className={`statusbadge st-${r.c.stage}`}>{STAGE_LABEL[r.c.stage]}</span></td>
                   <td className="ellipsis">{[r.c.company, r.c.role].filter(Boolean).join(' · ') || '—'}</td>
                   <td>{ageLabel(r.days)}</td>
@@ -381,12 +451,12 @@ export function ContactsPage() {
       )}
 
       {adding && (
-        <NewContactSheet onClose={() => setAdding(false)} onCreated={(id) => {
+        <NewContactPanel kind={kind} onClose={() => setAdding(false)} onCreated={(id) => {
           if (kind === 'pipeline') setContactStage(id, 'reach_out')
           setOpenId(id)
         }} />
       )}
-      {openContact && <ContactDetailSheet contact={openContact} onClose={() => setOpenId(null)} />}
+      {openContact && <ContactDetailPanel contact={openContact} onClose={() => setOpenId(null)} />}
     </div>
   )
 }

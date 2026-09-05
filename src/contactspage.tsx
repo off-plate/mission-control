@@ -1,8 +1,11 @@
-import { useState } from 'react'
+import { useState, type DragEvent } from 'react'
 import { useStore } from './store'
 import { AutoTextarea, Band, Segmented, Select, SpaceMark, type SelectOption } from './ui'
 import { Sheet } from './modals'
-import { contactDaysSince, contactStatus, type Contact, type ContactStatus } from './types'
+import {
+  contactDaysSince, contactStatus, stageDaysSince, PIPELINE_STAGES, STAGE_LABEL,
+  type Contact, type ContactStatus, type PipelineStage,
+} from './types'
 
 const STATUS_LABEL: Record<ContactStatus, string> = { quiet: 'Gone Quiet', soon: 'Reach Out Soon', track: 'On Track' }
 const STATUS_ORDER: ContactStatus[] = ['quiet', 'soon', 'track']
@@ -28,7 +31,7 @@ function ageLabel(d: number): string {
 }
 
 function ContactDetailSheet({ contact, onClose }: { contact: Contact; onClose: () => void }) {
-  const { projects, contactActivity, updateContact, deleteContact, logContactActivity } = useStore()
+  const { projects, contactActivity, updateContact, deleteContact, logContactActivity, setContactStage } = useStore()
   const [name, setName] = useState(contact.name)
   const [tag, setTag] = useState(contact.tag)
   const [phone, setPhone] = useState(contact.phone ?? '')
@@ -37,6 +40,7 @@ function ContactDetailSheet({ contact, onClose }: { contact: Contact; onClose: (
   const [role, setRole] = useState(contact.role ?? '')
   const [next, setNext] = useState(contact.next ?? '')
   const [notes, setNotes] = useState(contact.notes ?? '')
+  const [lostReason, setLostReason] = useState(contact.lostReason ?? '')
 
   /* Every field commits the moment it's left, not on a single "Save" at the
      end -- Sheet's own Escape key and a backdrop click both call this same
@@ -61,6 +65,26 @@ function ContactDetailSheet({ contact, onClose }: { contact: Contact; onClose: (
         <span className={`statusbadge s-${status}`}>{STATUS_LABEL[status]}</span>
         <span className="contact-lasttouch">Last touch: {ageLabel(days)}</span>
       </div>
+
+      {contact.stage ? (
+        <div className="contact-stagerow">
+          <Select className="contact-stagepick" ariaLabel="Pipeline stage" value={contact.stage}
+            onChange={(v) => setContactStage(contact.id, v as PipelineStage)}
+            options={PIPELINE_STAGES.map((s) => ({ value: s, label: STAGE_LABEL[s] }))} />
+          <span className="contact-stageage">{ageLabel(stageDaysSince(contact))} in stage</span>
+        </div>
+      ) : (
+        <button className="btn btn-quiet" style={{ marginBottom: 'var(--s3)' }}
+          onClick={() => setContactStage(contact.id, 'reach_out')}>Add to pipeline</button>
+      )}
+      {contact.stage === 'lost' && (
+        <>
+          <label className="field-label" htmlFor="ct-lostreason">Why</label>
+          <AutoTextarea id="ct-lostreason" className="textinput" style={{ width: '100%', marginBottom: 'var(--s4)' }}
+            placeholder="Said no, went quiet, or got disqualified -- their words where possible."
+            value={lostReason} onChange={(e) => setLostReason(e.target.value)} onBlur={() => commit({ lostReason: lostReason.trim() })} />
+        </>
+      )}
 
       <label className="field-label" htmlFor="ct-name">Name</label>
       <input id="ct-name" className="textinput" style={{ width: '100%', marginBottom: 'var(--s3)' }}
@@ -149,23 +173,50 @@ function ContactCard({ c, days, status, onOpen }: { c: Contact; days: number; st
   )
 }
 
+function PipelineCard({ c, onOpen, onDragStart }: { c: Contact; onOpen: () => void; onDragStart: (e: DragEvent<HTMLDivElement>) => void }) {
+  return (
+    <div className="ccard" role="button" tabIndex={0} draggable onDragStart={onDragStart}
+      onClick={onOpen} onKeyDown={(e) => { if (e.key === 'Enter') onOpen() }}>
+      <b>{c.name}</b>
+      {(c.company || c.role) && <div className="ccard-sub">{[c.company, c.role].filter(Boolean).join(' · ')}</div>}
+      <div className="ccard-foot">
+        <span className="ccard-lasttouch">{ageLabel(stageDaysSince(c))} in stage</span>
+      </div>
+    </div>
+  )
+}
+
+/* Acquired and Lost are still live lanes -- Off-Plate's own CRM note is
+   explicit that Acquired stays visible ("what happens after the first
+   invoice is where the money is") and Lost's reasons are the whole point.
+   Folded by default is a display preference, not an archive: the count
+   still shows, one click opens the lane back up. */
+const FOLDED_BY_DEFAULT: PipelineStage[] = ['acquired', 'lost']
+
 export function ContactsPage() {
-  const { contacts, contactActivity } = useStore()
+  const { contacts, contactActivity, setContactStage } = useStore()
+  const [kind, setKind] = useState<'people' | 'pipeline'>('people')
   const [view, setView] = useState<'board' | 'table'>('board')
   const [adding, setAdding] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<'name' | 'status' | 'company' | 'days' | 'next'>('days')
   const [sortDir, setSortDir] = useState<1 | -1>(-1)
+  const [pSortKey, setPSortKey] = useState<'name' | 'stage' | 'company' | 'days' | 'next'>('days')
+  const [pSortDir, setPSortDir] = useState<1 | -1>(-1)
   const [relFilter, setRelFilter] = useState('')
+  const [folded, setFolded] = useState<Set<PipelineStage>>(new Set(FOLDED_BY_DEFAULT))
+  const [dropStage, setDropStage] = useState<PipelineStage | null>(null)
 
-  const rows = contacts.map((c) => ({ c, days: contactDaysSince(c, contactActivity), status: contactStatus(c, contactActivity) }))
+  /* Stage is the only thing that decides which of the two this page shows a
+     contact in -- not a separate kind field. "The board is the only place a
+     client's stage lives" is the CRM Client card note's own rule; a contact
+     either carries a stage or it doesn't. */
+  const people = contacts.filter((c) => !c.stage)
+  const prospects = contacts.filter((c): c is Contact & { stage: PipelineStage } => !!c.stage)
   const openContact = contacts.find((c) => c.id === openId) ?? null
 
-  /* Relationship is the only filter this page gets -- deliberately, not an
-     oversight. Options come from what's actually in use, not the full
-     RELATIONSHIPS list, so the control never offers a choice that would
-     return nothing. */
-  const relOptions = Array.from(new Set(contacts.map((c) => c.tag).filter(Boolean))).sort()
+  const rows = people.map((c) => ({ c, days: contactDaysSince(c, contactActivity), status: contactStatus(c, contactActivity) }))
+  const relOptions = Array.from(new Set(people.map((c) => c.tag).filter(Boolean))).sort()
   const filteredRows = relFilter ? rows.filter((r) => r.c.tag === relFilter) : rows
 
   const setSort = (key: typeof sortKey) => {
@@ -186,36 +237,120 @@ export function ContactsPage() {
     return 0
   })
 
+  const prospectRows = prospects.map((c) => ({ c, days: stageDaysSince(c) }))
+  const setPSort = (key: typeof pSortKey) => {
+    if (key === pSortKey) setPSortDir((d) => (d === 1 ? -1 : 1) as 1 | -1)
+    else { setPSortKey(key); setPSortDir(key === 'name' ? 1 : -1) }
+  }
+  const pSortVal = (r: typeof prospectRows[number]) => (
+    pSortKey === 'name' ? r.c.name
+      : pSortKey === 'stage' ? PIPELINE_STAGES.indexOf(r.c.stage)
+        : pSortKey === 'company' ? (r.c.company ?? '')
+          : pSortKey === 'next' ? (r.c.next ?? '')
+            : r.days
+  )
+  const pSortedRows = [...prospectRows].sort((a, b) => {
+    const av = pSortVal(a), bv = pSortVal(b)
+    if (av < bv) return -1 * pSortDir
+    if (av > bv) return 1 * pSortDir
+    return 0
+  })
+
+  const toggleFold = (stage: PipelineStage) => setFolded((prev) => {
+    const next = new Set(prev)
+    if (next.has(stage)) next.delete(stage); else next.add(stage)
+    return next
+  })
+
   return (
     <div className="page">
       <Band title="Contacts" />
       <div className="cpage-head">
-        <Segmented value={view} onPick={setView} label="View" size="sm"
-          options={[{ id: 'board', label: 'Board' }, { id: 'table', label: 'Table' }]} />
-        {relOptions.length > 0 && (
+        <div className="cpage-head-left">
+          <Segmented value={kind} onPick={setKind} label="Kind" size="sm"
+            options={[{ id: 'people', label: 'People' }, { id: 'pipeline', label: 'Pipeline' }]} />
+          <Segmented value={view} onPick={setView} label="View" size="sm"
+            options={[{ id: 'board', label: 'Board' }, { id: 'table', label: 'Table' }]} />
+        </div>
+        {kind === 'people' && relOptions.length > 0 && (
           <Select className="cpage-filter" ariaLabel="Filter by relationship" value={relFilter} onChange={setRelFilter}
             options={[{ value: '', label: 'All relationships' }, ...relOptions.map((r) => ({ value: r, label: r }))]} />
         )}
       </div>
       <div className="formrow" style={{ marginBottom: 'var(--s4)' }}>
-        <input className="textinput" placeholder="Add a person…" readOnly onClick={() => setAdding(true)} />
+        <input className="textinput" placeholder={kind === 'pipeline' ? 'Add a prospect…' : 'Add a person…'} readOnly onClick={() => setAdding(true)} />
         <button className="btn btn-quiet" onClick={() => setAdding(true)}>Add</button>
       </div>
 
-      {contacts.length === 0 ? (
-        <div className="empty">Nobody added yet. Add the first person above.</div>
-      ) : filteredRows.length === 0 ? (
-        <div className="empty">Nobody with that relationship yet.</div>
+      {kind === 'people' ? (
+        people.length === 0 ? (
+          <div className="empty">Nobody added yet. Add the first person above.</div>
+        ) : filteredRows.length === 0 ? (
+          <div className="empty">Nobody with that relationship yet.</div>
+        ) : view === 'board' ? (
+          <div className="cboard">
+            {STATUS_ORDER.map((st) => {
+              const list = filteredRows.filter((r) => r.status === st).sort((a, b) => b.days - a.days)
+              return (
+                <div className="ccol" key={st}>
+                  <div className="ccol-head"><span className={`statusbadge s-${st}`}>{STATUS_LABEL[st]}</span><span className="ccol-count">{list.length}</span></div>
+                  {list.length ? list.map((r) => (
+                    <ContactCard key={r.c.id} c={r.c} days={r.days} status={r.status} onOpen={() => setOpenId(r.c.id)} />
+                  )) : <p className="ccol-empty">Nobody here.</p>}
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="ctable-wrap">
+            <table className="ctable">
+              <thead><tr>
+                <th onClick={() => setSort('name')}>Name{sortKey === 'name' && <span className="arrow">{sortDir === 1 ? '▲' : '▼'}</span>}</th>
+                <th onClick={() => setSort('status')}>Status{sortKey === 'status' && <span className="arrow">{sortDir === 1 ? '▲' : '▼'}</span>}</th>
+                <th onClick={() => setSort('company')}>Company / role{sortKey === 'company' && <span className="arrow">{sortDir === 1 ? '▲' : '▼'}</span>}</th>
+                <th onClick={() => setSort('days')}>Last touch{sortKey === 'days' && <span className="arrow">{sortDir === 1 ? '▲' : '▼'}</span>}</th>
+                <th onClick={() => setSort('next')}>Next{sortKey === 'next' && <span className="arrow">{sortDir === 1 ? '▲' : '▼'}</span>}</th>
+              </tr></thead>
+              <tbody>
+                {sortedRows.map((r) => (
+                  <tr key={r.c.id} onClick={() => setOpenId(r.c.id)}>
+                    <td className="name"><b>{r.c.name}</b><span>{r.c.tag}</span></td>
+                    <td><span className={`statusbadge s-${r.status}`}>{STATUS_LABEL[r.status]}</span></td>
+                    <td className="ellipsis">{[r.c.company, r.c.role].filter(Boolean).join(' · ') || '—'}</td>
+                    <td>{ageLabel(r.days)}</td>
+                    <td className="ellipsis">{r.c.next || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      ) : prospects.length === 0 ? (
+        <div className="empty">Nobody in the pipeline yet. Add someone above, or open a contact and add them to the pipeline.</div>
       ) : view === 'board' ? (
-        <div className="cboard">
-          {STATUS_ORDER.map((st) => {
-            const list = filteredRows.filter((r) => r.status === st).sort((a, b) => b.days - a.days)
+        <div className="cboard cboard-pipeline">
+          {PIPELINE_STAGES.map((stage) => {
+            const list = prospectRows.filter((r) => r.c.stage === stage).sort((a, b) => b.days - a.days)
+            const isFolded = folded.has(stage)
             return (
-              <div className="ccol" key={st}>
-                <div className="ccol-head"><span className={`statusbadge s-${st}`}>{STATUS_LABEL[st]}</span><span className="ccol-count">{list.length}</span></div>
-                {list.length ? list.map((r) => (
-                  <ContactCard key={r.c.id} c={r.c} days={r.days} status={r.status} onOpen={() => setOpenId(r.c.id)} />
-                )) : <p className="ccol-empty">Nobody here.</p>}
+              <div className={`ccol drop-zone${dropStage === stage ? ' drop-over' : ''}`} key={stage}
+                onDragOver={(e) => { e.preventDefault(); setDropStage(stage) }}
+                onDragLeave={() => setDropStage((s) => (s === stage ? null : s))}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  const id = e.dataTransfer.getData('text/plain')
+                  if (id) { setContactStage(id, stage); if (stage === 'lost') setOpenId(id) }
+                  setDropStage(null)
+                }}>
+                <button className="ccol-head foldable" aria-expanded={!isFolded} onClick={() => toggleFold(stage)}>
+                  <span className={`fold-caret${isFolded ? ' is-shut' : ''}`} aria-hidden="true" />
+                  <span className={`statusbadge st-${stage}`}>{STAGE_LABEL[stage]}</span>
+                  <span className="ccol-count">{list.length}</span>
+                </button>
+                {!isFolded && (list.length ? list.map((r) => (
+                  <PipelineCard key={r.c.id} c={r.c} onOpen={() => setOpenId(r.c.id)}
+                    onDragStart={(e) => { e.dataTransfer.setData('text/plain', r.c.id); e.dataTransfer.effectAllowed = 'move' }} />
+                )) : <p className="ccol-empty">Nobody here.</p>)}
               </div>
             )
           })}
@@ -224,17 +359,17 @@ export function ContactsPage() {
         <div className="ctable-wrap">
           <table className="ctable">
             <thead><tr>
-              <th onClick={() => setSort('name')}>Name{sortKey === 'name' && <span className="arrow">{sortDir === 1 ? '▲' : '▼'}</span>}</th>
-              <th onClick={() => setSort('status')}>Status{sortKey === 'status' && <span className="arrow">{sortDir === 1 ? '▲' : '▼'}</span>}</th>
-              <th onClick={() => setSort('company')}>Company / role{sortKey === 'company' && <span className="arrow">{sortDir === 1 ? '▲' : '▼'}</span>}</th>
-              <th onClick={() => setSort('days')}>Last touch{sortKey === 'days' && <span className="arrow">{sortDir === 1 ? '▲' : '▼'}</span>}</th>
-              <th onClick={() => setSort('next')}>Next{sortKey === 'next' && <span className="arrow">{sortDir === 1 ? '▲' : '▼'}</span>}</th>
+              <th onClick={() => setPSort('name')}>Name{pSortKey === 'name' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}</th>
+              <th onClick={() => setPSort('stage')}>Stage{pSortKey === 'stage' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}</th>
+              <th onClick={() => setPSort('company')}>Company / role{pSortKey === 'company' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}</th>
+              <th onClick={() => setPSort('days')}>Time in stage{pSortKey === 'days' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}</th>
+              <th onClick={() => setPSort('next')}>Next{pSortKey === 'next' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}</th>
             </tr></thead>
             <tbody>
-              {sortedRows.map((r) => (
+              {pSortedRows.map((r) => (
                 <tr key={r.c.id} onClick={() => setOpenId(r.c.id)}>
                   <td className="name"><b>{r.c.name}</b><span>{r.c.tag}</span></td>
-                  <td><span className={`statusbadge s-${r.status}`}>{STATUS_LABEL[r.status]}</span></td>
+                  <td><span className={`statusbadge st-${r.c.stage}`}>{STAGE_LABEL[r.c.stage]}</span></td>
                   <td className="ellipsis">{[r.c.company, r.c.role].filter(Boolean).join(' · ') || '—'}</td>
                   <td>{ageLabel(r.days)}</td>
                   <td className="ellipsis">{r.c.next || '—'}</td>
@@ -245,7 +380,12 @@ export function ContactsPage() {
         </div>
       )}
 
-      {adding && <NewContactSheet onClose={() => setAdding(false)} onCreated={(id) => setOpenId(id)} />}
+      {adding && (
+        <NewContactSheet onClose={() => setAdding(false)} onCreated={(id) => {
+          if (kind === 'pipeline') setContactStage(id, 'reach_out')
+          setOpenId(id)
+        }} />
+      )}
       {openContact && <ContactDetailSheet contact={openContact} onClose={() => setOpenId(null)} />}
     </div>
   )

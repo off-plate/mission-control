@@ -114,6 +114,9 @@ body:has(.shell.is-hud) {
   --cat-admin: #7FA6C4;
   --cat-deep: #C89BF0;
   --cat-quick: #4FD8E8;
+  /* Two more of the same family, for the sixth and fifth contact-avatar hue --
+     see the light block's --av-5/--av-6 for why these exist at all. */
+  --av-5: #E9A8D8; --av-6: #F2C97F;
   /* The dock's own FAB was fixed to read var(--a-accent)/var(--a-ink)
      directly (2026-09-01) rather than the adapter names above, because
      --accent resolves to the muted olive text-safe partner everywhere else
@@ -359,6 +362,9 @@ body:has(.shell.is-hud) { background: var(--bg); }
   --cat-admin: #5b6e8c;
   --cat-deep: #8a6a4f;
   --cat-quick: #4e8a88;
+  /* Two more of the same muted family, for the fifth and sixth
+     contact-avatar colour -- see AV_COLORS in contactspage.tsx. */
+  --av-5: #8a5b7c; --av-6: #6e7a4e;
 
   --shadow-pop: 0 18px 50px rgba(22, 21, 15, 0.18);
 
@@ -6728,37 +6734,55 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .statusbadge.st-acquired { background: var(--a-accent-wash); color: var(--a-accent-text); }
 .statusbadge.st-lost { background: var(--a-alert-wash); color: var(--a-alert); }
 
-.cpage-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); flex-wrap: wrap; margin-bottom: var(--s4); }
-.cpage-head-left { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+/* Kind is the primary decision on this page -- People or Pipeline changes
+   what the whole board means -- so it gets the same visual weight as the
+   app's own Space switcher: big filled pills, not a small Segmented tucked
+   in a corner next to Board/Table, which is a secondary choice. */
+.kindrow { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); flex-wrap: wrap; margin-bottom: var(--s4); }
+.kind { display: inline-flex; gap: 3px; border: 1px solid var(--a-line-2); border-radius: 999px; padding: 4px; background: var(--surface); box-shadow: var(--a-lift); }
+.kind button {
+  border: none; background: none; padding: 11px 22px; border-radius: 999px; font-size: var(--text-sm); font-weight: 700;
+  color: var(--muted); cursor: pointer; transition: background var(--t-fast), color var(--t-fast);
+}
+.kind button[aria-pressed="true"] { background: var(--a-accent); color: var(--a-ink); }
+.kind button:not([aria-pressed="true"]):hover { color: var(--ink); }
+.cpage-subrow { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
 .cpage-filter { width: 200px; }
 @media (max-width: 520px) { .cpage-filter { width: 100%; } }
-/* A pipeline column's head is also its fold toggle -- same target-is-the-
-   whole-line pattern as a Today bucket, reusing .fold-caret rather than a
-   second icon vocabulary for the same gesture. */
-.ccol-head.foldable {
-  cursor: pointer; border: none; background: none; padding: 0; font: inherit; color: inherit;
-  width: 100%; text-align: left;
-}
-.ccol-head.foldable .fold-caret { margin-right: 2px; }
-.ccol-head.foldable .fold-caret.is-shut { transform: rotate(-45deg); }
-.ccol-head.foldable:hover .fold-caret { border-color: var(--accent-text); }
-.contact-stagerow { display: flex; align-items: center; gap: var(--s3); margin-bottom: var(--s3); flex-wrap: wrap; }
-.contact-stagepick { width: 190px; }
-.contact-stageage { font-size: var(--text-sm); color: var(--faint); }
+
 .cboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s4); align-items: start; }
+.cboard-pipeline { grid-template-columns: repeat(5, minmax(200px, 1fr)); overflow-x: auto; min-width: 0; padding-bottom: 4px; }
 @media (max-width: 860px) { .cboard { grid-template-columns: 1fr; } }
-.ccol-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s3); }
-.ccol-count { font-size: var(--text-xs); color: var(--faint); font-variant-numeric: tabular-nums; }
+@media (max-width: 1100px) { .cboard-pipeline { grid-template-columns: repeat(5, 220px); } }
+/* Colour lives on the column, once, via --stage-c -- a top stripe and a
+   dot, not five different badge hues repeated on every card inside it. */
+.ccol { border-top: 3px solid var(--stage-c, var(--hairline-strong)); padding-top: var(--s3); min-width: 0; }
+.ccol-head { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s3); }
+.ccol-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--stage-c, var(--faint)); flex: none; }
+.ccol-name { font-size: 0.8rem; font-weight: 800; letter-spacing: 0.02em; }
+.ccol-count { font-size: var(--text-xs); color: var(--faint); font-variant-numeric: tabular-nums; margin-left: auto; }
+.ccol-fold { border: none; background: none; color: var(--faint); font-size: var(--text-xs); font-weight: 700; cursor: pointer; padding: 2px 4px; }
+.ccol-fold:hover { color: var(--ink); }
 .ccol-empty { color: var(--faint); font-size: var(--text-sm); }
-.ccard {
+
+/* ---- Avatars: a stable colour and initials give a card and a table row
+   something to scan by, which plain name-plus-caption text never did. ---- */
+.avatar { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: #fff; font-weight: 800; flex: none; }
+.namecell { display: flex; align-items: center; gap: var(--s2); }
+
+.leadcard {
   display: block; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--hairline);
-  border-radius: var(--a-r-lg); box-shadow: var(--a-lift); padding: var(--s3) var(--s4); margin-bottom: var(--s3); cursor: pointer;
+  border-radius: var(--a-r-lg); box-shadow: var(--a-lift); padding: var(--s3) var(--s4); margin-bottom: var(--s3);
+  cursor: pointer; transition: box-shadow var(--t-fast), transform var(--t-fast);
 }
-.ccard:hover { border-color: var(--a-accent-text); box-shadow: var(--a-lift-2); }
-.ccard b { display: block; font-size: 0.9375rem; }
-.ccard-sub { color: var(--faint); font-size: 0.75rem; margin-top: 2px; }
-.ccard-foot { margin-top: var(--s2); }
-.ccard-lasttouch { font-size: var(--text-xs); color: var(--faint); }
+.leadcard:hover { border-color: var(--a-accent-text); box-shadow: var(--a-lift-2); transform: translateY(-1px); }
+.leadcard-top { display: flex; align-items: center; gap: var(--s3); }
+.leadcard-name { font-size: 0.9375rem; font-weight: 700; line-height: 1.25; }
+.leadcard-sub { color: var(--faint); font-size: 0.75rem; margin-top: 1px; }
+.leadcard-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); margin-top: var(--s2); }
+.leadcard-age { font-size: 0.71rem; color: var(--faint); font-weight: 600; }
+.leadcard-age.is-stale { color: var(--a-warn); }
+.leadcard-next { font-size: 0.71rem; color: var(--soft); background: var(--surface-2); padding: 3px 8px; border-radius: 999px; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* The table view: same sortable-header recipe used nowhere else yet, so
    this is the one place it's spelled out rather than copied. */
@@ -6779,17 +6803,50 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .ctable td.ellipsis { color: var(--soft); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 720px) { .ctable-wrap { overflow-x: auto; } .ctable { min-width: 640px; } }
 
-/* The detail sheet's own fields. */
+/* A slide-in from the right, not the app's centred Sheet -- a reviewed,
+   deliberate exception for this page only (Sheet itself is untouched and
+   still what every other sheet in the app uses). A full CRM record needs
+   the room a right-edge panel gives it that a small centred card doesn't. */
+/* Above the Dock FAB (.dock is also z-index 61, fixed bottom-right, and
+   overlaps this panel's own bottom-right corner where its action buttons
+   sit) rather than level with it, so the FAB never steals a click meant for
+   the panel underneath it. */
+.cpanel-scrim { position: fixed; inset: 0; background: rgba(18, 16, 12, 0.36); z-index: 70; }
+.cpanel {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(460px, 100%); background: var(--surface);
+  border-left: 1px solid var(--hairline-strong); box-shadow: var(--a-lift-2); z-index: 71;
+  display: flex; flex-direction: column; animation: cpanel-in var(--t-med) cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes cpanel-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.cpanel-head { display: flex; align-items: center; gap: var(--s3); padding: var(--s5) var(--s5) var(--s4); border-bottom: 1px solid var(--hairline); flex: none; }
+.cpanel-head h2 { margin: 0; font-size: var(--text-lg); }
+.cpanel-close { margin-left: auto; border: none; background: var(--surface-2); color: var(--muted); width: 30px; height: 30px; border-radius: 50%; font-size: 16px; cursor: pointer; flex: none; }
+.cpanel-close:hover { color: var(--ink); }
+.cpanel-body { padding: var(--s4) var(--s5) var(--s8); overflow-y: auto; flex: 1; }
+.cpanel-actions { display: flex; gap: var(--s2); justify-content: flex-end; margin-top: var(--s5); }
+
+/* The detail panel's own fields. */
 .contact-toprow { display: flex; align-items: center; gap: var(--s3); margin-bottom: var(--s4); flex-wrap: wrap; }
 .contact-lasttouch { font-size: var(--text-sm); color: var(--faint); }
 .contact-infogrid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); margin-bottom: var(--s3); }
 .contact-projectlink { display: flex; align-items: center; gap: var(--s2); font-size: var(--text-sm); color: var(--soft); margin-bottom: var(--s4); }
 .contact-projectlink b { color: var(--ink); }
 .contact-logrow { display: flex; gap: var(--s2); flex-wrap: wrap; margin-bottom: var(--s4); }
+.logbtn { border: 1px solid var(--hairline-strong); background: none; color: var(--ink); font-size: 0.8125rem; font-weight: 700; padding: 8px 13px; border-radius: 999px; cursor: pointer; }
+.logbtn:hover { border-color: var(--a-accent-text); color: var(--a-accent-text); }
 .contact-activity { display: flex; flex-direction: column; gap: var(--s3); }
 .contact-activity-row { display: flex; gap: var(--s3); font-size: var(--text-sm); }
 .contact-activity-icon { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--surface-2); display: grid; place-items: center; color: var(--soft); font-weight: 700; font-size: var(--text-xs); }
 .contact-activity-when { color: var(--faint); font-size: var(--text-xs); }
+
+/* Stage as a row of pills you press, not a value picked from a closed
+   dropdown -- the CRM Client card note treats a stage move as the whole
+   point of the board, so it gets a one-click control, not a menu. */
+.stagepick { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: var(--s2); }
+.stagepick-btn { border: 1px solid var(--hairline-strong); background: var(--surface); color: var(--muted); font-size: 0.72rem; font-weight: 700; padding: 7px 11px; border-radius: 999px; cursor: pointer; }
+.stagepick-btn:hover:not(.is-active) { border-color: var(--a-accent-text); color: var(--a-accent-text); }
+.contact-stageage { font-size: var(--text-sm); color: var(--faint); margin-bottom: var(--s4); }
+.cpanel-whybox { border-color: var(--a-alert) !important; background: var(--a-alert-wash); }
 
 /* ==========================================================================
    DIRECTION A, THE TREATMENT

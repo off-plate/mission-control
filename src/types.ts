@@ -225,9 +225,39 @@ export interface Contact {
   next?: string
   notes?: string
   createdAt: string
+  /** Unset for an ordinary relationship. Set the moment someone becomes a
+   *  business prospect, and from then on this -- not tag, not status -- is
+   *  where they live: the Pipeline view, not the People view. Stage names
+   *  and order come from the CRM Pipeline board already kept in Obsidian
+   *  (Company HQ/CRM), not invented here. */
+  stage?: PipelineStage
+  /** When the current stage was entered. Drives stageDaysSince below --
+   *  "three weeks in Contacted" is the number the CRM Client card note says
+   *  matters, not when the contact itself was created. */
+  stageAt?: string
+  /** Lost's whole point, per the same note: the reason is worth more than
+   *  any strategy document. Free text, no required-field nagging -- it's a
+   *  soft prompt on drop, not a gate. */
+  lostReason?: string
 }
 
 export type ContactStatus = 'quiet' | 'soon' | 'track'
+
+/** The Off-Plate sales pipeline, verbatim from Company HQ/CRM/[CRM]
+ *  Pipeline.md -- not a taxonomy invented for this page. "Contacted" covers
+ *  every touch up to a reply on purpose: how many sit there, and for how
+ *  long, is the number that says whether the opener works, not something a
+ *  split into "1st touch"/"2nd touch" lanes would show any better. */
+export type PipelineStage = 'reach_out' | 'contacted' | 'conversation' | 'acquired' | 'lost'
+export const PIPELINE_STAGES: PipelineStage[] = ['reach_out', 'contacted', 'conversation', 'acquired', 'lost']
+export const STAGE_LABEL: Record<PipelineStage, string> = {
+  reach_out: 'To reach out', contacted: 'Contacted', conversation: 'In conversation', acquired: 'Acquired', lost: 'Lost',
+}
+
+export function stageDaysSince(c: Contact): number {
+  const at = c.stageAt ?? c.createdAt
+  return Math.max(0, Math.floor((Date.now() - new Date(at).getTime()) / 86400000))
+}
 
 /** Computed from the log, the moment it's asked for -- never stored, so it
  *  can never go stale the way a saved "last touch" field would the instant

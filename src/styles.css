@@ -6719,10 +6719,32 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .statusbadge.s-track { background: var(--a-accent-wash); color: var(--a-accent-text); }
 .statusbadge.s-soon { background: var(--a-warn-wash); color: var(--a-warn); }
 .statusbadge.s-quiet { background: var(--a-alert-wash); color: var(--a-alert); }
+/* Pipeline stage badges -- same shape, a five-step semantic run from
+   not-yet-started to closed, not the three-step relationship-freshness
+   colors above. */
+.statusbadge.st-reach_out { background: var(--a-info-wash); color: var(--a-info); }
+.statusbadge.st-contacted { background: var(--a-warn-wash); color: var(--a-warn); }
+.statusbadge.st-conversation { background: var(--a-progress-wash); color: var(--a-progress); }
+.statusbadge.st-acquired { background: var(--a-accent-wash); color: var(--a-accent-text); }
+.statusbadge.st-lost { background: var(--a-alert-wash); color: var(--a-alert); }
 
 .cpage-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); flex-wrap: wrap; margin-bottom: var(--s4); }
+.cpage-head-left { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
 .cpage-filter { width: 200px; }
 @media (max-width: 520px) { .cpage-filter { width: 100%; } }
+/* A pipeline column's head is also its fold toggle -- same target-is-the-
+   whole-line pattern as a Today bucket, reusing .fold-caret rather than a
+   second icon vocabulary for the same gesture. */
+.ccol-head.foldable {
+  cursor: pointer; border: none; background: none; padding: 0; font: inherit; color: inherit;
+  width: 100%; text-align: left;
+}
+.ccol-head.foldable .fold-caret { margin-right: 2px; }
+.ccol-head.foldable .fold-caret.is-shut { transform: rotate(-45deg); }
+.ccol-head.foldable:hover .fold-caret { border-color: var(--accent-text); }
+.contact-stagerow { display: flex; align-items: center; gap: var(--s3); margin-bottom: var(--s3); flex-wrap: wrap; }
+.contact-stagepick { width: 190px; }
+.contact-stageage { font-size: var(--text-sm); color: var(--faint); }
 .cboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s4); align-items: start; }
 @media (max-width: 860px) { .cboard { grid-template-columns: 1fr; } }
 .ccol-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s3); }

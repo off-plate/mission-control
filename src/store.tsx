@@ -40,6 +40,7 @@ import type {
   ViewId,
   Contact,
   ContactActivity,
+  PipelineStage,
   FocusSession,
   HabitSlip,
   HabitTick,
@@ -204,9 +205,14 @@ interface Store extends PersistedState {
   contacts: Contact[]
   contactActivity: ContactActivity[]
   addContact: (name: string) => string
-  updateContact: (id: string, patch: Partial<Pick<Contact, 'name' | 'tag' | 'phone' | 'email' | 'company' | 'role' | 'next' | 'notes' | 'projectId'>>) => void
+  updateContact: (id: string, patch: Partial<Pick<Contact, 'name' | 'tag' | 'phone' | 'email' | 'company' | 'role' | 'next' | 'notes' | 'projectId' | 'lostReason'>>) => void
   deleteContact: (id: string) => void
   logContactActivity: (id: string, type: ContactActivity['type'], note?: string) => void
+  /** The only way stage ever changes -- always stamps stageAt with it, so
+   *  "days in this stage" can never drift out of step with a stage that
+   *  moved without it, the way a caller patching stage through updateContact
+   *  directly could leave behind. */
+  setContactStage: (id: string, stage: PipelineStage) => void
   /** The one way in: opens a project's Plan without the id being wiped by
    *  setPage's own clearing (see setPage's note). */
   enterProject: (id: string) => void
@@ -2067,6 +2073,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       armUndo(gone ? `Deleted "${gone.name}"` : 'Contact deleted', () => { setContacts(beforeContacts); setContactActivity(beforeActivity); digUp(...keys) })
     },
     logContactActivity: (id, type, note) => setContactActivity((prev) => [{ id: newId('act'), contactId: id, type, at: new Date().toISOString(), note }, ...prev]),
+    setContactStage: (id, stage) => setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, stage, stageAt: new Date().toISOString() } : c))),
     focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog,
     view, setView, inView,
     twoLives, setTwoLives, reels, setReels,

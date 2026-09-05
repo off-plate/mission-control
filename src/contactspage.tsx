@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useStore } from './store'
-import { AutoTextarea, Band, Segmented, SpaceMark } from './ui'
+import { AutoTextarea, Band, Segmented, Select, SpaceMark, type SelectOption } from './ui'
 import { Sheet } from './modals'
 import { contactDaysSince, contactStatus, type Contact, type ContactStatus } from './types'
 
@@ -8,6 +8,13 @@ const STATUS_LABEL: Record<ContactStatus, string> = { quiet: 'Gone Quiet', soon:
 const STATUS_ORDER: ContactStatus[] = ['quiet', 'soon', 'track']
 const LOG_TYPES = ['call', 'text', 'email', 'meeting'] as const
 const LOG_LABEL: Record<string, string> = { call: 'Call', text: 'Text', email: 'Email', meeting: 'Meeting' }
+
+/* The one closed set a relationship can be. Closed on purpose: this field
+   doubles as the CRM's only filter, and a filter over freeform text is not
+   a filter. A contact saved before this shipped can still hold a value
+   outside this list -- ContactDetailSheet adds it back in as an extra
+   option rather than silently discarding it on the next open. */
+const RELATIONSHIPS = ['Client', 'Potential client', 'Vendor', 'Family', 'Partner', 'Friend', 'Colleague', 'Accountant', 'Co-founder', 'Advisor'] as const
 
 /** Same shape ageDays elsewhere in the app already reads: days, not a date,
  *  because "21 days ago" answers the only question this page ever asks --
@@ -42,6 +49,12 @@ function ContactDetailSheet({ contact, onClose }: { contact: Contact; onClose: (
   const status = contactStatus(contact, contactActivity)
   const project = contact.projectId ? projects.find((p) => p.id === contact.projectId) : undefined
 
+  const tagOptions: SelectOption<string>[] = [
+    { value: '', label: 'Not set' },
+    ...RELATIONSHIPS.map((r) => ({ value: r as string, label: r })),
+    ...(tag && !(RELATIONSHIPS as readonly string[]).includes(tag) ? [{ value: tag, label: tag }] : []),
+  ]
+
   return (
     <Sheet title={contact.name || 'New contact'} onClose={onClose} steady>
       <div className="contact-toprow">
@@ -54,8 +67,8 @@ function ContactDetailSheet({ contact, onClose }: { contact: Contact; onClose: (
         value={name} onChange={(e) => setName(e.target.value)} onBlur={() => commit({ name: name.trim() || contact.name })} />
 
       <label className="field-label" htmlFor="ct-tag">Relationship</label>
-      <input id="ct-tag" className="textinput" style={{ width: '100%', marginBottom: 'var(--s4)' }} placeholder="Client, Family, Vendor…"
-        value={tag} onChange={(e) => setTag(e.target.value)} onBlur={() => commit({ tag: tag.trim() })} />
+      <Select id="ct-tag" style={{ width: '100%', marginBottom: 'var(--s4)' }} ariaLabel="Relationship"
+        value={tag} options={tagOptions} onChange={(v) => { setTag(v); commit({ tag: v }) }} />
 
       <label className="field-label">Contact info</label>
       <div className="contact-infogrid">
@@ -143,9 +156,17 @@ export function ContactsPage() {
   const [openId, setOpenId] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<'name' | 'status' | 'company' | 'days' | 'next'>('days')
   const [sortDir, setSortDir] = useState<1 | -1>(-1)
+  const [relFilter, setRelFilter] = useState('')
 
   const rows = contacts.map((c) => ({ c, days: contactDaysSince(c, contactActivity), status: contactStatus(c, contactActivity) }))
   const openContact = contacts.find((c) => c.id === openId) ?? null
+
+  /* Relationship is the only filter this page gets -- deliberately, not an
+     oversight. Options come from what's actually in use, not the full
+     RELATIONSHIPS list, so the control never offers a choice that would
+     return nothing. */
+  const relOptions = Array.from(new Set(contacts.map((c) => c.tag).filter(Boolean))).sort()
+  const filteredRows = relFilter ? rows.filter((r) => r.c.tag === relFilter) : rows
 
   const setSort = (key: typeof sortKey) => {
     if (key === sortKey) setSortDir((d) => (d === 1 ? -1 : 1) as 1 | -1)
@@ -158,7 +179,7 @@ export function ContactsPage() {
           : sortKey === 'next' ? (r.c.next ?? '')
             : r.days
   )
-  const sortedRows = [...rows].sort((a, b) => {
+  const sortedRows = [...filteredRows].sort((a, b) => {
     const av = sortVal(a), bv = sortVal(b)
     if (av < bv) return -1 * sortDir
     if (av > bv) return 1 * sortDir
@@ -171,6 +192,10 @@ export function ContactsPage() {
       <div className="cpage-head">
         <Segmented value={view} onPick={setView} label="View" size="sm"
           options={[{ id: 'board', label: 'Board' }, { id: 'table', label: 'Table' }]} />
+        {relOptions.length > 0 && (
+          <Select className="cpage-filter" ariaLabel="Filter by relationship" value={relFilter} onChange={setRelFilter}
+            options={[{ value: '', label: 'All relationships' }, ...relOptions.map((r) => ({ value: r, label: r }))]} />
+        )}
       </div>
       <div className="formrow" style={{ marginBottom: 'var(--s4)' }}>
         <input className="textinput" placeholder="Add a person…" readOnly onClick={() => setAdding(true)} />
@@ -179,10 +204,12 @@ export function ContactsPage() {
 
       {contacts.length === 0 ? (
         <div className="empty">Nobody added yet. Add the first person above.</div>
+      ) : filteredRows.length === 0 ? (
+        <div className="empty">Nobody with that relationship yet.</div>
       ) : view === 'board' ? (
         <div className="cboard">
           {STATUS_ORDER.map((st) => {
-            const list = rows.filter((r) => r.status === st).sort((a, b) => b.days - a.days)
+            const list = filteredRows.filter((r) => r.status === st).sort((a, b) => b.days - a.days)
             return (
               <div className="ccol" key={st}>
                 <div className="ccol-head"><span className={`statusbadge s-${st}`}>{STATUS_LABEL[st]}</span><span className="ccol-count">{list.length}</span></div>

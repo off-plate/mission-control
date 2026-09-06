@@ -33,7 +33,7 @@ import {
   MOCK_TASKS,
   WIDGET_DEFS,
 } from './mock'
-import { goalCurrent, habitGate, habitStepKey, isTimeFed, requiredSteps, routineComplete, stepLocked } from './types'
+import { goalCurrent, habitGate, habitStepKey, isTimeFed, requiredSteps, routineComplete, stepLocked, type ImportedLead, type LeadImportFile, type LeadOffers } from './types'
 import { isSpace, SPACES, spaceFolderId } from './types'
 import type { HabitFrequency } from './types'
 import type {
@@ -94,6 +94,7 @@ interface PersistedState {
   projects?: Project[]
   /** People. Optional for the same reason projects is. */
   contacts?: Contact[]
+  leadOffers?: LeadOffers
   /** Every logged touch, dated. Its own collection rather than nested on
    *  Contact -- see the type's own note in types.ts. */
   contactActivity?: ContactActivity[]
@@ -204,15 +205,28 @@ interface Store extends PersistedState {
    *  see the type's own note in types.ts for why. */
   contacts: Contact[]
   contactActivity: ContactActivity[]
+  leadOffers: LeadOffers
+  /* True when this device can no longer save. Surfaced in the UI; never silent. */
+  storageFull: boolean
   addContact: (name: string) => string
-  updateContact: (id: string, patch: Partial<Pick<Contact, 'name' | 'tag' | 'phone' | 'email' | 'company' | 'role' | 'next' | 'notes' | 'projectId' | 'lostReason'>>) => void
+  updateContact: (id: string, patch: Partial<Pick<Contact, 'name' | 'tag' | 'phone' | 'email' | 'company' | 'role' | 'next' | 'notes' | 'projectId' | 'lostReason' | 'lead'>>) => void
   deleteContact: (id: string) => void
   logContactActivity: (id: string, type: ContactActivity['type'], note?: string) => void
+  /* A logged touch has to be removable. The log is what contactStatus reads, so one mis-click
+     otherwise leaves a call on the record that never happened and no way to take it back. */
+  deleteContactActivity: (activityId: string) => void
   /** The only way stage ever changes -- always stamps stageAt with it, so
    *  "days in this stage" can never drift out of step with a stage that
    *  moved without it, the way a caller patching stage through updateContact
    *  directly could leave behind. */
   setContactStage: (id: string, stage: PipelineStage) => void
+  /** Merges a batch from the lead engine into the pipeline. Matched on the
+   *  Google place id the row carries, so importing again after another city
+   *  finishes updates the measurements on a row already here rather than
+   *  adding a second copy of the same business. Anything he has since typed
+   *  on a row (stage, notes, next, the reason it was lost) survives: only the
+   *  measured half is overwritten. */
+  importLeads: (file: LeadImportFile) => { added: number; updated: number }
   /** The one way in: opens a project's Plan without the id being wiped by
    *  setPage's own clearing (see setPage's note). */
   enterProject: (id: string) => void
@@ -1278,6 +1292,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<Project[]>(persisted?.projects ?? [])
   const [contacts, setContacts] = useState<Contact[]>(persisted?.contacts ?? [])
   const [contactActivity, setContactActivity] = useState<ContactActivity[]>(persisted?.contactActivity ?? [])
+  const [leadOffers, setLeadOffers] = useState<LeadOffers>(persisted?.leadOffers ?? {})
+  const [storageFull, setStorageFull] = useState(false)
   const [ledger, setLedger] = useState(persisted?.ledger ?? MOCK_LEDGER)
   const [social, setSocialState] = useState(persisted?.social ?? MOCK_SOCIAL)
   const [sources, setSources] = useState(persisted?.sources ?? MOCK_SOURCES)
@@ -1445,7 +1461,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (futureBlob) return
 
     const state: PersistedState = {
-      version: 3, spaces, tasks, habits, goals, projects, contacts, contactActivity, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
+      version: 3, spaces, tasks, habits, goals, projects, contacts, contactActivity, leadOffers, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
       notes, noteFolders,
       savedAt: Date.now(), lastWrite: { dev: deviceId(), name: deviceName(), at: Date.now() },
       weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
@@ -1460,8 +1476,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     latestJson.current = json
     try {
       localStorage.setItem(STORAGE_KEY, json)
+      if (storageFull) setStorageFull(false)
     } catch {
-      /* localStorage full or unavailable; Supabase (if configured) is the source of truth */
+      /* This used to be swallowed. With Supabase off, a full quota means every edit from here on
+         is lost on reload and nothing on screen says so. Measured after importing one city of
+         leads: the state and its backup mirror together reach 3.8 MB of a ~5.2 MB quota, so this
+         is a reachable state rather than a theoretical one. */
+      if (!storageFull) setStorageFull(true)
     }
     /* Mirror to Supabase when configured, debounced so rapid edits collapse into
        one write. The outbox owns the write from here: a failure is retried on a
@@ -1471,7 +1492,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { outbox.push(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, projects, contacts, contactActivity, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels])
+  }, [spaces, tasks, habits, goals, projects, contacts, contactActivity, leadOffers, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels])
 
   /* ---- state that arrived from somewhere else ----
      Another tab of this browser, or this account on another device. Merged in,
@@ -1504,6 +1525,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (p.projects) setProjects(p.projects)
     if (p.contacts) setContacts(p.contacts)
     if (p.contactActivity) setContactActivity(p.contactActivity)
+    if (p.leadOffers) setLeadOffers(p.leadOffers)
     if (p.routines) setRoutines(p.routines)
     if (p.ideas) setIdeas(p.ideas)
     /* Arrays, not truthiness: deleting the last note on the other device has to
@@ -2031,7 +2053,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value: Store = {
     version: 3,
-    spaces, tasks, habits, goals, projects, contacts, contactActivity, ledger, social, sources, plan, review, routines, ideas,
+    spaces, tasks, habits, goals, projects, contacts, contactActivity, leadOffers, storageFull, ledger, social, sources, plan, review, routines, ideas,
     openProjectId, setOpenProject, enterProject,
     addProject: (name, sp) => {
       const trimmed = name.trim()
@@ -2087,7 +2109,70 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       armUndo(gone ? `Deleted "${gone.name}"` : 'Contact deleted', () => { setContacts(beforeContacts); setContactActivity(beforeActivity); digUp(...keys) })
     },
     logContactActivity: (id, type, note) => setContactActivity((prev) => [{ id: newId('act'), contactId: id, type, at: new Date().toISOString(), note }, ...prev]),
+    deleteContactActivity: (activityId) => {
+      const before = contactActivity
+      const gone = contactActivity.find((a) => a.id === activityId)
+      setContactActivity((prev) => prev.filter((a) => a.id !== activityId))
+      bury(rowKey('contactActivity', { id: activityId }))
+      armUndo(gone ? `Removed the logged ${gone.type}` : 'Entry removed', () => {
+        setContactActivity(before); digUp(rowKey('contactActivity', { id: activityId }))
+      })
+    },
     setContactStage: (id, stage) => setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, stage, stageAt: new Date().toISOString() } : c))),
+    importLeads: (file) => {
+      const rows = file.leads ?? []
+      const now = new Date().toISOString()
+      // Merged, not replaced: importing Albania must not drop the Czech offers.
+      if (file.offers) setLeadOffers((prev) => ({ ...prev, ...file.offers }))
+      /* The merge runs here rather than inside the setContacts updater so the
+         counts it returns are the counts the caller shows. Computing them in
+         the updater returned zero every time, because the updater had not run
+         yet, and under StrictMode it runs twice. Reading `contacts` from scope
+         is what deleteContact already does. */
+      const byPlace = new Map(contacts.filter((c) => c.lead?.placeKey).map((c) => [c.lead!.placeKey, c]))
+      const next = [...contacts]
+      let added = 0, updated = 0
+      for (const r of rows) {
+        if (!r.lead?.placeKey || !r.name?.trim()) continue
+        const existing = byPlace.get(r.lead.placeKey)
+        if (existing) {
+          const i = next.findIndex((c) => c.id === existing.id)
+          if (i < 0) continue
+          /* His edits win over the engine's: a phone he corrected, a note he
+             wrote, the stage he dragged it to. Only the measured block is
+             refreshed. */
+          next[i] = {
+            ...existing,
+            phone: existing.phone || r.phone,
+            email: existing.email || r.email,
+            company: existing.company || r.company,
+            lead: { ...r.lead, importedAt: now },
+          }
+          updated++
+        } else {
+          const row: Contact = {
+            id: newId('contact'),
+            name: r.name.trim(),
+            tag: 'Potential client',
+            phone: r.phone,
+            email: r.email,
+            company: r.company,
+            createdAt: now,
+            /* Everything sourced lands in the first lane. The five stages are
+               the Obsidian board's own, and a sourced lead is exactly what
+               "To reach out" already means, so nothing new is invented here. */
+            stage: 'reach_out',
+            stageAt: now,
+            lead: { ...r.lead, importedAt: now },
+          }
+          next.push(row)
+          byPlace.set(r.lead.placeKey, row)
+          added++
+        }
+      }
+      if (added || updated) setContacts(next)
+      return { added, updated }
+    },
     focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog,
     view, setView, inView,
     twoLives, setTwoLives, reels, setReels,

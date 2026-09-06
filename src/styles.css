@@ -6725,6 +6725,32 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .statusbadge.s-track { background: var(--a-accent-wash); color: var(--a-accent-text); }
 .statusbadge.s-soon { background: var(--a-warn-wash); color: var(--a-warn); }
 .statusbadge.s-quiet { background: var(--a-alert-wash); color: var(--a-alert); }
+/* Never contacted is not a freshness state and must not read as one: no green, and it is the
+   absence of a touch rather than a stale one. */
+.statusbadge.s-never { background: var(--surface-2); color: var(--soft); }
+/* The evidence column is the reason to pick up the phone, and a fixed 220px ellipsis cut it off
+   on every row while the name column took 1450px it had no use for. */
+.ctable { table-layout: fixed; }
+/* Name takes what its content needs, the score sits next to it rather than 770px away, and the
+   number is in the row so the list can actually be dialled from. */
+/* Fixed, not a percentage. Under table-layout: fixed a percentage on the first column absorbs
+   every extra pixel of a wide screen, which left "Why call them" stuck at 88px and ellipsised at
+   1440, 2560 and 3440 alike: the one column the table is opened for. Everything else is fixed too,
+   so the slack lands on the last column, which is the one that wants it. */
+.ctable th:nth-child(1), .ctable td:nth-child(1) { width: 340px; }
+.ctable td.name b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ctable th:nth-child(2), .ctable td:nth-child(2) { width: 84px; }
+.ctable th:nth-child(3), .ctable td:nth-child(3) { width: 130px; }
+.ctable th:nth-child(4), .ctable td:nth-child(4) { width: 220px; }
+.ctable th:nth-child(5), .ctable td:nth-child(5) { width: 92px; }
+.ctable th:last-child, .ctable td:last-child { width: auto; }
+.ctable td.col-phone a { color: var(--a-accent-text); white-space: nowrap; }
+.ctable td.col-phone-none, .col-phone-none { color: var(--faint); font-size: 0.78rem; }
+.ctable td.col-why { max-width: none; white-space: normal; color: var(--soft); font-size: 0.8125rem; line-height: 1.4; }
+/* The clamp goes on an inner box. Putting -webkit-box on the <td> itself broke the cell at 390px:
+   the third line was sliced through the glyphs and row heights went irregular. */
+.clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
 /* Pipeline stage badges -- same shape, a five-step semantic run from
    not-yet-started to closed, not the three-step relationship-freshness
    colors above. */
@@ -6756,7 +6782,10 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    content, so dropping into the empty-looking space below a one-card
    column actually misses it and lands on the page instead. Stretch makes
    every column's box match the tallest one in the row, so the whole visual
-   slot -- not just the area right around the cards -- is real drop target. */
+   slot -- not just the area right around the cards -- is real drop target.
+   An earlier pass here narrowed empty lanes to reclaim ultrawide space; that
+   is dropped, because a lane you cannot drop into is worse than a wide empty
+   one, and the table is the default view for a sourced pipeline anyway. */
 .cboard-pipeline { grid-template-columns: repeat(5, minmax(200px, 1fr)); overflow-x: auto; min-width: 0; padding-bottom: 4px; align-items: stretch; }
 @media (max-width: 860px) { .cboard { grid-template-columns: 1fr; } }
 @media (max-width: 1100px) { .cboard-pipeline { grid-template-columns: repeat(5, 220px); } }
@@ -6796,9 +6825,95 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .leadcard-age.is-stale { color: var(--a-warn); }
 .leadcard-next { font-size: 0.71rem; color: var(--soft); background: var(--surface-2); padding: 3px 8px; border-radius: 999px; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* Sourced leads. A score is plain data, so it takes info-slate and never the
+   accent: the accent on this page already means the active space and the
+   Acquired lane, and a number that appears on three thousand cards is not
+   competing for that. */
+.leadscore {
+  font-variant-numeric: tabular-nums; font-weight: 800; font-size: 0.8125rem; line-height: 1;
+  color: var(--info); background: var(--info-wash); border-radius: var(--a-r-xs);
+  padding: 6px 8px; flex: none;
+}
+.leadscore-sm { margin-left: auto; align-self: flex-start; }
+.leadcard-offer {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--s2);
+  margin-top: var(--s2); padding-top: var(--s2); border-top: 1px solid var(--a-line-2);
+  font-size: 0.75rem; font-weight: 700; min-width: 0;
+}
+.leadcard-offer b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leadcard-offer span { font-weight: 600; color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; flex: none; }
+.ccol-more {
+  width: 100%; margin-top: var(--s2); padding: 9px; border: 1px dashed var(--a-line-2); background: none;
+  border-radius: var(--a-r-xs); color: var(--soft); font: 600 0.78rem var(--font-body); cursor: pointer;
+}
+.ccol-more:hover { border-color: var(--a-accent-text); color: var(--a-accent-text); }
+.callrow { display: flex; gap: var(--s2); margin: 0 0 var(--s4); flex-wrap: wrap; }
+.callbtn { text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+.callrow-none { color: var(--soft); font-size: 0.8125rem; margin: 0 0 var(--s4); }
+.leadevidence-top { font-size: 0.9375rem; line-height: 1.5; margin: 0 0 var(--s4); padding-left: var(--s3); border-left: 2px solid var(--info); }
+.leadofferwrap { border: 1px solid var(--a-line-2); border-radius: var(--a-r-xs); padding: var(--s3); margin-top: var(--s3); }
+.leadofferwrap > summary { cursor: pointer; display: flex; justify-content: space-between; gap: var(--s3); align-items: baseline; font-size: 0.875rem; }
+.leadofferwrap > summary span { color: var(--faint); font-size: 0.8125rem; text-align: right; }
+.leadofferwrap[open] > summary { margin-bottom: var(--s3); padding-bottom: var(--s3); border-bottom: 1px solid var(--a-line-2); }
+/* Touch targets. The stage pills are the primary action in the drawer and were 33px. */
+@media (max-width: 640px) {
+  .stagepick-btn, .seg.seg-sm button, .cpage-filter, .logbtn { min-height: 44px; }
+  .cpage-subrow { width: 100%; }
+}
+.cpage-import { cursor: pointer; }
+.cpage-importmsg { color: var(--soft); font-size: 0.8125rem; margin: calc(var(--s3) * -1) 0 var(--s4); }
+.cpage-warn { background: var(--a-alert-wash); color: var(--a-alert); font-size: 0.8125rem; padding: var(--s3); border-radius: var(--a-r-xs); margin: 0 0 var(--s4); }
+.cpage-search { width: 210px; }
+.leadscore i { font-style: normal; font-weight: 600; opacity: 0.65; font-size: 0.72em; }
+.detailsblock { border: 1px solid var(--a-line-2); border-radius: var(--a-r-xs); padding: var(--s3); margin-bottom: var(--s4); }
+.detailsblock > summary { cursor: pointer; font-size: 0.8125rem; color: var(--soft); }
+.detailsblock[open] > summary { margin-bottom: var(--s3); }
+.contact-logrow-top { margin-bottom: var(--s4); }
+.contact-activity-row { position: relative; }
+.contact-activity-del {
+  margin-left: auto; border: none; background: none; color: var(--faint); cursor: pointer;
+  font-size: 1.1rem; line-height: 1; padding: 4px 6px; border-radius: var(--a-r-xs);
+}
+.contact-activity-del:hover { color: var(--a-alert); background: var(--a-alert-wash); }
+.cpage-filtertoggle { display: none; }
+@media (max-width: 700px) {
+  .cpage-search { flex: 1; width: auto; min-width: 140px; }
+  /* The board is a lane scroller on touch and CLAUDE.md says phone is a stacked list by design,
+     so the toggle is a control that only costs a row here. */
+  .cpage-subrow .seg.seg-sm { display: none; }
+  .kindrow { margin-bottom: var(--s3); gap: var(--s2); }
+  .page > .band { margin-bottom: var(--s2); }
+  .cpage-importmsg { margin: 0 0 var(--s2); }
+  .cpage-filtertoggle { display: inline-flex; align-items: center; min-height: 44px; }
+  /* Folded away until Filters is pressed: on a phone these five controls were the whole screen. */
+  .cpage-subrow:not(.is-open) .cpage-foldable { display: none; }
+  .cpage-subrow.is-open { flex-wrap: wrap; }
+  .cpage-subrow.is-open .cpage-foldable { width: 100%; }
+}
+
+.leadblock { border-top: 1px solid var(--a-line-2); margin: var(--s4) 0; padding-top: var(--s4); }
+.leadblock-head { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s3); flex-wrap: wrap; }
+.leadband { font: 800 11px/1 var(--font-body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--soft); }
+.leadwhere { font-size: 0.75rem; color: var(--faint); margin-left: auto; }
+.leadevidence { margin: 0 0 var(--s3); font-size: 0.9375rem; line-height: 1.5; }
+.leadevidence-more { margin: 0 0 var(--s3); padding-left: 1.1rem; color: var(--soft); font-size: 0.8125rem; line-height: 1.55; }
+.leadfacts { display: grid; gap: 2px; margin-bottom: var(--s4); }
+.leadfacts > div { display: flex; gap: var(--s3); font-size: 0.8125rem; padding: 5px 0; border-bottom: 1px solid var(--a-line-2); }
+.leadfacts span { color: var(--faint); min-width: 108px; flex: none; }
+.leadfacts b { font-weight: 600; }
+.leadfacts a { color: var(--a-accent-text); overflow-wrap: anywhere; }
+.leadoffer { margin: 0; display: grid; gap: var(--s3); }
+.leadoffer > div { display: grid; grid-template-columns: 112px 1fr; gap: var(--s3); align-items: start; }
+.leadoffer dt { font: 700 11px/1.4 var(--font-body); letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
+.leadoffer dd { margin: 0; font-size: 0.875rem; line-height: 1.55; }
+@media (max-width: 560px) {
+  .leadoffer > div { grid-template-columns: 1fr; gap: 2px; }
+  .leadfacts > div { flex-direction: column; gap: 0; }
+}
+
 /* The table view: same sortable-header recipe used nowhere else yet, so
    this is the one place it's spelled out rather than copied. */
-.ctable-wrap { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--a-r-lg); overflow: hidden; }
+.ctable-wrap { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--a-r-lg); overflow: hidden auto; }
 .ctable { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
 .ctable th {
   text-align: left; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
@@ -6811,9 +6926,36 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .ctable tbody tr { cursor: pointer; }
 .ctable tbody tr:hover { background: var(--surface-2); }
 .ctable td.name b { display: block; font-size: 0.9375rem; }
+
+
 .ctable td.name span { color: var(--faint); font-size: var(--text-xs); }
 .ctable td.ellipsis { color: var(--soft); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 720px) { .ctable-wrap { overflow-x: auto; } .ctable { min-width: 640px; } }
+
+/* Below this width the table is a 658px horizontal scroller nobody finds, so each row becomes a
+   two-column card: name and score on one line, then where, then why. Stacking every cell into its
+   own full-width band made one lead four screens' worth of rules. */
+@media (max-width: 700px) {
+  .ctable-wrap { overflow-x: visible; }
+  /* table-layout: fixed and the percentage widths above are desktop column sizing; left on, they
+     squash every cell of the stacked card to a fraction of the screen. */
+  .ctable { min-width: 0; table-layout: auto; }
+  .ctable th:nth-child(n), .ctable td:nth-child(n) { width: auto !important; }
+  .ctable thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .ctable, .ctable tbody { display: block; width: auto; }
+  .ctable tr {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px var(--s3);
+    border-bottom: 1px solid var(--a-line-2); padding: var(--s3) 0;
+  }
+  .ctable td { border: none; padding: 0; width: auto; display: block; }
+  .ctable td:nth-child(1) { grid-column: 1; grid-row: 1; min-width: 0; }
+  .ctable .namecell { align-items: center; }
+  .ctable td.mono { grid-column: 2; grid-row: 1; text-align: right; font-weight: 700; align-self: start; }
+  .ctable td:nth-child(n+3) { grid-column: 1 / -1; font-size: 0.8125rem; color: var(--soft); }
+  .ctable td:empty { display: none; }
+  /* Adding by hand is what the floating button is for; the row only crowds the leads out. */
+  .page > .formrow:has(.cpage-import) { display: none; }
+}
 
 /* A slide-in from the right, not the app's centred Sheet -- a reviewed,
    deliberate exception for this page only (Sheet itself is untouched and
@@ -6829,6 +6971,9 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   border-left: 1px solid var(--hairline-strong); box-shadow: var(--a-lift-2); z-index: 71;
   display: flex; flex-direction: column; animation: cpanel-in var(--t-med) cubic-bezier(0.22, 1, 0.36, 1);
 }
+/* A 460px drawer on a 2560px screen wrapped the nine-row offer at about 40 characters while
+   1600px of board sat dimmed behind it. 55-70ch is the target measure. */
+@media (min-width: 1100px) { .cpanel { width: clamp(460px, 32vw, 660px); } }
 @keyframes cpanel-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
 .cpanel-head { display: flex; align-items: center; gap: var(--s3); padding: var(--s5) var(--s5) var(--s4); border-bottom: 1px solid var(--hairline); flex: none; }
 .cpanel-head h2 { margin: 0; font-size: var(--text-lg); }

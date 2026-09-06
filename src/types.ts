@@ -30,7 +30,6 @@ export type PageId =
      doing things. */
   | 'quitting'
   | 'settings'
-  | 'brand'
   | 'notes'
   /** The old address of the Brain Dump board. Kept so a bookmark still lands
    *  somewhere real: the route walks it to Notes. */

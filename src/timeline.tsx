@@ -127,8 +127,14 @@ export function TimelinePage() {
              so the moment he's looking at whether to quit is the same
              moment his own reasons are one tap away, not a menu away. The
              page itself is untouched -- setPage('board') still renders it,
-             this was only ever the tab in. */}
-          <button className="tl-why" onClick={() => setPage('board')}>Why</button>
+             this was only ever the tab in.
+
+             The door in is dropped below 639px too (2026-09-06, mobile
+             review): the wall behind it is a long image-and-quote scroll
+             built for a screen he's sitting back from, not the one thing to
+             reach for one-handed at the exact moment he's tempted to quit.
+             The address still resolves for anyone who already has it. */}
+          <button className="tl-why hide-phone" onClick={() => setPage('board')}>Why</button>
           <button className="tl-giveup" onClick={() => setLives(true)}>I want to give up</button>
         </div>
       </header>

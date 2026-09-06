@@ -22,7 +22,6 @@ import { ZonePage, useZoneDepth } from './zone'
    origin, well under what a loading state is worth drawing for (see the
    as-speak comment in styles.css making the same call for a slow reply). */
 const SettingsPage = lazy(() => import('./pages2').then((m) => ({ default: m.SettingsPage })))
-const BrandPage = lazy(() => import('./brand').then((m) => ({ default: m.BrandPage })))
 const DayPage = lazy(() => import('./day').then((m) => ({ default: m.DayPage })))
 const BoardPage = lazy(() => import('./board').then((m) => ({ default: m.BoardPage })))
 const CalendarPage = lazy(() => import('./calendarpage').then((m) => ({ default: m.CalendarPage })))
@@ -563,9 +562,17 @@ export default function App() {
             <span className="btn-label">The Zone</span>
           </button>
           {/* The helmet. Its eyes light when the mode is on, so the icon IS the
-              state and the button needs no second indicator. */}
+              state and the button needs no second indicator.
+
+              Dropped below 639px on his instruction (2026-09-06, mobile
+              review): HUD is an ambient always-on-display look for a screen
+              mounted somewhere, not a phone concept, and it was one of six
+              icons crowding an already tight row. Since HUD is per-device
+              (see the localStorage read above), a phone can never have it on
+              in the first place -- hiding the toggle loses no one a way back
+              to paper. */}
           <button
-            className={`btn btn-ghost btn-helmet${hud ? ' is-on' : ''}`}
+            className={`btn btn-ghost btn-helmet hide-phone${hud ? ' is-on' : ''}`}
             onClick={() => setHud((v) => !v)}
             aria-pressed={hud}
             title={hud ? 'Back to paper' : 'HUD mode'}
@@ -669,7 +676,6 @@ export default function App() {
         {page === 'notes' && <NotesPage />}
         {page === 'bills' && <BillsPage />}
         {page === 'settings' && <SettingsPage />}
-        {page === 'brand' && <BrandPage />}
         {page === 'day' && <DayPage />}
         {page === 'zone' && <ZonePage />}
         </Suspense>

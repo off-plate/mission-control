@@ -799,6 +799,19 @@ function loadPersisted(): PersistedState | null {
       })
     }
 
+    /* Journaling added to the same routine, 2026-09-06. Last step, after the
+       alarm is set -- the last thing before the light goes off. Same guard as
+       fix:bed-compass just above: runs once, only adds it if it is not
+       already there. */
+    if (!p.removedSeeds.includes('fix:bed-journal')) {
+      p.removedSeeds.push('fix:bed-journal')
+      p.routines = (p.routines ?? []).map((r) => {
+        if (r.id !== 'r-evening' || r.steps.some((st) => st.id === 'be9')) return r
+        const step = { id: 'be9', title: 'Journal', kind: 'do' as const, note: 'A few lines on the day -- what happened, what’s still on your mind.' }
+        return { ...r, steps: [...r.steps, step] }
+      })
+    }
+
     /* A plan is for a day. Yesterday's cannot be allowed to sit on this morning's
        list pretending it was chosen. Tomorrow's is a different matter: he put it
        there on purpose and it has not had its day yet, so only the past is

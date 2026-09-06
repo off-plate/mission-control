@@ -233,6 +233,7 @@ export const MOCK_ROUTINES: Routine[] = [
       { id: 'be7', title: 'Light stretching', kind: 'timer', seconds: 600, note: 'Ten minutes, easy. Nothing that wakes you up.' },
       { id: 'be5', title: 'Fold today\u2019s clothes', kind: 'do', note: 'Off, folded, put away.' },
       { id: 'be6', title: 'Set the alarm', kind: 'do' },
+      { id: 'be9', title: 'Journal', kind: 'do', note: 'A few lines on the day -- what happened, what\u2019s still on your mind.' },
     ],
   },
   /* Night work is Off-Plate work: evening business sessions, ended on purpose.

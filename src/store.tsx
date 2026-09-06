@@ -1386,10 +1386,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   /* Date watcher: if the app sits open across midnight (or a laptop wakes up
      the next morning), reload once so routines, habits and "today" all roll
-     over to the new day instead of showing yesterday frozen in place. */
+     over to the new day instead of showing yesterday frozen in place.
+
+     Only while the tab is actually VISIBLE. His report (2026-09-06): away
+     since Friday, opened Sunday, no "3 things came back" banner. The interval
+     used to fire unconditionally, so the desktop build sitting open and
+     backgrounded over the weekend reloaded itself at Saturday's midnight with
+     nobody looking, ran roll() right then, and stamped plan.returnedOn to
+     Saturday. By Sunday that record no longer matched today and the banner
+     (gated on returnedOn === today, on his instruction: said once, on the day
+     it happened) stayed silent -- correctly silent about a day he never saw.
+     Gating the reload on visibility means a backgrounded app does nothing at
+     midnight; roll() only runs once, when he actually looks, spanning the
+     whole gap in one pass and landing the banner on the day he is there for
+     it. An app that is genuinely open and visible across midnight is
+     unaffected -- the interval still catches it within the minute. */
   useEffect(() => {
     const bootDay = localDateKey()
-    const check = () => { if (localDateKey() !== bootDay) location.reload() }
+    const check = () => { if (document.visibilityState === 'visible' && localDateKey() !== bootDay) location.reload() }
     const t = window.setInterval(check, 60_000)
     document.addEventListener('visibilitychange', check)
     return () => { window.clearInterval(t); document.removeEventListener('visibilitychange', check) }

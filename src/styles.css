@@ -6737,16 +6737,53 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    every extra pixel of a wide screen, which left "Why call them" stuck at 88px and ellipsised at
    1440, 2560 and 3440 alike: the one column the table is opened for. Everything else is fixed too,
    so the slack lands on the last column, which is the one that wants it. */
-.ctable th:nth-child(1), .ctable td:nth-child(1) { width: 340px; }
+/* Name, Score, Contact, City, Category, Age, Reason. Everything fixed except Reason, which takes
+   the slack. Score is wide enough that its sort arrow and info button stop spilling into the next
+   header, which is what ran "SCORE /100" and "PHONE" together. */
+.ctable th:nth-child(1), .ctable td:nth-child(1) { width: 290px; }
 .ctable td.name b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.ctable th:nth-child(2), .ctable td:nth-child(2) { width: 84px; }
-.ctable th:nth-child(3), .ctable td:nth-child(3) { width: 130px; }
-.ctable th:nth-child(4), .ctable td:nth-child(4) { width: 220px; }
-.ctable th:nth-child(5), .ctable td:nth-child(5) { width: 92px; }
+.ctable th:nth-child(2), .ctable td:nth-child(2) { width: 104px; }
+.ctable th:nth-child(3), .ctable td:nth-child(3) { width: 176px; }
+.ctable th:nth-child(4), .ctable td:nth-child(4) { width: 116px; }
+.ctable th:nth-child(5), .ctable td:nth-child(5) { width: 210px; }
+.ctable th:nth-child(6), .ctable td:nth-child(6) { width: 86px; }
 .ctable th:last-child, .ctable td:last-child { width: auto; }
-.ctable td.col-phone a { color: var(--a-accent-text); white-space: nowrap; }
+.ctable th { white-space: nowrap; }
+.ctable td { vertical-align: top; }
 .ctable td.col-phone-none, .col-phone-none { color: var(--faint); font-size: 0.78rem; }
-.ctable td.col-why { max-width: none; white-space: normal; color: var(--soft); font-size: 0.8125rem; line-height: 1.4; }
+/* Reason wraps and the row grows with it, the way a spreadsheet cell does, instead of clamping. */
+.ctable td.col-why { max-width: none; white-space: normal; overflow: visible; color: var(--soft); font-size: 0.8125rem; line-height: 1.45; padding-block: 11px; }
+/* Category is a real column now, so it gets to be read rather than ellipsised at 220px. */
+.ctable td:nth-child(5).ellipsis { max-width: none; white-space: normal; }
+
+/* One cell, three ways to reach them. display:flex on a <td> is unreliable, so the box is inside. */
+.contact-cta { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.contact-cta a { text-decoration: none; }
+.cta-call { color: var(--a-accent-text); font-weight: 600; font-size: 0.84rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cta-call:hover { text-decoration: underline; }
+.cta-row { display: flex; gap: var(--s2); }
+.cta-mail, .cta-web { color: var(--soft); font-size: 0.76rem; text-decoration: underline; }
+.cta-mail:hover, .cta-web:hover { color: var(--a-accent-text); }
+
+.th-info {
+  display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px;
+  margin-left: 6px; border-radius: 50%; border: 1px solid var(--a-line-2); background: none;
+  color: var(--faint); font: 700 10px/1 var(--font-body); cursor: pointer; vertical-align: 1px;
+}
+.th-info:hover { color: var(--a-accent-text); border-color: var(--a-accent-text); }
+.scorehelp {
+  background: var(--surface); border: 1px solid var(--a-line-2); border-radius: var(--a-r-lg);
+  padding: var(--s4); margin-bottom: var(--s4); font-size: 0.875rem; line-height: 1.55; max-width: 780px;
+}
+.scorehelp ul { margin: var(--s3) 0; padding-left: 1.1rem; }
+.scorehelp li { margin-bottom: 4px; color: var(--soft); }
+.scorehelp li b { color: var(--ink); font-weight: 600; }
+
+.formrow-tight { margin-bottom: var(--s3); }
+.pager { display: flex; align-items: center; gap: var(--s3); padding: var(--s3); border-top: 1px solid var(--a-line-2); flex-wrap: wrap; }
+.pager-at { font-size: 0.8125rem; color: var(--soft); font-variant-numeric: tabular-nums; }
+.pager-size { width: 150px; margin-left: auto; }
+@media (max-width: 700px) { .pager-size { margin-left: 0; width: 100%; } }
 /* The clamp goes on an inner box. Putting -webkit-box on the <td> itself broke the cell at 390px:
    the third line was sliced through the glyphs and row heights went irregular. */
 .clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }

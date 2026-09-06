@@ -426,7 +426,8 @@ export function ContactsPage() {
   const [sortDir, setSortDir] = useState<1 | -1>(-1)
   /* A lead list is worked in score order. Age defaulted the sort to a column that says
      "never called" on every row until he starts calling. */
-  const [pSortKey, setPSortKey] = useState<'name' | 'stage' | 'company' | 'days' | 'next' | 'score'>('score')
+  const [pSortKey, setPSortKey] = useState<'name' | 'stage' | 'company' | 'cat' | 'days' | 'next' | 'score'>('score')
+  const [scoreHelp, setScoreHelp] = useState(false)
   const [pSortDir, setPSortDir] = useState<1 | -1>(-1)
   const [relFilter, setRelFilter] = useState('')
   const [folded, setFolded] = useState<Set<PipelineStage>>(new Set(FOLDED_BY_DEFAULT))
@@ -442,9 +443,10 @@ export function ContactsPage() {
   /* Everything he asked for is imported; the floor lives here, where he can drop it, instead of
      in an export that silently threw rows away. */
   const [minScore, setMinScore] = useState(45)
-  /* The board paints 60 a lane; the table was painting all of them, which is the same wall in a
-     different shape. Both grow on request now. */
-  const [tableCap, setTableCap] = useState(200)
+  /* Real pages, not a cap that grows. 4 626 rows behind a "more" button is the same wall as no
+     paging at all: he asked to pick a page size and step through. */
+  const [pageSize, setPageSize] = useState(50)
+  const [page, setPage] = useState(0)
   const [q, setQ] = useState('')
   /* 1206 of 2680 have neither number nor address. Without this they are invisible until he opens
      one, which costs a click each to find out he cannot call them. */
@@ -534,8 +536,9 @@ export function ContactsPage() {
   const pSortVal = (r: typeof prospectRows[number]) => (
     pSortKey === 'name' ? r.c.name
       : pSortKey === 'stage' ? PIPELINE_STAGES.indexOf(r.c.stage)
-        : pSortKey === 'company' ? (r.c.company ?? '')
-          : pSortKey === 'next' ? (r.c.next ?? '')
+        : pSortKey === 'company' ? (r.c.lead?.city ?? r.c.company ?? '')
+          : pSortKey === 'cat' ? (r.c.lead?.category ?? r.c.company ?? '')
+            : pSortKey === 'next' ? (r.c.next ?? '')
             : pSortKey === 'score' ? (r.c.lead?.score ?? -1)
               : r.days
   )
@@ -545,6 +548,11 @@ export function ContactsPage() {
     if (av > bv) return 1 * pSortDir
     return 0
   })
+  const pageCount = Math.max(1, Math.ceil(pSortedRows.length / pageSize))
+  const safePage = Math.min(page, pageCount - 1)
+  const pageRows = pSortedRows.slice(safePage * pageSize, safePage * pageSize + pageSize)
+  /* A filter or a sort that shrinks the list must not leave him stranded past the end. */
+  useEffect(() => { setPage(0) }, [q, minScore, cityFilter, offerFilter, sourcedOnly, reachableOnly, pSortKey, pSortDir, pageSize])
 
   const shownIn = (stage: PipelineStage) => shown[stage] ?? LANE_CAP
   const showMore = (stage: PipelineStage) => setShown((prev) => ({ ...prev, [stage]: (prev[stage] ?? LANE_CAP) + 200 }))
@@ -626,9 +634,12 @@ export function ContactsPage() {
         </div>
       </div>
 
-      <div className="formrow" style={{ marginBottom: 'var(--s4)' }}>
-        <input className="textinput" placeholder={kind === 'pipeline' ? 'Add a prospect…' : 'Add a person…'} readOnly onClick={() => setAdding(true)} />
-        <button className="btn btn-quiet" onClick={() => setAdding(true)}>Add</button>
+      {/* A permanent empty input above the list was taking a row and adding nothing; adding one
+          by hand is rare next to eight thousand sourced rows. */}
+      <div className="formrow formrow-tight">
+        <button className="btn btn-quiet" onClick={() => setAdding(true)}>
+          {kind === 'pipeline' ? 'Add a prospect' : 'Add a person'}
+        </button>
         {kind === 'pipeline' && !anySourced && (
           <label className="btn btn-quiet cpage-import">
             Import leads
@@ -639,6 +650,21 @@ export function ContactsPage() {
       </div>
       {storageFull && (
         <p className="cpage-warn">This device cannot save any more. Anything changed from here is lost on reload. Raise the score filter and re-import fewer leads, or sign in so the server holds them.</p>
+      )}
+      {scoreHelp && kind === 'pipeline' && (
+        <div className="scorehelp">
+          <b>Score out of 100.</b> Six measures, each scored 1 to 5 and weighted. It is a sort
+          order, not a verdict.
+          <ul>
+            <li><b>Demand, 22.</b> How many Google reviews they have, plus a point for a high rating with real volume behind it. Proof customers already arrive.</li>
+            <li><b>Spend, 22.</b> Whether money already goes out: a Maps ad, a Meta pixel, Sklik, a paid booking platform, analytics, a large Instagram following.</li>
+            <li><b>Pain, 22.</b> How big the fixable defect is. A dead site scores highest, then no website with real demand, then a broken phone layout, then paying for ads with nothing counted.</li>
+            <li><b>Access, 12.</b> Whether there is a published number and a findable address, and that they are not a chain or a branch.</li>
+            <li><b>Repeat, 12.</b> Whether this kind of work comes back, or ends when the job does.</li>
+            <li><b>Reach, 10.</b> How many ways there are to actually get hold of them.</li>
+          </ul>
+          <button className="btn btn-quiet" onClick={() => setScoreHelp(false)}>Close</button>
+        </div>
       )}
       {kind === 'pipeline' && (importMsg || leadSync) && (
         <p className="cpage-importmsg">{[importMsg, leadSync].filter(Boolean).join('  ')}</p>
@@ -724,37 +750,63 @@ export function ContactsPage() {
           <table className="ctable">
             <thead><tr>
               <th onClick={() => setPSort('name')}>Name{pSortKey === 'name' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}</th>
-              <th onClick={() => setPSort('score')}>Score /100{pSortKey === 'score' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}</th>
-              {anySourced && <th>Phone</th>}
+              <th onClick={() => setPSort('score')}>
+                Score
+                {/* The number needs its scale and its method within reach, or it is a number he
+                    is asked to sort by and trust without being told what it measures. */}
+                <button type="button" className="th-info" aria-label="How the score is worked out"
+                  onClick={(e) => { e.stopPropagation(); setScoreHelp((v) => !v) }}>i</button>
+                {pSortKey === 'score' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}
+              </th>
+              {anySourced && <th>Contact</th>}
               {!oneStage && <th onClick={() => setPSort('stage')}>Stage{pSortKey === 'stage' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}</th>}
-              <th onClick={() => setPSort('company')}>{anySourced ? 'Where' : 'Company / role'}{pSortKey === 'company' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}</th>
+              {anySourced && <th onClick={() => setPSort('company')}>City{pSortKey === 'company' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}</th>}
+              <th onClick={() => setPSort('cat')}>{anySourced ? 'Category' : 'Company / role'}{pSortKey === 'cat' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}</th>
               {!allNever && <th onClick={() => setPSort('days')}>Age{pSortKey === 'days' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}</th>}
-              <th className="col-why" onClick={() => setPSort('next')}>{anySourced ? 'Why call them' : 'Next'}{pSortKey === 'next' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}</th>
+              <th className="col-why" onClick={() => setPSort('next')}>{anySourced ? 'Reason' : 'Next'}{pSortKey === 'next' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}</th>
             </tr></thead>
             <tbody>
-              {pSortedRows.slice(0, tableCap).map((r) => (
+              {pageRows.map((r) => (
                 <tr key={r.c.id} onClick={() => setOpenId(r.c.id)}>
                   <td className="name"><div className="namecell"><Avatar name={r.c.name} size={30} /><div><b>{r.c.name}</b><span>{offerNameOf(r.c) ?? ''}</span></div></div></td>
                   <td className="mono">{r.c.lead ? r.c.lead.score : '—'}</td>
                   {anySourced && (
-                    <td className="col-phone" onClick={(e) => e.stopPropagation()}>
-                      {r.c.phone
-                        ? <a href={`tel:${r.c.phone.replace(/\s/g, '')}`}>{r.c.phone}</a>
-                        : <span className="col-phone-none">no number</span>}
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <div className="contact-cta">
+                        {r.c.phone && <a className="cta-call" href={`tel:${r.c.phone.replace(/\s/g, '')}`}>{r.c.phone}</a>}
+                        {(r.c.email || r.c.lead?.website) && (
+                          <span className="cta-row">
+                            {r.c.email && <a className="cta-mail" href={`mailto:${r.c.email}`}>Email</a>}
+                            {r.c.lead?.website && <a className="cta-web" href={r.c.lead.website} target="_blank" rel="noopener noreferrer">Site</a>}
+                          </span>
+                        )}
+                        {!r.c.phone && !r.c.email && !r.c.lead?.website && <span className="col-phone-none">nothing found</span>}
+                      </div>
                     </td>
                   )}
                   {!oneStage && <td><span className={`statusbadge st-${r.c.stage}`}>{STAGE_LABEL[r.c.stage]}</span></td>}
-                  <td className="ellipsis">{[r.c.company, r.c.role].filter(Boolean).join(' · ') || [r.c.lead?.city, r.c.lead?.category].filter(Boolean).join(' · ') || '—'}</td>
+                  {anySourced && <td className="ellipsis">{r.c.lead?.city || '—'}</td>}
+                  <td className="ellipsis">{[r.c.company, r.c.role].filter(Boolean).join(' · ') || r.c.lead?.category || '—'}</td>
                   {!allNever && <td>{neverTouched(r.c, contactActivity) ? 'never called' : ageLabel(r.days)}</td>}
-                  <td className="col-why"><div className="clamp2">{r.c.next || r.c.lead?.evidence || '—'}</div></td>
+                  {/* Wraps and grows the row instead of clamping. He asked for taller rows with
+                      the whole reason in them rather than an ellipsis. */}
+                  <td className="col-why">{r.c.next || r.c.lead?.evidence || '—'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {pSortedRows.length > tableCap && (
-            <button className="ccol-more" onClick={() => setTableCap((n) => n + 500)}>
-              {pSortedRows.length - tableCap} more
-            </button>
+          {pSortedRows.length > pageSize && (
+            <div className="pager">
+              <button className="btn btn-quiet" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>Previous</button>
+              <span className="pager-at">
+                {(safePage * pageSize + 1).toLocaleString('cs-CZ')}–{Math.min((safePage + 1) * pageSize, pSortedRows.length).toLocaleString('cs-CZ')}
+                {' of '}{pSortedRows.length.toLocaleString('cs-CZ')}
+              </span>
+              <button className="btn btn-quiet" disabled={safePage >= pageCount - 1} onClick={() => setPage(safePage + 1)}>Next</button>
+              <Select className="pager-size" ariaLabel="Rows per page" value={String(pageSize)}
+                onChange={(v) => setPageSize(Number(v))}
+                options={[20, 50, 100, 400].map((n) => ({ value: String(n), label: `${n} per page` }))} />
+            </div>
           )}
         </div>
       )}

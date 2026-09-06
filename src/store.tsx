@@ -18,6 +18,7 @@ function stripDates(j: string): string {
   } catch { return j }
 }
 import { roll } from './roll'
+import { allLeads, getOffers, putLeads, putOffers, deleteLead, clearLeads, type LeadRow } from './leadstore'
 import { bodyHash, deviceId, deviceName, HIST, mergeStates, rowKey, type LastWrite, type Tomb } from './sync-merge'
 import { dayIndexOf, dayOfWeekKey, goalPeriodKey, goalPeriodRange, isoWeekKey, localDateKey, periodIsPast, periodKeyFor, slotForTime, type GoalTf } from './util'
 import {
@@ -94,7 +95,6 @@ interface PersistedState {
   projects?: Project[]
   /** People. Optional for the same reason projects is. */
   contacts?: Contact[]
-  leadOffers?: LeadOffers
   /** Every logged touch, dated. Its own collection rather than nested on
    *  Contact -- see the type's own note in types.ts. */
   contactActivity?: ContactActivity[]
@@ -206,6 +206,14 @@ interface Store extends PersistedState {
   contacts: Contact[]
   contactActivity: ContactActivity[]
   leadOffers: LeadOffers
+  /* Sourced leads, from IndexedDB. Not synced and not in the state row: they are regenerable by
+     re-running the export, and 8 783 of them do not fit in a 5 MB quota. */
+  leads: LeadRow[]
+  leadsLoaded: boolean
+  /* Turns a sourced lead into a real, synced Contact. Called the moment he does anything to one:
+     drags it, logs a touch, writes a note. Until then it costs nothing but IndexedDB. */
+  promoteLead: (placeKey: string) => string | undefined
+  clearAllLeads: () => void
   /* True when this device can no longer save. Surfaced in the UI; never silent. */
   storageFull: boolean
   addContact: (name: string) => string
@@ -226,7 +234,7 @@ interface Store extends PersistedState {
    *  adding a second copy of the same business. Anything he has since typed
    *  on a row (stage, notes, next, the reason it was lost) survives: only the
    *  measured half is overwritten. */
-  importLeads: (file: LeadImportFile) => { added: number; updated: number }
+  importLeads: (file: LeadImportFile) => Promise<{ added: number; updated: number }>
   /** The one way in: opens a project's Plan without the id being wiped by
    *  setPage's own clearing (see setPage's note). */
   enterProject: (id: string) => void
@@ -1292,7 +1300,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<Project[]>(persisted?.projects ?? [])
   const [contacts, setContacts] = useState<Contact[]>(persisted?.contacts ?? [])
   const [contactActivity, setContactActivity] = useState<ContactActivity[]>(persisted?.contactActivity ?? [])
-  const [leadOffers, setLeadOffers] = useState<LeadOffers>(persisted?.leadOffers ?? {})
+  /* Sourced leads and their offer catalogue come from IndexedDB, never from the synced blob.
+     See the note at the top of leadstore.ts for why. */
+  const [leadOffers, setLeadOffers] = useState<LeadOffers>({})
+  const [leads, setLeads] = useState<LeadRow[]>([])
+  const [leadsLoaded, setLeadsLoaded] = useState(false)
+  useEffect(() => {
+    let live = true
+    Promise.all([allLeads(), getOffers()])
+      .then(([rows, offers]) => { if (!live) return; setLeads(rows); setLeadOffers(offers) })
+      .catch(() => { /* no IndexedDB (private window, or blocked): the pipeline just has no
+                        sourced leads, which is the same as never having imported any. */ })
+      .finally(() => { if (live) setLeadsLoaded(true) })
+    return () => { live = false }
+  }, [])
   const [storageFull, setStorageFull] = useState(false)
   const [ledger, setLedger] = useState(persisted?.ledger ?? MOCK_LEDGER)
   const [social, setSocialState] = useState(persisted?.social ?? MOCK_SOCIAL)
@@ -1461,7 +1482,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (futureBlob) return
 
     const state: PersistedState = {
-      version: 3, spaces, tasks, habits, goals, projects, contacts, contactActivity, leadOffers, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
+      version: 3, spaces, tasks, habits, goals, projects, contacts, contactActivity, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
       notes, noteFolders,
       savedAt: Date.now(), lastWrite: { dev: deviceId(), name: deviceName(), at: Date.now() },
       weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
@@ -1492,7 +1513,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { outbox.push(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, projects, contacts, contactActivity, leadOffers, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels])
+  }, [spaces, tasks, habits, goals, projects, contacts, contactActivity, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels])
 
   /* ---- state that arrived from somewhere else ----
      Another tab of this browser, or this account on another device. Merged in,
@@ -1525,7 +1546,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (p.projects) setProjects(p.projects)
     if (p.contacts) setContacts(p.contacts)
     if (p.contactActivity) setContactActivity(p.contactActivity)
-    if (p.leadOffers) setLeadOffers(p.leadOffers)
     if (p.routines) setRoutines(p.routines)
     if (p.ideas) setIdeas(p.ideas)
     /* Arrays, not truthiness: deleting the last note on the other device has to
@@ -2053,7 +2073,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value: Store = {
     version: 3,
-    spaces, tasks, habits, goals, projects, contacts, contactActivity, leadOffers, storageFull, ledger, social, sources, plan, review, routines, ideas,
+    spaces, tasks, habits, goals, projects, contacts, contactActivity, leadOffers, leads, leadsLoaded, storageFull, ledger, social, sources, plan, review, routines, ideas,
     openProjectId, setOpenProject, enterProject,
     addProject: (name, sp) => {
       const trimmed = name.trim()
@@ -2120,58 +2140,43 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     setContactStage: (id, stage) => setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, stage, stageAt: new Date().toISOString() } : c))),
     importLeads: (file) => {
-      const rows = file.leads ?? []
-      const now = new Date().toISOString()
-      // Merged, not replaced: importing Albania must not drop the Czech offers.
-      if (file.offers) setLeadOffers((prev) => ({ ...prev, ...file.offers }))
-      /* The merge runs here rather than inside the setContacts updater so the
-         counts it returns are the counts the caller shows. Computing them in
-         the updater returned zero every time, because the updater had not run
-         yet, and under StrictMode it runs twice. Reading `contacts` from scope
-         is what deleteContact already does. */
+      /* Writes to IndexedDB and returns a promise; nothing lands in the synced state row. Rows he
+         has already worked keep their Contact, and the measured half of that Contact is refreshed
+         from the file so a re-import after another city still updates what it found. */
+      const rows: LeadRow[] = (file.leads ?? [])
+        .filter((r) => r.lead?.placeKey && r.name?.trim())
+        .map((r) => ({ placeKey: r.lead.placeKey, name: r.name.trim(), phone: r.phone, email: r.email, lead: r.lead }))
       const byPlace = new Map(contacts.filter((c) => c.lead?.placeKey).map((c) => [c.lead!.placeKey, c]))
-      const next = [...contacts]
-      let added = 0, updated = 0
-      for (const r of rows) {
-        if (!r.lead?.placeKey || !r.name?.trim()) continue
-        const existing = byPlace.get(r.lead.placeKey)
-        if (existing) {
-          const i = next.findIndex((c) => c.id === existing.id)
-          if (i < 0) continue
-          /* His edits win over the engine's: a phone he corrected, a note he
-             wrote, the stage he dragged it to. Only the measured block is
-             refreshed. */
-          next[i] = {
-            ...existing,
-            phone: existing.phone || r.phone,
-            email: existing.email || r.email,
-            company: existing.company || r.company,
-            lead: { ...r.lead, importedAt: now },
-          }
-          updated++
-        } else {
-          const row: Contact = {
-            id: newId('contact'),
-            name: r.name.trim(),
-            tag: 'Potential client',
-            phone: r.phone,
-            email: r.email,
-            company: r.company,
-            createdAt: now,
-            /* Everything sourced lands in the first lane. The five stages are
-               the Obsidian board's own, and a sourced lead is exactly what
-               "To reach out" already means, so nothing new is invented here. */
-            stage: 'reach_out',
-            stageAt: now,
-            lead: { ...r.lead, importedAt: now },
-          }
-          next.push(row)
-          byPlace.set(r.lead.placeKey, row)
-          added++
-        }
+      if (byPlace.size) {
+        setContacts((prev) => prev.map((c) => {
+          const fresh = c.lead?.placeKey ? rows.find((r) => r.placeKey === c.lead!.placeKey) : undefined
+          return fresh ? { ...c, lead: fresh.lead } : c
+        }))
       }
-      if (added || updated) setContacts(next)
-      return { added, updated }
+      return Promise.all([putOffers(file.offers ?? {}), putLeads(rows)]).then(([, res]) => {
+        setLeadOffers((prev) => ({ ...prev, ...(file.offers ?? {}) }))
+        return allLeads().then((all) => { setLeads(all); return res })
+      })
+    },
+    promoteLead: (placeKey) => {
+      const already = contacts.find((c) => c.lead?.placeKey === placeKey)
+      if (already) return already.id
+      const row = leads.find((l) => l.placeKey === placeKey)
+      if (!row) return undefined
+      const id = newId('contact')
+      const now = new Date().toISOString()
+      setContacts((prev) => [...prev, {
+        id, name: row.name, tag: 'Potential client', phone: row.phone, email: row.email,
+        createdAt: now, stage: 'reach_out', stageAt: now, lead: row.lead,
+      }])
+      /* It leaves IndexedDB the moment it becomes a Contact, so it can never render twice. */
+      setLeads((prev) => prev.filter((l) => l.placeKey !== placeKey))
+      deleteLead(placeKey).catch(() => {})
+      return id
+    },
+    clearAllLeads: () => {
+      setLeads([])
+      clearLeads().catch(() => {})
     },
     focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog,
     view, setView, inView,

@@ -3,7 +3,7 @@ import { useStore } from './store'
 import { AutoTextarea, Band, Select, SpaceMark, type SelectOption } from './ui'
 import {
   contactDaysSince, contactStatus, stageDaysSince, PIPELINE_STAGES, STAGE_LABEL,
-  type Contact, type ContactStatus, type LeadImportFile, type LeadOffer, type PipelineStage,
+  type Contact, type ContactActivity, type ContactStatus, type LeadImportFile, type LeadOffer, type PipelineStage,
 } from './types'
 
 const STATUS_LABEL: Record<ContactStatus, string> = { quiet: 'Gone Quiet', soon: 'Reach Out Soon', track: 'On Track' }
@@ -82,8 +82,16 @@ function ContactPanel({ title, avatarName, onClose, children }: { title: string;
   )
 }
 
-function ContactDetailPanel({ contact, onClose }: { contact: Contact; onClose: () => void }) {
-  const { projects, contactActivity, leadOffers, updateContact, deleteContact, logContactActivity, deleteContactActivity, setContactStage } = useStore()
+function ContactDetailPanel({ contact, onClose, onPromoted }: { contact: Contact; onClose: () => void; onPromoted: (id: string) => void }) {
+  const { projects, contactActivity, leadOffers, updateContact, deleteContact, logContactActivity, deleteContactActivity, setContactStage, promoteLead } = useStore()
+  /* A sourced lead is not a Contact until he does something to it. Reading one costs nothing;
+     the first edit, logged touch or stage change is what makes it real and synced. */
+  const realId = (): string | undefined => {
+    if (!contact.id.startsWith('lead:')) return contact.id
+    const id = promoteLead(contact.id.slice(5))
+    if (id) onPromoted(id)
+    return id
+  }
   const [name, setName] = useState(contact.name)
   const [tag, setTag] = useState(contact.tag)
   const [phone, setPhone] = useState(contact.phone ?? '')
@@ -98,7 +106,9 @@ function ContactDetailPanel({ contact, onClose }: { contact: Contact; onClose: (
      end -- the panel's own Escape key and a backdrop click both call this
      same onClose, so a save that only happened there would be skippable.
      Losing a field to a stray click is worse than a few extra writes. */
-  const commit = (patch: Partial<Contact>) => updateContact(contact.id, patch)
+  const commit = (patch: Partial<Contact>) => { const id = realId(); if (id) updateContact(id, patch) }
+  const logTouch = (t: ContactActivity['type']) => { const id = realId(); if (id) logContactActivity(id, t) }
+  const moveStage = (st: PipelineStage) => { const id = realId(); if (id) setContactStage(id, st) }
 
   const mine = contactActivity.filter((a) => a.contactId === contact.id).sort((a, b) => b.at.localeCompare(a.at))
   const days = contactDaysSince(contact, contactActivity)
@@ -122,14 +132,14 @@ function ContactDetailPanel({ contact, onClose }: { contact: Contact; onClose: (
             {PIPELINE_STAGES.map((s) => (
               <button key={s} className={`stagepick-btn${s === contact.stage ? ' is-active' : ''}`}
                 style={s === contact.stage ? { background: STAGE_COLOR[s], color: s === 'acquired' ? 'var(--ink)' : '#fff', borderColor: 'transparent' } : undefined}
-                onClick={() => setContactStage(contact.id, s)}>{STAGE_LABEL[s]}</button>
+                onClick={() => moveStage(s)}>{STAGE_LABEL[s]}</button>
             ))}
           </div>
           {!never && <div className="contact-stageage">{ageLabel(stageDaysSince(contact))} in this stage</div>}
         </>
       ) : (
         <button className="btn btn-quiet" style={{ marginBottom: 'var(--s3)' }}
-          onClick={() => setContactStage(contact.id, 'reach_out')}>Add to pipeline</button>
+          onClick={() => moveStage('reach_out')}>Add to pipeline</button>
       )}
       {contact.stage === 'lost' && (
         <>
@@ -216,7 +226,7 @@ function ContactDetailPanel({ contact, onClose }: { contact: Contact; onClose: (
       <label className="field-label">Log a touch</label>
       <div className="contact-logrow contact-logrow-top">
         {LOG_TYPES.map((t) => (
-          <button key={t} className="logbtn" onClick={() => logContactActivity(contact.id, t)}>{LOG_LABEL[t]}</button>
+          <button key={t} className="logbtn" onClick={() => logTouch(t)}>{LOG_LABEL[t]}</button>
         ))}
       </div>
 
@@ -249,7 +259,7 @@ function ContactDetailPanel({ contact, onClose }: { contact: Contact; onClose: (
       </div>
 
       <div className="cpanel-actions">
-        <button className="btn btn-danger" onClick={() => { deleteContact(contact.id); onClose() }}>Delete</button>
+        <button className="btn btn-danger" onClick={() => { const id = realId(); if (id) deleteContact(id); onClose() }}>Delete</button>
         <button className="btn btn-primary" onClick={onClose}>Done</button>
       </div>
     </ContactPanel>
@@ -387,10 +397,13 @@ const FOLDED_BY_DEFAULT: PipelineStage[] = ['lost']
 const LANE_CAP = 60
 
 export function ContactsPage() {
-  const { contacts, contactActivity, leadOffers, storageFull, setContactStage, importLeads } = useStore()
+  const { contacts, contactActivity, leadOffers, leads, leadsLoaded, storageFull, setContactStage, promoteLead, importLeads } = useStore()
   /* Reloading after an import used to land on People, which is empty when every contact is a
      sourced prospect, and read as "the import failed". */
+  /* Leads arrive from IndexedDB after mount, so a lazy initializer alone sees none of them and
+     lands on an empty People tab after every reload. Same trap the view toggle already had. */
   const [kind, setKind] = useState<'people' | 'pipeline'>(() => (contacts.some((c) => c.lead) ? 'pipeline' : 'people'))
+  const [kindChosen, setKindChosen] = useState(false)
   /* The board is right for a handful of prospects and wrong for a thousand sourced ones: they all
      sit in one lane, so four lanes of white fill the screen and the fifth is a column of cards.
      A pipeline that is mostly sourced opens as a table; the board is one click away.
@@ -399,10 +412,11 @@ export function ContactsPage() {
      to avoid. Once he picks a view himself, his choice stands. */
   const [view, setView] = useState<'board' | 'table'>('board')
   const [viewChosen, setViewChosen] = useState(false)
-  const leadCount = contacts.reduce((n, c) => n + (c.lead ? 1 : 0), 0)
+  const leadCount = contacts.reduce((n, c) => n + (c.lead ? 1 : 0), 0) + leads.length
   useEffect(() => {
     if (!viewChosen && leadCount > 40) setView('table')
-  }, [leadCount, viewChosen])
+    if (!kindChosen && leadsLoaded && leads.length > 0) setKind('pipeline')
+  }, [leadCount, viewChosen, kindChosen, leadsLoaded, leads.length])
   const isPhone = typeof window !== 'undefined' && window.matchMedia?.('(max-width: 700px)').matches
   const effView = isPhone && kind === 'pipeline' ? 'table' : view
   const pickView = (v: 'board' | 'table') => { setViewChosen(true); setView(v) }
@@ -410,7 +424,9 @@ export function ContactsPage() {
   const [openId, setOpenId] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<'name' | 'status' | 'company' | 'days' | 'next'>('days')
   const [sortDir, setSortDir] = useState<1 | -1>(-1)
-  const [pSortKey, setPSortKey] = useState<'name' | 'stage' | 'company' | 'days' | 'next' | 'score'>('days')
+  /* A lead list is worked in score order. Age defaulted the sort to a column that says
+     "never called" on every row until he starts calling. */
+  const [pSortKey, setPSortKey] = useState<'name' | 'stage' | 'company' | 'days' | 'next' | 'score'>('score')
   const [pSortDir, setPSortDir] = useState<1 | -1>(-1)
   const [relFilter, setRelFilter] = useState('')
   const [folded, setFolded] = useState<Set<PipelineStage>>(new Set(FOLDED_BY_DEFAULT))
@@ -442,8 +458,18 @@ export function ContactsPage() {
      client's stage lives" is the CRM Client card note's own rule; a contact
      either carries a stage or it doesn't. */
   const people = contacts.filter((c) => !c.stage)
-  const prospects = contacts.filter((c): c is Contact & { stage: PipelineStage } => !!c.stage)
-  const openContact = contacts.find((c) => c.id === openId) ?? null
+  const worked = contacts.filter((c): c is Contact & { stage: PipelineStage } => !!c.stage)
+  /* Leads that have not been worked yet live in IndexedDB, so they are shaped into the same row
+     the board and table already render. They carry a "lead:" id, which is what tells every
+     mutation below to turn them into a real Contact first. */
+  const virtualLeads: (Contact & { stage: PipelineStage })[] = leads.map((l) => ({
+    id: `lead:${l.placeKey}`,
+    name: l.name, tag: 'Potential client', phone: l.phone, email: l.email,
+    createdAt: l.lead.importedAt, stage: 'reach_out' as PipelineStage, stageAt: l.lead.importedAt,
+    lead: l.lead,
+  }))
+  const prospects: (Contact & { stage: PipelineStage })[] = [...worked, ...virtualLeads]
+  const openContact = contacts.find((c) => c.id === openId) ?? prospects.find((c) => c.id === openId) ?? null
 
   const rows = people.map((c) => ({ c, days: contactDaysSince(c, contactActivity), status: contactStatus(c, contactActivity) }))
   const relOptions = Array.from(new Set(people.map((c) => c.tag).filter(Boolean))).sort()
@@ -492,7 +518,8 @@ export function ContactsPage() {
     try {
       const parsed = JSON.parse(await file.text()) as LeadImportFile
       if (!Array.isArray(parsed?.leads)) { setImportMsg('That file does not look like a lead export.'); return }
-      const { added, updated } = importLeads(parsed)
+      setImportMsg('Importing…')
+      const { added, updated } = await importLeads(parsed)
       setImportMsg(`${added} added, ${updated} updated.`)
       window.setTimeout(() => setImportMsg(''), 6000)
       return
@@ -540,8 +567,8 @@ export function ContactsPage() {
 
       <div className="kindrow">
         <div className="kind" role="tablist" aria-label="Kind">
-          <button aria-pressed={kind === 'people'} onClick={() => setKind('people')}>People</button>
-          <button aria-pressed={kind === 'pipeline'} onClick={() => setKind('pipeline')}>Pipeline</button>
+          <button aria-pressed={kind === 'people'} onClick={() => { setKindChosen(true); setKind('people') }}>People</button>
+          <button aria-pressed={kind === 'pipeline'} onClick={() => { setKindChosen(true); setKind('pipeline') }}>Pipeline</button>
         </div>
         <div className={`cpage-subrow${filtersOpen ? ' is-open' : ''}`}>
           {/* Board is a Pipeline-only concept: it's the one place a stage is
@@ -663,7 +690,10 @@ export function ContactsPage() {
                 onDrop={(e) => {
                   e.preventDefault()
                   const id = e.dataTransfer.getData('text/plain')
-                  if (id) { setContactStage(id, stage); if (stage === 'lost') setOpenId(id) }
+                  if (id) {
+                    const real = id.startsWith('lead:') ? promoteLead(id.slice(5)) : id
+                    if (real) { setContactStage(real, stage); if (stage === 'lost') setOpenId(real) }
+                  }
                   setDropStage(null)
                 }}>
                 <div className="ccol-head">
@@ -733,7 +763,7 @@ export function ContactsPage() {
           setOpenId(id)
         }} />
       )}
-      {openContact && <ContactDetailPanel contact={openContact} onClose={() => setOpenId(null)} />}
+      {openContact && <ContactDetailPanel contact={openContact} onClose={() => setOpenId(null)} onPromoted={setOpenId} />}
     </div>
   )
 }

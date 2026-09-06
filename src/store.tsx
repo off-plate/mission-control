@@ -19,6 +19,7 @@ function stripDates(j: string): string {
 }
 import { roll } from './roll'
 import { allLeads, getOffers, putLeads, putOffers, deleteLead, clearLeads, type LeadRow } from './leadstore'
+import { pullLeads, pushLeads, deleteRemoteLead } from './supabase'
 import { bodyHash, deviceId, deviceName, HIST, mergeStates, rowKey, type LastWrite, type Tomb } from './sync-merge'
 import { dayIndexOf, dayOfWeekKey, goalPeriodKey, goalPeriodRange, isoWeekKey, localDateKey, periodIsPast, periodKeyFor, slotForTime, type GoalTf } from './util'
 import {
@@ -210,6 +211,8 @@ interface Store extends PersistedState {
      re-running the export, and 8 783 of them do not fit in a 5 MB quota. */
   leads: LeadRow[]
   leadsLoaded: boolean
+  /* Progress and failures of the Supabase push, surfaced rather than swallowed. */
+  leadSync: string
   /* Turns a sourced lead into a real, synced Contact. Called the moment he does anything to one:
      drags it, logs a touch, writes a note. Until then it costs nothing but IndexedDB. */
   promoteLead: (placeKey: string) => string | undefined
@@ -1318,12 +1321,40 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [leadOffers, setLeadOffers] = useState<LeadOffers>({})
   const [leads, setLeads] = useState<LeadRow[]>([])
   const [leadsLoaded, setLeadsLoaded] = useState(false)
+  const [leadSync, setLeadSync] = useState('')
   useEffect(() => {
     let live = true
+    /* IndexedDB first so the list paints immediately, then Supabase. A device that has never
+       imported has an empty cache and pulls the whole set once; after that the cache answers and
+       the pull only fills in what another device added. */
     Promise.all([allLeads(), getOffers()])
-      .then(([rows, offers]) => { if (!live) return; setLeads(rows); setLeadOffers(offers) })
-      .catch(() => { /* no IndexedDB (private window, or blocked): the pipeline just has no
-                        sourced leads, which is the same as never having imported any. */ })
+      .then(([rows, offers]) => {
+        if (!live) return
+        setLeads(rows); setLeadOffers(offers); setLeadsLoaded(true)
+        return pullLeads().then((remote) => {
+          if (!live || !remote) return
+          const merged = new Map(rows.map((r) => [r.placeKey, r]))
+          for (const r of remote.leads) {
+            merged.set(r.place_key, {
+              placeKey: r.place_key, name: r.name,
+              phone: r.phone ?? undefined, email: r.email ?? undefined,
+              lead: r.lead as LeadRow['lead'],
+            })
+          }
+          const all = [...merged.values()]
+          if (all.length !== rows.length) {
+            setLeads(all)
+            putLeads(all).catch(() => {})
+          }
+          if (Object.keys(remote.offers).length) {
+            const offersTyped = remote.offers as LeadOffers
+            setLeadOffers((prev) => ({ ...prev, ...offersTyped }))
+            putOffers(offersTyped).catch(() => {})
+          }
+        })
+      })
+      .catch(() => { /* no IndexedDB, or signed out: the pipeline simply has no sourced leads,
+                        which is the same as never having imported any. */ })
       .finally(() => { if (live) setLeadsLoaded(true) })
     return () => { live = false }
   }, [])
@@ -2086,7 +2117,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value: Store = {
     version: 3,
-    spaces, tasks, habits, goals, projects, contacts, contactActivity, leadOffers, leads, leadsLoaded, storageFull, ledger, social, sources, plan, review, routines, ideas,
+    spaces, tasks, habits, goals, projects, contacts, contactActivity, leadOffers, leads, leadsLoaded, leadSync, storageFull, ledger, social, sources, plan, review, routines, ideas,
     openProjectId, setOpenProject, enterProject,
     addProject: (name, sp) => {
       const trimmed = name.trim()
@@ -2166,9 +2197,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           return fresh ? { ...c, lead: fresh.lead } : c
         }))
       }
-      return Promise.all([putOffers(file.offers ?? {}), putLeads(rows)]).then(([, res]) => {
+      return Promise.all([putOffers(file.offers ?? {}), putLeads(rows)]).then(async ([, res]) => {
         setLeadOffers((prev) => ({ ...prev, ...(file.offers ?? {}) }))
-        return allLeads().then((all) => { setLeads(all); return res })
+        const all = await allLeads()
+        setLeads(all)
+        /* Then to Supabase, so every device sees them and they survive this browser. Local
+           already succeeded, so a failure here is reported rather than losing the import. */
+        try {
+          const sent = await pushLeads(
+            rows.map((r) => ({ place_key: r.placeKey, name: r.name, phone: r.phone ?? null, email: r.email ?? null, lead: r.lead })),
+            file.offers ?? {},
+            (done, total) => setLeadSync(`Syncing ${done.toLocaleString('cs-CZ')} of ${total.toLocaleString('cs-CZ')}…`),
+          )
+          setLeadSync(sent ? '' : 'Saved on this device only: sign in to sync them.')
+        } catch (e) {
+          setLeadSync(`Saved on this device, but syncing failed: ${(e as Error).message}`)
+        }
+        return res
       })
     },
     promoteLead: (placeKey) => {
@@ -2185,6 +2230,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       /* It leaves IndexedDB the moment it becomes a Contact, so it can never render twice. */
       setLeads((prev) => prev.filter((l) => l.placeKey !== placeKey))
       deleteLead(placeKey).catch(() => {})
+      /* It is a Contact now, and a Contact syncs in the state row. Leaving it in mc_leads too
+         would bring it back as a duplicate on the next device that pulls. */
+      deleteRemoteLead(placeKey).catch(() => {})
       return id
     },
     clearAllLeads: () => {

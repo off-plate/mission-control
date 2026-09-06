@@ -397,7 +397,7 @@ const FOLDED_BY_DEFAULT: PipelineStage[] = ['lost']
 const LANE_CAP = 60
 
 export function ContactsPage() {
-  const { contacts, contactActivity, leadOffers, leads, leadsLoaded, storageFull, setContactStage, promoteLead, importLeads } = useStore()
+  const { contacts, contactActivity, leadOffers, leads, leadsLoaded, leadSync, storageFull, setContactStage, promoteLead, importLeads } = useStore()
   /* Reloading after an import used to land on People, which is empty when every contact is a
      sourced prospect, and read as "the import failed". */
   /* Leads arrive from IndexedDB after mount, so a lazy initializer alone sees none of them and
@@ -640,7 +640,9 @@ export function ContactsPage() {
       {storageFull && (
         <p className="cpage-warn">This device cannot save any more. Anything changed from here is lost on reload. Raise the score filter and re-import fewer leads, or sign in so the server holds them.</p>
       )}
-      {kind === 'pipeline' && importMsg && <p className="cpage-importmsg">{importMsg}</p>}
+      {kind === 'pipeline' && (importMsg || leadSync) && (
+        <p className="cpage-importmsg">{[importMsg, leadSync].filter(Boolean).join('  ')}</p>
+      )}
 
       {kind === 'people' ? (
         people.length === 0 ? (

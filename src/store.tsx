@@ -1208,10 +1208,12 @@ function routeFromHash(): { page: PageId; day: string | null } {
   if (m) return { page: 'day', day: m[1] }
   // The board's old address still resolves: a bookmark lands on its successor.
   if (h === 'braindump') return { page: 'notes', day: null }
-  /* Achievements, Money and Reflect were removed. Their addresses land on Today
-     rather than on nothing, the same courtesy braindump gets above. */
-  if (h === 'achievements' || h === 'money' || h === 'review' || h === 'stats') return { page: 'today', day: null }
-  const pages: PageId[] = ['today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting', 'settings', 'brand', 'notes', 'bills', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant', 'timeline', 'contacts']
+  /* Achievements, Money, Reflect and Brand & guidelines were removed (the
+     last on his instruction, 2026-09-06: a design-system reference nobody
+     consults from the app itself). Their addresses land on Today rather than
+     on nothing, the same courtesy braindump gets above. */
+  if (h === 'achievements' || h === 'money' || h === 'review' || h === 'stats' || h === 'brand') return { page: 'today', day: null }
+  const pages: PageId[] = ['today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting', 'settings', 'notes', 'bills', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant', 'timeline', 'contacts']
   return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
 }
 

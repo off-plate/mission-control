@@ -277,7 +277,7 @@ function HevyKeyField() {
 }
 
 export function SettingsPage() {
-  const { resetDemo, setPage } = useStore()
+  const { resetDemo } = useStore()
   return (
     <div className="page">
       <Band title="Settings" />
@@ -292,11 +292,6 @@ export function SettingsPage() {
           <VoiceKeyField />
           <span className="microcap" style={{ marginTop: 24, display: 'block' }}>Fitness</span>
           <HevyKeyField />
-          <span className="microcap" style={{ marginTop: 24, display: 'block' }}>Design</span>
-          <div className="source-row">
-            <span className="info"><span className="name">Brand &amp; guidelines</span><span className="detail" style={{ display: 'block' }}>The colours, type and rules this app is built on</span></span>
-            <button className="btn btn-quiet" onClick={() => setPage('brand')}>Open</button>
-          </div>
           {/* Which build is on this screen, in plain sight.
 
               This exists because "still not fixed" and "it is fixed here" were

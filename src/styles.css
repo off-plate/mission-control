@@ -2440,7 +2440,14 @@ button.chip:hover { filter: brightness(0.96); }
 .done-mark { color: var(--progress); font-family: var(--font-display); font-weight: 800; font-size: var(--text-xl); }
 
 @media (max-width: 639px) {
-  .hide-phone { display: none; }
+  /* A plain display:none here lost to whatever component the class was added
+     to when that component's OWN rule set display later in the cascade at
+     equal specificity -- .tl-why is exactly that: a class added on top of it
+     for this media query, overridden by .tl-next, .tl-giveup, .tl-why's own
+     display: inline-flex hundreds of lines further down the file. A utility
+     meant to hide anything has to win regardless of where in the file that
+     anything is styled. */
+  .hide-phone { display: none !important; }
   .brand-name { display: none; }
   .topbar { gap: var(--s2); row-gap: var(--s2); padding-block: var(--s2); }
   /* Row one: logo and the three actions. Row two: the workspace switcher on a

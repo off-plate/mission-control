@@ -3,10 +3,14 @@ import { useStore } from './store'
 import { AutoTextarea, Band, Select, SpaceMark, type SelectOption } from './ui'
 import {
   contactDaysSince, contactStatus, stageDaysSince, PIPELINE_STAGES, STAGE_LABEL,
-  type Contact, type ContactStatus, type PipelineStage,
+  type Contact, type ContactStatus, type LeadImportFile, type LeadOffer, type PipelineStage,
 } from './types'
 
 const STATUS_LABEL: Record<ContactStatus, string> = { quiet: 'Gone Quiet', soon: 'Reach Out Soon', track: 'On Track' }
+/* An import is not a touch. contactDaysSince falls back to createdAt, so every freshly imported
+   lead read "On Track, last touch today" while nothing had happened, which both invents a signal
+   and zeroes the age clock that is the only avoidance measure this app has. */
+const neverTouched = (c: Contact, activity: { contactId: string }[]) => !!c.lead && !activity.some((a) => a.contactId === c.id)
 const STAGE_COLOR: Record<PipelineStage, string> = {
   reach_out: 'var(--info)', contacted: 'var(--warn)', conversation: 'var(--accent-text)', acquired: 'var(--accent)', lost: 'var(--alert)',
 }
@@ -79,7 +83,7 @@ function ContactPanel({ title, avatarName, onClose, children }: { title: string;
 }
 
 function ContactDetailPanel({ contact, onClose }: { contact: Contact; onClose: () => void }) {
-  const { projects, contactActivity, updateContact, deleteContact, logContactActivity, setContactStage } = useStore()
+  const { projects, contactActivity, leadOffers, updateContact, deleteContact, logContactActivity, deleteContactActivity, setContactStage } = useStore()
   const [name, setName] = useState(contact.name)
   const [tag, setTag] = useState(contact.tag)
   const [phone, setPhone] = useState(contact.phone ?? '')
@@ -99,6 +103,8 @@ function ContactDetailPanel({ contact, onClose }: { contact: Contact; onClose: (
   const mine = contactActivity.filter((a) => a.contactId === contact.id).sort((a, b) => b.at.localeCompare(a.at))
   const days = contactDaysSince(contact, contactActivity)
   const status = contactStatus(contact, contactActivity)
+  const never = neverTouched(contact, contactActivity)
+  const importedDays = contact.lead ? Math.max(0, Math.floor((Date.now() - new Date(contact.lead.importedAt).getTime()) / 86400000)) : 0
   const project = contact.projectId ? projects.find((p) => p.id === contact.projectId) : undefined
 
   const tagOptions: SelectOption<string>[] = [
@@ -119,7 +125,7 @@ function ContactDetailPanel({ contact, onClose }: { contact: Contact; onClose: (
                 onClick={() => setContactStage(contact.id, s)}>{STAGE_LABEL[s]}</button>
             ))}
           </div>
-          <div className="contact-stageage">{ageLabel(stageDaysSince(contact))} in this stage</div>
+          {!never && <div className="contact-stageage">{ageLabel(stageDaysSince(contact))} in this stage</div>}
         </>
       ) : (
         <button className="btn btn-quiet" style={{ marginBottom: 'var(--s3)' }}
@@ -135,46 +141,94 @@ function ContactDetailPanel({ contact, onClose }: { contact: Contact; onClose: (
       )}
 
       <div className="contact-toprow">
-        <span className={`statusbadge s-${status}`}>{STATUS_LABEL[status]}</span>
-        <span className="contact-lasttouch">Last touch: {ageLabel(days)}</span>
+        {never
+          ? <span className="statusbadge s-never">Never contacted</span>
+          : <span className={`statusbadge s-${status}`}>{STATUS_LABEL[status]}</span>}
+        <span className="contact-lasttouch">{never ? `Imported ${ageLabel(importedDays)}` : `Last touch: ${ageLabel(days)}`}</span>
       </div>
 
-      <label className="field-label" htmlFor="ct-name">Name</label>
-      <input id="ct-name" className="textinput" style={{ width: '100%', marginBottom: 'var(--s3)' }}
-        value={name} onChange={(e) => setName(e.target.value)} onBlur={() => commit({ name: name.trim() || contact.name })} />
-
-      <label className="field-label" htmlFor="ct-tag">Relationship</label>
-      <Select id="ct-tag" style={{ width: '100%', marginBottom: 'var(--s4)' }} ariaLabel="Relationship"
-        value={tag} options={tagOptions} onChange={(v) => { setTag(v); commit({ tag: v }) }} />
-
-      <label className="field-label">Contact info</label>
-      <div className="contact-infogrid">
-        <input className="textinput" placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} onBlur={() => commit({ phone: phone.trim() })} />
-        <input className="textinput" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => commit({ email: email.trim() })} />
-        <input className="textinput" placeholder="Company" value={company} onChange={(e) => setCompany(e.target.value)} onBlur={() => commit({ company: company.trim() })} />
-        <input className="textinput" placeholder="Role" value={role} onChange={(e) => setRole(e.target.value)} onBlur={() => commit({ role: role.trim() })} />
-      </div>
-      {project && (
-        <div className="contact-projectlink">
-          <SpaceMark space={project.space} always />
-          Linked to <b>{project.name}</b>
+      {/* The number is the point of a sourced lead, so it is a link and a button before it is a
+          field. Editing it is still possible below; reaching it takes one tap. */}
+      {(contact.phone || contact.email) ? (
+        <div className="callrow">
+          {contact.phone && <a className="btn btn-primary callbtn" href={`tel:${contact.phone.replace(/\s/g, '')}`}>Call {contact.phone}</a>}
+          {contact.email && <a className="btn btn-quiet callbtn" href={`mailto:${contact.email}`}>Email</a>}
         </div>
+      ) : contact.lead ? (
+        <p className="callrow-none">No phone and no email were found for this one. The Google profile is the only way in.</p>
+      ) : null}
+
+      {contact.lead && <p className="leadevidence leadevidence-top">{contact.lead.evidence}</p>}
+
+
+      {/* For a sourced lead the identity fields are scraped and correct, and he is here to call
+          rather than to type. They fold; for a person he added himself they stay open. */}
+      {contact.lead ? (
+        <details className="detailsblock"><summary>Edit details</summary>
+        <label className="field-label" htmlFor="ct-name">Name</label>
+        <input id="ct-name" className="textinput" style={{ width: '100%', marginBottom: 'var(--s3)' }}
+          value={name} onChange={(e) => setName(e.target.value)} onBlur={() => commit({ name: name.trim() || contact.name })} />
+
+        <label className="field-label" htmlFor="ct-tag">Relationship</label>
+        <Select id="ct-tag" style={{ width: '100%', marginBottom: 'var(--s4)' }} ariaLabel="Relationship"
+          value={tag} options={tagOptions} onChange={(v) => { setTag(v); commit({ tag: v }) }} />
+
+        <label className="field-label">Contact info</label>
+        <div className="contact-infogrid">
+          <input className="textinput" placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} onBlur={() => commit({ phone: phone.trim() })} />
+          <input className="textinput" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => commit({ email: email.trim() })} />
+          <input className="textinput" placeholder="Company" value={company} onChange={(e) => setCompany(e.target.value)} onBlur={() => commit({ company: company.trim() })} />
+          <input className="textinput" placeholder="Role" value={role} onChange={(e) => setRole(e.target.value)} onBlur={() => commit({ role: role.trim() })} />
+        </div>
+        {project && (
+          <div className="contact-projectlink">
+            <SpaceMark space={project.space} always />
+            Linked to <b>{project.name}</b>
+          </div>
+        )}
+        </details>
+      ) : (
+        <>
+        <label className="field-label" htmlFor="ct-name">Name</label>
+        <input id="ct-name" className="textinput" style={{ width: '100%', marginBottom: 'var(--s3)' }}
+          value={name} onChange={(e) => setName(e.target.value)} onBlur={() => commit({ name: name.trim() || contact.name })} />
+
+        <label className="field-label" htmlFor="ct-tag">Relationship</label>
+        <Select id="ct-tag" style={{ width: '100%', marginBottom: 'var(--s4)' }} ariaLabel="Relationship"
+          value={tag} options={tagOptions} onChange={(v) => { setTag(v); commit({ tag: v }) }} />
+
+        <label className="field-label">Contact info</label>
+        <div className="contact-infogrid">
+          <input className="textinput" placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} onBlur={() => commit({ phone: phone.trim() })} />
+          <input className="textinput" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => commit({ email: email.trim() })} />
+          <input className="textinput" placeholder="Company" value={company} onChange={(e) => setCompany(e.target.value)} onBlur={() => commit({ company: company.trim() })} />
+          <input className="textinput" placeholder="Role" value={role} onChange={(e) => setRole(e.target.value)} onBlur={() => commit({ role: role.trim() })} />
+        </div>
+        {project && (
+          <div className="contact-projectlink">
+            <SpaceMark space={project.space} always />
+            Linked to <b>{project.name}</b>
+          </div>
+        )}
+        </>
       )}
 
+      <label className="field-label">Log a touch</label>
+      <div className="contact-logrow contact-logrow-top">
+        {LOG_TYPES.map((t) => (
+          <button key={t} className="logbtn" onClick={() => logContactActivity(contact.id, t)}>{LOG_LABEL[t]}</button>
+        ))}
+      </div>
+
       <label className="field-label" htmlFor="ct-next">Next</label>
-      <input id="ct-next" className="textinput" style={{ width: '100%', marginBottom: 'var(--s4)' }} placeholder="What's the next step with this person?"
+      <input id="ct-next" className="textinput" style={{ width: '100%', marginBottom: 'var(--s4)' }} placeholder={contact.lead ? "What's the next step with this lead?" : "What's the next step with this person?"}
         value={next} onChange={(e) => setNext(e.target.value)} onBlur={() => commit({ next: next.trim() })} />
 
       <label className="field-label" htmlFor="ct-notes">Notes</label>
       <AutoTextarea id="ct-notes" className="textinput" style={{ width: '100%', marginBottom: 'var(--s4)' }}
         value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={() => commit({ notes: notes.trim() })} />
 
-      <label className="field-label">Log a touch</label>
-      <div className="contact-logrow">
-        {LOG_TYPES.map((t) => (
-          <button key={t} className="logbtn" onClick={() => logContactActivity(contact.id, t)}>{LOG_LABEL[t]}</button>
-        ))}
-      </div>
+      {contact.lead && <LeadBlock lead={contact.lead} offer={contact.lead.offerKey ? leadOffers[contact.lead.offerKey] : undefined} />}
 
       <label className="field-label">Activity</label>
       <div className="contact-activity">
@@ -183,8 +237,13 @@ function ContactDetailPanel({ contact, onClose }: { contact: Contact; onClose: (
             <span className="contact-activity-icon">{LOG_LABEL[a.type][0]}</span>
             <div className="contact-activity-body">
               <div>{LOG_LABEL[a.type]}</div>
-              <div className="contact-activity-when">{ageLabel(Math.max(0, Math.floor((Date.now() - new Date(a.at).getTime()) / 86400000)))}</div>
+              <div className="contact-activity-when">
+                {ageLabel(Math.max(0, Math.floor((Date.now() - new Date(a.at).getTime()) / 86400000)))}
+                {' · '}{new Date(a.at).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}
+              </div>
             </div>
+            <button className="contact-activity-del" aria-label="Remove this entry"
+              onClick={() => deleteContactActivity(a.id)}>×</button>
           </div>
         )) : <p className="empty">Nothing logged yet.</p>}
       </div>
@@ -194,6 +253,79 @@ function ContactDetailPanel({ contact, onClose }: { contact: Contact; onClose: (
         <button className="btn btn-primary" onClick={onClose}>Done</button>
       </div>
     </ContactPanel>
+  )
+}
+
+/* Everything the lead engine measured, and the offer that measurement
+   supports. Only rendered when the contact carries a lead, so a person he
+   actually knows never sees a word of it. Read-only on purpose: these are
+   measurements with a date on them, not fields to edit. Correcting one by
+   hand would leave a number in the CRM that nothing checked. */
+/* A price reads "19 000 Kč, credited in full against a build or the first
+   three months of a retainer if they start inside 30 days." on the offer, and
+   a card has room for the number. The panel still shows the sentence. */
+/* One rating format everywhere: a Czech decimal comma, one place, so the same number never
+   renders "2948" in the table and "2 948" in the panel. */
+const fmtRating = (r: number) => r.toFixed(1).replace('.', ',')
+
+function shortPrice(p: string): string {
+  const m = p.match(/^(EUR\s?[\d\u00a0\u202f ]+|[\d\u00a0\u202f ]+\s?Kč)/)
+  return m ? m[1].trim() : p.split(/[,.]/)[0]
+}
+
+/* Rebuilt from the place id rather than stored: a Maps URL is 199 characters
+   and the id it contains is already here. */
+function mapsHref(lead: NonNullable<Contact['lead']>): string {
+  if (lead.mapsUrl) return lead.mapsUrl
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lead.city || '')}&query_place_id=${encodeURIComponent(lead.placeKey)}`
+}
+
+function LeadBlock({ lead, offer: o }: { lead: NonNullable<Contact['lead']>; offer?: LeadOffer }) {
+  const rows: [string, string | undefined][] = o ? [
+    ['Who it is for', o.whoFor], ['The problem', o.problem], ['The result', o.result],
+    ['Included', o.included], ['Price', o.price], ['Step-down', o.stepDown],
+    ['How long', o.howLong], ['Risk reversal', o.riskReversal], ['Why now', o.whyNow],
+  ] : []
+  return (
+    <div className="leadblock">
+      <div className="leadblock-head">
+        <span className="leadscore" title={`${lead.score} out of 100`}>{lead.score}<i>/100</i></span>
+        <span className="leadband">{lead.band}</span>
+        <span className="leadwhere">{[lead.city, lead.category].filter(Boolean).join(' · ')}</span>
+      </div>
+
+      {/* The headline evidence is printed at the top of the panel, so this block carries only
+          what it did not already say. */}
+      {lead.evidenceAll && lead.evidenceAll.length > 0 && (
+        <>
+          <span className="field-label">Also measured</span>
+          <ul className="leadevidence-more">
+            {lead.evidenceAll.map((e, i) => <li key={i}>{e}</li>)}
+          </ul>
+        </>
+      )}
+
+      <div className="leadfacts">
+        {lead.rating != null && (
+          <div><span>Google</span><b>{fmtRating(lead.rating)}{lead.reviews != null ? ` from ${lead.reviews.toLocaleString('cs-CZ')} reviews` : ''}</b></div>
+        )}
+        <div><span>Web presence</span><b>{lead.webPresence || 'not recorded'}</b></div>
+        {lead.website && <div><span>Website</span><a href={lead.website} target="_blank" rel="noopener noreferrer">{lead.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</a></div>}
+        {lead.instagram && <div><span>Instagram</span><a href={`https://instagram.com/${lead.instagram}`} target="_blank" rel="noopener noreferrer">@{lead.instagram}</a></div>}
+        <div><span>Google profile</span><a href={mapsHref(lead)} target="_blank" rel="noopener noreferrer">Open in Maps</a></div>
+      </div>
+
+      {o && (
+        /* The nine rows are identical across every lead carrying this offer, and he wrote them.
+           Folded by default so the per-lead half is what the panel opens on. */
+        <details className="leadofferwrap">
+          <summary><b>{o.name}</b><span>{o.price}</span></summary>
+          <dl className="leadoffer">
+            {rows.map(([k, v]) => v ? <div key={k}><dt>{k}</dt><dd>{v}</dd></div> : null)}
+          </dl>
+        </details>
+      )}
+    </div>
   )
 }
 
@@ -214,7 +346,7 @@ function NewContactPanel({ kind, onClose, onCreated }: { kind: 'people' | 'pipel
   )
 }
 
-function PipelineCard({ c, onOpen, onDragStart }: { c: Contact; onOpen: () => void; onDragStart: (e: DragEvent<HTMLDivElement>) => void }) {
+function PipelineCard({ c, offer, never, onOpen, onDragStart }: { c: Contact; offer?: LeadOffer; never: boolean; onOpen: () => void; onDragStart: (e: DragEvent<HTMLDivElement>) => void }) {
   const days = stageDaysSince(c)
   const stale = c.stage === 'contacted' && days > 14
   return (
@@ -223,11 +355,18 @@ function PipelineCard({ c, onOpen, onDragStart }: { c: Contact; onOpen: () => vo
       <div className="leadcard-top">
         <Avatar name={c.name} />
         <div><div className="leadcard-name">{c.name}</div>
-          {(c.company || c.role) && <div className="leadcard-sub">{[c.company, c.role].filter(Boolean).join(' · ')}</div>}
+          {(c.company || c.role || c.lead) && (
+            <div className="leadcard-sub">
+              {[c.company, c.role].filter(Boolean).join(' · ')
+                || [c.lead?.category, c.lead?.rating != null ? `${fmtRating(c.lead.rating)}${c.lead.reviews != null ? ` (${c.lead.reviews.toLocaleString('cs-CZ')})` : ''}` : ''].filter(Boolean).join(' · ')}
+            </div>
+          )}
         </div>
+        {c.lead && <span className="leadscore leadscore-sm" title={`${c.lead.score} out of 100, ${c.lead.band}`}>{c.lead.score}</span>}
       </div>
+      {offer && <div className="leadcard-offer"><b>{offer.name}</b><span>{shortPrice(offer.price)}</span></div>}
       <div className="leadcard-foot">
-        <span className={`leadcard-age${stale ? ' is-stale' : ''}`}>{ageLabel(days)} in stage</span>
+        <span className={`leadcard-age${stale ? ' is-stale' : ''}`}>{never ? 'never contacted' : `${ageLabel(days)} in stage`}</span>
         {c.next && <span className="leadcard-next" title={c.next}>{c.next}</span>}
       </div>
     </div>
@@ -241,19 +380,62 @@ function PipelineCard({ c, onOpen, onDragStart }: { c: Contact; onOpen: () => vo
    either way: the count still shows, one click opens the lane back up. */
 const FOLDED_BY_DEFAULT: PipelineStage[] = ['lost']
 
+/* A sourced pipeline puts well over a thousand cards in one lane, and painting
+   all of them is a locked-up phone rather than a useful board. The lane shows
+   the top of its own sort order and says how many more there are; the table
+   view and the filters are how you get to the rest. */
+const LANE_CAP = 60
+
 export function ContactsPage() {
-  const { contacts, contactActivity, setContactStage } = useStore()
-  const [kind, setKind] = useState<'people' | 'pipeline'>('people')
+  const { contacts, contactActivity, leadOffers, storageFull, setContactStage, importLeads } = useStore()
+  /* Reloading after an import used to land on People, which is empty when every contact is a
+     sourced prospect, and read as "the import failed". */
+  const [kind, setKind] = useState<'people' | 'pipeline'>(() => (contacts.some((c) => c.lead) ? 'pipeline' : 'people'))
+  /* The board is right for a handful of prospects and wrong for a thousand sourced ones: they all
+     sit in one lane, so four lanes of white fill the screen and the fifth is a column of cards.
+     A pipeline that is mostly sourced opens as a table; the board is one click away.
+     This has to react to the import, not only to what was on disk at mount: the lazy initializer
+     alone ran once with zero leads, so importing dropped him straight onto the board it exists
+     to avoid. Once he picks a view himself, his choice stands. */
   const [view, setView] = useState<'board' | 'table'>('board')
+  const [viewChosen, setViewChosen] = useState(false)
+  const leadCount = contacts.reduce((n, c) => n + (c.lead ? 1 : 0), 0)
+  useEffect(() => {
+    if (!viewChosen && leadCount > 40) setView('table')
+  }, [leadCount, viewChosen])
+  const isPhone = typeof window !== 'undefined' && window.matchMedia?.('(max-width: 700px)').matches
+  const effView = isPhone && kind === 'pipeline' ? 'table' : view
+  const pickView = (v: 'board' | 'table') => { setViewChosen(true); setView(v) }
   const [adding, setAdding] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<'name' | 'status' | 'company' | 'days' | 'next'>('days')
   const [sortDir, setSortDir] = useState<1 | -1>(-1)
-  const [pSortKey, setPSortKey] = useState<'name' | 'stage' | 'company' | 'days' | 'next'>('days')
+  const [pSortKey, setPSortKey] = useState<'name' | 'stage' | 'company' | 'days' | 'next' | 'score'>('days')
   const [pSortDir, setPSortDir] = useState<1 | -1>(-1)
   const [relFilter, setRelFilter] = useState('')
   const [folded, setFolded] = useState<Set<PipelineStage>>(new Set(FOLDED_BY_DEFAULT))
   const [dropStage, setDropStage] = useState<PipelineStage | null>(null)
+  /* The pipeline holds hand-added prospects and thousands of sourced ones in
+     one board on purpose (one page, more views and filters, never a second
+     page). These are the filters that make that survivable. */
+  const [cityFilter, setCityFilter] = useState('')
+  const [offerFilter, setOfferFilter] = useState('')
+  const [sourcedOnly, setSourcedOnly] = useState<'' | 'sourced' | 'hand'>('')
+  const [importMsg, setImportMsg] = useState('')
+  const [shown, setShown] = useState<Partial<Record<PipelineStage, number>>>({})
+  /* Everything he asked for is imported; the floor lives here, where he can drop it, instead of
+     in an export that silently threw rows away. */
+  const [minScore, setMinScore] = useState(45)
+  /* The board paints 60 a lane; the table was painting all of them, which is the same wall in a
+     different shape. Both grow on request now. */
+  const [tableCap, setTableCap] = useState(200)
+  const [q, setQ] = useState('')
+  /* 1206 of 2680 have neither number nor address. Without this they are invisible until he opens
+     one, which costs a click each to find out he cannot call them. */
+  const [reachableOnly, setReachableOnly] = useState(false)
+  /* On a phone the filter row was pushing the first lead 1500px down the page, so it collapses
+     behind one button there and stays inline on anything wider. */
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   /* Stage is the only thing that decides which of the two this page shows a
      contact in -- not a separate kind field. "The board is the only place a
@@ -285,7 +467,39 @@ export function ContactsPage() {
     return 0
   })
 
-  const prospectRows = prospects.map((c) => ({ c, days: stageDaysSince(c) }))
+  const cityOptions = Array.from(new Set(prospects.map((c) => c.lead?.city).filter((v): v is string => !!v))).sort()
+  const anySourced = prospects.some((c) => c.lead)
+  /* Every visible row carrying the same stage makes the column 500px of repetition on an
+     ultrawide, and makes sorting by it do nothing. */
+  const oneStage = new Set(prospects.map((c) => c.stage)).size <= 1
+  const allNever = anySourced && prospects.every((c) => neverTouched(c, contactActivity))
+  const offerNameOf = (c: Contact) => (c.lead?.offerKey ? leadOffers[c.lead.offerKey]?.name : undefined)
+  const offerOptions = Array.from(new Set(prospects.map(offerNameOf).filter((v): v is string => !!v))).sort()
+  const filteredProspects = prospects.filter((c) => (
+    (!cityFilter || c.lead?.city === cityFilter)
+    && (!offerFilter || offerNameOf(c) === offerFilter)
+    && (sourcedOnly === '' || (sourcedOnly === 'sourced' ? !!c.lead : !c.lead))
+    && (!c.lead || c.lead.score >= minScore)
+    && (!reachableOnly || !!c.phone || !!c.email)
+    && (!q || `${c.name} ${c.lead?.category ?? ''} ${c.lead?.city ?? ''} ${c.lead?.evidence ?? ''}`.toLowerCase().includes(q.toLowerCase()))
+  ))
+  const prospectRows = filteredProspects.map((c) => ({ c, days: stageDaysSince(c) }))
+
+  /* Reads a file the lead engine wrote. Deliberately a local file rather than
+     anything bundled: mission-control is a public repo, and a few thousand
+     businesses' phone numbers do not belong in it. */
+  const onImportFile = async (file: File) => {
+    try {
+      const parsed = JSON.parse(await file.text()) as LeadImportFile
+      if (!Array.isArray(parsed?.leads)) { setImportMsg('That file does not look like a lead export.'); return }
+      const { added, updated } = importLeads(parsed)
+      setImportMsg(`${added} added, ${updated} updated.`)
+      window.setTimeout(() => setImportMsg(''), 6000)
+      return
+    } catch {
+      setImportMsg('Could not read that file.')
+    }
+  }
   const setPSort = (key: typeof pSortKey) => {
     if (key === pSortKey) setPSortDir((d) => (d === 1 ? -1 : 1) as 1 | -1)
     else { setPSortKey(key); setPSortDir(key === 'name' ? 1 : -1) }
@@ -295,7 +509,8 @@ export function ContactsPage() {
       : pSortKey === 'stage' ? PIPELINE_STAGES.indexOf(r.c.stage)
         : pSortKey === 'company' ? (r.c.company ?? '')
           : pSortKey === 'next' ? (r.c.next ?? '')
-            : r.days
+            : pSortKey === 'score' ? (r.c.lead?.score ?? -1)
+              : r.days
   )
   const pSortedRows = [...prospectRows].sort((a, b) => {
     const av = pSortVal(a), bv = pSortVal(b)
@@ -303,6 +518,9 @@ export function ContactsPage() {
     if (av > bv) return 1 * pSortDir
     return 0
   })
+
+  const shownIn = (stage: PipelineStage) => shown[stage] ?? LANE_CAP
+  const showMore = (stage: PipelineStage) => setShown((prev) => ({ ...prev, [stage]: (prev[stage] ?? LANE_CAP) + 200 }))
 
   const toggleFold = (stage: PipelineStage) => setFolded((prev) => {
     const next = new Set(prev)
@@ -312,27 +530,71 @@ export function ContactsPage() {
 
   return (
     <div className="page">
-      <Band title="Contacts" metrics={[{ v: String(kind === 'pipeline' ? prospects.length : people.length), k: kind === 'pipeline' ? 'in pipeline' : 'people' }]} />
+      {/* "1441 of 2680 in pipeline" reads as 1239 having failed to import. All of them are in the
+          pipeline; a filter is hiding some. */}
+      <Band title="Contacts" metrics={[
+        kind === 'pipeline' && filteredProspects.length !== prospects.length
+          ? { v: String(filteredProspects.length), k: `shown of ${prospects.length}` }
+          : { v: String(kind === 'pipeline' ? prospects.length : people.length), k: kind === 'pipeline' ? 'in pipeline' : 'people' },
+      ]} />
 
       <div className="kindrow">
         <div className="kind" role="tablist" aria-label="Kind">
           <button aria-pressed={kind === 'people'} onClick={() => setKind('people')}>People</button>
           <button aria-pressed={kind === 'pipeline'} onClick={() => setKind('pipeline')}>Pipeline</button>
         </div>
-        <div className="cpage-subrow">
+        <div className={`cpage-subrow${filtersOpen ? ' is-open' : ''}`}>
           {/* Board is a Pipeline-only concept: it's the one place a stage is
              actually dragged from column to column. People's three groups
              are computed, not something you arrange, so there is nothing
              for a Board/Table switch to toggle there -- it's Table, always. */}
           {kind === 'pipeline' && (
             <div className="seg seg-sm" role="group" aria-label="View">
-              <button aria-pressed={view === 'board'} onClick={() => setView('board')}><b>Board</b></button>
-              <button aria-pressed={view === 'table'} onClick={() => setView('table')}><b>Table</b></button>
+              <button aria-pressed={view === 'board'} onClick={() => pickView('board')}><b>Board</b></button>
+              <button aria-pressed={view === 'table'} onClick={() => pickView('table')}><b>Table</b></button>
             </div>
           )}
           {kind === 'people' && relOptions.length > 0 && (
             <Select className="cpage-filter" ariaLabel="Filter by relationship" value={relFilter} onChange={setRelFilter}
               options={[{ value: '', label: 'All relationships' }, ...relOptions.map((r) => ({ value: r, label: r }))]} />
+          )}
+          {kind === 'pipeline' && anySourced && (
+            <input className="textinput cpage-search" type="search" placeholder="Search leads…"
+              value={q} onChange={(e) => setQ(e.target.value)} />
+          )}
+          {kind === 'pipeline' && anySourced && (
+            <button className="btn btn-quiet cpage-filtertoggle" aria-expanded={filtersOpen}
+              onClick={() => setFiltersOpen((v) => !v)}>Filters</button>
+          )}
+          {kind === 'pipeline' && anySourced && (
+            <label className="btn btn-quiet cpage-import cpage-foldable">
+              Import leads
+              <input type="file" accept="application/json,.json" hidden
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) onImportFile(f); e.target.value = '' }} />
+            </label>
+          )}
+          {kind === 'pipeline' && anySourced && (
+            <label className="chk cpage-foldable"><input type="checkbox" checked={reachableOnly}
+              onChange={(e) => setReachableOnly(e.target.checked)} /> Has a number</label>
+          )}
+          {kind === 'pipeline' && prospects.some((c) => c.lead) && (
+            <Select className="cpage-filter cpage-foldable" ariaLabel="Minimum lead score" value={String(minScore)}
+              onChange={(v) => setMinScore(Number(v))}
+              options={[{ value: '0', label: 'Any score' }, { value: '45', label: 'Score 45+' }, { value: '60', label: 'Score 60+' }, { value: '75', label: 'Score 75+' }]} />
+          )}
+          {/* A filter with one option is not a filter. */}
+          {kind === 'pipeline' && cityOptions.length > 1 && (
+            <Select className="cpage-filter cpage-foldable" ariaLabel="Filter by city" value={cityFilter} onChange={setCityFilter}
+              options={[{ value: '', label: 'All cities' }, ...cityOptions.map((c) => ({ value: c, label: c }))]} />
+          )}
+          {kind === 'pipeline' && offerOptions.length > 0 && (
+            <Select className="cpage-filter cpage-foldable" ariaLabel="Filter by offer" value={offerFilter} onChange={setOfferFilter}
+              options={[{ value: '', label: 'All offers' }, ...offerOptions.map((o) => ({ value: o, label: o }))]} />
+          )}
+          {kind === 'pipeline' && prospects.some((c) => c.lead) && (
+            <Select className="cpage-filter cpage-foldable" ariaLabel="Filter by where it came from" value={sourcedOnly}
+              onChange={(v) => setSourcedOnly(v as '' | 'sourced' | 'hand')}
+              options={[{ value: '', label: 'Everyone' }, { value: 'sourced', label: 'Sourced' }, { value: 'hand', label: 'Added by hand' }]} />
           )}
         </div>
       </div>
@@ -340,7 +602,18 @@ export function ContactsPage() {
       <div className="formrow" style={{ marginBottom: 'var(--s4)' }}>
         <input className="textinput" placeholder={kind === 'pipeline' ? 'Add a prospect…' : 'Add a person…'} readOnly onClick={() => setAdding(true)} />
         <button className="btn btn-quiet" onClick={() => setAdding(true)}>Add</button>
+        {kind === 'pipeline' && !anySourced && (
+          <label className="btn btn-quiet cpage-import">
+            Import leads
+            <input type="file" accept="application/json,.json" hidden
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) onImportFile(f); e.target.value = '' }} />
+          </label>
+        )}
       </div>
+      {storageFull && (
+        <p className="cpage-warn">This device cannot save any more. Anything changed from here is lost on reload. Raise the score filter and re-import fewer leads, or sign in so the server holds them.</p>
+      )}
+      {kind === 'pipeline' && importMsg && <p className="cpage-importmsg">{importMsg}</p>}
 
       {kind === 'people' ? (
         people.length === 0 ? (
@@ -372,11 +645,16 @@ export function ContactsPage() {
           </div>
         )
       ) : prospects.length === 0 ? (
-        <div className="empty">Nobody in the pipeline yet. Add someone above, or open a contact and add them to the pipeline.</div>
-      ) : view === 'board' ? (
+        <div className="empty">Nobody in the pipeline yet. Import a lead export or add a prospect from a wider screen, or open a contact and add them to the pipeline.</div>
+      ) : filteredProspects.length === 0 ? (
+        <div className="empty">Nobody matches those filters.</div>
+      ) : effView === 'board' ? (
         <div className="cboard cboard-pipeline">
           {PIPELINE_STAGES.map((stage) => {
-            const list = prospectRows.filter((r) => r.c.stage === stage).sort((a, b) => b.days - a.days)
+            /* Sourced rows sort by score, which is the order to work them in.
+               Anything without one keeps the original age order and sits after. */
+            const list = prospectRows.filter((r) => r.c.stage === stage)
+              .sort((a, b) => (b.c.lead?.score ?? -1) - (a.c.lead?.score ?? -1) || b.days - a.days)
             const isFolded = folded.has(stage)
             return (
               <div className={`ccol drop-zone${dropStage === stage ? ' drop-over' : ''}`} key={stage} style={{ ['--stage-c' as string]: STAGE_COLOR[stage] }}
@@ -392,10 +670,19 @@ export function ContactsPage() {
                   <span className="ccol-dot" /><span className="ccol-name">{STAGE_LABEL[stage]}</span><span className="ccol-count">{list.length}</span>
                   <button className="ccol-fold" onClick={() => toggleFold(stage)}>{isFolded ? 'Show' : 'Hide'}</button>
                 </div>
-                {!isFolded && (list.length ? list.map((r) => (
-                  <PipelineCard key={r.c.id} c={r.c} onOpen={() => setOpenId(r.c.id)}
-                    onDragStart={(e) => { e.dataTransfer.setData('text/plain', r.c.id); e.dataTransfer.effectAllowed = 'move' }} />
-                )) : <p className="ccol-empty">Nobody here.</p>)}
+                {!isFolded && (list.length ? (
+                  <>
+                    {list.slice(0, shownIn(stage)).map((r) => (
+                      <PipelineCard key={r.c.id} c={r.c} offer={r.c.lead?.offerKey ? leadOffers[r.c.lead.offerKey] : undefined} never={neverTouched(r.c, contactActivity)} onOpen={() => setOpenId(r.c.id)}
+                        onDragStart={(e) => { e.dataTransfer.setData('text/plain', r.c.id); e.dataTransfer.effectAllowed = 'move' }} />
+                    ))}
+                    {list.length > shownIn(stage) && (
+                      <button className="ccol-more" onClick={() => showMore(stage)}>
+                        {list.length - shownIn(stage)} more
+                      </button>
+                    )}
+                  </>
+                ) : <p className="ccol-empty">Nobody here.</p>)}
               </div>
             )
           })}
@@ -405,23 +692,38 @@ export function ContactsPage() {
           <table className="ctable">
             <thead><tr>
               <th onClick={() => setPSort('name')}>Name{pSortKey === 'name' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}</th>
-              <th onClick={() => setPSort('stage')}>Stage{pSortKey === 'stage' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}</th>
-              <th onClick={() => setPSort('company')}>Company / role{pSortKey === 'company' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}</th>
-              <th onClick={() => setPSort('days')}>Time in stage{pSortKey === 'days' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}</th>
-              <th onClick={() => setPSort('next')}>Next{pSortKey === 'next' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}</th>
+              <th onClick={() => setPSort('score')}>Score /100{pSortKey === 'score' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}</th>
+              {anySourced && <th>Phone</th>}
+              {!oneStage && <th onClick={() => setPSort('stage')}>Stage{pSortKey === 'stage' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}</th>}
+              <th onClick={() => setPSort('company')}>{anySourced ? 'Where' : 'Company / role'}{pSortKey === 'company' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}</th>
+              {!allNever && <th onClick={() => setPSort('days')}>Age{pSortKey === 'days' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}</th>}
+              <th className="col-why" onClick={() => setPSort('next')}>{anySourced ? 'Why call them' : 'Next'}{pSortKey === 'next' && <span className="arrow">{pSortDir === 1 ? '▲' : '▼'}</span>}</th>
             </tr></thead>
             <tbody>
-              {pSortedRows.map((r) => (
+              {pSortedRows.slice(0, tableCap).map((r) => (
                 <tr key={r.c.id} onClick={() => setOpenId(r.c.id)}>
-                  <td className="name"><div className="namecell"><Avatar name={r.c.name} size={30} /><div><b>{r.c.name}</b></div></div></td>
-                  <td><span className={`statusbadge st-${r.c.stage}`}>{STAGE_LABEL[r.c.stage]}</span></td>
-                  <td className="ellipsis">{[r.c.company, r.c.role].filter(Boolean).join(' · ') || '—'}</td>
-                  <td>{ageLabel(r.days)}</td>
-                  <td className="ellipsis">{r.c.next || '—'}</td>
+                  <td className="name"><div className="namecell"><Avatar name={r.c.name} size={30} /><div><b>{r.c.name}</b><span>{offerNameOf(r.c) ?? ''}</span></div></div></td>
+                  <td className="mono">{r.c.lead ? r.c.lead.score : '—'}</td>
+                  {anySourced && (
+                    <td className="col-phone" onClick={(e) => e.stopPropagation()}>
+                      {r.c.phone
+                        ? <a href={`tel:${r.c.phone.replace(/\s/g, '')}`}>{r.c.phone}</a>
+                        : <span className="col-phone-none">no number</span>}
+                    </td>
+                  )}
+                  {!oneStage && <td><span className={`statusbadge st-${r.c.stage}`}>{STAGE_LABEL[r.c.stage]}</span></td>}
+                  <td className="ellipsis">{[r.c.company, r.c.role].filter(Boolean).join(' · ') || [r.c.lead?.city, r.c.lead?.category].filter(Boolean).join(' · ') || '—'}</td>
+                  {!allNever && <td>{neverTouched(r.c, contactActivity) ? 'never called' : ageLabel(r.days)}</td>}
+                  <td className="col-why"><div className="clamp2">{r.c.next || r.c.lead?.evidence || '—'}</div></td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {pSortedRows.length > tableCap && (
+            <button className="ccol-more" onClick={() => setTableCap((n) => n + 500)}>
+              {pSortedRows.length - tableCap} more
+            </button>
+          )}
         </div>
       )}
 

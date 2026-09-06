@@ -239,6 +239,88 @@ export interface Contact {
    *  any strategy document. Free text, no required-field nagging -- it's a
    *  soft prompt on drop, not a gate. */
   lostReason?: string
+  /** Present only on a contact that came from the lead engine rather than
+   *  from someone he actually knows. Everything a sourced prospect carries
+   *  that a person does not: what was measured about them, and the offer
+   *  that measurement supports. A hand-added contact never has one. */
+  lead?: LeadInfo
+}
+
+/** The offer the evidence supports, carried on the lead rather than looked up
+ *  from a catalogue in the bundle. Off-Plate's price list is not something to
+ *  commit to a public repo, and the import file is local, so the text travels
+ *  with the row it belongs to. Nine fields because [OP] Offers requires nine:
+ *  an offer missing any of them is a service description, not an offer. */
+export interface LeadOffer {
+  key: string
+  name: string
+  price: string
+  stepDown: string
+  whoFor: string
+  problem: string
+  result: string
+  included: string
+  howLong: string
+  riskReversal: string
+  whyNow: string
+}
+
+/** What the lead engine measured about a business, in the shape the Contacts
+ *  page reads it. `placeKey` is Google's own stable place id and is what makes
+ *  a re-import update a row instead of duplicating it, so running the importer
+ *  again after another city finishes is safe. */
+export interface LeadInfo {
+  placeKey: string
+  source: string
+  market: string
+  city: string
+  category?: string
+  /** The Google Maps score and how many reviews are behind it. Rating alone is
+   *  close to meaningless in Albania, where 4.9 is ordinary, so the count is
+   *  never dropped. */
+  rating?: number
+  reviews?: number
+  website?: string
+  webPresence?: string
+  mapsUrl?: string
+  instagram?: string
+  /** Out of 100, and the band it falls in. A sort order, not a verdict. */
+  score: number
+  band: string
+  /** The one specific broken thing, measured, which is what [OP] Client
+   *  Acquisition says a first message opens on. */
+  evidence: string
+  evidenceAll?: string[]
+  /** Points into the leadOffers catalogue rather than carrying the offer text.
+   *  Nine offers cover a whole market, so embedding them on every row cost
+   *  1.8 kB of the 2.18 kB a lead weighed, and the whole app state is one JSON
+   *  row inside a browser quota his notes and tasks already share. Namespaced
+   *  by market, because cz and al both have a "mobile_broken" and they are not
+   *  the same offer or the same price. */
+  offerKey?: string
+  importedAt: string
+}
+
+/** The offer catalogue, one entry per market-and-key, held once for the whole
+ *  app instead of once per lead. Arrives with an import and is merged, never
+ *  replaced, so importing Albania does not drop the Czech offers. */
+export type LeadOffers = Record<string, LeadOffer>
+
+/** One row of the lead engine's export, as the importer receives it. Only the
+ *  fields a Contact can actually hold; everything else in the export file is
+ *  for the HTML report, not for here. */
+export interface ImportedLead {
+  name: string
+  phone?: string
+  email?: string
+  company?: string
+  lead: LeadInfo
+}
+
+/** What the importer reads: the catalogue once, then the rows that point at it. */
+export interface LeadImportFile {
+  offers: LeadOffers
+  leads: ImportedLead[]
 }
 
 export type ContactStatus = 'quiet' | 'soon' | 'track'

@@ -7,11 +7,6 @@ import {
 } from './types'
 
 const STATUS_LABEL: Record<ContactStatus, string> = { quiet: 'Gone Quiet', soon: 'Reach Out Soon', track: 'On Track' }
-const STATUS_ORDER: ContactStatus[] = ['quiet', 'soon', 'track']
-/* Column colour, not badge colour -- s-quiet/s-soon/s-track (badges, tables)
-   stay put; this is the top-stripe-and-dot treatment the board now shares
-   with the pipeline board below it. */
-const STATUS_COLOR: Record<ContactStatus, string> = { quiet: 'var(--alert)', soon: 'var(--warn)', track: 'var(--accent-text)' }
 const STAGE_COLOR: Record<PipelineStage, string> = {
   reach_out: 'var(--info)', contacted: 'var(--warn)', conversation: 'var(--accent-text)', acquired: 'var(--accent)', lost: 'var(--alert)',
 }
@@ -219,18 +214,6 @@ function NewContactPanel({ kind, onClose, onCreated }: { kind: 'people' | 'pipel
   )
 }
 
-function ContactCard({ c, days, onOpen }: { c: Contact; days: number; onOpen: () => void }) {
-  return (
-    <button className="leadcard" onClick={onOpen}>
-      <div className="leadcard-top">
-        <Avatar name={c.name} />
-        <div><div className="leadcard-name">{c.name}</div><div className="leadcard-sub">{c.tag || '—'}</div></div>
-      </div>
-      <div className="leadcard-foot"><span className="leadcard-age">{ageLabel(days)}</span></div>
-    </button>
-  )
-}
-
 function PipelineCard({ c, onOpen, onDragStart }: { c: Contact; onOpen: () => void; onDragStart: (e: DragEvent<HTMLDivElement>) => void }) {
   const days = stageDaysSince(c)
   const stale = c.stage === 'contacted' && days > 14
@@ -251,12 +234,12 @@ function PipelineCard({ c, onOpen, onDragStart }: { c: Contact; onOpen: () => vo
   )
 }
 
-/* Acquired and Lost are still live lanes -- Off-Plate's own CRM note is
-   explicit that Acquired stays visible ("what happens after the first
-   invoice is where the money is") and Lost's reasons are the whole point.
-   Folded by default is a display preference, not an archive: the count
-   still shows, one click opens the lane back up. */
-const FOLDED_BY_DEFAULT: PipelineStage[] = ['acquired', 'lost']
+/* Only Lost folds by default. Acquired is explicitly NOT an archive -- the
+   CRM Client card note is clear that it stays visible ("what happens after
+   the first invoice is where the money is"), and Michael confirmed he wants
+   to see it, not just Lost, tucked away. Folding is a display preference
+   either way: the count still shows, one click opens the lane back up. */
+const FOLDED_BY_DEFAULT: PipelineStage[] = ['lost']
 
 export function ContactsPage() {
   const { contacts, contactActivity, setContactStage } = useStore()
@@ -337,10 +320,16 @@ export function ContactsPage() {
           <button aria-pressed={kind === 'pipeline'} onClick={() => setKind('pipeline')}>Pipeline</button>
         </div>
         <div className="cpage-subrow">
-          <div className="seg seg-sm" role="group" aria-label="View">
-            <button aria-pressed={view === 'board'} onClick={() => setView('board')}><b>Board</b></button>
-            <button aria-pressed={view === 'table'} onClick={() => setView('table')}><b>Table</b></button>
-          </div>
+          {/* Board is a Pipeline-only concept: it's the one place a stage is
+             actually dragged from column to column. People's three groups
+             are computed, not something you arrange, so there is nothing
+             for a Board/Table switch to toggle there -- it's Table, always. */}
+          {kind === 'pipeline' && (
+            <div className="seg seg-sm" role="group" aria-label="View">
+              <button aria-pressed={view === 'board'} onClick={() => setView('board')}><b>Board</b></button>
+              <button aria-pressed={view === 'table'} onClick={() => setView('table')}><b>Table</b></button>
+            </div>
+          )}
           {kind === 'people' && relOptions.length > 0 && (
             <Select className="cpage-filter" ariaLabel="Filter by relationship" value={relFilter} onChange={setRelFilter}
               options={[{ value: '', label: 'All relationships' }, ...relOptions.map((r) => ({ value: r, label: r }))]} />
@@ -358,20 +347,6 @@ export function ContactsPage() {
           <div className="empty">Nobody added yet. Add the first person above.</div>
         ) : filteredRows.length === 0 ? (
           <div className="empty">Nobody with that relationship yet.</div>
-        ) : view === 'board' ? (
-          <div className="cboard">
-            {STATUS_ORDER.map((st) => {
-              const list = filteredRows.filter((r) => r.status === st).sort((a, b) => b.days - a.days)
-              return (
-                <div className="ccol" key={st} style={{ ['--stage-c' as string]: STATUS_COLOR[st] }}>
-                  <div className="ccol-head"><span className="ccol-dot" /><span className="ccol-name">{STATUS_LABEL[st]}</span><span className="ccol-count">{list.length}</span></div>
-                  {list.length ? list.map((r) => (
-                    <ContactCard key={r.c.id} c={r.c} days={r.days} onOpen={() => setOpenId(r.c.id)} />
-                  )) : <p className="ccol-empty">Nobody here.</p>}
-                </div>
-              )
-            })}
-          </div>
         ) : (
           <div className="ctable-wrap">
             <table className="ctable">

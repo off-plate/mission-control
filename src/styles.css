@@ -6751,12 +6751,18 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 @media (max-width: 520px) { .cpage-filter { width: 100%; } }
 
 .cboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s4); align-items: start; }
-.cboard-pipeline { grid-template-columns: repeat(5, minmax(200px, 1fr)); overflow-x: auto; min-width: 0; padding-bottom: 4px; }
+/* align-items: stretch (not the base's start) is load-bearing for drag and
+   drop: with "start" a short column's box is only as tall as its own
+   content, so dropping into the empty-looking space below a one-card
+   column actually misses it and lands on the page instead. Stretch makes
+   every column's box match the tallest one in the row, so the whole visual
+   slot -- not just the area right around the cards -- is real drop target. */
+.cboard-pipeline { grid-template-columns: repeat(5, minmax(200px, 1fr)); overflow-x: auto; min-width: 0; padding-bottom: 4px; align-items: stretch; }
 @media (max-width: 860px) { .cboard { grid-template-columns: 1fr; } }
 @media (max-width: 1100px) { .cboard-pipeline { grid-template-columns: repeat(5, 220px); } }
 /* Colour lives on the column, once, via --stage-c -- a top stripe and a
    dot, not five different badge hues repeated on every card inside it. */
-.ccol { border-top: 3px solid var(--stage-c, var(--hairline-strong)); padding-top: var(--s3); min-width: 0; }
+.ccol { border-top: 3px solid var(--stage-c, var(--hairline-strong)); padding-top: var(--s3); min-width: 0; min-height: 90px; }
 .ccol-head { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s3); }
 .ccol-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--stage-c, var(--faint)); flex: none; }
 .ccol-name { font-size: 0.8rem; font-weight: 800; letter-spacing: 0.02em; }
@@ -6770,12 +6776,18 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .avatar { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: #fff; font-weight: 800; flex: none; }
 .namecell { display: flex; align-items: center; gap: var(--s2); }
 
+/* Border only, no box-shadow -- matches .ctable-wrap's own flat treatment
+   elsewhere on this page. A shadow here also has nowhere safe to fall:
+   .cboard-pipeline scrolls (overflow-x: auto forces overflow-y non-visible
+   too, per spec, the moment either axis isn't "visible"), so a card near an
+   edge had its shadow hard-clipped into exactly the stray "shading" look
+   flagged as broken, not a soft ambient lift. */
 .leadcard {
   display: block; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--hairline);
-  border-radius: var(--a-r-lg); box-shadow: var(--a-lift); padding: var(--s3) var(--s4); margin-bottom: var(--s3);
-  cursor: pointer; transition: box-shadow var(--t-fast), transform var(--t-fast);
+  border-radius: var(--a-r-lg); padding: var(--s3) var(--s4); margin-bottom: var(--s3);
+  cursor: pointer; transition: border-color var(--t-fast), transform var(--t-fast);
 }
-.leadcard:hover { border-color: var(--a-accent-text); box-shadow: var(--a-lift-2); transform: translateY(-1px); }
+.leadcard:hover { border-color: var(--a-accent-text); transform: translateY(-1px); }
 .leadcard-top { display: flex; align-items: center; gap: var(--s3); }
 .leadcard-name { font-size: 0.9375rem; font-weight: 700; line-height: 1.25; }
 .leadcard-sub { color: var(--faint); font-size: 0.75rem; margin-top: 1px; }

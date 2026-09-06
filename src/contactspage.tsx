@@ -1,5 +1,6 @@
 import { useEffect, useState, type DragEvent, type ReactNode } from 'react'
 import { useStore } from './store'
+import { FolderAdd } from './icons'
 import { AutoTextarea, Band, Select, SpaceMark, type SelectOption } from './ui'
 import {
   contactDaysSince, contactStatus, stageDaysSince, PIPELINE_STAGES, STAGE_LABEL,
@@ -497,6 +498,9 @@ export function ContactsPage() {
 
   const cityOptions = Array.from(new Set(prospects.map((c) => c.lead?.city).filter((v): v is string => !!v))).sort()
   const anySourced = prospects.some((c) => c.lead)
+  /* Folded filters that are still on have to announce themselves, or the list is quietly filtered
+     by something he cannot see. */
+  const activeExtraFilters = [reachableOnly, !!cityFilter, !!offerFilter, !!sourcedOnly].filter(Boolean).length
   /* Every visible row carrying the same stage makes the column 500px of repetition on an
      ultrawide, and makes sorting by it do nothing. */
   const oneStage = new Set(prospects.map((c) => c.stage)).size <= 1
@@ -573,81 +577,79 @@ export function ContactsPage() {
           : { v: String(kind === 'pipeline' ? prospects.length : people.length), k: kind === 'pipeline' ? 'in pipeline' : 'people' },
       ]} />
 
+      {/* Two rows, and no more. Row one is what you are looking at: which list, and how it is
+          drawn. Row two is what you are looking for. Everything past the search and the score
+          floor folds behind "More filters", because those four are set once and then left. */}
       <div className="kindrow">
         <div className="kind" role="tablist" aria-label="Kind">
           <button aria-pressed={kind === 'people'} onClick={() => { setKindChosen(true); setKind('people') }}>People</button>
           <button aria-pressed={kind === 'pipeline'} onClick={() => { setKindChosen(true); setKind('pipeline') }}>Pipeline</button>
         </div>
-        <div className={`cpage-subrow${filtersOpen ? ' is-open' : ''}`}>
-          {/* Board is a Pipeline-only concept: it's the one place a stage is
-             actually dragged from column to column. People's three groups
-             are computed, not something you arrange, so there is nothing
-             for a Board/Table switch to toggle there -- it's Table, always. */}
+        <div className="kindrow-right">
+          {/* Board/Table is a switcher, so it wears the switcher's clothes rather than a second
+              visual language 40px away. Board is Pipeline-only: it is the one place a stage is
+              dragged from column to column, and People's groups are computed, not arranged. */}
           {kind === 'pipeline' && (
-            <div className="seg seg-sm" role="group" aria-label="View">
-              <button aria-pressed={view === 'board'} onClick={() => pickView('board')}><b>Board</b></button>
-              <button aria-pressed={view === 'table'} onClick={() => pickView('table')}><b>Table</b></button>
+            <div className="kind kind-sm" role="group" aria-label="View">
+              <button aria-pressed={view === 'board'} onClick={() => pickView('board')}>Board</button>
+              <button aria-pressed={view === 'table'} onClick={() => pickView('table')}>Table</button>
             </div>
           )}
-          {kind === 'people' && relOptions.length > 0 && (
-            <Select className="cpage-filter" ariaLabel="Filter by relationship" value={relFilter} onChange={setRelFilter}
-              options={[{ value: '', label: 'All relationships' }, ...relOptions.map((r) => ({ value: r, label: r }))]} />
-          )}
-          {kind === 'pipeline' && anySourced && (
-            <input className="textinput cpage-search" type="search" placeholder="Search leads…"
-              value={q} onChange={(e) => setQ(e.target.value)} />
-          )}
-          {kind === 'pipeline' && anySourced && (
-            <button className="btn btn-quiet cpage-filtertoggle" aria-expanded={filtersOpen}
-              onClick={() => setFiltersOpen((v) => !v)}>Filters</button>
-          )}
-          {kind === 'pipeline' && anySourced && (
-            <label className="btn btn-quiet cpage-import cpage-foldable">
-              Import leads
+          {kind === 'pipeline' && (
+            <label className="iconbtn" title="Import leads">
+              <FolderAdd />
+              <span className="sr-only">Import leads</span>
               <input type="file" accept="application/json,.json" hidden
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) onImportFile(f); e.target.value = '' }} />
             </label>
           )}
-          {kind === 'pipeline' && anySourced && (
-            <label className="chk cpage-foldable"><input type="checkbox" checked={reachableOnly}
-              onChange={(e) => setReachableOnly(e.target.checked)} /> Has a number</label>
-          )}
-          {kind === 'pipeline' && prospects.some((c) => c.lead) && (
-            <Select className="cpage-filter cpage-foldable" ariaLabel="Minimum lead score" value={String(minScore)}
-              onChange={(v) => setMinScore(Number(v))}
-              options={[{ value: '0', label: 'Any score' }, { value: '45', label: 'Score 45+' }, { value: '60', label: 'Score 60+' }, { value: '75', label: 'Score 75+' }]} />
-          )}
-          {/* A filter with one option is not a filter. */}
-          {kind === 'pipeline' && cityOptions.length > 1 && (
-            <Select className="cpage-filter cpage-foldable" ariaLabel="Filter by city" value={cityFilter} onChange={setCityFilter}
-              options={[{ value: '', label: 'All cities' }, ...cityOptions.map((c) => ({ value: c, label: c }))]} />
-          )}
-          {kind === 'pipeline' && offerOptions.length > 0 && (
-            <Select className="cpage-filter cpage-foldable" ariaLabel="Filter by offer" value={offerFilter} onChange={setOfferFilter}
-              options={[{ value: '', label: 'All offers' }, ...offerOptions.map((o) => ({ value: o, label: o }))]} />
-          )}
-          {kind === 'pipeline' && prospects.some((c) => c.lead) && (
-            <Select className="cpage-filter cpage-foldable" ariaLabel="Filter by where it came from" value={sourcedOnly}
-              onChange={(v) => setSourcedOnly(v as '' | 'sourced' | 'hand')}
-              options={[{ value: '', label: 'Everyone' }, { value: 'sourced', label: 'Sourced' }, { value: 'hand', label: 'Added by hand' }]} />
-          )}
         </div>
       </div>
 
-      {/* A permanent empty input above the list was taking a row and adding nothing; adding one
-          by hand is rare next to eight thousand sourced rows. */}
-      <div className="formrow formrow-tight">
+      <div className={`cpage-subrow${filtersOpen ? ' is-open' : ''}`}>
+        {kind === 'people' && relOptions.length > 0 && (
+          <Select className="cpage-filter" ariaLabel="Filter by relationship" value={relFilter} onChange={setRelFilter}
+            options={[{ value: '', label: 'All relationships' }, ...relOptions.map((r) => ({ value: r, label: r }))]} />
+        )}
+        {kind === 'pipeline' && anySourced && (
+          <input className="textinput cpage-search" type="search" placeholder="Search leads…"
+            value={q} onChange={(e) => setQ(e.target.value)} />
+        )}
+        {kind === 'pipeline' && anySourced && (
+          <Select className="cpage-filter" ariaLabel="Minimum lead score" value={String(minScore)}
+            onChange={(v) => setMinScore(Number(v))}
+            options={[{ value: '0', label: 'Any score' }, { value: '45', label: 'Score 45+' }, { value: '60', label: 'Score 60+' }, { value: '75', label: 'Score 75+' }]} />
+        )}
+        {kind === 'pipeline' && anySourced && (
+          <button className="btn btn-quiet" aria-expanded={filtersOpen}
+            onClick={() => setFiltersOpen((v) => !v)}>
+            {filtersOpen ? 'Fewer filters' : 'More filters'}
+            {activeExtraFilters > 0 && <span className="filtercount">{activeExtraFilters}</span>}
+          </button>
+        )}
         <button className="btn btn-quiet" onClick={() => setAdding(true)}>
           {kind === 'pipeline' ? 'Add a prospect' : 'Add a person'}
         </button>
-        {kind === 'pipeline' && !anySourced && (
-          <label className="btn btn-quiet cpage-import">
-            Import leads
-            <input type="file" accept="application/json,.json" hidden
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) onImportFile(f); e.target.value = '' }} />
-          </label>
+
+        {kind === 'pipeline' && anySourced && filtersOpen && (
+          <div className="cpage-morefilters">
+            <label className="chk"><input type="checkbox" checked={reachableOnly}
+              onChange={(e) => setReachableOnly(e.target.checked)} /> Has a number</label>
+            {cityOptions.length > 1 && (
+              <Select className="cpage-filter" ariaLabel="Filter by city" value={cityFilter} onChange={setCityFilter}
+                options={[{ value: '', label: 'All cities' }, ...cityOptions.map((c) => ({ value: c, label: c }))]} />
+            )}
+            {offerOptions.length > 0 && (
+              <Select className="cpage-filter" ariaLabel="Filter by offer" value={offerFilter} onChange={setOfferFilter}
+                options={[{ value: '', label: 'All offers' }, ...offerOptions.map((o) => ({ value: o, label: o }))]} />
+            )}
+            <Select className="cpage-filter" ariaLabel="Filter by where it came from" value={sourcedOnly}
+              onChange={(v) => setSourcedOnly(v as '' | 'sourced' | 'hand')}
+              options={[{ value: '', label: 'Everyone' }, { value: 'sourced', label: 'Sourced' }, { value: 'hand', label: 'Added by hand' }]} />
+          </div>
         )}
       </div>
+
       {storageFull && (
         <p className="cpage-warn">This device cannot save any more. Anything changed from here is lost on reload. Raise the score filter and re-import fewer leads, or sign in so the server holds them.</p>
       )}

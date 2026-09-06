@@ -6750,6 +6750,10 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .ctable th:last-child, .ctable td:last-child { width: auto; }
 .ctable th { white-space: nowrap; }
 .ctable td { vertical-align: top; }
+/* Eight thousand rows of the same colour and the eye loses its place mid-row. Every other row
+   gets a shade, and the row under the cursor gets a stronger one. */
+.ctable tbody tr:nth-child(even) { background: var(--surface-2); }
+.ctable tbody tr:hover td { background: var(--a-accent-wash); }
 .ctable td.col-phone-none, .col-phone-none { color: var(--faint); font-size: 0.78rem; }
 /* Reason wraps and the row grows with it, the way a spreadsheet cell does, instead of clamping. */
 .ctable td.col-why { max-width: none; white-space: normal; overflow: visible; color: var(--soft); font-size: 0.8125rem; line-height: 1.45; padding-block: 11px; }
@@ -6779,7 +6783,24 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .scorehelp li { margin-bottom: 4px; color: var(--soft); }
 .scorehelp li b { color: var(--ink); font-weight: 600; }
 
-.formrow-tight { margin-bottom: var(--s3); }
+/* Row one: which list on the left, how it is drawn on the right. */
+.kindrow-right { display: flex; align-items: center; gap: var(--s2); }
+.kind-sm button { padding: 8px 16px; font-size: 0.8125rem; }
+.iconbtn {
+  display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px;
+  border: 1px solid var(--a-line-2); border-radius: 999px; background: var(--surface);
+  color: var(--soft); cursor: pointer; flex: none;
+}
+.iconbtn:hover { color: var(--a-accent-text); border-color: var(--a-accent-text); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Row two: search, the score floor, and everything else behind one toggle. */
+.cpage-morefilters { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; flex-basis: 100%; margin-top: var(--s2); }
+.filtercount {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 17px; height: 17px;
+  margin-left: 6px; padding: 0 4px; border-radius: 999px; background: var(--a-accent); color: var(--a-ink);
+  font: 700 10px/1 var(--font-body);
+}
 .pager { display: flex; align-items: center; gap: var(--s3); padding: var(--s3); border-top: 1px solid var(--a-line-2); flex-wrap: wrap; }
 .pager-at { font-size: 0.8125rem; color: var(--soft); font-variant-numeric: tabular-nums; }
 .pager-size { width: 150px; margin-left: auto; }
@@ -6809,7 +6830,10 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 }
 .kind button[aria-pressed="true"] { background: var(--a-accent); color: var(--a-ink); }
 .kind button:not([aria-pressed="true"]):hover { color: var(--ink); }
-.cpage-subrow { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+.cpage-subrow { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; margin-bottom: var(--s3); }
+/* The search takes the slack but stops short of the full width, so it reads as a field rather
+   than a banner. */
+.cpage-search { flex: 1 1 260px; max-width: 420px; }
 .cpage-filter { width: 200px; }
 @media (max-width: 520px) { .cpage-filter { width: 100%; } }
 
@@ -6898,7 +6922,8 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   .cpage-subrow { width: 100%; }
 }
 .cpage-import { cursor: pointer; }
-.cpage-importmsg { color: var(--soft); font-size: 0.8125rem; margin: calc(var(--s3) * -1) 0 var(--s4); }
+/* No negative top margin: it pulled this line up into the filter row above and the two collided. */
+.cpage-importmsg { color: var(--soft); font-size: 0.8125rem; margin: 0 0 var(--s3); }
 .cpage-warn { background: var(--a-alert-wash); color: var(--a-alert); font-size: 0.8125rem; padding: var(--s3); border-radius: var(--a-r-xs); margin: 0 0 var(--s4); }
 .cpage-search { width: 210px; }
 .leadscore i { font-style: normal; font-weight: 600; opacity: 0.65; font-size: 0.72em; }

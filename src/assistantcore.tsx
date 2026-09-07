@@ -11,7 +11,12 @@ import {
 } from './voicemode'
 import { getWeather, weatherLine } from './weather'
 import { useAssistantBills } from './assistantbills'
-import { SLOTS, dueOn, habitsDueToday, goalCurrent, habitStepKey, routineComplete, requiredSteps, type HabitDef, type PageId, type SpaceId, type Task } from './types'
+import { usePomodoro } from './pomodoro'
+import {
+  SLOTS, dueOn, habitsDueToday, goalCurrent, habitStepKey, routineComplete, requiredSteps,
+  contactDaysSince, contactStatus, daysClean, spaceFolderId,
+  type HabitDef, type PageId, type SpaceId, type Task,
+} from './types'
 import { localDateKey, fmtDuration, taskMinutes, goalPeriodKey, goalPeriodRange, periodKeyFor, type GoalTf } from './util'
 import * as Icon from './icons'
 
@@ -49,7 +54,7 @@ const label = (s?: SpaceId) => (s ? SPACE_LABELS[s] : 'Unfiled')
 const dropUrl = (title: string) => title.replace(/https?:\/\/\S+/gi, '').replace(/\s{2,}/g, ' ').trim()
 
 function useBrief(): Brief {
-  const { tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, slips, plan } = useStore()
+  const { tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, slips, plan, contacts, contactActivity } = useStore()
   const { state: cal } = useCalendar()
   /* Fetched once when the page opens. It is a garnish on the brief, so it never
      blocks anything and a failure just means no weather line. */
@@ -163,8 +168,20 @@ function useBrief(): Brief {
         return { name: g.name, pct: g.target > 0 ? Math.round((cur / g.target) * 100) : 0 }
       }),
       bills: billsBrief,
+      /* Same computation contactsdock.tsx's own glance runs: real people,
+         real days since the last logged touch, "quiet" past 20 (the same
+         line contactStatus already draws), oldest first. */
+      contacts: contacts
+        .map((c) => ({ name: c.name, days: contactDaysSince(c, contactActivity), status: contactStatus(c, contactActivity) }))
+        .filter((c) => c.status === 'quiet')
+        .sort((a, b) => b.days - a.days)
+        .slice(0, 8)
+        .map(({ name, days }) => ({ name, days })),
+      quitting: habits
+        .filter((h) => h.kind === 'break' && !h.archivedAt)
+        .map((h) => ({ name: h.name, days: daysClean(h, slips) ?? 0 })),
     }
-  }, [tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, slips, cal, sky, plan, billsBrief])
+  }, [tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, slips, cal, sky, plan, billsBrief, contacts, contactActivity])
 }
 
 /* WHAT HAPPENED, in the app's words rather than the model's.
@@ -438,6 +455,7 @@ function useDoer() {
   const live = useRef(st)
   live.current = st
   const bills = useAssistantBills()
+  const pomo = usePomodoro()
 
   /* async now, for "bill" alone -- marking one paid/unpaid is a real
      Supabase round trip (assistantbills.ts), unlike every other action here,
@@ -533,6 +551,57 @@ function useDoer() {
         }
         if (a.paid) await bills.markPaid(row); else await bills.markUnpaid(row)
         out.push({ ok: true, text: a.paid ? `Marked paid: ${row.name}` : `Marked unpaid: ${row.name}` })
+        continue
+      }
+      if (a.kind === 'contact') {
+        /* His ask: full operation across the app, not just the task list.
+           logContactActivity is the exact function the dock's own Contacts
+           glance calls from its quick "log a touch" button -- one real row
+           in contactActivity, same as a person tapping it by hand. */
+        const rows = s2.contacts.map((c) => ({ ...c, title: c.name }))
+        const { row, why } = pick(rows, a.match)
+        if (!row) { out.push({ ok: false, text: why ?? 'no contact matched' }); continue }
+        s2.logContactActivity(row.id, a.log)
+        out.push({ ok: true, text: `Logged a ${a.log} with ${row.name}` })
+        continue
+      }
+      if (a.kind === 'slip') {
+        /* Only break-kind habits -- the quitting list, never an ordinary
+           one, and never a routine (routines have no "slip" at all, see the
+           habit/routine split elsewhere in useDoer). logSlip writes today's
+           date; there is no undo, by design (assistant.ts). */
+        const rows = s2.habits.filter((h) => !h.archivedAt && h.kind === 'break').map((h) => ({ ...h, title: h.name }))
+        const { row, why } = pick(rows, a.match)
+        if (!row) { out.push({ ok: false, text: why ?? 'no habit matched' }); continue }
+        s2.logSlip(row.id)
+        out.push({ ok: true, text: `Logged a slip: ${row.name}` })
+        continue
+      }
+      if (a.kind === 'focus') {
+        /* A real timer, starting now -- pomo lives in its own context
+           (PomodoroProvider, mounted around the whole app in main.tsx), not
+           the store, so it is read here rather than through s2. announce
+           true matches every other REAL start elsewhere (a task's own Start
+           button, the Zone's first move) -- see the toast note on
+           announcedAt in dock.tsx for why that flag exists at all. */
+        if (a.match) {
+          const { row, why } = pick(s2.tasks, a.match)
+          if (!row) { out.push({ ok: false, text: why ?? 'no task matched' }); continue }
+          pomo.startFocus(a.min ?? taskMinutes(row), row.title, true)
+          out.push({ ok: true, text: `Focus started: ${row.title}` })
+        } else {
+          pomo.startFocus(a.min, undefined, true)
+          out.push({ ok: true, text: a.min ? `Focus started, ${fmtDuration(a.min)}` : 'Focus started' })
+        }
+        continue
+      }
+      if (a.kind === 'note') {
+        /* His own words, filed in the space he is currently standing in --
+           the same default NotePanel's own "+ new note" button uses
+           (notedock.tsx: addNote(spaceFolderId(space))), not a folder
+           invented for this. */
+        s2.addNote(spaceFolderId(space), a.text)
+        out.push({ ok: true, text: 'Noted' })
         continue
       }
       if (a.kind === 'habit') {

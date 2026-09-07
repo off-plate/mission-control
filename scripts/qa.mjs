@@ -3340,6 +3340,92 @@ await step('assistant: signed out of Bills, "bill" says so rather than guessing 
     throw new Error('claimed to mark a bill paid with no bills data at all')
   }
 })
+await step('assistant: "log that I called her" writes a real contact touch', async () => {
+  /* His ask, after Bills: "it's not only bills... it's every functionality
+     across the mission control." contact (assistant.ts/assistantcore.tsx)
+     calls the exact logContactActivity the dock's own Contacts glance uses
+     from its quick-touch button -- a real row in contactActivity, not a
+     sentence about one. */
+  await fresh('assistant')
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    s.contacts = [{ id: 'c-eva', name: 'Eva Kaiserová', tag: 'client', createdAt: '2024-01-01' }]
+    s.contactActivity = []
+    localStorage.setItem(K, JSON.stringify(s))
+    localStorage.setItem('mc-groq-key', 'gsk_gatetest')
+  }, KEY)
+  await stubAssistant(() => JSON.stringify({
+    say: 'Logged it.', show: [],
+    do: [{ kind: 'contact', match: 'Eva', log: 'call' }],
+  }))
+  await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('log that I called Eva')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  const line = await page.locator('.as-did li').innerText()
+  if (!/Eva/.test(line)) throw new Error(`the outcome line does not name her: "${line}"`)
+  const activity = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).contactActivity ?? [], KEY)
+  if (activity.length !== 1 || activity[0].contactId !== 'c-eva' || activity[0].type !== 'call') {
+    throw new Error(`no real touch logged: ${JSON.stringify(activity)}`)
+  }
+})
+await step('assistant: "I slipped on X" logs a real slip, no undo exists', async () => {
+  /* slip only ever adds -- there is no "un-slip" action (assistant.ts is
+     explicit about this: a slip is a fact about a day that happened). */
+  await fresh('assistant')
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    s.habits = [...(s.habits ?? []), {
+      id: 'h-quit', name: 'Vaping', kind: 'break', frequency: 'daily', quitSince: '2026-08-01', archivedAt: null,
+    }]
+    localStorage.setItem(K, JSON.stringify(s))
+    localStorage.setItem('mc-groq-key', 'gsk_gatetest')
+  }, KEY)
+  await stubAssistant(() => JSON.stringify({
+    say: 'Logged it.', show: [],
+    do: [{ kind: 'slip', match: 'Vaping' }],
+  }))
+  await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('I slipped on vaping today')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  const line = await page.locator('.as-did li').innerText()
+  if (!/Vaping/.test(line)) throw new Error(`the outcome line does not name it: "${line}"`)
+  const slips = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).slips ?? [], KEY)
+  if (!slips.some((s) => s.habitId === 'h-quit')) throw new Error(`no real slip recorded: ${JSON.stringify(slips)}`)
+})
+await step('assistant: "note that..." writes a real note in his own words', async () => {
+  /* His words verbatim, same rule "add" already follows for a task's
+     title -- never a summary of what he said. */
+  await fresh('assistant')
+  await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
+  await stubAssistant(() => JSON.stringify({
+    say: 'Noted.', show: [],
+    do: [{ kind: 'note', text: 'Call the accountant about Q3 VAT' }],
+  }))
+  await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('note that I need to call the accountant about Q3 VAT')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  const notes = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).notes ?? [], KEY)
+  if (!notes.some((n) => n.body === 'Call the accountant about Q3 VAT')) {
+    throw new Error(`no real note written: ${JSON.stringify(notes.map((n) => n.body))}`)
+  }
+})
+await step('assistant: "start a focus block" starts a real, running timer', async () => {
+  /* A real timer the instant this runs, not a suggestion -- checked against
+     mc-pomodoro's own persisted phase, the same state the Focus page and
+     the dock's own Focus row both read. */
+  await fresh('assistant')
+  await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
+  await stubAssistant(() => JSON.stringify({
+    say: 'Starting.', show: [],
+    do: [{ kind: 'focus', min: 20 }],
+  }))
+  await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('start a 20 minute focus block')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  const pomo = await page.evaluate(() => JSON.parse(localStorage.getItem('mc-pomodoro')))
+  if (pomo?.phase !== 'focus') throw new Error(`pomodoro phase is "${pomo?.phase}", never actually started`)
+  if (pomo?.blockMin !== 20) throw new Error(`block length is ${pomo?.blockMin}, not the 20 he asked for`)
+})
 
 /* The systematic matrix the critic and persona panel actually judge: the
    app's real pages (App.tsx's page switch, not the QA flow names above,

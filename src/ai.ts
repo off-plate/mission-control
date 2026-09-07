@@ -37,6 +37,18 @@ export interface ProviderConfig {
   keyStore: string
   keyPlaceholder: string
   getKeyUrl: string
+  /** Extra body fields that ask this provider's model to skip its thinking
+   *  phase and answer directly. NOT a shared shape across providers -- this
+   *  was the actual bug (2026-09-07): every provider was sent Groq's own
+   *  `reasoning_format`/`reasoning_effort: 'none'`, and GLM-5.3 does not
+   *  accept "none" as a reasoning_effort value at all (their docs: only
+   *  low/high/max for this model), defaults to "max" the moment the flag is
+   *  rejected or ignored, and spends the entire response budget on invisible
+   *  reasoning_content -- the visible `content` field this app reads stays
+   *  empty the whole stream through. That is "took a long time and came back
+   *  unreadable", exactly. Z.ai's own way to turn thinking off entirely is a
+   *  `thinking: { type: 'disabled' }` object, nothing shaped like Groq's. */
+  quiet: Record<string, unknown>
 }
 
 export const PROVIDERS: Record<AiProvider, ProviderConfig> = {
@@ -47,6 +59,7 @@ export const PROVIDERS: Record<AiProvider, ProviderConfig> = {
     keyStore: 'mc-groq-key',
     keyPlaceholder: 'gsk_…',
     getKeyUrl: 'https://console.groq.com/keys',
+    quiet: { reasoning_format: 'hidden', reasoning_effort: 'none' },
   },
   zai: {
     label: 'Z.ai (GLM)',
@@ -59,6 +72,7 @@ export const PROVIDERS: Record<AiProvider, ProviderConfig> = {
     keyStore: 'mc-zai-key',
     keyPlaceholder: 'Z.ai API key…',
     getKeyUrl: 'https://z.ai/model-api',
+    quiet: { thinking: { type: 'disabled' } },
   },
 }
 
@@ -172,18 +186,29 @@ export function stripReasoning(raw: string): string {
  *  toggle says so. notesai.ts pins this to 'groq' explicitly for its one
  *  Groq-only model (see there for why).
  *
- *  The reasoning flags are Groq's own vocabulary for hiding a reasoning
- *  model's scratchpad; a provider that does not know them answers 400, which
- *  already falls through to a plain retry below rather than failing the
- *  whole call, so this needs no per-provider branch to stay correct on Z.ai. */
+ *  Each provider's own `quiet` fields are sent to keep its model from
+ *  thinking out loud before it answers. This USED to be one hardcoded Groq
+ *  shape (`reasoning_format`/`reasoning_effort: 'none'`) sent to every
+ *  provider, retried without it on a 400 -- which quietly assumed an unknown
+ *  flag always gets REJECTED. GLM-5.3 does neither: "none" is not a value it
+ *  accepts for reasoning_effort at all, and rather than 400 it appears to
+ *  fall back to its own default of "max" -- full extended thinking, the
+ *  entire response budget spent on invisible reasoning_content, the visible
+ *  `content` field this app actually reads left empty the whole stream
+ *  through. That is "took a long time and came back unreadable" (his report,
+ *  2026-09-07), and the retry-without-flags fallback could not have fixed it
+ *  either: dropping the flags entirely still leaves Z.ai's own default of
+ *  maximum thinking in force. The fallback below still exists for whatever
+ *  the NEXT provider's own quiet fields turn out not to be, but it is no
+ *  longer the only line of defence. */
 export async function request(body: Record<string, unknown>, key: string, provider: AiProvider = getAiProvider()): Promise<Response> {
-  const endpoint = PROVIDERS[provider].endpoint
-  const send = (b: Record<string, unknown>) => fetch(endpoint, {
+  const cfg = PROVIDERS[provider]
+  const send = (b: Record<string, unknown>) => fetch(cfg.endpoint, {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(b),
   })
-  const res = await send({ ...body, reasoning_format: 'hidden', reasoning_effort: 'none' })
+  const res = await send({ ...body, ...cfg.quiet })
   if (res.status !== 400) return res
   return send(body)
 }

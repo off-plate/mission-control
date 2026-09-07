@@ -59,12 +59,16 @@ function caretToEnd(node: Node) {
   sel.addRange(r)
 }
 
-/* Matches the wording Settings and Break It Down already use for the same
-   three failure shapes, so a key problem reads the same everywhere it shows. */
+/* Provider-neutral on purpose, unlike Settings and Break It Down: /help tries
+   Groq's own compound-mini first for its web search, then falls back to
+   whichever provider Settings has active (notesai.ts, 2026-09-07), so a
+   terminal 'bad-key' here can genuinely be either one's key -- naming the
+   wrong provider would be worse than naming none. The parenthetical detail
+   appended below already carries the actual model when it is worth knowing. */
 const HELP_ERROR: Record<Exclude<HelpResult, { ok: true }>['reason'], string> = {
-  'no-key': 'No Groq key yet. Add one in Settings and /help can actually answer.',
-  'bad-key': 'That Groq key was rejected. Check it in Settings.',
-  'rate-limit': 'Groq is rate-limited right now. Try again in a moment.',
+  'no-key': 'No AI key yet. Add one in Settings and /help can actually answer.',
+  'bad-key': 'That key was rejected. Check it in Settings.',
+  'rate-limit': 'Rate-limited right now. Try again in a moment.',
   'failed': 'That did not go through. Try again.',
 }
 

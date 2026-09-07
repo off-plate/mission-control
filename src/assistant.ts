@@ -19,7 +19,7 @@
    money, no note contents. It is what a colleague glancing at the screen would
    see, and nothing that would be a problem if the model logged it. */
 
-import { MODEL, getAiKey, groq, stripReasoning } from './ai'
+import { activeModel, getAiKey, request, stripReasoning } from './ai'
 import { getTtsKey, hasTtsKey } from './speech'
 
 /** What a card shows. The app owns every one of these; the model only names one. */
@@ -588,8 +588,8 @@ export async function ask(
   if (!key) return { ok: false, reason: 'no-key' }
   let res: Response
   try {
-    res = await groq({
-      model: MODEL,
+    res = await request({
+      model: activeModel(),
       temperature: 0.3,
       /* 700 was set when the answer was two sentences and a card name; 1400
          when the brief grew to four beats. A finished-yesterday list is
@@ -613,15 +613,17 @@ export async function ask(
   }
   if (res.status === 401 || res.status === 403) return { ok: false, reason: 'rejected' }
   if (res.status === 429) {
-    /* GROQ SAYS NO. Before he sees a word about it, try Gemini with the exact
-       same question, because he probably already has the key: it is the same
-       one the voice reads answers with, stored by speech.ts, verified live and
-       CORS-clean against this app's own domain before a line of this was
-       written. He never had to know Groq was full, and he never has to know
-       Gemini answered instead. This is the same shape LiteLLM (github.com/
-       BerriAI/litellm) calls "retry/fallback logic across multiple
-       deployments", except LiteLLM is a server you would have to run and this
-       app has no server: two providers, one browser, no proxy in between.
+    /* THE ACTIVE PROVIDER SAYS NO -- Groq or Z.ai, whichever the toggle in
+       Settings points at. Before he sees a word about it, try Gemini with the
+       exact same question, because he probably already has the key: it is the
+       same one the voice reads answers with, stored by speech.ts, verified
+       live and CORS-clean against this app's own domain before a line of this
+       was written. He never had to know the main provider was full, and he
+       never has to know Gemini answered instead. This is the same shape
+       LiteLLM (github.com/BerriAI/litellm) calls "retry/fallback logic across
+       multiple deployments", except LiteLLM is a server you would have to run
+       and this app has no server: providers, one browser, no proxy in
+       between.
 
        Falls through to the clean rate-limit message below only when there is
        no Gemini key, or Gemini also fails. It never shows the WAIT for the
@@ -633,13 +635,15 @@ export async function ask(
        to the one message he already understands. */
     if (fallback?.ok) return fallback
 
-    /* Groq's 429 body is a wall of text he should never see: an org id, a
-       service tier, a token accounting, and a billing upsell link, ending in
-       "Ask again, or rephrase it." on a request that was never unreadable.
-       Two questions asked back to back after a card just wrote a habit or
-       moved a task is enough to hit an 8000 token-per-minute cap, so this is
-       ordinary traffic, not a fault. Only the number worth keeping - how long
-       to wait - is pulled out, and the rest is dropped. */
+    /* A 429 body is a wall of text he should never see: an org id, a service
+       tier, a token accounting, and a billing upsell link, ending in "Ask
+       again, or rephrase it." on a request that was never unreadable. Two
+       questions asked back to back after a card just wrote a habit or moved a
+       task is enough to hit a per-minute cap, so this is ordinary traffic,
+       not a fault. Only the number worth keeping - how long to wait - is
+       pulled out, and the rest is dropped. The "try again in Xs" phrasing is
+       Groq's own; a provider that says it differently just leaves wait null,
+       and the hint below still holds without a number. */
     let wait: number | null = null
     try {
       const body = await res.json()

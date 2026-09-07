@@ -4,6 +4,7 @@ import { isMeeting, useCalendar } from './calendar'
 import { SpaceMark } from './ui'
 import { SPACE_LABELS } from './mock'
 import { MORNING, SKILLS, ask, type Action, type Brief, type Card, type CardKind, type Reply } from './assistant'
+import { getAiProvider, PROVIDERS } from './ai'
 import { engineName, speakingLevel, speakingMeasured, speechState, stop as stopSpeech, subscribe, toggle } from './speech'
 import {
   cancel as cancelDictation, dictateState, dictationAvailable, dictationEngine,
@@ -973,16 +974,20 @@ export function AssistantPage() {
          ending in "Ask again" on a request that was never unreadable. Two
          questions back to back after a card just wrote something is ordinary
          traffic, not a fault, and reads that way now. */
+      /* Named for whichever provider is actually active (Settings' toggle),
+         not hardcoded to Groq -- a Z.ai key rejected read as "That Groq key
+         was rejected", which sends him to fix the wrong field. */
+      const provider = PROVIDERS[getAiProvider()]
       setErr(
-        out.reason === 'no-key' ? 'No Groq key yet.'
-          : out.reason === 'rejected' ? 'That Groq key was rejected.'
+        out.reason === 'no-key' ? `No ${provider.label} key yet.`
+          : out.reason === 'rejected' ? `That ${provider.label} key was rejected.`
             : out.reason === 'offline' ? 'Could not reach the model.'
               : out.reason === 'rate-limit' ? 'Too many questions in the last minute.'
                 : out.detail ?? 'The answer came back unreadable.',
       )
       setErrHint(
-        out.reason === 'no-key' ? 'Add one in Settings. It is free and it stays on this device.'
-          : out.reason === 'rejected' ? 'Check it in Settings, or generate a new one at console.groq.com.'
+        out.reason === 'no-key' ? 'Add one in Settings. It stays on this device.'
+          : out.reason === 'rejected' ? `Check it in Settings, or generate a new one at ${provider.getKeyUrl}.`
             : out.reason === 'model-gone' ? 'The model this app used was retired. This build already moved to its replacement, so reload the page.'
               : out.reason === 'offline' ? 'Check the connection and ask again.'
                 : out.reason === 'rate-limit' ? (out.detail ? `Wait about ${out.detail}s and ask again.` : 'Wait a few seconds and ask again.')

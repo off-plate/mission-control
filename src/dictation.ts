@@ -8,14 +8,18 @@
    It is missing in Firefox, and present-but-broken in Chromium builds that are
    not Chrome, the desktop app included: those ship without Google's speech key,
    so start() succeeds and then errors. So the fallback records the microphone
-   and posts it to Groq's whisper-large-v3-turbo with the SAME gsk_ key the
-   assistant already uses. No second key to paste, and dictation still works in
-   the desktop app.
+   and posts it to Groq's whisper-large-v3-turbo, specifically with his Groq
+   key -- not "whichever provider is active" (ai.ts, 2026-09-07 on), because
+   transcription is Groq's own product with no equivalent on Z.ai or anywhere
+   else a second provider might point at. Reading the active key here would
+   silently mail a GLM key to Groq's endpoint the moment he switched Settings'
+   pill, and fail with no explanation. So this always reaches for Groq's key
+   specifically, present or not, regardless of the toggle.
 
    The trade is honest and worth saying out loud: the browser engine transcribes
    live, the fallback only produces text once you stop talking. */
 
-import { getAiKey } from './ai'
+import { getProviderKey } from './ai'
 
 const GROQ_STT = 'https://api.groq.com/openai/v1/audio/transcriptions'
 const STT_MODEL = 'whisper-large-v3-turbo'
@@ -61,7 +65,7 @@ export function dictationAvailable(): boolean {
 /** Which engine a click would use. The button's tooltip says this out loud. */
 export function dictationEngine(): 'browser' | 'whisper' | 'none' {
   if (RecognitionCtor()) return 'browser'
-  if (canRecord() && getAiKey()) return 'whisper'
+  if (canRecord() && getProviderKey('groq')) return 'whisper'
   return 'none'
 }
 
@@ -173,7 +177,7 @@ function startBrowser(base: string, onText: OnText): void {
 }
 
 async function startWhisper(base: string, onText: OnText): Promise<void> {
-  const key = getAiKey()
+  const key = getProviderKey('groq')
   if (!key) return
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: true })

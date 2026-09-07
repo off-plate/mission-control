@@ -3314,6 +3314,32 @@ await step('assistant: "open the bills page" actually opens it', async () => {
   if (!(await page.locator('.assistantdock-panel').count())) throw new Error('the dock panel closed on its own when the page underneath changed')
   if (!(await page.locator('.bills-page').count())) throw new Error('setPage never actually rendered the real Bills page underneath')
 })
+await step('assistant: signed out of Bills, "bill" says so rather than guessing or crashing', async () => {
+  /* His report, verbatim: "it cannot check one simple thing besides the task
+     list" -- asked whether Spotify was paid, the assistant had no bills data
+     at all and correctly said so. This gate never signs in to a real
+     account (?noremote), so "signed out" is the one bills state it can
+     actually exercise end to end; a real signed-in read/write was verified
+     by hand against a faked Supabase session and real recurring-bill/
+     transaction rows (assistantbills.ts's markPaid inserts exactly the row
+     billspage.tsx's own markPaid does). This step only has to prove the new
+     wiring behaves honestly, and does not throw, when there is nothing to
+     read -- the state every real user of this gate is actually in. */
+  await fresh('assistant')
+  await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
+  await stubAssistant(() => JSON.stringify({
+    say: "I can't see Bills from here.", show: [],
+    do: [{ kind: 'bill', match: 'Spotify', paid: true }],
+  }))
+  await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('did I pay for Spotify')
+  await page.waitForSelector('.as-did li', { timeout: 4000 })
+  const line = await page.locator('.as-did li').innerText()
+  if (!/not signed in/i.test(line)) throw new Error(`expected an honest "not signed in" line, got: "${line}"`)
+  if (await page.locator('.as-did li.is-ok').filter({ hasText: 'Marked paid' }).count()) {
+    throw new Error('claimed to mark a bill paid with no bills data at all')
+  }
+})
 
 /* The systematic matrix the critic and persona panel actually judge: the
    app's real pages (App.tsx's page switch, not the QA flow names above,

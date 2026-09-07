@@ -10,6 +10,7 @@ import {
   voiceHeard, voiceLevel, voiceModeAvailable, voicePhase,
 } from './voicemode'
 import { getWeather, weatherLine } from './weather'
+import { useAssistantBills } from './assistantbills'
 import { SLOTS, dueOn, habitsDueToday, goalCurrent, habitStepKey, routineComplete, requiredSteps, type HabitDef, type PageId, type SpaceId, type Task } from './types'
 import { localDateKey, fmtDuration, taskMinutes, goalPeriodKey, goalPeriodRange, periodKeyFor, type GoalTf } from './util'
 import * as Icon from './icons'
@@ -58,6 +59,11 @@ function useBrief(): Brief {
     void getWeather().then((w) => { if (live && w) setSky(weatherLine(w)) })
     return () => { live = false }
   }, [])
+  /* Real Bills data, the same account/cycle read the Bills page itself does
+     (2026-09-08 report: the assistant had nothing to say when asked whether
+     a bill was paid). Also a garnish, same treatment as weather: null when
+     signed out or not yet loaded, never something this briefing waits on. */
+  const { brief: billsBrief } = useAssistantBills()
   return useMemo(() => {
     const day = localDateKey()
     const tm = new Date(); tm.setDate(tm.getDate() + 1)
@@ -156,8 +162,9 @@ function useBrief(): Brief {
         const cur = goalCurrent(g, habits, habitLog, range, slips, focusSessions)
         return { name: g.name, pct: g.target > 0 ? Math.round((cur / g.target) * 100) : 0 }
       }),
+      bills: billsBrief,
     }
-  }, [tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, slips, cal, sky, plan])
+  }, [tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, slips, cal, sky, plan, billsBrief])
 }
 
 /* WHAT HAPPENED, in the app's words rather than the model's.
@@ -430,8 +437,14 @@ function useDoer() {
   const { space, todayIndex } = st
   const live = useRef(st)
   live.current = st
+  const bills = useAssistantBills()
 
-  return (actions: Action[]): Done[] => {
+  /* async now, for "bill" alone -- marking one paid/unpaid is a real
+     Supabase round trip (assistantbills.ts), unlike every other action here,
+     which is a synchronous store write. useAssistantThread already awaits
+     this call, so nothing about the caller changes; every other kind below
+     still resolves on the same tick it always did. */
+  return async (actions: Action[]): Promise<Done[]> => {
     const out: Done[] = []
     /* live.current is the store as of the last RENDER, not as of the last
        loop iteration -- addTask's own update lands on the next render, which
@@ -504,6 +517,22 @@ function useDoer() {
            calls. */
         s2.setPage(a.page)
         out.push({ ok: true, text: `Opened ${OPEN_LABELS[a.page] ?? a.page}` })
+        continue
+      }
+      if (a.kind === 'bill') {
+        /* A different log entirely -- Bills, not tasks -- so it never
+           reaches the task pick() below. His report, 2026-09-08: "it
+           cannot check one simple thing besides the task list." */
+        if (!bills.ready) { out.push({ ok: false, text: 'Bills is not signed in on this device' }); continue }
+        const rows = bills.items.map((i) => ({ ...i, title: i.name }))
+        const { row, why } = pick(rows, a.match)
+        if (!row) { out.push({ ok: false, text: why ?? 'no bill matched' }); continue }
+        if (row.paid === a.paid) {
+          out.push({ ok: true, text: `${row.name} was already ${a.paid ? 'paid' : 'unpaid'}` })
+          continue
+        }
+        if (a.paid) await bills.markPaid(row); else await bills.markUnpaid(row)
+        out.push({ ok: true, text: a.paid ? `Marked paid: ${row.name}` : `Marked unpaid: ${row.name}` })
         continue
       }
       if (a.kind === 'habit') {
@@ -655,7 +684,7 @@ export function useAssistantThread() {
     if (out.ok) {
       /* Performed BEFORE the turn is drawn, so the line under the sentence is
          the outcome and not a prediction of it. */
-      const done = out.reply.do?.length ? run(out.reply.do) : undefined
+      const done = out.reply.do?.length ? await run(out.reply.do) : undefined
       setTurns((t) => [...t, { who: 'it', text: out.reply.say, reply: out.reply, done }])
       let kinds = out.reply.show.map((c: Card) => c.kind)
       /* The brief ALWAYS draws the sky, whether or not the model remembered to

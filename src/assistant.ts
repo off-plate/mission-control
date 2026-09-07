@@ -95,6 +95,32 @@ export type Action =
    *  shape as "habit"'s on. Scoped to the cycle Bills itself opens on --
    *  never a past or future one, since he never named a date. */
   | { kind: 'bill'; match: string; paid: boolean }
+  /** "Log that I called Jiří" -- a real touch, on the same contact log the
+   *  dock's own Contacts glance writes to. match is the person's name;
+   *  log is which kind of touch he actually named. Never guessed: no "log a
+   *  touch" with nothing said about how, and never invented for someone he
+   *  only mentioned in passing rather than asked to log. */
+  | { kind: 'contact'; match: string; log: 'call' | 'text' | 'email' | 'meeting' }
+  /** "I slipped on X" -- a real slip, today, on a thing he is quitting.
+   *  match is the habit's name, same vocabulary as "habit" above. There is
+   *  no "un-slip": a slip is a fact about a day that happened, not a box to
+   *  toggle back off, so this only ever adds one. */
+  | { kind: 'slip'; match: string }
+  /** "Start a focus block on X" / "start a 25 minute block" -- a REAL timer,
+   *  not a suggestion: it begins the instant this runs, same as pressing
+   *  Start on the task or the Focus page itself. match, when given, is a
+   *  task's title and sets both the length (its own estimate) and the
+   *  label; min overrides the length either way, only when he said a
+   *  number himself. Neither given starts the app's own default length. */
+  | { kind: 'focus'; match?: string; min?: number }
+  /** "Write that down" / "note that X" -- a real note, filed in his current
+   *  workspace, off HIS words for it and nothing invented around them. This
+   *  is the one place the model may be handed the plainest reading of what
+   *  he just said, the same way "add" carries his words for a task: he
+   *  asked for a NOTE, specifically, not a task -- "clear my head" already
+   *  covers turning loose talk into tasks, and this is not a second way to
+   *  do that. */
+  | { kind: 'note'; text: string }
 
 const SLOTS_OK: Slot[] = ['morning', 'noon', 'afternoon', 'evening']
 const WHERE_OK: Where[] = ['today', 'backlog']
@@ -161,6 +187,22 @@ function cleanActions(raw: unknown): Action[] {
       case 'bill':
         if (match) out.push({ kind: 'bill', match, paid: o.paid !== false })
         break
+      case 'contact': {
+        const log = o.log as 'call' | 'text' | 'email' | 'meeting'
+        if (match && ['call', 'text', 'email', 'meeting'].includes(log)) out.push({ kind: 'contact', match, log })
+        break
+      }
+      case 'slip':
+        if (match) out.push({ kind: 'slip', match })
+        break
+      case 'focus':
+        out.push({ kind: 'focus', match: match || undefined, min })
+        break
+      case 'note': {
+        const text = str(o.text, 4000)
+        if (text) out.push({ kind: 'note', text })
+        break
+      }
       default: break
     }
   }
@@ -229,6 +271,16 @@ export interface Brief {
      this briefing blocks on. Same due/kept/open shape as habits/routines on
      purpose: paid is this cycle's "kept". */
   bills: { due: number; paid: number; open: string[] } | null
+  /* Gone quiet, by the same 20-day line the dock's own Contacts glance uses
+     (contactStatus in types.ts). Real people, real last-touch dates -- never
+     invented, and never the whole address book, only who has actually
+     slipped. */
+  contacts: { name: string; days: number }[]
+  /* Things he is quitting, not keeping -- a different HabitDef kind (see the
+     real habits/routines split above for why the two are never conflated).
+     days is how long since the last slip or the day he started, whichever
+     is later -- the same arithmetic the Quitting page itself runs. */
+  quitting: { name: string; days: number }[]
 }
 
 const SYSTEM = `You are the assistant inside Mission Control, Michael's own life dashboard.
@@ -320,6 +372,10 @@ The whole vocabulary, and nothing outside it works:
 {"kind":"workspace","space":"personal"|"work"|"offplate"|"corner"|"all"}  personal=Personal, work=Big Time, offplate=Off-Plate, corner=Michael's Corner, all=every workspace on screen at once. Switches which workspace he is standing in.
 {"kind":"open","page":"today"|"plan"|"projects"|"habits"|"routines"|"goals"|"quitting"|"settings"|"notes"|"board"|"apps"|"focus"|"zone"|"bills"|"calendar"|"timeline"|"contacts"}  a real page, not a workspace -- see below.
 {"kind":"bill","match":"bill name","paid":true}      marks a real bill paid or unpaid, this cycle only
+{"kind":"contact","match":"person's name","log":"call"|"text"|"email"|"meeting"}  logs a real touch with them, today
+{"kind":"slip","match":"habit name"}                 logs a real slip today, on something he is quitting
+{"kind":"focus","match":"task title","min":30}        starts a REAL timer right now, both optional
+{"kind":"note","text":"..."}                          writes a real note, in his own words
 
 "match" is words out of the real title as it appears in the briefing above, not
 a description of it. "add" carries HIS words for the new task, off the message
@@ -359,6 +415,40 @@ as a task's title. Do not call a bill a task, and do not run "done" on
 one: they live in a different log, and "bill" is the only action that
 reaches it. If "Bills: not signed in on this device" is what the briefing
 says, tell him that in plain words rather than guessing at an answer.
+
+CONTACTS, THE SAME WAY: the briefing's "Gone quiet" line is everyone real,
+by name, past 20 days since the last logged touch -- nobody else, and
+nothing about them beyond that. "match" for "contact" is the person's name
+exactly as given. "log" is which kind of touch he actually said -- a call, a
+text, an email, a meeting -- never assumed when he only said "log that I
+talked to X" with no shape to it; ask which, briefly, rather than guessing
+one. Logging a touch with someone NOT on the "gone quiet" line still works
+(he can reach out to anyone, not just the ones flagged), it simply is not
+something you were told to worry about.
+
+QUITTING is a different list from ordinary habits (the real split is above,
+under "A HABIT AND A ROUTINE ARE NOT THE SAME THING" -- a quit is its own
+third kind, tracked in days since the last slip, never a daily tick). "slip"
+only ever ADDS a slip for today; there is no undo action, because a slip is
+a fact about a day that already happened, not a box he can toggle back off.
+Only run it when he actually says he slipped -- never when he is only
+talking about the thing he is quitting, and never as a guess at what a
+vague sentence might mean.
+
+FOCUS is a real, running timer the moment "focus" runs, not a suggestion or
+a card. "match" names a task and both its length and its label come from
+that task, exactly like pressing Start on it would; "min" overrides the
+length when he said a number, with or without a task named. Neither given
+starts the app's own default block. Never send this one lightly: it changes
+what he is doing right now, so only when he actually asked to start
+something, not when a task merely came up in conversation.
+
+A NOTE is HIS words, verbatim, never a summary or a cleanup of them --
+exactly the same rule "add" already follows for a task's title. Only when
+he is explicit that this is a NOTE ("write this down", "make a note of
+that") -- "clear my head" already exists for turning loose talk into
+tasks, in the right workspace, and "note" is not a second, competing way
+to do the same job. Never both for the same sentence.
 
 "done", "undone", "drop", "move" and "estimate" all take an optional "inSlot",
 one of "morning"|"noon"|"afternoon"|"evening" -- the SAME slot the briefing
@@ -584,6 +674,8 @@ export function briefText(b: Brief): string {
     b.bills
       ? `Bills this cycle: ${b.bills.paid} of ${b.bills.due} paid${b.bills.open.length ? `, still unpaid: ${b.bills.open.join('; ')}` : ''}`
       : 'Bills: not signed in on this device, nothing to read',
+    b.contacts.length ? `Gone quiet, over 20 days since the last touch: ${b.contacts.map((c) => `${c.name} (${c.days}d)`).join('; ')}` : 'Nobody has gone quiet',
+    b.quitting.length ? `Quitting: ${b.quitting.map((q) => `${q.name}, ${q.days}d clean`).join('; ')}` : '',
   ].join('\n')
 }
 

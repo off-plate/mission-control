@@ -6,6 +6,7 @@ import { NoteChip, NotePanel } from './notedock'
 import { BillsChip, BillsPanel } from './billsdock'
 import { TimelineChip, TimelinePanel } from './timelinedock'
 import { ContactsChip, ContactsPanel } from './contactsdock'
+import { AssistantChip, AssistantPanel } from './assistantdock'
 import * as Icon from './icons'
 
 /* Hover opens the dial now, on his instruction (2026-09-02) -- the same
@@ -248,7 +249,7 @@ function useFocusToast(announcedAt: number, dockIsClosed: boolean): 'hidden' | '
    the notes store) and only hands this file what it needs to render.
    Rendered from inside PomodoroProvider (see pomodoro.tsx), which is what
    puts it inside both the Pomodoro context and the Store context it needs. */
-type PanelFace = 'media' | 'note' | 'bills' | 'timeline' | 'contacts'
+type PanelFace = 'media' | 'note' | 'bills' | 'timeline' | 'contacts' | 'assistant'
 type Mode = 'closed' | 'menu' | PanelFace
 
 export function Dock() {
@@ -263,7 +264,8 @@ export function Dock() {
   const billsHold = useHoldForFull(() => { setPage('bills'); go('closed') })
   const timelineHold = useHoldForFull(() => { setPage('timeline'); go('closed') })
   const contactsHold = useHoldForFull(() => { setPage('contacts'); go('closed') })
-  const holdFor: Partial<Record<PanelFace, ReturnType<typeof useHoldForFull>>> = { note: noteHold, bills: billsHold, timeline: timelineHold, contacts: contactsHold }
+  const assistantHold = useHoldForFull(() => { setPage('assistant'); go('closed') })
+  const holdFor: Partial<Record<PanelFace, ReturnType<typeof useHoldForFull>>> = { note: noteHold, bills: billsHold, timeline: timelineHold, contacts: contactsHold, assistant: assistantHold }
   const scrollHidden = useHideOnScroll(mode === 'closed')
   const pomo = usePomodoro()
   const toastPhase = useFocusToast(pomo.announcedAt, mode === 'closed')
@@ -274,23 +276,26 @@ export function Dock() {
      exists to make dominant. */
   if (page === 'zone') return null
 
-  /* Note on top, then Bills, then Timeline, Contacts, Assistant, Focus at
-     the bottom, his order -- closest to the corner is the one he reaches
-     for most. The player, when it exists at all, sits above both: rarest
-     to need, so furthest from the thumb. Bills and Timeline both land here
-     as compact read-mostly summaries, not their full pages -- see
+  /* Note on top, then Bills, Timeline, Contacts, Assistant, Focus at the
+     bottom, his order -- closest to the corner is the one he reaches for
+     most. The player, when it exists at all, sits above both: rarest to
+     need, so furthest from the thumb. Bills and Timeline both land here as
+     compact read-mostly summaries, not their full pages -- see
      billsdock.tsx and timelinedock.tsx for why: hundreds of lines of
-     sign-in, edit sheets, a canvas flywheel view and video reels are a
-     much bigger, worse-fitting build for a 560px popup than a glanceable
+     sign-in, edit sheets, a canvas flywheel view and video reels are a much
+     bigger, worse-fitting build for a 560px popup than a glanceable
      headline with a door out to the real page.
 
-     Assistant is neither: its own header button retired in its favour
-     (2026-09-08, his ask) with no smaller "glance" of it worth building --
-     a conversation has no meaningful mini state the way a bill list or a
-     wallet balance does. So it rides the same plain-shortcut shape Focus
-     already proved out below rather than a fifth PanelFace: one tap opens
-     the real page directly, full history and canvas and all, "long
-     functionality fully" -- never a stripped-down copy of it in the popup.
+     Assistant is a fifth PanelFace, not Focus's plain-shortcut shape, on
+     his direct correction (2026-09-08) of a first pass that gave it exactly
+     that shape: a short tap opens a real quick-ask widget right here (see
+     assistantdock.tsx), same as Note or Bills, and only a hold reaches the
+     full page below through the same useHoldForFull every other panel
+     already uses. His own words for why: "quick solution, meaning when I
+     only tap it, it should pull up just like a widget... just like the
+     notes app or the focus app or the bills app" -- Focus's own row was
+     never the model, it just happened to be the thing already sitting at
+     the bottom of this stack.
 
      Icons sized up across the row (2026-09-04): the chip circles are 56px
      and were carrying a 16-18px glyph, a lot of empty ring around not much
@@ -308,6 +313,7 @@ export function Dock() {
     { id: 'bills' as const, label: 'Bills', chip: <BillsChip />, switchIcon: <Icon.DockWallet size={17} /> },
     { id: 'timeline' as const, label: 'Timeline', chip: <TimelineChip />, switchIcon: <Icon.DockHistory size={17} /> },
     { id: 'contacts' as const, label: 'Contacts', chip: <ContactsChip />, switchIcon: <Icon.DockUser size={17} /> },
+    { id: 'assistant' as const, label: 'Assistant', chip: <AssistantChip />, switchIcon: <Icon.Waveform size={17} /> },
   ]
 
   if (mode === 'closed' || mode === 'menu') {
@@ -344,18 +350,6 @@ export function Dock() {
         </button>
       </div>
     )
-    /* Assistant, the same plain-shortcut shape as Focus above it -- no live
-       state to carry in the label, so the whole row IS the button, unlike
-       Focus's row (which nests a real play/pause control of its own and so
-       cannot be one). */
-    const assistantRow = (
-      <button className="dock-item dock-item--link" onClick={() => setPage('assistant')} aria-label="Open the assistant" title="Open Assistant">
-        <span className="dock-item-label">Assistant</span>
-        <span className="dock-item-avatar-ring">
-          <span className="dock-item-avatar dock-item-avatar--assistant"><Icon.Waveform size={22} /></span>
-        </span>
-      </button>
-    )
     return (
       <div
         className={`dock${closing ? ' is-closing' : entered ? ' is-open' : ''}${scrollHidden ? ' is-scroll-hidden' : ''}`}
@@ -386,7 +380,6 @@ export function Dock() {
                 </button>
               )
             })}
-            {assistantRow}
             {focusRow}
           </div>
         )}
@@ -491,6 +484,16 @@ export function Dock() {
       <div className="dock">
         <div className="dock-face">
           <TimelinePanel dockControls={switchButtons} onOpenFull={() => go('closed')} />
+        </div>
+      </div>
+    )
+  }
+
+  if (mode === 'assistant') {
+    return (
+      <div className="dock">
+        <div className="dock-face">
+          <AssistantPanel dockControls={switchButtons} onOpenFull={() => go('closed')} />
         </div>
       </div>
     )

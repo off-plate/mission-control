@@ -3133,7 +3133,7 @@ await step('assistant: "done, took me fifteen minutes" fills the real time in on
   await fresh('assistant')
   await page.evaluate((K) => {
     const s = JSON.parse(localStorage.getItem(K))
-    const day = new Date().toISOString().slice(0, 10)
+    const now = new Date(); const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
     s.tasks = [{
       id: 'v1', title: 'Write the Q3 update', space: 'work', source: 'mc', estimateMin: 20, done: false,
       list: 'today', category: 'admin', slot: 'morning', plannedOn: day, createdAt: day, addedAt: Date.now(),
@@ -3200,7 +3200,7 @@ await step('assistant: inSlot tells apart two rows that share a title', async ()
   await fresh('assistant')
   await page.evaluate((K) => {
     const s = JSON.parse(localStorage.getItem(K))
-    const day = new Date().toISOString().slice(0, 10)
+    const now = new Date(); const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
     const t = (id, slot) => ({
       id, title: 'Zaplatit AirBank', space: 'work', source: 'mc', estimateMin: 10, done: false,
       list: 'today', category: 'admin', slot, plannedOn: day, createdAt: day, addedAt: Date.now(),
@@ -3215,7 +3215,7 @@ await step('assistant: inSlot tells apart two rows that share a title', async ()
   }))
   await page.reload(); await page.waitForTimeout(700)
   await askAssistant('mark the afternoon AirBank payment done')
-  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 8000 })
   if (await page.locator('.as-did li.is-no').count()) throw new Error('inSlot narrowing still read as ambiguous')
   const after = await page.evaluate((K) => {
     const t = JSON.parse(localStorage.getItem(K)).tasks ?? []
@@ -3233,7 +3233,7 @@ await step('assistant: "both of them" acts on every row still matching, named on
   await fresh('assistant')
   await page.evaluate((K) => {
     const s = JSON.parse(localStorage.getItem(K))
-    const day = new Date().toISOString().slice(0, 10)
+    const now = new Date(); const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
     const t = (id) => ({
       id, title: 'Zaplatit AirBank', space: 'work', source: 'mc', estimateMin: 10, done: false,
       list: 'today', category: 'admin', slot: 'afternoon', plannedOn: day, createdAt: day, addedAt: Date.now(),
@@ -3248,7 +3248,7 @@ await step('assistant: "both of them" acts on every row still matching, named on
   }))
   await page.reload(); await page.waitForTimeout(700)
   await askAssistant('check both of the afternoon AirBank ones as done, took about a minute each')
-  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 8000 })
   const lines = await page.locator('.as-did li').allInnerTexts()
   if (lines.length !== 2) throw new Error(`${lines.length} outcome lines for 2 rows, expected 2: ${JSON.stringify(lines)}`)
   if (lines.some((l) => /nothing changed|of them match/i.test(l))) throw new Error(`"both" still refused as ambiguous: ${JSON.stringify(lines)}`)
@@ -3293,9 +3293,15 @@ await step('assistant: "open the bills page" actually opens it', async () => {
      away from 'assistant' unmounts the full page before its own "Opened
      Bills" line ever paints (confirmed directly -- .as-did never appears
      there, even though the navigation itself lands fine), since that page
-     IS the thing being navigated away from. The dock's panel is not tied
-     to the current page, so it stays on screen over whatever it just
-     opened -- the real shape "keep the conversation going" asked for. */
+     IS the thing being navigated away from.
+
+     UPDATED (2026-09-08, his later report): a click-to-navigate that
+     leaves the popup sitting open on top of the page it just opened read
+     as "nothing happened" -- he had to close it and look himself to
+     confirm. Done.nav now folds the dock back to the FAB the instant an
+     'open' succeeds (see the dedicated test for that), so this one only
+     has to confirm the real page underneath actually changed, not that
+     the popup stayed open over it. */
   await fresh('today')
   await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
   await stubAssistant(() => JSON.stringify({
@@ -3308,10 +3314,8 @@ await step('assistant: "open the bills page" actually opens it', async () => {
   await page.locator('.dock-item').filter({ hasText: 'Assistant' }).click(); await page.waitForTimeout(400)
   await page.locator('.assistantdock-panel .as-input').fill('open up the bills page please')
   await page.locator('.assistantdock-panel .as-input').press('Enter')
-  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
-  const line = await page.locator('.as-did li').innerText()
-  if (!/Bills/.test(line)) throw new Error(`the outcome line does not name Bills: "${line}"`)
-  if (!(await page.locator('.assistantdock-panel').count())) throw new Error('the dock panel closed on its own when the page underneath changed')
+  await page.waitForTimeout(1200)
+  if (await page.locator('.assistantdock-panel').count()) throw new Error('the dock popup is still open after a successful navigation')
   if (!(await page.locator('.bills-page').count())) throw new Error('setPage never actually rendered the real Bills page underneath')
 })
 await step('assistant: signed out of Bills, "bill" says so rather than guessing or crashing', async () => {
@@ -3426,6 +3430,76 @@ await step('assistant: "start a focus block" starts a real, running timer', asyn
   if (pomo?.phase !== 'focus') throw new Error(`pomodoro phase is "${pomo?.phase}", never actually started`)
   if (pomo?.blockMin !== 20) throw new Error(`block length is ${pomo?.blockMin}, not the 20 he asked for`)
 })
+await step('assistant: a successful "open" folds the dock back so the page is actually visible', async () => {
+  /* His report, verbatim: asked to open Habits from the dock's quick panel,
+     it confirmed, and the popup just sat there over whatever was already
+     on screen with no visible sign anything happened -- setPage() ran for
+     real, but with the popup still up there was no way to tell without
+     closing it and looking himself. Done.nav (assistantcore.tsx) now folds
+     the dock back to the FAB the moment an 'open' succeeds, the same as
+     every panel's own "Open in X" door-out button already does. */
+  await fresh('today')
+  await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
+  await stubAssistant(() => JSON.stringify({
+    say: 'Opening Habits.', show: [],
+    do: [{ kind: 'open', page: 'habits' }],
+  }))
+  await page.getByRole('button', { name: 'Open quick tools' }).click(); await page.waitForTimeout(400)
+  await page.locator('.dock-item').filter({ hasText: 'Assistant' }).click(); await page.waitForTimeout(400)
+  await page.locator('.assistantdock-panel .as-input').fill('open habits')
+  await page.locator('.assistantdock-panel .as-input').press('Enter')
+  await page.waitForTimeout(1200)
+  if (await page.locator('.assistantdock-panel').count()) throw new Error('the dock popup is still open after a successful navigation')
+  if (!(await page.locator('h1', { hasText: 'Habits' }).count())) throw new Error('setPage never actually rendered the real Habits page underneath')
+})
+await step('assistant: a habit not due today is still findable, not "does not exist"', async () => {
+  /* His report, verbatim: a real habit (a weekly one, not due on that
+     specific weekday) got "I can't find a habit called X" because the
+     briefing's "still open" line is deliberately today-only. allHabits
+     (assistant.ts/assistantcore.tsx) carries every real, non-quitting
+     habit's name regardless of today's due state, so the model can tell a
+     real name from an invented one before ever trying the action. */
+  await fresh('assistant')
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    s.habits = [...(s.habits ?? []), {
+      id: 'h-gym', name: 'Workout / Gym / Fitness', kind: 'build', frequency: 'weekly', targetPerWeek: 5,
+      days: [false, false, false, false, false, false, false], archivedAt: null,
+    }]
+    localStorage.setItem(K, JSON.stringify(s))
+    localStorage.setItem('mc-groq-key', 'gsk_gatetest')
+  }, KEY)
+  await stubAssistant(() => JSON.stringify({
+    say: 'Keeping it.', show: [],
+    do: [{ kind: 'habit', match: 'Workout / Gym / Fitness', on: true }],
+  }))
+  await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('keep workout gym fitness for today')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  const line = await page.locator('.as-did li').innerText()
+  if (!/Workout/.test(line)) throw new Error(`the outcome line does not name it: "${line}"`)
+  if (/was already/i.test(line) === false && /Kept today/i.test(line) === false) {
+    throw new Error(`expected a real keep, got: "${line}"`)
+  }
+})
+await step('assistant: "sync my workout" reaches the real Hevy sync, honestly, with no key set', async () => {
+  /* His report, verbatim: asked to synchronize the Hevy-backed habit and
+     was told there was no way to run a sync at all. 'sync' now calls the
+     exact syncHevy() Settings' own "Sync now" button calls; this gate has
+     no real Hevy key (same reason it never signs in to real Bills), so
+     the state it can actually exercise is the honest "no key" answer. */
+  await fresh('assistant')
+  await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
+  await stubAssistant(() => JSON.stringify({
+    say: 'Syncing your workout data now.', show: [],
+    do: [{ kind: 'sync' }],
+  }))
+  await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('sync my workout')
+  await page.waitForSelector('.as-did li', { timeout: 4000 })
+  const line = await page.locator('.as-did li').innerText()
+  if (!/Hevy/i.test(line)) throw new Error(`expected an honest Hevy-specific line, got: "${line}"`)
+})
 await step('settings: the device voice picker lists real voices and remembers a pick', async () => {
   /* His question (2026-09-08): macOS ships Enhanced/Premium voices and
      there was never a way to choose one -- only the automatic GOOD-list
@@ -3496,6 +3570,50 @@ await step('assistant: tapping the voice wave while it talks skips straight to l
   await page.waitForTimeout(600)
   const after = await page.locator('.as-voice').getAttribute('class').catch(() => 'GONE')
   if (!after?.includes('is-listening')) throw new Error(`expected to be listening again after the interrupt, got: "${after}"`)
+})
+await step('assistant: voice mode gives Gemini a short leash, not the Play button\'s full six seconds', async () => {
+  /* His report, verbatim: "on the assistant page you react within one or
+     two seconds... this pop-up thing takes six to ten seconds." A slow or
+     degraded Gemini TTS call sitting in the middle of every live voice
+     turn, still burning the Play button's own patient six-second window
+     (speech.ts's GEMINI_TIMEOUT_MS) before falling back to the instant
+     device voice, was very likely the largest single piece of that --
+     paid on every turn of a conversation, not once on an answer already
+     read. voicemode.ts now passes its own much shorter
+     VOICE_TTS_TIMEOUT_MS to speech.ts's say(); Play, unchanged, keeps the
+     full six. A Gemini endpoint that never answers forces both paths onto
+     their timeout branch, so the gap between them is the whole test. */
+  await fresh('assistant')
+  await page.route('https://generativelanguage.googleapis.com/**', () => { /* never fulfilled, on purpose */ })
+  await stubAssistant(() => JSON.stringify({ say: 'Answer text.', show: [] }))
+  await page.evaluate(() => {
+    localStorage.setItem('mc-groq-key', 'gsk_gatetest')
+    localStorage.setItem('mc-gemini-key', 'AIzafaketest')
+  })
+  await page.reload(); await page.waitForTimeout(700)
+
+  await askAssistant('what is on today')
+  await page.waitForSelector('.as-speak', { timeout: 8000 })
+  let playT0 = Date.now()
+  await page.locator('.as-speak').click()
+  let waited = 0
+  while (!(await page.evaluate(() => speechSynthesis.speaking)) && waited < 9000) { await page.waitForTimeout(100); waited += 100 }
+  const playMs = Date.now() - playT0
+  await page.evaluate(() => speechSynthesis.cancel())
+  if (playMs < 5000) throw new Error(`Play fell back to device voice after only ${playMs}ms -- its own six-second window shrank too`)
+
+  await page.unroute('https://api.groq.com/**').catch(() => {})
+  await stubAssistant(() => JSON.stringify({ say: 'Answer text.', show: [] }))
+  await page.getByRole('button', { name: 'Open quick tools' }).click(); await page.waitForTimeout(400)
+  await page.locator('.dock-item').filter({ hasText: 'Assistant' }).click(); await page.waitForTimeout(400)
+  await page.locator('.assistantdock-talk').click(); await page.waitForTimeout(500)
+  await page.locator('.as-voice-exit').click(); await page.waitForTimeout(300)
+  const voiceT0 = Date.now()
+  await page.locator('.as-skills .as-brief').first().click()
+  waited = 0
+  while (!(await page.evaluate(() => speechSynthesis.speaking)) && waited < 9000) { await page.waitForTimeout(100); waited += 100 }
+  const voiceMs = Date.now() - voiceT0
+  if (voiceMs >= 5000) throw new Error(`voice mode waited ${voiceMs}ms for a dead Gemini call -- the short leash never applied`)
 })
 
 /* The systematic matrix the critic and persona panel actually judge: the

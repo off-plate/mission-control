@@ -403,8 +403,16 @@ function speakable(text: string): string {
   return text.split('\n').map((line) => line.replace(/^\s*-\s+/, '')).join('\n')
 }
 
-/** The button's whole behaviour: play, pause, resume, or switch to a new answer. */
-export async function toggle(id: string, text: string): Promise<void> {
+/** The button's whole behaviour: play, pause, resume, or switch to a new
+ *  answer. geminiTimeoutMs overrides GEMINI_TIMEOUT_MS for this one call --
+ *  voice mode (voicemode.ts) passes a much shorter one, since a live,
+ *  hands-free back-and-forth pays this wait on EVERY turn, not once on an
+ *  answer he is already reading. His report (2026-09-08): "on the AI
+ *  assistant page you react within one or two seconds... on this pop-up
+ *  thing it takes six to ten seconds" -- Play (unhurried, one answer he
+ *  already has in front of him) keeps the full six seconds; a live
+ *  conversation does not get to spend that on every single reply. */
+export async function toggle(id: string, text: string, geminiTimeoutMs = GEMINI_TIMEOUT_MS): Promise<void> {
   // Same answer, already talking: pause it.
   if (current === id && state === 'playing') {
     if (audio) { audio.pause(); set(id, 'paused') }
@@ -433,7 +441,7 @@ export async function toggle(id: string, text: string): Promise<void> {
      cache, so pressing Play again right after this is instant. */
   const blob = await Promise.race([
     fetchGemini(clean, key),
-    new Promise<null>((resolve) => setTimeout(() => resolve(null), GEMINI_TIMEOUT_MS)),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), geminiTimeoutMs)),
   ])
   /* He clicked something else while this was in flight. Whatever we just
      fetched is no longer wanted, and playing it would talk over the new one. */
@@ -459,7 +467,7 @@ export async function toggle(id: string, text: string): Promise<void> {
     It resolves on the way back down to idle, and only after it has genuinely
     started, or a call that never begins would resolve instantly and hand the
     microphone back while the answer is still being fetched. */
-export function say(id: string, text: string): Promise<void> {
+export function say(id: string, text: string, geminiTimeoutMs?: number): Promise<void> {
   return new Promise((resolve) => {
     let started = false
     const off = subscribe(() => {
@@ -467,7 +475,7 @@ export function say(id: string, text: string): Promise<void> {
       if (s !== 'idle') { started = true; return }
       if (started) { off(); resolve() }
     })
-    void toggle(id, text).then(() => {
+    void toggle(id, text, geminiTimeoutMs).then(() => {
       /* Nothing to wait for: no text, or the engine refused outright. */
       if (!started && speechState(id) === 'idle') { off(); resolve() }
     })

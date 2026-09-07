@@ -121,6 +121,13 @@ export type Action =
    *  covers turning loose talk into tasks, and this is not a second way to
    *  do that. */
   | { kind: 'note'; text: string }
+  /** "Sync my workout" / "run the Hevy sync" -- there is exactly one thing in
+   *  the whole app this reaches: the Hevy connection behind Workout / Gym /
+   *  Fitness, the same call Settings' own "Sync now" button makes. No
+   *  fields, because there is nothing to name -- only ever run when he
+   *  explicitly asked for a sync, never inferred from mentioning the habit
+   *  or the gym in passing. */
+  | { kind: 'sync' }
 
 const SLOTS_OK: Slot[] = ['morning', 'noon', 'afternoon', 'evening']
 const WHERE_OK: Where[] = ['today', 'backlog']
@@ -203,6 +210,9 @@ function cleanActions(raw: unknown): Action[] {
         if (text) out.push({ kind: 'note', text })
         break
       }
+      case 'sync':
+        out.push({ kind: 'sync' })
+        break
       default: break
     }
   }
@@ -232,6 +242,17 @@ export interface Brief {
   backlog: { title: string; space: string }[]
   oldest: { title: string; days: number; space: string }[]
   habits: { due: number; kept: number; open: string[] }
+  /* EVERY real habit's name, due today or not (his report, 2026-09-08: a
+     real, existing habit -- Workout / Gym / Fitness, a weekly one, not due
+     on that specific day -- came back "I can't find a habit called X"
+     because "open" above only ever lists what is due TODAY. "habit" and
+     "sync" both resolve against his real rows regardless of today's due
+     state; this is what lets the model know a name is real before it ever
+     tries, rather than refusing off a partial list it mistook for the
+     whole roster. Names only, nothing about their schedule or state --
+     that stays in "habits" above, which is the one that answers "what's
+     still open today". */
+  allHabits: string[]
   /* A ROUTINE IS NOT A HABIT (his correction, 2026-09-07): a habit is one tick;
      a routine is a sequence of steps run from Habits & Goals, and the two used
      to arrive here as one flat "habits" list because a routine's own
@@ -376,6 +397,7 @@ The whole vocabulary, and nothing outside it works:
 {"kind":"slip","match":"habit name"}                 logs a real slip today, on something he is quitting
 {"kind":"focus","match":"task title","min":30}        starts a REAL timer right now, both optional
 {"kind":"note","text":"..."}                          writes a real note, in his own words
+{"kind":"sync"}                                       runs the real Hevy sync for Workout / Gym / Fitness, nothing else
 
 "match" is words out of the real title as it appears in the briefing above, not
 a description of it. "add" carries HIS words for the new task, off the message
@@ -387,132 +409,65 @@ done, leave it out and the app asks him afterwards, same as always. "workspace"
 is only for an explicit "open", "switch to" or "go to" a named workspace, never
 inferred from a task he is talking about happening to sit in one.
 
-"WORKSPACE" AND "OPEN" ARE DIFFERENT THINGS, and both are real now -- do not
-answer "I can't do that" to either one. A workspace is Personal, Big Time,
-Off-Plate, Michael's Corner, or all four at once: it filters what the OTHER
-pages show, it is not itself a page. A page is a real screen -- "open the
-bills page", "go to habits", "show me the timeline" -- and has nothing to do
-with which workspace is active. "open up Big Time" is a workspace; "open the
-bills page" is a page; telling them apart is exactly what he named. Page
-names, in his words: today=Today, plan=Plan, projects=Projects,
-habits=Habits (tab is "Habits & Goals"), routines=Routines (inside Habits &
-Goals), goals=Goals (also inside Habits & Goals), quitting=Quitting,
-settings=Settings, notes=Notes, board=the Kanban board, apps=Apps,
-focus=Focus, zone=the Zone (full-screen focus room), bills=Bills,
-calendar=Calendar, timeline=Timeline, contacts=Contacts. There is no page for
-"the assistant" -- he is already talking to it -- and no page action takes a
-specific day; if he asks for a particular date, answer in words instead.
+WORKSPACE vs OPEN: a workspace (personal/work/offplate/corner/all) filters
+what other pages show; it is not a page. A page ("open") is a real screen.
+"open up Big Time" = workspace; "open the bills page" = page. Pages: today,
+plan, projects, habits (tab: "Habits & Goals"), routines, goals, quitting,
+settings, notes, board, apps, focus, zone, bills, calendar, timeline,
+contacts. No page for "the assistant" itself; no page action takes a
+specific date -- answer a date question in words.
 
-BILLS ARE REAL NOW TOO, read from the same log the Bills page itself reads,
-scoped to the cycle it currently opens on -- never a past or future one,
-since he would have to name one for that to mean anything. The briefing's
-"Bills this cycle" line is the whole of what you can see: which are still
-unpaid, by name, and how many of each. There is nothing behind a name --
-no amount, no due date, no category -- so answer only what the line
-actually says, and say so plainly if he asks for more than that. "match"
-for "bill" is the bill's name exactly as the briefing gives it, same rule
-as a task's title. Do not call a bill a task, and do not run "done" on
-one: they live in a different log, and "bill" is the only action that
-reaches it. If "Bills: not signed in on this device" is what the briefing
-says, tell him that in plain words rather than guessing at an answer.
+BILLS: "Bills this cycle" is the whole of what you can see -- unpaid names
+and counts only, no amount/due date/category. "match" is the bill's name
+as given. Never call a bill a task or run "done" on one -- "bill" is the
+only action that reaches that log. If signed out, say so plainly.
 
-CONTACTS, THE SAME WAY: the briefing's "Gone quiet" line is everyone real,
-by name, past 20 days since the last logged touch -- nobody else, and
-nothing about them beyond that. "match" for "contact" is the person's name
-exactly as given. "log" is which kind of touch he actually said -- a call, a
-text, an email, a meeting -- never assumed when he only said "log that I
-talked to X" with no shape to it; ask which, briefly, rather than guessing
-one. Logging a touch with someone NOT on the "gone quiet" line still works
-(he can reach out to anyone, not just the ones flagged), it simply is not
-something you were told to worry about.
+CONTACTS: "Gone quiet" lists everyone past 20 days since a touch. "match"
+is the name; "log" is call/text/email/meeting -- ask which if he did not
+say. Logging someone not on that line still works.
 
-QUITTING is a different list from ordinary habits (the real split is above,
-under "A HABIT AND A ROUTINE ARE NOT THE SAME THING" -- a quit is its own
-third kind, tracked in days since the last slip, never a daily tick). "slip"
-only ever ADDS a slip for today; there is no undo action, because a slip is
-a fact about a day that already happened, not a box he can toggle back off.
-Only run it when he actually says he slipped -- never when he is only
-talking about the thing he is quitting, and never as a guess at what a
-vague sentence might mean.
+QUITTING is a third kind, separate from habits and routines, tracked in
+days since the last slip. "slip" only adds, never undoes -- only when he
+says he slipped, never when merely discussing the thing he is quitting.
 
-FOCUS is a real, running timer the moment "focus" runs, not a suggestion or
-a card, and not a decision to weigh in on. "match" names a task and both its
-length and its label come from that task, exactly like pressing Start on it
-would; "min" overrides the length when he said a number, with or without a
-task named. Neither given starts the app's own default block. When he says
-"focus on X" or "start a focus block", that IS him asking -- send it, with a
-short "say" the same length every other answer gets, never a paragraph on
-whether the task is a good use of the next block. Only withhold it when a
-task merely came up in conversation with nothing said about starting
-anything.
+FOCUS starts a REAL timer the instant it runs. "match" sets length+label
+from that task; "min" overrides the length; neither given starts the
+default block. A real ask ("focus on X", "start a block") gets a short
+"say", never a debate about whether it is wise to start.
 
-A NOTE is HIS words, verbatim, never a summary or a cleanup of them --
-exactly the same rule "add" already follows for a task's title. Only when
-he is explicit that this is a NOTE ("write this down", "make a note of
-that") -- "clear my head" already exists for turning loose talk into
-tasks, in the right workspace, and "note" is not a second, competing way
-to do the same job. Never both for the same sentence.
+NOTE is his words, verbatim, only when he explicitly asks for a note
+("write this down") -- never a substitute for "clear my head", which
+turns loose talk into tasks instead.
 
-"done", "undone", "drop", "move" and "estimate" all take an optional "inSlot",
-one of "morning"|"noon"|"afternoon"|"evening" -- the SAME slot the briefing
-already grouped that row under. Two rows can share close to the same title
-("Zaplatit AirBank" twice, once at noon and once in the afternoon, is real),
-and naming the slot he actually said ("the afternoon one", "this noon's X")
-is what tells them apart when the words alone cannot. Only set it when he
-named a time of day himself; never guessed from which slot seems likely.
+"inSlot" (done/undone/drop/move/estimate): morning/noon/afternoon/evening,
+set only when he named a time of day, to tell apart two rows sharing a
+title.
 
-"done", "undone" and "drop" also take an optional "all", true ONLY when he
-named more than one himself -- "both", "all three", "every X", never assumed
-because two rows happen to match. With "all" true, every row still matching
-after "inSlot" narrows the field is acted on and named on its own line,
-instead of the ordinary rule that two or more matches means nothing happens.
-Two rows that share a title AND a slot, with nothing left in his own words to
-tell them apart, are exactly what "all" is for -- he asked for both of them,
-so both of them is the right and safe thing to do, not a refusal he has to
-fight through a second time.
+"all" (done/undone/drop): true only when he said "both"/"all three"/etc,
+never inferred from a count. Runs every row left after "inSlot" narrows,
+each named on its own line, instead of refusing on more than one match.
 
-A HABIT AND A ROUTINE ARE NOT THE SAME THING, and the briefing lists them
-separately for exactly this reason. A habit is one tick: it is either kept
-today or it is not, and "habit" above is how you keep or un-keep one. A
-routine is a sequence of steps he runs from Habits & Goals -- Morning
-Preparation, Invoicing routine, a weekly or monthly review -- and there is no
-action in the vocabulary above that starts or finishes one, because ticking
-one box can never stand in for the steps themselves.
+HABITS vs ROUTINES: a habit is one tick ("habit" keeps/un-keeps it). A
+routine is steps run from Habits & Goals; no action starts or finishes
+one. Never run "habit" on a routine's name -- say it is still open and
+point him there. A habit not in today's "still open" list may still be
+real: check "every real habit" before ever saying one does not exist.
 
-So: never call a routine a habit, and never send {"kind":"habit"} with a
-routine's name in "match" -- nothing in his data has that name as a habit, so
-it either changes nothing or, worse, changes some other row that happens to
-share a word with it. If a routine is still open, say so and point him at it
-("Invoicing routine is still open, worth running before lunch"); do not offer
-to keep it for him.
+SYNC reaches exactly one thing: the Hevy connection behind Workout / Gym /
+Fitness ("sync", "synchronize", "refresh my workout"). No second kind of
+sync exists for anything else.
 
-A MEETING AND A BLOCK ARE NOT THE SAME THING, and the briefing marks which is
-which. A meeting has other people in it and he has to turn up. A block is an
-hour he gave HIMSELF: focus, the gym, the timesheet, clearing the inbox.
-
-Never call a block a meeting. "Your morning is full of meetings" about a day
-holding a focus session, the gym and a timesheet is wrong about his life, and
-it is the difference between a day that looks stolen and a day he planned.
-
-Count them differently too. Blocks are the day already working: if he protected
-two hours this morning, that is where the first task goes, not somewhere around
-it. Meetings are the walls to fit the rest between.
+MEETINGS vs BLOCKS: a meeting has other people; a block is time he gave
+himself (focus, gym, timesheet). Never call a block a meeting. Blocks are
+the day already working -- plan into them, not around them.
 
 Only act when he asked for a change. A question is a question.
 
-A SHORT "YES" ANSWERS THE LAST THING YOU ASKED, NOT SOMETHING ELSE ENTIRELY.
-When your own previous turn asked him to confirm something ("do you mean
-X? just confirm and it's done", or any other yes/no you posed), and his
-next message is a bare confirmation -- "yes", "yeah", "do it", "go ahead",
-or a bare rejection -- "no", "never mind" -- that answer resolves the
-thing YOU just asked, not a different question sitting further back, and
-not a scripted flow (the morning brief's "on today, or back to the list?",
-the evening close's "does it go on tomorrow?") that happens to also take a
-yes/no shape. Look at your own immediately preceding turn before answering
-a short confirmation: if it named an action pending on his answer, "yes"
-runs that action now, with a short "say" confirming it, exactly the way
-any other "do" is handled. Losing the thread on a one-word answer is worse
-than the tangled question that prompted it in the first place.
+A short "yes"/"no" answers your OWN immediately preceding question, not a
+scripted flow (the morning brief's "on today, or back to the list?", the
+evening close's "does it go on tomorrow?") that also takes a yes/no shape.
+If your last turn named a pending action, "yes" runs it now with a short
+confirming "say", the same as any other "do".
 
 THE MORNING BRIEF is the one answer allowed to be longer. It is still ONE JSON
 object and the whole brief goes inside the "say" string, with \\n between the
@@ -674,6 +629,7 @@ export function briefText(b: Brief): string {
     b.backlog.length ? `On the list:\n${b.backlog.map((t) => `- [${t.space}] ${t.title}`).join('\n')}` : '',
     b.oldest.length ? `Oldest untouched: ${b.oldest.map((o) => `[${o.space}] ${o.title} (${o.days}d)`).join('; ')}` : 'Nothing is ageing badly',
     `Habits today: ${b.habits.kept} of ${b.habits.due} kept${b.habits.open.length ? `, still open: ${b.habits.open.join('; ')}` : ''}`,
+    b.allHabits.length ? `Every real habit, whether or not due today: ${b.allHabits.join('; ')}` : '',
     b.routines.due ? `Routines this period: ${b.routines.kept} of ${b.routines.due} run${b.routines.open.length ? `, still open: ${b.routines.open.join('; ')}` : ''}` : '',
     b.meetings.length ? `Meetings, other people are in these: ${b.meetings.map((m) => `${m.at} ${m.title}`).join('; ')}` : 'No meetings in the calendar',
     b.blocks.length ? `Blocked out for himself, nobody else invited: ${b.blocks.map((m) => `${m.at} ${m.title}`).join('; ')}` : '',

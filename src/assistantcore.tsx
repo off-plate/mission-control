@@ -11,6 +11,7 @@ import {
 } from './voicemode'
 import { getWeather, weatherLine } from './weather'
 import { useAssistantBills } from './assistantbills'
+import { hasHevyKey, syncHevy } from './hevy'
 import { usePomodoro } from './pomodoro'
 import {
   SLOTS, dueOn, habitsDueToday, goalCurrent, habitStepKey, routineComplete, requiredSteps,
@@ -107,6 +108,12 @@ function useBrief(): Brief {
     const routineHabitIds = new Set(routines.filter((r) => !r.archivedAt && r.habitId).map((r) => r.habitId as string))
     const isRoutineLinked = (h: HabitDef) => routineHabitIds.has(h.id) || habitStepKey(h) !== null
     const open = visible.filter((h) => dueOn(h, todayIndex, habitLog) && !h.days[todayIndex] && !h.folderId && !isRoutineLinked(h)).map((h) => h.name)
+    /* His report, 2026-09-08: a real, existing habit (a weekly one, not due
+       on that specific day) came back "I can't find a habit called X"
+       because "open" above is deliberately today-only. Break-kind (quitting)
+       excluded -- those already have their own list below and their own
+       action ("slip"), never "habit". */
+    const allHabits = visible.filter((h) => h.kind !== 'break' && !isRoutineLinked(h)).map((h) => h.name)
 
     /* Routines, as their own thing the assistant can name and point him at --
        never as a "habit" to offer to tick, which was the whole complaint.
@@ -132,6 +139,7 @@ function useBrief(): Brief {
       backlog: backlog.slice(0, 25).map((t) => ({ title: dropUrl(t.title), space: label(t.space) })).filter((t) => t.title),
       oldest: [...backlog].sort((a, b) => age(b) - age(a)).slice(0, 3).map((t) => ({ title: dropUrl(t.title), days: age(t), space: label(t.space) })).filter((t) => t.title),
       habits: { due, kept, open: open.slice(0, 6) },
+      allHabits: allHabits.slice(0, 40),
       routines: routinesBrief,
       meetings,
       blocks,
@@ -198,6 +206,14 @@ export interface Done {
    *  this specifically because a task he finishes by telling the assistant
    *  was going in with no actual time recorded, and no page open to fix it. */
   needsActual?: { taskId: string; est: number }
+  /** Set only by a successful 'open' -- his report, 2026-09-08: he asked to
+   *  open Habits from the dock's quick panel, it said done, and the popup
+   *  just sat there over whatever was already on screen with no visible
+   *  change, reading as "nothing happened" even though setPage() ran for
+   *  real. The panel watches for this and folds itself back to the FAB the
+   *  same way "Open in X" already does, so a navigation he asked for
+   *  actually clears the way to see it. */
+  nav?: boolean
 }
 
 /** Loose enough to find "the noon testing task" from "test testing website",
@@ -534,7 +550,26 @@ function useDoer() {
            same function every nav tab and dock door-out button already
            calls. */
         s2.setPage(a.page)
-        out.push({ ok: true, text: `Opened ${OPEN_LABELS[a.page] ?? a.page}` })
+        out.push({ ok: true, text: `Opened ${OPEN_LABELS[a.page] ?? a.page}`, nav: true })
+        continue
+      }
+      if (a.kind === 'sync') {
+        /* Exactly the call Settings' own "Sync now" button makes -- same
+           key check, same targets-by-name match inside syncHevy() itself,
+           same markHabitDaysOn write. His report, 2026-09-08: he asked to
+           sync the Hevy habit and was told there was no way to run a sync
+           at all, which was true until this. */
+        if (!hasHevyKey()) { out.push({ ok: false, text: 'No Hevy key set on this device' }); continue }
+        const res = await syncHevy(s2.habits, s2.markHabitDaysOn)
+        out.push(res.ok
+          ? { ok: true, text: `Synced Hevy: ${res.days} day${res.days === 1 ? '' : 's'} of workouts` }
+          : {
+            ok: false,
+            text: res.reason === 'bad-key' ? 'That Hevy key was rejected'
+              : res.reason === 'rate-limit' ? 'Hevy is rate limiting right now'
+                : res.reason === 'no-habit' ? 'No habit named Workout / Gym / Fitness to tick'
+                  : 'Hevy could not be reached',
+          })
         continue
       }
       if (a.kind === 'bill') {

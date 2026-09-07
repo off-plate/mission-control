@@ -717,12 +717,35 @@ function useDoer() {
 
   return (actions: Action[]): Done[] => {
     const out: Done[] = []
+    /* live.current is the store as of the last RENDER, not as of the last
+       loop iteration -- addTask's own update lands on the next render, which
+       has not happened yet while this synchronous loop is still running. Two
+       "add" actions for the same title in the one response (his report,
+       2026-09-08: the model itself answering both attempts of a 400-then-
+       retry turn) both saw the store BEFORE either add, and the check below
+       against s2.tasks alone would miss a duplicate created earlier in this
+       exact call. Titles added so far in THIS run close the gap. */
+    const addedThisRun = new Set<string>()
     for (const a of actions) {
       const s2 = live.current
       const day = localDateKey()
       if (a.kind === 'add') {
         const slot = a.list === 'backlog' ? undefined : a.slot
         const list = a.list ?? (a.slot ? 'today' : 'backlog')
+        /* No guard here duplicated the row the moment "add" ran twice for the
+           same title (his report, 2026-09-08) -- and it now can, the same way
+           a rate-limited or 400-then-retried turn already runs the WHOLE
+           request twice: a model that answers on both attempts, or a
+           question asked again before the first answer was back, means two
+           real "do" arrays, not one. Every other action here is written to be
+           safe run twice ("habit" above answers "already kept" rather than
+           toggling itself back off); "add" is the one place creating the
+           second row was silent. An exact, still-open title is treated as the
+           same request repeated, not two things he actually wants. */
+        const key = a.title.trim().toLowerCase()
+        const dupe = addedThisRun.has(key) || s2.tasks.some((t) => !t.done && t.title.trim().toLowerCase() === key)
+        if (dupe) { out.push({ ok: true, text: `Already on the list: ${a.title}` }); continue }
+        addedThisRun.add(key)
         s2.addTask({
           title: a.title,
           source: 'mc',

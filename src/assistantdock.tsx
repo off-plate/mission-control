@@ -50,7 +50,10 @@ export function AssistantPanel({ dockControls, onOpenFull }: { dockControls?: Re
   const foot = useRef<HTMLDivElement>(null)
 
   const send = (text: string, shown?: string) => sendRaw(text, shown).then((r) => { box.current?.focus(); return r })
-  const { voice, startVoice, runSkill, endVoice } = useVoiceGlue(send, () => setQ(''), () => box.current?.focus())
+  /* 0: never hang up on silence alone in here -- his ask (2026-09-08). The
+     session runs until he closes the panel, holds for the full page, or
+     presses Done on the voice panel itself. */
+  const { voice, startVoice, runSkill, endVoice } = useVoiceGlue(send, () => setQ(''), () => box.current?.focus(), 0)
 
   /* NOT autofocused on open the way the full page's box is. There, typing is
      the default mode and the caret belongs in the box the moment it opens;
@@ -186,16 +189,24 @@ export function AssistantPanel({ dockControls, onOpenFull }: { dockControls?: Re
               onChange={(e) => setQ(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(q) } }}
             />
-            {voiceModeAvailable() && !empty && (
-              <button
-                type="button" className="as-voice-btn" onClick={() => void startVoice()} disabled={busy}
-                aria-label="Talk"
-                title="Talk to it, and it talks back. It keeps listening until you are done."
-              >
-                <Icon.Waveform size={15} />
-              </button>
-            )}
-            <button className="btn btn-primary as-send" disabled={busy || !q.trim()}>Ask</button>
+            {/* A row, not two more direct children of .as-ask: that class is
+               a column flex (textarea stacked over its footer on the full
+               page), so a voice button and Ask dropped straight in here each
+               took the row's full width and stacked, one under the other --
+               the squashed layout he flagged. .as-ask-foot is the same
+               footer row the full page already wraps these in. */}
+            <div className="as-ask-foot assistantdock-ask-foot">
+              {voiceModeAvailable() && !empty && (
+                <button
+                  type="button" className="as-voice-btn" onClick={() => void startVoice()} disabled={busy}
+                  aria-label="Talk"
+                  title="Talk to it, and it talks back. It keeps listening until you are done."
+                >
+                  <Icon.Waveform size={15} />
+                </button>
+              )}
+              <button className="btn btn-primary as-send" disabled={busy || !q.trim()}>Ask</button>
+            </div>
           </form>
         )}
       </div>

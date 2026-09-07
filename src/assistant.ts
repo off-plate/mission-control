@@ -59,12 +59,20 @@ export type Action =
    *  actually took ("mark it done, took me fifteen minutes") -- voice mode's
    *  main use for this, since a spoken "done" and a spoken duration arrive as
    *  one utterance with nowhere else to land. Left out, this behaves exactly
-   *  as before: done, and the app asks him separately how long it took. */
-  | { kind: 'done'; match: string; actualMin?: number }
-  | { kind: 'undone'; match: string }
-  | { kind: 'move'; match: string; slot?: Slot; list?: Where }
-  | { kind: 'estimate'; match: string; min: number }
-  | { kind: 'drop'; match: string }
+   *  as before: done, and the app asks him separately how long it took.
+   *
+   *  inSlot narrows which rows "match" is even tried against, to the one
+   *  time-of-day he named ("the noon one", "this afternoon's X") -- two rows
+   *  that share a title text are still two different rows once one of them
+   *  sits in a slot he actually said. all is set ONLY when he explicitly
+   *  said more than one ("both", "all three", "every X") -- with it, every
+   *  row left after narrowing is acted on and named on its own line, rather
+   *  than pick()'s ordinary refusal the moment more than one row matches. */
+  | { kind: 'done'; match: string; actualMin?: number; inSlot?: Slot; all?: boolean }
+  | { kind: 'undone'; match: string; inSlot?: Slot; all?: boolean }
+  | { kind: 'move'; match: string; slot?: Slot; list?: Where; inSlot?: Slot }
+  | { kind: 'estimate'; match: string; min: number; inSlot?: Slot }
+  | { kind: 'drop'; match: string; inSlot?: Slot; all?: boolean }
   | { kind: 'habit'; match: string; on: boolean }
   /** "Open up Big Time" / "switch to Off-Plate" -- changes which workspace he
    *  is standing in. Never inferred from what a task happens to belong to:
@@ -84,9 +92,11 @@ function cleanActions(raw: unknown): Action[] {
     const o = a as Record<string, unknown>
     const str = (v: unknown, cap: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, cap) : '')
     const slot = SLOTS_OK.includes(o.slot as Slot) ? (o.slot as Slot) : undefined
+    const inSlot = SLOTS_OK.includes(o.inSlot as Slot) ? (o.inSlot as Slot) : undefined
     const list = WHERE_OK.includes(o.list as Where) ? (o.list as Where) : undefined
     const min = typeof o.min === 'number' && o.min > 0 && o.min <= 480 ? Math.round(o.min) : undefined
     const actualMin = typeof o.actualMin === 'number' && o.actualMin > 0 && o.actualMin <= 480 ? Math.round(o.actualMin) : undefined
+    const all = o.all === true
     const match = str(o.match, 200)
     switch (o.kind) {
       case 'add': {
@@ -99,17 +109,17 @@ function cleanActions(raw: unknown): Action[] {
         break
       }
       case 'done':
-        if (match) out.push({ kind: 'done', match, actualMin })
+        if (match) out.push({ kind: 'done', match, actualMin, inSlot, all })
         break
       case 'undone': case 'drop':
-        if (match) out.push({ kind: o.kind, match })
+        if (match) out.push({ kind: o.kind, match, inSlot, all })
         break
       case 'move':
         /* A move that names neither a destination nor a list is not a move. */
-        if (match && (slot || list)) out.push({ kind: 'move', match, slot, list })
+        if (match && (slot || list)) out.push({ kind: 'move', match, slot, list, inSlot })
         break
       case 'estimate':
-        if (match && min) out.push({ kind: 'estimate', match, min })
+        if (match && min) out.push({ kind: 'estimate', match, min, inSlot })
         break
       case 'habit':
         if (match) out.push({ kind: 'habit', match, on: o.on !== false })
@@ -277,6 +287,24 @@ a duration you are estimating on his behalf -- when he only says a task is
 done, leave it out and the app asks him afterwards, same as always. "workspace"
 is only for an explicit "open", "switch to" or "go to" a named workspace, never
 inferred from a task he is talking about happening to sit in one.
+
+"done", "undone", "drop", "move" and "estimate" all take an optional "inSlot",
+one of "morning"|"noon"|"afternoon"|"evening" -- the SAME slot the briefing
+already grouped that row under. Two rows can share close to the same title
+("Zaplatit AirBank" twice, once at noon and once in the afternoon, is real),
+and naming the slot he actually said ("the afternoon one", "this noon's X")
+is what tells them apart when the words alone cannot. Only set it when he
+named a time of day himself; never guessed from which slot seems likely.
+
+"done", "undone" and "drop" also take an optional "all", true ONLY when he
+named more than one himself -- "both", "all three", "every X", never assumed
+because two rows happen to match. With "all" true, every row still matching
+after "inSlot" narrows the field is acted on and named on its own line,
+instead of the ordinary rule that two or more matches means nothing happens.
+Two rows that share a title AND a slot, with nothing left in his own words to
+tell them apart, are exactly what "all" is for -- he asked for both of them,
+so both of them is the right and safe thing to do, not a refusal he has to
+fight through a second time.
 
 A HABIT AND A ROUTINE ARE NOT THE SAME THING, and the briefing lists them
 separately for exactly this reason. A habit is one tick: it is either kept

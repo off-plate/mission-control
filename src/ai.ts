@@ -1,37 +1,103 @@
-/* Real task breakdown, through Groq. notesai.ts's /help in Notes reads the
-   same key and the groq()/stripReasoning() helpers below.
+/* Real task breakdown, through whichever provider is active. notesai.ts's
+   /help in Notes reads the same choice and the request()/stripReasoning()
+   helpers below.
 
-   Where the key lives, and why: this repo is public, so nothing goes in the
-   bundle. Compass keeps its Groq key in the synced Supabase row, but this app's
-   row is readable with the anon key that ships in the page, so a key stored
-   there would effectively be published. Here it stays in localStorage on the
-   machine you typed it on: never synced, never in the repo, never in the build.
-   The cost is that you paste it once per device, which is the right trade. */
+   Where a key lives, and why: this repo is public, so nothing goes in the
+   bundle. Compass keeps its Groq key in the synced Supabase row, but this
+   app's row is readable with the anon key that ships in the page, so a key
+   stored there would effectively be published. Every key here stays in
+   localStorage on the machine it was typed on: never synced, never in the
+   repo, never in the build. The cost is that you paste it once per device,
+   which is the right trade.
+
+   TWO PROVIDERS, one active at a time (his ask, 2026-09-07: Groq is not the
+   only place a key can come from, and the app had it hardcoded three ways --
+   the endpoint, the "gsk_" prefix a live key was recognised by, and the model
+   name). Adding one is one entry in PROVIDERS; everything downstream --
+   Settings' key field, the assistant, task breakdowns and estimates -- reads
+   through getAiProvider()/getAiKey()/activeModel() and never names a provider
+   itself. Each provider keeps its OWN key in its OWN localStorage slot, so
+   switching the toggle back and forth never makes you retype one. */
 
 import type { TaskCategory } from './types'
 
-const KEY_STORE = 'mc-groq-key'
-/* The model, named ONCE for the whole app.
-   llama-3.3-70b-versatile was shut off for free and developer tier on
-   2026-08-16, which silently killed every AI feature here at the same moment:
-   the assistant, /help in Notes, task breakdowns and estimates. Nothing in the
-   app said so, because a dead model answers with an HTTP error that each
-   caller was quietly swallowing.
-   Exported so the next retirement is one line, not three files. */
-export const MODEL = 'openai/gpt-oss-120b'
-const ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions'
+export type AiProvider = 'groq' | 'zai'
 
-export function getAiKey(): string {
-  try { return localStorage.getItem(KEY_STORE) ?? '' } catch { return '' }
+export interface ProviderConfig {
+  label: string
+  /** OpenAI-compatible chat-completions endpoint. */
+  endpoint: string
+  /** The model, named ONCE per provider so the next retirement is one line,
+   *  not three files -- llama-3.3-70b-versatile was shut off for free and
+   *  developer tier on 2026-08-16, which silently killed every AI feature
+   *  here at the same moment: the assistant, /help in Notes, breakdowns and
+   *  estimates. Nothing in the app said so, because a dead model answers with
+   *  an HTTP error that each caller was quietly swallowing. */
+  model: string
+  keyStore: string
+  keyPlaceholder: string
+  getKeyUrl: string
 }
-export function setAiKey(key: string): void {
+
+export const PROVIDERS: Record<AiProvider, ProviderConfig> = {
+  groq: {
+    label: 'Groq',
+    endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+    model: 'openai/gpt-oss-120b',
+    keyStore: 'mc-groq-key',
+    keyPlaceholder: 'gsk_…',
+    getKeyUrl: 'https://console.groq.com/keys',
+  },
+  zai: {
+    label: 'Z.ai (GLM)',
+    endpoint: 'https://api.z.ai/api/paas/v4/chat/completions',
+    /* His own trial package, confirmed against his Z.ai console rather than
+       their docs (2026-09-07): the GLM-5.3 docs page names only "glm-5.3",
+       no "-flash" variant, but a model his account actually lists beats a
+       page that may simply not have caught up to it. */
+    model: 'glm-5.3-flash',
+    keyStore: 'mc-zai-key',
+    keyPlaceholder: 'Z.ai API key…',
+    getKeyUrl: 'https://z.ai/model-api',
+  },
+}
+
+const PROVIDER_STORE = 'mc-ai-provider'
+
+export function getAiProvider(): AiProvider {
+  try { return localStorage.getItem(PROVIDER_STORE) === 'zai' ? 'zai' : 'groq' } catch { return 'groq' }
+}
+export function setAiProvider(p: AiProvider): void {
+  try { localStorage.setItem(PROVIDER_STORE, p) } catch { /* storage unavailable */ }
+}
+
+export function getProviderKey(p: AiProvider): string {
+  try { return localStorage.getItem(PROVIDERS[p].keyStore) ?? '' } catch { return '' }
+}
+export function setProviderKey(p: AiProvider, key: string): void {
   try {
-    if (key.trim()) localStorage.setItem(KEY_STORE, key.trim())
-    else localStorage.removeItem(KEY_STORE)
+    if (key.trim()) localStorage.setItem(PROVIDERS[p].keyStore, key.trim())
+    else localStorage.removeItem(PROVIDERS[p].keyStore)
   } catch { /* storage unavailable */ }
 }
+
+/** The active provider's key -- what every generic caller below actually
+ *  wants, so none of them has to know a provider exists. */
+export function getAiKey(): string {
+  return getProviderKey(getAiProvider())
+}
+export function setAiKey(key: string): void {
+  setProviderKey(getAiProvider(), key)
+}
 export function hasAiKey(): boolean {
-  return getAiKey().startsWith('gsk_')
+  /* Was a check for Groq's own "gsk_" prefix, which is meaningless the moment
+     a second provider with a different key shape exists. The actual question
+     this answers -- will a request be attempted -- only ever needed to know
+     whether a key is there at all. */
+  return getAiKey().trim().length > 0
+}
+export function activeModel(): string {
+  return PROVIDERS[getAiProvider()].model
 }
 
 /* How thorough the breakdown should be. Goblin Tools calls this spiciness; the
@@ -100,10 +166,19 @@ export function stripReasoning(raw: string): string {
   return s.replace(/<\/?(think|thinking|reasoning)>/gi, '').trim()
 }
 
-/** Groq rejects unknown params on some models, so the reasoning flags are sent
- *  first and dropped on a 400 rather than failing the whole call. */
-export async function groq(body: Record<string, unknown>, key: string): Promise<Response> {
-  const send = (b: Record<string, unknown>) => fetch(ENDPOINT, {
+/** Posts to a provider's own endpoint with its own key. Defaults to whichever
+ *  provider is active, so every existing caller that only ever spoke of
+ *  "Groq" keeps working unchanged -- it is just quietly Z.ai now when the
+ *  toggle says so. notesai.ts pins this to 'groq' explicitly for its one
+ *  Groq-only model (see there for why).
+ *
+ *  The reasoning flags are Groq's own vocabulary for hiding a reasoning
+ *  model's scratchpad; a provider that does not know them answers 400, which
+ *  already falls through to a plain retry below rather than failing the
+ *  whole call, so this needs no per-provider branch to stay correct on Z.ai. */
+export async function request(body: Record<string, unknown>, key: string, provider: AiProvider = getAiProvider()): Promise<Response> {
+  const endpoint = PROVIDERS[provider].endpoint
+  const send = (b: Record<string, unknown>) => fetch(endpoint, {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(b),
@@ -122,8 +197,8 @@ export async function estimateTask(title: string, category: TaskCategory): Promi
   const key = getAiKey()
   if (!key) return null
   try {
-    const res = await groq({
-      model: MODEL,
+    const res = await request({
+      model: activeModel(),
       temperature: 0.2,
       response_format: { type: 'json_object' },
       messages: [
@@ -151,8 +226,8 @@ export async function breakdownTask(title: string, category: TaskCategory, detai
   const key = getAiKey()
   if (!key) return { ok: false, reason: 'no-key' }
   try {
-    const res = await groq({
-      model: MODEL,
+    const res = await request({
+      model: activeModel(),
       temperature: 0.3,
       response_format: { type: 'json_object' },
       messages: [

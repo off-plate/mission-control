@@ -1,5 +1,4 @@
-/* /help inside a note, through the same Groq key Break It Down already asks
-   for in Settings (ai.ts). One command for the three things he asked for:
+/* /help inside a note. One command for the three things he asked for:
    drafting new text, tightening what is already there, and looking
    something up. groq/compound-mini decides which, and can reach for its own
    built-in web_search tool when the answer depends on something current or
@@ -10,9 +9,21 @@
    answer itself: end with a line reading exactly "Sources:" and a link per
    page actually read, only when the web was actually used. That is also
    the more honest contract: nothing here is real unless the model says so
-   in words, not a field this code has to trust blindly. */
+   in words, not a field this code has to trust blindly.
 
-import { detectLang, getAiKey, groq, MODEL as SHARED_MODEL, stripReasoning } from './ai'
+   TWO PROVIDERS complicate this one (2026-09-07): compound-mini's web search
+   is Groq's own and has no equivalent anywhere else, so it is tried first
+   whenever a Groq key is on file at all -- regardless of which provider
+   Settings has toggled active, since a search-capable answer beats a plain
+   one and having both keys costs nothing extra to try. It is genuinely
+   SKIPPED, not attempted-and-failed, when there is no Groq key, rather than
+   reporting a key that was never meant to exist. The fallback below no
+   longer assumes the second attempt shares the first one's key: a bad or
+   rate-limited Groq key only short-circuits the retry when the active
+   provider IS Groq, i.e. it would be the identical key against the identical
+   account. Any other active provider gets its own real attempt. */
+
+import { activeModel, detectLang, getAiKey, getAiProvider, getProviderKey, request, stripReasoning } from './ai'
 
 /* compound-mini is an agentic SYSTEM rather than a plain model, and it is
    chosen for one reason: it can reach for its own web_search when the answer
@@ -22,10 +33,10 @@ import { detectLang, getAiKey, groq, MODEL as SHARED_MODEL, stripReasoning } fro
    hard way when llama-3.3-70b-versatile was retired and every AI feature went
    quiet at once, and the lesson written there, "named ONCE for the whole app",
    never reached this file: this constant sat here untouched, so the fix that
-   revived the assistant did nothing for /help. If the system is unavailable,
-   the answer falls back to the model the rest of the app uses. Without the
-   web, but answering. */
-const MODEL = 'groq/compound-mini'
+   revived the assistant did nothing for /help. If Groq is unavailable, or
+   never had a key here at all, the answer falls back to the active
+   provider's own model. Without the web, but answering. */
+const COMPOUND_MODEL = 'groq/compound-mini'
 
 export type HelpResult =
   | { ok: true; text: string }
@@ -51,23 +62,27 @@ Rules:
 }
 
 export async function helpWithNote(instruction: string, noteSoFar: string): Promise<HelpResult> {
-  const key = getAiKey()
-  if (!key) return { ok: false, reason: 'no-key' }
+  const groqKey = getProviderKey('groq')
+  const activeProvider = getAiProvider()
+  const activeKey = getAiKey()
+  if (!groqKey && !activeKey) return { ok: false, reason: 'no-key' }
 
   const messages = [
     { role: 'system', content: systemFor(detectLang(instruction || noteSoFar)) },
     { role: 'user', content: `Note so far, as markdown (may still include the /help line itself; that line is the instruction below, not content):\n\n${noteSoFar}\n\nHis instruction: ${instruction}` },
   ]
 
-  /** One attempt against one model. Returns the answer, or why not, in words. */
-  const ask = async (model: string): Promise<HelpResult> => {
+  /** One attempt against one model, on one provider's own key. Returns the
+   *  answer, or why not, in words. */
+  const ask = async (model: string, key: string, provider: 'groq' | ReturnType<typeof getAiProvider>): Promise<HelpResult> => {
     try {
-      const res = await groq({ model, temperature: 0.4, messages }, key)
+      const res = await request({ model, temperature: 0.4, messages }, key, provider)
       if (res.status === 401 || res.status === 403) return { ok: false, reason: 'bad-key' }
       if (res.status === 429) return { ok: false, reason: 'rate-limit' }
       if (!res.ok) {
-        /* Read what Groq said rather than throwing it away. A retired model
-           answers with a perfectly clear sentence and this used to swallow it. */
+        /* Read what the provider said rather than throwing it away. A retired
+           model answers with a perfectly clear sentence and this used to
+           swallow it. */
         let said = ''
         try {
           const body = await res.json() as { error?: { message?: string } }
@@ -84,13 +99,16 @@ export async function helpWithNote(instruction: string, noteSoFar: string): Prom
     }
   }
 
-  const first = await ask(MODEL)
-  /* A bad key or a rate limit will not be cured by asking a different model,
-     so those stand. Anything else gets one more try on the model the rest of
-     the app is already using. */
-  if (first.ok || first.reason === 'bad-key' || first.reason === 'rate-limit') return first
-  if ((MODEL as string) === (SHARED_MODEL as string)) return first
-  const second = await ask(SHARED_MODEL)
+  const first = groqKey ? await ask(COMPOUND_MODEL, groqKey, 'groq') : null
+  if (first?.ok) return first
+  /* A bad key or a rate limit on Groq will not be cured by asking Groq's own
+     plain model with the SAME key -- but the active provider might be a
+     completely different account now, so this only stands when trying again
+     really would be the identical key against the identical account. */
+  if (first && (first.reason === 'bad-key' || first.reason === 'rate-limit') && activeProvider === 'groq') return first
+  if (!activeKey) return first ?? { ok: false, reason: 'no-key' }
+  const second = await ask(activeModel(), activeKey, activeProvider)
   if (second.ok) return second
+  if (!first) return second
   return { ok: false, reason: 'failed', detail: [first.detail, second.detail].filter(Boolean).join(' / ') }
 }

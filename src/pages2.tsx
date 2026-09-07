@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Band } from './pages1'
 import { useStore } from './store'
-import { getAiKey, hasAiKey, setAiKey } from './ai'
+import { PROVIDERS, getAiKey, getAiProvider, hasAiKey, setAiKey, setAiProvider, type AiProvider } from './ai'
+import { Segmented } from './ui'
 import { getHevyKey, getHevyLastSync, hasHevyKey, setHevyKey, syncHevy } from './hevy'
 import { getTtsKey, hasTtsKey, setTtsKey } from './speech'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange, sendSignInCode, signInWithCode, signOutAccount, type Account } from './supabase'
@@ -136,27 +137,52 @@ function OpenAtLogin() {
   )
 }
 
+/* Groq, for breaking tasks down and /help in Notes -- and now a second slot
+   next to it (his ask, 2026-09-07). Only ONE is "active" at a time: whichever
+   the pill picks is what Assistant, breakdowns and estimates actually call
+   (see ai.ts). Both keys are kept regardless of which is active, each in its
+   own localStorage slot, so switching the pill back and forth to compare them
+   never makes him retype one. /help in Notes is the one exception: it still
+   reaches for a saved Groq key first no matter which pill is picked, because
+   compound-mini's web search only exists on Groq -- see notesai.ts. */
 function AiKeyField() {
+  const [provider, setProvider] = useState<AiProvider>(getAiProvider())
   const [key, setKey] = useState(getAiKey())
   const [saved, setSaved] = useState(false)
   const live = hasAiKey()
+  const cfg = PROVIDERS[provider]
+
+  const pick = (p: AiProvider) => {
+    setAiProvider(p)
+    setProvider(p)
+    setKey(getAiKey())
+    setSaved(false)
+  }
+
   return (
     <div className="ai-key">
-      <div className="source-row">
+      <Segmented
+        label="AI provider"
+        value={provider}
+        size="sm"
+        onPick={pick}
+        options={(Object.keys(PROVIDERS) as AiProvider[]).map((p) => ({ id: p, label: PROVIDERS[p].label }))}
+      />
+      <div className="source-row" style={{ marginTop: 'var(--s2)' }}>
         <span className={`status-dot ${live ? 'connected' : 'off'}`} />
         <span className="info">
-          <span className="name">Groq, for breaking tasks down and /help in Notes</span>
+          <span className="name">{cfg.label}, for the assistant, breaking tasks down, and /help in Notes</span>
           <span className="detail" style={{ display: 'block' }}>
             {live ? 'Connected. Break it down reads the actual task, and /help works in Notes.' : 'Not set. Break it down falls back to a pattern library, and /help in Notes does nothing.'}
           </span>
         </span>
-        <a className="btn btn-quiet" href="https://console.groq.com/keys" target="_blank" rel="noreferrer">Get a free key ↗</a>
+        <a className="btn btn-quiet" href={cfg.getKeyUrl} target="_blank" rel="noreferrer">Get a key ↗</a>
       </div>
       <div className="formrow" style={{ marginTop: 'var(--s2)', marginBottom: 0 }}>
         <input
-          className="textinput grow" type="password" placeholder="gsk_…" value={key}
+          className="textinput grow" type="password" placeholder={cfg.keyPlaceholder} value={key}
           onChange={(e) => { setKey(e.target.value); setSaved(false) }}
-          aria-label="Groq API key"
+          aria-label={`${cfg.label} API key`}
         />
         <button className="btn btn-primary" onClick={() => { setAiKey(key); setSaved(true) }}>Save</button>
       </div>

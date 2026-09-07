@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { fakeDecompose, type DecomposedStep } from './mock'
 import { BUFFER } from './estimate'
 import type { Task } from './types'
-import { breakdownTask, type Detail } from './ai'
+import { PROVIDERS, breakdownTask, getAiProvider, type Detail } from './ai'
 import { useStore } from './store'
 import { fmtDuration } from './util'
 
@@ -64,11 +64,14 @@ export function BreakdownSheet({ task, onClose }: { task: Task; onClose: () => v
         setSteps(r.steps.map((s) => ({ title: s.title, why: s.why, estimateMin: s.estimateMin })))
       } else {
         setSource('local')
-        setWhy(
-          r.reason === 'no-key' ? 'No Groq key yet. Add one in Settings and this reads the actual task.'
-          : r.reason === 'bad-key' ? 'That Groq key was rejected. Check it in Settings.'
-          : r.reason === 'rate-limit' ? 'Groq is rate limiting right now. Try again shortly.'
-          : 'Groq could not be reached just now.')
+        {
+          const providerLabel = PROVIDERS[getAiProvider()].label
+          setWhy(
+            r.reason === 'no-key' ? `No ${providerLabel} key yet. Add one in Settings and this reads the actual task.`
+            : r.reason === 'bad-key' ? `That ${providerLabel} key was rejected. Check it in Settings.`
+            : r.reason === 'rate-limit' ? `${providerLabel} is rate limiting right now. Try again shortly.`
+            : `${providerLabel} could not be reached just now.`)
+        }
         setSteps(fakeDecompose(task.title).map((s) => ({ ...s, estimateMin: Math.max(1, Math.round(s.estimateMin * BUFFER)) })))
       }
       setBusy(false)

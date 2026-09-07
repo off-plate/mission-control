@@ -20,6 +20,7 @@
    switching the toggle back and forth never makes you retype one. */
 
 import type { TaskCategory } from './types'
+import { SUPABASE_URL } from './config'
 
 export type AiProvider = 'groq' | 'zai'
 
@@ -63,7 +64,19 @@ export const PROVIDERS: Record<AiProvider, ProviderConfig> = {
   },
   zai: {
     label: 'Z.ai (GLM)',
-    endpoint: 'https://api.z.ai/api/paas/v4/chat/completions',
+    /* Not Z.ai's own endpoint. Confirmed live (2026-09-08), his real key, his
+       real browser, DevTools open: the actual request shows as a CORS error
+       in the Network panel, its own preflight having already passed -- Z.ai's
+       server never sends access-control-allow-origin back at all, a choice
+       made entirely on their end that no request shape from here could ever
+       have worked around. This is Mission Control's own relay instead
+       (supabase/functions/zai-chat), which makes the same call
+       server-to-server, where CORS does not apply, and hands the answer back
+       with the header a browser needs to read it. It carries no secret of
+       its own -- the Authorization header IS his key, forwarded through
+       untouched -- so it asks nothing new of him: same key, same field in
+       Settings, one extra hop he never sees. */
+    endpoint: `${SUPABASE_URL}/functions/v1/zai-chat`,
     /* His own trial package, confirmed against his Z.ai console rather than
        their docs (2026-09-07): the GLM-5.3 docs page names only "glm-5.3",
        no "-flash" variant, but a model his account actually lists beats a

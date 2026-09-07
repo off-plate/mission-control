@@ -274,15 +274,23 @@ export function Dock() {
      exists to make dominant. */
   if (page === 'zone') return null
 
-  /* Note on top, then Bills, then Timeline, Focus at the bottom, his order
-     -- closest to the corner is the one he reaches for most. The player,
-     when it exists at all, sits above both: rarest to need, so furthest
-     from the thumb. Bills and Timeline both land here as compact
-     read-mostly summaries, not their full pages -- see billsdock.tsx and
-     timelinedock.tsx for why: hundreds of lines of sign-in, edit sheets,
-     a canvas flywheel view and video reels are a much bigger, worse-
-     fitting build for a 560px popup than a glanceable headline with a
-     door out to the real page.
+  /* Note on top, then Bills, then Timeline, Contacts, Assistant, Focus at
+     the bottom, his order -- closest to the corner is the one he reaches
+     for most. The player, when it exists at all, sits above both: rarest
+     to need, so furthest from the thumb. Bills and Timeline both land here
+     as compact read-mostly summaries, not their full pages -- see
+     billsdock.tsx and timelinedock.tsx for why: hundreds of lines of
+     sign-in, edit sheets, a canvas flywheel view and video reels are a
+     much bigger, worse-fitting build for a 560px popup than a glanceable
+     headline with a door out to the real page.
+
+     Assistant is neither: its own header button retired in its favour
+     (2026-09-08, his ask) with no smaller "glance" of it worth building --
+     a conversation has no meaningful mini state the way a bill list or a
+     wallet balance does. So it rides the same plain-shortcut shape Focus
+     already proved out below rather than a fifth PanelFace: one tap opens
+     the real page directly, full history and canvas and all, "long
+     functionality fully" -- never a stripped-down copy of it in the popup.
 
      Icons sized up across the row (2026-09-04): the chip circles are 56px
      and were carrying a 16-18px glyph, a lot of empty ring around not much
@@ -336,6 +344,18 @@ export function Dock() {
         </button>
       </div>
     )
+    /* Assistant, the same plain-shortcut shape as Focus above it -- no live
+       state to carry in the label, so the whole row IS the button, unlike
+       Focus's row (which nests a real play/pause control of its own and so
+       cannot be one). */
+    const assistantRow = (
+      <button className="dock-item dock-item--link" onClick={() => setPage('assistant')} aria-label="Open the assistant" title="Open Assistant">
+        <span className="dock-item-label">Assistant</span>
+        <span className="dock-item-avatar-ring">
+          <span className="dock-item-avatar dock-item-avatar--assistant"><Icon.Waveform size={22} /></span>
+        </span>
+      </button>
+    )
     return (
       <div
         className={`dock${closing ? ' is-closing' : entered ? ' is-open' : ''}${scrollHidden ? ' is-scroll-hidden' : ''}`}
@@ -366,6 +386,7 @@ export function Dock() {
                 </button>
               )
             })}
+            {assistantRow}
             {focusRow}
           </div>
         )}

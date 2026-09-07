@@ -256,19 +256,26 @@ await step('the menu is six tabs, and what left it is reachable from the header'
   for (const gone of ['Avoidance', 'Assistant', 'Notes', 'Focus', 'Money', 'Reflect', 'Achievements', 'Timeline', "Why's", 'Why']) {
     if (tabs.includes(gone)) throw new Error(`${gone} is still a tab`)
   }
-  /* Note left the header entirely for the dock (2026-09-01/02) -- it is
-     checked below by opening the dock and reading its item labels, not as a
-     header button any more. Assistant is the one page that kept its own
-     header button through the whole dock rebuild. */
-  if (!(await page.getByRole('button', { name: 'Assistant', exact: true }).count())) {
-    throw new Error('no Assistant in the header')
+  /* Note left the header entirely for the dock (2026-09-01/02); Assistant
+     followed it there (2026-09-08), the last page that had kept its own
+     header button through the whole dock rebuild. Both are checked below by
+     opening the dock and reading its item labels, not as header buttons. */
+  if (await page.getByRole('button', { name: 'Assistant', exact: true }).count()) {
+    throw new Error('Assistant still has its own header button')
   }
   const dockOpen = page.getByRole('button', { name: 'Open quick tools' })
   await dockOpen.click(); await page.waitForTimeout(400)
   const dockLabels = await page.locator('.dock-item-label').allInnerTexts()
-  for (const want of ['Note', 'Bills', 'Timeline']) {
+  for (const want of ['Note', 'Bills', 'Timeline', 'Assistant']) {
     if (!dockLabels.some((l) => l.trim() === want)) throw new Error(`${want} is not in the dock (${dockLabels.join(', ')})`)
   }
+  /* Assistant's row is a real full-page shortcut, not a hold-for-full panel
+     like the three above -- one tap has to actually land on the real page,
+     not just fan the dock's own stack open further. */
+  await page.getByRole('button', { name: 'Open the assistant' }).click(); await page.waitForTimeout(500)
+  if (!(await page.getByText('What can I help with?').count())) throw new Error('tapping Assistant in the dock did not open the real page')
+  await fresh('today')
+  await dockOpen.click(); await page.waitForTimeout(400)
   await page.getByRole('button', { name: 'Close quick tools' }).click(); await page.waitForTimeout(400)
   /* The FAB sits fixed bottom-right; the cursor is still resting there right
      after this click, and the same spot re-renders the closed FAB on every

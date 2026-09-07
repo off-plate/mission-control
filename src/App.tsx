@@ -474,10 +474,10 @@ export default function App() {
       >
       <header className="topbar">
         {/* Only this cluster (name, workspace) triggers the reveal on hover,
-            on his instruction: the right side (sync, Assistant, Zone, the
-            helmet, Note, Yesterday, the page menu, Settings) is stuff he
-            reaches for directly, not a place a passing cursor should open a
-            second row underneath. Leaving here still bubbles up to the
+            on his instruction: the right side (sync, Zone, the helmet, Note,
+            Yesterday, the page menu, Settings) is stuff he reaches for
+            directly, not a place a passing cursor should open a second row
+            underneath. Leaving here still bubbles up to the
             topstick's onMouseLeave same as before, so once open, moving the
             cursor anywhere else in the header -- this cluster, the right
             side, the row itself -- keeps it open; only this cluster can
@@ -532,20 +532,12 @@ export default function App() {
           {/* Status before actions, and not in the Zone: that room is one thing
               at a time and a sync line is not the thing. */}
           {page !== 'zone' && <SyncPip />}
-          {/* First in the group and next to the Zone, on his instruction: these
-              two are where he actually starts something, so they carry the
-              same vibrant weight and stand apart from the plain ghost buttons
-              beside them. */}
-          <button
-            className={`btn btn-primary${page === 'assistant' ? ' is-on' : ''}`}
-            onClick={() => setPage('assistant')}
-            aria-pressed={page === 'assistant'}
-            title="Assistant"
-            aria-label="Assistant"
-          >
-            <Icon.Waveform size={18} />
-            <span className="btn-label">Assistant</span>
-          </button>
+          {/* Assistant's own header button retired in its favour (2026-09-08,
+              his ask): the floating dock (see dock.tsx) reaches it in one tap
+              from anywhere, the same door Note/Bills/Timeline/Contacts
+              already use, full page and full history, nothing smaller. The
+              page itself is untouched -- setPage('assistant') below still
+              renders it, this was only ever the header shortcut in. */}
           {/* The one thing running, full screen. Filled with the accent so it
               reads as the button that starts something, not a place he browses.
               It is a toggle: pressing it again puts him back on the page he
@@ -619,8 +611,10 @@ export default function App() {
               )
             ))}
           </Dropdown>
-          {/* Assistant left this list the same way the Zone did: it is its own
-              button now, not a tab, so the picker has nothing to say about it. */}
+          {/* Assistant was never in this list, same as the Zone: reached from
+              the dock now (2026-09-08) rather than its own header button, but
+              the picker still has nothing to say about a page that was never
+              one of its tabs. */}
           {page !== 'zone' && page !== 'assistant' && <PhonePages tabs={tabs} page={navPage} setPage={setPage} />}
           <button
             className={`btn btn-ghost${page === 'settings' ? ' is-on' : ''}${needsSignIn ? ' has-dot' : ''}`}

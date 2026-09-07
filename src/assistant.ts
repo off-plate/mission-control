@@ -130,6 +130,14 @@ export interface Brief {
   backlog: { title: string; space: string }[]
   oldest: { title: string; days: number; space: string }[]
   habits: { due: number; kept: number; open: string[] }
+  /* A ROUTINE IS NOT A HABIT (his correction, 2026-09-07): a habit is one tick;
+     a routine is a sequence of steps run from Habits & Goals, and the two used
+     to arrive here as one flat "habits" list because a routine's own
+     auto-ticking habit shares that list's data. Same due/kept/open shape as
+     habits, kept separate so the model can talk about them as the different
+     things they are, and never offer to "keep" one with a habit action -- a
+     routine is finished by running it, not by a checkbox. */
+  routines: { due: number; kept: number; open: string[] }
   /* Other people are in these. */
   meetings: { at: string; title: string }[]
   /* Hours he gave himself: focus, the gym, the timesheet. Time already spent,
@@ -246,6 +254,21 @@ The whole vocabulary, and nothing outside it works:
 a description of it. "add" carries HIS words for the new task, off the message
 he just typed, and nothing invented around them. Leave "min" out unless he gave
 a number: a made-up estimate is a made-up number.
+
+A HABIT AND A ROUTINE ARE NOT THE SAME THING, and the briefing lists them
+separately for exactly this reason. A habit is one tick: it is either kept
+today or it is not, and "habit" above is how you keep or un-keep one. A
+routine is a sequence of steps he runs from Habits & Goals -- Morning
+Preparation, Invoicing routine, a weekly or monthly review -- and there is no
+action in the vocabulary above that starts or finishes one, because ticking
+one box can never stand in for the steps themselves.
+
+So: never call a routine a habit, and never send {"kind":"habit"} with a
+routine's name in "match" -- nothing in his data has that name as a habit, so
+it either changes nothing or, worse, changes some other row that happens to
+share a word with it. If a routine is still open, say so and point him at it
+("Invoicing routine is still open, worth running before lunch"); do not offer
+to keep it for him.
 
 A MEETING AND A BLOCK ARE NOT THE SAME THING, and the briefing marks which is
 which. A meeting has other people in it and he has to turn up. A block is an
@@ -421,6 +444,7 @@ export function briefText(b: Brief): string {
     b.backlog.length ? `On the list:\n${b.backlog.map((t) => `- [${t.space}] ${t.title}`).join('\n')}` : '',
     b.oldest.length ? `Oldest untouched: ${b.oldest.map((o) => `[${o.space}] ${o.title} (${o.days}d)`).join('; ')}` : 'Nothing is ageing badly',
     `Habits today: ${b.habits.kept} of ${b.habits.due} kept${b.habits.open.length ? `, still open: ${b.habits.open.join('; ')}` : ''}`,
+    b.routines.due ? `Routines this period: ${b.routines.kept} of ${b.routines.due} run${b.routines.open.length ? `, still open: ${b.routines.open.join('; ')}` : ''}` : '',
     b.meetings.length ? `Meetings, other people are in these: ${b.meetings.map((m) => `${m.at} ${m.title}`).join('; ')}` : 'No meetings in the calendar',
     b.blocks.length ? `Blocked out for himself, nobody else invited: ${b.blocks.map((m) => `${m.at} ${m.title}`).join('; ')}` : '',
     b.tomorrow.length ? `Already planned for TOMORROW:\n${b.tomorrow.map((t) => `- [${t.space}] ${t.title}`).join('\n')}` : 'Nothing planned for tomorrow yet',

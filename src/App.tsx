@@ -533,10 +533,11 @@ export default function App() {
               at a time and a sync line is not the thing. */}
           {page !== 'zone' && <SyncPip />}
           {/* Assistant's own header button retired in its favour (2026-09-08,
-              his ask): the floating dock (see dock.tsx) reaches it in one tap
-              from anywhere, the same door Note/Bills/Timeline/Contacts
-              already use, full page and full history, nothing smaller. The
-              page itself is untouched -- setPage('assistant') below still
+              his ask): the floating dock (see dock.tsx) reaches it from
+              anywhere now, the same door Note/Bills/Timeline/Contacts already
+              use -- a short tap opens a real quick-ask widget right in the
+              dock, a hold reaches this same full page, full history and all.
+              The page itself is untouched -- setPage('assistant') below still
               renders it, this was only ever the header shortcut in. */}
           {/* The one thing running, full screen. Filled with the accent so it
               reads as the button that starts something, not a place he browses.

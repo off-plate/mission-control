@@ -259,7 +259,11 @@ await step('the menu is six tabs, and what left it is reachable from the header'
   /* Note left the header entirely for the dock (2026-09-01/02); Assistant
      followed it there (2026-09-08), the last page that had kept its own
      header button through the whole dock rebuild. Both are checked below by
-     opening the dock and reading its item labels, not as header buttons. */
+     opening the dock and reading its item labels, not as header buttons.
+     Assistant's own click-vs-hold behaviour (his correction, 2026-09-08: a
+     tap opens a real quick-ask widget, only a hold reaches the full page --
+     the same shape Note/Bills/Timeline already use, not Focus's plain
+     shortcut) has its own dedicated step below, alongside Note's. */
   if (await page.getByRole('button', { name: 'Assistant', exact: true }).count()) {
     throw new Error('Assistant still has its own header button')
   }
@@ -269,11 +273,6 @@ await step('the menu is six tabs, and what left it is reachable from the header'
   for (const want of ['Note', 'Bills', 'Timeline', 'Assistant']) {
     if (!dockLabels.some((l) => l.trim() === want)) throw new Error(`${want} is not in the dock (${dockLabels.join(', ')})`)
   }
-  /* Assistant's row is a real full-page shortcut, not a hold-for-full panel
-     like the three above -- one tap has to actually land on the real page,
-     not just fan the dock's own stack open further. */
-  await page.getByRole('button', { name: 'Open the assistant' }).click(); await page.waitForTimeout(500)
-  if (!(await page.getByText('What can I help with?').count())) throw new Error('tapping Assistant in the dock did not open the real page')
   await fresh('today')
   await dockOpen.click(); await page.waitForTimeout(400)
   await page.getByRole('button', { name: 'Close quick tools' }).click(); await page.waitForTimeout(400)
@@ -329,6 +328,35 @@ await step('the dock opens Notes (click for the popup, hold for the full page), 
   await page.getByRole('button', { name: 'Open the focus history' }).click(); await page.waitForTimeout(600)
   const h1 = await page.locator('h1').first().innerText()
   if (h1 !== 'Focus') throw new Error(`the dock's Focus avatar went to ${h1}`)
+})
+await step('the dock opens Assistant (click for the quick-ask widget, hold for the full page)', async () => {
+  /* His correction (2026-09-08) of a first pass that gave Assistant the same
+     plain-shortcut shape as Focus's row: "the quick solution, meaning when I
+     only tap it, it should pull up just like a widget... like the notes app
+     or the focus app or the bills app... when I long press it... it should
+     direct me to the AI assistant subpage." So it is a PanelFace like Note,
+     not a shortcut like Focus -- same click-opens-popup/hold-reaches-the-
+     full-page mechanics as the Note test above, asserted the same way. */
+  await fresh('today')
+  const openDock = page.getByRole('button', { name: 'Open quick tools' })
+  await openDock.waitFor({ state: 'visible', timeout: 10000 })
+  await openDock.click(); await page.waitForTimeout(400)
+  const assistantItem = page.locator('.dock-item').filter({ hasText: 'Assistant' })
+  await assistantItem.click(); await page.waitForTimeout(400)
+  if (!(await page.locator('.assistantdock-panel').count())) throw new Error('a click on the Assistant dock item did not open the quick widget')
+  if (await page.locator('.as-page').count()) throw new Error('a click on the Assistant dock item jumped straight to the full page')
+  // The same quick-ask skill grid the full page opens on, not a thinned copy.
+  if (!(await page.getByRole('button', { name: /Morning brief/ }).count())) throw new Error('the Assistant widget is missing its quick-ask skills')
+  await page.getByRole('button', { name: 'Close', exact: true }).click(); await page.waitForTimeout(400)
+
+  await page.getByRole('button', { name: 'Open quick tools' }).click(); await page.waitForTimeout(400)
+  const box = await assistantItem.boundingBox()
+  if (!box) throw new Error('no Assistant dock item to hold')
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down(); await page.waitForTimeout(650); await page.mouse.up()
+  await page.waitForTimeout(400)
+  if (!(await page.locator('.as-page').count())) throw new Error('holding the Assistant dock item did not open the full Assistant page')
+  if (!(await page.getByText('What can I help with?').count())) throw new Error('the full Assistant page did not render its own hero question')
 })
 await step('the zone: header stays, first move starts it, and the note lands in its folder', async () => {
   await fresh('today')

@@ -27,7 +27,15 @@ const RESTART_DELAY = 250
 /* Said nothing at all for this long: he is done, or he walked away. Voice mode
    hangs up rather than holding the microphone open for the rest of the evening.
    Only ever armed when NOTHING has been heard; once he starts a sentence, HUSH
-   owns the timing and this stays out of the way. */
+   owns the timing and this stays out of the way.
+
+   The full page's own default -- his correction (2026-09-08) was scoped to
+   the dock's quick panel specifically: "keep the conversation going until I
+   close it, open the assistant page, or click stop", not a silent hang-up
+   mid-conversation because he was reading the last answer rather than
+   already talking. enter()'s own idleMs argument overrides this per call;
+   the dock passes 0 to disable it outright, the full page passes nothing
+   and keeps this exact number. */
 const IDLE_HANGUP = 6000
 
 type Recognition = {
@@ -73,6 +81,7 @@ let stream: MediaStream | null = null
 let ctx: AudioContext | null = null
 let raf = 0
 let askFn: ((text: string) => Promise<string>) | null = null
+let idleMs = IDLE_HANGUP
 
 const listeners = new Set<() => void>()
 export function subscribe(fn: () => void): () => void {
@@ -97,7 +106,11 @@ function clearIdle(): void {
 }
 function armIdle(): void {
   clearIdle()
-  idle = setTimeout(() => { if (phase === 'listening') exit() }, IDLE_HANGUP)
+  /* 0 (or below) turns this hangup off outright, rather than an infinite
+     setTimeout -- his ask (2026-09-08) for the dock's quick panel specif-
+     ically, so a session there never ends on silence alone. */
+  if (idleMs <= 0) return
+  idle = setTimeout(() => { if (phase === 'listening') exit() }, idleMs)
 }
 
 /* Recognition is torn down handler-first every time. A detached handler cannot
@@ -273,9 +286,14 @@ export async function enter(
   /* Asked on his behalf the moment it opens, for the morning brief. Skips
      straight to thinking: there is nothing to listen for yet. */
   opening?: string,
+  /* Overrides IDLE_HANGUP for this session only, reset to the real default
+     the moment it ends (exit(), below) -- the full page never passes this
+     and keeps the default exactly as it always was. */
+  hangupMs = IDLE_HANGUP,
 ): Promise<boolean> {
   if (!voiceModeAvailable() || phase !== 'off') return false
   askFn = ask
+  idleMs = hangupMs
   phase = 'listening'
   /* The waveform is a nicety; recognition is the feature. If the meter cannot
      be opened, carry on without it rather than refusing to start. */
@@ -311,6 +329,7 @@ export function exit(): void {
   void ctx?.close().catch(() => { /* already closed */ })
   ctx = null
   askFn = null
+  idleMs = IDLE_HANGUP
   heard = ''
   interim = ''
   level = 0

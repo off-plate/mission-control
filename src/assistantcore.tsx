@@ -182,22 +182,42 @@ export interface Done {
 const fold = (t: string) =>
   t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim()
 
-function pick<T extends { title: string }>(rows: T[], match: string): { row?: T; why?: string } {
+/** The one tier of rows pick()/pickAll() actually decide on -- exact title,
+ *  else substring, else every word present in any order, whichever of the
+ *  three is the first to turn up anything at all. Split out from pick()
+ *  itself (2026-09-08) so pickAll() can share the exact same tiering
+ *  without a second, drifting copy of it. */
+function candidates<T extends { title: string }>(rows: T[], match: string): T[] {
   const m = fold(match)
-  if (!m) return { why: 'nothing to look for' }
+  if (!m) return []
   const exact = rows.filter((r) => fold(r.title) === m)
-  if (exact.length === 1) return { row: exact[0] }
+  if (exact.length === 1) return exact
   const has = rows.filter((r) => fold(r.title).includes(m))
-  if (has.length === 1) return { row: has[0] }
-  if (has.length > 1) return { why: `${has.length} of them match "${match}"` }
+  if (has.length >= 1) return has
   /* Last resort: every word he used has to appear, in any order. This is what
      turns "noon testing task" into the row actually called "test testing
      website", and it is deliberately the LAST thing tried. */
   const words = m.split(' ').filter((w) => w.length > 2)
-  const all = words.length ? rows.filter((r) => words.every((w) => fold(r.title).includes(w))) : []
-  if (all.length === 1) return { row: all[0] }
-  if (all.length > 1) return { why: `${all.length} of them match "${match}"` }
+  return words.length ? rows.filter((r) => words.every((w) => fold(r.title).includes(w))) : []
+}
+
+function pick<T extends { title: string }>(rows: T[], match: string): { row?: T; why?: string } {
+  if (!fold(match)) return { why: 'nothing to look for' }
+  const found = candidates(rows, match)
+  if (found.length === 1) return { row: found[0] }
+  if (found.length > 1) return { why: `${found.length} of them match "${match}"` }
   return { why: `nothing here is called "${match}"` }
+}
+
+/** pick()'s counterpart for when he named more than one himself ("both",
+ *  "all three"): every row still in the same tier pick() would have refused
+ *  on, rather than one row or nothing. Never invents a row pick() would not
+ *  also have found -- the difference is only in what happens once several
+ *  real ones turn up. */
+function pickAll<T extends { title: string }>(rows: T[], match: string): { found: T[]; why?: string } {
+  if (!fold(match)) return { found: [], why: 'nothing to look for' }
+  const found = candidates(rows, match)
+  return found.length ? { found } : { found: [], why: `nothing here is called "${match}"` }
 }
 
 /* The assistant's mark: a blob that changes shape as it works.
@@ -473,57 +493,76 @@ function useDoer() {
         out.push({ ok: true, text: a.on ? `Kept today: ${row.name}` : `Reopened today: ${row.name}` })
         continue
       }
-      const { row, why } = pick(s2.tasks, a.match)
-      if (!row) { out.push({ ok: false, text: why ?? 'no task matched' }); continue }
-      switch (a.kind) {
-        case 'done':
-          if (row.done) { out.push({ ok: true, text: `${row.title} was already done` }); break }
-          /* He said the real number in the same breath ("done, took me
-             fifteen minutes") -- log it outright rather than asking a
-             question he already answered. logActual is the one function
-             that marks it done, records the actual minutes, and writes the
-             ledger/focus rows behind it, the same path the manual "how long
-             did it take?" prompt already calls into (see ActualLog). */
-          if (a.actualMin != null) {
-            s2.logActual(row.id, a.actualMin)
-            out.push({ ok: true, text: `Done: ${row.title} — ${fmtDuration(a.actualMin)}` })
-            break
+      /* inSlot narrows the field BEFORE match is ever tried against it --
+         two rows sharing close to one title, one at noon and one in the
+         afternoon (his report, 2026-09-08: two real "Zaplatit AirBank"
+         rows), are the exact case a plain title search cannot tell apart,
+         and the slot he actually named is real, already-known data, never
+         a guess. */
+      const scoped = a.inSlot ? s2.tasks.filter((t) => t.slot === a.inSlot) : s2.tasks
+      const applyToRow = (row: Task): Done => {
+        switch (a.kind) {
+          case 'done': {
+            if (row.done) return { ok: true, text: `${row.title} was already done` }
+            /* He said the real number in the same breath ("done, took me
+               fifteen minutes") -- log it outright rather than asking a
+               question he already answered. logActual is the one function
+               that marks it done, records the actual minutes, and writes
+               the ledger/focus rows behind it, the same path the manual
+               "how long did it take?" prompt already calls into (see
+               ActualLog). */
+            if (a.actualMin != null) {
+              s2.logActual(row.id, a.actualMin)
+              return { ok: true, text: `Done: ${row.title} — ${fmtDuration(a.actualMin)}` }
+            }
+            s2.toggleTask(row.id)
+            return {
+              ok: true,
+              text: `Done: ${row.title}`,
+              needsActual: row.actualMin == null ? { taskId: row.id, est: taskMinutes(row) } : undefined,
+            }
           }
-          s2.toggleTask(row.id)
-          out.push({
-            ok: true,
-            text: `Done: ${row.title}`,
-            needsActual: row.actualMin == null ? { taskId: row.id, est: taskMinutes(row) } : undefined,
-          })
-          break
-        case 'undone':
-          if (!row.done) { out.push({ ok: true, text: `${row.title} was already open` }); break }
-          s2.toggleTask(row.id)
-          out.push({ ok: true, text: `Reopened: ${row.title}` })
-          break
-        case 'move':
-          if (a.list && a.list !== row.list) s2.moveTaskList(row.id, a.list, day)
-          if (a.slot) {
-            if (row.list !== 'today' && !a.list) s2.moveTaskList(row.id, 'today', day)
-            s2.assignSlot(row.id, a.slot)
-          }
-          out.push({
-            ok: true,
-            text: a.slot
-              ? `Moved to ${SLOTS.find((x) => x.id === a.slot)?.label.toLowerCase()}: ${row.title}`
-              : `Moved to ${a.list === 'today' ? 'today' : 'the list'}: ${row.title}`,
-          })
-          break
-        case 'estimate':
-          s2.setEstimate(row.id, a.min)
-          out.push({ ok: true, text: `${fmtDuration(a.min)} on ${row.title}` })
-          break
-        case 'drop':
-          s2.deleteTask(row.id)
-          out.push({ ok: true, text: `Deleted: ${row.title}` })
-          break
-        default: break
+          case 'undone':
+            if (!row.done) return { ok: true, text: `${row.title} was already open` }
+            s2.toggleTask(row.id)
+            return { ok: true, text: `Reopened: ${row.title}` }
+          case 'move':
+            if (a.list && a.list !== row.list) s2.moveTaskList(row.id, a.list, day)
+            if (a.slot) {
+              if (row.list !== 'today' && !a.list) s2.moveTaskList(row.id, 'today', day)
+              s2.assignSlot(row.id, a.slot)
+            }
+            return {
+              ok: true,
+              text: a.slot
+                ? `Moved to ${SLOTS.find((x) => x.id === a.slot)?.label.toLowerCase()}: ${row.title}`
+                : `Moved to ${a.list === 'today' ? 'today' : 'the list'}: ${row.title}`,
+            }
+          case 'estimate':
+            s2.setEstimate(row.id, a.min)
+            return { ok: true, text: `${fmtDuration(a.min)} on ${row.title}` }
+          case 'drop':
+            s2.deleteTask(row.id)
+            return { ok: true, text: `Deleted: ${row.title}` }
+          default:
+            return { ok: false, text: 'nothing here to run' }
+        }
       }
+      /* all is set ONLY when he named more than one himself ("both", "all
+         three") -- never assumed from the count pick() would have refused
+         on. Every row pickAll() still finds after inSlot narrowed the field
+         gets its own line, named, so what actually changed is as legible as
+         a single match always was -- not a summary that hides which rows
+         it touched. */
+      if ((a.kind === 'done' || a.kind === 'undone' || a.kind === 'drop') && a.all) {
+        const { found, why } = pickAll(scoped, a.match)
+        if (!found.length) { out.push({ ok: false, text: why ?? 'no task matched' }); continue }
+        for (const row of found) out.push(applyToRow(row))
+        continue
+      }
+      const { row, why } = pick(scoped, a.match)
+      if (!row) { out.push({ ok: false, text: why ?? 'no task matched' }); continue }
+      out.push(applyToRow(row))
     }
     return out
   }
@@ -776,6 +815,13 @@ export function useVoiceGlue(
   send: (text: string, shown?: string) => Promise<string>,
   onBeforeSend: () => void,
   refocus: () => void,
+  /* Passed straight through to voicemode's own enter(). Omitted, the full
+     page keeps its exact existing behaviour (a silent hang-up after enough
+     dead air) -- the dock passes 0 (his ask, 2026-09-08): the quick panel's
+     session runs until HE ends it, closing the panel, holding a long press
+     to the full page, or the voice panel's own Done button, never on
+     silence alone. */
+  idleHangupMs?: number,
 ) {
   const [voice, setVoice] = useState(false)
   /* Voice mode drives the SAME send as the button, so a spoken question is an
@@ -787,6 +833,7 @@ export function useVoiceGlue(
     const ok = await enterVoice(
       (text) => send(text, text === opening ? openingLabel : undefined),
       opening,
+      idleHangupMs,
     )
     if (!ok) setVoice(false)
   }

@@ -3169,8 +3169,9 @@ await step('assistant: "done, took me fifteen minutes" fills the real time in on
 await step('assistant: "open up Big Time" switches the real workspace', async () => {
   /* His example, verbatim: "open up Big Time workspace... and show me what I
      have for today." The switch itself (assistantcore.tsx's 'workspace'
-     case, calling the same setSpace the header's own switcher uses) is what
-     is under test -- persisted to mc-space, same as a manual switch. */
+     case, calling the same setView the header's own switcher uses) is what
+     is under test -- persisted to mc-view/mc-space, same as a manual
+     switch. */
   await fresh('assistant')
   await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
   await stubAssistant(() => JSON.stringify({
@@ -3188,6 +3189,76 @@ await step('assistant: "open up Big Time" switches the real workspace', async ()
   const { view, space } = await page.evaluate(() => ({ view: localStorage.getItem('mc-view'), space: localStorage.getItem('mc-space') }))
   if (view !== 'work') throw new Error(`mc-view is "${view}", the visible workspace switcher never moved`)
   if (space !== 'work') throw new Error(`mc-space is "${space}", the switch never reached the store`)
+})
+await step('assistant: inSlot tells apart two rows that share a title', async () => {
+  /* His real data, hit live (2026-09-08): two "Zaplatit AirBank" rows, one at
+     noon and one in the afternoon. A plain title search alone cannot tell
+     them apart -- inSlot (assistant.ts/assistantcore.tsx) narrows the field
+     to the slot he actually named before match is even tried, so "the
+     afternoon one" resolves to exactly one row without touching its noon
+     twin. */
+  await fresh('assistant')
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const day = new Date().toISOString().slice(0, 10)
+    const t = (id, slot) => ({
+      id, title: 'Zaplatit AirBank', space: 'work', source: 'mc', estimateMin: 10, done: false,
+      list: 'today', category: 'admin', slot, plannedOn: day, createdAt: day, addedAt: Date.now(),
+    })
+    s.tasks = [t('ab-noon', 'noon'), t('ab-aft', 'afternoon')]
+    localStorage.setItem(K, JSON.stringify(s))
+    localStorage.setItem('mc-groq-key', 'gsk_gatetest')
+  }, KEY)
+  await stubAssistant(() => JSON.stringify({
+    say: 'Marking the afternoon one done.', show: [],
+    do: [{ kind: 'done', match: 'AirBank', inSlot: 'afternoon' }],
+  }))
+  await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('mark the afternoon AirBank payment done')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  if (await page.locator('.as-did li.is-no').count()) throw new Error('inSlot narrowing still read as ambiguous')
+  const after = await page.evaluate((K) => {
+    const t = JSON.parse(localStorage.getItem(K)).tasks ?? []
+    return { noon: t.find((x) => x.id === 'ab-noon')?.done, aft: t.find((x) => x.id === 'ab-aft')?.done }
+  }, KEY)
+  if (after.aft !== true) throw new Error('the afternoon row was never marked done')
+  if (after.noon) throw new Error('the noon twin was marked done too -- inSlot did not actually narrow the field')
+})
+await step('assistant: "both of them" acts on every row still matching, named on its own line', async () => {
+  /* The other half of the same report: he said "both", so two rows sharing
+     a title AND a slot -- nothing left in his own words to tell them apart
+     -- should both be touched, not refused a second time. "all"
+     (assistant.ts/assistantcore.tsx) is what turns that into every row
+     pickAll() still finds after inSlot narrows the field, one line each. */
+  await fresh('assistant')
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const day = new Date().toISOString().slice(0, 10)
+    const t = (id) => ({
+      id, title: 'Zaplatit AirBank', space: 'work', source: 'mc', estimateMin: 10, done: false,
+      list: 'today', category: 'admin', slot: 'afternoon', plannedOn: day, createdAt: day, addedAt: Date.now(),
+    })
+    s.tasks = [t('ab1'), t('ab2')]
+    localStorage.setItem(K, JSON.stringify(s))
+    localStorage.setItem('mc-groq-key', 'gsk_gatetest')
+  }, KEY)
+  await stubAssistant(() => JSON.stringify({
+    say: 'Marking both done.', show: [],
+    do: [{ kind: 'done', match: 'AirBank', inSlot: 'afternoon', all: true, actualMin: 1 }],
+  }))
+  await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('check both of the afternoon AirBank ones as done, took about a minute each')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  const lines = await page.locator('.as-did li').allInnerTexts()
+  if (lines.length !== 2) throw new Error(`${lines.length} outcome lines for 2 rows, expected 2: ${JSON.stringify(lines)}`)
+  if (lines.some((l) => /nothing changed|of them match/i.test(l))) throw new Error(`"both" still refused as ambiguous: ${JSON.stringify(lines)}`)
+  const after = await page.evaluate((K) => {
+    const t = JSON.parse(localStorage.getItem(K)).tasks ?? []
+    return t.filter((x) => x.id === 'ab1' || x.id === 'ab2').map((x) => ({ done: x.done, actualMin: x.actualMin }))
+  }, KEY)
+  if (after.length !== 2 || after.some((x) => !x.done || x.actualMin !== 1)) {
+    throw new Error(`both rows should be done with actualMin 1: ${JSON.stringify(after)}`)
+  }
 })
 
 /* The systematic matrix the critic and persona panel actually judge: the

@@ -883,7 +883,16 @@ body:has(.shell.is-hud) .dock-face { border-radius: var(--a-r-lg); }
    read as a random fourth color with no logic behind it. Bills now matches
    Note and Media; the wash stays Focus-only, on purpose. */
 .dock-item-avatar--focus { background: var(--accent-wash); }
-.dock-item-avatar--note, .dock-item-avatar--bills, .dock-item-avatar--timeline, .dock-item-avatar--media { background: var(--surface-2); }
+.dock-item-avatar--note, .dock-item-avatar--bills, .dock-item-avatar--timeline, .dock-item-avatar--media, .dock-item-avatar--assistant { background: var(--surface-2); }
+/* Assistant's row is a real <button> around the whole thing (unlike Focus's
+   div, which nests a play/pause control of its own and cannot be one) --
+   these are the same resets .dock-fab and .dock-item's own button-based
+   panels.map rows already needed, just not previously written down as
+   their own rule because every prior dock-item was either a div or came
+   from a button with no extra classes to reset. */
+/* The existing .dock-item:hover rule already highlights the label pill for
+   any dock-item, this button included -- no extra hover rule needed here. */
+.dock-item--link { border: none; background: none; padding: 0; cursor: pointer; font: inherit; color: inherit; text-align: left; }
 .dock-chip-art { width: 100%; height: 100%; object-fit: cover; }
 
 /* Focus's row: not a button (see the component note in dock.tsx), so hover

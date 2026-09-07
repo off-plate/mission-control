@@ -4,7 +4,7 @@ import { isMeeting, useCalendar } from './calendar'
 import { SPACE_LABELS } from './mock'
 import { MORNING, ask, type Action, type Brief, type Card, type CardKind, type Reply } from './assistant'
 import { getAiProvider, PROVIDERS } from './ai'
-import { engineName, speakingLevel, speakingMeasured, speechState, subscribe, toggle } from './speech'
+import { engineName, speakingLevel, speakingMeasured, speechState, stop as stopSpeaking, subscribe, toggle } from './speech'
 import {
   enter as enterVoice, exit as exitVoice, subscribe as subscribeVoice,
   voiceHeard, voiceLevel, voiceModeAvailable, voicePhase,
@@ -874,14 +874,40 @@ export function VoicePanel({ onExit }: { onExit: () => void }): JSX.Element {
      label says why. A still meter that looks like a fault, with no explanation,
      is how a generated wave got written in the first place. */
   const mute = phase === 'speaking' && !speakingMeasured()
+  /* His ask (2026-09-08): a long answer read out loud with no way to cut it
+     short except a voice he cannot use while it is already talking over him
+     -- "I should be able to interrupt... not with voice, just a click."
+     stopSpeaking() (speech.ts) ends the playback outright; voicemode.ts's
+     own send() is still sitting on `await say(...)` at that exact moment
+     (it resolves the instant playback state returns to idle) and falls
+     straight through to listen() itself, phase never having left
+     'speaking' along the way -- so a tap here needs nothing from
+     voicemode.ts at all, only to end the audio it is already watching for. */
+  const interrupt = phase === 'speaking' ? () => stopSpeaking() : undefined
   const said = phase === 'thinking' ? 'Thinking'
     : phase === 'speaking' ? (mute ? 'Reading it out, no level from this voice' : 'Reading it out')
       : 'Listening'
 
+  const wave = (
+    <svg
+      className="as-wave" viewBox="0 0 300 48" preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {RIBBONS.map((r, i) => (
+        <path
+          key={i}
+          d={ribbon(amp.current * r.scale, drift.current * r.speed + r.offset, r.freq)}
+          opacity={r.opacity}
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+    </svg>
+  )
+
   return (
     <div className={`as-voice is-${phase}`}>
       <div className="as-voice-head">
-        <span className="as-voice-state">{said}</span>
+        <span className="as-voice-state">{said}{interrupt ? ' — tap to skip' : ''}</span>
         <button type="button" className="as-voice-exit" onClick={onExit}>Done</button>
       </div>
       {/* FLUID, NOT AN EQUALISER. He showed me the reference: a light ribbon
@@ -898,21 +924,18 @@ export function VoicePanel({ onExit }: { onExit: () => void }): JSX.Element {
           nothing to measure the curves settle into a straight line, which is
           the honest picture of silence. Nothing here generates a shape.
 
-          aria-hidden: the bars are the state made visible, and the state is
-          already announced in words beside them. */}
-      <svg
-        className="as-wave" viewBox="0 0 300 48" preserveAspectRatio="none"
-        aria-hidden="true"
-      >
-        {RIBBONS.map((r, i) => (
-          <path
-            key={i}
-            d={ribbon(amp.current * r.scale, drift.current * r.speed + r.offset, r.freq)}
-            opacity={r.opacity}
-            vectorEffect="non-scaling-stroke"
-          />
-        ))}
-      </svg>
+          A real button only while speaking, wrapping the exact same wave --
+          listening and thinking have nothing here worth interrupting, so
+          the picture stays a picture (aria-hidden, named in words beside it)
+          the rest of the time rather than a control that does nothing. */}
+      {interrupt ? (
+        <button
+          type="button" className="as-wave-btn" onClick={interrupt}
+          aria-label="Stop reading and listen again" title="Tap to stop reading and listen again"
+        >
+          {wave}
+        </button>
+      ) : wave}
       <p className="as-voice-heard" aria-live="polite">
         {heard || (live ? 'Say something.' : ' ')}
       </p>

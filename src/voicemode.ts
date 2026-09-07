@@ -19,8 +19,13 @@ import { say, speakingLevel, stop as stopSpeech } from './speech'
 
 export type VoicePhase = 'off' | 'listening' | 'thinking' | 'speaking'
 
-/** How long a pause means "finished", rather than "thinking of the next word". */
-const HUSH = 1100
+/** How long a pause means "finished", rather than "thinking of the next word".
+ *  Was 1100ms; his report (2026-09-08), twice over, of a half-said sentence
+ *  getting sent on its own ("could you check the" / "could you turn on
+ *  focus on the", both cut off mid-thought and both landing as their own
+ *  turn) -- a beat spent choosing which task or bill name to say next is
+ *  ordinary, not a finished question, and 1100ms was catching it as one. */
+const HUSH = 1700
 /** Chrome ends recognition on its own after a stretch of silence. If we are
     still meant to be listening, start it again rather than going deaf. */
 const RESTART_DELAY = 250

@@ -3260,6 +3260,60 @@ await step('assistant: "both of them" acts on every row still matching, named on
     throw new Error(`both rows should be done with actualMin 1: ${JSON.stringify(after)}`)
   }
 })
+await step('assistant: "show me all workspaces" switches the view to All, not just one space', async () => {
+  /* His report, verbatim (2026-09-08): "there is one more workspace and
+     that's called all" -- the workspace action only ever accepted the four
+     real spaces, so asking for the header's own "All" view got refused,
+     twice, with the model reduced to explaining it could not do it rather
+     than doing it. 'all' is now a real target, same value the header's own
+     switcher already writes to mc-view. */
+  await fresh('assistant')
+  await page.evaluate(() => { localStorage.setItem('mc-view', 'personal'); localStorage.setItem('mc-groq-key', 'gsk_gatetest') })
+  await stubAssistant(() => JSON.stringify({
+    say: 'Showing all workspaces now.', show: [],
+    do: [{ kind: 'workspace', space: 'all' }],
+  }))
+  await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('I want all workspaces on the screen, not just personal')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  const line = await page.locator('.as-did li').innerText()
+  if (!/\ball\b/i.test(line)) throw new Error(`the outcome line does not name "all": "${line}"`)
+  const view = await page.evaluate(() => localStorage.getItem('mc-view'))
+  if (view !== 'all') throw new Error(`mc-view is "${view}", never switched to all`)
+})
+await step('assistant: "open the bills page" actually opens it', async () => {
+  /* His report, verbatim: asked to open Bills, it answered "I can't take
+     you there, Michael -- I don't open pages, I only switch between the
+     four workspaces." True when it was written, and the actual gap: there
+     was no page-navigation action at all, only the workspace one. 'open'
+     (assistant.ts/assistantcore.tsx) calls the same setPage every nav tab
+     and dock door-out button already does.
+
+     Run through the DOCK panel, not the full #/assistant page: setPage
+     away from 'assistant' unmounts the full page before its own "Opened
+     Bills" line ever paints (confirmed directly -- .as-did never appears
+     there, even though the navigation itself lands fine), since that page
+     IS the thing being navigated away from. The dock's panel is not tied
+     to the current page, so it stays on screen over whatever it just
+     opened -- the real shape "keep the conversation going" asked for. */
+  await fresh('today')
+  await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
+  await stubAssistant(() => JSON.stringify({
+    say: 'Opening Bills.', show: [],
+    do: [{ kind: 'open', page: 'bills' }],
+  }))
+  const openDock = page.getByRole('button', { name: 'Open quick tools' })
+  await openDock.waitFor({ state: 'visible', timeout: 10000 })
+  await openDock.click(); await page.waitForTimeout(400)
+  await page.locator('.dock-item').filter({ hasText: 'Assistant' }).click(); await page.waitForTimeout(400)
+  await page.locator('.assistantdock-panel .as-input').fill('open up the bills page please')
+  await page.locator('.assistantdock-panel .as-input').press('Enter')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  const line = await page.locator('.as-did li').innerText()
+  if (!/Bills/.test(line)) throw new Error(`the outcome line does not name Bills: "${line}"`)
+  if (!(await page.locator('.assistantdock-panel').count())) throw new Error('the dock panel closed on its own when the page underneath changed')
+  if (!(await page.locator('.bills-page').count())) throw new Error('setPage never actually rendered the real Bills page underneath')
+})
 
 /* The systematic matrix the critic and persona panel actually judge: the
    app's real pages (App.tsx's page switch, not the QA flow names above,

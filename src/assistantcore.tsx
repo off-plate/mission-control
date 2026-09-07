@@ -10,7 +10,7 @@ import {
   voiceHeard, voiceLevel, voiceModeAvailable, voicePhase,
 } from './voicemode'
 import { getWeather, weatherLine } from './weather'
-import { SLOTS, dueOn, habitsDueToday, goalCurrent, habitStepKey, routineComplete, requiredSteps, type HabitDef, type SpaceId, type Task } from './types'
+import { SLOTS, dueOn, habitsDueToday, goalCurrent, habitStepKey, routineComplete, requiredSteps, type HabitDef, type PageId, type SpaceId, type Task } from './types'
 import { localDateKey, fmtDuration, taskMinutes, goalPeriodKey, goalPeriodRange, periodKeyFor, type GoalTf } from './util'
 import * as Icon from './icons'
 
@@ -409,6 +409,15 @@ export function Speak({ id, text }: { id: string; text: string }): JSX.Element {
   )
 }
 
+/** The app's own name for each page an 'open' action can land on -- not the
+ *  route id, and not the model's own guess at a label. */
+const OPEN_LABELS: Partial<Record<PageId, string>> = {
+  today: 'Today', plan: 'Plan', projects: 'Projects', habits: 'Habits',
+  routines: 'Routines', goals: 'Goals', quitting: 'Quitting', settings: 'Settings',
+  notes: 'Notes', board: 'the board', apps: 'Apps', focus: 'Focus', zone: 'the Zone',
+  bills: 'Bills', calendar: 'Calendar', timeline: 'Timeline', contacts: 'Contacts',
+}
+
 /** Runs what the model named, against the same store every page writes to, and
  *  reports what it actually did. Nothing here trusts a title: every match is
  *  resolved against his real rows first, and an unresolved one changes nothing.
@@ -470,7 +479,10 @@ function useDoer() {
       if (a.kind === 'workspace') {
         /* Not a task action -- no title to resolve against his rows, so it
            never reaches the pick() below. Voice's own use for this: "open up
-           Big Time" said instead of tapping the workspace switcher.
+           Big Time" said instead of tapping the workspace switcher. 'all' is
+           a real target too (his report, 2026-09-08: "there is one more
+           workspace and that's called all") -- the same value the header's
+           own switcher already accepts, not a fifth space of its own.
 
            setView, not setSpace: setSpace alone only moves writeSpace, which
            the header's own dropdown (view) can silently override the moment
@@ -480,7 +492,18 @@ function useDoer() {
            already keeps writeSpace in step with it (store.tsx), so this
            changes what he SEES, not just an internal default. */
         s2.setView(a.space)
-        out.push({ ok: true, text: `Switched to ${SPACE_LABELS[a.space]}` })
+        out.push({ ok: true, text: `Switched to ${a.space === 'all' ? 'All' : SPACE_LABELS[a.space]}` })
+        continue
+      }
+      if (a.kind === 'open') {
+        /* A page, not a workspace -- "open the bills page" was refused
+           outright before this (his report, 2026-09-08: "I don't open
+           pages, I only switch between workspaces"), a true sentence about
+           a real gap rather than a guardrail worth keeping. setPage is the
+           same function every nav tab and dock door-out button already
+           calls. */
+        s2.setPage(a.page)
+        out.push({ ok: true, text: `Opened ${OPEN_LABELS[a.page] ?? a.page}` })
         continue
       }
       if (a.kind === 'habit') {

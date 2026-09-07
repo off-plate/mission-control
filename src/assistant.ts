@@ -21,6 +21,7 @@
 
 import { activeModel, getAiKey, request, stripReasoning } from './ai'
 import { getTtsKey, hasTtsKey } from './speech'
+import type { PageId } from './types'
 
 /** What a card shows. The app owns every one of these; the model only names one. */
 export type CardKind =
@@ -74,14 +75,32 @@ export type Action =
   | { kind: 'estimate'; match: string; min: number; inSlot?: Slot }
   | { kind: 'drop'; match: string; inSlot?: Slot; all?: boolean }
   | { kind: 'habit'; match: string; on: boolean }
-  /** "Open up Big Time" / "switch to Off-Plate" -- changes which workspace he
-   *  is standing in. Never inferred from what a task happens to belong to:
-   *  only when he named a workspace and asked to move to it. */
-  | { kind: 'workspace'; space: Space }
+  /** "Open up Big Time" / "switch to Off-Plate" / "show me all workspaces" --
+   *  changes which workspace he is standing in, 'all' included: that is a
+   *  real thing the header's own switcher can show, not a fifth space, and
+   *  he asked for it by name (2026-09-08 report: "there is one more
+   *  workspace and that's called all"). Never inferred from what a task
+   *  happens to belong to: only when he named one and asked to move there. */
+  | { kind: 'workspace'; space: Space | 'all' }
+  /** "Open the bills page" / "go to habits" -- a real page, not a workspace.
+   *  Two different things he can ask to move to, and conflating them is
+   *  what the report above was actually about: "I don't open pages, I only
+   *  switch between workspaces" was a true sentence about a real gap, not a
+   *  guardrail worth keeping. */
+  | { kind: 'open'; page: PageId }
 
 const SLOTS_OK: Slot[] = ['morning', 'noon', 'afternoon', 'evening']
 const WHERE_OK: Where[] = ['today', 'backlog']
 const SPACE_OK: Space[] = ['personal', 'work', 'offplate', 'corner']
+/** Every real page he can be sent to, and nothing else. 'day' takes a date
+ *  in its own route with nowhere for the model to safely supply one;
+ *  'braindump' is a pure legacy alias for 'notes', never a reason to be the
+ *  one named; 'assistant' is where this conversation already is. */
+const OPEN_OK: PageId[] = [
+  'today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting',
+  'settings', 'notes', 'board', 'apps', 'focus', 'zone', 'bills', 'calendar',
+  'timeline', 'contacts',
+]
 
 /** Everything the model sent, minus everything this app cannot promise to do. */
 function cleanActions(raw: unknown): Action[] {
@@ -125,7 +144,12 @@ function cleanActions(raw: unknown): Action[] {
         if (match) out.push({ kind: 'habit', match, on: o.on !== false })
         break
       case 'workspace':
-        if (SPACE_OK.includes(o.space as Space)) out.push({ kind: 'workspace', space: o.space as Space })
+        if (o.space === 'all' || SPACE_OK.includes(o.space as Space)) {
+          out.push({ kind: 'workspace', space: o.space as Space | 'all' })
+        }
+        break
+      case 'open':
+        if (OPEN_OK.includes(o.page as PageId)) out.push({ kind: 'open', page: o.page as PageId })
         break
       default: break
     }
@@ -276,7 +300,8 @@ The whole vocabulary, and nothing outside it works:
 {"kind":"estimate","match":"...","min":45}
 {"kind":"drop","match":"..."}                        deletes it, and he can undo
 {"kind":"habit","match":"habit name","on":true}      keeps or un-keeps it today
-{"kind":"workspace","space":"personal"|"work"|"offplate"|"corner"}  personal=Personal, work=Big Time, offplate=Off-Plate, corner=Michael's Corner. Switches which workspace he is standing in.
+{"kind":"workspace","space":"personal"|"work"|"offplate"|"corner"|"all"}  personal=Personal, work=Big Time, offplate=Off-Plate, corner=Michael's Corner, all=every workspace on screen at once. Switches which workspace he is standing in.
+{"kind":"open","page":"today"|"plan"|"projects"|"habits"|"routines"|"goals"|"quitting"|"settings"|"notes"|"board"|"apps"|"focus"|"zone"|"bills"|"calendar"|"timeline"|"contacts"}  a real page, not a workspace -- see below.
 
 "match" is words out of the real title as it appears in the briefing above, not
 a description of it. "add" carries HIS words for the new task, off the message
@@ -287,6 +312,22 @@ a duration you are estimating on his behalf -- when he only says a task is
 done, leave it out and the app asks him afterwards, same as always. "workspace"
 is only for an explicit "open", "switch to" or "go to" a named workspace, never
 inferred from a task he is talking about happening to sit in one.
+
+"WORKSPACE" AND "OPEN" ARE DIFFERENT THINGS, and both are real now -- do not
+answer "I can't do that" to either one. A workspace is Personal, Big Time,
+Off-Plate, Michael's Corner, or all four at once: it filters what the OTHER
+pages show, it is not itself a page. A page is a real screen -- "open the
+bills page", "go to habits", "show me the timeline" -- and has nothing to do
+with which workspace is active. "open up Big Time" is a workspace; "open the
+bills page" is a page; telling them apart is exactly what he named. Page
+names, in his words: today=Today, plan=Plan, projects=Projects,
+habits=Habits (tab is "Habits & Goals"), routines=Routines (inside Habits &
+Goals), goals=Goals (also inside Habits & Goals), quitting=Quitting,
+settings=Settings, notes=Notes, board=the Kanban board, apps=Apps,
+focus=Focus, zone=the Zone (full-screen focus room), bills=Bills,
+calendar=Calendar, timeline=Timeline, contacts=Contacts. There is no page for
+"the assistant" -- he is already talking to it -- and no page action takes a
+specific day; if he asks for a particular date, answer in words instead.
 
 "done", "undone", "drop", "move" and "estimate" all take an optional "inSlot",
 one of "morning"|"noon"|"afternoon"|"evening" -- the SAME slot the briefing

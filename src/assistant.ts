@@ -88,6 +88,13 @@ export type Action =
    *  switch between workspaces" was a true sentence about a real gap, not a
    *  guardrail worth keeping. */
   | { kind: 'open'; page: PageId }
+  /** "Check that I paid Spotify" / "mark the AirBank one paid" -- Bills, read
+   *  and written for real (2026-09-08 report: "it cannot check one simple
+   *  thing"). match is a recurring bill or planned expense's name, the same
+   *  vocabulary as a task's title; paid is which way to set it, the same
+   *  shape as "habit"'s on. Scoped to the cycle Bills itself opens on --
+   *  never a past or future one, since he never named a date. */
+  | { kind: 'bill'; match: string; paid: boolean }
 
 const SLOTS_OK: Slot[] = ['morning', 'noon', 'afternoon', 'evening']
 const WHERE_OK: Where[] = ['today', 'backlog']
@@ -151,6 +158,9 @@ function cleanActions(raw: unknown): Action[] {
       case 'open':
         if (OPEN_OK.includes(o.page as PageId)) out.push({ kind: 'open', page: o.page as PageId })
         break
+      case 'bill':
+        if (match) out.push({ kind: 'bill', match, paid: o.paid !== false })
+        break
       default: break
     }
   }
@@ -212,6 +222,13 @@ export interface Brief {
   /* Written by the app from its own fetch, so the numbers in it are safe to
      repeat verbatim. */
   weather: string | null
+  /* Bills, read from the same account Bills itself reads (2026-09-08: he
+     asked whether Spotify was paid and the assistant had nothing at all to
+     answer from). null when he is signed out of Bills on this device or it
+     has not loaded yet -- a garnish exactly like weather, never something
+     this briefing blocks on. Same due/kept/open shape as habits/routines on
+     purpose: paid is this cycle's "kept". */
+  bills: { due: number; paid: number; open: string[] } | null
 }
 
 const SYSTEM = `You are the assistant inside Mission Control, Michael's own life dashboard.
@@ -302,6 +319,7 @@ The whole vocabulary, and nothing outside it works:
 {"kind":"habit","match":"habit name","on":true}      keeps or un-keeps it today
 {"kind":"workspace","space":"personal"|"work"|"offplate"|"corner"|"all"}  personal=Personal, work=Big Time, offplate=Off-Plate, corner=Michael's Corner, all=every workspace on screen at once. Switches which workspace he is standing in.
 {"kind":"open","page":"today"|"plan"|"projects"|"habits"|"routines"|"goals"|"quitting"|"settings"|"notes"|"board"|"apps"|"focus"|"zone"|"bills"|"calendar"|"timeline"|"contacts"}  a real page, not a workspace -- see below.
+{"kind":"bill","match":"bill name","paid":true}      marks a real bill paid or unpaid, this cycle only
 
 "match" is words out of the real title as it appears in the briefing above, not
 a description of it. "add" carries HIS words for the new task, off the message
@@ -328,6 +346,19 @@ focus=Focus, zone=the Zone (full-screen focus room), bills=Bills,
 calendar=Calendar, timeline=Timeline, contacts=Contacts. There is no page for
 "the assistant" -- he is already talking to it -- and no page action takes a
 specific day; if he asks for a particular date, answer in words instead.
+
+BILLS ARE REAL NOW TOO, read from the same log the Bills page itself reads,
+scoped to the cycle it currently opens on -- never a past or future one,
+since he would have to name one for that to mean anything. The briefing's
+"Bills this cycle" line is the whole of what you can see: which are still
+unpaid, by name, and how many of each. There is nothing behind a name --
+no amount, no due date, no category -- so answer only what the line
+actually says, and say so plainly if he asks for more than that. "match"
+for "bill" is the bill's name exactly as the briefing gives it, same rule
+as a task's title. Do not call a bill a task, and do not run "done" on
+one: they live in a different log, and "bill" is the only action that
+reaches it. If "Bills: not signed in on this device" is what the briefing
+says, tell him that in plain words rather than guessing at an answer.
 
 "done", "undone", "drop", "move" and "estimate" all take an optional "inSlot",
 one of "morning"|"noon"|"afternoon"|"evening" -- the SAME slot the briefing
@@ -550,6 +581,9 @@ export function briefText(b: Brief): string {
       : 'Nothing marked done yesterday',
     b.weather ? `Weather, fetched by the app: ${b.weather}` : '',
     b.goals.length ? `Goals: ${b.goals.map((g) => `${g.name} ${g.pct}%`).join('; ')}` : 'No goals set',
+    b.bills
+      ? `Bills this cycle: ${b.bills.paid} of ${b.bills.due} paid${b.bills.open.length ? `, still unpaid: ${b.bills.open.join('; ')}` : ''}`
+      : 'Bills: not signed in on this device, nothing to read',
   ].join('\n')
 }
 

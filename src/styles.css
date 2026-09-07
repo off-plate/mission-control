@@ -5574,6 +5574,13 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .as-row-title { flex: 1; min-width: 0; font-size: var(--text-sm); text-align: left; overflow-wrap: anywhere; }
 .as-row-min { flex: none; font-size: var(--text-xs); color: var(--faint); white-space: nowrap; }
 .as-row-when { flex: none; font-size: var(--text-xs); color: var(--muted); white-space: nowrap; min-width: 5ch; justify-content: flex-start !important; }
+/* A routine's row in the (now split) habits card: unlike a habit it has no
+   checkbox, because a routine is finished by running its steps, not a tick --
+   this is a button to Habits & Goals instead, so it needs the usual element
+   resets .as-row's own div-shaped siblings never had to ask for. */
+.as-row-link { border: none; cursor: pointer; font: inherit; color: inherit; }
+.as-row-link:hover .as-row-title { color: var(--accent); }
+.as-row-link .as-row-min { color: var(--accent); }
 .as-link { cursor: pointer; }
 .as-link:hover .as-row-title { color: var(--accent-text); }
 .as-empty { font-size: var(--text-sm); color: var(--muted); margin-top: var(--s2); }

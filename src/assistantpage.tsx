@@ -15,8 +15,8 @@ import {
   voiceHeard, voiceLevel, voiceModeAvailable, voicePhase,
 } from './voicemode'
 import { getWeather, weatherLine, type Weather } from './weather'
-import { SLOTS, dueOn, habitsDueToday, goalCurrent, type HabitDef, type PageId, type SpaceId, type Task } from './types'
-import { localDateKey, fmtDuration, taskMinutes, goalPeriodKey, goalPeriodRange, type GoalTf } from './util'
+import { SLOTS, dueOn, habitsDueToday, goalCurrent, habitStepKey, routineComplete, requiredSteps, type HabitDef, type PageId, type SpaceId, type Task } from './types'
+import { localDateKey, fmtDuration, taskMinutes, goalPeriodKey, goalPeriodRange, periodKeyFor, type GoalTf } from './util'
 import { ActualLog } from './pages1'
 import * as Icon from './icons'
 
@@ -102,7 +102,29 @@ function useBrief(): Brief {
     }
     const visible = habits.filter((h) => !h.archivedAt)
     const { due, kept } = habitsDueToday(visible, routines, habitLog, todayIndex)
-    const open = visible.filter((h) => dueOn(h, todayIndex, habitLog) && !h.days[todayIndex] && !h.folderId).map((h) => h.name)
+    /* A routine's own auto-ticking habit was landing in this list by name
+       (2026-09-07 report: "Morning Preparation" and "Invoicing routine"
+       showing up as habits to keep) even though habitsDueToday above already
+       excludes it from the due/kept COUNT for the same reason -- it belongs
+       to the routine's own streak, not a row of its own. Same exclusion,
+       applied to the names too, so the count and the list agree. */
+    /* srcStepId catches the much larger set routineHabitIds alone missed: a
+       habit auto-materialized FROM one routine step (its typing test, its
+       "clean the desk", forty-odd of them in a real routine set) rather than
+       the routine's own single streak. Both are "run the routine", not "tick
+       a habit", so both are excluded the same way. */
+    const routineHabitIds = new Set(routines.filter((r) => !r.archivedAt && r.habitId).map((r) => r.habitId as string))
+    const isRoutineLinked = (h: HabitDef) => routineHabitIds.has(h.id) || habitStepKey(h) !== null
+    const open = visible.filter((h) => dueOn(h, todayIndex, habitLog) && !h.days[todayIndex] && !h.folderId && !isRoutineLinked(h)).map((h) => h.name)
+
+    /* Routines, as their own thing the assistant can name and point him at --
+       never as a "habit" to offer to tick, which was the whole complaint.
+       Same due/kept/open shape as habits on purpose, so the model reads them
+       the same way and briefText needs no new format. A routine with no
+       required steps yet cannot be "run", so it never counts as due. */
+    const activeRoutines = routines.filter((r) => !r.archivedAt && requiredSteps(r).length > 0)
+    const routineOpen = activeRoutines.filter((r) => !routineComplete(r, periodKeyFor(r.cadence)))
+    const routinesBrief = { due: activeRoutines.length, kept: activeRoutines.length - routineOpen.length, open: routineOpen.slice(0, 6).map((r) => r.title) }
     /* Split, not lumped. isMeeting() reads the guest list rather than the
        title, so an hour he blocked for himself stops being reported as a
        meeting he has to attend. */
@@ -119,6 +141,7 @@ function useBrief(): Brief {
       backlog: backlog.slice(0, 25).map((t) => ({ title: dropUrl(t.title), space: label(t.space) })).filter((t) => t.title),
       oldest: [...backlog].sort((a, b) => age(b) - age(a)).slice(0, 3).map((t) => ({ title: dropUrl(t.title), days: age(t), space: label(t.space) })).filter((t) => t.title),
       habits: { due, kept, open: open.slice(0, 6) },
+      routines: routinesBrief,
       meetings,
       blocks,
       focusToday: focusSessions.filter((f) => f.day === day).reduce((a, f) => a + f.minutes, 0),
@@ -295,7 +318,7 @@ function WeatherCard(): JSX.Element {
 }
 
 function CardBody({ kind, limit }: { kind: CardKind; limit?: number }) {
-  const { tasks, habits, habitLog, focusSessions, goals, todayIndex, setPage, toggleTask, toggleHabitDay } = useStore()
+  const { tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, setPage, toggleTask, toggleHabitDay } = useStore()
   const { state: cal } = useCalendar()
   const day = localDateKey()
 
@@ -356,23 +379,48 @@ function CardBody({ kind, limit }: { kind: CardKind; limit?: number }) {
   }
 
   if (kind === 'habits') {
-    const all = [...habits.filter((h) => !h.archivedAt && dueOn(h, todayIndex, habitLog))]
+    /* Routines used to ride in this same list under their own auto-ticking
+       habit, so "Morning Preparation" and "Invoicing routine" showed up as
+       plain checkboxes -- tapping one looked like it worked and reverted on
+       the next load, because a routine is finished by running its steps, not
+       by a tick (his report, 2026-09-07). Same exclusion useBrief() applies
+       to the text brief, applied here to the card so the two never disagree
+       about what counts as a habit. */
+    const routineHabitIds = new Set(routines.filter((r) => !r.archivedAt && r.habitId).map((r) => r.habitId as string))
+    const allHabits = [...habits.filter((h) => !h.archivedAt && dueOn(h, todayIndex, habitLog) && !routineHabitIds.has(h.id) && !habitStepKey(h))]
       .sort((a, b) => Number(a.days[todayIndex]) - Number(b.days[todayIndex]))
-    if (!all.length) return <p className="as-empty">Nothing is due today.</p>
-    const rows = limit ? all.slice(0, limit) : all
+    const openRoutines = routines
+      .filter((r) => !r.archivedAt && requiredSteps(r).length > 0 && !routineComplete(r, periodKeyFor(r.cadence)))
+    if (!allHabits.length && !openRoutines.length) return <p className="as-empty">Nothing is due today.</p>
+    const habitRows = limit ? allHabits.slice(0, limit) : allHabits
     return (
       <div className="as-list">
-        <div className="as-group">
-          {rows.map((h: HabitDef, i) => (
-            <div className={`as-row${h.days[todayIndex] ? ' is-done' : ''}`} key={h.id} style={stagger(i)}>
-              <button className="checkbox" role="checkbox" aria-checked={h.days[todayIndex]}
-                aria-label={h.name} onClick={() => toggleHabitDay(h.id, todayIndex)}><Tick /></button>
-              <SpaceMark space={h.space} always />
-              <span className="as-row-title">{h.name}</span>
-            </div>
-          ))}
-        </div>
-        <More n={all.length - rows.length} kind={kind} />
+        {openRoutines.length > 0 && (
+          <div className="as-group">
+            <span className="microcap">Routines still open</span>
+            {openRoutines.map((r, i) => (
+              <button className="as-row as-row-link" key={r.id} style={stagger(i)} onClick={() => setPage('routines')}>
+                <SpaceMark space={r.space} always />
+                <span className="as-row-title">{r.title}</span>
+                <span className="as-row-min mono">Run it →</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {habitRows.length > 0 && (
+          <div className="as-group">
+            {openRoutines.length > 0 && <span className="microcap">Habits</span>}
+            {habitRows.map((h: HabitDef, i) => (
+              <div className={`as-row${h.days[todayIndex] ? ' is-done' : ''}`} key={h.id} style={stagger(i)}>
+                <button className="checkbox" role="checkbox" aria-checked={h.days[todayIndex]}
+                  aria-label={h.name} onClick={() => toggleHabitDay(h.id, todayIndex)}><Tick /></button>
+                <SpaceMark space={h.space} always />
+                <span className="as-row-title">{h.name}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <More n={allHabits.length - habitRows.length} kind={kind} />
       </div>
     )
   }

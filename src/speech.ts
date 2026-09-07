@@ -44,6 +44,21 @@ export function hasTtsKey(): boolean {
   return getTtsKey().startsWith('AIza')
 }
 
+/** His own pick of the machine's own voice, by name -- Settings' voice picker
+ *  writes this. Unset (the default) keeps every device on the automatic
+ *  GOOD-list pick below exactly as it already worked; this only ever
+ *  narrows a choice he made himself, never widens what the auto-pick tries. */
+const DEVICE_VOICE_KEY = 'mc-device-voice'
+export function getDeviceVoicePref(): string {
+  try { return localStorage.getItem(DEVICE_VOICE_KEY) ?? '' } catch { return '' }
+}
+export function setDeviceVoicePref(name: string): void {
+  try {
+    if (name) localStorage.setItem(DEVICE_VOICE_KEY, name)
+    else localStorage.removeItem(DEVICE_VOICE_KEY)
+  } catch { /* storage unavailable */ }
+}
+
 /** Which engine a click would use right now. The settings page says this out loud. */
 export function engineName(): 'Gemini' | 'device' {
   return hasTtsKey() ? 'Gemini' : 'device'
@@ -262,13 +277,13 @@ async function fetchGemini(text: string, key: string): Promise<Blob | null> {
 
    Google US English is still here, at the bottom, for a machine with no local
    voice at all: a good voice with a still waveform beats no voice. */
-const GOOD = [
+export const GOOD_VOICES = [
   'Samantha', 'Alex', 'Ava', 'Allison', 'Susan', 'Tom',
   'Microsoft Aria', 'Microsoft Jenny', 'Microsoft Guy',
   'Google US English',
 ]
 /* Named, not pattern-matched: these are jokes, not accents. */
-const NOVELTY = /^(Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Deranged|Good News|Hysterical|Jester|Junior|Kathy|Organ|Princess|Ralph|Fred|Grandma|Grandpa|Superstar|Trinoids|Whisper|Wobble|Zarvox)\b/i
+export const NOVELTY_VOICES = /^(Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Deranged|Good News|Hysterical|Jester|Junior|Kathy|Organ|Princess|Ralph|Fred|Grandma|Grandpa|Superstar|Trinoids|Whisper|Wobble|Zarvox)\b/i
 
 let voicePromise: Promise<SpeechSynthesisVoice[]> | null = null
 
@@ -297,15 +312,57 @@ function pickVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null 
   /* Two passes over the same list: anything local before anything remote, so a
      named remote voice never beats a named local one. */
   for (const localOnly of [true, false]) {
-    for (const name of GOOD) {
+    for (const name of GOOD_VOICES) {
       const hit = voices.find((v) =>
         (v.name === name || v.name.startsWith(`${name} `)) && v.localService === localOnly)
       if (hit) return hit
     }
   }
-  return voices.find((v) => /^en[-_]US/i.test(v.lang) && !NOVELTY.test(v.name))
-    ?? voices.find((v) => /^en[-_]/i.test(v.lang) && !NOVELTY.test(v.name))
+  return voices.find((v) => /^en[-_]US/i.test(v.lang) && !NOVELTY_VOICES.test(v.name))
+    ?? voices.find((v) => /^en[-_]/i.test(v.lang) && !NOVELTY_VOICES.test(v.name))
     ?? null
+}
+
+/** His own choice first, when he made one and it is still actually installed
+ *  -- a preference naming a voice this machine no longer has (a different
+ *  computer, a removed download) falls straight through to the same
+ *  auto-pick every device already had, rather than reading in whatever the
+ *  browser's own fallback happens to be. */
+function resolveVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+  const pref = getDeviceVoicePref()
+  if (pref) {
+    const hit = voices.find((v) => v.name === pref)
+    if (hit) return hit
+  }
+  return pickVoice(voices)
+}
+
+/** The real voice list, for Settings' picker -- everything installed, not
+ *  just the GOOD shortlist the automatic pick tries. Enhanced/Premium
+ *  downloads (System Settings -> Accessibility -> Spoken Content) show up
+ *  here under their own name the moment macOS has them, nothing to build on
+ *  this side for that. */
+export function listDeviceVoices(): Promise<SpeechSynthesisVoice[]> {
+  return voicesReady()
+}
+
+/** One line, in exactly the named voice, independent of whatever a real
+ *  answer is doing -- Settings' own "hear it" button. Never goes through
+ *  Gemini: the whole point is auditioning what THIS voice sounds like, not
+ *  whichever engine a key would otherwise route to. An empty name previews
+ *  "Automatic" itself -- the plain GOOD-list pick, not whatever the browser's
+ *  own bare fallback happens to be, and not his saved preference either: the
+ *  row being auditioned is Automatic, not the choice this would replace. */
+export function previewDeviceVoice(name: string): void {
+  stop()
+  const voices = speechSynthesis.getVoices()
+  const voice = name ? (voices.find((v) => v.name === name) ?? null) : pickVoice(voices)
+  const u = new SpeechSynthesisUtterance('This is what I sound like.')
+  u.lang = 'en-US'
+  u.rate = 1.0
+  if (voice) u.voice = voice
+  speechSynthesis.cancel()
+  speechSynthesis.speak(u)
 }
 
 /* Ask for the list the moment this module loads, so by the time he clicks Play
@@ -324,7 +381,7 @@ async function speakOnDevice(id: string, text: string): Promise<void> {
     const u = new SpeechSynthesisUtterance(text)
     u.lang = 'en-US'
     u.rate = 1.0
-    const pick = pickVoice(voices)
+    const pick = resolveVoice(voices)
     if (pick) u.voice = pick
     u.onboundary = () => { boundaries++; spoken = 1; spokenAt = Date.now() }
     u.onend = () => { if (current === id) { untap(); set(null, 'idle') } }

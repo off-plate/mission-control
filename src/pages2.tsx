@@ -2,9 +2,12 @@ import { useEffect, useState } from 'react'
 import { Band } from './pages1'
 import { useStore } from './store'
 import { PROVIDERS, getAiKey, getAiProvider, hasAiKey, setAiKey, setAiProvider, type AiProvider } from './ai'
-import { Segmented } from './ui'
+import { Segmented, Select } from './ui'
 import { getHevyKey, getHevyLastSync, hasHevyKey, setHevyKey, syncHevy } from './hevy'
-import { getTtsKey, hasTtsKey, setTtsKey } from './speech'
+import {
+  getDeviceVoicePref, GOOD_VOICES, getTtsKey, hasTtsKey, listDeviceVoices, NOVELTY_VOICES, previewDeviceVoice,
+  setDeviceVoicePref, setTtsKey,
+} from './speech'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange, sendSignInCode, signInWithCode, signOutAccount, type Account } from './supabase'
 import { describe, useSyncStatus } from './sync'
 import { getOpenAtLogin, isDesktop, setOpenAtLogin } from './desktop'
@@ -302,6 +305,79 @@ function HevyKeyField() {
   )
 }
 
+/* His question (2026-09-08): macOS ships its own Enhanced/Premium voices,
+   downloadable free from System Settings -> Accessibility -> Spoken Content,
+   and this app never offered a way to pick one -- the device-voice path
+   (speech.ts) auto-picks from a short, deliberately named GOOD list and
+   there was nowhere to see or choose otherwise. This is that picker: every
+   installed voice, not just the shortlist, and a way to hear one before
+   committing to it. Gemini (the field above) is untouched -- this only ever
+   governs the free, no-key fallback path. */
+function DeviceVoiceField() {
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[] | null>(null)
+  const [pref, setPref] = useState(getDeviceVoicePref())
+  useEffect(() => { void listDeviceVoices().then(setVoices) }, [])
+
+  /* The names pickVoice() already looks for, in its own order, float to the
+     top -- the ones most likely to actually sound good, on a machine that
+     may have 180 voices installed across a dozen languages. Below them:
+     local before remote, English before everything else, the plain jokes
+     (Bahh, Zarvox, Fred) last of all rather than hidden -- this is a real
+     Chrome/macOS voice list, and hiding an option a system voice picker
+     shows is a worse trade than a few silly names sitting at the bottom. */
+  const rank = (v: SpeechSynthesisVoice): number => {
+    const goodIdx = GOOD_VOICES.findIndex((name) => v.name === name || v.name.startsWith(`${name} `))
+    if (goodIdx >= 0) return goodIdx
+    const en = /^en/i.test(v.lang)
+    const novelty = NOVELTY_VOICES.test(v.name)
+    return GOOD_VOICES.length
+      + (novelty ? 300 : 0)
+      + (v.localService ? 0 : 100)
+      + (en ? 0 : 200)
+  }
+  const sorted = (voices ?? []).slice().sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))
+  const options = [
+    { value: '', label: 'Automatic (recommended)' },
+    ...sorted.map((v) => ({ value: v.name, label: `${v.name} — ${v.lang}${v.localService ? '' : ', remote'}` })),
+  ]
+
+  return (
+    <div className="ai-key">
+      <div className="source-row">
+        <span className={`status-dot ${pref ? 'connected' : 'partial'}`} />
+        <span className="info">
+          <span className="name">The machine's own voice, when Gemini has no key</span>
+          <span className="detail" style={{ display: 'block' }}>
+            {pref
+              ? `Set to ${pref}. Download an Enhanced or Premium voice in System Settings → Accessibility → Spoken Content and it shows up here.`
+              : "Automatic: picks the best-sounding voice this machine has installed. Download an Enhanced or Premium one in System Settings → Accessibility → Spoken Content, then pick it here by name."}
+          </span>
+        </span>
+      </div>
+      <div className="formrow" style={{ marginTop: 'var(--s2)', marginBottom: 0 }}>
+        <Select
+          className="grow"
+          value={pref}
+          onChange={(v) => { setPref(v); setDeviceVoicePref(v) }}
+          options={options}
+          ariaLabel="Device voice"
+          disabled={!voices}
+        />
+        <button
+          type="button" className="btn btn-quiet"
+          onClick={() => previewDeviceVoice(pref)}
+          disabled={!voices}
+        >
+          Hear it
+        </button>
+      </div>
+      <p className="assist-note" style={{ marginTop: 6 }}>
+        {voices === null ? 'Reading the voices installed on this machine…' : `${sorted.length} voices found on this device. Kept in this browser only, same as the key above.`}
+      </p>
+    </div>
+  )
+}
+
 export function SettingsPage() {
   const { resetDemo } = useStore()
   return (
@@ -316,6 +392,7 @@ export function SettingsPage() {
           <span className="microcap" style={{ marginTop: 24, display: 'block' }}>AI</span>
           <AiKeyField />
           <VoiceKeyField />
+          <DeviceVoiceField />
           <span className="microcap" style={{ marginTop: 24, display: 'block' }}>Fitness</span>
           <HevyKeyField />
           {/* Which build is on this screen, in plain sight.

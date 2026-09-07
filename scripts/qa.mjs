@@ -3426,6 +3426,35 @@ await step('assistant: "start a focus block" starts a real, running timer', asyn
   if (pomo?.phase !== 'focus') throw new Error(`pomodoro phase is "${pomo?.phase}", never actually started`)
   if (pomo?.blockMin !== 20) throw new Error(`block length is ${pomo?.blockMin}, not the 20 he asked for`)
 })
+await step('settings: the device voice picker lists real voices and remembers a pick', async () => {
+  /* His question (2026-09-08): macOS ships Enhanced/Premium voices and
+     there was never a way to choose one -- only the automatic GOOD-list
+     pick (speech.ts) and a Gemini key field. Settings' new picker lists
+     whatever speechSynthesis actually reports on this machine, remembers a
+     choice in mc-device-voice, and it survives a reload -- the same
+     mc-groq-key/mc-gemini-key pattern every other Settings field here
+     already uses. */
+  await fresh('settings')
+  const select = page.locator('[aria-label="Device voice"]')
+  await select.waitFor({ state: 'visible', timeout: 10000 })
+  await select.click(); await page.waitForTimeout(300)
+  const options = await page.locator('.dd-panel').first().locator('.dd-option').allInnerTexts().catch(() => [])
+  if (!options.some((o) => /Automatic/.test(o))) throw new Error(`no Automatic option in the list: ${JSON.stringify(options.slice(0, 5))}`)
+  if (options.length < 2) throw new Error('the picker found no real installed voices to choose from')
+  // Pick whatever the second real option is (index 1, since 0 is Automatic).
+  const target = options[1]
+  await page.getByText(target, { exact: true }).click()
+  await page.waitForTimeout(300)
+  const pref = await page.evaluate(() => localStorage.getItem('mc-device-voice'))
+  if (!pref || !target.startsWith(pref)) throw new Error(`picked "${target}" but mc-device-voice is "${pref}"`)
+  await page.reload(); await page.waitForTimeout(900)
+  const afterReload = await select.innerText()
+  if (!afterReload.startsWith(pref)) throw new Error(`selection did not survive a reload: shows "${afterReload}", expected to start with "${pref}"`)
+  // Hear it should not throw, and should actually invoke the browser's own speech engine.
+  await page.getByRole('button', { name: 'Hear it' }).click()
+  await page.waitForTimeout(300)
+  if (!(await page.evaluate(() => speechSynthesis.speaking))) throw new Error('Hear it did not actually speak')
+})
 
 /* The systematic matrix the critic and persona panel actually judge: the
    app's real pages (App.tsx's page switch, not the QA flow names above,

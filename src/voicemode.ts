@@ -24,8 +24,20 @@ export type VoicePhase = 'off' | 'listening' | 'thinking' | 'speaking'
  *  getting sent on its own ("could you check the" / "could you turn on
  *  focus on the", both cut off mid-thought and both landing as their own
  *  turn) -- a beat spent choosing which task or bill name to say next is
- *  ordinary, not a finished question, and 1100ms was catching it as one. */
-const HUSH = 1700
+ *  ordinary, not a finished question, and 1100ms was catching it as one.
+ *  Settled on 1400ms after his very next report was the opposite direction
+ *  (the whole loop reading as slow) -- a real trade-off between the two,
+ *  not a number either complaint gets to fully own. */
+const HUSH = 1400
+/** The Play button's own patient window (speech.ts) is six full seconds,
+ *  right for an answer he is already reading and pressed play on once. A
+ *  live, hands-free turn pays whatever this is on EVERY single reply, so it
+ *  gets a much shorter leash before falling back to the instant, free
+ *  device voice -- his report, 2026-09-08: "on the assistant page you
+ *  react within one or two seconds... this pop-up thing takes six to ten",
+ *  and a slow or degraded Gemini call sitting in the middle of every turn
+ *  was very likely the largest single piece of that. */
+const VOICE_TTS_TIMEOUT_MS = 2500
 /** Chrome ends recognition on its own after a stretch of silence. If we are
     still meant to be listening, start it again rather than going deaf. */
 const RESTART_DELAY = 250
@@ -193,7 +205,7 @@ async function send(): Promise<void> {
   if (voicePhase() === 'off') return   // he left while it was thinking
   if (answer.trim()) {
     setPhase('speaking')
-    try { await say('voice', answer) } catch { /* fall through and listen again */ }
+    try { await say('voice', answer, VOICE_TTS_TIMEOUT_MS) } catch { /* fall through and listen again */ }
   }
   if (voicePhase() === 'off') return   // he left while it was speaking
   listen()

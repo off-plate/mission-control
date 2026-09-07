@@ -1048,9 +1048,25 @@ body:has(.shell.is-hud) .dock-face { border-radius: var(--a-r-lg); }
 .assistantdock-head { flex: none; display: flex; align-items: center; gap: 6px; padding: var(--s2); border-bottom: 1px solid var(--hairline); }
 .assistantdock-switch { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: var(--text-sm); color: var(--ink); padding: 0 var(--s1); }
 .assistantdock-body { flex: 1; min-height: 0; overflow-y: auto; padding: var(--s3) var(--s4) var(--s4); display: flex; flex-direction: column; }
-/* Idle state: the same skill grid the full page opens on, just centered in
-   the narrower face instead of sat under a big hero mark. */
-.assistantdock-open { display: flex; flex-direction: column; align-items: center; gap: var(--s3); padding: var(--s3) 0; }
+/* Idle state: voice first (his ask, 2026-09-08: the quick tap should be
+   "primarily voice"), the same skill grid the full page opens on underneath
+   it as the second choice, both centered in the narrower face instead of
+   sat under a big hero mark. */
+.assistantdock-open { display: flex; flex-direction: column; align-items: center; gap: var(--s4); padding: var(--s3) 0; }
+/* The one big thing this panel opens on. No border of its own -- the Mark
+   underneath it already reads as a distinct shape, so a second outline
+   around it would be a box around a blob -- just a wash on hover/press to
+   say it is a button, the same feedback .as-brief gives its own rows. */
+.assistantdock-talk {
+  display: flex; flex-direction: column; align-items: center; gap: var(--s2);
+  border: none; background: none; cursor: pointer; padding: var(--s3) var(--s5);
+  border-radius: var(--r-md);
+  transition: background var(--t-fast), transform var(--t-fast);
+}
+.assistantdock-talk:hover:not(:disabled) { background: var(--accent-wash); }
+.assistantdock-talk:active:not(:disabled) { transform: scale(0.98); transition-duration: 60ms; }
+.assistantdock-talk:disabled { cursor: default; opacity: 0.55; }
+.assistantdock-talk-label { font-weight: 700; font-size: var(--text-base); color: var(--ink); }
 .assistantdock-thread { flex: 1; min-height: 0; overflow-y: auto; margin: 0 calc(var(--s4) * -1); padding: 0 var(--s4); }
 /* Pinned under the thread rather than inline with .as-hero's own layout
    (that one assumes the wide, centered full-page column) -- a plain

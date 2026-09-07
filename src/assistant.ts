@@ -55,12 +55,21 @@ export type Action =
   /** A new task. The only action carrying words of its own, and they are HIS
    *  words out of the question he just typed, never a number. */
   | { kind: 'add'; title: string; list?: Where; slot?: Slot; space?: Space; min?: number }
-  | { kind: 'done'; match: string }
+  /** actualMin is set ONLY when he said, in the same breath, how long it
+   *  actually took ("mark it done, took me fifteen minutes") -- voice mode's
+   *  main use for this, since a spoken "done" and a spoken duration arrive as
+   *  one utterance with nowhere else to land. Left out, this behaves exactly
+   *  as before: done, and the app asks him separately how long it took. */
+  | { kind: 'done'; match: string; actualMin?: number }
   | { kind: 'undone'; match: string }
   | { kind: 'move'; match: string; slot?: Slot; list?: Where }
   | { kind: 'estimate'; match: string; min: number }
   | { kind: 'drop'; match: string }
   | { kind: 'habit'; match: string; on: boolean }
+  /** "Open up Big Time" / "switch to Off-Plate" -- changes which workspace he
+   *  is standing in. Never inferred from what a task happens to belong to:
+   *  only when he named a workspace and asked to move to it. */
+  | { kind: 'workspace'; space: Space }
 
 const SLOTS_OK: Slot[] = ['morning', 'noon', 'afternoon', 'evening']
 const WHERE_OK: Where[] = ['today', 'backlog']
@@ -77,6 +86,7 @@ function cleanActions(raw: unknown): Action[] {
     const slot = SLOTS_OK.includes(o.slot as Slot) ? (o.slot as Slot) : undefined
     const list = WHERE_OK.includes(o.list as Where) ? (o.list as Where) : undefined
     const min = typeof o.min === 'number' && o.min > 0 && o.min <= 480 ? Math.round(o.min) : undefined
+    const actualMin = typeof o.actualMin === 'number' && o.actualMin > 0 && o.actualMin <= 480 ? Math.round(o.actualMin) : undefined
     const match = str(o.match, 200)
     switch (o.kind) {
       case 'add': {
@@ -88,7 +98,10 @@ function cleanActions(raw: unknown): Action[] {
         })
         break
       }
-      case 'done': case 'undone': case 'drop':
+      case 'done':
+        if (match) out.push({ kind: 'done', match, actualMin })
+        break
+      case 'undone': case 'drop':
         if (match) out.push({ kind: o.kind, match })
         break
       case 'move':
@@ -100,6 +113,9 @@ function cleanActions(raw: unknown): Action[] {
         break
       case 'habit':
         if (match) out.push({ kind: 'habit', match, on: o.on !== false })
+        break
+      case 'workspace':
+        if (SPACE_OK.includes(o.space as Space)) out.push({ kind: 'workspace', space: o.space as Space })
         break
       default: break
     }
@@ -243,17 +259,24 @@ setting in motion, briefly, and let the line under it carry the fact.
 The whole vocabulary, and nothing outside it works:
 {"kind":"add","title":"...","list":"today"|"backlog","slot":"morning"|"noon"|"afternoon"|"evening","space":"personal"|"work"|"offplate"|"corner","min":30}
 {"kind":"done","match":"part of the title"}
+{"kind":"done","match":"...","actualMin":15}         only when he told you, in the same breath, how long it actually took
 {"kind":"undone","match":"..."}
 {"kind":"move","match":"...","slot":"noon"}          moves it inside the day
 {"kind":"move","match":"...","list":"backlog"}       takes it off the day
 {"kind":"estimate","match":"...","min":45}
 {"kind":"drop","match":"..."}                        deletes it, and he can undo
 {"kind":"habit","match":"habit name","on":true}      keeps or un-keeps it today
+{"kind":"workspace","space":"personal"|"work"|"offplate"|"corner"}  personal=Personal, work=Big Time, offplate=Off-Plate, corner=Michael's Corner. Switches which workspace he is standing in.
 
 "match" is words out of the real title as it appears in the briefing above, not
 a description of it. "add" carries HIS words for the new task, off the message
 he just typed, and nothing invented around them. Leave "min" out unless he gave
-a number: a made-up estimate is a made-up number.
+a number: a made-up estimate is a made-up number. Same rule for "actualMin": it
+exists for "done, that took me fifteen minutes" said as one sentence, never for
+a duration you are estimating on his behalf -- when he only says a task is
+done, leave it out and the app asks him afterwards, same as always. "workspace"
+is only for an explicit "open", "switch to" or "go to" a named workspace, never
+inferred from a task he is talking about happening to sit in one.
 
 A HABIT AND A ROUTINE ARE NOT THE SAME THING, and the briefing lists them
 separately for exactly this reason. A habit is one tick: it is either kept

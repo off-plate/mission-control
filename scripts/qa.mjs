@@ -3121,6 +3121,74 @@ await step('assistant: it ticks, moves, estimates and keeps a habit, on his real
   if (after.slot !== 'evening') throw new Error(`the task is in ${after.slot}, not evening`)
   if (after.min !== 45) throw new Error(`the estimate is ${after.min}, not 45`)
 })
+await step('assistant: "done, took me fifteen minutes" fills the real time in one go', async () => {
+  /* His ask (2026-09-08), the whole point of voice being able to act rather
+     than just answer: "done, took me fifteen minutes" said as one sentence
+     should log that real number outright, not tick the task and then still
+     ask him separately how long it took. actualMin on a 'done' action
+     (assistant.ts/assistantcore.tsx) is what that sentence turns into --
+     tested here through the same mocked-model text path every other action
+     above uses, since a real microphone is not something this gate can
+     drive; the model output is identical whichever way the words arrived. */
+  await fresh('assistant')
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const day = new Date().toISOString().slice(0, 10)
+    s.tasks = [{
+      id: 'v1', title: 'Write the Q3 update', space: 'work', source: 'mc', estimateMin: 20, done: false,
+      list: 'today', category: 'admin', slot: 'morning', plannedOn: day, createdAt: day, addedAt: Date.now(),
+    }]
+    localStorage.setItem(K, JSON.stringify(s))
+    localStorage.setItem('mc-groq-key', 'gsk_gatetest')
+  }, KEY)
+  await stubAssistant(() => JSON.stringify({
+    say: 'Marking that done.', show: [],
+    do: [{ kind: 'done', match: 'Q3 update', actualMin: 15 }],
+  }))
+  await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('mark the Q3 update done, took me fifteen minutes')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  const line = await page.locator('.as-did li').innerText()
+  if (!/15/.test(line)) throw new Error(`the outcome line does not carry the real minutes: "${line}"`)
+  /* No follow-up prompt: he already said the number, so ActualLog's own
+     "how long did it take?" row must never appear on top of an answer he
+     already gave. */
+  if (await page.locator('.as-did .actual-log, .as-did button:has-text("Took")').count()) {
+    throw new Error('the manual actual-time prompt showed up even though he already gave the number')
+  }
+  const after = await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const t = (s.tasks ?? []).find((x) => x.id === 'v1')
+    const led = (s.ledger ?? []).find((x) => x.title === 'Write the Q3 update')
+    return { done: !!t?.done, actualMin: t?.actualMin, ledgerMin: led?.actualMin }
+  }, KEY)
+  if (!after.done) throw new Error('the task was not marked done')
+  if (after.actualMin !== 15) throw new Error(`actualMin on the task is ${after.actualMin}, not 15`)
+  if (after.ledgerMin !== 15) throw new Error(`the ledger row logged ${after.ledgerMin} minutes, not 15`)
+})
+await step('assistant: "open up Big Time" switches the real workspace', async () => {
+  /* His example, verbatim: "open up Big Time workspace... and show me what I
+     have for today." The switch itself (assistantcore.tsx's 'workspace'
+     case, calling the same setSpace the header's own switcher uses) is what
+     is under test -- persisted to mc-space, same as a manual switch. */
+  await fresh('assistant')
+  await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
+  await stubAssistant(() => JSON.stringify({
+    say: 'Switching over.', show: [{ kind: 'today' }],
+    do: [{ kind: 'workspace', space: 'work' }],
+  }))
+  await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('open up my Big Time workspace and show me what I have for today')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  const line = await page.locator('.as-did li').innerText()
+  if (!/Big Time/i.test(line)) throw new Error(`the outcome line does not name the workspace: "${line}"`)
+  /* mc-view is what the header's own dropdown reads -- the visible switch,
+     not just an internal default. setView keeps mc-space in step with it
+     (store.tsx), checked here too as the belt to that braces. */
+  const { view, space } = await page.evaluate(() => ({ view: localStorage.getItem('mc-view'), space: localStorage.getItem('mc-space') }))
+  if (view !== 'work') throw new Error(`mc-view is "${view}", the visible workspace switcher never moved`)
+  if (space !== 'work') throw new Error(`mc-space is "${space}", the switch never reached the store`)
+})
 
 /* The systematic matrix the critic and persona panel actually judge: the
    app's real pages (App.tsx's page switch, not the QA flow names above,

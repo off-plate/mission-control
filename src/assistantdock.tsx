@@ -1,28 +1,37 @@
 /* THE FLOATING ASSISTANT.
 
-   His correction (2026-09-08), twice over: the first pass moved Assistant
-   into the dock as a plain shortcut, the same shape Focus already used --
-   one tap straight to the full page. That was the wrong half of the ask. He
-   wanted what Note, Bills and Timeline already do: a SHORT tap opens a real
-   quick-ask widget right here in the popup, and only a LONG PRESS goes to
-   the full page. "Long functionality fully" was the other half -- not a
-   thinned-out copy of asking a question, the actual thing, rate-limit
-   retries and provider-named errors and all.
+   His first correction (2026-09-08): the first pass moved Assistant into the
+   dock as a plain shortcut, the same shape Focus already used -- one tap
+   straight to the full page. Wrong half of the ask. He wanted what Note,
+   Bills and Timeline already do: a SHORT tap opens a real quick-ask widget
+   right here in the popup, and only a LONG PRESS goes to the full page.
 
-   That is why this file exists rather than a smaller one: useAssistantThread
-   (assistantpage.tsx) is the real send() logic, extracted untouched so this
-   panel and the full page share the exact same behavior, never a second copy
-   that quietly drifts from the first. What this panel does NOT carry is
-   voice mode and the canvas cards -- both take a whole page to do properly,
-   and a 560px popup showing a worse version of either is the identical
-   mistake Bills' and Timeline's own panels were built to avoid making. Ask,
-   read the answer, hear it, act on it, follow up -- that is the whole quick
-   version, and it is genuinely all of it, not a preview of it. */
+   His second correction, same day, after that widget shipped text-first:
+   the quick tap should be "primarily voice" -- he wants to talk to it, hands
+   free, the way he would say "open up Big Time, show me what I have today"
+   out loud rather than type it. So Talk is the one big thing this panel
+   opens on, voice mode itself is the real, continuous kind (VoicePanel, the
+   same loop the full page uses -- it keeps listening turn after turn, not
+   one utterance and done), and it can act on the real app exactly like the
+   full page can, workspace switch and all: "mark it done, took me fifteen
+   minutes" logs that exact number through the same logActual path the
+   manual follow-up button already uses, in one sentence, no second prompt.
+
+   useAssistantThread and useVoiceGlue (assistantcore.tsx) are the real
+   send()/voice logic, extracted untouched so this panel and the full page
+   share one implementation, never a second copy that quietly drifts from
+   the first. What stays page-only is the canvas cards and typed dictation --
+   both still need a whole page to do properly, and a 560px popup showing a
+   worse version of either is the mistake Bills' and Timeline's own panels
+   were built to avoid repeating. Talk to it, read the small chat it leaves
+   behind, act on the real app -- that is the whole quick version, and voice
+   is the front door into it now, not a button buried in a footer. */
 
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useStore } from './store'
 import { MORNING, SKILLS } from './assistant'
-import { Mark, Speak, useAssistantThread } from './assistantcore'
+import { Mark, Speak, useAssistantThread, useVoiceGlue, VoicePanel } from './assistantcore'
+import { voiceModeAvailable } from './voicemode'
 import { ActualLog } from './pages1'
 import * as Icon from './icons'
 
@@ -35,19 +44,28 @@ export function AssistantChip() {
 
 export function AssistantPanel({ dockControls, onOpenFull }: { dockControls?: ReactNode; onOpenFull?: () => void }) {
   const { logActual } = useStore()
-  const { turns, setTurns, busy, err, errHint, live, send } = useAssistantThread()
+  const { turns, setTurns, busy, err, errHint, live, send: sendRaw } = useAssistantThread()
   const [q, setQ] = useState('')
   const box = useRef<HTMLTextAreaElement>(null)
   const foot = useRef<HTMLDivElement>(null)
 
-  useEffect(() => { box.current?.focus() }, [])
+  const send = (text: string, shown?: string) => sendRaw(text, shown).then((r) => { box.current?.focus(); return r })
+  const { voice, startVoice, runSkill, endVoice } = useVoiceGlue(send, () => setQ(''), () => box.current?.focus())
+
+  /* NOT autofocused on open the way the full page's box is. There, typing is
+     the default mode and the caret belongs in the box the moment it opens;
+     here voice is the front door (his ask), and a focused textarea below the
+     Talk button pulled the browser's own scroll-into-view along with it,
+     opening the panel already scrolled past Talk and onto the fallback
+     input -- the opposite of "primarily voice". The box still gets focus
+     the moment he actually uses it: after a send, and after voice hangs up. */
   useEffect(() => { foot.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }) }, [turns, busy])
 
   const submit = (text: string, shown?: string) => {
     const t = text.trim()
     if (!t || busy) return
     setQ('')
-    void send(t, shown).then(() => box.current?.focus())
+    void send(t, shown)
   }
 
   const logTaskActual = (turnIndex: number, doneIndex: number, taskId: string, minutes: number) => {
@@ -58,7 +76,7 @@ export function AssistantPanel({ dockControls, onOpenFull }: { dockControls?: Re
     )))
   }
 
-  const empty = turns.length === 0
+  const empty = turns.length === 0 && !busy && !err
 
   return (
     <div className="assistantdock-panel">
@@ -77,16 +95,26 @@ export function AssistantPanel({ dockControls, onOpenFull }: { dockControls?: Re
         {dockControls}
       </div>
       <div className="assistantdock-body">
-        {empty ? (
+        {voice ? (
+          <VoicePanel onExit={endVoice} />
+        ) : empty ? (
           <div className="assistantdock-open">
-            <Mark state="idle" size={56} />
+            {/* Voice is the front door here, on his ask -- one tap and it is
+               listening, the same continuous back-and-forth the full page's
+               own voice mode runs, not a single-shot capture. Typing and the
+               skill grid below are still there for a library or a quiet
+               room, but they are the second choice, not the first. */}
+            <button type="button" className="assistantdock-talk" onClick={() => void startVoice()} disabled={busy}>
+              <Mark state="idle" size={56} />
+              <span className="assistantdock-talk-label">Talk</span>
+            </button>
             <div className="as-skills">
-              <button className="as-brief" onClick={() => submit(MORNING.ask, MORNING.label)}>
+              <button className="as-brief" onClick={() => void runSkill(MORNING)}>
                 <Icon.Waveform size={16} />
                 {MORNING.label}
               </button>
               {SKILLS.map((k) => (
-                <button className="as-brief" key={k.label} onClick={() => submit(k.ask, k.label)}>
+                <button className="as-brief" key={k.label} onClick={() => void runSkill(k)}>
                   <Icon.Waveform size={16} />
                   {k.label}
                 </button>
@@ -143,22 +171,33 @@ export function AssistantPanel({ dockControls, onOpenFull }: { dockControls?: Re
             <div ref={foot} />
           </div>
         )}
-        <form
-          className="as-ask assistantdock-ask"
-          onSubmit={(e) => { e.preventDefault(); submit(q) }}
-        >
-          <textarea
-            ref={box}
-            className="as-input"
-            value={q}
-            rows={1}
-            placeholder="Ask anything about your week"
-            aria-label="Ask the assistant"
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(q) } }}
-          />
-          <button className="btn btn-primary as-send" disabled={busy || !q.trim()}>Ask</button>
-        </form>
+        {!voice && (
+          <form
+            className="as-ask assistantdock-ask"
+            onSubmit={(e) => { e.preventDefault(); submit(q) }}
+          >
+            <textarea
+              ref={box}
+              className="as-input"
+              value={q}
+              rows={1}
+              placeholder="Ask anything about your week"
+              aria-label="Ask the assistant"
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(q) } }}
+            />
+            {voiceModeAvailable() && !empty && (
+              <button
+                type="button" className="as-voice-btn" onClick={() => void startVoice()} disabled={busy}
+                aria-label="Talk"
+                title="Talk to it, and it talks back. It keeps listening until you are done."
+              >
+                <Icon.Waveform size={15} />
+              </button>
+            )}
+            <button className="btn btn-primary as-send" disabled={busy || !q.trim()}>Ask</button>
+          </form>
+        )}
       </div>
     </div>
   )

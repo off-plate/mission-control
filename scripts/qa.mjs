@@ -3455,6 +3455,48 @@ await step('settings: the device voice picker lists real voices and remembers a 
   await page.waitForTimeout(300)
   if (!(await page.evaluate(() => speechSynthesis.speaking))) throw new Error('Hear it did not actually speak')
 })
+await step('assistant: tapping the voice wave while it talks skips straight to listening', async () => {
+  /* His ask (2026-09-08): "I should be able to interrupt... not with
+     voice, just a click... right now if she has long answers, I have to
+     wait until it stops." A tap on the wave during 'speaking' now calls
+     speech.ts's own stop() (assistantcore.tsx's VoicePanel) -- ends the
+     playback outright, and voicemode.ts's send(), still sitting on its own
+     `await say(...)`, falls straight through to listen() once that
+     resolves, with nothing here needing to know that happened. */
+  await fresh('today')
+  await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
+  await stubAssistant(() => JSON.stringify({
+    say: 'This is a long answer that should take several seconds to read out loud in a device voice, long enough to click the interrupt button while it is still actively speaking the sentence, testing whether the tap actually stops it and moves on to listening again rather than waiting for the whole thing.',
+    show: [],
+  }))
+  const openDock = page.getByRole('button', { name: 'Open quick tools' })
+  await openDock.waitFor({ state: 'visible', timeout: 10000 })
+  await openDock.click(); await page.waitForTimeout(400)
+  await page.locator('.dock-item').filter({ hasText: 'Assistant' }).click(); await page.waitForTimeout(400)
+  // Talk immediately replaces the idle skills grid with the voice panel
+  // itself, so exit straight back out -- the skill button that actually
+  // drives this test lives on the idle screen, not inside voice mode.
+  await page.locator('.assistantdock-talk').click(); await page.waitForTimeout(500)
+  await page.locator('.as-voice-exit').click(); await page.waitForTimeout(300)
+  // The morning-brief-style opening prompt used by the skill buttons drives
+  // straight to 'thinking' then 'speaking' without needing real microphone
+  // input, which headless Chromium has none of.
+  await page.locator('.as-skills .as-brief').first().click()
+  let phaseClass = ''
+  for (let i = 0; i < 20; i++) {
+    phaseClass = await page.locator('.as-voice').getAttribute('class').catch(() => '')
+    if (phaseClass?.includes('is-speaking')) break
+    await page.waitForTimeout(200)
+  }
+  if (!phaseClass?.includes('is-speaking')) throw new Error(`never reached the speaking phase to interrupt: "${phaseClass}"`)
+  if (!(await page.evaluate(() => speechSynthesis.speaking))) throw new Error('speechSynthesis was not actually speaking to interrupt')
+  await page.locator('.as-wave-btn').click()
+  await page.waitForTimeout(400)
+  if (await page.evaluate(() => speechSynthesis.speaking)) throw new Error('the tap did not actually stop the reading')
+  await page.waitForTimeout(600)
+  const after = await page.locator('.as-voice').getAttribute('class').catch(() => 'GONE')
+  if (!after?.includes('is-listening')) throw new Error(`expected to be listening again after the interrupt, got: "${after}"`)
+})
 
 /* The systematic matrix the critic and persona panel actually judge: the
    app's real pages (App.tsx's page switch, not the QA flow names above,

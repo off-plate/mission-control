@@ -1067,7 +1067,17 @@ body:has(.shell.is-hud) .dock-face { border-radius: var(--a-r-lg); }
 .assistantdock-talk:active:not(:disabled) { transform: scale(0.98); transition-duration: 60ms; }
 .assistantdock-talk:disabled { cursor: default; opacity: 0.55; }
 .assistantdock-talk-label { font-weight: 700; font-size: var(--text-base); color: var(--ink); }
-.assistantdock-thread { flex: 1; min-height: 0; overflow-y: auto; margin: 0 calc(var(--s4) * -1); padding: 0 var(--s4); }
+/* .as-thread.assistantdock-thread, not .assistantdock-thread alone: the
+   element carries BOTH classes (assistantdock.tsx), and .as-thread's own
+   rule further down this file sets `padding: var(--s6) var(--s3) var(--s5)
+   0` -- zero on the left, correct for the full page's own wide layout, but
+   an equal-specificity single-class selector declared later in the
+   cascade, so it was silently overriding this rule's left padding to zero
+   (his report, 2026-09-08: "the text doesn't have any space on the left
+   ... only the left text is fucked up"). The compound selector outranks
+   both single-class rules regardless of source order, so this one wins for
+   real rather than by accident of where it sits in the file. */
+.as-thread.assistantdock-thread { flex: 1; min-height: 0; overflow-y: auto; margin: 0 calc(var(--s4) * -1); padding: 0 var(--s4); }
 /* Pinned under the thread rather than inline with .as-hero's own layout
    (that one assumes the wide, centered full-page column) -- a plain
    two-line form is all a 560px face has room for. */
@@ -5723,6 +5733,18 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 }
 /* Mouth shut and ears shut: nothing to draw, so it draws a line. */
 .as-voice.is-thinking .as-wave { stroke: var(--faint); }
+/* The wave itself, made real while speaking: his ask (2026-09-08) for a way
+   to cut a long answer short with a tap rather than a voice he cannot use
+   while it is already talking. Plain button reset -- the wave inside it is
+   the only visible thing, this only adds the hit target and the hover/press
+   feedback every other tappable control here already gives. */
+.as-wave-btn {
+  display: block; width: 100%; padding: 0; margin: 0;
+  border: none; background: none; cursor: pointer; border-radius: var(--r-sm);
+  transition: opacity var(--t-fast);
+}
+.as-wave-btn:hover { opacity: 0.8; }
+.as-wave-btn:active { opacity: 0.6; }
 
 .as-voice-heard {
   font-size: var(--text-sm); color: var(--ink);

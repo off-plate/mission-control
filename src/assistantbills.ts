@@ -56,10 +56,21 @@ export function useAssistantBills() {
   }
 
   const ready = signedIn === true && !!data
+  /* His report, verbatim, real data: he asked whether he'd paid Spotify --
+     visibly still unpaid on the real Bills page -- and the model said it
+     "is not on the bills list for this cycle", confidently and wrongly,
+     because an 8-item cap on this line had silently dropped it: overdue
+     debts and planned expenses sort ahead of ordinary recurring bills
+     (cycleChecklist's own order), and past a handful of those Spotify
+     never reached the briefing at all. The exact failure the rest of this
+     app already learned to avoid with tasks ("a filtered briefing makes
+     the model confident about a day it has only seen a third of") --
+     uncapped here for the same reason backlog itself is only capped at 25,
+     not 8: a wrong "it isn't here" is worse than a slightly longer prompt. */
   const brief: BillsBrief | null = ready ? {
     due: items.length,
     paid: items.filter((i) => i.paid).length,
-    open: items.filter((i) => !i.paid).map((i) => i.name).slice(0, 8),
+    open: items.filter((i) => !i.paid).map((i) => i.name).slice(0, 25),
   } : null
 
   return { ready, items, brief, markPaid, markUnpaid }

@@ -85,7 +85,19 @@ export const PROVIDERS: Record<AiProvider, ProviderConfig> = {
     keyStore: 'mc-zai-key',
     keyPlaceholder: 'Z.ai API key…',
     getKeyUrl: 'https://z.ai/model-api',
-    quiet: { thinking: { type: 'disabled' } },
+    /* Was `thinking: { type: 'disabled' }`, the general shutoff switch Z.ai's
+       own docs describe -- and it was the actual 400 in his live trace
+       (2026-09-08): every real request went out twice, quiet flags first,
+       then the plain retry once those got rejected, landing back on the
+       model's own default of maximum reasoning either way. Their own docs
+       carry the reason next to reasoning_effort: "for the GLM-5.3 /
+       GLM-5.3-FLASH model, only the low / high / max levels are supported" --
+       a restriction specific to this exact model, not the general API, and
+       the general shutoff switch is plausibly one more thing it does not
+       carry. "low" is the one value their own docs confirm this model
+       actually accepts, so it is the real lever here, not full elimination:
+       expect noticeably faster than max, not Groq-instant. */
+    quiet: { reasoning_effort: 'low' },
   },
 }
 

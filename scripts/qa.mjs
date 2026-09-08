@@ -3121,6 +3121,25 @@ await step('assistant: it ticks, moves, estimates and keeps a habit, on his real
   if (after.slot !== 'evening') throw new Error(`the task is in ${after.slot}, not evening`)
   if (after.min !== 45) throw new Error(`the estimate is ${after.min}, not 45`)
 })
+await step('assistant: "rename that to..." changes a real task title', async () => {
+  await fresh('assistant')
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const day = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`
+    s.tasks = [{ id: 't-rename', title: 'Call the plumber', space: 'personal', source: 'mc', estimateMin: 15, done: false, list: 'today', category: 'admin', slot: 'morning', plannedOn: day, createdAt: day, addedAt: Date.now() }]
+    localStorage.setItem(K, JSON.stringify(s))
+    localStorage.setItem('mc-groq-key', 'gsk_gatetest')
+  }, KEY)
+  await stubAssistant(() => JSON.stringify({
+    say: 'Renamed.', show: [],
+    do: [{ kind: 'rename', match: 'plumber', title: 'Call the plumber about the leak' }],
+  }))
+  await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('rename the plumber task to call the plumber about the leak')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  const title = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).tasks?.find((t) => t.id === 't-rename')?.title, KEY)
+  if (title !== 'Call the plumber about the leak') throw new Error(`title was not really changed: "${title}"`)
+})
 await step('assistant: "done, took me fifteen minutes" fills the real time in one go', async () => {
   /* His ask (2026-09-08), the whole point of voice being able to act rather
      than just answer: "done, took me fifteen minutes" said as one sentence
@@ -3344,6 +3363,31 @@ await step('assistant: signed out of Bills, "bill" says so rather than guessing 
     throw new Error('claimed to mark a bill paid with no bills data at all')
   }
 })
+await step('assistant: "I need to pay for garbage bags" writes a real one-off, signed out honestly otherwise', async () => {
+  /* His report, verbatim: asked to write in an unexpected cost ("garbage
+     bags, 800 czk"), and the model said "I'll put it on the list" with no
+     list that exists to put it on -- expense (assistant.ts/assistantcore.
+     tsx/assistantbills.ts) is the exact insert "Add a one-off" under
+     Unexpected this cycle already makes. This gate never signs in to a
+     real account (?noremote), so it can only exercise the honest-failure
+     path end to end; the real insert was checked by hand against a faked
+     Supabase session (same insertRow('compass_planned', ...) PlannedSheet
+     itself calls, cycle_start as a real date, not the "YYYY-MM" key). */
+  await fresh('assistant')
+  await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
+  await stubAssistant(() => JSON.stringify({
+    say: "I can't reach Bills from here.", show: [],
+    do: [{ kind: 'expense', name: 'Garbage bags', amount: 800 }],
+  }))
+  await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('I need to pay for garbage bags, 800 crowns')
+  await page.waitForSelector('.as-did li', { timeout: 4000 })
+  const line = await page.locator('.as-did li').innerText()
+  if (!/not signed in/i.test(line)) throw new Error(`expected an honest "not signed in" line, got: "${line}"`)
+  if (await page.locator('.as-did li.is-ok').filter({ hasText: 'Added' }).count()) {
+    throw new Error('claimed to add a one-off with no bills data at all')
+  }
+})
 await step('assistant: "log that I called her" writes a real contact touch', async () => {
   /* His ask, after Bills: "it's not only bills... it's every functionality
      across the mission control." contact (assistant.ts/assistantcore.tsx)
@@ -3477,6 +3521,157 @@ await step('assistant: "sync my workout" reaches the real Hevy sync, honestly, w
   await page.waitForSelector('.as-did li', { timeout: 4000 })
   const line = await page.locator('.as-did li').innerText()
   if (!/Hevy/i.test(line)) throw new Error(`expected an honest Hevy-specific line, got: "${line}"`)
+})
+await step('assistant: "rewrite that note to say..." replaces a real note, and delete removes one', async () => {
+  /* His demand, verbatim, after the bills-page confusion: full write access
+     across notes, not just add. noteEdit/noteDelete (assistantcore.tsx)
+     call the exact updateNote/deleteNote the Notes page's own editor uses. */
+  await fresh('assistant')
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    s.notes = [...(s.notes ?? []), { id: 'n-groceries', space: 'personal', folderId: 'nf-space-personal', title: '', body: 'Groceries: milk, eggs', color: 'amber', when: '2026-09-08', updatedAt: Date.now() }]
+    localStorage.setItem(K, JSON.stringify(s))
+    localStorage.setItem('mc-groq-key', 'gsk_gatetest')
+  }, KEY)
+  await stubAssistant(() => JSON.stringify({
+    say: 'Updated.', show: [],
+    do: [{ kind: 'noteEdit', match: 'Groceries', text: 'Groceries: milk, eggs, bread' }],
+  }))
+  await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('add bread to the groceries note')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  const body = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).notes.find((n) => n.id === 'n-groceries')?.body, KEY)
+  if (body !== 'Groceries: milk, eggs, bread') throw new Error(`note body was not really replaced: "${body}"`)
+
+  await stubAssistant(() => JSON.stringify({
+    say: 'Deleted.', show: [],
+    do: [{ kind: 'noteDelete', match: 'Groceries' }],
+  }))
+  await askAssistant('delete the groceries note')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  const stillThere = await page.evaluate((K) => (JSON.parse(localStorage.getItem(K)).notes ?? []).some((n) => n.id === 'n-groceries'), KEY)
+  if (stillThere) throw new Error('the note was still there after "delete"')
+})
+await step('assistant: makes a real project, and a task can land inside it', async () => {
+  /* His ask, verbatim: create projects, and add tasks within them. project
+     is the same addProject the Projects page's own "New project" makes;
+     "add" now takes an optional project name too. */
+  await fresh('assistant')
+  await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
+  await stubAssistant(() => JSON.stringify({
+    say: 'Made it.', show: [],
+    do: [{ kind: 'project', name: 'Kitchen remodel' }],
+  }))
+  await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('make a new project called kitchen remodel')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  const proj = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).projects?.find((p) => p.name === 'Kitchen remodel'), KEY)
+  if (!proj) throw new Error('no real project row was created')
+
+  await stubAssistant(() => JSON.stringify({
+    say: 'Added.', show: [],
+    do: [{ kind: 'add', title: 'Pick tile', project: 'Kitchen remodel' }],
+  }))
+  await askAssistant('add pick tile to the kitchen remodel project')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  let task = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).tasks?.find((t) => t.title === 'Pick tile'), KEY)
+  if (!task || task.projectId !== proj.id) throw new Error(`task did not land in the real project: ${JSON.stringify(task)}`)
+
+  /* An EXISTING task changing projects -- "move" with a project name, the
+     same setTaskProject the task's own project picker calls. */
+  await stubAssistant(() => JSON.stringify({
+    say: 'Made it.', show: [],
+    do: [{ kind: 'project', name: 'Bathroom' }],
+  }))
+  await askAssistant('make a new project called bathroom')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  const proj2 = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).projects?.find((p) => p.name === 'Bathroom'), KEY)
+
+  await stubAssistant(() => JSON.stringify({
+    say: 'Moved.', show: [],
+    do: [{ kind: 'move', match: 'Pick tile', project: 'Bathroom' }],
+  }))
+  await askAssistant('move pick tile to the bathroom project instead')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  task = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).tasks?.find((t) => t.title === 'Pick tile'), KEY)
+  if (task.projectId !== proj2.id) throw new Error(`task was not moved to the second project: ${JSON.stringify(task)}`)
+})
+await step('assistant: adds, archives and edits a real habit or quit, all through one vocabulary', async () => {
+  /* His ask, verbatim: add, delete or adjust habits AND quitting things.
+     addHabit/archiveHabit/editHabit all reach both kinds, exactly like
+     "habit"/"slip" already do -- breaking:true is the only difference. */
+  await fresh('assistant')
+  await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
+  await stubAssistant(() => JSON.stringify({
+    say: 'Added.', show: [],
+    do: [{ kind: 'addHabit', name: 'Read every day', frequency: 'daily' }],
+  }))
+  await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('add a habit to read every day')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  let h = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).habits?.find((x) => x.name === 'Read every day'), KEY)
+  if (!h || h.kind === 'break') throw new Error(`expected a real build habit: ${JSON.stringify(h)}`)
+
+  await stubAssistant(() => JSON.stringify({
+    say: 'Set.', show: [],
+    do: [{ kind: 'addHabit', name: 'Sugar', breaking: true }],
+  }))
+  await askAssistant("I'm quitting sugar")
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  const quit = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).habits?.find((x) => x.name === 'Sugar'), KEY)
+  if (!quit || quit.kind !== 'break' || !quit.quitSince) throw new Error(`expected a real quit, dated: ${JSON.stringify(quit)}`)
+
+  await stubAssistant(() => JSON.stringify({
+    say: 'Updated.', show: [],
+    do: [{ kind: 'editHabit', match: 'Read every day', frequency: 'weekly' }],
+  }))
+  await askAssistant('make the reading habit weekly instead')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  h = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).habits?.find((x) => x.name === 'Read every day'), KEY)
+  if (h.frequency !== 'weekly') throw new Error(`frequency was not patched: ${JSON.stringify(h)}`)
+
+  await stubAssistant(() => JSON.stringify({
+    say: 'Archived.', show: [],
+    do: [{ kind: 'archiveHabit', match: 'Read every day' }],
+  }))
+  await askAssistant('archive the reading habit')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  h = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).habits?.find((x) => x.name === 'Read every day'), KEY)
+  if (!h?.archivedAt) throw new Error(`habit was not archived: ${JSON.stringify(h)}`)
+})
+await step('assistant: sets up a real routine', async () => {
+  /* His ask: create routines, same addRoutine the Routines page's own form
+     calls (which also makes the mirroring habit). */
+  await fresh('assistant')
+  await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
+  await stubAssistant(() => JSON.stringify({
+    say: 'Set up.', show: [],
+    do: [{ kind: 'addRoutine', title: 'Evening wind-down', cadence: 'daily' }],
+  }))
+  await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('set up a daily evening wind-down routine')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  const routine = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).routines?.find((r) => r.title === 'Evening wind-down'), KEY)
+  if (!routine) throw new Error('no real routine row was created')
+})
+await step('assistant: "open Watchless" opens a real embedded app', async () => {
+  /* His ask: open up the applications he has. app (assistantcore.tsx) calls
+     the same setFocusAppId/setPage('apps') the Apps page's own tile click
+     already makes -- both already on the shared store. */
+  await fresh('today')
+  await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
+  await stubAssistant(() => JSON.stringify({
+    say: 'Opening it.', show: [],
+    do: [{ kind: 'app', match: 'Watchless' }],
+  }))
+  await page.getByRole('button', { name: 'Open quick tools' }).click(); await page.waitForTimeout(400)
+  await page.locator('.dock-item').filter({ hasText: 'Assistant' }).click(); await page.waitForTimeout(400)
+  await page.locator('.assistantdock-panel .as-input').fill('open Watchless')
+  await page.locator('.assistantdock-panel .as-input').press('Enter')
+  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  await page.waitForTimeout(400)
+  const src = await page.evaluate(() => document.querySelector('.apps-frame')?.getAttribute('src') ?? '')
+  if (!src.startsWith('https://watchless.netlify.app')) throw new Error(`did not really open the app, frame is: "${src}"`)
 })
 await step('settings: the device voice picker lists real voices and remembers a pick', async () => {
   /* His question (2026-09-08): macOS ships Enhanced/Premium voices and

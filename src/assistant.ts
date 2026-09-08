@@ -21,7 +21,7 @@
 
 import { activeModel, getAiKey, request, stripReasoning } from './ai'
 import { getTtsKey, hasTtsKey } from './speech'
-import type { PageId } from './types'
+import type { HabitFrequency, PageId, RoutineCadence } from './types'
 
 /** What a card shows. The app owns every one of these; the model only names one. */
 export type CardKind =
@@ -55,7 +55,7 @@ export type Space = 'personal' | 'work' | 'offplate' | 'corner'
 export type Action =
   /** A new task. The only action carrying words of its own, and they are HIS
    *  words out of the question he just typed, never a number. */
-  | { kind: 'add'; title: string; list?: Where; slot?: Slot; space?: Space; min?: number }
+  | { kind: 'add'; title: string; list?: Where; slot?: Slot; space?: Space; min?: number; project?: string }
   /** actualMin is set ONLY when he said, in the same breath, how long it
    *  actually took ("mark it done, took me fifteen minutes") -- voice mode's
    *  main use for this, since a spoken "done" and a spoken duration arrive as
@@ -71,8 +71,11 @@ export type Action =
    *  than pick()'s ordinary refusal the moment more than one row matches. */
   | { kind: 'done'; match: string; actualMin?: number; inSlot?: Slot; all?: boolean }
   | { kind: 'undone'; match: string; inSlot?: Slot; all?: boolean }
-  | { kind: 'move'; match: string; slot?: Slot; list?: Where; inSlot?: Slot }
+  | { kind: 'move'; match: string; slot?: Slot; list?: Where; inSlot?: Slot; project?: string }
   | { kind: 'estimate'; match: string; min: number; inSlot?: Slot }
+  /** "Rename that to..." -- a real title change on an EXISTING task, HIS
+   *  new words, never invented. */
+  | { kind: 'rename'; match: string; title: string; inSlot?: Slot }
   | { kind: 'drop'; match: string; inSlot?: Slot; all?: boolean }
   | { kind: 'habit'; match: string; on: boolean }
   /** "Open up Big Time" / "switch to Off-Plate" / "show me all workspaces" --
@@ -88,6 +91,11 @@ export type Action =
    *  switch between workspaces" was a true sentence about a real gap, not a
    *  guardrail worth keeping. */
   | { kind: 'open'; page: PageId }
+  /** "Open Watchless" -- a specific one of his other tools, embedded live on
+   *  the Apps page. Different from "open" (a page here) -- this opens a
+   *  named app INSIDE that page, the same click "Open" on its own tile
+   *  makes. match is the app's name. */
+  | { kind: 'app'; match: string }
   /** "Check that I paid Spotify" / "mark the AirBank one paid" -- Bills, read
    *  and written for real (2026-09-08 report: "it cannot check one simple
    *  thing"). match is a recurring bill or planned expense's name, the same
@@ -95,6 +103,12 @@ export type Action =
    *  shape as "habit"'s on. Scoped to the cycle Bills itself opens on --
    *  never a past or future one, since he never named a date. */
   | { kind: 'bill'; match: string; paid: boolean }
+  /** "I need to pay 800 for garbage bags" -- a real one-off, the same insert
+   *  "Add a one-off" under Unexpected this cycle makes (2026-09-08 report:
+   *  the model claimed to "put it on the list" with no list that exists to
+   *  put it on). name/amount are his words/number as given; dueOn only when
+   *  he named a date, defaulting to today. Always the active cycle. */
+  | { kind: 'expense'; name: string; amount: number; dueOn?: string }
   /** "Log that I called Jiří" -- a real touch, on the same contact log the
    *  dock's own Contacts glance writes to. match is the person's name;
    *  log is which kind of touch he actually named. Never guessed: no "log a
@@ -128,18 +142,59 @@ export type Action =
    *  explicitly asked for a sync, never inferred from mentioning the habit
    *  or the gym in passing. */
   | { kind: 'sync' }
+  /** "Rewrite that note to say..." -- match is the note's own words (its
+   *  title, or its first line when it has none, the same handle "note"'s
+   *  own briefing line already shows him); text REPLACES the body, HIS
+   *  words, never a summary. */
+  | { kind: 'noteEdit'; match: string; text: string }
+  /** "Delete the note about X" -- a real delete, no undo built for this
+   *  action (Notes' own UI still has one; this is the same call it makes). */
+  | { kind: 'noteDelete'; match: string }
+  /** "I got paid 45000 this cycle" -- a real row under Income, the same
+   *  insert the Income sheet's own Save makes. label only when he named
+   *  one ("the freelance invoice"), amount his number, never invented. */
+  | { kind: 'income'; amount: number; label?: string }
+  /** "Make a new project called X" -- the same call the Projects page's own
+   *  "New project" makes. Scoped to the workspace he is standing in unless
+   *  he named one. */
+  | { kind: 'project'; name: string; space?: Space }
+  /** "Add a habit to read every day" / "I'm quitting sugar" -- a real row,
+   *  the same addHabit the Habits & Goals page's own form calls. breaking
+   *  true is a quit, the third kind (see QUITTING below) -- never inferred,
+   *  only when he actually said he is trying to stop something. frequency
+   *  defaults to daily when he did not name one. */
+  | { kind: 'addHabit'; name: string; breaking?: boolean; frequency?: HabitFrequency }
+  /** "Delete the flossing habit" / "I'm done quitting vaping" -- the same
+   *  archive deleteHabit already does elsewhere (its history stays, only
+   *  the live row goes). match reaches habits AND quitting rows both,
+   *  same as "habit"/"slip" above. */
+  | { kind: 'archiveHabit'; match: string }
+  /** "Rename that to..." / "make it three times a week" -- a real patch to
+   *  an existing habit or quit, never a new row. Only the fields he
+   *  actually named change; the rest of the row is untouched. */
+  | { kind: 'editHabit'; match: string; name?: string; frequency?: HabitFrequency }
+  /** "Set up a new routine for..." -- the same addRoutine the Routines
+   *  page's own form calls, which also makes the habit that mirrors it.
+   *  cadence defaults to daily. There is no separate "start a routine"
+   *  action: running one is ticking its own first step, on the Routines
+   *  page itself, the same way it always has been. */
+  | { kind: 'addRoutine'; title: string; cadence?: RoutineCadence; blurb?: string }
 
 const SLOTS_OK: Slot[] = ['morning', 'noon', 'afternoon', 'evening']
 const WHERE_OK: Where[] = ['today', 'backlog']
+const FREQ_OK: HabitFrequency[] = ['daily', 'weekdays', 'times-per-week', 'weekly', 'monthly']
+const CADENCE_OK: RoutineCadence[] = ['daily', 'prework', 'weekly', 'monthly']
 const SPACE_OK: Space[] = ['personal', 'work', 'offplate', 'corner']
 /** Every real page he can be sent to, and nothing else. 'day' takes a date
  *  in its own route with nowhere for the model to safely supply one;
  *  'braindump' is a pure legacy alias for 'notes', never a reason to be the
- *  one named; 'assistant' is where this conversation already is. */
+ *  one named. 'assistant' IS included -- from the dock's quick panel, "open
+ *  the AI assistant page" is a real navigation away to the full page, not a
+ *  no-op; from the full page itself it is a harmless one. */
 const OPEN_OK: PageId[] = [
   'today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting',
   'settings', 'notes', 'board', 'apps', 'focus', 'zone', 'bills', 'calendar',
-  'timeline', 'contacts',
+  'timeline', 'contacts', 'assistant',
 ]
 
 /** Everything the model sent, minus everything this app cannot promise to do. */
@@ -164,6 +219,7 @@ function cleanActions(raw: unknown): Action[] {
         out.push({
           kind: 'add', title, list, slot, min,
           space: SPACE_OK.includes(o.space as Space) ? (o.space as Space) : undefined,
+          project: str(o.project, 200) || undefined,
         })
         break
       }
@@ -173,10 +229,18 @@ function cleanActions(raw: unknown): Action[] {
       case 'undone': case 'drop':
         if (match) out.push({ kind: o.kind, match, inSlot, all })
         break
-      case 'move':
-        /* A move that names neither a destination nor a list is not a move. */
-        if (match && (slot || list)) out.push({ kind: 'move', match, slot, list, inSlot })
+      case 'move': {
+        /* A move that names neither a destination, a list, nor a project is
+           not a move. */
+        const project = str(o.project, 200)
+        if (match && (slot || list || project)) out.push({ kind: 'move', match, slot, list, inSlot, project: project || undefined })
         break
+      }
+      case 'rename': {
+        const title = str(o.title, 200)
+        if (match && title) out.push({ kind: 'rename', match, title, inSlot })
+        break
+      }
       case 'estimate':
         if (match && min) out.push({ kind: 'estimate', match, min, inSlot })
         break
@@ -191,9 +255,19 @@ function cleanActions(raw: unknown): Action[] {
       case 'open':
         if (OPEN_OK.includes(o.page as PageId)) out.push({ kind: 'open', page: o.page as PageId })
         break
+      case 'app':
+        if (match) out.push({ kind: 'app', match })
+        break
       case 'bill':
         if (match) out.push({ kind: 'bill', match, paid: o.paid !== false })
         break
+      case 'expense': {
+        const name = str(o.name, 200)
+        const amount = typeof o.amount === 'number' && o.amount > 0 ? Math.round(o.amount) : 0
+        const dueOn = typeof o.dueOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.dueOn) ? o.dueOn : undefined
+        if (name && amount) out.push({ kind: 'expense', name, amount, dueOn })
+        break
+      }
       case 'contact': {
         const log = o.log as 'call' | 'text' | 'email' | 'meeting'
         if (match && ['call', 'text', 'email', 'meeting'].includes(log)) out.push({ kind: 'contact', match, log })
@@ -213,6 +287,44 @@ function cleanActions(raw: unknown): Action[] {
       case 'sync':
         out.push({ kind: 'sync' })
         break
+      case 'noteEdit': {
+        const text = str(o.text, 4000)
+        if (match && text) out.push({ kind: 'noteEdit', match, text })
+        break
+      }
+      case 'noteDelete':
+        if (match) out.push({ kind: 'noteDelete', match })
+        break
+      case 'income': {
+        const amount = typeof o.amount === 'number' && o.amount > 0 ? Math.round(o.amount) : 0
+        if (amount) out.push({ kind: 'income', amount, label: str(o.label, 200) || undefined })
+        break
+      }
+      case 'project': {
+        const name = str(o.name, 200)
+        if (name) out.push({ kind: 'project', name, space: SPACE_OK.includes(o.space as Space) ? (o.space as Space) : undefined })
+        break
+      }
+      case 'addHabit': {
+        const name = str(o.name, 200)
+        const frequency = FREQ_OK.includes(o.frequency as HabitFrequency) ? (o.frequency as HabitFrequency) : undefined
+        if (name) out.push({ kind: 'addHabit', name, breaking: o.breaking === true, frequency })
+        break
+      }
+      case 'archiveHabit':
+        if (match) out.push({ kind: 'archiveHabit', match })
+        break
+      case 'editHabit': {
+        const frequency = FREQ_OK.includes(o.frequency as HabitFrequency) ? (o.frequency as HabitFrequency) : undefined
+        if (match) out.push({ kind: 'editHabit', match, name: str(o.name, 200) || undefined, frequency })
+        break
+      }
+      case 'addRoutine': {
+        const title = str(o.title, 200)
+        const cadence = CADENCE_OK.includes(o.cadence as RoutineCadence) ? (o.cadence as RoutineCadence) : undefined
+        if (title) out.push({ kind: 'addRoutine', title, cadence, blurb: str(o.blurb, 300) || undefined })
+        break
+      }
       default: break
     }
   }
@@ -291,7 +403,7 @@ export interface Brief {
      has not loaded yet -- a garnish exactly like weather, never something
      this briefing blocks on. Same due/kept/open shape as habits/routines on
      purpose: paid is this cycle's "kept". */
-  bills: { due: number; paid: number; open: string[] } | null
+  bills: { due: number; paid: number; open: string[] } | 'loading' | null
   /* Gone quiet, by the same 20-day line the dock's own Contacts glance uses
      (contactStatus in types.ts). Real people, real last-touch dates -- never
      invented, and never the whole address book, only who has actually
@@ -302,6 +414,10 @@ export interface Brief {
      days is how long since the last slip or the day he started, whichever
      is later -- the same arithmetic the Quitting page itself runs. */
   quitting: { name: string; days: number }[]
+  /** The one thing Today and the Zone would put in front of him next --
+   *  same derivation (useFirstMove, ui.tsx), so "what am I having next"
+   *  can never disagree with what the app itself shows. */
+  nextTask: string | null
 }
 
 const SYSTEM = `You are the assistant inside Mission Control, Michael's own life dashboard.
@@ -387,17 +503,29 @@ The whole vocabulary, and nothing outside it works:
 {"kind":"undone","match":"..."}
 {"kind":"move","match":"...","slot":"noon"}          moves it inside the day
 {"kind":"move","match":"...","list":"backlog"}       takes it off the day
+{"kind":"move","match":"...","project":"..."}        moves an EXISTING task into a real project
 {"kind":"estimate","match":"...","min":45}
+{"kind":"rename","match":"...","title":"..."}         a real title change on an existing task, his words
 {"kind":"drop","match":"..."}                        deletes it, and he can undo
 {"kind":"habit","match":"habit name","on":true}      keeps or un-keeps it today
 {"kind":"workspace","space":"personal"|"work"|"offplate"|"corner"|"all"}  personal=Personal, work=Big Time, offplate=Off-Plate, corner=Michael's Corner, all=every workspace on screen at once. Switches which workspace he is standing in.
-{"kind":"open","page":"today"|"plan"|"projects"|"habits"|"routines"|"goals"|"quitting"|"settings"|"notes"|"board"|"apps"|"focus"|"zone"|"bills"|"calendar"|"timeline"|"contacts"}  a real page, not a workspace -- see below.
+{"kind":"open","page":"today"|"plan"|"projects"|"habits"|"routines"|"goals"|"quitting"|"settings"|"notes"|"board"|"apps"|"focus"|"zone"|"bills"|"calendar"|"timeline"|"contacts"|"assistant"}  a real page, not a workspace -- see below.
+{"kind":"app","match":"..."}                          opens one of his real embedded apps on the Apps page
 {"kind":"bill","match":"bill name","paid":true}      marks a real bill paid or unpaid, this cycle only
+{"kind":"expense","name":"...","amount":800,"dueOn":"2026-09-20"}  a real one-off under Unexpected this cycle, dueOn optional (today if not given)
 {"kind":"contact","match":"person's name","log":"call"|"text"|"email"|"meeting"}  logs a real touch with them, today
 {"kind":"slip","match":"habit name"}                 logs a real slip today, on something he is quitting
 {"kind":"focus","match":"task title","min":30}        starts a REAL timer right now, both optional
 {"kind":"note","text":"..."}                          writes a real note, in his own words
 {"kind":"sync"}                                       runs the real Hevy sync for Workout / Gym / Fitness, nothing else
+{"kind":"noteEdit","match":"...","text":"..."}        replaces a real note's body with his words
+{"kind":"noteDelete","match":"..."}                   deletes a real note
+{"kind":"income","amount":45000,"label":"..."}        a real row under Income, this cycle
+{"kind":"project","name":"...","space":"personal"|"work"|"offplate"|"corner"}  a real project, space defaults to where he is standing
+{"kind":"addHabit","name":"...","breaking":true,"frequency":"daily"|"weekdays"|"times-per-week"|"weekly"|"monthly"}  a real habit or, breaking:true, a real quit
+{"kind":"archiveHabit","match":"..."}                 archives a real habit or quit; history stays
+{"kind":"editHabit","match":"...","name":"...","frequency":"..."}  patches only the fields given
+{"kind":"addRoutine","title":"...","cadence":"daily"|"prework"|"weekly"|"monthly","blurb":"..."}  a real routine
 
 "match" is words out of the real title as it appears in the briefing above, not
 a description of it. "add" carries HIS words for the new task, off the message
@@ -414,13 +542,57 @@ what other pages show; it is not a page. A page ("open") is a real screen.
 "open up Big Time" = workspace; "open the bills page" = page. Pages: today,
 plan, projects, habits (tab: "Habits & Goals"), routines, goals, quitting,
 settings, notes, board, apps, focus, zone, bills, calendar, timeline,
-contacts. No page for "the assistant" itself; no page action takes a
-specific date -- answer a date question in words.
+contacts, assistant (the full page this quick panel is a shortcut for --
+"open the AI assistant page" means this one). No page action takes a
+specific date -- answer a date question in words. "Turn on the Zone" is
+this same action with page "zone", nothing else. Naming one of his OTHER
+tools by name ("open Watchless") is "app", not "open" -- a real embedded
+app inside the Apps page, never confused with the page itself.
 
 BILLS: "Bills this cycle" is the whole of what you can see -- unpaid names
 and counts only, no amount/due date/category. "match" is the bill's name
 as given. Never call a bill a task or run "done" on one -- "bill" is the
-only action that reaches that log. If signed out, say so plainly.
+only action that reaches that log. If signed out, say so plainly -- if it
+is still loading, say THAT instead, never "signed out" for a device that
+just has not answered yet. A real cost he names ("I need to pay X, it's
+Y") is "expense", a real one-off under Unexpected this cycle -- never a
+sentence claiming it was written down when no action ran. Money he
+RECEIVES ("I got paid X", "the invoice landed") is "income", never
+"expense" or "add" -- a different real row entirely.
+
+NOTES: "note" ADDS a new one, in his words. "noteEdit" REPLACES an
+existing note's whole body -- match is the note's own words (its title,
+or its first line when it has none, the same handle its own briefing
+line shows). "noteDelete" removes one for real. Never confuse these three
+-- adding when he asked to change one leaves two notes where he wanted
+one.
+
+PROJECTS: "project" makes a real one, space defaults to wherever he is
+standing unless he named another. "add" takes an optional project name
+too ("add X to the Y project") -- it is the same task action, just
+landing inside that project instead of the plain list. Moving an
+EXISTING task into (or between) projects is "move" with a project name,
+same action as moving it in the day, just a different field.
+
+HABITS AND QUITTING, adding/removing/editing: "addHabit" makes a real
+row -- breaking:true for something he is trying to STOP (a real "I'm
+quitting X" or "I want to stop Y", never inferred from him merely
+mentioning a bad habit), plain for something he is trying to KEEP.
+"archiveHabit" retires one for real, its history stays. "editHabit"
+patches only the fields he actually named (a rename, a new frequency) --
+never touches anything he did not mention. All three reach quitting rows
+too, the same as "habit"/"slip" above -- there is no second vocabulary
+for them.
+
+ROUTINES: "addRoutine" makes a real routine (and the habit that mirrors
+it). There is no "start a routine" action -- running one is ticking its
+own first step on the Routines page, exactly as it always has been; if
+he asks to start one, say that plainly rather than pretending an action
+ran.
+
+There is no "Jarvis mode" or "Ironman mode" anywhere in this app -- if he
+asks for one, say plainly that it does not exist rather than guessing at
+what it might mean or pretending some other action is it.
 
 CONTACTS: "Gone quiet" lists everyone past 20 days since a touch. "match"
 is the name; "log" is call/text/email/meeting -- ask which if he did not
@@ -644,11 +816,14 @@ export function briefText(b: Brief): string {
       : 'Nothing marked done yesterday',
     b.weather ? `Weather, fetched by the app: ${b.weather}` : '',
     b.goals.length ? `Goals: ${b.goals.map((g) => `${g.name} ${g.pct}%`).join('; ')}` : 'No goals set',
-    b.bills
-      ? `Bills this cycle: ${b.bills.paid} of ${b.bills.due} paid${b.bills.open.length ? `, still unpaid: ${b.bills.open.join('; ')}` : ''}`
-      : 'Bills: not signed in on this device, nothing to read',
+    b.bills === 'loading'
+      ? 'Bills: still loading on this device -- say so, do not claim signed out'
+      : b.bills
+        ? `Bills this cycle: ${b.bills.paid} of ${b.bills.due} paid${b.bills.open.length ? `, still unpaid: ${b.bills.open.join('; ')}` : ''}`
+        : 'Bills: not signed in on this device, nothing to read',
     b.contacts.length ? `Gone quiet, over 20 days since the last touch: ${b.contacts.map((c) => `${c.name} (${c.days}d)`).join('; ')}` : 'Nobody has gone quiet',
     b.quitting.length ? `Quitting: ${b.quitting.map((q) => `${q.name}, ${q.days}d clean`).join('; ')}` : '',
+    b.nextTask ? `Next up, the one thing Today itself would show him: ${b.nextTask}` : 'Nothing queued as next up',
   ].join('\n')
 }
 

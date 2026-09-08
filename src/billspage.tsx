@@ -91,7 +91,11 @@ function publishBills(next: { data: BillsData | null; error: string | null }): v
 }
 
 
-function refreshBills(signedIn: boolean | null, force = false): Promise<void> {
+/* Exported for assistantbills.ts's ensure(): a write action that lands the
+   instant Bills opens has to wait on the same in-flight fetch a fresh mount
+   already started, not read a still-null snapshot and report "not signed
+   in" for what is really just "not loaded yet" (his report, 2026-09-08). */
+export function refreshBills(signedIn: boolean | null, force = false): Promise<void> {
   if (!signedIn) { publishBills({ data: null, error: null }); return Promise.resolve() }
   /* Shared unconditionally, force included -- the same rule calendar.ts's
      refreshCalendar uses. force only skips the "already have this account's
@@ -127,7 +131,7 @@ function subscribeBills(f: () => void): () => void {
   return () => { billsListeners.delete(f) }
 }
 
-const getBillsSnapshot = () => billsView
+export const getBillsSnapshot = () => billsView
 
 /* refreshBills is called from an effect here, once per caller, but its own
    billsInFlight/billsForAccount guards mean two callers mounting together

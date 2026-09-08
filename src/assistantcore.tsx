@@ -16,9 +16,11 @@ import { usePomodoro } from './pomodoro'
 import {
   SLOTS, dueOn, habitsDueToday, goalCurrent, habitStepKey, routineComplete, requiredSteps,
   contactDaysSince, contactStatus, daysClean, spaceFolderId,
-  type HabitDef, type PageId, type SpaceId, type Task,
+  type HabitDef, type HabitFrequency, type PageId, type SpaceId, type Task,
 } from './types'
 import { localDateKey, fmtDuration, taskMinutes, goalPeriodKey, goalPeriodRange, periodKeyFor, type GoalTf } from './util'
+import { useFirstMove } from './ui'
+import { APPS } from './apps'
 import * as Icon from './icons'
 
 /* THE ASSISTANT'S CORE, shared by the full page (assistantpage.tsx, lazy-
@@ -70,6 +72,11 @@ function useBrief(): Brief {
      a bill was paid). Also a garnish, same treatment as weather: null when
      signed out or not yet loaded, never something this briefing waits on. */
   const { brief: billsBrief } = useAssistantBills()
+  /* "What am I having next" -- the exact same derivation Today and the Zone
+     already point at (useFirstMove, ui.tsx), so the model's answer can
+     never disagree with the one thing the app itself would put in front of
+     him next. */
+  const firstMove = useFirstMove()
   return useMemo(() => {
     const day = localDateKey()
     const tm = new Date(); tm.setDate(tm.getDate() + 1)
@@ -188,8 +195,9 @@ function useBrief(): Brief {
       quitting: habits
         .filter((h) => h.kind === 'break' && !h.archivedAt)
         .map((h) => ({ name: h.name, days: daysClean(h, slips) ?? 0 })),
+      nextTask: firstMove ? dropUrl(firstMove.title) || firstMove.title : null,
     }
-  }, [tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, slips, cal, sky, plan, billsBrief, contacts, contactActivity])
+  }, [tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, slips, cal, sky, plan, billsBrief, contacts, contactActivity, firstMove])
 }
 
 /* WHAT HAPPENED, in the app's words rather than the model's.
@@ -448,6 +456,7 @@ const OPEN_LABELS: Partial<Record<PageId, string>> = {
   routines: 'Routines', goals: 'Goals', quitting: 'Quitting', settings: 'Settings',
   notes: 'Notes', board: 'the board', apps: 'Apps', focus: 'Focus', zone: 'the Zone',
   bills: 'Bills', calendar: 'Calendar', timeline: 'Timeline', contacts: 'Contacts',
+  assistant: 'the Assistant',
 }
 
 /** Runs what the model named, against the same store every page writes to, and
@@ -500,6 +509,16 @@ function useDoer() {
         const key = a.title.trim().toLowerCase()
         const dupe = addedThisRun.has(key) || s2.tasks.some((t) => !t.done && t.title.trim().toLowerCase() === key)
         if (dupe) { out.push({ ok: true, text: `Already on the list: ${a.title}` }); continue }
+        /* "add X to the Y project" -- a real project, not a made-up one. No
+           match means the task still gets added, just without a project,
+           rather than the whole add failing over one unresolved word. */
+        let projectId: string | undefined
+        let projectNote = ''
+        if (a.project) {
+          const { row } = pick(s2.projects.map((p) => ({ ...p, title: p.name })), a.project)
+          if (row) { projectId = row.id; projectNote = ` in ${row.name}` }
+          else projectNote = ` (no project called "${a.project}", added without one)`
+        }
         addedThisRun.add(key)
         s2.addTask({
           title: a.title,
@@ -511,8 +530,9 @@ function useDoer() {
           category: 'admin',
           slot,
           plannedOn: list === 'today' ? day : undefined,
+          projectId,
         })
-        out.push({ ok: true, text: `Added to ${slot ? SLOTS.find((x) => x.id === slot)?.label.toLowerCase() : list === 'today' ? 'today' : 'the list'}: ${a.title}` })
+        out.push({ ok: true, text: `Added to ${slot ? SLOTS.find((x) => x.id === slot)?.label.toLowerCase() : list === 'today' ? 'today' : 'the list'}${projectNote}: ${a.title}` })
         continue
       }
       if (a.kind === 'workspace') {
@@ -545,6 +565,18 @@ function useDoer() {
         out.push({ ok: true, text: `Opened ${OPEN_LABELS[a.page] ?? a.page}` })
         continue
       }
+      if (a.kind === 'app') {
+        /* A real one of his OTHER tools, embedded on the Apps page -- the
+           same click "Open" on its own tile makes (apps.tsx: setFocusAppId,
+           setPage('apps')), both already on the shared store. */
+        const rows = APPS.map((app) => ({ ...app, title: app.name }))
+        const { row, why } = pick(rows, a.match)
+        if (!row) { out.push({ ok: false, text: why ?? 'no app matched' }); continue }
+        s2.setFocusAppId(row.id)
+        s2.setPage('apps')
+        out.push({ ok: true, text: `Opened ${row.name}` })
+        continue
+      }
       if (a.kind === 'sync') {
         /* Exactly the call Settings' own "Sync now" button makes -- same
            key check, same targets-by-name match inside syncHevy() itself,
@@ -567,9 +599,19 @@ function useDoer() {
       if (a.kind === 'bill') {
         /* A different log entirely -- Bills, not tasks -- so it never
            reaches the task pick() below. His report, 2026-09-08: "it
-           cannot check one simple thing besides the task list." */
-        if (!bills.ready) { out.push({ ok: false, text: 'Bills is not signed in on this device' }); continue }
-        const rows = bills.items.map((i) => ({ ...i, title: i.name }))
+           cannot check one simple thing besides the task list."
+
+           ensure(), not bills.ready/bills.items directly: those are this
+           hook's own render, which can be a beat behind a request landing
+           the instant Bills opens (his report, same day: a genuinely
+           signed-in device with real data on screen got told it was
+           signed out, because the fetch that page just kicked off had not
+           resolved yet by the time this ran). ensure() reads the shared
+           store fresh and waits on that same fetch instead of the stale
+           snapshot. */
+        const fresh = await bills.ensure()
+        if (!fresh.ready) { out.push({ ok: false, text: 'Bills is not signed in on this device' }); continue }
+        const rows = fresh.items.map((i) => ({ ...i, title: i.name }))
         const { row, why } = pick(rows, a.match)
         if (!row) { out.push({ ok: false, text: why ?? 'no bill matched' }); continue }
         if (row.paid === a.paid) {
@@ -578,6 +620,26 @@ function useDoer() {
         }
         if (a.paid) await bills.markPaid(row); else await bills.markUnpaid(row)
         out.push({ ok: true, text: a.paid ? `Marked paid: ${row.name}` : `Marked unpaid: ${row.name}` })
+        continue
+      }
+      if (a.kind === 'expense') {
+        /* His report, verbatim: asked to write in an unexpected cost, and
+           the model claimed it "put it on the list" -- there was no list,
+           and nothing this app could do reached that claim. addExpense is
+           the exact insert "Add a one-off" under Unexpected this cycle
+           already makes (billspage.tsx's PlannedSheet). Same ensure()
+           freshness as "bill" above, same reason. */
+        const fresh = await bills.ensure()
+        if (!fresh.ready) { out.push({ ok: false, text: 'Bills is not signed in on this device' }); continue }
+        await bills.addExpense(a.name, a.amount, a.dueOn)
+        out.push({ ok: true, text: `Added to Unexpected this cycle: ${a.name} (${a.amount} Kč)` })
+        continue
+      }
+      if (a.kind === 'income') {
+        const fresh = await bills.ensure()
+        if (!fresh.ready) { out.push({ ok: false, text: 'Bills is not signed in on this device' }); continue }
+        await bills.addIncome(a.amount, a.label)
+        out.push({ ok: true, text: `Added to Income: ${a.amount} Kč${a.label ? ` (${a.label})` : ''}` })
         continue
       }
       if (a.kind === 'contact') {
@@ -631,6 +693,58 @@ function useDoer() {
         out.push({ ok: true, text: 'Noted' })
         continue
       }
+      if (a.kind === 'noteEdit' || a.kind === 'noteDelete') {
+        /* A note has no reliable title -- most are just typed text -- so it
+           is matched the same way its own briefing line names it: the title
+           when it has one, its first line when it does not. */
+        const rows = s2.notes.map((n) => ({ ...n, title: n.title || n.body.split('\n')[0].slice(0, 60) }))
+        const { row, why } = pick(rows, a.match)
+        if (!row) { out.push({ ok: false, text: why ?? 'no note matched' }); continue }
+        if (a.kind === 'noteEdit') { s2.updateNote(row.id, { body: a.text }); out.push({ ok: true, text: `Updated note: ${row.title}` }) }
+        else { s2.deleteNote(row.id); out.push({ ok: true, text: `Deleted note: ${row.title}` }) }
+        continue
+      }
+      if (a.kind === 'project') {
+        const dupe = s2.projects.some((p) => p.name.trim().toLowerCase() === a.name.trim().toLowerCase())
+        if (dupe) { out.push({ ok: true, text: `Already have a project called ${a.name}` }); continue }
+        s2.addProject(a.name, a.space ?? space)
+        out.push({ ok: true, text: `Made a new project: ${a.name}` })
+        continue
+      }
+      if (a.kind === 'addHabit') {
+        s2.addHabit({ name: a.name, frequency: a.frequency ?? 'daily', kind: a.breaking ? 'break' : 'build', quitSince: a.breaking ? day : undefined })
+        out.push({ ok: true, text: a.breaking ? `Now tracking: quitting ${a.name}` : `Added a habit: ${a.name}` })
+        continue
+      }
+      if (a.kind === 'archiveHabit') {
+        const rows = s2.habits.filter((h) => !h.archivedAt).map((h) => ({ ...h, title: h.name }))
+        const { row, why } = pick(rows, a.match)
+        if (!row) { out.push({ ok: false, text: why ?? 'no habit matched' }); continue }
+        s2.deleteHabit(row.id)
+        out.push({ ok: true, text: `Archived: ${row.name}` })
+        continue
+      }
+      if (a.kind === 'editHabit') {
+        const rows = s2.habits.filter((h) => !h.archivedAt).map((h) => ({ ...h, title: h.name }))
+        const { row, why } = pick(rows, a.match)
+        if (!row) { out.push({ ok: false, text: why ?? 'no habit matched' }); continue }
+        if (!a.name && !a.frequency) { out.push({ ok: false, text: 'nothing to change' }); continue }
+        /* updateHabit merges via {...h, ...patch} (store.tsx) -- a key
+           PRESENT with value undefined still overwrites, it does not skip.
+           Building the patch from only the fields he actually named is the
+           difference between "renamed" and "silently wiped the name". */
+        const patch: { name?: string; frequency?: HabitFrequency } = {}
+        if (a.name) patch.name = a.name
+        if (a.frequency) patch.frequency = a.frequency
+        s2.updateHabit(row.id, patch)
+        out.push({ ok: true, text: `Updated: ${a.name ?? row.name}` })
+        continue
+      }
+      if (a.kind === 'addRoutine') {
+        s2.addRoutine({ title: a.title, cadence: a.cadence ?? 'daily', blurb: a.blurb })
+        out.push({ ok: true, text: `Made a new routine: ${a.title}` })
+        continue
+      }
       if (a.kind === 'habit') {
         const rows = s2.habits.filter((h) => !h.archivedAt).map((h) => ({ ...h, title: h.name }))
         const { row, why } = pick(rows, a.match)
@@ -674,21 +788,40 @@ function useDoer() {
             if (!row.done) return { ok: true, text: `${row.title} was already open` }
             s2.toggleTask(row.id)
             return { ok: true, text: `Reopened: ${row.title}` }
-          case 'move':
+          case 'move': {
             if (a.list && a.list !== row.list) s2.moveTaskList(row.id, a.list, day)
             if (a.slot) {
               if (row.list !== 'today' && !a.list) s2.moveTaskList(row.id, 'today', day)
               s2.assignSlot(row.id, a.slot)
             }
+            /* "move it into the kitchen remodel project" -- an EXISTING task
+               changing which project owns it, the same setTaskProject the
+               task's own project picker calls. Never invents a project: no
+               match means the rest of the move (slot/list, if any) still
+               happens, just without touching projectId. */
+            let projectNote = ''
+            if (a.project) {
+              const { row: proj } = pick(s2.projects.map((p) => ({ ...p, title: p.name })), a.project)
+              if (proj) { s2.setTaskProject(row.id, proj.id); projectNote = ` into ${proj.name}` }
+              else projectNote = ` (no project called "${a.project}")`
+            }
             return {
               ok: true,
-              text: a.slot
+              text: (a.slot
                 ? `Moved to ${SLOTS.find((x) => x.id === a.slot)?.label.toLowerCase()}: ${row.title}`
-                : `Moved to ${a.list === 'today' ? 'today' : 'the list'}: ${row.title}`,
+                : a.list
+                  ? `Moved to ${a.list === 'today' ? 'today' : 'the list'}: ${row.title}`
+                  : `Moved: ${row.title}`) + projectNote,
             }
+          }
           case 'estimate':
             s2.setEstimate(row.id, a.min)
             return { ok: true, text: `${fmtDuration(a.min)} on ${row.title}` }
+          case 'rename': {
+            const was = row.title
+            s2.updateTask(row.id, { title: a.title })
+            return { ok: true, text: `Renamed "${was}" to: ${a.title}` }
+          }
           case 'drop':
             s2.deleteTask(row.id)
             return { ok: true, text: `Deleted: ${row.title}` }

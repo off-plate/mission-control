@@ -64,24 +64,6 @@ export function AssistantPanel({ dockControls, onOpenFull }: { dockControls?: Re
      the moment he actually uses it: after a send, and after voice hangs up. */
   useEffect(() => { foot.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }) }, [turns, busy])
 
-  /* His report, 2026-09-08: asked to open Habits from here, the assistant
-     confirmed it, and the popup just sat there over whatever page was
-     already on screen -- setPage() ran for real, but with the popup still
-     up he had no way to tell, and had to close it and look himself. A
-     successful "open" (Done.nav, assistantcore.tsx) now folds the dock back
-     to the FAB the same way every panel's own "Open in X" door-out button
-     already does, so a navigation he asked for actually clears the way to
-     see it -- once per new turn, not on every render this effect sees. */
-  const onOpenFullRef = useRef(onOpenFull)
-  onOpenFullRef.current = onOpenFull
-  const navSeenAt = useRef(0)
-  useEffect(() => {
-    if (turns.length <= navSeenAt.current) return
-    const justIn = turns[turns.length - 1]
-    navSeenAt.current = turns.length
-    if (justIn?.done?.some((d) => d.nav)) onOpenFullRef.current?.()
-  }, [turns])
-
   const submit = (text: string, shown?: string) => {
     const t = text.trim()
     if (!t || busy) return

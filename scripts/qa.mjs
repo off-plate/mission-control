@@ -3295,13 +3295,13 @@ await step('assistant: "open the bills page" actually opens it', async () => {
      there, even though the navigation itself lands fine), since that page
      IS the thing being navigated away from.
 
-     UPDATED (2026-09-08, his later report): a click-to-navigate that
-     leaves the popup sitting open on top of the page it just opened read
-     as "nothing happened" -- he had to close it and look himself to
-     confirm. Done.nav now folds the dock back to the FAB the instant an
-     'open' succeeds (see the dedicated test for that), so this one only
-     has to confirm the real page underneath actually changed, not that
-     the popup stayed open over it. */
+     UPDATED (2026-09-08, his later report -- reverted the same day): a
+     folded-back-on-nav version shipped briefly, closing the popup the
+     instant an 'open' succeeded. His correction: "it should be always
+     opened until I close it, or until I open the AI assistant page" --
+     a page navigating underneath is not one of those two things. The
+     popup now stays exactly where he left it; only the real page under
+     it is required to have changed. */
   await fresh('today')
   await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
   await stubAssistant(() => JSON.stringify({
@@ -3315,7 +3315,7 @@ await step('assistant: "open the bills page" actually opens it', async () => {
   await page.locator('.assistantdock-panel .as-input').fill('open up the bills page please')
   await page.locator('.assistantdock-panel .as-input').press('Enter')
   await page.waitForTimeout(1200)
-  if (await page.locator('.assistantdock-panel').count()) throw new Error('the dock popup is still open after a successful navigation')
+  if (!(await page.locator('.assistantdock-panel').count())) throw new Error('the dock popup closed itself after a navigation he did not ask it to close for')
   if (!(await page.locator('.bills-page').count())) throw new Error('setPage never actually rendered the real Bills page underneath')
 })
 await step('assistant: signed out of Bills, "bill" says so rather than guessing or crashing', async () => {
@@ -3429,28 +3429,6 @@ await step('assistant: "start a focus block" starts a real, running timer', asyn
   const pomo = await page.evaluate(() => JSON.parse(localStorage.getItem('mc-pomodoro')))
   if (pomo?.phase !== 'focus') throw new Error(`pomodoro phase is "${pomo?.phase}", never actually started`)
   if (pomo?.blockMin !== 20) throw new Error(`block length is ${pomo?.blockMin}, not the 20 he asked for`)
-})
-await step('assistant: a successful "open" folds the dock back so the page is actually visible', async () => {
-  /* His report, verbatim: asked to open Habits from the dock's quick panel,
-     it confirmed, and the popup just sat there over whatever was already
-     on screen with no visible sign anything happened -- setPage() ran for
-     real, but with the popup still up there was no way to tell without
-     closing it and looking himself. Done.nav (assistantcore.tsx) now folds
-     the dock back to the FAB the moment an 'open' succeeds, the same as
-     every panel's own "Open in X" door-out button already does. */
-  await fresh('today')
-  await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
-  await stubAssistant(() => JSON.stringify({
-    say: 'Opening Habits.', show: [],
-    do: [{ kind: 'open', page: 'habits' }],
-  }))
-  await page.getByRole('button', { name: 'Open quick tools' }).click(); await page.waitForTimeout(400)
-  await page.locator('.dock-item').filter({ hasText: 'Assistant' }).click(); await page.waitForTimeout(400)
-  await page.locator('.assistantdock-panel .as-input').fill('open habits')
-  await page.locator('.assistantdock-panel .as-input').press('Enter')
-  await page.waitForTimeout(1200)
-  if (await page.locator('.assistantdock-panel').count()) throw new Error('the dock popup is still open after a successful navigation')
-  if (!(await page.locator('h1', { hasText: 'Habits' }).count())) throw new Error('setPage never actually rendered the real Habits page underneath')
 })
 await step('assistant: a habit not due today is still findable, not "does not exist"', async () => {
   /* His report, verbatim: a real habit (a weekly one, not due on that

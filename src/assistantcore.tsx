@@ -206,14 +206,6 @@ export interface Done {
    *  this specifically because a task he finishes by telling the assistant
    *  was going in with no actual time recorded, and no page open to fix it. */
   needsActual?: { taskId: string; est: number }
-  /** Set only by a successful 'open' -- his report, 2026-09-08: he asked to
-   *  open Habits from the dock's quick panel, it said done, and the popup
-   *  just sat there over whatever was already on screen with no visible
-   *  change, reading as "nothing happened" even though setPage() ran for
-   *  real. The panel watches for this and folds itself back to the FAB the
-   *  same way "Open in X" already does, so a navigation he asked for
-   *  actually clears the way to see it. */
-  nav?: boolean
 }
 
 /** Loose enough to find "the noon testing task" from "test testing website",
@@ -550,7 +542,7 @@ function useDoer() {
            same function every nav tab and dock door-out button already
            calls. */
         s2.setPage(a.page)
-        out.push({ ok: true, text: `Opened ${OPEN_LABELS[a.page] ?? a.page}`, nav: true })
+        out.push({ ok: true, text: `Opened ${OPEN_LABELS[a.page] ?? a.page}` })
         continue
       }
       if (a.kind === 'sync') {

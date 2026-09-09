@@ -23,6 +23,7 @@ import { newId, todayKey } from './store/shared'
 import { type Undoable, useUndo } from './store/undo'
 import { useGraveyard } from './store/graveyard'
 import { noteTitle, useNotesSlice } from './store/notes'
+import { useContactsSlice } from './store/contacts'
 import { dayIndexOf, dayOfWeekKey, goalPeriodKey, goalPeriodRange, isoWeekKey, localDateKey, periodIsPast, periodKeyFor, slotForTime, type GoalTf } from './util'
 import {
   DEFAULT_SPACES,
@@ -1247,8 +1248,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [habits, setHabits] = useState(persisted?.habits ?? seededHabits)
   const [goals, setGoals] = useState(persisted?.goals ?? seededGoals)
   const [projects, setProjects] = useState<Project[]>(persisted?.projects ?? [])
-  const [contacts, setContacts] = useState<Contact[]>(persisted?.contacts ?? [])
-  const [contactActivity, setContactActivity] = useState<ContactActivity[]>(persisted?.contactActivity ?? [])
   const [storageFull, setStorageFull] = useState(false)
   const [ledger, setLedger] = useState(persisted?.ledger ?? MOCK_LEDGER)
   const [social, setSocialState] = useState(persisted?.social ?? MOCK_SOCIAL)
@@ -1325,6 +1324,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const { graveyard, setGraveyard, bury, digUp } = useGraveyard(persisted?.graveyard)
   const notesSlice = useNotesSlice(persisted, { space, armUndo, bury, digUp })
   const { notes, setNotes, noteFolders, setNoteFolders } = notesSlice
+  const contactsSlice = useContactsSlice(persisted, { armUndo, bury, digUp })
+  const { contacts, setContacts, contactActivity, setContactActivity } = contactsSlice
   const setSpace = (s: SpaceId) => setWriteSpace(s)
   const setView = (v: ViewId) => { setViewState(v); if (isSpace(v)) setWriteSpace(v); setOpenProject(null) }
   /* A record belongs to exactly one space. The old form treated a space-less row
@@ -2036,35 +2037,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       armUndo(label, () => { setProjects(beforeProjects); setTasks(beforeTasks); digUp(...keys) })
     },
     setTaskProject: (id, projectId) => setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, projectId } : t))),
-    addContact: (name) => {
-      const trimmed = name.trim()
-      const id = newId('contact')
-      if (!trimmed) return id
-      setContacts((prev) => [...prev, { id, name: trimmed, tag: '', createdAt: new Date().toISOString() }])
-      return id
-    },
-    updateContact: (id, patch) => setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c))),
-    deleteContact: (id) => {
-      const beforeContacts = contacts
-      const beforeActivity = contactActivity
-      const gone = contacts.find((c) => c.id === id)
-      const theirs = contactActivity.filter((a) => a.contactId === id)
-      const keys = [rowKey('contacts', { id }), ...theirs.map((a) => rowKey('contactActivity', { id: a.id }))]
-      setContacts((prev) => prev.filter((c) => c.id !== id))
-      setContactActivity((prev) => prev.filter((a) => a.contactId !== id))
-      bury(...keys)
-      armUndo(gone ? `Deleted "${gone.name}"` : 'Contact deleted', () => { setContacts(beforeContacts); setContactActivity(beforeActivity); digUp(...keys) })
-    },
-    logContactActivity: (id, type, note) => setContactActivity((prev) => [{ id: newId('act'), contactId: id, type, at: new Date().toISOString(), note }, ...prev]),
-    deleteContactActivity: (activityId) => {
-      const before = contactActivity
-      const gone = contactActivity.find((a) => a.id === activityId)
-      setContactActivity((prev) => prev.filter((a) => a.id !== activityId))
-      bury(rowKey('contactActivity', { id: activityId }))
-      armUndo(gone ? `Removed the logged ${gone.type}` : 'Entry removed', () => {
-        setContactActivity(before); digUp(rowKey('contactActivity', { id: activityId }))
-      })
-    },
+    addContact: contactsSlice.addContact, updateContact: contactsSlice.updateContact, deleteContact: contactsSlice.deleteContact,
+    logContactActivity: contactsSlice.logContactActivity, deleteContactActivity: contactsSlice.deleteContactActivity,
     focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog,
     view, setView, inView,
     twoLives, setTwoLives, reels, setReels,

@@ -50,6 +50,11 @@ export const APPS: EmbeddedApp[] = [
     url: 'https://challenger-392-service.netlify.app',
     icon: <Icon.Flag size={20} />,
   },
+  {
+    id: 'nexus', name: 'Nexus',
+    url: 'https://nexus-offplate.netlify.app/',
+    icon: <Icon.BarChart size={20} />,
+  },
 ]
 
 export function AppsPage() {

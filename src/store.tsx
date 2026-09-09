@@ -30,7 +30,8 @@ import { useConnectionsSlice } from './store/connections'
 import { useCoachSlice } from './store/coach'
 import { useAssistantSlice } from './store/assistant'
 import { foldersFromRoutines, useGrowthSlice } from './store/growth'
-import { dayIndexOf, dayOfWeekKey, goalPeriodKey, goalPeriodRange, isoWeekKey, localDateKey, periodIsPast, periodKeyFor, slotForTime, type GoalTf } from './util'
+import { usePlannerSlice } from './store/planner'
+import { dayIndexOf, dayOfWeekKey, goalPeriodKey, goalPeriodRange, isoWeekKey, localDateKey, periodIsPast, periodKeyFor, type GoalTf } from './util'
 import {
   DEFAULT_SPACES,
   MOCK_GOALS,
@@ -38,7 +39,6 @@ import {
   MOCK_LEDGER,
   LATE_STEPS,
   MOCK_ROUTINES,
-  MOCK_TASKS,
 } from './mock'
 import { goalCurrent, isTimeFed, routineComplete } from './types'
 import { isSpace, SPACES, spaceFolderId } from './types'
@@ -1112,8 +1112,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const persisted = useMemo(loadPersisted, [])
   const widgetsSlice = useWidgetsSlice(persisted)
   const { spaces, setSpaces } = widgetsSlice
-  const [tasks, setTasks] = useState(persisted?.tasks ?? MOCK_TASKS)
-  const [projects, setProjects] = useState<Project[]>(persisted?.projects ?? [])
   const [storageFull, setStorageFull] = useState(false)
   const [ledger, setLedger] = useState(persisted?.ledger ?? MOCK_LEDGER)
   const connectionsSlice = useConnectionsSlice(persisted)
@@ -1184,6 +1182,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     stepLog, setStepLog, dayLog, setDayLog, stepTicks, setStepTicks,
     dailyOpen, dailyDone, setDailyDone, dailySkipped, setDailySkipped, plan, setPlan, review, setReview,
   } = growthSlice
+  const [openProjectId, setOpenProject] = useState<string | null>(null)
+  const plannerSlice = usePlannerSlice(persisted, { armUndo, bury, digUp, openProjectId, setOpenProject, setPlan })
+  const { tasks, setTasks, projects, setProjects } = plannerSlice
   const assistantSlice = useAssistantSlice(persisted, { space, setTasks, setGoals })
   const { assistantLog, setAssistantLog, applyDictation, revertAssistantItem } = assistantSlice
   const setSpace = (s: SpaceId) => setWriteSpace(s)
@@ -1195,7 +1196,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const inView = (s?: SpaceId) => view === 'all' || s === view
   const [editing, setEditing] = useState(false)
   const [focusTaskId, setFocusTaskId] = useState<string | null>(null)
-  const [openProjectId, setOpenProject] = useState<string | null>(null)
   const [focusRoutineId, setFocusRoutineId] = useState<string | null>(null)
   const [focusAppId, setFocusAppId] = useState<string | null>(null)
   const [noteToOpen, setNoteToOpen] = useState<string | null>(null)
@@ -1539,40 +1539,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     version: 3,
     spaces, tasks, habits, goals, projects, contacts, contactActivity, storageFull, ledger, social, sources, plan, review, routines, ideas,
     openProjectId, setOpenProject, enterProject,
-    addProject: (name, sp) => {
-      const trimmed = name.trim()
-      if (!trimmed) return
-      setProjects((prev) => [...prev, { id: newId('proj'), name: trimmed, space: sp, createdAt: todayKey() }])
-    },
-    renameProject: (id, name) => {
-      const trimmed = name.trim()
-      if (!trimmed) return
-      setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, name: trimmed } : p)))
-    },
-    /** 'move' keeps the project's tasks -- they just lose the projectId and
-     *  stand as ordinary tasks in the Space's own Plan, exactly where they'd
-     *  already have been showing up all along. 'delete' takes them with it. */
-    deleteProject: (id, mode) => {
-      const beforeProjects = projects
-      const beforeTasks = tasks
-      const gone = projects.find((p) => p.id === id)
-      const theirs = tasks.filter((t) => t.projectId === id)
-      const keys = [rowKey('projects', { id }), ...(mode === 'delete' ? theirs.map((t) => rowKey('tasks', { id: t.id })) : [])]
-
-      setProjects((prev) => prev.filter((p) => p.id !== id))
-      if (mode === 'delete') setTasks((prev) => prev.filter((t) => t.projectId !== id))
-      else setTasks((prev) => prev.map((t) => (t.projectId === id ? { ...t, projectId: undefined } : t)))
-      bury(...keys)
-      if (openProjectId === id) setOpenProject(null)
-
-      const label = gone
-        ? mode === 'delete' && theirs.length
-          ? `Deleted "${gone.name}" and ${theirs.length} ${theirs.length === 1 ? 'task' : 'tasks'}`
-          : `Deleted project "${gone.name}"`
-        : 'Project deleted'
-      armUndo(label, () => { setProjects(beforeProjects); setTasks(beforeTasks); digUp(...keys) })
-    },
-    setTaskProject: (id, projectId) => setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, projectId } : t))),
+    addProject: plannerSlice.addProject,
+    renameProject: plannerSlice.renameProject,
+    deleteProject: plannerSlice.deleteProject,
+    setTaskProject: plannerSlice.setTaskProject,
     addContact: contactsSlice.addContact, updateContact: contactsSlice.updateContact, deleteContact: contactsSlice.deleteContact,
     logContactActivity: contactsSlice.logContactActivity, deleteContactActivity: contactsSlice.deleteContactActivity,
     focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog,
@@ -1625,34 +1595,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     addWidget: widgetsSlice.addWidget,
     moveWidget: widgetsSlice.moveWidget,
 
-    /* Reopening a task clears the time that was logged against it, so "skip"
-       genuinely means no time recorded instead of resurfacing an old number. */
-    /* A task with steps is done when you say it is done, so its steps go with it.
-       Leaving them unticked underneath a finished parent was the app disagreeing
-       with itself. Reopening puts them all back. */
-    toggleTask: (id) =>
-      setTasks((prev) => prev.map((t) => {
-        if (t.id !== id) return t
-        const done = !t.done
-        return {
-          ...t,
-          done,
-          // Finishing is a moment, and the calendar wants to know which one.
-          doneAt: done ? new Date().toISOString() : undefined,
-          actualMin: t.done ? undefined : t.actualMin,
-          subtasks: t.subtasks?.map((sub) => ({ ...sub, done, actualMin: done ? sub.actualMin : undefined })),
-        }
-      })),
-    updateTask: (id, patch) =>
-      setTasks((prev) => prev.map((t) => {
-        if (t.id !== id) return t
-        const title = patch.title !== undefined && patch.title.trim() ? patch.title.trim() : t.title
-        // A breakdown owns the estimate; a bare number only applies without one.
-        const est = patch.estimateMin !== undefined && !t.subtasks?.length
-          ? { estimateMin: Math.max(1, Math.round(patch.estimateMin)), estimated: true }
-          : {}
-        return { ...t, title, ...est }
-      })),
+    toggleTask: plannerSlice.toggleTask,
+    updateTask: plannerSlice.updateTask,
 
     logActual: (id, actualMin) => {
       const t = tasks.find((x) => x.id === id)
@@ -1679,102 +1623,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     },
 
-    addTask: (t) => setTasks((prev) => [{ ...t, id: newId('t'), done: false, createdAt: todayKey(), addedAt: Date.now() }, ...prev]),
-    addTasks: (ts) =>
-      setTasks((prev) => [...ts.map((t, i) => ({ ...t, id: newId('t'), done: false, createdAt: todayKey(), addedAt: Date.now() + i })), ...prev]),
-    addTaskWithSubtasks: (parent, subs) =>
-      setTasks((prev) => {
-        const pid = newId('t')
-        const subtasks = subs.map((sub, i) => ({ id: `${pid}s${i}`, title: sub.title, estimateMin: sub.estimateMin, done: false }))
-        const est = subtasks.reduce((a, s) => a + s.estimateMin, 0)
-        return [{ ...parent, id: pid, done: false, createdAt: todayKey(), addedAt: Date.now(), estimateMin: est, estimated: true, subtasks }, ...prev]
-      }),
-    commitTask: (id, horizon, key) =>
-      setTasks((prev) => prev.map((t) => (t.id === id
-        ? {
-          ...t,
-          horizon,
-          horizonKey: horizon ? (key ?? goalPeriodKey(horizon as GoalTf)) : undefined,
-        }
-        : t))),
-    /* The to-do list sorts newest-added first, so a task sent back to it needs
-       a fresh addedAt or it reappears wherever its ORIGINAL creation time
-       ranked it -- his report: send it back after adding ten other things,
-       and it lands 11th, not first. Coming back to the pool is a fresh arrival
-       on the list, same as if he'd just typed it. */
-    moveTaskList: (id, list, day) => {
-      setTasks((prev) => prev.map((t) => (t.id === id
-        ? { ...t, list, plannedOn: list === 'today' ? (day ?? todayKey()) : undefined, addedAt: list === 'backlog' ? Date.now() : t.addedAt }
-        : t)))
-      /* His report: replan a returned task, decide mid-day it's not
-         happening, send it back to the list yourself -- and the "you did not
-         finish this" banner comes right back, even though you just handled
-         it. returnedIds is stamped once at the overnight rollover and never
-         touched again, so a task cycling backlog -> today -> backlog the
-         same day still matches that morning's stale set the moment it lands
-         back in backlog. A deliberate move by him is not a fresh miss, so it
-         drops out of the set for good -- the NEXT rollover is what decides
-         whether it counts as carried again, same as it always did. */
-      if (list === 'backlog') {
-        setPlan((p) => {
-          if (!p.returnedIds?.includes(id)) return p
-          const returnedIds = p.returnedIds.filter((x) => x !== id)
-          return { ...p, returnedIds, returnedCount: returnedIds.length }
-        })
-      }
-    },
-    moveTasksToToday: (ids, day) =>
-      setTasks((prev) => prev.map((t) => (ids.includes(t.id) ? { ...t, list: 'today', slot: undefined, plannedOn: day ?? todayKey() } : t))),
-    assignSlot: (id, slot) =>
-      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, slot } : t))),
-    /* A clock time implies a part of the day, so setting one moves the task into
-       the matching bucket. Leaving them free to disagree meant a task could read
-       9 AM on the schedule and sit under Evening in the list. */
-    /* Giving a task a time puts it on today. TAKING the time away must not:
-       "Back to the list" clears the time as part of sending a task away, and
-       this forced list back to 'today' every time, so the task never left. */
-    setTaskAt: (id, at) =>
-      setTasks((prev) => prev.map((t) => {
-        if (t.id !== id) return t
-        if (!at) return { ...t, at: undefined }
-        return { ...t, at, list: 'today' as const, plannedOn: t.plannedOn ?? todayKey(), slot: slotForTime(at) }
-      })),
-    /* A breakdown is generated, so it is a first draft: wrong wording, wrong
-       minutes, sometimes a step that is not his at all. Both edits re-derive the
-       parent's estimate, because with a breakdown present the parent's number IS
-       the sum of its steps, and leaving it stale would quietly misreport the day. */
-    updateSubtask: (taskId, subId, patch) =>
-      setTasks((prev) => prev.map((t) => {
-        if (t.id !== taskId || !t.subtasks) return t
-        const subtasks = t.subtasks.map((s) => (s.id === subId
-          ? { ...s, ...(patch.title !== undefined ? { title: patch.title } : {}), ...(patch.estimateMin !== undefined ? { estimateMin: Math.max(1, patch.estimateMin) } : {}) }
-          : s))
-        return { ...t, subtasks, estimateMin: subtasks.reduce((a, s) => a + s.estimateMin, 0), estimated: true }
-      })),
-    deleteSubtask: (taskId, subId) => {
-      const before = tasks
-      const t = tasks.find((x) => x.id === taskId)
-      const gone = t?.subtasks?.find((s) => s.id === subId)
-      armUndo(gone ? `Removed "${gone.title}"` : 'Step removed', () => setTasks(before))
-      setTasks((prev) => prev.map((x) => {
-        if (x.id !== taskId || !x.subtasks) return x
-        const subtasks = x.subtasks.filter((s) => s.id !== subId)
-        /* The last step going leaves a plain task. Its estimate came from the
-           steps, so with none left the number is whatever the final step
-           happened to be, which is not the size of the task: keep it as a
-           starting point but stop calling it an estimate. */
-        if (!subtasks.length) return { ...x, subtasks: undefined, estimated: false }
-        return { ...x, subtasks, estimateMin: subtasks.reduce((a, s) => a + s.estimateMin, 0), estimated: true }
-      }))
-    },
-    toggleSubtask: (taskId, subId) =>
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === taskId && t.subtasks
-            ? { ...t, subtasks: t.subtasks.map((s) => (s.id === subId ? { ...s, done: !s.done, actualMin: s.done ? undefined : s.actualMin } : s)) }
-            : t,
-        ),
-      ),
+    addTask: plannerSlice.addTask,
+    addTasks: plannerSlice.addTasks,
+    addTaskWithSubtasks: plannerSlice.addTaskWithSubtasks,
+    commitTask: plannerSlice.commitTask,
+    moveTaskList: plannerSlice.moveTaskList,
+    moveTasksToToday: plannerSlice.moveTasksToToday,
+    assignSlot: plannerSlice.assignSlot,
+    setTaskAt: plannerSlice.setTaskAt,
+    updateSubtask: plannerSlice.updateSubtask,
+    deleteSubtask: plannerSlice.deleteSubtask,
+    toggleSubtask: plannerSlice.toggleSubtask,
     /* Logging the LAST subtask closes the parent task and writes one ledger row
        for the whole thing, so subtasked work reaches Review the same as flat work. */
     logSubtaskActual: (taskId, subId, actualMin) => {
@@ -1801,21 +1660,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         autoFrom(next, 0)
       }
     },
-    deleteTask: (id) => {
-      const before = tasks
-      const gone = tasks.find((t) => t.id === id)
-      setTasks((prev) => prev.filter((t) => t.id !== id))
-      bury(rowKey('tasks', { id }))
-      armUndo(gone ? `Deleted "${gone.title}"` : 'Task deleted', () => { setTasks(before); digUp(rowKey('tasks', { id })) })
-    },
-    setSubtasks: (taskId, subs) =>
-      setTasks((prev) => prev.map((t) => {
-        if (t.id !== taskId) return t
-        const subtasks = subs.map((s, i) => ({ id: `${taskId}s${i}${Date.now().toString(36)}`, title: s.title, estimateMin: s.estimateMin, done: false }))
-        return { ...t, subtasks, estimateMin: subtasks.reduce((a, x) => a + x.estimateMin, 0), estimated: true }
-      })),
-    setEstimate: (taskId, minutes) =>
-      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, estimateMin: Math.max(1, Math.round(minutes)), estimated: true } : t))),
+    deleteTask: plannerSlice.deleteTask,
+    setSubtasks: plannerSlice.setSubtasks,
+    setEstimate: plannerSlice.setEstimate,
 
     /* Both of these write the dated log first: that is the record that survives
        the week rolling over. days[] is a cache of the current week and is kept in

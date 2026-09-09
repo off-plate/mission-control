@@ -383,6 +383,27 @@ export function Segmented<T extends string>({ value, options, onPick, size = 'md
 }
 
 
+/* A thumb, not a mouse. Drag-and-drop is the whole of how a task gets onto
+   the day on the desktop, and it is unusable with a thumb -- which is most
+   of why he said Plan "doesn't work at all" on a phone. Anywhere this is
+   true, the tap paths drag replaced have to still exist.
+
+   (pointer: coarse) rather than a width, deliberately: a narrow desktop
+   window still has a mouse and drag still works in it. */
+export function useCoarsePointer(): boolean {
+  const [coarse, setCoarse] = useState(
+    () => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches,
+  )
+  useEffect(() => {
+    if (typeof matchMedia !== 'function') return
+    const mq = matchMedia('(pointer: coarse)')
+    const on = () => setCoarse(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return coarse
+}
+
 /* Today's open list, the raw material both the auto pick below and the
    Zone's own "choose a task" picker draw from, so the two can never
    disagree about what is actually on today's list. */

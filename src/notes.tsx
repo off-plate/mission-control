@@ -13,7 +13,7 @@
    check; src/richtext.ts is the hinge, and its round trip is tested. */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AutoTextarea, Dropdown } from './pages1'
+import { AutoTextarea, Dropdown } from './ui'
 import { useStore } from './store'
 import { MeetingPrompt } from './meetingprompt'
 import { fmtWhen, localDateKey } from './util'

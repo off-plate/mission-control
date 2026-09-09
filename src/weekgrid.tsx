@@ -1,9 +1,8 @@
 /* THE ALMANAC. Shared by both places the week shows up: Plan's collapsible
-   fold, and Today's always-open one. Its own module rather than living
-   inside pages1.tsx, because Today's version is rendered from todayroom.tsx,
-   and pages1.tsx already imports TodayRoom from there -- pulling WeekGrid the
-   other way (todayroom.tsx importing pages1.tsx) would have made the two
-   files import each other. */
+   fold (plan.tsx), and Today's always-open one, rendered from todayroom.tsx.
+   Its own module rather than living in either: today.tsx already imports
+   TodayRoom, so pulling WeekGrid the other way (todayroom.tsx importing
+   today.tsx) would have made the two files import each other. */
 import { useMemo } from 'react'
 import { SLOTS, type DayTaskLog, type Task } from './types'
 import { fmtDuration, localDateKey, taskMinutes } from './util'

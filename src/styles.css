@@ -2126,8 +2126,8 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
    WEEK_CAP and counts the rest rather than rendering them, so the sixteen-task
    day sits at whatever height its own content needs rather than forcing every
    quiet day next to it to match. One switch in the header un-caps the whole
-   week; see weekExpanded in pages1.tsx for why it resets to off on every
-   mount rather than remembering being left open.
+   week; see weekOpen in plan.tsx for why it resets to off on every mount
+   rather than remembering being left open.
 
    UNSORTED IS A FIFTH GROUP now, on his instruction: a count told him ten
    things were waiting and nothing else. His words: "it doesn't mean if it's

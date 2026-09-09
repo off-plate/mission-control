@@ -32,7 +32,7 @@ import { useStore } from './store'
 import { MORNING, SKILLS } from './assistant'
 import { Mark, Speak, useAssistantThread, useVoiceGlue, VoicePanel } from './assistantcore'
 import { voiceModeAvailable } from './voicemode'
-import { ActualLog } from './pages1'
+import { ActualLog } from './plan'
 import * as Icon from './icons'
 
 export function AssistantChip() {

@@ -27,6 +27,8 @@ import { useContactsSlice } from './store/contacts'
 import { useWidgetsSlice } from './store/widgets'
 import { useTwoLivesSlice } from './store/twolives'
 import { useConnectionsSlice } from './store/connections'
+import { useCoachSlice } from './store/coach'
+import { useAssistantSlice } from './store/assistant'
 import { dayIndexOf, dayOfWeekKey, goalPeriodKey, goalPeriodRange, isoWeekKey, localDateKey, periodIsPast, periodKeyFor, slotForTime, type GoalTf } from './util'
 import {
   DEFAULT_SPACES,
@@ -1254,8 +1256,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const { social, setSocial, sources, setSources, toggleSource, ideas, setIdeas } = connectionsSlice
   const [plan, setPlan] = useState<PlanState>(persisted?.plan ?? { committedDate: null, firstMoveId: null })
   const [review, setReview] = useState<ReviewState>(persisted?.review ?? { lastDoneDate: null, wins: [], outcomes: [] })
-  const [assistantLog, setAssistantLog] = useState<AssistantEntry[]>(persisted?.assistantLog ?? [])
-  const [coachSessions, setCoachSessions] = useState<CoachSession[]>(persisted?.coachSessions ?? [])
+  const coachSlice = useCoachSlice(persisted)
+  const { coachSessions, setCoachSessions } = coachSlice
   const [routines, setRoutines] = useState<Routine[]>(seededRoutines)
   const [records, setRecords] = useState<Record<string, number>>(persisted?.records ?? {})
   // Seeded ids he has deleted, so the forward-fill never resurrects them.
@@ -1322,6 +1324,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const { notes, setNotes, noteFolders, setNoteFolders } = notesSlice
   const contactsSlice = useContactsSlice(persisted, { armUndo, bury, digUp })
   const { contacts, setContacts, contactActivity, setContactActivity } = contactsSlice
+  const assistantSlice = useAssistantSlice(persisted, { space, setTasks, setGoals })
+  const { assistantLog, setAssistantLog, applyDictation, revertAssistantItem } = assistantSlice
   const setSpace = (s: SpaceId) => setWriteSpace(s)
   const setView = (v: ViewId) => { setViewState(v); if (isSpace(v)) setWriteSpace(v); setOpenProject(null) }
   /* A record belongs to exactly one space. The old form treated a space-less row
@@ -2503,37 +2507,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
 
     assistantLog,
-    applyDictation: (text, items) => {
-      const created: AssistantEntry['items'] = []
-      const newTasks: Task[] = []
-      const newGoals: Goal[] = []
-      items.forEach((it) => {
-        const id = newId('a')
-        if (it.kind === 'goal') {
-          newGoals.push({ id, space, name: it.text, current: 0, target: 1, unit: 'done', note: 'added by assistant', timeframe: 'weekly', category: 'life', periodKey: goalPeriodKey('weekly') })
-          created.push({ id, kind: 'goal', label: it.text, tab: 'goals' })
-        } else {
-          const done = it.kind === 'done'
-          /* A dictated "done" carries no measured time. Stamping actualMin with
-             the default estimate would invent a perfect log and pollute the
-             accuracy figure, so it stays undefined unless you said a number. */
-          newTasks.push({ id, title: it.text, source: 'mc', estimateMin: it.estimateMin ?? 15, done, actualMin: done ? it.estimateMin : undefined, createdAt: todayKey(), plannedOn: todayKey(), space, list: 'today', category: 'quick' })
-          created.push({ id, kind: it.kind, label: it.text, tab: done ? 'today' : 'plan' })
-        }
-      })
-      if (newTasks.length) setTasks((prev) => [...newTasks, ...prev])
-      if (newGoals.length) setGoals((prev) => [...prev, ...newGoals])
-      setAssistantLog((prev) => [{ id: newId('log'), text, when: todayKey(), items: created }, ...prev])
-    },
-    revertAssistantItem: (entryId, itemId) => {
-      const entry = assistantLog.find((e) => e.id === entryId)
-      const item = entry?.items.find((i) => i.id === itemId)
-      if (item) {
-        if (item.kind === 'goal') setGoals((p) => p.filter((g) => g.id !== item.id))
-        else setTasks((p) => p.filter((t) => t.id !== item.id))
-      }
-      setAssistantLog((prev) => prev.map((e) => (e.id === entryId ? { ...e, items: e.items.filter((i) => i.id !== itemId) } : e)).filter((e) => e.items.length))
-    },
+    applyDictation,
+    revertAssistantItem,
 
     coachSessions,
     /* Every path that can change whether a routine is complete goes through

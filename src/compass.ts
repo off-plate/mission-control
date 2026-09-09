@@ -14,6 +14,7 @@
 
 import { useCallback, useSyncExternalStore } from 'react'
 import { SUPABASE_ENABLED, readRows } from './supabase'
+import { createLiveStore } from './livestore'
 
 interface CompassDebt {
   id: string
@@ -155,20 +156,22 @@ export async function readCompass(): Promise<CompassState> {
  *  to the page later still sees a real refresh, not an hour-old balance. */
 const STALE_MS = 120_000
 
-let view: CompassState = SUPABASE_ENABLED ? { status: 'loading' } : { status: 'off' }
 let readAt = 0
-const listeners = new Set<() => void>()
+const store = createLiveStore<CompassState>(
+  SUPABASE_ENABLED ? { status: 'loading' } : { status: 'off' },
+  { onFirstSubscriber: () => { queueMicrotask(() => { void refresh() }) } },
+)
 
 function publish(next: CompassState): void {
-  view = next
   readAt = Date.now()
-  for (const f of [...listeners]) f()
+  store.publish(next)
 }
 
 let inFlight: Promise<void> | null = null
 
 function refresh(force = false): Promise<void> {
   if (inFlight) return inFlight
+  const view = store.getSnapshot()
   if (!SUPABASE_ENABLED) { if (view.status !== 'off') publish({ status: 'off' }); return Promise.resolve() }
   if (!force && view.status !== 'loading' && view.status !== 'off' && Date.now() - readAt < STALE_MS) return Promise.resolve()
   publish({ status: 'loading' })
@@ -178,18 +181,10 @@ function refresh(force = false): Promise<void> {
   return inFlight
 }
 
-function subscribe(f: () => void): () => void {
-  listeners.add(f)
-  if (listeners.size === 1) queueMicrotask(() => { void refresh() })
-  return () => { listeners.delete(f) }
-}
-
-const getSnapshot = () => view
-
 /** Reads once for the whole app (shared across every caller on screen), and
  *  again on demand. */
 export function useCompass(): { state: CompassState; reload: () => void } {
-  const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const reload = useCallback(() => { void refresh(true) }, [])
   return { state, reload }
 }

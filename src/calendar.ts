@@ -23,6 +23,7 @@
 import { useCallback, useSyncExternalStore } from 'react'
 import { SUPABASE_ENABLED, callFunction } from './supabase'
 import { localDateKey } from './util'
+import { createLiveStore } from './livestore'
 import type { CalEvent } from './ical'
 export { isMeeting } from './calkind'
 
@@ -134,12 +135,28 @@ function boot(): CalState {
 
 /* One frozen object per change, because useSyncExternalStore compares
    snapshots by identity and a fresh object every call is an infinite render. */
-let view: { state: CalState; reading: boolean } = { state: boot(), reading: false }
-const listeners = new Set<() => void>()
+const store = createLiveStore<{ state: CalState; reading: boolean }>(
+  { state: boot(), reading: false },
+  {
+    onFirstSubscriber: () => {
+      /* Off the current task: subscribe runs inside React's commit, and a read
+         that resolves from cache would otherwise publish to a listener React
+         has not finished registering. */
+      queueMicrotask(() => { void refreshCalendar() })
+      timer = window.setInterval(() => { void refreshCalendar(true) }, POLL_MS)
+      document.addEventListener('visibilitychange', onWake)
+      window.addEventListener('focus', onWake)
+    },
+    onLastUnsubscribe: () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', onWake)
+      window.removeEventListener('focus', onWake)
+    },
+  },
+)
 
 function publish(state: CalState, reading: boolean): void {
-  view = { state, reading }
-  for (const f of [...listeners]) f()
+  store.publish({ state, reading })
 }
 
 let inFlight: Promise<void> | null = null
@@ -148,13 +165,14 @@ let inFlight: Promise<void> | null = null
  *  air waits on that one rather than starting another. */
 export function refreshCalendar(force = false): Promise<void> {
   if (inFlight) return inFlight
+  const view = store.getSnapshot()
   if (!SUPABASE_ENABLED) { if (view.state.status !== 'off') publish({ status: 'off' }, false); return Promise.resolve() }
   const s = view.state
   if (!force && s.status === 'ok' && Date.now() - s.readAt < STALE_MS) return Promise.resolve()
   publish(s, true)
   inFlight = readCalendar()
     .then((next) => {
-      const held = view.state
+      const held = store.getSnapshot().state
       if (next.status === 'ok') {
         saveCache(next.events, next.readAt)
         publish(next, false)
@@ -172,7 +190,7 @@ export function refreshCalendar(force = false): Promise<void> {
       else publish(next, false)
     })
     .catch(() => {
-      const held = view.state
+      const held = store.getSnapshot().state
       if (held.status === 'ok') publish({ ...held, problem: 'Calendar could not be read.' }, false)
       else publish({ status: 'error', message: 'Calendar could not be read.' }, false)
     })
@@ -184,34 +202,11 @@ const onWake = (): void => { if (document.visibilityState === 'visible') void re
 
 let timer = 0
 
-function subscribe(f: () => void): () => void {
-  listeners.add(f)
-  if (listeners.size === 1) {
-    /* Off the current task: subscribe runs inside React's commit, and a read
-       that resolves from cache would otherwise publish to a listener React has
-       not finished registering. */
-    queueMicrotask(() => { void refreshCalendar() })
-    timer = window.setInterval(() => { void refreshCalendar(true) }, POLL_MS)
-    document.addEventListener('visibilitychange', onWake)
-    window.addEventListener('focus', onWake)
-  }
-  return () => {
-    listeners.delete(f)
-    if (listeners.size === 0) {
-      window.clearInterval(timer)
-      document.removeEventListener('visibilitychange', onWake)
-      window.removeEventListener('focus', onWake)
-    }
-  }
-}
-
-const getSnapshot = () => view
-
 /** The shared calendar. Every caller sees the same read, and after the first
  *  one it is on screen before the network is asked anything. `reading` is for
  *  saying so on a refresh button; it is never a reason to blank the page. */
 export function useCalendar(): { state: CalState; reload: () => void; reading: boolean } {
-  const v = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  const v = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const reload = useCallback(() => { void refreshCalendar(true) }, [])
   return { state: v.state, reload, reading: v.reading }
 }

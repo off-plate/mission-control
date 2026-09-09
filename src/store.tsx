@@ -18,8 +18,6 @@ function stripDates(j: string): string {
   } catch { return j }
 }
 import { roll } from './roll'
-import { allLeads, getOffers, putLeads, putOffers, deleteLead, clearLeads, type LeadRow } from './leadstore'
-import { pullLeads, pushLeads, deleteRemoteLead } from './supabase'
 import { bodyHash, deviceId, deviceName, HIST, mergeStates, rowKey, type LastWrite, type Tomb } from './sync-merge'
 import { dayIndexOf, dayOfWeekKey, goalPeriodKey, goalPeriodRange, isoWeekKey, localDateKey, periodIsPast, periodKeyFor, slotForTime, type GoalTf } from './util'
 import {
@@ -35,14 +33,13 @@ import {
   MOCK_TASKS,
   WIDGET_DEFS,
 } from './mock'
-import { goalCurrent, habitGate, habitStepKey, isTimeFed, requiredSteps, routineComplete, stepLocked, type ImportedLead, type LeadImportFile, type LeadOffers } from './types'
+import { goalCurrent, habitGate, habitStepKey, isTimeFed, requiredSteps, routineComplete, stepLocked } from './types'
 import { isSpace, SPACES, spaceFolderId } from './types'
 import type { HabitFrequency } from './types'
 import type {
   ViewId,
   Contact,
   ContactActivity,
-  PipelineStage,
   FocusSession,
   HabitSlip,
   HabitTick,
@@ -206,38 +203,15 @@ interface Store extends PersistedState {
    *  see the type's own note in types.ts for why. */
   contacts: Contact[]
   contactActivity: ContactActivity[]
-  leadOffers: LeadOffers
-  /* Sourced leads, from IndexedDB. Not synced and not in the state row: they are regenerable by
-     re-running the export, and 8 783 of them do not fit in a 5 MB quota. */
-  leads: LeadRow[]
-  leadsLoaded: boolean
-  /* Progress and failures of the Supabase push, surfaced rather than swallowed. */
-  leadSync: string
-  /* Turns a sourced lead into a real, synced Contact. Called the moment he does anything to one:
-     drags it, logs a touch, writes a note. Until then it costs nothing but IndexedDB. */
-  promoteLead: (placeKey: string) => string | undefined
-  clearAllLeads: () => void
   /* True when this device can no longer save. Surfaced in the UI; never silent. */
   storageFull: boolean
   addContact: (name: string) => string
-  updateContact: (id: string, patch: Partial<Pick<Contact, 'name' | 'tag' | 'phone' | 'email' | 'company' | 'role' | 'next' | 'notes' | 'projectId' | 'lostReason' | 'lead'>>) => void
+  updateContact: (id: string, patch: Partial<Pick<Contact, 'name' | 'tag' | 'phone' | 'email' | 'company' | 'role' | 'next' | 'notes' | 'projectId'>>) => void
   deleteContact: (id: string) => void
   logContactActivity: (id: string, type: ContactActivity['type'], note?: string) => void
   /* A logged touch has to be removable. The log is what contactStatus reads, so one mis-click
      otherwise leaves a call on the record that never happened and no way to take it back. */
   deleteContactActivity: (activityId: string) => void
-  /** The only way stage ever changes -- always stamps stageAt with it, so
-   *  "days in this stage" can never drift out of step with a stage that
-   *  moved without it, the way a caller patching stage through updateContact
-   *  directly could leave behind. */
-  setContactStage: (id: string, stage: PipelineStage) => void
-  /** Merges a batch from the lead engine into the pipeline. Matched on the
-   *  Google place id the row carries, so importing again after another city
-   *  finishes updates the measurements on a row already here rather than
-   *  adding a second copy of the same business. Anything he has since typed
-   *  on a row (stage, notes, next, the reason it was lost) survives: only the
-   *  measured half is overwritten. */
-  importLeads: (file: LeadImportFile) => Promise<{ added: number; updated: number }>
   /** The one way in: opens a project's Plan without the id being wiped by
    *  setPage's own clearing (see setPage's note). */
   enterProject: (id: string) => void
@@ -1318,48 +1292,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<Project[]>(persisted?.projects ?? [])
   const [contacts, setContacts] = useState<Contact[]>(persisted?.contacts ?? [])
   const [contactActivity, setContactActivity] = useState<ContactActivity[]>(persisted?.contactActivity ?? [])
-  /* Sourced leads and their offer catalogue come from IndexedDB, never from the synced blob.
-     See the note at the top of leadstore.ts for why. */
-  const [leadOffers, setLeadOffers] = useState<LeadOffers>({})
-  const [leads, setLeads] = useState<LeadRow[]>([])
-  const [leadsLoaded, setLeadsLoaded] = useState(false)
-  const [leadSync, setLeadSync] = useState('')
-  useEffect(() => {
-    let live = true
-    /* IndexedDB first so the list paints immediately, then Supabase. A device that has never
-       imported has an empty cache and pulls the whole set once; after that the cache answers and
-       the pull only fills in what another device added. */
-    Promise.all([allLeads(), getOffers()])
-      .then(([rows, offers]) => {
-        if (!live) return
-        setLeads(rows); setLeadOffers(offers); setLeadsLoaded(true)
-        return pullLeads().then((remote) => {
-          if (!live || !remote) return
-          const merged = new Map(rows.map((r) => [r.placeKey, r]))
-          for (const r of remote.leads) {
-            merged.set(r.place_key, {
-              placeKey: r.place_key, name: r.name,
-              phone: r.phone ?? undefined, email: r.email ?? undefined,
-              lead: r.lead as LeadRow['lead'],
-            })
-          }
-          const all = [...merged.values()]
-          if (all.length !== rows.length) {
-            setLeads(all)
-            putLeads(all).catch(() => {})
-          }
-          if (Object.keys(remote.offers).length) {
-            const offersTyped = remote.offers as LeadOffers
-            setLeadOffers((prev) => ({ ...prev, ...offersTyped }))
-            putOffers(offersTyped).catch(() => {})
-          }
-        })
-      })
-      .catch(() => { /* no IndexedDB, or signed out: the pipeline simply has no sourced leads,
-                        which is the same as never having imported any. */ })
-      .finally(() => { if (live) setLeadsLoaded(true) })
-    return () => { live = false }
-  }, [])
   const [storageFull, setStorageFull] = useState(false)
   const [ledger, setLedger] = useState(persisted?.ledger ?? MOCK_LEDGER)
   const [social, setSocialState] = useState(persisted?.social ?? MOCK_SOCIAL)
@@ -2119,7 +2051,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value: Store = {
     version: 3,
-    spaces, tasks, habits, goals, projects, contacts, contactActivity, leadOffers, leads, leadsLoaded, leadSync, storageFull, ledger, social, sources, plan, review, routines, ideas,
+    spaces, tasks, habits, goals, projects, contacts, contactActivity, storageFull, ledger, social, sources, plan, review, routines, ideas,
     openProjectId, setOpenProject, enterProject,
     addProject: (name, sp) => {
       const trimmed = name.trim()
@@ -2183,63 +2115,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       armUndo(gone ? `Removed the logged ${gone.type}` : 'Entry removed', () => {
         setContactActivity(before); digUp(rowKey('contactActivity', { id: activityId }))
       })
-    },
-    setContactStage: (id, stage) => setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, stage, stageAt: new Date().toISOString() } : c))),
-    importLeads: (file) => {
-      /* Writes to IndexedDB and returns a promise; nothing lands in the synced state row. Rows he
-         has already worked keep their Contact, and the measured half of that Contact is refreshed
-         from the file so a re-import after another city still updates what it found. */
-      const rows: LeadRow[] = (file.leads ?? [])
-        .filter((r) => r.lead?.placeKey && r.name?.trim())
-        .map((r) => ({ placeKey: r.lead.placeKey, name: r.name.trim(), phone: r.phone, email: r.email, lead: r.lead }))
-      const byPlace = new Map(contacts.filter((c) => c.lead?.placeKey).map((c) => [c.lead!.placeKey, c]))
-      if (byPlace.size) {
-        setContacts((prev) => prev.map((c) => {
-          const fresh = c.lead?.placeKey ? rows.find((r) => r.placeKey === c.lead!.placeKey) : undefined
-          return fresh ? { ...c, lead: fresh.lead } : c
-        }))
-      }
-      return Promise.all([putOffers(file.offers ?? {}), putLeads(rows)]).then(async ([, res]) => {
-        setLeadOffers((prev) => ({ ...prev, ...(file.offers ?? {}) }))
-        const all = await allLeads()
-        setLeads(all)
-        /* Then to Supabase, so every device sees them and they survive this browser. Local
-           already succeeded, so a failure here is reported rather than losing the import. */
-        try {
-          const sent = await pushLeads(
-            rows.map((r) => ({ place_key: r.placeKey, name: r.name, phone: r.phone ?? null, email: r.email ?? null, lead: r.lead })),
-            file.offers ?? {},
-            (done, total) => setLeadSync(`Syncing ${done.toLocaleString('cs-CZ')} of ${total.toLocaleString('cs-CZ')}…`),
-          )
-          setLeadSync(sent ? '' : 'Saved on this device only: sign in to sync them.')
-        } catch (e) {
-          setLeadSync(`Saved on this device, but syncing failed: ${(e as Error).message}`)
-        }
-        return res
-      })
-    },
-    promoteLead: (placeKey) => {
-      const already = contacts.find((c) => c.lead?.placeKey === placeKey)
-      if (already) return already.id
-      const row = leads.find((l) => l.placeKey === placeKey)
-      if (!row) return undefined
-      const id = newId('contact')
-      const now = new Date().toISOString()
-      setContacts((prev) => [...prev, {
-        id, name: row.name, tag: 'Potential client', phone: row.phone, email: row.email,
-        createdAt: now, stage: 'reach_out', stageAt: now, lead: row.lead,
-      }])
-      /* It leaves IndexedDB the moment it becomes a Contact, so it can never render twice. */
-      setLeads((prev) => prev.filter((l) => l.placeKey !== placeKey))
-      deleteLead(placeKey).catch(() => {})
-      /* It is a Contact now, and a Contact syncs in the state row. Leaving it in mc_leads too
-         would bring it back as a duplicate on the next device that pulls. */
-      deleteRemoteLead(placeKey).catch(() => {})
-      return id
-    },
-    clearAllLeads: () => {
-      setLeads([])
-      clearLeads().catch(() => {})
     },
     focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog,
     view, setView, inView,

@@ -194,7 +194,7 @@ const SPACE_OK: Space[] = ['personal', 'work', 'offplate', 'corner']
 const OPEN_OK: PageId[] = [
   'today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting',
   'settings', 'notes', 'board', 'apps', 'focus', 'zone', 'bills', 'calendar',
-  'timeline', 'contacts', 'assistant',
+  'timeline', 'contacts', 'assistant', 'skills',
 ]
 
 /** Everything the model sent, minus everything this app cannot promise to do. */
@@ -542,8 +542,8 @@ what other pages show; it is not a page. A page ("open") is a real screen.
 "open up Big Time" = workspace; "open the bills page" = page. Pages: today,
 plan, projects, habits (tab: "Habits & Goals"), routines, goals, quitting,
 settings, notes, board, apps, focus, zone, bills, calendar, timeline,
-contacts, assistant (the full page this quick panel is a shortcut for --
-"open the AI assistant page" means this one). No page action takes a
+contacts, skills, assistant (the full page this quick panel is a shortcut
+for -- "open the AI assistant page" means this one). No page action takes a
 specific date -- answer a date question in words. "Turn on the Zone" is
 this same action with page "zone", nothing else. Naming one of his OTHER
 tools by name ("open Watchless") is "app", not "open" -- a real embedded

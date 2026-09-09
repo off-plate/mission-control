@@ -456,7 +456,7 @@ const OPEN_LABELS: Partial<Record<PageId, string>> = {
   routines: 'Routines', goals: 'Goals', quitting: 'Quitting', settings: 'Settings',
   notes: 'Notes', board: 'the board', apps: 'Apps', focus: 'Focus', zone: 'the Zone',
   bills: 'Bills', calendar: 'Calendar', timeline: 'Timeline', contacts: 'Contacts',
-  assistant: 'the Assistant',
+  assistant: 'the Assistant', skills: 'Skills',
 }
 
 /** Runs what the model named, against the same store every page writes to, and

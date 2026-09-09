@@ -55,6 +55,10 @@ export type PageId =
   /** People. Reached from the dock only, same as Bills and Timeline -- not a
    *  workspace page, not filtered by space, same shape as those two. */
   | 'contacts'
+  /** Every real skill across every workspace (Jarvis, Sofia, ...), one place
+   *  to remember what exists and what it does. Reached from the dock only,
+   *  same shape as Bills/Timeline/Contacts -- not a workspace page. */
+  | 'skills'
 
 export type WidgetType =
   | 'clock'

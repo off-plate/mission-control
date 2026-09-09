@@ -8928,3 +8928,32 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   .rtc-run { flex: 1 1 100%; order: 9; margin-top: var(--s2); }
   .rtc-top { flex-wrap: wrap; }
 }
+
+/* SKILLS -- the dock's compact popup and the full page share the same row
+   shape (name, workspace badge, description); only the list container
+   differs (fixed-height scroll in the popup, a plain flowing list on the
+   page). */
+.skillsdock-search { width: 100%; margin-bottom: var(--s3); }
+.skillsdock-list { display: flex; flex-direction: column; gap: var(--s3); }
+.skillsdock-row { padding-bottom: var(--s3); border-bottom: 1px solid var(--hairline); }
+.skillsdock-row:last-child { border-bottom: none; padding-bottom: 0; }
+.skillsdock-rowhead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s2); }
+.skillsdock-rowhead b { font-size: var(--text-sm); }
+.skillsdock-desc { margin: 4px 0 0; font-size: var(--text-xs); color: var(--muted); line-height: 1.45; }
+.skillsdock-ws {
+  flex: none; font-size: 10px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 999px; background: var(--hairline); color: var(--muted);
+}
+.skillsdock-ws-jarvis { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-text, var(--accent)); }
+.skillsdock-ws-sofia { background: color-mix(in srgb, var(--info) 16%, transparent); color: var(--info); }
+
+.skillspage-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3); margin: var(--s4) 0; }
+.skillspage-search { flex: 1 1 260px; min-width: 0; }
+.skillspage-list { display: flex; flex-direction: column; gap: var(--s3); }
+.skillspage-row {
+  background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-md);
+  padding: var(--s3) var(--s4);
+}
+.skillspage-rowhead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3); }
+.skillspage-rowhead h3 { margin: 0; font-size: var(--text-base); }
+.skillspage-desc { margin: 6px 0 0; color: var(--muted); line-height: 1.5; }

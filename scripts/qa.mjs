@@ -3749,6 +3749,24 @@ await step('assistant: "open Watchless" opens a real embedded app', async () => 
   const src = await page.evaluate(() => document.querySelector('.apps-frame')?.getAttribute('src') ?? '')
   if (!src.startsWith('https://watchless.netlify.app')) throw new Error(`did not really open the app, frame is: "${src}"`)
 })
+await step('dock: Skills opens honestly signed out, hold reaches the real page', async () => {
+  /* His ask, verbatim (2026-09-09): a reference page for every real skill
+     across every workspace, in the dock's quick-popup + hold-for-full shape
+     like Note/Bills/Timeline. The list itself lives in Supabase
+     (mc_skills), never bundled -- this repo is public, and 170 business
+     playbooks and internal processes are not something to ship in the JS.
+     This gate never signs in (?noremote), so "signed out, no crash" is the
+     one state it can exercise end to end; the real signed-in read was
+     verified by hand against a faked Supabase session (skills.ts). */
+  await fresh('today')
+  await page.getByRole('button', { name: 'Open quick tools' }).click(); await page.waitForTimeout(400)
+  await page.locator('.dock-item').filter({ hasText: 'Skills' }).click(); await page.waitForTimeout(400)
+  const panelText = await page.locator('.billsdock-panel').innerText()
+  if (!/signed in|off on this device/i.test(panelText)) throw new Error(`did not say why there is nothing to show: "${panelText}"`)
+  if (await page.locator('.skillsdock-row').count()) throw new Error('showed rows with no real data behind them')
+  await page.locator('.dock-open-btn').click(); await page.waitForTimeout(400)
+  if (!(await page.locator('h1', { hasText: 'Skills' }).count())) throw new Error('the door-out button did not land on the real Skills page')
+})
 await step('settings: the device voice picker lists real voices and remembers a pick', async () => {
   /* His question (2026-09-08): macOS ships Enhanced/Premium voices and
      there was never a way to choose one -- only the automatic GOOD-list

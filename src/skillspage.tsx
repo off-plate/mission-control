@@ -1,25 +1,27 @@
 /* THE SKILLS PAGE. His ask, verbatim (2026-09-09): "I have so many skills...
    need to have it somehow somewhere." A plain reference page, not a tool --
    what exists, across every workspace, and what it does. Reads from
-   Supabase (skills.ts), never bundled: see that file's own header for why. */
-import { useMemo, useState } from 'react'
+   Supabase (skills.ts), never bundled: see that file's own header for why.
+
+   One flat list, always. He tried a workspace filter (All/Jarvis/Sofia)
+   and a follow-up correction removed it the same day: "do not filter it by
+   Jarvis and Sofia nor all... I don't want them separated." Search is the
+   only narrowing this page does. */
+import { useState } from 'react'
 import { useSkills, type Skill } from './skills'
-import { Band, Segmented } from './ui'
+import { Band } from './ui'
 
 const WORKSPACE_LABEL: Record<string, string> = { jarvis: 'Jarvis', sofia: 'Sofia' }
 
 export function SkillsPage() {
   const { state, reload } = useSkills()
   const [q, setQ] = useState('')
-  const [ws, setWs] = useState<'all' | string>('all')
 
   const all: Skill[] = state.status === 'ok' ? state.skills : []
-  const workspaces = useMemo(() => Array.from(new Set(all.map((s) => s.workspace))).sort(), [all])
 
   const needle = q.trim().toLowerCase()
   const filtered = all.filter((s) => (
-    (ws === 'all' || s.workspace === ws)
-    && (!needle || s.name.toLowerCase().includes(needle) || s.description.toLowerCase().includes(needle))
+    !needle || s.name.toLowerCase().includes(needle) || s.description.toLowerCase().includes(needle)
   ))
 
   return (
@@ -41,24 +43,13 @@ export function SkillsPage() {
 
       {state.status === 'ok' && (
         <>
-          <div className="skillspage-toolbar">
-            <input
-              className="textinput skillspage-search"
-              type="search"
-              placeholder={`Search ${all.length} skills…`}
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
-            {workspaces.length > 1 && (
-              <Segmented
-                label="Workspace"
-                size="sm"
-                value={ws}
-                onPick={setWs}
-                options={[{ id: 'all', label: 'All' }, ...workspaces.map((w) => ({ id: w, label: WORKSPACE_LABEL[w] ?? w }))]}
-              />
-            )}
-          </div>
+          <input
+            className="textinput skillspage-search"
+            type="search"
+            placeholder={`Search ${all.length} skills…`}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
 
           {filtered.length === 0 ? (
             <div className="empty">Nothing matches.</div>

@@ -8,9 +8,9 @@ import { BreakdownSheet, Sheet } from './modals'
 import { Linkify } from './widgets'
 import { HabitRun, habitHasRun } from './habitrun'
 import type { PageId } from './types'
-import { PLAN_AHEAD_DAYS, WeekGrid, dayPlus, weekRangeLabel } from './weekgrid'
+import { PLAN_AHEAD_DAYS, WeekGrid, dayPlus, shortDay, weekRangeLabel } from './weekgrid'
 import { habitsDueToday, GOAL_CATEGORIES, GOAL_TIMEFRAMES, HABIT_FREQUENCIES, SLOTS, SPACES, bestCleanRun, bestStreak, dueOn, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, goalCurrent, isTimeFed, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, habitGate, habitLocked, isCounted, COUNT_PERIODS, requiredSteps, routineComplete, routineProgress, routineRunsOn, slotMinutes, stepLocked, TYPING_TARGET_WPM, type AgendaEvent, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone, type HabitDef, type HabitFrequency, type CountPeriod, type DayTaskLog, type HabitKind, type HabitSlip, type Project, type Routine, type RoutineCadence, type SpaceId, type SubTask, type Task, type TaskCategory, type TimeSlot } from './types'
-import { useFirstMove, useOpenToday } from './ui'
+import { useCoarsePointer, useFirstMove, useOpenToday } from './ui'
 import { estimateFor } from './estimate'
 import { estimateTask } from './ai'
 import { goalPeriodKey, goalPeriodRange, habitPeriodRange, periodIsPast, periodKeyFor, periodLabel, shiftPeriodKey, type GoalTf, fmtDuration, fmtNum, fmtSigned, goalPace, fmtTime, fmtTimeShort, fmtWhen, dayOfWeekKey, gcalUrl, isEstimated, localDateKey, slotForMoment, taskMinutes, toMin } from './util'
@@ -658,6 +658,7 @@ export function PlanPage() {
      more days he can step onto and lay out, one at a time, the same panel he
      already knows. offset 0 is today, 1 is tomorrow, up to 6 days out. */
   const [dayOffset, setDayOffset] = useState(0)
+  const coarse = useCoarsePointer()
   const planDay = dayPlus(dayOffset)
   const onDay = (t: Task) => t.list === 'today' && (t.plannedOn ?? localDateKey()) === planDay
   const todayAll = spaceTasks.filter(onDay)                      // the day incl. finished (they stay, struck)
@@ -1106,6 +1107,29 @@ export function PlanPage() {
                   <Dropdown label={`Options for ${t.title}`}>
                     <button role="menuitem" onClick={() => setEditingTask(t)}>Edit</button>
                     <button role="menuitem" onClick={() => setBreakdownFor(t)}>Break it down</button>
+                    {/* ON A TOUCH SCREEN ONLY, restored 2026-09-09. These two
+                        groups were cut on 2026-09-04 because he does not reach
+                        for them with a mouse -- drag does both, and the menu
+                        was getting long. True on the desktop, and it stays cut
+                        there. It was not true on a phone: drag needs a cursor,
+                        so cutting them left a task that could be written down
+                        and then never put on a day at all, which is the exact
+                        complaint ("Plan doesn't work at all on mobile") the tap
+                        paths were built for in the first place. */}
+                    {coarse && (
+                      <>
+                        <span className="kebab-head">Plan for a day</span>
+                        {Array.from({ length: PLAN_AHEAD_DAYS + 1 }, (_, n) => n).map((n) => (
+                          <button key={n} role="menuitem" onClick={() => { moveTasksToToday([t.id], dayPlus(n)); setDayOffset(n) }}>
+                            Move to {n <= 1 ? offsetWord(n).toLowerCase() : shortDay(dayPlus(n))}
+                          </button>
+                        ))}
+                        <span className="kebab-head">Straight into today</span>
+                        {SLOTS.map((sl) => (
+                          <button key={sl.id} role="menuitem" onClick={() => dropTo(sl.id, t.id)}>{sl.label}</button>
+                        ))}
+                      </>
+                    )}
                     {projectMenu(t)}
                     <span className="kebab-sep" />
                     <button role="menuitem" className="danger" onClick={() => deleteTask(t.id)}>Delete</button>

@@ -89,7 +89,15 @@ page.on('pageerror', (e) => noteError(e.message))
 page.on('console', (m) => { if (m.type() === 'error') noteError(m.text(), m.location()?.url ?? '') })
 const step = async (name, fn) => {
   try { await fn(); pass++; console.log(`PASS ${name}`) }
-  catch (e) { fail++; console.log(`FAIL ${name}: ${String(e).split('\n')[0]}`) }
+  catch (e) {
+    fail++
+    console.log(`FAIL ${name}: ${String(e).split('\n')[0]}`)
+    if (process.env.QA_VERBOSE) {
+      const msg = String(e.message ?? '')
+      const hit = msg.split('\n').filter((l) => /intercepts pointer events|waiting for locator|not visible|element is/.test(l)).slice(0, 4)
+      for (const l of hit) console.log(`     | ${l.trim()}`)
+    }
+  }
 }
 const fresh = async (route = '') => {
   await page.goto(URL); await page.waitForTimeout(300)
@@ -104,12 +112,70 @@ const fresh = async (route = '') => {
      with no mouse movement of its own to blame. Parking the cursor
      somewhere the dock never renders keeps every test starting from the
      dock's real default (closed) state. */
-  await page.mouse.move(20, 20)
+  /* NOT (20, 20). Found 2026-09-09 chasing two habit-page tests that only
+     failed inside the full run, never in isolation: .topstick spans the
+     FULL WIDTH of the header (App.tsx), and its own onMouseLeave -- the only
+     thing that starts the fold-away timer -- fires on leaving THAT box, not
+     the narrower .topbar-left cluster that actually arms the reveal. (20, 20)
+     sits inside .topstick's own bounds (just outside topbar-left), so it
+     never counts as "leaving" at all. Once some earlier test's click on a
+     .nav-tab (itself a descendant of .topstick) left the real cursor resting
+     up there, EVERY later fresh() calling mouse.move(20, 20) kept it right
+     where a stray hover had already opened it -- for the rest of the run,
+     until some other test happened to move the mouse below the header by
+     coincidence. (20, 300) is comfortably clear of the header on every page. */
+  await page.mouse.move(20, 300)
+  await page.locator('.topstick:not(.is-navopen)').waitFor({ timeout: 2000 }).catch(() => {})
 }
 
 /* Routine cards rest SHUT (2026-08-26): the page is a list of routines you run,
    and its steps live behind the card's disclosure. Any test that reaches for a
    step has to open them first, the same way he would. */
+/* SWITCHING WORKSPACE, then getting out of the header's way. The page row
+   reveals on hover and the WHOLE header is its trigger (App.tsx), so a click
+   on a space button leaves the cursor resting inside it and the expanded row
+   (.topstick.is-navopen) goes on covering the top of the page underneath.
+   A person moves their hand on to whatever they came for and it folds away
+   after NAV_HIDE_MS; Playwright's cursor just stays where it was clicked, so
+   the next click on a row near the top of the list lands on a space button
+   instead. That is what had the two habit-run steps red: not their own
+   selectors, which resolve fine, but the header sitting on top of them.
+
+   Same class of problem as the cursor-on-the-dock-FAB note in fresh() above,
+   and parked the same way -- somewhere neither the header nor the dock ever
+   renders, with the fold-away actually waited out. */
+const pickSpace = async (label) => {
+  await page.locator('.space-btn', { hasText: label }).click()
+  await page.waitForTimeout(500)
+  await page.mouse.move(700, 500)
+  await page.waitForTimeout(1200)
+}
+
+/* GETTING A TASK FROM THE LIST ONTO THE DAY, the way the desktop actually
+   does it. The kebab's "Plan for a day" and "Straight into today" groups were
+   cut on 2026-09-04 on his word (drag already does both with a mouse, and the
+   menu was getting long), which left six steps here clicking a menu item that
+   no longer existed -- red for five days, and red in a way that hid whatever
+   else broke underneath. Drag is the real path now, so the gate drives the
+   real path: synthetic DragEvents onto the bucket, the same technique the
+   hover-arm step below uses on the day pills, because pages1.tsx's bucket
+   reads text/plain off the dataTransfer and calls dropTo() with it.
+
+   Touch is the exception and keeps the tap paths (restored 2026-09-09, gated
+   on (pointer: coarse) -- drag needs a cursor). The phone steps cover those. */
+const dragToSlot = async (title, slotLabel, p = page) => {
+  const row = p.locator('.todo-row', { hasText: title }).first()
+  const id = await row.evaluate((el) => el.closest('[data-todo-id]').dataset.todoId)
+  const bucket = p.locator('.bucket').filter({ has: p.locator('.bucket-head', { hasText: slotLabel }) }).first()
+  await bucket.evaluate((el, taskId) => {
+    const dt = new DataTransfer()
+    dt.setData('text/plain', taskId)
+    el.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }))
+    el.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }))
+  }, id)
+  await p.waitForTimeout(400)
+}
+
 const openRoutines = async () => {
   const all = page.locator('.band-collapseall')
   if (await all.count() && /expand/i.test(await all.innerText())) {
@@ -128,8 +194,7 @@ await step('plan: add, estimate visible, complete via chips', async () => {
   await fresh('plan')
   await page.getByRole('textbox', { name: 'New task' }).fill('Gate task')
   await page.getByRole('button', { name: 'Add', exact: true }).click()
-  await page.locator('.todo-row', { hasText: 'Gate task' }).first().getByRole('button', { name: /Options/ }).click()
-  await page.getByRole('menuitem', { name: 'Move to today' }).click()
+  await dragToSlot('Gate task', 'Morning')
   await page.locator('.today-task', { hasText: 'Gate task' }).first().locator('.checkbox').click()
   await page.locator('.actual-chip').first().click()
   await page.waitForTimeout(400)
@@ -216,7 +281,7 @@ await step('focus: timer start writes state', async () => {
   if (p.phase !== 'focus') throw new Error(`phase ${p.phase}`)
   await page.locator('.focus-live').getByRole('button', { name: 'Stop' }).click()
 })
-await step('the menu is six tabs, and what left it is reachable from the header', async () => {
+await step('the menu is five tabs, and what left it is reachable from the header', async () => {
   /* Five since Routines became a folder inside Habits (his instruction,
      2026-08-11); six since Apps joined after Why's (2026-08-23); seven since
      the Assistant got a page of its own (2026-08-25). Then, all the same day
@@ -243,9 +308,14 @@ await step('the menu is six tabs, and what left it is reachable from the header'
      history in its own comments). setPage('timeline') and setPage('board')
      still render their real pages -- asserted below, same as the older
      retired addresses. */
+  /* FIVE, not four: NAV itself holds four (Today, Plan, Projects, Habits &
+     Goals) and navFor() appends Calendar to every workspace (App.tsx), so the
+     rendered row has always been one longer than the array. The count here
+     was written against the array and had been red since 2026-09-04. */
   await fresh('today')
   const tabs = await page.locator('.nav-tab').allInnerTexts()
-  if (tabs.length !== 4) throw new Error(`${tabs.length} tabs: ${tabs.join(', ')}`)
+  if (tabs.length !== 5) throw new Error(`${tabs.length} tabs: ${tabs.join(', ')}`)
+  if (!tabs.some((t) => /calendar/i.test(t))) throw new Error(`Calendar is not in the row: ${tabs.join(', ')}`)
   if (tabs.some((t) => /apps/i.test(t))) throw new Error('Apps is still a tab')
   if (!tabs.some((t) => /habits & goals/i.test(t))) throw new Error(`no merged tab: ${tabs.join(', ')}`)
   if (tabs.filter((t) => /goals/i.test(t)).length !== 1) throw new Error('Goals is still a tab of its own')
@@ -903,8 +973,10 @@ await step('plan: tomorrow holds its own day', async () => {
   await fresh('plan')
   await page.getByRole('textbox', { name: 'New task' }).fill('Gate tomorrow task')
   await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(300)
-  await page.locator('.todo-row', { hasText: 'Gate tomorrow' }).getByRole('button', { name: /Options/ }).click()
-  await page.getByRole('menuitem', { name: 'Move to tomorrow' }).click(); await page.waitForTimeout(400)
+  /* Step the panel onto tomorrow first, then drop: dropTo() plans onto the
+     day the panel is showing, which is the whole point of the switcher. */
+  await page.locator('.day-switch .microcap', { hasText: 'Tomorrow' }).click(); await page.waitForTimeout(300)
+  await dragToSlot('Gate tomorrow', 'Morning')
   const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
   const t = s.tasks.find((x) => x.title === 'Gate tomorrow task')
   const tomorrow = await page.evaluate(() => { const d = new Date(); d.setDate(d.getDate() + 1); const z = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}` })
@@ -984,15 +1056,11 @@ await step('plan: the day switcher reaches six days out, one real day each', asy
   if ((await wedPill.getAttribute('aria-pressed')) !== 'true') throw new Error('the fifth pill did not become the active day')
   await page.getByRole('textbox', { name: 'New task' }).fill('Gate five-out task')
   await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(300)
-  await page.locator('.todo-row', { hasText: 'Gate five-out' }).getByRole('button', { name: /Options/ }).click()
-  await page.waitForTimeout(200)
-  // The kebab's own "Plan for a day" list reaches the same six days.
-  const moveItems = await page.locator('[role="menuitem"]', { hasText: /^Move to/ }).allInnerTexts()
-  if (moveItems.length !== 7) throw new Error(`kebab offers ${moveItems.length} days: ${moveItems.join(', ')}`)
-  await page.keyboard.press('Escape')
+  /* The kebab's own seven-day "Plan for a day" list was asserted here until
+     2026-09-04, when it was cut from the desktop menu on his word. It lives
+     on for touch only now and is asserted in the phone step instead. */
   // Dropping straight into a slot lands it on the day currently on screen (Wed), not today.
-  await page.locator('.todo-row', { hasText: 'Gate five-out' }).getByRole('button', { name: /Options/ }).click()
-  await page.locator('[role="menuitem"]', { hasText: 'Morning' }).click(); await page.waitForTimeout(400)
+  await dragToSlot('Gate five-out', 'Morning')
   if (!(await page.locator('.today-task', { hasText: 'Gate five-out' }).count())) throw new Error('did not land on the day shown')
   const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
   const t = s.tasks.find((x) => x.title === 'Gate five-out task')
@@ -1022,8 +1090,7 @@ await step('plan: the week widget is a real Monday-to-Sunday, not the switcher a
   await page.locator('.day-switch .microcap').first().click(); await page.waitForTimeout(300)
   await page.getByRole('textbox', { name: 'New task' }).fill('Gate week widget task')
   await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(300)
-  await page.locator('.todo-row', { hasText: 'Gate week widget' }).getByRole('button', { name: /Options/ }).click()
-  await page.locator('[role="menuitem"]', { hasText: 'Afternoon' }).click(); await page.waitForTimeout(400)
+  await dragToSlot('Gate week widget', 'Afternoon')
   const todayCol = page.locator('.weekplan-day.is-today')
   if (!(await todayCol.count())) throw new Error("no column is marked today's")
   const cell = todayCol.locator('.weekplan-slot', { hasText: 'Afternoon' })
@@ -1152,8 +1219,7 @@ await step('goals: a promised task ticks from the plan', async () => {
   await col.locator('.ptask-add').click(); await page.waitForTimeout(200)
   await col.locator('.ptask-offer-row', { hasText: 'Gate promise' }).click(); await page.waitForTimeout(300)
   await page.goto(`${URL}#/plan`); await page.waitForTimeout(500)
-  await page.locator('.todo-row', { hasText: 'Gate promise' }).getByRole('button', { name: /Options/ }).click()
-  await page.getByRole('menuitem', { name: 'Move to today' }).click(); await page.waitForTimeout(300)
+  await dragToSlot('Gate promise', 'Morning')
   await page.locator('.today-task', { hasText: 'Gate promise' }).locator('.checkbox').click()
   await page.locator('.actual-chip').first().click(); await page.waitForTimeout(400)
   await page.goto(`${URL}#/goals`); await page.waitForTimeout(500)
@@ -1243,7 +1309,7 @@ await step('habits: a gated habit stays locked until the day\'s number clears it
      that you will tell me that something doesn't work or doesn't live." */
   await fresh('habits')
   await openRoutines()
-  await page.locator('.space-btn', { hasText: 'All' }).click(); await page.waitForTimeout(500)
+  await pickSpace('All')
   const row = page.locator('.habit-line').filter({ has: page.locator('.habit-name', { hasText: 'Typing test' }) }).first()
   if (!(await row.count())) throw new Error('no Typing test habit on the page')
   const dot = row.locator('.day-cell.is-today .daydot').first()
@@ -1275,8 +1341,15 @@ await step('habits: picking either answer of a two-way habit keeps the day', asy
      picking the other answer afterwards is a change of mind, not a second
      thing done: the day stays kept either way. */
   await fresh('habits')
+  /* Real wall-clock dependent, same class of thing as the local-date/UTC
+     rollover bugs elsewhere in this file: run this deep enough into a long
+     gate and "yesterday" now has real logged data from earlier steps, which
+     is exactly what the Daily Review is offered for. Every other test near a
+     day boundary already guards this the same way. */
+  const skip = page.getByRole('button', { name: 'Not today' })
+  if (await skip.count()) { await skip.first().click(); await page.waitForTimeout(400) }
   await openRoutines()
-  await page.locator('.space-btn', { hasText: 'All' }).click(); await page.waitForTimeout(500)
+  await pickSpace('All')
   const row = page.locator('.habit-line').filter({ has: page.locator('.habit-name', { hasText: 'Move or caffeine' }) }).first()
   if (!(await row.count())) throw new Error('no "Move or caffeine" habit on the page')
   const dot = row.locator('.day-cell.is-today .daydot').first()
@@ -1332,6 +1405,11 @@ await step('phone: a task can be scheduled and rescheduled without dragging', as
 
   await p.locator('.todo-row', { hasText: 'Thumb scheduling' }).first().getByRole('button', { name: /Options/ }).click()
   await p.waitForTimeout(250)
+  /* The seven-day "Plan for a day" list, asserted here since 2026-09-09: it
+     is touch-only now (it left the desktop menu on 2026-09-04), so this is
+     the one place it can be checked. */
+  const days = await p.locator('[role="menuitem"]', { hasText: /^Move to/ }).allInnerTexts()
+  if (days.length !== 7) throw new Error(`the phone menu offers ${days.length} days: ${days.join(', ')}`)
   await p.getByRole('menuitem', { name: 'Morning' }).click(); await p.waitForTimeout(500)
   if ((await slotOf()) !== 'morning') throw new Error(`tapping Morning from the list left it at ${await slotOf()}`)
 
@@ -1613,9 +1691,7 @@ await step('a task finished without a time is finished on every page that counts
     await page.goto(`${URL}#/plan`); await page.waitForTimeout(700)
     await page.getByRole('textbox', { name: 'New task' }).fill(title)
     await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(500)
-    const row = page.locator('.todo-row', { hasText: title }).first()
-    await row.getByRole('button', { name: /Options/ }).click()
-    await page.getByRole('menuitem', { name: 'Move to today' }).click(); await page.waitForTimeout(600)
+    await dragToSlot(title, 'Morning')
     await page.locator('.today-task', { hasText: title }).first().locator('.checkbox').click()
     await page.waitForTimeout(400)
     if (skip) await page.locator('.actual-skip').first().click()

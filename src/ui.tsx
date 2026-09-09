@@ -412,6 +412,37 @@ export function useOpenToday(): Task[] {
   return tasks.filter((t) => inView(t.space) && t.list === 'today' && !t.done && (t.plannedOn ?? localDateKey()) === localDateKey())
 }
 
+/* The pill pair switching between Habits, Goals and Quitting -- one small
+   shared component, on three separate pages (habits.tsx, goals.tsx,
+   quitting.tsx). Lives here rather than on any one of those three so none of
+   them has to import from another: each of the three pages already needs a
+   real cross-import of its own (habits.tsx needs GoalSheet from goals.tsx;
+   quitting.tsx needs HabitSheet from habits.tsx), and putting this here too
+   avoided the one cycle that would have made (goals.tsx importing this FROM
+   habits.tsx, while habits.tsx imports GoalSheet FROM goals.tsx). */
+export function HabitsGoalsSwitch({ on }: { on: 'habits' | 'goals' | 'quitting' }) {
+  const { setPage } = useStore()
+  return (
+    <span className="hg-switch" role="group" aria-label="Habits or goals">
+      <button
+        className={`hg-pill${on === 'habits' ? ' is-on' : ''}`}
+        aria-pressed={on === 'habits'}
+        onClick={() => setPage('habits')}
+      >Habits</button>
+      <button
+        className={`hg-pill${on === 'goals' ? ' is-on' : ''}`}
+        aria-pressed={on === 'goals'}
+        onClick={() => setPage('goals')}
+      >Goals</button>
+      <button
+        className={`hg-pill${on === 'quitting' ? ' is-on' : ''}`}
+        aria-pressed={on === 'quitting'}
+        onClick={() => setPage('quitting')}
+      >Quitting</button>
+    </span>
+  )
+}
+
 /* The one thing to do next, on Today and in the Zone. Alerts first (a debt
    deadline beats everything), then whatever he pinned by hand, then the least
    dreaded of what is left. One derivation, so the two pages can never point

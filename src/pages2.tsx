@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Band } from './pages1'
 import { useStore } from './store'
 import { PROVIDERS, getAiKey, getAiProvider, hasAiKey, setAiKey, setAiProvider, type AiProvider } from './ai'
-import { Segmented, Select } from './ui'
+import { Band, Segmented, Select } from './ui'
 import { getHevyKey, getHevyLastSync, hasHevyKey, setHevyKey, syncHevy } from './hevy'
 import {
   getDeviceVoicePref, GOOD_VOICES, getTtsKey, hasTtsKey, listDeviceVoices, NOVELTY_VOICES, previewDeviceVoice,

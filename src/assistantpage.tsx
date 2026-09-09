@@ -12,7 +12,7 @@ import { voiceModeAvailable } from './voicemode'
 import { getWeather, type Weather } from './weather'
 import { SLOTS, dueOn, habitStepKey, routineComplete, requiredSteps, type HabitDef, type PageId } from './types'
 import { localDateKey, fmtDuration, periodKeyFor } from './util'
-import { ActualLog } from './pages1'
+import { ActualLog } from './plan'
 import * as Icon from './icons'
 import { Mark, Speak, useAssistantThread, useVoiceGlue, VoicePanel } from './assistantcore'
 

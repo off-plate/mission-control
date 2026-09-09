@@ -1,6 +1,6 @@
 import { useStore } from './store'
 import { Linkify } from './widgets'
-import { Band, SpaceMark } from './pages1'
+import { Band, SpaceMark } from './ui'
 import { fmtDuration, localDateKey } from './util'
 import { quitKeptDays, slipDays } from './types'
 

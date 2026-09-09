@@ -263,72 +263,10 @@ export async function deleteRemoteState(): Promise<void> {
   try { await c.from(TABLE).delete().eq('id', me.id) } catch (e) { console.warn('supabase delete failed', e) }
 }
 
-/* ── Sourced leads ─────────────────────────────────────────────────────────
- *  Their own tables, not mc_state: 8 752 of them are 4.6 MB, and the state row
- *  is mirrored into a ~5 MB localStorage quota the rest of the app shares.
- *  `owner` defaults to auth.uid() in the schema, so nothing here stamps it. */
-
-export interface RemoteLead {
-  place_key: string
-  name: string
-  phone: string | null
-  email: string | null
-  lead: unknown
-}
-
-/** null when signed out or unconfigured, which is "no data", never zero. */
-export async function pullLeads(): Promise<{ leads: RemoteLead[]; offers: Record<string, unknown> } | null> {
-  const c = db()
-  const me = await currentAccount()
-  if (!c || !me) return null
-  /* Paged: PostgREST caps a response, and a silent truncation here would read
-     as "those leads were never imported". */
-  const leads: RemoteLead[] = []
-  const PAGE = 1000
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await c.from('mc_leads')
-      .select('place_key,name,phone,email,lead')
-      .range(from, from + PAGE - 1)
-    if (error) throw new Error(error.message)
-    const batch = (data ?? []) as RemoteLead[]
-    leads.push(...batch)
-    if (batch.length < PAGE) break
-  }
-  const { data: od, error: oe } = await c.from('mc_lead_offers').select('key,offer')
-  if (oe) throw new Error(oe.message)
-  const offers: Record<string, unknown> = {}
-  for (const row of (od ?? []) as { key: string; offer: unknown }[]) offers[row.key] = row.offer
-  return { leads, offers }
-}
-
-/** Upserts in chunks. Returns false when signed out, so the caller can say so. */
-export async function pushLeads(
-  rows: RemoteLead[],
-  offers: Record<string, unknown>,
-  onProgress?: (done: number, total: number) => void,
-): Promise<boolean> {
-  const c = db()
-  const me = await currentAccount()
-  if (!c || !me) return false
-  const offerRows = Object.entries(offers).map(([key, offer]) => ({ key, offer }))
-  if (offerRows.length) {
-    const { error } = await c.from('mc_lead_offers').upsert(offerRows, { onConflict: 'owner,key' })
-    if (error) throw new Error(error.message)
-  }
-  const CHUNK = 500
-  for (let i = 0; i < rows.length; i += CHUNK) {
-    const { error } = await c.from('mc_leads').upsert(rows.slice(i, i + CHUNK), { onConflict: 'owner,place_key' })
-    if (error) throw new Error(error.message)
-    onProgress?.(Math.min(i + CHUNK, rows.length), rows.length)
-  }
-  return true
-}
-
-export async function deleteRemoteLead(placeKey: string): Promise<void> {
-  const c = db()
-  const me = await currentAccount()
-  if (!c || !me) return
-  await c.from('mc_leads').delete().eq('place_key', placeKey)
-}
+/* Sourced leads (mc_leads/mc_lead_offers) were read and written from here --
+   deleted 2026-09-09, on his instruction, along with the rest of the Contacts
+   CRM pipeline (store.tsx, contactspage.tsx, leadstore.ts). Hunterpart still
+   writes to those two tables directly; nothing here reads them back into
+   Mission Control anymore. */
 
 export { SUPABASE_ENABLED }

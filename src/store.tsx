@@ -26,17 +26,15 @@ import { noteTitle, useNotesSlice } from './store/notes'
 import { useContactsSlice } from './store/contacts'
 import { useWidgetsSlice } from './store/widgets'
 import { useTwoLivesSlice } from './store/twolives'
+import { useConnectionsSlice } from './store/connections'
 import { dayIndexOf, dayOfWeekKey, goalPeriodKey, goalPeriodRange, isoWeekKey, localDateKey, periodIsPast, periodKeyFor, slotForTime, type GoalTf } from './util'
 import {
   DEFAULT_SPACES,
   MOCK_GOALS,
   MOCK_HABITS,
-  MOCK_IDEAS,
   MOCK_LEDGER,
   LATE_STEPS,
   MOCK_ROUTINES,
-  MOCK_SOCIAL,
-  MOCK_SOURCES,
   MOCK_TASKS,
 } from './mock'
 import { goalCurrent, habitGate, habitStepKey, isTimeFed, requiredSteps, routineComplete, stepLocked } from './types'
@@ -1252,14 +1250,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<Project[]>(persisted?.projects ?? [])
   const [storageFull, setStorageFull] = useState(false)
   const [ledger, setLedger] = useState(persisted?.ledger ?? MOCK_LEDGER)
-  const [social, setSocialState] = useState(persisted?.social ?? MOCK_SOCIAL)
-  const [sources, setSources] = useState(persisted?.sources ?? MOCK_SOURCES)
+  const connectionsSlice = useConnectionsSlice(persisted)
+  const { social, setSocial, sources, setSources, toggleSource, ideas, setIdeas } = connectionsSlice
   const [plan, setPlan] = useState<PlanState>(persisted?.plan ?? { committedDate: null, firstMoveId: null })
   const [review, setReview] = useState<ReviewState>(persisted?.review ?? { lastDoneDate: null, wins: [], outcomes: [] })
   const [assistantLog, setAssistantLog] = useState<AssistantEntry[]>(persisted?.assistantLog ?? [])
   const [coachSessions, setCoachSessions] = useState<CoachSession[]>(persisted?.coachSessions ?? [])
   const [routines, setRoutines] = useState<Routine[]>(seededRoutines)
-  const [ideas, setIdeas] = useState<Idea[]>(persisted?.ideas ?? MOCK_IDEAS)
   const [records, setRecords] = useState<Record<string, number>>(persisted?.records ?? {})
   // Seeded ids he has deleted, so the forward-fill never resurrects them.
   const [removedSeeds, setRemovedSeeds] = useState<string[]>(persisted?.removedSeeds ?? [])
@@ -2488,10 +2485,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       armUndo(gone ? `Deleted "${gone.name}"` : 'Goal deleted', () => { setGoals(before); digUp(rowKey('goals', { id })) })
     },
 
-    setSocial: (entries) => setSocialState(entries),
-    /* Connecting a source is a real OAuth flow, not a boolean. Until one
-       exists, nothing in the app may flip a status to "connected". */
-    toggleSource: () => {},
+    setSocial,
+    toggleSource,
 
     commitPlan: (taskIds, firstMoveId) => {
       setTasks((prev) =>

@@ -24,6 +24,8 @@ import { type Undoable, useUndo } from './store/undo'
 import { useGraveyard } from './store/graveyard'
 import { noteTitle, useNotesSlice } from './store/notes'
 import { useContactsSlice } from './store/contacts'
+import { useWidgetsSlice } from './store/widgets'
+import { useTwoLivesSlice } from './store/twolives'
 import { dayIndexOf, dayOfWeekKey, goalPeriodKey, goalPeriodRange, isoWeekKey, localDateKey, periodIsPast, periodKeyFor, slotForTime, type GoalTf } from './util'
 import {
   DEFAULT_SPACES,
@@ -36,7 +38,6 @@ import {
   MOCK_SOCIAL,
   MOCK_SOURCES,
   MOCK_TASKS,
-  WIDGET_DEFS,
 } from './mock'
 import { goalCurrent, habitGate, habitStepKey, isTimeFed, requiredSteps, routineComplete, stepLocked } from './types'
 import { isSpace, SPACES, spaceFolderId } from './types'
@@ -1243,7 +1244,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     })
   }, [persisted])
-  const [spaces, setSpaces] = useState(persisted?.spaces ?? DEFAULT_SPACES)
+  const widgetsSlice = useWidgetsSlice(persisted)
+  const { spaces, setSpaces } = widgetsSlice
   const [tasks, setTasks] = useState(persisted?.tasks ?? MOCK_TASKS)
   const [habits, setHabits] = useState(persisted?.habits ?? seededHabits)
   const [goals, setGoals] = useState(persisted?.goals ?? seededGoals)
@@ -1275,13 +1277,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [dailyOpen, setDailyOpen] = useState(false)
   const [dailyDone, setDailyDone] = useState<string | undefined>(persisted?.dailyDone)
   const [dailySkipped, setDailySkipped] = useState<string | undefined>(persisted?.dailySkipped)
-  const [twoLives, setTwoLivesRaw] = useState<Record<string, string>>(persisted?.twoLives ?? {})
   /* An empty link is a removal, not a blank entry, so the key does not linger
      and win a merge against a device that still holds the real one. */
-  const [reels, setReelsRaw] = useState<string[]>(persisted?.reels ?? [])
-  const setReels = (list: string[]) => setReelsRaw(list)
-  const setTwoLives = (key: string, url: string) =>
-    setTwoLivesRaw((m) => { const n = { ...m }; if (url.trim()) n[key] = url.trim(); else delete n[key]; return n })
+  const twoLivesSlice = useTwoLivesSlice(persisted)
+  const { twoLives, setTwoLivesRaw, setTwoLives, reels, setReelsRaw, setReels } = twoLivesSlice
   const [spaceGuessed] = useState<number>(persisted?.spaceGuessed ?? 0)
   const [lastRollDay] = useState<string | undefined>(persisted?.lastRollDay)
   const remoteSaveTimer = useRef<number | undefined>(undefined)
@@ -2083,35 +2082,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     focusAppId, setFocusAppId,
     noteToOpen, openNote: setNoteToOpen,
 
-    reorderSpace: (sp, order) =>
-      setSpaces((prev) => {
-        const byId = new Map(prev[sp].map((w) => [w.id, w]))
-        const next = order.map((id) => byId.get(id)).filter(Boolean) as WidgetInstance[]
-        for (const w of prev[sp]) if (!order.includes(w.id)) next.push(w)
-        return { ...prev, [sp]: next }
-      }),
-
-    resizeWidget: (sp, id, size) =>
-      setSpaces((prev) => ({ ...prev, [sp]: prev[sp].map((w) => (w.id === id ? { ...w, size } : w)) })),
-
-    removeWidget: (sp, id) =>
-      setSpaces((prev) => ({ ...prev, [sp]: prev[sp].filter((w) => w.id !== id) })),
-
-    addWidget: (sp, type) =>
-      setSpaces((prev) => ({
-        ...prev,
-        [sp]: [...prev[sp], { id: newId(type), type, size: WIDGET_DEFS[type].defaultSize }],
-      })),
-
-    moveWidget: (sp, id, dir) =>
-      setSpaces((prev) => {
-        const list = [...prev[sp]]
-        const i = list.findIndex((w) => w.id === id)
-        const j = i + dir
-        if (i < 0 || j < 0 || j >= list.length) return prev
-        ;[list[i], list[j]] = [list[j], list[i]]
-        return { ...prev, [sp]: list }
-      }),
+    reorderSpace: widgetsSlice.reorderSpace,
+    resizeWidget: widgetsSlice.resizeWidget,
+    removeWidget: widgetsSlice.removeWidget,
+    addWidget: widgetsSlice.addWidget,
+    moveWidget: widgetsSlice.moveWidget,
 
     /* Reopening a task clears the time that was logged against it, so "skip"
        genuinely means no time recorded instead of resurfacing an old number. */

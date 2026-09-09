@@ -18,7 +18,11 @@ function stripDates(j: string): string {
   } catch { return j }
 }
 import { roll } from './roll'
-import { bodyHash, deviceId, deviceName, HIST, mergeStates, rowKey, type LastWrite, type Tomb } from './sync-merge'
+import { deviceId, deviceName, mergeStates, rowKey, type LastWrite, type Tomb } from './sync-merge'
+import { newId, todayKey } from './store/shared'
+import { type Undoable, useUndo } from './store/undo'
+import { useGraveyard } from './store/graveyard'
+import { noteTitle, useNotesSlice } from './store/notes'
 import { dayIndexOf, dayOfWeekKey, goalPeriodKey, goalPeriodRange, isoWeekKey, localDateKey, periodIsPast, periodKeyFor, slotForTime, type GoalTf } from './util'
 import {
   DEFAULT_SPACES,
@@ -162,8 +166,7 @@ interface PersistedState {
   reels?: string[]
 }
 
-/** A delete you can still take back: what it was, and how to put it back. */
-export interface Undoable { id: string; label: string; restore: () => void }
+export type { Undoable }
 
 interface Store extends PersistedState {
   /** Set or clear one Two Lives link. An empty string removes the key. */
@@ -1191,52 +1194,6 @@ function routeFromHash(): { page: PageId; day: string | null } {
   return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
 }
 
-/* The first line of a note is its title, the way it is in every notes app worth
-   using: no second field to fill in, nothing to keep in step with the text, and
-   an untitled note is simply one whose first line is short. Cached on the row so
-   the list and the search do not re-derive it for every note on every keystroke. */
-function noteTitle(body: string): string {
-  const first = body.split('\n').map((l) => l.trim()).find((l) => l.length > 0) ?? ''
-  return first.replace(/^#{1,3}\s+/, '').replace(/^[-*]\s+(\[[ xX]\]\s*)?/, '').slice(0, 120)
-}
-
-/** Which workspace a folder belongs to. A workspace folder says so in its id;
- *  one he made says so on the row. Either way there is one answer, and a note's
- *  workspace is read from here rather than being a second thing to keep in step. */
-function spaceOfFolder(id: string, folders: NoteFolder[]): SpaceId | null {
-  const m = id.match(/^nf-space-(.+)$/)
-  if (m && (SPACES as string[]).includes(m[1])) return m[1] as SpaceId
-  return folders.find((f) => f.id === id)?.space ?? null
-}
-
-/* What a profile that has never saved anything starts with. The seeded stickies
-   become notes on exactly the terms the migration uses, so a fresh install and a
-   migrated one are the same shape. */
-function seedNoteFolders(): NoteFolder[] {
-  const spaces = [...new Set(MOCK_IDEAS.map((i) => i.space))]
-  return spaces.map((s) => ({ id: `nf-braindump-${s}`, space: s, name: 'Brain dumps', parentId: spaceFolderId(s), order: 0 }))
-}
-
-function seedNotes(): Note[] {
-  return MOCK_IDEAS.map((i) => ({
-    id: `note-${i.id}`,
-    space: i.space,
-    folderId: `nf-braindump-${i.space}`,
-    title: noteTitle(i.text),
-    body: i.text,
-    color: i.color,
-    when: localDateKey(),
-    updatedAt: Date.now(),
-  }))
-}
-
-/* Ids must survive reloads without colliding: a plain counter restarts at the
-   same numbers and duplicates ids already persisted (then one delete removes
-   two rows). Time-based prefix + burst counter is collision-proof. */
-let seq = 0
-const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}${(seq++).toString(36)}`
-const todayKey = () => localDateKey()
-
 export function StoreProvider({ children }: { children: ReactNode }) {
   const persisted = useMemo(loadPersisted, [])
   const seedTodayIdx = (new Date().getDay() + 6) % 7
@@ -1302,10 +1259,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [coachSessions, setCoachSessions] = useState<CoachSession[]>(persisted?.coachSessions ?? [])
   const [routines, setRoutines] = useState<Routine[]>(seededRoutines)
   const [ideas, setIdeas] = useState<Idea[]>(persisted?.ideas ?? MOCK_IDEAS)
-  /* A fresh profile has never run the migration, so the seeded stickies are
-     turned into notes here on the same terms: same folder, same text. */
-  const [notes, setNotes] = useState<Note[]>(persisted?.notes ?? seedNotes())
-  const [noteFolders, setNoteFolders] = useState<NoteFolder[]>(persisted?.noteFolders ?? seedNoteFolders())
   const [records, setRecords] = useState<Record<string, number>>(persisted?.records ?? {})
   // Seeded ids he has deleted, so the forward-fill never resurrects them.
   const [removedSeeds, setRemovedSeeds] = useState<string[]>(persisted?.removedSeeds ?? [])
@@ -1323,7 +1276,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [dailyOpen, setDailyOpen] = useState(false)
   const [dailyDone, setDailyDone] = useState<string | undefined>(persisted?.dailyDone)
   const [dailySkipped, setDailySkipped] = useState<string | undefined>(persisted?.dailySkipped)
-  const [graveyard, setGraveyard] = useState<Tomb[]>(persisted?.graveyard ?? [])
   const [twoLives, setTwoLivesRaw] = useState<Record<string, string>>(persisted?.twoLives ?? {})
   /* An empty link is a removal, not a blank entry, so the key does not linger
      and win a merge against a device that still holds the real one. */
@@ -1331,17 +1283,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const setReels = (list: string[]) => setReelsRaw(list)
   const setTwoLives = (key: string, url: string) =>
     setTwoLivesRaw((m) => { const n = { ...m }; if (url.trim()) n[key] = url.trim(); else delete n[key]; return n })
-  const bury = (...keys: string[]) =>
-    setGraveyard((g) => [...g.filter((t) => !keys.includes(t.k)), ...keys.map((k) => ({ k, at: Date.now() }))].slice(-900))
-  /* Not a removal: a dated opposite. Another device that still holds the
-     tombstone would otherwise re-bury this the next time it saved anything. */
-  const digUp = (...keys: string[]) =>
-    setGraveyard((g) => [...g.filter((t) => !keys.includes(t.k)), ...keys.map((k) => ({ k, at: Date.now(), undone: true }))].slice(-900))
   const [spaceGuessed] = useState<number>(persisted?.spaceGuessed ?? 0)
   const [lastRollDay] = useState<string | undefined>(persisted?.lastRollDay)
-  /* The last thing you deleted, held long enough to take it back. Deliberately
-     not persisted: a delete you can still undo after a reload is not a delete. */
-  const [undoable, setUndoable] = useState<Undoable | null>(null)
   const remoteSaveTimer = useRef<number | undefined>(undefined)
   const latestJson = useRef<string>('')
   /* Where the copy on screen last came from, when that was somewhere else.
@@ -1374,6 +1317,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   })
   // In a single space, new things land there. In All he picks, and the pick sticks.
   const space: SpaceId = isSpace(view) ? view : writeSpace
+  /* Undo and the graveyard are genuinely cross-domain -- every slice that
+     deletes something calls armUndo/bury/digUp -- so they are composed in
+     here, ahead of the domains that need them, rather than owned by any
+     one of those domains. */
+  const { undoable, armUndo, undoDelete, dismissUndo } = useUndo()
+  const { graveyard, setGraveyard, bury, digUp } = useGraveyard(persisted?.graveyard)
+  const notesSlice = useNotesSlice(persisted, { space, armUndo, bury, digUp })
+  const { notes, setNotes, noteFolders, setNoteFolders } = notesSlice
   const setSpace = (s: SpaceId) => setWriteSpace(s)
   const setView = (v: ViewId) => { setViewState(v); if (isSpace(v)) setWriteSpace(v); setOpenProject(null) }
   /* A record belongs to exactly one space. The old form treated a space-less row
@@ -2046,8 +1997,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return on ? [...rest, ...stepIds.map((stepId) => ({ routineId, stepId, day }))] : rest
     })
   }
-
-  const armUndo = (label: string, restore: () => void) => setUndoable({ id: newId('u'), label, restore })
 
   const value: Store = {
     version: 3,
@@ -2795,108 +2744,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     syncOrigin,
     notes, noteFolders,
-    addNote: (folderId, body = '') => {
-      const id = newId('note')
-      const sp = spaceOfFolder(folderId, noteFolders) ?? space
-      setNotes((prev) => [{
-        id, space: sp, folderId, title: noteTitle(body), body,
-        color: 'amber', when: todayKey(), updatedAt: Date.now(), hist: [], dev: deviceId(),
-      }, ...prev])
-      return id
-    },
-    /* Every body this note has had leaves its hash behind. That trail is what
-       lets a merge on another device tell "I am behind" from "we both wrote",
-       so the cost of keeping it is one small string per edit. */
-    updateNote: (id, patch) => setNotes((prev) => prev.map((n) => {
-      if (n.id !== id) return n
-      const bodyChanged = patch.body !== undefined && patch.body !== n.body
-      return {
-        ...n, ...patch,
-        title: patch.body !== undefined ? noteTitle(patch.body) : n.title,
-        hist: bodyChanged ? [...(n.hist ?? []), bodyHash(n.body)].slice(-HIST) : n.hist,
-        /* Who wrote it last. A merge uses this to tell this device's own
-           earlier push from a genuinely different device, which is the whole
-           of the "another device" question. */
-        dev: deviceId(),
-        updatedAt: Date.now(),
-      }
-    })),
-    /* Filing a note keeps the note where it was written. It used to adopt the
-       folder's workspace, which is how a note moved into a folder made in
-       Michael's Corner quietly became a Corner note. Folders are folders now:
-       they hold notes, they do not reassign them. */
-    /* Ticking a note is not an edit of its text, so it does not touch hist or
-       the body. It does stamp updatedAt, because a note that just changed state
-       has changed and the list should feel it. Unpinned on the way out: a done
-       note holding a pinned slot at the top is exactly the clutter this removes. */
-    setNoteDone: (id, done) => setNotes((prev) => prev.map((n) => (n.id === id
-      ? { ...n, done: done ? Date.now() : undefined, pinned: done ? false : n.pinned, dev: deviceId(), updatedAt: Date.now() }
-      : n))),
-    moveNote: (id, folderId) => setNotes((prev) => prev.map((n) => (n.id === id
-      ? { ...n, folderId, updatedAt: Date.now() }
-      : n))),
-    deleteNote: (id) => {
-      const before = notes
-      setNotes((prev) => prev.filter((n) => n.id !== id))
-      bury(rowKey('notes', { id }))
-      armUndo('Note deleted', () => { setNotes(before); digUp(rowKey('notes', { id })) })
-    },
-    /* The other device's paragraph joins this one under a rule, rather than him
-       having to copy it out by hand before it can be dismissed. */
-    keepNoteConflict: (id) => setNotes((prev) => prev.map((n) => (n.id === id && n.conflict
-      ? {
-        ...n,
-        body: `${n.body}\n\n--- from another device ---\n${n.conflict.body}`,
-        title: n.title,
-        hist: [...(n.hist ?? []), bodyHash(n.body), bodyHash(n.conflict.body)].slice(-HIST), dev: deviceId(),
-        conflict: undefined,
-        updatedAt: Date.now(),
-      }
-      : n))),
-    dropNoteConflict: (id) => setNotes((prev) => prev.map((n) => (n.id === id
-      ? { ...n, conflict: undefined, hist: [...(n.hist ?? []), ...(n.conflict ? [bodyHash(n.conflict.body)] : [])].slice(-HIST), dev: deviceId(), updatedAt: Date.now() }
-      : n))),
+    addNote: notesSlice.addNote, updateNote: notesSlice.updateNote, setNoteDone: notesSlice.setNoteDone,
+    moveNote: notesSlice.moveNote, deleteNote: notesSlice.deleteNote,
+    keepNoteConflict: notesSlice.keepNoteConflict, dropNoteConflict: notesSlice.dropNoteConflict,
+    addNoteFolder: notesSlice.addNoteFolder, renameNoteFolder: notesSlice.renameNoteFolder,
+    deleteNoteFolder: notesSlice.deleteNoteFolder, renameNoteTag: notesSlice.renameNoteTag,
 
-    addNoteFolder: (sp, name) => {
-      const id = newId('nf')
-      const order = noteFolders.filter((f) => f.space === sp).length
-      setNoteFolders((prev) => [...prev, { id, space: sp, name: name.trim() || 'New folder', parentId: spaceFolderId(sp), order }])
-      return id
-    },
-    renameNoteFolder: (id, name) => setNoteFolders((prev) => prev.map((f) => (f.id === id ? { ...f, name: name.trim() || f.name } : f))),
-    /* Deleting a shelf does not burn the books: its notes go up to the workspace
-       folder, where he can still find every one of them. */
-    deleteNoteFolder: (id) => {
-      const folder = noteFolders.find((f) => f.id === id)
-      if (!folder) return
-      const beforeFolders = noteFolders
-      const beforeNotes = notes
-      setNoteFolders((prev) => prev.filter((f) => f.id !== id))
-      setNotes((prev) => prev.map((n) => (n.folderId === id ? { ...n, folderId: folder.parentId, updatedAt: Date.now() } : n)))
-      bury(rowKey('noteFolders', { id }))
-      const moved = notes.filter((n) => n.folderId === id).length
-      armUndo(moved ? `Folder deleted, ${moved} ${moved === 1 ? 'note' : 'notes'} moved up` : 'Folder deleted', () => {
-        setNoteFolders(beforeFolders); setNotes(beforeNotes); digUp(rowKey('noteFolders', { id }))
-      })
-    },
-    renameNoteTag: (from, to) => {
-      const clean = to.replace(/^#/, '').replace(/[^\p{L}\d_/-]/gu, '')
-      if (!clean) return
-      /* Not \b: that boundary is spelled in ASCII, so #test would reach inside
-         #testů and rename half a Czech word. The lookahead asks the real
-         question, which is whether the tag actually ends there. */
-      const esc = from.replace(/^#/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      const re = new RegExp(`#${esc}(?![\\p{L}\\d_/-])`, 'giu')
-      setNotes((prev) => prev.map((n) => {
-        const body = n.body.replace(re, `#${clean}`)
-        if (body === n.body) return n
-        return { ...n, body, title: noteTitle(body), hist: [...(n.hist ?? []), bodyHash(n.body)].slice(-HIST), dev: deviceId(), updatedAt: Date.now() }
-      }))
-    },
-
-    undoable,
-    undoDelete: () => { undoable?.restore(); setUndoable(null) },
-    dismissUndo: () => setUndoable(null),
+    undoable, undoDelete, dismissUndo,
 
     todayIndex,
     weekLedger,

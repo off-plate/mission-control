@@ -2690,7 +2690,7 @@ await step('apps: a shelf that embeds nothing until an app is opened', async () 
   if (!shelf.tiles.includes('Watchless')) throw new Error(`Watchless left the shelf: ${shelf.tiles.join(', ')}`)
   if (shelf.tiles.includes('My Mind')) throw new Error('My Mind is still on the shelf')
   if (shelf.tiles.includes('Compass')) throw new Error('Compass is still on the shelf')
-  if (shelf.tiles.length !== 3) throw new Error(`${shelf.tiles.length} apps on the shelf: ${shelf.tiles.join(', ')}`)
+  if (shelf.tiles.length !== 4) throw new Error(`${shelf.tiles.length} apps on the shelf: ${shelf.tiles.join(', ')}`)
   if (shelf.subs) throw new Error('a tile carries a subtitle')
 })
 

@@ -12,3 +12,6 @@ release/
 
 # Local-only screenshots from scripts/hpshot.mjs
 .hp-shots/
+
+# Local-only screenshots from scripts/zshot.mjs
+.z-shots/

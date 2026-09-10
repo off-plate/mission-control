@@ -9411,6 +9411,47 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .zrow.is-done .zrow-title { color: var(--z-muted); text-decoration: line-through; }
 .zrow.is-active .zrow-title { font-weight: 600; }
 
+/* ---- a task's steps, in the room ----
+   His ask (2026-09-11). The list already mirrors Today; a task broken into
+   steps should read the same way here, because the step is what he actually
+   starts on. The active task's steps are open by default -- that is the task
+   the timer is pointed at -- and the count doubles as the control. */
+.zrow-wrap { display: flex; flex-direction: column; }
+.zrow-wrap.has-steps { padding-bottom: 4px; }
+.zrow-steps {
+  flex: none; display: inline-flex; align-items: center; gap: 3px;
+  padding: 4px 7px; margin-right: 4px; border-radius: 8px;
+  border: 1px solid var(--z-line); background: none; cursor: pointer;
+  font: inherit; font-size: 10px; font-weight: 700;
+  color: var(--z-muted); transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+.zrow-steps:hover { color: var(--z-bone); border-color: var(--z-bone); }
+.zrow-steps svg { transition: transform 0.2s var(--hp-soft, ease); }
+.zrow-steps.is-open { color: var(--z-bone); background: rgba(237, 230, 216, 0.08); }
+.zrow-steps.is-open svg { transform: rotate(180deg); }
+
+.zsteps {
+  display: flex; flex-direction: column; gap: 1px;
+  margin: 2px 0 6px 34px; padding-left: var(--s4);
+  border-left: 1px solid var(--z-line);
+}
+.zsub { display: flex; align-items: center; gap: var(--s3); border-radius: 8px; padding: 4px 6px 4px 0; }
+.zsub-tick {
+  flex: none; width: 15px; height: 15px; border-radius: 5px; cursor: pointer;
+  border: 1.5px solid rgba(237, 230, 216, 0.3); background: none; color: var(--z-ground);
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background 0.2s, border-color 0.2s;
+}
+.zsub-tick:hover { border-color: var(--z-bone); }
+.zsub-tick svg { width: 10px; height: 10px; }
+.zsub.is-done .zsub-tick { background: var(--z-bone); border-color: var(--z-bone); }
+.zsub-title {
+  flex: 1; min-width: 0; font-size: var(--text-xs); line-height: 1.35; color: var(--z-bone);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.zsub-min { flex: none; font-size: 10px; color: var(--z-muted); }
+.zsub.is-done .zsub-title { color: var(--z-muted); text-decoration: line-through; }
+
 .znow-queued {
   margin: var(--s4) 0 0; text-align: center;
   font-size: var(--text-sm); color: var(--z-muted);

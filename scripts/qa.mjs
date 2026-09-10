@@ -665,6 +665,60 @@ await step('the zone: with more than one task open, he can choose which one to f
   }, KEY)
   if (stored !== true) throw new Error(`ticking in the room did not reach the stored task (done = ${stored})`)
 })
+await step('the zone: a broken-down task shows its steps, and they tick from in here', async () => {
+  await fresh('today')
+  await page.evaluate(() => {
+    localStorage.setItem('mc-view', 'personal'); localStorage.setItem('mc-space', 'personal')
+    localStorage.removeItem('mc-pomodoro')
+  })
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const d = new Date()
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    s.tasks = [
+      { id: 'sub-t1', title: 'Task with steps', source: 'mc', estimateMin: 60, estimated: true, done: false, space: 'personal', list: 'today', category: 'deep', createdAt: key, plannedOn: key,
+        subtasks: [
+          { id: 'sub-t1s0', title: 'First step', estimateMin: 20, done: false },
+          { id: 'sub-t1s1', title: 'Second step', estimateMin: 40, done: false },
+        ] },
+      { id: 'sub-t2', title: 'Task with no steps', source: 'mc', estimateMin: 15, estimated: true, done: false, space: 'personal', list: 'today', category: 'admin', createdAt: key, plannedOn: key },
+    ]
+    localStorage.setItem(K, JSON.stringify(s))
+  }, KEY)
+  await page.goto(`${URL}#/zone`); await page.reload(); await page.waitForTimeout(900)
+  const skip = page.getByRole('button', { name: 'Not today' })
+  if (await skip.count()) { await skip.first().click(); await page.waitForTimeout(400) }
+  await page.waitForSelector('.zroom', { timeout: 10000 })
+
+  /* A task with no breakdown offers no control at all. */
+  const plain = page.locator('.zrow-wrap', { hasText: 'Task with no steps' })
+  if (await plain.locator('.zrow-steps').count()) throw new Error('a task with no subtasks still offers a steps control')
+
+  /* His ask (2026-09-11): pointing the timer at a broken-down task puts its
+     steps on screen without a second click, because the step is what he
+     actually starts on. Pointed explicitly rather than left to the auto pick,
+     which is free to choose the task WITHOUT steps -- it did on the first run
+     of this test, and an assertion that depends on that choice is testing the
+     picker, not the steps. */
+  await page.locator('.zrow-pick', { hasText: 'Task with steps' }).click()
+  await page.waitForTimeout(400)
+  const steps = await page.locator('.zsteps .zsub-title').allInnerTexts()
+  if (!steps.some((s) => s.includes('First step'))) throw new Error("the active task's steps are not showing in the room")
+
+  /* Ticking a step in here has to reach the same store Today writes to. */
+  await page.locator('.zsub', { hasText: 'First step' }).locator('.zsub-tick').click()
+  await page.waitForTimeout(400)
+  const stored = await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K) ?? '{}')
+    return (s.tasks ?? []).find((t) => t.id === 'sub-t1')?.subtasks?.find((x) => x.id === 'sub-t1s0')?.done ?? null
+  }, KEY)
+  if (stored !== true) throw new Error(`ticking a step in the room did not reach the store (done = ${stored})`)
+
+  const count = page.locator('.zrow-wrap', { hasText: 'Task with steps' }).locator('.zrow-steps')
+  if (!/1\/2/.test(await count.innerText())) throw new Error('the step count did not follow the tick')
+  await count.click(); await page.waitForTimeout(300)
+  if (await page.locator('.zsteps').count()) throw new Error('collapsing the steps left them on screen')
+})
 await step('mundi opus: leaving the zone does not stop the music, and the corner picks it up', async () => {
   await fresh('zone')
   const skip = page.getByRole('button', { name: 'Not today' })

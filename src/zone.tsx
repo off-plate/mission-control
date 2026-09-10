@@ -77,6 +77,11 @@ function BackIcon() {
     <Icon.ChevronLeft size={17} />
   )
 }
+function ChevronIcon() {
+  return (
+    <Icon.ChevronDown size={13} />
+  )
+}
 function CheckIcon() {
   return (
     <Icon.Check size={14} strokeWidth={2.4} />
@@ -92,8 +97,16 @@ function CheckIcon() {
    It carries the two things he asked for and nothing else: pick what the
    timer is pointed at, and tick a task off without leaving the room. */
 function ZoneList({ activeId, onPick }: { activeId: string | null; onPick: (id: string) => void }) {
-  const { tasks, inView, toggleTask, space } = useStore()
+  const { tasks, inView, toggleTask, toggleSubtask, space } = useStore()
   const today = localDateKey()
+  /* His ask (2026-09-11): see a task's steps in here too. The one the timer is
+     pointed at opens on its own, because that is the task he is actually
+     working and its steps are the next thing he needs; everything else opens
+     on a click, so a day of broken-down tasks does not bury the list. An entry
+     here overrides that default in either direction. */
+  const [override, setOverride] = useState<Record<string, boolean>>({})
+  const stepsShown = (t: Task) => override[t.id] ?? (activeId === t.id)
+  const toggleSteps = (t: Task) => setOverride((o) => ({ ...o, [t.id]: !stepsShown(t) }))
   const mine = tasks
     .filter((t) => inView(t.space) && t.list === 'today' && (t.plannedOn ?? today) === today)
     .sort((a, b) => (Number(a.done) - Number(b.done)) || SLOT_ORDER(a.slot) - SLOT_ORDER(b.slot))
@@ -122,28 +135,65 @@ function ZoneList({ activeId, onPick }: { activeId: string | null; onPick: (id: 
           {groups.map(([key, rows]) => (
             <div className="zlist-group" key={key}>
               <span className="zlist-slot">{key === 'done' ? 'Done' : key === 'unslotted' ? 'Anytime' : SLOTS.find((s) => s.id === key)?.label ?? key}</span>
-              {rows.map((t) => (
-                <div key={t.id} className={`zrow${t.done ? ' is-done' : ''}${activeId === t.id ? ' is-active' : ''}`}>
-                  <button
-                    className="zrow-tick"
-                    role="checkbox"
-                    aria-checked={!!t.done}
-                    aria-label={t.done ? `Reopen ${t.title}` : `Finish ${t.title}`}
-                    onClick={() => toggleTask(t.id)}
-                  >
-                    {t.done && <CheckIcon />}
-                  </button>
-                  <button
-                    className="zrow-pick"
-                    onClick={() => onPick(t.id)}
-                    disabled={t.done}
-                    title={t.done ? undefined : 'Point the timer at this'}
-                  >
-                    <span className="zrow-title">{t.title}</span>
-                    {isEstimated(t) && t.estimateMin > 0 && <span className="zrow-min mono">{taskMinutes(t)}m</span>}
-                  </button>
-                </div>
-              ))}
+              {rows.map((t) => {
+                const steps = t.subtasks ?? []
+                const doneSteps = steps.filter((s) => s.done).length
+                const showSteps = steps.length > 0 && stepsShown(t)
+                return (
+                  <div key={t.id} className={`zrow-wrap${showSteps ? ' has-steps' : ''}`}>
+                    <div className={`zrow${t.done ? ' is-done' : ''}${activeId === t.id ? ' is-active' : ''}`}>
+                      <button
+                        className="zrow-tick"
+                        role="checkbox"
+                        aria-checked={!!t.done}
+                        aria-label={t.done ? `Reopen ${t.title}` : `Finish ${t.title}`}
+                        onClick={() => toggleTask(t.id)}
+                      >
+                        {t.done && <CheckIcon />}
+                      </button>
+                      <button
+                        className="zrow-pick"
+                        onClick={() => onPick(t.id)}
+                        disabled={t.done}
+                        title={t.done ? undefined : 'Point the timer at this'}
+                      >
+                        <span className="zrow-title">{t.title}</span>
+                        {isEstimated(t) && t.estimateMin > 0 && <span className="zrow-min mono">{taskMinutes(t)}m</span>}
+                      </button>
+                      {steps.length > 0 && (
+                        <button
+                          className={`zrow-steps${showSteps ? ' is-open' : ''}`}
+                          onClick={() => toggleSteps(t)}
+                          aria-expanded={showSteps}
+                          aria-label={`${showSteps ? 'Hide' : 'Show'} the ${steps.length} steps of ${t.title}`}
+                        >
+                          <span className="mono">{doneSteps}/{steps.length}</span>
+                          <ChevronIcon />
+                        </button>
+                      )}
+                    </div>
+                    {showSteps && (
+                      <div className="zsteps">
+                        {steps.map((s) => (
+                          <div key={s.id} className={`zsub${s.done ? ' is-done' : ''}`}>
+                            <button
+                              className="zsub-tick"
+                              role="checkbox"
+                              aria-checked={s.done}
+                              aria-label={s.done ? `Reopen ${s.title}` : `Finish ${s.title}`}
+                              onClick={() => toggleSubtask(t.id, s.id)}
+                            >
+                              {s.done && <CheckIcon />}
+                            </button>
+                            <span className="zsub-title">{s.title}</span>
+                            {s.estimateMin > 0 && <span className="zsub-min mono">{s.estimateMin}m</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           ))}
         </div>

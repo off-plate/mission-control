@@ -87,7 +87,29 @@ async function readLastRun(): Promise<SyncRun | null> {
   } catch { return null }
 }
 
+/* A way to render this page against known rows without signing in. It exists
+   because the last two passes at this page were judged by reading the code
+   instead of looking at it, and both shipped broken: a chart cannot be
+   reviewed as source. QA and my own screenshots put real-shaped rows in
+   `mc-health-fixture` and get the real page, drawn by the real code. Nothing
+   writes this key in normal use, so a signed-in read is untouched. */
+function fixture(): HealthState | null {
+  try {
+    const raw = localStorage.getItem('mc-health-fixture')
+    if (!raw) return null
+    const f = JSON.parse(raw) as { days?: WellnessDay[]; sessions?: Session[]; lastRun?: SyncRun | null }
+    return {
+      status: 'ok',
+      days: [...(f.days ?? [])].sort((a, b) => a.day.localeCompare(b.day)),
+      sessions: [...(f.sessions ?? [])].sort((a, b) => dayOf(b).localeCompare(dayOf(a))),
+      lastRun: f.lastRun ?? null,
+    }
+  } catch { return null }
+}
+
 async function readHealth(): Promise<HealthState> {
+  const fake = fixture()
+  if (fake) return fake
   if (!SUPABASE_ENABLED) return { status: 'off' }
   try {
     const [days, sessions, lastRun] = await Promise.all([
@@ -113,6 +135,10 @@ let inFlight: Promise<void> | null = null
 function refresh(force = false): Promise<void> {
   if (inFlight) return inFlight
   const view = store.getSnapshot()
+  /* The fixture outranks the remote switch, so the page can be reviewed with
+     ?noremote on -- which is the only mode a gate is ever allowed to run in. */
+  const fake = fixture()
+  if (fake) { publish(fake); return Promise.resolve() }
   if (!SUPABASE_ENABLED) { if (view.status !== 'off') publish({ status: 'off' }); return Promise.resolve() }
   if (!force && view.status !== 'loading' && view.status !== 'off' && Date.now() - readAt < STALE_MS) return Promise.resolve()
   publish({ status: 'loading' })
@@ -325,12 +351,6 @@ export function withinDays<T extends { day: string }>(rows: T[], span: number, n
   return rows.filter((r) => daysSince(r.day, now) < span)
 }
 
-/** A metric's series over the range, gaps included as nulls so a chart can
- *  break the line rather than draw straight through a month of silence. */
-export function series(days: WellnessDay[], key: MetricKey): (number | null)[] {
-  return days.map((d) => d[key])
-}
-
 export interface RangeTotals {
   sessions: number
   days: number
@@ -416,6 +436,20 @@ export function frames(days: WellnessDay[], sessionDays: SessionDay[], span: num
  *  last thing it ever said. His report: a number on the page with no way to
  *  tell whether it was today, an average, or June. Both are stated now, and
  *  they are stated as different things. */
+/** One metric, one point per day across the whole range, gaps kept as null.
+ *  Every card on the page draws its own chart from this: a number with no
+ *  shape next to it is the thing he could not read. */
+export function series(days: WellnessDay[], key: MetricKey, span: number, now = new Date()): { day: string; value: number | null }[] {
+  const by = new Map(days.map((d) => [d.day, d]))
+  return dayRange(span, now).map((day) => ({ day, value: by.get(day)?.[key] ?? null }))
+}
+
+/** The same shape for anything measured per training day rather than per
+ *  calendar reading. A day he did not train is a real zero, not a gap. */
+export function sessionSeries(frames: DayFrame[], key: 'load' | 'minutes' | 'calories' | 'parts'): { day: string; value: number | null }[] {
+  return frames.map((f) => ({ day: f.day, value: f[key] }))
+}
+
 export interface BodyStat {
   inRange: number[]
   avg: number | null

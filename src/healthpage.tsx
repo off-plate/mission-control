@@ -297,6 +297,18 @@ function DayRow({ d, hardest }: { d: SessionDay; hardest: number }) {
           <span className="hp-day-type">{prettyType(d.type)}</span>
           {isHardest && <span className="hp-day-best">hardest of the range</span>}
         </span>
+        {/* The dead space in the middle of the row, spent on the one thing the
+            row could not say: what the day was actually made of. One bar per
+            fragment the watch filed, sized by its effort, so a day that was one
+            long push looks different from a day of six scraps -- and the count
+            on the right stops being a number he has to take on trust. */}
+        <span className="hp-day-shape" aria-hidden="true">
+          {d.items.map((s, i) => {
+            const v = s.icu_training_load ?? (s.moving_time ? s.moving_time / 60 : 0)
+            const top = Math.max(...d.items.map((p) => p.icu_training_load ?? (p.moving_time ? p.moving_time / 60 : 0)), 1)
+            return <i key={s.id ?? i} style={{ height: `${Math.max(10, (v / top) * 100)}%` }} />
+          })}
+        </span>
       </span>
 
       <span className="hp-day-stats">

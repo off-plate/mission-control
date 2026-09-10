@@ -43,13 +43,22 @@ export interface Session {
   distance: number | null
 }
 
+/** One row of zepp_sync_log: when the worker last ran, and what it wrote. */
+export interface SyncRun {
+  ran_at: string
+  ok: boolean
+  wellness_rows: number | null
+  activity_rows: number | null
+  error: string | null
+}
+
 export type HealthState =
   | { status: 'off' }
   | { status: 'signed-out' }
   | { status: 'loading' }
   | { status: 'empty' }
   | { status: 'error'; message: string }
-  | { status: 'ok'; days: WellnessDay[]; sessions: Session[] }
+  | { status: 'ok'; days: WellnessDay[]; sessions: Session[]; lastRun: SyncRun | null }
 
 const STALE_MS = 300_000
 
@@ -66,13 +75,25 @@ function publish(next: HealthState): void {
 
 const WELLNESS_COLS = 'day,resting_hr,sleep_secs,sleep_score,steps,weight,ctl,atl,ramp_rate'
 const SESSION_COLS = 'id,start_date,start_date_local,type,name,moving_time,average_heartrate,max_heartrate,calories,icu_training_load,distance'
+const RUN_COLS = 'ran_at,ok,wellness_rows,activity_rows,error'
+
+/** The newest row of the worker's own log. Read separately from the data so a
+ *  log that is empty, or a policy that hides it, never costs him the page. */
+async function readLastRun(): Promise<SyncRun | null> {
+  try {
+    const rows = await readRows<SyncRun>('zepp_sync_log', RUN_COLS)
+    if (!rows?.length) return null
+    return [...rows].sort((a, b) => b.ran_at.localeCompare(a.ran_at))[0]
+  } catch { return null }
+}
 
 async function readHealth(): Promise<HealthState> {
   if (!SUPABASE_ENABLED) return { status: 'off' }
   try {
-    const [days, sessions] = await Promise.all([
+    const [days, sessions, lastRun] = await Promise.all([
       readRows<WellnessDay>('zepp_wellness', WELLNESS_COLS),
       readRows<Session>('zepp_activities', SESSION_COLS),
+      readLastRun(),
     ])
     if (days === null || sessions === null) return { status: 'signed-out' }
     if (days.length === 0 && sessions.length === 0) return { status: 'empty' }
@@ -80,6 +101,7 @@ async function readHealth(): Promise<HealthState> {
       status: 'ok',
       days: [...days].sort((a, b) => a.day.localeCompare(b.day)),
       sessions: [...sessions].sort((a, b) => dayOf(b).localeCompare(dayOf(a))),
+      lastRun,
     }
   } catch (e) {
     return { status: 'error', message: e instanceof Error ? e.message : 'Health data could not be read.' }
@@ -104,6 +126,99 @@ export function useHealth(): { state: HealthState; reload: () => void } {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const reload = useCallback(() => { void refresh(true) }, [])
   return { state, reload }
+}
+
+/* ------------------------------------------------------------------ *
+ * SYNCING ON DEMAND.
+ *
+ * His ask: a button that actually goes and fetches. The worker that
+ * talks to Intervals.icu is a GitHub Action in off-plate/zepp-health --
+ * it holds the API key, and it must, because a key in this bundle is a
+ * key on a public site. So this presses the button that repo already
+ * exposes for it: a Netlify function that dispatches the workflow.
+ *
+ * Then it WAITS FOR THE REAL ANSWER rather than flashing "synced" the
+ * moment the dispatch is accepted. The dispatch only means GitHub took
+ * the request; the sync itself lands about a minute later, and the
+ * worker writes its own row to zepp_sync_log when it is done. That row
+ * appearing is the only honest evidence anything synced, so that is
+ * what this watches for, and what it reports back -- including the
+ * worker's own error when it failed.
+ * ------------------------------------------------------------------ */
+const SYNC_ENDPOINT = 'https://zepp-health.netlify.app/.netlify/functions/sync'
+/** The worker is dispatched, queued, installs and runs. Measured at roughly a
+ *  minute end to end; three is the point at which something is wrong. */
+const SYNC_TIMEOUT_MS = 180_000
+const SYNC_POLL_MS = 4_000
+
+export type SyncPhase =
+  | { phase: 'idle' }
+  | { phase: 'asking' }
+  | { phase: 'running' }
+  | { phase: 'done'; run: SyncRun }
+  | { phase: 'failed'; message: string }
+
+const syncStore = createLiveStore<SyncPhase>({ phase: 'idle' })
+
+const wait = (ms: number) => new Promise((r) => { setTimeout(r, ms) })
+
+async function runSync(): Promise<void> {
+  const now = syncStore.getSnapshot()
+  if (now.phase === 'asking' || now.phase === 'running') return
+  if (!SUPABASE_ENABLED) { syncStore.publish({ phase: 'failed', message: 'Sync is off on this device.' }); return }
+
+  syncStore.publish({ phase: 'asking' })
+  const before = (await readLastRun())?.ran_at ?? ''
+
+  try {
+    const res = await fetch(SYNC_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lookback_days: '60' }),
+    })
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '')
+      syncStore.publish({ phase: 'failed', message: detail.trim() || `The sync worker answered ${res.status}.` })
+      return
+    }
+  } catch {
+    /* A blocked request and an unreachable one look identical from here, and
+       both mean the same thing to him: it did not start. */
+    syncStore.publish({ phase: 'failed', message: 'Could not reach the sync worker.' })
+    return
+  }
+
+  syncStore.publish({ phase: 'running' })
+  const until = Date.now() + SYNC_TIMEOUT_MS
+  while (Date.now() < until) {
+    await wait(SYNC_POLL_MS)
+    const run = await readLastRun()
+    if (run && run.ran_at > before) {
+      await refresh(true)
+      syncStore.publish(run.ok
+        ? { phase: 'done', run }
+        : { phase: 'failed', message: run.error?.trim() || 'The worker ran and reported a failure.' })
+      return
+    }
+  }
+  syncStore.publish({ phase: 'failed', message: 'It started, but nothing had landed after three minutes.' })
+}
+
+export function useHealthSync(): { sync: SyncPhase; start: () => void; clear: () => void } {
+  const sync = useSyncExternalStore(syncStore.subscribe, syncStore.getSnapshot, syncStore.getSnapshot)
+  const start = useCallback(() => { void runSync() }, [])
+  const clear = useCallback(() => { syncStore.publish({ phase: 'idle' }) }, [])
+  return { sync, start, clear }
+}
+
+/** "2 hours ago", from a timestamp rather than a day. */
+export function agoFrom(iso: string, now = Date.now()): string {
+  const mins = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60_000))
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.round(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.round(hrs / 24)}d ago`
 }
 
 /* ------------------------------------------------------------------ *

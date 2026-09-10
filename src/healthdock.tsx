@@ -4,7 +4,7 @@
    session. The full page carries the charts; this carries the verdict. */
 import { type ReactNode } from 'react'
 import { useStore } from './store'
-import { daysSince, fmtDay, fmtHm, lastReading, rollUpByDay, totals, useHealth, withinDays } from './health'
+import { agoFrom, daysSince, fmtDay, fmtHm, lastReading, rollUpByDay, totals, useHealth, useHealthSync, withinDays } from './health'
 import * as Icon from './icons'
 
 export function HealthChip() {
@@ -14,6 +14,7 @@ export function HealthChip() {
 export function HealthPanel({ dockControls, onOpenFull }: { dockControls?: ReactNode; onOpenFull?: () => void }) {
   const { setPage } = useStore()
   const { state } = useHealth()
+  const { sync, start } = useHealthSync()
 
   const openFull = () => { setPage('health'); onOpenFull?.() }
 
@@ -24,6 +25,7 @@ export function HealthPanel({ dockControls, onOpenFull }: { dockControls?: React
   const sessionDays = rollUpByDay(sessions)
   const last = sessionDays[0] ?? null
   const week = totals(withinDays(sessionDays, 7))
+  const busy = sync.phase === 'asking' || sync.phase === 'running'
 
   return (
     <div className="billsdock-panel">
@@ -56,7 +58,17 @@ export function HealthPanel({ dockControls, onOpenFull }: { dockControls?: React
                 <span>This week</span>
                 <b>{week.days ? `${week.days} ${week.days === 1 ? 'day' : 'days'}, ${fmtHm(week.minutes)}` : 'nothing yet'}</b>
               </div>
+              <div className="hpdock-row">
+                <span>Synced</span>
+                <b>{state.lastRun ? agoFrom(state.lastRun.ran_at) : 'never'}</b>
+              </div>
             </div>
+            <button className="btn btn-quiet hpdock-sync" onClick={start} disabled={busy}>
+              <Icon.Repeat size={13} className={busy ? 'hp-spin' : undefined} />
+              {busy ? 'Syncing…' : 'Sync now'}
+            </button>
+            {sync.phase === 'done' && <p className="hpdock-note">Synced {sync.run.wellness_rows ?? 0} days, {sync.run.activity_rows ?? 0} sessions.</p>}
+            {sync.phase === 'failed' && <p className="hpdock-note is-bad">{sync.message}</p>}
           </div>
         )}
       </div>

@@ -59,6 +59,9 @@ export type PageId =
    *  to remember what exists and what it does. Reached from the dock only,
    *  same shape as Bills/Timeline/Contacts -- not a workspace page. */
   | 'skills'
+  /** The body, read from the zepp_* tables the watch already feeds through
+   *  Intervals.icu. Dock only, same shape as Bills/Timeline/Contacts/Skills. */
+  | 'health'
 
 export type WidgetType =
   | 'clock'

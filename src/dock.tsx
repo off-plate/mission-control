@@ -8,6 +8,7 @@ import { TimelineChip, TimelinePanel } from './timelinedock'
 import { ContactsChip, ContactsPanel } from './contactsdock'
 import { AssistantChip, AssistantPanel } from './assistantdock'
 import { SkillsChip, SkillsPanel } from './skillsdock'
+import { HealthChip, HealthPanel } from './healthdock'
 import * as Icon from './icons'
 
 /* Hover opens the dial now, on his instruction (2026-09-02) -- the same
@@ -250,7 +251,7 @@ function useFocusToast(announcedAt: number, dockIsClosed: boolean): 'hidden' | '
    the notes store) and only hands this file what it needs to render.
    Rendered from inside PomodoroProvider (see pomodoro.tsx), which is what
    puts it inside both the Pomodoro context and the Store context it needs. */
-type PanelFace = 'media' | 'note' | 'bills' | 'timeline' | 'contacts' | 'assistant' | 'skills'
+type PanelFace = 'media' | 'note' | 'bills' | 'timeline' | 'contacts' | 'assistant' | 'skills' | 'health'
 type Mode = 'closed' | 'menu' | PanelFace
 
 export function Dock() {
@@ -267,7 +268,8 @@ export function Dock() {
   const contactsHold = useHoldForFull(() => { setPage('contacts'); go('closed') })
   const assistantHold = useHoldForFull(() => { setPage('assistant'); go('closed') })
   const skillsHold = useHoldForFull(() => { setPage('skills'); go('closed') })
-  const holdFor: Partial<Record<PanelFace, ReturnType<typeof useHoldForFull>>> = { note: noteHold, bills: billsHold, timeline: timelineHold, contacts: contactsHold, assistant: assistantHold, skills: skillsHold }
+  const healthHold = useHoldForFull(() => { setPage('health'); go('closed') })
+  const holdFor: Partial<Record<PanelFace, ReturnType<typeof useHoldForFull>>> = { note: noteHold, bills: billsHold, timeline: timelineHold, contacts: contactsHold, assistant: assistantHold, skills: skillsHold, health: healthHold }
   const scrollHidden = useHideOnScroll(mode === 'closed')
   const pomo = usePomodoro()
   const toastPhase = useFocusToast(pomo.announcedAt, mode === 'closed')
@@ -317,6 +319,7 @@ export function Dock() {
     { id: 'contacts' as const, label: 'Contacts', chip: <ContactsChip />, switchIcon: <Icon.DockUser size={17} /> },
     { id: 'assistant' as const, label: 'Assistant', chip: <AssistantChip />, switchIcon: <Icon.Waveform size={17} /> },
     { id: 'skills' as const, label: 'Skills', chip: <SkillsChip />, switchIcon: <Icon.DockBook size={17} /> },
+    { id: 'health' as const, label: 'Health', chip: <HealthChip />, switchIcon: <Icon.DockHeartbeat size={17} /> },
   ]
 
   if (mode === 'closed' || mode === 'menu') {
@@ -507,6 +510,16 @@ export function Dock() {
       <div className="dock">
         <div className="dock-face">
           <SkillsPanel dockControls={switchButtons} onOpenFull={() => go('closed')} />
+        </div>
+      </div>
+    )
+  }
+
+  if (mode === 'health') {
+    return (
+      <div className="dock">
+        <div className="dock-face">
+          <HealthPanel dockControls={switchButtons} onOpenFull={() => go('closed')} />
         </div>
       </div>
     )

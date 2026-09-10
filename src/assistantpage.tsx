@@ -408,6 +408,26 @@ export function AssistantPage() {
     )))
   }
 
+  /* Send one applied change straight back. Only the full page renders the
+   *  button this answers -- the dock popup shows the same line with nothing
+   *  to press, on purpose (his instruction, 2026-09-10). */
+  const undoOne = (turnIndex: number, doneIndex: number) => {
+    setTurns((prev) => prev.map((t, ti) => {
+      if (ti !== turnIndex) return t
+      const d = t.done?.[doneIndex]
+      if (!d?.undo || d.undone) return t
+      d.undo()
+      return { ...t, done: t.done?.map((x, di) => (di !== doneIndex ? x : { ...x, undone: true })) }
+    }))
+  }
+  const undoAll = (turnIndex: number) => {
+    setTurns((prev) => prev.map((t, ti) => {
+      if (ti !== turnIndex) return t
+      t.done?.forEach((d) => { if (d.undo && !d.undone) d.undo() })
+      return { ...t, done: t.done?.map((x) => (x.undo && !x.undone ? { ...x, undone: true } : x)) }
+    }))
+  }
+
   useEffect(() => { foot.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }) }, [turns, busy])
   /* Instant while it writes. Smooth-scrolling on every token makes each new
      word fight the last one's animation and the column shivers. */
@@ -511,21 +531,41 @@ export function AssistantPage() {
                       It sits under the sentence because the sentence is an
                       intention and this is the fact. */}
                   {t.done?.length ? (
-                    <ul className="as-did">
-                      {t.done.map((d, k) => (
-                        <li className={d.ok ? 'is-ok' : 'is-no'} key={k}>
-                          {d.ok ? null : <span className="as-did-head">Nothing changed, </span>}
-                          {d.text}
-                          {d.needsActual ? (
-                            <ActualLog
-                              est={d.needsActual.est}
-                              onLog={(m) => logTaskActual(i, k, d.needsActual!.taskId, m)}
-                              onSkip={() => logTaskActual(i, k, d.needsActual!.taskId, d.needsActual!.est)}
-                            />
-                          ) : null}
-                        </li>
-                      ))}
-                    </ul>
+                    <>
+                      <ul className="as-did">
+                        {t.done.map((d, k) => (
+                          <li className={`${d.ok ? 'is-ok' : 'is-no'}${d.undone ? ' is-undone' : ''}`} key={k}>
+                            {d.ok ? null : <span className="as-did-head">Nothing changed, </span>}
+                            {d.text}
+                            {d.undone ? <span className="as-did-undone"> — reverted</span> : null}
+                            {d.undo && !d.undone ? (
+                              <button className="as-did-undo" onClick={() => undoOne(i, k)} title="Undo this one">
+                                <Icon.Rewind size={13} /> Undo
+                              </button>
+                            ) : null}
+                            {d.needsActual ? (
+                              <ActualLog
+                                est={d.needsActual.est}
+                                onLog={(m) => logTaskActual(i, k, d.needsActual!.taskId, m)}
+                                onSkip={() => logTaskActual(i, k, d.needsActual!.taskId, d.needsActual!.est)}
+                              />
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                      {/* A batch worth reviewing as one, not one row at a time --
+                          his ask, verbatim: "are you approving these edits or you
+                          want them revert back". Only past one real change: a
+                          single add already has its own row-level Undo right
+                          there, and a second button next to it would just be
+                          the same choice asked twice. */}
+                      {t.done.filter((d) => d.undo && !d.undone).length > 1 ? (
+                        <div className="as-did-batch">
+                          <span>{t.done.filter((d) => d.undo && !d.undone).length} changes applied</span>
+                          <button className="btn btn-quiet as-did-undoall" onClick={() => undoAll(i)}>Undo all</button>
+                        </div>
+                      ) : null}
+                    </>
                   ) : null}
                   {/* One row of things you can do with the answer: hear it, and
                       go to what it pulled. Play used to sit on its own line above

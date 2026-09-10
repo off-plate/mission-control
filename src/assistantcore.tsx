@@ -214,6 +214,19 @@ export interface Done {
    *  this specifically because a task he finishes by telling the assistant
    *  was going in with no actual time recorded, and no page open to fix it. */
   needsActual?: { taskId: string; est: number }
+  /** Set on the actions common enough, and safe enough, to take straight back:
+   *  a real add, move, estimate or done/undone. His report (2026-09-10): a
+   *  bulk paste that under-did itself with no way to see what actually landed
+   *  or send it back. Not every kind gets one -- a logged contact touch or a
+   *  posted expense has no clean inverse, and this is a real per-row undo, not
+   *  a promise the app cannot keep, so those lines simply carry none. Only
+   *  the full assistant page renders a button for this; the dock popup shows
+   *  the same line with no way to act on it, on purpose (his instruction). */
+  undo?: () => void
+  /** Set once undo has actually been used on this line, so a second render
+   *  shows what happened rather than offering the same button again. Page
+   *  state, not something the doer above ever sets itself. */
+  undone?: boolean
 }
 
 /** Loose enough to find "the noon testing task" from "test testing website",
@@ -520,7 +533,7 @@ function useDoer() {
           else projectNote = ` (no project called "${a.project}", added without one)`
         }
         addedThisRun.add(key)
-        s2.addTask({
+        const newTaskId = s2.addTask({
           title: a.title,
           source: 'mc',
           estimateMin: a.min ?? 15,
@@ -532,7 +545,11 @@ function useDoer() {
           plannedOn: list === 'today' ? day : undefined,
           projectId,
         })
-        out.push({ ok: true, text: `Added to ${slot ? SLOTS.find((x) => x.id === slot)?.label.toLowerCase() : list === 'today' ? 'today' : 'the list'}${projectNote}: ${a.title}` })
+        out.push({
+          ok: true,
+          text: `Added to ${slot ? SLOTS.find((x) => x.id === slot)?.label.toLowerCase() : list === 'today' ? 'today' : 'the list'}${projectNote}: ${a.title}`,
+          undo: () => s2.deleteTask(newTaskId),
+        })
         continue
       }
       if (a.kind === 'workspace') {
@@ -775,20 +792,35 @@ function useDoer() {
                ActualLog). */
             if (a.actualMin != null) {
               s2.logActual(row.id, a.actualMin)
-              return { ok: true, text: `Done: ${row.title} — ${fmtDuration(a.actualMin)}` }
+              /* toggleTask alone reverses the done flag and clears actualMin
+                 the same way finishing it by hand and reopening it would; the
+                 ledger row and focus block logActual wrote behind it are not
+                 unwound. Same trade already made for logSlip elsewhere in
+                 this file: a full undo here would mean carrying every side
+                 effect back out through Ledger and Focus for one row, and the
+                 common case -- catching a bad bulk add -- never reaches it. */
+              return { ok: true, text: `Done: ${row.title} — ${fmtDuration(a.actualMin)}`, undo: () => s2.toggleTask(row.id) }
             }
             s2.toggleTask(row.id)
             return {
               ok: true,
               text: `Done: ${row.title}`,
               needsActual: row.actualMin == null ? { taskId: row.id, est: taskMinutes(row) } : undefined,
+              undo: () => s2.toggleTask(row.id),
             }
           }
           case 'undone':
             if (!row.done) return { ok: true, text: `${row.title} was already open` }
             s2.toggleTask(row.id)
-            return { ok: true, text: `Reopened: ${row.title}` }
+            return { ok: true, text: `Reopened: ${row.title}`, undo: () => s2.toggleTask(row.id) }
           case 'move': {
+            /* Snapshot before any of the writes below: row is this call's own
+               argument, never touched by them, so its fields are exactly what
+               undo needs to put back. */
+            const wasList = row.list
+            const wasSlot = row.slot
+            const wasPlannedOn = row.plannedOn
+            const wasProjectId = row.projectId
             if (a.list && a.list !== row.list) s2.moveTaskList(row.id, a.list, day)
             if (a.slot) {
               if (row.list !== 'today' && !a.list) s2.moveTaskList(row.id, 'today', day)
@@ -800,9 +832,10 @@ function useDoer() {
                match means the rest of the move (slot/list, if any) still
                happens, just without touching projectId. */
             let projectNote = ''
+            let movedProject = false
             if (a.project) {
               const { row: proj } = pick(s2.projects.map((p) => ({ ...p, title: p.name })), a.project)
-              if (proj) { s2.setTaskProject(row.id, proj.id); projectNote = ` into ${proj.name}` }
+              if (proj) { s2.setTaskProject(row.id, proj.id); projectNote = ` into ${proj.name}`; movedProject = true }
               else projectNote = ` (no project called "${a.project}")`
             }
             return {
@@ -812,15 +845,22 @@ function useDoer() {
                 : a.list
                   ? `Moved to ${a.list === 'today' ? 'today' : 'the list'}: ${row.title}`
                   : `Moved: ${row.title}`) + projectNote,
+              undo: () => {
+                s2.moveTaskList(row.id, wasList, wasPlannedOn)
+                if (wasSlot) s2.assignSlot(row.id, wasSlot)
+                if (movedProject) s2.setTaskProject(row.id, wasProjectId)
+              },
             }
           }
-          case 'estimate':
+          case 'estimate': {
+            const wasMin = row.estimateMin
             s2.setEstimate(row.id, a.min)
-            return { ok: true, text: `${fmtDuration(a.min)} on ${row.title}` }
+            return { ok: true, text: `${fmtDuration(a.min)} on ${row.title}`, undo: () => s2.setEstimate(row.id, wasMin) }
+          }
           case 'rename': {
             const was = row.title
             s2.updateTask(row.id, { title: a.title })
-            return { ok: true, text: `Renamed "${was}" to: ${a.title}` }
+            return { ok: true, text: `Renamed "${was}" to: ${a.title}`, undo: () => s2.updateTask(row.id, { title: was }) }
           }
           case 'drop':
             s2.deleteTask(row.id)

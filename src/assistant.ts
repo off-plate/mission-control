@@ -496,6 +496,16 @@ ambiguous, nothing changes, and a sentence claiming otherwise is the app lying
 about his own data, which is the one thing it must never do. Say what you are
 setting in motion, briefly, and let the line under it carry the fact.
 
+A LIST IS EVERY ROW IN IT, NOT A SAMPLE. When he pastes or types several
+things at once -- a plan for the day, several lines, a block with one item per
+line -- "do" gets one action per item, all of them, in the order he gave them.
+His report (2026-09-10): thirty tasks pasted in slot by slot, four came back.
+Picking the easy handful and answering as if that were the whole job is worse
+than answering slowly, because the rest silently never happened. "say" still
+stays two or three sentences -- it names what you are doing, not each row --
+the full account of every item is the line the app writes under it, per
+action, same as always.
+
 The whole vocabulary, and nothing outside it works:
 {"kind":"add","title":"...","list":"today"|"backlog","slot":"morning"|"noon"|"afternoon"|"evening","space":"personal"|"work"|"offplate"|"corner","min":30}
 {"kind":"done","match":"part of the title"}
@@ -1003,14 +1013,17 @@ export async function ask(
       model: activeModel(),
       temperature: 0.3,
       /* 700 was set when the answer was two sentences and a card name; 1400
-         when the brief grew to four beats. A finished-yesterday list is
-         another few lines of "say" on top of that, still inside the same
-         budget, and it ran out again the same way: the sentence finished, the
-         object did not, "show" and "next" came back empty, and a real answer
-         read as a broken one. A reasoning model spends part of this thinking
-         before it writes a word, so the number has to cover more than the
-         visible text. */
-      max_tokens: 2200,
+         when the brief grew to four beats; 2200 when a finished-yesterday
+         list added a few more lines of "say" on top of that. Each time it ran
+         out the same way: the sentence finished, the object did not, "show"
+         and "next" came back empty, and a real answer read as a broken one.
+         6000 is for a genuinely different shape of answer, not a longer "say":
+         a bulk "do" is one full action object PER ROW (his report,
+         2026-09-10, thirty tasks pasted at once), and Czech titles with a
+         pasted URL in them run long. A reasoning model spends part of this
+         thinking before it writes a word, so the number has to cover more
+         than the visible text either way. */
+      max_tokens: 6000,
       stream: !!onSay,
       messages: [
         { role: 'system', content: SYSTEM },

@@ -254,7 +254,8 @@ interface Store extends PersistedState {
    *  estimate is the sum of its steps, so only the title is editable then. */
   updateTask: (id: string, patch: { title?: string; estimateMin?: number }) => void
   logActual: (id: string, actualMin: number) => void
-  addTask: (t: Omit<Task, 'id' | 'done'>) => void
+  /** Returns the new row's id. */
+  addTask: (t: Omit<Task, 'id' | 'done'>) => string
   addTasks: (tasks: Omit<Task, 'id' | 'done'>[]) => void
   addTaskWithSubtasks: (parent: Omit<Task, 'id' | 'done' | 'subtasks'>, subs: { title: string; estimateMin: number }[]) => void
   /** Put a task on a period in Goals, or take it off again with no horizon. The

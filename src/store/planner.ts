@@ -95,7 +95,14 @@ export function usePlannerSlice(
         return { ...t, title, ...est }
       })),
 
-    addTask: (t: Omit<Task, 'id' | 'done'>) => setTasks((prev) => [{ ...t, id: newId('t'), done: false, createdAt: todayKey(), addedAt: Date.now() }, ...prev]),
+    /** Returns the new row's id, so a caller that needs to undo its own add
+     *  (the assistant's per-line revert, assistantcore.tsx) has something
+     *  real to delete rather than guessing which row it just made. */
+    addTask: (t: Omit<Task, 'id' | 'done'>): string => {
+      const id = newId('t')
+      setTasks((prev) => [{ ...t, id, done: false, createdAt: todayKey(), addedAt: Date.now() }, ...prev])
+      return id
+    },
     addTasks: (ts: Omit<Task, 'id' | 'done'>[]) =>
       setTasks((prev) => [...ts.map((t, i) => ({ ...t, id: newId('t'), done: false, createdAt: todayKey(), addedAt: Date.now() + i })), ...prev]),
     addTaskWithSubtasks: (parent: Omit<Task, 'id' | 'done' | 'subtasks'>, subs: { title: string; estimateMin: number }[]) =>

@@ -9072,158 +9072,147 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .hp-tab.is-on { background: var(--hp-card); color: var(--hp-t1); box-shadow: var(--hp-shadow); }
 .shell.is-hud .hp-tab.is-on { background: rgba(255, 255, 255, 0.10); }
 
-/* ---- tiles ---- */
-.hp-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s4); }
-@media (max-width: 900px) { .hp-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 560px) { .hp-grid { grid-template-columns: 1fr; } }
+/* ---- the card grid ----
+   Third pass. One measurement per card, each with its own chart, after his
+   verdict on the single wide hero: six bars stranded in a thousand pixels of
+   white. A card-width chart is dense by construction, and the same shape
+   works for every metric instead of one getting a stage and the rest a
+   number. Structure follows the two references he sent: Apple Health's
+   Summary, and a card-per-measurement dashboard. */
+.hp-cards {
+  display: grid; gap: var(--s4);
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
 
-.hp-tile {
+.hp-card {
   position: relative; overflow: hidden;
-  background: var(--hp-card);
-  border: 1px solid var(--hp-line);
-  border-radius: 20px;
-  padding: var(--s5);
-  box-shadow: var(--hp-shadow);
-  transition: border-color 0.3s, transform 0.4s var(--hp-spring);
+  display: flex; flex-direction: column;
+  padding: var(--s5) var(--s5) var(--s4);
+  background: var(--hp-card); border: 1px solid var(--hp-line);
+  border-radius: 22px; box-shadow: var(--hp-shadow);
+  transition: transform 0.32s var(--hp-soft), border-color 0.2s, box-shadow 0.32s var(--hp-soft);
 }
-/* The playful part, and the only decoration on the page: each tile carries a
-   breath of its own category colour, the way Apple tints a Health card. */
-.hp-tile::before {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(120% 80% at 0% 0%, var(--hp-accent) 0%, transparent 58%);
-  opacity: 0.07;
+/* The accent as a wash rather than a block: enough to tell the cards apart at
+   a glance, never enough to fight the number sitting on it. */
+.hp-card::before {
+  content: ''; position: absolute; inset: 0 0 auto; height: 128px;
+  background: linear-gradient(180deg, var(--hp-accent), transparent);
+  opacity: 0.07; pointer-events: none;
 }
-.shell.is-hud .hp-tile::before { opacity: 0.13; }
-.hp-tile > * { position: relative; }
-.hp-tile:hover { border-color: var(--hp-line-2); }
-.hp-hero { margin-bottom: var(--s4); }
+.shell.is-hud .hp-card::before { opacity: 0.16; }
+.hp-card > * { position: relative; }
+.hp-card:hover { border-color: var(--hp-line-2); box-shadow: var(--hp-shadow-2); transform: translateY(-2px); }
+@media (prefers-reduced-motion: reduce) { .hp-card:hover { transform: none; } }
+.hp-card.is-empty::before { opacity: 0.03; }
 
-.hp-label {
-  display: flex; align-items: center; gap: 8px;
-  font-size: var(--text-xs); font-weight: 700;
-  letter-spacing: 0.1em; text-transform: uppercase;
-  color: var(--hp-accent, var(--hp-t3)); margin-bottom: var(--s3);
+.hp-card-top { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
+.hp-card-label {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--hp-accent); min-width: 0;
 }
-.hp-dot {
-  width: 7px; height: 7px; border-radius: 50%; flex: none;
-  background: var(--hp-accent, var(--hp-t3));
+.hp-card-label .hp-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+.hp-card-peak { font-size: 10px; font-weight: 600; color: var(--hp-t3); white-space: nowrap; }
+
+.hp-card-read { display: flex; align-items: baseline; gap: 5px; margin-top: var(--s4); min-height: 40px; }
+.hp-card-read b {
+  font-size: 34px; font-weight: 700; line-height: 1;
+  letter-spacing: -0.03em; color: var(--hp-t1);
+  font-variant-numeric: tabular-nums;
 }
-.hp-value {
-  font-size: 34px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.05;
-  display: flex; align-items: baseline; gap: 5px; color: var(--hp-t1);
+.hp-card-read b.is-quiet { color: var(--hp-t3); font-weight: 600; }
+.hp-card-read em { font-size: var(--text-sm); font-style: normal; font-weight: 600; color: var(--hp-t3); }
+/* What the number IS. His complaint was never the figure, it was not knowing
+   whether it meant today, an average, or June. */
+.hp-card-note {
+  margin: 5px 0 0; font-size: var(--text-xs); color: var(--hp-t2);
+  min-height: 1.35em; transition: color 0.2s;
 }
-.hp-value em { font-size: var(--text-sm); font-style: normal; font-weight: 500; color: var(--hp-t3); }
-.hp-sub {
-  margin-top: 8px; font-size: var(--text-sm); color: var(--hp-t2);
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+.hp-card-note.is-live { color: var(--hp-accent); font-weight: 600; }
+
+.hp-card-chart { margin-top: var(--s4); height: 76px; }
+
+.hp-card-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s3);
+  margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--hp-line);
+  font-size: 10px; font-weight: 600; color: var(--hp-t3); white-space: nowrap;
+}
+.hp-card-last { color: var(--hp-t2); overflow: hidden; text-overflow: ellipsis; }
+.hp-card-last.is-old { color: var(--hp-cardio); }
+
+/* ---- bars ----
+   HTML, not SVG. The old chart stretched a fixed viewBox to the card width,
+   which turned every rounded corner into a lozenge and every bar into a
+   stripe. Divs stay crisp at any width and give each day a real hit target. */
+.hp-bars { display: flex; align-items: flex-end; gap: 2px; height: 100%; }
+.hp-bar {
+  flex: 1; min-width: 0; padding: 0; border: 0; cursor: pointer;
+  background: var(--hp-accent); border-radius: 4px 4px 2px 2px;
+  opacity: 0.82; transition: opacity 0.18s, transform 0.18s var(--hp-soft);
+  transform-origin: bottom;
+}
+.hp-bar:hover, .hp-bar.is-at { opacity: 1; transform: scaleY(1.03); }
+.hp-bar.is-zero { background: var(--hp-grid); opacity: 1; cursor: default; }
+/* The peak, marked. He asked for it by name: "if you are measuring peak,
+   there should be indication somewhere of each of the peak". */
+.hp-bar.is-peak { box-shadow: 0 0 0 2px var(--hp-card), 0 -6px 0 -2px var(--hp-accent); }
+.hp-bars:has(.hp-bar:hover) .hp-bar:not(:hover) { opacity: 0.42; }
+
+/* ---- line ---- */
+.hp-spark { position: relative; height: 100%; }
+.hp-spark svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.hp-spark-line { fill: none; stroke: var(--hp-accent); stroke-width: 2.25; stroke-linejoin: round; stroke-linecap: round; }
+.hp-spark-dot {
+  position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px;
+  border-radius: 50%; background: var(--hp-accent);
+  box-shadow: 0 0 0 3px var(--hp-card); pointer-events: none;
+}
+.hp-spark-hits { position: absolute; inset: 0; display: flex; }
+.hp-spark-hits button { flex: 1; border: 0; background: none; cursor: pointer; padding: 0; }
+.hp-spark.is-thin {
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--text-xs); color: var(--hp-t3); text-align: center;
+  border: 1px dashed var(--hp-line); border-radius: 12px;
 }
 
-.hp-delta { padding: 2px 7px; border-radius: 6px; font-size: var(--text-xs); font-weight: 700; }
-.hp-delta.up { color: var(--hp-move); background: color-mix(in srgb, var(--hp-move) 13%, transparent); }
-.hp-delta.down { color: var(--hp-cardio); background: color-mix(in srgb, var(--hp-cardio) 13%, transparent); }
-.hp-delta.flat { color: var(--hp-t3); background: var(--hp-card-2); }
-
-/* ---- age chips: the honesty layer ---- */
-.hp-age { font-size: var(--text-xs); font-weight: 700; padding: 2px 8px; border-radius: 999px; }
-.hp-age.is-live { color: var(--hp-move); background: color-mix(in srgb, var(--hp-move) 13%, transparent); }
-.hp-age.is-recent { color: var(--hp-train); background: color-mix(in srgb, var(--hp-train) 15%, transparent); }
-.hp-age.is-stale { color: var(--hp-cardio); background: color-mix(in srgb, var(--hp-cardio) 13%, transparent); }
-.hp-age.is-none { color: var(--hp-t3); background: var(--hp-card-2); }
-
-/* ---- hero ---- */
-.hp-hero-body { display: grid; grid-template-columns: auto 1fr; gap: var(--s8); align-items: center; }
-@media (max-width: 900px) { .hp-hero-body { grid-template-columns: 1fr; } }
-.hp-hero-side { display: flex; align-items: center; gap: var(--s6); flex-wrap: wrap; }
-.hp-hero-chart { min-width: 0; }
-.hp-ring { position: relative; width: 132px; flex: none; }
-.hp-ring svg { display: block; width: 132px; height: 132px; }
-.hp-ring-arc {
-  animation: hp-ring-in 1.4s var(--hp-spring) both;
-  transform-origin: 65px 65px;
-}
-@keyframes hp-ring-in { from { stroke-dasharray: 0 999; } }
-.hp-ring-mid {
-  position: absolute; inset: 0; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 1px; pointer-events: none;
-}
-.hp-ring-mid b { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; color: var(--hp-t1); }
-.hp-ring-mid span {
-  font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--hp-t3); font-weight: 700;
-}
-.hp-hero-lines { display: flex; flex-direction: column; gap: var(--s3); }
-@media (max-width: 900px) { .hp-hero-lines { flex-direction: row; gap: var(--s6); } }
-.hp-hero-line b { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; display: block; line-height: 1.15; }
-.hp-hero-line b.is-down { color: var(--hp-cardio); }
-.hp-hero-line b.is-up { color: var(--hp-move); }
-.hp-hero-line span { font-size: var(--text-xs); color: var(--hp-t2); }
-
-/* ---- the day chart ----
-   His report, second pass: it named three dates across a quarter and called
-   that a chart, and there was no way to hover it. Bars are the days he
-   trained, the line is what those days did to his fitness, and every day has
-   a hit target whether or not anything happened on it. */
-.hp-daychart { --hp-pad-r: 44px; }
-.hp-daychart-plot { position: relative; padding-right: var(--hp-pad-r); }
-.hp-daychart-plot svg { display: block; width: 100%; height: 200px; overflow: visible; }
-.hp-daychart-y {
-  position: absolute; inset: 0 0 26px auto; width: var(--hp-pad-r);
-  display: flex; flex-direction: column; justify-content: space-between;
-  padding-left: 9px; pointer-events: none;
-}
-.hp-daychart-y span { font-size: 10px; color: var(--hp-t3); font-weight: 600; line-height: 1; }
-.hp-daychart-x {
-  display: grid; margin-top: 2px; padding-right: var(--hp-pad-r);
-  font-size: 10px; color: var(--hp-t3); font-weight: 600; text-align: center;
-}
-.hp-daychart-x span { overflow: hidden; white-space: nowrap; }
-.hp-daychart-x span.is-on { color: var(--hp-t1); }
-.hp-daychart-key {
-  display: flex; gap: var(--s4); flex-wrap: wrap; margin-top: var(--s3);
-  font-size: var(--text-xs); color: var(--hp-t2);
-}
-.hp-daychart-key span { display: inline-flex; align-items: center; gap: 6px; }
-.hp-daychart-key i { width: 9px; height: 9px; border-radius: 3px; }
-.hp-daychart-key i.is-line { height: 3px; border-radius: 2px; }
-.hp-key-peak { color: var(--hp-move); font-weight: 600; }
-
-.hp-bar { fill: var(--hp-train); opacity: 0.75; transition: opacity 0.2s; }
-.hp-bar.is-hardest { opacity: 1; }
-.hp-hit { fill: transparent; cursor: crosshair; }
-.hp-ctl-line {
-  fill: none; stroke: var(--hp-move); stroke-width: 2.25;
-  stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke;
-}
-.hp-ctl-peak { fill: var(--hp-move); }
-.hp-cross { stroke: var(--hp-line-2); stroke-width: 1; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
-
-.hp-tipcard {
-  position: absolute; top: 6px; transform: translateX(-50%);
-  background: var(--hp-card); border: 1px solid var(--hp-line-2);
-  border-radius: 12px; padding: 9px 12px; pointer-events: none;
-  box-shadow: 0 10px 30px rgba(22, 21, 15, 0.14);
-  display: flex; flex-direction: column; gap: 2px; white-space: nowrap; z-index: 3;
-}
-.hp-tipcard.is-low { top: auto; bottom: 34px; }
-.shell.is-hud .hp-tipcard { background: #131A22; }
-.hp-chev { transition: transform 0.2s var(--hp-soft); vertical-align: -1px; }
-.hp-chev.is-open { transform: rotate(180deg); }
-.hp-tipcard b { font-size: var(--text-sm); font-weight: 700; }
-.hp-tipcard span { font-size: var(--text-xs); color: var(--hp-t2); display: flex; align-items: center; gap: 6px; }
-.hp-tipcard i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
-
-/* ---- sections ---- */
-.hp-section { margin-top: var(--s6); }
+/* ---- sessions ----
+   Rewritten because "+5 more" survived two passes as an 11px chevron floating
+   above the words, which reads as decoration, not a control. A day with real
+   parts now carries a count in something button-shaped; a day with one part
+   is not openable at all, since opening it only repeated the row back. */
+/* ---- section headings and the readings' age ---- */
+.hp-section { margin-top: var(--s7); }
 .hp-h2 {
-  font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.1em;
-  text-transform: uppercase; color: var(--hp-t3); margin: 0 0 var(--s3);
+  display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap;
+  margin: 0 0 var(--s4);
+  font-family: var(--font-display); font-size: 1.05rem; font-weight: 700;
+  letter-spacing: 0.01em; color: var(--hp-t1);
 }
-.hp-h2-count { color: var(--hp-t3); font-weight: 600; margin-left: 10px; letter-spacing: 0; text-transform: none; }
+.hp-h2-count { font-family: var(--font-body); font-size: var(--text-xs); font-weight: 500; color: var(--hp-t3); letter-spacing: 0; }
+.hp-age {
+  font-size: var(--text-xs); font-weight: 600;
+  padding: 1px 8px; border-radius: 999px;
+  background: var(--hp-card-2); border: 1px solid var(--hp-line); color: var(--hp-t2);
+}
+.hp-age.is-live { color: var(--hp-move); border-color: color-mix(in srgb, var(--hp-move) 32%, transparent); }
+.hp-age.is-stale, .hp-age.is-none { color: var(--hp-cardio); border-color: color-mix(in srgb, var(--hp-cardio) 32%, transparent); }
+.hp-spark-area { pointer-events: none; }
 
-/* His report: hundreds of rows on a 90-day range, and rows that were mostly
-   empty space. Now the list is a scroller with real height per row, the
-   numbers are captioned rather than crammed, and a day opens to show the
-   fragments the watch actually filed. */
+.hp-day-more {
+  display: inline-flex; align-items: center; gap: 5px; flex: none;
+  padding: 5px 10px 5px 8px; border-radius: 999px;
+  background: var(--hp-card-2); border: 1px solid var(--hp-line);
+  color: var(--hp-t2); transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+.hp-day-count { font-size: var(--text-xs); font-weight: 700; font-variant-numeric: tabular-nums; }
+.hp-day-main:hover .hp-day-more { background: var(--hp-accent-soft, var(--hp-card)); border-color: var(--hp-line-2); color: var(--hp-t1); }
+.hp-day.is-open .hp-day-more { background: var(--hp-train); border-color: var(--hp-train); color: #fff; }
+.hp-day-best {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--hp-train);
+}
+
+.hp .hp-section:last-child { padding-bottom: 92px; }
 .hp-days {
   list-style: none; margin: 0; padding: 0;
   background: var(--hp-card); border: 1px solid var(--hp-line);
@@ -9236,13 +9225,15 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .hp-day-main {
   width: 100%; border: 0; background: none; cursor: pointer; text-align: left;
   font: inherit; color: inherit;
-  display: grid; grid-template-columns: 52px 1fr auto auto;
+  display: grid; grid-template-columns: 52px minmax(0, 1fr) auto auto auto;
   gap: var(--s5); align-items: center; padding: var(--s4) var(--s5);
 }
-.hp-day-main:hover { background: var(--hp-card-2); }
+.hp-day-main.is-flat { cursor: default; }
+.hp-day-main:not(.is-flat):hover { background: var(--hp-card-2); }
 @media (max-width: 860px) {
-  .hp-day-main { grid-template-columns: 44px 1fr; gap: var(--s3); }
-  .hp-day-stats, .hp-day-effort { grid-column: 2; }
+  .hp-day-main { grid-template-columns: 44px minmax(0, 1fr) auto; gap: var(--s3); }
+  .hp-day-stats { grid-column: 2 / -1; }
+  .hp-day-effort { grid-column: 2; }
 }
 
 .hp-day-date { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
@@ -9430,4 +9421,27 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   cursor: pointer; font: inherit; font-size: var(--text-xs); font-weight: 600;
   color: var(--z-ground); background: var(--z-bone); border: 0;
   border-radius: 999px; padding: 4px 12px;
+}
+
+/* ---- what opens ----
+   The actual fragments the watch filed. Read as rows, because the thing he
+   asked to see was the sessions, not a sentence about them. */
+.hp-part {
+  display: grid; grid-template-columns: 54px minmax(0, 1fr) auto;
+  gap: var(--s4); align-items: center;
+  padding: 9px 0; border-top: 1px dashed var(--hp-line);
+}
+.hp-part:first-child { border-top: 0; }
+.hp-part-time { font-size: var(--text-xs); color: var(--hp-t3); font-weight: 600; }
+.hp-part-name { font-size: var(--text-sm); color: var(--hp-t1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hp-part-nums { display: flex; gap: var(--s4); align-items: baseline; }
+.hp-part-nums b {
+  font-size: var(--text-sm); font-weight: 700; color: var(--hp-t1);
+  font-variant-numeric: tabular-nums; display: inline-flex; align-items: baseline; gap: 3px;
+}
+.hp-part-nums b.is-effort { color: var(--hp-train); }
+.hp-part-nums i { font-style: normal; font-size: 10px; font-weight: 600; color: var(--hp-t3); }
+@media (max-width: 700px) {
+  .hp-part { grid-template-columns: 48px minmax(0, 1fr); }
+  .hp-part-nums { grid-column: 2; }
 }

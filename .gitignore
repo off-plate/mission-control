@@ -9,3 +9,6 @@ qa-shots/
 _*.mjs
 /perm.mjs
 release/
+
+# Local-only screenshots from scripts/hpshot.mjs
+.hp-shots/

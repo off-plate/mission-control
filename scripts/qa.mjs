@@ -4197,6 +4197,99 @@ await step('timeline: giving up takes the whole window, and Escape gives it back
 
 await page.unroute('https://api.groq.com/**').catch(() => {})
 
+/* HEALTH. Added 2026-09-10 because this page had no gate at all, which is
+   exactly how it reached him twice with a chart he called fake and an expand
+   control that looked like decoration. The page reads Supabase, so the gate
+   feeds it `mc-health-fixture` instead: real-shaped rows, the real page, the
+   real components, and no live data anywhere near a test run. */
+const HEALTH_FIXTURE = (() => {
+  const iso = (back) => { const d = new Date(); d.setDate(d.getDate() - back); return d.toISOString().slice(0, 10) }
+  const days = []
+  for (let i = 100; i >= 0; i--) {
+    /* Sleep and steps run to today; weight stopped 40 days ago, which is his
+       real situation and the one the empty-range card has to describe. */
+    days.push({
+      day: iso(i),
+      ctl: 6 - i * 0.01, atl: 15 + (i % 7), ramp_rate: -0.8,
+      sleep_secs: 18000 + (i % 5) * 1800, steps: 4000 + (i % 9) * 700,
+      resting_hr: 48 + (i % 6), sleep_score: 60,
+      weight: i >= 40 ? 91.5 : null,
+    })
+  }
+  const sessions = []
+  for (const [back, parts] of [[1, 1], [2, 5], [3, 4], [5, 3]]) {
+    for (let k = 0; k < parts; k++) {
+      sessions.push({
+        id: `s-${back}-${k}`,
+        start_date: `${iso(back)} 12:0${k}:00+00`, start_date_local: `${iso(back)} 14:0${k}:00+00`,
+        type: k % 2 ? 'WeightTraining' : 'Workout', name: `Session ${k + 1}`,
+        moving_time: 600 + k * 300, average_heartrate: 115 + k, max_heartrate: 150 + k,
+        calories: 120 + k * 40, icu_training_load: 5 + k * 3, distance: null,
+      })
+    }
+  }
+  return JSON.stringify({ days, sessions, lastRun: { ran_at: new Date().toISOString(), ok: true, wellness_rows: days.length, activity_rows: sessions.length, error: null } })
+})()
+
+await step('health: every measurement is a card that draws its own range', async () => {
+  await page.goto(URL); await page.waitForTimeout(200)
+  await page.evaluate((f) => localStorage.setItem('mc-health-fixture', f), HEALTH_FIXTURE)
+  await page.goto(`${URL}#/health`); await page.reload(); await page.waitForTimeout(900)
+
+  const cards = await page.locator('.hp-card').count()
+  if (cards < 6) throw new Error(`only ${cards} measurement cards, so the page is back to one hero chart`)
+  /* The fault he named twice: a chart with nothing to read it against. Every
+     card must actually draw, and must date both ends of what it drew. */
+  const drawn = await page.locator('.hp-card .hp-bars .hp-bar, .hp-card .hp-spark-line').count()
+  if (drawn < 20) throw new Error(`only ${drawn} chart marks across ${cards} cards`)
+  for (const c of await page.locator('.hp-card').all()) {
+    const foot = (await c.locator('.hp-card-foot').innerText()).trim()
+    if (!foot) throw new Error('a card charts a range without dating it')
+  }
+  /* And every headline has to say what kind of number it is. */
+  const notes = await page.locator('.hp-card-note').allInnerTexts()
+  if (!notes.some((n) => /average/i.test(n))) throw new Error('no card says it is an average')
+  if (!notes.some((n) => /total/i.test(n))) throw new Error('no card says it is a total')
+})
+
+await step('health: the range moves the body cards, not just the training ones', async () => {
+  const sleep = page.locator('.hp-card', { hasText: 'SLEEP' }).first()
+  if ((await sleep.locator('.hp-card-note').innerText()).trim() !== '7-day average') {
+    throw new Error('sleep does not open on the 7-day average he asked for')
+  }
+  await page.locator('.hp-tab', { hasText: '90D' }).click(); await page.waitForTimeout(500)
+  if ((await sleep.locator('.hp-card-note').innerText()).trim() !== '90-day average') {
+    throw new Error('changing the range left the body cards on the old span')
+  }
+  /* Weight stopped inside the 7-day window, so on 7D the card must say so and
+     name the real last reading rather than print a stale figure as today's. */
+  await page.locator('.hp-tab', { hasText: '7D' }).click(); await page.waitForTimeout(500)
+  const weight = page.locator('.hp-card', { hasText: 'WEIGHT' }).first()
+  if (!/no readings in this range/i.test(await weight.innerText())) {
+    throw new Error('weight has no readings this week but does not say so')
+  }
+  if (!/last/i.test(await weight.locator('.hp-card-foot').innerText())) {
+    throw new Error('weight hides the last real reading instead of naming it')
+  }
+})
+
+await step('health: a day with several sessions opens and lists them', async () => {
+  await page.locator('.hp-tab', { hasText: '7D' }).click(); await page.waitForTimeout(400)
+  const row = page.locator('.hp-day.is-openable').first()
+  if (!(await row.count())) throw new Error('no day offers to open, though the fixture has multi-part days')
+  if (await page.locator('.hp-parts').count()) throw new Error('a day is already open before anything was clicked')
+  await row.locator('.hp-day-main').click(); await page.waitForTimeout(400)
+  const parts = await page.locator('.hp-day.is-open .hp-part').count()
+  if (parts < 2) throw new Error(`opening the day showed ${parts} sessions, so "+N more" is still a promise`)
+  /* A single-part day is not openable, because opening it only repeated the
+     row back at him and read as a dead click. */
+  const flat = page.locator('.hp-day:not(.is-openable)').first()
+  if (await flat.locator('button.hp-day-main').count()) throw new Error('a one-session day still pretends to open')
+  await row.locator('.hp-day-main').click(); await page.waitForTimeout(400)
+  if (await page.locator('.hp-day.is-open').count()) throw new Error('clicking again did not close it')
+  await page.evaluate(() => localStorage.removeItem('mc-health-fixture'))
+})
+
 await b.close(); server.close(); rmSync(SNAP, { recursive: true, force: true })
 if (errors.length) console.log(`CONSOLE ERRORS (${errors.length}): ${errors[0]}`)
 console.log(`${pass} pass, ${fail} fail${errors.length ? `, ${errors.length} console errors` : ', 0 console errors'}`)

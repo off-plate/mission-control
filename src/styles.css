@@ -9358,3 +9358,76 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .hpdock-note { margin: var(--s2) 0 0; font-size: var(--text-xs); color: var(--muted); }
 .hpdock-note.is-bad { color: var(--alert); }
 @media (prefers-reduced-motion: reduce) { .hp-spin { animation: none; } }
+
+/* ---- the room, split ----
+   His ask (2026-09-10): today's list on the left of the instrument, mirroring
+   Today for the workspace he is standing in, so he can re-point the timer or
+   tick something off without leaving the room. */
+.znow-split {
+  flex: 1; min-height: 0;
+  display: grid; grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.2fr);
+  gap: var(--s8);
+}
+.znow-main { display: flex; flex-direction: column; min-width: 0; }
+@media (max-width: 900px) {
+  .znow-split { grid-template-columns: 1fr; gap: var(--s5); }
+  .zlist { max-height: 34vh; }
+}
+
+.zlist { display: flex; flex-direction: column; min-height: 0; }
+.zlist-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--s3); padding-bottom: var(--s3);
+  border-bottom: 1px solid var(--z-line);
+}
+.zlist-title {
+  font-family: 'Technor', var(--font-display); font-weight: 700;
+  font-size: 1.05rem; color: var(--z-bone); letter-spacing: -0.01em;
+}
+.zlist-count { font-size: var(--text-xs); color: var(--z-muted); }
+.zlist-empty { color: var(--z-muted); font-size: var(--text-sm); margin: var(--s5) 0 0; }
+.zlist-body { overflow-y: auto; padding: var(--s3) 0 var(--s4); display: flex; flex-direction: column; gap: var(--s4); }
+.zlist-group { display: flex; flex-direction: column; gap: 2px; }
+.zlist-slot {
+  font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--z-muted); opacity: 0.75; font-weight: 700; margin-bottom: 4px;
+}
+
+.zrow { display: flex; align-items: center; gap: var(--s3); border-radius: 10px; }
+.zrow.is-active { background: rgba(237, 230, 216, 0.06); }
+.zrow-tick {
+  flex: none; width: 20px; height: 20px; border-radius: 6px; cursor: pointer;
+  border: 1.5px solid var(--z-line-strong, rgba(237, 230, 216, 0.34));
+  background: none; color: var(--z-ground);
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-left: 6px; transition: background 0.2s, border-color 0.2s;
+}
+.zrow-tick:hover { border-color: var(--z-bone); }
+.zrow.is-done .zrow-tick { background: var(--z-bone); border-color: var(--z-bone); }
+.zrow-pick {
+  flex: 1; min-width: 0; cursor: pointer; text-align: left;
+  background: none; border: 0; color: var(--z-bone); font: inherit;
+  display: flex; align-items: baseline; gap: var(--s3);
+  padding: 9px 10px 9px 4px; border-radius: 10px;
+}
+.zrow-pick:hover:not(:disabled) { background: rgba(237, 230, 216, 0.06); }
+.zrow-pick:disabled { cursor: default; }
+.zrow-title {
+  flex: 1; min-width: 0; font-size: var(--text-sm); line-height: 1.35;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.zrow-min { flex: none; font-size: var(--text-xs); color: var(--z-muted); }
+.zrow.is-done .zrow-title { color: var(--z-muted); text-decoration: line-through; }
+.zrow.is-active .zrow-title { font-weight: 600; }
+
+.znow-queued {
+  margin: var(--s4) 0 0; text-align: center;
+  font-size: var(--text-sm); color: var(--z-muted);
+  display: flex; align-items: center; justify-content: center; gap: var(--s3); flex-wrap: wrap;
+}
+.znow-queued b { color: var(--z-bone); font-weight: 600; }
+.znow-queued button {
+  cursor: pointer; font: inherit; font-size: var(--text-xs); font-weight: 600;
+  color: var(--z-ground); background: var(--z-bone); border: 0;
+  border-radius: 999px; padding: 4px 12px;
+}

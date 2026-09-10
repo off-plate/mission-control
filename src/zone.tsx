@@ -25,8 +25,9 @@ import { useClockStamp, useFirstMove, useOpenToday } from './ui'
 import { usePomodoro } from './pomodoro'
 import { ZonePlayer } from './zoneplayer'
 import { useStore } from './store'
-import { isEstimated, taskMinutes } from './util'
-import { spaceFolderId } from './types'
+import { SPACE_LABELS } from './mock'
+import { isEstimated, localDateKey, taskMinutes } from './util'
+import { SLOTS, spaceFolderId, type Task } from './types'
 import { Editor } from './notes'
 import * as Icon from './icons'
 
@@ -76,15 +77,84 @@ function BackIcon() {
     <Icon.ChevronLeft size={17} />
   )
 }
-function ListIcon() {
-  return (
-    <Icon.List size={17} />
-  )
-}
 function CheckIcon() {
   return (
     <Icon.Check size={14} strokeWidth={2.4} />
   )
+}
+
+/* TODAY'S LIST, IN THE ROOM. His ask (2026-09-10): the top half split, with
+   what he planned for today on the left of the instrument. It mirrors Today
+   for the workspace he is standing in -- the same rows, the same slots, the
+   same tick -- because a second list that could disagree with that one is
+   worse than no list.
+
+   It carries the two things he asked for and nothing else: pick what the
+   timer is pointed at, and tick a task off without leaving the room. */
+function ZoneList({ activeId, onPick }: { activeId: string | null; onPick: (id: string) => void }) {
+  const { tasks, inView, toggleTask, space } = useStore()
+  const today = localDateKey()
+  const mine = tasks
+    .filter((t) => inView(t.space) && t.list === 'today' && (t.plannedOn ?? today) === today)
+    .sort((a, b) => (Number(a.done) - Number(b.done)) || SLOT_ORDER(a.slot) - SLOT_ORDER(b.slot))
+
+  const bySlot = new Map<string, Task[]>()
+  for (const t of mine) {
+    const key = t.done ? 'done' : (t.slot ?? 'unslotted')
+    const list = bySlot.get(key)
+    if (list) list.push(t); else bySlot.set(key, [t])
+  }
+  const order = [...SLOTS.map((s) => s.id as string), 'unslotted', 'done']
+  const groups = order.filter((k) => bySlot.has(k)).map((k) => [k, bySlot.get(k) as Task[]] as const)
+
+  const left = mine.filter((t) => !t.done).length
+
+  return (
+    <div className="zlist">
+      <div className="zlist-head">
+        <span className="zlist-title">Today</span>
+        <span className="zlist-count">{left ? `${left} left` : 'all done'}</span>
+      </div>
+      {mine.length === 0 ? (
+        <p className="zlist-empty">Nothing on today's list in {SPACE_LABELS[space] ?? 'this workspace'}.</p>
+      ) : (
+        <div className="zlist-body">
+          {groups.map(([key, rows]) => (
+            <div className="zlist-group" key={key}>
+              <span className="zlist-slot">{key === 'done' ? 'Done' : key === 'unslotted' ? 'Anytime' : SLOTS.find((s) => s.id === key)?.label ?? key}</span>
+              {rows.map((t) => (
+                <div key={t.id} className={`zrow${t.done ? ' is-done' : ''}${activeId === t.id ? ' is-active' : ''}`}>
+                  <button
+                    className="zrow-tick"
+                    role="checkbox"
+                    aria-checked={!!t.done}
+                    aria-label={t.done ? `Reopen ${t.title}` : `Finish ${t.title}`}
+                    onClick={() => toggleTask(t.id)}
+                  >
+                    {t.done && <CheckIcon />}
+                  </button>
+                  <button
+                    className="zrow-pick"
+                    onClick={() => onPick(t.id)}
+                    disabled={t.done}
+                    title={t.done ? undefined : 'Point the timer at this'}
+                  >
+                    <span className="zrow-title">{t.title}</span>
+                    {isEstimated(t) && t.estimateMin > 0 && <span className="zrow-min mono">{taskMinutes(t)}m</span>}
+                  </button>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const SLOT_ORDER = (slot?: string) => {
+  const i = SLOTS.findIndex((s) => s.id === slot)
+  return i < 0 ? SLOTS.length : i
 }
 
 type PhaseState = 'running' | 'paused' | 'break' | 'done' | 'idle'
@@ -106,7 +176,6 @@ function ZoneTask() {
   // A hand pick overrides the auto first-move; it clears itself the moment
   // that task leaves today's open list (finished, or dropped from today),
   // rather than pointing at something that no longer exists.
-  const [pickerOpen, setPickerOpen] = useState(false)
   const [chosenId, setChosenId] = useState<string | null>(null)
   const chosenTask = chosenId ? openToday.find((t) => t.id === chosenId) : undefined
   const activeTask = chosenTask ?? firstMove
@@ -148,8 +217,23 @@ function ZoneTask() {
     }
   }
 
+  /* Picking from the list. Idle, it simply becomes what Start will run. Mid
+     block it does NOT silently re-point the timer -- minutes already banked
+     belong to the task they were spent on -- so it is held as what comes next
+     and the room says so. */
+  const pick = (id: string) => {
+    /* Picking the one already picked hands the room back to the auto choice.
+       That option used to be a row in a sheet; the list on the left is the
+       picker now, so it is a toggle rather than a second control. */
+    setChosenId((prev) => (prev === id ? null : id))
+  }
+  const queued = phaseState !== 'idle' && chosenTask && chosenTask.title !== pomo.focusLabel ? chosenTask : null
+
   return (
     <div className={`znow zn-${phaseState}`}>
+      <div className="znow-split">
+      <ZoneList activeId={activeTask?.id ?? null} onPick={pick} />
+      <div className="znow-main">
       {/* The band: what he is on, and the real hour, set as type on the field
           rather than boxed. The hour earns its place here because the whole
           point of this room is losing track of it. */}
@@ -201,17 +285,6 @@ function ZoneTask() {
         {(phaseState === 'running' || phaseState === 'paused' || phaseState === 'break') && (
           <button className="znow-icon" onClick={pomo.stop} aria-label="Stop this block"><StopIcon /></button>
         )}
-        {/* Choosing only makes sense before a block starts, and only when
-           there is more than the one task the auto pick would offer
-           anyway: nothing to choose between otherwise. */}
-        {phaseState === 'idle' && openToday.length > 1 && (
-          <button
-            className="znow-icon" aria-expanded={pickerOpen} aria-label="Choose what to focus on"
-            onClick={() => { setPickerOpen((v) => !v); setSettingsOpen(false) }}
-          >
-            <ListIcon />
-          </button>
-        )}
         {phaseState === 'idle' && (
           <button className="znow-pill" onClick={start}>Start</button>
         )}
@@ -221,31 +294,21 @@ function ZoneTask() {
         {phaseState === 'done' && <span className="znow-pill is-done">Banked</span>}
         <button
           className="znow-icon" aria-expanded={settingsOpen} aria-label="Timer settings"
-          onClick={() => { setSettingsOpen((v) => !v); setEditing(null); setPickerOpen(false) }}
+          onClick={() => { setSettingsOpen((v) => !v); setEditing(null) }}
         >
           <GearIcon />
         </button>
       </div>
-      {pickerOpen && (
-        <div className="znow-settings" role="dialog" aria-label="Choose what to focus on">
-          <div className="znow-settings-head">
-            <span>Choose a task</span>
-            <button className="znow-icon" onClick={() => setPickerOpen(false)} aria-label="Close"><CloseIcon /></button>
-          </div>
-          <div className="znow-picker-list">
-            <button className="znow-settings-row" onClick={() => { setChosenId(null); setPickerOpen(false) }}>
-              <span>Auto pick (first move)</span>
-              {!chosenTask && <CheckIcon />}
-            </button>
-            {openToday.map((t) => (
-              <button key={t.id} className="znow-settings-row" onClick={() => { setChosenId(t.id); setPickerOpen(false) }}>
-                <span>{t.title}</span>
-                {chosenTask?.id === t.id ? <CheckIcon /> : isEstimated(t) && t.estimateMin > 0 ? <span className="mono">{taskMinutes(t)}m</span> : null}
-              </button>
-            ))}
-          </div>
-        </div>
+      {queued && (
+        <p className="znow-queued">
+          Next up <b>{queued.title}</b>
+          <button onClick={() => { pomo.startFocus(isEstimated(queued) && queued.estimateMin > 0 ? taskMinutes(queued) : undefined, queued.title); setFocusTaskId(queued.id) }}>
+            Switch now
+          </button>
+        </p>
       )}
+      </div>
+      </div>
       {settingsOpen && (
         <div className="znow-settings" role="dialog" aria-label="Timer settings">
           {editing === null ? (

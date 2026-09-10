@@ -630,14 +630,15 @@ await step('the zone: with more than one task open, he can choose which one to f
   if (await skip.count()) { await skip.first().click(); await page.waitForTimeout(400) }
   await page.waitForSelector('.zroom', { timeout: 10000 })
 
-  const picker = page.locator('.znow-icon[aria-label="Choose what to focus on"]')
-  if (!(await picker.count())) throw new Error('two open tasks, but no way to choose between them')
-  await picker.click(); await page.waitForTimeout(300)
-  const rows = await page.locator('.znow-picker-list .znow-settings-row').allInnerTexts()
-  if (!rows[0].startsWith('Auto pick')) throw new Error(`picker's first row is "${rows[0]}", not the auto-pick option`)
-  if (!rows.some((r) => r.includes('Hand picked task'))) throw new Error('the second open task is missing from the picker')
+  /* Choosing moved out of a sheet behind an icon and onto the room's own
+     left half (2026-09-10, his ask): today's list is always on screen, so it
+     IS the picker, and a second hidden copy of the same choice was the only
+     thing the icon added. */
+  const rows = await page.locator('.zlist .zrow-title').allInnerTexts()
+  if (!rows.some((r) => r.includes('Auto pick task'))) throw new Error("today's list is missing the auto-pick task")
+  if (!rows.some((r) => r.includes('Hand picked task'))) throw new Error("today's list is missing the second open task")
 
-  await page.getByRole('button', { name: /Hand picked task/ }).click(); await page.waitForTimeout(300)
+  await page.locator('.zlist .zrow-pick', { hasText: 'Hand picked task' }).click(); await page.waitForTimeout(300)
   if ((await page.locator('.znow-title').innerText()) !== 'Hand picked task') throw new Error('choosing a task did not change what the room shows')
   // The about-to-start countdown has to reflect the chosen task's own
   // estimate (15m), not the auto pick's (25m) or the default focus length.
@@ -646,6 +647,23 @@ await step('the zone: with more than one task open, he can choose which one to f
   await page.locator('.znow-pill').click(); await page.waitForTimeout(500)
   const running = await page.locator('.znow.zn-running .znow-title').innerText()
   if (running !== 'Hand picked task') throw new Error(`starting ran "${running}", not the task he chose`)
+
+  /* The other half of what the list is for: finishing something without
+     leaving the room, against the same store Today writes to. */
+  await page.locator('.zlist .zrow', { hasText: 'Auto pick task' }).locator('.zrow-tick').click()
+  await page.waitForTimeout(400)
+  if (!(await page.locator('.zlist .zrow.is-done', { hasText: 'Auto pick task' }).count())) {
+    throw new Error('ticking a task in the room did not finish it')
+  }
+  /* Against the STORE, not against a second page. The claim worth proving is
+     that the room writes where Today reads -- both render from this one key --
+     and driving a route change to prove it only added the day-rollover prompt
+     as something that could fail the check for an unrelated reason. */
+  const stored = await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K) ?? '{}')
+    return (s.tasks ?? []).find((t) => t.title === 'Auto pick task')?.done ?? null
+  }, KEY)
+  if (stored !== true) throw new Error(`ticking in the room did not reach the stored task (done = ${stored})`)
 })
 await step('mundi opus: leaving the zone does not stop the music, and the corner picks it up', async () => {
   await fresh('zone')

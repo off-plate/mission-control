@@ -180,6 +180,62 @@ export type Action =
    *  page itself, the same way it always has been. */
   | { kind: 'addRoutine'; title: string; cadence?: RoutineCadence; blurb?: string }
 
+/** A section header naming which part of the day the lines under it belong
+ *  to -- "Morning:", "Noon", "Afternoon:", whatever case. */
+const SLOT_HEADER = /^(morning|noon|afternoon|evening)\s*:?\s*$/i
+
+/** One line of a plan: a title, then how long it takes, at the very end of
+ *  the line. Non-greedy up to an anchored $ so a title with its own hyphen
+ *  ("CTP x Big Time - floor plans & units — 10m") still splits at the LAST
+ *  dash, not the first: the engine only backtracks past it because nothing
+ *  shorter reaches the end of the string. Any of -, – or — is accepted
+ *  because his own paste has used all three across different attempts. */
+const PLAN_ITEM = /^[-*•]?\s*(.+?)\s*[-–—]\s*(\d+)\s*m\.?$/i
+
+/** Parses a pasted day plan -- section headers naming a slot, one task per
+ *  line below it as "title — Nm" -- straight into real add actions, with no
+ *  model in the loop at all. Built after his report, 2026-09-10: the same
+ *  30-line paste, sent three times, came back with a handful of items each
+ *  time and never the same handful twice. Raising the token budget and
+ *  telling the model to enumerate everything (both done, same day) helped
+ *  and still was not enough -- an LLM asked to reproduce thirty structured
+ *  rows in one JSON response can under-run no matter how the prompt is
+ *  worded, because "answer, but shorter" is a bias in the model itself, not
+ *  a instruction this app forgot to give it. His format is exact and
+ *  repeatable, which is exactly the case a real parser is right for and a
+ *  model is the wrong tool for. Returns null below a real threshold so an
+ *  ordinary short message -- even one that happens to end "...call her —
+ *  10m" -- still goes to the model instead of being silently hijacked by a
+ *  parser meant for a whole day at once. */
+export function parseBulkPlan(text: string): Action[] | null {
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
+  let slot: Slot | undefined
+  const actions: Action[] = []
+  /* A long title (his own titles run to a full pasted URL) wraps in a narrow
+     box, and copying it back out sometimes hands back real line breaks where
+     the screen only ever showed a soft wrap -- his own "Poslat Korejšovi
+     dokument", the link, and "— 5m" have arrived as three separate lines.
+     Each line joins onto what came before it until the buffer as a whole
+     reads as one complete item; capped at 3 so an ordinary paragraph that
+     never resolves into one cannot swallow every line after it. */
+  let pending: string[] = []
+  const MAX_WRAP = 3
+  for (const raw of lines) {
+    if (SLOT_HEADER.test(raw)) { pending = []; slot = SLOT_HEADER.exec(raw)![1].toLowerCase() as Slot; continue }
+    pending.push(raw)
+    const item = PLAN_ITEM.exec(pending.join(' '))
+    if (item) {
+      const title = item[1].trim()
+      const min = Number(item[2])
+      if (title && Number.isFinite(min) && min > 0) actions.push({ kind: 'add', title, list: slot ? 'today' : 'backlog', slot, min })
+      pending = []
+    } else if (pending.length >= MAX_WRAP) {
+      pending = []
+    }
+  }
+  return actions.length >= 3 ? actions : null
+}
+
 const SLOTS_OK: Slot[] = ['morning', 'noon', 'afternoon', 'evening']
 const WHERE_OK: Where[] = ['today', 'backlog']
 const FREQ_OK: HabitFrequency[] = ['daily', 'weekdays', 'times-per-week', 'weekly', 'monthly']

@@ -9096,9 +9096,7 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .shell.is-hud .hp-tile::before { opacity: 0.13; }
 .hp-tile > * { position: relative; }
 .hp-tile:hover { border-color: var(--hp-line-2); }
-.hp-hero { grid-column: span 4; }
-@media (max-width: 900px) { .hp-hero { grid-column: span 2; } }
-@media (max-width: 560px) { .hp-hero { grid-column: span 1; } }
+.hp-hero { margin-bottom: var(--s4); }
 
 .hp-label {
   display: flex; align-items: center; gap: 8px;
@@ -9133,7 +9131,10 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .hp-age.is-none { color: var(--hp-t3); background: var(--hp-card-2); }
 
 /* ---- hero ---- */
-.hp-hero-body { display: flex; align-items: center; gap: var(--s8); flex-wrap: wrap; }
+.hp-hero-body { display: grid; grid-template-columns: auto 1fr; gap: var(--s8); align-items: center; }
+@media (max-width: 900px) { .hp-hero-body { grid-template-columns: 1fr; } }
+.hp-hero-side { display: flex; align-items: center; gap: var(--s6); flex-wrap: wrap; }
+.hp-hero-chart { min-width: 0; }
 .hp-ring { position: relative; width: 132px; flex: none; }
 .hp-ring svg { display: block; width: 132px; height: 132px; }
 .hp-ring-arc {
@@ -9150,59 +9151,66 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--hp-t3); font-weight: 700;
 }
-.hp-hero-read { flex: 1 1 300px; min-width: 0; }
-.hp-hero-lines { display: flex; gap: var(--s6); flex-wrap: wrap; margin-bottom: var(--s2); }
+.hp-hero-lines { display: flex; flex-direction: column; gap: var(--s3); }
+@media (max-width: 900px) { .hp-hero-lines { flex-direction: row; gap: var(--s6); } }
 .hp-hero-line b { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; display: block; line-height: 1.15; }
 .hp-hero-line b.is-down { color: var(--hp-cardio); }
 .hp-hero-line b.is-up { color: var(--hp-move); }
 .hp-hero-line span { font-size: var(--text-xs); color: var(--hp-t2); }
 
-/* ---- charts: an axis, real values, real dates ----
-   His report: "there are fake fake diagrams". A line with no scale beside it
-   is a drawing; the numbers are what make it a reading. */
-.hp-chart { --hp-pad-r: 52px; }
-/* The plot stops short of the axis column, so the end dot never lands under
-   the number that labels it. */
-.hp-chart-plot { position: relative; padding-right: var(--hp-pad-r); }
-.hp-plot-inner { position: relative; height: 100%; }
-.hp-chart-plot svg { display: block; width: 100%; overflow: visible; }
-.hp-chart-y {
-  position: absolute; inset: 0 0 0 auto; width: var(--hp-pad-r);
+/* ---- the day chart ----
+   His report, second pass: it named three dates across a quarter and called
+   that a chart, and there was no way to hover it. Bars are the days he
+   trained, the line is what those days did to his fitness, and every day has
+   a hit target whether or not anything happened on it. */
+.hp-daychart { --hp-pad-r: 44px; }
+.hp-daychart-plot { position: relative; padding-right: var(--hp-pad-r); }
+.hp-daychart-plot svg { display: block; width: 100%; height: 200px; overflow: visible; }
+.hp-daychart-y {
+  position: absolute; inset: 0 0 26px auto; width: var(--hp-pad-r);
   display: flex; flex-direction: column; justify-content: space-between;
-  padding-left: 8px; pointer-events: none;
+  padding-left: 9px; pointer-events: none;
 }
-.hp-chart-y span {
-  font-size: 10px; color: var(--hp-t3); font-weight: 600; line-height: 1;
+.hp-daychart-y span { font-size: 10px; color: var(--hp-t3); font-weight: 600; line-height: 1; }
+.hp-daychart-x {
+  display: grid; margin-top: 2px; padding-right: var(--hp-pad-r);
+  font-size: 10px; color: var(--hp-t3); font-weight: 600; text-align: center;
 }
-.hp-chart-x {
-  display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3);
-  margin-top: 6px; padding-right: var(--hp-pad-r);
-  font-size: 10px; color: var(--hp-t3); font-weight: 600;
+.hp-daychart-x span { overflow: hidden; white-space: nowrap; }
+.hp-daychart-x span.is-on { color: var(--hp-t1); }
+.hp-daychart-key {
+  display: flex; gap: var(--s4); flex-wrap: wrap; margin-top: var(--s3);
+  font-size: var(--text-xs); color: var(--hp-t2);
 }
-.hp-chart-peak { color: var(--hp-accent); }
-.hp-grid-line { stroke: var(--hp-grid); stroke-width: 1; stroke-dasharray: 3 4; vector-effect: non-scaling-stroke; }
+.hp-daychart-key span { display: inline-flex; align-items: center; gap: 6px; }
+.hp-daychart-key i { width: 9px; height: 9px; border-radius: 3px; }
+.hp-daychart-key i.is-line { height: 3px; border-radius: 2px; }
+.hp-key-peak { color: var(--hp-move); font-weight: 600; }
 
-.hp-spark { width: 100%; display: block; overflow: visible; }
-.hp-spark-line {
-  fill: none; stroke: var(--hp-accent); stroke-width: 2.25;
-  stroke-linecap: round; stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
-  stroke-dasharray: 1000; stroke-dashoffset: 1000;
-  animation: hp-draw 1.3s var(--hp-soft) 0.15s forwards;
+.hp-bar { fill: var(--hp-train); opacity: 0.75; transition: opacity 0.2s; }
+.hp-bar.is-hardest { opacity: 1; }
+.hp-hit { fill: transparent; cursor: crosshair; }
+.hp-ctl-line {
+  fill: none; stroke: var(--hp-move); stroke-width: 2.25;
+  stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke;
 }
-.hp-spark-fill { opacity: 0; animation: hp-fade 0.7s ease 0.85s forwards; }
-.hp-sparkwrap { position: relative; width: 100%; }
-/* A real circle, in HTML, over a chart that stretches. See Tip() on why. */
-.hp-tip {
-  position: absolute; width: 9px; height: 9px; border-radius: 50%;
-  background: var(--hp-accent); border: 2px solid var(--hp-card);
-  transform: translate(-50%, -50%); pointer-events: none;
-  opacity: 0; animation: hp-pop 0.45s var(--hp-spring) 1.25s forwards;
+.hp-ctl-peak { fill: var(--hp-move); }
+.hp-cross { stroke: var(--hp-line-2); stroke-width: 1; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
+
+.hp-tipcard {
+  position: absolute; top: 6px; transform: translateX(-50%);
+  background: var(--hp-card); border: 1px solid var(--hp-line-2);
+  border-radius: 12px; padding: 9px 12px; pointer-events: none;
+  box-shadow: 0 10px 30px rgba(22, 21, 15, 0.14);
+  display: flex; flex-direction: column; gap: 2px; white-space: nowrap; z-index: 3;
 }
-.hp-spark-empty { border-bottom: 1px dashed var(--hp-line); }
-@keyframes hp-draw { to { stroke-dashoffset: 0; } }
-@keyframes hp-fade { to { opacity: 1; } }
-@keyframes hp-pop { from { opacity: 0; transform: scale(0.2); } to { opacity: 1; transform: scale(1); } }
+.hp-tipcard.is-low { top: auto; bottom: 34px; }
+.shell.is-hud .hp-tipcard { background: #131A22; }
+.hp-chev { transition: transform 0.2s var(--hp-soft); vertical-align: -1px; }
+.hp-chev.is-open { transform: rotate(180deg); }
+.hp-tipcard b { font-size: var(--text-sm); font-weight: 700; }
+.hp-tipcard span { font-size: var(--text-xs); color: var(--hp-t2); display: flex; align-items: center; gap: 6px; }
+.hp-tipcard i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
 
 /* ---- sections ---- */
 .hp-section { margin-top: var(--s6); }
@@ -9210,27 +9218,81 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.1em;
   text-transform: uppercase; color: var(--hp-t3); margin: 0 0 var(--s3);
 }
+.hp-h2-count { color: var(--hp-t3); font-weight: 600; margin-left: 10px; letter-spacing: 0; text-transform: none; }
+
+/* His report: hundreds of rows on a 90-day range, and rows that were mostly
+   empty space. Now the list is a scroller with real height per row, the
+   numbers are captioned rather than crammed, and a day opens to show the
+   fragments the watch actually filed. */
 .hp-days {
-  list-style: none; margin: 0; padding: var(--s2) var(--s4);
+  list-style: none; margin: 0; padding: 0;
   background: var(--hp-card); border: 1px solid var(--hp-line);
   border-radius: 20px; box-shadow: var(--hp-shadow);
+  max-height: 560px; overflow-y: auto;
 }
-.hp-day {
-  display: grid; grid-template-columns: 62px 1fr auto;
-  gap: var(--s4); align-items: baseline;
-  padding: 11px 0; border-top: 1px solid var(--hp-line);
-}
+.hp-day { border-top: 1px solid var(--hp-line); }
 .hp-day:first-child { border-top: 0; }
-.hp-day-when { color: var(--hp-t3); font-size: var(--text-sm); font-weight: 600; }
-.hp-day-what { min-width: 0; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.hp-day-title { color: var(--hp-t1); font-size: var(--text-sm); }
-.hp-day-parts { color: var(--hp-t3); font-size: var(--text-xs); }
-.hp-day-nums {
-  display: flex; align-items: baseline; gap: var(--s3);
-  font-size: var(--text-xs); color: var(--hp-t2); white-space: nowrap;
+.hp-day.is-open { background: var(--hp-card-2); }
+.hp-day-main {
+  width: 100%; border: 0; background: none; cursor: pointer; text-align: left;
+  font: inherit; color: inherit;
+  display: grid; grid-template-columns: 52px 1fr auto auto;
+  gap: var(--s5); align-items: center; padding: var(--s4) var(--s5);
 }
-.hp-day-nums b { color: var(--hp-t1); font-weight: 700; font-size: var(--text-sm); }
-.hp-day-load { display: inline-flex; align-items: center; gap: 4px; color: var(--hp-train); font-weight: 700; }
+.hp-day-main:hover { background: var(--hp-card-2); }
+@media (max-width: 860px) {
+  .hp-day-main { grid-template-columns: 44px 1fr; gap: var(--s3); }
+  .hp-day-stats, .hp-day-effort { grid-column: 2; }
+}
+
+.hp-day-date { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+.hp-day-date b { font-size: 21px; font-weight: 700; letter-spacing: -0.02em; }
+.hp-day-date span { font-size: 10px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--hp-t3); font-weight: 700; }
+
+.hp-day-mid { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.hp-day-title { font-size: var(--text-base); font-weight: 600; color: var(--hp-t1); }
+.hp-day-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.hp-day-type {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--hp-t2); background: var(--hp-card-2);
+  border: 1px solid var(--hp-line); border-radius: 999px; padding: 2px 9px;
+}
+.hp-day-parts { font-size: var(--text-xs); color: var(--hp-t3); }
+
+.hp-day-stats { display: flex; gap: var(--s5); flex-wrap: wrap; }
+.hp-stat { display: flex; flex-direction: column; line-height: 1.15; }
+.hp-stat b { font-size: var(--text-base); font-weight: 700; }
+.hp-stat i {
+  font-style: normal; font-size: 10px; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--hp-t3); font-weight: 600;
+}
+
+.hp-day-effort { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; width: 92px; flex: none; }
+.hp-effort-num { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--hp-train); }
+.hp-effort-bar { width: 100%; height: 5px; border-radius: 999px; background: var(--hp-ring-track); overflow: hidden; }
+.hp-effort-bar i { display: block; height: 100%; border-radius: 999px; background: var(--hp-train); }
+.hp-effort-cap {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--hp-t3); font-weight: 600;
+}
+
+.hp-parts { list-style: none; margin: 0; padding: 0 var(--s5) var(--s4) calc(52px + var(--s5) * 2); }
+.hp-parts li {
+  display: grid; grid-template-columns: 54px 1fr auto; gap: var(--s4);
+  padding: 7px 0; border-top: 1px dashed var(--hp-line);
+  font-size: var(--text-sm); color: var(--hp-t2);
+}
+.hp-part-time { color: var(--hp-t3); font-weight: 600; }
+.hp-part-name { color: var(--hp-t1); min-width: 0; }
+.hp-part-nums { white-space: nowrap; }
+@media (max-width: 860px) { .hp-parts { padding-left: var(--s5); } }
+
+.hp-bodyrange {
+  display: flex; justify-content: space-between; gap: var(--s3); flex-wrap: wrap;
+  margin-top: var(--s3); padding-top: var(--s3); border-top: 1px solid var(--hp-line);
+  font-size: var(--text-xs); color: var(--hp-t3);
+}
+.hp-value.is-quiet { color: var(--hp-t3); }
 
 .hp-empty {
   color: var(--hp-t2); background: var(--hp-card);
@@ -9280,12 +9342,18 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 @keyframes hp-turn { to { transform: rotate(360deg); } }
 .hp-syncline {
   margin: 0 0 var(--s4); font-size: var(--text-sm); color: var(--hp-t2);
-  padding: 9px 14px; border-radius: 12px;
+  padding: 9px 10px 9px 14px; border-radius: 12px;
   background: var(--hp-card); border: 1px solid var(--hp-line);
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s3);
 }
+.hp-syncline-x {
+  border: 0; background: none; cursor: pointer; color: inherit;
+  display: inline-flex; padding: 4px; border-radius: 50%; opacity: 0.6;
+}
+.hp-syncline-x:hover { opacity: 1; background: var(--hp-card-2); }
 .hp-syncline.is-done { color: var(--hp-move); border-color: color-mix(in srgb, var(--hp-move) 30%, transparent); }
 .hp-syncline.is-failed { color: var(--hp-cardio); border-color: color-mix(in srgb, var(--hp-cardio) 30%, transparent); }
-.hp-since-sync { color: var(--hp-t3); }
+.hp-since-sync { color: var(--hp-t3); margin-left: 14px; }
 .hpdock-sync { width: 100%; justify-content: center; gap: 6px; }
 .hpdock-note { margin: var(--s2) 0 0; font-size: var(--text-xs); color: var(--muted); }
 .hpdock-note.is-bad { color: var(--alert); }

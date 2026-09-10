@@ -528,21 +528,39 @@ function useDoer() {
            omission. A repeat "add" is his placement for the row, restated,
            not a no-op: if it is not already where he just asked for it, that
            is exactly what runs -- the same list/slot writes 'move' makes,
-           just reached from "add" instead. Estimate and project are left
-           alone here on purpose: he did not ask to change what the row
-           already says about itself, only where it sits today. */
+           just reached from "add" instead. Project is left alone: no "add"
+           he sends ever names one worth trusting over a real pick, and
+           there is no equivalent field to fill in here.
+
+           Estimate is different. A bare "move" never carries one -- the
+           Action type has no field for it -- so an existing number is never
+           at risk from that path. "add" is the one action that DOES name a
+           length, which means a title that already exists with none is a
+           row this exact plan is filling in for the first time, not a
+           number this app is overwriting behind his back. Found the same
+           day: two rows still read "no estimate" after landing in their
+           slot, because the first version of this fix protected an
+           estimate that was never really there to protect. A row that
+           already has its own non-zero number keeps it either way. */
         const existing = s2.tasks.find((t) => !t.done && t.title.trim().toLowerCase() === key)
         if (existing) {
           addedThisRun.add(key)
-          const alreadyThere = existing.list === list && (!slot || existing.slot === slot)
+          const blank = !existing.estimated && !existing.estimateMin
+          const fillsEstimate = a.min != null && blank
+          const alreadyThere = existing.list === list && (!slot || existing.slot === slot) && !fillsEstimate
           if (alreadyThere) { out.push({ ok: true, text: `Already on the list: ${a.title}` }); continue }
-          const wasList = existing.list, wasSlot = existing.slot, wasPlannedOn = existing.plannedOn
+          const wasList = existing.list, wasSlot = existing.slot, wasPlannedOn = existing.plannedOn, wasMin = existing.estimateMin
           if (list !== existing.list) s2.moveTaskList(existing.id, list, day)
           if (slot) s2.assignSlot(existing.id, slot)
+          if (fillsEstimate) s2.setEstimate(existing.id, a.min!)
           out.push({
             ok: true,
             text: `Moved to ${slot ? SLOTS.find((x) => x.id === slot)?.label.toLowerCase() : list === 'today' ? 'today' : 'the list'}: ${a.title}`,
-            undo: () => { s2.moveTaskList(existing.id, wasList, wasPlannedOn); if (wasSlot) s2.assignSlot(existing.id, wasSlot) },
+            undo: () => {
+              s2.moveTaskList(existing.id, wasList, wasPlannedOn)
+              if (wasSlot) s2.assignSlot(existing.id, wasSlot)
+              if (fillsEstimate) s2.setEstimate(existing.id, wasMin)
+            },
           })
           continue
         }

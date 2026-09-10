@@ -18,8 +18,8 @@
    Every reading carries the day it was taken. See health.ts on why. */
 import { useMemo, useState } from 'react'
 import {
-  daysSince, fmtDay, fmtHm, freshness, lastReading, rollUpByDay, totals, withinDays,
-  useHealth, type MetricKey, type SessionDay, type WellnessDay,
+  agoFrom, daysSince, fmtDay, fmtHm, freshness, lastReading, rollUpByDay, totals, withinDays,
+  useHealth, useHealthSync, type MetricKey, type SessionDay, type WellnessDay,
 } from './health'
 import * as Icon from './icons'
 
@@ -250,6 +250,7 @@ function BodyTile({ days, metric, accent, label, format }: {
 
 export function HealthPage() {
   const { state, reload } = useHealth()
+  const { sync, start } = useHealthSync()
   const [span, setSpan] = useState(90)
 
   const days = state.status === 'ok' ? state.days : []
@@ -266,6 +267,8 @@ export function HealthPage() {
     return { inRange, allDays, now: totals(nowDays), prev: totals(prevDays), nowDays }
   }, [days, sessions, span])
 
+  const busySync = sync.phase === 'asking' || sync.phase === 'running'
+  const lastRun = state.status === 'ok' ? state.lastRun : null
   const fitness = lastReading(days, 'ctl')
   const peak = days.reduce((m, d) => (d.ctl != null && d.ctl > m ? d.ctl : m), 0)
   const lastSession = view.allDays[0] ?? null
@@ -287,20 +290,42 @@ export function HealthPage() {
               {lastSession
                 ? <>Last session {fmtDay(lastSession.day)}, <Age day={lastSession.day} /></>
                 : 'No sessions on record.'}
+              {lastRun && <span className="hp-since-sync"> · synced {agoFrom(lastRun.ran_at)}</span>}
             </p>
           </div>
-          <div className="hp-tabs" role="tablist" aria-label="Range">
-            {SPANS.map((s) => (
-              <button
-                key={s.id}
-                role="tab"
-                aria-selected={span === s.id}
-                className={`hp-tab${span === s.id ? ' is-on' : ''}`}
-                onClick={() => setSpan(s.id)}
-              >{s.label}</button>
-            ))}
+          <div className="hp-head-right">
+            <div className="hp-tabs" role="tablist" aria-label="Range">
+              {SPANS.map((s) => (
+                <button
+                  key={s.id}
+                  role="tab"
+                  aria-selected={span === s.id}
+                  className={`hp-tab${span === s.id ? ' is-on' : ''}`}
+                  onClick={() => setSpan(s.id)}
+                >{s.label}</button>
+              ))}
+            </div>
+            <button
+              className="hp-sync"
+              onClick={start}
+              disabled={busySync}
+              title="Fetch everything new from Intervals.icu"
+            >
+              <Icon.Repeat size={13} className={busySync ? 'hp-spin' : undefined} />
+              {busySync ? 'Syncing' : 'Sync'}
+            </button>
           </div>
         </header>
+
+        {/* The worker's own words, never this page's guess about them. */}
+        {sync.phase !== 'idle' && (
+          <p className={`hp-syncline is-${sync.phase}`}>
+            {sync.phase === 'asking' && 'Asking the worker to run…'}
+            {sync.phase === 'running' && 'Running. It usually lands within a minute.'}
+            {sync.phase === 'done' && `Synced ${sync.run.wellness_rows ?? 0} days and ${sync.run.activity_rows ?? 0} sessions.`}
+            {sync.phase === 'failed' && sync.message}
+          </p>
+        )}
 
         {state.status === 'off' && <p className="hp-empty">Sync is off on this device.</p>}
         {state.status === 'signed-out' && <p className="hp-empty">Not signed in on this device.</p>}

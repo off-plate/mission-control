@@ -41,21 +41,24 @@ const ACCENT = {
 }
 
 /* ---------------------------------------------------------------- *
- * Sparkline: Zepp's, with one thing added -- it breaks on a gap.
- * His sleep series stops in June, and a line drawn straight across
- * three missing months is a claim about months he has no data for.
+ * The chart. Zepp drew the line and the glow; what it never carried
+ * was a scale, and his report on the first build was blunt -- "there
+ * are fake fake diagrams". A line with no numbers beside it IS a
+ * drawing. So every chart here states its own top and bottom value,
+ * the dates at each end, and where the peak fell. It breaks on a gap
+ * too: his sleep stops in June, and a line carried straight across
+ * three silent months is a claim about months nothing reported.
  * ---------------------------------------------------------------- */
-function Spark({ points, accent, height = 54 }: { points: (number | null)[]; accent: string; height?: number }) {
+function plot(points: (number | null)[], height: number) {
   const w = 300
   const real = points.filter((v): v is number => v != null)
-  if (real.length < 2) return <div className="hp-spark hp-spark-empty" style={{ height }} />
+  if (real.length < 2) return null
   const min = Math.min(...real)
   const max = Math.max(...real)
   const range = max - min || 1
   const stepX = w / Math.max(1, points.length - 1)
-  const y = (v: number) => height - 4 - ((v - min) / range) * (height - 10)
+  const y = (v: number) => 4 + (1 - (v - min) / range) * (height - 8)
 
-  /* One <path> per unbroken run, so the gaps stay gaps. */
   const runs: string[] = []
   let run: string[] = []
   points.forEach((v, i) => {
@@ -66,30 +69,101 @@ function Spark({ points, accent, height = 54 }: { points: (number | null)[]; acc
 
   const lastIdx = points.reduce<number>((acc, v, i) => (v != null ? i : acc), -1)
   const firstIdx = points.findIndex((v) => v != null)
-  const lastVal = lastIdx >= 0 ? points[lastIdx] : null
-  const fillId = `hpfill-${accent.replace(/[^a-z]/gi, '')}-${points.length}`
+  const peakIdx = points.reduce<number>((acc, v, i) => (v != null && (acc < 0 || (points[acc] ?? 0) < v) ? i : acc), -1)
+  return { w, min, max, stepX, y, runs, lastIdx, firstIdx, peakIdx, height }
+}
 
+function Spark({ points, accent, height = 44 }: { points: (number | null)[]; accent: string; height?: number }) {
+  const g = plot(points, height)
+  if (!g) return <div className="hp-spark hp-spark-empty" style={{ height }} />
+  const id = `hpf-${accent.replace(/[^a-z]/gi, '')}-${points.length}-${height}`
   return (
-    <svg className="hp-spark" viewBox={`0 0 ${w} ${height}`} preserveAspectRatio="none" style={{ height, ['--hp-accent' as string]: accent }} aria-hidden="true">
+    <div className="hp-sparkwrap" style={{ height, ['--hp-accent' as string]: accent }}>
+    <svg className="hp-spark" viewBox={`0 0 ${g.w} ${height}`} preserveAspectRatio="none" style={{ height }} aria-hidden="true">
       <defs>
-        <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={accent} stopOpacity="0.42" />
+        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={accent} stopOpacity="0.28" />
           <stop offset="100%" stopColor={accent} stopOpacity="0" />
         </linearGradient>
       </defs>
-      {/* Closed at the last REAL reading, not at the right edge: his steps stop
-          in June, and a fill carried on to today is a shaded claim about three
-          months the watch never reported. */}
-      {runs.length === 1 && (
+      {g.runs.length === 1 && (
         <path
           className="hp-spark-fill"
-          d={`${runs[0]} L ${(lastIdx * stepX).toFixed(1)} ${height} L ${(firstIdx * stepX).toFixed(1)} ${height} Z`}
-          fill={`url(#${fillId})`}
+          d={`${g.runs[0]} L ${(g.lastIdx * g.stepX).toFixed(1)} ${height} L ${(g.firstIdx * g.stepX).toFixed(1)} ${height} Z`}
+          fill={`url(#${id})`}
         />
       )}
-      {runs.map((d, i) => <path key={i} className="hp-spark-line" d={d} />)}
-      {lastVal != null && <circle className="hp-spark-tip" cx={lastIdx * stepX} cy={y(lastVal)} r="3.5" />}
+      {g.runs.map((d, i) => <path key={i} className="hp-spark-line" d={d} />)}
     </svg>
+    <Tip g={g} points={points} />
+    </div>
+  )
+}
+
+/* The end dot lives in HTML, not in the chart. These charts stretch to their
+   container (preserveAspectRatio="none", which is what keeps the line reading
+   the same at any width), and a <circle> inside a viewBox scaled unevenly is
+   drawn as an ellipse. */
+function Tip({ g, points }: { g: NonNullable<ReturnType<typeof plot>>; points: (number | null)[] }) {
+  if (g.lastIdx < 0) return null
+  const left = (g.lastIdx / Math.max(1, points.length - 1)) * 100
+  const top = (g.y(points[g.lastIdx] as number) / g.height) * 100
+  return <i className="hp-tip" style={{ left: `${left}%`, top: `${top}%` }} />
+}
+
+/** The same line, with the scale that makes it a reading: the value at the top
+ *  and bottom of the drawn range, the date at each end, and the peak named. */
+function Chart({ points, days, accent, format, height = 96 }: {
+  points: (number | null)[]; days: string[]; accent: string; format: (v: number) => string; height?: number
+}) {
+  const g = plot(points, height)
+  if (!g) return <p className="hp-sub">Not enough readings in this range to chart.</p>
+  const id = `hpc-${accent.replace(/[^a-z]/gi, '')}-${points.length}`
+  const mid = (g.min + g.max) / 2
+  const peakVal = g.peakIdx >= 0 ? points[g.peakIdx] : null
+  return (
+    <div className="hp-chart" style={{ ['--hp-accent' as string]: accent }}>
+      <div className="hp-chart-plot" style={{ height }}>
+        {/* The dot is placed as a percentage of the PLOT, so the plot needs a
+            box of its own -- the axis gutter is padding on the parent, and a
+            dot at 100% of that box lands beside the numbers instead of on the
+            line's last point. */}
+        <div className="hp-plot-inner">
+        <svg viewBox={`0 0 ${g.w} ${height}`} preserveAspectRatio="none" style={{ height }} aria-hidden="true">
+          <defs>
+            <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={accent} stopOpacity="0.26" />
+              <stop offset="100%" stopColor={accent} stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <line className="hp-grid-line" x1="0" y1={g.y(g.max)} x2={g.w} y2={g.y(g.max)} />
+          <line className="hp-grid-line" x1="0" y1={g.y(mid)} x2={g.w} y2={g.y(mid)} />
+          <line className="hp-grid-line" x1="0" y1={g.y(g.min)} x2={g.w} y2={g.y(g.min)} />
+          {g.runs.length === 1 && (
+            <path
+              className="hp-spark-fill"
+              d={`${g.runs[0]} L ${(g.lastIdx * g.stepX).toFixed(1)} ${height} L ${(g.firstIdx * g.stepX).toFixed(1)} ${height} Z`}
+              fill={`url(#${id})`}
+            />
+          )}
+          {g.runs.map((d, i) => <path key={i} className="hp-spark-line" d={d} />)}
+        </svg>
+        <Tip g={g} points={points} />
+        </div>
+        <div className="hp-chart-y">
+          <span>{format(g.max)}</span>
+          <span>{format(mid)}</span>
+          <span>{format(g.min)}</span>
+        </div>
+      </div>
+      <div className="hp-chart-x">
+        <span>{days[g.firstIdx] ? fmtDay(days[g.firstIdx]) : ''}</span>
+        {peakVal != null && days[g.peakIdx] && (
+          <span className="hp-chart-peak">peak {format(peakVal)} · {fmtDay(days[g.peakIdx])}</span>
+        )}
+        <span>{days[g.lastIdx] ? fmtDay(days[g.lastIdx]) : ''}</span>
+      </div>
+    </div>
   )
 }
 
@@ -109,7 +183,7 @@ function Ring({ pct, label, value, sub }: { pct: number; label: string; value: s
             <stop offset="100%" stopColor="var(--hp-train-soft)" />
           </linearGradient>
         </defs>
-        <circle cx="65" cy="65" r={r} fill="none" stroke="var(--hp-train)" strokeOpacity="0.14" strokeWidth="13" />
+        <circle cx="65" cy="65" r={r} fill="none" stroke="var(--hp-ring-track)" strokeWidth="13" />
         <circle
           className="hp-ring-arc"
           cx="65" cy="65" r={r} fill="none"
@@ -154,19 +228,29 @@ function BodyTile({ days, metric, accent, label, format }: {
 }) {
   const last = lastReading(days, metric)
   const pts = days.map((d) => d[metric])
+  const real = pts.filter((v): v is number => v != null)
+  const lo = real.length ? Math.min(...real) : null
+  const hi = real.length ? Math.max(...real) : null
   return (
     <div className="hp-tile" style={{ ['--hp-accent' as string]: accent }}>
       <div className="hp-label"><i className="hp-dot" />{label}</div>
       <div className="hp-value">{last ? format(last.value) : '—'}</div>
       <div className="hp-sub"><Age day={last?.day ?? null} /></div>
       <Spark points={pts} accent={accent} height={40} />
+      {lo != null && hi != null && (
+        <div className="hp-chart-x" style={{ paddingRight: 0 }}>
+          <span>{format(lo)}</span>
+          <span>{real.length} readings</span>
+          <span>{format(hi)}</span>
+        </div>
+      )}
     </div>
   )
 }
 
 export function HealthPage() {
   const { state, reload } = useHealth()
-  const [span, setSpan] = useState(30)
+  const [span, setSpan] = useState(90)
 
   const days = state.status === 'ok' ? state.days : []
   const sessions = state.status === 'ok' ? state.sessions : []
@@ -243,17 +327,29 @@ export function HealthPage() {
                     sub={peak ? `peak ${peak.toFixed(1)}` : 'no peak yet'}
                   />
                   <div className="hp-hero-read">
-                    <div className="hp-hero-line">
-                      <b>{peak ? Math.round(((fitness?.value ?? 0) / peak) * 100) : 0}%</b>
-                      <span>of your {peak.toFixed(1)} peak</span>
-                    </div>
-                    {ramp != null && (
+                    <div className="hp-hero-lines">
                       <div className="hp-hero-line">
-                        <b className={ramp < 0 ? 'is-down' : 'is-up'}>{ramp > 0 ? '+' : ''}{ramp.toFixed(2)}</b>
-                        <span>ramp rate a week</span>
+                        <b>{peak ? Math.round(((fitness?.value ?? 0) / peak) * 100) : 0}%</b>
+                        <span>of your {peak.toFixed(1)} peak</span>
                       </div>
-                    )}
-                    <Spark points={view.inRange.map((d) => d.ctl)} accent={ACCENT.train} height={78} />
+                      {ramp != null && (
+                        <div className="hp-hero-line">
+                          <b className={ramp < 0 ? 'is-down' : 'is-up'}>{ramp > 0 ? '+' : ''}{ramp.toFixed(2)}</b>
+                          <span>ramp rate a week</span>
+                        </div>
+                      )}
+                      <div className="hp-hero-line">
+                        <b>{view.now.days}</b>
+                        <span>days trained in range</span>
+                      </div>
+                    </div>
+                    <Chart
+                      points={view.inRange.map((d) => d.ctl)}
+                      days={view.inRange.map((d) => d.day)}
+                      accent={ACCENT.train}
+                      format={(v) => v.toFixed(1)}
+                      height={104}
+                    />
                   </div>
                 </div>
               </div>

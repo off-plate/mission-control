@@ -3767,6 +3767,24 @@ await step('dock: Skills opens honestly signed out, hold reaches the real page',
   await page.locator('.dock-open-btn').click(); await page.waitForTimeout(400)
   if (!(await page.locator('h1', { hasText: 'Skills' }).count())) throw new Error('the door-out button did not land on the real Skills page')
 })
+await step('dock: Health opens honestly signed out, hold reaches the real page', async () => {
+  /* His ask (2026-09-10): a Health page in the dock's bottom-right, with the
+     look taken from his own Zepp dashboard. The numbers come from the zepp_*
+     tables the watch already feeds through Intervals.icu into this same
+     Supabase project, so nothing about the body is bundled either. Signed
+     out is the only state this gate can drive end to end (?noremote), and it
+     is the one that must never invent a heart rate: no tile may show a
+     number when there is no session to read one from. */
+  await fresh('today')
+  await page.getByRole('button', { name: 'Open quick tools' }).click(); await page.waitForTimeout(400)
+  await page.locator('.dock-item').filter({ hasText: 'Health' }).click(); await page.waitForTimeout(400)
+  const panelText = await page.locator('.billsdock-panel').innerText()
+  if (!/signed in|off on this device/i.test(panelText)) throw new Error(`did not say why there is nothing to show: "${panelText}"`)
+  if (await page.locator('.hpdock-lead').count()) throw new Error('showed a fitness number with no real data behind it')
+  await page.locator('.dock-open-btn').click(); await page.waitForTimeout(500)
+  if (!(await page.locator('h1', { hasText: 'Health' }).count())) throw new Error('the door-out button did not land on the real Health page')
+  if (await page.locator('.hp-tile').count()) throw new Error('drew body tiles with nothing signed in behind them')
+})
 await step('settings: the device voice picker lists real voices and remembers a pick', async () => {
   /* His question (2026-09-08): macOS ships Enhanced/Premium voices and
      there was never a way to choose one -- only the automatic GOOD-list

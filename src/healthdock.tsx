@@ -46,7 +46,7 @@ export function HealthPanel({ dockControls, onOpenFull }: { dockControls?: React
         {state.status === 'ok' && (
           <div className="hpdock">
             <div className="hpdock-lead">
-              <b>{fitness ? fitness.value.toFixed(1) : '—'}</b>
+              <b>{fitness ? fitness.value.toFixed(1) : 'None'}</b>
               <span>fitness{peak ? `, ${Math.round(((fitness?.value ?? 0) / peak) * 100)}% of peak` : ''}</span>
             </div>
             <div className="hpdock-rows">

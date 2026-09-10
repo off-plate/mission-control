@@ -279,6 +279,9 @@ export interface SessionDay {
   /** The longest part's type, which is what the day was really about. */
   type: string
   title: string
+  /** The real rows behind the roll-up, newest first. The page opens a day to
+   *  show these: "+4 more" that cannot be opened is a promise, not a summary. */
+  items: Session[]
 }
 
 export function rollUpByDay(sessions: Session[]): SessionDay[] {
@@ -308,6 +311,7 @@ export function rollUpByDay(sessions: Session[]): SessionDay[] {
       maxHr: maxes.length ? Math.max(...maxes) : null,
       type: lead?.type ?? 'Workout',
       title: lead?.name ?? 'Workout',
+      items: [...parts].sort((a, b) => (b.start_date_local ?? b.start_date ?? '').localeCompare(a.start_date_local ?? a.start_date ?? '')),
     })
   }
   return out.sort((a, b) => b.day.localeCompare(a.day))
@@ -360,6 +364,87 @@ export function fmtHm(minutes: number): string {
   const h = Math.floor(minutes / 60)
   const m = minutes % 60
   return h ? `${h}h ${m}m` : `${m}m`
+}
+
+/** Every day in the range, present whether or not anything happened on it.
+ *  A chart that only plots the days with data is not a day-by-day chart: it
+ *  silently closes the gaps, and the gaps are the story here. */
+export function dayRange(span: number, now = new Date()): string[] {
+  const out: string[] = []
+  for (let i = span - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i)
+    out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)
+  }
+  return out
+}
+
+/** One day, everything about it, whether it holds anything or not. */
+export interface DayFrame {
+  day: string
+  ctl: number | null
+  load: number
+  minutes: number
+  calories: number
+  avgHr: number | null
+  maxHr: number | null
+  parts: number
+  title: string | null
+  type: string | null
+}
+
+export function frames(days: WellnessDay[], sessionDays: SessionDay[], span: number, now = new Date()): DayFrame[] {
+  const wellness = new Map(days.map((d) => [d.day, d]))
+  const sessions = new Map(sessionDays.map((d) => [d.day, d]))
+  return dayRange(span, now).map((day) => {
+    const s = sessions.get(day)
+    return {
+      day,
+      ctl: wellness.get(day)?.ctl ?? null,
+      load: s?.load ?? 0,
+      minutes: s?.minutes ?? 0,
+      calories: s?.calories ?? 0,
+      avgHr: s?.avgHr ?? null,
+      maxHr: s?.maxHr ?? null,
+      parts: s?.parts ?? 0,
+      title: s?.title ?? null,
+      type: s?.type ?? null,
+    }
+  })
+}
+
+/** What a body metric says INSIDE the chosen range, and -- separately -- the
+ *  last thing it ever said. His report: a number on the page with no way to
+ *  tell whether it was today, an average, or June. Both are stated now, and
+ *  they are stated as different things. */
+export interface BodyStat {
+  inRange: number[]
+  avg: number | null
+  lo: number | null
+  hi: number | null
+  last: { day: string; value: number } | null
+}
+
+export function bodyStat(days: WellnessDay[], key: MetricKey, span: number, now = new Date()): BodyStat {
+  const from = dayRange(span, now)[0]
+  const inRange = days.filter((d) => d.day >= from).map((d) => d[key]).filter((v): v is number => v != null)
+  return {
+    inRange,
+    avg: inRange.length ? inRange.reduce((a, v) => a + v, 0) / inRange.length : null,
+    lo: inRange.length ? Math.min(...inRange) : null,
+    hi: inRange.length ? Math.max(...inRange) : null,
+    last: lastReading(days, key),
+  }
+}
+
+/** "Mon 8", for an axis that has to name real days. */
+export function fmtWeekday(day: string): string {
+  const d = new Date(`${day}T12:00:00`)
+  return d.toLocaleDateString('en-GB', { weekday: 'short' })
+}
+
+export function fmtDayFull(day: string): string {
+  const d = new Date(`${day}T12:00:00`)
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
 }
 
 export function fmtDay(day: string): string {

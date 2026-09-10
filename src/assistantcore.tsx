@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from './store'
 import { isMeeting, useCalendar } from './calendar'
 import { SPACE_LABELS } from './mock'
-import { MORNING, ask, type Action, type Brief, type Card, type CardKind, type Reply } from './assistant'
+import { MORNING, ask, parseBulkPlan, type Action, type Brief, type Card, type CardKind, type Reply } from './assistant'
 import { getAiProvider, PROVIDERS } from './ai'
 import { engineName, speakingLevel, speakingMeasured, speechState, stop as stopSpeaking, subscribe, toggle } from './speech'
 import {
@@ -520,8 +520,32 @@ function useDoer() {
            second row was silent. An exact, still-open title is treated as the
            same request repeated, not two things he actually wants. */
         const key = a.title.trim().toLowerCase()
-        const dupe = addedThisRun.has(key) || s2.tasks.some((t) => !t.done && t.title.trim().toLowerCase() === key)
-        if (dupe) { out.push({ ok: true, text: `Already on the list: ${a.title}` }); continue }
+        if (addedThisRun.has(key)) { out.push({ ok: true, text: `Already on the list: ${a.title}` }); continue }
+        /* An open row with this exact title already exists -- his own report,
+           2026-09-10: a bulk plan naming a task that was already sitting in
+           the backlog got "Already on the list" and never actually moved,
+           so the noon slot he asked for stayed empty and the line lied by
+           omission. A repeat "add" is his placement for the row, restated,
+           not a no-op: if it is not already where he just asked for it, that
+           is exactly what runs -- the same list/slot writes 'move' makes,
+           just reached from "add" instead. Estimate and project are left
+           alone here on purpose: he did not ask to change what the row
+           already says about itself, only where it sits today. */
+        const existing = s2.tasks.find((t) => !t.done && t.title.trim().toLowerCase() === key)
+        if (existing) {
+          addedThisRun.add(key)
+          const alreadyThere = existing.list === list && (!slot || existing.slot === slot)
+          if (alreadyThere) { out.push({ ok: true, text: `Already on the list: ${a.title}` }); continue }
+          const wasList = existing.list, wasSlot = existing.slot, wasPlannedOn = existing.plannedOn
+          if (list !== existing.list) s2.moveTaskList(existing.id, list, day)
+          if (slot) s2.assignSlot(existing.id, slot)
+          out.push({
+            ok: true,
+            text: `Moved to ${slot ? SLOTS.find((x) => x.id === slot)?.label.toLowerCase() : list === 'today' ? 'today' : 'the list'}: ${a.title}`,
+            undo: () => { s2.moveTaskList(existing.id, wasList, wasPlannedOn); if (wasSlot) s2.assignSlot(existing.id, wasSlot) },
+          })
+          continue
+        }
         /* "add X to the Y project" -- a real project, not a made-up one. No
            match means the task still gets added, just without a project,
            rather than the whole add failing over one unresolved word. */
@@ -932,6 +956,18 @@ export function useAssistantThread() {
     if (busy) return ''
     setBusy(true); setErr(null); setErrHint(null); setLive('')
     setTurns((t) => [...t, { who: 'you', text: shown ?? text }])
+    /* A real day plan, parsed straight into real rows -- no model asked to
+       reproduce it, so nothing in it can be sampled, truncated or reordered.
+       See parseBulkPlan's own note for why this exists at all. */
+    const bulk = parseBulkPlan(text)
+    if (bulk) {
+      const done = await run(bulk)
+      const say = `Slotting in ${bulk.length} item${bulk.length === 1 ? '' : 's'}, exactly as written -- no model in the loop for this one.`
+      setTurns((t) => [...t, { who: 'it', text: say, done }])
+      if (done.some((d) => d.ok)) setCanvas(['today'])
+      setBusy(false); setLive('')
+      return say
+    }
     const history = turns.map((t) => ({ role: (t.who === 'you' ? 'user' : 'assistant') as 'user' | 'assistant', content: t.text }))
     let out = await ask(text, brief, history, setLive)
     /* A RATE LIMIT WAITS RATHER THAN FAILS, on his instruction: he would rather

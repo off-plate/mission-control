@@ -125,6 +125,13 @@ type Input = {
   /* Matches the store's own signature exactly. Widening it to `string` forces a
      cast at every call site and hides real type errors. */
   inView: (s?: SpaceId) => boolean
+  /* Days a real training session was recorded, from the health pipeline.
+     Added 2026-09-12: the Health column read the workout HABIT and nothing
+     else, so it stayed empty while Intervals was syncing every two hours --
+     the tick depends on an in-app Hevy sync that needs a key in that
+     particular browser, and no amount of syncing elsewhere reaches it. A
+     session that actually happened counts whether or not anything ticked. */
+  workoutDays?: Iterable<string>
 }
 
 const addDays = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x }
@@ -187,7 +194,7 @@ export function momentumRun(input: Input, days = 60, today = new Date()): DaySco
      space the way build habits are, because a workout is not a workspace;
      it is scoped to the habit by name instead. */
   const workoutIds = new Set(habits.filter((h) => h.name.trim().toLowerCase() === TARGET_HABIT_NAME).map((h) => h.id))
-  const workoutByDay = new Set<string>()
+  const workoutByDay = new Set<string>(input.workoutDays ?? [])
   if (workoutIds.size) {
     for (const t of habitLog) if (workoutIds.has(t.habitId)) workoutByDay.add(t.day)
   }

@@ -4110,6 +4110,55 @@ await step('timeline: his columns, in his words, on a page that is dark in both 
   if (!hot) throw new Error('the timeline declares no palette of its own')
 })
 
+await step('timeline: a real session counts as health, with no habit ticked', async () => {
+  /* His report (2026-09-12): health never updated here though four different
+     syncs were running. The column read the workout HABIT and nothing else,
+     and that tick comes from an in-app Hevy sync needing a key in THIS
+     browser -- so the Intervals pipeline could run every two hours forever
+     and never reach it. A session that actually happened counts now. */
+  await fresh('today')
+  const day = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+  await page.evaluate((f) => localStorage.setItem('mc-health-fixture', f), JSON.stringify({
+    days: [], sessions: [{ id: 's1', start_date_local: `${day(0)} 18:00:00+00`, type: 'WeightTraining', name: 'Session', moving_time: 3600, icu_training_load: 40 }], lastRun: null,
+  }))
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    /* No workout habit at all, and no tick: the old path has nothing to read,
+       so anything showing here came from the session. */
+    s.habits = (s.habits ?? []).filter((h) => h.name.trim().toLowerCase() !== 'workout / gym / fitness')
+    s.habitLog = []
+    localStorage.setItem(K, JSON.stringify(s))
+  }, KEY)
+  await page.goto(`${URL}#/timeline`); await page.reload(); await page.waitForTimeout(1100)
+  const skip = page.getByRole('button', { name: 'Not today' })
+  if (await skip.count()) { await skip.first().click(); await page.waitForTimeout(300) }
+  const top = (await page.locator('.tl-rung').first().innerText()).toLowerCase()
+  if (/no workout/.test(top)) throw new Error('today had a real session but the timeline still reads "no workout"')
+  await page.evaluate(() => localStorage.removeItem('mc-health-fixture'))
+})
+
+await step('timeline: the give-up screen keeps the menu, and the way in is the way out', async () => {
+  await fresh('timeline')
+  const skip = page.getByRole('button', { name: 'Not today' })
+  if (await skip.count()) { await skip.first().click(); await page.waitForTimeout(300) }
+  const btn = page.locator('.tl-giveup')
+  await btn.click(); await page.waitForTimeout(700)
+
+  /* His report: it "removes all the menu that is normally within the
+     timeline", so the only way back was hunting a close button. */
+  if (!(await page.locator('.tl-giveup').count())) throw new Error("the timeline's own header vanished behind the give-up screen")
+  if (!/back to the timeline/i.test(await btn.innerText())) throw new Error('the button he came in through does not say the way out')
+  if (await page.locator('.tl-scrub, .tl-stops').count()) throw new Error('the horizon slider and its stops are still there')
+  const cards = await page.locator('.tl-stat').count()
+  if (cards < 6) throw new Error(`${cards} status widgets, so his list is not all there`)
+  const labels = (await page.locator('.tl-stat-l').allInnerTexts()).join(' ').toLowerCase()
+  for (const want of ['debt', 'training', 'postponed', 'habits', 'quitting', 'routines', 'goals']) {
+    if (!labels.includes(want)) throw new Error(`no "${want}" widget: ${labels}`)
+  }
+  await btn.click(); await page.waitForTimeout(500)
+  if (await page.locator('.tl-stat').count()) throw new Error('the same button did not take him back out')
+})
+
 await step('timeline: days, weeks and months are three different reads', async () => {
   await fresh('timeline')
   const labels = await page.locator('.tl-seg button').allInnerTexts()
@@ -4213,7 +4262,7 @@ await step('timeline: a library of hundreds, pasted in bulk and still there afte
   await page.keyboard.press('Escape'); await page.waitForTimeout(300)
 })
 
-await step('timeline: the reel answers to Next, never to the slider', async () => {
+await step('timeline: the reel answers to Next', async () => {
   await fresh('timeline')
   /* Three real, verified clips (David Goggins, Eric Thomas, Jocko Willink --
      the same library the give-up mode ships with) so this checks actual
@@ -4235,106 +4284,45 @@ await step('timeline: the reel answers to Next, never to the slider', async () =
   const first = await src()
   if (!first) throw new Error('nothing is playing with three real reels in the library')
   if (/mute=1|muted=1/.test(first)) throw new Error('the reel is muted')
-  await page.locator('.tl-slider input').focus()
-  await page.keyboard.press('Home'); await page.waitForTimeout(300)
-  await page.keyboard.press('ArrowRight'); await page.waitForTimeout(400)
-  await page.keyboard.press('End'); await page.waitForTimeout(400)
-  if (await src() !== first) throw new Error('the slider changed the clip -- it is supposed to leave it alone')
+  /* The slider this used to drive is gone (2026-09-12, his instruction), so
+     what is left to prove is the half that was always the point: Next moves
+     the clip on. */
   await page.locator('.tl-setshot', { hasText: 'Next' }).click(); await page.waitForTimeout(1500)
   if (await src() === first) throw new Error('Next did not change the clip')
   await page.keyboard.press('Escape'); await page.waitForTimeout(300)
 })
 
-/* THE STOPS UNDER THE SLIDER ARE THE SIX TIERS, clipped to his own horizon --
-   tapping one is a real jump every time, not sometimes a no-op. The old
-   Days/Weeks/Months toggle only ever changed the drag increment, so
-   switching it at rest (or dragging inside a tier) visibly changed nothing;
-   he called that dead and it is gone. */
-await step('timeline: the scrubber runs to his horizon, and its stops actually change the picture', async () => {
+await step('timeline: giving up keeps the page it came from, and Escape gives it back', async () => {
   await fresh('timeline')
-  await page.locator('.tl-giveup').click(); await page.waitForTimeout(500)
-  const horizon = await page.locator('.tl-slider .tl-l').innerText()
-  if (!/2027/.test(horizon)) throw new Error(`the range reads "${horizon}"`)
-  const span = Number(await page.locator('.tl-slider input').getAttribute('max'))
-  if (span < 30) throw new Error(`the horizon is only ${span} days out`)
-  if (Number(await page.locator('.tl-slider input').getAttribute('step')) !== 1) {
-    throw new Error('the handle no longer drags a day at a time')
-  }
-  const stops = await page.locator('.tl-stops button').allInnerTexts()
-  if (stops[0] !== 'Today') throw new Error(`the first stop reads "${stops[0]}", not Today`)
-  if (stops.length < 3) throw new Error(`only ${stops.length} stops -- the tiers collapsed`)
-  if (stops[stops.length - 1] === 'Today') throw new Error('the horizon has no stop of its own')
-  /* Tapping a stop is the fix itself: at rest, picking a different one used
-     to be a no-op. Day zero has no .tl-domains at all (it is the one-line
-     "nothing has happened yet" state), so the comparison is stop-to-stop,
-     not rest-to-stop. */
-  await page.locator('.tl-stops button').nth(1).click(); await page.waitForTimeout(300)
-  if (Number(await page.locator('.tl-slider input').inputValue()) === 0) throw new Error('the stop did not move the slider')
-  const atStop1 = await page.locator('.tl-side.is-push .tl-domains').innerText()
-  await page.locator('.tl-stops button').last().click(); await page.waitForTimeout(300)
-  const atLastStop = await page.locator('.tl-side.is-push .tl-domains').innerText()
-  if (atLastStop === atStop1) throw new Error('tapping a different stop changed nothing')
-  /* And it still free-drags a day at a time between stops. */
-  await page.locator('.tl-slider input').focus()
-  await page.keyboard.press('Home'); await page.waitForTimeout(300)
-  await page.keyboard.press('ArrowRight'); await page.waitForTimeout(300)
-  const oneRight = Number(await page.locator('.tl-slider input').inputValue())
-  if (oneRight <= 0 || oneRight >= span) throw new Error(`one press landed on ${oneRight} of a ${span} day span`)
-  /* Both sides carry the same six categories, and Discipline reads two
-     different kinds of number on purpose: his real momentum on the push
-     side, his own declining self-respect percentage on the drift side. */
-  await page.keyboard.press('End'); await page.waitForTimeout(400)
-  const push = await page.locator('.tl-side.is-push .tl-domains').innerText()
-  const drift = await page.locator('.tl-side.is-drift .tl-domains').innerText()
-  for (const k of ['FINANCES', 'BODY', 'WORK', 'DISCIPLINE', 'FREEDOM', 'RELATIONSHIPS']) {
-    if (!push.toUpperCase().includes(k) || !drift.toUpperCase().includes(k)) throw new Error(`${k} is missing from a side`)
-  }
-  const pushDiscipline = await page.locator('.tl-side.is-push .tl-domain', { hasText: 'Discipline' }).locator('dd').innerText()
-  const driftDiscipline = await page.locator('.tl-side.is-drift .tl-domain', { hasText: 'Discipline' }).locator('dd').innerText()
-  if (!/^\d+%$/.test(driftDiscipline)) throw new Error(`drift discipline should read a percentage, got "${driftDiscipline}"`)
-  if (/%$/.test(pushDiscipline)) throw new Error(`push discipline should be his real momentum, not a percentage, got "${pushDiscipline}"`)
-  /* And the last stop is the horizon itself, not the last whole month short. */
-  const at = await page.locator('.tl-gap').innerText()
-  if (!new RegExp(String(span)).test(at)) throw new Error(`the end of the slider reads "${at.replace(/\n/g, ' ')}" against a ${span} day span`)
-  await page.keyboard.press('Escape'); await page.waitForTimeout(300)
-})
-
-await step('timeline: giving up takes the whole window, and Escape gives it back', async () => {
-  await fresh('timeline')
+  const skipRoll = page.getByRole('button', { name: 'Not today' })
+  if (await skipRoll.count()) { await skipRoll.first().click(); await page.waitForTimeout(300) }
   await page.locator('.tl-giveup').click(); await page.waitForTimeout(600)
-  const box = await page.locator('.tl-lives').evaluate((el) => {
-    const r = el.getBoundingClientRect()
-    return { t: r.top, l: r.left, w: r.width, h: r.height, vw: innerWidth, vh: innerHeight }
-  })
-  if (box.t > 0 || box.l > 0 || box.w < box.vw || box.h < box.vh) throw new Error(`two lives is ${box.w}x${box.h} at ${box.l},${box.t}`)
-  /* HIS LAYOUT: one reel down the left half, the two futures stacked on the
-     right, the life he keeps on top. ONE slot per stop, and no footage on the
-     right at all. */
+
+  /* It used to be a sheet over the whole window, which is exactly what he
+     reported on 2026-09-12: it "removes all the menu that is normally within
+     the timeline", leaving a close button as the only way out. It is inline
+     under the page's own header now, so the header must still be on screen
+     and above it. */
   const shape = await page.evaluate(() => {
     const r = (e) => e.getBoundingClientRect()
+    const lives = r(document.querySelector('.tl-lives'))
+    const head = document.querySelector('.tl-giveup')
     const reel = r(document.querySelector('.tl-reel'))
-    const push = r(document.querySelector('.tl-side.is-push')), drift = r(document.querySelector('.tl-side.is-drift'))
-    return { reelLeft: reel.left, reelW: reel.width, reelH: reel.height, vw: innerWidth, vh: innerHeight,
-      pushTop: push.top, driftTop: drift.top, sides: document.querySelectorAll('.tl-side').length,
-      pills: [...document.querySelectorAll('.tl-side .tl-pill')].map((e) => e.textContent) }
+    const stats = document.querySelector('.tl-status')
+    return {
+      livesTop: lives.top, headTop: head ? r(head).top : -1, headVisible: !!head,
+      reelLeft: reel.left, reelW: reel.width, vw: innerWidth,
+      statsLeft: stats ? r(stats).left : -1,
+    }
   })
-  if (shape.reelLeft > 1 || Math.abs(shape.reelW - shape.vw / 2) > 2) throw new Error(`the reel is ${shape.reelW}px at ${shape.reelLeft}`)
-  if (Math.abs(shape.reelH - shape.vh) > 2) throw new Error(`the reel is ${shape.reelH} tall in a ${shape.vh} window`)
-  if (shape.sides !== 2 || shape.pushTop >= shape.driftTop) throw new Error('the two futures are not stacked, keep on top')
-  if (!/anyway/i.test(shape.pills[0]) || !/skip/i.test(shape.pills[1])) throw new Error(`the rows read ${shape.pills.join(' then ')}`)
-  if (await page.locator('.tl-reel').count() !== 1) throw new Error('there is not exactly one reel')
-  if (!(await page.locator('.tl-reelbar button').count())) throw new Error('no way into the reel library')
-  if (await page.locator('.tl-shot, .tl-pane').count()) throw new Error('the old two-pane footage frames are back')
-  const clash = await page.evaluate(() => {
-    const r = (e) => e.getBoundingClientRect()
-    const hit = (a, z) => !(a.right <= z.left || a.left >= z.right || a.bottom <= z.top || a.top >= z.bottom)
-    const foot = r(document.querySelector('.tl-livesfoot')), close = r(document.querySelector('.tl-close'))
-    return [...document.querySelectorAll('.tl-said, .tl-setshot')].some((e) => hit(r(e), foot) || hit(r(e), close))
-  })
-  if (clash) throw new Error('the copy or the reel control runs under the chrome')
-  await page.keyboard.press('Escape'); await page.waitForTimeout(400)
-  if (await page.locator('.tl-lives').count()) throw new Error('Escape did not close it')
-  if (await page.evaluate(() => getComputedStyle(document.body).overflow) === 'hidden') throw new Error('the page is still locked')
+  if (!shape.headVisible) throw new Error("the timeline's header is gone behind the give-up screen")
+  if (shape.headTop >= shape.livesTop) throw new Error('the header is not above the give-up screen any more')
+  /* His layout: reel down the left, status down the right. */
+  if (shape.reelLeft > shape.vw / 2) throw new Error('the reel is not on the left')
+  if (shape.statsLeft <= shape.reelLeft) throw new Error('the status side is not to the right of the reel')
+
+  await page.keyboard.press('Escape'); await page.waitForTimeout(500)
+  if (await page.locator('.tl-stat').count()) throw new Error('Escape did not give the timeline back')
 })
 
 await page.unroute('https://api.groq.com/**').catch(() => {})

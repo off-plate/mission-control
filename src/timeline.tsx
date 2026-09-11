@@ -31,6 +31,7 @@ import { dayOf, useHealth } from './health'
 import { debtCard, goalsCard, habitsCard, healthCard, postponedCard, quittingCard, routinesCard } from './giveupstatus'
 import { useCompass, type CompassMoney } from './compass'
 import { reelPool, reelKind, parseReels, dedupe } from './reels'
+import { callFunction } from './supabase'
 import { loadYouTubeApi } from './mundiplayer'
 import { getHevyStatsForDay } from './hevy'
 import { localDateKey } from './util'
@@ -721,27 +722,55 @@ function Reel({ url, count, onOpenLibrary, onNext }: {
   const [failed, setFailed] = useState(false)
   const kind = url ? reelKind(url) : null
 
+  const { reelFiles, setReelFile } = useStore()
+  /* An Instagram link is a page, not a video -- reel-fetch downloads it once
+     and this is that download's result, so it can be played the same way a
+     direct file link already is. Undefined means "not fetched yet", '' means
+     "fetched and it failed", so a dead link is remembered rather than retried
+     on every visit. */
+  const cached = kind === 'instagram' ? reelFiles?.[url] : undefined
+  const [fetchingUrl, setFetchingUrl] = useState<string | null>(null)
+
   useEffect(() => { setFailed(false); setSound(true) }, [url])
+
+  useEffect(() => {
+    if (kind !== 'instagram' || cached !== undefined || fetchingUrl === url) return
+    setFetchingUrl(url)
+    void callFunction('reel-fetch', { method: 'POST', body: { url } }).then((res) => {
+      setFetchingUrl((cur) => (cur === url ? null : cur))
+      const fileUrl = res.ok && typeof (res.data as { fileUrl?: unknown })?.fileUrl === 'string'
+        ? (res.data as { fileUrl: string }).fileUrl
+        : ''
+      setReelFile(url, fileUrl)
+    })
+  }, [url, kind, cached, fetchingUrl, setReelFile])
+
+  const playable = kind === 'instagram' ? (cached || null) : url
+  const effectiveKind = kind === 'instagram' ? (cached ? 'file' : null) : kind
+
   useEffect(() => {
     const v = vid.current
-    if (!v || kind !== 'file') return
+    if (!v || effectiveKind !== 'file') return
     v.muted = false
     /* Unmuted autoplay is refused unless the browser trusts this origin. Rather
        than guess, ask for sound and take muted playback over no playback. */
     v.play().catch(() => { v.muted = true; setSound(false); v.play().catch(() => setFailed(true)) })
-  }, [url, kind])
+  }, [playable, effectiveKind])
 
   const hear = () => { const v = vid.current; if (v) { v.muted = false; void v.play() } setSound(true) }
 
+  const fetchingInstagram = kind === 'instagram' && cached === undefined
+  const deadInstagram = kind === 'instagram' && cached === ''
+
   return (
-    <div className={`tl-reel${kind && !failed ? ' has-media' : ''}`}>
+    <div className={`tl-reel${effectiveKind && !failed ? ' has-media' : ''}`}>
       {/* A clip that ends is a clip that hands off to another one, straight
           away, the same way he stops one habit for another instead of sitting
           in the gap. `loop` on the file, and `loop=1` in the YouTube/Vimeo
           embed, both used to replay the SAME clip forever -- so nothing here
           ever advanced on its own, only the manual Next button did. */}
-      {!failed && kind === 'file' && (
-        <video ref={vid} className="tl-media" src={url} autoPlay playsInline onEnded={onNext} onError={() => setFailed(true)} />
+      {!failed && effectiveKind === 'file' && (
+        <video ref={vid} className="tl-media" src={playable ?? undefined} autoPlay playsInline onEnded={onNext} onError={() => setFailed(true)} />
       )}
       {!failed && kind === 'youtube' && (
         <YouTubeReel url={url} sound={sound} onEnded={onNext} onFail={() => setFailed(true)} />
@@ -751,6 +780,20 @@ function Reel({ url, count, onOpenLibrary, onNext }: {
           allow="autoplay; encrypted-media" frameBorder="0" />
       )}
       {!failed && kind === 'other' && <img className="tl-media" src={url} alt="" onError={() => setFailed(true)} />}
+
+      {fetchingInstagram && (
+        <div className="tl-reelempty">
+          <p className="tl-l">Fetching this Reel…</p>
+          <p>Downloaded once, then it plays straight from here on every device.</p>
+        </div>
+      )}
+      {deadInstagram && (
+        <div className="tl-reelempty is-bad">
+          <p className="tl-l">That Reel would not download</p>
+          <p className="tl-url">{url}</p>
+          <p>Private, deleted, or Instagram changed its page. Skip to the next one, or take it out.</p>
+        </div>
+      )}
 
       {!kind && (
         <div className="tl-reelempty">
@@ -836,7 +879,7 @@ function ReelLibrary({ pool, onClose }: { pool: string[]; onClose: () => void })
   const [text, setText] = useState(() => (reels ?? []).join('\n'))
   const parsed = useMemo(() => parseReels(text), [text])
   const counts = useMemo(() => {
-    const c = { youtube: 0, vimeo: 0, file: 0, other: 0 }
+    const c = { youtube: 0, vimeo: 0, instagram: 0, file: 0, other: 0 }
     for (const u of parsed) c[reelKind(u)]++
     return c
   }, [parsed])
@@ -854,11 +897,12 @@ function ReelLibrary({ pool, onClose }: { pool: string[]; onClose: () => void })
           with links in it: every URL gets pulled out and the same clip twice counts once.
         </p>
         <textarea value={text} onChange={(e) => setText(e.target.value)} spellCheck={false}
-          placeholder={'https://www.youtube.com/watch?v=...\nhttps://youtu.be/...\nhttps://youtube.com/shorts/...'} />
+          placeholder={'https://www.youtube.com/watch?v=...\nhttps://youtu.be/...\nhttps://youtube.com/shorts/...\nhttps://www.instagram.com/reel/...'} />
         <div className="tl-libcount">
           <span><b>{parsed.length}</b> link{parsed.length === 1 ? '' : 's'}</span>
           <span><b>{counts.youtube}</b> YouTube</span>
           <span><b>{counts.vimeo}</b> Vimeo</span>
+          <span><b>{counts.instagram}</b> Instagram</span>
           <span><b>{counts.file}</b> file{counts.file === 1 ? '' : 's'}</span>
           {counts.other > 0 && <span className="off"><b>{counts.other}</b> not recognised</span>}
           {curated > 0 && <span className="off"><b>{curated}</b> already shipped</span>}

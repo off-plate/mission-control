@@ -29,14 +29,26 @@ export const REELS: string[] = [
 const YT = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([\w-]{6,})/i
 const VIMEO = /vimeo\.com\/(?:video\/)?(\d+)/i
 const FILE = /\.(mp4|webm|mov|m4v)(\?|#|$)/i
+/* instagram.com/reel/<code>, /reels/<code>, or a plain post at /p/<code> --
+   all three carry a video on a public account. The trailing slash is
+   optional, a query string or share suffix after the code is common. */
+const INSTAGRAM = /instagram\.com\/(?:reel|reels|p)\/([\w-]+)/i
 
-export type ReelKind = 'youtube' | 'vimeo' | 'file' | 'other'
+export type ReelKind = 'youtube' | 'vimeo' | 'instagram' | 'file' | 'other'
 
 export function reelKind(url: string): ReelKind {
   if (YT.test(url)) return 'youtube'
   if (VIMEO.test(url)) return 'vimeo'
+  if (INSTAGRAM.test(url)) return 'instagram'
   if (FILE.test(url)) return 'file'
   return 'other'
+}
+
+/** The shortcode out of an Instagram URL, or null. Used as the cache key and
+ *  as the stored file's name, so the same Reel pasted twice never downloads
+ *  twice. */
+export function instagramCode(url: string): string | null {
+  return url.match(INSTAGRAM)?.[1] ?? null
 }
 
 /** A YouTube link is the same video under a dozen spellings. Two links to one
@@ -48,6 +60,8 @@ export function reelId(url: string): string {
   if (y) return `yt:${y[1]}`
   const v = url.match(VIMEO)
   if (v) return `vimeo:${v[1]}`
+  const ig = url.match(INSTAGRAM)
+  if (ig) return `ig:${ig[1]}`
   return url.trim().replace(/[?#].*$/, '').toLowerCase()
 }
 

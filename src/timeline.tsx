@@ -57,22 +57,53 @@ const kc = (n: number) => Math.round(n).toLocaleString('cs-CZ')
  *  for it. Drops the hour entirely when there is none. */
 const wm = (min: number) => (min >= 60 ? `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, '0')}m` : `${Math.round(min)}m`)
 
-/** Length and volume for a stretch of days, from this device's own Hevy
- *  cache -- see the note on STATS_STORE in hevy.ts for why that cache is
- *  device-local rather than synced. Days ticked by hand rather than by
- *  Hevy contribute nothing here, which is exactly right: there is no
- *  length or volume to report for them. */
-function hevyDetail(days: string[]): { minutes: number; volumeKg: number } | null {
+/** Length and volume for a stretch of days.
+ *
+ *  TWO SOURCES, and they carry different things. Hevy's own cache is
+ *  device-local (see STATS_STORE in hevy.ts) and is the only one that knows
+ *  VOLUME, because Intervals never sees the weight on the bar. Intervals
+ *  knows the minutes for every session, on every device, which Hevy only
+ *  knows on the machine it synced to.
+ *
+ *  So: Hevy wins where it has the day, because it says more. Where it does
+ *  not, the real session minutes still show. Fixed 2026-09-12, immediately
+ *  after his report -- the pass before this one made Intervals sessions count
+ *  as workout days but left the read-out on Hevy alone, so every day that came
+ *  from Intervals collapsed to a bare "worked out" with the time and the
+ *  weight he was used to seeing gone. */
+function hevyDetail(days: string[], sessionMinutes?: Map<string, number>): { minutes: number; volumeKg: number } | null {
   let minutes = 0, volumeKg = 0, hit = false
   for (const day of days) {
     const s = getHevyStatsForDay(day)
-    if (!s) continue
-    hit = true
-    minutes += s.minutes
-    volumeKg += s.volumeKg
+    if (s) {
+      hit = true
+      minutes += s.minutes
+      volumeKg += s.volumeKg
+      continue
+    }
+    const mins = sessionMinutes?.get(day)
+    if (mins != null && mins > 0) { hit = true; minutes += mins }
   }
   return hit ? { minutes, volumeKg } : null
 }
+
+/** Minutes per day from real sessions, for the two places that draw the
+ *  health read-out. A hook rather than a prop drilled through Ladder and
+ *  Flywheel to reach two leaves. */
+function useSessionMinutes(): Map<string, number> {
+  const health = useHealth().state
+  return useMemo(() => {
+    const by = new Map<string, number>()
+    if (health.status !== 'ok') return by
+    for (const s of health.sessions) {
+      const day = dayOf(s)
+      if (!day || !s.moving_time) continue
+      by.set(day, (by.get(day) ?? 0) + s.moving_time / 60)
+    }
+    return by
+  }, [health])
+}
+
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
 /* His instruction (2026-09-03), after the space switcher made the same real
    chain and momentum score read as "not one real thing" depending which
@@ -258,6 +289,7 @@ function Sum({ label, figure, unit, says, win }: { label: string; figure: string
 }
 
 function Rung({ p, zoom, money, today }: { p: Period; zoom: Zoom; money: CompassMoney | null; today: boolean }) {
+  const sessionMins = useSessionMinutes()
   /* Money moved inside this rung, whatever the rung is made of. */
   const fin = money ? p.days.reduce((a, d) => {
     const row = money.byDay[d.day]
@@ -285,14 +317,15 @@ function Rung({ p, zoom, money, today }: { p: Period; zoom: Zoom; money: Compass
             ? <Cell figure={kc(fin.saved)} unit="Kč set aside" pct={1} />
             : <Cell figure="—" unit="nothing moved" pct={0} muted />}
 
-      {/* HEALTH. Read off the Workout / Gym / Fitness habit, from either
-          source that ticks it -- Hevy or his own click, this cell does not
-          know which. Not scored; see the note in momentum.ts for why.
-          Length and volume ride along when Hevy is the source: hevyDetail
-          reads nothing for a day ticked by hand, which is exactly right,
-          there is no length or volume to report for one. */}
+      {/* HEALTH. A day counts when the Workout / Gym / Fitness habit was
+          ticked -- by Hevy or by hand, this cell does not know which -- or
+          when a real session was recorded. Not scored; see the note in
+          momentum.ts for why. Length rides along from whichever source has
+          it, and volume only from Hevy, which is the only one that sees the
+          weight. A day ticked purely by hand still has neither, which is
+          right: there is nothing to report for one. */}
       {(() => {
-        const detail = hevyDetail(p.days.map((d) => d.day))
+        const detail = hevyDetail(p.days.map((d) => d.day), sessionMins)
         if (dayUnit) {
           if (detail) return <Cell figure={wm(detail.minutes)} unit={detail.volumeKg > 0 ? `${kc(detail.volumeKg)}kg lifted` : 'worked out'} pct={1} />
           return <Cell figure={p.counts.workoutDays ? '✓' : '—'} unit={p.counts.workoutDays ? 'worked out' : 'no workout'} pct={p.counts.workoutDays ? 1 : 0} muted={!p.counts.workoutDays} />
@@ -584,6 +617,7 @@ function Maths({ run, now }: { run: DayScore[]; now: number }) {
 function DayCard({ p, zoom, money }: {
   p: Period; zoom: Zoom; money: CompassMoney | null
 }) {
+  const sessionMins = useSessionMinutes()
   const fin = money ? p.days.reduce((a, d) => a + (money.byDay[d.day]?.paid ?? 0) + (money.byDay[d.day]?.saved ?? 0), 0) : null
   const pct = Math.round(clamp01(p.ratio) * 100)
   const cost = p.empty && p.delta < 0     // see the note on the rung
@@ -607,7 +641,7 @@ function DayCard({ p, zoom, money }: {
         <div><dt>Focus</dt><dd>{hm(p.counts.focusMin)}<small>{zoom === 'd' ? 'today' : 'in total'}</small></dd></div>
         <div className={fin ? '' : 'off'}><dt>Finances</dt><dd>{fin ? kc(fin) : '—'}<small>{fin ? 'Kč moved' : money ? 'nothing moved' : 'no Compass'}</small></dd></div>
         {(() => {
-          const detail = hevyDetail(p.days.map((d) => d.day))
+          const detail = hevyDetail(p.days.map((d) => d.day), sessionMins)
           const dayFigure = zoom === 'd' ? (p.counts.workoutDays ? '✓' : '—') : p.counts.workoutDays
           const dayUnitText = zoom === 'd' ? (p.counts.workoutDays ? 'worked out' : 'no workout') : `of ${p.totalDays} days`
           return (

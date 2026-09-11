@@ -12,6 +12,7 @@
    answer says what it cost, including the zero that a cache hit costs. */
 import { useCallback, useSyncExternalStore } from 'react'
 import { createLiveStore } from './livestore'
+import { activeModel, getAiKey, request, stripReasoning } from './ai'
 
 export interface Cue { start: number; end: number; text: string }
 export interface Chapter { start: number; title: string }
@@ -228,4 +229,92 @@ export function asText(doc: Transcript): string {
     .map((b) => `[${stamp(b.start)}] ${b.title ? `${b.title}\n` : ''}${b.text}`)
     .join('\n\n')
   return `${head}\n\n${doc.summary ? `${doc.summary}\n\n` : ''}${body}\n`
+}
+
+/* ------------------------------------------------------------ tidying up
+
+   His note (2026-09-11): use the GLM key already in Settings for this too, it
+   "might recognize the script better".
+
+   What it cannot do, and is worth writing down so nobody tries: the WORDS are
+   not a model's guess. They come from YouTube's own caption track, or from the
+   provider when YouTube refuses. No model hears the audio at any point, so no
+   model can improve what was heard.
+
+   What it can do is the thing auto-captions are actually bad at. They arrive
+   as one flat run with no full stops, no capitals and no speakers, which is
+   exhausting to read for an hour. That is punctuation, not transcription, and
+   a language model is the right tool for it.
+
+   Strictly on demand. It spends his own key, so it happens when he presses the
+   button and never because a page loaded. */
+
+const TIDY_BATCH = 8
+
+export type TidyState =
+  | { phase: 'idle' }
+  | { phase: 'working'; done: number; total: number }
+  | { phase: 'done'; changed: number }
+  | { phase: 'failed'; message: string }
+
+const tidyStore = createLiveStore<TidyState>({ phase: 'idle' })
+/** Cleaned paragraphs, by videoId then block index. Kept beside the document
+ *  rather than written into it, so the original is never lost and a second
+ *  press costs nothing. */
+const tidied = new Map<string, Map<number, string>>()
+
+export function tidyFor(videoId: string): Map<number, string> | undefined { return tidied.get(videoId) }
+
+export function useTidy(): TidyState {
+  return useSyncExternalStore(tidyStore.subscribe, tidyStore.getSnapshot, tidyStore.getSnapshot)
+}
+
+export function resetTidy(): void { tidyStore.publish({ phase: 'idle' }) }
+
+export async function tidy(doc: Transcript, list: Block[]): Promise<void> {
+  const key = getAiKey()
+  if (!key) { tidyStore.publish({ phase: 'failed', message: 'No AI key in Settings.' }); return }
+  const already = tidied.get(doc.videoId) ?? new Map<number, string>()
+  const todo = list.map((b, i) => ({ i, text: b.text })).filter((b) => !already.has(b.i))
+  if (!todo.length) { tidyStore.publish({ phase: 'done', changed: already.size }); return }
+
+  tidyStore.publish({ phase: 'working', done: 0, total: todo.length })
+  let changed = already.size
+  for (let at = 0; at < todo.length; at += TIDY_BATCH) {
+    const batch = todo.slice(at, at + TIDY_BATCH)
+    try {
+      const res = await request({
+        model: activeModel(),
+        temperature: 0.1,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You repair the punctuation of automatic video captions. For each numbered paragraph, return the SAME words with sentence breaks, capitals and commas added, and filler ("um", "uh", repeated false starts) removed. Never reword, never summarise, never translate, never add anything that was not said. Reply as JSON: {"out":[{"i":<number>,"text":"<repaired>"}]}, one entry per paragraph given.',
+          },
+          { role: 'user', content: JSON.stringify({ paragraphs: batch.map((b) => ({ i: b.i, text: b.text })) }) },
+        ],
+      }, key)
+      if (!res.ok) throw new Error(`the model answered ${res.status}`)
+      const data = await res.json()
+      const parsed = JSON.parse(stripReasoning(data.choices?.[0]?.message?.content ?? '') || '{}')
+      const out = Array.isArray(parsed.out) ? parsed.out : []
+      /* A batch that comes back the wrong shape keeps its originals rather than
+         dropping paragraphs on the floor: a transcript missing its middle is
+         worse than one that is hard to read. */
+      for (const row of out) {
+        const i = Number(row?.i)
+        const text = typeof row?.text === 'string' ? row.text.trim() : ''
+        if (Number.isFinite(i) && text && batch.some((b) => b.i === i)) { already.set(i, text); changed++ }
+      }
+      tidied.set(doc.videoId, already)
+      tidyStore.publish({ phase: 'working', done: Math.min(todo.length, at + batch.length), total: todo.length })
+    } catch (e) {
+      tidied.set(doc.videoId, already)
+      tidyStore.publish({ phase: 'failed', message: e instanceof Error ? e.message : 'the model could not be reached' })
+      return
+    }
+  }
+  tidyStore.publish({ phase: 'done', changed })
 }

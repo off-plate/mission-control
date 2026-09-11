@@ -9506,132 +9506,173 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .hp-day-title { font-size: var(--text-base); }
 
 /* ============================================================
-   WATCHLESS — a YouTube video, read instead of watched.
-   His ask (2026-09-11): bring the project into the dock at the
-   bottom right, beside Health.
+   WATCHLESS — the reader, in the reader's own clothes.
 
-   Light-first like the rest of the app, with the HUD overriding
-   below. The transcript is the page's whole reason to exist, so
-   it gets real reading measure and the chrome stays quiet.
+   His note (2026-09-11): the first pass was ugly, welded to the
+   navigation, and ignored the design the original app already
+   has. Both fair. The original is an editorial page, not a
+   dashboard: warm paper, a big serif line, a mono prompt on a
+   single hairline rule, a rust caret, and nothing boxed.
+
+   So this page borrows that language rather than the app's card
+   chrome, the same licence he gave Health -- a page may leave the
+   house style when the thing it is showing has one of its own.
+   The serif stack is the original's own fallback chain, so it
+   costs no webfont.
    ============================================================ */
-.wl { display: flex; flex-direction: column; gap: var(--s5); padding-bottom: 92px; }
+.wl {
+  --wl-ink: #1A1A17;
+  --wl-rust: #C2452B;
+  --wl-rule: rgba(26, 26, 23, 0.22);
+  --wl-faint: rgba(26, 26, 23, 0.55);
+  --wl-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+  --wl-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
 
-.wl-ask { display: flex; gap: var(--s3); }
+  max-width: 940px; margin-inline: auto;
+  /* His complaint, twice now: content welded to the navigation. `main` sets a
+     horizontal gutter only, so a page that wants air above it has to say so. */
+  padding: clamp(48px, 9vh, 104px) 0 120px;
+  display: flex; flex-direction: column; gap: var(--s6);
+  color: var(--wl-ink);
+}
+.shell.is-hud .wl { --wl-ink: #E8E4DA; --wl-rule: rgba(232, 228, 218, 0.24); --wl-faint: rgba(232, 228, 218, 0.6); }
+
+.wl-ask-h1 {
+  margin: 0; font-family: var(--wl-serif); font-weight: 400;
+  font-size: clamp(2.4rem, 5.4vw, 4rem); line-height: 1.05; letter-spacing: -0.018em;
+}
+
+/* ---- the prompt ---- */
+.wl-ask {
+  display: flex; align-items: baseline; gap: 12px;
+  padding-bottom: 12px; border-bottom: 1px solid var(--wl-ink);
+}
+.wl-ask.is-tight { margin-bottom: var(--s3); }
+.wl-caret { font-family: var(--wl-mono); color: var(--wl-rust); font-size: 15px; flex: none; }
 .wl-input {
-  flex: 1; min-width: 0; font: inherit; font-size: var(--text-base);
-  padding: 12px 16px; border-radius: 14px;
-  border: 1px solid var(--line); background: var(--a-card); color: var(--a-ink);
+  flex: 1; min-width: 0; border: 0; background: none; outline: none;
+  font-family: var(--wl-mono); font-size: 15px; color: var(--wl-ink); padding: 0;
 }
-.wl-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.wl-input::placeholder { color: var(--wl-faint); }
 .wl-go {
-  flex: none; cursor: pointer; font: inherit; font-weight: 700;
-  padding: 12px 22px; border-radius: 14px; border: 0;
-  background: var(--accent); color: var(--accent-ink, #5E6B12);
+  flex: none; cursor: pointer; border: 0; background: none;
+  font-family: var(--wl-mono); font-size: 13px; letter-spacing: 0.14em;
+  color: var(--wl-ink); padding: 0;
 }
-.wl-go:disabled { opacity: 0.45; cursor: default; }
+.wl-go:hover:not(:disabled) { color: var(--wl-rust); }
+.wl-go:disabled { color: var(--wl-faint); cursor: default; }
 
-.wl-empty {
-  padding: var(--s7) var(--s5); border-radius: 18px;
-  background: var(--a-card); border: 1px solid var(--line);
-  color: var(--muted); text-align: center;
-  display: flex; flex-direction: column; align-items: center; gap: var(--s4);
+.wl-note, .wl-hint { font-family: var(--wl-mono); font-size: 13px; color: var(--wl-faint); margin: 0; }
+.wl-err { font-family: var(--wl-serif); font-size: 1.4rem; margin: 0 0 6px; }
+.wl-empty { display: flex; flex-direction: column; gap: var(--s3); }
+.wl-tidyfail { color: var(--wl-rust); }
+
+.wl-recent { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 18px; }
+.wl-recent-h {
+  font-family: var(--wl-mono); font-size: 11px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--wl-faint);
 }
-.wl-empty.is-bad { border-color: color-mix(in srgb, var(--alert) 34%, transparent); }
-.wl-err { color: var(--a-ink); font-weight: 600; margin: 0; }
-.wl-hint { margin: 0; font-size: var(--text-sm); }
-.wl-recent { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
-.wl-recent-h { width: 100%; font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.1em; }
+.wl-chip {
+  cursor: pointer; border: 0; background: none; padding: 0; text-align: left;
+  font-family: var(--wl-serif); font-size: 1rem; color: var(--wl-ink);
+  display: inline-flex; align-items: baseline; gap: 9px; max-width: 100%;
+  border-bottom: 1px solid transparent;
+}
+.wl-chip:hover { border-bottom-color: var(--wl-rust); color: var(--wl-rust); }
+.wl-chip-at { font-family: var(--wl-mono); font-size: 12px; color: var(--wl-faint); flex: none; }
+.wl-chip-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ---- the video it is ---- */
+/* ---- what it is ---- */
 .wl-head {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--s5);
-  align-items: center; padding: var(--s4);
-  background: var(--a-card); border: 1px solid var(--line); border-radius: 18px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s5);
+  align-items: end; padding-bottom: var(--s4); border-bottom: 1px solid var(--wl-ink);
 }
-.wl-thumb { width: 132px; height: 74px; object-fit: cover; border-radius: 10px; flex: none; }
-.wl-headtext { min-width: 0; }
-.wl-title { margin: 0 0 5px; font-size: 1.15rem; font-weight: 700; letter-spacing: -0.01em; line-height: 1.25; }
-.wl-meta { margin: 0; display: flex; flex-wrap: wrap; gap: var(--s4); font-size: var(--text-xs); color: var(--muted); }
-.wl-free { color: var(--good, #3E7D32); font-weight: 600; }
-.wl-paid { color: var(--alert); font-weight: 600; }
+.wl-thumb { display: none; }
+.wl-title {
+  margin: 0 0 8px; font-family: var(--wl-serif); font-weight: 400;
+  font-size: clamp(1.7rem, 3.4vw, 2.5rem); line-height: 1.12; letter-spacing: -0.015em;
+}
+.wl-meta {
+  margin: 0; display: flex; flex-wrap: wrap; gap: 18px;
+  font-family: var(--wl-mono); font-size: 11.5px; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--wl-faint);
+}
+.wl-free { color: var(--wl-faint); }
+.wl-paid { color: var(--wl-rust); }
 .wl-watch {
-  flex: none; display: inline-flex; align-items: center; gap: 6px;
-  padding: 8px 14px; border-radius: 999px; text-decoration: none;
-  border: 1px solid var(--line); color: var(--a-ink); font-size: var(--text-sm); font-weight: 600;
+  flex: none; font-family: var(--wl-mono); font-size: 12px; letter-spacing: 0.12em;
+  color: var(--wl-ink); text-decoration: none; display: inline-flex; align-items: center; gap: 7px;
+  border-bottom: 1px solid var(--wl-rule); padding-bottom: 3px;
 }
-.wl-watch:hover { border-color: var(--a-ink); }
-@media (max-width: 760px) {
-  .wl-head { grid-template-columns: 1fr; }
-  .wl-thumb { width: 100%; height: 150px; }
-}
+.wl-watch:hover { color: var(--wl-rust); border-bottom-color: var(--wl-rust); }
 
-/* ---- the brief, read before anything else ---- */
-.wl-brief {
-  padding: var(--s5); border-radius: 18px;
-  background: color-mix(in srgb, var(--accent) 12%, var(--a-card));
-  border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
-}
+/* ---- the brief ---- */
+.wl-brief { border-left: 2px solid var(--wl-rust); padding-left: var(--s5); }
 .wl-h2 {
-  margin: 0 0 var(--s3); font-family: var(--font-display);
-  font-size: 0.78rem; font-weight: 700; letter-spacing: 0.11em; text-transform: uppercase;
+  margin: 0 0 10px; font-family: var(--wl-mono); font-size: 11px;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--wl-faint); font-weight: 400;
 }
-.wl-brief p { margin: 0 0 var(--s3); line-height: 1.55; max-width: 68ch; }
+.wl-brief p {
+  margin: 0 0 var(--s3); font-family: var(--wl-serif);
+  font-size: 1.12rem; line-height: 1.6; max-width: 62ch;
+}
 .wl-brief p:last-child { margin-bottom: 0; }
 
 /* ---- find, and take it away ---- */
-.wl-tools { display: flex; gap: var(--s3); align-items: center; flex-wrap: wrap; }
-.wl-find {
-  flex: 1; min-width: 200px; display: flex; align-items: center; gap: 8px;
-  padding: 9px 14px; border-radius: 999px;
-  background: var(--a-card); border: 1px solid var(--line); color: var(--muted);
+.wl-tools {
+  display: flex; gap: var(--s6); align-items: baseline; flex-wrap: wrap;
+  padding-bottom: 10px; border-bottom: 1px solid var(--wl-rule);
 }
-.wl-find input { flex: 1; min-width: 0; border: 0; background: none; font: inherit; color: var(--a-ink); outline: none; }
-.wl-count { font-size: var(--text-xs); font-weight: 700; color: var(--muted); white-space: nowrap; }
+.wl-find { flex: 1; min-width: 200px; display: flex; align-items: baseline; gap: 9px; color: var(--wl-faint); }
+.wl-find svg { align-self: center; }
+.wl-find input {
+  flex: 1; min-width: 0; border: 0; background: none; outline: none;
+  font-family: var(--wl-mono); font-size: 13px; color: var(--wl-ink);
+}
+.wl-find input::placeholder { color: var(--wl-faint); }
+.wl-count { font-family: var(--wl-mono); font-size: 11px; color: var(--wl-rust); white-space: nowrap; }
 .wl-tool {
-  flex: none; cursor: pointer; font: inherit; font-size: var(--text-sm); font-weight: 600;
-  display: inline-flex; align-items: center; gap: 7px;
-  padding: 9px 16px; border-radius: 999px;
-  border: 1px solid var(--line); background: var(--a-card); color: var(--a-ink);
+  flex: none; cursor: pointer; border: 0; background: none; padding: 0;
+  font-family: var(--wl-mono); font-size: 12px; letter-spacing: 0.1em;
+  color: var(--wl-ink); display: inline-flex; align-items: center; gap: 7px;
 }
-.wl-tool:hover { border-color: var(--a-ink); }
+.wl-tool:hover:not(:disabled) { color: var(--wl-rust); }
+.wl-tool:disabled { color: var(--wl-faint); cursor: default; }
 
-/* ---- chapters, as a table of contents ---- */
-.wl-chapters { display: flex; flex-wrap: wrap; gap: 6px; }
-.wl-chip {
-  cursor: pointer; font: inherit; font-size: var(--text-xs); text-align: left;
-  display: inline-flex; align-items: baseline; gap: 7px; max-width: 100%;
-  padding: 7px 13px; border-radius: 999px;
-  border: 1px solid var(--line); background: var(--a-card); color: var(--a-ink);
-}
-.wl-chip:hover { border-color: var(--a-ink); }
-.wl-chip-at { color: var(--muted); flex: none; }
-.wl-chip-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* ---- chapters, as a contents list ---- */
+.wl-chapters { display: flex; flex-direction: column; gap: 7px; }
 
-/* ---- the transcript itself ---- */
+/* ---- the transcript ---- */
 .wl-body { display: flex; flex-direction: column; }
 .wl-block {
-  display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: var(--s4);
-  padding: var(--s4) 0; border-top: 1px solid var(--line);
+  display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: var(--s5);
+  padding: var(--s5) 0; border-top: 1px solid var(--wl-rule);
   transition: opacity 0.2s;
 }
 .wl-block:first-child { border-top: 0; }
-/* A search dims what did not match rather than hiding it: the shape of the
-   talk stays visible, so he can see WHERE in the hour the answer sits. */
-.wl-block.is-dim { opacity: 0.34; }
-.wl-block.is-hit { opacity: 1; }
+.wl-block.is-dim { opacity: 0.3; }
 .wl-at {
-  font-size: var(--text-xs); color: var(--muted); text-decoration: none;
-  font-variant-numeric: tabular-nums; padding-top: 3px;
+  font-family: var(--wl-mono); font-size: 11.5px; color: var(--wl-faint);
+  text-decoration: none; padding-top: 7px; font-variant-numeric: tabular-nums;
 }
-.wl-at:hover { color: var(--a-ink); text-decoration: underline; }
-.wl-blocktitle { margin: 0 0 6px; font-size: var(--text-base); font-weight: 700; letter-spacing: -0.01em; }
-.wl-text p { margin: 0; line-height: 1.62; max-width: 72ch; }
-.wl-text mark { background: color-mix(in srgb, var(--accent) 55%, transparent); color: inherit; border-radius: 3px; padding: 0 2px; }
-@media (max-width: 620px) {
-  .wl-block { grid-template-columns: 1fr; gap: 4px; }
+.wl-at:hover { color: var(--wl-rust); }
+.wl-blocktitle {
+  margin: 0 0 10px; font-family: var(--wl-serif); font-weight: 400;
+  font-size: 1.45rem; line-height: 1.2; letter-spacing: -0.01em;
+}
+.wl-text p {
+  margin: 0; font-family: var(--wl-serif); font-size: 1.12rem;
+  line-height: 1.72; max-width: 64ch;
+}
+.wl-text mark { background: color-mix(in srgb, var(--wl-rust) 24%, transparent); color: inherit; padding: 0 2px; }
+@media (max-width: 700px) {
+  .wl { padding-top: 40px; }
+  .wl-block { grid-template-columns: 1fr; gap: 6px; }
+  .wl-head { grid-template-columns: 1fr; align-items: start; }
 }
 
-/* ---- the dock panel ---- */
+/* ---- the dock panel keeps the app's chrome: it is dock furniture, not the
+   reader, and a serif island inside the dock would read as a bug. ---- */
 .wldock-ask { display: flex; gap: 6px; }
 .wldock-input {
   flex: 1; min-width: 0; font: inherit; font-size: var(--text-sm);
@@ -9653,13 +9694,3 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 }
 .wldock-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wldock-row:hover { background: var(--a-feature, rgba(0,0,0,0.04)); color: var(--a-ink); }
-
-/* ---- the HUD ---- */
-.shell.is-hud .wl-input,
-.shell.is-hud .wl-head,
-.shell.is-hud .wl-empty,
-.shell.is-hud .wl-find,
-.shell.is-hud .wl-tool,
-.shell.is-hud .wl-chip,
-.shell.is-hud .wldock-input { background: rgba(255, 255, 255, 0.04); }
-.shell.is-hud .wl-block { border-color: rgba(255, 255, 255, 0.09); }

@@ -7903,6 +7903,17 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 /* ---- two lives: one reel on the left, two futures on the right ---- */
 .tl-lives { position: fixed; inset: 0; z-index: 300; background: #08090A; color: var(--tl-ink);
   overflow: hidden; animation: tlrise var(--t-med) var(--ease) both; }
+/* Inline under the page's own header, so the timeline's menu never leaves the
+   screen (2026-09-12, his report: the sheet took the menu with it and the only
+   way back was a close button he had to go looking for). */
+.tl-lives.is-inline { position: relative; inset: auto; z-index: 1; border-radius: 18px;
+  min-height: min(74vh, 720px); margin-top: 14px; }
+.tl-lives.is-inline .tl-stage { position: relative; inset: auto; min-height: min(74vh, 720px); }
+@media (max-width: 900px) {
+  .tl-lives.is-inline .tl-stage { grid-template-columns: 1fr; }
+  .tl-lives.is-inline { min-height: 0; }
+  .tl-lives.is-inline .tl-reel { min-height: 46vw; }
+}
 @keyframes tlrise { from { opacity: 0; transform: scale(0.99); } to { opacity: 1; transform: none; } }
 
 /* HALF AND HALF. The reel is a portrait clip in a landscape half, so it is
@@ -9648,3 +9659,32 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 }
 .wldock-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wldock-row:hover { background: var(--a-feature, rgba(0,0,0,0.04)); color: var(--a-ink); }
+
+/* ---- where he actually is ----
+   Replaces the horizon slider and its two projected futures, on his
+   instruction (2026-09-12). Counted from his own rows, and deliberately not
+   flattering: at the moment he wants to drop something, the useful thing is
+   what is already true, not an argument about February. */
+.tl-status { position: relative; height: 100%; overflow-y: auto; padding: 26px 26px 30px;
+  display: flex; flex-direction: column; gap: 16px;
+  background: radial-gradient(120% 130% at 80% 0%, #121316, #0A0A0B 72%); }
+.tl-status-head { margin: 0; font-family: var(--font-display); font-weight: 800;
+  font-size: clamp(1.05rem, 1.7vw, 1.4rem); line-height: 1.2; color: var(--tl-ink); max-width: 26ch; }
+.tl-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(212px, 1fr)); gap: 10px; }
+.tl-stat { padding: 13px 15px 14px; border-radius: 12px; background: rgba(242, 240, 234, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(242, 240, 234, 0.07); display: flex; flex-direction: column; }
+.tl-stat-l { font: 700 9.5px/1 var(--font-body); letter-spacing: 0.19em; text-transform: uppercase;
+  color: var(--tl-faint); }
+.tl-stat-fig { margin-top: 9px; font-family: var(--font-display); font-weight: 800;
+  font-size: clamp(1.5rem, 2.4vw, 2rem); line-height: 1; letter-spacing: -0.02em; color: var(--tl-ink);
+  font-variant-numeric: tabular-nums; }
+.tl-stat-unit { margin-top: 4px; font: 600 11px/1.35 var(--font-body); color: var(--tl-dim); }
+.tl-stat-line { margin: 8px 0 0; font: 500 12px/1.45 var(--font-body); color: var(--tl-dim); }
+.tl-stat-rows { list-style: none; margin: 9px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.tl-stat-rows li { font: 600 11.5px/1.35 var(--font-mono); color: var(--tl-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Bad earns the colour. If everything were tinted, none of it would read. */
+.tl-stat.is-bad .tl-stat-fig { color: var(--tl-no); }
+.tl-stat.is-bad { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tl-no) 34%, transparent); }
+.tl-stat.is-good .tl-stat-fig { color: var(--tl-hot); }
+.tl-status .tl-back { align-self: flex-start; margin-top: auto; }

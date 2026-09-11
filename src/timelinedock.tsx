@@ -10,6 +10,7 @@
    second copy of either the wording or the math. */
 import { useMemo, type ReactNode } from 'react'
 import { useStore } from './store'
+import { dayOf, useHealth } from './health'
 import { useCompass } from './compass'
 import { chainOf, momentumRun, momentumNow, stateFor, HARD_MIN_DAYS } from './momentum'
 import { chainPromiseLine, inAllSpaces, WINDOW } from './timeline'
@@ -32,9 +33,18 @@ export function TimelinePanel({ dockControls, onOpenFull }: { dockControls?: Rea
      exported from timeline.tsx, is the one place that decision lives, read
      here rather than re-declared so the dock and the full page can't drift
      into disagreeing about it again. */
+  /* Days a session was actually recorded, straight from the health pipeline.
+     The workout habit still counts when it is ticked; this is the other half,
+     so a real session shows here whether or not anything ticked it. */
+  const health = useHealth().state
+  const trainedDays = useMemo(
+    () => new Set(health.status === 'ok' ? health.sessions.map(dayOf).filter(Boolean) : []),
+    [health],
+  )
+
   const run = useMemo(
-    () => momentumRun({ habits, habitLog, tasks, focusSessions, inView: inAllSpaces }, WINDOW),
-    [habits, habitLog, tasks, focusSessions],
+    () => momentumRun({ habits, habitLog, tasks, focusSessions, inView: inAllSpaces, workoutDays: trainedDays }, WINDOW),
+    [habits, habitLog, tasks, focusSessions, trainedDays],
   )
   const now = momentumNow(run)
   const chain = chainOf(run)

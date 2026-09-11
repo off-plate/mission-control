@@ -27,6 +27,8 @@
                tracker is not a call this column gets to make alone. */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from './store'
+import { dayOf, useHealth } from './health'
+import { debtCard, goalsCard, habitsCard, healthCard, postponedCard, quittingCard, routinesCard } from './giveupstatus'
 import { useCompass, type CompassMoney } from './compass'
 import { reelPool, reelKind, parseReels, dedupe } from './reels'
 import { loadYouTubeApi } from './mundiplayer'
@@ -35,7 +37,7 @@ import { localDateKey } from './util'
 import {
   momentumRun, momentumNow, stateFor, chainOf, rollUp,
   POINTS, CAPS, HABIT_TARGET, TASK_TARGET, FOCUS_TARGET_MIN, HARD_MIN_DAYS,
-  EMPTY_WIPE, KEPT_AT, GAIN, FRICTION, CEILING, curveFor, project, daysBetween,
+  EMPTY_WIPE, KEPT_AT, GAIN, FRICTION, CEILING, curveFor, project,
   type DayScore, type Period, type Zoom, type Future,
 } from './momentum'
 
@@ -89,9 +91,18 @@ export function TimelinePage() {
   const [lives, setLives] = useState(false)
   const compass = useCompass().state
 
+  /* Days a session was actually recorded, straight from the health pipeline.
+     The workout habit still counts when it is ticked; this is the other half,
+     so a real session shows here whether or not anything ticked it. */
+  const health = useHealth().state
+  const trainedDays = useMemo(
+    () => new Set(health.status === 'ok' ? health.sessions.map(dayOf).filter(Boolean) : []),
+    [health],
+  )
+
   const run = useMemo(
-    () => momentumRun({ habits, habitLog, tasks, focusSessions, inView: inAllSpaces }, WINDOW),
-    [habits, habitLog, tasks, focusSessions],
+    () => momentumRun({ habits, habitLog, tasks, focusSessions, inView: inAllSpaces, workoutDays: trainedDays }, WINDOW),
+    [habits, habitLog, tasks, focusSessions, trainedDays],
   )
   const now = momentumNow(run)
   const chain = chainOf(run)
@@ -135,16 +146,26 @@ export function TimelinePage() {
              reach for one-handed at the exact moment he's tempted to quit.
              The address still resolves for anyone who already has it. */}
           <button className="tl-why hide-phone" onClick={() => setPage('board')}>Why</button>
-          <button className="tl-giveup" onClick={() => setLives(true)}>I want to give up</button>
+          <button className={`tl-giveup${lives ? ' is-on' : ''}`} onClick={() => setLives((v) => !v)}>
+            {lives ? 'Back to the timeline' : 'I want to give up'}
+          </button>
         </div>
       </header>
 
-      <Promise chain={chain} periods={periods} zoom={zoom} />
-
-      {view === 'ladder' && <Ladder rows={shown} zoom={zoom} money={money} run={run} chain={chain} now={now} />}
-      {view === 'wheel' && <Flywheel rows={shown} zoom={zoom} now={now} money={money} run={run} />}
-
-      {lives && <TwoLives onBack={() => setLives(false)} run={run} chain={chain} money={money} />}
+      {lives ? (
+        /* Inline, under the page's own header, rather than a sheet over the
+           whole window. His report (2026-09-12): the overlay took the
+           timeline's menu with it, so the only way back was hunting for a
+           close button. The header stays, every tab on it still works, and
+           the button he came in through now says the way out. */
+        <TwoLives onBack={() => setLives(false)} money={money} />
+      ) : (
+        <>
+          <Promise chain={chain} periods={periods} zoom={zoom} />
+          {view === 'ladder' && <Ladder rows={shown} zoom={zoom} money={money} run={run} chain={chain} now={now} />}
+          {view === 'wheel' && <Flywheel rows={shown} zoom={zoom} now={now} money={money} run={run} />}
+        </>
+      )}
     </div>
   )
 }
@@ -622,23 +643,6 @@ function DayCard({ p, zoom, money }: {
 }
 
 /* -------------------------------------------------------------- two lives */
-/* THE SCREEN HE OPENS WHEN HE WANTS TO STOP.
-
-   His layout: one portrait reel down the left half WITH SOUND, and the right
-   half split into two rows, the life he keeps on top and the one he lets go
-   underneath.
-
-   THE STOPS ARE NOT FIVE HAND-WRITTEN MILESTONES ANY MORE. He asked for a
-   scrubber that runs day by day, week by week and month by month to the goal
-   he is actually working towards, and for both futures to be worked out rather
-   than written. So the range is today to the horizon, the grain is his to
-   choose, and every figure on both sides comes out of `project()`, which runs
-   his own recent rate forward through the same model that scored the past.
-
-   THE HORIZON IS END OF FEBRUARY 2027, which is the goal he named. A real goal
-   deadline further out than that moves it, because his own data outranks a
-   constant, and the screen says which of the two it is using. */
-const DECLARED_HORIZON = '2027-02-28'
 
 /* Six tiers, one boundary list -- tierOf (below, next to the domains it
    gates) reads the same array. A stop's day-value is the boundary minus
@@ -661,32 +665,8 @@ const TIER_STOPS: { label: string; days: number }[] = [
 ]
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-const dayAfter = (n: number) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + n); return d }
-const longDate = (d: Date) => `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`
 
-/** "Six months", "Eleven weeks", "Four days" -- the unit scales itself to
- *  the number, because "182 days" is not how anyone hears half a year. */
-function spanWords(days: number): string {
-  if (days === 0) return 'Today'
-  if (days >= 28) { const n = Math.round(days / 30); return `${n} month${n === 1 ? '' : 's'}` }
-  if (days >= 10) { const n = Math.round(days / 7); return `${n} week${n === 1 ? '' : 's'}` }
-  return `${days} day${days === 1 ? '' : 's'}`
-}
 
-/** The tier stops he can tap, clipped to however far his own horizon
- *  actually reaches -- a stop past the horizon is not a real stop, it is
- *  the same handle position wearing a second label. The horizon itself is
- *  always the last one, under its own short date. */
-function buildStops(span: number, horizonLabel: string): { label: string; days: number }[] {
-  const out: { label: string; days: number }[] = []
-  for (const s of TIER_STOPS) {
-    if (s.days >= span) break
-    if (out.length && s.days - out[out.length - 1].days < 2) continue
-    out.push(s)
-  }
-  out.push({ label: horizonLabel, days: span })
-  return out
-}
 
 /* ---- the reel ---- */
 function useReelPool(): string[] {
@@ -869,20 +849,6 @@ function embedSrc(url: string, sound: boolean): string {
 }
 
 /* ---- what it costs, what it pays ---- */
-/* Neither side is written from nowhere. Both read off what is actually true
-   right now: his real momentum figures, his real open habits and goals, his
-   real Compass balance if he is signed in. Nothing here is invented, and
-   nothing personal that lives outside this app (what he has told Claude
-   about his life, his relationships, his exact numbers) gets typed into
-   public source -- only what this app already knows about him, live, from
-   his own account. The push side stays a reward. The drift side does not
-   pull punches: his words, not softened. */
-interface NarrativeCtx {
-  money: CompassMoney | null
-  anchorHabit?: string
-  quitHabit?: string
-  goalName?: string
-}
 
 /** 1 = this week, 2 = a few weeks, 3 = a month or two, 4 = a season,
  *  5 = half a year+, 6 = the long haul. Day 0 is handled separately, on
@@ -898,110 +864,7 @@ function tierOf(days: number): 1 | 2 | 3 | 4 | 5 | 6 {
   return 6
 }
 
-/* SIX CATEGORIES, ONE CARD EACH, EVERY HORIZON: the paragraph version made him
-   read to find the point. A category is the point, sitting right there --
-   label, a real value, one short line under it. His own words, "not hard
-   sentences, little ones", "percentage or calculations". Discipline runs his
-   own SELF-RESPECT ladder from The Negative Road on the drift side (100% down
-   to 0%, his own words for each rung); on the push side it's his actual
-   momentum, the same number everywhere else on this page, climbing instead of
-   given a name. */
-export interface Domain { label: string; value: string; line: string; rows?: string[] }
 
-function pushDomains(days: number, f: Future, c: NarrativeCtx): Domain[] {
-  const t = tierOf(days)
-
-  const finances: Omit<Domain, 'label'> = [
-    { value: '€0 so far', line: 'Nothing banked yet. This week starts the habit.' },
-    {
-      value: '€300–€1,000',
-      rows: ['€300/mo saved', '€500/mo saved', '€1,000/mo saved'],
-      line: 'Actually set aside. Not spent, not guessed at.',
-    },
-    {
-      value: '€900–€3,000',
-      rows: ['3mo @ €300/mo: €900', '3mo @ €500/mo: €1,500', '3mo @ €1,000/mo: €3,000'],
-      line: 'Real money, actually moved into savings.',
-    },
-    {
-      value: '€1,800–€6,000',
-      rows: ['6mo @ €300/mo: €1,800', '6mo @ €500/mo: €3,000', '6mo @ €1,000/mo: €6,000'],
-      line: 'Compounding. The other direction now.',
-    },
-    {
-      value: '€3,600–€12,000',
-      rows: ['€300/mo = €3,600/yr', '€500/mo = €6,000/yr', '€1,000/mo = €12,000/yr'],
-      line: 'A year of actually paying yourself first.',
-    },
-    {
-      value: '€10,800 → €120,000+',
-      rows: ['3yr @ €300–1,000/mo: €10,800–€36,000', '10yr, direct only: €36,000–€120,000', '20yr @ €500/mo: €120,000, before growth'],
-      line: 'The exact same math. Running the other way.',
-    },
-  ][t - 1]
-
-  const body: Omit<Domain, 'label'> = [
-    { value: '~89kg', line: 'Down a kilo. That’s what week one actually looks like.' },
-    { value: '86–87kg', line: 'Down 3–4kg. Real, not water-weight hope.' },
-    { value: '81–83kg', line: 'Down 7–9kg. Clothes fit different.' },
-    { value: '74–77kg', line: 'Down 13–16kg. Conditioning, not just the scale.' },
-    { value: '68–72kg', line: 'Down 18–22kg. A year of actually showing up.' },
-    { value: '~68kg, holding', line: 'Not still dropping. Just what your body is now.' },
-  ][t - 1]
-
-  const work: Omit<Domain, 'label'> = [
-    { value: `${Math.round(f.tasks)} done`, line: 'Real ones, off the real list.' },
-    { value: hm(f.focusMin), line: 'Actual focus. Phone lost.' },
-    { value: `${f.chain} days`, line: "Deep. The pile's finally shrinking." },
-    { value: `${Math.round(f.focusMin / 60)}h`, line: 'Spent on your own thing, on purpose.' },
-    { value: `${f.chain} days`, line: "A chain a year long doesn't happen by accident." },
-    { value: `${f.chain} days`, line: "Not because every day was easy. Because a bad one stopped meaning two." },
-  ][t - 1]
-
-  const discipline: Omit<Domain, 'label'> = [
-    { value: `${Math.round(f.momentum)}`, line: 'Climbing. You can feel it starting.' },
-    { value: `${Math.round(f.momentum)}`, line: "You don't get this from one good week." },
-    { value: `${Math.round(f.momentum)}`, line: 'This is what showing up looks like as a number.' },
-    { value: `${Math.round(f.momentum)}`, line: 'Six months of proof, not promises.' },
-    { value: `${Math.round(f.momentum)}`, line: 'A year of keeping your own word.' },
-    { value: `${Math.round(f.momentum)} / 100`, line: "The version of you that doesn't need convincing anymore." },
-  ][t - 1]
-
-  const freedom: Omit<Domain, 'label'> = [
-    { value: 'Untouched', line: 'No new constraints yet. Still fully yours.' },
-    { value: `${f.chain}-day streak`, line: 'One thing off the leash, on purpose.' },
-    { value: `${f.chain} days, no debt added`, line: "Real options opening. Nothing closed off." },
-    { value: `${f.chain} days`, line: 'Half a year of not being stuck to the same routine.' },
-    {
-      value: 'All of it',
-      rows: ['Leave the job: yes', 'Start a business: yes', 'Invest, move, travel: yes'],
-      line: 'A year of decisions nobody forced on you.',
-    },
-    {
-      value: 'Still all of it',
-      rows: ['Leave the job: yes', 'Start a business: yes', 'Invest, move, travel: yes'],
-      line: "Nobody's schedule, nobody's debt, nobody's permission.",
-    },
-  ][t - 1]
-
-  const relationships: Omit<Domain, 'label'> = [
-    { value: 'Unchanged', line: "Same as last week. This one's just the start." },
-    { value: 'Noticed', line: "One month in, and she's already noticed. Not a speech. Just showing up." },
-    { value: 'Trusted more', line: "Three months. Your word's starting to mean something again." },
-    { value: `${f.chain} days`, line: 'Half a year of actually being present.' },
-    { value: 'A year of it', line: "Showing up instead of explaining why you didn't." },
-    { value: 'Built, not promised', line: 'Years of actions she watched, not promises she heard.' },
-  ][t - 1]
-
-  return [
-    { label: 'Finances', ...finances },
-    { label: 'Body', ...body },
-    { label: 'Work', ...work },
-    { label: 'Discipline', ...discipline },
-    { label: 'Freedom', ...freedom },
-    { label: 'Relationships', ...relationships },
-  ]
-}
 
 /* THE NEGATIVE ROAD, his own document, his own numbers, adjusted to fit the
    six horizons this screen already has rather than his original nine
@@ -1013,134 +876,27 @@ function pushDomains(days: number, f: Future, c: NarrativeCtx): Domain[] {
    as written, specifics included, fully aware this file is public. Discipline
    here is his own SELF-RESPECT scale, verbatim: 100/80/60/40/20/0%, each with
    the line he wrote for that rung. */
-/** Every figure below is his own, copied off the actual document rather than
- *  rounded into a single softer number -- the thing he called out. Where he
- *  gave three scenarios at once (300 / 500 / 1,000 a month, say) the card
- *  carries all three as a short breakdown instead of one averaged line. */
-function driftDomains(days: number): Domain[] {
-  const t = tierOf(days)
-
-  const finances: Omit<Domain, 'label'> = [
-    { value: 'Untouched', line: 'Existing pressure, existing obligations. Limited room for mistakes.' },
-    { value: 'First reminder', line: 'Potential arrears, fees, interest already possible.' },
-    { value: 'Juggling begins', line: 'Between obligations. Quietly, before it looks like a problem.' },
-    { value: 'In collection', line: "Missed payments, arrears, fees. Not a risk file anymore -- an active one." },
-    {
-      value: '€3,600–€12,000',
-      rows: ['€300/mo = €3,600/yr', '€500/mo = €6,000/yr', '€1,000/mo = €12,000/yr'],
-      line: 'Never saved. Debt: possible formal demands, legal proceedings.',
-    },
-    {
-      value: '€10,800 → €120,000+',
-      rows: ['3yr @ €300–1,000/mo: €10,800–€36,000', '10yr, direct only: €36,000–€120,000', '20yr @ €500/mo: €120,000, before growth'],
-      line: 'None of it recoverable. Thirty years of missed compounding.',
-    },
-  ][t - 1]
-
-  const body: Omit<Domain, 'label'> = [
-    { value: '~90kg', line: 'Excess fat, particularly the stomach. Poor condition.' },
-    { value: '90 → 91–92kg', line: "Almost nothing looks different. That's the trap." },
-    { value: '~92–94kg', line: 'Less movement, worse conditioning, standards dropping.' },
-    { value: '~94–97kg', line: 'Half a year. Less movement, worse conditioning.' },
-    { value: '~97–101kg', line: "A year gone. This is what you'd have to show for it." },
-    { value: '102 → 120+kg', line: 'Older body eventually. Harder recovery, decades of neglect.' },
-  ][t - 1]
-
-  const work: Omit<Domain, 'label'> = [
-    { value: '0 hrs', line: 'On the thing with your name on it.' },
-    { value: '0 hrs', line: 'Still. Thirty days in, nothing shipped.' },
-    { value: 'Same cycle', line: 'Motivation, plan, intense start, fatigue, missed days, restart.' },
-    { value: '~130 hrs', line: "On your own thing. Five hours a week, if that, six months in." },
-    { value: '365 days', line: 'Gone. What did you actually ship?' },
-    {
-      value: '~52,000 hrs',
-      rows: ['Deep work, 10yr: 2,600 hrs lost', 'Workouts, 10yr: 1,560 hrs lost', '10 years = 3,650 days total'],
-      line: 'Starting late costs more than starting on time ever would have.',
-    },
-  ][t - 1]
-
-  const discipline: Omit<Domain, 'label'> = [
-    { value: '100%', line: '"When I tell myself something, I do it."' },
-    { value: '80%', line: '"I occasionally fail."' },
-    { value: '60%', line: '"I need to try harder."' },
-    { value: '40%', line: '"I’ve said this so many times."' },
-    { value: '20%', line: '"Maybe this is just who I am."' },
-    { value: '0%', line: 'You stop trusting your own word.' },
-  ][t - 1]
-
-  const freedom: Omit<Domain, 'label'> = [
-    { value: 'Full', line: "Nothing's cost you anything. Yet." },
-    { value: 'Shrinking', line: 'Quietly. Not visible yet.' },
-    { value: 'Narrower', line: 'Options closing without a decision.' },
-    { value: 'Tied to the job', line: "It's what's funding the wait." },
-    { value: 'Formal demand', line: 'Debt starts making decisions, not just costing money.' },
-    {
-      value: 'None of it',
-      rows: ['Leave the job: no', 'Start a business: no', 'Invest, move, travel: no'],
-      line: "Debt decides what you can say no to. Not you.",
-    },
-  ][t - 1]
-
-  /* ONE ARC, NOT SIX UNRELATED LABELS: this used to switch whose behavior
-     it was even describing partway through (her noticing, then suddenly
-     his own distraction quoted back at tier 5) and closed on a hedge
-     ("weaker, or gone") that never actually arrives anywhere. He called
-     that nonsense. It is a single relationship, deteriorating in a
-     straight line, and it ends at an actual breakup -- not a maybe. */
-  /* COMPRESSED TO FIT HIS OWN GOAL HORIZON: it used to take a full year-plus
-     to reach the breakup, which sat behind a longer horizon than he has a
-     real goal for -- reachable in the code, not on the actual slider. His
-     own horizon is roughly six months out, so the whole arc runs its
-     course inside that: "Unchanged" is gone as its own stage, the actual
-     breakup is the last CURRENTLY reachable stop, and the aftermath
-     (unreachable today, real the moment a goal pushes the horizon past a
-     year) is what is left for the tiers beyond it. */
-  const relationships: Omit<Domain, 'label'> = [
-    { value: 'Noticed', line: "This week, and she's already noticed. Not a rupture -- a pattern starting." },
-    { value: 'Pulling away', line: "One month. She's stopped bringing it up as often. That's not calm, that's distance." },
-    { value: 'Fighting about it', line: "Three months. The ‘we need to talk’ conversations have started." },
-    {
-      value: 'Breakup',
-      rows: ['+3yr: always something more important', '+5yr: unresolved things pile up, stress rises', '+10yr: some relationships weaker, or gone'],
-      line: 'Half a year. Not one fight that ends it -- a slow walk out the door, one skipped moment at a time.',
-    },
-    { value: 'Gone', line: "A year on your own. She's not looking back -- she already left." },
-    { value: "Someone else's", line: 'Years alone with it. The version of you that never tried to fix it.' },
-  ][t - 1]
-
-  return [
-    { label: 'Finances', ...finances },
-    { label: 'Body', ...body },
-    { label: 'Work', ...work },
-    { label: 'Discipline', ...discipline },
-    { label: 'Freedom', ...freedom },
-    { label: 'Relationships', ...relationships },
-  ]
-}
 
 /* ---- the screen ---- */
-function TwoLives({ onBack, run, chain, money }: {
-  onBack: () => void; run: DayScore[]; chain: ReturnType<typeof chainOf>; money: CompassMoney | null
-}) {
-  const { habits, goals } = useStore()
-  /* Same rule as the rest of this page: one dataset, not filtered by
-     whichever workspace tab happens to be open -- see inAllSpaces above. */
-  const narrCtx: NarrativeCtx = useMemo(() => {
-    const build = habits.filter((h) => !h.archivedAt && !h.paused && h.kind !== 'break')
-    const quit = habits.filter((h) => !h.archivedAt && h.kind === 'break')
-    const open = goals.filter((g) => !g.closed)
-    return { money, anchorHabit: build[0]?.name, quitHabit: quit[0]?.name, goalName: open[0]?.name }
-  }, [habits, goals, money])
+/* THE GIVE-UP SCREEN. Reel on the left, where he actually is on the right.
+
+   Rebuilt 2026-09-12 on his instruction. What was here: a slider from today to
+   February 2027 with stops along it, driving two projected futures. He asked
+   for the slider and its stops gone, the left side kept, and "widgets of
+   current status" in their place -- debt, health, the tasks he is postponing,
+   goals, the habits he is not doing or keeps failing to quit, the routines he
+   keeps breaking.
+
+   That is the right trade. A projection argues about a day that has not
+   happened; at the moment he is about to drop something, what carries weight
+   is the day that has. Every figure below is counted from his own rows, and
+   none of them is chosen to be encouraging. */
+function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney | null }) {
+  const { habits, habitLog, goals, tasks, routines, routineLog, slips } = useStore()
+  const health = useHealth().state
   const pool = useReelPool()
-  const [at, setAt] = useState(0)
   const [lib, setLib] = useState(false)
-  /* A different reel each time this screen opens, not always the first one in
-     the library. */
   const [skip, setSkip] = useState(() => (pool.length ? Math.floor(Math.random() * pool.length) : 0))
-  /* Advance to a genuinely different reel -- his own words were "shuffled
-     every time... including the sorting of all the different videos that
-     will come next", not just a different opening pick. Used for the manual
-     Next button and for a clip ending on its own. */
   const advanceReel = () => setSkip((s) => {
     if (pool.length <= 1) return s
     const cur = s % pool.length
@@ -1148,130 +904,56 @@ function TwoLives({ onBack, run, chain, money }: {
     while (i === cur) i = Math.floor(Math.random() * pool.length)
     return i
   })
-
-  /* The horizon he named, unless one of his own open goals reaches further. */
-  const horizon = useMemo(() => {
-    // No inView(g.space) here on purpose -- see inAllSpaces above.
-    const deadlines = goals
-      .filter((g) => !g.closed && g.deadline)
-      .map((g) => g.deadline as string)
-    const furthest = deadlines.sort().pop()
-    return furthest && furthest > DECLARED_HORIZON ? { day: furthest, own: true } : { day: DECLARED_HORIZON, own: false }
-  }, [goals])
-
-  const span = Math.max(1, daysBetween(localDateKey(), horizon.day))
-  /* The handle drags a full day at a time now -- min/max/step=1 on the input
-     itself already clamps and rounds, so there is no snapping left to do
-     here. */
-  const days = Math.min(at, span)
-  const when = dayAfter(days)
-  const p = project(run, chain.current, days)
-  /* The reel is what plays while he reads the two futures, not a second way
-     to read the slider: it used to fold the horizon into the same index
-     (`skip + days/step`), so dragging the slider to a new point silently
-     swapped the clip too. It answers to skip alone now. */
   const url = pool.length ? pool[skip % pool.length] : ''
-  const horizonShort = longDate(new Date(`${horizon.day}T00:00:00`)).replace(/^\d+ /, '')
-  const stops = useMemo(() => buildStops(span, horizonShort), [span, horizonShort])
-  /* A keyboard step of a single day is technically correct and practically
-     useless across a six-month range -- roughly thirty presses end to end,
-     regardless of how far the horizon actually is. */
-  const kbStep = Math.max(1, Math.round(span / 30))
+
+  const sessionDays = useMemo(
+    () => (health.status === 'ok' ? health.sessions.map(dayOf).filter(Boolean) : []),
+    [health],
+  )
+
+  /* One dataset, not filtered by whichever workspace tab is open -- the same
+     rule the rest of this page follows. */
+  const cards = useMemo(() => [
+    debtCard(money),
+    healthCard(sessionDays),
+    postponedCard(tasks),
+    habitsCard(habits, habitLog),
+    quittingCard(habits, slips),
+    routinesCard(routines, routineLog),
+    goalsCard(goals),
+  ], [money, sessionDays, tasks, habits, habitLog, slips, routines, routineLog, goals])
 
   useEffect(() => {
-    const k = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { if (lib) setLib(false); else onBack() }
-      /* NOT WHEN THE SLIDER ITSELF HAS FOCUS. A range input already walks on
-         the arrow keys, so this handler moved it a second step on top of the
-         browser's own and the handle jumped two at a time. */
-      if ((e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.tagName === 'TEXTAREA') return
-      if (e.key === 'ArrowRight') setAt((v) => Math.min(span, v + kbStep))
-      if (e.key === 'ArrowLeft') setAt((v) => Math.max(0, v - kbStep))
-    }
+    const k = (e: KeyboardEvent) => { if (e.key === 'Escape' && !lib) onBack() }
     addEventListener('keydown', k)
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { removeEventListener('keydown', k); document.body.style.overflow = prev }
-  }, [onBack, span, kbStep, lib])
+    return () => removeEventListener('keydown', k)
+  }, [onBack, lib])
 
   return (
-    <div className="tl-lives" role="dialog" aria-modal="true" aria-label="Two lives">
+    <div className="tl-lives is-inline">
       <div className="tl-stage">
         <Reel url={url} count={pool.length} onOpenLibrary={() => setLib(true)} onNext={advanceReel} />
-        <div className="tl-sides">
-          <section className="tl-side is-push">
-            <span className="tl-pill">If you do it anyway</span>
-            <p className="tl-said">{days === 0 ? 'Today. Nothing has happened yet.' : `${spanWords(days)} of keeping it.`}</p>
-            {days === 0 ? (
-              <p className="tl-under">
-                {p.assumed
-                  ? 'There is no rate of yours to run forward yet, so this is a full day, every day.'
-                  : `At your own rate of the last ${p.from} days: ${Math.round(p.rate * 100)}% of a full day.`}
-              </p>
-            ) : (
-              <Domains items={pushDomains(days, p.push, narrCtx)} />
-            )}
-          </section>
-          <div className="tl-gap">
-            <b>{days === 0 ? 'Today' : longDate(when).replace(/ \d{4}$/, '')}</b>
-            <span className="tl-l">{days === 0 ? 'right now' : `${days} days out`}</span>
-          </div>
-          <section className="tl-side is-drift">
-            <span className="tl-pill">If you skip it</span>
-            <p className="tl-said">{days === 0 ? 'Today. Nothing has happened yet.' : `${spanWords(days)} of not.`}</p>
-            {days === 0 ? (
-              <p className="tl-under">Both men are the same man this morning.</p>
-            ) : (
-              <Domains items={driftDomains(days)} dead />
-            )}
-          </section>
-        </div>
-      </div>
-
-      <button className="tl-close" onClick={onBack} aria-label="Close">✕</button>
-
-      <footer className="tl-livesfoot">
-        <div className="tl-scrub">
-          <label className="tl-slider">
-            <input type="range" min={0} max={span} step={1} value={days}
-              aria-label={`How far out: ${days} days`}
-              onChange={(e) => setAt(Number(e.target.value))} />
-            <span className="tl-l">
-              Now {'→'} {longDate(new Date(`${horizon.day}T00:00:00`))}
-              {horizon.own ? ', your furthest goal' : ''}
-            </span>
-          </label>
-          <div className="tl-stops" role="group" aria-label="Jump to">
-            {stops.map((s) => (
-              <button key={s.label} className={days === s.days ? 'on' : ''} aria-pressed={days === s.days}
-                onClick={() => setAt(s.days)}>{s.label}</button>
+        <div className="tl-status">
+          <p className="tl-status-head">Before you do. This is where you actually are.</p>
+          <div className="tl-stats">
+            {cards.map((c) => (
+              <article className={`tl-stat is-${c.tone}`} key={c.id}>
+                <span className="tl-stat-l">{c.label}</span>
+                <b className="tl-stat-fig">{c.figure}</b>
+                <span className="tl-stat-unit">{c.unit}</span>
+                <p className="tl-stat-line">{c.line}</p>
+                {c.rows?.length ? (
+                  <ul className="tl-stat-rows">{c.rows.map((r) => <li key={r}>{r}</li>)}</ul>
+                ) : null}
+              </article>
             ))}
           </div>
+          <button className="tl-back" onClick={onBack}>Ok. Let&rsquo;s go.</button>
         </div>
-        <button className="tl-back" onClick={onBack}>Ok. Let&rsquo;s go.</button>
-      </footer>
+      </div>
 
       {lib && <ReelLibrary pool={pool} onClose={() => setLib(false)} />}
     </div>
   )
 }
 
-function Domains({ items, dead }: { items: Domain[]; dead?: boolean }) {
-  return (
-    <dl className={`tl-domains${dead ? ' is-dead' : ''}`}>
-      {items.map((d) => (
-        <div className={`tl-domain${d.rows ? ' has-rows' : ''}`} key={d.label}>
-          <dt className="tl-l">{d.label}</dt>
-          <dd>{d.value}</dd>
-          {/* Some of his own numbers only make the actual point stated three
-              ways at once (300 vs 500 vs 1,000 a month, say) -- rounding
-              that down to one figure was exactly the imprecision he called
-              out, so a card that needs it gets a short breakdown instead of
-              a single line. */}
-          {d.rows && <ul className="tl-domain-rows">{d.rows.map((r) => <li key={r}>{r}</li>)}</ul>}
-          <p>{d.line}</p>
-        </div>
-      ))}
-    </dl>
-  )
-}

@@ -2762,7 +2762,11 @@ await step('apps: a shelf that embeds nothing until an app is opened', async () 
   if (!shelf.tiles.includes('Watchless')) throw new Error(`Watchless left the shelf: ${shelf.tiles.join(', ')}`)
   if (shelf.tiles.includes('My Mind')) throw new Error('My Mind is still on the shelf')
   if (shelf.tiles.includes('Compass')) throw new Error('Compass is still on the shelf')
-  if (shelf.tiles.length !== 4) throw new Error(`${shelf.tiles.length} apps on the shelf: ${shelf.tiles.join(', ')}`)
+  /* Forge left on his instruction (2026-09-11) along with its repo: the FORGE
+     dashboard was superseded by the Health page, and a tile pointing at a
+     deleted GitHub Pages site is a 404 in a frame. */
+  if (shelf.tiles.includes('Forge')) throw new Error('Forge is still on the shelf, but its repo is gone')
+  if (shelf.tiles.length !== 3) throw new Error(`${shelf.tiles.length} apps on the shelf: ${shelf.tiles.join(', ')}`)
   if (shelf.subs) throw new Error('a tile carries a subtitle')
 })
 

@@ -41,11 +41,6 @@ export const APPS: EmbeddedApp[] = [
     icon: <Icon.Video size={20} />,
   },
   {
-    id: 'forge', name: 'Forge',
-    url: 'https://off-plate.github.io/forge/',
-    icon: <Icon.Bolt size={20} />,
-  },
-  {
     id: 'challengers', name: 'Challengers',
     url: 'https://challenger-392-service.netlify.app',
     icon: <Icon.Flag size={20} />,

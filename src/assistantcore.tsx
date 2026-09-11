@@ -15,7 +15,7 @@ import { hasHevyKey, syncHevy } from './hevy'
 import { usePomodoro } from './pomodoro'
 import {
   SLOTS, dueOn, habitsDueToday, goalCurrent, habitStepKey, routineComplete, requiredSteps,
-  contactDaysSince, contactStatus, daysClean, spaceFolderId,
+  daysClean, spaceFolderId,
   type HabitDef, type HabitFrequency, type PageId, type SpaceId, type Task,
 } from './types'
 import { localDateKey, fmtDuration, taskMinutes, goalPeriodKey, goalPeriodRange, periodKeyFor, type GoalTf } from './util'
@@ -57,7 +57,7 @@ const label = (s?: SpaceId) => (s ? SPACE_LABELS[s] : 'Unfiled')
 const dropUrl = (title: string) => title.replace(/https?:\/\/\S+/gi, '').replace(/\s{2,}/g, ' ').trim()
 
 function useBrief(): Brief {
-  const { tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, slips, plan, contacts, contactActivity } = useStore()
+  const { tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, slips, plan } = useStore()
   const { state: cal } = useCalendar()
   /* Fetched once when the page opens. It is a garnish on the brief, so it never
      blocks anything and a failure just means no weather line. */
@@ -183,21 +183,12 @@ function useBrief(): Brief {
         return { name: g.name, pct: g.target > 0 ? Math.round((cur / g.target) * 100) : 0 }
       }),
       bills: billsBrief,
-      /* Same computation contactsdock.tsx's own glance runs: real people,
-         real days since the last logged touch, "quiet" past 20 (the same
-         line contactStatus already draws), oldest first. */
-      contacts: contacts
-        .map((c) => ({ name: c.name, days: contactDaysSince(c, contactActivity), status: contactStatus(c, contactActivity) }))
-        .filter((c) => c.status === 'quiet')
-        .sort((a, b) => b.days - a.days)
-        .slice(0, 8)
-        .map(({ name, days }) => ({ name, days })),
       quitting: habits
         .filter((h) => h.kind === 'break' && !h.archivedAt)
         .map((h) => ({ name: h.name, days: daysClean(h, slips) ?? 0 })),
       nextTask: firstMove ? dropUrl(firstMove.title) || firstMove.title : null,
     }
-  }, [tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, slips, cal, sky, plan, billsBrief, contacts, contactActivity, firstMove])
+  }, [tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, slips, cal, sky, plan, billsBrief, firstMove])
 }
 
 /* WHAT HAPPENED, in the app's words rather than the model's.
@@ -217,7 +208,7 @@ export interface Done {
   /** Set on the actions common enough, and safe enough, to take straight back:
    *  a real add, move, estimate or done/undone. His report (2026-09-10): a
    *  bulk paste that under-did itself with no way to see what actually landed
-   *  or send it back. Not every kind gets one -- a logged contact touch or a
+   *  or send it back. Not every kind gets one -- a logged slip or a
    *  posted expense has no clean inverse, and this is a real per-row undo, not
    *  a promise the app cannot keep, so those lines simply carry none. Only
    *  the full assistant page renders a button for this; the dock popup shows
@@ -468,7 +459,7 @@ const OPEN_LABELS: Partial<Record<PageId, string>> = {
   today: 'Today', plan: 'Plan', projects: 'Projects', habits: 'Habits',
   routines: 'Routines', goals: 'Goals', quitting: 'Quitting', settings: 'Settings',
   notes: 'Notes', board: 'the board', apps: 'Apps', focus: 'Focus', zone: 'the Zone',
-  bills: 'Bills', calendar: 'Calendar', timeline: 'Timeline', contacts: 'Contacts',
+  bills: 'Bills', calendar: 'Calendar', timeline: 'Timeline',
   assistant: 'the Assistant', skills: 'Skills', health: 'Health',
 }
 
@@ -699,18 +690,6 @@ function useDoer() {
         if (!fresh.ready) { out.push({ ok: false, text: 'Bills is not signed in on this device' }); continue }
         await bills.addIncome(a.amount, a.label)
         out.push({ ok: true, text: `Added to Income: ${a.amount} Kč${a.label ? ` (${a.label})` : ''}` })
-        continue
-      }
-      if (a.kind === 'contact') {
-        /* His ask: full operation across the app, not just the task list.
-           logContactActivity is the exact function the dock's own Contacts
-           glance calls from its quick "log a touch" button -- one real row
-           in contactActivity, same as a person tapping it by hand. */
-        const rows = s2.contacts.map((c) => ({ ...c, title: c.name }))
-        const { row, why } = pick(rows, a.match)
-        if (!row) { out.push({ ok: false, text: why ?? 'no contact matched' }); continue }
-        s2.logContactActivity(row.id, a.log)
-        out.push({ ok: true, text: `Logged a ${a.log} with ${row.name}` })
         continue
       }
       if (a.kind === 'slip') {

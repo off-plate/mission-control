@@ -23,7 +23,6 @@ import { newId, todayKey } from './store/shared'
 import { type Undoable, useUndo } from './store/undo'
 import { useGraveyard } from './store/graveyard'
 import { noteTitle, useNotesSlice } from './store/notes'
-import { useContactsSlice } from './store/contacts'
 import { useWidgetsSlice } from './store/widgets'
 import { useTwoLivesSlice } from './store/twolives'
 import { useConnectionsSlice } from './store/connections'
@@ -45,8 +44,6 @@ import { isSpace, SPACES, spaceFolderId } from './types'
 import type { HabitFrequency } from './types'
 import type {
   ViewId,
-  Contact,
-  ContactActivity,
   FocusSession,
   HabitSlip,
   HabitTick,
@@ -99,10 +96,6 @@ interface PersistedState {
    *  reads as an empty list rather than failing to parse. */
   projects?: Project[]
   /** People. Optional for the same reason projects is. */
-  contacts?: Contact[]
-  /** Every logged touch, dated. Its own collection rather than nested on
-   *  Contact -- see the type's own note in types.ts. */
-  contactActivity?: ContactActivity[]
   ledger: LedgerEntry[]
   social: SocialEntry[]
   sources: SourceState[]
@@ -207,17 +200,8 @@ interface Store extends PersistedState {
   setOpenProject: (id: string | null) => void
   /** People. Not filtered by Space or by inView, same as habits/goals --
    *  see the type's own note in types.ts for why. */
-  contacts: Contact[]
-  contactActivity: ContactActivity[]
   /* True when this device can no longer save. Surfaced in the UI; never silent. */
   storageFull: boolean
-  addContact: (name: string) => string
-  updateContact: (id: string, patch: Partial<Pick<Contact, 'name' | 'tag' | 'phone' | 'email' | 'company' | 'role' | 'next' | 'notes' | 'projectId'>>) => void
-  deleteContact: (id: string) => void
-  logContactActivity: (id: string, type: ContactActivity['type'], note?: string) => void
-  /* A logged touch has to be removable. The log is what contactStatus reads, so one mis-click
-     otherwise leaves a call on the record that never happened and no way to take it back. */
-  deleteContactActivity: (activityId: string) => void
   /** The one way in: opens a project's Plan without the id being wiped by
    *  setPage's own clearing (see setPage's note). */
   enterProject: (id: string) => void
@@ -1105,7 +1089,7 @@ function routeFromHash(): { page: PageId; day: string | null } {
      consults from the app itself). Their addresses land on Today rather than
      on nothing, the same courtesy braindump gets above. */
   if (h === 'achievements' || h === 'money' || h === 'review' || h === 'stats' || h === 'brand') return { page: 'today', day: null }
-  const pages: PageId[] = ['today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting', 'settings', 'notes', 'bills', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant', 'timeline', 'contacts', 'skills', 'health', 'watchless']
+  const pages: PageId[] = ['today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting', 'settings', 'notes', 'bills', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant', 'timeline', 'skills', 'health', 'watchless']
   return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
 }
 
@@ -1173,8 +1157,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const { graveyard, setGraveyard, bury, digUp } = useGraveyard(persisted?.graveyard)
   const notesSlice = useNotesSlice(persisted, { space, armUndo, bury, digUp })
   const { notes, setNotes, noteFolders, setNoteFolders } = notesSlice
-  const contactsSlice = useContactsSlice(persisted, { armUndo, bury, digUp })
-  const { contacts, setContacts, contactActivity, setContactActivity } = contactsSlice
   const growthSlice = useGrowthSlice(persisted, { space, armUndo, bury, digUp, setPageState })
   const {
     habits, setHabits, goals, setGoals, routines, setRoutines,
@@ -1270,7 +1252,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (futureBlob) return
 
     const state: PersistedState = {
-      version: 3, spaces, tasks, habits, goals, projects, contacts, contactActivity, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
+      version: 3, spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
       notes, noteFolders,
       savedAt: Date.now(), lastWrite: { dev: deviceId(), name: deviceName(), at: Date.now() },
       weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
@@ -1301,7 +1283,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { outbox.push(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, projects, contacts, contactActivity, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels])
+  }, [spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels])
 
   /* ---- state that arrived from somewhere else ----
      Another tab of this browser, or this account on another device. Merged in,
@@ -1332,8 +1314,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (p.habits) setHabits(p.habits)
     if (p.goals) setGoals(p.goals)
     if (p.projects) setProjects(p.projects)
-    if (p.contacts) setContacts(p.contacts)
-    if (p.contactActivity) setContactActivity(p.contactActivity)
     if (p.routines) setRoutines(p.routines)
     if (p.ideas) setIdeas(p.ideas)
     /* Arrays, not truthiness: deleting the last note on the other device has to
@@ -1538,14 +1518,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value: Store = {
     version: 3,
-    spaces, tasks, habits, goals, projects, contacts, contactActivity, storageFull, ledger, social, sources, plan, review, routines, ideas,
+    spaces, tasks, habits, goals, projects, storageFull, ledger, social, sources, plan, review, routines, ideas,
     openProjectId, setOpenProject, enterProject,
     addProject: plannerSlice.addProject,
     renameProject: plannerSlice.renameProject,
     deleteProject: plannerSlice.deleteProject,
     setTaskProject: plannerSlice.setTaskProject,
-    addContact: contactsSlice.addContact, updateContact: contactsSlice.updateContact, deleteContact: contactsSlice.deleteContact,
-    logContactActivity: contactsSlice.logContactActivity, deleteContactActivity: contactsSlice.deleteContactActivity,
     focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog,
     view, setView, inView,
     twoLives, setTwoLives, reels, setReels,

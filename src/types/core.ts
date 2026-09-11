@@ -52,15 +52,12 @@ export type PageId =
   /** The assistant: asks about the day, and shows real cards rather than
    *  writing numbers into a sentence. */
   | 'assistant'
-  /** People. Reached from the dock only, same as Bills and Timeline -- not a
-   *  workspace page, not filtered by space, same shape as those two. */
-  | 'contacts'
   /** Every real skill across every workspace (Jarvis, Sofia, ...), one place
    *  to remember what exists and what it does. Reached from the dock only,
-   *  same shape as Bills/Timeline/Contacts -- not a workspace page. */
+   *  same shape as Bills/Timeline -- not a workspace page. */
   | 'skills'
   /** The body, read from the zepp_* tables the watch already feeds through
-   *  Intervals.icu. Dock only, same shape as Bills/Timeline/Contacts/Skills. */
+   *  Intervals.icu. Dock only, same shape as Bills/Timeline/Skills. */
   | 'health'
   /** A YouTube transcript, read instead of watched. The reading is fetched from
    *  the Watchless endpoint, which is the only thing holding keys and the only

@@ -109,12 +109,6 @@ export type Action =
    *  put it on). name/amount are his words/number as given; dueOn only when
    *  he named a date, defaulting to today. Always the active cycle. */
   | { kind: 'expense'; name: string; amount: number; dueOn?: string }
-  /** "Log that I called Jiří" -- a real touch, on the same contact log the
-   *  dock's own Contacts glance writes to. match is the person's name;
-   *  log is which kind of touch he actually named. Never guessed: no "log a
-   *  touch" with nothing said about how, and never invented for someone he
-   *  only mentioned in passing rather than asked to log. */
-  | { kind: 'contact'; match: string; log: 'call' | 'text' | 'email' | 'meeting' }
   /** "I slipped on X" -- a real slip, today, on a thing he is quitting.
    *  match is the habit's name, same vocabulary as "habit" above. There is
    *  no "un-slip": a slip is a fact about a day that happened, not a box to
@@ -250,7 +244,7 @@ const SPACE_OK: Space[] = ['personal', 'work', 'offplate', 'corner']
 const OPEN_OK: PageId[] = [
   'today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting',
   'settings', 'notes', 'board', 'apps', 'focus', 'zone', 'bills', 'calendar',
-  'timeline', 'contacts', 'assistant', 'skills', 'health', 'watchless',
+  'timeline', 'assistant', 'skills', 'health', 'watchless',
 ]
 
 /** Everything the model sent, minus everything this app cannot promise to do. */
@@ -322,11 +316,6 @@ function cleanActions(raw: unknown): Action[] {
         const amount = typeof o.amount === 'number' && o.amount > 0 ? Math.round(o.amount) : 0
         const dueOn = typeof o.dueOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.dueOn) ? o.dueOn : undefined
         if (name && amount) out.push({ kind: 'expense', name, amount, dueOn })
-        break
-      }
-      case 'contact': {
-        const log = o.log as 'call' | 'text' | 'email' | 'meeting'
-        if (match && ['call', 'text', 'email', 'meeting'].includes(log)) out.push({ kind: 'contact', match, log })
         break
       }
       case 'slip':
@@ -460,11 +449,6 @@ export interface Brief {
      this briefing blocks on. Same due/kept/open shape as habits/routines on
      purpose: paid is this cycle's "kept". */
   bills: { due: number; paid: number; open: string[] } | 'loading' | null
-  /* Gone quiet, by the same 20-day line the dock's own Contacts glance uses
-     (contactStatus in types.ts). Real people, real last-touch dates -- never
-     invented, and never the whole address book, only who has actually
-     slipped. */
-  contacts: { name: string; days: number }[]
   /* Things he is quitting, not keeping -- a different HabitDef kind (see the
      real habits/routines split above for why the two are never conflated).
      days is how long since the last slip or the day he started, whichever
@@ -575,11 +559,10 @@ The whole vocabulary, and nothing outside it works:
 {"kind":"drop","match":"..."}                        deletes it, and he can undo
 {"kind":"habit","match":"habit name","on":true}      keeps or un-keeps it today
 {"kind":"workspace","space":"personal"|"work"|"offplate"|"corner"|"all"}  personal=Personal, work=Big Time, offplate=Off-Plate, corner=Michael's Corner, all=every workspace on screen at once. Switches which workspace he is standing in.
-{"kind":"open","page":"today"|"plan"|"projects"|"habits"|"routines"|"goals"|"quitting"|"settings"|"notes"|"board"|"apps"|"focus"|"zone"|"bills"|"calendar"|"timeline"|"contacts"|"assistant"}  a real page, not a workspace -- see below.
+{"kind":"open","page":"today"|"plan"|"projects"|"habits"|"routines"|"goals"|"quitting"|"settings"|"notes"|"board"|"apps"|"focus"|"zone"|"bills"|"calendar"|"timeline"|"assistant"}  a real page, not a workspace -- see below.
 {"kind":"app","match":"..."}                          opens one of his real embedded apps on the Apps page
 {"kind":"bill","match":"bill name","paid":true}      marks a real bill paid or unpaid, this cycle only
 {"kind":"expense","name":"...","amount":800,"dueOn":"2026-09-20"}  a real one-off under Unexpected this cycle, dueOn optional (today if not given)
-{"kind":"contact","match":"person's name","log":"call"|"text"|"email"|"meeting"}  logs a real touch with them, today
 {"kind":"slip","match":"habit name"}                 logs a real slip today, on something he is quitting
 {"kind":"focus","match":"task title","min":30}        starts a REAL timer right now, both optional
 {"kind":"note","text":"..."}                          writes a real note, in his own words
@@ -608,7 +591,7 @@ what other pages show; it is not a page. A page ("open") is a real screen.
 "open up Big Time" = workspace; "open the bills page" = page. Pages: today,
 plan, projects, habits (tab: "Habits & Goals"), routines, goals, quitting,
 settings, notes, board, apps, focus, zone, bills, calendar, timeline,
-contacts, skills, assistant (the full page this quick panel is a shortcut
+skills, assistant (the full page this quick panel is a shortcut
 for -- "open the AI assistant page" means this one). No page action takes a
 specific date -- answer a date question in words. "Turn on the Zone" is
 this same action with page "zone", nothing else. Naming one of his OTHER
@@ -660,9 +643,6 @@ There is no "Jarvis mode" or "Ironman mode" anywhere in this app -- if he
 asks for one, say plainly that it does not exist rather than guessing at
 what it might mean or pretending some other action is it.
 
-CONTACTS: "Gone quiet" lists everyone past 20 days since a touch. "match"
-is the name; "log" is call/text/email/meeting -- ask which if he did not
-say. Logging someone not on that line still works.
 
 QUITTING is a third kind, separate from habits and routines, tracked in
 days since the last slip. "slip" only adds, never undoes -- only when he
@@ -908,7 +888,6 @@ export function briefText(b: Brief): string {
       : b.bills
         ? `Bills this cycle: ${b.bills.paid} of ${b.bills.due} paid${b.bills.open.length ? `, still unpaid: ${b.bills.open.join('; ')}` : ''}`
         : 'Bills: not signed in on this device, nothing to read',
-    b.contacts.length ? `Gone quiet, over 20 days since the last touch: ${b.contacts.map((c) => `${c.name} (${c.days}d)`).join('; ')}` : 'Nobody has gone quiet',
     b.quitting.length ? `Quitting: ${b.quitting.map((q) => `${q.name}, ${q.days}d clean`).join('; ')}` : '',
     b.nextTask ? `Next up, the one thing Today itself would show him: ${b.nextTask}` : 'Nothing queued as next up',
   ].join('\n')

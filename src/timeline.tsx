@@ -724,26 +724,32 @@ function Reel({ url, count, onOpenLibrary, onNext }: {
 
   const { reelFiles, setReelFile } = useStore()
   /* An Instagram link is a page, not a video -- reel-fetch downloads it once
-     and this is that download's result, so it can be played the same way a
-     direct file link already is. Undefined means "not fetched yet", '' means
-     "fetched and it failed", so a dead link is remembered rather than retried
-     on every visit. */
+     and this download's success is what gets remembered, in the synced
+     library, forever: a file that downloaded once will download the same way
+     again. A FAILURE IS NEVER SYNCED. Some public reels refuse to hand over
+     their video to a plain fetch at all -- Instagram withholds it, most often
+     over the track's music rights, not over the reel being private -- and
+     that isn't a fact about the link that a retry fixes, but it also isn't
+     provably permanent, so it gets tried again next time this screen opens
+     rather than being bricked from one bad attempt. `attempt` is this
+     component's own memory of "already tried this url this time", not the
+     store's. */
   const cached = kind === 'instagram' ? reelFiles?.[url] : undefined
-  const [fetchingUrl, setFetchingUrl] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState<{ url: string; failed: boolean } | null>(null)
 
   useEffect(() => { setFailed(false); setSound(true) }, [url])
 
   useEffect(() => {
-    if (kind !== 'instagram' || cached !== undefined || fetchingUrl === url) return
-    setFetchingUrl(url)
+    if (kind !== 'instagram' || cached || attempt?.url === url) return
+    setAttempt({ url, failed: false })
     void callFunction('reel-fetch', { method: 'POST', body: { url } }).then((res) => {
-      setFetchingUrl((cur) => (cur === url ? null : cur))
       const fileUrl = res.ok && typeof (res.data as { fileUrl?: unknown })?.fileUrl === 'string'
         ? (res.data as { fileUrl: string }).fileUrl
         : ''
-      setReelFile(url, fileUrl)
+      if (fileUrl) setReelFile(url, fileUrl)
+      else setAttempt((cur) => (cur?.url === url ? { url, failed: true } : cur))
     })
-  }, [url, kind, cached, fetchingUrl, setReelFile])
+  }, [url, kind, cached, attempt, setReelFile])
 
   const playable = kind === 'instagram' ? (cached || null) : url
   const effectiveKind = kind === 'instagram' ? (cached ? 'file' : null) : kind
@@ -759,8 +765,8 @@ function Reel({ url, count, onOpenLibrary, onNext }: {
 
   const hear = () => { const v = vid.current; if (v) { v.muted = false; void v.play() } setSound(true) }
 
-  const fetchingInstagram = kind === 'instagram' && cached === undefined
-  const deadInstagram = kind === 'instagram' && cached === ''
+  const deadInstagram = kind === 'instagram' && !cached && attempt?.url === url && attempt.failed
+  const fetchingInstagram = kind === 'instagram' && !cached && !deadInstagram
 
   return (
     <div className={`tl-reel${effectiveKind && !failed ? ' has-media' : ''}`}>
@@ -791,7 +797,7 @@ function Reel({ url, count, onOpenLibrary, onNext }: {
         <div className="tl-reelempty is-bad">
           <p className="tl-l">That Reel would not download</p>
           <p className="tl-url">{url}</p>
-          <p>Private, deleted, or Instagram changed its page. Skip to the next one, or take it out.</p>
+          <p>Instagram didn't hand over the video for this one, often over the track's music rights, not because the reel is private. It'll try again next time this screen opens. Skip to the next one for now, or take it out.</p>
         </div>
       )}
 

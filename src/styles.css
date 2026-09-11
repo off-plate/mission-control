@@ -9579,7 +9579,7 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 }
 .wl-brief p {
   margin: 0 0 var(--s3); font-family: var(--wl-serif);
-  font-size: 1.12rem; line-height: 1.6; max-width: 62ch;
+  font-size: 1.12rem; line-height: 1.6; max-width: none;
 }
 .wl-brief p:last-child { margin-bottom: 0; }
 
@@ -9625,9 +9625,16 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   margin: 0 0 10px; font-family: var(--wl-serif); font-weight: 400;
   font-size: 1.45rem; line-height: 1.2; letter-spacing: -0.01em;
 }
+/* Full width, his call, said twice. I capped this at 64ch as a reading
+   measure and he does not want it: the page is a transcript he scans for a
+   line, not an essay he reads front to back, and a narrow column made him
+   scroll three times as far to find it. */
 .wl-text p {
-  margin: 0; font-family: var(--wl-serif); font-size: 1.12rem;
-  line-height: 1.72; max-width: 64ch;
+  /* `max-width: none` and not merely "no max-width here": the app sets
+     `p { max-width: 68ch }` globally, so removing the cap from this rule
+     changed nothing and the transcript stayed half a screen wide. */
+  margin: 0; max-width: none; font-family: var(--wl-serif); font-size: 1.12rem;
+  line-height: 1.72;
 }
 .wl-text mark { background: color-mix(in srgb, var(--wl-rust) 24%, transparent); color: inherit; padding: 0 2px; }
 @media (max-width: 700px) {

@@ -99,7 +99,11 @@ Deno.serve(async (req: Request) => {
     if (!page.ok) return json({ ok: false, message: `Instagram answered ${page.status}` }, 502, origin)
     const html = await page.text()
     const videoUrl = extractVideoUrl(html)
-    if (!videoUrl) return json({ ok: false, message: 'Could not find a video on that link. Private, deleted, or Instagram changed its page.' }, 422, origin)
+    /* Confirmed 2026-09-12 against a real public reel: Instagram can withhold
+       the video from a plain fetch on a post that is neither private nor
+       deleted -- most often over the track's music rights. So this is never
+       said to be a broken link, only that this attempt did not get one. */
+    if (!videoUrl) return json({ ok: false, message: "Instagram didn't hand over the video for this link. Often the track's music rights, not the reel being private." }, 422, origin)
 
     const video = await fetch(videoUrl, { headers: { 'user-agent': UA } })
     if (!video.ok || !video.body) return json({ ok: false, message: 'The video file itself would not load' }, 502, origin)

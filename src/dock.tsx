@@ -5,7 +5,6 @@ import { MediaBadge, MediaChip, PomodoroInline, usePomodoro } from './pomodoro'
 import { NoteChip, NotePanel } from './notedock'
 import { BillsChip, BillsPanel } from './billsdock'
 import { TimelineChip, TimelinePanel } from './timelinedock'
-import { ContactsChip, ContactsPanel } from './contactsdock'
 import { AssistantChip, AssistantPanel } from './assistantdock'
 import { SkillsChip, SkillsPanel } from './skillsdock'
 import { HealthChip, HealthPanel } from './healthdock'
@@ -252,7 +251,7 @@ function useFocusToast(announcedAt: number, dockIsClosed: boolean): 'hidden' | '
    the notes store) and only hands this file what it needs to render.
    Rendered from inside PomodoroProvider (see pomodoro.tsx), which is what
    puts it inside both the Pomodoro context and the Store context it needs. */
-type PanelFace = 'media' | 'note' | 'bills' | 'timeline' | 'contacts' | 'assistant' | 'skills' | 'health' | 'watchless'
+type PanelFace = 'media' | 'note' | 'bills' | 'timeline' | 'assistant' | 'skills' | 'health' | 'watchless'
 type Mode = 'closed' | 'menu' | PanelFace
 
 export function Dock() {
@@ -266,12 +265,11 @@ export function Dock() {
   const noteHold = useHoldForFull(() => { setPage('notes'); go('closed') })
   const billsHold = useHoldForFull(() => { setPage('bills'); go('closed') })
   const timelineHold = useHoldForFull(() => { setPage('timeline'); go('closed') })
-  const contactsHold = useHoldForFull(() => { setPage('contacts'); go('closed') })
   const assistantHold = useHoldForFull(() => { setPage('assistant'); go('closed') })
   const skillsHold = useHoldForFull(() => { setPage('skills'); go('closed') })
   const healthHold = useHoldForFull(() => { setPage('health'); go('closed') })
   const watchlessHold = useHoldForFull(() => { setPage('watchless'); go('closed') })
-  const holdFor: Partial<Record<PanelFace, ReturnType<typeof useHoldForFull>>> = { note: noteHold, bills: billsHold, timeline: timelineHold, contacts: contactsHold, assistant: assistantHold, skills: skillsHold, health: healthHold, watchless: watchlessHold }
+  const holdFor: Partial<Record<PanelFace, ReturnType<typeof useHoldForFull>>> = { note: noteHold, bills: billsHold, timeline: timelineHold, assistant: assistantHold, skills: skillsHold, health: healthHold, watchless: watchlessHold }
   const scrollHidden = useHideOnScroll(mode === 'closed')
   const pomo = usePomodoro()
   const toastPhase = useFocusToast(pomo.announcedAt, mode === 'closed')
@@ -282,7 +280,7 @@ export function Dock() {
      exists to make dominant. */
   if (page === 'zone') return null
 
-  /* Note on top, then Bills, Timeline, Contacts, Assistant, Focus at the
+  /* Note on top, then Bills, Timeline, Assistant, Focus at the
      bottom, his order -- closest to the corner is the one he reaches for
      most. The player, when it exists at all, sits above both: rarest to
      need, so furthest from the thumb. Bills and Timeline both land here as
@@ -318,7 +316,6 @@ export function Dock() {
     { id: 'note' as const, label: 'Note', chip: <NoteChip />, switchIcon: <Icon.DockNote size={17} /> },
     { id: 'bills' as const, label: 'Bills', chip: <BillsChip />, switchIcon: <Icon.DockWallet size={17} /> },
     { id: 'timeline' as const, label: 'Timeline', chip: <TimelineChip />, switchIcon: <Icon.DockHistory size={17} /> },
-    { id: 'contacts' as const, label: 'Contacts', chip: <ContactsChip />, switchIcon: <Icon.DockUser size={17} /> },
     { id: 'assistant' as const, label: 'Assistant', chip: <AssistantChip />, switchIcon: <Icon.Waveform size={17} /> },
     { id: 'skills' as const, label: 'Skills', chip: <SkillsChip />, switchIcon: <Icon.DockBook size={17} /> },
     { id: 'health' as const, label: 'Health', chip: <HealthChip />, switchIcon: <Icon.DockHeartbeat size={17} /> },
@@ -478,15 +475,6 @@ export function Dock() {
     )
   }
 
-  if (mode === 'contacts') {
-    return (
-      <div className="dock">
-        <div className="dock-face">
-          <ContactsPanel dockControls={switchButtons} onOpenFull={() => go('closed')} />
-        </div>
-      </div>
-    )
-  }
 
   if (mode === 'timeline') {
     return (

@@ -9,7 +9,6 @@
    change.
 
    Dependency order, so a future addition knows which way an import may run:
-   core -> contacts (standalone)
    core -> habits (needs SpaceId, TimeSlot)
    core, habits -> goals (needs HabitDef etc. for goalCurrent)
    core, goals -> tasks (needs GoalTimeframe for Task.horizon)
@@ -21,7 +20,6 @@
    eight files from becoming one cycle. */
 export * from './core'
 export * from './tasks'
-export * from './contacts'
 export * from './habits'
 export * from './goals'
 export * from './notes'

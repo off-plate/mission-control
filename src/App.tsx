@@ -32,7 +32,6 @@ const BoardPage = lazy(() => import('./board').then((m) => ({ default: m.BoardPa
 const CalendarPage = lazy(() => import('./calendarpage').then((m) => ({ default: m.CalendarPage })))
 const AssistantPage = lazy(() => import('./assistantpage').then((m) => ({ default: m.AssistantPage })))
 const FocusPage = lazy(() => import('./focus').then((m) => ({ default: m.FocusPage })))
-const ContactsPage = lazy(() => import('./contactspage').then((m) => ({ default: m.ContactsPage })))
 const SkillsPage = lazy(() => import('./skillspage').then((m) => ({ default: m.SkillsPage })))
 const HealthPage = lazy(() => import('./healthpage').then((m) => ({ default: m.HealthPage })))
 const WatchlessPage = lazy(() => import('./watchlesspage').then((m) => ({ default: m.WatchlessPage })))
@@ -542,7 +541,7 @@ export default function App() {
           {page !== 'zone' && <SyncPip />}
           {/* Assistant's own header button retired in its favour (2026-09-08,
               his ask): the floating dock (see dock.tsx) reaches it from
-              anywhere now, the same door Note/Bills/Timeline/Contacts already
+              anywhere now, the same door Note/Bills/Timeline already
               use -- a short tap opens a real quick-ask widget right in the
               dock, a hold reaches this same full page, full history and all.
               The page itself is untouched -- setPage('assistant') below still
@@ -670,7 +669,6 @@ export default function App() {
         {page === 'goals' && <GoalsPage />}
         {page === 'quitting' && <QuittingPage />}
         {page === 'timeline' && <TimelinePage />}
-        {page === 'contacts' && <ContactsPage />}
         {page === 'skills' && <SkillsPage />}
         {page === 'health' && <HealthPage />}
         {page === 'watchless' && <WatchlessPage />}

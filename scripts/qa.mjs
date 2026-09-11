@@ -3652,34 +3652,6 @@ await step('assistant: "I need to pay for garbage bags" writes a real one-off, s
     throw new Error('claimed to add a one-off with no bills data at all')
   }
 })
-await step('assistant: "log that I called her" writes a real contact touch', async () => {
-  /* His ask, after Bills: "it's not only bills... it's every functionality
-     across the mission control." contact (assistant.ts/assistantcore.tsx)
-     calls the exact logContactActivity the dock's own Contacts glance uses
-     from its quick-touch button -- a real row in contactActivity, not a
-     sentence about one. */
-  await fresh('assistant')
-  await page.evaluate((K) => {
-    const s = JSON.parse(localStorage.getItem(K))
-    s.contacts = [{ id: 'c-eva', name: 'Eva Kaiserová', tag: 'client', createdAt: '2024-01-01' }]
-    s.contactActivity = []
-    localStorage.setItem(K, JSON.stringify(s))
-    localStorage.setItem('mc-groq-key', 'gsk_gatetest')
-  }, KEY)
-  await stubAssistant(() => JSON.stringify({
-    say: 'Logged it.', show: [],
-    do: [{ kind: 'contact', match: 'Eva', log: 'call' }],
-  }))
-  await page.reload(); await page.waitForTimeout(700)
-  await askAssistant('log that I called Eva')
-  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
-  const line = await page.locator('.as-did li').innerText()
-  if (!/Eva/.test(line)) throw new Error(`the outcome line does not name her: "${line}"`)
-  const activity = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).contactActivity ?? [], KEY)
-  if (activity.length !== 1 || activity[0].contactId !== 'c-eva' || activity[0].type !== 'call') {
-    throw new Error(`no real touch logged: ${JSON.stringify(activity)}`)
-  }
-})
 await step('assistant: "I slipped on X" logs a real slip, no undo exists', async () => {
   /* slip only ever adds -- there is no "un-slip" action (assistant.ts is
      explicit about this: a slip is a fact about a day that happened). */

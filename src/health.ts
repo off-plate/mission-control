@@ -1,7 +1,8 @@
-/* HEALTH, read from the zepp_* tables that already live in this same Supabase
-   project. The watch feeds Zepp, Zepp feeds Intervals.icu, a cron in
-   off-plate/zepp-health writes both tables here nightly -- so Mission Control
-   needs no pipeline of its own, only the session it already has. Same shared
+/* HEALTH, read from the zepp_* tables that live in this same Supabase project.
+   The watch feeds Zepp, Zepp feeds Intervals.icu, and the `zepp-sync` Edge
+   Function pulls Intervals into those two tables every two hours. That pull
+   used to belong to off-plate/zepp-health; it moved here on 2026-09-11 when he
+   had that repo deleted, so the pipeline is this app's own now. Same shared
    read as skills.ts and compass.ts: the dock's glance and the full page can be
    on screen at once and must not fetch twice.
 

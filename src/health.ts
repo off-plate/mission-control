@@ -11,7 +11,7 @@
    and the page says how old that is. A dashboard that draws June's resting
    heart rate under today's date is the one thing this app must never do. */
 import { useCallback, useSyncExternalStore } from 'react'
-import { SUPABASE_ENABLED, readRows } from './supabase'
+import { SUPABASE_ENABLED, callFunction, readRows } from './supabase'
 import { createLiveStore } from './livestore'
 
 /** One row per day from Intervals.icu's wellness feed. Every metric is
@@ -157,23 +157,28 @@ export function useHealth(): { state: HealthState; reload: () => void } {
 /* ------------------------------------------------------------------ *
  * SYNCING ON DEMAND.
  *
- * His ask: a button that actually goes and fetches. The worker that
- * talks to Intervals.icu is a GitHub Action in off-plate/zepp-health --
- * it holds the API key, and it must, because a key in this bundle is a
- * key on a public site. So this presses the button that repo already
- * exposes for it: a Netlify function that dispatches the workflow.
+ * His ask: a button that actually goes and fetches. It calls the
+ * `zepp-sync` Edge Function, which holds the Intervals key and does the
+ * whole pull itself. The key has to live there rather than here,
+ * because a key in this bundle is a key on a public site.
  *
- * Then it WAITS FOR THE REAL ANSWER rather than flashing "synced" the
- * moment the dispatch is accepted. The dispatch only means GitHub took
- * the request; the sync itself lands about a minute later, and the
- * worker writes its own row to zepp_sync_log when it is done. That row
- * appearing is the only honest evidence anything synced, so that is
- * what this watches for, and what it reports back -- including the
- * worker's own error when it failed.
+ * Moved off off-plate/zepp-health on 2026-09-11, on his instruction to
+ * ditch that repo. It used to take three services to press this button:
+ * a Netlify function existed only to hold a GitHub token so it could
+ * dispatch a GitHub Action which ran the real worker. One function now,
+ * which the cron calls too, so there is a single implementation.
+ *
+ * It still WAITS FOR THE REAL ANSWER rather than flashing "synced" the
+ * moment the request is accepted, and it still reads that answer out of
+ * zepp_sync_log rather than trusting the reply: the row landing is the
+ * only honest evidence that rows landed. The function is synchronous
+ * now, so the row is usually there by the time the call returns, but the
+ * poll stays -- it is what reports the worker's own error, and it costs
+ * one read when the row is already waiting.
  * ------------------------------------------------------------------ */
-const SYNC_ENDPOINT = 'https://zepp-health.netlify.app/.netlify/functions/sync'
-/** The worker is dispatched, queued, installs and runs. Measured at roughly a
- *  minute end to end; three is the point at which something is wrong. */
+const SYNC_FUNCTION = 'zepp-sync'
+/** The pull itself, against Intervals, for two months of history. Measured in
+ *  seconds; three minutes is the point at which something is wrong. */
 const SYNC_TIMEOUT_MS = 180_000
 const SYNC_POLL_MS = 4_000
 
@@ -196,21 +201,16 @@ async function runSync(): Promise<void> {
   syncStore.publish({ phase: 'asking' })
   const before = (await readLastRun())?.ran_at ?? ''
 
-  try {
-    const res = await fetch(SYNC_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lookback_days: '60' }),
-    })
-    if (!res.ok) {
-      const detail = await res.text().catch(() => '')
-      syncStore.publish({ phase: 'failed', message: detail.trim() || `The sync worker answered ${res.status}.` })
-      return
-    }
-  } catch {
+  const called = await callFunction(SYNC_FUNCTION, { method: 'POST', body: { lookback_days: 60 } })
+  if (!called.ok) {
     /* A blocked request and an unreachable one look identical from here, and
-       both mean the same thing to him: it did not start. */
-    syncStore.publish({ phase: 'failed', message: 'Could not reach the sync worker.' })
+       both mean the same thing to him: it did not start. Being signed out is
+       the one case worth naming separately, because it is the one he can fix. */
+    const message =
+      called.reason === 'signed-out' ? 'Sign in on this device to sync.' :
+      called.reason === 'off' ? 'Sync is off on this device.' :
+      called.message?.trim() || 'Could not reach the sync worker.'
+    syncStore.publish({ phase: 'failed', message })
     return
   }
 

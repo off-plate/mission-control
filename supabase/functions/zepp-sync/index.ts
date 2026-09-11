@@ -44,7 +44,11 @@ const cors = (origin: string | null) => ({
 })
 
 const OWNER = Deno.env.get('ZEPP_USER_EMAIL') ?? 'mihael.florian@gmail.com'
-const KEY = Deno.env.get('INTERVALS_API_KEY') ?? ''
+/* INTERVALS_API_KE is not a typo here -- it is the name the secret actually
+   has in the project, the Y having been lost when it was pasted in. Reading
+   both spellings means this keeps working whichever way it is stored, and
+   nobody has to go back to the dashboard to satisfy the code. */
+const KEY = Deno.env.get('INTERVALS_API_KEY') ?? Deno.env.get('INTERVALS_API_KE') ?? ''
 const ATHLETE = Deno.env.get('INTERVALS_ATHLETE_ID') ?? ''
 
 const ymd = (d: Date) => d.toISOString().slice(0, 10)

@@ -1,0 +1,62 @@
+name: Health sync
+
+# Pulls wellness and activities from Intervals.icu into Supabase, every two
+# hours, exactly as off-plate/zepp-health did before this moved here on
+# 2026-09-11 at his instruction to ditch that repo.
+#
+# The pull itself is NOT in this file. It is the `zepp-sync` Edge Function,
+# which the app's Sync button calls too, so there is one implementation rather
+# than a cron copy and a button copy free to drift apart. This workflow only
+# presses the same button on a timer.
+#
+# No secrets. The URL and the publishable key below are already in the app's
+# public bundle -- they are what every visitor's browser uses to reach this
+# project -- so putting them here exposes nothing that isn't already served on
+# every page load. What is NOT here, and must never be, is the Intervals key:
+# that lives in Supabase secrets, which the function reads and nothing ships.
+#
+# The old Netlify endpoint this replaces was reachable by anyone who knew the
+# URL (CORS is not an access control; curl ignores it), so this is no wider a
+# door than the one it closes. If it ever needs narrowing, the move is a shared
+# secret header checked inside the function, not a change here.
+
+on:
+  schedule:
+    - cron: '0 */2 * * *'   # every 2 hours, the cadence it already ran at
+  workflow_dispatch:
+    inputs:
+      lookback_days:
+        description: 'Days of history to pull'
+        required: false
+        default: '60'
+
+concurrency:
+  group: health-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Call the sync function
+        env:
+          DAYS: ${{ github.event.inputs.lookback_days || '60' }}
+        run: |
+          set -euo pipefail
+          URL="https://fhfempisopwsdkmvywbt.supabase.co/functions/v1/zepp-sync"
+          KEY="sb_publishable_MDxQPm0SzLHFTnDqg-eyyQ_0yposnES"
+          code=$(curl -s -o /tmp/out.json -w '%{http_code}' \
+            -X POST "$URL" \
+            -H "Authorization: Bearer $KEY" \
+            -H "apikey: $KEY" \
+            -H 'Content-Type: application/json' \
+            -d "{\"lookback_days\": $DAYS}")
+          echo "HTTP $code"
+          cat /tmp/out.json
+          echo
+          # A 200 carrying ok:false is still a failed sync. Without this the
+          # schedule would show green over a dead pipeline, which is the exact
+          # failure the Health page is supposed to make impossible to miss.
+          test "$code" = "200"
+          grep -q '"ok":true' /tmp/out.json

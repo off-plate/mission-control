@@ -62,6 +62,10 @@ export type PageId =
   /** The body, read from the zepp_* tables the watch already feeds through
    *  Intervals.icu. Dock only, same shape as Bills/Timeline/Contacts/Skills. */
   | 'health'
+  /** A YouTube transcript, read instead of watched. The reading is fetched from
+   *  the Watchless endpoint, which is the only thing holding keys and the only
+   *  thing that can spend against its monthly cap. */
+  | 'watchless'
 
 export type WidgetType =
   | 'clock'

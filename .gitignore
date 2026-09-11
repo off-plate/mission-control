@@ -15,3 +15,6 @@ release/
 
 # Local-only screenshots from scripts/zshot.mjs
 .z-shots/
+
+# Local-only screenshots from scripts/wlshot.mjs
+.wl-shots/

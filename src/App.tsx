@@ -35,6 +35,7 @@ const FocusPage = lazy(() => import('./focus').then((m) => ({ default: m.FocusPa
 const ContactsPage = lazy(() => import('./contactspage').then((m) => ({ default: m.ContactsPage })))
 const SkillsPage = lazy(() => import('./skillspage').then((m) => ({ default: m.SkillsPage })))
 const HealthPage = lazy(() => import('./healthpage').then((m) => ({ default: m.HealthPage })))
+const WatchlessPage = lazy(() => import('./watchlesspage').then((m) => ({ default: m.WatchlessPage })))
 import { useStore } from './store'
 import { ago, describe, useSyncStatus } from './sync'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange } from './supabase'
@@ -672,6 +673,7 @@ export default function App() {
         {page === 'contacts' && <ContactsPage />}
         {page === 'skills' && <SkillsPage />}
         {page === 'health' && <HealthPage />}
+        {page === 'watchless' && <WatchlessPage />}
         {page === 'focus' && <FocusPage />}
         {page === 'board' && <BoardPage />}
         {page === 'apps' && <AppsPage />}

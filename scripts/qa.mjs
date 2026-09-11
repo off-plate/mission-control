@@ -4134,6 +4134,11 @@ await step('timeline: a real session counts as health, with no habit ticked', as
   if (await skip.count()) { await skip.first().click(); await page.waitForTimeout(300) }
   const top = (await page.locator('.tl-rung').first().innerText()).toLowerCase()
   if (/no workout/.test(top)) throw new Error('today had a real session but the timeline still reads "no workout"')
+  /* And it says HOW LONG. The pass that first made sessions count left the
+     read-out reading Hevy's device-local cache alone, so every day that came
+     from Intervals collapsed to a bare tick and he lost the time he was used
+     to seeing. His words: "what do you mean worked out, where is the time". */
+  if (!/\d+\s*m\b|\dh\s*\d/.test(top)) throw new Error(`the session counted but its length is missing: ${top.replace(/\n/g, ' / ')}`)
   await page.evaluate(() => localStorage.removeItem('mc-health-fixture'))
 })
 

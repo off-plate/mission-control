@@ -29,7 +29,13 @@ function db(): SupabaseClient | null {
  *  the JWT, so nobody without his session can pull his work calendar through
  *  it: the function is the only thing holding the feed's secret address, and a
  *  function anyone may call is the same as publishing that address. */
-export async function callFunction(name: string): Promise<{ ok: true; data: unknown } | { ok: false; reason: 'off' | 'signed-out' | 'error'; message?: string }> {
+export async function callFunction(
+  name: string,
+  /* The health sync POSTs a lookback window; the calendar proxy takes nothing
+     and stays a GET. Both want the same JWT and the same signed-out answer, so
+     they share this rather than growing a second copy of it. */
+  opts?: { method: 'POST'; body: Record<string, unknown> },
+): Promise<{ ok: true; data: unknown } | { ok: false; reason: 'off' | 'signed-out' | 'error'; message?: string }> {
   const c = db()
   if (!c) return { ok: false, reason: 'off' }
   const me = await currentAccount()
@@ -41,7 +47,9 @@ export async function callFunction(name: string): Promise<{ ok: true; data: unkn
        This used to force everything through a string, which turned a parsed
        object into "[object Object]" the moment the function started answering
        JSON, and the app reported the calendar as unreadable. */
-    const { data, error } = await c.functions.invoke(name, { method: 'GET' })
+    const { data, error } = opts
+      ? await c.functions.invoke(name, { method: 'POST', body: opts.body })
+      : await c.functions.invoke(name, { method: 'GET' })
     if (error) return { ok: false, reason: 'error', message: error.message }
     return { ok: true, data }
   } catch (e) {

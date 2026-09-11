@@ -719,6 +719,70 @@ await step('the zone: a broken-down task shows its steps, and they tick from in 
   await count.click(); await page.waitForTimeout(300)
   if (await page.locator('.zsteps').count()) throw new Error('collapsing the steps left them on screen')
 })
+/* WATCHLESS. Added with the page (2026-09-11). The reader endpoint is stubbed
+   throughout: a real call can spend a credit against a monthly cap, and a test
+   suite that costs money every run is a test suite that gets turned off. */
+const WL_DOC = (() => {
+  const cues = []
+  const lines = [
+    'The first thing people get wrong is assuming the model is the hard part.',
+    'It is not. The hard part is the data and what you do when it is wrong.',
+    'We spent six weeks on evaluation before writing a production prompt.',
+  ]
+  /* The first stretch carries a word nothing else says. Cycling three lines
+     across every paragraph meant a search matched all of them, so "what missed
+     is dimmed" had nothing to dim and the assertion failed on the fixture
+     rather than on the page. */
+  for (let i = 0; i < 60; i++) {
+    cues.push({ start: i * 12, end: i * 12 + 12, text: i < 4 ? 'A word about calibration only said here.' : lines[i % lines.length] })
+  }
+  return {
+    videoId: 'dQw4w9WgXcQ', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    title: 'What evaluation taught us', channel: 'Practical ML', duration: 720,
+    thumbnail: '', captionLang: 'en', captionSource: 'innertube',
+    words: 600, chapters: [{ start: 0, title: 'The hard part' }, { start: 360, title: 'Evaluation' }],
+    segments: cues, cost: 0, cached: true, summary: 'The model is rarely the hard part.',
+  }
+})()
+
+await step('watchless: a pasted link becomes a transcript that can be read and searched', async () => {
+  await page.route('**/api/transcript*', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(WL_DOC) }))
+  await fresh('watchless')
+  await page.waitForSelector('.wl-input', { timeout: 10000 })
+  if (await page.locator('.wl-block').count()) throw new Error('the page read something before being asked, which can cost money')
+
+  await page.locator('.wl-input').fill('https://www.youtube.com/watch?v=dQw4w9WgXcQ')
+  await page.locator('.wl-go').click(); await page.waitForTimeout(800)
+
+  /* Cues arrive three words at a time. The whole point of the page is that
+     what lands on screen is paragraphs, and that a long chapter still breaks
+     inside itself rather than becoming one wall of text. */
+  const blocks = await page.locator('.wl-block').count()
+  if (blocks < 6) throw new Error(`${blocks} blocks from 60 cues, so the transcript is not being broken into paragraphs`)
+  if (!(await page.locator('.wl-blocktitle').count())) throw new Error('chapter titles never made it onto the transcript')
+  if ((await page.locator('.wl-chapters .wl-chip').count()) !== 2) throw new Error('the chapter list does not match the video')
+
+  /* A cache hit is free and has to say so: the cost line is the only thing
+     standing between him and a surprise bill. */
+  if (!/free/i.test(await page.locator('.wl-meta').innerText())) throw new Error('a cached read does not say it was free')
+
+  await page.locator('.wl-find input').fill('calibration'); await page.waitForTimeout(400)
+  if (!(await page.locator('.wl-text mark').count())) throw new Error('searching marked nothing')
+  if (!(await page.locator('.wl-block.is-dim').count())) throw new Error('searching did not dim what missed, so the hits do not stand out')
+  await page.unroute('**/api/transcript*')
+})
+
+await step('watchless: a bad link is refused without spending a request', async () => {
+  let asked = 0
+  await page.route('**/api/transcript*', (r) => { asked++; r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(WL_DOC) }) })
+  await fresh('watchless')
+  await page.locator('.wl-input').fill('https://vimeo.com/12345')
+  await page.locator('.wl-go').click(); await page.waitForTimeout(600)
+  if (asked !== 0) throw new Error('a non-YouTube link still went to the reader, which is how a cap gets spent on nothing')
+  if (!/not a YouTube link/i.test(await page.locator('.wl-empty.is-bad').innerText())) throw new Error('a bad link does not say what is wrong')
+  await page.unroute('**/api/transcript*')
+})
+
 await step('mundi opus: leaving the zone does not stop the music, and the corner picks it up', async () => {
   await fresh('zone')
   const skip = page.getByRole('button', { name: 'Not today' })

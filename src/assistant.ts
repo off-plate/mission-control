@@ -250,7 +250,7 @@ const SPACE_OK: Space[] = ['personal', 'work', 'offplate', 'corner']
 const OPEN_OK: PageId[] = [
   'today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting',
   'settings', 'notes', 'board', 'apps', 'focus', 'zone', 'bills', 'calendar',
-  'timeline', 'contacts', 'assistant', 'skills', 'health',
+  'timeline', 'contacts', 'assistant', 'skills', 'health', 'watchless',
 ]
 
 /** Everything the model sent, minus everything this app cannot promise to do. */

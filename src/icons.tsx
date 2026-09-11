@@ -98,6 +98,7 @@ export const Checklist = make(<><rect x="3" y="3" width="18" height="18" rx="3"/
 /* hicon: minus */
 export const Divider = make(<><path d="M6 12H18"/></>, 16, { k: 1.6417, x: -7.7, y: -7.7 })
 /* hicon: lens */
+export const Copy = make(<><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M15 5.5A2.5 2.5 0 0 0 12.5 3h-7A2.5 2.5 0 0 0 3 5.5v7A2.5 2.5 0 0 0 5.5 15"/></>, 16, { k: 1.06, x: -0.7, y: -0.7 })
 export const Search = make(<><path d="M19.9604 11.4802C19.9604 13.8094 19.0227 15.9176 17.5019 17.4512C16.9332 18.0247 16.2834 18.5173 15.5716 18.9102C14.3594 19.5793 12.9658 19.9604 11.4802 19.9604C6.79672 19.9604 3 16.1637 3 11.4802C3 6.79672 6.79672 3 11.4802 3C16.1637 3 19.9604 6.79672 19.9604 11.4802Z"/><path d="M18.1553 18.1553L21.8871 21.8871"/></>, 16, { k: 1.0429, x: -0.979, y: -0.979 })
 /* hicon: plus */
 export const Plus = make(<><line x1="12" y1="6" x2="12" y2="18"/><line x1="6" y1="12" x2="18" y2="12"/></>, 16, { k: 1.6417, x: -7.7, y: -7.7 })
@@ -219,6 +220,9 @@ export const DockHistory = make(<><path d="M12 8l0 4l2 2" /><path d="M3.05 11a9 
 export const DockChartBar = make(<><path d="M3 13a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -6" /><path d="M15 9a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -10" /><path d="M9 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -14" /><path d="M4 20h14" /></>, 16, { k: 1, x: 0, y: 0 })
 export const DockUser = make(<><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /></>, 16, { k: 1, x: 0, y: 0 })
 export const DockBook = make(<><path d="M19 4v16h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12" /><path d="M19 16h-12a2 2 0 0 0 -2 2" /><path d="M9 8h6" /></>, 16, { k: 1, x: 0, y: 0 })
+/* Watchless: a transcript, not a video. Tabler's file-text over a play, because
+   the point of the page is that the video became something you read. */
+export const DockTranscript = make(<><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2" /><path d="M9 9l1 0" /><path d="M9 13l6 0" /><path d="M9 17l6 0" /></>, 16, { k: 1, x: 0, y: 0 })
 export const DockHeartbeat = make(<><path d="M19.5 13.572l-7.5 7.428l-2.896 -2.868m-6.117 -8.104a5 5 0 0 1 9.013 -3.022a5 5 0 1 1 7.5 6.572" /><path d="M3 13h2l2 3l2 -6l1 3h3" /></>, 16, { k: 1, x: 0, y: 0 })
 
 /* The drag grip. Not an icon: a texture that says "this row moves", which is

@@ -783,6 +783,54 @@ await step('watchless: a bad link is refused without spending a request', async 
   await page.unroute('**/api/transcript*')
 })
 
+await step('watchless: tidying repairs the captions on his own key, and only when asked', async () => {
+  await page.route('**/api/transcript*', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(WL_DOC) }))
+  /* The model is stubbed. Tidying spends HIS key, and a suite that costs money
+     on every run is a suite that gets switched off. */
+  let modelCalls = 0
+  await page.route('**/functions/v1/zai-chat', async (r) => {
+    modelCalls++
+    const sent = JSON.parse(r.request().postData() ?? '{}')
+    const asked = JSON.parse(sent.messages?.[1]?.content ?? '{}').paragraphs ?? []
+    const out = asked.map((p) => ({ i: p.i, text: `Repaired ${p.i}.` }))
+    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: JSON.stringify({ out }) } }] }) })
+  })
+
+  await fresh('watchless')
+  await page.evaluate(() => { localStorage.setItem('mc-ai-provider', 'zai'); localStorage.setItem('mc-zai-key', 'test-key') })
+  await page.reload(); await page.waitForTimeout(600)
+  await page.locator('.wl-input').fill('https://www.youtube.com/watch?v=dQw4w9WgXcQ')
+  await page.locator('.wl-go').click(); await page.waitForTimeout(800)
+
+  if (modelCalls !== 0) throw new Error('the model was called just for opening a transcript, which spends his key unasked')
+  const tidyBtn = page.locator('.wl-tool', { hasText: /Tidy/ })
+  if (!(await tidyBtn.count())) throw new Error('no way to tidy, though a key is set')
+
+  await tidyBtn.click()
+  await page.waitForFunction(() => !/Tidying/.test(document.querySelector('.wl-tool')?.textContent ?? ''), null, { timeout: 15000 })
+  await page.waitForTimeout(400)
+  if (modelCalls === 0) throw new Error('pressing tidy called nothing')
+
+  const text = await page.locator('.wl-body').innerText()
+  if (!/Repaired 0\./.test(text)) throw new Error('the repaired text never replaced the caption run')
+  /* Timestamps and chapter titles survive the repair: the model rewrites the
+     prose, not the structure it is filed under. */
+  if (!(await page.locator('.wl-blocktitle').count())) throw new Error('tidying lost the chapter titles')
+  if (!(await page.locator('.wl-at').count())) throw new Error('tidying lost the timestamps')
+
+  await page.unroute('**/functions/v1/zai-chat')
+  await page.unroute('**/api/transcript*')
+  /* Put the AI settings back. fresh() clears the app's own state key and
+     nothing else, so a provider and key left here followed the suite into
+     every later step: the assistant's stubbed Groq endpoint stopped being the
+     one the app called, and 32 unrelated tests failed with CORS errors against
+     zai-chat. Anything a step writes outside the state key, that step owns. */
+  await page.evaluate(() => {
+    localStorage.removeItem('mc-ai-provider')
+    localStorage.removeItem('mc-zai-key')
+  })
+})
+
 await step('mundi opus: leaving the zone does not stop the music, and the corner picks it up', async () => {
   await fresh('zone')
   const skip = page.getByRole('button', { name: 'Not today' })

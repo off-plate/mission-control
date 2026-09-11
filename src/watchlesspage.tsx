@@ -14,9 +14,10 @@
    cache hit costs, because "free" is worth seeing. */
 import { useMemo, useRef, useState } from 'react'
 import {
-  asText, atUrl, blocks, recents, search, stamp, useWatchless,
+  asText, atUrl, blocks, recents, resetTidy, search, stamp, tidy, tidyFor, useTidy, useWatchless,
   type Block, type Transcript,
 } from './watchless'
+import { hasAiKey } from './ai'
 import * as Icon from './icons'
 
 function Head({ doc }: { doc: Transcript }) {
@@ -100,8 +101,16 @@ export function WatchlessPage() {
   const bodyRef = useRef<HTMLDivElement>(null)
   const seen = recents()
 
+  const tidyState = useTidy()
   const doc = state.status === 'ok' ? state.doc : null
-  const list = useMemo(() => (doc ? blocks(doc) : []), [doc])
+  const raw = useMemo(() => (doc ? blocks(doc) : []), [doc])
+  /* The repaired text replaces the caption run for reading, and the original is
+     kept underneath: nothing the model did is destructive. */
+  const clean = doc ? tidyFor(doc.videoId) : undefined
+  const list = useMemo(
+    () => (clean ? raw.map((b, i) => (clean.has(i) ? { ...b, text: clean.get(i) as string } : b)) : raw),
+    [raw, clean, tidyState],
+  )
   const found = useMemo(() => search(list, term), [list, term])
 
   const jump = (i: number) => {
@@ -126,40 +135,37 @@ export function WatchlessPage() {
   return (
     <div className="page">
       <div className="wl">
-        <form className="wl-ask" onSubmit={submit}>
+        {/* The ask, in the original's own shape: a serif line, a mono prompt on
+            a single rule, and a bracketed verb. No box, no fill, no radius. */}
+        {!doc && <h1 className="wl-ask-h1">Paste a YouTube link</h1>}
+        <form className={`wl-ask${doc ? ' is-tight' : ''}`} onSubmit={submit}>
+          <span className="wl-caret" aria-hidden="true">&gt;</span>
           <input
             className="wl-input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Paste a YouTube link"
+            placeholder="youtube.com/watch?v=..."
             aria-label="YouTube link"
             spellCheck={false}
           />
           <button className="wl-go" type="submit" disabled={state.status === 'reading' || !input.trim()}>
-            {state.status === 'reading' ? 'Reading' : 'Read'}
+            [ {state.status === 'reading' ? 'READING' : 'READ IT'} ]
           </button>
         </form>
 
-        {state.status === 'idle' && (
-          <div className="wl-empty">
-            <p>Paste a link and read it instead of watching it.</p>
-            {seen.length > 0 && (
-              <div className="wl-recent">
-                <span className="wl-recent-h">Read before</span>
-                {seen.map((r) => (
-                  <button key={r.videoId} className="wl-chip" onClick={() => { setInput(r.url); void read(r.url) }}>
-                    <span className="wl-chip-t">{r.title}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+        {state.status === 'idle' && seen.length > 0 && (
+          <div className="wl-recent">
+            <span className="wl-recent-h">Read before</span>
+            {seen.map((r) => (
+              <button key={r.videoId} className="wl-chip" onClick={() => { setInput(r.url); void read(r.url) }}>
+                <span className="wl-chip-t">{r.title}</span>
+              </button>
+            ))}
           </div>
         )}
 
         {state.status === 'reading' && (
-          <p className="wl-empty">
-            Reading. A video the reader has seen before comes back at once; a new one has to be fetched.
-          </p>
+          <p className="wl-note">Reading. A video read before comes back at once; a new one has to be fetched.</p>
         )}
 
         {state.status === 'error' && (
@@ -187,11 +193,33 @@ export function WatchlessPage() {
                 />
                 {term && <span className="wl-count">{found.count || 'nothing'}</span>}
               </div>
+              {/* His note: use the GLM key already in Settings here too. It
+                  cannot improve the WORDS -- those are YouTube's caption track,
+                  no model hears the audio -- but auto-captions arrive with no
+                  full stops and no capitals, and repairing that is exactly what
+                  a language model is for. On his key, so: on his press. */}
+              {hasAiKey() && (
+                <button
+                  className="wl-tool"
+                  onClick={() => { resetTidy(); void tidy(doc, raw) }}
+                  disabled={tidyState.phase === 'working'}
+                  title="Add the punctuation the captions never had"
+                >
+                  <Icon.Edit size={13} />
+                  {tidyState.phase === 'working'
+                    ? `Tidying ${tidyState.done}/${tidyState.total}`
+                    : clean?.size ? 'Tidied' : 'Tidy up'}
+                </button>
+              )}
               <button className="wl-tool" onClick={copy}>
                 <Icon.Copy size={13} />
                 {copied ? 'Copied' : 'Copy all'}
               </button>
             </div>
+
+            {tidyState.phase === 'failed' && (
+              <p className="wl-hint wl-tidyfail">Could not tidy the transcript: {tidyState.message}. What is on screen is the original.</p>
+            )}
 
             <Chapters list={list} onJump={jump} />
 

@@ -21,13 +21,15 @@ await new Promise(ok=>server.listen(0,ok))
 const URL = `http://localhost:${server.address().port}/mission-control/?noremote`
 
 const cues = []
+// What YouTube auto-captions actually look like: no capitals, no full stops,
+// filler left in. This is the readability problem the tidy button addresses.
 const lines = [
-  'So the first thing people get wrong about this is they assume the model is the hard part.',
-  'It is not. The hard part is the data you feed it and what you do when it is wrong.',
-  'We spent about six weeks on evaluation before we wrote a single prompt for production.',
-  'And that felt slow at the time, but it is the only reason we could ship anything at all.',
-  'The second mistake is measuring the wrong thing. Accuracy on a benchmark is not the job.',
-  'What matters is whether the person on the other end trusted the answer enough to act on it.',
+  'so the first thing people get wrong about this is they assume the model is the hard part',
+  'it is not um the hard part is the data you feed it and what you do when it is wrong',
+  'we spent about six weeks on evaluation before we wrote a single prompt for production',
+  'and that felt slow at the time but it is the only reason we could ship anything at all',
+  'the second mistake is uh measuring the wrong thing accuracy on a benchmark is not the job',
+  'what matters is whether the person on the other end trusted the answer enough to act on it',
 ]
 for (let i = 0; i < 90; i++) {
   const t = i * 12
@@ -66,6 +68,11 @@ for (const [w,tag] of [[1500,'desktop'],[430,'mobile']]) {
     await page.locator('.wl-find input').fill('evaluation'); await page.waitForTimeout(600)
     console.log(`search hits: ${await page.locator('.wl-block.is-hit').count()}, marks: ${await page.locator('.wl-text mark').count()}, count label: ${await page.locator('.wl-count').innerText()}`)
     await page.screenshot({ path: join(OUT,'wl-search-desktop.png') })
+  }
+  if (tag === 'desktop') {
+    await page.locator('.wl-find input').fill('')
+    const tidyBtn = page.locator('.wl-tool', { hasText: /Tidy/ })
+    console.log(`tidy button present: ${await tidyBtn.count() > 0} (shows only with an AI key set)`)
   }
   await page.close()
 }

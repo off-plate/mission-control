@@ -9528,7 +9528,11 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   --wl-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
   --wl-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
 
-  max-width: 940px; margin-inline: auto;
+  /* Full width, like every other page: `main`'s gutter is the only horizontal
+     constraint the app uses, and a lone centred column here read as a
+     different app. The reading measure is set on the paragraphs instead, where
+     it belongs -- a line of prose the width of a 2560px screen is unreadable
+     no matter how correct the page width is. */
   /* His complaint, twice now: content welded to the navigation. `main` sets a
      horizontal gutter only, so a page that wants air above it has to say so. */
   padding: clamp(48px, 9vh, 104px) 0 120px;

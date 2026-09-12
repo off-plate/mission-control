@@ -814,6 +814,21 @@ body:has(.shell.in-zone) .dock-face {
 }
 body:has(.shell.in-zone) .dock-facebar { border-color: var(--z-line); }
 body:has(.shell.in-zone) .dock-focus-time { color: var(--z-muted); }
+/* The More pill and its grid: --ink/--surface are still the app's light
+   tokens even inside the Zone (only --z-* got redeclared above for it, on
+   the same sibling-inheritance gap the rest of this block already exists
+   to close), so the plain .dock-more-* rules above would paint it in the
+   light palette rather than inverting the Zone's own dark-on-bone pills. */
+body:has(.shell.in-zone) .dock-more-label { background: var(--z-bone); color: var(--z-ground); border-color: var(--z-bone); }
+body:has(.shell.in-zone) .dock-more-badge { background: var(--z-ground); color: var(--z-bone); }
+body:has(.shell.in-zone) .dock-item-avatar--more { background: var(--z-bone); color: var(--z-ground); }
+body:has(.shell.in-zone) .dock-more-grid {
+  background: var(--z-ground); border-color: var(--z-line); color: var(--z-bone);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+body:has(.shell.in-zone) .dock-more-cell { color: var(--z-bone); }
+body:has(.shell.in-zone) .dock-more-cell:hover { background: rgba(237, 230, 216, 0.08); color: var(--z-bone); }
+body:has(.shell.in-zone) .dock-more-cell-icon { background: var(--z-deep); color: var(--z-bone); }
 
 
 /* The stack: labelled pills growing upward from the FAB. .dock's own gap
@@ -931,6 +946,63 @@ body:has(.shell.in-zone) .dock-focus-time { color: var(--z-muted); }
 .dock-item-avatar--focus { background: var(--accent-wash); }
 .dock-item-avatar--note, .dock-item-avatar--bills, .dock-item-avatar--timeline, .dock-item-avatar--media, .dock-item-avatar--assistant { background: var(--surface-2); }
 .dock-chip-art { width: 100%; height: 100%; object-fit: cover; }
+
+/* ---- the "More" pill: Direction A ("The Trimmed Stack") from his own
+   artifact review, implemented (2026-09-12). Seven tools competing for
+   thumb space in one stack was the actual complaint -- "quite getting a lot
+   of items in there" -- so dock.tsx now shows only his three highest-
+   ranked (dockrank.ts) as normal pills and folds the rest behind this one.
+   It needs to read as a different KIND of pill, not a fourth ranked item,
+   since tapping it doesn't open a tool, it opens a grid -- inverted
+   background/text off the same tokens the label and avatar around it
+   already use, so it stays correct in whichever theme he's standing in
+   without a new palette of its own. display:contents on the button itself
+   keeps its label+avatar children as direct flex items of the same
+   .dock-item row every other pill already lays out that way -- the same
+   "a button can't nest inside a button, and this file already hit that
+   once" reasoning the focusRow comment above gives, just solved by not
+   giving the button its own box at all rather than not using one. */
+.dock-more-wrap { position: relative; }
+.dock-more-btn { all: unset; display: contents; cursor: pointer; }
+.dock-more-label {
+  background: var(--ink); color: var(--surface); border-color: var(--ink);
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.dock-more-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+  background: var(--surface); color: var(--ink); font-size: 10px; font-weight: 700;
+}
+.dock-item-avatar--more { background: var(--ink); color: var(--surface); }
+
+/* The grid it opens: the ranked pills and the player (if any) hide the
+   moment it's open (dock.tsx) rather than sitting underneath it, so the
+   More pill is always the topmost visible row while its grid is out --
+   anchoring the grid to THIS pill via a plain absolute/relative pair, not
+   to .dock's own fixed corner, means it always lands directly above it no
+   matter how many pills would otherwise have been between them. "The same
+   spot, sized like any other quick popup" was his own description of it. */
+.dock-more-grid {
+  position: absolute; right: 0; bottom: calc(100% + 10px); z-index: 62;
+  width: min(264px, 86vw);
+  background: var(--surface); border: 1px solid var(--hairline-strong);
+  border-radius: 16px; box-shadow: var(--shadow-pop);
+  padding: var(--s2);
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
+  animation: dock-rise var(--t-med);
+}
+.dock-more-cell {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: var(--s2) var(--s1); border-radius: 12px; color: var(--ink);
+  text-align: center; font-size: var(--text-xs); font-weight: 600;
+}
+.dock-more-cell:hover { background: var(--surface-2); color: var(--accent-text); }
+.dock-more-cell-icon {
+  width: 36px; height: 36px; border-radius: 50%; flex: none;
+  display: grid; place-items: center; background: var(--surface-2); color: var(--ink);
+}
+body:has(.shell.is-hud) .dock-more-grid { border-radius: var(--a-r-lg); }
+body:has(.shell.is-hud) .dock-more-cell-icon { border-radius: var(--a-r-sm); }
 
 /* Focus's row: not a button (see the component note in dock.tsx), so hover
    never gets the label-highlight treatment the button-based rows above do

@@ -9,6 +9,7 @@ import { AssistantChip, AssistantPanel } from './assistantdock'
 import { SkillsChip, SkillsPanel } from './skillsdock'
 import { HealthChip, HealthPanel } from './healthdock'
 import { WatchlessChip, WatchlessPanel } from './watchlessdock'
+import { bumpDockRank, rankDockItems } from './dockrank'
 import * as Icon from './icons'
 
 /* Hover opens the dial now, on his instruction (2026-09-02) -- the same
@@ -254,6 +255,22 @@ function useFocusToast(announcedAt: number, dockIsClosed: boolean): 'hidden' | '
 type PanelFace = 'media' | 'note' | 'bills' | 'timeline' | 'assistant' | 'skills' | 'health' | 'watchless'
 type Mode = 'closed' | 'menu' | PanelFace
 
+/* The player is deliberately never in this contest -- his artifact review
+   put it in writing: it's the rarest-to-need item and already sits above
+   the whole stack on that basis alone (see the panels comment below), and
+   folding it into a popularity score it can never win on its own terms
+   would just be a second, redundant reason for it to rank last. Everything
+   else here is a plain shortcut, so everything else competes. */
+const RANKABLE_FACES = ['note', 'bills', 'timeline', 'assistant', 'skills', 'health', 'watchless'] as const
+type RankableFace = typeof RANKABLE_FACES[number]
+function isRankable(id: PanelFace): id is RankableFace {
+  return (RANKABLE_FACES as readonly string[]).includes(id)
+}
+// The number of pills the stack shows before folding the rest behind More --
+// his own number, from "three by three grade" and "only three latest...
+// frequently used items."
+const TOP_N = 3
+
 export function Dock() {
   const { page, setPage } = useStore()
   const mo = useMundiOpus()
@@ -262,17 +279,26 @@ export function Dock() {
   // renders, and only Note, Bills and Timeline have a full page to hold
   // for -- the player has none (see PanelFace/Mode above), so it never
   // gets one.
-  const noteHold = useHoldForFull(() => { setPage('notes'); go('closed') })
-  const billsHold = useHoldForFull(() => { setPage('bills'); go('closed') })
-  const timelineHold = useHoldForFull(() => { setPage('timeline'); go('closed') })
-  const assistantHold = useHoldForFull(() => { setPage('assistant'); go('closed') })
-  const skillsHold = useHoldForFull(() => { setPage('skills'); go('closed') })
-  const healthHold = useHoldForFull(() => { setPage('health'); go('closed') })
-  const watchlessHold = useHoldForFull(() => { setPage('watchless'); go('closed') })
+  const noteHold = useHoldForFull(() => { bumpDockRank('note'); setPage('notes'); go('closed') })
+  const billsHold = useHoldForFull(() => { bumpDockRank('bills'); setPage('bills'); go('closed') })
+  const timelineHold = useHoldForFull(() => { bumpDockRank('timeline'); setPage('timeline'); go('closed') })
+  const assistantHold = useHoldForFull(() => { bumpDockRank('assistant'); setPage('assistant'); go('closed') })
+  const skillsHold = useHoldForFull(() => { bumpDockRank('skills'); setPage('skills'); go('closed') })
+  const healthHold = useHoldForFull(() => { bumpDockRank('health'); setPage('health'); go('closed') })
+  const watchlessHold = useHoldForFull(() => { bumpDockRank('watchless'); setPage('watchless'); go('closed') })
   const holdFor: Partial<Record<PanelFace, ReturnType<typeof useHoldForFull>>> = { note: noteHold, bills: billsHold, timeline: timelineHold, assistant: assistantHold, skills: skillsHold, health: healthHold, watchless: watchlessHold }
   const scrollHidden = useHideOnScroll(mode === 'closed')
   const pomo = usePomodoro()
   const toastPhase = useFocusToast(pomo.announcedAt, mode === 'closed')
+  // A plain click opens the quick popup below, same as it always has -- the
+  // hold callbacks above cover reaching the full page instead. Either path
+  // counts as "he opened this," so both bump the same score.
+  const goPanel = (id: PanelFace) => { if (isRankable(id)) bumpDockRank(id); go(id) }
+  // Only meaningful mid-menu, on his own "fourth icon, which I would be
+  // able to quickly click" -- reset the moment the menu itself closes so a
+  // stale expanded grid never reappears the next time he opens the dock.
+  const [moreOpen, setMoreOpen] = useState(false)
+  useEffect(() => { if (mode !== 'menu') setMoreOpen(false) }, [mode])
 
   /* Reopened in the Zone on his direct instruction (2026-09-12), reversing
      the note above this one: the room used to hold its own permanent Note
@@ -325,6 +351,16 @@ export function Dock() {
     { id: 'health' as const, label: 'Health', chip: <HealthChip />, switchIcon: <Icon.DockHeartbeat size={17} /> },
     { id: 'watchless' as const, label: 'Watchless', chip: <WatchlessChip />, switchIcon: <Icon.DockTranscript size={17} /> },
   ]
+  // Ranked fresh every render off whatever dockrank.ts currently has on
+  // disk -- cheap (seven localStorage rows, decayed with one Math.pow each)
+  // and it means the very next open after a bump already reflects it,
+  // rather than waiting on some separate subscription to notice.
+  const mediaItem = panels.find((t) => t.id === 'media')
+  const rankable = panels.filter((t): t is typeof panels[number] & { id: RankableFace } => isRankable(t.id))
+  const ranked = rankDockItems(rankable)
+  const topItems = ranked.slice(0, TOP_N)
+  const restItems = ranked.slice(TOP_N)
+  const hasMore = restItems.length > 0
 
   if (mode === 'closed' || mode === 'menu') {
     // One <button> for the FAB/X across both states, always the wrapper's
@@ -368,13 +404,79 @@ export function Dock() {
       >
         {open && (
           <div className="dock-menu">
-            {panels.map((t) => {
+            {/* His pick from the artifact, "The Trimmed Stack": the smallest
+               change from what was already live, so everything here still
+               renders exactly like it did before EXCEPT which items make the
+               cut. The player, when it exists, keeps its old fixed spot at
+               the very top -- rarest to need, so furthest from the thumb,
+               same reasoning as always -- since it never entered the
+               ranking pool at all (see RANKABLE_FACES above it never earns a
+               score to lose). */}
+            {!moreOpen && mediaItem && (() => {
+              const hold = holdFor[mediaItem.id]
+              return (
+                <button
+                  key={mediaItem.id}
+                  className={`dock-item${hold?.holding ? ' is-holding' : ''}`}
+                  onClick={() => goPanel(mediaItem.id)}
+                  {...hold?.handlers}
+                >
+                  <span className="dock-item-label">{mediaItem.label}</span>
+                  <span className="dock-item-avatar-ring">
+                    <span className={`dock-item-avatar dock-item-avatar--${mediaItem.id}`}>{mediaItem.chip}</span>
+                  </span>
+                </button>
+              )
+            })()}
+            {/* The fourth, dark pill -- his own "fourth icon, which I would
+               be able to quickly click" -- sits above the top three ranked
+               items, same place a fourth or fifth ranked pill used to sit.
+               Its grid opens fixed to the same corner the whole dock already
+               anchors to (see .dock-more-grid, styles.css) rather than
+               hanging off this pill's own shifting position in the stack,
+               so it lands in the same spot "any other quick popup" would --
+               his own words for the size and placement he wanted. */}
+            {hasMore && (
+              <div className="dock-item dock-more-wrap">
+                <button
+                  className="dock-more-btn"
+                  onClick={() => setMoreOpen((v) => !v)}
+                  aria-expanded={moreOpen}
+                  aria-label={moreOpen ? 'Hide more tools' : `Show ${restItems.length} more tools`}
+                >
+                  <span className="dock-item-label dock-more-label">More<span className="dock-more-badge">{restItems.length}</span></span>
+                  <span className="dock-item-avatar-ring">
+                    <span className="dock-item-avatar dock-item-avatar--more"><Icon.AppsGrid size={20} /></span>
+                  </span>
+                </button>
+                {moreOpen && (
+                  <div className="dock-more-grid" role="menu" aria-label="More tools">
+                    {restItems.map((t) => (
+                      <button
+                        key={t.id}
+                        className="dock-more-cell"
+                        role="menuitem"
+                        onClick={() => { goPanel(t.id); setMoreOpen(false) }}
+                      >
+                        <span className="dock-more-cell-icon">{t.switchIcon}</span>
+                        <span>{t.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {/* Reversed so the item he actually reaches for most lands
+               closest to the FAB -- the same "closest to the corner is the
+               one he reaches for most" convention every other row here
+               already follows (see the comment above the panels array). */}
+            {!moreOpen && [...topItems].reverse().map((t) => {
               const hold = holdFor[t.id]
               return (
                 <button
                   key={t.id}
                   className={`dock-item${hold?.holding ? ' is-holding' : ''}`}
-                  onClick={() => go(t.id)}
+                  onClick={() => goPanel(t.id)}
                   {...hold?.handlers}
                 >
                   <span className="dock-item-label">{t.label}</span>
@@ -435,7 +537,7 @@ export function Dock() {
       {/* Jumping straight to the other panel, not just back to the menu: the
           menu is one tap away, this is the one he'll reach for more. */}
       {other.map((t) => (
-        <button key={t.id} className="dock-icon" onClick={() => go(t.id)} aria-label={`Switch to ${t.label}`} title={t.label}>
+        <button key={t.id} className="dock-icon" onClick={() => goPanel(t.id)} aria-label={`Switch to ${t.label}`} title={t.label}>
           {t.switchIcon}
         </button>
       ))}
@@ -494,7 +596,7 @@ export function Dock() {
     return (
       <div className="dock">
         <div className="dock-face">
-          <AssistantPanel dockControls={switchButtons} onOpenFull={() => go('closed')} />
+          <AssistantPanel dockControls={switchButtons} onOpenFull={() => { setPage('assistant'); go('closed') }} />
         </div>
       </div>
     )

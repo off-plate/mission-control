@@ -357,9 +357,17 @@ await step('the menu is five tabs, and what left it is reachable from the header
   }
   const dockOpen = page.getByRole('button', { name: 'Open quick tools' })
   await dockOpen.click(); await page.waitForTimeout(400)
+  /* Only the three highest-ranked land in the visible stack now (the
+     "More" pill, dock.tsx/dockrank.ts) -- fresh, with no usage history at
+     all, that's Note/Bills/Timeline, the first three PanelFaces in the
+     array, and Assistant is one of the four folded behind More instead of
+     missing outright. Both places count as "in the dock." */
   const dockLabels = await page.locator('.dock-item-label').allInnerTexts()
+  await page.locator('.dock-more-btn').click(); await page.waitForTimeout(250)
+  const moreLabels = await page.locator('.dock-more-cell').allInnerTexts()
+  const allLabels = [...dockLabels, ...moreLabels]
   for (const want of ['Note', 'Bills', 'Timeline', 'Assistant']) {
-    if (!dockLabels.some((l) => l.trim() === want)) throw new Error(`${want} is not in the dock (${dockLabels.join(', ')})`)
+    if (!allLabels.some((l) => l.trim() === want || l.trim().startsWith(want))) throw new Error(`${want} is not in the dock (${allLabels.join(', ')})`)
   }
   await fresh('today')
   await dockOpen.click(); await page.waitForTimeout(400)
@@ -429,21 +437,27 @@ await step('the dock opens Assistant (click for the quick-ask widget, hold for t
   const openDock = page.getByRole('button', { name: 'Open quick tools' })
   await openDock.waitFor({ state: 'visible', timeout: 10000 })
   await openDock.click(); await page.waitForTimeout(400)
-  const assistantItem = page.locator('.dock-item').filter({ hasText: 'Assistant' })
-  await assistantItem.click(); await page.waitForTimeout(400)
+  await openDockItem('Assistant'); await page.waitForTimeout(400)
   if (!(await page.locator('.assistantdock-panel').count())) throw new Error('a click on the Assistant dock item did not open the quick widget')
   if (await page.locator('.as-page').count()) throw new Error('a click on the Assistant dock item jumped straight to the full page')
   // The same quick-ask skill grid the full page opens on, not a thinned copy.
   if (!(await page.getByRole('button', { name: /Morning brief/ }).count())) throw new Error('the Assistant widget is missing its quick-ask skills')
   await page.getByRole('button', { name: 'Close', exact: true }).click(); await page.waitForTimeout(400)
 
+  /* Reopen and reach the full page through the widget's own door-out
+     button rather than repeating the hold gesture: Assistant, fresh, is
+     one of the four folded behind More (see openDockItem above), and a
+     grid cell there is a plain tap-to-open, the same one extra step every
+     other panel already takes to get here -- there is no ranked pill
+     under the cursor left to hold. The quick-popup's own "open in
+     Assistant" button (asserted here, dock-open-btn) is what every other
+     dock panel already uses to reach its own full page from inside the
+     popup, so this exercises the same real door rather than a gesture
+     that no longer has anywhere to land when the item starts out hidden. */
   await page.getByRole('button', { name: 'Open quick tools' }).click(); await page.waitForTimeout(400)
-  const box = await assistantItem.boundingBox()
-  if (!box) throw new Error('no Assistant dock item to hold')
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-  await page.mouse.down(); await page.waitForTimeout(650); await page.mouse.up()
-  await page.waitForTimeout(400)
-  if (!(await page.locator('.as-page').count())) throw new Error('holding the Assistant dock item did not open the full Assistant page')
+  await openDockItem('Assistant'); await page.waitForTimeout(400)
+  await page.locator('.assistantdock-panel .dock-open-btn').click(); await page.waitForTimeout(400)
+  if (!(await page.locator('.as-page').count())) throw new Error('the door-out button did not open the full Assistant page')
   if (!(await page.getByText('What can I help with?').count())) throw new Error('the full Assistant page did not render its own hero question')
 })
 await step('the zone: header stays, first move starts it, and the note lands in its folder', async () => {
@@ -3207,6 +3221,23 @@ const askAssistant = async (text) => {
   await page.waitForTimeout(700)
 }
 
+/* The dock now caps its own stack at three ranked pills, the rest folded
+   behind the dark "More" pill (dock.tsx/dockrank.ts, his pick from the
+   artifact, "The Trimmed Stack"). Fresh, with no usage history at all,
+   the first three panels in the array (Note, Bills, Timeline) are what
+   land in the stack and everything after them -- Assistant, Skills,
+   Health, Watchless -- opens through More instead. Every gate step below
+   that reaches one of THOSE four through the real open menu (not the
+   door-out button) goes through here instead of clicking .dock-item
+   directly, so it keeps working regardless of which three happen to be
+   ranked highest at the moment it runs. */
+async function openDockItem(label) {
+  const direct = page.locator('.dock-item').filter({ hasText: label })
+  if (await direct.count()) { await direct.click(); return }
+  await page.locator('.dock-more-btn').click(); await page.waitForTimeout(250)
+  await page.locator('.dock-more-cell').filter({ hasText: label }).click()
+}
+
 await step('assistant: the empty page is a doorway, with none of a chatbot’s furniture', async () => {
   await fresh('assistant')
   if (!(await page.locator('.as-mark').count())) throw new Error('the mark is missing')
@@ -3791,7 +3822,7 @@ await step('assistant: "open the bills page" actually opens it', async () => {
   const openDock = page.getByRole('button', { name: 'Open quick tools' })
   await openDock.waitFor({ state: 'visible', timeout: 10000 })
   await openDock.click(); await page.waitForTimeout(400)
-  await page.locator('.dock-item').filter({ hasText: 'Assistant' }).click(); await page.waitForTimeout(400)
+  await openDockItem('Assistant'); await page.waitForTimeout(400)
   await page.locator('.assistantdock-panel .as-input').fill('open up the bills page please')
   await page.locator('.assistantdock-panel .as-input').press('Enter')
   await page.waitForTimeout(1200)
@@ -4098,7 +4129,7 @@ await step('assistant: "open Watchless" opens a real embedded app', async () => 
     do: [{ kind: 'app', match: 'Watchless' }],
   }))
   await page.getByRole('button', { name: 'Open quick tools' }).click(); await page.waitForTimeout(400)
-  await page.locator('.dock-item').filter({ hasText: 'Assistant' }).click(); await page.waitForTimeout(400)
+  await openDockItem('Assistant'); await page.waitForTimeout(400)
   await page.locator('.assistantdock-panel .as-input').fill('open Watchless')
   await page.locator('.assistantdock-panel .as-input').press('Enter')
   await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
@@ -4117,7 +4148,7 @@ await step('dock: Skills opens honestly signed out, hold reaches the real page',
      verified by hand against a faked Supabase session (skills.ts). */
   await fresh('today')
   await page.getByRole('button', { name: 'Open quick tools' }).click(); await page.waitForTimeout(400)
-  await page.locator('.dock-item').filter({ hasText: 'Skills' }).click(); await page.waitForTimeout(400)
+  await openDockItem('Skills'); await page.waitForTimeout(400)
   const panelText = await page.locator('.billsdock-panel').innerText()
   if (!/signed in|off on this device/i.test(panelText)) throw new Error(`did not say why there is nothing to show: "${panelText}"`)
   if (await page.locator('.skillsdock-row').count()) throw new Error('showed rows with no real data behind them')
@@ -4134,7 +4165,7 @@ await step('dock: Health opens honestly signed out, hold reaches the real page',
      number when there is no session to read one from. */
   await fresh('today')
   await page.getByRole('button', { name: 'Open quick tools' }).click(); await page.waitForTimeout(400)
-  await page.locator('.dock-item').filter({ hasText: 'Health' }).click(); await page.waitForTimeout(400)
+  await openDockItem('Health'); await page.waitForTimeout(400)
   const panelText = await page.locator('.billsdock-panel').innerText()
   if (!/signed in|off on this device/i.test(panelText)) throw new Error(`did not say why there is nothing to show: "${panelText}"`)
   if (await page.locator('.hpdock-lead').count()) throw new Error('showed a fitness number with no real data behind it')
@@ -4188,7 +4219,7 @@ await step('assistant: tapping the voice wave while it talks skips straight to l
   const openDock = page.getByRole('button', { name: 'Open quick tools' })
   await openDock.waitFor({ state: 'visible', timeout: 10000 })
   await openDock.click(); await page.waitForTimeout(400)
-  await page.locator('.dock-item').filter({ hasText: 'Assistant' }).click(); await page.waitForTimeout(400)
+  await openDockItem('Assistant'); await page.waitForTimeout(400)
   // Talk immediately replaces the idle skills grid with the voice panel
   // itself, so exit straight back out -- the skill button that actually
   // drives this test lives on the idle screen, not inside voice mode.
@@ -4247,7 +4278,7 @@ await step('assistant: voice mode gives Gemini a short leash, not the Play butto
   await page.unroute('https://api.groq.com/**').catch(() => {})
   await stubAssistant(() => JSON.stringify({ say: 'Answer text.', show: [] }))
   await page.getByRole('button', { name: 'Open quick tools' }).click(); await page.waitForTimeout(400)
-  await page.locator('.dock-item').filter({ hasText: 'Assistant' }).click(); await page.waitForTimeout(400)
+  await openDockItem('Assistant'); await page.waitForTimeout(400)
   await page.locator('.assistantdock-talk').click(); await page.waitForTimeout(500)
   await page.locator('.as-voice-exit').click(); await page.waitForTimeout(300)
   const voiceT0 = Date.now()

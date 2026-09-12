@@ -741,8 +741,14 @@ function useReelPool(localReels: LocalReel[] = []): string[] {
   }, [reels, twoLives, localReels])
 }
 
-function Reel({ url, count, onOpenLibrary, onNext }: {
-  url: string; count: number; onOpenLibrary: () => void; onNext: () => void
+/** A blob: URL means nothing to look at -- "which one is stuck" needs the file
+ *  name it actually came from, not the handle React is holding it by. */
+function useLocalNames(localReels: LocalReel[]): Map<string, string> {
+  return useMemo(() => new Map(localReels.map((r) => [r.url, r.name])), [localReels])
+}
+
+function Reel({ url, label, count, onOpenLibrary, onNext }: {
+  url: string; label?: string; count: number; onOpenLibrary: () => void; onNext: () => void
 }) {
   const vid = useRef<HTMLVideoElement>(null)
   const [sound, setSound] = useState(true)
@@ -876,6 +882,23 @@ function Reel({ url, count, onOpenLibrary, onNext }: {
         <button className="tl-setshot" onClick={onOpenLibrary}>
           {count ? `${count} reel${count === 1 ? '' : 's'}` : 'Add reels'}
         </button>
+        {/* His report (2026-09-12): "I dont know which video it is, you
+            doesnt show me any link" -- when one clip stalls with nothing on
+            screen, there was no way to tell which link in the library it even
+            was without opening the console. Always on screen now, not only in
+            an error state: a blob URL is meaningless to read, so a local
+            file shows its own name instead of the handle it is held by. */}
+        {kind && !failed && (
+          <a
+            className="tl-nowplaying"
+            href={url.startsWith('blob:') ? undefined : url}
+            target={url.startsWith('blob:') ? undefined : '_blank'}
+            rel="noreferrer"
+            title={label ?? url}
+          >
+            {label ?? url}
+          </a>
+        )}
         {kind && kind !== 'other' && !failed && (
           <button className="tl-setshot" onClick={() => setPaused((v) => !v)} aria-pressed={paused}>
             {paused ? 'Play' : 'Pause'}
@@ -904,6 +927,8 @@ function YouTubeReel({ url, sound, paused, onEnded, onFail }: {
   useEffect(() => { onEndedRef.current = onEnded }, [onEnded])
   const id = url.match(YT)?.[1] ?? ''
 
+  const stallRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
     if (!id) { onFail(); return }
     let alive = true
@@ -924,19 +949,44 @@ function YouTubeReel({ url, sound, paused, onEnded, onFail }: {
        the iframe unstyled and unfindable. */
     mount.className = 'tl-media'
     host.appendChild(mount)
+
+    /* A HUNG PLAYER IS A FAILED ONE. His report (2026-09-12): a video that
+       "isn't loading at all", with nothing in the app to say which one or
+       even that anything is wrong. Two different ways that happens, both
+       covered by starting this the moment the effect runs rather than after
+       the API script has already loaded:
+         - the script loads and the player exists, but YouTube's own internal
+           calls get blocked (an ad-blocker or privacy extension is enough)
+           and it never fires onError, so it just sits there;
+         - the SCRIPT ITSELF never loads at all, in which case the code below
+           never even runs -- a timer started inside that `.then()` would
+           never exist to fire. Verified against this exact case: the first
+           version of this fix started the clock only after load succeeded,
+           and passed every test except the one that mattered, a fully
+           blocked script, which it left hanging forever.
+       Ten seconds either way, and it now surfaces exactly like any other
+       failure: the card, the link, Skip. */
+    let started = false
+    const stall = setTimeout(() => { if (alive && !started) onFail() }, 10_000)
+    stallRef.current = stall
+
     void loadYouTubeApi().then(() => {
       if (!alive || !host.isConnected) return
       playerRef.current = new window.YT!.Player(mount, {
         videoId: id,
         playerVars: { autoplay: 1, mute: sound ? 0 : 1, controls: 0, playsinline: 1, rel: 0 },
         events: {
-          onStateChange: (e: { data: number }) => { if (e.data === 0) onEndedRef.current() },
-          onError: () => onFail(),
+          onStateChange: (e: { data: number }) => {
+            if (e.data === 1 || e.data === 3) { started = true; clearTimeout(stall) }
+            if (e.data === 0) onEndedRef.current()
+          },
+          onError: () => { clearTimeout(stall); onFail() },
         },
       })
     })
     return () => {
       alive = false
+      if (stallRef.current) clearTimeout(stallRef.current)
       try { playerRef.current?.destroy?.() } catch { /* already gone with its node */ }
       playerRef.current = null
       /* Whatever the API left behind goes with it. React never rendered these
@@ -1122,6 +1172,7 @@ function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney |
   const folder = useLocalFolder()
   const localReels = folder.state.status === 'ready' ? folder.state.reels : EMPTY_LOCAL
   const pool = useReelPool(localReels)
+  const localNames = useLocalNames(localReels)
   const [lib, setLib] = useState(false)
   const [skip, setSkip] = useState(() => (pool.length ? Math.floor(Math.random() * pool.length) : 0))
   const advanceReel = () => setSkip((s) => {
@@ -1199,7 +1250,7 @@ function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney |
           he wants the screen. The cross is the way out, plus Escape. */}
       <button className="tl-close" onClick={onBack} aria-label="Close">&#10005;</button>
       <div className="tl-stage">
-        <Reel url={url} count={pool.length} onOpenLibrary={() => setLib(true)} onNext={advanceReel} />
+        <Reel url={url} label={localNames.get(url)} count={pool.length} onOpenLibrary={() => setLib(true)} onNext={advanceReel} />
         <div className="tl-status">
           {/* THE COUNTDOWN, his instruction: days, weeks and hours to the
               fourteenth of February. It is the hero because it is the only

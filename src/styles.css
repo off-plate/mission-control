@@ -10149,3 +10149,14 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 /* The local-folder row in the reel library. */
 .tl-folder { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 2px 0 4px; }
 .tl-libsay.is-quiet { color: var(--tl-faint); flex: 1; min-width: 220px; }
+
+/* The always-on "which one is this" link, next to the reel's own pills. Text,
+   not another pill -- it identifies, it does not act, and a full URL in a
+   999px-radius button reads like a very long button rather than a fact. */
+.tl-nowplaying {
+  display: inline-flex; align-items: center; max-width: 46vw; min-width: 0;
+  padding: 10px 4px; font-size: 11px; color: var(--tl-faint);
+  text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tl-nowplaying:hover { color: var(--tl-ink); text-decoration: underline; }
+@media (max-width: 700px) { .tl-nowplaying { max-width: 60vw; } }

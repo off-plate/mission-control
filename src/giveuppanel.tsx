@@ -304,7 +304,18 @@ export function Wheel({ cards }: { cards: Scored[] }) {
       <ul className="gp-legend">
         {cards.map((card, i) => {
           const a = (i / cards.length) * TAU - Math.PI / 2
-          const p = pol(50, 50, 56, a)
+          /* His report, screenshot in hand (2026-09-12): "the names and
+             indicators are so far off the circle." They were -- 56 here is
+             PERCENTAGE POINTS from the center in the 0-100 box .gp-legend
+             is positioned over, but the ring itself only reaches (R/S)*100
+             = 28 points out. 56 was nearly double the ring's real edge, and
+             past 90 degrees off the horizontal/vertical it overshot the box
+             entirely (50+56 = 106%), landing labels outside .gp-wheel's own
+             bounds altogether -- exactly the huge gap in his screenshot.
+             Derived from the ring's own radius now, plus a small fixed
+             label gap, so the two can never drift apart like this again. */
+          const legendR = (R / S) * 100 + 9
+          const p = pol(50, 50, legendR, a)
           return (
             <li key={card.id} className={`is-${card.tone}`} style={{ left: `${p.x}%`, top: `${p.y}%` }}>
               <span className="gp-legend-l">{card.label}</span>

@@ -244,11 +244,14 @@ export function BoardPage() {
   return (
     <div className="board-page">
       <header className="board-head">
-        <button className="board-back" onClick={leave} aria-label="Back to the timeline">
-          <Icon.ChevronLeft size={16} />
-          Timeline
-        </button>
         <h1>The wall</h1>
+        {/* Top right, and the app's own button, not one invented for this page.
+            The first attempt was a white slab top-left in no style the rest of
+            Mission Control uses, which is what he sent back. */}
+        <button className="btn btn-ghost board-back" onClick={leave}>
+          <Icon.Close size={15} />
+          Close
+        </button>
       </header>
       <div className="board-wall" ref={wall}>
         {WALL.map((c, i) => {

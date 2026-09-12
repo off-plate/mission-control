@@ -1126,45 +1126,20 @@ export function PlanPage() {
                           {!t.done && <TaskActions task={t} onFocus={() => startFocus(taskMinutes(t), t.title)} />}
                           <Dropdown label={`Options for ${t.title}`}>
                             {!t.done && <button role="menuitem" onClick={() => setBreakdownFor(t)}>Break it down</button>}
-                            {!t.done && <span className="kebab-sep" />}
-                            {!t.done && <span className="kebab-head">Move to</span>}
-                            {!t.done && BUCKETS.map((mb) => (
-                              <button key={mb.id} role="menuitemradio" aria-checked={(t.slot ?? 'unsorted') === mb.id} onClick={() => dropTo(mb.id, t.id)}>
-                                {mb.label}
-                              </button>
-                            ))}
-                            {!t.done && <span className="kebab-sep" />}
-                            {/* Dragging onto the day is the fast way; on a phone
-                                there is no drag, so the time can be typed. */}
-                            {!t.done && <span className="kebab-head">At a time</span>}
-                            {!t.done && (
-                              <div className="kebab-timerow">
-                                <input
-                                  type="time" className="textinput" value={t.at ?? ''} step={900}
-                                  aria-label={`Clock time for ${t.title}`}
-                                  onChange={(e) => setTaskAt(t.id, e.target.value || undefined)}
-                                />
-                                {t.at && (
-                                  <button className="linkish" onClick={() => setTaskAt(t.id, undefined)}>Clear</button>
-                                )}
-                              </div>
-                            )}
+                            {/* Both "Move to" (the radio-style time-slot list)
+                                and "At a time" came out of this menu entirely
+                                on his direct instruction (2026-09-13), after
+                                the "duplicate Move to" fix above turned out to
+                                be answering the wrong question -- once there
+                                was only one of them left, he didn't want that
+                                one either. Dragging a task onto a slot, and
+                                "Back to the list" below plus the backlog's own
+                                "Straight into today" menu, are what's left for
+                                getting a task in and out of a time of day from
+                                here. */}
                             {!t.done && <span className="kebab-sep" />}
                             {!t.done && (
                               <>
-                                {/* His report, screenshot in hand (2026-09-12):
-                                    this menu carried a SECOND "Move to" group
-                                    right here, just the four time slots again
-                                    with the current one filtered out -- a plain
-                                    duplicate of the radio-style "Move to" above,
-                                    added later (2026-08-11) on the mistaken
-                                    belief no tap path existed yet for moving a
-                                    task off drag-only. It did; this fixed
-                                    nothing it claimed to and just made the menu
-                                    say "Move to" twice. Removed -- the group
-                                    above already covers every slot, Unsorted
-                                    included, with the current one visibly
-                                    checked rather than hidden. */}
                                 <button role="menuitem" onClick={() => setEditingTask(t)}>Edit</button>
                                 <button role="menuitem" onClick={() => { moveTaskList(t.id, 'backlog'); assignSlot(t.id, undefined); setTaskAt(t.id, undefined) }}>Back to the list</button>
                               </>

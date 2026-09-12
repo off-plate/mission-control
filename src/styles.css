@@ -4687,6 +4687,16 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
    token in the scale, so the whole shorthand was invalid and computed to zero:
    the wall started hard against the nav. */
 .board-head { margin: 0 0 var(--s10); }
+/* The wall's only door out. Slightly rounded, never a pill. */
+.board-back {
+  display: inline-flex; align-items: center; gap: 7px;
+  margin-bottom: var(--s5); padding: 8px 14px 8px 10px;
+  border: 1px solid var(--hairline-strong); border-radius: 8px;
+  background: var(--surface); color: var(--ink);
+  font: inherit; font-size: var(--text-sm); font-weight: 600; cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.board-back:hover { border-color: var(--ink); }
 .board-head h1 { font-size: clamp(2.6rem, 6vw, 5rem); line-height: 0.95; letter-spacing: -0.02em; }
 /* A grid, not CSS columns. A multi-column layout gives an item one column or
    all of them and nothing in between, so a landscape photograph had no way to
@@ -8145,15 +8155,21 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .shell.is-hud .tl-state { letter-spacing: 0.1em; }
 
 /* -------- I wanna give up: video left, the actual argument right -------- */
+/* .overlay pads and centres its child, which would leave a frame of dimmed
+   background around a sheet that is meant to BE the screen. */
+.giveup-overlay { padding: 0; place-items: stretch; }
 .giveup-sheet {
-  width: min(1040px, 100%);
-  max-height: min(90dvh, 820px);
+  /* Full screen, his call (2026-09-12). It was a 1040px dialog from the day it
+     was added; the point of this screen is that nothing else is on it, so the
+     dialog frame was working against the only thing it is for. */
+  width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
   display: flex;
   flex-direction: column;
   background: var(--surface);
-  border: 1px solid var(--hairline-strong);
-  border-radius: 12px;
-  box-shadow: var(--shadow-pop);
+  border: 0;
+  border-radius: 0;
   animation: rise var(--t-med);
   overflow: hidden;
 }

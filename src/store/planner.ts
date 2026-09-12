@@ -66,6 +66,16 @@ export function usePlannerSlice(
     },
     setTaskProject: (id: string, projectId: string | undefined) => setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, projectId } : t))),
 
+    /* His ask (2026-09-12): move a task across workspaces from its own
+       kebab menu, the same reach the project move already has. A project
+       only ever holds tasks that already belong to it (setTaskProject's
+       own doc comment), so a task landing in a new space with the old
+       space's projectId still attached would point at a project the task
+       can no longer see in its own Plan -- clearing it here keeps that
+       invariant instead of leaving a dangling reference for the next
+       person to find. */
+    setTaskSpace: (id: string, space: SpaceId) => setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, space, projectId: undefined } : t))),
+
     /* Reopening a task clears the time that was logged against it, so "skip"
        genuinely means no time recorded instead of resurfacing an old number. */
     /* A task with steps is done when you say it is done, so its steps go with it.

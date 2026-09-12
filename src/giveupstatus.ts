@@ -115,7 +115,7 @@ export function postponedCard(tasks: Task[]): StatusCard {
     unit: 'sitting a week or more',
     line: oldest ? `The oldest has been waiting ${age(oldest.createdAt)} days.` : 'Nothing has been sitting a week.',
     tone: stale.length >= 5 ? 'bad' : stale.length ? 'flat' : 'good',
-    rows: stale.slice(0, 3).map((t) => ({ at: `${age(t.createdAt)}d`, what: t.title })),
+    rows: stale.slice(0, 20).map((t) => ({ at: `${age(t.createdAt)}d`, what: t.title })),
   }
 }
 
@@ -133,7 +133,7 @@ export function goalsCard(goals: Goal[]): StatusCard {
       ? `${overdue.length} past ${overdue.length === 1 ? 'its date' : 'their dates'}.`
       : open.length ? 'None past their date yet.' : 'No open goals.',
     tone: overdue.length ? 'bad' : stuck.length ? 'flat' : 'good',
-    rows: stuck.slice(0, 3).map((g) => ({ at: `${Math.round((g.current / Math.max(1, g.target)) * 100)}%`, what: g.name })),
+    rows: stuck.slice(0, 20).map((g) => ({ at: `${Math.round((g.current / Math.max(1, g.target)) * 100)}%`, what: g.name })),
   }
 }
 
@@ -157,7 +157,7 @@ export function habitsCard(habits: HabitDef[], log: HabitTick[]): StatusCard {
       ? `Kept less than half of the last 14 days.`
       : 'Every one of them held for the last two weeks.',
     tone: cold.length >= Math.ceil(build.length / 2) ? 'bad' : cold.length ? 'flat' : 'good',
-    rows: cold.slice(0, 3).map((x) => ({ at: `${x.kept}/14`, what: x.h.name })),
+    rows: cold.slice(0, 20).map((x) => ({ at: `${x.kept}/14`, what: x.h.name })),
   }
 }
 
@@ -179,7 +179,7 @@ export function quittingCard(habits: HabitDef[], slips: HabitSlip[]): StatusCard
     unit: `${total === 1 ? 'slip' : 'slips'} in 30 days`,
     line: total ? `Across ${ranked.filter((x) => x.slipped).length} of ${quitting.length}.` : `Clean for 30 days across all ${quitting.length}.`,
     tone: total >= 10 ? 'bad' : total ? 'flat' : 'good',
-    rows: ranked.filter((x) => x.slipped).slice(0, 3).map((x) => ({ at: `${x.slipped}x`, what: x.h.name })),
+    rows: ranked.filter((x) => x.slipped).slice(0, 20).map((x) => ({ at: `${x.slipped}x`, what: x.h.name })),
   }
 }
 
@@ -205,7 +205,7 @@ export function routinesCard(routines: Routine[], log: RoutineDone[]): StatusCar
     unit: 'broken',
     line: broken.length ? 'Not run in the last two weeks.' : 'All of them ran in the last two weeks.',
     tone: broken.length >= Math.ceil(live.length / 2) ? 'bad' : broken.length ? 'flat' : 'good',
-    rows: broken.slice(0, 3).map((x) => ({ at: x.last ? `${age(x.last)}d` : "never", what: x.r.title })),
+    rows: broken.slice(0, 20).map((x) => ({ at: x.last ? `${age(x.last)}d` : "never", what: x.r.title })),
   }
 }
 

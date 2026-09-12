@@ -32,7 +32,7 @@ import {
   countdown, debtCard, goalArcs, goalsCard, habitRings, habitsCard, healthCard, postponedCard,
   quittingCard, routineTrack, routinesCard, score, slipSeries, trainingGrid, trainingKinds,
 } from './giveupstatus'
-import { AgeRange, Arcs, DebtPile, Heat, Orbit, Panel, Read, Rows, Slips, Track, Wheel } from './giveuppanel'
+import { AgeRange, Arcs, Heat, Orbit, Panel, Read, Rows, Slips, Stops, Wheel } from './giveuppanel'
 import { useCompass, type CompassMoney } from './compass'
 import { reelPool, reelKind, parseReels, dedupe } from './reels'
 import {
@@ -1270,25 +1270,31 @@ function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney |
           <p className="tl-status-head">Before you do. This is where you actually are.</p>
 
           <div className="gp-grid">
+            {/* His pass over the whole screen (2026-09-12): the sparse charts
+                (Habits, Training) were taking the same share of the grid as
+                the dense ones (Postponed, State of life), so the full ones
+                looked cramped next to empty space the thin ones did not need.
+                Postponed, Quitting and Goals get the extra row now -- there to
+                hold a real, scrolling list instead of the three-item cap that
+                was the actual reason "there should be more than this" kept
+                being true. Training and Routines lose the width they were not
+                using. */}
             <Panel label="Debt" tone={debt.tone}>
               <Read figure={debt.figure} unit={debt.unit} sub={debt.line} tone={debt.tone} />
-              {money && <DebtPile pct={debt.pct} owed={money.owed} />}
             </Panel>
 
-            <Panel label="Training" tone={training.tone} wide>
-              <div className="gp-split">
-                <Read figure={training.figure} unit={training.unit} sub={training.line} tone={training.tone} />
-                <ul className="gp-kinds">
-                  {cards.kinds.map((k) => <li key={k.label}><b>{k.n}</b><span>{k.label}</span></li>)}
-                </ul>
-              </div>
+            <Panel label="Training" tone={training.tone}>
+              <Read figure={training.figure} unit={training.unit} sub={training.line} tone={training.tone} />
+              <ul className="gp-kinds">
+                {cards.kinds.map((k) => <li key={k.label}><b>{k.n}</b><span>{k.label}</span></li>)}
+              </ul>
               <Heat days={cards.grid} />
             </Panel>
 
-            <Panel label="Postponed" tone={postponed.tone}>
+            <Panel label="Postponed" tone={postponed.tone} tall>
               <Read figure={postponed.figure} unit={postponed.unit} sub={postponed.line} tone={postponed.tone} />
               <AgeRange ages={cards.ages} />
-              {postponed.rows?.length ? <Rows rows={postponed.rows} /> : null}
+              {postponed.rows?.length ? <div className="gp-scroll"><Rows rows={postponed.rows} /></div> : null}
             </Panel>
 
             <Panel label="Habits" tone={habitsC.tone}>
@@ -1296,29 +1302,25 @@ function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney |
               <Orbit rings={cards.rings} overall={cards.kept} />
             </Panel>
 
-            <Panel label="State of life" tall>
+            <Panel label="State of life" wide tall>
               <Wheel cards={cards.list} />
             </Panel>
 
             <Panel label="Quitting" tone={quitting.tone}>
-              <div className="gp-split">
-                <Read figure={quitting.figure} unit={quitting.unit} sub={quitting.line} tone={quitting.tone} />
-                {quitting.rows?.length ? <Rows rows={quitting.rows} /> : null}
-              </div>
+              <Read figure={quitting.figure} unit={quitting.unit} sub={quitting.line} tone={quitting.tone} />
+              {quitting.rows?.length ? <div className="gp-scroll"><Rows rows={quitting.rows} /></div> : null}
               <Slips series={cards.slipSeries} />
             </Panel>
 
             <Panel label="Goals" tone={goalsC.tone}>
-              <div className="gp-split">
-                <Read figure={goalsC.figure} unit={goalsC.unit} sub={goalsC.line} tone={goalsC.tone} />
-                {goalsC.rows?.length ? <Rows rows={goalsC.rows} /> : null}
-              </div>
+              <Read figure={goalsC.figure} unit={goalsC.unit} sub={goalsC.line} tone={goalsC.tone} />
+              {goalsC.rows?.length ? <div className="gp-scroll"><Rows rows={goalsC.rows} /></div> : null}
               <Arcs arcs={cards.arcs} overall={cards.goalPct} />
             </Panel>
 
-            <Panel label="Routines" tone={routinesC.tone} wide>
+            <Panel label="Routines" tone={routinesC.tone}>
               <Read figure={routinesC.figure} unit={routinesC.unit} sub={routinesC.line} tone={routinesC.tone} />
-              <Track items={cards.track} />
+              <Stops items={cards.track} />
             </Panel>
           </div>
 

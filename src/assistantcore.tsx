@@ -707,17 +707,14 @@ function useDoer() {
       if (a.kind === 'focus') {
         /* A real timer, starting now -- pomo lives in its own context
            (PomodoroProvider, mounted around the whole app in main.tsx), not
-           the store, so it is read here rather than through s2. announce
-           true matches every other REAL start elsewhere (a task's own Start
-           button, the Zone's first move) -- see the toast note on
-           announcedAt in dock.tsx for why that flag exists at all. */
+           the store, so it is read here rather than through s2. */
         if (a.match) {
           const { row, why } = pick(s2.tasks, a.match)
           if (!row) { out.push({ ok: false, text: why ?? 'no task matched' }); continue }
-          pomo.startFocus(a.min ?? taskMinutes(row), row.title, true)
+          pomo.startFocus(a.min ?? taskMinutes(row), row.title)
           out.push({ ok: true, text: `Focus started: ${row.title}` })
         } else {
-          pomo.startFocus(a.min, undefined, true)
+          pomo.startFocus(a.min, undefined)
           out.push({ ok: true, text: a.min ? `Focus started, ${fmtDuration(a.min)}` : 'Focus started' })
         }
         continue

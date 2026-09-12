@@ -50,7 +50,24 @@ export async function callFunction(
     const { data, error } = opts
       ? await c.functions.invoke(name, { method: 'POST', body: opts.body })
       : await c.functions.invoke(name, { method: 'GET' })
-    if (error) return { ok: false, reason: 'error', message: error.message }
+    if (error) {
+      /* On a non-2xx response supabase-js hands back a generic
+         "Edge Function returned a non-2xx status code" and throws the real
+         body away -- it is sitting on error.context, the raw Response, unread.
+         reel-fetch and the health sync both answer a real reason on their
+         error paths (422/503 with a JSON message), and that reason is the
+         whole point of asking, so it is read here once for every caller
+         rather than each one reaching past this wrapper to get it. */
+      let message = error.message
+      const ctx = (error as { context?: Response }).context
+      if (ctx && typeof ctx.json === 'function') {
+        try {
+          const body = await ctx.clone().json()
+          if (typeof body?.message === 'string' && body.message.trim()) message = body.message
+        } catch { /* not JSON, or already read -- the generic message stands */ }
+      }
+      return { ok: false, reason: 'error', message }
+    }
     return { ok: true, data }
   } catch (e) {
     return { ok: false, reason: 'error', message: e instanceof Error ? e.message : 'unreachable' }

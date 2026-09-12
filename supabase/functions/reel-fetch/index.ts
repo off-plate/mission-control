@@ -13,15 +13,44 @@
    Reel on a second device is a lookup, not a second fetch.
 
    This is a personal reel library, watched by one signed-in account, never
-   redistributed -- not a public mirror of anyone's content. It still reads
-   pages Instagram would rather you not scrape, which is why it has no
-   ambition beyond that: no bulk crawling, no profile scraping, one URL in,
-   one file out, and a clean failure the moment the markup stops matching.
+   redistributed -- not a public mirror of anyone's content.
+
+   REBUILT 2026-09-12. His report: reels he had checked and confirmed public
+   -- playable in a fresh anonymous browser window, no login wall -- still
+   answered 422 here. Measured directly against one of his exact links: the
+   plain page fetch this used to scrape gets a 200 with NO video anywhere in
+   it (no og:video, no video_url, nothing) and login/consent markers instead.
+   That is Instagram showing a logged-out server a wall it does not show a
+   logged-out BROWSER, which runs enough of the page's own JS to bootstrap an
+   anonymous session Instagram is willing to answer. A static fetch has no way
+   to reproduce that.
+
+   So there are now two tries, in order:
+
+   1. LOGGED IN, if IG_SESSIONID is set. The one path that is not a guess: his
+      own account's session, the same one every real download tool uses,
+      talking to the private mobile API, which returns structured video
+      URLs rather than something scraped out of a page's markup. The
+      shortcode is decoded to Instagram's own numeric media id locally --
+      it is a straight base64-alphabet sum, no request needed, verified
+      against a real reel (Dc_mhjBTvno -> 3981070026731878888, confirmed
+      against Instagram's own oEmbed answer for that same reel).
+
+   2. THE OLD SCRAPE, as a fallback with no cost to keep: some reels answer it
+      without a login at all, and it costs nothing to try before giving up.
+
+   A session cookie is not the shortcut it looks like: it is his account
+   watching, so if his sessionid ever gets throttled or logged out elsewhere
+   this goes back to attempt 2's success rate. It also expires on its own
+   timeline and needs re-pasting occasionally -- there is no way around that
+   from a server with no browser to keep it alive.
 
    Deploy:
      supabase functions deploy reel-fetch
+     supabase secrets set IG_SESSIONID="<value of the sessionid cookie>"
    The bucket is created on first call if it doesn't exist yet -- no manual
-   dashboard step. */
+   dashboard step. IG_SESSIONID is optional; without it, only attempt 2 runs,
+   same as before this rebuild. */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -43,24 +72,60 @@ const json = (body: unknown, status: number, origin: string | null) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors(origin), 'content-type': 'application/json; charset=utf-8' } })
 
 const BUCKET = 'mc-reel-cache'
-const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'
+const UA_MOBILE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'
+const IG_APP_ID = '936619743392459' // the web client's own id, sent to every visitor, not a secret
 
 const CODE = /instagram\.com\/(?:reel|reels|p)\/([\w-]+)/i
 
-/** Instagram serves the video URL two ways depending on which markup answers:
- *  a plain `og:video` meta tag on some responses, or a `video_url` string
- *  buried in the embed page's own JSON-in-a-JS-string blob on others -- and
- *  on that blob, verified against a real reel (2026-09-11), the quotes and
- *  slashes are escaped an extra layer deep (`\"video_url\":\"https:\\/\\/...`)
- *  because the JSON was itself embedded as a string literal. Both are tried,
- *  in the order they're most often present, before giving up -- guessing a
- *  third pattern that has never been seen would be inventing a URL. */
+/** Instagram's shortcode is base64-in-its-own-alphabet over the numeric media
+ *  id -- no request needed to go from one to the other. Verified against a
+ *  real reel (2026-09-12): decoding "Dc_mhjBTvno" this way gives exactly the
+ *  media_id Instagram's own oEmbed endpoint reports for that same reel. */
+const IG_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+function shortcodeToMediaId(code: string): string {
+  let n = 0n
+  for (const ch of code) {
+    const i = IG_ALPHABET.indexOf(ch)
+    if (i < 0) continue // a post shortcode can carry characters (rare) outside the run of media chars
+    n = n * 64n + BigInt(i)
+  }
+  return n.toString()
+}
+
+/** Attempt 1: his own logged-in session, the private mobile API. Returns the
+ *  best video URL, or null if the session could not answer for this media
+ *  (expired, throttled, or the post genuinely has no video). */
+async function fetchWithSession(code: string, sessionId: string): Promise<string | null> {
+  const mediaId = shortcodeToMediaId(code)
+  const res = await fetch(`https://i.instagram.com/api/v1/media/${mediaId}/info/`, {
+    headers: {
+      'user-agent': UA_MOBILE,
+      'x-ig-app-id': IG_APP_ID,
+      cookie: `sessionid=${sessionId}`,
+    },
+  })
+  if (!res.ok) return null
+  const data = await res.json().catch(() => null) as { items?: { video_versions?: { url: string }[] }[] } | null
+  const versions = data?.items?.[0]?.video_versions
+  return versions?.[0]?.url ?? null
+}
+
+/** Attempt 2, the previous whole implementation: the embed page, scraped for
+ *  whichever of two markup shapes it answered with. Kept because it costs
+ *  nothing to try and some public reels do answer it. */
 function extractVideoUrl(html: string): string | null {
   const meta = html.match(/<meta property="og:video(?::secure_url)?" content="([^"]+)"/i)
   if (meta) return meta[1].replace(/&amp;/g, '&')
   const embedded = html.match(/\\?"video_url\\?":\\?"(.+?)\\?"/i)
   if (embedded) return embedded[1].replace(/\\+\//g, '/').replace(/\\u0026/g, '&')
   return null
+}
+async function fetchLoggedOut(code: string): Promise<string | null> {
+  const page = await fetch(`https://www.instagram.com/reel/${code}/embed/captioned/`, {
+    headers: { 'user-agent': UA_MOBILE, 'accept-language': 'en-US,en;q=0.9' },
+  })
+  if (!page.ok) return null
+  return extractVideoUrl(await page.text())
 }
 
 Deno.serve(async (req: Request) => {
@@ -91,21 +156,33 @@ Deno.serve(async (req: Request) => {
   const head = await fetch(publicUrl, { method: 'HEAD' })
   if (head.ok) return json({ ok: true, fileUrl: publicUrl }, 200, origin)
 
-  try {
-    // The embed page is the one that reliably answers without a login wall.
-    const page = await fetch(`https://www.instagram.com/reel/${code}/embed/captioned/`, {
-      headers: { 'user-agent': UA, 'accept-language': 'en-US,en;q=0.9' },
-    })
-    if (!page.ok) return json({ ok: false, message: `Instagram answered ${page.status}` }, 502, origin)
-    const html = await page.text()
-    const videoUrl = extractVideoUrl(html)
-    /* Confirmed 2026-09-12 against a real public reel: Instagram can withhold
-       the video from a plain fetch on a post that is neither private nor
-       deleted -- most often over the track's music rights. So this is never
-       said to be a broken link, only that this attempt did not get one. */
-    if (!videoUrl) return json({ ok: false, message: "Instagram didn't hand over the video for this link. Often the track's music rights, not the reel being private." }, 422, origin)
+  const sessionId = Deno.env.get('IG_SESSIONID')
 
-    const video = await fetch(videoUrl, { headers: { 'user-agent': UA } })
+  try {
+    let videoUrl: string | null = null
+    let via: 'session' | 'logged-out' | null = null
+
+    if (sessionId) {
+      videoUrl = await fetchWithSession(code, sessionId).catch(() => null)
+      if (videoUrl) via = 'session'
+    }
+    if (!videoUrl) {
+      videoUrl = await fetchLoggedOut(code).catch(() => null)
+      if (videoUrl) via = 'logged-out'
+    }
+
+    if (!videoUrl) {
+      /* What actually happens, measured against a real reel he confirmed was
+         public (2026-09-12): a 200 with no video anywhere in it and
+         login/consent markers, which a fresh browser does not get shown for
+         the same link. Never blamed on the reel itself. */
+      const message = sessionId
+        ? "Instagram would not hand over the video, even signed in. The session may have expired -- paste a fresh sessionid -- or this one genuinely has no video."
+        : "Instagram serves a logged-out fetch a page with no video on it, even for reels that play fine in a browser. Signing in (IG_SESSIONID) fixes most of these; it'll try again next time this screen opens otherwise."
+      return json({ ok: false, message }, 422, origin)
+    }
+
+    const video = await fetch(videoUrl, { headers: { 'user-agent': UA_MOBILE } })
     if (!video.ok || !video.body) return json({ ok: false, message: 'The video file itself would not load' }, 502, origin)
     const bytes = await video.arrayBuffer()
 
@@ -113,7 +190,7 @@ Deno.serve(async (req: Request) => {
     const { error } = await db.storage.from(BUCKET).upload(path, bytes, { contentType: 'video/mp4', upsert: true })
     if (error) return json({ ok: false, message: `Could not save it: ${error.message}` }, 500, origin)
 
-    return json({ ok: true, fileUrl: publicUrl }, 200, origin)
+    return json({ ok: true, fileUrl: publicUrl, via }, 200, origin)
   } catch (e) {
     return json({ ok: false, message: e instanceof Error ? e.message : 'Unreachable' }, 502, origin)
   }

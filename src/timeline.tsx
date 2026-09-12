@@ -1253,13 +1253,26 @@ function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney |
           <div className="tl-head-row">
             <div className="tl-count">
               <span className="tl-count-l">Until {clock.label}</span>
-              <div className="tl-count-fig">
-                <b>{clock.days.toLocaleString('en-GB')}</b>
-                <span>days</span>
-              </div>
-              <div className="tl-count-sub">
-                <span><b>{clock.weeks}</b> weeks</span>
-                <span><b>{clock.hours.toLocaleString('en-GB')}</b> hours</span>
+              {/* His ask (2026-09-13): days, weeks and hours the same size,
+                  one row -- weeks and hours used to run a full size class
+                  down in their own tl-count-sub row underneath, reading as
+                  an afterthought under the hero figure rather than three
+                  equally true readings of the same distance. Same
+                  .tl-count-fig markup for all three now, so a change to
+                  one's size or color is a change to all three's. */}
+              <div className="tl-count-figs">
+                <div className="tl-count-fig">
+                  <b>{clock.days.toLocaleString('en-GB')}</b>
+                  <span>days</span>
+                </div>
+                <div className="tl-count-fig">
+                  <b>{clock.weeks}</b>
+                  <span>weeks</span>
+                </div>
+                <div className="tl-count-fig">
+                  <b>{clock.hours.toLocaleString('en-GB')}</b>
+                  <span>hours</span>
+                </div>
               </div>
             </div>
 

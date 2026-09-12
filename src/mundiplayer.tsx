@@ -156,17 +156,31 @@ export function MundiOpusProvider({ children }: { children: ReactNode }) {
     return () => { alive = false; playerRef.current?.destroy?.() }
   }, [wanted])
 
+  /* His report (2026-09-12): the track kept restarting from 0:00 every so
+     often while he worked elsewhere -- notes, anything. Not a timer of its
+     own: the sync pull (store.tsx, every 60s and on every window focus)
+     calls applyExternal for ANY remote change, anywhere in the whole synced
+     blob, and applyExternal sets `tunes` from a freshly-parsed array every
+     time it runs, whether or not the list actually changed. `queue` here is
+     a useMemo over `tunes`, so that new-but-equal array gave `queue` a new
+     identity too, and this effect was keyed on `queue` itself -- a sync
+     pull that touched a totally unrelated field silently looked like "the
+     queue changed" and reloaded the current video. Keying on the actual
+     video id at the current track instead means a same-content resync
+     changes nothing here; only a real track change (a skip, a genuinely
+     different pasted library) does. */
+  const row = queue[track] ?? queue[0]
+  const rowId = row?.id
   const first = useRef(true)
   useEffect(() => {
     if (!ready) return
     if (first.current) { first.current = false; return }
     const p = playerRef.current
-    if (!p) return
-    const row = queue[track] ?? queue[0]
-    if (!row) return
-    if (playing) p.loadVideoById(row.id)
-    else p.cueVideoById(row.id)
-  }, [track, ready, queue])
+    if (!p || !rowId) return
+    if (playing) p.loadVideoById(rowId)
+    else p.cueVideoById(rowId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowId, ready])
 
   useEffect(() => {
     if (!ready) return

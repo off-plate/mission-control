@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from './store'
 import { useMundiOpus } from './mundiplayer'
-import { MediaBadge, MediaChip, PomodoroInline, usePomodoro } from './pomodoro'
+import { MediaBadge, MediaChip, PomodoroBadge, PomodoroInline, usePomodoro } from './pomodoro'
 import { NoteChip, NotePanel } from './notedock'
 import { BillsChip, BillsPanel } from './billsdock'
 import { TimelineChip, TimelinePanel } from './timelinedock'
@@ -195,38 +195,6 @@ function useHideOnScroll(active: boolean) {
   return hidden
 }
 
-const FOCUS_TOAST_MS = 2200
-const FOCUS_TOAST_EXIT_MS = 200
-
-/* His report (2026-09-04): starting a block from a task's own Start button
-   (Today, Plan) or from the Zone gave no sign it caught -- the dock's own
-   Focus row only ever showed anything while he'd already opened the dock by
-   hand, and the ambient edge glow (.pomo-ambient in pomodoro.tsx) reads as
-   too quiet to stand in for it. startFocus's third argument marks exactly
-   those starts (not the dock's own play button, and not resuming from idle
-   there either -- both are already looking straight at the thing that's
-   about to change, see pomodoro.tsx). This turns that signal into a few
-   seconds of the SAME focus row the open menu shows, closed dock only --
-   his ask was "just the part with the focus," not the whole speed-dial. */
-function useFocusToast(announcedAt: number, dockIsClosed: boolean): 'hidden' | 'shown' | 'hiding' {
-  const [phase, setPhase] = useState<'hidden' | 'shown' | 'hiding'>('hidden')
-  const seen = useRef(announcedAt)
-  const closedRef = useRef(dockIsClosed)
-  useEffect(() => { closedRef.current = dockIsClosed }, [dockIsClosed])
-  useEffect(() => {
-    if (announcedAt === seen.current) return
-    seen.current = announcedAt
-    /* Already looking at the real menu -- it shows this same row live the
-       moment it's open, so a toast on top of it would just be a second
-       copy of the same fact fighting for the same corner. */
-    if (!closedRef.current) return
-    setPhase('shown')
-    const hideTimer = window.setTimeout(() => setPhase('hiding'), FOCUS_TOAST_MS)
-    const goneTimer = window.setTimeout(() => setPhase('hidden'), FOCUS_TOAST_MS + FOCUS_TOAST_EXIT_MS)
-    return () => { window.clearTimeout(hideTimer); window.clearTimeout(goneTimer) }
-  }, [announcedAt])
-  return phase
-}
 
 /* THE DOCK: a Material speed-dial FAB (his reference, 2026-09-01). Closed,
    one round button. Tapping it fans a labelled item out per tool, stacked
@@ -289,7 +257,6 @@ export function Dock() {
   const holdFor: Partial<Record<PanelFace, ReturnType<typeof useHoldForFull>>> = { note: noteHold, bills: billsHold, timeline: timelineHold, assistant: assistantHold, skills: skillsHold, health: healthHold, watchless: watchlessHold }
   const scrollHidden = useHideOnScroll(mode === 'closed')
   const pomo = usePomodoro()
-  const toastPhase = useFocusToast(pomo.announcedAt, mode === 'closed')
   // A plain click opens the quick popup below, same as it always has -- the
   // hold callbacks above cover reaching the full page instead. Either path
   // counts as "he opened this," so both bump the same score.
@@ -495,16 +462,19 @@ export function Dock() {
             {focusRow}
           </div>
         )}
-        {/* Not open: either nothing, or the toast -- never both. A block
-           started elsewhere (a task's own Start button, the Zone) gets a
-           few seconds of this exact row, unprompted, then it's gone; the
-           real menu already shows the same row live the moment he opens it
-           by hand, so there is never a reason to stack one on the other. */}
-        {!open && toastPhase !== 'hidden' && (
-          <div className={`dock-toast${toastPhase === 'hiding' ? ' is-hiding' : ''}`}>
-            {focusRow}
-          </div>
-        )}
+        {/* His ask (2026-09-12): an always-on notification, not a toast that
+           flashes and vanishes -- one for the music, one for Focus, both
+           gone the instant the thing they report is actually off, real
+           media-notification behaviour rather than an announcement of the
+           moment it started. Not open: either nothing, or these -- never
+           stacked on the real menu, which already shows the same facts live
+           the moment he opens it by hand. Both are already self-contained
+           pills (.pomo-media, .pomo-badge) that .dock's own flex-column
+           stacks above the FAB with no wrapper needed -- the same spot the
+           old toast sat in, just no timer deciding when it leaves any
+           more. */}
+        {!open && mo.playing && <MediaBadge />}
+        {!open && pomo.phase !== 'idle' && <PomodoroBadge />}
         <button
           className={`dock-fab${open ? ' is-close' : ''}`}
           onClick={() => (open ? closeMenu() : go('menu'))}

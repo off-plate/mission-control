@@ -1265,63 +1265,58 @@ function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney |
           <p className="tl-status-head">Before you do. This is where you actually are.</p>
 
           <div className="gp-grid">
-            {/* His pass over the whole screen (2026-09-12): the sparse charts
-                (Habits, Training) were taking the same share of the grid as
-                the dense ones (Postponed, State of life), so the full ones
-                looked cramped next to empty space the thin ones did not need.
-                Postponed, Quitting and Goals get the extra row now -- there to
-                hold a real, scrolling list instead of the three-item cap that
-                was the actual reason "there should be more than this" kept
-                being true. Training and Routines lose the width they were not
-                using. */}
-            <Panel label="Debt" tone={debt.tone}>
-              <Read figure={debt.figure} unit={debt.unit} sub={debt.line} tone={debt.tone} />
-            </Panel>
+            {/* His pass (2026-09-12): Debt is short -- a figure and a line --
+                next to Training and Postponed, which both draw a real chart
+                and were stretched to Debt's leftover height for no reason.
+                Debt now stacks over Training in the first slot instead of
+                spending a whole column on three lines of text, which frees a
+                column for Habits to move up next to Postponed. State of life
+                keeps its two-column width but sits left now with Quitting
+                filling the column it used to leave empty; Goals and Routines
+                split the freed third row 50/50 instead of sharing three equal
+                thirds with nothing else. */}
+            <div className="gp-slot-stack">
+              <Panel label="Debt" tone={debt.tone}>
+                <Read figure={debt.figure} unit={debt.unit} sub={debt.line} tone={debt.tone} />
+              </Panel>
 
-            {/* The workout/strength/cardio breakdown left with the width Training
-                lost: it was the exact 26px this panel was short once Quitting,
-                Goals and State of life all took a second row-track. It was
-                also the least essential thing on the card -- the figure and
-                the heatmap are the two things he actually referred to. */}
-            {/* No sub-line here: "Last session today" / "No session has ever
-                reached this app" duplicates exactly what the heatmap right
-                below it already shows, and it was the specific reason this
-                panel was still 20px over even after the stat row left --
-                figure + unit + a clamped two-line sentence alone came to
-                95px, leaving the heatmap nothing to render into. */}
-            <Panel label="Training" tone={training.tone}>
-              <Read figure={training.figure} unit={training.unit} tone={training.tone} />
-              <Heat days={cards.grid} />
-            </Panel>
+              {/* No sub-line here: "Last session today" / "No session has ever
+                  reached this app" duplicates exactly what the heatmap right
+                  below it already shows. */}
+              <Panel label="Training" tone={training.tone}>
+                <Read figure={training.figure} unit={training.unit} tone={training.tone} />
+                <Heat days={cards.grid} />
+              </Panel>
+            </div>
 
-            <Panel label="Postponed" tone={postponed.tone}>
+            <Panel label="Postponed" tone={postponed.tone} slot="gp-slot-postponed">
               <Read figure={postponed.figure} unit={postponed.unit} sub={postponed.line} tone={postponed.tone} />
               <AgeRange ages={cards.ages} />
               {postponed.rows?.length ? <div className="gp-scroll"><Rows rows={postponed.rows} /></div> : null}
             </Panel>
 
-            <Panel label="Habits" tone={habitsC.tone}>
+            <Panel label="Habits" tone={habitsC.tone} slot="gp-slot-habits">
               <Read figure={habitsC.figure} unit={habitsC.unit} tone={habitsC.tone} />
               <Orbit rings={cards.rings} overall={cards.kept} />
             </Panel>
 
-            <Panel label="State of life" wide>
+            <Panel label="State of life" slot="gp-slot-state">
               <Wheel cards={cards.list} />
             </Panel>
 
-            <Panel label="Quitting" tone={quitting.tone}>
+            <Panel label="Quitting" tone={quitting.tone} slot="gp-slot-quitting">
               <Read figure={quitting.figure} unit={quitting.unit} sub={quitting.line} tone={quitting.tone} />
               {quitting.rows?.length ? <div className="gp-scroll"><Rows rows={quitting.rows} /></div> : null}
               <Slips series={cards.slipSeries} />
             </Panel>
 
-            <Panel label="Goals" tone={goalsC.tone}>
+            <Panel label="Goals" tone={goalsC.tone} slot="gp-slot-goals">
               <Read figure={goalsC.figure} unit={goalsC.unit} sub={goalsC.line} tone={goalsC.tone} />
               {goalsC.rows?.length ? <div className="gp-scroll"><Rows rows={goalsC.rows} /></div> : null}
               <Arcs arcs={cards.arcs} overall={cards.goalPct} />
             </Panel>
 
-            <Panel label="Routines" tone={routinesC.tone}>
+            <Panel label="Routines" tone={routinesC.tone} slot="gp-slot-routines">
               <Read figure={routinesC.figure} unit={routinesC.unit} sub={routinesC.line} tone={routinesC.tone} />
               <Stops items={cards.track} />
             </Panel>

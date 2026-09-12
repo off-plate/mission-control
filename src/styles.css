@@ -9811,9 +9811,13 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    .tl-status's own overflow-y below -- which is the one honest way to hold
    an unpredictable number of real habits, goals and overdue tasks without
    re-fighting this every time his data changes shape. */
+/* Six tracks, not three: Debt+Training share a column (see .gp-slot-stack)
+   and State of life/Goals/Routines all need a split the three visual
+   columns don't line up on their own -- two tracks per visual column gives
+   every one of those spans an exact edge to land on. */
 .gp-grid {
   display: grid; gap: 10px;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) minmax(0, 1fr);
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   grid-auto-rows: min-content;
   align-items: start;
 }
@@ -9823,14 +9827,30 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   box-shadow: inset 0 0 0 1px rgba(242, 240, 234, 0.07);
   display: flex; flex-direction: column; gap: 8px; min-width: 0;
 }
-.gp-panel.is-wide { grid-column: span 2; }
+/* Row 1: Debt+Training stacked in the first visual column, then Postponed,
+   then Habits -- each two tracks wide. */
+.gp-slot-stack { grid-column: 1 / 3; display: flex; flex-direction: column; gap: 10px; }
+.gp-slot-postponed { grid-column: 3 / 5; }
+.gp-slot-habits { grid-column: 5 / 7; }
+/* Row 2: State of life keeps the two-column width it always had, moved to
+   the left edge; Quitting takes the column that used to sit empty next to it. */
+.gp-slot-state { grid-column: 1 / 5; }
+.gp-slot-quitting { grid-column: 5 / 7; }
+/* Row 3: the freed row is Goals and Routines only, so they split it in half
+   instead of sharing three equal thirds with nothing in the third. */
+.gp-slot-goals { grid-column: 1 / 4; }
+.gp-slot-routines { grid-column: 4 / 7; }
+
 @media (max-width: 1180px) {
-  .gp-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .gp-panel.is-wide { grid-column: span 2; }
+  .gp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .gp-slot-stack, .gp-slot-postponed, .gp-slot-habits, .gp-slot-quitting,
+  .gp-slot-goals, .gp-slot-routines { grid-column: auto; }
+  .gp-slot-state { grid-column: span 2; }
 }
 @media (max-width: 760px) {
   .gp-grid { grid-template-columns: minmax(0, 1fr); }
-  .gp-panel.is-wide { grid-column: span 1; }
+  .gp-slot-stack, .gp-slot-postponed, .gp-slot-habits, .gp-slot-state,
+  .gp-slot-quitting, .gp-slot-goals, .gp-slot-routines { grid-column: 1 / -1; }
 }
 
 .gp-head {
@@ -9979,13 +9999,6 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    screen: the panel is the thing that must not grow. */
 .gp-panel .gp-list, .gp-panel .gp-kinds { min-height: 0; overflow: hidden; }
 
-/* FOUR ACROSS, NOT THREE. Eight panels three-wide is four rows, and four rows
-   inside one screen leaves each about 175px -- enough to fit, not enough to
-   read, which is how the heatmap's day labels ended up on top of each other.
-   Four columns makes it three rows and gives every panel back a third of its
-   height. The charts are small here by design; the point of this screen is the
-   shape of the last month, not a value read off an axis. */
-.gp-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 /* Room for the grid: the countdown is the hero but it does not need to be
    ninety pixels tall to say 154. */
 .tl-count { padding-bottom: 12px; }
@@ -9997,11 +10010,6 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    column at all -- the heatmap still reads as a shape without them. */
 .gp-heat-dow { overflow: hidden; }
 
-
-/* His fuller pass (2026-09-12) puts State of life back to being wide AND
-   tall at once -- .is-wide and .is-tall each do their own job below, and this
-   panel simply carries both classes now instead of is-tall borrowing
-   is-wide's job for it alone. */
 
 /* ---- COMPACT, his word ----
    The panels are back in half a window rather than seventy percent of one, and

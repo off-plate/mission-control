@@ -364,11 +364,34 @@ export function Dock() {
       </div>
     )
     return (
-      <div
-        className={`dock${closing ? ' is-closing' : entered ? ' is-open' : ''}${scrollHidden ? ' is-scroll-hidden' : ''}`}
-        onMouseEnter={hover.onMouseEnter}
-        onMouseLeave={hover.onMouseLeave}
-      >
+      <>
+        {/* His ask (2026-09-12): an always-on notification, not a toast that
+           flashes and vanishes -- one for the music, one for Focus, both
+           gone the instant the thing they report is actually off, real
+           media-notification behaviour rather than an announcement of the
+           moment it started. A SEPARATE fixed sibling, not a child of .dock:
+           the exact bug documented below on .dock-fab's own two icons --
+           a DOM node appearing or growing under a resting cursor fires a
+           real mouseenter from the browser's own hit-testing, no mouse
+           movement involved -- reproduced live the first time these lived
+           inside .dock's flex column, confirmed by tracing the click
+           coordinate through: pressing play in the Zone left the cursor
+           resting where MediaBadge's ~340px pill then grew underneath it,
+           and .dock's onMouseEnter read that as "he hovered in" and opened
+           the menu with no real hover at all. Sitting outside .dock's own
+           hover-tracked box means mounting or resizing these can never
+           change what .dock thinks is under the pointer. */}
+        {!open && (mo.playing || pomo.phase !== 'idle') && (
+          <div className="dock-notify">
+            {mo.playing && <MediaBadge />}
+            {pomo.phase !== 'idle' && <PomodoroBadge />}
+          </div>
+        )}
+        <div
+          className={`dock${closing ? ' is-closing' : entered ? ' is-open' : ''}${scrollHidden ? ' is-scroll-hidden' : ''}`}
+          onMouseEnter={hover.onMouseEnter}
+          onMouseLeave={hover.onMouseLeave}
+        >
         {open && (
           <div className="dock-menu">
             {/* His pick from the artifact, "The Trimmed Stack": the smallest
@@ -462,19 +485,6 @@ export function Dock() {
             {focusRow}
           </div>
         )}
-        {/* His ask (2026-09-12): an always-on notification, not a toast that
-           flashes and vanishes -- one for the music, one for Focus, both
-           gone the instant the thing they report is actually off, real
-           media-notification behaviour rather than an announcement of the
-           moment it started. Not open: either nothing, or these -- never
-           stacked on the real menu, which already shows the same facts live
-           the moment he opens it by hand. Both are already self-contained
-           pills (.pomo-media, .pomo-badge) that .dock's own flex-column
-           stacks above the FAB with no wrapper needed -- the same spot the
-           old toast sat in, just no timer deciding when it leaves any
-           more. */}
-        {!open && mo.playing && <MediaBadge />}
-        {!open && pomo.phase !== 'idle' && <PomodoroBadge />}
         <button
           className={`dock-fab${open ? ' is-close' : ''}`}
           onClick={() => (open ? closeMenu() : go('menu'))}
@@ -497,7 +507,8 @@ export function Dock() {
           <Icon.Plus size={22} className={`dock-fab-icon${open ? ' is-hidden' : ''}`} />
           <Icon.Close size={20} className={`dock-fab-icon${open ? '' : ' is-hidden'}`} />
         </button>
-      </div>
+        </div>
+      </>
     )
   }
 

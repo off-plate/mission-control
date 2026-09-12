@@ -831,7 +831,7 @@ await step('watchless: tidying repairs the captions on his own key, and only whe
   })
 })
 
-await step('the zone: his own YouTube links become the queue, and the list plays any of them', async () => {
+await step('the zone: adding links never drops the ones already there', async () => {
   await fresh('today')
   await page.evaluate(() => {
     localStorage.setItem('mc-view', 'personal'); localStorage.setItem('mc-space', 'personal')
@@ -868,7 +868,7 @@ await step('the zone: his own YouTube links become the queue, and the list plays
   await page.waitForTimeout(300)
   /* A typo is reported rather than silently dropped. */
   const foot = await page.locator('.zlib-foot span').innerText()
-  if (!/3 tracks/.test(foot) || !/1 line is not a YouTube link/.test(foot)) throw new Error(`the library miscounts: ${foot}`)
+  if (!/3 new tracks/.test(foot) || !/1 line is not a YouTube link/.test(foot)) throw new Error(`the library miscounts: ${foot}`)
   await page.locator('.zlib-save').click(); await page.waitForTimeout(900)
 
   if (!/your queue, 3/i.test(await page.locator('.zplayer-source').innerText())) {
@@ -886,6 +886,64 @@ await step('the zone: his own YouTube links become the queue, and the list plays
   }
   const kept = await page.evaluate((K) => (JSON.parse(localStorage.getItem(K) ?? '{}').tunes ?? []).length, KEY)
   if (kept !== 3) throw new Error(`his library did not persist (${kept} stored)`)
+  await page.unroute(/youtube\.com\/oembed/)
+})
+
+await step('the zone: pasting new links never wipes the ones already there', async () => {
+  /* His report (2026-09-12): he pasted four links and the rest of his library
+     was gone. The sheet used to be a REPLACE box, prefilled with the current
+     library so leaving it untouched round-tripped safely -- the moment he
+     pasted without keeping the old links in view, they were the text that
+     got saved over. It is an ADD box now: the existing library is a list
+     with its own remove button per row, and the textarea only ever appends. */
+  await page.route(/youtube\.com\/oembed/, (r) => {
+    const id = decodeURIComponent(r.request().url()).split('v=')[1]?.split('&')[0] ?? '?'
+    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ title: `Track ${id}` }) })
+  })
+  await fresh('today')
+  await page.evaluate(() => {
+    localStorage.setItem('mc-view', 'personal'); localStorage.setItem('mc-space', 'personal')
+    localStorage.removeItem('mc-pomodoro')
+  })
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    s.tunes = ['aaaaaaaaaaa', 'bbbbbbbbbbb', 'ccccccccccc', 'ddddddddddd', 'eeeeeeeeeee', 'fffffffffff']
+      .map((id) => `https://www.youtube.com/watch?v=${id}`)
+    localStorage.setItem(K, JSON.stringify(s))
+  }, KEY)
+  await page.goto(`${URL}#/zone`); await page.reload(); await page.waitForTimeout(1200)
+  const skipRoll = page.getByRole('button', { name: 'Not today' })
+  if (await skipRoll.count()) { await skipRoll.first().click(); await page.waitForTimeout(300) }
+  await page.waitForSelector('.zplayer', { timeout: 10000 })
+
+  await page.locator('.zqueue-add, .zplayer-btn[aria-label="Show the queue"]').first().click(); await page.waitForTimeout(400)
+  if (!(await page.locator('.zqueue-row').count())) {
+    await page.locator('.zplayer-btn[aria-label="Show the queue"]').click(); await page.waitForTimeout(300)
+  }
+  const before = await page.locator('.zqueue-row').count()
+  if (before !== 6) throw new Error(`seeded 6 links but the queue shows ${before}`)
+
+  await page.locator('.zqueue-add').click(); await page.waitForTimeout(300)
+  if ((await page.locator('.zlib-current li').count()) !== 6) throw new Error('the sheet does not show his existing library')
+
+  await page.locator('.zlib textarea').fill([
+    'https://www.youtube.com/watch?v=ggggggggggg',
+    'https://www.youtube.com/watch?v=hhhhhhhhhhh',
+  ].join('\n'))
+  await page.waitForTimeout(300)
+  await page.locator('.zlib-save').click(); await page.waitForTimeout(900)
+
+  const kept = await page.evaluate((K) => (JSON.parse(localStorage.getItem(K) ?? '{}').tunes ?? []).length, KEY)
+  if (kept !== 8) throw new Error(`had 6, added 2, ended with ${kept} -- links were dropped`)
+
+  await page.locator('.zplayer-btn[aria-label="Show the queue"]').click(); await page.waitForTimeout(600)
+  if ((await page.locator('.zqueue-row').count()) !== 8) throw new Error('the queue list does not reflect the merged library')
+
+  /* Removing one is still possible, on purpose, from its own button. */
+  await page.locator('.zqueue-add').click(); await page.waitForTimeout(300)
+  await page.locator('.zlib-remove').first().click(); await page.waitForTimeout(400)
+  const afterRemove = await page.evaluate((K) => (JSON.parse(localStorage.getItem(K) ?? '{}').tunes ?? []).length, KEY)
+  if (afterRemove !== 7) throw new Error(`removing one row left ${afterRemove}, not 7`)
   await page.unroute(/youtube\.com\/oembed/)
 })
 

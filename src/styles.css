@@ -10097,6 +10097,30 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--z-muted); font-weight: 700;
 }
+/* His existing library, always visible, never touched by the add box below. */
+.zlib-current {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 1px;
+  max-height: 156px; overflow-y: auto;
+  border-radius: 9px; box-shadow: inset 0 0 0 1px var(--z-line);
+}
+.zlib-current li {
+  display: flex; align-items: center; gap: var(--s3);
+  padding: 6px 6px 6px 10px;
+}
+.zlib-current-title {
+  flex: 1; min-width: 0; font-size: var(--text-xs); color: var(--z-bone);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.zlib-remove {
+  flex: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 7px; border: 0; background: none; color: var(--z-muted);
+}
+@media (hover: hover) and (pointer: fine) {
+  .zlib-remove:hover { background: rgba(224, 96, 58, 0.16); color: var(--z-bone); }
+}
+.zlib-remove:active { transform: scale(0.92); }
+
 .zlib-say { margin: 0; font-size: var(--text-xs); line-height: 1.45; color: var(--z-muted); }
 .zlib textarea {
   min-height: 116px; resize: vertical; border: 0; border-radius: 9px;
@@ -10107,6 +10131,7 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .zlib textarea:focus-visible { outline: 2px solid var(--z-bone); outline-offset: 1px; }
 .zlib-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--s3);
   font-size: var(--text-xs); color: var(--z-muted); }
+.zlib-save:disabled { opacity: 0.4; cursor: default; }
 .zlib-save {
   cursor: pointer; font: inherit; font-size: var(--text-xs); font-weight: 700;
   padding: 6px 15px; border-radius: 9px; border: 0;

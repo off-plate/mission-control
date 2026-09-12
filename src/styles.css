@@ -9767,9 +9767,17 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   display: flex; flex-direction: column; gap: 14px;
   background: radial-gradient(120% 130% at 82% -10%, #14161A, #0A0A0B 70%); }
 
+/* His instruction (2026-09-12): the tagline had its own full-width row below
+   the countdown, wasting the height that row cost. It now shares the
+   countdown's row instead, right-aligned toward the close button (which
+   stays exactly where it was -- a fixed circle over the whole screen, not
+   part of this column's layout) with enough clearance that the two never
+   overlap. */
+.tl-head-row { display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 20px; padding-bottom: 18px; border-bottom: 1px solid rgba(242, 240, 234, 0.08); }
+
 /* The one figure that moves whether he acts or not. */
-.tl-count { display: flex; flex-direction: column; gap: 2px; padding-bottom: 18px;
-  border-bottom: 1px solid rgba(242, 240, 234, 0.08); }
+.tl-count { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .tl-count-l { font: 700 9.5px/1 var(--font-body); letter-spacing: 0.2em; text-transform: uppercase;
   color: var(--tl-faint); }
 .tl-count-fig { display: flex; align-items: baseline; gap: 10px; margin-top: 8px; }
@@ -9782,9 +9790,9 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .tl-count-sub span { font: 500 12px/1 var(--font-body); color: var(--tl-faint); }
 .tl-count-sub b { font-weight: 700; color: var(--tl-ink); font-variant-numeric: tabular-nums; }
 
-.tl-status-head { margin: 0; font-family: var(--font-display); font-weight: 800;
+.tl-status-head { margin: 0 46px 0 0; font-family: var(--font-display); font-weight: 800;
   font-size: clamp(0.95rem, 1.35vw, 1.15rem); line-height: 1.25; color: var(--tl-ink);
-  max-width: 30ch; }
+  max-width: 22ch; text-align: right; flex: none; }
 .tl-status .tl-back { align-self: flex-start; margin-top: auto; }
 
 /* ============================================================
@@ -10001,7 +10009,7 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 
 /* Room for the grid: the countdown is the hero but it does not need to be
    ninety pixels tall to say 154. */
-.tl-count { padding-bottom: 12px; }
+.tl-head-row { padding-bottom: 12px; }
 .tl-count-fig b { font-size: clamp(34px, 4.4vh, 56px); }
 .tl-status-head { font-size: clamp(14px, 1.9vh, 19px); }
 
@@ -10022,7 +10030,7 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .gp-unit { font-size: 10.5px; }
 .gp-line, .gp-sub { font-size: 10.5px; line-height: 1.35; }
 .tl-status { padding: 16px 18px 18px; gap: 10px; }
-.tl-count { padding-bottom: 9px; }
+.tl-head-row { padding-bottom: 9px; }
 .tl-count-fig b { font-size: clamp(28px, 3.6vh, 44px); }
 .tl-status-head { font-size: clamp(13px, 1.7vh, 16px); }
 

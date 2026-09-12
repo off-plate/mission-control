@@ -30,7 +30,7 @@ import { useStore } from './store'
 import { dayOf, daysSince, useHealth } from './health'
 import {
   countdown, debtCard, goalArcs, goalsCard, habitRings, habitsCard, healthCard, postponedCard,
-  quittingCard, routineTrack, routinesCard, score, slipSeries, trainingGrid, trainingKinds,
+  quittingCard, routineTrack, routinesCard, score, slipSeries, trainingGrid,
 } from './giveupstatus'
 import { AgeRange, Arcs, Heat, Orbit, Panel, Read, Rows, Slips, Stops, Wheel } from './giveuppanel'
 import { useCompass, type CompassMoney } from './compass'
@@ -1194,10 +1194,6 @@ function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney |
   /* One dataset, not filtered by whichever workspace tab is open -- the same
      rule the rest of this page follows. */
   const sessionMins = useSessionMinutes()
-  const sessionTypes = useMemo(
-    () => (health.status === 'ok' ? health.sessions.filter((s) => sessionDays.includes(dayOf(s))).map((s) => s.type ?? '') : []),
-    [health, sessionDays],
-  )
 
   /* Every domain on one 0..1 scale, so the wheel can average them. Each is
      the plain reading of its own card: what fraction of this is going well. */
@@ -1219,7 +1215,6 @@ function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney |
         .filter((t) => t.createdAt && daysSince(t.createdAt) >= 7)
         .map((t) => ({ age: daysSince(t.createdAt as string), what: t.title }))
         .sort((a, b) => b.age - a.age),
-      kinds: trainingKinds(sessionTypes),
       slipSeries: slipSeries(slips),
       list: [
         score(debtCard(money), money ? money.pct / 100 : 0),
@@ -1231,7 +1226,7 @@ function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney |
         score(goalsCard(goals), goalPct),
       ],
     }
-  }, [money, sessionDays, sessionMins, sessionTypes, tasks, habits, habitLog, slips, routines, routineLog, goals])
+  }, [money, sessionDays, sessionMins, tasks, habits, habitLog, slips, routines, routineLog, goals])
 
   const [debt, training, postponed, habitsC, quitting, routinesC, goalsC] = cards.list
 
@@ -1283,11 +1278,19 @@ function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney |
               <Read figure={debt.figure} unit={debt.unit} sub={debt.line} tone={debt.tone} />
             </Panel>
 
+            {/* The workout/strength/cardio breakdown left with the width Training
+                lost: it was the exact 26px this panel was short once Quitting,
+                Goals and State of life all took a second row-track. It was
+                also the least essential thing on the card -- the figure and
+                the heatmap are the two things he actually referred to. */}
+            {/* No sub-line here: "Last session today" / "No session has ever
+                reached this app" duplicates exactly what the heatmap right
+                below it already shows, and it was the specific reason this
+                panel was still 20px over even after the stat row left --
+                figure + unit + a clamped two-line sentence alone came to
+                95px, leaving the heatmap nothing to render into. */}
             <Panel label="Training" tone={training.tone}>
-              <Read figure={training.figure} unit={training.unit} sub={training.line} tone={training.tone} />
-              <ul className="gp-kinds">
-                {cards.kinds.map((k) => <li key={k.label}><b>{k.n}</b><span>{k.label}</span></li>)}
-              </ul>
+              <Read figure={training.figure} unit={training.unit} tone={training.tone} />
               <Heat days={cards.grid} />
             </Panel>
 
@@ -1306,13 +1309,13 @@ function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney |
               <Wheel cards={cards.list} />
             </Panel>
 
-            <Panel label="Quitting" tone={quitting.tone}>
+            <Panel label="Quitting" tone={quitting.tone} tall>
               <Read figure={quitting.figure} unit={quitting.unit} sub={quitting.line} tone={quitting.tone} />
               {quitting.rows?.length ? <div className="gp-scroll"><Rows rows={quitting.rows} /></div> : null}
               <Slips series={cards.slipSeries} />
             </Panel>
 
-            <Panel label="Goals" tone={goalsC.tone}>
+            <Panel label="Goals" tone={goalsC.tone} tall>
               <Read figure={goalsC.figure} unit={goalsC.unit} sub={goalsC.line} tone={goalsC.tone} />
               {goalsC.rows?.length ? <div className="gp-scroll"><Rows rows={goalsC.rows} /></div> : null}
               <Arcs arcs={cards.arcs} overall={cards.goalPct} />

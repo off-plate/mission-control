@@ -94,11 +94,21 @@ function SyncPip() {
 
 /* One failing page must not take the whole shell with it: the header, the nav
    and every other tab keep working while the broken view shows a card. */
-class PageBoundary extends Component<{ children: ReactNode; page: string }, { failed: boolean }> {
-  state = { failed: false }
-  static getDerivedStateFromError() { return { failed: true } }
+class PageBoundary extends Component<{ children: ReactNode; page: string }, { failed: boolean; why: string }> {
+  state = { failed: false, why: '' }
+  static getDerivedStateFromError(error: unknown) {
+    return { failed: true, why: error instanceof Error ? error.message : String(error) }
+  }
+  /* SAY WHAT BROKE. This card used to swallow the error whole: he hit it
+     repeatedly (2026-09-12) and there was nothing in the console and nothing
+     on screen to say why, so every report was "it keeps happening" and every
+     answer was a guess. The message goes to the console with its component
+     stack, and onto the card, so the next screenshot carries its own cause. */
+  componentDidCatch(error: unknown, info: { componentStack?: string | null }) {
+    console.error('[page crashed]', this.props.page, error, info?.componentStack ?? '')
+  }
   componentDidUpdate(prev: { page: string }) {
-    if (prev.page !== this.props.page && this.state.failed) this.setState({ failed: false })
+    if (prev.page !== this.props.page && this.state.failed) this.setState({ failed: false, why: '' })
   }
   render() {
     if (this.state.failed) {
@@ -109,6 +119,11 @@ class PageBoundary extends Component<{ children: ReactNode; page: string }, { fa
             <p style={{ fontSize: 'var(--text-sm)', color: 'var(--muted)', marginTop: 8 }}>
               Nothing was lost. Every other tab still works; open one from the menu above, or reload to try this one again.
             </p>
+            {this.state.why && (
+              <p className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--alert)', marginTop: 10, wordBreak: 'break-word' }}>
+                {this.state.why}
+              </p>
+            )}
             <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={() => location.reload()}>Reload</button>
           </div>
         </div>

@@ -25,12 +25,10 @@ export function ZonePlayer() {
   const p = useMundiOpus()
   const { tunes } = useStore()
   const scrubRef = useRef<HTMLDivElement>(null)
-  const [list, setList] = useState(false)
-  const [lib, setLib] = useState(false)
   // Opening the room is what asks for the player; nothing else loads it.
   useEffect(() => { p.ensure() }, [p])
 
-  /* Titles arrive from oEmbed after the list is already on screen, so this
+  /* Titles arrive from oEmbed after the queue is already on screen, so this
      re-renders when they land rather than showing ids until the next click. */
   useSyncExternalStore(onTitles, titlesVersion, () => 0)
   useEffect(() => { wantTitles(missingTitles(p.queue)) }, [p.queue])
@@ -107,44 +105,54 @@ export function ZonePlayer() {
         >
           <Icon.Shuffle size={17} />
         </button>
-        {/* His ask (2026-09-12): open the list and click what he wants,
-            instead of pressing Next until it comes round. */}
-        <button
-          className={`zplayer-btn zplayer-tog${list ? ' is-on' : ''}`}
-          onClick={() => { setList((v) => !v); setLib(false) }}
-          aria-expanded={list}
-          aria-label={list ? 'Hide the queue' : 'Show the queue'}
-        >
-          <Icon.List size={17} />
+      </div>
+    </div>
+  )
+}
+
+/* THE QUEUE, always on screen now.
+   Second pass (2026-09-12): his report was "the list extends up [and] the
+   timer gets very small". It did -- the list had no bounded height of its
+   own, and the room's layout gives whatever the rail holds only what the
+   fixed-height timer above it does not need, so an unbounded list shrank an
+   otherwise-fixed instrument. This panel scrolls INSIDE its own fixed slot
+   instead (see .zqueue-list in styles.css), so the timer never moves again
+   no matter how long the queue gets. It also took the Note panel's old spot
+   outright: Note itself moved to the floating dock, reopened for the Zone
+   in the same change, rather than living as a second unbounded box next to
+   this one. */
+export function ZoneQueue() {
+  const p = useMundiOpus()
+  const { tunes } = useStore()
+  const [lib, setLib] = useState(false)
+  useSyncExternalStore(onTitles, titlesVersion, () => 0)
+  useEffect(() => { wantTitles(missingTitles(p.queue)) }, [p.queue])
+  const mine = (tunes ?? []).length > 0
+
+  return (
+    <div className="zqueue">
+      <div className="zqueue-head">
+        <span>{mine ? `Your queue, ${p.queue.length}` : 'Mundi Opus'}</span>
+        <button className="zqueue-add" onClick={() => setLib(true)}>
+          <Icon.Plus size={13} />
+          {mine ? 'Edit links' : 'Add your own'}
         </button>
       </div>
-
-      {list && (
-        <div className="zqueue">
-          <div className="zqueue-head">
-            <span>{mine ? 'Your queue' : 'Mundi Opus'}</span>
-            <button className="zqueue-add" onClick={() => { setLib(true); setList(false) }}>
-              <Icon.Plus size={13} />
-              {mine ? 'Edit links' : 'Add your own'}
+      <ul className="zqueue-list">
+        {p.queue.map((row, i) => (
+          <li key={row.id + i}>
+            <button
+              className={`zqueue-row${i === p.track ? ' is-on' : ''}`}
+              onClick={() => p.jump(i)}
+              title={row.title}
+            >
+              <img src={thumbUrl(row.id)} alt="" loading="lazy" onError={fallbackThumb} />
+              <span className="zqueue-title">{trackTitle(row)}</span>
+              {i === p.track && p.playing && <Icon.Waveform size={13} />}
             </button>
-          </div>
-          <ul className="zqueue-list">
-            {p.queue.map((row, i) => (
-              <li key={row.id + i}>
-                <button
-                  className={`zqueue-row${i === p.track ? ' is-on' : ''}`}
-                  onClick={() => p.jump(i)}
-                  title={row.title}
-                >
-                  <img src={thumbUrl(row.id)} alt="" loading="lazy" onError={fallbackThumb} />
-                  <span className="zqueue-title">{trackTitle(row)}</span>
-                  {i === p.track && p.playing && <Icon.Waveform size={13} />}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+          </li>
+        ))}
+      </ul>
 
       {lib && <TuneLibrary onClose={() => setLib(false)} />}
     </div>
@@ -168,6 +176,11 @@ function TuneLibrary({ onClose }: { onClose: () => void }) {
   const { tunes, setTunes } = useStore()
   const mine = tunes ?? []
   const [text, setText] = useState('')
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
   const parsed = useMemo(() => parseTunes(text), [text])
   const already = useMemo(() => new Set(mine.map(tuneId)), [mine])
   const fresh = useMemo(() => parsed.filter((u) => !already.has(tuneId(u))), [parsed, already])
@@ -184,11 +197,21 @@ function TuneLibrary({ onClose }: { onClose: () => void }) {
     setTunes(next)
     wantTitles(fresh.map((u) => tuneId(u) as string))
     setText('')
+    /* Always closes now. This never used to matter -- the sheet was an
+       inline box in the room and staying open cost nothing -- but making it
+       a full-screen overlay today turned "does not close on success" into
+       a real block: it sat on top of everything, including the row he
+       wanted to click next, and every one of these gate steps timed out on
+       a click the overlay itself was covering. Caught by a screenshot
+       diagnostic showing the overlay still mounted at the moment of
+       failure, not by reasoning about the code. */
+    onClose()
   }
   const remove = (id: string) => setTunes(mine.filter((u) => tuneId(u) !== id))
 
   return (
-    <div className="zlib" role="dialog" aria-label="Focus music">
+    <div className="zlib-scrim" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+    <div className="zlib" role="dialog" aria-label="Focus music" aria-modal="true">
       <div className="zlib-head">
         <span>Focus music</span>
         <button className="zplayer-btn" onClick={onClose} aria-label="Close"><Icon.Close size={15} /></button>
@@ -232,6 +255,7 @@ function TuneLibrary({ onClose }: { onClose: () => void }) {
           {fresh.length ? `Add ${fresh.length}` : 'Add'}
         </button>
       </div>
+    </div>
     </div>
   )
 }

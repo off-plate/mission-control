@@ -23,12 +23,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useClockStamp, useFirstMove, useOpenToday } from './ui'
 import { usePomodoro } from './pomodoro'
-import { ZonePlayer } from './zoneplayer'
+import { ZonePlayer, ZoneQueue } from './zoneplayer'
 import { useStore } from './store'
 import { SPACE_LABELS } from './mock'
 import { isEstimated, localDateKey, taskMinutes } from './util'
-import { SLOTS, spaceFolderId, type Task } from './types'
-import { Editor } from './notes'
+import { SLOTS, type Task } from './types'
 import * as Icon from './icons'
 
 /* Minutes padded to two digits, unlike everywhere else in the app: this one
@@ -436,76 +435,6 @@ function ZoneClock() {
   )
 }
 
-
-function NoteIcon() {
-  return (
-    <Icon.Note size={16} />
-  )
-}
-function PlusIcon() {
-  return (
-    <Icon.Plus size={18} />
-  )
-}
-
-function ZoneNote() {
-  const { space, noteFolders, notes, addNote, updateNote } = useStore()
-  /* No picker, and no choice to make. His instruction: a note written in the
-     Zone goes where a note written on the Notes page goes, which is the same
-     default folder every note already lands in. Offering a folder here asked a
-     question mid-focus-block that the Notes page does not ask, and the answer
-     never mattered: every note is visible from every workspace anyway. */
-  const folderId = spaceFolderId(space)
-
-  const [noteId, setNoteId] = useState<string | null>(null)
-  // Before the first character, there is no note to hold the draft yet: it
-  // lives in a ref so a keystroke does not fight the store for who owns it.
-  const draft = useRef('')
-  /* Typing fast enough (a real fast typist, or any programmatic input) can
-     fire several keystrokes before React commits the state update from the
-     one that just created the note. Reading noteId itself for that decision
-     raced: two or three keystrokes in a row each still saw it as null and
-     each created their OWN note, splitting one note into several. The ref
-     is written the instant the note exists, no render required to see it. */
-  const noteIdRef = useRef<string | null>(null)
-  const active = noteId ? notes.find((n) => n.id === noteId) : undefined
-  // A note this pointed at was deleted out from under it (folder removed,
-  // a sync merge). Fall back to a fresh draft rather than a dead id.
-  useEffect(() => { if (noteId && !active) { noteIdRef.current = null; setNoteId(null) } }, [noteId, active])
-  const note = active ?? { id: 'draft', body: draft.current }
-
-  const onChange = (md: string) => {
-    if (noteIdRef.current) { updateNote(noteIdRef.current, { body: md }); return }
-    draft.current = md
-    if (md.trim()) {
-      const id = addNote(folderId, md)
-      noteIdRef.current = id
-      setNoteId(id)
-    }
-  }
-  const fresh = () => { noteIdRef.current = null; setNoteId(null); draft.current = '' }
-  const hasBody = (active?.body ?? draft.current).trim().length > 0
-
-  return (
-    <div className="znote">
-      <div className="znote-head">
-        <span className="znote-heading"><NoteIcon /> Note</span>
-      </div>
-      <div className="znote-rich" aria-label="Zone note">
-        {/* The same two commands the Notes page has. A thought worth writing
-            down mid-block is exactly the thought worth putting on the list
-            without leaving the room, which is the whole argument for /task
-            being here rather than only on the page he came from. */}
-        <Editor note={note} onChange={onChange} tools={['bold', 'italic', 'bullet']} plain slashHelp slashTask />
-      </div>
-      <div className="znote-foot">
-        <span className={`znote-status${hasBody ? ' is-saved' : ''}`}>{hasBody ? 'Saved' : 'Empty'}</span>
-        <button className="znote-add" onClick={fresh} aria-label="New note" title="New note"><PlusIcon /></button>
-      </div>
-    </div>
-  )
-}
-
 /* How deep into the block he is, 0 to 1. The room's ground colour is mixed
    from this, so twenty minutes in is visibly deeper water than the moment he
    sat down. Real elapsed minutes, nothing decorative: idle and break leave
@@ -523,11 +452,16 @@ export function useZoneDepth(): number {
 }
 
 export function ZonePage() {
+  /* His instruction (2026-09-12): drop the room's own Note editor -- Note
+     already has a home in the floating dock, reopened for the Zone in the
+     same change -- and give its spot to the queue instead, since that is
+     the thing that actually needed room to grow. The player's transport
+     keeps its own slot on the right, unchanged. */
   return (
     <div className="zroom">
       <ZoneTask />
       <div className="zroom-rail">
-        <section className="zpanel zpanel-note" aria-label="Note"><ZoneNote /></section>
+        <section className="zpanel zpanel-queue" aria-label="Queue"><ZoneQueue /></section>
         <section className="zpanel zpanel-player" aria-label="Mundi Opus"><ZonePlayer /></section>
       </div>
     </div>

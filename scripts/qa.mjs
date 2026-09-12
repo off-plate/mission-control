@@ -97,6 +97,24 @@ const step = async (name, fn) => {
       const hit = msg.split('\n').filter((l) => /intercepts pointer events|waiting for locator|not visible|element is/.test(l)).slice(0, 4)
       for (const l of hit) console.log(`     | ${l.trim()}`)
     }
+    /* One-time diagnostic (2026-09-12): the same four steps were failing on
+       a plain click timeout, identically across several full-suite runs,
+       and none of the code they exercise reproduces the failure in
+       isolation. Rather than guess again at which click and why, every
+       click timeout now captures what was actually on screen and what
+       Playwright thinks is at the target point. */
+    if (process.env.QA_DIAG && /Timeout.*locator\.click/.test(String(e))) {
+      try {
+        const tag = name.replace(/[^a-z0-9]+/gi, '-').slice(0, 60)
+        await page.screenshot({ path: `/tmp/qa-fail-${tag}.png`, fullPage: true })
+        const dump = await page.evaluate(() => ({
+          openOverlays: [...document.querySelectorAll('.zlib-scrim, .dock-face, .zlib')].map((el) => el.className),
+          url: location.hash,
+          bodyClasses: document.body.className,
+        }))
+        console.log(`     DIAG screenshot: /tmp/qa-fail-${tag}.png overlays=${JSON.stringify(dump.openOverlays)} url=${dump.url}`)
+      } catch { /* the diagnostic itself must never mask the real failure */ }
+    }
   }
 }
 const fresh = async (route = '') => {
@@ -480,16 +498,21 @@ await step('the zone: header stays, first move starts it, and the note lands in 
       cards: document.querySelectorAll('.zroom .widget').length,
       hasTask: !!document.querySelector('.znow-title'),
       hasClock: !!document.querySelector('.zclock-time'),
-      hasNote: !!document.querySelector('.znote-rich .nt-editor'),
+      hasQueue: !!document.querySelector('.zqueue'),
       hasPlayer: !!document.querySelector('.zplayer'),
       vOverflow: document.documentElement.scrollHeight - document.documentElement.clientHeight,
     }
   })
   if (!room.exists) throw new Error('the zone room did not render')
   if (room.cards) throw new Error(`${room.cards} bordered widget cards are still in the room; it is meant to be one field`)
-  for (const [what, ok] of [['task', room.hasTask], ['clock', room.hasClock], ['note', room.hasNote], ['player', room.hasPlayer]]) {
+  for (const [what, ok] of [['task', room.hasTask], ['clock', room.hasClock], ['queue', room.hasQueue], ['player', room.hasPlayer]]) {
     if (!ok) throw new Error(`the ${what} is missing from the room`)
   }
+  /* Note left the room on his instruction (2026-09-12): it never had a
+     bounded height of its own, and fighting the queue for the same fixed
+     rail was the actual cause of "the timer gets tiny". It is reachable
+     from the floating dock instead (see the dedicated room-layout test). */
+  if (await page.locator('.znote-rich .nt-editor').count()) throw new Error('the room still carries its own Note editor')
   if (room.vOverflow > 2) throw new Error(`the room scrolls by ${room.vOverflow}px; it is meant to be one screen`)
 
   if (!(await page.getByText('Zone gate task').count())) throw new Error('the first-move task did not appear in the zone')
@@ -515,17 +538,31 @@ await step('the zone: header stays, first move starts it, and the note lands in 
   if (!(await page.locator('.spaces').count())) throw new Error('the workspace switcher did not come back on Today')
   await page.goto(`${URL}#/zone`); await page.waitForTimeout(500)
 
-  // The note saves into the folder shown, with no way to create a new one.
-  if (await page.locator('.znote button', { hasText: 'New folder' }).count()) throw new Error('the zone note can create folders')
-  await page.locator('.znote-rich .nt-editor').click()
+  // A note written from the Zone now goes through the same floating dock
+  // every other page uses, not a room-only editor -- same Editor component,
+  // same folder rule, reached one extra click away instead of always taking
+  // up its own share of the room.
+  await page.locator('.dock-fab').click(); await page.waitForTimeout(400)
+  await page.locator('.dock-item', { hasText: 'Note' }).click(); await page.waitForTimeout(400)
+  /* The dock's own Note resumes whichever note he touched last (its own
+     documented behaviour, notedock.tsx) rather than opening blank the way
+     the room's retired editor always did -- so a fresh one is asked for
+     explicitly, same as he would with his own click. */
+  await page.locator('.notedock-panel .dock-icon[aria-label="New note"]').click(); await page.waitForTimeout(300)
+  await page.locator('.notedock-panel .nt-editor').click()
   await page.keyboard.insertText('Zone gate note')
   await page.waitForTimeout(400)
   const saved = await page.evaluate((K) => {
     const s = JSON.parse(localStorage.getItem(K))
-    return s.notes.find((n) => n.body === 'Zone gate note')
+    /* A fresh contenteditable note types onto a leading blank line -- the
+       body comes back "\nZone gate note", not an exact match. Ordinary and
+       harmless (the Notes page renders it identically either way), so this
+       checks for the text landing, not its exact whitespace. */
+    return s.notes.find((n) => n.body.trim() === 'Zone gate note')
   }, KEY)
-  if (!saved) throw new Error('typing in the zone note did not save a note')
+  if (!saved) throw new Error('typing in the dock note from the zone did not save a note')
   if (saved.folderId !== 'nf-space-personal') throw new Error(`the note landed in ${saved.folderId}, not the shown folder`)
+  await page.locator('.dock-icon[aria-label="Close"]').click(); await page.waitForTimeout(300)
 
   // The player: a real Mundi Opus video mounted (off-screen, in mundiplayer's
   // own permanent host, never inside the Zone tile), and next moves the
@@ -847,7 +884,6 @@ await step('the zone: adding links never drops the ones already there', async ()
   if (!/mundi opus/i.test(await page.locator('.zplayer-source').innerText())) {
     throw new Error('with no library of his own the player is not on Mundi Opus')
   }
-  await page.locator('.zplayer-btn[aria-label="Show the queue"]').click(); await page.waitForTimeout(400)
   const seeded = await page.locator('.zqueue-row').count()
   if (seeded < 2) throw new Error(`the queue list shows ${seeded} tracks`)
 
@@ -874,7 +910,6 @@ await step('the zone: adding links never drops the ones already there', async ()
   if (!/your queue, 3/i.test(await page.locator('.zplayer-source').innerText())) {
     throw new Error('saving his links did not make them the queue')
   }
-  await page.locator('.zplayer-btn[aria-label="Show the queue"]').click(); await page.waitForTimeout(700)
   const titles = await page.locator('.zqueue-title').allInnerTexts()
   if (titles.length !== 3) throw new Error(`${titles.length} tracks in his queue, not 3`)
   if (!titles.some((x) => /^Track /.test(x))) throw new Error(`the real titles never arrived: ${titles.join(' | ')}`)
@@ -887,6 +922,50 @@ await step('the zone: adding links never drops the ones already there', async ()
   const kept = await page.evaluate((K) => (JSON.parse(localStorage.getItem(K) ?? '{}').tunes ?? []).length, KEY)
   if (kept !== 3) throw new Error(`his library did not persist (${kept} stored)`)
   await page.unroute(/youtube\.com\/oembed/)
+})
+
+await step('the zone: the timer never shrinks, no matter how long the queue gets', async () => {
+  /* His report (2026-09-12): "the list of focus videos extends, the timer
+     gets very small". It did -- the queue had no bounded height of its own,
+     so the room's flex column handed the rail whatever it asked for and the
+     timer above shrank to make room. The rail is a fixed height now; a long
+     queue scrolls inside it instead of growing it. */
+  await fresh('today')
+  await page.evaluate(() => {
+    localStorage.setItem('mc-view', 'personal'); localStorage.setItem('mc-space', 'personal')
+    localStorage.removeItem('mc-pomodoro')
+  })
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    s.tunes = Array.from({ length: 20 }, (_, i) => `https://www.youtube.com/watch?v=${String(i).padStart(11, 'a')}`)
+    localStorage.setItem(K, JSON.stringify(s))
+  }, KEY)
+  await page.goto(`${URL}#/zone`); await page.reload(); await page.waitForTimeout(1200)
+  const skip = page.getByRole('button', { name: 'Not today' })
+  if (await skip.count()) { await skip.first().click(); await page.waitForTimeout(300) }
+  await page.waitForSelector('.znow-face', { timeout: 10000 })
+
+  const before = await page.locator('.znow-face').boundingBox()
+  const railH = await page.locator('.zroom-rail').evaluate((e) => e.getBoundingClientRect().height)
+  if (railH > 260) throw new Error(`the rail is ${railH}px tall with 20 tracks in it, so it is growing again`)
+  if (!before || before.height < 200) throw new Error(`the timer face is only ${before?.height}px tall with a long queue open`)
+
+  /* Note is off this room and reachable from the dock instead now. */
+  if (await page.locator('.zpanel-note, .znote').count()) throw new Error('the room still carries its own Note panel')
+  if (!(await page.locator('.dock-fab').count())) throw new Error('the floating dock is not reachable from the Zone')
+  await page.locator('.dock-fab').click(); await page.waitForTimeout(400)
+  const noteItem = page.locator('.dock-item', { hasText: 'Note' })
+  if (!(await noteItem.count())) throw new Error('Note is not one of the dock items while in the Zone')
+
+  /* .dock is a fixed SIBLING of .shell, so its --z-* custom properties are
+     only reachable if they are redeclared reading from body, not merely
+     scoped inside .shell.in-zone -- caught the first time by a computed
+     style coming back fully transparent despite the CSS rule existing. */
+  await noteItem.click(); await page.waitForTimeout(400)
+  const bg = await page.locator('.dock-face').evaluate((e) => getComputedStyle(e).backgroundColor)
+  if (bg === 'rgba(0, 0, 0, 0)' || /^rgb\(255, 255, 255/.test(bg)) {
+    throw new Error(`the dock face is untinted in the Zone (background: ${bg})`)
+  }
 })
 
 await step('the zone: pasting new links never wipes the ones already there', async () => {
@@ -916,10 +995,6 @@ await step('the zone: pasting new links never wipes the ones already there', asy
   if (await skipRoll.count()) { await skipRoll.first().click(); await page.waitForTimeout(300) }
   await page.waitForSelector('.zplayer', { timeout: 10000 })
 
-  await page.locator('.zqueue-add, .zplayer-btn[aria-label="Show the queue"]').first().click(); await page.waitForTimeout(400)
-  if (!(await page.locator('.zqueue-row').count())) {
-    await page.locator('.zplayer-btn[aria-label="Show the queue"]').click(); await page.waitForTimeout(300)
-  }
   const before = await page.locator('.zqueue-row').count()
   if (before !== 6) throw new Error(`seeded 6 links but the queue shows ${before}`)
 
@@ -936,7 +1011,6 @@ await step('the zone: pasting new links never wipes the ones already there', asy
   const kept = await page.evaluate((K) => (JSON.parse(localStorage.getItem(K) ?? '{}').tunes ?? []).length, KEY)
   if (kept !== 8) throw new Error(`had 6, added 2, ended with ${kept} -- links were dropped`)
 
-  await page.locator('.zplayer-btn[aria-label="Show the queue"]').click(); await page.waitForTimeout(600)
   if ((await page.locator('.zqueue-row').count()) !== 8) throw new Error('the queue list does not reflect the merged library')
 
   /* Removing one is still possible, on purpose, from its own button. */
@@ -998,20 +1072,27 @@ await step('mundi opus: leaving the zone does not stop the music, and the corner
   if ((await page.locator('.zplayer-title').innerText()) !== trackAfterCornerSkip) throw new Error('the zone and the dock disagree about what is playing')
 })
 await step('the zone: the note takes real formatting, not a plain textarea', async () => {
+  /* Note left the room for the floating dock (2026-09-12, his instruction),
+     so this now opens the exact same door the room-layout test above uses --
+     one Editor, reached the same way from anywhere in the app, not a
+     zone-only copy of it. */
   await fresh('zone')
   const skip = page.getByRole('button', { name: 'Not today' })
   if (await skip.count()) { await skip.first().click(); await page.waitForTimeout(400) }
   await page.waitForSelector('.zroom', { timeout: 10000 })
 
-  const editor = page.locator('.znote-rich .nt-editor')
+  await page.locator('.dock-fab').click(); await page.waitForTimeout(400)
+  await page.locator('.dock-item', { hasText: 'Note' }).click(); await page.waitForTimeout(400)
+  await page.locator('.notedock-panel .dock-icon[aria-label="New note"]').click(); await page.waitForTimeout(300)
+  const editor = page.locator('.notedock-panel .nt-editor')
   await editor.click()
   await page.keyboard.insertText('gate note')
   await page.waitForTimeout(400)
   // Bold and italic are real marks on real selected text, not styled UI
   // with nothing behind it.
   await editor.selectText()
-  await page.locator('.znote-rich').getByRole('button', { name: 'Bold' }).click()
-  await page.locator('.znote-rich').getByRole('button', { name: 'Italic' }).click()
+  await page.locator('.notedock-panel').getByRole('button', { name: 'Bold' }).click()
+  await page.locator('.notedock-panel').getByRole('button', { name: 'Italic' }).click()
   await page.waitForTimeout(300)
   const marked = await editor.evaluate((el) => !!el.querySelector('b, strong') && !!el.querySelector('i, em'))
   if (!marked) throw new Error('bold and italic did not mark the text')

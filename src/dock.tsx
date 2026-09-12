@@ -274,11 +274,15 @@ export function Dock() {
   const pomo = usePomodoro()
   const toastPhase = useFocusToast(pomo.announcedAt, mode === 'closed')
 
-  /* The Zone already shows the timer, the player and a place to write at
-     full size. A second, smaller copy of the same facts in the corner is
-     not a safety net, it is noise competing with the one thing the room
-     exists to make dominant. */
-  if (page === 'zone') return null
+  /* Reopened in the Zone on his direct instruction (2026-09-12), reversing
+     the note above this one: the room used to hold its own permanent Note
+     editor exactly because this was hidden here, and that editor never had
+     a bounded height of its own -- an unlimited case grid, an unlimited
+     queue list, an unlimited note, all fighting the same fixed-height room
+     for space, was the actual cause of "the timer got tiny". The room now
+     holds only the timer, the task list and the music; Note (and everything
+     else this dock already reaches) comes from here instead, themed for the
+     Zone below rather than duplicated inside it. */
 
   /* Note on top, then Bills, Timeline, Assistant, Focus at the
      bottom, his order -- closest to the corner is the one he reaches for

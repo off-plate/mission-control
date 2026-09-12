@@ -763,6 +763,58 @@ body:not(:has(.shell.is-hud)) .dock-item-avatar {
    the open face stayed rounded even in HUD. Squared off here to match. */
 body:has(.shell.is-hud) .dock-item-label { border-radius: var(--a-r-sm); }
 body:has(.shell.is-hud) .dock-face { border-radius: var(--a-r-lg); }
+/* ---- the floating dock, inside the Zone ----
+   Reopened here on his direct instruction (2026-09-12): Note's permanent
+   spot in the room is gone (see zone.tsx), so this is how he reaches it
+   and everything else the dock already holds while he is in the room. Its
+   default colours are the app's light or HUD surfaces, neither of which
+   sits on the Zone's own dark water without looking like a dropped-in
+   widget -- reskinned here with the same --z-* tokens the room itself
+   already uses, the identical pattern .znote and .nt-slash used above for
+   the same reason. */
+/* .dock is a fixed SIBLING of .shell, not a descendant -- the same gap the
+   HUD block above (body:has(.shell.is-hud)) already exists to close, hit
+   again here. Custom properties only inherit down the real DOM tree, so
+   .shell.in-zone's own --z-* declarations are invisible to an element that
+   sits outside it; every var(--z-ground) below was silently resolving to
+   nothing and painting transparent, caught by reading the computed
+   background off the actual element rather than trusting the rule existed.
+   Redeclared here, values copied from .shell.in-zone itself, so .dock can
+   read them the same way body:has(.shell.is-hud) already lets it read the
+   HUD palette. */
+body:has(.shell.in-zone) {
+  --z-ground: #04283C;
+  --z-deep: #02202F;
+  --z-bone: #EDE6D8;
+  --z-muted: #8FB2C4;
+  --z-line: rgba(237, 230, 216, 0.14);
+  --z-ice: #7BD5EA;
+}
+body:has(.shell.in-zone) .dock-fab {
+  background: var(--z-bone); color: var(--z-ground);
+}
+body:has(.shell.in-zone) .dock-fab:hover { background: var(--z-bone); opacity: 0.88; }
+body:has(.shell.in-zone) .dock-item-label {
+  background: var(--z-ground); border-color: var(--z-line); color: var(--z-bone);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+body:has(.shell.in-zone) .dock-item:hover .dock-item-label { border-color: var(--z-bone); color: var(--z-bone); }
+body:has(.shell.in-zone) .dock-item-avatar {
+  background: var(--z-deep); border-color: var(--z-line); color: var(--z-bone);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+body:has(.shell.in-zone) .dock-item-avatar--focus { background: color-mix(in srgb, var(--z-bone) 16%, var(--z-deep)); }
+body:has(.shell.in-zone) .dock-fab,
+body:has(.shell.in-zone) .dock-item-avatar { border-color: rgba(0, 0, 0, 0.3); }
+body:has(.shell.in-zone) .dock-icon { color: var(--z-muted); }
+body:has(.shell.in-zone) .dock-icon:hover { color: var(--z-bone); background: rgba(237, 230, 216, 0.08); }
+body:has(.shell.in-zone) .dock-face {
+  background: var(--z-ground); border-color: var(--z-line); color: var(--z-bone);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+body:has(.shell.in-zone) .dock-facebar { border-color: var(--z-line); }
+body:has(.shell.in-zone) .dock-focus-time { color: var(--z-muted); }
+
 
 /* The stack: labelled pills growing upward from the FAB. .dock's own gap
    (above) now supplies the space between the stack and the FAB below it,
@@ -4394,13 +4446,20 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   letter-spacing: 0.18em; text-transform: uppercase; color: var(--z-muted);
 }
 
-/* ---- the rail: note and player, flush on the water ---- */
+/* ---- the rail: queue and player, flush on the water ----
+   FIXED, not min-height, on his report (2026-09-12): the queue used to have
+   no bounded height of its own, so the room's flex column handed the rail
+   whatever it asked for and the fixed-height timer above shrank to make
+   room -- "the list extends [and] the timer gets very small" was that,
+   working as laid out rather than a bug in one component. Nothing in this
+   row can grow the row any more; each panel scrolls inside its own share
+   of it instead. */
 .zroom-rail {
   display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, 1fr);
   gap: var(--s8); border-top: 1px solid var(--z-line);
-  padding: var(--s5) 0 var(--s6); min-height: 210px;
+  padding: var(--s5) 0 var(--s6); height: 248px;
 }
-.zpanel { min-width: 0; display: flex; }
+.zpanel { min-width: 0; min-height: 0; display: flex; overflow: hidden; }
 .zpanel-player { padding-left: var(--s8); border-left: 1px solid var(--z-line); }
 
 /* The note: no box, no fill, just the writing surface on the field. */
@@ -9985,11 +10044,17 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 /* ---- the Zone's queue, and where it comes from ----
    His ask (2026-09-12): paste his own YouTube links, and open a list to click
    the one he wants instead of pressing Next until it comes round. */
-.zqueue { margin-top: var(--s4); border-top: 1px solid var(--z-line); padding-top: var(--s3); }
+/* Fills its panel exactly, header fixed and the list taking whatever is
+   left -- flex, not a hardcoded max-height, so it always matches the rail's
+   own fixed height above instead of guessing at a number that could drift
+   out of sync with it. */
+.zqueue { width: 100%; min-height: 0; display: flex; flex-direction: column; }
 .zqueue-head {
+  flex: none;
   display: flex; align-items: center; justify-content: space-between; gap: var(--s3);
   font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--z-muted); font-weight: 700;
+  color: var(--z-muted); font-weight: 700; padding-bottom: var(--s3);
+  border-bottom: 1px solid var(--z-line);
 }
 .zqueue-add {
   display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
@@ -10000,9 +10065,9 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 }
 .zqueue-add:hover { color: var(--z-bone); border-color: var(--z-bone); }
 .zqueue-list {
-  list-style: none; margin: var(--s3) 0 0; padding: 0;
+  list-style: none; margin: var(--s3) 0 0; padding: 0 4px 0 0;
   display: flex; flex-direction: column; gap: 1px;
-  max-height: 208px; overflow-y: auto;
+  flex: 1; min-height: 0; overflow-y: auto;
 }
 .zqueue-row {
   display: flex; align-items: center; gap: var(--s3); width: 100%;
@@ -10019,13 +10084,25 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .zqueue-row:active { transform: scale(0.99); }
 .zqueue-row.is-on { color: var(--z-bone); background: rgba(237, 230, 216, 0.09); }
 
-/* ---- pasting the links ---- */
-.zlib {
-  margin-top: var(--s4); padding: var(--s4);
-  border-radius: 12px; border: 1px solid var(--z-line);
-  background: rgba(0, 0, 0, 0.24);
-  display: flex; flex-direction: column; gap: var(--s3);
+/* ---- pasting the links ----
+   Floating, not inline, on the same report that fixed the rail above: this
+   used to sit inside the bounded queue panel and fight it for the same
+   248px, which left no real room for the textarea or his own list at once.
+   It has the whole water to itself now. */
+.zlib-scrim {
+  position: fixed; inset: 0; z-index: 90; background: rgba(2, 8, 12, 0.45);
+  display: flex; align-items: flex-end; justify-content: flex-end;
+  padding: 24px;
 }
+.zlib {
+  width: min(420px, 100%); max-height: min(72vh, 620px);
+  padding: var(--s5); overflow-y: auto;
+  border-radius: 16px; border: 1px solid var(--z-line);
+  background: var(--z-ground); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  display: flex; flex-direction: column; gap: var(--s3);
+  animation: zlib-rise var(--t-med, 220ms) var(--ease, ease);
+}
+@keyframes zlib-rise { from { transform: translateY(16px) scale(0.98); opacity: 0; } }
 .zlib-head {
   display: flex; align-items: center; justify-content: space-between;
   font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;

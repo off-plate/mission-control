@@ -4686,17 +4686,14 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 /* The title gets air under it. This padding used to name --s7, which is not a
    token in the scale, so the whole shorthand was invalid and computed to zero:
    the wall started hard against the nav. */
-.board-head { margin: 0 0 var(--s10); }
-/* The wall's only door out. Slightly rounded, never a pill. */
-.board-back {
-  display: inline-flex; align-items: center; gap: 7px;
-  margin-bottom: var(--s5); padding: 8px 14px 8px 10px;
-  border: 1px solid var(--hairline-strong); border-radius: 8px;
-  background: var(--surface); color: var(--ink);
-  font: inherit; font-size: var(--text-sm); font-weight: 600; cursor: pointer;
-  transition: border-color 0.2s, color 0.2s;
+/* The heading and the way out, on one line, the door on the right where he
+   asked for it. .btn-ghost does the looks: this page gets no button of its
+   own invention. */
+.board-head {
+  margin: 0 0 var(--s10);
+  display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s5);
 }
-.board-back:hover { border-color: var(--ink); }
+.board-back { flex: none; }
 .board-head h1 { font-size: clamp(2.6rem, 6vw, 5rem); line-height: 0.95; letter-spacing: -0.02em; }
 /* A grid, not CSS columns. A multi-column layout gives an item one column or
    all of them and nothing in between, so a landscape photograph had no way to

@@ -1250,19 +1250,21 @@ function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney |
           {/* THE COUNTDOWN, his instruction: days, weeks and hours to the
               fourteenth of February. It is the hero because it is the only
               figure here that moves whether he does anything or not. */}
-          <div className="tl-count">
-            <span className="tl-count-l">Until {clock.label}</span>
-            <div className="tl-count-fig">
-              <b>{clock.days.toLocaleString('en-GB')}</b>
-              <span>days</span>
+          <div className="tl-head-row">
+            <div className="tl-count">
+              <span className="tl-count-l">Until {clock.label}</span>
+              <div className="tl-count-fig">
+                <b>{clock.days.toLocaleString('en-GB')}</b>
+                <span>days</span>
+              </div>
+              <div className="tl-count-sub">
+                <span><b>{clock.weeks}</b> weeks</span>
+                <span><b>{clock.hours.toLocaleString('en-GB')}</b> hours</span>
+              </div>
             </div>
-            <div className="tl-count-sub">
-              <span><b>{clock.weeks}</b> weeks</span>
-              <span><b>{clock.hours.toLocaleString('en-GB')}</b> hours</span>
-            </div>
-          </div>
 
-          <p className="tl-status-head">Before you do. This is where you actually are.</p>
+            <p className="tl-status-head">Before you do. This is where you actually are.</p>
+          </div>
 
           <div className="gp-grid">
             {/* His pass (2026-09-12): Debt is short -- a figure and a line --

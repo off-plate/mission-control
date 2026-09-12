@@ -16,8 +16,8 @@ import type { Scored, StatusRow } from './giveupstatus'
 const TAU = Math.PI * 2
 const pol = (cx: number, cy: number, r: number, a: number) => ({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) })
 
-export function Panel({ label, tone, wide, tall, children }: {
-  label: string; tone?: 'good' | 'flat' | 'bad'; wide?: boolean; tall?: boolean; children: ReactNode
+export function Panel({ label, tone, wide, children }: {
+  label: string; tone?: 'good' | 'flat' | 'bad'; wide?: boolean; children: ReactNode
 }) {
   /* His report (2026-09-12): the label owned its own row across every panel
      and bought nothing with the height it took -- the number underneath
@@ -25,7 +25,7 @@ export function Panel({ label, tone, wide, tall, children }: {
      It sits top right now, aligned with the big figure rather than pushing
      it down, so the height goes to the number and the list, not the caption. */
   return (
-    <section className={`gp-panel${wide ? ' is-wide' : ''}${tall ? ' is-tall' : ''}`}>
+    <section className={`gp-panel${wide ? ' is-wide' : ''}`}>
       <span className="gp-head"><i className={`gp-dot is-${tone ?? 'flat'}`} />{label}</span>
       {children}
     </section>

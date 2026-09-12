@@ -4319,7 +4319,7 @@ await step('timeline: the give-up screen takes the whole window, and the cross i
     orbit: document.querySelectorAll('.gp-orbit-on, .gp-orbit-off').length,
     wheelNodes: document.querySelectorAll('.gp-node').length,
     arcs: document.querySelectorAll('.gp-arc-on').length,
-    stops: document.querySelectorAll('.gp-stop').length,
+    stops: document.querySelectorAll('.gp-stops li').length,
     coins: document.querySelectorAll('.gp-coin-rim').length,
     ridges: document.querySelectorAll('.gp-ridge-lit').length,
     slips: document.querySelectorAll('.gp-slips-line').length,

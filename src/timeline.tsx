@@ -1294,7 +1294,7 @@ function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney |
               <Heat days={cards.grid} />
             </Panel>
 
-            <Panel label="Postponed" tone={postponed.tone} tall>
+            <Panel label="Postponed" tone={postponed.tone}>
               <Read figure={postponed.figure} unit={postponed.unit} sub={postponed.line} tone={postponed.tone} />
               <AgeRange ages={cards.ages} />
               {postponed.rows?.length ? <div className="gp-scroll"><Rows rows={postponed.rows} /></div> : null}
@@ -1305,17 +1305,17 @@ function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney |
               <Orbit rings={cards.rings} overall={cards.kept} />
             </Panel>
 
-            <Panel label="State of life" wide tall>
+            <Panel label="State of life" wide>
               <Wheel cards={cards.list} />
             </Panel>
 
-            <Panel label="Quitting" tone={quitting.tone} tall>
+            <Panel label="Quitting" tone={quitting.tone}>
               <Read figure={quitting.figure} unit={quitting.unit} sub={quitting.line} tone={quitting.tone} />
               {quitting.rows?.length ? <div className="gp-scroll"><Rows rows={quitting.rows} /></div> : null}
               <Slips series={cards.slipSeries} />
             </Panel>
 
-            <Panel label="Goals" tone={goalsC.tone} tall>
+            <Panel label="Goals" tone={goalsC.tone}>
               <Read figure={goalsC.figure} unit={goalsC.unit} sub={goalsC.line} tone={goalsC.tone} />
               {goalsC.rows?.length ? <div className="gp-scroll"><Rows rows={goalsC.rows} /></div> : null}
               <Arcs arcs={cards.arcs} overall={cards.goalPct} />

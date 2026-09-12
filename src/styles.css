@@ -9698,12 +9698,14 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    THE ROWS WERE UNREADABLE. Age and title were glued into one string, so the
    layout cut them mid-word: "42d Build a SoMe post generator and…". They are
    two elements now, the age fixed and the title free to use what is left. */
-/* IT FITS, IT DOES NOT SCROLL. His instruction (2026-09-12): the panels have
-   acres of empty space and no business scrolling. So the column is a flex
-   stack whose grid takes whatever height is left after the countdown, and the
-   rows divide it between them rather than each growing to its content. */
-.tl-status { position: relative; height: 100%; overflow: hidden; padding: 20px 22px 22px;
-  display: flex; flex-direction: column; gap: 14px; min-height: 0;
+/* SCROLLS NOW, ON PURPOSE -- the opposite of this morning's instruction, and
+   his own correction (2026-09-12): forcing every card into a fixed no-scroll
+   budget was what kept breaking. Whatever the real total content comes to,
+   the column holds it and scrolls; no card is ever squeezed to make room for
+   another again. The left side (the reel) is untouched -- this column is the
+   half of the screen he asked to fix. */
+.tl-status { position: relative; height: 100%; overflow-y: auto; overflow-x: hidden; padding: 20px 22px 22px;
+  display: flex; flex-direction: column; gap: 14px;
   background: radial-gradient(120% 130% at 82% -10%, #14161A, #0A0A0B 70%); }
 
 /* The one figure that moves whether he acts or not. */
@@ -9738,35 +9740,38 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    and a mountain says nothing true about how long a task waited.
    Their slots draw from his own figures instead.
    ============================================================ */
+/* REBUILT (2026-09-12), his instruction: stop forcing every card into a
+   fixed, no-scroll grid computed from row-span arithmetic. That arithmetic
+   is what kept breaking -- every time one card needed more room, something
+   else lost exactly enough to start clipping again, four separate times in
+   one day. A card's height is its own content's height now, full stop. Nine
+   is fine, three is fine, nothing is stretched to match a neighbour and
+   nothing is squeezed to fit a row it was never measured against.
+
+   The column scrolls if the real total exceeds the screen -- see
+   .tl-status's own overflow-y below -- which is the one honest way to hold
+   an unpredictable number of real habits, goals and overdue tasks without
+   re-fighting this every time his data changes shape. */
 .gp-grid {
-  /* flex:1 + min-height:0 is the pair that lets a grid shrink inside a flex
-     column at all; without the floor removed it takes its content height and
-     pushes the column past the screen, which is the scroll he was seeing. */
-  flex: 1; min-height: 0;
   display: grid; gap: 10px;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) minmax(0, 1fr);
-  grid-auto-rows: minmax(0, 1fr);
+  grid-auto-rows: min-content;
+  align-items: start;
 }
 .gp-panel {
   position: relative; padding: 12px 14px 13px; border-radius: 14px;
   background: linear-gradient(168deg, rgba(242, 240, 234, 0.055), rgba(242, 240, 234, 0.022));
   box-shadow: inset 0 0 0 1px rgba(242, 240, 234, 0.07);
   display: flex; flex-direction: column; gap: 8px; min-width: 0;
-  /* Same floor removal, one level down: a panel that cannot shrink makes its
-     row unshrinkable, and one stubborn row is all it takes to scroll again. */
-  min-height: 0; overflow: hidden;
 }
 .gp-panel.is-wide { grid-column: span 2; }
-.gp-panel.is-tall { grid-row: span 2; }
-/* The wheel centres itself; centring the PANEL put its own header in the middle. */
-.gp-panel.is-tall > .gp-wheel { margin: auto; }
 @media (max-width: 1180px) {
   .gp-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .gp-panel.is-wide, .gp-panel.is-tall { grid-column: span 2; grid-row: auto; }
+  .gp-panel.is-wide { grid-column: span 2; }
 }
 @media (max-width: 760px) {
   .gp-grid { grid-template-columns: minmax(0, 1fr); }
-  .gp-panel.is-wide, .gp-panel.is-tall { grid-column: span 1; }
+  .gp-panel.is-wide { grid-column: span 1; }
 }
 
 .gp-head {
@@ -9878,7 +9883,11 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    out the naming, but didn't make the actual circle bigger." Sized by
    whichever of height or width binds first, so it grows to fill the panel's
    real 2x2 space rather than the old fixed 330px ceiling. */
-.gp-wheel { position: relative; height: 100%; width: auto; max-width: 100%; margin: 0 auto; aspect-ratio: 1;
+/* Natural size again: a fixed cap on a content-sized panel, not a stretch to
+   fill a row-span that no longer exists. Bigger than its very first size
+   today (280px, was 210px) because the panel is wide (is-wide, two columns)
+   and the wheel is the one thing on this whole screen worth the room. */
+.gp-wheel { position: relative; width: 100%; max-width: 280px; margin: 0 auto; aspect-ratio: 1;
   padding: 4px; }
 .gp-wheel svg { display: block; width: 100%; height: 100%; }
 .gp-wheel-ring { fill: none; stroke: rgba(242, 240, 234, 0.09); stroke-width: 1; }
@@ -9900,59 +9909,11 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .gp-legend li.is-bad b { color: var(--tl-no); }
 .gp-legend li.is-good b { color: var(--tl-hot); }
 
-/* ---- every chart scales to the panel it is in ----
-   His instruction (2026-09-12): fit the screen, stop scrolling. Clipping was
-   the first answer and it is a worse one -- a heatmap cut off after Tuesday is
-   not a heatmap. These were all `height: auto`, which takes its size from the
-   panel's WIDTH and cannot give any of it back when the panel gets shorter, so
-   the panel overflowed and the overflow was hidden. Each chart now takes the
-   height that is left and scales into it. */
-.gp-panel > .gp-coins,
-.gp-panel > .gp-orbit,
-.gp-panel > .gp-arcs,
-.gp-panel > .gp-slips,
-.gp-panel > .gp-range,
-.gp-panel > .gp-heat,
-.gp-panel > .gp-track { flex: 1; min-height: 0; }
-
-.gp-coins svg, .gp-orbit svg, .gp-arcs svg, .gp-slips svg, .gp-range svg {
-  width: 100%; height: 100%; display: block;
-}
-/* The orbit is a circle and must stay one, so it is centred in whatever box it
-   gets rather than stretched to fill it. */
-.gp-orbit { max-width: none; display: grid; place-items: center; }
-.gp-orbit svg { max-width: min(100%, 210px); max-height: 100%; }
-.gp-arcs svg, .gp-coins svg, .gp-slips svg, .gp-range svg { max-height: 100%; }
-
-/* The heatmap is a CSS grid of fixed 16px cells, so it could not shrink at
-   all. Rows share the height now and a cell stays square by aspect-ratio. */
-.gp-heat { align-items: stretch; }
-.gp-heat-dow { grid-template-rows: repeat(7, minmax(0, 1fr)); }
-.gp-heat-dow span { font-size: 9px; line-height: 1; display: flex; align-items: center; }
-.gp-heat-col { grid-template-rows: repeat(7, minmax(0, 1fr)); }
-/* No aspect-ratio: a square cell takes its height from its width, and with
-   eleven columns across a wide panel that made the seven rows taller than the
-   panel however small the rows were told to be. The grid sets both axes now,
-   so cells are whatever shape the space allows. */
-.gp-cell { width: 100%; height: 100%; min-width: 0; min-height: 0; }
-.gp-heat-grid { grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; justify-content: stretch; }
-
-/* The wheel keeps its own square and centres, and its labels sit inside the
-   panel rather than off its edge. */
-.gp-panel.is-tall > .gp-wheel { flex: 1; min-height: 0; }
-
-/* Training and Routines keep their chart one level down, inside a split or
-   after a read-out, so the direct-child rule above never reached them. */
-.gp-panel .gp-heat { flex: 1; min-height: 0; }
-.gp-panel .gp-track { flex: 1; min-height: 0; align-content: center; }
-/* The routine rings were a fixed 44px that could not give anything back. */
-/* The split above the heatmap must not claim height the heatmap then needs. */
-
-/* The last of it. `.gp-heat` is a two-column grid (day labels, then the days)
-   and its own rows still sized to content; the read-outs above a chart also
-   had generous leading that a short panel cannot afford. */
-.gp-heat { grid-template-rows: minmax(0, 1fr); min-height: 0; }
-.gp-heat-dow, .gp-heat-grid { min-height: 0; height: 100%; }
+/* All of today's earlier "shrink to fit a fixed row" overrides for these
+   charts are gone -- the charts underneath (the ones actually defined where
+   Heat/Orbit/Arcs/Wheel are first styled, further up this file) already draw
+   at a sensible fixed size. That size was fighting these overrides all day;
+   removing the overrides is the fix, not writing a smarter one. */
 .gp-panel .gp-read { flex: none; }
 .gp-panel .gp-sub, .gp-panel .gp-line { flex: none; }
 /* A list inside a panel scrolls itself rather than pushing the panel past the
@@ -9982,7 +9943,6 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    tall at once -- .is-wide and .is-tall each do their own job below, and this
    panel simply carries both classes now instead of is-tall borrowing
    is-wide's job for it alone. */
-.gp-wheel { min-height: 0; }
 
 /* ---- COMPACT, his word ----
    The panels are back in half a window rather than seventy percent of one, and
@@ -10171,7 +10131,11 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    cut at three. The three-item cap that made Postponed, Quitting and Goals
    all draw the same "I know there's more than this" complaint was in the
    data, not the layout -- raised there; this is what lets the fix show. */
-.gp-scroll { flex: 1; min-height: 0; overflow-y: auto; margin-top: 2px; }
+/* A real cap, not flex:1 -- in a content-sized panel there is no leftover
+   space for flex to distribute, and with the row cap raised to 20 items
+   (2026-09-12) an unconstrained list would make one card enormous. Five or
+   six rows show before it scrolls; the rest are a scroll away, not gone. */
+.gp-scroll { max-height: 132px; overflow-y: auto; margin-top: 2px; }
 .gp-scroll .gp-rows { padding-right: 2px; }
 
 /* ---- routines, as a list instead of a row of rings ---- */

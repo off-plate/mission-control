@@ -831,6 +831,64 @@ await step('watchless: tidying repairs the captions on his own key, and only whe
   })
 })
 
+await step('the zone: his own YouTube links become the queue, and the list plays any of them', async () => {
+  await fresh('today')
+  await page.evaluate(() => {
+    localStorage.setItem('mc-view', 'personal'); localStorage.setItem('mc-space', 'personal')
+    localStorage.removeItem('mc-pomodoro'); localStorage.removeItem('mc-tune-titles')
+  })
+  await page.goto(`${URL}#/zone`); await page.reload(); await page.waitForTimeout(1200)
+  const skipRoll = page.getByRole('button', { name: 'Not today' })
+  if (await skipRoll.count()) { await skipRoll.first().click(); await page.waitForTimeout(300) }
+  await page.waitForSelector('.zplayer', { timeout: 10000 })
+
+  /* With nothing of his own, the curated channel is what plays: the room is
+     never silent on a fresh install. */
+  if (!/mundi opus/i.test(await page.locator('.zplayer-source').innerText())) {
+    throw new Error('with no library of his own the player is not on Mundi Opus')
+  }
+  await page.locator('.zplayer-btn[aria-label="Show the queue"]').click(); await page.waitForTimeout(400)
+  const seeded = await page.locator('.zqueue-row').count()
+  if (seeded < 2) throw new Error(`the queue list shows ${seeded} tracks`)
+
+  /* His ask (2026-09-12): paste links, get a queue. Titles are fetched from
+     YouTube's oEmbed, so they are stubbed here -- a gate that needs the
+     network is a gate that goes red when the network does. */
+  await page.route(/youtube\.com\/oembed/, (r) => {
+    const id = decodeURIComponent(r.request().url()).split('v=')[1]?.split('&')[0] ?? '?'
+    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ title: `Track ${id}` }) })
+  })
+  await page.locator('.zqueue-add').click(); await page.waitForTimeout(300)
+  await page.locator('.zlib textarea').fill([
+    'https://www.youtube.com/watch?v=aaaaaaaaaaa',
+    'https://youtu.be/bbbbbbbbbbb',
+    'this is not a link',
+    'https://www.youtube.com/watch?v=ccccccccccc',
+  ].join('\n'))
+  await page.waitForTimeout(300)
+  /* A typo is reported rather than silently dropped. */
+  const foot = await page.locator('.zlib-foot span').innerText()
+  if (!/3 tracks/.test(foot) || !/1 line is not a YouTube link/.test(foot)) throw new Error(`the library miscounts: ${foot}`)
+  await page.locator('.zlib-save').click(); await page.waitForTimeout(900)
+
+  if (!/your queue, 3/i.test(await page.locator('.zplayer-source').innerText())) {
+    throw new Error('saving his links did not make them the queue')
+  }
+  await page.locator('.zplayer-btn[aria-label="Show the queue"]').click(); await page.waitForTimeout(700)
+  const titles = await page.locator('.zqueue-title').allInnerTexts()
+  if (titles.length !== 3) throw new Error(`${titles.length} tracks in his queue, not 3`)
+  if (!titles.some((x) => /^Track /.test(x))) throw new Error(`the real titles never arrived: ${titles.join(' | ')}`)
+
+  /* The other half of what he asked for: click the one he wants. */
+  await page.locator('.zqueue-row').nth(2).click(); await page.waitForTimeout(600)
+  if (!(await page.locator('.zqueue-row').nth(2).evaluate((e) => e.classList.contains('is-on')))) {
+    throw new Error('clicking a track in the list did not make it the one playing')
+  }
+  const kept = await page.evaluate((K) => (JSON.parse(localStorage.getItem(K) ?? '{}').tunes ?? []).length, KEY)
+  if (kept !== 3) throw new Error(`his library did not persist (${kept} stored)`)
+  await page.unroute(/youtube\.com\/oembed/)
+})
+
 await step('mundi opus: leaving the zone does not stop the music, and the corner picks it up', async () => {
   await fresh('zone')
   const skip = page.getByRole('button', { name: 'Not today' })

@@ -160,6 +160,8 @@ interface PersistedState {
    *  list in `reels.ts` at read time. In the synced blob because a library he
    *  built on the laptop has to be there on the phone at midnight. */
   reels?: string[]
+  /** His own focus-music links for the Zone's player. */
+  tunes?: string[]
   /** Instagram link -> the file reel-fetch downloaded for it, once. Synced so
    *  the download that already happened on one device is a lookup on every
    *  other, not a second fetch. */
@@ -173,6 +175,8 @@ interface Store extends PersistedState {
   setTwoLives: (key: string, url: string) => void
   /** Replace the reel library with this list, already parsed and deduplicated. */
   setReels: (list: string[]) => void
+  tunes: string[]
+  setTunes: (list: string[]) => void
   /** Record where reel-fetch put the downloaded file for an Instagram link. */
   setReelFile: (originalUrl: string, fileUrl: string) => void
   /** What he is looking at. 'all' shows every space at once. */
@@ -1117,7 +1121,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   /* An empty link is a removal, not a blank entry, so the key does not linger
      and win a merge against a device that still holds the real one. */
   const twoLivesSlice = useTwoLivesSlice(persisted)
-  const { twoLives, setTwoLivesRaw, setTwoLives, reels, setReelsRaw, setReels, reelFiles, setReelFilesRaw, setReelFile } = twoLivesSlice
+  const { twoLives, setTwoLivesRaw, setTwoLives, reels, setReelsRaw, setReels, tunes, setTunesRaw, setTunes, reelFiles, setReelFilesRaw, setReelFile } = twoLivesSlice
   const [spaceGuessed] = useState<number>(persisted?.spaceGuessed ?? 0)
   const [lastRollDay] = useState<string | undefined>(persisted?.lastRollDay)
   const remoteSaveTimer = useRef<number | undefined>(undefined)
@@ -1262,7 +1266,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       notes, noteFolders,
       savedAt: Date.now(), lastWrite: { dev: deviceId(), name: deviceName(), at: Date.now() },
       weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
-      habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, spaceGuessed, graveyard, twoLives, reels, reelFiles, lastRollDay: lastRollDay ?? localDateKey(),
+      habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, spaceGuessed, graveyard, twoLives, reels, tunes, reelFiles, lastRollDay: lastRollDay ?? localDateKey(),
     }
     const json = JSON.stringify(state)
     /* His own writing is the one thing that makes "updated from your iPhone"
@@ -1289,7 +1293,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { outbox.push(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels, reelFiles])
+  }, [spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels, tunes, reelFiles])
 
   /* ---- state that arrived from somewhere else ----
      Another tab of this browser, or this account on another device. Merged in,
@@ -1350,6 +1354,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     /* An array, not truthiness: clearing the library on one device has to
        arrive here too, and an empty list is a real answer. */
     if (Array.isArray(p.reels)) setReelsRaw(p.reels)
+    if (Array.isArray(p.tunes)) setTunesRaw(p.tunes)
     if (p.reelFiles) setReelFilesRaw(p.reelFiles)
   }
   /* applyExternal itself is a plain closure rebuilt every render (it reads
@@ -1533,7 +1538,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setTaskProject: plannerSlice.setTaskProject,
     focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog,
     view, setView, inView,
-    twoLives, setTwoLives, reels, setReels, reelFiles, setReelFile,
+    twoLives, setTwoLives, reels, setReels, tunes, setTunes, reelFiles, setReelFile,
     /* A finished block is recorded once, and everything that cares reads from
        here: measured habits fill from it, and the ledger gets it so focus time
        counts toward estimate accuracy instead of vanishing. */

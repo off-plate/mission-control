@@ -17,25 +17,31 @@ export interface TwoLivesSlice {
   setTwoLivesRaw: (next: Record<string, string>) => void
   setTwoLives: (key: string, url: string) => void
   reels: string[]
+  /** His own focus-music links for the Zone's player (2026-09-12). */
+  tunes: string[]
   setReelsRaw: (next: string[]) => void
   setReels: (list: string[]) => void
+  setTunesRaw: (next: string[]) => void
+  setTunes: (list: string[]) => void
   reelFiles: Record<string, string>
   setReelFilesRaw: (next: Record<string, string>) => void
   setReelFile: (originalUrl: string, fileUrl: string) => void
 }
 
 export function useTwoLivesSlice(
-  persisted: { twoLives?: Record<string, string>; reels?: string[]; reelFiles?: Record<string, string> } | null,
+  persisted: { twoLives?: Record<string, string>; reels?: string[]; reelFiles?: Record<string, string>; tunes?: string[] } | null,
 ): TwoLivesSlice {
   const [twoLives, setTwoLivesRaw] = useState<Record<string, string>>(persisted?.twoLives ?? {})
   const [reels, setReelsRaw] = useState<string[]>(persisted?.reels ?? [])
+  const [tunes, setTunesRaw] = useState<string[]>(persisted?.tunes ?? [])
   const [reelFiles, setReelFilesRaw] = useState<Record<string, string>>(persisted?.reelFiles ?? {})
 
   const setReels = (list: string[]): void => setReelsRaw(list)
+  const setTunes = (list: string[]): void => setTunesRaw(list)
   const setTwoLives = (key: string, url: string): void =>
     setTwoLivesRaw((m) => { const n = { ...m }; if (url.trim()) n[key] = url.trim(); else delete n[key]; return n })
   const setReelFile = (originalUrl: string, fileUrl: string): void =>
     setReelFilesRaw((m) => ({ ...m, [originalUrl]: fileUrl }))
 
-  return { twoLives, setTwoLivesRaw, setTwoLives, reels, setReelsRaw, setReels, reelFiles, setReelFilesRaw, setReelFile }
+  return { twoLives, setTwoLivesRaw, setTwoLives, reels, setReelsRaw, setReels, tunes, setTunesRaw, setTunes, reelFiles, setReelFilesRaw, setReelFile }
 }

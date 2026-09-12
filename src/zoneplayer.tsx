@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { thumbUrl, useMundiOpus } from './mundiplayer'
 import { useStore } from './store'
-import { missingTitles, onTitles, parseTunes, titlesVersion, trackTitle, tuneId, wantTitles } from './tunes'
+import { missingTitles, onTitles, parseTunes, titleFor, titlesVersion, trackTitle, tuneId, wantTitles } from './tunes'
 import * as Icon from './icons'
 
 /* hqdefault does not exist for every video (a live stream has none), and a
@@ -151,13 +151,26 @@ export function ZonePlayer() {
   )
 }
 
-/* Paste links, get a queue. Same shape as the give-up screen's reel library,
-   because he already knows how that one works and two libraries in one app
-   that behave differently is one too many. */
+/* Paste links, ADD a queue.
+   His report (2026-09-12): he pasted four links and the rest of his queue
+   was gone. It was, because this started as the reel library's editor --
+   a box that replaces the whole list with whatever text is in it, prefilled
+   with the current library so leaving it untouched round-tripped safely. The
+   moment he pasted without keeping the old links in view, they were the text
+   that got saved over.
+
+   So this is an ADD box now, never a replace box. Everything already in his
+   library is shown above it and stays there no matter what he pastes below;
+   pasting only ever appends what is new. Removing one is its own button,
+   right on the row, so it is a decision he makes on purpose rather than a
+   side effect of editing text. */
 function TuneLibrary({ onClose }: { onClose: () => void }) {
   const { tunes, setTunes } = useStore()
-  const [text, setText] = useState(() => (tunes ?? []).join('\n'))
+  const mine = tunes ?? []
+  const [text, setText] = useState('')
   const parsed = useMemo(() => parseTunes(text), [text])
+  const already = useMemo(() => new Set(mine.map(tuneId)), [mine])
+  const fresh = useMemo(() => parsed.filter((u) => !already.has(tuneId(u))), [parsed, already])
   /* What he pasted that is NOT a YouTube link, so a typo is visible rather
      than silently dropped. */
   const rejected = useMemo(
@@ -165,32 +178,59 @@ function TuneLibrary({ onClose }: { onClose: () => void }) {
     [text],
   )
 
+  const add = () => {
+    if (!fresh.length) { onClose(); return }
+    const next = [...mine, ...fresh]
+    setTunes(next)
+    wantTitles(fresh.map((u) => tuneId(u) as string))
+    setText('')
+  }
+  const remove = (id: string) => setTunes(mine.filter((u) => tuneId(u) !== id))
+
   return (
     <div className="zlib" role="dialog" aria-label="Focus music">
       <div className="zlib-head">
         <span>Focus music</span>
         <button className="zplayer-btn" onClick={onClose} aria-label="Close"><Icon.Close size={15} /></button>
       </div>
+
+      {mine.length > 0 && (
+        <ul className="zlib-current">
+          {mine.map((url) => {
+            const id = tuneId(url)
+            if (!id) return null
+            return (
+              <li key={id}>
+                <span className="zlib-current-title">{titleFor(id) ?? id}</span>
+                <button className="zlib-remove" onClick={() => remove(id)} aria-label={`Remove ${titleFor(id) ?? id}`}>
+                  <Icon.Close size={12} />
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+
       <p className="zlib-say">
-        One YouTube link per line. They play in this order, and the list opens from the player.
-        Empty it to go back to Mundi Opus.
+        {mine.length ? 'Paste more links to add to the list above. Nothing already there is removed.'
+          : 'Paste YouTube links, one per line. Empty, Mundi Opus plays instead.'}
       </p>
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
         spellCheck={false}
         placeholder="https://www.youtube.com/watch?v=..."
-        aria-label="YouTube links"
+        aria-label="Add YouTube links"
       />
       <div className="zlib-foot">
         <span>
-          {parsed.length} {parsed.length === 1 ? 'track' : 'tracks'}
-          {rejected > 0 && `, ${rejected} ${rejected === 1 ? 'line is' : 'lines are'} not a YouTube link`}
+          {fresh.length > 0 && `${fresh.length} new ${fresh.length === 1 ? 'track' : 'tracks'}`}
+          {parsed.length > fresh.length && ` (${parsed.length - fresh.length} already in your list)`}
+          {rejected > 0 && `${fresh.length || parsed.length > fresh.length ? ', ' : ''}${rejected} ${rejected === 1 ? 'line is' : 'lines are'} not a YouTube link`}
         </span>
-        <button
-          className="zlib-save"
-          onClick={() => { setTunes(parsed); wantTitles(parsed.map((u) => tuneId(u) as string)); onClose() }}
-        >Save</button>
+        <button className="zlib-save" onClick={add} disabled={!fresh.length}>
+          {fresh.length ? `Add ${fresh.length}` : 'Add'}
+        </button>
       </div>
     </div>
   )

@@ -17,7 +17,9 @@
                 interpret. These are the only cards in a loud colour because
                 on a wall meant to be felt, they are the ones to be obeyed. */
 
-import { useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useStore } from './store'
+import * as Icon from './icons'
 
 import { wallImage } from './wall-images'
 
@@ -225,9 +227,27 @@ function Photo({
 
 export function BoardPage() {
   const wall = useMasonry(WALL.length)
+  const { setPage } = useStore()
+  const leave = () => setPage('timeline')
+
+  /* The wall is a dead end without this. Its tab was retired when "Why" moved
+     into Timeline's header, so Timeline is the only door in -- and with no
+     door out he was stuck on it, which is exactly what he reported
+     (2026-09-12). Escape closes it too, the way the give-up screen already
+     behaves, because the two are reached from the same header a tap apart. */
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') leave() }
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [])
+
   return (
     <div className="board-page">
       <header className="board-head">
+        <button className="board-back" onClick={leave} aria-label="Back to the timeline">
+          <Icon.ChevronLeft size={16} />
+          Timeline
+        </button>
         <h1>The wall</h1>
       </header>
       <div className="board-wall" ref={wall}>

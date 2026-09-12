@@ -7927,7 +7927,11 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 /* HALF AND HALF. The reel is a portrait clip in a landscape half, so it is
    cropped rather than letterboxed: black bars either side of a talking head
    are the opposite of what this screen is for. */
-.tl-stage { position: absolute; inset: 0; display: grid; grid-template-columns: 1fr 1fr; }
+/* THIRTY / SEVENTY, his instruction (2026-09-12). The clips are portrait, so
+   an even split had to crop a tall frame into a squarish one to fill its half.
+   A narrow column suits the source, and the seventy it gives back is where the
+   live panels actually live. */
+.tl-stage { position: absolute; inset: 0; display: grid; grid-template-columns: minmax(0, 30fr) minmax(0, 70fr); }
 .tl-reel { position: relative; overflow: hidden; background: #0B0B0C; display: grid; place-items: center; }
 .tl-media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border: 0; }
 .tl-reelempty { position: relative; z-index: 2; max-width: 34ch; padding: 30px; text-align: center; }

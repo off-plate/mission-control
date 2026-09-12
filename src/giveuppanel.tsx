@@ -238,9 +238,40 @@ export function Stops({ items }: { items: { name: string; ran: number; of: numbe
 }
 
 /* ---- the wheel: every domain on one scale, and their average ---- */
+/* "It's just visually not appealing," his exact words (2026-09-12) after
+   living with the first version -- reviewed against three redesigns laid
+   out in an artifact (a true radar instrument, an organic bloom, and a
+   ranked ledger dropping the circle outright), and he picked the
+   instrument: "A is perfect."
+
+   The actual flaw the artifact named, underneath the visual one: position
+   never carried the number. Every node sat at the same fixed radius R and
+   only its own SIZE grew with pct, so a domain at 4% and one at 100% drew
+   spokes of an identical length -- the one thing a radar chart exists to
+   show at a glance was the one thing this version never drew. Nodes now
+   sit at `card.pct * R` along their own spoke, so the shape of the
+   polygon connecting them IS the read: Training out at the rim, Goals and
+   Routines collapsed in near the center, visible before a single number
+   is read. Reference rings at 25/50/75/100 and two tick numerals turn the
+   backdrop into an instrument scale rather than plain decoration.
+
+   Found putting this in front of a real browser, not by reading the code:
+   a card sitting at or near 0% (Debt, most days) draws its node a few
+   pixels off the exact center -- right on top of the big overall percentage
+   the HTML overlay draws there. INNER gives every node a floor distance
+   from the hub before its own pct starts adding to that, the same reason
+   most real radar charts never start their scale at the literal center
+   point. Distance still carries the number end to end (0% and 100% are
+   still as far apart as the ring allows), it just no longer has to also
+   double as this room's leftover space for a hole that was never drawn. */
 export function Wheel({ cards }: { cards: Scored[] }) {
-  const S = 300, c = S / 2, R = 84
+  const S = 300, c = S / 2, R = 84, INNER = 30
   const overall = cards.length ? cards.reduce((a, x) => a + x.pct, 0) / cards.length : 0
+  const spokes = cards.map((card, i) => {
+    const a = (i / cards.length) * TAU - Math.PI / 2
+    return { card, rim: pol(c, c, R, a), at: pol(c, c, INNER + card.pct * (R - INNER), a) }
+  })
+  const polyD = spokes.length ? `M ${spokes.map(({ at }) => `${at.x} ${at.y}`).join(' L ')} Z` : ''
   return (
     <div className="gp-wheel">
       <svg viewBox={`0 0 ${S} ${S}`} aria-hidden="true">
@@ -252,19 +283,18 @@ export function Wheel({ cards }: { cards: Scored[] }) {
           </radialGradient>
         </defs>
         <circle cx={c} cy={c} r={R + 24} fill="url(#gp-core)" />
-        <circle cx={c} cy={c} r={R} className="gp-wheel-ring" />
-        {cards.map((card, i) => {
-          const a = (i / cards.length) * TAU - Math.PI / 2
-          const at = pol(c, c, R, a)
-          const inner = pol(c, c, 26, a)
-          return (
-            <g key={card.id}>
-              <line x1={inner.x} y1={inner.y} x2={at.x} y2={at.y}
-                className={`gp-spoke is-${card.tone}`} style={{ opacity: 0.22 + card.pct * 0.5 }} />
-              <circle cx={at.x} cy={at.y} r={3.4 + card.pct * 2.4} className={`gp-node is-${card.tone}`} />
-            </g>
-          )
-        })}
+        {[1, 0.75, 0.5, 0.25].map((f) => (
+          <circle key={f} cx={c} cy={c} r={R * f} className="gp-wheel-ring" />
+        ))}
+        <text x={c + 4} y={c - R + 3} className="gp-wheel-tick">100</text>
+        <text x={c + 4} y={c - R * 0.5 + 3} className="gp-wheel-tick">50</text>
+        {spokes.map(({ card, rim }) => (
+          <line key={card.id} x1={c} y1={c} x2={rim.x} y2={rim.y} className="gp-wheel-spoke" />
+        ))}
+        {polyD && <path d={polyD} className="gp-wheel-poly" />}
+        {spokes.map(({ card, at }) => (
+          <circle key={card.id} cx={at.x} cy={at.y} r={5} className={`gp-node is-${card.tone}`} />
+        ))}
       </svg>
       <div className="gp-wheel-mid">
         <span>overall</span>

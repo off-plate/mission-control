@@ -1,8 +1,8 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { useStore } from './store'
 import { fmtDuration, taskMinutes } from './util'
 import { thumbUrl, useMundiOpus } from './mundiplayer'
-import { MUNDI_OPUS_QUEUE } from './mundiopus'
+import { onTitles, titlesVersion, trackTitle } from './tunes'
 import { isDesktop, notify as nativeNotify } from './desktop'
 import * as Icon from './icons'
 import { Dock } from './dock'
@@ -370,20 +370,24 @@ export function PomodoroInline() {
 export function MediaChip() {
   const mo = useMundiOpus()
   if (!mo.started) return null
-  const current = MUNDI_OPUS_QUEUE[mo.track]
+  const current = mo.queue[mo.track] ?? mo.queue[0]
   return <img className="dock-chip-art" src={thumbUrl(current.id)} alt="" />
 }
 
 export function MediaBadge() {
   const mo = useMundiOpus()
+  /* Same title source as the Zone's own player, so the two can never name
+     the same track differently. */
+  useSyncExternalStore(onTitles, titlesVersion, () => 0)
   /* Nothing shows until he has actually pressed play once: a player he has
      never touched has nothing to say in a corner he looks at constantly. */
   if (!mo.started) return null
-  const current = MUNDI_OPUS_QUEUE[mo.track]
+  const current = mo.queue[mo.track] ?? mo.queue[0]
+  const title = trackTitle(current)
   return (
     <div className="pomo-media">
       <img className="pomo-media-art" src={thumbUrl(current.id)} alt="" />
-      <span className="pomo-media-title" title={current.title}>{current.title}</span>
+      <span className="pomo-media-title" title={title}>{title}</span>
       <button className="pomo-icon" onClick={() => mo.go(-1)} aria-label="Previous track">
         <Icon.SkipBack size={17} filled />
       </button>

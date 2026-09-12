@@ -13,8 +13,10 @@
    differently sized places without restarting it) for a cost he never asked
    to be able to see: whether the "art" is a still or the frame itself. */
 
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
-import { MUNDI_OPUS_QUEUE } from './mundiopus'
+import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { MUNDI_OPUS_QUEUE, type Track } from './mundiopus'
+import { tunePool } from './tunes'
+import { useStore } from './store'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare global {
@@ -44,13 +46,16 @@ export function loadYouTubeApi(): Promise<void> {
 
 export const thumbUrl = (id: string) => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
 
-function nextIndex(cur: number, shuffled: boolean): number {
-  if (shuffled && MUNDI_OPUS_QUEUE.length > 1) {
+/* Against the LIVE queue, not the curated constant. Once he pastes a library
+   the constant is no longer what is playing, and a shuffle that still counted
+   six would have refused to reach his seventh track. */
+function nextIndex(cur: number, shuffled: boolean, len: number): number {
+  if (shuffled && len > 1) {
     let i = cur
-    while (i === cur) i = Math.floor(Math.random() * MUNDI_OPUS_QUEUE.length)
+    while (i === cur) i = Math.floor(Math.random() * len)
     return i
   }
-  return (cur + 1) % MUNDI_OPUS_QUEUE.length
+  return (cur + 1) % Math.max(1, len)
 }
 
 interface MundiOpus {
@@ -59,6 +64,9 @@ interface MundiOpus {
    *  carries transport for a player he has actually touched. */
   started: boolean
   track: number
+  /** What is actually in the queue: his own library when he has pasted one,
+   *  the curated channel when he has not. */
+  queue: Track[]
   playing: boolean
   pos: number
   dur: number
@@ -66,6 +74,9 @@ interface MundiOpus {
   shuffle: boolean
   toggle: () => void
   go: (by: 1 | -1) => void
+  /** Play a specific track. His ask (2026-09-12): open the list and click the
+   *  one he wants, rather than skipping to it. */
+  jump: (index: number) => void
   seekTo: (seconds: number) => void
   seekBy: (delta: number) => void
   setLoop: (v: boolean) => void
@@ -86,6 +97,11 @@ export function MundiOpusProvider({ children }: { children: ReactNode }) {
   const playerRef = useRef<any>(null)
   const [ready, setReady] = useState(false)
   const [started, setStarted] = useState(false)
+  const { tunes } = useStore()
+  /* His library if he has pasted one, the curated channel if not. */
+  const queue = useMemo(() => tunePool(tunes), [tunes])
+  const queueRef = useRef(queue)
+  useEffect(() => { queueRef.current = queue }, [queue])
   const [track, setTrack] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [pos, setPos] = useState(0)
@@ -109,7 +125,7 @@ export function MundiOpusProvider({ children }: { children: ReactNode }) {
     void loadYouTubeApi().then(() => {
       if (!alive || !mountRef.current) return
       playerRef.current = new window.YT.Player(mountRef.current, {
-        videoId: MUNDI_OPUS_QUEUE[0].id,
+        videoId: (queueRef.current[0] ?? MUNDI_OPUS_QUEUE[0]).id,
         playerVars: { rel: 0, modestbranding: 1, iv_load_policy: 3, playsinline: 1 },
         events: {
           /* No compute-pressure grant here any more. There was one, setting
@@ -131,7 +147,7 @@ export function MundiOpusProvider({ children }: { children: ReactNode }) {
               playerRef.current?.seekTo(0, true)
               playerRef.current?.playVideo()
             } else {
-              setTrack((i) => nextIndex(i, shuffleRef.current))
+              setTrack((i) => nextIndex(i, shuffleRef.current, queueRef.current.length))
             }
           },
         },
@@ -146,9 +162,11 @@ export function MundiOpusProvider({ children }: { children: ReactNode }) {
     if (first.current) { first.current = false; return }
     const p = playerRef.current
     if (!p) return
-    if (playing) p.loadVideoById(MUNDI_OPUS_QUEUE[track].id)
-    else p.cueVideoById(MUNDI_OPUS_QUEUE[track].id)
-  }, [track, ready])
+    const row = queue[track] ?? queue[0]
+    if (!row) return
+    if (playing) p.loadVideoById(row.id)
+    else p.cueVideoById(row.id)
+  }, [track, ready, queue])
 
   useEffect(() => {
     if (!ready) return
@@ -169,7 +187,16 @@ export function MundiOpusProvider({ children }: { children: ReactNode }) {
        and the corner badge showing up should not wait on it. */
     if (playing) { p.pauseVideo() } else { setStarted(true); p.playVideo() }
   }
-  const go = (by: 1 | -1) => setTrack((i) => (i + by + MUNDI_OPUS_QUEUE.length) % MUNDI_OPUS_QUEUE.length)
+  const go = (by: 1 | -1) => setTrack((i) => {
+    const len = Math.max(1, queueRef.current.length)
+    return (i + by + len) % len
+  })
+  const jump = (index: number) => {
+    const len = queueRef.current.length
+    if (index < 0 || index >= len) return
+    setTrack(index)
+    setWanted(true)
+  }
   const seekTo = (seconds: number) => {
     const p = playerRef.current
     if (!p || !dur) return
@@ -179,7 +206,7 @@ export function MundiOpusProvider({ children }: { children: ReactNode }) {
   }
   const seekBy = (delta: number) => seekTo(pos + delta)
 
-  const value: MundiOpus = { ready, started, track, playing, pos, dur, loop, shuffle, toggle, go, seekTo, seekBy, setLoop, setShuffle, ensure: () => setWanted(true) }
+  const value: MundiOpus = { ready, started, track, queue, jump, playing, pos, dur, loop, shuffle, toggle, go, seekTo, seekBy, setLoop, setShuffle, ensure: () => setWanted(true) }
   return (
     <Ctx.Provider value={value}>
       {children}

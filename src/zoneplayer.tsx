@@ -3,19 +3,42 @@
    five-button transport. The player itself lives above this component now,
    so leaving the Zone does not stop the music; this file only draws it. */
 
-import { useEffect, useRef } from 'react'
-import { MUNDI_OPUS_QUEUE } from './mundiopus'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { thumbUrl, useMundiOpus } from './mundiplayer'
+import { useStore } from './store'
+import { missingTitles, onTitles, parseTunes, titlesVersion, trackTitle, tuneId, wantTitles } from './tunes'
 import * as Icon from './icons'
+
+/* hqdefault does not exist for every video (a live stream has none), and a
+   missing one 404s into the console on every render. Fall back to mqdefault
+   once, then give up quietly rather than looping. */
+function fallbackThumb(e: React.SyntheticEvent<HTMLImageElement>): void {
+  const img = e.currentTarget
+  if (img.dataset.fell) { img.style.visibility = 'hidden'; return }
+  img.dataset.fell = '1'
+  img.src = img.src.replace('/hqdefault.jpg', '/mqdefault.jpg')
+}
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`
 
 export function ZonePlayer() {
   const p = useMundiOpus()
+  const { tunes } = useStore()
   const scrubRef = useRef<HTMLDivElement>(null)
+  const [list, setList] = useState(false)
+  const [lib, setLib] = useState(false)
   // Opening the room is what asks for the player; nothing else loads it.
   useEffect(() => { p.ensure() }, [p])
-  const current = MUNDI_OPUS_QUEUE[p.track]
+
+  /* Titles arrive from oEmbed after the list is already on screen, so this
+     re-renders when they land rather than showing ids until the next click. */
+  useSyncExternalStore(onTitles, titlesVersion, () => 0)
+  useEffect(() => { wantTitles(missingTitles(p.queue)) }, [p.queue])
+
+  const current = p.queue[p.track] ?? p.queue[0]
+  const mine = (tunes ?? []).length > 0
+  if (!current) return null
+  const shownTitle = trackTitle(current)
   const pct = p.dur > 0 ? Math.min(100, (p.pos / p.dur) * 100) : 0
   const remaining = p.dur > 0 ? mmss(Math.max(0, p.dur - p.pos)) : '·:··'
 
@@ -30,10 +53,10 @@ export function ZonePlayer() {
   return (
     <div className="zplayer">
       <div className="zplayer-row">
-        <img className="zplayer-art" src={thumbUrl(current.id)} alt="" />
+        <img className="zplayer-art" src={thumbUrl(current.id)} alt="" onError={fallbackThumb} />
         <div className="zplayer-meta">
-          <span className="zplayer-source">Mundi Opus</span>
-          <span className="zplayer-title" title={current.title}>{current.title}</span>
+          <span className="zplayer-source">{mine ? `Your queue, ${p.queue.length}` : 'Mundi Opus'}</span>
+          <span className="zplayer-title" title={shownTitle}>{shownTitle}</span>
         </div>
       </div>
       <div
@@ -84,6 +107,90 @@ export function ZonePlayer() {
         >
           <Icon.Shuffle size={17} />
         </button>
+        {/* His ask (2026-09-12): open the list and click what he wants,
+            instead of pressing Next until it comes round. */}
+        <button
+          className={`zplayer-btn zplayer-tog${list ? ' is-on' : ''}`}
+          onClick={() => { setList((v) => !v); setLib(false) }}
+          aria-expanded={list}
+          aria-label={list ? 'Hide the queue' : 'Show the queue'}
+        >
+          <Icon.List size={17} />
+        </button>
+      </div>
+
+      {list && (
+        <div className="zqueue">
+          <div className="zqueue-head">
+            <span>{mine ? 'Your queue' : 'Mundi Opus'}</span>
+            <button className="zqueue-add" onClick={() => { setLib(true); setList(false) }}>
+              <Icon.Plus size={13} />
+              {mine ? 'Edit links' : 'Add your own'}
+            </button>
+          </div>
+          <ul className="zqueue-list">
+            {p.queue.map((row, i) => (
+              <li key={row.id + i}>
+                <button
+                  className={`zqueue-row${i === p.track ? ' is-on' : ''}`}
+                  onClick={() => p.jump(i)}
+                  title={row.title}
+                >
+                  <img src={thumbUrl(row.id)} alt="" loading="lazy" onError={fallbackThumb} />
+                  <span className="zqueue-title">{trackTitle(row)}</span>
+                  {i === p.track && p.playing && <Icon.Waveform size={13} />}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {lib && <TuneLibrary onClose={() => setLib(false)} />}
+    </div>
+  )
+}
+
+/* Paste links, get a queue. Same shape as the give-up screen's reel library,
+   because he already knows how that one works and two libraries in one app
+   that behave differently is one too many. */
+function TuneLibrary({ onClose }: { onClose: () => void }) {
+  const { tunes, setTunes } = useStore()
+  const [text, setText] = useState(() => (tunes ?? []).join('\n'))
+  const parsed = useMemo(() => parseTunes(text), [text])
+  /* What he pasted that is NOT a YouTube link, so a typo is visible rather
+     than silently dropped. */
+  const rejected = useMemo(
+    () => text.split('\n').filter((line) => line.trim() && !parseTunes(line).length).length,
+    [text],
+  )
+
+  return (
+    <div className="zlib" role="dialog" aria-label="Focus music">
+      <div className="zlib-head">
+        <span>Focus music</span>
+        <button className="zplayer-btn" onClick={onClose} aria-label="Close"><Icon.Close size={15} /></button>
+      </div>
+      <p className="zlib-say">
+        One YouTube link per line. They play in this order, and the list opens from the player.
+        Empty it to go back to Mundi Opus.
+      </p>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        spellCheck={false}
+        placeholder="https://www.youtube.com/watch?v=..."
+        aria-label="YouTube links"
+      />
+      <div className="zlib-foot">
+        <span>
+          {parsed.length} {parsed.length === 1 ? 'track' : 'tracks'}
+          {rejected > 0 && `, ${rejected} ${rejected === 1 ? 'line is' : 'lines are'} not a YouTube link`}
+        </span>
+        <button
+          className="zlib-save"
+          onClick={() => { setTunes(parsed); wantTitles(parsed.map((u) => tuneId(u) as string)); onClose() }}
+        >Save</button>
       </div>
     </div>
   )

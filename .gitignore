@@ -21,3 +21,6 @@ release/
 
 # Local-only screenshots from scripts/tlshot.mjs
 .tl-shots/
+
+# Local-only screenshots
+.zp-shots/

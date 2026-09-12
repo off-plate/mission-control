@@ -19,9 +19,14 @@ const pol = (cx: number, cy: number, r: number, a: number) => ({ x: cx + r * Mat
 export function Panel({ label, tone, wide, tall, children }: {
   label: string; tone?: 'good' | 'flat' | 'bad'; wide?: boolean; tall?: boolean; children: ReactNode
 }) {
+  /* His report (2026-09-12): the label owned its own row across every panel
+     and bought nothing with the height it took -- the number underneath
+     already says what happened, the label only says what it is measuring.
+     It sits top right now, aligned with the big figure rather than pushing
+     it down, so the height goes to the number and the list, not the caption. */
   return (
     <section className={`gp-panel${wide ? ' is-wide' : ''}${tall ? ' is-tall' : ''}`}>
-      <header className="gp-head"><i className={`gp-dot is-${tone ?? 'flat'}`} />{label}</header>
+      <span className="gp-head"><i className={`gp-dot is-${tone ?? 'flat'}`} />{label}</span>
       {children}
     </section>
   )
@@ -47,72 +52,6 @@ export function Rows({ rows }: { rows: StatusRow[] }) {
         </li>
       ))}
     </ul>
-  )
-}
-
-/* ---- debt: a real pile of coins, drawn ----
-   He asked for the coin pile from his reference. That reference is a rendered
-   3D picture; this is the same object built from his own figure, so the pile
-   is as tall as the debt actually is and the lit coins are the share actually
-   paid off. A picture would have looked the same on the day he clears it. */
-export function DebtPile({ pct, owed }: { pct: number; owed: number }) {
-  /* Columns across, coins up. The tallest stack is the middle of the pile,
-     and the whole thing is scaled by what is owed rather than fixed, so
-     paying it down visibly lowers the heap. */
-  const cols = 15
-  const tallest = Math.max(3, Math.min(9, Math.round(3 + (owed / 250000) * 6)))
-  const W = 260, H = 108, cw = W / cols
-  const rows: { cx: number; cy: number; rx: number; lit: boolean }[] = []
-  let total = 0, lit = 0
-  for (let i = 0; i < cols; i++) {
-    const t = Math.abs(i - (cols - 1) / 2) / ((cols - 1) / 2)
-    const n = Math.max(1, Math.round(tallest * (1 - t * t * 0.92)))
-    total += n
-  }
-  const litUpTo = Math.round(total * pct)
-  let seen = 0
-  for (let i = 0; i < cols; i++) {
-    const t = Math.abs(i - (cols - 1) / 2) / ((cols - 1) / 2)
-    const n = Math.max(1, Math.round(tallest * (1 - t * t * 0.92)))
-    for (let k = 0; k < n; k++) {
-      seen++
-      rows.push({ cx: cw / 2 + i * cw, cy: H - 12 - k * 5.4, rx: cw * 0.46, lit: seen <= litUpTo })
-    }
-    if (seen <= litUpTo) lit = seen
-  }
-  return (
-    <div className="gp-coins" aria-hidden="true">
-      <svg viewBox={`0 0 ${W} ${H}`}>
-        <defs>
-          <linearGradient id="gp-coin" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3A2A24" />
-            <stop offset="100%" stopColor="#140F0D" />
-          </linearGradient>
-          <linearGradient id="gp-coin-lit" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#C9F24A" />
-            <stop offset="100%" stopColor="#6E8A18" />
-          </linearGradient>
-          <radialGradient id="gp-coin-floor">
-            <stop offset="0%" stopColor="var(--tl-no)" stopOpacity="0.5" />
-            <stop offset="100%" stopColor="var(--tl-no)" stopOpacity="0" />
-          </radialGradient>
-        </defs>
-        <ellipse cx={W / 2} cy={H - 8} rx={W * 0.46} ry="9" fill="url(#gp-coin-floor)" />
-        {/* Back to front, so a coin sits IN FRONT of the one behind it. */}
-        {rows.sort((a, b) => b.cy - a.cy).map((c, i) => (
-          <g key={i}>
-            <ellipse cx={c.cx} cy={c.cy} rx={c.rx} ry={c.rx * 0.34}
-              fill={c.lit ? 'url(#gp-coin-lit)' : 'url(#gp-coin)'} />
-            <ellipse cx={c.cx} cy={c.cy - 1.4} rx={c.rx} ry={c.rx * 0.34}
-              className={c.lit ? 'gp-coin-rim is-lit' : 'gp-coin-rim'} />
-          </g>
-        ))}
-      </svg>
-      <div className="gp-coins-scale">
-        <span>{lit ? `${Math.round(pct * 100)}% paid` : '0% paid'}</span>
-        <span>{Math.round(owed).toLocaleString('cs-CZ')} Kč left</span>
-      </div>
-    </div>
   )
 }
 
@@ -198,19 +137,24 @@ export function Heat({ days }: { days: { day: string; minutes: number; on: boole
 /* ---- habits: one ring per habit, a dot per day kept ---- */
 export function Orbit({ rings, overall }: { rings: { name: string; kept: number; of: number }[]; overall: number }) {
   const show = rings.slice(0, 5)
-  const S = 200, c = S / 2
+  /* Half the footprint, his call (2026-09-12): most nights this draws two or
+     three thin rings of mostly-dim dots, which read as empty space long
+     before they read as a chart. Smaller does not lose information -- there
+     was never much of it -- it just stops pretending to be as full as the
+     panels next to it. */
+  const S = 130, c = S / 2
   return (
     <div className="gp-orbit">
       <svg viewBox={`0 0 ${S} ${S}`} aria-hidden="true">
         {show.map((r, i) => {
-          const rad = 34 + i * 15
+          const rad = 22 + i * 10
           return (
             <g key={r.name}>
               <circle cx={c} cy={c} r={rad} className="gp-orbit-track" />
               {Array.from({ length: r.of }, (_, d) => {
                 const a = (d / r.of) * TAU - Math.PI / 2
                 const p = pol(c, c, rad, a)
-                return <circle key={d} cx={p.x} cy={p.y} r={d < r.kept ? 2.6 : 1.5}
+                return <circle key={d} cx={p.x} cy={p.y} r={d < r.kept ? 1.8 : 1.05}
                   className={d < r.kept ? 'gp-orbit-on' : 'gp-orbit-off'} />
               })}
             </g>
@@ -273,27 +217,23 @@ export function Arcs({ arcs, overall }: { arcs: { name: string; pct: number }[];
   )
 }
 
-/* ---- routines: one stop each along a line ---- */
-export function Track({ items }: { items: { name: string; ran: number; of: number; dormant: boolean }[] }) {
-  const show = items.slice(0, 4)
+/* ---- routines: a scrollable list, not a row of rings ----
+   His call (2026-09-12): four rings in a row cost more space than the fact
+   they carried. This is a list, the same weight as Postponed and Quitting's,
+   and it scrolls in place rather than stopping at four -- a fifth routine is
+   not less real for arriving after the fold. */
+export function Stops({ items }: { items: { name: string; ran: number; of: number; dormant: boolean }[] }) {
+  if (!items.length) return null
   return (
-    <div className="gp-track">
-      {show.map((r) => (
-        <div className={`gp-stop${r.dormant ? ' is-dormant' : ''}`} key={r.name}>
+    <ul className="gp-stops">
+      {items.map((r) => (
+        <li key={r.name} className={r.dormant ? 'is-dormant' : undefined}>
           <span className="gp-stop-name">{r.name}</span>
-          <span className="gp-stop-ring">
-            <svg viewBox="0 0 44 44" aria-hidden="true">
-              <circle cx="22" cy="22" r="17" className="gp-stop-track" />
-              <circle cx="22" cy="22" r="17" className="gp-stop-on"
-                strokeDasharray={`${TAU * 17 * (r.ran / r.of)} ${TAU * 17}`}
-                transform="rotate(-90 22 22)" />
-            </svg>
-          </span>
+          <span className="gp-stop-n mono">{r.ran}/{r.of}</span>
           <span className="gp-stop-state">{r.dormant ? 'dormant' : 'on track'}</span>
-          <span className="gp-stop-n">{r.ran}/{r.of}</span>
-        </div>
+        </li>
       ))}
-    </div>
+    </ul>
   )
 }
 

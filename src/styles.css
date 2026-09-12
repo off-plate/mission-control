@@ -9788,7 +9788,6 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .gp-fig.is-good { color: var(--tl-hot); }
 .gp-unit { display: block; margin-top: 5px; font: 600 11px/1.35 var(--font-body); color: var(--tl-dim); }
 .gp-sub { margin: 6px 0 0; font: 500 11px/1.45 var(--font-body); color: var(--tl-faint); }
-.gp-split { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
 
 .gp-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .gp-rows li { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 8px; align-items: baseline; }
@@ -9873,17 +9872,6 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .gp-arcs-mid span { margin-top: 3px; font: 600 8.5px/1 var(--font-body); letter-spacing: 0.14em; text-transform: uppercase; color: var(--tl-faint); }
 
 /* ---- routine track ---- */
-.gp-track { display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: 10px; margin-top: auto; }
-.gp-stop { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; min-width: 0; }
-.gp-stop-name { font: 600 10.5px/1.3 var(--font-body); color: var(--tl-ink); }
-.gp-stop-ring { width: 44px; }
-.gp-stop-ring svg { display: block; width: 100%; height: auto; }
-.gp-stop-track { fill: none; stroke: rgba(242, 240, 234, 0.09); stroke-width: 3; }
-.gp-stop-on { fill: none; stroke: var(--tl-no); stroke-width: 3; stroke-linecap: round; }
-.gp-stop.is-dormant .gp-stop-on { stroke: rgba(242, 240, 234, 0.2); }
-.gp-stop-state { font: 600 9px/1 var(--font-body); letter-spacing: 0.1em; text-transform: uppercase; color: var(--tl-no); }
-.gp-stop.is-dormant .gp-stop-state { color: var(--tl-faint); }
-.gp-stop-n { font: 700 10px/1 var(--font-mono); color: var(--tl-dim); }
 
 /* ---- the wheel ---- */
 .gp-wheel { position: relative; width: 100%; max-width: 330px; margin: 0 auto; aspect-ratio: 1;
@@ -9954,11 +9942,7 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .gp-panel .gp-heat { flex: 1; min-height: 0; }
 .gp-panel .gp-track { flex: 1; min-height: 0; align-content: center; }
 /* The routine rings were a fixed 44px that could not give anything back. */
-.gp-stop-ring { width: auto; max-width: 44px; min-height: 0; display: grid; place-items: center; }
-.gp-stop-ring svg { width: 100%; height: 100%; max-height: 100%; }
-.gp-stop { min-height: 0; overflow: hidden; }
 /* The split above the heatmap must not claim height the heatmap then needs. */
-.gp-split { flex: none; }
 
 /* The last of it. `.gp-heat` is a two-column grid (day labels, then the days)
    and its own rows still sized to content; the read-outs above a chart also
@@ -9990,16 +9974,10 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .gp-heat-dow { overflow: hidden; }
 
 
-/* The wheel needs WIDTH, not height: it carries seven labels around its rim,
-   and in a one-column-wide panel they ran off both edges and over the header.
-   So the tall panel becomes a wide one, which also fills the row it sits in.
-   Rows: Debt Training(2) Postponed / Habits StateOfLife(2) Quitting / Goals
-   Routines(2). */
-.gp-panel.is-tall { grid-column: span 2; grid-row: auto; }
-/* `margin: 0` here was my own bug: it dropped the `auto` that centres the
-   wheel, shoving it against the panel's left edge so its left-hand label ran
-   off. It needs the auto, just not the vertical centring. */
-.gp-panel.is-tall > .gp-wheel { margin: 0 auto; }
+/* His fuller pass (2026-09-12) puts State of life back to being wide AND
+   tall at once -- .is-wide and .is-tall each do their own job below, and this
+   panel simply carries both classes now instead of is-tall borrowing
+   is-wide's job for it alone. */
 .gp-wheel { min-height: 0; }
 
 /* ---- COMPACT, his word ----
@@ -10019,15 +9997,15 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .tl-count-fig b { font-size: clamp(28px, 3.6vh, 44px); }
 .tl-status-head { font-size: clamp(13px, 1.7vh, 16px); }
 
-/* STATE OF LIFE was the one he named: "unreasonably super tall with a lot of
-   empty space". Its wheel is a fixed square that reserved a full row's height
-   whatever was in it, and its labels then needed even more room around that.
-   It spans two columns and ONE row, and the wheel takes the height it is given
-   rather than the width it would like. */
-.gp-panel.is-tall { grid-column: span 2; grid-row: auto; }
-.gp-wheel { max-width: none; width: auto; aspect-ratio: auto; height: 100%;
+/* Now genuinely tall as well as wide -- two row-tracks, not one -- so the
+   wheel gets real height to grow into instead of being squeezed flat, which
+   is what he asked for the second time he saw it ("prolong it a little bit
+   in terms of height... whenever you will make square out of it, expand it
+   to the sides"). It still takes whichever of height or width binds first,
+   so it stays a circle rather than an oval in either direction. */
+.gp-wheel { max-width: none; width: 100%; aspect-ratio: auto; height: 100%;
   display: grid; place-items: center; padding: 0; }
-.gp-wheel svg { width: auto; height: 100%; max-width: 100%; aspect-ratio: 1; }
+.gp-wheel svg { width: auto; height: 100%; max-width: 100%; max-height: 100%; aspect-ratio: 1; }
 .gp-wheel-mid b { font-size: clamp(1.3rem, 3.4vh, 2rem); }
 .gp-legend li { font-size: 9px; }
 .gp-legend li b { font-size: 11px; }
@@ -10042,12 +10020,6 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 
 /* Routines was losing its last line off the bottom: four rings, four names and
    four counts is more than a short panel holds at the old sizes. */
-.gp-track { gap: 6px; }
-.gp-stop { gap: 3px; }
-.gp-stop-name { font-size: 9px; line-height: 1.2; max-height: 2.4em; overflow: hidden; }
-.gp-stop-ring { max-width: 30px; }
-.gp-stop-state { font-size: 7.5px; }
-.gp-stop-n { font-size: 9px; }
 /* ---- the Zone's queue, and where it comes from ----
    His ask (2026-09-12): paste his own YouTube links, and open a list to click
    the one he wants instead of pressing Next until it comes round. */
@@ -10160,3 +10132,61 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 }
 .tl-nowplaying:hover { color: var(--tl-ink); text-decoration: underline; }
 @media (max-width: 700px) { .tl-nowplaying { max-width: 60vw; } }
+
+/* ---- the fuller pass over the give-up screen, his own walk-through ----
+   (2026-09-12) He went panel by panel. What follows is the shared shape that
+   answer took, not eight unrelated tweaks. */
+
+/* THE LABEL MOVES TO THE CORNER. It owned a full row before, in every panel,
+   for a caption the number underneath already implies. Absolute rather than
+   in flow, so the number starts at the panel's own top edge and the height
+   that used to go to "DEBT" goes to "970 473" instead. */
+.gp-panel { padding-top: 26px; }
+.gp-head {
+  position: absolute; top: 12px; right: 14px; z-index: 1;
+  font-size: 8px; letter-spacing: 0.14em;
+}
+
+/* Freed by the label leaving the top and the coins leaving Debt: the
+   supporting lines were compacted to the edge of legibility earlier today
+   and can afford to give some of that back now that there is room. */
+.gp-unit { font-size: 12px; }
+.gp-line, .gp-sub {
+  font-size: 12px; line-height: 1.42;
+  /* A panel that lost its wide layout (Training) can wrap a sub-line that
+     used to fit on one, and a fixed-height row-track has nowhere to put the
+     overflow -- it just gets cut, silently. Clamped to two lines with an
+     ellipsis instead: it degrades, it never spills past the card. */
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* A tall panel's list scrolls INSIDE the card instead of growing it or being
+   cut at three. The three-item cap that made Postponed, Quitting and Goals
+   all draw the same "I know there's more than this" complaint was in the
+   data, not the layout -- raised there; this is what lets the fix show. */
+.gp-scroll { flex: 1; min-height: 0; overflow-y: auto; margin-top: 2px; }
+.gp-scroll .gp-rows { padding-right: 2px; }
+
+/* ---- routines, as a list instead of a row of rings ---- */
+.gp-stops {
+  list-style: none; margin: 0; padding: 0; flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 1px;
+}
+.gp-stops li {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 6px 2px; border-top: 1px dashed rgba(242, 240, 234, 0.08);
+}
+.gp-stops li:first-child { border-top: 0; }
+.gp-stop-name { flex: 1; min-width: 0; font-size: 12px; color: var(--tl-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gp-stop-n { flex: none; font-size: 11px; color: var(--tl-dim); }
+.gp-stop-state {
+  flex: none; font: 700 8.5px/1 var(--font-body); letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--tl-no);
+}
+.gp-stops li.is-dormant .gp-stop-state { color: var(--tl-faint); }
+
+/* The row-track budget: tall panels (Postponed, Quitting, Goals, State of
+   life) get two tracks, everything else one, and dense packing lets the
+   short panels backfill rather than leaving a hole under a spanning one. */
+.gp-grid { grid-auto-flow: dense; }

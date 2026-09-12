@@ -17,8 +17,8 @@ const KEY='mission-control-demo-v12'
 const d=new Date(); const key=(n)=>{const x=new Date(d);x.setDate(x.getDate()-n);return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`}
 
 const b=await chromium.launch(); const errors=[]
-for (const [w,tag] of [[1600,'desktop'],[430,'mobile']]) {
-  const page=await b.newPage({viewport:{width:w,height:1000},deviceScaleFactor:2})
+for (const [w,tag] of [[1600,"desktop"],[430,"mobile"]]) {
+  const page=await b.newPage({viewport:{width:w,height:tag==="desktop"?2300:1000},deviceScaleFactor:2})
   page.on('pageerror',e=>errors.push(`[${w}] ${e.message}`))
   page.on('console',m=>{if(m.type()==='error')errors.push(`[${w}] ${m.text().slice(0,120)}`)})
   await page.goto(URL); await page.waitForTimeout(300)

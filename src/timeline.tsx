@@ -27,8 +27,12 @@
                tracker is not a call this column gets to make alone. */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from './store'
-import { dayOf, useHealth } from './health'
-import { debtCard, goalsCard, habitsCard, healthCard, postponedCard, quittingCard, routinesCard } from './giveupstatus'
+import { dayOf, daysSince, useHealth } from './health'
+import {
+  countdown, debtCard, goalArcs, goalsCard, habitRings, habitsCard, healthCard, postponedCard,
+  quittingCard, routineTrack, routinesCard, score, slipSeries, trainingGrid, trainingKinds,
+} from './giveupstatus'
+import { AgeRange, Arcs, DebtPile, Heat, Orbit, Panel, Read, Rows, Slips, Track, Wheel } from './giveuppanel'
 import { useCompass, type CompassMoney } from './compass'
 import { reelPool, reelKind, parseReels, dedupe } from './reels'
 import { callFunction } from './supabase'
@@ -990,6 +994,8 @@ function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney |
   })
   const url = pool.length ? pool[skip % pool.length] : ''
 
+  const clock = useMemo(() => countdown(), [])
+
   const sessionDays = useMemo(
     () => (health.status === 'ok' ? health.sessions.map(dayOf).filter(Boolean) : []),
     [health],
@@ -997,15 +1003,47 @@ function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney |
 
   /* One dataset, not filtered by whichever workspace tab is open -- the same
      rule the rest of this page follows. */
-  const cards = useMemo(() => [
-    debtCard(money),
-    healthCard(sessionDays),
-    postponedCard(tasks),
-    habitsCard(habits, habitLog),
-    quittingCard(habits, slips),
-    routinesCard(routines, routineLog),
-    goalsCard(goals),
-  ], [money, sessionDays, tasks, habits, habitLog, slips, routines, routineLog, goals])
+  const sessionMins = useSessionMinutes()
+  const sessionTypes = useMemo(
+    () => (health.status === 'ok' ? health.sessions.filter((s) => sessionDays.includes(dayOf(s))).map((s) => s.type ?? '') : []),
+    [health, sessionDays],
+  )
+
+  /* Every domain on one 0..1 scale, so the wheel can average them. Each is
+     the plain reading of its own card: what fraction of this is going well. */
+  const cards = useMemo(() => {
+    const rings = habitRings(habits, habitLog)
+    const track = routineTrack(routines, routineLog)
+    const arcs = goalArcs(goals)
+    const kept = rings.length ? rings.reduce((a, r) => a + r.kept / r.of, 0) / rings.length : 0
+    const ran = track.length ? track.filter((r) => !r.dormant).length / track.length : 0
+    const goalPct = arcs.length ? arcs.reduce((a, g) => a + g.pct, 0) / arcs.length : 0
+    const open = tasks.filter((t) => !t.done)
+    const stale = open.filter((t) => t.createdAt && daysSince(t.createdAt) >= 7).length
+    const slips30 = slips.filter((s) => daysSince(s.day) < 30).length
+    const trained = new Set(sessionDays.filter((d) => daysSince(d) < 30)).size
+    return {
+      rings, track, arcs, kept, ran, goalPct,
+      grid: trainingGrid(sessionDays, sessionMins),
+      ages: open
+        .filter((t) => t.createdAt && daysSince(t.createdAt) >= 7)
+        .map((t) => ({ age: daysSince(t.createdAt as string), what: t.title }))
+        .sort((a, b) => b.age - a.age),
+      kinds: trainingKinds(sessionTypes),
+      slipSeries: slipSeries(slips),
+      list: [
+        score(debtCard(money), money ? money.pct / 100 : 0),
+        score(healthCard(sessionDays), Math.min(1, trained / 20)),
+        score(postponedCard(tasks), open.length ? 1 - stale / open.length : 1),
+        score(habitsCard(habits, habitLog), kept),
+        score(quittingCard(habits, slips), Math.max(0, 1 - slips30 / 20)),
+        score(routinesCard(routines, routineLog), ran),
+        score(goalsCard(goals), goalPct),
+      ],
+    }
+  }, [money, sessionDays, sessionMins, sessionTypes, tasks, habits, habitLog, slips, routines, routineLog, goals])
+
+  const [debt, training, postponed, habitsC, quitting, routinesC, goalsC] = cards.list
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === 'Escape' && !lib) onBack() }
@@ -1018,20 +1056,76 @@ function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney |
       <div className="tl-stage">
         <Reel url={url} count={pool.length} onOpenLibrary={() => setLib(true)} onNext={advanceReel} />
         <div className="tl-status">
-          <p className="tl-status-head">Before you do. This is where you actually are.</p>
-          <div className="tl-stats">
-            {cards.map((c) => (
-              <article className={`tl-stat is-${c.tone}`} key={c.id}>
-                <span className="tl-stat-l">{c.label}</span>
-                <b className="tl-stat-fig">{c.figure}</b>
-                <span className="tl-stat-unit">{c.unit}</span>
-                <p className="tl-stat-line">{c.line}</p>
-                {c.rows?.length ? (
-                  <ul className="tl-stat-rows">{c.rows.map((r) => <li key={r}>{r}</li>)}</ul>
-                ) : null}
-              </article>
-            ))}
+          {/* THE COUNTDOWN, his instruction: days, weeks and hours to the
+              fourteenth of February. It is the hero because it is the only
+              figure here that moves whether he does anything or not. */}
+          <div className="tl-count">
+            <span className="tl-count-l">Until {clock.label}</span>
+            <div className="tl-count-fig">
+              <b>{clock.days.toLocaleString('en-GB')}</b>
+              <span>days</span>
+            </div>
+            <div className="tl-count-sub">
+              <span><b>{clock.weeks}</b> weeks</span>
+              <span><b>{clock.hours.toLocaleString('en-GB')}</b> hours</span>
+            </div>
           </div>
+
+          <p className="tl-status-head">Before you do. This is where you actually are.</p>
+
+          <div className="gp-grid">
+            <Panel label="Debt" tone={debt.tone}>
+              <Read figure={debt.figure} unit={debt.unit} sub={debt.line} tone={debt.tone} />
+              {money && <DebtPile pct={debt.pct} owed={money.owed} />}
+            </Panel>
+
+            <Panel label="Training" tone={training.tone} wide>
+              <div className="gp-split">
+                <Read figure={training.figure} unit={training.unit} sub={training.line} tone={training.tone} />
+                <ul className="gp-kinds">
+                  {cards.kinds.map((k) => <li key={k.label}><b>{k.n}</b><span>{k.label}</span></li>)}
+                </ul>
+              </div>
+              <Heat days={cards.grid} />
+            </Panel>
+
+            <Panel label="Postponed" tone={postponed.tone}>
+              <Read figure={postponed.figure} unit={postponed.unit} sub={postponed.line} tone={postponed.tone} />
+              <AgeRange ages={cards.ages} />
+              {postponed.rows?.length ? <Rows rows={postponed.rows} /> : null}
+            </Panel>
+
+            <Panel label="Habits" tone={habitsC.tone}>
+              <Read figure={habitsC.figure} unit={habitsC.unit} tone={habitsC.tone} />
+              <Orbit rings={cards.rings} overall={cards.kept} />
+            </Panel>
+
+            <Panel label="State of life" tall>
+              <Wheel cards={cards.list} />
+            </Panel>
+
+            <Panel label="Quitting" tone={quitting.tone}>
+              <div className="gp-split">
+                <Read figure={quitting.figure} unit={quitting.unit} sub={quitting.line} tone={quitting.tone} />
+                {quitting.rows?.length ? <Rows rows={quitting.rows} /> : null}
+              </div>
+              <Slips series={cards.slipSeries} />
+            </Panel>
+
+            <Panel label="Goals" tone={goalsC.tone}>
+              <div className="gp-split">
+                <Read figure={goalsC.figure} unit={goalsC.unit} sub={goalsC.line} tone={goalsC.tone} />
+                {goalsC.rows?.length ? <Rows rows={goalsC.rows} /> : null}
+              </div>
+              <Arcs arcs={cards.arcs} overall={cards.goalPct} />
+            </Panel>
+
+            <Panel label="Routines" tone={routinesC.tone} wide>
+              <Read figure={routinesC.figure} unit={routinesC.unit} sub={routinesC.line} tone={routinesC.tone} />
+              <Track items={cards.track} />
+            </Panel>
+          </div>
+
           <button className="tl-back" onClick={onBack}>Ok. Let&rsquo;s go.</button>
         </div>
       </div>

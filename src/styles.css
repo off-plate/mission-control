@@ -10138,3 +10138,14 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   background: var(--z-bone); color: var(--z-ground);
 }
 .zlib-save:active { transform: scale(0.97); }
+
+/* The YouTube host is a wrapper React owns and the API fills, so the iframe it
+   creates has to be told to fill it -- `.tl-media`'s object-fit only applies to
+   replaced elements and the wrapper is not one. */
+/* The host React owns. It takes the place `.tl-media` used to hold on this
+   element, and the iframe inside carries `.tl-media` itself. */
+.tl-ythost { position: absolute; inset: 0; display: block; }
+
+/* The local-folder row in the reel library. */
+.tl-folder { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 2px 0 4px; }
+.tl-libsay.is-quiet { color: var(--tl-faint); flex: 1; min-width: 220px; }

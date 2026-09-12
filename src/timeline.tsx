@@ -35,6 +35,10 @@ import {
 import { AgeRange, Arcs, DebtPile, Heat, Orbit, Panel, Read, Rows, Slips, Track, Wheel } from './giveuppanel'
 import { useCompass, type CompassMoney } from './compass'
 import { reelPool, reelKind, parseReels, dedupe } from './reels'
+import {
+  canPickFolder, forgetFolder, grantFolder, pickFolder, restoreFolder,
+  type FolderState, type LocalReel,
+} from './localreels'
 import { callFunction } from './supabase'
 import { loadYouTubeApi } from './mundiplayer'
 import { getHevyStatsForDay } from './hevy'
@@ -708,14 +712,33 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 
 /* ---- the reel ---- */
-function useReelPool(): string[] {
+
+/* The folder on his own machine, read once per visit and shared by the room
+   and the library so they cannot disagree about what is in it. Restoring
+   never prompts: a browser only grants this off a real click, so a page load
+   that asked would simply be refused. */
+/* A stable empty array: a new [] every render would re-run the pool memo and
+   restart the clip on every keystroke elsewhere on the screen. */
+const EMPTY_LOCAL: LocalReel[] = []
+
+function useLocalFolder() {
+  const [state, setState] = useState<FolderState>({ status: 'none' })
+  useEffect(() => { void restoreFolder().then(setState) }, [])
+  return { state, setState }
+}
+
+function useReelPool(localReels: LocalReel[] = []): string[] {
   const { reels, twoLives } = useStore()
   return useMemo(() => {
     /* Anything set under the old one-link-per-stop shape joins the library
        rather than being stranded in a field nothing reads any more. */
     const old = Object.values(twoLives ?? {}).filter(Boolean)
-    return reelPool([...(reels ?? []), ...old])
-  }, [reels, twoLives])
+    /* His folder goes FIRST. Those are the clips he chose deliberately and
+       downloaded himself; a link that may or may not resolve should not push
+       them down the queue. Blob URLs are per-visit, so they never reach the
+       synced library -- the folder is the record, not a list of URLs. */
+    return [...localReels.map((r) => r.url), ...reelPool([...(reels ?? []), ...old])]
+  }, [reels, twoLives, localReels])
 }
 
 function Reel({ url, count, onOpenLibrary, onNext }: {
@@ -724,6 +747,12 @@ function Reel({ url, count, onOpenLibrary, onNext }: {
   const vid = useRef<HTMLVideoElement>(null)
   const [sound, setSound] = useState(true)
   const [failed, setFailed] = useState(false)
+  /* His ask (2026-09-12): "I cannot stop it at all". One switch for every kind
+     of reel -- the <video> element, the YouTube player, and the Vimeo embed --
+     because from where he is sitting they are all just the clip that is
+     playing. A new clip starts playing, so this resets with the url. */
+  const [paused, setPaused] = useState(false)
+  useEffect(() => { setPaused(false) }, [url])
   const kind = url ? reelKind(url) : null
 
   const { reelFiles, setReelFile } = useStore()
@@ -739,19 +768,23 @@ function Reel({ url, count, onOpenLibrary, onNext }: {
      component's own memory of "already tried this url this time", not the
      store's. */
   const cached = kind === 'instagram' ? reelFiles?.[url] : undefined
-  const [attempt, setAttempt] = useState<{ url: string; failed: boolean } | null>(null)
+  const [attempt, setAttempt] = useState<{ url: string; failed: boolean; message: string } | null>(null)
 
   useEffect(() => { setFailed(false); setSound(true) }, [url])
 
   useEffect(() => {
     if (kind !== 'instagram' || cached || attempt?.url === url) return
-    setAttempt({ url, failed: false })
+    setAttempt({ url, failed: false, message: '' })
     void callFunction('reel-fetch', { method: 'POST', body: { url } }).then((res) => {
       const fileUrl = res.ok && typeof (res.data as { fileUrl?: unknown })?.fileUrl === 'string'
         ? (res.data as { fileUrl: string }).fileUrl
         : ''
-      if (fileUrl) setReelFile(url, fileUrl)
-      else setAttempt((cur) => (cur?.url === url ? { url, failed: true } : cur))
+      if (fileUrl) { setReelFile(url, fileUrl); return }
+      /* The reason changes with what reel-fetch actually tried -- signed in or
+         not, expired session or a reel with no video at all -- so the message
+         it sent back is what shows, not a copy of it kept here to drift. */
+      const message = !res.ok && res.message?.trim() ? res.message : 'Could not reach the downloader.'
+      setAttempt((cur) => (cur?.url === url ? { url, failed: true, message } : cur))
     })
   }, [url, kind, cached, attempt, setReelFile])
 
@@ -766,6 +799,13 @@ function Reel({ url, count, onOpenLibrary, onNext }: {
        than guess, ask for sound and take muted playback over no playback. */
     v.play().catch(() => { v.muted = true; setSound(false); v.play().catch(() => setFailed(true)) })
   }, [playable, effectiveKind])
+
+  useEffect(() => {
+    const v = vid.current
+    if (!v) return
+    if (paused) v.pause()
+    else void v.play().catch(() => { /* autoplay rules, already handled on mount */ })
+  }, [paused, playable])
 
   const hear = () => { const v = vid.current; if (v) { v.muted = false; void v.play() } setSound(true) }
 
@@ -783,9 +823,13 @@ function Reel({ url, count, onOpenLibrary, onNext }: {
         <video ref={vid} className="tl-media" src={playable ?? undefined} autoPlay playsInline onEnded={onNext} onError={() => setFailed(true)} />
       )}
       {!failed && kind === 'youtube' && (
-        <YouTubeReel url={url} sound={sound} onEnded={onNext} onFail={() => setFailed(true)} />
+        <YouTubeReel url={url} sound={sound} paused={paused} onEnded={onNext} onFail={() => setFailed(true)} />
       )}
-      {!failed && kind === 'vimeo' && (
+      {/* Vimeo is a plain embed with no player API wired up here, so "paused"
+          means the iframe is not mounted. Pressing play remounts it, which
+          restarts the clip rather than resuming it -- worth it, because a
+          control that visibly does nothing on one kind of reel is worse. */}
+      {!failed && kind === 'vimeo' && !paused && (
         <iframe key={`${url}|${sound}`} className="tl-media" src={embedSrc(url, sound)} title="Reel"
           allow="autoplay; encrypted-media" frameBorder="0" />
       )}
@@ -801,7 +845,15 @@ function Reel({ url, count, onOpenLibrary, onNext }: {
         <div className="tl-reelempty is-bad">
           <p className="tl-l">That Reel would not download</p>
           <p className="tl-url">{url}</p>
-          <p>Instagram didn't hand over the video for this one, often over the track's music rights, not because the reel is private. It'll try again next time this screen opens. Skip to the next one for now, or take it out.</p>
+          {/* The old wording here was a static guess, first blaming music
+              rights and then a hardcoded rewrite of "what usually happens".
+              Neither survives him actually setting up a session: reel-fetch
+              now has two different true answers -- signed in vs not, expired
+              vs never worked -- and the one that applies is decided server
+              side. So the words on screen are reel-fetch's OWN answer, read
+              straight (2026-09-12), not a copy of it kept here to go stale
+              the next time that function's reasoning changes. */}
+          <p>{attempt?.message || "It'll try again next time this screen opens."}</p>
         </div>
       )}
 
@@ -824,6 +876,11 @@ function Reel({ url, count, onOpenLibrary, onNext }: {
         <button className="tl-setshot" onClick={onOpenLibrary}>
           {count ? `${count} reel${count === 1 ? '' : 's'}` : 'Add reels'}
         </button>
+        {kind && kind !== 'other' && !failed && (
+          <button className="tl-setshot" onClick={() => setPaused((v) => !v)} aria-pressed={paused}>
+            {paused ? 'Play' : 'Pause'}
+          </button>
+        )}
         {count > 1 && <button className="tl-setshot" onClick={onNext}>Next</button>}
         {kind && kind !== 'other' && !failed && !sound && (
           <button className="tl-setshot is-hot" onClick={hear}>Sound on</button>
@@ -837,10 +894,10 @@ function Reel({ url, count, onOpenLibrary, onNext }: {
  *  iframe had no way to know when a clip ended, so `loop=1` was the only
  *  option and the same thirty seconds played forever. This one calls onEnded
  *  the moment the clip finishes, the same pattern Mundi Opus already uses. */
-function YouTubeReel({ url, sound, onEnded, onFail }: {
-  url: string; sound: boolean; onEnded: () => void; onFail: () => void
+function YouTubeReel({ url, sound, paused, onEnded, onFail }: {
+  url: string; sound: boolean; paused: boolean; onEnded: () => void; onFail: () => void
 }) {
-  const mountRef = useRef<HTMLDivElement>(null)
+  const hostRef = useRef<HTMLDivElement>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const playerRef = useRef<any>(null)
   const onEndedRef = useRef(onEnded)
@@ -850,9 +907,26 @@ function YouTubeReel({ url, sound, onEnded, onFail }: {
   useEffect(() => {
     if (!id) { onFail(); return }
     let alive = true
+    /* THE NODE THE API DESTROYS MUST NOT BE REACT'S. Given an element, the
+       IFrame API REPLACES it with its own iframe -- so the div React rendered
+       is gone from the DOM while React still believes it is there, and the
+       next unmount throws "Failed to execute 'removeChild' on 'Node': The node
+       to be removed is not a child of this node". That is the crash he kept
+       hitting on this screen (2026-09-12), found from the message the error
+       card now prints. So React owns an empty host it never fills, and the
+       node handed to the API is created here and cleaned up here. */
+    const host = hostRef.current
+    if (!host) return
+    const mount = document.createElement('div')
+    /* The API copies this node's className onto the iframe it swaps in, which
+       is how `.tl-media` -- the fill rule every other reel kind answers to --
+       reaches the real playing element. Keeping it on the wrapper instead left
+       the iframe unstyled and unfindable. */
+    mount.className = 'tl-media'
+    host.appendChild(mount)
     void loadYouTubeApi().then(() => {
-      if (!alive || !mountRef.current) return
-      playerRef.current = new window.YT!.Player(mountRef.current, {
+      if (!alive || !host.isConnected) return
+      playerRef.current = new window.YT!.Player(mount, {
         videoId: id,
         playerVars: { autoplay: 1, mute: sound ? 0 : 1, controls: 0, playsinline: 1, rel: 0 },
         events: {
@@ -861,7 +935,14 @@ function YouTubeReel({ url, sound, onEnded, onFail }: {
         },
       })
     })
-    return () => { alive = false; playerRef.current?.destroy?.(); playerRef.current = null }
+    return () => {
+      alive = false
+      try { playerRef.current?.destroy?.() } catch { /* already gone with its node */ }
+      playerRef.current = null
+      /* Whatever the API left behind goes with it. React never rendered these
+         children, so clearing them is not touching anything React tracks. */
+      host.replaceChildren()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
@@ -872,11 +953,18 @@ function YouTubeReel({ url, sound, onEnded, onFail }: {
     else p.mute?.()
   }, [sound])
 
+  useEffect(() => {
+    const p = playerRef.current
+    if (!p?.pauseVideo) return
+    if (paused) p.pauseVideo?.()
+    else p.playVideo?.()
+  }, [paused])
+
   /* Given a real element (not a string id), the IFrame API replaces this div
      in place with its generated iframe and carries the className over, so
      tl-media -- the fill rule every other reel kind already answers to --
      lands on the real playing element with no extra wrapper or CSS. */
-  return <div ref={mountRef} className="tl-media" />
+  return <div ref={hostRef} className="tl-ythost" />
 }
 
 /* ---- the library ---- */
@@ -884,7 +972,11 @@ function YouTubeReel({ url, sound, onEnded, onFail }: {
    is a textarea he can paste a page into: every URL in it is pulled out, the
    same clip under four different YouTube spellings counts once, and the panel
    says what it took before he saves. */
-function ReelLibrary({ pool, onClose }: { pool: string[]; onClose: () => void }) {
+function ReelLibrary({ pool, folder, onClose }: {
+  pool: string[]
+  folder: { state: FolderState; setState: (s: FolderState) => void }
+  onClose: () => void
+}) {
   const { reels, setReels } = useStore()
   const [text, setText] = useState(() => (reels ?? []).join('\n'))
   const parsed = useMemo(() => parseReels(text), [text])
@@ -906,6 +998,51 @@ function ReelLibrary({ pool, onClose }: { pool: string[]; onClose: () => void })
           Paste as many links as you like. One per line, separated by commas, or a whole page
           with links in it: every URL gets pulled out and the same clip twice counts once.
         </p>
+
+        {/* A FOLDER ON HIS OWN MACHINE. His instruction (2026-09-12) after
+            Instagram refused a download for the third time: he is not uploading
+            anything, the app should read the clips off his disk. A page cannot
+            open a path -- file:// from https is refused everywhere -- but it can
+            be handed a folder, once, and remember it. */}
+        <div className="tl-folder">
+          {folder.state.status === 'unsupported' && (
+            <p className="tl-libsay is-quiet">
+              Reading a folder needs Chrome or Edge. Safari and Firefox do not offer it, so on
+              those the links above are the only way in.
+            </p>
+          )}
+          {folder.state.status === 'none' && (
+            <>
+              <button className="tl-setshot" onClick={() => void pickFolder().then(folder.setState)}>
+                Play from a folder
+              </button>
+              <span className="tl-libsay is-quiet">
+                Point it at a folder of .mp4, .webm, .mov or .m4v and they play here. Nothing is
+                uploaded and nothing leaves the machine.
+              </span>
+            </>
+          )}
+          {folder.state.status === 'needs-permission' && (
+            <>
+              <button className="tl-setshot is-hot" onClick={() => void grantFolder().then(folder.setState)}>
+                Allow {folder.state.name} again
+              </button>
+              <span className="tl-libsay is-quiet">
+                The folder is remembered; the browser asks for permission again each time it
+                restarts, and only off a click.
+              </span>
+            </>
+          )}
+          {folder.state.status === 'ready' && (
+            <>
+              <span className="tl-libsay">
+                <b>{folder.state.reels.length}</b> clip{folder.state.reels.length === 1 ? '' : 's'} from <b>{folder.state.name}</b>
+              </span>
+              <button className="tl-setshot" onClick={() => void pickFolder().then(folder.setState)}>Change folder</button>
+              <button className="tl-setshot" onClick={() => void forgetFolder().then(folder.setState)}>Stop using it</button>
+            </>
+          )}
+        </div>
         <textarea value={text} onChange={(e) => setText(e.target.value)} spellCheck={false}
           placeholder={'https://www.youtube.com/watch?v=...\nhttps://youtu.be/...\nhttps://youtube.com/shorts/...\nhttps://www.instagram.com/reel/...'} />
         <div className="tl-libcount">
@@ -982,7 +1119,9 @@ function tierOf(days: number): 1 | 2 | 3 | 4 | 5 | 6 {
 function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney | null }) {
   const { habits, habitLog, goals, tasks, routines, routineLog, slips } = useStore()
   const health = useHealth().state
-  const pool = useReelPool()
+  const folder = useLocalFolder()
+  const localReels = folder.state.status === 'ready' ? folder.state.reels : EMPTY_LOCAL
+  const pool = useReelPool(localReels)
   const [lib, setLib] = useState(false)
   const [skip, setSkip] = useState(() => (pool.length ? Math.floor(Math.random() * pool.length) : 0))
   const advanceReel = () => setSkip((s) => {
@@ -1136,7 +1275,7 @@ function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney |
         </div>
       </div>
 
-      {lib && <ReelLibrary pool={pool} onClose={() => setLib(false)} />}
+      {lib && <ReelLibrary pool={pool} folder={folder} onClose={() => setLib(false)} />}
     </div>
   )
 }

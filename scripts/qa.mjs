@@ -4481,15 +4481,34 @@ await step('timeline: the reel answers to Next', async () => {
     localStorage.setItem(K, JSON.stringify(s))
   }, KEY)
   await page.reload(); await page.waitForTimeout(700)
-  await page.locator('.tl-giveup').click(); await page.waitForTimeout(2000)
+  await page.locator('.tl-giveup').click()
   const src = () => page.evaluate(() => document.querySelector('iframe.tl-media, video.tl-media')?.getAttribute('src') ?? '')
+  /* Was a fixed 2000ms sleep. The YouTube IFrame API script has to load from
+     a real network before it fills the host with a playing element, and how
+     long that takes depends on the network this run happens to get -- timed
+     directly at 280ms on a clear connection, but a fixed wait either eats
+     that every single run or, on the day the network is a beat slower, fails
+     a real render as "nothing is playing". Polling for the actual element
+     costs nothing extra on the fast path and survives the slow one. */
+  await page.waitForFunction(
+    () => !!document.querySelector('iframe.tl-media, video.tl-media')?.getAttribute('src'),
+    null, { timeout: 12000 },
+  ).catch(() => {})
   const first = await src()
   if (!first) throw new Error('nothing is playing with three real reels in the library')
   if (/mute=1|muted=1/.test(first)) throw new Error('the reel is muted')
   /* The slider this used to drive is gone (2026-09-12, his instruction), so
      what is left to prove is the half that was always the point: Next moves
      the clip on. */
-  await page.locator('.tl-setshot', { hasText: 'Next' }).click(); await page.waitForTimeout(1500)
+  await page.locator('.tl-setshot', { hasText: 'Next' }).click()
+  await page.waitForFunction(
+    (prev) => {
+      const el = document.querySelector('iframe.tl-media, video.tl-media')
+      const cur = el?.getAttribute('src') ?? ''
+      return !!cur && cur !== prev
+    },
+    first, { timeout: 12000 },
+  ).catch(() => {})
   if (await src() === first) throw new Error('Next did not change the clip')
   await page.keyboard.press('Escape'); await page.waitForTimeout(300)
 })

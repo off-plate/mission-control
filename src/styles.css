@@ -7927,11 +7927,9 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 /* HALF AND HALF. The reel is a portrait clip in a landscape half, so it is
    cropped rather than letterboxed: black bars either side of a talking head
    are the opposite of what this screen is for. */
-/* THIRTY / SEVENTY, his instruction (2026-09-12). The clips are portrait, so
-   an even split had to crop a tall frame into a squarish one to fill its half.
-   A narrow column suits the source, and the seventy it gives back is where the
-   live panels actually live. */
-.tl-stage { position: absolute; inset: 0; display: grid; grid-template-columns: minmax(0, 30fr) minmax(0, 70fr); }
+/* Even halves. Briefly 30/70 at his instruction and corrected back the same
+   day: "maybe i was wrong, make the videos 50%". */
+.tl-stage { position: absolute; inset: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .tl-reel { position: relative; overflow: hidden; background: #0B0B0C; display: grid; place-items: center; }
 .tl-media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border: 0; }
 .tl-reelempty { position: relative; z-index: 2; max-width: 34ch; padding: 30px; text-align: center; }
@@ -9700,8 +9698,12 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    THE ROWS WERE UNREADABLE. Age and title were glued into one string, so the
    layout cut them mid-word: "42d Build a SoMe post generator and…". They are
    two elements now, the age fixed and the title free to use what is left. */
-.tl-status { position: relative; height: 100%; overflow-y: auto; padding: 24px 26px 28px;
-  display: flex; flex-direction: column; gap: 18px;
+/* IT FITS, IT DOES NOT SCROLL. His instruction (2026-09-12): the panels have
+   acres of empty space and no business scrolling. So the column is a flex
+   stack whose grid takes whatever height is left after the countdown, and the
+   rows divide it between them rather than each growing to its content. */
+.tl-status { position: relative; height: 100%; overflow: hidden; padding: 20px 22px 22px;
+  display: flex; flex-direction: column; gap: 14px; min-height: 0;
   background: radial-gradient(120% 130% at 82% -10%, #14161A, #0A0A0B 70%); }
 
 /* The one figure that moves whether he acts or not. */
@@ -9737,14 +9739,22 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    Their slots draw from his own figures instead.
    ============================================================ */
 .gp-grid {
+  /* flex:1 + min-height:0 is the pair that lets a grid shrink inside a flex
+     column at all; without the floor removed it takes its content height and
+     pushes the column past the screen, which is the scroll he was seeing. */
+  flex: 1; min-height: 0;
   display: grid; gap: 10px;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) minmax(0, 1fr);
+  grid-auto-rows: minmax(0, 1fr);
 }
 .gp-panel {
-  position: relative; padding: 14px 15px 15px; border-radius: 14px;
+  position: relative; padding: 12px 14px 13px; border-radius: 14px;
   background: linear-gradient(168deg, rgba(242, 240, 234, 0.055), rgba(242, 240, 234, 0.022));
   box-shadow: inset 0 0 0 1px rgba(242, 240, 234, 0.07);
-  display: flex; flex-direction: column; gap: 10px; min-width: 0;
+  display: flex; flex-direction: column; gap: 8px; min-width: 0;
+  /* Same floor removal, one level down: a panel that cannot shrink makes its
+     row unshrinkable, and one stubborn row is all it takes to scroll again. */
+  min-height: 0; overflow: hidden;
 }
 .gp-panel.is-wide { grid-column: span 2; }
 .gp-panel.is-tall { grid-row: span 2; }
@@ -9897,3 +9907,144 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .gp-legend b { margin-top: 2px; font: 800 13px/1 var(--font-display); color: var(--tl-dim); }
 .gp-legend li.is-bad b { color: var(--tl-no); }
 .gp-legend li.is-good b { color: var(--tl-hot); }
+
+/* ---- every chart scales to the panel it is in ----
+   His instruction (2026-09-12): fit the screen, stop scrolling. Clipping was
+   the first answer and it is a worse one -- a heatmap cut off after Tuesday is
+   not a heatmap. These were all `height: auto`, which takes its size from the
+   panel's WIDTH and cannot give any of it back when the panel gets shorter, so
+   the panel overflowed and the overflow was hidden. Each chart now takes the
+   height that is left and scales into it. */
+.gp-panel > .gp-coins,
+.gp-panel > .gp-orbit,
+.gp-panel > .gp-arcs,
+.gp-panel > .gp-slips,
+.gp-panel > .gp-range,
+.gp-panel > .gp-heat,
+.gp-panel > .gp-track { flex: 1; min-height: 0; }
+
+.gp-coins svg, .gp-orbit svg, .gp-arcs svg, .gp-slips svg, .gp-range svg {
+  width: 100%; height: 100%; display: block;
+}
+/* The orbit is a circle and must stay one, so it is centred in whatever box it
+   gets rather than stretched to fill it. */
+.gp-orbit { max-width: none; display: grid; place-items: center; }
+.gp-orbit svg { max-width: min(100%, 210px); max-height: 100%; }
+.gp-arcs svg, .gp-coins svg, .gp-slips svg, .gp-range svg { max-height: 100%; }
+
+/* The heatmap is a CSS grid of fixed 16px cells, so it could not shrink at
+   all. Rows share the height now and a cell stays square by aspect-ratio. */
+.gp-heat { align-items: stretch; }
+.gp-heat-dow { grid-template-rows: repeat(7, minmax(0, 1fr)); }
+.gp-heat-dow span { font-size: 9px; line-height: 1; display: flex; align-items: center; }
+.gp-heat-col { grid-template-rows: repeat(7, minmax(0, 1fr)); }
+/* No aspect-ratio: a square cell takes its height from its width, and with
+   eleven columns across a wide panel that made the seven rows taller than the
+   panel however small the rows were told to be. The grid sets both axes now,
+   so cells are whatever shape the space allows. */
+.gp-cell { width: 100%; height: 100%; min-width: 0; min-height: 0; }
+.gp-heat-grid { grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; justify-content: stretch; }
+
+/* The wheel keeps its own square and centres, and its labels sit inside the
+   panel rather than off its edge. */
+.gp-panel.is-tall > .gp-wheel { flex: 1; min-height: 0; }
+
+/* Training and Routines keep their chart one level down, inside a split or
+   after a read-out, so the direct-child rule above never reached them. */
+.gp-panel .gp-heat { flex: 1; min-height: 0; }
+.gp-panel .gp-track { flex: 1; min-height: 0; align-content: center; }
+/* The routine rings were a fixed 44px that could not give anything back. */
+.gp-stop-ring { width: auto; max-width: 44px; min-height: 0; display: grid; place-items: center; }
+.gp-stop-ring svg { width: 100%; height: 100%; max-height: 100%; }
+.gp-stop { min-height: 0; overflow: hidden; }
+/* The split above the heatmap must not claim height the heatmap then needs. */
+.gp-split { flex: none; }
+
+/* The last of it. `.gp-heat` is a two-column grid (day labels, then the days)
+   and its own rows still sized to content; the read-outs above a chart also
+   had generous leading that a short panel cannot afford. */
+.gp-heat { grid-template-rows: minmax(0, 1fr); min-height: 0; }
+.gp-heat-dow, .gp-heat-grid { min-height: 0; height: 100%; }
+.gp-panel .gp-read { flex: none; }
+.gp-panel .gp-sub, .gp-panel .gp-line { flex: none; }
+/* A list inside a panel scrolls itself rather than pushing the panel past the
+   screen: the panel is the thing that must not grow. */
+.gp-panel .gp-list, .gp-panel .gp-kinds { min-height: 0; overflow: hidden; }
+
+/* FOUR ACROSS, NOT THREE. Eight panels three-wide is four rows, and four rows
+   inside one screen leaves each about 175px -- enough to fit, not enough to
+   read, which is how the heatmap's day labels ended up on top of each other.
+   Four columns makes it three rows and gives every panel back a third of its
+   height. The charts are small here by design; the point of this screen is the
+   shape of the last month, not a value read off an axis. */
+.gp-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* Room for the grid: the countdown is the hero but it does not need to be
+   ninety pixels tall to say 154. */
+.tl-count { padding-bottom: 12px; }
+.tl-count-fig b { font-size: clamp(34px, 4.4vh, 56px); }
+.tl-status-head { font-size: clamp(14px, 1.9vh, 19px); }
+
+/* Day labels only when there is room for seven of them. Below that they
+   collide, and a column of overlapping three-letter words is worse than no
+   column at all -- the heatmap still reads as a shape without them. */
+.gp-heat-dow { overflow: hidden; }
+
+
+/* The wheel needs WIDTH, not height: it carries seven labels around its rim,
+   and in a one-column-wide panel they ran off both edges and over the header.
+   So the tall panel becomes a wide one, which also fills the row it sits in.
+   Rows: Debt Training(2) Postponed / Habits StateOfLife(2) Quitting / Goals
+   Routines(2). */
+.gp-panel.is-tall { grid-column: span 2; grid-row: auto; }
+/* `margin: 0` here was my own bug: it dropped the `auto` that centres the
+   wheel, shoving it against the panel's left edge so its left-hand label ran
+   off. It needs the auto, just not the vertical centring. */
+.gp-panel.is-tall > .gp-wheel { margin: 0 auto; }
+.gp-wheel { min-height: 0; }
+
+/* ---- COMPACT, his word ----
+   The panels are back in half a window rather than seventy percent of one, and
+   he wants them denser rather than scrolling. Every figure, label and pad comes
+   down a step; nothing is removed. */
+.gp-panel { padding: 10px 11px 11px; gap: 6px; border-radius: 12px; }
+.gp-grid { gap: 8px; }
+.gp-head { font-size: 8.5px; letter-spacing: 0.16em; }
+.gp-read b, .gp-figure { font-size: clamp(24px, 3.2vh, 40px); line-height: 1; }
+.gp-unit { font-size: 10.5px; }
+.gp-line, .gp-sub { font-size: 10.5px; line-height: 1.35; }
+.gp-kinds li b { font-size: 15px; }
+.gp-kinds li span { font-size: 8.5px; }
+.tl-status { padding: 16px 18px 18px; gap: 10px; }
+.tl-count { padding-bottom: 9px; }
+.tl-count-fig b { font-size: clamp(28px, 3.6vh, 44px); }
+.tl-status-head { font-size: clamp(13px, 1.7vh, 16px); }
+
+/* STATE OF LIFE was the one he named: "unreasonably super tall with a lot of
+   empty space". Its wheel is a fixed square that reserved a full row's height
+   whatever was in it, and its labels then needed even more room around that.
+   It spans two columns and ONE row, and the wheel takes the height it is given
+   rather than the width it would like. */
+.gp-panel.is-tall { grid-column: span 2; grid-row: auto; }
+.gp-wheel { max-width: none; width: auto; aspect-ratio: auto; height: 100%;
+  display: grid; place-items: center; padding: 0; }
+.gp-wheel svg { width: auto; height: 100%; max-width: 100%; aspect-ratio: 1; }
+.gp-wheel-mid b { font-size: clamp(1.3rem, 3.4vh, 2rem); }
+.gp-legend li { font-size: 9px; }
+.gp-legend li b { font-size: 11px; }
+
+/* The day labels sit in seven rows about ten pixels tall, so they are sized to
+   that rather than to a guess about the window's height -- the media query
+   that hid them below 900px still let them collide at 950. */
+.gp-heat { grid-template-columns: 22px minmax(0, 1fr); gap: 5px; }
+.gp-heat-dow span { font-size: 7.5px; line-height: 1; overflow: hidden; }
+.gp-heat-grid { gap: 2px; }
+.gp-heat-col { gap: 2px; }
+
+/* Routines was losing its last line off the bottom: four rings, four names and
+   four counts is more than a short panel holds at the old sizes. */
+.gp-track { gap: 6px; }
+.gp-stop { gap: 3px; }
+.gp-stop-name { font-size: 9px; line-height: 1.2; max-height: 2.4em; overflow: hidden; }
+.gp-stop-ring { max-width: 30px; }
+.gp-stop-state { font-size: 7.5px; }
+.gp-stop-n { font-size: 9px; }

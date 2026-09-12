@@ -713,6 +713,13 @@ main { padding-inline: var(--gutter); }
    had once, his catch. */
 .dock { --dock-circle: 56px; position: fixed; right: 20px; bottom: 20px; z-index: 61; display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
   transition: opacity var(--t-fast), transform var(--t-fast); }
+/* Same corner, deliberately NOT a child of .dock: see the long comment in
+   dock.tsx on why these two live in their own fixed sibling rather than
+   .dock's own flex column. Its own right/bottom match .dock's exactly,
+   offset up by the FAB's own height plus the gap, so it sits directly
+   above the FAB with no visible seam. */
+.dock-notify { position: fixed; right: 20px; bottom: 86px; z-index: 61;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
 /* Faded, not removed, while the page is moving underneath it -- see
    useHideOnScroll in dock.tsx. pointer-events: none so a scroll-then-tap
    that lands here reaches whatever real control is under it instead of the

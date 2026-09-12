@@ -10059,11 +10059,22 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .gp-wheel { position: relative; width: 100%; max-width: 280px; margin: 0 auto; aspect-ratio: 1;
   padding: 4px; }
 .gp-wheel svg { display: block; width: 100%; height: 100%; }
+/* Direction A, "The Instrument," from his artifact review (2026-09-12):
+   four concentric rings now instead of one, reading as a real reference
+   scale rather than a single decorative ring. */
 .gp-wheel-ring { fill: none; stroke: rgba(242, 240, 234, 0.09); stroke-width: 1; }
-.gp-spoke { stroke: var(--tl-dim); stroke-width: 1.2; }
-.gp-spoke.is-bad { stroke: var(--tl-no); }
-.gp-spoke.is-good { stroke: var(--tl-hot); }
-.gp-node { fill: var(--tl-dim); }
+.gp-wheel-tick { font: 600 6px var(--font-body); fill: var(--tl-faint); letter-spacing: 0.04em; }
+/* Plain radial guides now, not one per card -- position on the guide is
+   what carries the value (Wheel in giveuppanel.tsx), so the guide itself
+   has nothing left to encode and stays a single quiet tone throughout. */
+.gp-wheel-spoke { stroke: rgba(242, 240, 234, 0.15); stroke-width: 1; }
+/* The shape the seven nodes actually trace -- Training out near the rim,
+   Goals and Routines collapsed toward the hub, visible as one silhouette
+   before any of the numbers around it are read. Filled just enough to
+   read as a solid, no single tone of its own since its seven corners
+   rarely agree on one. */
+.gp-wheel-poly { fill: var(--tl-ink); fill-opacity: 0.05; stroke: var(--tl-ink); stroke-opacity: 0.5; stroke-width: 1.4; }
+.gp-node { fill: var(--tl-dim); stroke: var(--tl-bg); stroke-width: 2; }
 .gp-node.is-bad { fill: var(--tl-no); }
 .gp-node.is-good { fill: var(--tl-hot); }
 .gp-wheel-mid { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }

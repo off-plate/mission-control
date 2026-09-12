@@ -1052,7 +1052,13 @@ function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney |
   }, [onBack, lib])
 
   return (
-    <div className="tl-lives is-inline">
+    <div className="tl-lives">
+      {/* His instruction, said three times and finally with a screenshot: full
+          browser screen, OVER the navigation, 100vh, not scrollable, and one
+          cross top right. It was made inline under the timeline's own header
+          so the menu never left the screen; he does not want the menu here,
+          he wants the screen. The cross is the way out, plus Escape. */}
+      <button className="tl-close" onClick={onBack} aria-label="Close">&#10005;</button>
       <div className="tl-stage">
         <Reel url={url} count={pool.length} onOpenLibrary={() => setLib(true)} onNext={advanceReel} />
         <div className="tl-status">

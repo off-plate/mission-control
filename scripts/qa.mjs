@@ -4142,7 +4142,7 @@ await step('timeline: a real session counts as health, with no habit ticked', as
   await page.evaluate(() => localStorage.removeItem('mc-health-fixture'))
 })
 
-await step('timeline: the give-up screen keeps the menu, and the way in is the way out', async () => {
+await step('timeline: the give-up screen takes the whole window, and the cross is the way out', async () => {
   await fresh('timeline')
   /* Seeded, because half these panels correctly draw nothing when there is
      nothing to draw, and a demo profile has no open goals. The first run of
@@ -4183,10 +4183,11 @@ await step('timeline: the give-up screen keeps the menu, and the way in is the w
   const btn = page.locator('.tl-giveup')
   await btn.click(); await page.waitForTimeout(700)
 
-  /* His report: it "removes all the menu that is normally within the
-     timeline", so the only way back was hunting a close button. */
-  if (!(await page.locator('.tl-giveup').count())) throw new Error("the timeline's own header vanished behind the give-up screen")
-  if (!/back to the timeline/i.test(await btn.innerText())) throw new Error('the button he came in through does not say the way out')
+  /* His instruction on 2026-09-12, after seeing it inline: the whole browser
+     screen, over the navigation, nothing scrolling behind it, one cross top
+     right. The inline reading came from an earlier report about losing the
+     menu; he wants the screen, not the menu. */
+  if (!(await page.locator('.tl-lives .tl-close').count())) throw new Error('no cross on the give-up screen')
   if (await page.locator('.tl-scrub, .tl-stops').count()) throw new Error('the horizon slider and its stops are still there')
   const cards = await page.locator('.gp-panel').count()
   if (cards < 8) throw new Error(`${cards} panels, so his list is not all there`)
@@ -4240,8 +4241,8 @@ await step('timeline: the give-up screen keeps the menu, and the way in is the w
   })
   if (clash) throw new Error(`${clash} wheel labels sit on top of the ring`)
 
-  await btn.click(); await page.waitForTimeout(500)
-  if (await page.locator('.gp-panel').count()) throw new Error('the same button did not take him back out')
+  await page.locator('.tl-lives .tl-close').click(); await page.waitForTimeout(500)
+  if (await page.locator('.gp-panel').count()) throw new Error('the cross did not take him back out')
 })
 
 await step('timeline: days, weeks and months are three different reads', async () => {
@@ -4377,31 +4378,35 @@ await step('timeline: the reel answers to Next', async () => {
   await page.keyboard.press('Escape'); await page.waitForTimeout(300)
 })
 
-await step('timeline: giving up keeps the page it came from, and Escape gives it back', async () => {
+await step('timeline: giving up takes the whole window, and Escape gives it back', async () => {
   await fresh('timeline')
   const skipRoll = page.getByRole('button', { name: 'Not today' })
   if (await skipRoll.count()) { await skipRoll.first().click(); await page.waitForTimeout(300) }
   await page.locator('.tl-giveup').click(); await page.waitForTimeout(600)
 
-  /* It used to be a sheet over the whole window, which is exactly what he
-     reported on 2026-09-12: it "removes all the menu that is normally within
-     the timeline", leaving a close button as the only way out. It is inline
-     under the page's own header now, so the header must still be on screen
-     and above it. */
+  /* The four things he asked for, each measured rather than assumed: it fills
+     the window, it sits OVER the app's navigation, the page behind it cannot
+     scroll, and the cross is there. */
   const shape = await page.evaluate(() => {
     const r = (e) => e.getBoundingClientRect()
-    const lives = r(document.querySelector('.tl-lives'))
-    const head = document.querySelector('.tl-giveup')
+    const lives = document.querySelector('.tl-lives')
+    const box = r(lives), cs = getComputedStyle(lives)
+    const top = document.querySelector('.topbar')
     const reel = r(document.querySelector('.tl-reel'))
     const stats = document.querySelector('.tl-status')
     return {
-      livesTop: lives.top, headTop: head ? r(head).top : -1, headVisible: !!head,
-      reelLeft: reel.left, reelW: reel.width, vw: innerWidth,
-      statsLeft: stats ? r(stats).left : -1,
+      w: Math.round(box.width), h: Math.round(box.height), vw: innerWidth, vh: innerHeight,
+      position: cs.position, z: parseInt(cs.zIndex, 10),
+      topZ: top ? parseInt(getComputedStyle(top).zIndex, 10) || 0 : 0,
+      covers: top ? box.top <= r(top).top && box.bottom >= r(top).bottom : true,
+      pageScrolls: document.documentElement.scrollHeight > innerHeight + 2,
+      reelLeft: reel.left, statsLeft: stats ? r(stats).left : -1,
     }
   })
-  if (!shape.headVisible) throw new Error("the timeline's header is gone behind the give-up screen")
-  if (shape.headTop >= shape.livesTop) throw new Error('the header is not above the give-up screen any more')
+  if (shape.w !== shape.vw || shape.h !== shape.vh) throw new Error(`the give-up screen is ${shape.w}x${shape.h} in a ${shape.vw}x${shape.vh} window`)
+  if (shape.position !== 'fixed') throw new Error(`it is ${shape.position}, so it scrolls with the page instead of covering it`)
+  if (!(shape.covers && shape.z > shape.topZ)) throw new Error(`it does not cover the navigation (z ${shape.z} against the bar's ${shape.topZ})`)
+  if (shape.pageScrolls) throw new Error('the page behind it can still be scrolled')
   /* His layout: reel down the left, status down the right. */
   if (shape.reelLeft > shape.vw / 2) throw new Error('the reel is not on the left')
   if (shape.statsLeft <= shape.reelLeft) throw new Error('the status side is not to the right of the reel')

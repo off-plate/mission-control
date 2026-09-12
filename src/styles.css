@@ -7910,16 +7910,17 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 /* ---- two lives: one reel on the left, two futures on the right ---- */
 .tl-lives { position: fixed; inset: 0; z-index: 300; background: #08090A; color: var(--tl-ink);
   overflow: hidden; animation: tlrise var(--t-med) var(--ease) both; }
-/* Inline under the page's own header, so the timeline's menu never leaves the
-   screen (2026-09-12, his report: the sheet took the menu with it and the only
-   way back was a close button he had to go looking for). */
-.tl-lives.is-inline { position: relative; inset: auto; z-index: 1; border-radius: 18px;
-  min-height: min(74vh, 720px); margin-top: 14px; }
-.tl-lives.is-inline .tl-stage { position: relative; inset: auto; min-height: min(74vh, 720px); }
+/* It was inline under the timeline's header for one day, so the menu never
+   left the screen. He asked for the opposite, three times and then with a
+   screenshot: the whole browser screen, over the navigation, 100vh, nothing
+   scrolling behind it, one cross top right. The base rule above already is
+   that; the inline modifier is gone rather than left as a variant nothing
+   sets, and the height is dvh so a phone's collapsing toolbar cannot leave a
+   strip of page showing under it. */
+.tl-lives { height: 100dvh; }
 @media (max-width: 900px) {
-  .tl-lives.is-inline .tl-stage { grid-template-columns: 1fr; }
-  .tl-lives.is-inline { min-height: 0; }
-  .tl-lives.is-inline .tl-reel { min-height: 46vw; }
+  .tl-lives .tl-stage { grid-template-columns: 1fr; }
+  .tl-lives .tl-reel { min-height: 46vw; }
 }
 @keyframes tlrise { from { opacity: 0; transform: scale(0.99); } to { opacity: 1; transform: none; } }
 

@@ -9831,10 +9831,6 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .gp-cell.l2 { background: rgba(190, 232, 60, 0.48); }
 .gp-cell.l3 { background: rgba(190, 232, 60, 0.72); }
 .gp-cell.l4 { background: var(--tl-hot); }
-.gp-kinds { list-style: none; margin: 0; padding: 0; display: flex; gap: 14px; }
-.gp-kinds li { display: flex; flex-direction: column; }
-.gp-kinds b { font: 800 17px/1 var(--font-display); color: var(--tl-ink); }
-.gp-kinds span { margin-top: 3px; font: 600 9.5px/1 var(--font-body); letter-spacing: 0.1em; text-transform: uppercase; color: var(--tl-faint); }
 
 /* ---- habit orbit ---- */
 .gp-orbit { position: relative; width: 100%; max-width: 210px; margin: 0 auto; }
@@ -9874,7 +9870,15 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 /* ---- routine track ---- */
 
 /* ---- the wheel ---- */
-.gp-wheel { position: relative; width: 100%; max-width: 330px; margin: 0 auto; aspect-ratio: 1;
+/* This box, not just the <svg> inside it, is the positioning context
+   `.gp-legend`'s inset:0 measures against. It has to stay a real square or
+   the labels spread to fill a wider panel while the circle, held square by
+   its own aspect-ratio, stays small and centered in the middle of that
+   spread -- exactly the bug his screenshot showed (2026-09-12): "you spread
+   out the naming, but didn't make the actual circle bigger." Sized by
+   whichever of height or width binds first, so it grows to fill the panel's
+   real 2x2 space rather than the old fixed 330px ceiling. */
+.gp-wheel { position: relative; height: 100%; width: auto; max-width: 100%; margin: 0 auto; aspect-ratio: 1;
   padding: 4px; }
 .gp-wheel svg { display: block; width: 100%; height: 100%; }
 .gp-wheel-ring { fill: none; stroke: rgba(242, 240, 234, 0.09); stroke-width: 1; }
@@ -9990,8 +9994,6 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .gp-read b, .gp-figure { font-size: clamp(24px, 3.2vh, 40px); line-height: 1; }
 .gp-unit { font-size: 10.5px; }
 .gp-line, .gp-sub { font-size: 10.5px; line-height: 1.35; }
-.gp-kinds li b { font-size: 15px; }
-.gp-kinds li span { font-size: 8.5px; }
 .tl-status { padding: 16px 18px 18px; gap: 10px; }
 .tl-count { padding-bottom: 9px; }
 .tl-count-fig b { font-size: clamp(28px, 3.6vh, 44px); }
@@ -10003,9 +10005,9 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    in terms of height... whenever you will make square out of it, expand it
    to the sides"). It still takes whichever of height or width binds first,
    so it stays a circle rather than an oval in either direction. */
-.gp-wheel { max-width: none; width: 100%; aspect-ratio: auto; height: 100%;
-  display: grid; place-items: center; padding: 0; }
-.gp-wheel svg { width: auto; height: 100%; max-width: 100%; max-height: 100%; aspect-ratio: 1; }
+/* The broken version of this rule stretched .gp-wheel to the full wide panel
+   and left only the <svg> square inside it -- which is the bug above. The
+   corrected sizing lives on the base .gp-wheel rule now; nothing to add here. */
 .gp-wheel-mid b { font-size: clamp(1.3rem, 3.4vh, 2rem); }
 .gp-legend li { font-size: 9px; }
 .gp-legend li b { font-size: 11px; }
@@ -10141,7 +10143,12 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    for a caption the number underneath already implies. Absolute rather than
    in flow, so the number starts at the panel's own top edge and the height
    that used to go to "DEBT" goes to "970 473" instead. */
-.gp-panel { padding-top: 26px; }
+/* Trimmed from 26px once the five-row budget (his ask: Quitting, Goals and
+   State of life all get a second row-track now) left Training and Routines
+   32px and 8px short of fitting their own minimum content. The corner label
+   only ever needed about this much clearance. */
+.gp-panel { padding-top: 20px; }
+.gp-panel { gap: 6px; }
 .gp-head {
   position: absolute; top: 12px; right: 14px; z-index: 1;
   font-size: 8px; letter-spacing: 0.14em;
@@ -10190,3 +10197,10 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    life) get two tracks, everything else one, and dense packing lets the
    short panels backfill rather than leaving a hole under a spanning one. */
 .gp-grid { grid-auto-flow: dense; }
+
+/* The chart below a scrollable list must never be asked to share space with
+   it -- it keeps its own natural size always, and the scroll area is what
+   gives up room when a panel is tight, never the other way round. Without
+   this a cramped panel could still let the two visually collide instead of
+   the list simply showing less before you scroll it. */
+.gp-arcs, .gp-slips, .gp-range { flex: none; }

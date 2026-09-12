@@ -201,6 +201,10 @@ interface Store extends PersistedState {
    *  with undefined. The task's own space never changes; a project only
    *  ever holds tasks that already belonged to it. */
   setTaskProject: (id: string, projectId: string | undefined) => void
+  /** Move a task into a different workspace outright, clearing its project
+   *  (a project only ever holds tasks from its own space, same rule
+   *  setTaskProject already keeps). */
+  setTaskSpace: (id: string, space: SpaceId) => void
   /** Which Project's Plan is open, or null for the Space's own Plan.
    *  Deliberately not persisted: a project stays a room you walk into, not a
    *  mode that survives a reload. Cleared automatically by setPage and
@@ -1536,6 +1540,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     renameProject: plannerSlice.renameProject,
     deleteProject: plannerSlice.deleteProject,
     setTaskProject: plannerSlice.setTaskProject,
+    setTaskSpace: plannerSlice.setTaskSpace,
     focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog,
     view, setView, inView,
     twoLives, setTwoLives, reels, setReels, tunes, setTunes, reelFiles, setReelFile,

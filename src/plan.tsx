@@ -17,7 +17,7 @@ import { PLAN_AHEAD_DAYS, WeekGrid, dayPlus, shortDay, weekRangeLabel } from './
 import { useCoarsePointer, Band, Dropdown, SpaceMark } from './ui'
 import { estimateFor } from './estimate'
 import { estimateTask } from './ai'
-import { SLOTS, habitLocked, routineComplete, routineProgress, slotMinutes, TYPING_TARGET_WPM, type Project, type Routine, type SubTask, type Task, type TimeSlot } from './types'
+import { SLOTS, SPACES, habitLocked, routineComplete, routineProgress, slotMinutes, TYPING_TARGET_WPM, type Project, type Routine, type SubTask, type Task, type TimeSlot } from './types'
 import { periodKeyFor, fmtDuration, fmtSigned, dayOfWeekKey, isEstimated, localDateKey, slotForMoment, taskMinutes } from './util'
 
 const prevDay = (): string => dayPlus(-1)
@@ -419,7 +419,7 @@ export function PlanPage() {
   const { startFocus } = pomo
   const { routines, habits } = useStore()
   const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId, setTaskAt, plan, setPage, openDay, view, inView, focusSessions, dayLog } = useStore()
-  const { projects, openProjectId, setTaskProject } = useStore()
+  const { projects, openProjectId, setTaskProject, setTaskSpace } = useStore()
   /* A project is a room inside a Space, not a second store: this is the one
      line that scopes Plan to it. Everything below (backlog, the day, the
      progress bar) is derived from spaceTasks, so nothing downstream has to
@@ -445,6 +445,22 @@ export function PlanPage() {
       </>
     )
   }
+
+  /* His ask (2026-09-12): move a task across workspaces from its own
+     kebab menu, the same one tap the project move above already gets.
+     "Workspace," not "Move to" -- both menus that render this already
+     have their own "Move to" heading (a time slot, or a day), and a third
+     one with the same words but a different meaning is exactly the kind
+     of menu he flagged as confusing right before asking for this. */
+  const spaceMenu = (t: Task) => (
+    <>
+      <span className="kebab-sep" />
+      <span className="kebab-head">Workspace</span>
+      {SPACES.filter((s) => s !== t.space).map((s) => (
+        <button key={s} role="menuitem" onClick={() => setTaskSpace(t.id, s)}>Move to {SPACE_LABELS[s]}</button>
+      ))}
+    </>
+  )
 
   const spaceTasks = tasks.filter((t) => inView(t.space) && (!openProjectId || t.projectId === openProjectId))
   const backlogOpen = spaceTasks.filter((t) => !t.done && t.list === 'backlog') // the to-do pool
@@ -947,6 +963,7 @@ export function PlanPage() {
                       </>
                     )}
                     {projectMenu(t)}
+                    {spaceMenu(t)}
                     <span className="kebab-sep" />
                     <button role="menuitem" className="danger" onClick={() => deleteTask(t.id)}>Delete</button>
                   </Dropdown>
@@ -1135,22 +1152,25 @@ export function PlanPage() {
                             {!t.done && <span className="kebab-sep" />}
                             {!t.done && (
                               <>
-                                {/* Moving a task between times used to be drag
-                                    only, and drag does not work with a thumb.
-                                    That is most of why he said Plan "doesn't
-                                    work at all" on a phone: he could get a
-                                    task onto the day from the list, then never
-                                    move it again. */}
-                                <span className="kebab-head">Move to</span>
-                                {SLOTS.filter((sl) => sl.id !== (t.slot ?? 'unsorted')).map((sl) => (
-                                  <button key={sl.id} role="menuitem" onClick={() => assignSlot(t.id, sl.id)}>{sl.label}</button>
-                                ))}
-                                <span className="kebab-sep" />
+                                {/* His report, screenshot in hand (2026-09-12):
+                                    this menu carried a SECOND "Move to" group
+                                    right here, just the four time slots again
+                                    with the current one filtered out -- a plain
+                                    duplicate of the radio-style "Move to" above,
+                                    added later (2026-08-11) on the mistaken
+                                    belief no tap path existed yet for moving a
+                                    task off drag-only. It did; this fixed
+                                    nothing it claimed to and just made the menu
+                                    say "Move to" twice. Removed -- the group
+                                    above already covers every slot, Unsorted
+                                    included, with the current one visibly
+                                    checked rather than hidden. */}
                                 <button role="menuitem" onClick={() => setEditingTask(t)}>Edit</button>
                                 <button role="menuitem" onClick={() => { moveTaskList(t.id, 'backlog'); assignSlot(t.id, undefined); setTaskAt(t.id, undefined) }}>Back to the list</button>
                               </>
                             )}
                             {!t.done && projectMenu(t)}
+                            {!t.done && spaceMenu(t)}
                             <button role="menuitem" className="danger" onClick={() => deleteTask(t.id)}>Delete</button>
                           </Dropdown>
                         </div>

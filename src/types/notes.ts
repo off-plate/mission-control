@@ -11,6 +11,21 @@ export interface Idea {
   color: string
 }
 
+/** One sticky on the Ideas board: a project he has in mind and no time for yet.
+ *  Not an Idea above -- those were the old Brain Dump stickies, already carried
+ *  into Notes and kept only so an old bundle does not show an empty board. */
+export interface IdeaCard {
+  id: string
+  title: string
+  body: string
+  color: string
+  /** Top-left corner on the board, in board units (zoom 1). */
+  x: number
+  y: number
+  createdAt: number
+  updatedAt: number
+}
+
 /* ---- Notes ----------------------------------------------------------------
    Two levels, and only two. The top level is one folder per workspace and it is
    NOT stored: it is computed from the spaces that exist. That way a workspace

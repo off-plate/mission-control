@@ -9,6 +9,7 @@ import { AssistantChip, AssistantPanel } from './assistantdock'
 import { SkillsChip, SkillsPanel } from './skillsdock'
 import { HealthChip, HealthPanel } from './healthdock'
 import { WatchlessChip, WatchlessPanel } from './watchlessdock'
+import { IdeasChip, IdeasPanel } from './ideasdock'
 import { bumpDockRank, rankDockItems } from './dockrank'
 import * as Icon from './icons'
 
@@ -220,7 +221,7 @@ function useHideOnScroll(active: boolean) {
    the notes store) and only hands this file what it needs to render.
    Rendered from inside PomodoroProvider (see pomodoro.tsx), which is what
    puts it inside both the Pomodoro context and the Store context it needs. */
-type PanelFace = 'media' | 'note' | 'bills' | 'timeline' | 'assistant' | 'skills' | 'health' | 'watchless'
+type PanelFace = 'media' | 'note' | 'bills' | 'timeline' | 'assistant' | 'skills' | 'health' | 'watchless' | 'ideas'
 type Mode = 'closed' | 'menu' | PanelFace
 
 /* The player is deliberately never in this contest -- his artifact review
@@ -229,7 +230,7 @@ type Mode = 'closed' | 'menu' | PanelFace
    folding it into a popularity score it can never win on its own terms
    would just be a second, redundant reason for it to rank last. Everything
    else here is a plain shortcut, so everything else competes. */
-const RANKABLE_FACES = ['note', 'bills', 'timeline', 'assistant', 'skills', 'health', 'watchless'] as const
+const RANKABLE_FACES = ['note', 'bills', 'timeline', 'assistant', 'skills', 'health', 'watchless', 'ideas'] as const
 type RankableFace = typeof RANKABLE_FACES[number]
 function isRankable(id: PanelFace): id is RankableFace {
   return (RANKABLE_FACES as readonly string[]).includes(id)
@@ -254,7 +255,8 @@ export function Dock() {
   const skillsHold = useHoldForFull(() => { bumpDockRank('skills'); setPage('skills'); go('closed') })
   const healthHold = useHoldForFull(() => { bumpDockRank('health'); setPage('health'); go('closed') })
   const watchlessHold = useHoldForFull(() => { bumpDockRank('watchless'); setPage('watchless'); go('closed') })
-  const holdFor: Partial<Record<PanelFace, ReturnType<typeof useHoldForFull>>> = { note: noteHold, bills: billsHold, timeline: timelineHold, assistant: assistantHold, skills: skillsHold, health: healthHold, watchless: watchlessHold }
+  const ideasHold = useHoldForFull(() => { bumpDockRank('ideas'); setPage('ideas'); go('closed') })
+  const holdFor: Partial<Record<PanelFace, ReturnType<typeof useHoldForFull>>> = { note: noteHold, bills: billsHold, timeline: timelineHold, assistant: assistantHold, skills: skillsHold, health: healthHold, watchless: watchlessHold, ideas: ideasHold }
   const scrollHidden = useHideOnScroll(mode === 'closed')
   const pomo = usePomodoro()
   // A plain click opens the quick popup below, same as it always has -- the
@@ -317,6 +319,7 @@ export function Dock() {
     { id: 'skills' as const, label: 'Skills', chip: <SkillsChip />, switchIcon: <Icon.DockBook size={17} /> },
     { id: 'health' as const, label: 'Health', chip: <HealthChip />, switchIcon: <Icon.DockHeartbeat size={17} /> },
     { id: 'watchless' as const, label: 'Watchless', chip: <WatchlessChip />, switchIcon: <Icon.DockTranscript size={17} /> },
+    { id: 'ideas' as const, label: 'Ideas', chip: <IdeasChip />, switchIcon: <Icon.DockBulb size={17} /> },
   ]
   // Ranked fresh every render off whatever dockrank.ts currently has on
   // disk -- cheap (seven localStorage rows, decayed with one Math.pow each)
@@ -598,6 +601,16 @@ export function Dock() {
       <div className="dock">
         <div className="dock-face">
           <WatchlessPanel dockControls={switchButtons} onOpenFull={() => go('closed')} />
+        </div>
+      </div>
+    )
+  }
+
+  if (mode === 'ideas') {
+    return (
+      <div className="dock">
+        <div className="dock-face">
+          <IdeasPanel dockControls={switchButtons} onOpenFull={() => go('closed')} />
         </div>
       </div>
     )

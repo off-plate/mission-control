@@ -101,6 +101,7 @@ export const Divider = make(<><path d="M6 12H18"/></>, 16, { k: 1.6417, x: -7.7,
 export const Copy = make(<><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M15 5.5A2.5 2.5 0 0 0 12.5 3h-7A2.5 2.5 0 0 0 3 5.5v7A2.5 2.5 0 0 0 5.5 15"/></>, 16, { k: 1.06, x: -0.7, y: -0.7 })
 export const Search = make(<><path d="M19.9604 11.4802C19.9604 13.8094 19.0227 15.9176 17.5019 17.4512C16.9332 18.0247 16.2834 18.5173 15.5716 18.9102C14.3594 19.5793 12.9658 19.9604 11.4802 19.9604C6.79672 19.9604 3 16.1637 3 11.4802C3 6.79672 6.79672 3 11.4802 3C16.1637 3 19.9604 6.79672 19.9604 11.4802Z"/><path d="M18.1553 18.1553L21.8871 21.8871"/></>, 16, { k: 1.0429, x: -0.979, y: -0.979 })
 /* hicon: plus */
+export const Minus = make(<><line x1="6" y1="12" x2="18" y2="12"/></>, 16, { k: 1.6417, x: -7.7, y: -7.7 })
 export const Plus = make(<><line x1="12" y1="6" x2="12" y2="18"/><line x1="6" y1="12" x2="18" y2="12"/></>, 16, { k: 1.6417, x: -7.7, y: -7.7 })
 /* hicon: chevron-left */
 export const ChevronLeft = make(<><path d="M10 12.4L14.5 17.8"/><path d="M10 12.4L14.5 7.00006"/></>, 16, { k: 1.8241, x: -10.345, y: -10.619 })
@@ -223,6 +224,8 @@ export const DockBook = make(<><path d="M19 4v16h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0
 /* Watchless: a transcript, not a video. Tabler's file-text over a play, because
    the point of the page is that the video became something you read. */
 export const DockTranscript = make(<><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2" /><path d="M9 9l1 0" /><path d="M9 13l6 0" /><path d="M9 17l6 0" /></>, 16, { k: 1, x: 0, y: 0 })
+/* Ideas: Tabler's bulb, the one mark nobody reads as anything but an idea. */
+export const DockBulb = make(<><path d="M3 12h1m8 -9v1m8 8h1m-15.4 -6.4l.7 .7m12.1 -.7l-.7 .7" /><path d="M9 16a5 5 0 1 1 6 0a3.5 3.5 0 0 0 -1 3a2 2 0 0 1 -4 0a3.5 3.5 0 0 0 -1 -3" /><path d="M9.7 17l4.6 0" /></>, 16, { k: 1, x: 0, y: 0 })
 export const DockHeartbeat = make(<><path d="M19.5 13.572l-7.5 7.428l-2.896 -2.868m-6.117 -8.104a5 5 0 0 1 9.013 -3.022a5 5 0 1 1 7.5 6.572" /><path d="M3 13h2l2 3l2 -6l1 3h3" /></>, 16, { k: 1, x: 0, y: 0 })
 
 /* The drag grip. Not an icon: a texture that says "this row moves", which is

@@ -10668,3 +10668,10 @@ body:has(.shell.is-dark-chrome) .projnav-menu,
    (the five hues lifted for a dark ground), switched on by the page rather than
    the mode, and the page's own ground and text take the dark tokens above. */
 .shell.is-dark-page { background: #0E0E10; color: #F2F0EA; }
+
+/* His report (2026-09-15): hovering a header button on the dark header was
+   unreadable. The hover is a lime wipe (.btn::before), and the light system
+   paints the text over it with --a-ink, which is the LIGHT ink in the dark
+   header, so light text landed on lime. Over the wipe, the ink stays dark. */
+.shell.is-dark-chrome .topstick .btn:hover:not(:disabled),
+.shell.is-dark-chrome .topstick .btn:focus-visible { color: #0E0E10; }

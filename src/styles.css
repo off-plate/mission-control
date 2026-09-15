@@ -2058,15 +2058,6 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
   pointer-events: none;
   transition: transform 190ms cubic-bezier(0.4, 0.0, 0.9, 0.6),
               clip-path 190ms cubic-bezier(0.4, 0.0, 0.9, 0.6);
-  /* Each row is its own opaque pill, but the gaps between them are not --
-     over a quiet page that was fine, over the Cookie Jar's bold display
-     text (his report, 2026-09-15: "DODGE FIXES" reading as jammed into
-     "three more days") the page bled through the gaps and jumbled with the
-     pill labels. A blur on the whole floating group keeps the rooms
-     separate (no shared background, no tray) while making whatever is
-     behind them illegible on purpose instead of accidentally. */
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
 }
 /* .nav{background:var(--a-sunk)} (the pill redesign, further down this file)
    is the SAME specificity as .projnav-menu alone and sits later in the

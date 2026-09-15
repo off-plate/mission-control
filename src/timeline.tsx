@@ -27,6 +27,7 @@
                tracker is not a call this column gets to make alone. */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from './store'
+import { CookieJarNav, readJarView, takeGiveUpRequest, writeJarView } from './cookiejarnav'
 import { dayOf, daysSince, useHealth } from './health'
 import {
   countdown, debtCard, goalArcs, goalsCard, habitRings, habitsCard, healthCard, postponedCard,
@@ -126,9 +127,13 @@ export const inAllSpaces = () => true
 
 export function TimelinePage() {
   const { habits, habitLog, tasks, focusSessions, setPage } = useStore()
-  const [view, setView] = useState<View>('ladder')
+  /* Remembered, so the nav on Health and Why can bring him back to the view
+     he left rather than always to the ladder. */
+  const [view, setView] = useState<View>(readJarView)
+  useEffect(() => { writeJarView(view) }, [view])
   const [zoom, setZoom] = useState<Zoom>('d')
-  const [lives, setLives] = useState(false)
+  /* Asked for from Health or Why: open straight onto the give-up screen. */
+  const [lives, setLives] = useState(takeGiveUpRequest)
   const compass = useCompass().state
 
   /* Days a session was actually recorded, straight from the health pipeline.
@@ -173,32 +178,7 @@ export function TimelinePage() {
             <b>{chain.current}</b>
             <span className="tl-l">day chain</span>
           </span>
-          <button className="tl-next" onClick={() => setView(view === 'ladder' ? 'wheel' : 'ladder')}>
-            {view === 'ladder' ? 'The flywheel' : 'The ladder'}
-            <span aria-hidden="true">{view === 'ladder' ? '→' : '←'}</span>
-          </button>
-          {/* Why's own tab retired (2026-09-04), the same way Notes',
-             Bills' and Timeline's were: not moved to the floating dock
-             like those three, but placed here instead, on his instruction
-             -- between the flywheel and "I want to give up" specifically,
-             so the moment he's looking at whether to quit is the same
-             moment his own reasons are one tap away, not a menu away. The
-             page itself is untouched -- setPage('board') still renders it,
-             this was only ever the tab in.
-
-             The door in is dropped below 639px too (2026-09-06, mobile
-             review): the wall behind it is a long image-and-quote scroll
-             built for a screen he's sitting back from, not the one thing to
-             reach for one-handed at the exact moment he's tempted to quit.
-             The address still resolves for anyone who already has it. */}
-          {/* Health left the dock for here, on his instruction (2026-09-15):
-              the body belongs next to his reasons and the give-up screen.
-              Not hidden on a phone like Why: this is the only door in now. */}
-          <button className="tl-why tl-health" onClick={() => setPage('health')}>Health</button>
-          <button className="tl-why hide-phone" onClick={() => setPage('board')}>Why</button>
-          <button className={`tl-giveup${lives ? ' is-on' : ''}`} onClick={() => setLives((v) => !v)}>
-            {lives ? 'Back to the Cookie Jar' : 'I want to give up'}
-          </button>
+          <CookieJarNav here="jar" view={view} onToggleView={() => setView(view === 'ladder' ? 'wheel' : 'ladder')} lives={lives} onGiveUp={() => setLives((v) => !v)} />
         </div>
       </header>
 

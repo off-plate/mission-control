@@ -10675,3 +10675,37 @@ body:has(.shell.is-dark-chrome) .projnav-menu,
    header, so light text landed on lime. Over the wipe, the ink stays dark. */
 .shell.is-dark-chrome .topstick .btn:hover:not(:disabled),
 .shell.is-dark-chrome .topstick .btn:focus-visible { color: #0E0E10; }
+
+/* ---- one Cookie Jar nav on the ladder, the flywheel, Health and Why ----
+   His ask (2026-09-15): the three doors in the accent, no arrow on the view
+   toggle, and the page he is standing on drawn as an outline instead of a
+   fill. Tokens fall back to the Cookie Jar's own values so the same buttons
+   look identical on Health and Why, which do not carry the --tl-* set. */
+.cj-nav {
+  --cj-hot: var(--tl-hot, #C6F24A); --cj-rung: var(--tl-rung, #16161A); --cj-dim: var(--tl-dim, #8B877E);
+  --cj-line: var(--tl-line, rgba(242, 240, 234, 0.09)); --cj-no: var(--tl-no, #E0603A);
+  display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap;
+}
+.shell.is-hud .cj-nav.is-away { --cj-hot: #4FD8E8; --cj-rung: #0C121A; --cj-dim: #93A7B8; --cj-line: rgba(79, 216, 232, 0.16); }
+.cj-nav .cj-btn {
+  border: 0; cursor: pointer; border-radius: 999px; min-height: 38px; padding: 11px 18px;
+  font: 800 12.5px/1 var(--font-body); display: inline-flex; align-items: center; gap: 8px;
+  background: var(--cj-hot); color: #0E0E10; box-shadow: none;
+  transition: background var(--a-enter), color var(--a-enter), transform var(--a-enter);
+}
+.cj-nav .cj-btn:hover { transform: translateY(-1px); color: #0E0E10; box-shadow: none; }
+.cj-nav .cj-btn.is-here, .cj-nav .cj-btn.is-here:hover {
+  background: transparent; color: var(--cj-hot); box-shadow: inset 0 0 0 1.5px var(--cj-hot); transform: none;
+}
+.shell.is-hud .cj-nav .cj-btn:not(.is-here) { color: #04141A; }
+/* Off the Cookie Jar the give-up button has no --tl-* tokens to read. */
+.cj-nav.is-away .tl-giveup { background: var(--cj-rung); color: var(--cj-dim); box-shadow: inset 0 0 0 1px var(--cj-line); }
+.cj-nav.is-away .tl-giveup:hover { color: var(--cj-no); box-shadow: inset 0 0 0 1px rgba(224, 96, 58, 0.4); }
+/* Health: the nav on top, the range and Sync right under it. */
+.hp-head-right { flex-direction: column; align-items: flex-end; }
+.hp-head-tools { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; justify-content: flex-end; }
+.board-head { align-items: center; }
+@media (max-width: 639px) {
+  .hp-head-right { align-items: flex-start; }
+  .hp-head-tools { justify-content: flex-start; }
+}

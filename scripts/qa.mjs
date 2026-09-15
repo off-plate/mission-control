@@ -4774,6 +4774,26 @@ await step('ideas: click to pick up, click to drop, and the list brings the boar
   if (Math.abs(cx - wantX) > 60 || Math.abs(cy - wantY) > 60) throw new Error(`the list did not bring the sticky into view: it is at ${Math.round(cx)},${Math.round(cy)}, the middle is ${Math.round(wantX)},${Math.round(wantY)}`)
 })
 
+/* His ask (2026-09-15): the five Cookie Jar numbers live inside the promise,
+   folded shut by default like Plan's week bar, and only the bar opens or
+   closes them. */
+await step('cookie jar: the promise folds its numbers shut, and only the bar opens or closes them', async () => {
+  await fresh('timeline')
+  const promise = page.locator('.tl-promise')
+  await promise.waitFor({ timeout: 8000 })
+  if ((await promise.getAttribute('class'))?.includes('is-open')) throw new Error('the numbers start open; they should be folded shut on load')
+  const shut = await page.locator('.tl-promise-collapse').evaluate((el) => el.getBoundingClientRect().height)
+  if (shut > 4) throw new Error(`the folded numbers still measure ${shut}px`)
+  if ((await page.locator('.tl-sum').count()) !== 1) throw new Error('the numbers are not in exactly one place')
+  await page.locator('.tl-promise-bar').click(); await page.waitForTimeout(500)
+  if (!((await promise.getAttribute('class'))?.includes('is-open'))) throw new Error('clicking the promise did not open the numbers')
+  if ((await page.locator('.tl-promise-collapse').evaluate((el) => el.getBoundingClientRect().height)) < 60) throw new Error('open, but the numbers never grew')
+  await page.locator('.tl-sum > div').first().click(); await page.waitForTimeout(300)
+  if (!((await promise.getAttribute('class'))?.includes('is-open'))) throw new Error('a click on a number closed the fold; only the bar should')
+  await page.locator('.tl-promise-bar').click(); await page.waitForTimeout(500)
+  if ((await promise.getAttribute('class'))?.includes('is-open')) throw new Error('clicking the promise again did not fold the numbers')
+})
+
 await b.close(); server.close(); rmSync(SNAP, { recursive: true, force: true })
 if (errors.length) console.log(`CONSOLE ERRORS (${errors.length}): ${errors[0]}`)
 console.log(`${pass} pass, ${fail} fail${errors.length ? `, ${errors.length} console errors` : ', 0 console errors'}`)

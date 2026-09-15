@@ -170,6 +170,41 @@ interface PersistedState {
   reelFiles?: Record<string, string>
   /** The Ideas board: every sticky and where he left it. */
   ideaBoard?: IdeaCard[]
+  /** The Pomodoro block running right now, synced so it shows the same on
+   *  every device (and in Raycast) rather than living only in this tab's
+   *  localStorage. Null means nothing is running. */
+  activeFocus?: ActiveFocus | null
+}
+
+/** Mirrors just enough of pomodoro.tsx's own local state to redraw the clock
+ *  elsewhere: which task, how long the block is, and the wall-clock deadline
+ *  it ends at (never a countdown number, which would drift the moment the
+ *  reader's own clock ticks even one second out of step). `dev` is whichever
+ *  device last wrote this, so that device's own effect can tell "I said this"
+ *  from "someone else did" and never fights its own echo on the way back down
+ *  from Supabase. */
+export interface ActiveFocus {
+  phase: 'focus' | 'break'
+  /** Epoch ms this phase ends at, while running. Null while paused --
+   *  pausedLeft is the number that means something then, same split
+   *  pomodoro.tsx's own endsAt/pausedLeft pair makes, and for the same
+   *  reason: a paused block has no deadline to read a countdown from. */
+  endsAt: number | null
+  /** Seconds left, frozen, while paused. Null while running. */
+  pausedLeft: number | null
+  /** Epoch ms this phase started at. */
+  startedAt: number
+  /** Minutes the running block was started for -- not a setting, the actual
+   *  length, same distinction pomodoro.tsx's own blockMin makes. */
+  blockMin: number
+  /** What it's for, when started from a task. */
+  focusLabel: string | null
+  /** Which task, if any -- lets a reader (Raycast, another device) show or
+   *  act on the real row rather than just the label text. */
+  taskId?: string
+  space?: SpaceId
+  dev: string
+  updatedAt: number
 }
 
 export type { Undoable }
@@ -287,6 +322,11 @@ interface Store extends PersistedState {
   setSubtasks: (taskId: string, subs: { title: string; estimateMin: number }[]) => void
   /** Set a task's own estimate (used by the per-task estimate action). */
   setEstimate: (taskId: string, minutes: number) => void
+  /** The Pomodoro block running right now, synced across devices. Null
+   *  clears it (used by stop/finish, and by anything remote that stopped
+   *  it first). */
+  activeFocus: ActiveFocus | null
+  setActiveFocus: (f: ActiveFocus | null) => void
 
   /** The last day the daily review was walked, and the last day it was skipped. */
   dailyDone?: string
@@ -1126,6 +1166,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const coachSlice = useCoachSlice(persisted)
   const { coachSessions, setCoachSessions } = coachSlice
   const [focusSessions, setFocusSessions] = useState<FocusSession[]>(persisted?.focusSessions ?? [])
+  /* The one Pomodoro block running right now, if any -- separate from
+     focusSessions, which only ever holds FINISHED blocks. PomodoroProvider
+     owns the countdown itself (still its own localStorage clock, see
+     pomodoro.tsx) and mirrors it here so a block started on one device shows
+     up, live, on every other: the phone that started it, the Mac it syncs to,
+     and Raycast, which can only ever see this synced copy. Whichever side
+     saved most recently wins outright (see mergeStates -- this field isn't in
+     ALL_KEYS, so it follows the newer blob's savedAt like `plan`/`review`
+     used to before those needed their own union rules); a single running
+     timer has exactly one truth at a time, so last-write-wins is correct
+     here, not a compromise. */
+  const [activeFocus, setActiveFocus] = useState<ActiveFocus | null>(persisted?.activeFocus ?? null)
   /* What he deliberately deleted. Every collection is united across devices
      now, so a row missing here is only "not seen yet" unless something says
      otherwise: this is that something. Without it, deleting a task on the
@@ -1281,6 +1333,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       savedAt: Date.now(), lastWrite: { dev: deviceId(), name: deviceName(), at: Date.now() },
       weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
       habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, spaceGuessed, graveyard, twoLives, reels, tunes, reelFiles, lastRollDay: lastRollDay ?? localDateKey(),
+      activeFocus,
     }
     const json = JSON.stringify(state)
     /* His own writing is the one thing that makes "updated from your iPhone"
@@ -1307,7 +1360,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { outbox.push(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels, tunes, reelFiles, ideaBoard])
+  }, [spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels, tunes, reelFiles, ideaBoard, activeFocus])
 
   /* ---- state that arrived from somewhere else ----
      Another tab of this browser, or this account on another device. Merged in,
@@ -1371,6 +1424,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (Array.isArray(p.reels)) setReelsRaw(p.reels)
     if (Array.isArray(p.tunes)) setTunesRaw(p.tunes)
     if (p.reelFiles) setReelFilesRaw(p.reelFiles)
+    /* `!== undefined`, not truthiness: a remote stop (null) has to arrive here
+       too, same reasoning as reels/tunes above -- "nothing running" is a real
+       answer, not "no opinion". */
+    if (p.activeFocus !== undefined) setActiveFocus(p.activeFocus ?? null)
   }
   /* applyExternal itself is a plain closure rebuilt every render (it reads
      dailyDone/dailySkipped by value, not by ref) but the two effects below
@@ -1670,6 +1727,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     deleteTask: plannerSlice.deleteTask,
     setSubtasks: plannerSlice.setSubtasks,
     setEstimate: plannerSlice.setEstimate,
+    activeFocus,
+    setActiveFocus,
 
     /* Both of these write the dated log first: that is the record that survives
        the week rolling over. days[] is a cache of the current week and is kept in

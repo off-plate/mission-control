@@ -21,6 +21,7 @@
    Verified with his real rows in a browser (scripts/hpshot.mjs) before it
    was committed, which is the step the last two passes skipped. */
 import { useMemo, useState } from 'react'
+import { CookieJarNav, readJarView } from './cookiejarnav'
 import {
   agoFrom, bodyStat, daysSince, fmtDay, fmtDayFull, fmtHm, fmtWeekday, frames, freshness,
   rollUpByDay, series, sessionSeries, totals, useHealth, useHealthSync, withinDays,
@@ -401,6 +402,10 @@ export function HealthPage() {
             </p>
           </div>
           <div className="hp-head-right">
+            {/* The Cookie Jar nav, top right, like the ladder, the flywheel and
+                Why (his ask, 2026-09-15): this page used to have no way back. */}
+            <CookieJarNav here="health" view={readJarView()} />
+            <div className="hp-head-tools">
             <div className="hp-tabs" role="tablist" aria-label="Range">
               {SPANS.map((s) => (
                 <button
@@ -416,6 +421,7 @@ export function HealthPage() {
               <Icon.Repeat size={13} className={busySync ? 'hp-spin' : undefined} />
               {busySync ? 'Syncing' : 'Sync'}
             </button>
+            </div>
           </div>
         </header>
 

@@ -4794,6 +4794,31 @@ await step('cookie jar: the promise folds its numbers shut, and only the bar ope
   if ((await promise.getAttribute('class'))?.includes('is-open')) throw new Error('clicking the promise again did not fold the numbers')
 })
 
+/* His ask (2026-09-15): the ladder, the flywheel, Health and Why share one nav
+   top right. Health used to be a dead end and Why had a lone Close; now each
+   carries the same doors, the toggle returns to the view he left, and "I want
+   to give up" opens the give-up screen from anywhere. */
+await step('cookie jar: one nav on the ladder, the flywheel, Health and Why, and give up works from any of them', async () => {
+  await page.evaluate(() => localStorage.removeItem('mc-cookiejar-view'))
+  await fresh('timeline')
+  const nav = () => page.locator('.cj-nav')
+  if (await nav().getByRole('button', { name: /→|←/ }).count()) throw new Error('the view toggle still carries an arrow')
+  await nav().getByRole('button', { name: 'The flywheel' }).click(); await page.waitForTimeout(500)
+  await nav().getByRole('button', { name: 'Health', exact: true }).click(); await page.waitForTimeout(600)
+  if ((await page.evaluate(() => location.hash)) !== '#/health') throw new Error('Health did not open from the Cookie Jar')
+  if (!(await nav().count())) throw new Error('Health has no Cookie Jar nav, so it is a dead end again')
+  if (!(await nav().locator('.is-here', { hasText: 'Health' }).count())) throw new Error('Health is not marked as the page he is on')
+  await nav().getByRole('button', { name: 'The flywheel' }).click(); await page.waitForTimeout(600)
+  if ((await page.evaluate(() => location.hash)) !== '#/timeline') throw new Error('the toggle on Health did not go back to the Cookie Jar')
+  if ((await nav().locator('button').first().innerText()).trim() !== 'The ladder') throw new Error('the Cookie Jar did not come back in the flywheel view he left')
+  await nav().getByRole('button', { name: 'Why', exact: true }).click(); await page.waitForTimeout(600)
+  if (await page.locator('.board-back').count()) throw new Error('the Why wall still has its own Close button')
+  if (!(await nav().count())) throw new Error('the Why wall has no Cookie Jar nav')
+  await nav().getByRole('button', { name: 'I want to give up' }).click(); await page.waitForTimeout(800)
+  if ((await page.evaluate(() => location.hash)) !== '#/timeline') throw new Error('give up from Why did not go to the Cookie Jar')
+  if (!(await page.locator('.tl-lives').count())) throw new Error('give up from Why did not open the give-up screen')
+})
+
 await b.close(); server.close(); rmSync(SNAP, { recursive: true, force: true })
 if (errors.length) console.log(`CONSOLE ERRORS (${errors.length}): ${errors[0]}`)
 console.log(`${pass} pass, ${fail} fail${errors.length ? `, ${errors.length} console errors` : ', 0 console errors'}`)

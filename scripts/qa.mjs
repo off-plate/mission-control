@@ -332,7 +332,10 @@ await step('the menu is five tabs, and what left it is reachable from the header
      was written against the array and had been red since 2026-09-04. */
   await fresh('today')
   const tabs = await page.locator('.nav-tab').allInnerTexts()
-  if (tabs.length !== 5) throw new Error(`${tabs.length} tabs: ${tabs.join(', ')}`)
+  /* FOUR since 2026-09-15: Projects moved under Plan (a hover list), on his
+     instruction. Today, Plan, Habits & Goals, Calendar. */
+  if (tabs.length !== 4) throw new Error(`${tabs.length} tabs: ${tabs.join(', ')}`)
+  if (tabs.some((t) => /projects/i.test(t))) throw new Error('Projects is still a tab; it lives under Plan now')
   if (!tabs.some((t) => /calendar/i.test(t))) throw new Error(`Calendar is not in the row: ${tabs.join(', ')}`)
   if (tabs.some((t) => /apps/i.test(t))) throw new Error('Apps is still a tab')
   if (!tabs.some((t) => /habits & goals/i.test(t))) throw new Error(`no merged tab: ${tabs.join(', ')}`)
@@ -355,6 +358,14 @@ await step('the menu is five tabs, and what left it is reachable from the header
   if (await page.getByRole('button', { name: 'Assistant', exact: true }).count()) {
     throw new Error('Assistant still has its own header button')
   }
+  /* His instruction (2026-09-15): the top right is the Zone, Jarvis, Notes
+     and Ideas. Apps and Settings live in the dock's More instead. */
+  const topRight = page.locator('.topbar-right')
+  for (const want of ['Notes', 'Ideas']) {
+    if (!(await topRight.getByRole('button', { name: want, exact: true }).count())) throw new Error(`${want} is not in the top right`)
+  }
+  if (await topRight.getByRole('button', { name: 'Apps', exact: true }).count()) throw new Error('Apps is still in the header')
+  if (await topRight.getByRole('button', { name: /^Settings/ }).count()) throw new Error('Settings is still in the header')
   const dockOpen = page.getByRole('button', { name: 'Open quick tools' })
   await dockOpen.click(); await page.waitForTimeout(400)
   /* Only the three highest-ranked land in the visible stack now (the
@@ -366,7 +377,7 @@ await step('the menu is five tabs, and what left it is reachable from the header
   await page.locator('.dock-more-btn').click(); await page.waitForTimeout(250)
   const moreLabels = await page.locator('.dock-more-cell').allInnerTexts()
   const allLabels = [...dockLabels, ...moreLabels]
-  for (const want of ['Note', 'Bills', 'Timeline', 'Assistant']) {
+  for (const want of ['Note', 'Bills', 'Timeline', 'Assistant', 'Apps', 'Settings']) {
     if (!allLabels.some((l) => l.trim() === want || l.trim().startsWith(want))) throw new Error(`${want} is not in the dock (${allLabels.join(', ')})`)
   }
   await fresh('today')
@@ -394,6 +405,18 @@ await step('the menu is five tabs, and what left it is reachable from the header
   }
   await page.goto(`${URL}#/timeline`); await page.reload(); await page.waitForTimeout(500)
   if (!(await page.locator('.tl-why').count())) throw new Error('#/timeline did not render the Timeline page')
+})
+await step('projects: hovering Plan lists them, and All projects opens the directory', async () => {
+  await fresh('today')
+  await page.locator('.topbar-left').hover(); await page.waitForTimeout(350)
+  await page.locator('.nav-tab', { hasText: /^Plan$/ }).hover(); await page.waitForTimeout(450)
+  const menu = page.locator('.projnav-menu.is-open')
+  if (!(await menu.count())) throw new Error('hovering Plan did not open the projects list')
+  await menu.getByRole('menuitem', { name: 'All projects' }).click(); await page.waitForTimeout(500)
+  const hash = await page.evaluate(() => location.hash)
+  if (hash !== '#/projects') throw new Error(`All projects landed on ${hash}`)
+  const lit = await page.locator('.nav-tab[aria-current="page"]').allInnerTexts()
+  if (lit.map((t) => t.trim().toLowerCase()).join() !== 'plan') throw new Error(`the project directory lights ${lit.join(', ') || 'no tab'}, not Plan`)
 })
 await step('the dock opens Notes (click for the popup, hold for the full page), and its Focus row opens Focus', async () => {
   /* Rewritten 2026-09-04: Note's header button and the old Focus pill both

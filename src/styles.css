@@ -10562,3 +10562,19 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   .ib-list-open { top: auto; right: auto; bottom: var(--s3); left: calc(var(--s3) + 184px); }
   .ib-hint { top: 128px; white-space: normal; text-align: center; width: max-content; max-width: calc(100% - 2 * var(--s3)); }
 }
+
+/* ---- Menus, his sort (2026-09-15) ----
+   Settings moved into the dock's More, so its "sync is off" mark moved with
+   it: on the Settings cell, on More, and on the FAB while the dock is shut.
+   Always in the DOM and faded by class, never mounted and unmounted, because
+   a node appearing under a resting cursor fires a phantom hover on .dock. */
+.dock-fab, .dock-more-label, .dock-more-cell-icon { position: relative; }
+.dock-alert-dot {
+  position: absolute; top: -1px; right: -1px; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--alert); box-shadow: 0 0 0 2px var(--surface);
+  opacity: 0; pointer-events: none;
+}
+.dock-alert-dot.is-on { opacity: 1; }
+.dock-more-label > .dock-alert-dot { top: -4px; right: -4px; }
+.projnav-all { margin-top: 2px; border-top: 1px solid var(--hairline); color: var(--muted); }
+.kebab-menu .kebab-sub { padding-left: 28px; font-weight: 500; color: var(--muted); }

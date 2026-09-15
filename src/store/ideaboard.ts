@@ -66,18 +66,3 @@ export function useIdeaBoardSlice(
 
   return { ideaBoard, setIdeaBoard, addIdeaCard, updateIdeaCard, deleteIdeaCard }
 }
-
-/** Where a sticky goes when it was not dropped anywhere in particular (the dock's
- *  quick add): the first free slot of a loose grid, in reading order. */
-export function nextIdeaSpot(cards: IdeaCard[]): { x: number; y: number } {
-  const stepX = IDEA_W + 28
-  const stepY = IDEA_H + 28
-  for (let row = 0; row < 400; row++) {
-    for (let col = 0; col < 5; col++) {
-      const x = col * stepX
-      const y = row * stepY
-      if (!cards.some((c) => Math.abs(c.x - x) < IDEA_W && Math.abs(c.y - y) < IDEA_H)) return { x, y }
-    }
-  }
-  return { x: 0, y: 0 }
-}

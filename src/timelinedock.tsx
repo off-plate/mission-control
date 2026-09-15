@@ -62,7 +62,7 @@ export function TimelinePanel({ dockControls, onOpenFull }: { dockControls?: Rea
     // this small, not something specific to Bills despite the class names.
     <div className="billsdock-panel">
       <div className="billsdock-head">
-        <span className="billsdock-title">Timeline</span>
+        <span className="billsdock-title">Cookie Jar</span>
         {/* Same real .btn-primary classes as Notes' and Bills' door out --
            see the note on notedock.tsx for why this isn't a hand-rolled
            background. */}

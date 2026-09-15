@@ -155,7 +155,13 @@ export function TimelinePage() {
   return (
     <div className="page tline">
       <header className="tl-bar">
-        <h1>Timeline</h1>
+        {/* The Cookie Jar, his name for it (2026-09-15), after Goggins: the jar
+            of hard things already survived that he reaches into when he wants
+            to quit. It stopped being a timeline a while ago, and the one idea
+            that holds the record, the body, the reasons and the give-up
+            screen together is that one. The address stays #/timeline so
+            nothing that links here breaks. */}
+        <h1>Cookie Jar</h1>
         <div className="tl-seg" role="group" aria-label="Zoom">
           {ZOOMS.map((z) => (
             <button key={z.id} className={zoom === z.id ? 'on' : ''} aria-pressed={zoom === z.id} onClick={() => setZoom(z.id)}>{z.label}</button>
@@ -185,9 +191,13 @@ export function TimelinePage() {
              built for a screen he's sitting back from, not the one thing to
              reach for one-handed at the exact moment he's tempted to quit.
              The address still resolves for anyone who already has it. */}
+          {/* Health left the dock for here, on his instruction (2026-09-15):
+              the body belongs next to his reasons and the give-up screen.
+              Not hidden on a phone like Why: this is the only door in now. */}
+          <button className="tl-why tl-health" onClick={() => setPage('health')}>Health</button>
           <button className="tl-why hide-phone" onClick={() => setPage('board')}>Why</button>
           <button className={`tl-giveup${lives ? ' is-on' : ''}`} onClick={() => setLives((v) => !v)}>
-            {lives ? 'Back to the timeline' : 'I want to give up'}
+            {lives ? 'Back to the Cookie Jar' : 'I want to give up'}
           </button>
         </div>
       </header>

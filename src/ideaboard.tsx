@@ -86,6 +86,22 @@ export function IdeasPage() {
   const flashTimer = useRef<number | undefined>(undefined)
 
   const rect = () => boardRef.current?.getBoundingClientRect() ?? new DOMRect()
+
+  /* The board runs to the bottom edge of the window, measured from wherever it
+     actually starts, rather than a guessed header height. His report
+     (2026-09-15): a white strip sat under it, the shell's own bottom padding
+     showing through below a board sized by a fixed calc. */
+  useLayoutEffect(() => {
+    const size = () => {
+      const el = boardRef.current
+      if (!el) return
+      const top = el.getBoundingClientRect().top + window.scrollY
+      el.style.height = `${Math.max(420, Math.round(window.innerHeight - top))}px`
+    }
+    size()
+    window.addEventListener('resize', size)
+    return () => window.removeEventListener('resize', size)
+  }, [])
   const toWorld = (cx: number, cy: number) => {
     const r = rect()
     const v = viewRef.current

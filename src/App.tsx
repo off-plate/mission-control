@@ -579,7 +579,8 @@ export default function App() {
             title={page === 'zone' ? 'Leave the Zone' : 'The Zone'}
             aria-label={page === 'zone' ? 'Leave the Zone' : 'The Zone'}
           >
-            <Icon.Focus size={18} />
+            <Icon.Focus size={16} />
+            <span className="btn-sq-label">Zone</span>
           </button>
           {/* The helmet. Its eyes light when the mode is on, so the icon IS the
               state and the button needs no second indicator.
@@ -599,6 +600,7 @@ export default function App() {
             aria-label={hud ? 'Turn HUD mode off' : 'Turn HUD mode on'}
           >
             <Helmet lit={hud} />
+            <span className="btn-sq-label">Jarvis</span>
           </button>
           {/* Notes and Ideas, back in the top right on his instruction
               (2026-09-15), next to the Zone and Jarvis. The dock keeps its own
@@ -610,7 +612,8 @@ export default function App() {
             aria-label="Notes"
             title="Notes"
           >
-            <Icon.DockNote size={18} />
+            <Icon.DockNote size={16} />
+            <span className="btn-sq-label">Notes</span>
           </button>
           <button
             className={`btn btn-ghost btn-sq${page === 'ideas' ? ' is-on' : ''}`}
@@ -619,7 +622,8 @@ export default function App() {
             aria-label="Ideas"
             title="Ideas"
           >
-            <Icon.DockBulb size={18} />
+            <Icon.DockBulb size={16} />
+            <span className="btn-sq-label">Ideas</span>
           </button>
           {/* Bills' own header button retired (2026-09-03), the same way
              Notes' was above: the floating dock's Bills summary (see

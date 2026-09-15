@@ -4757,6 +4757,53 @@ await step('health: a day with several sessions opens and lists them', async () 
   await page.evaluate(() => localStorage.removeItem('mc-health-fixture'))
 })
 
+/* His ask (2026-09-15): the backlog of ideas he has no time for yet, as
+   stickies on a board. The whole promise in one pass: a sticky dragged off the
+   pad asks for its name, lands where it was dropped rather than somewhere
+   else, moves when dragged instead of opening, and is still there after a
+   reload. */
+await step('ideas: a sticky dragged off the pad asks for its name, lands where it was dropped, and stays', async () => {
+  await page.evaluate(() => localStorage.removeItem('mc-ideaboard-view'))
+  await fresh('ideas')
+  const board = page.locator('.ib-board')
+  await board.waitFor({ timeout: 8000 })
+  if (await page.locator('.ib-card').count()) throw new Error('a fresh profile already has stickies on the board')
+  const pad = await page.locator('.ib-pad-note').first().boundingBox()
+  const bb = await board.boundingBox()
+  const dropX = bb.x + bb.width * 0.55
+  const dropY = bb.y + bb.height * 0.55
+  await page.mouse.move(pad.x + pad.width / 2, pad.y + pad.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(dropX, dropY, { steps: 12 })
+  await page.mouse.up()
+  const composer = page.locator('.ib-composer')
+  await composer.waitFor({ timeout: 3000 })
+  await page.locator('.ib-title-input').fill('Rebuild the garage shelves')
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(300)
+  if (await composer.count()) throw new Error('Enter did not save the idea')
+  const card = page.locator('.ib-card').filter({ hasText: 'Rebuild the garage shelves' })
+  if ((await card.count()) !== 1) throw new Error('the idea did not land on the board')
+  const cb = await card.boundingBox()
+  const cx = cb.x + cb.width / 2
+  if (Math.abs(cx - dropX) > 40 || cb.y > dropY || cb.y + cb.height < dropY) {
+    throw new Error(`the sticky landed at ${Math.round(cx)},${Math.round(cb.y)}, not where it was dropped (${Math.round(dropX)},${Math.round(dropY)})`)
+  }
+  await page.mouse.move(cx, cb.y + 40)
+  await page.mouse.down()
+  await page.mouse.move(cx - 200, cb.y - 60, { steps: 10 })
+  await page.mouse.up()
+  await page.waitForTimeout(300)
+  if (await composer.count()) throw new Error('dragging a sticky opened it instead of moving it')
+  const moved = await card.boundingBox()
+  if (Math.abs(moved.x - (cb.x - 200)) > 20 || Math.abs(moved.y - (cb.y - 100)) > 20) throw new Error('the sticky did not follow the drag')
+  await page.reload(); await page.waitForTimeout(900)
+  const after = page.locator('.ib-card').filter({ hasText: 'Rebuild the garage shelves' })
+  if ((await after.count()) !== 1) throw new Error('the idea was gone after a reload')
+  const kept = await after.boundingBox()
+  if (Math.abs(kept.x - moved.x) > 4 || Math.abs(kept.y - moved.y) > 4) throw new Error('the sticky moved back after a reload')
+})
+
 await b.close(); server.close(); rmSync(SNAP, { recursive: true, force: true })
 if (errors.length) console.log(`CONSOLE ERRORS (${errors.length}): ${errors[0]}`)
 console.log(`${pass} pass, ${fail} fail${errors.length ? `, ${errors.length} console errors` : ', 0 console errors'}`)

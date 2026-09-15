@@ -10365,3 +10365,143 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    this a cramped panel could still let the two visually collide instead of
    the list simply showing less before you scroll it. */
 .gp-arcs, .gp-slips, .gp-range { flex: none; }
+
+/* ---------- Ideas board ----------
+   A board, not a page: pan, zoom, and stickies that stay exactly where he left
+   them. The stickies are paper and keep their own colour and dark ink in every
+   theme; everything around them (toolbar, zoom, the dotted ground) is the app's
+   own surface and follows the theme. */
+.ib-page { margin: 0 calc(var(--gutter) * -1); }
+.ib-board {
+  position: relative; overflow: hidden;
+  height: calc(100dvh - 116px); min-height: 460px;
+  border-top: 1px solid var(--hairline);
+  background-color: var(--surface-2);
+  background-image: radial-gradient(circle, var(--hairline-strong) 1px, transparent 1.3px);
+  cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.ib-board.is-panning { cursor: grabbing; }
+.ib-world { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
+
+.ib-card {
+  position: absolute; left: 0; top: 0; width: 220px; min-height: 150px;
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 14px 16px 12px; border-radius: 3px;
+  color: #26241d;
+  box-shadow: 0 1px 1px rgba(20, 18, 10, 0.08), 0 6px 16px -6px rgba(20, 18, 10, 0.3);
+  cursor: grab;
+  transition: box-shadow 160ms var(--ease);
+}
+.ib-card:hover { box-shadow: 0 1px 1px rgba(20, 18, 10, 0.08), 0 12px 26px -8px rgba(20, 18, 10, 0.36); }
+.ib-card:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.ib-card.is-dragging { z-index: 5; cursor: grabbing; box-shadow: 0 22px 44px -12px rgba(20, 18, 10, 0.5); }
+.ib-card.is-pending { opacity: 0.7; outline: 2px dashed rgba(38, 36, 29, 0.4); outline-offset: 4px; pointer-events: none; }
+.ib-card-title {
+  margin: 0; font-family: var(--font-body); font-size: 16px; font-weight: 700;
+  line-height: 1.25; overflow-wrap: anywhere; text-wrap: pretty;
+}
+.ib-card-body {
+  margin: 0; font-size: 13px; line-height: 1.45; color: rgba(38, 36, 29, 0.78);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden;
+}
+.ib-card-date { margin-top: auto; padding-top: 6px; font-size: 11px; font-weight: 600; color: rgba(38, 36, 29, 0.5); font-variant-numeric: tabular-nums; }
+
+.ib-bar {
+  position: absolute; left: var(--s4); top: var(--s4); z-index: 10;
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--s4);
+  max-width: calc(100% - 2 * var(--s4));
+  padding: 8px 10px 8px 16px; border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--hairline-strong); box-shadow: var(--shadow-pop);
+  cursor: default;
+}
+.ib-bar-head { display: flex; align-items: baseline; gap: 8px; }
+.ib-h1 { margin: 0; font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--ink); }
+.ib-count { font-size: var(--text-xs); font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ib-pad { display: flex; align-items: center; padding: 0 6px; }
+.ib-pad-note {
+  position: relative; width: 34px; height: 34px; margin-left: -10px; padding: 0;
+  border: 0; border-radius: 3px; cursor: grab; touch-action: none;
+  box-shadow: 0 1px 1px rgba(20, 18, 10, 0.1), 0 4px 10px -4px rgba(20, 18, 10, 0.4);
+  transition: transform 140ms var(--ease);
+}
+.ib-pad-note:first-child { margin-left: 0; }
+.ib-pad-note:nth-child(odd) { transform: rotate(-5deg); }
+.ib-pad-note:nth-child(even) { transform: rotate(4deg); }
+.ib-pad-note:hover { z-index: 1; transform: translateY(-4px) rotate(0deg); }
+.ib-pad-note:active { cursor: grabbing; }
+.ib-pad-note:focus-visible { z-index: 1; outline: 2px solid var(--focus); outline-offset: 2px; }
+.ib-add { display: inline-flex; align-items: center; gap: 6px; }
+.ib-ghost { position: absolute; z-index: 20; border-radius: 3px; opacity: 0.92; pointer-events: none; box-shadow: 0 22px 44px -12px rgba(20, 18, 10, 0.5); }
+
+.ib-zoom {
+  position: absolute; left: var(--s4); bottom: var(--s4); z-index: 10;
+  display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--hairline-strong); box-shadow: var(--shadow-pop);
+  cursor: default;
+}
+.ib-zbtn {
+  min-width: 32px; height: 32px; padding: 0 8px; display: grid; place-items: center;
+  border: 0; border-radius: 7px; background: none; color: var(--ink);
+  font: inherit; font-size: var(--text-xs); font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.ib-zbtn:hover { background: var(--surface-2); }
+.ib-zbtn:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.ib-zpct { min-width: 54px; color: var(--muted); }
+
+.ib-empty {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  max-width: 36ch; text-align: center; color: var(--muted); font-size: var(--text-sm); line-height: 1.5;
+  pointer-events: none;
+}
+.ib-empty p { margin: 0; }
+.ib-empty .ib-empty-h { margin-bottom: 4px; color: var(--ink); font-size: var(--text-base); font-weight: 700; }
+
+.ib-scrim { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: var(--s4); background: rgba(16, 15, 10, 0.34); }
+.ib-composer {
+  width: min(440px, 100%); display: flex; flex-direction: column; gap: 12px;
+  padding: 20px 20px 16px; border-radius: 6px;
+  background: var(--ib-paper, #f6e3b0); color: #26241d;
+  box-shadow: 0 30px 70px -20px rgba(16, 15, 10, 0.55);
+  transition: background-color 160ms var(--ease);
+}
+.ib-composer-h { margin: 0; font-family: var(--font-body); font-size: 18px; font-weight: 700; color: #26241d; }
+.ib-field { display: flex; align-items: flex-start; gap: 6px; }
+.ib-title-input, .ib-body-input {
+  flex: 1; min-width: 0; font: inherit; color: #26241d;
+  padding: 10px 12px; border-radius: 6px;
+  background: rgba(255, 255, 255, 0.5); border: 1px solid rgba(38, 36, 29, 0.18);
+}
+.ib-title-input { font-size: 17px; font-weight: 700; }
+.ib-body-input { min-height: 92px; font-size: 14px; line-height: 1.5; resize: vertical; }
+.ib-title-input::placeholder, .ib-body-input::placeholder { color: rgba(38, 36, 29, 0.48); }
+.ib-title-input:focus, .ib-body-input:focus { outline: 2px solid rgba(38, 36, 29, 0.6); outline-offset: 1px; background: rgba(255, 255, 255, 0.75); }
+.ib-mic {
+  flex: none; width: 44px; height: 44px; display: grid; place-items: center; padding: 0;
+  border-radius: 6px; border: 1px solid rgba(38, 36, 29, 0.18);
+  background: rgba(255, 255, 255, 0.5); color: #26241d; cursor: pointer;
+}
+.ib-mic:hover { background: rgba(255, 255, 255, 0.8); }
+.ib-mic.is-on { background: #26241d; border-color: #26241d; color: #fff; animation: ib-listen 1.4s ease-in-out infinite; }
+@keyframes ib-listen { 50% { box-shadow: 0 0 0 5px rgba(38, 36, 29, 0.2); } }
+@media (prefers-reduced-motion: reduce) { .ib-mic.is-on { animation: none; } .ib-card, .ib-pad-note { transition: none; } }
+.ib-swatches { display: flex; gap: 8px; }
+.ib-swatch { width: 26px; height: 26px; padding: 0; border-radius: 4px; border: 1px solid rgba(38, 36, 29, 0.25); cursor: pointer; }
+.ib-swatch.is-on { outline: 2px solid #26241d; outline-offset: 2px; }
+.ib-actions { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.ib-actions-grow { flex: 1; }
+.ib-composer .btn-ghost { color: #26241d; }
+.ib-composer .ib-delete { color: #9a3412; }
+
+/* The same mic in the dock panel sits on the app's surface, not on paper. */
+.wldock-ask .ib-mic { width: 40px; height: auto; align-self: stretch; border-radius: 10px; border-color: var(--hairline-strong); background: var(--surface-2); color: var(--ink); }
+.wldock-ask .ib-mic.is-on { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+.ibd-dot { flex: none; width: 10px; height: 10px; border-radius: 2px; }
+.dock-item-avatar--ideas { background: var(--surface-2); }
+
+@media (max-width: 639px) {
+  .ib-board { height: calc(100dvh - 240px); min-height: 420px; }
+  .ib-bar { left: var(--s3); right: var(--s3); top: var(--s3); gap: var(--s2) var(--s3); padding: 8px 10px 8px 12px; }
+  .ib-h1 { font-size: 17px; }
+  .ib-zoom { left: var(--s3); bottom: var(--s3); }
+}

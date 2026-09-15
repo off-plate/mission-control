@@ -377,8 +377,12 @@ await step('the menu is five tabs, and what left it is reachable from the header
   await page.locator('.dock-more-btn').click(); await page.waitForTimeout(250)
   const moreLabels = await page.locator('.dock-more-cell').allInnerTexts()
   const allLabels = [...dockLabels, ...moreLabels]
-  for (const want of ['Note', 'Bills', 'Timeline', 'Assistant', 'Apps', 'Settings']) {
+  for (const want of ['Bills', 'Cookie Jar', 'Assistant', 'Apps', 'Settings']) {
     if (!allLabels.some((l) => l.trim() === want || l.trim().startsWith(want))) throw new Error(`${want} is not in the dock (${allLabels.join(', ')})`)
+  }
+  /* Note and Ideas live in the top right, Health on the Cookie Jar page (2026-09-15). */
+  for (const gone of ['Note', 'Ideas', 'Health']) {
+    if (allLabels.some((l) => l.trim() === gone || l.trim().startsWith(`${gone}\n`))) throw new Error(`${gone} is still in the dock (${allLabels.join(', ')})`)
   }
   await fresh('today')
   await dockOpen.click(); await page.waitForTimeout(400)
@@ -418,31 +422,16 @@ await step('projects: hovering Plan lists them, and All projects opens the direc
   const lit = await page.locator('.nav-tab[aria-current="page"]').allInnerTexts()
   if (lit.map((t) => t.trim().toLowerCase()).join() !== 'plan') throw new Error(`the project directory lights ${lit.join(', ') || 'no tab'}, not Plan`)
 })
-await step('the dock opens Notes (click for the popup, hold for the full page), and its Focus row opens Focus', async () => {
-  /* Rewritten 2026-09-04: Note's header button and the old Focus pill both
-     left for the floating dock during the dock rebuild (2026-09-01/02). A
-     click on a dock item opens its compact popup; holding it ~520ms (see
-     HOLD_MS in dock.tsx) jumps straight to the full page and closes the
-     dock -- his pick from a 3-option artifact comparison. */
+await step('Notes and Ideas open from the top right, and the dock Focus row opens Focus', async () => {
+  /* His instruction (2026-09-15): Notes and Ideas live in the top right as
+     icon buttons, so they left the floating dock. */
   await fresh('today')
-  const openDock = page.getByRole('button', { name: 'Open quick tools' })
-  await openDock.waitFor({ state: 'visible', timeout: 10000 })
-  await openDock.click(); await page.waitForTimeout(400)
-  const noteItem = page.locator('.dock-item').filter({ hasText: 'Note' })
-  await noteItem.click(); await page.waitForTimeout(400)
-  if (!(await page.locator('.notedock-panel').count())) throw new Error('a click on the Note dock item did not open the quick popup')
-  // A click on a panel takes the dock straight to mode: 'note', not back to
-  // 'menu' or 'closed' -- its own Close button (not the FAB) gets it there.
-  await page.getByRole('button', { name: 'Close', exact: true }).click(); await page.waitForTimeout(400)
-
-  await page.getByRole('button', { name: 'Open quick tools' }).click(); await page.waitForTimeout(400)
-  const box = await noteItem.boundingBox()
-  if (!box) throw new Error('no Note dock item to hold')
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-  await page.mouse.down(); await page.waitForTimeout(650); await page.mouse.up()
-  await page.waitForTimeout(400)
-  if (!(await page.locator('.nt-app').count())) throw new Error('holding the Note dock item did not open the full Notes page')
-
+  const topRight = page.locator('.topbar-right')
+  await topRight.getByRole('button', { name: 'Notes', exact: true }).click(); await page.waitForTimeout(500)
+  if (!(await page.locator('.nt-app').count())) throw new Error('the Notes button did not open the Notes page')
+  await topRight.getByRole('button', { name: 'Ideas', exact: true }).click(); await page.waitForTimeout(600)
+  if (!(await page.locator('.ib-board').count())) throw new Error('the Ideas button did not open the Ideas board')
+  await page.mouse.move(20, 300)
   await page.getByRole('button', { name: 'Open quick tools' }).click(); await page.waitForTimeout(400)
   await page.getByRole('button', { name: 'Open the focus history' }).click(); await page.waitForTimeout(600)
   const h1 = await page.locator('h1').first().innerText()
@@ -483,7 +472,7 @@ await step('the dock opens Assistant (click for the quick-ask widget, hold for t
   if (!(await page.locator('.as-page').count())) throw new Error('the door-out button did not open the full Assistant page')
   if (!(await page.getByText('What can I help with?').count())) throw new Error('the full Assistant page did not render its own hero question')
 })
-await step('the zone: header stays, first move starts it, and the note lands in its folder', async () => {
+await step('the zone: header stays, and the first move starts it', async () => {
   await fresh('today')
   await page.evaluate(() => { localStorage.setItem('mc-view', 'personal'); localStorage.setItem('mc-space', 'personal') })
   // A real task on today's list, so the empty-state message is not the one
@@ -547,8 +536,8 @@ await step('the zone: header stays, first move starts it, and the note lands in 
   }
   /* Note left the room on his instruction (2026-09-12): it never had a
      bounded height of its own, and fighting the queue for the same fixed
-     rail was the actual cause of "the timer gets tiny". It is reachable
-     from the floating dock instead (see the dedicated room-layout test). */
+     rail was the actual cause of "the timer gets tiny". It is reached
+     from the Notes button in the top right now. */
   if (await page.locator('.znote-rich .nt-editor').count()) throw new Error('the room still carries its own Note editor')
   if (room.vOverflow > 2) throw new Error(`the room scrolls by ${room.vOverflow}px; it is meant to be one screen`)
 
@@ -575,31 +564,6 @@ await step('the zone: header stays, first move starts it, and the note lands in 
   if (!(await page.locator('.spaces').count())) throw new Error('the workspace switcher did not come back on Today')
   await page.goto(`${URL}#/zone`); await page.waitForTimeout(500)
 
-  // A note written from the Zone now goes through the same floating dock
-  // every other page uses, not a room-only editor -- same Editor component,
-  // same folder rule, reached one extra click away instead of always taking
-  // up its own share of the room.
-  await page.locator('.dock-fab').click(); await page.waitForTimeout(400)
-  await page.locator('.dock-item', { hasText: 'Note' }).click(); await page.waitForTimeout(400)
-  /* The dock's own Note resumes whichever note he touched last (its own
-     documented behaviour, notedock.tsx) rather than opening blank the way
-     the room's retired editor always did -- so a fresh one is asked for
-     explicitly, same as he would with his own click. */
-  await page.locator('.notedock-panel .dock-icon[aria-label="New note"]').click(); await page.waitForTimeout(300)
-  await page.locator('.notedock-panel .nt-editor').click()
-  await page.keyboard.insertText('Zone gate note')
-  await page.waitForTimeout(400)
-  const saved = await page.evaluate((K) => {
-    const s = JSON.parse(localStorage.getItem(K))
-    /* A fresh contenteditable note types onto a leading blank line -- the
-       body comes back "\nZone gate note", not an exact match. Ordinary and
-       harmless (the Notes page renders it identically either way), so this
-       checks for the text landing, not its exact whitespace. */
-    return s.notes.find((n) => n.body.trim() === 'Zone gate note')
-  }, KEY)
-  if (!saved) throw new Error('typing in the dock note from the zone did not save a note')
-  if (saved.folderId !== 'nf-space-personal') throw new Error(`the note landed in ${saved.folderId}, not the shown folder`)
-  await page.locator('.dock-icon[aria-label="Close"]').click(); await page.waitForTimeout(300)
 
   // The player: a real Mundi Opus video mounted (off-screen, in mundiplayer's
   // own permanent host, never inside the Zone tile), and next moves the
@@ -987,18 +951,15 @@ await step('the zone: the timer never shrinks, no matter how long the queue gets
   if (railH > 260) throw new Error(`the rail is ${railH}px tall with 20 tracks in it, so it is growing again`)
   if (!before || before.height < 200) throw new Error(`the timer face is only ${before?.height}px tall with a long queue open`)
 
-  /* Note is off this room and reachable from the dock instead now. */
+  /* Note is off this room; the Notes button in the top right reaches it. */
   if (await page.locator('.zpanel-note, .znote').count()) throw new Error('the room still carries its own Note panel')
   if (!(await page.locator('.dock-fab').count())) throw new Error('the floating dock is not reachable from the Zone')
   await page.locator('.dock-fab').click(); await page.waitForTimeout(400)
-  const noteItem = page.locator('.dock-item', { hasText: 'Note' })
-  if (!(await noteItem.count())) throw new Error('Note is not one of the dock items while in the Zone')
-
+  if (await page.locator('.dock-item', { hasText: 'Note' }).count()) throw new Error('Note is still in the dock; it lives in the top right')
   /* .dock is a fixed SIBLING of .shell, so its --z-* custom properties are
      only reachable if they are redeclared reading from body, not merely
-     scoped inside .shell.in-zone -- caught the first time by a computed
-     style coming back fully transparent despite the CSS rule existing. */
-  await noteItem.click(); await page.waitForTimeout(400)
+     scoped inside .shell.in-zone. Any open panel shows the tint. */
+  await openDockItem('Bills'); await page.waitForTimeout(400)
   const bg = await page.locator('.dock-face').evaluate((e) => getComputedStyle(e).backgroundColor)
   if (bg === 'rgba(0, 0, 0, 0)' || /^rgb\(255, 255, 255/.test(bg)) {
     throw new Error(`the dock face is untinted in the Zone (background: ${bg})`)
@@ -1108,59 +1069,7 @@ await step('mundi opus: leaving the zone does not stop the music, and the corner
   await page.goto(`${URL}#/zone`); await page.waitForTimeout(600)
   if ((await page.locator('.zplayer-title').innerText()) !== trackAfterCornerSkip) throw new Error('the zone and the dock disagree about what is playing')
 })
-await step('the zone: the note takes real formatting, not a plain textarea', async () => {
-  /* Note left the room for the floating dock (2026-09-12, his instruction),
-     so this now opens the exact same door the room-layout test above uses --
-     one Editor, reached the same way from anywhere in the app, not a
-     zone-only copy of it. */
-  await fresh('zone')
-  const skip = page.getByRole('button', { name: 'Not today' })
-  if (await skip.count()) { await skip.first().click(); await page.waitForTimeout(400) }
-  await page.waitForSelector('.zroom', { timeout: 10000 })
 
-  await page.locator('.dock-fab').click(); await page.waitForTimeout(400)
-  await page.locator('.dock-item', { hasText: 'Note' }).click(); await page.waitForTimeout(400)
-  await page.locator('.notedock-panel .dock-icon[aria-label="New note"]').click(); await page.waitForTimeout(300)
-  const editor = page.locator('.notedock-panel .nt-editor')
-  await editor.click()
-  await page.keyboard.insertText('gate note')
-  await page.waitForTimeout(400)
-  // Bold and italic are real marks on real selected text, not styled UI
-  // with nothing behind it.
-  await editor.selectText()
-  await page.locator('.notedock-panel').getByRole('button', { name: 'Bold' }).click()
-  await page.locator('.notedock-panel').getByRole('button', { name: 'Italic' }).click()
-  await page.waitForTimeout(300)
-  const marked = await editor.evaluate((el) => !!el.querySelector('b, strong') && !!el.querySelector('i, em'))
-  if (!marked) throw new Error('bold and italic did not mark the text')
-  // The whole point of a dash-in-hand-becomes-a-bullet editor is that a
-  // literal "- " typed at the start of a line makes a real list. The Bold
-  // and Italic marks just applied leave the WHOLE line selected (execCommand
-  // does not collapse it), and a synthetic End keypress on that selection
-  // did not collapse it either: Enter then overwrote the selected text
-  // instead of starting a new line. Collapse to the end explicitly first.
-  await editor.evaluate((el) => {
-    const r = document.createRange()
-    r.selectNodeContents(el)
-    r.collapse(false)
-    const sel = window.getSelection()
-    sel.removeAllRanges()
-    sel.addRange(r)
-  })
-  await page.keyboard.press('Enter')
-  await page.keyboard.insertText('- a bullet point')
-  await page.waitForTimeout(300)
-  if (!(await editor.evaluate((el) => !!el.querySelector('ul li')))) throw new Error('typing "- " did not make a bullet')
-  // It survives, in the saved note, as markdown, the same way every other
-  // note on the app does: this is the real editor, not a second one.
-  const saved = await page.evaluate((K) => {
-    const s = JSON.parse(localStorage.getItem(K))
-    return s.notes.find((n) => /a bullet point/.test(n.body))
-  }, KEY)
-  if (!saved) throw new Error('the formatted note did not save')
-  if (!/\*\*[^*]+\*\*/.test(saved.body)) throw new Error(`bold did not round-trip to markdown: ${saved.body}`)
-  if (!/^-\s/m.test(saved.body)) throw new Error(`the bullet did not round-trip to markdown: ${saved.body}`)
-})
 await step('notes: folders are folders, with no workspace above them', async () => {
   await fresh('notes')
   const names = await page.locator('.nt-side .nt-fname').allInnerTexts()
@@ -4178,22 +4087,17 @@ await step('dock: Skills opens honestly signed out, hold reaches the real page',
   await page.locator('.dock-open-btn').click(); await page.waitForTimeout(400)
   if (!(await page.locator('h1', { hasText: 'Skills' }).count())) throw new Error('the door-out button did not land on the real Skills page')
 })
-await step('dock: Health opens honestly signed out, hold reaches the real page', async () => {
-  /* His ask (2026-09-10): a Health page in the dock's bottom-right, with the
-     look taken from his own Zepp dashboard. The numbers come from the zepp_*
-     tables the watch already feeds through Intervals.icu into this same
-     Supabase project, so nothing about the body is bundled either. Signed
-     out is the only state this gate can drive end to end (?noremote), and it
-     is the one that must never invent a heart rate: no tile may show a
-     number when there is no session to read one from. */
-  await fresh('today')
-  await page.getByRole('button', { name: 'Open quick tools' }).click(); await page.waitForTimeout(400)
-  await openDockItem('Health'); await page.waitForTimeout(400)
-  const panelText = await page.locator('.billsdock-panel').innerText()
-  if (!/signed in|off on this device/i.test(panelText)) throw new Error(`did not say why there is nothing to show: "${panelText}"`)
-  if (await page.locator('.hpdock-lead').count()) throw new Error('showed a fitness number with no real data behind it')
-  await page.locator('.dock-open-btn').click(); await page.waitForTimeout(500)
-  if (!(await page.locator('h1', { hasText: 'Health' }).count())) throw new Error('the door-out button did not land on the real Health page')
+await step('health: the Cookie Jar opens it, and signed out it draws no body tiles', async () => {
+  /* Health left the dock for a button next to Why and "I want to give up" on
+     the Cookie Jar page (his instruction, 2026-09-15). Signed out is the one
+     state this gate can drive end to end (?noremote), and it is the one that
+     must never invent a heart rate: no tile may show a number with no session
+     behind it. */
+  await fresh('timeline')
+  if (!(await page.locator('h1', { hasText: 'Cookie Jar' }).count())) throw new Error('the page is not called the Cookie Jar')
+  if (await page.locator('.dock-item, .dock-more-cell').filter({ hasText: 'Health' }).count()) throw new Error('Health is still in the dock')
+  await page.locator('.tl-right').getByRole('button', { name: 'Health', exact: true }).click(); await page.waitForTimeout(500)
+  if (!(await page.locator('h1', { hasText: 'Health' }).count())) throw new Error('the Health button did not land on the real Health page')
   if (await page.locator('.hp-tile').count()) throw new Error('drew body tiles with nothing signed in behind them')
 })
 await step('settings: the device voice picker lists real voices and remembers a pick', async () => {

@@ -10578,3 +10578,17 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .dock-more-label > .dock-alert-dot { top: -4px; right: -4px; }
 .projnav-all { margin-top: 2px; border-top: 1px solid var(--hairline); color: var(--muted); }
 .kebab-menu .kebab-sub { padding-left: 28px; font-weight: 500; color: var(--muted); }
+
+/* The Ideas board is the whole window below the header, so the space every
+   other page keeps under its content (the shell's bottom padding, and the
+   phone's room for the dock) would only show as a strip under the board. */
+body:has(.ib-page) .shell { padding-bottom: 0; }
+body:has(.ib-page) #main { padding-bottom: 0; }
+
+/* His ask (2026-09-15): the top right as square boxes with icons and no
+   names, the shape the Jarvis helmet already had. One size for all four,
+   taken from the height the row already rendered at, so nothing jumps. The
+   names stay as each button's title and aria-label. */
+.topbar-right .btn-sq, .topbar-right .btn-helmet {
+  width: 46px; height: 46px; min-height: 46px; padding: 0; justify-content: center;
+}

@@ -181,6 +181,12 @@ function refresh(force = false): Promise<void> {
   return inFlight
 }
 
+/** Bills (or the assistant) just wrote to Compass. Re-read now rather than
+ *  wait out STALE_MS, so a payment ticked in Bills is already on the Cookie
+ *  Jar the moment he looks, his report (2026-09-15): "this has to be
+ *  automatic, updated based on the Bills page". */
+export function compassChanged(): void { void refresh(true) }
+
 /** Reads once for the whole app (shared across every caller on screen), and
  *  again on demand. */
 export function useCompass(): { state: CompassState; reload: () => void } {

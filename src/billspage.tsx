@@ -12,6 +12,7 @@
    against known values there, because this reads and writes his real
    financial data on a shared production database. */
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { compassChanged } from './compass'
 import { Sheet } from './modals'
 import { CycleRail, type RailIncome } from './cyclerail'
 import { parseDebtLines } from './debtimport'
@@ -228,17 +229,30 @@ export function BillsPage() {
     try {
       await insertRow('compass_transactions', {
         kind: i.kind, amount: i.amount,
-        occurred_on: cycleOffset === 0 ? todayISO() : (i.dueOn ?? iso(cycle.start)),
+        /* A bill ticked in a PAST cycle is dated that cycle's last day, not its
+           due date. His report (2026-09-15): Moneta, paid on the 14th and ticked
+           in last cycle, was stamped with its August due date. That fell before
+           the day the debt started being tracked in Compass, so the payment was
+           silently dropped from the Cookie Jar. The last day keeps it paid in
+           the cycle he ticked it in and as close as that cycle allows to when it
+           actually went out. A future cycle keeps its due date, and today's
+           cycle is dated today, as before. */
+        occurred_on: cycleOffset === 0
+          ? todayISO()
+          : cycleOffset < 0
+            ? iso(new Date(cycle.end.getFullYear(), cycle.end.getMonth(), cycle.end.getDate() - 1))
+            : (i.dueOn ?? iso(cycle.start)),
         recurring_id: i.link.recurring_id ?? null, planned_id: i.link.planned_id ?? null,
         debt_id: i.debtId, category_id: i.categoryId, goal_id: i.goalId, account_id: null,
       })
       reload()
+      compassChanged()
     } finally { setBusy(false) }
   }
   const undoPaid = async (i: CycleItem) => {
     if (!i.paidTxId) return
     setBusy(true)
-    try { await deleteRow('compass_transactions', i.paidTxId); reload() } finally { setBusy(false) }
+    try { await deleteRow('compass_transactions', i.paidTxId); reload(); compassChanged() } finally { setBusy(false) }
   }
   const toggleSkip = async (itemId: string) => {
     setBusy(true)

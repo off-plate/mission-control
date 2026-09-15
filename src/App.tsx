@@ -573,14 +573,13 @@ export default function App() {
               walked in from, because the room has no close of its own and he
               was leaving it by pressing Note to get out. */}
           <button
-            className={`btn btn-primary${page === 'zone' ? ' is-on' : ''}`}
+            className={`btn btn-primary btn-sq${page === 'zone' ? ' is-on' : ''}`}
             onClick={() => setPage(page === 'zone' ? backFromZone.current : 'zone')}
             aria-pressed={page === 'zone'}
             title={page === 'zone' ? 'Leave the Zone' : 'The Zone'}
             aria-label={page === 'zone' ? 'Leave the Zone' : 'The Zone'}
           >
             <Icon.Focus size={18} />
-            <span className="btn-label">The Zone</span>
           </button>
           {/* The helmet. Its eyes light when the mode is on, so the icon IS the
               state and the button needs no second indicator.
@@ -605,24 +604,22 @@ export default function App() {
               (2026-09-15), next to the Zone and Jarvis. The dock keeps its own
               Note and Ideas for quick capture; these open the full pages. */}
           <button
-            className={`btn btn-ghost${page === 'notes' ? ' is-on' : ''}`}
+            className={`btn btn-ghost btn-sq${page === 'notes' ? ' is-on' : ''}`}
             onClick={() => setPage('notes')}
             aria-pressed={page === 'notes'}
             aria-label="Notes"
             title="Notes"
           >
             <Icon.DockNote size={18} />
-            <span className="btn-label">Notes</span>
           </button>
           <button
-            className={`btn btn-ghost${page === 'ideas' ? ' is-on' : ''}`}
+            className={`btn btn-ghost btn-sq${page === 'ideas' ? ' is-on' : ''}`}
             onClick={() => setPage('ideas')}
             aria-pressed={page === 'ideas'}
             aria-label="Ideas"
             title="Ideas"
           >
             <Icon.DockBulb size={18} />
-            <span className="btn-label">Ideas</span>
           </button>
           {/* Bills' own header button retired (2026-09-03), the same way
              Notes' was above: the floating dock's Bills summary (see

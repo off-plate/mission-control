@@ -11,6 +11,7 @@
    real page's own read, reused. */
 
 import { useMemo } from 'react'
+import { compassChanged } from './compass'
 import { useCompassAccount, useBillsData, refreshBills, getBillsSnapshot, type BillsData } from './billspage'
 import {
   activeCycleKey, cycleChecklist, cycleForKey, iso, resolveCycleIncome, todayISO,
@@ -49,11 +50,13 @@ export function useAssistantBills() {
       debt_id: i.debtId, category_id: i.categoryId, goal_id: i.goalId, account_id: null,
     })
     reload()
+    compassChanged()
   }
   const markUnpaid = async (i: CycleItem): Promise<void> => {
     if (!i.paidTxId) return
     await deleteRow('compass_transactions', i.paidTxId)
     reload()
+    compassChanged()
   }
 
   /* "Unexpected this cycle" -- the exact insert PlannedSheet's own "Add a

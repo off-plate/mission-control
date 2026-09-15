@@ -1,18 +1,11 @@
-/* THE FLOATING IDEAS GLANCE. The dock panel answers one question: "I just had
-   one, where does it go?" So the panel is a single line he can type or talk
-   into, and it lands on the board in the next free spot. Arranging them is
-   the board's job, where there is room to.
-
-   The sticky palette and the dictation button live here too, because the board
-   page is lazy and the dock is not: the board imports them from here rather
-   than the other way round. */
-import { type ReactNode, useEffect, useRef, useState } from 'react'
-import { useStore } from './store'
+/* What the Ideas board shares with anything else that captures an idea: the
+   sticky palette and the dictation button. The dock's quick-add left with
+   Ideas' dock item (2026-09-15); the board is reached from the top right. */
+import { useEffect, useRef, useState } from 'react'
 import {
   cancel as cancelDictation, dictateState, dictationAvailable, dictationEngine,
   subscribe, toggle as toggleDictation, type DictateState,
 } from './dictation'
-import { nextIdeaSpot } from './store/ideaboard'
 import * as Icon from './icons'
 
 /* Paper, not UI colour: a sticky keeps its own colour and dark ink in every
@@ -69,71 +62,5 @@ export function MicButton({ on, busy, label, onClick }: { on: boolean; busy: boo
     >
       <Icon.Mic size={16} />
     </button>
-  )
-}
-
-export function IdeasChip() {
-  return <Icon.DockBulb size={22} />
-}
-
-export function IdeasPanel({ dockControls, onOpenFull }: { dockControls?: ReactNode; onOpenFull?: () => void }) {
-  const { setPage, ideaBoard, addIdeaCard } = useStore()
-  const [title, setTitle] = useState('')
-  const [added, setAdded] = useState<string | null>(null)
-  const dict = useFieldDictation<'title'>()
-  const recent = [...ideaBoard].sort((a, b) => b.createdAt - a.createdAt).slice(0, 4)
-
-  const open = () => { dict.stopAll(); setPage('ideas'); onOpenFull?.() }
-  const add = () => {
-    const t = title.trim()
-    if (!t) return
-    dict.stopAll()
-    addIdeaCard({ title: t, ...nextIdeaSpot(ideaBoard) })
-    setTitle('')
-    setAdded(t)
-  }
-
-  return (
-    <div className="billsdock-panel">
-      <div className="billsdock-head">
-        <span className="billsdock-title">Ideas</span>
-        <button className="btn btn-primary dock-open-btn" onClick={open} title="Open the Ideas board">
-          <Icon.ExternalLink size={13} />
-          Board
-        </button>
-        {dockControls}
-      </div>
-      <div className="billsdock-body">
-        <form className="wldock-ask" onSubmit={(e) => { e.preventDefault(); add() }}>
-          <input
-            className="wldock-input"
-            value={title}
-            onChange={(e) => { setTitle(e.target.value); setAdded(null) }}
-            placeholder="What’s the idea?"
-            aria-label="Idea name"
-            maxLength={140}
-          />
-          <MicButton
-            on={dict.owner === 'title'}
-            busy={dict.state === 'transcribing'}
-            label="Dictate the idea"
-            onClick={() => dict.start('title', title, (t) => { setTitle(t); setAdded(null) })}
-          />
-          <button className="wldock-go" type="submit" disabled={!title.trim()}>Add</button>
-        </form>
-        {added && <p className="wldock-note">On the board: {added}</p>}
-
-        {recent.length > 0 && (
-          <div className="wldock-recent">
-            {recent.map((c) => (
-              <button key={c.id} className="wldock-row" onClick={open} title={c.title}>
-                <i className="ibd-dot" style={{ background: ideaBg(c.color) }} aria-hidden="true" />
-                <span>{c.title}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
   )
 }

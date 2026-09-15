@@ -38,8 +38,8 @@ export function CookieJarNav({ here, view, onToggleView, lives = false, onGiveUp
   const { setPage } = useStore()
   const onJar = here === 'jar'
   const toggleLabel = onJar
-    ? (view === 'ladder' ? 'The flywheel' : 'The ladder')
-    : (view === 'ladder' ? 'The ladder' : 'The flywheel')
+    ? (view === 'ladder' ? 'Momentum' : 'The ladder')
+    : (view === 'ladder' ? 'The ladder' : 'Momentum')
   const toggle = onJar && onToggleView ? onToggleView : () => setPage('timeline')
   const giveUp = onJar && onGiveUp ? onGiveUp : () => { giveUpAsked = true; setPage('timeline') }
 

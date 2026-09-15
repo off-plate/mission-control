@@ -9141,7 +9141,8 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 
 /* The HUD is this app's dark, and it is the only thing that makes this page
    dark. Same five hues, lifted for a dark ground. */
-.shell.is-hud .hp {
+.shell.is-hud .hp,
+.shell.is-dark-page .hp {
   --hp-card: rgba(255, 255, 255, 0.045);
   --hp-card-2: rgba(255, 255, 255, 0.03);
   --hp-line: rgba(255, 255, 255, 0.10);
@@ -9185,7 +9186,8 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 }
 .hp-tab:hover { color: var(--hp-t1); }
 .hp-tab.is-on { background: var(--hp-card); color: var(--hp-t1); box-shadow: var(--hp-shadow); }
-.shell.is-hud .hp-tab.is-on { background: rgba(255, 255, 255, 0.10); }
+.shell.is-hud .hp-tab.is-on,
+.shell.is-dark-page .hp-tab.is-on { background: rgba(255, 255, 255, 0.10); }
 
 /* ---- the card grid ----
    Third pass. One measurement per card, each with its own chart, after his
@@ -9214,7 +9216,8 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   background: linear-gradient(180deg, var(--hp-accent), transparent);
   opacity: 0.07; pointer-events: none;
 }
-.shell.is-hud .hp-card::before { opacity: 0.16; }
+.shell.is-hud .hp-card::before,
+.shell.is-dark-page .hp-card::before { opacity: 0.16; }
 .hp-card > * { position: relative; }
 .hp-card:hover { border-color: var(--hp-line-2); box-shadow: var(--hp-shadow-2); transform: translateY(-2px); }
 @media (prefers-reduced-motion: reduce) { .hp-card:hover { transform: none; } }
@@ -10630,3 +10633,38 @@ body:has(.ib-page) #main { padding-bottom: 0; }
 @media (prefers-reduced-motion: reduce) {
   .tl-promise-collapse, .tl-promise-collapse-inner, .tl-promise-chev, .tl-promise-collapse-inner .tl-sum { transition: none; }
 }
+
+/* ---- the dark header, on the dark pages only (his ask, 2026-09-15) ----
+   The Cookie Jar (#/timeline) and the Why wall (#/board) are dark in both
+   modes. On those two, the header and the nav row take the Cookie Jar's own
+   ground and cards with the app's usual lime accent, not HUD's cold palette:
+   same app, dark room. Both the source --a-* tokens and the mapped ones are
+   redeclared here, because the mapped ones are resolved on :root and a
+   redeclared source alone would not reach them. The projects hover list is
+   portalled to <body>, outside the header, so it is named on its own. */
+.shell.is-dark-chrome .topstick,
+body:has(.shell.is-dark-chrome) .projnav-menu,
+.shell.is-dark-page main {
+  --a-paper: #0E0E10; --a-card: #16161A; --a-sunk: #1C1C21; --a-feature: #F2F0EA;
+  --a-on-ink: #0E0E10;
+  --a-ink: #F2F0EA; --a-muted: #A09D94; --a-soft: #8C897F; --a-faint: #6A675F;
+  --a-accent: #DFF24A; --a-accent-2: #C8DC2E; --a-accent-text: #DFF24A; --a-accent-wash: rgba(223, 242, 74, 0.14);
+  --a-line: rgba(242, 240, 234, 0.10); --a-line-2: rgba(242, 240, 234, 0.22);
+  --bg: #0E0E10; --surface: #16161A; --surface-2: #1C1C21;
+  --ink: #F2F0EA; --muted: #A09D94; --faint: #8C897F;
+  --hairline: rgba(242, 240, 234, 0.10); --hairline-strong: rgba(242, 240, 234, 0.22);
+  --accent: #DFF24A; --accent-text: #DFF24A; --accent-ink: #0E0E10; --accent-wash: rgba(223, 242, 74, 0.14);
+  --focus: #DFF24A; --focus-text: #DFF24A;
+  color: var(--ink);
+}
+/* A lime fill keeps dark ink: the light system paints these with --a-ink,
+   which is the light ink in here. */
+.shell.is-dark-chrome .topstick .space-btn[aria-pressed="true"],
+.shell.is-dark-chrome .topstick .btn-primary,
+.shell.is-dark-chrome .topstick .tab.is-on { color: #0E0E10; }
+
+/* Health is dark by default (his ask, 2026-09-15): the same dark room as the
+   Cookie Jar, header included. It uses the palette HUD already gave this page
+   (the five hues lifted for a dark ground), switched on by the page rather than
+   the mode, and the page's own ground and text take the dark tokens above. */
+.shell.is-dark-page { background: #0E0E10; color: #F2F0EA; }

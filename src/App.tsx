@@ -386,6 +386,9 @@ function PhonePages({ tabs, page, setPage }: {
   )
 }
 
+/* Pages that are dark in both modes, so the header goes dark with them. */
+const DARK_CHROME_PAGES: PageId[] = ['timeline', 'board', 'health']
+
 export default function App() {
   const { space, view, setView, page, setPage, tasks, routines, goals, habits, markHabitDaysOn } = useStore()
   /* Projects live under Plan now (2026-09-15), so a project's Plan and the
@@ -486,7 +489,11 @@ export default function App() {
        because this is the element that paints the water; set any lower down
        it could never reach this rule, and the room never deepened at all. */
     <div
-      className={`shell${page === 'zone' ? ' in-zone' : ''}${hud ? ' is-hud' : ''}`}
+      /* A dark header on the dark pages only (his ask, 2026-09-15): the Cookie
+         Jar and the Why wall it opens are dark in both modes, and a paper
+         header on top of them read as two apps. Every other page keeps the
+         light header, and HUD is already dark, so it is left alone. */
+      className={`shell${page === 'zone' ? ' in-zone' : ''}${hud ? ' is-hud' : ''}${!hud && DARK_CHROME_PAGES.includes(page) ? ' is-dark-chrome' : ''}${!hud && page === 'health' ? ' is-dark-page' : ''}`}
       style={page === 'zone' ? ({ '--depth': zoneDepth } as React.CSSProperties) : undefined}
     >
       <a className="skiplink" href="#main">Skip to the page</a>
@@ -567,13 +574,13 @@ export default function App() {
               dock, a hold reaches this same full page, full history and all.
               The page itself is untouched -- setPage('assistant') below still
               renders it, this was only ever the header shortcut in. */}
-          {/* The one thing running, full screen. Filled with the accent so it
-              reads as the button that starts something, not a place he browses.
+          {/* The one thing running, full screen. The same plain square as Jarvis,
+              Notes and Ideas on his instruction (2026-09-15): no fill of its own.
               It is a toggle: pressing it again puts him back on the page he
               walked in from, because the room has no close of its own and he
               was leaving it by pressing Note to get out. */}
           <button
-            className={`btn btn-primary btn-sq${page === 'zone' ? ' is-on' : ''}`}
+            className={`btn btn-ghost btn-sq${page === 'zone' ? ' is-on' : ''}`}
             onClick={() => setPage(page === 'zone' ? backFromZone.current : 'zone')}
             aria-pressed={page === 'zone'}
             title={page === 'zone' ? 'Leave the Zone' : 'The Zone'}

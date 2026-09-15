@@ -4804,6 +4804,49 @@ await step('ideas: a sticky dragged off the pad asks for its name, lands where i
   if (Math.abs(kept.x - moved.x) > 4 || Math.abs(kept.y - moved.y) > 4) throw new Error('the sticky moved back after a reload')
 })
 
+/* His second report (2026-09-15): the sticky would not let go and there was
+   "no drop button", and he wanted a list to jump to any sticky rather than
+   hunting around the board. So: a click picks a sticky up, the next click on
+   the board puts it down, Escape puts it back, and a row in the list brings
+   the board round to that sticky. */
+await step('ideas: click to pick up, click to drop, and the list brings the board to any sticky', async () => {
+  await page.evaluate(() => { localStorage.removeItem('mc-ideaboard-view'); localStorage.setItem('mc-ideaboard-list', '1') })
+  await fresh('ideas')
+  const board = page.locator('.ib-board')
+  await board.waitFor({ timeout: 8000 })
+  const bb = await board.boundingBox()
+  const pad = await page.locator('.ib-pad-note').nth(2).boundingBox()
+  await page.mouse.click(pad.x + pad.width / 2, pad.y + pad.height / 2)
+  await page.waitForTimeout(200)
+  if (!(await page.locator('.ib-board.is-carrying').count())) throw new Error('a click on the pad did not pick a sticky up')
+  if (!(await page.locator('.ib-hint').count())) throw new Error('carrying a sticky does not say how to put it down')
+  await page.mouse.move(bb.x + 320, bb.y + 420, { steps: 6 })
+  if (!(await page.locator('.ib-ghost').count())) throw new Error('the picked-up sticky does not follow the pointer')
+  await page.mouse.click(bb.x + 320, bb.y + 420)
+  await page.locator('.ib-composer').waitFor({ timeout: 3000 })
+  if (await page.locator('.ib-board.is-carrying').count()) throw new Error('the sticky was still being carried after the drop')
+  await page.locator('.ib-title-input').fill('Carried and dropped')
+  await page.keyboard.press('Enter'); await page.waitForTimeout(300)
+  if ((await page.locator('.ib-card').filter({ hasText: 'Carried and dropped' }).count()) !== 1) throw new Error('the dropped sticky is not on the board')
+
+  await page.mouse.click(pad.x + pad.width / 2, pad.y + pad.height / 2); await page.waitForTimeout(150)
+  await page.keyboard.press('Escape'); await page.waitForTimeout(150)
+  if (await page.locator('.ib-board.is-carrying').count()) throw new Error('Escape did not put the sticky back')
+
+  await page.mouse.move(bb.x + 600, bb.y + 600)
+  for (let i = 0; i < 6; i++) { await page.mouse.wheel(1500, 1200); await page.waitForTimeout(40) }
+  await page.waitForTimeout(200)
+  const row = page.locator('.ib-list-row').filter({ hasText: 'Carried and dropped' })
+  if ((await row.count()) !== 1) throw new Error('the new idea is not in the list')
+  await row.click(); await page.waitForTimeout(900)
+  const card = await page.locator('.ib-card').filter({ hasText: 'Carried and dropped' }).boundingBox()
+  const cx = card.x + card.width / 2
+  const cy = card.y + card.height / 2
+  const wantX = bb.x + (bb.width - 272) / 2
+  const wantY = bb.y + bb.height / 2
+  if (Math.abs(cx - wantX) > 60 || Math.abs(cy - wantY) > 60) throw new Error(`the list did not bring the sticky into view: it is at ${Math.round(cx)},${Math.round(cy)}, the middle is ${Math.round(wantX)},${Math.round(wantY)}`)
+})
+
 await b.close(); server.close(); rmSync(SNAP, { recursive: true, force: true })
 if (errors.length) console.log(`CONSOLE ERRORS (${errors.length}): ${errors[0]}`)
 console.log(`${pass} pass, ${fail} fail${errors.length ? `, ${errors.length} console errors` : ', 0 console errors'}`)

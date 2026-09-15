@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from './store'
 import { useMundiOpus } from './mundiplayer'
+import { SUPABASE_ENABLED, currentAccount, onAccountChange } from './supabase'
 import { MediaBadge, MediaChip, PomodoroBadge, PomodoroInline, usePomodoro } from './pomodoro'
 import { NoteChip, NotePanel } from './notedock'
 import { BillsChip, BillsPanel } from './billsdock'
@@ -267,6 +268,15 @@ export function Dock() {
   // able to quickly click" -- reset the moment the menu itself closes so a
   // stale expanded grid never reappears the next time he opens the dock.
   const [moreOpen, setMoreOpen] = useState(false)
+  /* Signed out, nothing is backed up. This mark used to sit on the header's
+     settings gear; Settings lives in More now (2026-09-15), so the mark moved
+     with it, and onto the FAB so it is still visible with the dock closed. */
+  const [needsSignIn, setNeedsSignIn] = useState(false)
+  useEffect(() => {
+    if (!SUPABASE_ENABLED) return
+    void currentAccount().then((a) => setNeedsSignIn(!a))
+    return onAccountChange((a) => setNeedsSignIn(!a))
+  }, [])
   useEffect(() => { if (mode !== 'menu') setMoreOpen(false) }, [mode])
 
   /* Reopened in the Zone on his direct instruction (2026-09-12), reversing
@@ -330,7 +340,10 @@ export function Dock() {
   const ranked = rankDockItems(rankable)
   const topItems = ranked.slice(0, TOP_N)
   const restItems = ranked.slice(TOP_N)
-  const hasMore = restItems.length > 0
+  /* Apps and Settings always live in More (his instruction, 2026-09-15), so
+     More always exists. */
+  const moreCount = restItems.length + 2
+  const hasMore = true
 
   if (mode === 'closed' || mode === 'menu') {
     // One <button> for the FAB/X across both states, always the wrapper's
@@ -435,9 +448,9 @@ export function Dock() {
                   className="dock-more-btn"
                   onClick={() => setMoreOpen((v) => !v)}
                   aria-expanded={moreOpen}
-                  aria-label={moreOpen ? 'Hide more tools' : `Show ${restItems.length} more tools`}
+                  aria-label={moreOpen ? 'Hide more tools' : `Show ${moreCount} more tools${needsSignIn ? ', sync is off' : ''}`}
                 >
-                  <span className="dock-item-label dock-more-label">More<span className="dock-more-badge">{restItems.length}</span></span>
+                  <span className="dock-item-label dock-more-label">More<span className="dock-more-badge">{moreCount}</span><i className={`dock-alert-dot${needsSignIn ? ' is-on' : ''}`} aria-hidden="true" /></span>
                   <span className="dock-item-avatar-ring">
                     <span className="dock-item-avatar dock-item-avatar--more"><Icon.AppsGrid size={20} /></span>
                   </span>
@@ -455,6 +468,14 @@ export function Dock() {
                         <span>{t.label}</span>
                       </button>
                     ))}
+                    <button className="dock-more-cell" role="menuitem" onClick={() => { setMoreOpen(false); setPage('apps'); go('closed') }}>
+                      <span className="dock-more-cell-icon"><Icon.AppsGrid size={17} /></span>
+                      <span>Apps</span>
+                    </button>
+                    <button className="dock-more-cell" role="menuitem" aria-label={needsSignIn ? 'Settings, sync is off' : 'Settings'} onClick={() => { setMoreOpen(false); setPage('settings'); go('closed') }}>
+                      <span className="dock-more-cell-icon"><Icon.Settings size={17} /><i className={`dock-alert-dot${needsSignIn ? ' is-on' : ''}`} aria-hidden="true" /></span>
+                      <span>Settings</span>
+                    </button>
                   </div>
                 )}
               </div>
@@ -507,6 +528,7 @@ export function Dock() {
               menu vanishing on an early hover with no real mouse movement to
               cause it. CSS opacity on two always-present icons swaps the
               glyph without ever touching the DOM under the pointer. */}
+          <i className={`dock-alert-dot${needsSignIn && !open ? ' is-on' : ''}`} aria-hidden="true" />
           <Icon.Plus size={22} className={`dock-fab-icon${open ? ' is-hidden' : ''}`} />
           <Icon.Close size={20} className={`dock-fab-icon${open ? '' : ' is-hidden'}`} />
         </button>

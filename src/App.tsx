@@ -1,4 +1,4 @@
-import { Component, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Component, Fragment, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { exceptionsFor, globalExceptions } from './exceptions'
 import { useDockBadge } from './desktop'
@@ -12,8 +12,7 @@ import { QuittingPage } from './quitting'
 import { NotesPage } from './notes'
 import { BillsPage } from './billspage'
 import { DailyReview } from './daily'
-import { AppsPage, APPS } from './apps'
-import { Dropdown } from './ui'
+import { AppsPage } from './apps'
 import { Helmet } from './helmet'
 import { TimelinePage } from './timeline'
 import * as Icon from './icons'
@@ -38,7 +37,6 @@ const WatchlessPage = lazy(() => import('./watchlesspage').then((m) => ({ defaul
 const IdeasPage = lazy(() => import('./ideaboard').then((m) => ({ default: m.IdeasPage })))
 import { useStore } from './store'
 import { ago, describe, useSyncStatus } from './sync'
-import { SUPABASE_ENABLED, currentAccount, onAccountChange } from './supabase'
 import { isReadOnly } from './store'
 import type { PageId, SpaceId, ViewId } from './types'
 
@@ -154,7 +152,8 @@ function Logo() {
 const NAV: { id: PageId; label: string }[] = [
   { id: 'today', label: 'Today' },
   { id: 'plan', label: 'Plan' },
-  { id: 'projects', label: 'Projects' },
+  /* Projects left the row on his instruction (2026-09-15): hovering Plan lists
+     them instead (see PageNav). #/projects still renders the directory. */
   /* One tab for both, on his instruction 2026-08-26. Goals here are mostly a
      reflection over habits, so they switch inside the page on a pill pair
      rather than sitting in the menu as a second destination. Routines left the
@@ -241,10 +240,10 @@ function PageNav({
     activeRef.current?.scrollIntoView({ inline: 'center', block: 'nearest' })
   }, [page])
 
-  /* A preview, not a menu: hovering Projects jumps straight into one without
-     a click, but the pill itself still only ever navigates to the directory
-     -- clicking it is untouched. No "view all" or "add" row here on purpose;
-     those already live one click away, on the page this is a shortcut past.
+  /* A preview, not a menu: hovering Plan jumps straight into a project without
+     a click, and clicking Plan itself still just opens Plan. Projects' own tab
+     left the row on his instruction (2026-09-15), so the one "All projects"
+     row at the end is now the door to the directory where they are made.
 
      Portalled to the body rather than nested under .nav: .nav clips to its
      OWN box while revealing (clip-path: inset(0), part of its slide-down
@@ -279,7 +278,7 @@ function PageNav({
             {t.label}
           </button>
         )
-        if (t.id !== 'projects' || hoverProjects.length === 0) return button
+        if (t.id !== 'plan') return button
         return (
           <span className="kebab-wrap" key={t.id} ref={wrapRef} onMouseEnter={showHover} onMouseLeave={hideHoverSoon}>
             {button}
@@ -305,6 +304,9 @@ function PageNav({
                     {p.name}
                   </button>
                 ))}
+                <button className="nav-tab projnav-all" role="menuitem" onClick={() => { setPage('projects'); setHoverOpen(false) }}>
+                  All projects
+                </button>
               </div>,
               document.body,
             )}
@@ -331,6 +333,10 @@ function PhonePages({ tabs, page, setPage }: {
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLSpanElement>(null)
+  /* No hover on a phone, so the projects Plan lists on hover sit under Plan
+     in this menu instead. */
+  const { projects, view, setSpace, enterProject } = useStore()
+  const phoneProjects = view === 'all' ? projects : projects.filter((p) => p.space === view)
   useEffect(() => {
     if (!open) return
     const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
@@ -355,15 +361,24 @@ function PhonePages({ tabs, page, setPage }: {
       {open && (
         <div className="kebab-menu" role="menu" onClick={() => setOpen(false)}>
           {tabs.map((t) => (
-            <button
-              key={t.id}
-              role="menuitem"
-              aria-current={page === t.id ? 'page' : undefined}
-              className={page === t.id ? 'is-on' : ''}
-              onClick={() => setPage(t.id)}
-            >
-              {t.label}
-            </button>
+            <Fragment key={t.id}>
+              <button
+                role="menuitem"
+                aria-current={page === t.id ? 'page' : undefined}
+                className={page === t.id ? 'is-on' : ''}
+                onClick={() => setPage(t.id)}
+              >
+                {t.label}
+              </button>
+              {t.id === 'plan' && phoneProjects.map((p) => (
+                <button key={p.id} role="menuitem" className="kebab-sub" onClick={() => { setSpace(p.space); enterProject(p.id) }}>
+                  {p.name}
+                </button>
+              ))}
+              {t.id === 'plan' && (
+                <button role="menuitem" className="kebab-sub" onClick={() => setPage('projects')}>All projects</button>
+              )}
+            </Fragment>
           ))}
         </div>
       )}
@@ -372,13 +387,11 @@ function PhonePages({ tabs, page, setPage }: {
 }
 
 export default function App() {
-  const { space, view, setView, page, setPage, openProjectId, tasks, routines, goals, habits, markHabitDaysOn, setFocusAppId } = useStore()
-  /* A project's Plan is still page 'plan' underneath (see enterProject in the
-     store), but the nav has to say Projects, not Plan, or it reads as lying
-     about where he is the moment the Band above it already says the project's
-     name. This is ONLY the nav's own idea of which tab is lit; setPage below
-     still gets the real page id. */
-  const navPage: PageId = openProjectId ? 'projects' : page
+  const { space, view, setView, page, setPage, tasks, routines, goals, habits, markHabitDaysOn } = useStore()
+  /* Projects live under Plan now (2026-09-15), so a project's Plan and the
+     project directory both light Plan. This is ONLY the nav's own idea of
+     which tab is lit; setPage below still gets the real page id. */
+  const navPage: PageId = page === 'projects' ? 'plan' : page
   // The dot follows the alerts: money and admin count from any profile.
   const exceptions = space === 'personal'
     ? exceptionsFor(space, { tasks, routines, goals })
@@ -406,14 +419,6 @@ export default function App() {
 
   const tabs = navFor(view)
 
-  /* Signed out, nothing is backed up and the phone shows a different day. That is
-     worth a mark on the gear rather than a banner across the top. */
-  const [needsSignIn, setNeedsSignIn] = useState(false)
-  useEffect(() => {
-    if (!SUPABASE_ENABLED) return
-    void currentAccount().then((a) => setNeedsSignIn(!a))
-    return onAccountChange((a) => setNeedsSignIn(!a))
-  }, [])
   /* The once-a-day Hevy sync is GONE, on his instruction, 2026-08-26: "the
      23:00 sync doesn't work, so I would kill that automatic sync and put there
      a button". It only ever fired if the app happened to be open and focused
@@ -596,58 +601,41 @@ export default function App() {
           >
             <Helmet lit={hud} />
           </button>
-          {/* Notes' own header button retired (2026-09-02): the floating
-             dock (see dock.tsx) reaches it in fewer moves than this bar
-             ever did, from any page, with no navigation at all for a quick
-             note. The page itself is untouched -- setPage('notes') below
-             still renders it, this was only ever the shortcut in. */}
+          {/* Notes and Ideas, back in the top right on his instruction
+              (2026-09-15), next to the Zone and Jarvis. The dock keeps its own
+              Note and Ideas for quick capture; these open the full pages. */}
+          <button
+            className={`btn btn-ghost${page === 'notes' ? ' is-on' : ''}`}
+            onClick={() => setPage('notes')}
+            aria-pressed={page === 'notes'}
+            aria-label="Notes"
+            title="Notes"
+          >
+            <Icon.DockNote size={18} />
+            <span className="btn-label">Notes</span>
+          </button>
+          <button
+            className={`btn btn-ghost${page === 'ideas' ? ' is-on' : ''}`}
+            onClick={() => setPage('ideas')}
+            aria-pressed={page === 'ideas'}
+            aria-label="Ideas"
+            title="Ideas"
+          >
+            <Icon.DockBulb size={18} />
+            <span className="btn-label">Ideas</span>
+          </button>
           {/* Bills' own header button retired (2026-09-03), the same way
              Notes' was above: the floating dock's Bills summary (see
              billsdock.tsx) plus its hold-for-the-full-page shortcut cover
              this in fewer moves than the header ever did. The page itself
              is untouched -- setPage('bills') below still renders it. */}
-          {/* Apps, a shelf now rather than a page: seven icons never filled a
-              tab's worth of room, and this is the same one-click-from-anywhere
-              shape as Note and Yesterday beside it. Opening a framed app still
-              lands on the Apps page -- it needs the room -- so the item hands
-              the choice over via focusAppId rather than doing it inline. */}
-          <Dropdown
-            label="Apps"
-            className="apps-shelf-menu"
-            trigger={({ onClick, open }) => (
-              <button className={`btn btn-ghost${page === 'apps' ? ' is-on' : ''}`} onClick={onClick} aria-expanded={open} aria-label="Apps" title="Apps">
-                <Icon.AppsGrid size={18} />
-                <span className="btn-label">Apps</span>
-              </button>
-            )}
-          >
-            {APPS.map((a) => (
-              a.external ? (
-                <a key={a.id} href={a.url} target="_blank" rel="noreferrer" role="menuitem">
-                  <span aria-hidden="true">{a.icon}</span>
-                  {a.name}
-                </a>
-              ) : (
-                <button key={a.id} role="menuitem" onClick={() => { setFocusAppId(a.id); setPage('apps') }}>
-                  <span aria-hidden="true">{a.icon}</span>
-                  {a.name}
-                </button>
-              )
-            ))}
-          </Dropdown>
+          {/* Apps and Settings left the header for the dock's More on his
+              instruction (2026-09-15). */}
           {/* Assistant was never in this list, same as the Zone: reached from
               the dock now (2026-09-08) rather than its own header button, but
               the picker still has nothing to say about a page that was never
               one of its tabs. */}
           {page !== 'zone' && page !== 'assistant' && <PhonePages tabs={tabs} page={navPage} setPage={setPage} />}
-          <button
-            className={`btn btn-ghost${page === 'settings' ? ' is-on' : ''}${needsSignIn ? ' has-dot' : ''}`}
-            onClick={() => setPage('settings')}
-            aria-label={needsSignIn ? 'Settings, sync is off' : 'Settings'}
-            aria-pressed={page === 'settings'}
-          >
-            <Icon.Settings size={18} />
-          </button>
         </div>
       </header>
 

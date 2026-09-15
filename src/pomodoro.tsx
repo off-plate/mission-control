@@ -1,9 +1,10 @@
-import { createContext, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { useStore } from './store'
+import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useStore, type ActiveFocus } from './store'
 import { fmtDuration, taskMinutes } from './util'
 import { thumbUrl, useMundiOpus } from './mundiplayer'
 import { onTitles, titlesVersion, trackTitle } from './tunes'
 import { isDesktop, notify as nativeNotify } from './desktop'
+import { deviceId } from './sync-merge'
 import * as Icon from './icons'
 import { Dock } from './dock'
 
@@ -98,7 +99,7 @@ function loadPomo(): Partial<Saved> {
 }
 
 export function PomodoroProvider({ children }: { children: ReactNode }) {
-  const { logFocus, logFocusOn, syncAutoHabits, tasks } = useStore()
+  const { logFocus, logFocusOn, syncAutoHabits, tasks, activeFocus, setActiveFocus } = useStore()
   const saved = useState(loadPomo)[0]
   const [focusMin, setFocusMin] = useState(saved.focusMin ?? 25)
   /* A block saved by an older version has no blockMin. Falling back to the
@@ -263,6 +264,56 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
      when IT finishes, so the extension is recorded as the extra work it is. */
   const extend = (min: number) => { setPhase('focus'); setBlockMin(min); setStartedAt(Date.now()); setEndsAt(Date.now() + min * 60 * 1000); setPausedLeft(null) }
   const dismiss = () => { setPhase('idle'); setEndsAt(null); setPausedLeft(null); setFocusLabel(null) }
+
+  /* Mirrors this device's own focus/break block into the synced blob so it
+     shows the same on every device, and in Raycast, which can only ever see
+     this synced copy. 'idle' and 'await' sync to null: a finished block
+     waiting on his decision, or nothing running, both read as "nothing
+     running" to anyone outside this tab, which is the only thing they need
+     to know. Skips the write when nothing meaningful actually changed, so
+     adopting a remote block below (which sets these same fields) does not
+     immediately echo them straight back out under this device's own name. */
+  const sameFocus = (a: ActiveFocus | null, b: ActiveFocus | null) => {
+    if (a === b) return true
+    if (!a || !b) return false
+    return a.phase === b.phase && a.endsAt === b.endsAt && a.pausedLeft === b.pausedLeft
+      && a.blockMin === b.blockMin && a.focusLabel === b.focusLabel && a.startedAt === b.startedAt
+  }
+  useEffect(() => {
+    const mine: ActiveFocus | null = phase === 'focus' || phase === 'break'
+      ? { phase, endsAt, pausedLeft, blockMin, startedAt: startedAt ?? Date.now(), focusLabel, dev: deviceId(), updatedAt: Date.now() }
+      : null
+    if (sameFocus(mine, activeFocus)) return
+    setActiveFocus(mine)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, endsAt, pausedLeft, blockMin, focusLabel, startedAt])
+
+  /* Adopts a block a DIFFERENT device started (or stopped), by the same
+     wall-clock-deadline shape this file already uses for its own reload
+     recovery above -- endsAt is a moment in time, not a countdown, so it
+     reads correctly here no matter how long the pull took. Guarded by dev so
+     this device never "adopts" the block it just wrote out above, and by
+     updatedAt so an out-of-order pull can't replay an older remote state over
+     a newer one this device has already adopted. */
+  const lastAdoptedRef = useRef(0)
+  useEffect(() => {
+    if (activeFocus && activeFocus.dev === deviceId()) return
+    const stamp = activeFocus?.updatedAt ?? 0
+    if (activeFocus && stamp <= lastAdoptedRef.current) return
+    lastAdoptedRef.current = stamp
+    if (activeFocus) {
+      setPhase(activeFocus.phase)
+      setEndsAt(activeFocus.endsAt)
+      setPausedLeft(activeFocus.pausedLeft)
+      setBlockMin(activeFocus.blockMin)
+      setFocusLabel(activeFocus.focusLabel)
+      setStartedAt(activeFocus.startedAt)
+    } else if (phase === 'focus' || phase === 'break') {
+      // Another device stopped it; this one was only ever showing its echo.
+      setPhase('idle'); setEndsAt(null); setPausedLeft(null); setFocusLabel(null)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFocus])
 
   const value: Pomo = { phase, running, secondsLeft, focusMin, blockMin, breakMin, cyclesDone, focusLabel, startFocus, toggle, skip, stop, startBreak, extend, dismiss, setFocusMin, setBreakMin }
   return (

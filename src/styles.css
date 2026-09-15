@@ -10592,3 +10592,10 @@ body:has(.ib-page) #main { padding-bottom: 0; }
 .topbar-right .btn-sq, .topbar-right .btn-helmet {
   width: 46px; height: 46px; min-height: 46px; padding: 0; justify-content: center;
 }
+
+/* His ask (2026-09-15): the same squares, with a very small name under each
+   icon. The box does not grow: the icon comes down a size and the name sits
+   in the room that frees. */
+.topbar-right .btn-sq, .topbar-right .btn-helmet { flex-direction: column; gap: 3px; }
+.topbar-right .btn-helmet .helmet { width: 16px; height: 16px; }
+.btn-sq-label { font: 600 9px/1 var(--font-body); letter-spacing: 0.02em; text-transform: none; white-space: nowrap; }

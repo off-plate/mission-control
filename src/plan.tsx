@@ -623,7 +623,11 @@ export function PlanPage() {
   const searchMatches = (() => {
     const q = search.trim().toLowerCase()
     if (!q) return []
-    return tasks.filter((t) => t.title.toLowerCase().includes(q)).slice(0, 8)
+    /* His report (2026-09-16): a finished task showed up here as if it were
+       still waiting somewhere. Search exists to find something he still has
+       to act on -- a task he already finished isn't lost, it's done, and
+       belongs in the record, not in a search for where he left something. */
+    return tasks.filter((t) => !t.done && t.title.toLowerCase().includes(q)).slice(0, 8)
   })()
   const jumpTo = (t: Task) => {
     const proj = t.projectId ? projects.find((p) => p.id === t.projectId) : undefined

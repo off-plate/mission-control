@@ -29,6 +29,11 @@ const ALLOW = [
   'https://off-plate.github.io',
   'http://localhost:5173',
   'http://localhost:4173',
+  /* The desktop app's own registered scheme (electron/main.cjs), not a real
+     domain -- his report, 2026-09-16: the calendar wouldn't load there while
+     working fine on the website, same CORS-preflight shape as the fix above,
+     just an origin that hadn't been added yet. */
+  'app://mc',
 ]
 
 /* Every header supabase-js actually sends. It sets `apikey` and `x-client-info`

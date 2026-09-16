@@ -9,6 +9,7 @@ import { AssistantChip, AssistantPanel } from './assistantdock'
 import { SkillsChip, SkillsPanel } from './skillsdock'
 import { WatchlessChip, WatchlessPanel } from './watchlessdock'
 import { bumpDockRank, rankDockItems } from './dockrank'
+import { APPS } from './apps'
 import * as Icon from './icons'
 
 /* Hover opens the dial now, on his instruction (2026-09-02) -- the same
@@ -242,7 +243,7 @@ function isRankable(id: PanelFace): id is RankableFace {
 const TOP_N = 3
 
 export function Dock() {
-  const { page, setPage } = useStore()
+  const { page, setPage, setFocusAppId } = useStore()
   const mo = useMundiOpus()
   const { mode, closing, entered, go, closeMenu, hover } = useDockMenu()
   // Fixed, not looped over panels: hooks can't vary in count between
@@ -336,7 +337,7 @@ export function Dock() {
   const restItems = ranked.slice(TOP_N)
   /* Apps and Settings always live in More (his instruction, 2026-09-15), so
      More always exists. */
-  const moreCount = restItems.length + 2
+  const moreCount = restItems.length + APPS.filter((a) => a.id !== 'watchless').length + 1
   const hasMore = true
 
   if (mode === 'closed' || mode === 'menu') {
@@ -462,10 +463,31 @@ export function Dock() {
                         <span>{t.label}</span>
                       </button>
                     ))}
-                    <button className="dock-more-cell" role="menuitem" onClick={() => { setMoreOpen(false); setPage('apps'); go('closed') }}>
-                      <span className="dock-more-cell-icon"><Icon.AppsGrid size={17} /></span>
-                      <span>Apps</span>
-                    </button>
+                    {/* His apps sit in this grid as themselves, not behind a second
+                       "Apps" page one more tap away -- Challengers and Nexus are the
+                       point, not the shelf they used to live on. Opening one still
+                       goes through the Apps page's own iframe/back-out machinery
+                       (focusAppId is the one-shot signal it already reads), just
+                       arrived at directly. */}
+                    {/* Watchless already has its own panel above (a real chip,
+                       transcripts inline) -- listing it again from APPS would
+                       be the same tool twice in one grid. */}
+                    {APPS.filter((a) => a.id !== 'watchless').map((a) => (
+                      a.external ? (
+                        <a key={a.id} className="dock-more-cell" role="menuitem" href={a.url} target="_blank" rel="noreferrer" onClick={() => setMoreOpen(false)}>
+                          <span className="dock-more-cell-icon">{a.icon}</span>
+                          <span>{a.name}</span>
+                        </a>
+                      ) : (
+                        <button
+                          key={a.id} className="dock-more-cell" role="menuitem"
+                          onClick={() => { setMoreOpen(false); setFocusAppId(a.id); setPage('apps'); go('closed') }}
+                        >
+                          <span className="dock-more-cell-icon">{a.icon}</span>
+                          <span>{a.name}</span>
+                        </button>
+                      )
+                    ))}
                     <button className="dock-more-cell" role="menuitem" aria-label={needsSignIn ? 'Settings, sync is off' : 'Settings'} onClick={() => { setMoreOpen(false); setPage('settings'); go('closed') }}>
                       <span className="dock-more-cell-icon"><Icon.Settings size={17} /><i className={`dock-alert-dot${needsSignIn ? ' is-on' : ''}`} aria-hidden="true" /></span>
                       <span>Settings</span>

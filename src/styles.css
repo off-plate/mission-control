@@ -2246,6 +2246,34 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
    things were waiting and nothing else. His words: "it doesn't mean if it's
    unsorted... you still have to show" it. Same shape, same cap, same order
    the day panel's own BUCKETS already uses above it. */
+/* One search, every workspace, every project -- deliberately not scoped to
+   the current view's own filters, since the whole point is finding a task
+   he can't remember which room he left in. Results sit in a floating panel
+   under the field rather than pushing the page down, so opening it and
+   closing it again doesn't reflow everything below. */
+.plan-search { position: relative; margin-bottom: var(--s4); }
+.plan-search-ico { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--faint); pointer-events: none; }
+.plan-search-input {
+  width: 100%; height: 38px; padding: 0 var(--s3) 0 34px;
+  border-radius: var(--r-md); border: 1px solid var(--hairline); background: var(--surface);
+  color: var(--ink); font-size: var(--text-sm);
+}
+.plan-search-input:focus-visible { outline: 2px solid var(--focus); outline-offset: -1px; }
+.plan-search-results {
+  position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; right: 0;
+  margin: 0; padding: var(--s2); list-style: none;
+  background: var(--surface); border: 1px solid var(--hairline-strong); border-radius: var(--r-md);
+  box-shadow: var(--shadow-pop); max-height: 340px; overflow-y: auto;
+}
+.plan-search-hit {
+  all: unset; display: flex; align-items: center; gap: var(--s2); width: 100%; box-sizing: border-box;
+  padding: var(--s2) var(--s3); border-radius: var(--r-sm); cursor: pointer;
+}
+.plan-search-hit:hover, .plan-search-hit:focus-visible { background: var(--accent-wash); }
+.plan-search-hit-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); }
+.plan-search-hit-where { flex: none; color: var(--faint); font-size: 0.7rem; }
+.plan-search-results .empty { padding: var(--s3); color: var(--muted); font-size: var(--text-sm); }
+
 .weekplan {
   /* His pass, same day: white text, white card outlines, white task chips.
      Only the lime "today" ring stays lime -- everything else in the section
@@ -2905,6 +2933,19 @@ a.pron-src:hover { color: var(--accent-text); text-decoration: underline; }
 .nt-app > * { min-width: 0; }
 .nt-side, .nt-list { overflow-y: auto; overscroll-behavior: contain; }
 .nt-app > * + * { border-left: 1px solid var(--hairline); }
+
+/* Screen-share mode: folders and the note list step out, the note itself
+   takes the whole row. The toggle that does this lives in the note's own
+   toolbar (nt-presenttoggle below) so it is reachable from the one column
+   that is still on screen. */
+.nt-app.is-presenting { grid-template-columns: minmax(0, 1fr) !important; }
+.nt-app.is-presenting .nt-side, .nt-app.is-presenting .nt-list { display: none; }
+.nt-presenttoggle {
+  all: unset; display: inline-grid; place-items: center; flex: none;
+  width: 28px; height: 28px; border-radius: var(--r-sm); color: var(--muted); cursor: pointer;
+}
+.nt-presenttoggle:hover { background: var(--a-sunk); color: var(--ink); }
+.nt-presenttoggle[aria-pressed="true"] { color: var(--accent-text); }
 
 /* The grips sit ON the column edges rather than taking a track of their own,
    so dragging one cannot shift the thing it is resizing. */
@@ -4147,6 +4188,16 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 /* Michael's Corner wears its own green, the V3 brand lead, so the mark is not
    another warm tone next to Personal's red. */
 .spacemark.s-corner { --mark: #1E5244; }
+/* A project's own mark, distinct from SpaceMark's color-coded bar (projects
+   don't carry a palette) -- a quiet lettered tag instead, so it reads as
+   "which room inside the room" rather than competing for the same kind of
+   attention as the space color. */
+.projectmark {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 16px; padding: 0 4px; border-radius: 4px;
+  background: var(--a-sunk); font-family: var(--font-body); font-weight: 700;
+  font-size: 0.625rem; letter-spacing: 0.04em; color: var(--muted);
+}
 .visually-hidden {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;

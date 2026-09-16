@@ -14,7 +14,7 @@ import { usePomodoro } from './pomodoro'
 import { BreakdownSheet, Sheet } from './modals'
 import { Linkify } from './widgets'
 import { PLAN_AHEAD_DAYS, WeekGrid, dayPlus, shortDay, weekRangeLabel } from './weekgrid'
-import { useCoarsePointer, Band, Dropdown, SpaceMark } from './ui'
+import { useCoarsePointer, Band, Dropdown, ProjectMark, SpaceMark } from './ui'
 import { estimateFor } from './estimate'
 import { estimateTask } from './ai'
 import { SLOTS, SPACES, habitLocked, routineComplete, routineProgress, slotMinutes, TYPING_TARGET_WPM, type Project, type Routine, type SubTask, type Task, type TimeSlot } from './types'
@@ -419,13 +419,17 @@ export function PlanPage() {
   const { startFocus } = pomo
   const { routines, habits } = useStore()
   const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId, setTaskAt, plan, setPage, openDay, view, inView, focusSessions, dayLog } = useStore()
-  const { projects, openProjectId, setTaskProject, setTaskSpace } = useStore()
+  const { projects, openProjectId, setTaskProject, setTaskSpace, setSpace, setView, enterProject } = useStore()
   /* A project is a room inside a Space, not a second store: this is the one
      line that scopes Plan to it. Everything below (backlog, the day, the
      progress bar) is derived from spaceTasks, so nothing downstream has to
      know a project was ever involved. */
   const activeProject = openProjectId ? projects.find((p) => p.id === openProjectId) ?? null : null
   const addSpace = activeProject ? activeProject.space : space
+  /* Only outside a project's own room: standing inside it already says which
+     project every task on screen belongs to, so the mark would be repeating
+     the room he is already standing in. */
+  const markOf = (t: Task) => (openProjectId ? undefined : projects.find((p) => p.id === t.projectId))
 
   /* Moving a task between a project and the Space's own Plan is the same
      move either direction: set or clear projectId. A task's own space never
@@ -610,6 +614,23 @@ export function PlanPage() {
   const [logging, setLogging] = useState<string | null>(null)
   const [flashId, setFlashId] = useState<string | null>(null)
   const [flashIds, setFlashIds] = useState<string[]>([])
+  /* Every task, every workspace, every project -- the current view's own
+     filters (space, project, day) exist to keep the working list small, and
+     that is exactly what makes a task hard to find again once he can't
+     remember which of those rooms he left it in. Search is the one place in
+     Plan that reads `tasks` unfiltered on purpose. */
+  const [search, setSearch] = useState('')
+  const searchMatches = (() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return []
+    return tasks.filter((t) => t.title.toLowerCase().includes(q)).slice(0, 8)
+  })()
+  const jumpTo = (t: Task) => {
+    const proj = t.projectId ? projects.find((p) => p.id === t.projectId) : undefined
+    if (proj) { setSpace(proj.space); enterProject(proj.id) } else { setView(t.space) }
+    setFocusTaskId(t.id)
+    setSearch('')
+  }
   const [listDropOver, setListDropOver] = useState(false)
   const [quick, setQuick] = useState('')
   const [breakdownFor, setBreakdownFor] = useState<Task | null>(null)
@@ -655,14 +676,19 @@ export function PlanPage() {
     window.setTimeout(() => setFlashIds([]), 2600)
   }
 
-  /* Today's "Start" hands the task over here: flash it so the eye lands on it. */
+  /* Today's "Start" hands the task over here, and now the search box does too
+     (below): flash it so the eye lands on it, wherever it actually lives --
+     Today and the backlog mark "here it is" with two different classes on
+     two different rows, so both fire rather than guessing which one a given
+     task is in. */
   useEffect(() => {
     if (!focusTaskId) return
     setFlashId(focusTaskId)
+    setFlashIds([focusTaskId])
     setFocusTaskId(null)
-    const el = document.querySelector(`[data-task-id="${focusTaskId}"]`)
+    const el = document.querySelector(`[data-task-id="${focusTaskId}"], [data-todo-id="${focusTaskId}"]`)
     el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-    const timer = window.setTimeout(() => setFlashId(null), 2600)
+    const timer = window.setTimeout(() => { setFlashId(null); setFlashIds([]) }, 2600)
     return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusTaskId])
@@ -759,6 +785,41 @@ export function PlanPage() {
           ? <button className="btn btn-ghost" onClick={() => setPage('projects')}>&larr; Projects</button>
           : <button className="btn btn-ghost" onClick={() => openDay(prevDay())}>Yesterday</button>}
       />
+      {/* Every task, every workspace, every project -- the one search that
+          isn't scoped to whatever room he's standing in, because "which room
+          did I leave it in" is exactly the question he can't answer by
+          filtering. */}
+      <div className="plan-search">
+        <Icon.Search size={14} className="plan-search-ico" />
+        <input
+          className="plan-search-input"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Escape') setSearch('') }}
+          placeholder="Search every task, every workspace…"
+          aria-label="Search every task"
+        />
+        {search.trim() && (
+          <ul className="plan-search-results" role="listbox">
+            {searchMatches.length === 0 && <li className="empty">Nothing matches.</li>}
+            {searchMatches.map((t) => {
+              const proj = t.projectId ? projects.find((p) => p.id === t.projectId) : undefined
+              return (
+                <li key={t.id}>
+                  <button className="plan-search-hit" onClick={() => jumpTo(t)}>
+                    <SpaceMark space={t.space} always />
+                    <ProjectMark project={proj} />
+                    <span className="plan-search-hit-title"><Linkify text={t.title} /></span>
+                    <span className="plan-search-hit-where mono">
+                      {proj ? proj.name : t.list === 'today' ? "today's plan" : 'backlog'}
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
       {/* THE WEEK. Moved above the to-do list and day panel on his instruction
           (2026-08-31, from his own mockup): folded to one bar by default,
           giving context for the day he's about to plan without taking over
@@ -922,6 +983,7 @@ export function PlanPage() {
                 >
                   <span className="drag-grip" aria-hidden="true"><Icon.Grip /></span>
                   <SpaceMark space={t.space} />
+                  <ProjectMark project={markOf(t)} />
                   <span className={`cat-dot ${t.category}`} aria-hidden="true" />
                   <span className="grow"><Linkify text={t.title} /></span>
                   {(t.carried ?? 0) > 0 && (
@@ -1099,6 +1161,7 @@ export function PlanPage() {
                         >
                           <span className="drag-grip" aria-hidden="true"><Icon.Grip /></span>
                           <SpaceMark space={t.space} />
+                          <ProjectMark project={markOf(t)} />
                           <button
                             className="checkbox" role="checkbox" aria-checked={t.done}
                             aria-label={t.done ? `Reopen: ${t.title}` : `Complete: ${t.title}`}

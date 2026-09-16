@@ -1,8 +1,11 @@
-/* Apps: his other tools, as a shelf of icons.
+/* Apps: his other tools, opened straight from the dock's More grid.
 
-   The shelf is the page. Nothing loads until he picks something, because six
-   live iframes is six whole apps running behind the one he is looking at, and
-   he asked for icons rather than a permanent embed.
+   There is no shelf page any more (his call, 2026-09-16): a second "Apps"
+   destination one tap before the tool you actually wanted was a step nobody
+   asked for once the tools themselves live as entries in More. This page is
+   now purely the iframe host focusAppId lands you in, and closing one sends
+   you back to Today rather than to a grid that no longer exists anywhere in
+   the nav.
 
    Each app is an iframe when opened, deliberately. These apps own their own data
    and their own sync; embedding the live site means Mission Control never
@@ -53,24 +56,33 @@ export const APPS: EmbeddedApp[] = [
 ]
 
 export function AppsPage() {
-  /* null is the shelf. Opening an app is a state, not a route: it should not
-     put a second thing in his back button between Apps and the rest of MC. */
   const [openId, setOpenId] = useState<string | null>(null)
   /* Bumped to force a clean re-mount: an SPA that has wandered deep inside
      itself comes back to its front door. */
   const [reload, setReload] = useState(0)
   const open = APPS.find((a) => a.id === openId) ?? null
 
-  /* The header shelf hands over which app to open the same way Today hands a
-     routine to Habits: a one-shot signal, read once and cleared, so landing
-     here from the shelf opens straight into the frame instead of the grid. */
-  const { focusAppId, setFocusAppId } = useStore()
+  /* The dock's More grid hands over which app to open the same way Today
+     hands a routine to Habits: a one-shot signal, read once and cleared, so
+     landing here from More opens straight into the frame. */
+  const { focusAppId, setFocusAppId, setPage } = useStore()
   useEffect(() => {
     if (!focusAppId) return
     setOpenId(focusAppId)
     setFocusAppId(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusAppId])
+
+  /* There is no shelf to fall back to any more -- an app opened without one
+     (a stale reload, a direct hash) has nowhere honest to sit, so it leaves
+     for Today instead of showing a grid that isn't reachable from anywhere
+     in the nav. */
+  useEffect(() => {
+    if (!focusAppId && !open) setPage('today')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  const close = () => setPage('today')
 
   /* Escape closes the app, the way it closes everything else here.
 
@@ -85,16 +97,17 @@ export function AppsPage() {
   useEffect(() => {
     if (!open) return
     wayOut.current?.focus()
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpenId(null) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   if (open) {
     return (
       <div className="page">
         <div className="apps-open">
-          <button ref={wayOut} className="btn btn-quiet" onClick={() => setOpenId(null)}>Back to apps</button>
+          <button ref={wayOut} className="btn btn-quiet" onClick={close}>Back to Today</button>
           <h1 className="apps-openname">{open.name}</h1>
           <button className="btn btn-quiet" onClick={() => setReload((n) => n + 1)}>Reload</button>
           <a className="btn btn-quiet" href={open.url} target="_blank" rel="noreferrer">Open in browser</a>
@@ -121,26 +134,7 @@ export function AppsPage() {
     )
   }
 
-  return (
-    <div className="page">
-      <h1 className="apps-h">Apps</h1>
-      <ul className="apps-shelf">
-        {APPS.map((a) => (
-          <li key={a.id}>
-            {a.external ? (
-              <a className="apps-tile" href={a.url} target="_blank" rel="noreferrer">
-                <span className="apps-ico" aria-hidden="true">{a.icon}</span>
-                <span className="apps-name">{a.name}</span>
-              </a>
-            ) : (
-              <button className="apps-tile" onClick={() => setOpenId(a.id)}>
-                <span className="apps-ico" aria-hidden="true">{a.icon}</span>
-                <span className="apps-name">{a.name}</span>
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
+  /* Nothing to show: the effect above is already sending this back to
+     Today. */
+  return null
 }

@@ -16,7 +16,7 @@ import { SPACE_LABELS } from './mock'
 import { exceptionsFor } from './exceptions'
 import { useStore } from './store'
 import { isoWeekKey, localDateKey } from './util'
-import type { SpaceId, Task } from './types'
+import type { Project, SpaceId, Task } from './types'
 import * as Icon from './icons'
 
 
@@ -259,6 +259,26 @@ export function SpaceMark({ space, always }: { space?: SpaceId; always?: boolean
       <i aria-hidden="true" />
       <b aria-hidden="true">{SPACE_LABELS[space][0]}</b>
       <span className="visually-hidden">{SPACE_LABELS[space]}</span>
+    </span>
+  )
+}
+
+/** Which project a task belongs to, at a glance, wherever that isn't already
+ *  obvious from being inside the project's own view -- a space's own Plan, the
+ *  All view, Today, anywhere tasks from more than one project (or none) sit
+ *  in the same list. Same shape as SpaceMark on purpose: a small lettered
+ *  mark is already how this app answers "which room is this from", so a
+ *  second kind of room uses the same answer rather than inventing a chip,
+ *  a color, or a full name that would crowd the row. A task with no project
+ *  renders nothing here -- the absence of the mark already says "unfiled",
+ *  the same way a task shows no error for lacking a due date it never has. */
+export function ProjectMark({ project }: { project?: Project }) {
+  if (!project) return null
+  const initials = project.name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
+  return (
+    <span className="projectmark" title={project.name}>
+      <b aria-hidden="true">{initials}</b>
+      <span className="visually-hidden">{project.name}</span>
     </span>
   )
 }

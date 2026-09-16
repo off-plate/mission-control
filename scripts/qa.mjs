@@ -377,9 +377,13 @@ await step('the menu is five tabs, and what left it is reachable from the header
   await page.locator('.dock-more-btn').click(); await page.waitForTimeout(250)
   const moreLabels = await page.locator('.dock-more-cell').allInnerTexts()
   const allLabels = [...dockLabels, ...moreLabels]
-  for (const want of ['Bills', 'Cookie Jar', 'Assistant', 'Apps', 'Settings']) {
+  /* His apps sit in More as themselves (2026-09-16), not behind a second
+     "Apps" page one more tap away -- Challengers and Nexus stand in for the
+     whole APPS list here. */
+  for (const want of ['Bills', 'Cookie Jar', 'Assistant', 'Challengers', 'Nexus', 'Settings']) {
     if (!allLabels.some((l) => l.trim() === want || l.trim().startsWith(want))) throw new Error(`${want} is not in the dock (${allLabels.join(', ')})`)
   }
+  if (allLabels.some((l) => l.trim() === 'Apps')) throw new Error(`Apps is still its own grid cell (${allLabels.join(', ')})`)
   /* Note and Ideas live in the top right, Health on the Cookie Jar page (2026-09-15). */
   for (const gone of ['Note', 'Ideas', 'Health']) {
     if (allLabels.some((l) => l.trim() === gone || l.trim().startsWith(`${gone}\n`))) throw new Error(`${gone} is still in the dock (${allLabels.join(', ')})`)
@@ -2996,38 +3000,35 @@ await step('notes: the note menu opens where it can be reached', async () => {
   if (Math.abs(bar.offset) > 1) throw new Error(`the date sits ${bar.offset}px off the title's margin`)
 })
 
-/* Apps: a shelf of icons that opens one app at a time. The frame's CONTENT is
-   other sites and is not this gate's to judge; what is asserted is Mission
-   Control's half of the contract: nothing is embedded until he asks, opening
-   targets the right app, and the browser link agrees with the frame. */
-await step('apps: a shelf that embeds nothing until an app is opened', async () => {
+/* Apps: no shelf page any more (his instruction, 2026-09-16) -- Challengers,
+   Nexus and Watchless live as entries in the dock's More grid instead, and
+   #/apps is purely the iframe host focusAppId lands you in. What is
+   asserted is Mission Control's half of the contract: nothing is embedded
+   until he asks, landing on #/apps with nothing chosen leaves for Today
+   rather than showing a grid that isn't reachable from anywhere in the nav,
+   opening targets the right app, and the browser link agrees with the
+   frame. */
+await step('apps: with nothing chosen, the page leaves for Today', async () => {
   await fresh('apps')
-  const shelf = await page.evaluate(() => ({
-    tiles: [...document.querySelectorAll('.apps-tile .apps-name')].map((el) => el.textContent.trim()),
+  await page.waitForTimeout(400)
+  const state = await page.evaluate(() => ({
+    hash: location.hash,
     frames: document.querySelectorAll('iframe').length,
-    subs: document.querySelectorAll('.apps-what').length,
+    tiles: document.querySelectorAll('.apps-tile').length,
   }))
-  if (shelf.frames !== 0) throw new Error(`${shelf.frames} iframe(s) mounted on the shelf; nothing should load unasked`)
-  /* My Mind and Compass left the shelf on his instruction (2026-09-04). My
-     Mind was this shelf's only `external: true` app -- mymind answers with
-     frame-ancestors 'none', so a panel inside this page was never something
-     it could build, and that's WHY the `external` flag/new-tab-link path in
-     apps.tsx exists at all. No app on the current shelf uses it, so that
-     path has no live test subject here until one does again. */
-  if (!shelf.tiles.includes('Watchless')) throw new Error(`Watchless left the shelf: ${shelf.tiles.join(', ')}`)
-  if (shelf.tiles.includes('My Mind')) throw new Error('My Mind is still on the shelf')
-  if (shelf.tiles.includes('Compass')) throw new Error('Compass is still on the shelf')
-  /* Forge left on his instruction (2026-09-11) along with its repo: the FORGE
-     dashboard was superseded by the Health page, and a tile pointing at a
-     deleted GitHub Pages site is a 404 in a frame. */
-  if (shelf.tiles.includes('Forge')) throw new Error('Forge is still on the shelf, but its repo is gone')
-  if (shelf.tiles.length !== 3) throw new Error(`${shelf.tiles.length} apps on the shelf: ${shelf.tiles.join(', ')}`)
-  if (shelf.subs) throw new Error('a tile carries a subtitle')
+  if (state.hash !== '#/today') throw new Error(`landed on ${state.hash}, not Today`)
+  if (state.frames !== 0) throw new Error(`${state.frames} iframe(s) mounted with nothing chosen`)
+  if (state.tiles !== 0) throw new Error('a shelf of tiles still renders somewhere')
 })
 
-await step('apps: opening one frames it, Escape comes back, browser link agrees', async () => {
-  await fresh('apps')
-  await page.evaluate(() => { [...document.querySelectorAll('.apps-tile')].find((t) => t.textContent.includes('Watchless'))?.click() })
+await step('apps: opening one from More frames it, Escape leaves for Today, browser link agrees', async () => {
+  /* Challengers, not Watchless: Watchless already has its own native dock
+     panel (the chip, transcripts inline) and never goes through this iframe
+     host at all, so it is not a live subject for what this step checks. */
+  await fresh('today')
+  await page.getByRole('button', { name: 'Open quick tools' }).click(); await page.waitForTimeout(400)
+  await page.locator('.dock-more-btn').click(); await page.waitForTimeout(250)
+  await page.locator('.dock-more-cell', { hasText: 'Challengers' }).click()
   await page.waitForTimeout(400)
   const opened = await page.evaluate(() => ({
     src: document.querySelector('.apps-frame')?.getAttribute('src') ?? '',
@@ -3040,25 +3041,30 @@ await step('apps: opening one frames it, Escape comes back, browser link agrees'
       return f.getBoundingClientRect().width > clip.getBoundingClientRect().width + 8
     })(),
   }))
-  if (!opened.src.startsWith('https://watchless.netlify.app')) throw new Error(`frame is ${opened.src || 'missing'}`)
+  if (!opened.src.startsWith('https://challenger-392-service.netlify.app')) throw new Error(`frame is ${opened.src || 'missing'}`)
   if (opened.out !== opened.src) throw new Error(`Open in browser goes to ${opened.out}, the frame to ${opened.src}`)
-  if (opened.name !== 'Watchless') throw new Error(`header reads ${opened.name}`)
+  if (opened.name !== 'Challengers') throw new Error(`header reads ${opened.name}`)
   if (!opened.clipped) throw new Error('the frame is not wider than its clip, so its scrollbar will show')
+  const backLabel = await page.evaluate(() => document.querySelector('.apps-open button')?.textContent.trim())
+  if (backLabel !== 'Back to Today') throw new Error(`back button reads "${backLabel}", not "Back to Today"`)
   /* Escape belongs to whoever has focus, and the thing on screen is a real
      cross-origin site: once the iframe has it, the keystroke is the iframe's
      and never reaches us. That is a documented limit of the Apps page, not a
-     bug, and "Back to apps" always works.
+     bug, and "Back to Today" always works.
 
      So this asserts the contract we actually make, deterministically: from
-     Mission Control's own chrome, Escape closes the app. Without the focus
-     line it was racing a network load, and it lost once on 2026-08-26 in a run
-     whose only other result was green, on a build where the same click and
-     keypress closed the app four times out of four. */
+     Mission Control's own chrome, Escape closes the app -- and now leaves
+     #/apps entirely, for Today, since there is no shelf to fall back to any
+     more. Without the focus line it was racing a network load, and it lost
+     once on 2026-08-26 in a run whose only other result was green, on a
+     build where the same click and keypress closed the app four times out
+     of four. */
   await page.evaluate(() => document.querySelector(".apps-open button, .shell")?.focus())
   await page.keyboard.press('Escape')
   await page.waitForTimeout(300)
-  const back = await page.evaluate(() => document.querySelectorAll('iframe').length)
-  if (back !== 0) throw new Error('Escape did not close the app')
+  const back = await page.evaluate(() => ({ frames: document.querySelectorAll('iframe').length, hash: location.hash }))
+  if (back.frames !== 0) throw new Error('Escape did not close the app')
+  if (back.hash !== '#/today') throw new Error(`Escape left the app on ${back.hash}, not Today`)
 })
 
 await step('notes: ticking one files it under Done and takes it out of the folder', async () => {
@@ -4052,8 +4058,11 @@ await step('assistant: sets up a real routine', async () => {
 })
 await step('assistant: "open Watchless" opens a real embedded app', async () => {
   /* His ask: open up the applications he has. app (assistantcore.tsx) calls
-     the same setFocusAppId/setPage('apps') the Apps page's own tile click
-     already makes -- both already on the shared store. */
+     the same setFocusAppId/setPage('apps') the dock's More grid uses for the
+     apps that don't already have a native panel -- both already on the
+     shared store. Watchless has its own dock panel now, but focusAppId
+     still opens it through this same iframe host when asked by name, which
+     is exactly what this step is checking. */
   await fresh('today')
   await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
   await stubAssistant(() => JSON.stringify({

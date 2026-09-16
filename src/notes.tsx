@@ -807,6 +807,11 @@ export function NotesPage() {
   useEffect(() => { try { localStorage.setItem(COLS_KEY, JSON.stringify(cols)) } catch { /* quota */ } }, [cols])
   const phone = vw < 1000
   const wide = vw >= 1180
+  /* Screen-share safe: hides the folders and the note list, leaving only the
+     one note he means to show. Not persisted on purpose -- coming back to
+     Notes tomorrow with everyone able to see it again is the safer default
+     than a meeting mode that silently stuck. */
+  const [presenting, setPresenting] = useState(false)
 
   const finding = query.trim().length > 0 || tag !== null
   const spaceOf = (id: string) => id.match(/^nf-space-(.+)$/)?.[1] as SpaceId | undefined
@@ -1002,8 +1007,8 @@ export function NotesPage() {
   const reading = phone && open
   return (
     <div
-      className={`nt-app${reading ? ' is-reading' : ''}`}
-      style={wide ? { gridTemplateColumns: `${cols.side}px ${cols.list}px minmax(0, 1fr)` } : undefined}
+      className={`nt-app${reading ? ' is-reading' : ''}${presenting ? ' is-presenting' : ''}`}
+      style={wide && !presenting ? { gridTemplateColumns: `${cols.side}px ${cols.list}px minmax(0, 1fr)` } : undefined}
     >
       {/* ---- folders ----
            Shaped after the Notes sidebar, on his instruction: one row per
@@ -1215,7 +1220,15 @@ export function NotesPage() {
                 <Icon.ChevronLeft size={15} />
                 {nameOf(open.folderId)}
               </button>
-            ) : undefined}
+            ) : (
+              <button
+                className="nt-presenttoggle" aria-pressed={presenting}
+                title={presenting ? 'Show folders and the note list' : 'Hide folders and the note list'}
+                onClick={() => setPresenting((v) => !v)}
+              >
+                {presenting ? <Icon.ChevronRight size={15} /> : <Icon.ChevronLeft size={15} />}
+              </button>
+            )}
             trail={kebab(open)}
           >
             {/* When it was last touched, on the same margin as the title. Centred

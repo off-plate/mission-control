@@ -1140,32 +1140,6 @@ export function HabitsPage() {
               )}
             </div>
           )}
-
-          {manualRows.length > 0 && (
-            <div className="panel hg-panel">
-              <div className="hg-head">
-                <span className="microcap">Yours to tick</span>
-                <span className="hg-n mono">{manualRows.filter((h) => h.days[todayIndex]).length}/{manualRows.length}</span>
-              </div>
-              <div className="hg-rows">
-                {[...manualRows].sort((a, b) => Number(a.days[todayIndex]) - Number(b.days[todayIndex])).map((h) => (
-                  <div className={`hg-row${h.days[todayIndex] ? ' is-done' : ''}`} key={h.id}>
-                    <span className="hg-what">
-                      <span className="hg-title">{h.name}{qualifyOf(h) && <span className="habit-qual">{qualifyOf(h)}</span>}</span>
-                      {h.note && <span className="hg-note">{h.note}</span>}
-                    </span>
-                    <span className="hg-do">
-                      {kebab(h)}
-                      <button
-                        className="daydot" role="checkbox" aria-checked={h.days[todayIndex]} aria-label={h.name}
-                        onClick={() => toggleHabitDay(h.id, todayIndex)}
-                      />
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="hg-col">
@@ -1212,6 +1186,31 @@ export function HabitsPage() {
             </div>
           )}
 
+          {manualRows.length > 0 && (
+            <div className="panel hg-panel">
+              <div className="hg-head">
+                <span className="microcap">Yours to tick</span>
+                <span className="hg-n mono">{manualRows.filter((h) => h.days[todayIndex]).length}/{manualRows.length}</span>
+              </div>
+              <div className="hg-rows">
+                {[...manualRows].sort((a, b) => Number(a.days[todayIndex]) - Number(b.days[todayIndex])).map((h) => (
+                  <div className={`hg-row${h.days[todayIndex] ? ' is-done' : ''}`} key={h.id}>
+                    <span className="hg-what">
+                      <span className="hg-title">{h.name}{qualifyOf(h) && <span className="habit-qual">{qualifyOf(h)}</span>}</span>
+                      {h.note && <span className="hg-note">{h.note}</span>}
+                    </span>
+                    <span className="hg-do">
+                      {kebab(h)}
+                      <button
+                        className="daydot" role="checkbox" aria-checked={h.days[todayIndex]} aria-label={h.name}
+                        onClick={() => toggleHabitDay(h.id, todayIndex)}
+                      />
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
       {routineCols.length === 0 && looseCols.length === 0 && <div className="empty">No habits in this space yet. Add one from the button above.</div>}

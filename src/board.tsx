@@ -33,7 +33,7 @@ const art = (a: string, b: string) =>
     `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="800"><defs><radialGradient id="g" cx="28%" cy="22%" r="110%"><stop offset="0%" stop-color="${a}"/><stop offset="55%" stop-color="${b}"/><stop offset="100%" stop-color="#0c0c10"/></radialGradient><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="linear" slope="0.1"/></feComponentTransfer></filter></defs><rect width="640" height="800" fill="url(#g)"/><rect width="640" height="800" filter="url(#n)"/></svg>`,
   )}`
 
-type Card =
+export type Card =
   | { kind: 'statement'; text: string; size?: 'xl' | 'lg' }
   | { kind: 'quote'; text: string; by?: string }
   | { kind: 'number'; value: string; label: string }

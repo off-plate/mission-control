@@ -1287,6 +1287,21 @@ await step('today: nothing to upload, and no camera left on the page', async () 
   const n = await page.locator('input[type="file"]').count()
   if (n) throw new Error(`${n} file inputs are still in the app`)
 })
+await step('today: the chain and Why widgets show real local data, Health and Debt stay off signed out', async () => {
+  /* ?noremote never signs in, so Health and Compass are both 'off' -- exactly
+     the shape they'd have for someone who has never connected them, and
+     those two widgets guard on that (return null). The chain reads the same
+     local habits/tasks/focus the momentum machinery always has, and Why is
+     a static wall, so both of those render for real even signed out -- this
+     step is checking that split, not that everything goes blank together. */
+  await fresh('today')
+  const state = await page.evaluate(() => ({
+    heads: [...document.querySelectorAll('.tr-widget .tr-l')].map((el) => el.textContent.trim()),
+  }))
+  if (!state.heads.includes('The chain')) throw new Error(`the chain widget did not render: ${state.heads.join(', ')}`)
+  if (!state.heads.includes('Why')) throw new Error(`the Why widget did not render: ${state.heads.join(', ')}`)
+  if (state.heads.some((h) => /sleep|debt/i.test(h))) throw new Error(`Health or Debt rendered signed out: ${state.heads.join(', ')}`)
+})
 await step('workspaces: write a task into Michael’s Corner', async () => {
   await fresh('plan')
   await page.locator('button', { hasText: 'Michael' }).first().click(); await page.waitForTimeout(400)

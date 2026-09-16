@@ -6193,6 +6193,38 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .tr-pips i { flex: 1; height: 9px; border-radius: 2px; background: color-mix(in srgb, var(--t-ink) 11%, transparent); }
 .tr-pips i.is-on { background: var(--t-hot); }
 
+/* ---- Health, the chain, debt and Why -- four doors out of Today, each
+   reading straight off the page it points at (his ask, 2026-09-16) ---- */
+.troom-widgets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.troom .tr-widget {
+  all: unset; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px;
+  min-height: 150px; cursor: pointer; text-align: left;
+}
+.troom .tr-widget .tr-head { margin-bottom: 0; }
+.trw-bars { display: flex; align-items: flex-end; gap: 4px; height: 40px; flex: none; }
+.trw-bars i { flex: 1; border-radius: 2px 2px 0 0; background: color-mix(in srgb, var(--t-ink) 11%, transparent); display: block; }
+.trw-bars i.is-today { background: var(--t-hot-text); }
+.trw-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; color: var(--t-dim); margin-top: auto; padding-top: 10px; border-top: 1px solid var(--t-line); }
+.trw-foot b { color: var(--t-ink); font-weight: 700; }
+.trw-line { font-family: var(--font-display); font-weight: 700; font-size: 14px; line-height: 1.5; margin: 0; color: var(--t-ink); }
+.trw-line em { font-style: normal; color: var(--t-hot-text); }
+.trw-dots { display: flex; gap: 4px; margin-top: auto; }
+.trw-dots i { width: 14px; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--t-ink) 11%, transparent); display: block; }
+.trw-dots i.is-on { background: var(--t-hot); }
+.trw-ring { display: flex; align-items: center; gap: 14px; }
+.trw-ring svg circle:last-child { transition: stroke-dashoffset 400ms ease; }
+.trw-ringfig { font-family: var(--font-display); font-weight: 800; font-size: 22px; color: var(--t-ink); }
+.trw-ringsub { font-size: 12px; color: var(--t-dim); }
+.trw-quote { font-family: var(--font-display); font-weight: 700; font-size: 14px; line-height: 1.45; margin: 0; color: var(--t-ink); flex: 1; }
+.tr-startblock {
+  all: unset; box-sizing: border-box; align-self: flex-start; margin-top: auto;
+  padding: 6px 12px; border-radius: var(--a-r-md, 8px); background: var(--t-hot);
+  color: var(--a-on-ink); font-family: var(--font-body); font-weight: 700; font-size: 12.5px; cursor: pointer;
+}
+@media (max-width: 1180px) {
+  .troom-widgets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 @media (max-width: 1180px) {
   .troom-lists { grid-template-columns: 1fr; }
   .troom-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }

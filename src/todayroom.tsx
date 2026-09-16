@@ -28,6 +28,8 @@ import { SLOTS, dueOn, goalCurrent, habitsDueToday, isTimeFed, type Task } from 
 import { PLAN_AHEAD_DAYS, WeekGrid, dayPlus, weekRangeLabel } from './weekgrid'
 import { SpaceMark } from './ui'
 import { SPACE_LABELS } from './mock'
+import { TodayWidgets } from './todaywidgets'
+import { usePomodoro } from './pomodoro'
 
 /* A pasted spreadsheet link is an address, not a title. Left raw it took three
    lines of the Next card and pushed the card off the right of the room. The
@@ -101,6 +103,7 @@ function isoWeek(d: Date): number {
 
 export function TodayRoom() {
   const { tasks, habits, habitLog, routines, focusSessions, goals, slips, savedMin, todayIndex, inView, setPage, setFocusTaskId, setFocusRoutineId, toggleTask, toggleHabitDay, dayLog, openDay } = useStore()
+  const pomo = usePomodoro()
   const now = useNow()
   const firstMove = useFirstMove()
   const day = localDateKey()
@@ -397,6 +400,11 @@ export function TodayRoom() {
           <p className="tr-l k">Focused</p>
           <div className="tr-n v">{focusedMin > 0 ? fmtDuration(focusedMin) : '\u2014'}</div>
           <div className="tr-bar"><i style={{ width: `${Math.min(100, Math.round((focusedMin / 240) * 100))}%` }} /></div>
+          {/* Only when nothing is already running -- this tile is not a second
+             transport for a block already under way, which lives in the dock. */}
+          {pomo.phase === 'idle' && (
+            <button className="tr-startblock" onClick={() => pomo.startFocus()}>Start a block</button>
+          )}
         </div>
         <div className="tr-card tr-stat" data-stat="habits">
           <p className="tr-l k">Habits</p>
@@ -415,6 +423,9 @@ export function TodayRoom() {
           <div className={`tr-n v${savedMin < 0 ? ' is-hot' : ''}`}>{savedMin === 0 ? '\u2014' : fmtSigned(savedMin)}</div>
         </div>
       </section>
+
+      {/* ---- health, the chain, debt and why -- his ask, 2026-09-16 ---- */}
+      <TodayWidgets />
 
       {/* ---- habits, goals, and the week behind ---- */}
       <section className="troom-lower">

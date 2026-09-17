@@ -10957,7 +10957,11 @@ body:has(.pp-page) #main { padding-bottom: 0; }
   display: flex; flex-direction: column; overflow: hidden;
 }
 .pp-card.is-open { transform: translateX(0); }
-.pp-card-scroll { overflow-y: auto; padding: 18px 20px 24px; display: flex; flex-direction: column; gap: 20px; }
+/* The card is a fixed-height column, so the scrolling part has to be allowed
+   to shrink: without flex/min-height it grew past the card and the sections at
+   the bottom (history, connections) were simply cut off with no way to reach
+   them. His report, 2026-09-17. */
+.pp-card-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 18px 20px 24px; display: flex; flex-direction: column; gap: 20px; }
 .pp-card-top { display: flex; align-items: center; gap: 12px; }
 .pp-card-av { width: 52px; height: 52px; border-radius: 50%; flex: none; display: grid; place-items: center; font-weight: 800; font-size: 1.05rem; color: #fff; transition: background-color 700ms var(--pp-ease); }
 .pp-card-names { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -11097,3 +11101,25 @@ body:has(.pp-page) #main { padding-bottom: 0; }
    running underneath it. */
 .pp-stage.has-card .pp-bar { max-width: calc(100% - 3 * var(--s4) - 360px); }
 @media (max-width: 760px) { .pp-stage.has-card .pp-bar { max-width: calc(100% - 2 * var(--s4)); } }
+
+/* People bar, one row (his ask, 2026-09-17): the circle buttons became one
+   dropdown, the counts tightened, and Add lost its second word. */
+.pp-bar { flex-wrap: nowrap; gap: 10px; }
+.pp-bar .pp-counts { flex-wrap: nowrap; gap: 4px; }
+.pp-bar .pp-count { white-space: nowrap; padding: 4px 8px; font-size: 0.76rem; }
+.pp-circle-pick { flex: none; }
+.pp-add { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.pp-dd { width: 100%; }
+.pp-dd .dd-trigger { width: 100%; }
+.pp-circle-pick, .pp-circle-pick .dd-trigger { width: auto; }
+.pp-circle-pick .dd-trigger { white-space: nowrap; }
+.pp-bar .pp-circle-pick .dd-panel { min-width: 200px; }
+.pp-field > span { font-size: 0.74rem; font-weight: 700; color: #5F5A4E; }
+.pp-link-add .pp-link-who { min-width: 0; }
+@media (max-width: 1100px) {
+  .pp-bar .pp-count:not(.is-alert) { display: none; }
+}
+@media (max-width: 760px) {
+  .pp-bar { flex-wrap: wrap; }
+  .pp-bar .pp-count:not(.is-alert) { display: inline-flex; }
+}

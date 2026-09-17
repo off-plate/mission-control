@@ -19,6 +19,7 @@
    Where he is looking (pan and zoom) is per device and never synced. */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react'
 import { useStore } from './store'
+import { Select } from './ui'
 import { localDateKey } from './util'
 import { ALL_NAMES, daysUntil, nameDayFor } from './namedays'
 import type { ContactChannel, Person, PersonBond, PersonContact, PersonTier } from './types'
@@ -281,11 +282,11 @@ export function PeoplePage() {
       if (p) flyTo(p)
     } else if (was) fit(true, false)
   }
-  const toggleFocus = (id: PersonTier) => {
-    const next = focusTier === id ? null : id
+  const setFocus = (next: PersonTier | null) => {
     setFocusTier(next)
     if (next && person && person.tier !== next) setSelected(null)
   }
+  const toggleFocus = (id: PersonTier) => setFocus(focusTier === id ? null : id)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const typing = (e.target as HTMLElement | null)?.closest('input, textarea, select, [contenteditable]')
@@ -553,23 +554,23 @@ export function PeoplePage() {
               </ul>
             )}
           </div>
-          <div className="pp-counts">
-            <span className={`pp-count${counts.over ? ' is-alert' : ''}`}><b>{counts.over}</b> overdue</span>
-            <span className={`pp-count${counts.week ? ' is-warn' : ''}`}><b>{counts.week}</b> due this week</span>
-            <span className="pp-count"><b>{counts.ok}</b> in touch</span>
+          <div className="pp-counts" aria-label="How you are doing">
+            <span className={`pp-count${counts.over ? ' is-alert' : ''}`} title="Overdue"><b>{counts.over}</b> overdue</span>
+            <span className={`pp-count${counts.week ? ' is-warn' : ''}`} title="Due in the next 7 days"><b>{counts.week}</b> this week</span>
+            <span className="pp-count" title="In touch"><b>{counts.ok}</b> in touch</span>
           </div>
-          <span className="pp-bar-rule" aria-hidden="true" />
-          <div className="pp-filters" role="group" aria-label="Show one circle">
-            {TIERS.map((t) => (
-              <button
-                key={t.id} type="button" className={`pp-chip${focusTier === t.id ? ' is-on' : ''}`}
-                aria-pressed={focusTier === t.id} data-tier-chip={t.id} onClick={() => toggleFocus(t.id)}
-              >
-                {t.label}<span>{people.filter((p) => p.tier === t.id).length}</span>
-              </button>
-            ))}
-          </div>
-          <button className="btn btn-primary pp-add" type="button" onClick={() => setAdding(true)}>Add person</button>
+          <Select
+            className="pp-dd pp-circle-pick" ariaLabel="Show one circle" value={focusTier ?? ''}
+            onChange={(v) => setFocus(v || null)}
+            options={[
+              { value: '', label: `All circles (${people.length})` },
+              ...TIERS.map((t) => ({ value: t.id, label: `${t.label} (${people.filter((p) => p.tier === t.id).length})` })),
+            ]}
+          />
+          <button className="btn btn-primary pp-add" type="button" onClick={() => setAdding(true)} aria-label="Add person">
+            <svg width="13" height="13" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+            Add
+          </button>
         </div>
 
         {people.length === 0 && (
@@ -733,17 +734,22 @@ function PersonCard({
       <AboutPerson person={person} today={today} onPatch={onPatch} />
 
       <div className="pp-row2">
-        <label className="pp-field">Talk to them
-          <select className="pp-select" value={person.cadenceDays} onChange={(e) => onPatch({ cadenceDays: Number(e.target.value) })}>
-            {CADENCES.map(([n, l]) => <option key={n} value={n}>{l}</option>)}
-            {!CADENCES.some(([n]) => n === person.cadenceDays) && <option value={person.cadenceDays}>Every {person.cadenceDays} days</option>}
-          </select>
-        </label>
-        <label className="pp-field">Circle
-          <select className="pp-select" value={person.tier} onChange={(e) => onTier(e.target.value as PersonTier)}>
-            {TIERS.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
-          </select>
-        </label>
+        <div className="pp-field"><span>Talk to them</span>
+          <Select
+            className="pp-dd" ariaLabel="How often to talk to them" value={person.cadenceDays}
+            onChange={(n) => onPatch({ cadenceDays: n })}
+            options={[
+              ...CADENCES.map(([n, l]) => ({ value: n, label: l })),
+              ...(CADENCES.some(([n]) => n === person.cadenceDays) ? [] : [{ value: person.cadenceDays, label: `Every ${person.cadenceDays} days` }]),
+            ]}
+          />
+        </div>
+        <div className="pp-field"><span>Circle</span>
+          <Select
+            className="pp-dd" ariaLabel="Circle" value={person.tier}
+            onChange={(t) => onTier(t)} options={TIERS.map((t) => ({ value: t.id, label: t.label }))}
+          />
+        </div>
       </div>
 
       <div className="pp-section">
@@ -809,10 +815,10 @@ function PersonCard({
             className="pp-link-add"
             onSubmit={(e) => { e.preventDefault(); if (linkTo) { onLink(linkTo, linkWord); setLinkTo(''); setLinkWord('') } }}
           >
-            <select className="pp-select" value={linkTo} aria-label="Who to connect" onChange={(e) => setLinkTo(e.target.value)}>
-              <option value="">Connect someone</option>
-              {unlinked.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
+            <Select
+              className="pp-dd pp-link-who" ariaLabel="Who to connect" value={linkTo} onChange={setLinkTo}
+              options={[{ value: '', label: 'Connect someone' }, ...unlinked.map((p) => ({ value: p.id, label: p.name }))]}
+            />
             <input
               className="pp-text" list="pp-rel-words" value={linkWord} placeholder="is their… brother, friend"
               aria-label={`What they are to ${person.name}`} onChange={(e) => setLinkWord(e.target.value)}
@@ -855,16 +861,19 @@ function AddPerson({ onClose, onAdd }: { onClose: () => void; onAdd: (name: stri
           <input className="pp-text" value={rel} placeholder="Brother, gym friend, accountant" onChange={(e) => setRel(e.target.value)} />
         </label>
         <div className="pp-row2">
-          <label className="pp-field">Circle
-            <select className="pp-select" value={tier} onChange={(e) => { const t = e.target.value as PersonTier; setTier(t); setCadence(TIER[t].cadence) }}>
-              {TIERS.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
-            </select>
-          </label>
-          <label className="pp-field">Talk to them
-            <select className="pp-select" value={cadence} onChange={(e) => setCadence(Number(e.target.value))}>
-              {CADENCES.map(([n, l]) => <option key={n} value={n}>{l}</option>)}
-            </select>
-          </label>
+          <div className="pp-field"><span>Circle</span>
+            <Select
+              className="pp-dd pp-add-circle" ariaLabel="Circle" value={tier}
+              onChange={(t) => { setTier(t); setCadence(TIER[t].cadence) }}
+              options={TIERS.map((t) => ({ value: t.id, label: t.label }))}
+            />
+          </div>
+          <div className="pp-field"><span>Talk to them</span>
+            <Select
+              className="pp-dd" ariaLabel="How often to talk to them" value={cadence} onChange={setCadence}
+              options={CADENCES.map(([n, l]) => ({ value: n, label: l }))}
+            />
+          </div>
         </div>
         <div className="pp-dialog-actions">
           <button className="btn btn-quiet" type="button" onClick={onClose}>Cancel</button>
@@ -931,14 +940,15 @@ function AboutPerson({ person, today, onPatch }: {
       <div className="pp-field">
         <span>Birthday</span>
         <div className="pp-birth">
-          <select className="pp-select" aria-label="Birthday day" value={day} onChange={(e) => setBirth(month, e.target.value)}>
-            <option value="">Day</option>
-            {Array.from({ length: maxDay }, (_, i) => String(i + 1).padStart(2, '0')).map((d) => <option key={d} value={d}>{Number(d)}</option>)}
-          </select>
-          <select className="pp-select" aria-label="Birthday month" value={month} onChange={(e) => setBirth(e.target.value, day && Number(day) > new Date(2024, Number(e.target.value), 0).getDate() ? '' : day)}>
-            <option value="">Month</option>
-            {MONTHS.map((m, i) => <option key={m} value={String(i + 1).padStart(2, '0')}>{m}</option>)}
-          </select>
+          <Select
+            className="pp-dd" ariaLabel="Birthday day" value={day} onChange={(d) => setBirth(month, d)}
+            options={[{ value: '', label: 'Day' }, ...Array.from({ length: maxDay }, (_, i) => String(i + 1).padStart(2, '0')).map((d) => ({ value: d, label: String(Number(d)) }))]}
+          />
+          <Select
+            className="pp-dd" ariaLabel="Birthday month" value={month}
+            onChange={(m) => setBirth(m, day && m && Number(day) > new Date(2024, Number(m), 0).getDate() ? '' : day)}
+            options={[{ value: '', label: 'Month' }, ...MONTHS.map((m, i) => ({ value: String(i + 1).padStart(2, '0'), label: m }))]}
+          />
           <input
             className="pp-text" inputMode="numeric" aria-label="Birth year, if you know it" placeholder="Year"
             defaultValue={person.birthYear ?? ''} key={person.birthYear ?? 'none'}

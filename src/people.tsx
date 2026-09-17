@@ -160,7 +160,7 @@ export function PeoplePage() {
       const el = stageRef.current
       if (!el) return
       const top = el.getBoundingClientRect().top + window.scrollY
-      el.style.height = `${Math.max(460, Math.round(window.innerHeight - top - 16))}px`
+      el.style.height = `${Math.max(460, Math.round(window.innerHeight - top))}px`
     }
     size()
     window.addEventListener('resize', size)
@@ -195,9 +195,10 @@ export function PeoplePage() {
     const minY = Math.min(...pts.map((p) => p.y)) - pad
     const maxY = Math.max(...pts.map((p) => p.y)) + pad + 20
     const w = el.clientWidth - cardWidth(open)
-    const h = el.clientHeight - 56
+    const top = (el.querySelector('.pp-bar')?.getBoundingClientRect().height ?? 0) + 24
+    const h = el.clientHeight - top - 20
     const z = clampZ(Math.min(1.4, Math.min(w / (maxX - minX), h / (maxY - minY))))
-    const target = { z, x: w / 2 - ((minX + maxX) / 2) * z, y: h / 2 - ((minY + maxY) / 2) * z }
+    const target = { z, x: w / 2 - ((minX + maxX) / 2) * z, y: top + h / 2 - ((minY + maxY) / 2) * z }
     if (animate) tween(target)
     else setView(target)
   }
@@ -361,27 +362,6 @@ export function PeoplePage() {
 
   return (
     <div className="pp-page">
-      <div className="pp-bar">
-        <h1>People</h1>
-        <div className="pp-counts">
-          <span className={`pp-count${counts.over ? ' is-alert' : ''}`}><b>{counts.over}</b> overdue</span>
-          <span className={`pp-count${counts.week ? ' is-warn' : ''}`}><b>{counts.week}</b> due this week</span>
-          <span className="pp-count"><b>{counts.ok}</b> in touch</span>
-        </div>
-        <span className="pp-spacer" />
-        <button className="btn btn-primary" type="button" onClick={() => setAdding(true)}>Add person</button>
-      </div>
-      <div className="pp-filters" role="group" aria-label="Show one circle">
-        {TIERS.map((t) => (
-          <button
-            key={t.id} type="button" className={`pp-chip${focusTier === t.id ? ' is-on' : ''}`}
-            aria-pressed={focusTier === t.id} data-tier-chip={t.id} onClick={() => toggleFocus(t.id)}
-          >
-            {t.label}<span>{people.filter((p) => p.tier === t.id).length}</span>
-          </button>
-        ))}
-      </div>
-
       <div ref={stageRef} className={`pp-stage${panning ? ' is-panning' : ''}`}>
         <svg
           className="pp-canvas" aria-label="Your people, you in the middle"
@@ -491,6 +471,27 @@ export function PeoplePage() {
             })}
           </g>
         </svg>
+
+        <div className="pp-bar" role="toolbar" aria-label="People">
+          <h1 className="pp-h1">People</h1>
+          <div className="pp-counts">
+            <span className={`pp-count${counts.over ? ' is-alert' : ''}`}><b>{counts.over}</b> overdue</span>
+            <span className={`pp-count${counts.week ? ' is-warn' : ''}`}><b>{counts.week}</b> due this week</span>
+            <span className="pp-count"><b>{counts.ok}</b> in touch</span>
+          </div>
+          <span className="pp-bar-rule" aria-hidden="true" />
+          <div className="pp-filters" role="group" aria-label="Show one circle">
+            {TIERS.map((t) => (
+              <button
+                key={t.id} type="button" className={`pp-chip${focusTier === t.id ? ' is-on' : ''}`}
+                aria-pressed={focusTier === t.id} data-tier-chip={t.id} onClick={() => toggleFocus(t.id)}
+              >
+                {t.label}<span>{people.filter((p) => p.tier === t.id).length}</span>
+              </button>
+            ))}
+          </div>
+          <button className="btn btn-primary pp-add" type="button" onClick={() => setAdding(true)}>Add person</button>
+        </div>
 
         {people.length === 0 && (
           <div className="pp-empty">

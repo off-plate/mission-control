@@ -232,7 +232,10 @@ function dayOfWeekKeyFor(i: number, now = new Date()): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
-const RESOLVE: Record<string, (a: Row, b: Row, buried?: Set<string>) => Row> = { notes: resolveNote, habits: resolveHabit }
+/* A person or a link edited on two devices: the edit made last stands, not the
+   one on whichever device happened to save last. */
+const byUpdatedAt = (a: Row, b: Row): Row => (Number(b.updatedAt ?? 0) > Number(a.updatedAt ?? 0) ? b : a)
+const RESOLVE: Record<string, (a: Row, b: Row, buried?: Set<string>) => Row> = { notes: resolveNote, habits: resolveHabit, people: byUpdatedAt, personBonds: byUpdatedAt }
 
 /** The key a row is buried under, so the store can bury or dig up the same
  *  thing this file will look for. */

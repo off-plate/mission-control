@@ -235,6 +235,7 @@ interface Store extends PersistedState {
   updatePerson: PeopleSlice['updatePerson']
   deletePerson: PeopleSlice['deletePerson']
   addPersonBond: PeopleSlice['addPersonBond']
+  setBondLabel: PeopleSlice['setBondLabel']
   removePersonBond: PeopleSlice['removePersonBond']
   logContact: PeopleSlice['logContact']
   removeContact: PeopleSlice['removeContact']
@@ -1832,7 +1833,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     ideaBoard, addIdeaCard: ideaBoardSlice.addIdeaCard, updateIdeaCard: ideaBoardSlice.updateIdeaCard, deleteIdeaCard: ideaBoardSlice.deleteIdeaCard,
     people, personBonds, personContacts,
     addPerson: peopleSlice.addPerson, updatePerson: peopleSlice.updatePerson, deletePerson: peopleSlice.deletePerson,
-    addPersonBond: peopleSlice.addPersonBond, removePersonBond: peopleSlice.removePersonBond,
+    addPersonBond: peopleSlice.addPersonBond, setBondLabel: peopleSlice.setBondLabel, removePersonBond: peopleSlice.removePersonBond,
     logContact: peopleSlice.logContact, removeContact: peopleSlice.removeContact,
 
     undoable, undoDelete, dismissUndo,

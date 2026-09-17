@@ -4791,8 +4791,20 @@ await step('people: the header opens it, a contact turns someone green, and a ci
   if (dim.join() !== 'true,false') throw new Error(`focusing Business dimmed the wrong people: ${dim}`)
   await page.locator('[data-tier-chip=business]').click(); await page.waitForTimeout(300)
   if (await page.locator('.pp-atom.is-dim').count()) throw new Error('a second click did not show everyone again')
-  const saved = await page.evaluate((K) => { const s = JSON.parse(localStorage.getItem(K)); return [s.people?.length, s.personContacts?.length] }, KEY)
-  if (saved.join() !== '2,1') throw new Error(`not saved: ${saved}`)
+  /* What two people are to each other, one word per direction, each set from
+     that person's own card and drawn next to the person it describes. */
+  await page.locator('.pp-due-item', { hasText: 'Gate Accountant' }).click(); await page.waitForTimeout(500)
+  await page.locator('.pp-link-add select').selectOption({ label: 'Gate Mum' })
+  await page.locator('.pp-link-add input').fill('client')
+  await page.locator('.pp-link-add button').click(); await page.waitForTimeout(300)
+  await page.keyboard.press('Escape'); await page.waitForTimeout(500)
+  await page.locator('.pp-due-item', { hasText: 'Gate Mum' }).click(); await page.waitForTimeout(500)
+  await page.locator('.pp-link-word').fill('accountant')
+  await page.locator('.pp-link-word').press('Enter'); await page.waitForTimeout(300)
+  const words = (await page.locator('.pp-bond-word').allTextContents()).sort().join()
+  if (words !== 'accountant,client') throw new Error(`the link words on the canvas read: ${words}`)
+  const saved = await page.evaluate((K) => { const s = JSON.parse(localStorage.getItem(K)); return [s.people?.length, s.personContacts?.length, s.personBonds?.length] }, KEY)
+  if (saved.join() !== '2,1,1') throw new Error(`not saved: ${saved}`)
 })
 await step('ideas: click to pick up, click to drop, and the list brings the board to any sticky', async () => {
   await page.evaluate(() => { localStorage.removeItem('mc-ideaboard-view'); localStorage.setItem('mc-ideaboard-list', '1') })

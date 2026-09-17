@@ -261,6 +261,12 @@ export function PeoplePage() {
     const el = stageRef.current
     if (!el) return
     const onWheel = (e: WheelEvent) => {
+      /* The card and the due list float over the canvas but are still inside
+         it, so a wheel event scrolling either of them was reaching this
+         handler too and being hijacked into panning the canvas -- his report
+         (2026-09-17): the card "still not scrollable" after the CSS fix,
+         because the CSS was never the problem, this was. */
+      if ((e.target as HTMLElement | null)?.closest('.pp-card, .pp-due')) return
       e.preventDefault()
       const r = el.getBoundingClientRect()
       if (e.ctrlKey || e.metaKey || Math.abs(e.deltaY) > 40) {

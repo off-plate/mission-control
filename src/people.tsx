@@ -20,7 +20,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react'
 import { useStore } from './store'
 import { localDateKey } from './util'
-import type { ContactChannel, Person, PersonContact, PersonTier } from './types'
+import type { ContactChannel, Person, PersonBond, PersonContact, PersonTier } from './types'
 
 type Tier = { id: PersonTier; label: string; r: number; size: number; cadence: number; bond: number }
 const TIERS: Tier[] = [
@@ -50,6 +50,8 @@ const ChannelIcon = ({ id, size = 16 }: { id: ContactChannel; size?: number }) =
   </svg>
 )
 
+/* Suggestions only: any word he types is kept as he typed it. */
+const REL_WORDS = ['brother', 'sister', 'partner', 'wife', 'husband', 'mother', 'father', 'son', 'daughter', 'cousin', 'friend', 'best friend', 'colleague', 'boss', 'client', 'business partner', 'neighbour', 'ex']
 const DAY = 86_400_000
 const noon = (day: string) => new Date(`${day}T12:00:00`).getTime()
 const daysBetween = (from: string, to: string) => Math.round((noon(to) - noon(from)) / DAY)
@@ -110,7 +112,7 @@ function readView(): View | null {
 export function PeoplePage() {
   const {
     people, personBonds, personContacts,
-    addPerson, updatePerson, deletePerson, addPersonBond, removePersonBond, logContact, removeContact,
+    addPerson, updatePerson, deletePerson, addPersonBond, setBondLabel, removePersonBond, logContact, removeContact,
   } = useStore()
   const today = localDateKey()
 
@@ -424,6 +426,31 @@ export function PeoplePage() {
                 )
               })}
             </g>
+            {view.z >= 0.5 && (
+              <g className="pp-bond-labels" aria-hidden="true">
+                {personBonds.flatMap((b) => {
+                  const A = people.find((p) => p.id === b.a)
+                  const B = people.find((p) => p.id === b.b)
+                  if (!A || !B) return []
+                  const pa = posOf(A)
+                  const pb = posOf(B)
+                  const dim = dimmed(A) && dimmed(B)
+                  const lit = selected === A.id || selected === B.id
+                  // Each word sits on the line, a third of the way out from the person it describes.
+                  return ([[b.aToB, pa, pb, 'a'], [b.bToA, pb, pa, 'b']] as const)
+                    .filter(([w]) => !!w)
+                    .map(([w, from, to, side]) => (
+                      <text
+                        key={`${b.id}-${side}`}
+                        className={`pp-bond-word${lit ? ' is-lit' : ''}${dim ? ' is-dim' : ''}`}
+                        x={from.x + (to.x - from.x) * 0.34} y={from.y + (to.y - from.y) * 0.34}
+                      >
+                        {w}
+                      </text>
+                    ))
+                })}
+              </g>
+            )}
             <g className="pp-atom pp-me" aria-label="You">
               <circle className="pp-atom-body" r={40} />
               <text className="pp-atom-initials" fontSize={18}>You</text>
@@ -538,7 +565,8 @@ export function PeoplePage() {
               }}
               onLog={(day, ch) => logContact(person.id, day, ch)}
               onUnlog={removeContact}
-              onLink={(other) => addPersonBond(person.id, other)}
+              onLink={(other, word) => addPersonBond(person.id, other, word)}
+              onLabel={(bondId, word) => setBondLabel(bondId, person.id, word)}
               onUnlink={removePersonBond}
               onRemove={() => { deletePerson(person.id); select(null) }}
             />
@@ -552,12 +580,12 @@ export function PeoplePage() {
 }
 
 function PersonCard({
-  person, hh, people, bonds, contacts, today, onClose, onPatch, onTier, onLog, onUnlog, onLink, onUnlink, onRemove,
+  person, hh, people, bonds, contacts, today, onClose, onPatch, onTier, onLog, onUnlog, onLink, onLabel, onUnlink, onRemove,
 }: {
   person: Person
   hh: Health
   people: Person[]
-  bonds: { id: string; a: string; b: string }[]
+  bonds: PersonBond[]
   contacts: PersonContact[]
   today: string
   onClose: () => void
@@ -565,13 +593,16 @@ function PersonCard({
   onTier: (tier: PersonTier) => void
   onLog: (day: string, ch: ContactChannel) => void
   onUnlog: (id: string) => void
-  onLink: (other: string) => void
+  onLink: (other: string, word: string) => void
+  onLabel: (bondId: string, word: string) => void
   onUnlink: (bondId: string) => void
   onRemove: () => void
 }) {
   const [day, setDay] = useState(today)
   const [armed, setArmed] = useState(false)
   const [flash, setFlash] = useState<string | null>(null)
+  const [linkTo, setLinkTo] = useState('')
+  const [linkWord, setLinkWord] = useState('')
   useEffect(() => {
     if (!armed) return
     const t = window.setTimeout(() => setArmed(false), 3000)
@@ -672,22 +703,40 @@ function PersonCard({
         <h3>Connected to</h3>
         {linked.length === 0 && <p className="pp-muted pp-mb">Only to you, so far.</p>}
         {linked.length > 0 && (
-          <div className="pp-bonds">
+          <ul className="pp-links">
             {linked.map(({ bond, other }) => (
-              <span key={bond.id} className="pp-bond-chip">{other.name}
+              <li key={bond.id}>
+                <span className="pp-link-name">{other.name}</span>
+                <span className="pp-link-is">is their</span>
+                <BondWord
+                  value={(bond.a === person.id ? bond.bToA : bond.aToB) ?? ''}
+                  label={`What ${other.name} is to ${person.name}`}
+                  onCommit={(w) => onLabel(bond.id, w)}
+                />
                 <button className="pp-x" type="button" aria-label={`Remove the link to ${other.name}`} onClick={() => onUnlink(bond.id)}>
                   <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2L2 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
                 </button>
-              </span>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
         {unlinked.length > 0 && (
-          <select className="pp-select" value="" aria-label="Connect to someone else" onChange={(e) => { if (e.target.value) onLink(e.target.value) }}>
-            <option value="">Connect to someone else</option>
-            {unlinked.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+          <form
+            className="pp-link-add"
+            onSubmit={(e) => { e.preventDefault(); if (linkTo) { onLink(linkTo, linkWord); setLinkTo(''); setLinkWord('') } }}
+          >
+            <select className="pp-select" value={linkTo} aria-label="Who to connect" onChange={(e) => setLinkTo(e.target.value)}>
+              <option value="">Connect someone</option>
+              {unlinked.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            <input
+              className="pp-text" list="pp-rel-words" value={linkWord} placeholder="is their… brother, friend"
+              aria-label={`What they are to ${person.name}`} onChange={(e) => setLinkWord(e.target.value)}
+            />
+            <button className="btn btn-primary" type="submit" disabled={!linkTo}>Connect</button>
+          </form>
         )}
+        <datalist id="pp-rel-words">{REL_WORDS.map((w) => <option key={w} value={w} />)}</datalist>
       </div>
 
       <button className={`pp-danger${armed ? ' is-armed' : ''}`} type="button" onClick={() => (armed ? onRemove() : setArmed(true))}>
@@ -739,5 +788,20 @@ function AddPerson({ onClose, onAdd }: { onClose: () => void; onAdd: (name: stri
         </div>
       </form>
     </div>
+  )
+}
+
+/* Saved when he leaves the field or presses Enter, so typing a word is not a
+   synced write per keystroke. */
+function BondWord({ value, label, onCommit }: { value: string; label: string; onCommit: (w: string) => void }) {
+  const [draft, setDraft] = useState(value)
+  useEffect(() => { setDraft(value) }, [value])
+  const commit = () => { if (draft.trim() !== value) onCommit(draft) }
+  return (
+    <input
+      className="pp-inline pp-link-word" list="pp-rel-words" value={draft} placeholder="add a word" aria-label={label}
+      onChange={(e) => setDraft(e.target.value)} onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur() } }}
+    />
   )
 }

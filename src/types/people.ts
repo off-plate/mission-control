@@ -21,12 +21,18 @@ export interface Person {
   updatedAt: number
 }
 
-/** Two people who know each other. Unordered. */
+/** Two people who know each other, and what they are to each other. Each side
+ *  is its own word, because "brother" one way can be "sister" the other. */
 export interface PersonBond {
   id: string
   a: string
   b: string
+  /** What `a` is to `b` ("brother", "boss"). Empty when not set. */
+  aToB?: string
+  /** What `b` is to `a`. */
+  bToA?: string
   createdAt: number
+  updatedAt?: number
 }
 
 export type ContactChannel = 'inperson' | 'call' | 'message' | 'video' | 'email'

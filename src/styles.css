@@ -11000,9 +11000,9 @@ body:has(.pp-page) #main { padding-bottom: 0; }
 .pp-h-date { color: #5F5A4E; font-weight: 600; font-variant-numeric: tabular-nums; }
 .pp-x { border: 0; background: none; color: #8C877A; width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; cursor: pointer; }
 @media (hover: hover) and (pointer: fine) { .pp-x:hover { background: #F0EDE6; color: var(--pp-alert); } }
-.pp-bonds { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-.pp-bond-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 4px 4px 9px; border-radius: 6px; background: #F0EDE6; font-size: 0.8rem; font-weight: 700; }
-.pp-bond-chip .pp-x { width: 20px; height: 20px; }
+
+
+
 .pp-danger {
   border: 1px solid rgba(18, 16, 12, 0.18); background: none; color: var(--pp-alert); border-radius: 8px; cursor: pointer;
   padding: 8px 12px; font-weight: 700; font-size: 0.82rem; align-self: flex-start; transition: background-color 150ms ease, transform 160ms var(--pp-ease);
@@ -11028,3 +11028,22 @@ body:has(.pp-page) #main { padding-bottom: 0; }
 @media (prefers-reduced-motion: reduce) {
   .pp-card, .pp-dialog, .pp-atom-fill, .pp-minibar i, .pp-health-big i { transition: none; animation: none; }
 }
+
+/* People: what two people are to each other. The word sits on their line,
+   next to the person it describes. */
+.pp-bond-word {
+  fill: #5F5A4E; font-size: 10px; font-weight: 700; text-anchor: middle; dominant-baseline: central;
+  paint-order: stroke; stroke: var(--pp-canvas); stroke-width: 4px; stroke-linejoin: round;
+  pointer-events: none; transition: opacity 250ms var(--pp-ease), fill 200ms ease;
+}
+.pp-bond-word.is-lit { fill: var(--pp-olive); }
+.pp-bond-word.is-dim { opacity: 0.15; }
+.pp-links { list-style: none; margin: 0 0 10px; padding: 0; }
+.pp-links li { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: 6px; padding: 5px 0; border-top: 1px solid rgba(18, 16, 12, 0.10); font-size: 0.84rem; }
+.pp-links li:first-child { border-top: 0; }
+.pp-link-name { font-weight: 700; }
+.pp-link-is { color: #8C877A; font-weight: 600; }
+.pp-link-word { font-size: 0.84rem; font-weight: 700; margin-left: 0; }
+.pp-link-word::placeholder { color: #8C877A; font-weight: 600; }
+.pp-link-add { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.pp-link-add .btn { grid-column: 1 / -1; justify-self: start; }

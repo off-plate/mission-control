@@ -19,7 +19,11 @@ export interface PeopleSlice {
   addPerson: (p: PersonInput) => string
   updatePerson: (id: string, patch: PersonPatch) => void
   deletePerson: (id: string) => void
-  addPersonBond: (a: string, b: string) => void
+  /** Link `from` to `other`, saying what `other` is to `from`. Linking an
+   *  existing pair only sets that word. */
+  addPersonBond: (from: string, other: string, otherIsTo?: string) => void
+  /** Set what `other` is to `from` on an existing link. */
+  setBondLabel: (bondId: string, from: string, otherIsTo: string) => void
   removePersonBond: (id: string) => void
   logContact: (personId: string, day: string, channel: ContactChannel) => void
   removeContact: (id: string) => void
@@ -74,11 +78,23 @@ export function usePeopleSlice(
     })
   }
 
-  const addPersonBond = (a: string, b: string): void => {
-    if (a === b) return
-    setPersonBonds((prev) => (prev.some((x) => (x.a === a && x.b === b) || (x.a === b && x.b === a))
-      ? prev
-      : [...prev, { id: newId('bond'), a, b, createdAt: Date.now() }]))
+  /* A bond stores each direction on its own side: aToB is what a is to b. So
+     "what other is to from" lands in bToA when from is a, aToB otherwise. */
+  const withLabel = (b: PersonBond, from: string, word: string): PersonBond => {
+    const w = word.trim()
+    return { ...b, ...(b.a === from ? { bToA: w } : { aToB: w }), updatedAt: Date.now() }
+  }
+  const addPersonBond = (from: string, other: string, otherIsTo = ''): void => {
+    if (from === other) return
+    setPersonBonds((prev) => {
+      const have = prev.find((x) => (x.a === from && x.b === other) || (x.a === other && x.b === from))
+      if (have) return otherIsTo ? prev.map((x) => (x.id === have.id ? withLabel(x, from, otherIsTo) : x)) : prev
+      const now = Date.now()
+      return [...prev, { id: newId('bond'), a: from, b: other, bToA: otherIsTo.trim(), createdAt: now, updatedAt: now }]
+    })
+  }
+  const setBondLabel = (bondId: string, from: string, otherIsTo: string): void => {
+    setPersonBonds((prev) => prev.map((x) => (x.id === bondId ? withLabel(x, from, otherIsTo) : x)))
   }
 
   const removePersonBond = (id: string): void => {
@@ -99,6 +115,6 @@ export function usePeopleSlice(
 
   return {
     people, setPeople, personBonds, setPersonBonds, personContacts, setPersonContacts,
-    addPerson, updatePerson, deletePerson, addPersonBond, removePersonBond, logContact, removeContact,
+    addPerson, updatePerson, deletePerson, addPersonBond, setBondLabel, removePersonBond, logContact, removeContact,
   }
 }

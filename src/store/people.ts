@@ -7,7 +7,7 @@ import type { ContactChannel, Person, PersonBond, PersonContact, PersonTier } fr
 import { newId } from './shared'
 
 export type PersonInput = { name: string; rel?: string; tier: PersonTier; cadenceDays: number; x: number; y: number }
-type PersonPatch = Partial<Pick<Person, 'name' | 'rel' | 'tier' | 'cadenceDays' | 'x' | 'y'>>
+type PersonPatch = Partial<Pick<Person, 'name' | 'rel' | 'tier' | 'cadenceDays' | 'x' | 'y' | 'job' | 'birthday' | 'birthYear' | 'nameDayAs'>>
 
 export interface PeopleSlice {
   people: Person[]

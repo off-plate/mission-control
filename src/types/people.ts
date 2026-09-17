@@ -14,6 +14,14 @@ export interface Person {
   tier: PersonTier
   /** How often he wants to be in touch, in days. */
   cadenceDays: number
+  /** What they do. */
+  job?: string
+  /** Birthday as MM-DD, and the year when he knows it. */
+  birthday?: string
+  birthYear?: number
+  /** The calendar name their name day follows, when their first name is not
+   *  one ("Verů" celebrates Veronika). Empty means use the first name. */
+  nameDayAs?: string
   /** Where he left them on the canvas, in canvas units, the centre being him. */
   x: number
   y: number

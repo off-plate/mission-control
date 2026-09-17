@@ -4803,7 +4803,21 @@ await step('people: the header opens it, a contact turns someone green, and a ci
   await page.locator('.pp-link-word').press('Enter'); await page.waitForTimeout(300)
   const words = (await page.locator('.pp-bond-word').allTextContents()).sort().join()
   if (words !== 'accountant,client') throw new Error(`the link words on the canvas read: ${words}`)
-  const saved = await page.evaluate((K) => { const s = JSON.parse(localStorage.getItem(K)); return [s.people?.length, s.personContacts?.length, s.personBonds?.length] }, KEY)
+  /* Name day from the first name, short forms included, and a search that
+     finds people by what they do. */
+  await page.keyboard.press('Escape'); await page.waitForTimeout(400)
+  await page.getByRole('button', { name: 'Add person', exact: true }).click()
+  await page.locator('.pp-dialog input').first().fill('Honza Gate')
+  await page.locator('.pp-dialog button[type=submit]').click(); await page.waitForTimeout(400)
+  const nameDay = await page.locator('.pp-about .pp-about-line').last().innerText()
+  if (!/^Jan, 24 June/.test(nameDay)) throw new Error(`Honza's name day reads: ${nameDay}`)
+  await page.getByLabel('Job').fill('Gate plumber'); await page.getByLabel('Job').press('Enter')
+  await page.keyboard.press('Escape'); await page.waitForTimeout(400)
+  await page.keyboard.press('/'); await page.keyboard.type('plumb'); await page.waitForTimeout(200)
+  const hits = await page.locator('.pp-search-hit .pp-search-name').allInnerTexts()
+  if (hits.join() !== 'Honza Gate') throw new Error(`search for a job found: ${hits}`)
+  await page.keyboard.press('Escape')
+  const saved = await page.evaluate((K) => { const s = JSON.parse(localStorage.getItem(K)); return [s.people?.length - 1, s.personContacts?.length, s.personBonds?.length] }, KEY)
   if (saved.join() !== '2,1,1') throw new Error(`not saved: ${saved}`)
 })
 await step('ideas: click to pick up, click to drop, and the list brings the board to any sticky', async () => {

@@ -33,6 +33,23 @@ const TIERS: Tier[] = [
   { id: 'distant', label: 'Distant', r: 640, size: 19, cadence: 365, bond: 1 },
 ]
 const TIER = Object.fromEntries(TIERS.map((t) => [t.id, t])) as Record<PersonTier, Tier>
+/* Each circle owns the band halfway to its neighbours, less a little so two
+   bands never touch. A person moves freely inside their own band and cannot
+   be dragged out of it: changing circle is a choice on their card. */
+const BAND = Object.fromEntries(TIERS.map((t, i) => {
+  const prev = i === 0 ? 40 + t.size + 12 : (TIERS[i - 1].r + t.r) / 2 + 8
+  const next = i === TIERS.length - 1 ? t.r + 60 : (t.r + TIERS[i + 1].r) / 2 - 8
+  return [t.id, [prev, next] as const]
+})) as Record<PersonTier, readonly [number, number]>
+function inBand(tier: PersonTier, x: number, y: number): { x: number; y: number } {
+  const [lo, hi] = BAND[tier]
+  const d = Math.hypot(x, y)
+  if (d >= lo && d <= hi) return { x, y }
+  // Dead centre has no direction; send it straight up.
+  const a = d === 0 ? -Math.PI / 2 : Math.atan2(y, x)
+  const r = Math.min(hi, Math.max(lo, d))
+  return { x: Math.cos(a) * r, y: Math.sin(a) * r }
+}
 const CADENCES: [number, string][] = [
   [1, 'Every day'], [3, 'Every 3 days'], [7, 'Every week'], [14, 'Every 2 weeks'],
   [30, 'Every month'], [90, 'Every 3 months'], [180, 'Every 6 months'], [365, 'Every year'],
@@ -208,7 +225,7 @@ export function PeoplePage() {
     const el = stageRef.current
     if (!el) return
     const outer = TIER[people.length ? people.reduce((a, p) => (TIER[p.tier].r > TIER[a].r ? p.tier : a), 'core' as PersonTier) : 'friends'].r
-    const pts = [{ x: -outer, y: -outer }, { x: outer, y: outer }, ...people]
+    const pts = [{ x: -outer, y: -outer }, { x: outer, y: outer }, ...people.map((p) => inBand(p.tier, p.x, p.y))]
     const pad = 70
     const minX = Math.min(...pts.map((p) => p.x)) - pad
     const maxX = Math.max(...pts.map((p) => p.x)) + pad
@@ -229,7 +246,8 @@ export function PeoplePage() {
     const z = Math.max(viewRef.current.z, 0.9)
     const w = el.clientWidth - cardWidth(true)
     const h = phone() ? el.clientHeight * 0.28 : el.clientHeight
-    tween({ z, x: w / 2 - p.x * z, y: h / 2 - p.y * z })
+    const at = inBand(p.tier, p.x, p.y)
+    tween({ z, x: w / 2 - at.x * z, y: h / 2 - at.y * z })
   }
   const zoomAt = (px: number, py: number, factor: number) => {
     tweenRef.current++
@@ -309,7 +327,10 @@ export function PeoplePage() {
     if (!d.moved && Math.hypot(dx, dy) < 4) return
     d.moved = true
     if (d.person) {
-      setDragPos({ id: d.person, x: d.ox + dx / viewRef.current.z, y: d.oy + dy / viewRef.current.z })
+      const who = people.find((x) => x.id === d.person)
+      const nx = d.ox + dx / viewRef.current.z
+      const ny = d.oy + dy / viewRef.current.z
+      setDragPos({ id: d.person, ...(who ? inBand(who.tier, nx, ny) : { x: nx, y: ny }) })
     } else {
       setPanning(true)
       setView((v) => ({ ...v, x: d.ox + dx, y: d.oy + dy }))
@@ -339,7 +360,7 @@ export function PeoplePage() {
     if (d.person && dragPos && dragPos.id === d.person) updatePerson(d.person, { x: dragPos.x, y: dragPos.y })
     setDragPos(null)
   }
-  const posOf = (p: Person) => (dragPos?.id === p.id ? dragPos : p)
+  const posOf = (p: Person) => (dragPos?.id === p.id ? dragPos : inBand(p.tier, p.x, p.y))
 
   /* ---------- derived lists ---------- */
   const counts = useMemo(() => {
@@ -622,7 +643,7 @@ export function PeoplePage() {
                 const a = Math.atan2(person.y, person.x)
                 const dist = Math.hypot(person.x, person.y) || from.r
                 const r = dist * (to.r / from.r)
-                updatePerson(person.id, { tier, x: Math.cos(a) * r, y: Math.sin(a) * r })
+                updatePerson(person.id, { tier, ...inBand(tier, Math.cos(a) * r, Math.sin(a) * r) })
               }}
               onLog={(day, ch) => logContact(person.id, day, ch)}
               onUnlog={removeContact}

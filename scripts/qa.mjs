@@ -4803,6 +4803,15 @@ await step('people: the header opens it, a contact turns someone green, and a ci
   await page.locator('.pp-link-word').press('Enter'); await page.waitForTimeout(300)
   const words = (await page.locator('.pp-bond-word').allTextContents()).sort().join()
   if (words !== 'accountant,client') throw new Error(`the link words on the canvas read: ${words}`)
+  /* A person cannot be dragged out of their circle (his ask, 2026-09-17). */
+  await page.keyboard.press('Escape'); await page.waitForTimeout(400)
+  const mum = page.locator('[data-person]').first()
+  const reach = () => mum.evaluate((g) => { const [x, y] = g.getAttribute('transform').slice(10, -1).split(/[ ,]+/).map(Number); return Math.hypot(x, y) })
+  const bb = await mum.locator('.pp-atom-body').boundingBox()
+  await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2); await page.mouse.down()
+  await page.mouse.move(bb.x + bb.width / 2, bb.y - 700, { steps: 8 }); await page.mouse.up(); await page.waitForTimeout(300)
+  const out = await reach()
+  if (out > 195) throw new Error(`an inner-circle person was dragged out to ${Math.round(out)} (ring edge is 194.5)`)
   /* Name day from the first name, short forms included, and a search that
      finds people by what they do. */
   await page.keyboard.press('Escape'); await page.waitForTimeout(400)

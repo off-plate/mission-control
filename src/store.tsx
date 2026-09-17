@@ -26,6 +26,7 @@ import { noteTitle, useNotesSlice } from './store/notes'
 import { useWidgetsSlice } from './store/widgets'
 import { useTwoLivesSlice } from './store/twolives'
 import { useIdeaBoardSlice, type IdeaBoardSlice } from './store/ideaboard'
+import { usePeopleSlice, type PeopleSlice } from './store/people'
 import { useConnectionsSlice } from './store/connections'
 import { useCoachSlice } from './store/coach'
 import { useAssistantSlice } from './store/assistant'
@@ -59,6 +60,9 @@ import type {
   Goal,
   Idea,
   IdeaCard,
+  Person,
+  PersonBond,
+  PersonContact,
   Note,
   NoteFolder,
   Routine,
@@ -170,6 +174,10 @@ interface PersistedState {
   reelFiles?: Record<string, string>
   /** The Ideas board: every sticky and where he left it. */
   ideaBoard?: IdeaCard[]
+  /** The People page: who, who knows whom, and every logged contact. */
+  people?: Person[]
+  personBonds?: PersonBond[]
+  personContacts?: PersonContact[]
   /** The Pomodoro block running right now, synced so it shows the same on
    *  every device (and in Raycast) rather than living only in this tab's
    *  localStorage. Null means nothing is running. */
@@ -220,6 +228,16 @@ interface Store extends PersistedState {
   addIdeaCard: IdeaBoardSlice['addIdeaCard']
   updateIdeaCard: IdeaBoardSlice['updateIdeaCard']
   deleteIdeaCard: IdeaBoardSlice['deleteIdeaCard']
+  people: Person[]
+  personBonds: PersonBond[]
+  personContacts: PersonContact[]
+  addPerson: PeopleSlice['addPerson']
+  updatePerson: PeopleSlice['updatePerson']
+  deletePerson: PeopleSlice['deletePerson']
+  addPersonBond: PeopleSlice['addPersonBond']
+  removePersonBond: PeopleSlice['removePersonBond']
+  logContact: PeopleSlice['logContact']
+  removeContact: PeopleSlice['removeContact']
   /** Record where reel-fetch put the downloaded file for an Instagram link. */
   setReelFile: (originalUrl: string, fileUrl: string) => void
   /** What he is looking at. 'all' shows every space at once. */
@@ -1151,7 +1169,7 @@ function routeFromHash(): { page: PageId; day: string | null } {
      consults from the app itself). Their addresses land on Today rather than
      on nothing, the same courtesy braindump gets above. */
   if (h === 'achievements' || h === 'money' || h === 'review' || h === 'stats' || h === 'brand') return { page: 'today', day: null }
-  const pages: PageId[] = ['today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting', 'settings', 'notes', 'bills', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant', 'timeline', 'skills', 'health', 'watchless', 'ideas']
+  const pages: PageId[] = ['today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting', 'settings', 'notes', 'bills', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant', 'timeline', 'skills', 'health', 'watchless', 'ideas', 'people']
   return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
 }
 
@@ -1233,6 +1251,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const { notes, setNotes, noteFolders, setNoteFolders } = notesSlice
   const ideaBoardSlice = useIdeaBoardSlice(persisted, { armUndo, bury, digUp })
   const { ideaBoard, setIdeaBoard } = ideaBoardSlice
+  const peopleSlice = usePeopleSlice(persisted, { armUndo, bury, digUp })
+  const { people, setPeople, personBonds, setPersonBonds, personContacts, setPersonContacts } = peopleSlice
   const growthSlice = useGrowthSlice(persisted, { space, armUndo, bury, digUp, setPageState })
   const {
     habits, setHabits, goals, setGoals, routines, setRoutines,
@@ -1329,7 +1349,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     const state: PersistedState = {
       version: 3, spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
-      notes, noteFolders, ideaBoard,
+      notes, noteFolders, ideaBoard, people, personBonds, personContacts,
       savedAt: Date.now(), lastWrite: { dev: deviceId(), name: deviceName(), at: Date.now() },
       weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
       habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, spaceGuessed, graveyard, twoLives, reels, tunes, reelFiles, lastRollDay: lastRollDay ?? localDateKey(),
@@ -1360,7 +1380,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { outbox.push(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels, tunes, reelFiles, ideaBoard, activeFocus])
+  }, [spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels, tunes, reelFiles, ideaBoard, people, personBonds, personContacts, activeFocus])
 
   /* ---- state that arrived from somewhere else ----
      Another tab of this browser, or this account on another device. Merged in,
@@ -1398,6 +1418,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (Array.isArray(p.notes)) setNotes(p.notes)
     if (Array.isArray(p.noteFolders)) setNoteFolders(p.noteFolders)
     if (Array.isArray(p.ideaBoard)) setIdeaBoard(p.ideaBoard)
+    if (Array.isArray(p.people)) setPeople(p.people)
+    if (Array.isArray(p.personBonds)) setPersonBonds(p.personBonds)
+    if (Array.isArray(p.personContacts)) setPersonContacts(p.personContacts)
     if (p.ledger) setLedger(p.ledger)
     if (p.focusSessions) setFocusSessions(p.focusSessions)
     if (p.habitLog) setHabitLog(p.habitLog)
@@ -1807,6 +1830,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     addNoteFolder: notesSlice.addNoteFolder, renameNoteFolder: notesSlice.renameNoteFolder,
     deleteNoteFolder: notesSlice.deleteNoteFolder, renameNoteTag: notesSlice.renameNoteTag,
     ideaBoard, addIdeaCard: ideaBoardSlice.addIdeaCard, updateIdeaCard: ideaBoardSlice.updateIdeaCard, deleteIdeaCard: ideaBoardSlice.deleteIdeaCard,
+    people, personBonds, personContacts,
+    addPerson: peopleSlice.addPerson, updatePerson: peopleSlice.updatePerson, deletePerson: peopleSlice.deletePerson,
+    addPersonBond: peopleSlice.addPersonBond, removePersonBond: peopleSlice.removePersonBond,
+    logContact: peopleSlice.logContact, removeContact: peopleSlice.removeContact,
 
     undoable, undoDelete, dismissUndo,
 

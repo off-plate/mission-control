@@ -1,0 +1,743 @@
+/* THE PEOPLE PAGE. Everyone he keeps in his life, on one canvas, him in the
+   middle. Built on his description (2026-09-17) and the prototype he approved
+   the same day:
+
+   - rings by closeness, inner circle out to distant, with Business as its own
+     ring; a click on a ring (or its button above the canvas) fades everyone
+     else, and a second click shows everyone again;
+   - each person carries how often he wants to be in touch, and their colour
+     runs from green (just spoke) through orange to red as that time runs out,
+     with a "!" once it has;
+   - who knows whom, as dotted lines between people;
+   - the card on the side says when he last spoke to them and how, and logging
+     a contact is one tap per channel.
+
+   Contacts are logged by hand on purpose: a call, a coffee or a WhatsApp
+   thread never reaches his inbox, and a date read from email would call him
+   in touch with someone he has not actually spoken to in months.
+
+   Where he is looking (pan and zoom) is per device and never synced. */
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react'
+import { useStore } from './store'
+import { localDateKey } from './util'
+import type { ContactChannel, Person, PersonContact, PersonTier } from './types'
+
+type Tier = { id: PersonTier; label: string; r: number; size: number; cadence: number; bond: number }
+const TIERS: Tier[] = [
+  { id: 'core', label: 'Inner circle', r: 150, size: 30, cadence: 7, bond: 2.6 },
+  { id: 'close', label: 'Close', r: 255, size: 26, cadence: 14, bond: 2 },
+  { id: 'friends', label: 'Friends', r: 355, size: 23, cadence: 30, bond: 1.5 },
+  { id: 'business', label: 'Business', r: 450, size: 22, cadence: 30, bond: 1.2 },
+  { id: 'wider', label: 'Wider circle', r: 545, size: 21, cadence: 90, bond: 1.2 },
+  { id: 'distant', label: 'Distant', r: 640, size: 19, cadence: 365, bond: 1 },
+]
+const TIER = Object.fromEntries(TIERS.map((t) => [t.id, t])) as Record<PersonTier, Tier>
+const CADENCES: [number, string][] = [
+  [1, 'Every day'], [3, 'Every 3 days'], [7, 'Every week'], [14, 'Every 2 weeks'],
+  [30, 'Every month'], [90, 'Every 3 months'], [180, 'Every 6 months'], [365, 'Every year'],
+]
+const CHANNELS: { id: ContactChannel; label: string; icon: JSX.Element }[] = [
+  { id: 'inperson', label: 'In person', icon: <path d="M8 8.2a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2ZM3 14c.6-2.6 2.6-4 5-4s4.4 1.4 5 4" /> },
+  { id: 'call', label: 'Call', icon: <path d="M5.2 2.5 6.6 5.6 5.3 6.8a8 8 0 0 0 3.9 3.9l1.2-1.3 3.1 1.4-.5 2.2c-.1.5-.6.9-1.1.9A10.4 10.4 0 0 1 2.1 3.6c0-.5.4-1 .9-1.1l2.2-.5Z" /> },
+  { id: 'message', label: 'Message', icon: <path d="M3 3.5h10a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H7l-3 2.5v-2.5H3a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1Z" /> },
+  { id: 'video', label: 'Video', icon: <><rect x="1.8" y="4" width="8.6" height="8" rx="1.5" /><path d="m10.4 7 3.8-2.2v6.4L10.4 9" /></> },
+  { id: 'email', label: 'Email', icon: <><rect x="2" y="3.5" width="12" height="9" rx="1.4" /><path d="m2.6 4.5 5.4 4 5.4-4" /></> },
+]
+const CHANNEL = Object.fromEntries(CHANNELS.map((c) => [c.id, c])) as Record<ContactChannel, typeof CHANNELS[number]>
+const ChannelIcon = ({ id, size = 16 }: { id: ContactChannel; size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {CHANNEL[id].icon}
+  </svg>
+)
+
+const DAY = 86_400_000
+const noon = (day: string) => new Date(`${day}T12:00:00`).getTime()
+const daysBetween = (from: string, to: string) => Math.round((noon(to) - noon(from)) / DAY)
+const fmtDay = (day: string) => {
+  const d = new Date(`${day}T12:00:00`)
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined })
+}
+const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map((w) => w[0] ?? '').join('').toUpperCase() || '?'
+
+type Health = { h: number; days: number | null; left: number; last: PersonContact | null }
+function healthOf(p: Person, last: PersonContact | null, today: string): Health {
+  if (!last) return { h: 0, days: null, left: -Infinity, last: null }
+  const days = Math.max(0, daysBetween(last.day, today))
+  return { h: Math.max(0, Math.min(1, 1 - days / p.cadenceDays)), days, left: p.cadenceDays - days, last }
+}
+const overdue = (hh: Health) => hh.days === null || hh.left < 0
+/* Green when he has just spoken to them, orange halfway to the deadline, red as
+   it arrives. Overdue is red outright. */
+const RAMP: [number, number[]][] = [[0, [210, 69, 42]], [0.5, [224, 138, 30]], [1, [62, 155, 79]]]
+function colourOf(hh: Health): string {
+  if (overdue(hh)) return 'rgb(210, 69, 42)'
+  for (let i = 1; i < RAMP.length; i++) {
+    const [h0, c0] = RAMP[i - 1]
+    const [h1, c1] = RAMP[i]
+    if (hh.h <= h1) {
+      const k = (hh.h - h0) / (h1 - h0)
+      return `rgb(${c0.map((v, j) => Math.round(v + (c1[j] - v) * k)).join(', ')})`
+    }
+  }
+  return 'rgb(62, 155, 79)'
+}
+function dueLabel(hh: Health): { t: string; tone: '' | 'warn' | 'alert' } {
+  if (hh.days === null) return { t: 'Never logged', tone: 'alert' }
+  if (hh.left < 0) return { t: `${-hh.left}d overdue`, tone: 'alert' }
+  if (hh.left === 0) return { t: 'Due today', tone: 'warn' }
+  if (hh.left <= 7 && hh.h <= 0.5) return { t: `Due in ${hh.left}d`, tone: 'warn' }
+  return { t: `in ${hh.left}d`, tone: '' }
+}
+function sinceLabel(hh: Health): string {
+  if (!hh.last || hh.days === null) return 'No contact logged yet'
+  const when = hh.days === 0 ? 'today' : hh.days === 1 ? 'yesterday' : `${hh.days} days ago`
+  return hh.last.channel === 'inperson'
+    ? `Last saw them in person, ${when}`
+    : `Last spoke by ${CHANNEL[hh.last.channel].label.toLowerCase()}, ${when}`
+}
+
+type View = { x: number; y: number; z: number }
+const VIEW_KEY = 'mc-people-view'
+const LIST_KEY = 'mc-people-list'
+const clampZ = (z: number) => Math.min(2.2, Math.max(0.3, z))
+function readView(): View | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(VIEW_KEY) ?? 'null') as View | null
+    return v && [v.x, v.y, v.z].every((n) => typeof n === 'number') ? { ...v, z: clampZ(v.z) } : null
+  } catch { return null }
+}
+
+export function PeoplePage() {
+  const {
+    people, personBonds, personContacts,
+    addPerson, updatePerson, deletePerson, addPersonBond, removePersonBond, logContact, removeContact,
+  } = useStore()
+  const today = localDateKey()
+
+  const lastBy = useMemo(() => {
+    const m = new Map<string, PersonContact>()
+    for (const c of personContacts) {
+      const prev = m.get(c.personId)
+      if (!prev || c.day > prev.day || (c.day === prev.day && c.createdAt > prev.createdAt)) m.set(c.personId, c)
+    }
+    return m
+  }, [personContacts])
+  const health = useMemo(
+    () => new Map(people.map((p) => [p.id, healthOf(p, lastBy.get(p.id) ?? null, today)])),
+    [people, lastBy, today],
+  )
+  const hOf = (id: string) => health.get(id) ?? { h: 0, days: null, left: -Infinity, last: null }
+
+  const [selected, setSelected] = useState<string | null>(null)
+  const [focusTier, setFocusTier] = useState<PersonTier | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [listOpen, setListOpen] = useState(() => {
+    try { const v = localStorage.getItem(LIST_KEY); if (v) return v === '1' } catch { /* private mode */ }
+    return window.innerWidth > 760
+  })
+  useEffect(() => { try { localStorage.setItem(LIST_KEY, listOpen ? '1' : '0') } catch { /* private mode */ } }, [listOpen])
+  const person = selected ? people.find((p) => p.id === selected) : undefined
+  useEffect(() => { if (selected && !person) setSelected(null) }, [selected, person])
+  const dimmed = (p: Person) => !!focusTier && p.tier !== focusTier
+
+  /* ---------- view ---------- */
+  const stageRef = useRef<HTMLDivElement>(null)
+  const [view, setView] = useState<View>(() => readView() ?? { x: 400, y: 320, z: 0.7 })
+  const viewRef = useRef(view)
+  viewRef.current = view
+  const tweenRef = useRef(0)
+  useEffect(() => {
+    const t = window.setTimeout(() => { try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)) } catch { /* private mode */ } }, 250)
+    return () => window.clearTimeout(t)
+  }, [view])
+
+  /* The canvas runs to the bottom edge of the window, measured from where it
+     starts, the same way the Ideas board does. */
+  useLayoutEffect(() => {
+    const size = () => {
+      const el = stageRef.current
+      if (!el) return
+      const top = el.getBoundingClientRect().top + window.scrollY
+      el.style.height = `${Math.max(460, Math.round(window.innerHeight - top - 16))}px`
+    }
+    size()
+    window.addEventListener('resize', size)
+    return () => window.removeEventListener('resize', size)
+  }, [])
+
+  const phone = () => window.innerWidth <= 760
+  const cardWidth = (open: boolean) => (open && !phone() ? Math.min(360, stageRef.current?.clientWidth ?? 0) : 0)
+  const tween = (target: View, ms = 480) => {
+    const id = ++tweenRef.current
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setView(target); return }
+    const from = { ...viewRef.current }
+    const t0 = performance.now()
+    const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
+    const step = (t: number) => {
+      if (id !== tweenRef.current) return
+      const k = Math.min(1, (t - t0) / ms)
+      const e = ease(k)
+      setView({ x: from.x + (target.x - from.x) * e, y: from.y + (target.y - from.y) * e, z: from.z + (target.z - from.z) * e })
+      if (k < 1) requestAnimationFrame(step)
+    }
+    requestAnimationFrame(step)
+  }
+  const fit = (animate = true, open = !!selected) => {
+    const el = stageRef.current
+    if (!el) return
+    const outer = TIER[people.length ? people.reduce((a, p) => (TIER[p.tier].r > TIER[a].r ? p.tier : a), 'core' as PersonTier) : 'friends'].r
+    const pts = [{ x: -outer, y: -outer }, { x: outer, y: outer }, ...people]
+    const pad = 70
+    const minX = Math.min(...pts.map((p) => p.x)) - pad
+    const maxX = Math.max(...pts.map((p) => p.x)) + pad
+    const minY = Math.min(...pts.map((p) => p.y)) - pad
+    const maxY = Math.max(...pts.map((p) => p.y)) + pad + 20
+    const w = el.clientWidth - cardWidth(open)
+    const h = el.clientHeight - 56
+    const z = clampZ(Math.min(1.4, Math.min(w / (maxX - minX), h / (maxY - minY))))
+    const target = { z, x: w / 2 - ((minX + maxX) / 2) * z, y: h / 2 - ((minY + maxY) / 2) * z }
+    if (animate) tween(target)
+    else setView(target)
+  }
+  useLayoutEffect(() => { if (!readView()) fit(false, false) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const flyTo = (p: Person) => {
+    const el = stageRef.current
+    if (!el) return
+    const z = Math.max(viewRef.current.z, 0.9)
+    const w = el.clientWidth - cardWidth(true)
+    const h = phone() ? el.clientHeight * 0.28 : el.clientHeight
+    tween({ z, x: w / 2 - p.x * z, y: h / 2 - p.y * z })
+  }
+  const zoomAt = (px: number, py: number, factor: number) => {
+    tweenRef.current++
+    setView((v) => {
+      const z = clampZ(v.z * factor)
+      return { z, x: px - (px - v.x) * (z / v.z), y: py - (py - v.y) * (z / v.z) }
+    })
+  }
+  useEffect(() => {
+    const el = stageRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const r = el.getBoundingClientRect()
+      if (e.ctrlKey || e.metaKey || Math.abs(e.deltaY) > 40) {
+        zoomAt(e.clientX - r.left, e.clientY - r.top, Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0016)))
+      } else {
+        tweenRef.current++
+        setView((v) => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }))
+      }
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
+
+  const select = (id: string | null) => {
+    const was = selected
+    setSelected(id)
+    if (id) {
+      const p = people.find((x) => x.id === id)
+      if (p) flyTo(p)
+    } else if (was) fit(true, false)
+  }
+  const toggleFocus = (id: PersonTier) => {
+    const next = focusTier === id ? null : id
+    setFocusTier(next)
+    if (next && person && person.tier !== next) setSelected(null)
+  }
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || adding) return
+      if (selected) select(null)
+      else if (focusTier) setFocusTier(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
+
+  /* ---------- pointer: pan, drag a person, pick a ring ---------- */
+  type Drag = { pid: number; sx: number; sy: number; moved: boolean; person: string | null; tier: PersonTier | null; ox: number; oy: number }
+  const dragRef = useRef<Drag | null>(null)
+  const [dragPos, setDragPos] = useState<{ id: string; x: number; y: number } | null>(null)
+  const [panning, setPanning] = useState(false)
+  const onDown = (e: RPointerEvent<SVGSVGElement>) => {
+    if (dragRef.current || e.button !== 0) return
+    const t = e.target as Element
+    const atom = t.closest('[data-person]')
+    const tier = atom ? null : t.closest('[data-tier]')
+    const pid = atom?.getAttribute('data-person') ?? null
+    const p = pid ? people.find((x) => x.id === pid) : undefined
+    tweenRef.current++
+    dragRef.current = {
+      pid: e.pointerId, sx: e.clientX, sy: e.clientY, moved: false,
+      person: p ? p.id : null, tier: (tier?.getAttribute('data-tier') as PersonTier | null) ?? null,
+      ox: p ? p.x : viewRef.current.x, oy: p ? p.y : viewRef.current.y,
+    }
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+  const onMove = (e: RPointerEvent<SVGSVGElement>) => {
+    const d = dragRef.current
+    if (!d || e.pointerId !== d.pid) return
+    const dx = e.clientX - d.sx
+    const dy = e.clientY - d.sy
+    if (!d.moved && Math.hypot(dx, dy) < 4) return
+    d.moved = true
+    if (d.person) {
+      setDragPos({ id: d.person, x: d.ox + dx / viewRef.current.z, y: d.oy + dy / viewRef.current.z })
+    } else {
+      setPanning(true)
+      setView((v) => ({ ...v, x: d.ox + dx, y: d.oy + dy }))
+    }
+  }
+  const onUp = (e: RPointerEvent<SVGSVGElement>) => {
+    const d = dragRef.current
+    if (!d || e.pointerId !== d.pid) return
+    dragRef.current = null
+    setPanning(false)
+    if (d.person && d.moved) {
+      if (dragPos && dragPos.id === d.person) updatePerson(d.person, { x: dragPos.x, y: dragPos.y })
+      setDragPos(null)
+      return
+    }
+    if (d.moved) return
+    if (d.person) return select(d.person === selected ? null : d.person)
+    if (d.tier) return toggleFocus(d.tier)
+    if (selected) return select(null)
+    if (focusTier) setFocusTier(null)
+  }
+  const onLost = () => {
+    const d = dragRef.current
+    if (!d) return
+    dragRef.current = null
+    setPanning(false)
+    if (d.person && dragPos && dragPos.id === d.person) updatePerson(d.person, { x: dragPos.x, y: dragPos.y })
+    setDragPos(null)
+  }
+  const posOf = (p: Person) => (dragPos?.id === p.id ? dragPos : p)
+
+  /* ---------- derived lists ---------- */
+  const counts = useMemo(() => {
+    let over = 0
+    let week = 0
+    for (const p of people) {
+      const hh = hOf(p.id)
+      if (overdue(hh)) over++
+      else if (hh.left <= 7 && hh.h <= 0.5) week++
+    }
+    return { over, week, ok: people.length - over - week }
+  }, [people, health]) // eslint-disable-line react-hooks/exhaustive-deps
+  const due = people
+    .filter((p) => !dimmed(p))
+    .map((p) => ({ p, hh: hOf(p.id) }))
+    .sort((a, b) => (a.hh.left / a.p.cadenceDays) - (b.hh.left / b.p.cadenceDays) || a.p.name.localeCompare(b.p.name))
+
+  /* ---------- add ---------- */
+  const add = (name: string, rel: string, tier: PersonTier, cadenceDays: number) => {
+    const t = TIER[tier]
+    // The widest free gap on that ring, so a newcomer never lands on someone.
+    const angles = people.filter((p) => p.tier === tier).map((p) => Math.atan2(p.y, p.x)).sort((a, b) => a - b)
+    let a = -Math.PI / 2
+    let best = -1
+    angles.forEach((cur, i) => {
+      const next = i + 1 < angles.length ? angles[i + 1] : angles[0] + Math.PI * 2
+      if (next - cur > best) { best = next - cur; a = cur + (next - cur) / 2 }
+    })
+    const id = addPerson({ name, rel, tier, cadenceDays, x: Math.cos(a) * t.r, y: Math.sin(a) * t.r })
+    setAdding(false)
+    setSelected(id)
+    const el = stageRef.current
+    if (el) {
+      const z = Math.max(viewRef.current.z, 0.9)
+      const w = el.clientWidth - cardWidth(true)
+      const h = phone() ? el.clientHeight * 0.28 : el.clientHeight
+      tween({ z, x: w / 2 - Math.cos(a) * t.r * z, y: h / 2 - Math.sin(a) * t.r * z })
+    }
+  }
+
+  const stageW = stageRef.current?.clientWidth ?? 0
+  const stageH = stageRef.current?.clientHeight ?? 0
+
+  return (
+    <div className="pp-page">
+      <div className="pp-bar">
+        <h1>People</h1>
+        <div className="pp-counts">
+          <span className={`pp-count${counts.over ? ' is-alert' : ''}`}><b>{counts.over}</b> overdue</span>
+          <span className={`pp-count${counts.week ? ' is-warn' : ''}`}><b>{counts.week}</b> due this week</span>
+          <span className="pp-count"><b>{counts.ok}</b> in touch</span>
+        </div>
+        <span className="pp-spacer" />
+        <button className="btn btn-primary" type="button" onClick={() => setAdding(true)}>Add person</button>
+      </div>
+      <div className="pp-filters" role="group" aria-label="Show one circle">
+        {TIERS.map((t) => (
+          <button
+            key={t.id} type="button" className={`pp-chip${focusTier === t.id ? ' is-on' : ''}`}
+            aria-pressed={focusTier === t.id} data-tier-chip={t.id} onClick={() => toggleFocus(t.id)}
+          >
+            {t.label}<span>{people.filter((p) => p.tier === t.id).length}</span>
+          </button>
+        ))}
+      </div>
+
+      <div ref={stageRef} className={`pp-stage${panning ? ' is-panning' : ''}`}>
+        <svg
+          className="pp-canvas" aria-label="Your people, you in the middle"
+          onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onLostPointerCapture={onLost}
+        >
+          <g transform={`translate(${view.x} ${view.y}) scale(${view.z})`}>
+            <g>
+              {TIERS.map((t) => (
+                <g key={t.id} className={`pp-tier${focusTier === t.id ? ' is-focus' : focusTier ? ' is-dim' : ''}`} data-tier={t.id}>
+                  <circle className="pp-tier-hit" r={t.r} />
+                  <circle className="pp-tier-ring" r={t.r} />
+                  <text className="pp-tier-label" y={-t.r - 8}>{t.label}</text>
+                </g>
+              ))}
+            </g>
+            <g>
+              {people.map((p) => {
+                const hh = hOf(p.id)
+                const pos = posOf(p)
+                return (
+                  <line
+                    key={p.id}
+                    className={`pp-bond${overdue(hh) ? ' is-late' : ''}${selected === p.id ? ' is-lit' : ''}${dimmed(p) ? ' is-dim' : ''}`}
+                    x1={0} y1={0} x2={pos.x} y2={pos.y} strokeWidth={TIER[p.tier].bond}
+                    style={{ strokeOpacity: 0.2 + 0.5 * hh.h }}
+                  />
+                )
+              })}
+              {personBonds.map((b) => {
+                const A = people.find((p) => p.id === b.a)
+                const B = people.find((p) => p.id === b.b)
+                if (!A || !B) return null
+                const pa = posOf(A)
+                const pb = posOf(B)
+                return (
+                  <line
+                    key={b.id}
+                    className={`pp-bond is-peer${selected === A.id || selected === B.id ? ' is-lit' : ''}${dimmed(A) && dimmed(B) ? ' is-dim' : ''}`}
+                    x1={pa.x} y1={pa.y} x2={pb.x} y2={pb.y}
+                    style={{ strokeOpacity: 0.22 + 0.33 * Math.min(hOf(A.id).h, hOf(B.id).h) }}
+                  />
+                )
+              })}
+            </g>
+            <g className="pp-atom pp-me" aria-label="You">
+              <circle className="pp-atom-body" r={40} />
+              <text className="pp-atom-initials" fontSize={18}>You</text>
+            </g>
+            {people.map((p) => {
+              const hh = hOf(p.id)
+              const R = TIER[p.tier].size
+              const pos = posOf(p)
+              const colour = colourOf(hh)
+              const late = overdue(hh)
+              return (
+                <g
+                  key={p.id}
+                  data-person={p.id}
+                  className={`pp-atom${selected === p.id ? ' is-selected' : ''}${dimmed(p) ? ' is-dim' : ''}${late ? ' is-over' : ''}${dragPos?.id === p.id ? ' is-dragging' : ''}`}
+                  transform={`translate(${pos.x} ${pos.y})`}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`${p.name}${p.rel ? `, ${p.rel}` : ''}. ${sinceLabel(hh)}.`}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(p.id) } }}
+                >
+                  <circle className="pp-atom-halo" r={R + 5} />
+                  <circle className="pp-atom-body" r={R} style={{ fill: colour }} />
+                  <text className="pp-atom-initials" fontSize={Math.round(R * 0.62)}>{initials(p.name)}</text>
+                  <text className="pp-atom-name" y={R + 15}>{p.name}</text>
+                  <rect className="pp-atom-track" x={-23} y={R + 22} width={46} height={4} rx={2} />
+                  <rect
+                    className="pp-atom-fill" x={-23} y={R + 22} width={46} height={4} rx={2}
+                    style={{ fill: colour, transform: `scaleX(${Math.max(0.001, hh.h)})` }}
+                  />
+                  {late && <text className="pp-atom-late" y={R + 40}>{hh.days === null ? 'never' : `${-hh.left}d late`}</text>}
+                  <g className="pp-atom-warn" transform={`translate(${Math.round(R * 0.72)} ${-Math.round(R * 0.72)})`}>
+                    <circle r={9} />
+                    <text>!</text>
+                  </g>
+                </g>
+              )
+            })}
+          </g>
+        </svg>
+
+        {people.length === 0 && (
+          <div className="pp-empty">
+            <p>Everyone you keep in your life goes on these rings, closest in the middle.</p>
+            <button className="btn btn-primary" type="button" onClick={() => setAdding(true)}>Add the first person</button>
+          </div>
+        )}
+
+        {people.length > 0 && (
+          <div className={`pp-due${listOpen ? '' : ' is-shut'}`}>
+            <div className="pp-due-head">
+              <h2>{focusTier ? `Who to reach, ${TIER[focusTier].label.toLowerCase()}` : 'Who to reach'}</h2>
+              <button className="pp-link" type="button" aria-expanded={listOpen} onClick={() => setListOpen((v) => !v)}>
+                {listOpen ? 'Hide' : 'Show'}
+              </button>
+            </div>
+            {listOpen && (
+              <ul className="pp-due-list">
+                {due.map(({ p, hh }) => {
+                  const d = dueLabel(hh)
+                  return (
+                    <li key={p.id}>
+                      <button className={`pp-due-item${selected === p.id ? ' is-selected' : ''}`} type="button" onClick={() => select(p.id)}>
+                        <span className="pp-mini-av">{initials(p.name)}</span>
+                        <span className="pp-due-mid">
+                          <span className="pp-due-name">{p.name}</span>
+                          <span className="pp-minibar"><i style={{ background: colourOf(hh), transform: `scaleX(${Math.max(0.001, hh.h)})` }} /></span>
+                        </span>
+                        <span className={`pp-due-when${d.tone ? ` is-${d.tone}` : ''}`}>{d.t}</span>
+                      </button>
+                    </li>
+                  )
+                })}
+                {due.length === 0 && <li className="pp-muted pp-pad">No one in this circle yet.</li>}
+              </ul>
+            )}
+          </div>
+        )}
+
+        <div className="pp-controls">
+          <button className="pp-icon-btn" type="button" aria-label="Zoom out" onClick={() => zoomAt((stageW - cardWidth(!!selected)) / 2, stageH / 2, 1 / 1.2)}>
+            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+          </button>
+          <span className="pp-zoom-read">{Math.round(view.z * 100)}%</span>
+          <button className="pp-icon-btn" type="button" aria-label="Zoom in" onClick={() => zoomAt((stageW - cardWidth(!!selected)) / 2, stageH / 2, 1.2)}>
+            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7h10M7 2v10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+          </button>
+          <button className="pp-icon-btn" type="button" aria-label="Show everyone" onClick={() => fit()}>
+            <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+        </div>
+
+        <aside className={`pp-card${person ? ' is-open' : ''}`} aria-label="Person" aria-hidden={!person}>
+          {person && (
+            <PersonCard
+              key={person.id}
+              person={person}
+              hh={hOf(person.id)}
+              people={people}
+              bonds={personBonds}
+              contacts={personContacts.filter((c) => c.personId === person.id)}
+              today={today}
+              onClose={() => select(null)}
+              onPatch={(patch) => updatePerson(person.id, patch)}
+              onTier={(tier) => {
+                const from = TIER[person.tier]
+                const to = TIER[tier]
+                const a = Math.atan2(person.y, person.x)
+                const dist = Math.hypot(person.x, person.y) || from.r
+                const r = dist * (to.r / from.r)
+                updatePerson(person.id, { tier, x: Math.cos(a) * r, y: Math.sin(a) * r })
+              }}
+              onLog={(day, ch) => logContact(person.id, day, ch)}
+              onUnlog={removeContact}
+              onLink={(other) => addPersonBond(person.id, other)}
+              onUnlink={removePersonBond}
+              onRemove={() => { deletePerson(person.id); select(null) }}
+            />
+          )}
+        </aside>
+      </div>
+
+      {adding && <AddPerson onClose={() => setAdding(false)} onAdd={add} />}
+    </div>
+  )
+}
+
+function PersonCard({
+  person, hh, people, bonds, contacts, today, onClose, onPatch, onTier, onLog, onUnlog, onLink, onUnlink, onRemove,
+}: {
+  person: Person
+  hh: Health
+  people: Person[]
+  bonds: { id: string; a: string; b: string }[]
+  contacts: PersonContact[]
+  today: string
+  onClose: () => void
+  onPatch: (patch: Partial<Pick<Person, 'name' | 'rel' | 'cadenceDays'>>) => void
+  onTier: (tier: PersonTier) => void
+  onLog: (day: string, ch: ContactChannel) => void
+  onUnlog: (id: string) => void
+  onLink: (other: string) => void
+  onUnlink: (bondId: string) => void
+  onRemove: () => void
+}) {
+  const [day, setDay] = useState(today)
+  const [armed, setArmed] = useState(false)
+  const [flash, setFlash] = useState<string | null>(null)
+  useEffect(() => {
+    if (!armed) return
+    const t = window.setTimeout(() => setArmed(false), 3000)
+    return () => window.clearTimeout(t)
+  }, [armed])
+  useEffect(() => {
+    if (!flash) return
+    const t = window.setTimeout(() => setFlash(null), 2200)
+    return () => window.clearTimeout(t)
+  }, [flash])
+
+  const linked = bonds
+    .filter((b) => b.a === person.id || b.b === person.id)
+    .map((b) => ({ bond: b, other: people.find((p) => p.id === (b.a === person.id ? b.b : b.a)) }))
+    .filter((x): x is { bond: typeof x.bond; other: Person } => !!x.other)
+  const unlinked = people.filter((p) => p.id !== person.id && !linked.some((l) => l.other.id === p.id))
+  const history = [...contacts].sort((a, b) => (a.day === b.day ? b.createdAt - a.createdAt : a.day < b.day ? 1 : -1))
+  const colour = colourOf(hh)
+  const dueText = hh.days === null ? 'Log a first one'
+    : hh.left < 0 ? `${-hh.left} days overdue`
+      : hh.left === 0 ? 'Due today'
+        : `Due in ${hh.left} days`
+  const dueTone = overdue(hh) ? 'is-alert' : hh.left <= 7 && hh.h <= 0.5 ? 'is-warn' : 'is-good'
+
+  return (
+    <div className="pp-card-scroll">
+      <div className="pp-card-top">
+        <span className="pp-card-av" style={{ background: colour }}>{initials(person.name)}</span>
+        <div className="pp-card-names">
+          <input className="pp-inline pp-in-name" value={person.name} aria-label="Name" onChange={(e) => onPatch({ name: e.target.value })} />
+          <input className="pp-inline pp-in-rel" value={person.rel} aria-label="Who they are to you" placeholder="Who they are to you" onChange={(e) => onPatch({ rel: e.target.value })} />
+        </div>
+        <button className="pp-close" type="button" aria-label="Close" onClick={onClose}>
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
+        </button>
+      </div>
+
+      <div className="pp-health">
+        <div className="pp-health-big"><i style={{ background: colour, transform: `scaleX(${Math.max(0.001, hh.h)})` }} /></div>
+        <div className="pp-health-lines">
+          <span className="pp-when">{sinceLabel(hh)}</span>
+          <span className={`pp-due-txt ${dueTone}`}>{dueText}</span>
+        </div>
+      </div>
+
+      <div className="pp-row2">
+        <label className="pp-field">Talk to them
+          <select className="pp-select" value={person.cadenceDays} onChange={(e) => onPatch({ cadenceDays: Number(e.target.value) })}>
+            {CADENCES.map(([n, l]) => <option key={n} value={n}>{l}</option>)}
+            {!CADENCES.some(([n]) => n === person.cadenceDays) && <option value={person.cadenceDays}>Every {person.cadenceDays} days</option>}
+          </select>
+        </label>
+        <label className="pp-field">Circle
+          <select className="pp-select" value={person.tier} onChange={(e) => onTier(e.target.value as PersonTier)}>
+            {TIERS.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+          </select>
+        </label>
+      </div>
+
+      <div className="pp-section">
+        <h3>Log a contact</h3>
+        <div className="pp-channels">
+          {CHANNELS.map((c) => (
+            <button
+              key={c.id} type="button" className="pp-ch"
+              onClick={() => { onLog(day || today, c.id); setFlash(`Logged: ${c.label.toLowerCase()}${day && day !== today ? `, ${fmtDay(day)}` : ''}`) }}
+            >
+              <ChannelIcon id={c.id} size={18} />{c.label}
+            </button>
+          ))}
+        </div>
+        <label className="pp-log-when">On
+          <input type="date" className="pp-select pp-date" value={day} max={today} onChange={(e) => setDay(e.target.value)} />
+        </label>
+        <p className={`pp-flash${flash ? ' is-on' : ''}`} role="status" aria-live="polite">{flash ?? ''}</p>
+      </div>
+
+      <div className="pp-section">
+        <h3>History</h3>
+        {history.length === 0 && <p className="pp-muted">Nothing logged yet.</p>}
+        {history.length > 0 && (
+          <ul className="pp-history">
+            {history.map((c) => (
+              <li key={c.id}>
+                <ChannelIcon id={c.channel} />
+                <span className="pp-h-ch">{CHANNEL[c.channel].label}</span>
+                <span className="pp-h-date">{fmtDay(c.day)}</span>
+                <button className="pp-x" type="button" aria-label="Remove this entry" onClick={() => onUnlog(c.id)}>
+                  <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2L2 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="pp-section">
+        <h3>Connected to</h3>
+        {linked.length === 0 && <p className="pp-muted pp-mb">Only to you, so far.</p>}
+        {linked.length > 0 && (
+          <div className="pp-bonds">
+            {linked.map(({ bond, other }) => (
+              <span key={bond.id} className="pp-bond-chip">{other.name}
+                <button className="pp-x" type="button" aria-label={`Remove the link to ${other.name}`} onClick={() => onUnlink(bond.id)}>
+                  <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2L2 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        {unlinked.length > 0 && (
+          <select className="pp-select" value="" aria-label="Connect to someone else" onChange={(e) => { if (e.target.value) onLink(e.target.value) }}>
+            <option value="">Connect to someone else</option>
+            {unlinked.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        )}
+      </div>
+
+      <button className={`pp-danger${armed ? ' is-armed' : ''}`} type="button" onClick={() => (armed ? onRemove() : setArmed(true))}>
+        {armed ? `Click again to remove ${person.name}` : 'Remove from People'}
+      </button>
+    </div>
+  )
+}
+
+function AddPerson({ onClose, onAdd }: { onClose: () => void; onAdd: (name: string, rel: string, tier: PersonTier, cadence: number) => void }) {
+  const [name, setName] = useState('')
+  const [rel, setRel] = useState('')
+  const [tier, setTier] = useState<PersonTier>('friends')
+  const [cadence, setCadence] = useState(TIER.friends.cadence)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  return (
+    <div className="pp-scrim" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <form
+        className="pp-dialog"
+        aria-label="Add a person"
+        onSubmit={(e) => { e.preventDefault(); if (name.trim()) onAdd(name.trim(), rel.trim(), tier, cadence) }}
+      >
+        <h2>Add a person</h2>
+        <label className="pp-field">Name
+          <input className="pp-text" autoFocus required value={name} placeholder="Their name" onChange={(e) => setName(e.target.value)} />
+        </label>
+        <label className="pp-field">Who they are to you
+          <input className="pp-text" value={rel} placeholder="Brother, gym friend, accountant" onChange={(e) => setRel(e.target.value)} />
+        </label>
+        <div className="pp-row2">
+          <label className="pp-field">Circle
+            <select className="pp-select" value={tier} onChange={(e) => { const t = e.target.value as PersonTier; setTier(t); setCadence(TIER[t].cadence) }}>
+              {TIERS.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+            </select>
+          </label>
+          <label className="pp-field">Talk to them
+            <select className="pp-select" value={cadence} onChange={(e) => setCadence(Number(e.target.value))}>
+              {CADENCES.map(([n, l]) => <option key={n} value={n}>{l}</option>)}
+            </select>
+          </label>
+        </div>
+        <div className="pp-dialog-actions">
+          <button className="btn btn-quiet" type="button" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" type="submit" disabled={!name.trim()}>Add</button>
+        </div>
+      </form>
+    </div>
+  )
+}

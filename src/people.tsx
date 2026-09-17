@@ -20,6 +20,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react'
 import { useStore } from './store'
 import { localDateKey } from './util'
+import { ALL_NAMES, daysUntil, nameDayFor } from './namedays'
 import type { ContactChannel, Person, PersonBond, PersonContact, PersonTier } from './types'
 
 type Tier = { id: PersonTier; label: string; r: number; size: number; cadence: number; bond: number }
@@ -52,6 +53,18 @@ const ChannelIcon = ({ id, size = 16 }: { id: ContactChannel; size?: number }) =
 
 /* Suggestions only: any word he types is kept as he typed it. */
 const REL_WORDS = ['brother', 'sister', 'partner', 'wife', 'husband', 'mother', 'father', 'son', 'daughter', 'cousin', 'friend', 'best friend', 'colleague', 'boss', 'client', 'business partner', 'neighbour', 'ex']
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+const fmtMD = (mmdd: string) => { const [m, d] = mmdd.split('-').map(Number); return `${d} ${MONTHS[m - 1]}` }
+const inDays = (n: number) => (n === 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`)
+const fold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+/** A birthday or name day within the week, the nearer one first. */
+function occasionOf(p: Person, today: string): { t: string; days: number } | null {
+  const out: { t: string; days: number }[] = []
+  if (p.birthday) { const n = daysUntil(p.birthday, today); if (n <= 7) out.push({ t: n === 0 ? 'Birthday today' : `Birthday ${inDays(n)}`, days: n }) }
+  const nd = nameDayFor(p.name, p.nameDayAs)
+  if (nd) { const n = daysUntil(nd.day, today); if (n <= 7) out.push({ t: n === 0 ? 'Name day today' : `Name day ${inDays(n)}`, days: n }) }
+  return out.sort((a, b) => a.days - b.days)[0] ?? null
+}
 const DAY = 86_400_000
 const noon = (day: string) => new Date(`${day}T12:00:00`).getTime()
 const daysBetween = (from: string, to: string) => Math.round((noon(to) - noon(from)) / DAY)
@@ -140,7 +153,14 @@ export function PeoplePage() {
   useEffect(() => { try { localStorage.setItem(LIST_KEY, listOpen ? '1' : '0') } catch { /* private mode */ } }, [listOpen])
   const person = selected ? people.find((p) => p.id === selected) : undefined
   useEffect(() => { if (selected && !person) setSelected(null) }, [selected, person])
-  const dimmed = (p: Person) => !!focusTier && p.tier !== focusTier
+  const [query, setQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [hit, setHit] = useState(0)
+  const searchRef = useRef<HTMLInputElement>(null)
+  const q = fold(query.trim())
+  const matches = (p: Person) => !q || fold(`${p.name} ${p.rel} ${p.job ?? ''}`).includes(q)
+  const found = q ? people.filter(matches).sort((a, b) => a.name.localeCompare(b.name, 'cs')) : []
+  const dimmed = (p: Person) => (!!focusTier && p.tier !== focusTier) || !matches(p)
 
   /* ---------- view ---------- */
   const stageRef = useRef<HTMLDivElement>(null)
@@ -250,8 +270,11 @@ export function PeoplePage() {
   }
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || adding) return
+      const typing = (e.target as HTMLElement | null)?.closest('input, textarea, select, [contenteditable]')
+      if (e.key === '/' && !typing && !adding) { e.preventDefault(); searchRef.current?.focus(); return }
+      if (e.key !== 'Escape' || adding || typing) return
       if (selected) select(null)
+      else if (query) setQuery('')
       else if (focusTier) setFocusTier(null)
     }
     window.addEventListener('keydown', onKey)
@@ -362,7 +385,7 @@ export function PeoplePage() {
 
   return (
     <div className="pp-page">
-      <div ref={stageRef} className={`pp-stage${panning ? ' is-panning' : ''}`}>
+      <div ref={stageRef} className={`pp-stage${panning ? ' is-panning' : ''}${person ? ' has-card' : ''}`}>
         <svg
           className="pp-canvas" aria-label="Your people, you in the middle"
           onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onLostPointerCapture={onLost}
@@ -474,6 +497,41 @@ export function PeoplePage() {
 
         <div className="pp-bar" role="toolbar" aria-label="People">
           <h1 className="pp-h1">People</h1>
+          <div className="pp-search">
+            <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" strokeWidth="1.7" /><path d="m10.4 10.4 3.4 3.4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>
+            <input
+              ref={searchRef} className="pp-search-input" type="search" value={query} placeholder="Search people"
+              aria-label="Search people" aria-expanded={searchOpen && !!q} aria-controls="pp-search-results" role="combobox" autoComplete="off"
+              onChange={(e) => { setQuery(e.target.value); setHit(0); setSearchOpen(true) }}
+              onFocus={() => setSearchOpen(true)}
+              onBlur={() => window.setTimeout(() => setSearchOpen(false), 120)}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowDown') { e.preventDefault(); setHit((h) => Math.min(found.length - 1, h + 1)) }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); setHit((h) => Math.max(0, h - 1)) }
+                else if (e.key === 'Enter' && found[hit]) { e.preventDefault(); select(found[hit].id); setSearchOpen(false) }
+                else if (e.key === 'Escape') { e.preventDefault(); if (query) setQuery(''); else e.currentTarget.blur() }
+              }}
+            />
+            {!query && <kbd className="pp-kbd" aria-hidden="true">/</kbd>}
+            {searchOpen && q && (
+              <ul className="pp-search-results" id="pp-search-results" role="listbox">
+                {found.slice(0, 8).map((p, i) => (
+                  <li key={p.id} role="option" aria-selected={i === hit}>
+                    <button
+                      type="button" className={`pp-search-hit${i === hit ? ' is-on' : ''}`}
+                      onMouseEnter={() => setHit(i)} onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => { select(p.id); setSearchOpen(false) }}
+                    >
+                      <span className="pp-search-dot" style={{ background: colourOf(hOf(p.id)) }} />
+                      <span className="pp-search-name">{p.name}</span>
+                      <span className="pp-search-meta">{[p.rel, p.job].filter(Boolean).join(', ') || TIER[p.tier].label}</span>
+                    </button>
+                  </li>
+                ))}
+                {found.length === 0 && <li className="pp-muted pp-pad">No one matches.</li>}
+              </ul>
+            )}
+          </div>
           <div className="pp-counts">
             <span className={`pp-count${counts.over ? ' is-alert' : ''}`}><b>{counts.over}</b> overdue</span>
             <span className={`pp-count${counts.week ? ' is-warn' : ''}`}><b>{counts.week}</b> due this week</span>
@@ -503,7 +561,7 @@ export function PeoplePage() {
         {people.length > 0 && (
           <div className={`pp-due${listOpen ? '' : ' is-shut'}`}>
             <div className="pp-due-head">
-              <h2>{focusTier ? `Who to reach, ${TIER[focusTier].label.toLowerCase()}` : 'Who to reach'}</h2>
+              <h2>{q ? 'Matches' : focusTier ? `Who to reach, ${TIER[focusTier].label.toLowerCase()}` : 'Who to reach'}</h2>
               <button className="pp-link" type="button" aria-expanded={listOpen} onClick={() => setListOpen((v) => !v)}>
                 {listOpen ? 'Hide' : 'Show'}
               </button>
@@ -512,12 +570,14 @@ export function PeoplePage() {
               <ul className="pp-due-list">
                 {due.map(({ p, hh }) => {
                   const d = dueLabel(hh)
+                  const occ = occasionOf(p, today)
                   return (
                     <li key={p.id}>
                       <button className={`pp-due-item${selected === p.id ? ' is-selected' : ''}`} type="button" onClick={() => select(p.id)}>
                         <span className="pp-mini-av">{initials(p.name)}</span>
                         <span className="pp-due-mid">
                           <span className="pp-due-name">{p.name}</span>
+                          {occ && <span className="pp-due-occ">{occ.t}</span>}
                           <span className="pp-minibar"><i style={{ background: colourOf(hh), transform: `scaleX(${Math.max(0.001, hh.h)})` }} /></span>
                         </span>
                         <span className={`pp-due-when${d.tone ? ` is-${d.tone}` : ''}`}>{d.t}</span>
@@ -525,7 +585,7 @@ export function PeoplePage() {
                     </li>
                   )
                 })}
-                {due.length === 0 && <li className="pp-muted pp-pad">No one in this circle yet.</li>}
+                {due.length === 0 && <li className="pp-muted pp-pad">{q ? 'No one matches.' : 'No one in this circle yet.'}</li>}
               </ul>
             )}
           </div>
@@ -590,7 +650,7 @@ function PersonCard({
   contacts: PersonContact[]
   today: string
   onClose: () => void
-  onPatch: (patch: Partial<Pick<Person, 'name' | 'rel' | 'cadenceDays'>>) => void
+  onPatch: (patch: Partial<Pick<Person, 'name' | 'rel' | 'cadenceDays' | 'job' | 'birthday' | 'birthYear' | 'nameDayAs'>>) => void
   onTier: (tier: PersonTier) => void
   onLog: (day: string, ch: ContactChannel) => void
   onUnlog: (id: string) => void
@@ -648,6 +708,8 @@ function PersonCard({
           <span className={`pp-due-txt ${dueTone}`}>{dueText}</span>
         </div>
       </div>
+
+      <AboutPerson person={person} today={today} onPatch={onPatch} />
 
       <div className="pp-row2">
         <label className="pp-field">Talk to them
@@ -794,15 +856,99 @@ function AddPerson({ onClose, onAdd }: { onClose: () => void; onAdd: (name: stri
 
 /* Saved when he leaves the field or presses Enter, so typing a word is not a
    synced write per keystroke. */
-function BondWord({ value, label, onCommit }: { value: string; label: string; onCommit: (w: string) => void }) {
+function BondWord({ value, label, onCommit, className = 'pp-inline pp-link-word', list = 'pp-rel-words', placeholder = 'add a word' }: {
+  value: string; label: string; onCommit: (w: string) => void; className?: string; list?: string; placeholder?: string
+}) {
   const [draft, setDraft] = useState(value)
   useEffect(() => { setDraft(value) }, [value])
-  const commit = () => { if (draft.trim() !== value) onCommit(draft) }
+  const commit = () => { if (draft.trim() !== value) onCommit(draft.trim()) }
   return (
     <input
-      className="pp-inline pp-link-word" list="pp-rel-words" value={draft} placeholder="add a word" aria-label={label}
+      className={className} list={list} value={draft} placeholder={placeholder} aria-label={label}
       onChange={(e) => setDraft(e.target.value)} onBlur={commit}
       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur() } }}
     />
+  )
+}
+
+/* Job, birthday and name day. The birthday is a day and a month, with the year
+   only when he knows it; the name day follows the first name unless he says
+   which calendar name it goes by. */
+function AboutPerson({ person, today, onPatch }: {
+  person: Person
+  today: string
+  onPatch: (patch: Partial<Pick<Person, 'job' | 'birthday' | 'birthYear' | 'nameDayAs'>>) => void
+}) {
+  const [bm, bd] = (person.birthday ?? '-').split('-')
+  const [month, setMonth] = useState(bm ?? '')
+  const [day, setDay] = useState(bd ?? '')
+  useEffect(() => { const [m, d] = (person.birthday ?? '-').split('-'); setMonth(m ?? ''); setDay(d ?? '') }, [person.birthday])
+  const setBirth = (m: string, d: string) => {
+    setMonth(m); setDay(d)
+    if (m && d) onPatch({ birthday: `${m}-${d}` })
+    else if (!m && !d) onPatch({ birthday: undefined, birthYear: undefined })
+  }
+  const maxDay = month ? new Date(2024, Number(month), 0).getDate() : 31
+  const bdays = person.birthday ? daysUntil(person.birthday, today) : null
+  // The age on the next birthday: this year's if it has not passed yet, else next year's.
+  const turning = person.birthday && person.birthYear
+    ? Number(today.slice(0, 4)) + (person.birthday < today.slice(5) ? 1 : 0) - person.birthYear
+    : null
+  const nd = nameDayFor(person.name, person.nameDayAs)
+  const ndays = nd ? daysUntil(nd.day, today) : null
+  const first = person.name.trim().split(/\s+/)[0] ?? ''
+
+  return (
+    <div className="pp-section pp-about">
+      <label className="pp-field">Job
+        <BondWord
+          value={person.job ?? ''} label="Job" className="pp-text" list="" placeholder="What they do"
+          onCommit={(w) => onPatch({ job: w || undefined })}
+        />
+      </label>
+
+      <div className="pp-field">
+        <span>Birthday</span>
+        <div className="pp-birth">
+          <select className="pp-select" aria-label="Birthday day" value={day} onChange={(e) => setBirth(month, e.target.value)}>
+            <option value="">Day</option>
+            {Array.from({ length: maxDay }, (_, i) => String(i + 1).padStart(2, '0')).map((d) => <option key={d} value={d}>{Number(d)}</option>)}
+          </select>
+          <select className="pp-select" aria-label="Birthday month" value={month} onChange={(e) => setBirth(e.target.value, day && Number(day) > new Date(2024, Number(e.target.value), 0).getDate() ? '' : day)}>
+            <option value="">Month</option>
+            {MONTHS.map((m, i) => <option key={m} value={String(i + 1).padStart(2, '0')}>{m}</option>)}
+          </select>
+          <input
+            className="pp-text" inputMode="numeric" aria-label="Birth year, if you know it" placeholder="Year"
+            defaultValue={person.birthYear ?? ''} key={person.birthYear ?? 'none'}
+            onBlur={(e) => {
+              const y = Number(e.target.value)
+              const ok = Number.isInteger(y) && y > 1900 && y <= Number(today.slice(0, 4))
+              if (!e.target.value.trim()) { if (person.birthYear) onPatch({ birthYear: undefined }) }
+              else if (ok && y !== person.birthYear) onPatch({ birthYear: y })
+              else if (!ok) e.target.value = person.birthYear ? String(person.birthYear) : ''
+            }}
+          />
+        </div>
+        {person.birthday && bdays !== null && (
+          <span className={`pp-about-line${bdays <= 7 ? ' is-soon' : ''}`}>
+            {turning !== null ? `Turns ${turning} on ${fmtMD(person.birthday)}` : fmtMD(person.birthday)}, {inDays(bdays)}
+          </span>
+        )}
+      </div>
+
+      <div className="pp-field">
+        <span>Name day</span>
+        {nd && ndays !== null
+          ? <span className={`pp-about-line is-strong${ndays <= 7 ? ' is-soon' : ''}`}>{nd.name}, {fmtMD(nd.day)}, {inDays(ndays)}</span>
+          : <span className="pp-about-line">{person.nameDayAs ? `"${person.nameDayAs}" is not in the Czech calendar` : `No name day for "${first}" in the Czech calendar`}</span>}
+        <BondWord
+          value={person.nameDayAs ?? ''} label="Name day goes by" className="pp-text" list="pp-cal-names"
+          placeholder={nd && !person.nameDayAs ? `Goes by ${nd.name}` : 'Goes by, e.g. Veronika'}
+          onCommit={(w) => onPatch({ nameDayAs: w || undefined })}
+        />
+        <datalist id="pp-cal-names">{ALL_NAMES.map((n) => <option key={n} value={n} />)}</datalist>
+      </div>
+    </div>
   )
 }

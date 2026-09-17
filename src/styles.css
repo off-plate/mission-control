@@ -11028,7 +11028,7 @@ body:has(.pp-page) #main { padding-bottom: 0; }
 .pp-dialog h2 { margin: 0; font-size: 1.1rem; font-weight: 800; }
 .pp-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
-@media (max-width: 1366px) {
+@media (max-width: 1600px) {
   .pp-bar-rule { display: none; }
   .pp-filters { order: 5; flex-basis: 100%; }
 }
@@ -11064,3 +11064,36 @@ body:has(.pp-page) #main { padding-bottom: 0; }
 .pp-link-word::placeholder { color: #8C877A; font-weight: 600; }
 .pp-link-add { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .pp-link-add .btn { grid-column: 1 / -1; justify-self: start; }
+
+/* People: search, and what a card knows about someone. */
+.pp-search { position: relative; display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 8px 0 10px; border-radius: 8px; background: var(--surface-2); color: var(--muted); }
+.pp-search:focus-within { box-shadow: 0 0 0 2px var(--focus); }
+.pp-search-input { width: 170px; border: 0; background: none; outline: none; font: inherit; font-size: 0.86rem; font-weight: 600; color: var(--ink); }
+.pp-search-input::-webkit-search-cancel-button { cursor: pointer; }
+.pp-kbd { font-family: inherit; font-size: 0.7rem; font-weight: 700; color: var(--faint); border: 1px solid var(--hairline-strong); border-radius: 4px; padding: 0 5px; line-height: 16px; }
+.pp-search-results {
+  position: absolute; top: calc(100% + 6px); left: 0; width: 300px; max-height: 320px; overflow-y: auto; z-index: 30;
+  list-style: none; margin: 0; padding: 6px; border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--hairline-strong); box-shadow: var(--shadow-pop);
+}
+.pp-search-hit { width: 100%; display: grid; grid-template-columns: 10px auto minmax(0, 1fr); align-items: center; gap: 9px; padding: 7px 8px; border: 0; background: none; border-radius: 7px; text-align: left; cursor: pointer; color: var(--ink); }
+.pp-search-hit.is-on { background: var(--surface-2); }
+.pp-search-dot { width: 10px; height: 10px; border-radius: 50%; }
+.pp-search-name { font-size: 0.86rem; font-weight: 700; white-space: nowrap; }
+.pp-search-meta { font-size: 0.76rem; font-weight: 600; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pp-due-occ { display: block; margin-top: 2px; font-size: 0.7rem; font-weight: 700; color: var(--pp-olive); }
+.pp-about { display: flex; flex-direction: column; gap: 12px; }
+.pp-about .pp-field > span:first-child { font-size: 0.74rem; font-weight: 700; color: #5F5A4E; }
+.pp-birth { display: grid; grid-template-columns: 0.8fr 1.4fr 0.9fr; gap: 6px; }
+.pp-about-line { font-size: 0.84rem; font-weight: 600; color: #5F5A4E; }
+.pp-about-line.is-strong { color: var(--pp-ink); font-weight: 700; }
+.pp-about-line.is-soon { color: #2F7A3D; font-weight: 700; }
+@media (max-width: 760px) {
+  .pp-search { flex: 1 1 100%; order: 2; }
+  .pp-search-input { width: 100%; }
+  .pp-search-results { width: 100%; }
+}
+/* An open card takes the right side, so the bar gives way rather than
+   running underneath it. */
+.pp-stage.has-card .pp-bar { max-width: calc(100% - 3 * var(--s4) - 360px); }
+@media (max-width: 760px) { .pp-stage.has-card .pp-bar { max-width: calc(100% - 2 * var(--s4)); } }

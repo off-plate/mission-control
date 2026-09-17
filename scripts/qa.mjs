@@ -4814,6 +4814,27 @@ await step('people: the header opens it, a contact turns someone green, and a ci
   await page.locator('.pp-link-word').press('Enter'); await page.waitForTimeout(300)
   const words = (await page.locator('.pp-bond-word').allTextContents()).sort().join()
   if (words !== 'accountant,client') throw new Error(`the link words on the canvas read: ${words}`)
+  /* His report, twice: the card would not scroll. The CSS fix alone was not
+     enough -- the canvas's own pan/zoom wheel handler covers the whole
+     stage, including the card and the due list floating over it, and was
+     swallowing their scroll wheel events into a canvas pan. */
+  await page.keyboard.press('Escape'); await page.waitForTimeout(400)
+  await page.locator('.pp-due-item', { hasText: 'Gate Accountant' }).click(); await page.waitForTimeout(400)
+  // Enough logged contacts that the card genuinely overflows its own height.
+  for (const ch of ['Call', 'Message', 'Email', 'Video', 'In person', 'Call', 'Message', 'Email']) {
+    await page.locator('.pp-ch', { hasText: ch }).click(); await page.waitForTimeout(100)
+  }
+  await page.evaluate(() => { document.querySelector('.pp-card-scroll').scrollTop = 0 })
+  const overflow = await page.evaluate(() => { const el = document.querySelector('.pp-card-scroll'); return el.scrollHeight - el.clientHeight })
+  if (overflow < 20) throw new Error(`test setup did not make the card overflow (${overflow}px) -- cannot check scrolling`)
+  const scrollBox = await page.locator('.pp-card-scroll').boundingBox()
+  await page.mouse.move(scrollBox.x + scrollBox.width / 2, scrollBox.y + scrollBox.height / 2)
+  const viewBefore = await page.evaluate(() => document.querySelector('.pp-canvas > g')?.getAttribute('transform'))
+  await page.mouse.wheel(0, 400); await page.waitForTimeout(300)
+  const cardScrolled = await page.evaluate(() => document.querySelector('.pp-card-scroll').scrollTop)
+  const viewAfter = await page.evaluate(() => document.querySelector('.pp-canvas > g')?.getAttribute('transform'))
+  if (cardScrolled === 0) throw new Error('scrolling over the open card did not move it')
+  if (viewBefore !== viewAfter) throw new Error('scrolling the card also panned the canvas underneath it')
   /* A person cannot be dragged out of their circle (his ask, 2026-09-17). */
   await page.keyboard.press('Escape'); await page.waitForTimeout(400)
   const mum = page.locator('[data-person]').first()
@@ -4838,7 +4859,7 @@ await step('people: the header opens it, a contact turns someone green, and a ci
   if (hits.join() !== 'Honza Gate') throw new Error(`search for a job found: ${hits}`)
   await page.keyboard.press('Escape')
   const saved = await page.evaluate((K) => { const s = JSON.parse(localStorage.getItem(K)); return [s.people?.length - 1, s.personContacts?.length, s.personBonds?.length] }, KEY)
-  if (saved.join() !== '2,1,1') throw new Error(`not saved: ${saved}`)
+  if (saved.join() !== '2,9,1') throw new Error(`not saved: ${saved}`)
 })
 await step('ideas: click to pick up, click to drop, and the list brings the board to any sticky', async () => {
   await page.evaluate(() => { localStorage.removeItem('mc-ideaboard-view'); localStorage.setItem('mc-ideaboard-list', '1') })

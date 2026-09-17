@@ -10919,7 +10919,13 @@ body:has(.pp-page) #main { padding-bottom: 0; }
 .pp-due.is-shut .pp-due-head { padding-bottom: 12px; }
 .pp-due-head h2 { margin: 0; font-size: 0.95rem; font-weight: 800; }
 .pp-link { border: 0; background: none; color: #5F5A4E; font-weight: 700; font-size: 0.78rem; padding: 4px 6px; border-radius: 6px; cursor: pointer; }
-.pp-due-list { list-style: none; margin: 0; padding: 0 6px 8px; overflow-y: auto; }
+/* touch-action:none on .pp-stage (needed so a trackpad pan/zoom never also
+   scrolls the page) intersects with a descendant's own touch-action, so
+   without this override the browser refused to scroll this list too --
+   his report, 2026-09-17. The event-level fix in people.tsx stops the
+   canvas from panning while over these two; this is what lets them
+   actually scroll once that's stopped. */
+.pp-due-list { list-style: none; margin: 0; padding: 0 6px 8px; overflow-y: auto; touch-action: pan-y; }
 .pp-due-item {
   width: 100%; display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 10px;
   border: 0; background: none; padding: 7px 8px; border-radius: 8px; text-align: left; cursor: pointer; color: var(--pp-ink);
@@ -10961,7 +10967,7 @@ body:has(.pp-page) #main { padding-bottom: 0; }
    to shrink: without flex/min-height it grew past the card and the sections at
    the bottom (history, connections) were simply cut off with no way to reach
    them. His report, 2026-09-17. */
-.pp-card-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 18px 20px 24px; display: flex; flex-direction: column; gap: 20px; }
+.pp-card-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; padding: 18px 20px 24px; display: flex; flex-direction: column; gap: 20px; }
 .pp-card-top { display: flex; align-items: center; gap: 12px; }
 .pp-card-av { width: 52px; height: 52px; border-radius: 50%; flex: none; display: grid; place-items: center; font-weight: 800; font-size: 1.05rem; color: #fff; transition: background-color 700ms var(--pp-ease); }
 .pp-card-names { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }

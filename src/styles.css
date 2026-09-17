@@ -10850,6 +10850,7 @@ body:has(.shell.is-dark-chrome) .projnav-menu,
 
 .pp-stage {
   position: relative; overflow: hidden; min-height: 460px; touch-action: none;
+  user-select: none; -webkit-user-select: none;
   background-color: var(--pp-canvas); border-top: 1px solid var(--hairline);
   background-image: radial-gradient(var(--pp-dot) 1.2px, transparent 1.3px), radial-gradient(ellipse 70% 65% at 50% 50%, var(--pp-glow) 0%, var(--pp-canvas) 100%);
   background-size: 22px 22px, 100% 100%;

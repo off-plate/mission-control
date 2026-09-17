@@ -4760,6 +4760,40 @@ await step('ideas: a sticky dragged off the pad asks for its name, lands where i
    hunting around the board. So: a click picks a sticky up, the next click on
    the board puts it down, Escape puts it back, and a row in the list brings
    the board round to that sticky. */
+await step('people: the header opens it, a contact turns someone green, and a circle can be shown alone', async () => {
+  /* His ask (2026-09-17): everyone in his life on one canvas, him in the
+     middle, each person's colour running from green to red as the time he
+     set for them runs out, and a click on a circle fading everyone else. */
+  await fresh('today')
+  await page.locator('.topbar-right').getByRole('button', { name: 'People', exact: true }).click()
+  await page.waitForTimeout(500)
+  if (!(await page.locator('.pp-empty').count())) throw new Error('an empty People page does not say what to do')
+  for (const [name, tier] of [['Gate Mum', 'core'], ['Gate Accountant', 'business']]) {
+    await page.getByRole('button', { name: 'Add person', exact: true }).click()
+    await page.locator('.pp-dialog input').first().fill(name)
+    await page.locator('.pp-dialog select').first().selectOption(tier)
+    await page.locator('.pp-dialog button[type=submit]').click()
+    await page.waitForTimeout(400)
+  }
+  const acc = page.locator('[data-person]').nth(1)
+  const red = await acc.evaluate((g) => g.querySelector('.pp-atom-body').style.fill)
+  if (red !== 'rgb(210, 69, 42)' || !(await acc.evaluate((g) => g.classList.contains('is-over')))) throw new Error(`someone never contacted is not red and flagged (${red})`)
+  await page.locator('.pp-ch', { hasText: 'Call' }).click()
+  await page.waitForTimeout(400)
+  const green = await acc.evaluate((g) => g.querySelector('.pp-atom-body').style.fill)
+  if (green !== 'rgb(62, 155, 79)') throw new Error(`a contact logged today did not turn them green (${green})`)
+  if (await acc.evaluate((g) => g.classList.contains('is-over'))) throw new Error('the ! stayed after a contact')
+  const line = await page.locator('.pp-health-lines').innerText()
+  if (!/call, today/i.test(line)) throw new Error(`the card does not say how and when: ${line}`)
+  await page.keyboard.press('Escape'); await page.waitForTimeout(400)
+  await page.locator('[data-tier-chip=business]').click(); await page.waitForTimeout(300)
+  const dim = await page.evaluate(() => [...document.querySelectorAll('[data-person]')].map((g) => g.classList.contains('is-dim')))
+  if (dim.join() !== 'true,false') throw new Error(`focusing Business dimmed the wrong people: ${dim}`)
+  await page.locator('[data-tier-chip=business]').click(); await page.waitForTimeout(300)
+  if (await page.locator('.pp-atom.is-dim').count()) throw new Error('a second click did not show everyone again')
+  const saved = await page.evaluate((K) => { const s = JSON.parse(localStorage.getItem(K)); return [s.people?.length, s.personContacts?.length] }, KEY)
+  if (saved.join() !== '2,1') throw new Error(`not saved: ${saved}`)
+})
 await step('ideas: click to pick up, click to drop, and the list brings the board to any sticky', async () => {
   await page.evaluate(() => { localStorage.removeItem('mc-ideaboard-view'); localStorage.setItem('mc-ideaboard-list', '1') })
   await fresh('ideas')

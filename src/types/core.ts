@@ -57,6 +57,7 @@ export type PageId =
    *  same shape as Bills/Timeline -- not a workspace page. */
   /** The idea backlog: sticky notes on a pan-and-zoom board. Dock only. */
   | 'ideas'
+  | 'people'
   | 'skills'
   /** The body, read from the zepp_* tables the watch already feeds through
    *  Intervals.icu. Dock only, same shape as Bills/Timeline/Skills. */

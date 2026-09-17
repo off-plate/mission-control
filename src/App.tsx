@@ -35,6 +35,7 @@ const SkillsPage = lazy(() => import('./skillspage').then((m) => ({ default: m.S
 const HealthPage = lazy(() => import('./healthpage').then((m) => ({ default: m.HealthPage })))
 const WatchlessPage = lazy(() => import('./watchlesspage').then((m) => ({ default: m.WatchlessPage })))
 const IdeasPage = lazy(() => import('./ideaboard').then((m) => ({ default: m.IdeasPage })))
+const PeoplePage = lazy(() => import('./people').then((m) => ({ default: m.PeoplePage })))
 import { useStore } from './store'
 import { ago, describe, useSyncStatus } from './sync'
 import { isReadOnly } from './store'
@@ -632,6 +633,17 @@ export default function App() {
             <Icon.DockBulb size={16} />
             <span className="btn-sq-label">Ideas</span>
           </button>
+          {/* People, next to Ideas on his instruction (2026-09-17). */}
+          <button
+            className={`btn btn-ghost btn-sq${page === 'people' ? ' is-on' : ''}`}
+            onClick={() => setPage('people')}
+            aria-pressed={page === 'people'}
+            aria-label="People"
+            title="People"
+          >
+            <Icon.DockPeople size={16} />
+            <span className="btn-sq-label">People</span>
+          </button>
           {/* Bills' own header button retired (2026-09-03), the same way
              Notes' was above: the floating dock's Bills summary (see
              billsdock.tsx) plus its hold-for-the-full-page shortcut cover
@@ -685,6 +697,7 @@ export default function App() {
         {page === 'health' && <HealthPage />}
         {page === 'watchless' && <WatchlessPage />}
         {page === 'ideas' && <IdeasPage />}
+        {page === 'people' && <PeoplePage />}
         {page === 'focus' && <FocusPage />}
         {page === 'board' && <BoardPage />}
         {page === 'apps' && <AppsPage />}

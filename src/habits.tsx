@@ -779,6 +779,16 @@ export function HabitsPage() {
   const [goalFor, setGoalFor] = useState<string | null>(null)
   const [editHabit, setEditHabit] = useState<HabitDef | null>(null)
   const [giveUp, setGiveUp] = useState<HabitDef | null>(null)
+  /* The desktop shell's `missioncontrol://give-up` deep link. He has several
+     habits he's quitting, and this isn't attached to any one of them --
+     opening with no habitName is a deliberate different (generic) case
+     GiveUpMode already supports, not a stand-in for one specific quit. */
+  const [genericGiveUp, setGenericGiveUp] = useState(false)
+  useEffect(() => {
+    const onGiveUp = () => setGenericGiveUp(true)
+    window.addEventListener('mc:give-up', onGiveUp)
+    return () => window.removeEventListener('mc:give-up', onGiveUp)
+  }, [])
   const goalOn = new Map(goals.filter((g) => g.habitId).map((g) => [g.habitId as string, g]))
 /* Habits, Goals and Quitting ignore the workspace switcher, on his instruction
    2026-08-26: "all of them should have all of the habits, goals and quitting.
@@ -1219,6 +1229,7 @@ export function HabitsPage() {
       {editHabit && <HabitSheet habit={editHabit} drivenBy={drivenBy.get(editHabit.id)} onClose={() => setEditHabit(null)} />}
       {goalFor && <GoalSheet presetHabitId={goalFor} thenGoToGoals onClose={() => setGoalFor(null)} />}
       {giveUp && <GiveUpMode habitName={giveUp.name} onClose={() => setGiveUp(null)} />}
+      {genericGiveUp && <GiveUpMode onClose={() => setGenericGiveUp(false)} />}
     </div>
   )
 

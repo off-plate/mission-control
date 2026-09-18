@@ -8411,8 +8411,18 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 }
 @media (max-width: 860px) { .giveup-body { grid-template-columns: 1fr; } }
 
-.giveup-video { display: flex; flex-direction: column; gap: var(--s3); min-width: 0; }
-.giveup-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: var(--r-md); overflow: hidden; }
+.giveup-video { display: flex; flex-direction: column; gap: var(--s3); min-width: 0; width: min(100%, 420px); margin: 0 auto; }
+/* His report (2026-09-18): on a wide screen this column is easily 1500px+,
+   and a box hard-coded to 16:9 stretched to fill it -- but every video in
+   GIVEUP_QUEUE is a Reel or a Short, shot 9:16. YouTube/Instagram's own
+   embed letterboxes that portrait clip inside the huge landscape box instead
+   of cropping it, so the actual video shrank to a thin strip down the
+   middle while the black bars around it "expanded so much it's barely
+   visible." Matching the real aspect ratio and capping the width to a size
+   an actual phone video reads at, rather than the column's full width,
+   fixes both: no more letterboxing, and no more a portrait clip trying to
+   be 1500px wide. */
+.giveup-frame { position: relative; width: 100%; aspect-ratio: 9 / 16; background: #000; border-radius: var(--r-md); overflow: hidden; }
 .giveup-frame > div, .giveup-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; }
 .giveup-nowplaying { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .giveup-title { font-size: var(--text-sm); font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

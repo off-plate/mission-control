@@ -48,8 +48,9 @@ app.setName('Mission Control')
 /* External automations (a Shortcuts.app shortcut, a keyboard-triggered launcher)
    reach the app through this instead of faking a click or a keystroke -- opening
    a URL needs no Accessibility or Automation permission, unlike driving the app
-   via System Events. `missioncontrol://new-task`, `missioncontrol://new-idea`
-   and `missioncontrol://zone-play` are the actions so far. */
+   via System Events. `missioncontrol://new-task`, `missioncontrol://new-idea`,
+   `missioncontrol://zone-play` and `missioncontrol://give-up` are the
+   actions so far. */
 const DEEPLINK_SCHEME = 'missioncontrol'
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
@@ -237,6 +238,27 @@ function triggerZonePlay() {
   runWhenAppReady(`window.dispatchEvent(new CustomEvent('mc:zone-play'))`)
 }
 
+/* HabitsPage isn't lazy-loaded like Ideas, but it still only mounts (and
+   only then attaches the mc:give-up listener) once the hash actually says
+   'habits' -- same race as Ideas otherwise, just without a second chunk to
+   wait on. `.hg-two` is its own root once rendered. */
+function triggerGiveUp() {
+  if (!win) return
+  focusWindow()
+  runWhenAppReady(`
+    location.hash = '/habits'
+    ;(function poll(n) {
+      if (document.querySelector('.hg-two')) {
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          window.dispatchEvent(new CustomEvent('mc:give-up'))
+        }))
+      } else if (n < 60) {
+        requestAnimationFrame(() => poll(n + 1))
+      }
+    })(0)
+  `)
+}
+
 /* Launched cold via the deep link, `win` doesn't exist (or hasn't finished its
    first load) yet when `open-url` fires -- queued here and flushed once the
    window's first page load actually completes. Already-running is the common
@@ -249,6 +271,7 @@ function flushPendingDeepLink() {
   if (action === 'new-task') triggerNewTask()
   if (action === 'new-idea') triggerNewIdea()
   if (action === 'zone-play') triggerZonePlay()
+  if (action === 'give-up') triggerGiveUp()
 }
 function handleDeepLink(url) {
   let action

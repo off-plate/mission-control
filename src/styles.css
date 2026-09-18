@@ -8168,11 +8168,14 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    9:16 clip down to a sliver blown up to fill it -- "expanded so much it's
    barely visible" was the crop this design's own comment above committed to,
    just taken to an extreme this screen never got tested at. The column now
-   caps at a real 9:16 shape (100vh tall, 9/16 of that wide) so the clip
-   needs no cropping at all past whatever the window's own proportions force
-   -- on his laptop and most normal screens that's still ~50/50, unchanged
-   from what he asked for; only past that does it stop growing. */
-.tl-stage { position: absolute; inset: 0; display: grid; grid-template-columns: min(50%, calc(100vh * 9 / 16)) minmax(0, 1fr); }
+   caps at the CLIP'S OWN real shape (100vh tall, --reel-ratio of that wide,
+   measured off the actual video/image by Reel and falling back to 9:16
+   before metadata loads or for an embed it can't measure) so the clip needs
+   no cropping past whatever the window's own proportions force -- on his
+   laptop and most normal screens that's still ~50/50, unchanged from what he
+   asked for; only past that does it stop growing. A flat 9:16 here cropped a
+   4:5 clip harder than before, which is what he reported 2026-09-18. */
+.tl-stage { position: absolute; inset: 0; display: grid; grid-template-columns: min(50%, calc(100vh * var(--reel-ratio, 0.5625))) minmax(0, 1fr); }
 .tl-reel { position: relative; overflow: hidden; background: #0B0B0C; display: grid; place-items: center; }
 .tl-media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border: 0; }
 .tl-reelempty { position: relative; z-index: 2; max-width: 34ch; padding: 30px; text-align: center; }
@@ -9303,62 +9306,6 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .hp-tab.is-on { background: var(--hp-card); color: var(--hp-t1); box-shadow: var(--hp-shadow); }
 .shell.is-hud .hp-tab.is-on,
 .shell.is-dark-page .hp-tab.is-on { background: rgba(255, 255, 255, 0.10); }
-
-/* ---- goals: the PROVING GROUND band, pinned above the card grid ----
-   His ask (2026-09-18): the permanent PR targets he had in Forge, always
-   visible, never the weekly/monthly ones the Goals page rotates. Reuses
-   this page's own accent tokens and card language rather than a second
-   visual system living on the same screen. */
-.hgoals { margin-bottom: var(--s5); }
-.hgoals-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s3); }
-.hgoals-add {
-  display: flex; align-items: center; gap: 6px; border: 1px solid var(--hp-line); background: var(--hp-card-2);
-  color: var(--hp-t2); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: var(--text-xs); font-weight: 700; cursor: pointer;
-}
-.hgoals-add:hover { color: var(--hp-t1); border-color: var(--hp-line-2); }
-.hgoals-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
-.hgoal-chip {
-  display: flex; align-items: center; gap: 10px; text-align: left;
-  border: 1px solid var(--hp-line); background: var(--hp-card); border-radius: 16px; padding: 10px 12px; cursor: pointer;
-  font: inherit; color: inherit; transition: border-color 0.2s, transform 0.2s var(--hp-soft);
-}
-.hgoal-chip:hover { border-color: var(--hp-line-2); transform: translateY(-1px); }
-.hgoal-ring { flex: none; }
-.hgoal-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.hgoal-name { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--hp-t2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hgoal-nums { font-family: var(--font-display); font-size: 15px; font-weight: 700; color: var(--hp-t1); font-variant-numeric: tabular-nums; }
-.hgoal-nums i { font-family: var(--font-body); font-style: normal; font-weight: 600; font-size: 12px; color: var(--hp-t2); }
-
-.hgoal-edit {
-  grid-column: span 1; display: flex; flex-direction: column; gap: 8px;
-  border: 1px solid var(--hp-line-2); background: var(--hp-card); border-radius: 16px; padding: 12px;
-}
-.hgoal-in {
-  border: 1px solid var(--hp-line); background: var(--hp-card-2); color: var(--hp-t1);
-  border-radius: 8px; padding: 6px 9px; font: inherit; font-size: var(--text-sm); width: 100%; box-sizing: border-box;
-}
-.hgoal-edit-row { display: flex; align-items: center; gap: 6px; }
-.hgoal-in-num { width: 64px; flex: none; }
-.hgoal-in-unit { width: 56px; flex: none; }
-.hgoal-of { font-size: var(--text-xs); color: var(--hp-t3); flex: none; }
-.hgoal-edit-actions { display: flex; align-items: center; gap: 8px; }
-.hgoal-del { border: 0; background: none; color: #FF5C6C; font: inherit; font-size: var(--text-xs); font-weight: 700; cursor: pointer; padding: 4px 0; }
-.hgoal-cancel { border: 0; background: none; color: var(--hp-t2); font: inherit; font-size: var(--text-xs); font-weight: 700; cursor: pointer; padding: 4px 8px; }
-.hgoal-save { border: 0; background: var(--hp-move); color: #04141A; font: inherit; font-size: var(--text-xs); font-weight: 800; cursor: pointer; padding: 5px 12px; border-radius: 999px; }
-
-/* ---- ladder: real recent sessions, newest first ---- */
-.hladder { margin-bottom: var(--s5); }
-.hladder-rows { display: flex; flex-direction: column; gap: 6px; margin-top: var(--s3); }
-.hladder-row {
-  display: grid; grid-template-columns: 56px 1fr auto auto; align-items: center; gap: 14px;
-  border: 1px solid var(--hp-line); background: var(--hp-card); border-radius: 12px; padding: 10px 14px;
-}
-.hladder-day { display: flex; flex-direction: column; line-height: 1.2; }
-.hladder-day b { font-family: var(--font-display); font-size: 15px; color: var(--hp-t1); font-weight: 700; }
-.hladder-day i { font-style: normal; font-size: 10px; font-weight: 700; letter-spacing: 0.05em; color: var(--hp-t3); }
-.hladder-title { font-size: var(--text-sm); font-weight: 600; color: var(--hp-t1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hladder-stat { font-size: var(--text-xs); font-weight: 700; color: var(--hp-t2); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.hladder-cal { color: var(--hp-t3); }
 
 /* ---- the card grid ----
    Third pass. One measurement per card, each with its own chart, after his

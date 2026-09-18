@@ -4860,6 +4860,24 @@ await step('people: the header opens it, a contact turns someone green, and a ci
   await page.keyboard.press('Escape')
   const saved = await page.evaluate((K) => { const s = JSON.parse(localStorage.getItem(K)); return [s.people?.length - 1, s.personContacts?.length, s.personBonds?.length] }, KEY)
   if (saved.join() !== '2,9,1') throw new Error(`not saved: ${saved}`)
+
+  /* Reminders are on by default and can be turned off per person (his ask,
+     2026-09-18): off drops the health colour to one neutral grey, takes
+     them out of Who to reach and the tallies, and greys their circle. */
+  await page.keyboard.press('Escape'); await page.waitForTimeout(400)
+  await page.locator('.pp-due-item', { hasText: 'Gate Mum' }).click(); await page.waitForTimeout(400)
+  if (!(await page.locator('.pp-remind-toggle input').isChecked())) throw new Error('reminders were not on by default')
+  const countsBefore = (await page.locator('.pp-count').allInnerTexts()).join('|')
+  await page.locator('.pp-remind-toggle').click(); await page.waitForTimeout(400)
+  const fill = await page.locator('[data-person]').first().locator('.pp-atom-body').evaluate((el) => el.style.fill)
+  if (fill !== 'rgb(140, 135, 122)') throw new Error(`circle did not turn the off grey: ${fill}`)
+  if (!(await page.getByRole('button', { name: 'How often to talk to them' }).isDisabled())) throw new Error('the cadence dropdown stayed enabled with reminders off')
+  const countsAfter = (await page.locator('.pp-count').allInnerTexts()).join('|')
+  if (countsAfter === countsBefore) throw new Error('turning reminders off did not change the tallies')
+  await page.locator('.pp-close').click(); await page.waitForTimeout(400)
+  if ((await page.locator('.pp-due-item', { hasText: 'Gate Mum' }).count()) !== 0) throw new Error('someone with reminders off still shows in Who to reach')
+  const offSaved = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).people.find((p) => p.name === 'Gate Mum')?.remindersOff, KEY)
+  if (offSaved !== true) throw new Error(`remindersOff was not saved: ${offSaved}`)
 })
 await step('ideas: click to pick up, click to drop, and the list brings the board to any sticky', async () => {
   await page.evaluate(() => { localStorage.removeItem('mc-ideaboard-view'); localStorage.setItem('mc-ideaboard-list', '1') })

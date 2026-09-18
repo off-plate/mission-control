@@ -14,6 +14,10 @@ export interface Person {
   tier: PersonTier
   /** How often he wants to be in touch, in days. */
   cadenceDays: number
+  /** Off means don't run the reminder for this person: no health colour, no
+   *  place in Who to reach, not counted in the tallies. On by default --
+   *  it's set only when he's turned it off. */
+  remindersOff?: boolean
   /** What they do. */
   job?: string
   /** Birthday as MM-DD, and the year when he knows it. */

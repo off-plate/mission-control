@@ -238,6 +238,18 @@ export function useHealthSync(): { sync: SyncPhase; start: () => void; clear: ()
   return { sync, start, clear }
 }
 
+/** The same pull `useHealthSync().start()` makes, callable from outside a
+ *  component. His ask (2026-09-18): asking for one sync (Hevy, from the
+ *  Habits page or the assistant) should not leave Intervals sitting on
+ *  whatever it last had -- both requests now go out together, so the
+ *  Cookie Jar's own training days are never stale just because he reached
+ *  for the wrong button. Fire-and-forget on purpose: this pull can run for
+ *  up to three minutes (SYNC_TIMEOUT_MS), and the caller (a fast Hevy
+ *  sync) has already returned its own answer by then. The health page
+ *  reads its progress from the same syncStore this sets, so its own
+ *  spinner still shows this run if he happens to have it open. */
+export function syncHealth(): void { void runSync() }
+
 /** "2 hours ago", from a timestamp rather than a day. */
 export function agoFrom(iso: string, now = Date.now()): string {
   const mins = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60_000))

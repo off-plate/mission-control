@@ -27,6 +27,8 @@ import {
   rollUpByDay, series, sessionSeries, totals, useHealth, useHealthSync, withinDays,
   type DayFrame, type MetricKey, type SessionDay, type Session, type WellnessDay,
 } from './health'
+import { syncHevy } from './hevy'
+import { useStore } from './store'
 import * as Icon from './icons'
 
 const SPANS = [
@@ -361,6 +363,11 @@ function DayRow({ d, hardest }: { d: SessionDay; hardest: number }) {
 export function HealthPage() {
   const { state, reload } = useHealth()
   const { sync, start, clear } = useHealthSync()
+  const { habits, markHabitDaysOn } = useStore()
+  /* His ask (2026-09-18): asking for one sync should cover both training
+     sources. Hevy's own pull is fast and has nothing to wait on, so it
+     fires alongside Intervals rather than after it. */
+  const startBoth = () => { start(); void syncHevy(habits, markHabitDaysOn) }
   const [span, setSpan] = useState(7)
 
   const days = state.status === 'ok' ? state.days : []
@@ -417,7 +424,7 @@ export function HealthPage() {
                 >{s.label}</button>
               ))}
             </div>
-            <button className="hp-sync" onClick={start} disabled={busySync} title="Fetch everything new from Intervals.icu">
+            <button className="hp-sync" onClick={startBoth} disabled={busySync} title="Fetch everything new from Intervals.icu and Hevy">
               <Icon.Repeat size={13} className={busySync ? 'hp-spin' : undefined} />
               {busySync ? 'Syncing' : 'Sync'}
             </button>

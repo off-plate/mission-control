@@ -8,6 +8,7 @@
    read-only, for one purpose, ticking the Workout / Gym / Fitness habit and,
    later, the Timeline's Health column. */
 
+import { syncHealth } from './health'
 import type { HabitDef } from './types'
 
 const KEY_STORE = 'mc-hevy-key'
@@ -168,6 +169,11 @@ export async function syncHevy(
   habits: HabitDef[],
   markHabitDaysOn: (id: string, days: string[], value: boolean) => void,
 ): Promise<HevySyncOutcome> {
+  /* His ask (2026-09-18): one sync request should cover both training
+     sources, so the Cookie Jar never shows a workout from one and not the
+     other. Started here, not awaited -- Intervals can take up to three
+     minutes and Hevy's own answer should not wait on it. */
+  syncHealth()
   const res = await fetchHevyWorkoutDays()
   if (!res.ok) return res
   const targets = habits.filter((h) => h.name.trim().toLowerCase() === TARGET_HABIT_NAME)

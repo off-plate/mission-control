@@ -221,7 +221,15 @@ export async function fetchHevyWorkoutDays(): Promise<HevySyncResult> {
 
         for (const ex of w.exercises ?? []) {
           if (!ex.title) continue
-          const sets = (ex.sets ?? []).filter((s): s is Required<HevySet> => typeof s.weight_kg === 'number' && typeof s.reps === 'number')
+          /* A bodyweight set (a real Pull Up, most of the time) comes back
+             with reps but no weight_kg at all -- treated as 0kg here, not
+             dropped, or a repTotal goal like his pull-up day total would
+             never see a single real set. Confirmed against his own Hevy
+             history 2026-09-19: every "Pull Up" row but one legacy 2024
+             entry was silently empty before this fix. */
+          const sets = (ex.sets ?? [])
+            .filter((s): s is HevySet & { reps: number } => typeof s.reps === 'number')
+            .map((s) => ({ weight_kg: typeof s.weight_kg === 'number' ? s.weight_kg : 0, reps: s.reps }))
           if (!sets.length) continue
           const repTotal = sets.reduce((a, s) => a + s.reps, 0)
           let best = sets[0]

@@ -62,6 +62,10 @@ export type PageId =
   /** The body, read from the zepp_* tables the watch already feeds through
    *  Intervals.icu. Dock only, same shape as Bills/Timeline/Skills. */
   | 'health'
+  /** PROVING GROUND, back from Forge (his ask, 2026-09-18): permanent PR
+   *  targets against real Hevy history, not the Health page's daily
+   *  wellness readout and not the Goals page's periodic goals. */
+  | 'gym'
   /** A YouTube transcript, read instead of watched. The reading is fetched from
    *  the Watchless endpoint, which is the only thing holding keys and the only
    *  thing that can spend against its monthly cap. */

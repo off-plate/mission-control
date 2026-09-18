@@ -33,6 +33,7 @@ const AssistantPage = lazy(() => import('./assistantpage').then((m) => ({ defaul
 const FocusPage = lazy(() => import('./focus').then((m) => ({ default: m.FocusPage })))
 const SkillsPage = lazy(() => import('./skillspage').then((m) => ({ default: m.SkillsPage })))
 const HealthPage = lazy(() => import('./healthpage').then((m) => ({ default: m.HealthPage })))
+const GymPage = lazy(() => import('./gympage').then((m) => ({ default: m.GymPage })))
 const WatchlessPage = lazy(() => import('./watchlesspage').then((m) => ({ default: m.WatchlessPage })))
 const IdeasPage = lazy(() => import('./ideaboard').then((m) => ({ default: m.IdeasPage })))
 const PeoplePage = lazy(() => import('./people').then((m) => ({ default: m.PeoplePage })))
@@ -388,7 +389,7 @@ function PhonePages({ tabs, page, setPage }: {
 }
 
 /* Pages that are dark in both modes, so the header goes dark with them. */
-const DARK_CHROME_PAGES: PageId[] = ['timeline', 'board', 'health']
+const DARK_CHROME_PAGES: PageId[] = ['timeline', 'board', 'health', 'gym']
 
 export default function App() {
   const { space, view, setView, page, setPage, tasks, routines, goals, habits, markHabitDaysOn } = useStore()
@@ -494,7 +495,7 @@ export default function App() {
          Jar and the Why wall it opens are dark in both modes, and a paper
          header on top of them read as two apps. Every other page keeps the
          light header, and HUD is already dark, so it is left alone. */
-      className={`shell${page === 'zone' ? ' in-zone' : ''}${hud ? ' is-hud' : ''}${!hud && DARK_CHROME_PAGES.includes(page) ? ' is-dark-chrome' : ''}${!hud && page === 'health' ? ' is-dark-page' : ''}`}
+      className={`shell${page === 'zone' ? ' in-zone' : ''}${hud ? ' is-hud' : ''}${!hud && DARK_CHROME_PAGES.includes(page) ? ' is-dark-chrome' : ''}${!hud && (page === 'health' || page === 'gym') ? ' is-dark-page' : ''}`}
       style={page === 'zone' ? ({ '--depth': zoneDepth } as React.CSSProperties) : undefined}
     >
       <a className="skiplink" href="#main">Skip to the page</a>
@@ -695,6 +696,7 @@ export default function App() {
         {page === 'timeline' && <TimelinePage />}
         {page === 'skills' && <SkillsPage />}
         {page === 'health' && <HealthPage />}
+        {page === 'gym' && <GymPage />}
         {page === 'watchless' && <WatchlessPage />}
         {page === 'ideas' && <IdeasPage />}
         {page === 'people' && <PeoplePage />}

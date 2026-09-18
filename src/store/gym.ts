@@ -5,8 +5,8 @@ import { rowKey } from '../sync-merge'
 import type { GymGoal } from '../types'
 import { newId } from './shared'
 
-export type GymGoalInput = { name: string; current: number; goal: number; unit: string; note?: string }
-type GymGoalPatch = Partial<Pick<GymGoal, 'name' | 'current' | 'goal' | 'unit' | 'note'>>
+export type GymGoalInput = Pick<GymGoal, 'name' | 'goal' | 'unit' | 'metric'> & Partial<Pick<GymGoal, 'exerciseName' | 'current' | 'note' | 'lowerIsBetter'>>
+type GymGoalPatch = Partial<Pick<GymGoal, 'name' | 'current' | 'goal' | 'unit' | 'metric' | 'exerciseName' | 'note' | 'lowerIsBetter'>>
 
 export interface GymSlice {
   gymGoals: GymGoal[]

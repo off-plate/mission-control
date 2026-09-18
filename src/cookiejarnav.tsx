@@ -29,7 +29,7 @@ export function takeGiveUpRequest(): boolean {
 }
 
 export function CookieJarNav({ here, view, onToggleView, lives = false, onGiveUp }: {
-  here: 'jar' | 'health' | 'why'
+  here: 'jar' | 'health' | 'gym' | 'why'
   view: JarView
   onToggleView?: () => void
   lives?: boolean
@@ -51,6 +51,11 @@ export function CookieJarNav({ here, view, onToggleView, lives = false, onGiveUp
         aria-current={here === 'health' ? 'page' : undefined}
         onClick={() => setPage('health')}
       >Health</button>
+      <button
+        className={`cj-btn tl-health${here === 'gym' ? ' is-here' : ''}`}
+        aria-current={here === 'gym' ? 'page' : undefined}
+        onClick={() => setPage('gym')}
+      >Gym</button>
       {/* Dropped below 639px, as it always was: the wall is a long read built
           for a screen he sits back from, not a one-handed moment. */}
       <button

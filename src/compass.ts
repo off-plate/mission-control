@@ -60,8 +60,12 @@ export interface CompassMoney {
    *
    *  The Timeline asks what the big number DID on a given day, and a monthly
    *  total cannot answer that. `paid` is debt going down, `saved` is money set
-   *  aside; both are what Compass recorded, never a projection. */
-  byDay: Record<string, { paid: number; saved: number }>
+   *  aside, `spent` is an ordinary bill or one-off marked paid in Bills --
+   *  his report (2026-09-18): the Cookie Jar showed nothing for a day he had
+   *  actually paid several bills on, because this only ever counted debt
+   *  payments and savings, never a plain bill. All three are what Compass
+   *  recorded, never a projection. */
+  byDay: Record<string, { paid: number; saved: number; spent: number }>
 }
 
 export type CompassState =
@@ -117,11 +121,12 @@ export function summarise(debts: CompassDebt[], tx: CompassTx[]): CompassMoney {
       }))
       .filter((r) => r.amount > 0)
       .sort((a, b) => a.day - b.day),
-    byDay: tx.reduce<Record<string, { paid: number; saved: number }>>((acc, t) => {
-      if (t.kind !== 'debt_payment' && t.kind !== 'saving') return acc
-      const row = (acc[t.occurred_on] ??= { paid: 0, saved: 0 })
+    byDay: tx.reduce<Record<string, { paid: number; saved: number; spent: number }>>((acc, t) => {
+      if (t.kind === 'income') return acc
+      const row = (acc[t.occurred_on] ??= { paid: 0, saved: 0, spent: 0 })
       if (t.kind === 'debt_payment') row.paid += t.amount
-      else row.saved += t.amount
+      else if (t.kind === 'saving') row.saved += t.amount
+      else row.spent += t.amount
       return acc
     }, {}),
   }

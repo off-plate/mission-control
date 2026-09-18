@@ -322,8 +322,8 @@ function Rung({ p, zoom, money, today }: { p: Period; zoom: Zoom; money: Compass
   /* Money moved inside this rung, whatever the rung is made of. */
   const fin = money ? p.days.reduce((a, d) => {
     const row = money.byDay[d.day]
-    return row ? { paid: a.paid + row.paid, saved: a.saved + row.saved } : a
-  }, { paid: 0, saved: 0 }) : null
+    return row ? { paid: a.paid + row.paid, saved: a.saved + row.saved, spent: a.spent + row.spent } : a
+  }, { paid: 0, saved: 0, spent: 0 }) : null
 
   const dayUnit = zoom === 'd'
   /* AN EMPTY DAY IS ONLY RED IF IT TOOK SOMETHING. On a fresh install every
@@ -337,11 +337,17 @@ function Rung({ p, zoom, money, today }: { p: Period; zoom: Zoom; money: Compass
         <span className="tl-l">{p.sub}</span>
       </span>
 
-      {/* FINANCES. Read, never scored, and it says which. */}
+      {/* FINANCES. Read, never scored, and it says which.
+          His report (2026-09-18): a day he paid several ordinary bills on
+          showed nothing here, because this only ever looked at fin.paid --
+          debt going down specifically -- never a plain bill. "Off the debt"
+          stays the label on a day that really was only that; any day a bill
+          was part of it reads as the plainer "paid", the two combined, since
+          by then the figure is no longer only about the debt. */}
       {fin === null
         ? <Cell figure="—" unit="no Compass" pct={0} muted />
-        : fin.paid > 0
-          ? <Cell figure={kc(fin.paid)} unit="Kč off the debt" pct={1} />
+        : fin.paid + fin.spent > 0
+          ? <Cell figure={kc(fin.paid + fin.spent)} unit={fin.spent > 0 ? 'Kč paid' : 'Kč off the debt'} pct={1} />
           : fin.saved > 0
             ? <Cell figure={kc(fin.saved)} unit="Kč set aside" pct={1} />
             : <Cell figure="—" unit="nothing moved" pct={0} muted />}
@@ -647,7 +653,7 @@ function DayCard({ p, zoom, money }: {
   p: Period; zoom: Zoom; money: CompassMoney | null
 }) {
   const sessionMins = useSessionMinutes()
-  const fin = money ? p.days.reduce((a, d) => a + (money.byDay[d.day]?.paid ?? 0) + (money.byDay[d.day]?.saved ?? 0), 0) : null
+  const fin = money ? p.days.reduce((a, d) => a + (money.byDay[d.day]?.paid ?? 0) + (money.byDay[d.day]?.saved ?? 0) + (money.byDay[d.day]?.spent ?? 0), 0) : null
   const pct = Math.round(clamp01(p.ratio) * 100)
   const cost = p.empty && p.delta < 0     // see the note on the rung
   return (

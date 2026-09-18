@@ -51,7 +51,12 @@ export function TimelinePanel({ dockControls, onOpenFull }: { dockControls?: Rea
   const money = compass.status === 'ok' ? compass.money : null
   const hardTotal = run.filter((r) => r.hard).length
   const focusTotal = run.reduce((a, r) => a + r.counts.focusMin, 0)
-  const paidTotal = money ? Object.values(money.byDay).reduce((a, d) => a + d.paid, 0) : null
+  /* His report (2026-09-18): this only ever summed debt payments, so a
+     window where he mostly paid ordinary bills read as if nothing had moved
+     at all. Now the same combined figure the Cookie Jar's own day cells show
+     (timeline.tsx), labelled the same plain way below since it is no longer
+     only ever debt. */
+  const paidTotal = money ? Object.values(money.byDay).reduce((a, d) => a + d.paid + d.spent, 0) : null
 
   const openFull = () => { setPage('timeline'); onOpenFull?.() }
 
@@ -79,7 +84,7 @@ export function TimelinePanel({ dockControls, onOpenFull }: { dockControls?: Rea
           <div className="bdr"><span>Chain</span><span className="mono">{chain.current} {chain.current === 1 ? 'day' : 'days'}</span></div>
           <div className="bdr"><span>Hard things <span className="tldock-unit">({HARD_MIN_DAYS}+ days carried)</span></span><span className="mono">{hardTotal}</span></div>
           <div className="bdr"><span>Focused</span><span className="mono">{hm(focusTotal)}</span></div>
-          {paidTotal !== null && <div className="bdr"><span>Off the debt</span><span className="mono pos">{kc(paidTotal)} Kč</span></div>}
+          {paidTotal !== null && <div className="bdr"><span>Paid</span><span className="mono pos">{kc(paidTotal)} Kč</span></div>}
         </div>
       </div>
     </div>

@@ -122,6 +122,7 @@ const ENTITY_KEYS: Record<string, (r: Row) => string> = {
   people: (r) => `people:${r.id}`,
   personBonds: (r) => `personBonds:${r.id}`,
   personContacts: (r) => `personContacts:${r.id}`,
+  gymGoals: (r) => `gymGoals:${r.id}`,
   noteFolders: (r) => `noteFolders:${r.id}`,
   coachSessions: (r) => `coachSessions:${r.id}`,
   assistantLog: (r) => `assistantLog:${r.id}`,
@@ -235,7 +236,7 @@ function dayOfWeekKeyFor(i: number, now = new Date()): string {
 /* A person or a link edited on two devices: the edit made last stands, not the
    one on whichever device happened to save last. */
 const byUpdatedAt = (a: Row, b: Row): Row => (Number(b.updatedAt ?? 0) > Number(a.updatedAt ?? 0) ? b : a)
-const RESOLVE: Record<string, (a: Row, b: Row, buried?: Set<string>) => Row> = { notes: resolveNote, habits: resolveHabit, people: byUpdatedAt, personBonds: byUpdatedAt }
+const RESOLVE: Record<string, (a: Row, b: Row, buried?: Set<string>) => Row> = { notes: resolveNote, habits: resolveHabit, people: byUpdatedAt, personBonds: byUpdatedAt, gymGoals: byUpdatedAt }
 
 /** The key a row is buried under, so the store can bury or dig up the same
  *  thing this file will look for. */

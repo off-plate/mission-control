@@ -360,6 +360,136 @@ function DayRow({ d, hardest }: { d: SessionDay; hardest: number }) {
   )
 }
 
+/* ------------------------------------------------------------------ *
+ * GOALS. His ask (2026-09-18): the PROVING GROUND dashboard he had in
+ * Forge -- permanent PR targets and how close he is to them, pinned where
+ * he always sees them, not the main Goals page's weekly/monthly ones
+ * (which close and roll over; a bench e1RM target never does). Cycles
+ * through the same five accents the metric cards above already use, so a
+ * goal never introduces a colour nothing else on this page has.
+ * ------------------------------------------------------------------ */
+const GOAL_ACCENTS = ['var(--hp-cardio)', 'var(--hp-train)', 'var(--hp-sleep)', 'var(--hp-body)', 'var(--hp-move)']
+
+function GoalRing({ pct, accent }: { pct: number; accent: string }) {
+  const r = 15
+  const c = 2 * Math.PI * r
+  return (
+    <svg width="36" height="36" viewBox="0 0 36 36" className="hgoal-ring">
+      <circle cx="18" cy="18" r={r} fill="none" stroke="var(--hp-ring-track)" strokeWidth="4" />
+      <circle
+        cx="18" cy="18" r={r} fill="none" stroke={accent} strokeWidth="4" strokeLinecap="round"
+        strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)} transform="rotate(-90 18 18)"
+      />
+    </svg>
+  )
+}
+
+function GoalEditor({ initial, onSave, onCancel, onDelete }: {
+  initial: { name: string; current: number; goal: number; unit: string }
+  onSave: (v: { name: string; current: number; goal: number; unit: string }) => void
+  onCancel: () => void
+  onDelete?: () => void
+}) {
+  const [v, setV] = useState(initial)
+  const submit = () => { if (v.name.trim()) onSave({ ...v, name: v.name.trim(), unit: v.unit.trim() || 'reps' }) }
+  return (
+    <div className="hgoal-edit">
+      <input className="hgoal-in" value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} placeholder="Bench e1RM" aria-label="Goal name" autoFocus />
+      <div className="hgoal-edit-row">
+        <input className="hgoal-in hgoal-in-num" type="number" value={v.current} onChange={(e) => setV({ ...v, current: Number(e.target.value) })} aria-label="Current" />
+        <span className="hgoal-of">of</span>
+        <input className="hgoal-in hgoal-in-num" type="number" value={v.goal} onChange={(e) => setV({ ...v, goal: Number(e.target.value) })} aria-label="Target" />
+        <input className="hgoal-in hgoal-in-unit" value={v.unit} onChange={(e) => setV({ ...v, unit: e.target.value })} placeholder="kg" aria-label="Unit" />
+      </div>
+      <div className="hgoal-edit-actions">
+        {onDelete && <button className="hgoal-del" onClick={onDelete}>Delete</button>}
+        <span className="grow" />
+        <button className="hgoal-cancel" onClick={onCancel}>Cancel</button>
+        <button className="hgoal-save" onClick={submit}>Save</button>
+      </div>
+    </div>
+  )
+}
+
+function HealthGoals() {
+  const { gymGoals, addGymGoal, updateGymGoal, deleteGymGoal } = useStore()
+  const [editing, setEditing] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
+
+  return (
+    <div className="hgoals">
+      <div className="hgoals-head">
+        <span className="microcap">Goals</span>
+        <button className="hgoals-add" onClick={() => setAdding(true)}>
+          <Icon.Plus size={12} /> Add a goal
+        </button>
+      </div>
+      <div className="hgoals-grid">
+        {gymGoals.map((g, i) => {
+          const accent = GOAL_ACCENTS[i % GOAL_ACCENTS.length]
+          const pct = g.goal > 0 ? Math.max(0, Math.min(100, (g.current / g.goal) * 100)) : 0
+          if (editing === g.id) {
+            return (
+              <GoalEditor
+                key={g.id}
+                initial={{ name: g.name, current: g.current, goal: g.goal, unit: g.unit }}
+                onSave={(v) => { updateGymGoal(g.id, v); setEditing(null) }}
+                onCancel={() => setEditing(null)}
+                onDelete={() => { deleteGymGoal(g.id); setEditing(null) }}
+              />
+            )
+          }
+          return (
+            <button key={g.id} className="hgoal-chip" onClick={() => setEditing(g.id)} title="Edit this goal">
+              <GoalRing pct={pct} accent={accent} />
+              <span className="hgoal-text">
+                <span className="hgoal-name">{g.name}</span>
+                <span className="hgoal-nums">{g.current}<i> / {g.goal} {g.unit}</i></span>
+              </span>
+            </button>
+          )
+        })}
+        {adding && (
+          <GoalEditor
+            initial={{ name: '', current: 0, goal: 0, unit: 'kg' }}
+            onSave={(v) => { addGymGoal(v); setAdding(false) }}
+            onCancel={() => setAdding(false)}
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ *
+ * LADDER. Real days, real sessions -- everything frames() already knows
+ * about each day (title, minutes, calories), styled as one row apiece,
+ * newest first. Nothing here is invented: a day with no session just
+ * doesn't get a row.
+ * ------------------------------------------------------------------ */
+function HealthLadder({ rows }: { rows: DayFrame[] }) {
+  const trained = [...rows].reverse().filter((d) => d.parts > 0).slice(0, 7)
+  if (!trained.length) return null
+  return (
+    <div className="hladder">
+      <span className="microcap">Recent sessions</span>
+      <div className="hladder-rows">
+        {trained.map((d) => (
+          <div key={d.day} className="hladder-row">
+            <span className="hladder-day">
+              <b>{fmtDay(d.day)}</b>
+              <i>{fmtWeekday(d.day)}</i>
+            </span>
+            <span className="hladder-title">{d.title ?? d.type ?? 'Session'}</span>
+            <span className="hladder-stat">{fmtHm(d.minutes)}</span>
+            <span className="hladder-stat hladder-cal">{Math.round(d.calories)} kcal</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function HealthPage() {
   const { state, reload } = useHealth()
   const { sync, start, clear } = useHealthSync()
@@ -461,6 +591,8 @@ export function HealthPage() {
 
         {state.status === 'ok' && (
           <>
+            <HealthGoals />
+            <HealthLadder rows={view.rows} />
             <div className="hp-cards">
               <MetricCard
                 accent="var(--hp-train)" label="Fitness" basis="latest" span={span}

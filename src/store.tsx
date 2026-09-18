@@ -27,6 +27,7 @@ import { useWidgetsSlice } from './store/widgets'
 import { useTwoLivesSlice } from './store/twolives'
 import { useIdeaBoardSlice, type IdeaBoardSlice } from './store/ideaboard'
 import { usePeopleSlice, type PeopleSlice } from './store/people'
+import { useGymSlice, type GymSlice } from './store/gym'
 import { useConnectionsSlice } from './store/connections'
 import { useCoachSlice } from './store/coach'
 import { useAssistantSlice } from './store/assistant'
@@ -63,6 +64,7 @@ import type {
   Person,
   PersonBond,
   PersonContact,
+  GymGoal,
   Note,
   NoteFolder,
   Routine,
@@ -178,6 +180,9 @@ interface PersistedState {
   people?: Person[]
   personBonds?: PersonBond[]
   personContacts?: PersonContact[]
+  /** The Health page's own permanent PR targets -- see types/gym.ts for why
+   *  these are separate from the main Goals page's periodic ones. */
+  gymGoals?: GymGoal[]
   /** The Pomodoro block running right now, synced so it shows the same on
    *  every device (and in Raycast) rather than living only in this tab's
    *  localStorage. Null means nothing is running. */
@@ -239,6 +244,10 @@ interface Store extends PersistedState {
   removePersonBond: PeopleSlice['removePersonBond']
   logContact: PeopleSlice['logContact']
   removeContact: PeopleSlice['removeContact']
+  gymGoals: GymGoal[]
+  addGymGoal: GymSlice['addGymGoal']
+  updateGymGoal: GymSlice['updateGymGoal']
+  deleteGymGoal: GymSlice['deleteGymGoal']
   /** Record where reel-fetch put the downloaded file for an Instagram link. */
   setReelFile: (originalUrl: string, fileUrl: string) => void
   /** What he is looking at. 'all' shows every space at once. */
@@ -1254,6 +1263,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const { ideaBoard, setIdeaBoard } = ideaBoardSlice
   const peopleSlice = usePeopleSlice(persisted, { armUndo, bury, digUp })
   const { people, setPeople, personBonds, setPersonBonds, personContacts, setPersonContacts } = peopleSlice
+  const gymSlice = useGymSlice(persisted, { armUndo, bury, digUp })
+  const { gymGoals, setGymGoals } = gymSlice
   const growthSlice = useGrowthSlice(persisted, { space, armUndo, bury, digUp, setPageState })
   const {
     habits, setHabits, goals, setGoals, routines, setRoutines,
@@ -1350,7 +1361,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     const state: PersistedState = {
       version: 3, spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
-      notes, noteFolders, ideaBoard, people, personBonds, personContacts,
+      notes, noteFolders, ideaBoard, people, personBonds, personContacts, gymGoals,
       savedAt: Date.now(), lastWrite: { dev: deviceId(), name: deviceName(), at: Date.now() },
       weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
       habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, spaceGuessed, graveyard, twoLives, reels, tunes, reelFiles, lastRollDay: lastRollDay ?? localDateKey(),
@@ -1381,7 +1392,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { outbox.push(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels, tunes, reelFiles, ideaBoard, people, personBonds, personContacts, activeFocus])
+  }, [spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels, tunes, reelFiles, ideaBoard, people, personBonds, personContacts, gymGoals, activeFocus])
 
   /* ---- state that arrived from somewhere else ----
      Another tab of this browser, or this account on another device. Merged in,
@@ -1422,6 +1433,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (Array.isArray(p.people)) setPeople(p.people)
     if (Array.isArray(p.personBonds)) setPersonBonds(p.personBonds)
     if (Array.isArray(p.personContacts)) setPersonContacts(p.personContacts)
+    if (Array.isArray(p.gymGoals)) setGymGoals(p.gymGoals)
     if (p.ledger) setLedger(p.ledger)
     if (p.focusSessions) setFocusSessions(p.focusSessions)
     if (p.habitLog) setHabitLog(p.habitLog)
@@ -1835,6 +1847,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     addPerson: peopleSlice.addPerson, updatePerson: peopleSlice.updatePerson, deletePerson: peopleSlice.deletePerson,
     addPersonBond: peopleSlice.addPersonBond, setBondLabel: peopleSlice.setBondLabel, removePersonBond: peopleSlice.removePersonBond,
     logContact: peopleSlice.logContact, removeContact: peopleSlice.removeContact,
+    gymGoals, addGymGoal: gymSlice.addGymGoal, updateGymGoal: gymSlice.updateGymGoal, deleteGymGoal: gymSlice.deleteGymGoal,
 
     undoable, undoDelete, dismissUndo,
 

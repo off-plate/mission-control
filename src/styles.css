@@ -9756,6 +9756,58 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .hp-day-main:hover .hp-day-shape, .hp-day.is-open .hp-day-shape { opacity: 1; }
 .hp-day-title { font-size: var(--text-base); }
 
+/* ---- GYM — PROVING GROUND's goal cards. Everything else on this page is
+   Health's own .hp-* structure (his instruction: reuse that style); only the
+   goal ladder is new, so it takes the same --hp-* tokens rather than a
+   second palette. ---- */
+.gp-goals {
+  display: grid; gap: var(--s4); margin-bottom: var(--s7);
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+.gp-goal {
+  position: relative; overflow: hidden;
+  background: var(--hp-card); border: 1px solid var(--hp-line);
+  border-radius: 18px; padding: var(--s4) var(--s5); box-shadow: var(--hp-shadow);
+}
+.gp-goal::before {
+  content: ''; position: absolute; inset: 0 auto 0 0; width: 3px;
+  background: var(--gp-accent, var(--hp-train));
+}
+.gp-goal-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
+.gp-goal-name {
+  font-size: var(--text-xs); font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.05em; color: var(--hp-t2);
+}
+.gp-goal-edit {
+  flex: none; width: 22px; height: 22px; display: grid; place-items: center;
+  border: 0; border-radius: 999px; background: transparent; color: var(--hp-t3);
+  cursor: pointer;
+}
+.gp-goal-edit:hover { background: var(--hp-card-2); color: var(--hp-t1); }
+.gp-goal-nums { display: flex; align-items: baseline; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.gp-goal-current { font-family: var(--font-display); font-size: 26px; font-weight: 700; color: var(--hp-t1); letter-spacing: -0.01em; }
+.gp-goal-of { font-size: var(--text-xs); color: var(--hp-t3); }
+.gp-goal-target { font-size: var(--text-sm); color: var(--hp-t2); font-weight: 600; }
+.gp-goal-bar {
+  margin-top: var(--s3); height: 6px; border-radius: 999px;
+  background: var(--hp-ring-track); overflow: hidden;
+}
+.gp-goal-bar i { display: block; height: 100%; background: var(--gp-accent, var(--hp-train)); border-radius: 999px; }
+.gp-goal-note { margin: var(--s3) 0 0; font-size: var(--text-xs); color: var(--hp-t3); line-height: 1.5; }
+.gp-goal-form { display: flex; flex-direction: column; gap: var(--s3); margin-top: var(--s3); }
+.gp-goal-form label { display: flex; flex-direction: column; gap: 4px; font-size: var(--text-xs); color: var(--hp-t2); }
+.gp-goal-form input {
+  font: inherit; font-size: var(--text-sm); color: var(--hp-t1); background: var(--hp-card-2);
+  border: 1px solid var(--hp-line-2); border-radius: 10px; padding: 6px 10px;
+}
+.gp-goal-form-actions { display: flex; gap: var(--s2); }
+.gp-goal-save, .gp-goal-cancel {
+  font: inherit; font-size: var(--text-xs); font-weight: 600; padding: 6px 12px;
+  border-radius: 999px; cursor: pointer; border: 1px solid var(--hp-line-2);
+}
+.gp-goal-save { background: var(--gp-accent, var(--hp-train)); border-color: transparent; color: #14110B; }
+.gp-goal-cancel { background: transparent; color: var(--hp-t2); }
+
 /* ============================================================
    WATCHLESS — the reader, in the reader's own clothes.
 

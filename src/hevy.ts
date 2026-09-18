@@ -87,9 +87,76 @@ export function getHevyStatsForDay(day: string): HevyDayStats | null {
 function setHevyStats(stats: Record<string, HevyDayStats>): void {
   try { localStorage.setItem(STATS_STORE, JSON.stringify(stats)) } catch { /* storage unavailable */ }
 }
+/** Every day Hevy has ever reported, for the Gym page's session ladder --
+ *  that page reads training days off Hevy itself, not the Zepp/Intervals
+ *  rollup Health already shows, so the two pages never repeat one session. */
+export function getAllHevyDayStats(): Record<string, HevyDayStats> {
+  try {
+    const raw = localStorage.getItem(STATS_STORE)
+    return raw ? JSON.parse(raw) as Record<string, HevyDayStats> : {}
+  } catch { return {} }
+}
+
+/* The Gym page's own exercise history -- his report (2026-09-18): PROVING
+   GROUND's real goals back, but this time built from what Hevy's API
+   already returns per set (weight_kg, reps) rather than the coarse
+   day-total volume above, which throws away which exercise a set even
+   belonged to. A per-device cache, same reasoning as STATS_STORE: fully
+   rebuilt every sync, never the synced blob, since it is a straight
+   derivation of what Hevy itself already has. */
+const EXERCISE_STORE = 'mc-hevy-exercises'
+export interface ExerciseDayEntry {
+  day: string
+  /** Epley estimate off the day's single best set for this exercise:
+     weight_kg * (1 + reps / 30). */
+  e1rm: number
+  weight: number
+  reps: number
+  /** Every set's reps summed, for exercises scored as a session total
+     (a pull-up day) rather than a single best set. */
+  repTotal: number
+  /** True the first day this exercise's e1rm reached a new all-time high,
+     computed once here in chronological order so nothing downstream has
+     to re-walk the whole history to answer "was this a PR". */
+  isPR: boolean
+}
+export type ExerciseHistory = Record<string, ExerciseDayEntry[]>
+
+export function getHevyExerciseHistory(): ExerciseHistory {
+  try {
+    const raw = localStorage.getItem(EXERCISE_STORE)
+    return raw ? JSON.parse(raw) as ExerciseHistory : {}
+  } catch { return {} }
+}
+function setHevyExerciseHistory(h: ExerciseHistory): void {
+  try { localStorage.setItem(EXERCISE_STORE, JSON.stringify(h)) } catch { /* storage unavailable */ }
+}
+
+/** The best e1rm this exercise has ever hit, or null if it's never been
+ *  logged at all -- a Gym goal with nothing to show yet, not a zero. */
+export function bestE1rmEver(h: ExerciseHistory, name: string): number | null {
+  const rows = h[name]
+  if (!rows?.length) return null
+  return rows.reduce((m, r) => Math.max(m, r.e1rm), 0)
+}
+/** The best single-session rep total this exercise has ever hit (a pull-up
+ *  day's four sets summed), or null if it's never been logged. */
+export function bestRepTotalEver(h: ExerciseHistory, name: string): number | null {
+  const rows = h[name]
+  if (!rows?.length) return null
+  return rows.reduce((m, r) => Math.max(m, r.repTotal), 0)
+}
+/** Which exercises hit a new all-time e1RM on this exact day, for the Gym
+ *  page's session ladder -- "any PR was hit" read straight off the same
+ *  isPR flag the goal rings use, not a second guess at what counts as one. */
+export function prsOnDay(h: ExerciseHistory, day: string): string[] {
+  return Object.entries(h)
+    .filter(([, rows]) => rows.some((r) => r.day === day && r.isPR))
+    .map(([name]) => name)
+}
 
 interface HevySet { weight_kg?: number; reps?: number }
-interface HevyExercise { sets?: HevySet[] }
+interface HevyExercise { title?: string; sets?: HevySet[] }
 interface HevyWorkout { start_time?: string; end_time?: string; exercises?: HevyExercise[] }
 interface HevyWorkoutsPage { workouts?: HevyWorkout[]; page_count?: number }
 
@@ -104,11 +171,23 @@ export type HevySyncResult =
  *  the same cost on day one (a real backfill) and on the thousandth day.
  *  Cheap enough at once-a-day cadence that it was not worth the bug surface
  *  of a partial, since-last-sync fetch. */
+/** weight_kg * (1 + reps/30), the same Epley estimate Forge's own
+ *  update_forge.py used -- so a number carried over from that dashboard
+ *  still means the same thing here. */
+function epley1rm(weightKg: number, reps: number): number {
+  return weightKg * (1 + reps / 30)
+}
+
 export async function fetchHevyWorkoutDays(): Promise<HevySyncResult> {
   const key = getHevyKey()
   if (!key) return { ok: false, reason: 'no-key' }
   const days = new Set<string>()
   const stats: Record<string, HevyDayStats> = {}
+  /* Exercise -> day -> the day's best set (highest e1rm) and its rep total,
+     collected raw across every page before any PR flag is decided, since
+     Hevy's pages are not guaranteed to arrive in date order and a PR is
+     only knowable once every day for that exercise is in hand. */
+  const exerciseDayBest: Record<string, Record<string, { weight: number; reps: number; e1rm: number; repTotal: number }>> = {}
   try {
     for (let page = 1; page <= MAX_PAGES; page++) {
       const res = await fetch(`${BASE_URL}/workouts?pageSize=10&page=${page}`, {
@@ -139,9 +218,48 @@ export async function fetchHevyWorkoutDays(): Promise<HevySyncResult> {
 
         const prev = stats[day]
         stats[day] = { minutes: (prev?.minutes ?? 0) + minutes, volumeKg: (prev?.volumeKg ?? 0) + volumeKg }
+
+        for (const ex of w.exercises ?? []) {
+          if (!ex.title) continue
+          const sets = (ex.sets ?? []).filter((s): s is Required<HevySet> => typeof s.weight_kg === 'number' && typeof s.reps === 'number')
+          if (!sets.length) continue
+          const repTotal = sets.reduce((a, s) => a + s.reps, 0)
+          let best = sets[0]
+          let bestE1rm = epley1rm(best.weight_kg, best.reps)
+          for (const s of sets.slice(1)) {
+            const e = epley1rm(s.weight_kg, s.reps)
+            if (e > bestE1rm) { best = s; bestE1rm = e }
+          }
+          const byDay = (exerciseDayBest[ex.title] ??= {})
+          const prevDay = byDay[day]
+          /* Two workouts of the same exercise on one real day (a make-up
+             session): keep whichever set actually hit higher, and sum both
+             sessions' reps into the day's total rather than picking one. */
+          byDay[day] = {
+            weight: !prevDay || bestE1rm > prevDay.e1rm ? best.weight_kg : prevDay.weight,
+            reps: !prevDay || bestE1rm > prevDay.e1rm ? best.reps : prevDay.reps,
+            e1rm: Math.max(prevDay?.e1rm ?? 0, bestE1rm),
+            repTotal: (prevDay?.repTotal ?? 0) + repTotal,
+          }
+        }
       }
       if (workouts.length === 0 || page >= (data.page_count ?? 1)) break
     }
+
+    const history: ExerciseHistory = {}
+    for (const [name, byDay] of Object.entries(exerciseDayBest)) {
+      const rows = Object.entries(byDay)
+        .map(([day, v]) => ({ day, ...v }))
+        .sort((a, b) => a.day.localeCompare(b.day))
+      let runningMax = 0
+      history[name] = rows.map((r) => {
+        const isPR = r.e1rm > runningMax
+        if (isPR) runningMax = r.e1rm
+        return { day: r.day, e1rm: r.e1rm, weight: r.weight, reps: r.reps, repTotal: r.repTotal, isPR }
+      })
+    }
+    setHevyExerciseHistory(history)
+
     return { ok: true, days: [...days], stats }
   } catch {
     return { ok: false, reason: 'failed' }

@@ -12,7 +12,7 @@
    registered standard scheme gives a real, stable origin, so storage persists
    exactly as it does in a browser tab. */
 
-const { app, BrowserWindow, Menu, Notification, protocol, net, shell, ipcMain, nativeTheme } = require('electron')
+const { app, BrowserWindow, Menu, Notification, protocol, net, session, shell, ipcMain, nativeTheme } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
 const { pathToFileURL } = require('node:url')
@@ -338,9 +338,35 @@ app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 
+/* His report (2026-09-18): every embedded YouTube player in the app (Mundi
+   Opus, Give Up, Timeline) came back "Error 153: Video player configuration
+   error" and never played a single video. Confirmed with the debugger: the
+   IFrame API's own script ignores an `origin` playerVar entirely and always
+   derives the Origin/Referer it sends from the real page origin, which for
+   this app is the custom `app://mc` scheme (registered for a stable
+   localStorage origin -- see the file header). YouTube's server rejects
+   that scheme outright before a single frame of video loads. The origin
+   check happens against the actual HTTP headers on the request, not
+   anything the renderer can hand the API, so the only place to fix it is
+   here, rewriting Origin/Referer to a real address on the way out -- and
+   only for requests actually going to YouTube's own domains, so nothing
+   else the app talks to (Supabase, its own asset host) is touched. */
+function fixYouTubeEmbedOrigin() {
+  const REAL_ORIGIN = 'https://off-plate.github.io'
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: ['*://*.youtube.com/*', '*://*.ytimg.com/*', '*://*.googlevideo.com/*'] },
+    (details, callback) => {
+      details.requestHeaders['Origin'] = REAL_ORIGIN
+      details.requestHeaders['Referer'] = `${REAL_ORIGIN}/mission-control/`
+      callback({ requestHeaders: details.requestHeaders })
+    },
+  )
+}
+
 app.whenReady().then(() => {
   nativeTheme.themeSource = 'light'   // the app is light-only by decision
   registerProtocol()
+  fixYouTubeEmbedOrigin()
   buildMenu()
   createWindow()
 })

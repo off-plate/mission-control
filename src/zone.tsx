@@ -98,6 +98,16 @@ function CheckIcon() {
 function ZoneList({ activeId, onPick }: { activeId: string | null; onPick: (id: string) => void }) {
   const { tasks, inView, toggleTask, toggleSubtask, space } = useStore()
   const today = localDateKey()
+  /* His report (2026-09-18): he could point the timer at anything, once --
+     that ability was ever only "any task on today's list," the Today
+     section below, and he wants a real focus-anything door next to it, not
+     instead of it. Search is against the whole open list, any day, any
+     workspace in view, not just what's scheduled for today. */
+  const [query, setQuery] = useState('')
+  const q = query.trim().toLowerCase()
+  const searchResults = q
+    ? tasks.filter((t) => inView(t.space) && !t.done && t.title.toLowerCase().includes(q)).slice(0, 20)
+    : []
   /* His ask (2026-09-11): see a task's steps in here too. The one the timer is
      pointed at opens on its own, because that is the task he is actually
      working and its steps are the next thing he needs; everything else opens
@@ -123,6 +133,42 @@ function ZoneList({ activeId, onPick }: { activeId: string | null; onPick: (id: 
 
   return (
     <div className="zlist">
+      <div className="zlist-search">
+        <Icon.Search size={14} className="zlist-search-ico" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Escape') setQuery('') }}
+          placeholder="Focus on any task, any day"
+          aria-label="Search all tasks to focus on"
+        />
+        {query && (
+          <button className="zlist-searchx" onClick={() => setQuery('')} aria-label="Clear search">
+            <Icon.Close size={12} />
+          </button>
+        )}
+      </div>
+      {q && (
+        <div className="zlist-body">
+          <div className="zlist-group">
+            <span className="zlist-slot">{searchResults.length ? 'Search results' : 'No matches'}</span>
+            {searchResults.map((t) => (
+              <div className="zrow-wrap" key={t.id}>
+                <div className={`zrow${activeId === t.id ? ' is-active' : ''}`}>
+                  <button
+                    className="zrow-pick"
+                    onClick={() => { onPick(t.id); setQuery('') }}
+                    title="Point the timer at this"
+                  >
+                    <span className="zrow-title">{t.title}</span>
+                    {isEstimated(t) && t.estimateMin > 0 && <span className="zrow-min mono">{taskMinutes(t)}m</span>}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="zlist-head">
         <span className="zlist-title">Today</span>
         <span className="zlist-count">{left ? `${left} left` : 'all done'}</span>
@@ -217,16 +263,24 @@ function PhaseIcon({ state }: { state: PhaseState }) {
 
 function ZoneTask() {
   const pomo = usePomodoro()
-  const { setFocusTaskId } = useStore()
+  const { setFocusTaskId, tasks } = useStore()
   const firstMove = useFirstMove()
   const openToday = useOpenToday()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [editing, setEditing] = useState<'focus' | 'break' | null>(null)
-  // A hand pick overrides the auto first-move; it clears itself the moment
-  // that task leaves today's open list (finished, or dropped from today),
-  // rather than pointing at something that no longer exists.
+  /* A hand pick overrides the auto first-move; it clears itself the moment
+     that task is done or gone, rather than pointing at something that no
+     longer exists. His report (2026-09-18): this used to only ever look
+     inside today's own open list, which meant the pick and the search
+     below it (ZoneList) that can find ANY open task -- his actual ask --
+     silently lost anything picked that wasn't already on today's list the
+     instant it looked itself up here. Today's list is checked first since
+     it's the common case and already has the object in hand; the full
+     list is the fallback for a pick search actually reached for. */
   const [chosenId, setChosenId] = useState<string | null>(null)
-  const chosenTask = chosenId ? openToday.find((t) => t.id === chosenId) : undefined
+  const chosenTask = chosenId
+    ? (openToday.find((t) => t.id === chosenId) ?? tasks.find((t) => t.id === chosenId && !t.done))
+    : undefined
   const activeTask = chosenTask ?? firstMove
 
   const phaseState: PhaseState =

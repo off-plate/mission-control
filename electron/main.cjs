@@ -238,17 +238,18 @@ function triggerZonePlay() {
   runWhenAppReady(`window.dispatchEvent(new CustomEvent('mc:zone-play'))`)
 }
 
-/* HabitsPage isn't lazy-loaded like Ideas, but it still only mounts (and
-   only then attaches the mc:give-up listener) once the hash actually says
-   'habits' -- same race as Ideas otherwise, just without a second chunk to
-   wait on. `.hg-two` is its own root once rendered. */
+/* The give-up screen (his "Two Lives" reel-and-futures screen, on the Cookie
+   Jar/Timeline page, address #/timeline) isn't lazy-loaded like Ideas, but it
+   still only mounts (and only then attaches the mc:give-up listener) once
+   the hash actually says 'timeline' -- same race as Ideas otherwise, just
+   without a second chunk to wait on. `.tline` is the page's own root. */
 function triggerGiveUp() {
   if (!win) return
   focusWindow()
   runWhenAppReady(`
-    location.hash = '/habits'
+    location.hash = '/timeline'
     ;(function poll(n) {
-      if (document.querySelector('.hg-two')) {
+      if (document.querySelector('.tline')) {
         requestAnimationFrame(() => requestAnimationFrame(() => {
           window.dispatchEvent(new CustomEvent('mc:give-up'))
         }))

@@ -8157,8 +8157,17 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    cropped rather than letterboxed: black bars either side of a talking head
    are the opposite of what this screen is for. */
 /* Even halves. Briefly 30/70 at his instruction and corrected back the same
-   day: "maybe i was wrong, make the videos 50%". */
-.tl-stage { position: absolute; inset: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+   day: "maybe i was wrong, make the videos 50%". Still even on any screen
+   this reasoning actually had in mind. His report (2026-09-18), on an
+   ultrawide monitor: a 50vw-wide column is roughly 1700px there, cropping a
+   9:16 clip down to a sliver blown up to fill it -- "expanded so much it's
+   barely visible" was the crop this design's own comment above committed to,
+   just taken to an extreme this screen never got tested at. The column now
+   caps at a real 9:16 shape (100vh tall, 9/16 of that wide) so the clip
+   needs no cropping at all past whatever the window's own proportions force
+   -- on his laptop and most normal screens that's still ~50/50, unchanged
+   from what he asked for; only past that does it stop growing. */
+.tl-stage { position: absolute; inset: 0; display: grid; grid-template-columns: min(50%, calc(100vh * 9 / 16)) minmax(0, 1fr); }
 .tl-reel { position: relative; overflow: hidden; background: #0B0B0C; display: grid; place-items: center; }
 .tl-media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border: 0; }
 .tl-reelempty { position: relative; z-index: 2; max-width: 34ch; padding: 30px; text-align: center; }

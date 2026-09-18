@@ -285,6 +285,16 @@ export function IdeasPage() {
     for (let i = 0; i < 24 && ideaBoard.some((c) => Math.abs(c.x - x) < 40 && Math.abs(c.y - y) < 40); i++) { x += 32; y += 32 }
     setDraft({ mode: 'new', x, y, color })
   }
+  /* The desktop shell's `missioncontrol://new-idea` deep link: same pattern
+     as Cmd+N on Plan, but the listener has to live here rather than in
+     App.tsx, since this page (and this state) doesn't exist until he's
+     actually on Ideas -- the shell dispatches the event only after sending
+     him here and giving the page a couple of frames to mount. */
+  useEffect(() => {
+    const onNewIdea = () => newAtCenter()
+    window.addEventListener('mc:new-idea', onNewIdea)
+    return () => window.removeEventListener('mc:new-idea', onNewIdea)
+  }, [])
   const dropAt = (cx: number, cy: number, color: string) => {
     const p = toWorld(cx, cy)
     setDraft({ mode: 'new', x: p.x - IDEA_W / 2, y: p.y - 20, color })

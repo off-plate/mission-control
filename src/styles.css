@@ -11130,3 +11130,23 @@ body:has(.pp-page) #main { padding-bottom: 0; }
   .pp-bar { flex-wrap: wrap; }
   .pp-bar .pp-count:not(.is-alert) { display: inline-flex; }
 }
+
+/* People: reminders off for a person (his ask, 2026-09-18) -- a plain
+   toggle, and one neutral tone standing in for the whole green-to-red
+   ramp wherever a health colour would otherwise show. */
+.pp-atom.is-untracked .pp-atom-body { opacity: 0.55; }
+.pp-remind-toggle {
+  display: flex; align-items: center; gap: 8px; font-size: 0.82rem; font-weight: 600; color: #5F5A4E; cursor: pointer;
+}
+.pp-remind-toggle input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.pp-remind-switch {
+  position: relative; flex: none; width: 34px; height: 20px; border-radius: 10px;
+  background: #E4E0D6; transition: background-color 160ms var(--pp-ease);
+}
+.pp-remind-switch::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 2px rgba(18, 16, 12, 0.25); transition: transform 160ms var(--pp-ease);
+}
+.pp-remind-toggle input:checked + .pp-remind-switch { background: #3E9B4F; }
+.pp-remind-toggle input:checked + .pp-remind-switch::after { transform: translateX(14px); }
+.pp-remind-toggle input:focus-visible + .pp-remind-switch { outline: 2px solid var(--focus); outline-offset: 2px; }

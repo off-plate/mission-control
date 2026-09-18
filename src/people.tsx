@@ -99,6 +99,11 @@ function healthOf(p: Person, last: PersonContact | null, today: string): Health 
   return { h: Math.max(0, Math.min(1, 1 - days / p.cadenceDays)), days, left: p.cadenceDays - days, last }
 }
 const overdue = (hh: Health) => hh.days === null || hh.left < 0
+/* A person with reminders off keeps this same neutral tone everywhere a
+   health colour would otherwise show, so "off" reads as one clear state
+   rather than as whatever colour their last contact happened to leave
+   them at. */
+const OFF_COLOUR = '#8C877A'
 /* Green when he has just spoken to them, orange halfway to the deadline, red as
    it arrives. Overdue is red outright. */
 const RAMP: [number, number[]][] = [[0, [210, 69, 42]], [0.5, [224, 138, 30]], [1, [62, 155, 79]]]
@@ -373,15 +378,18 @@ export function PeoplePage() {
   const counts = useMemo(() => {
     let over = 0
     let week = 0
+    let tracked = 0
     for (const p of people) {
+      if (p.remindersOff) continue
+      tracked++
       const hh = hOf(p.id)
       if (overdue(hh)) over++
       else if (hh.left <= 7 && hh.h <= 0.5) week++
     }
-    return { over, week, ok: people.length - over - week }
+    return { over, week, ok: tracked - over - week }
   }, [people, health]) // eslint-disable-line react-hooks/exhaustive-deps
   const due = people
-    .filter((p) => !dimmed(p))
+    .filter((p) => !dimmed(p) && !p.remindersOff)
     .map((p) => ({ p, hh: hOf(p.id) }))
     .sort((a, b) => (a.hh.left / a.p.cadenceDays) - (b.hh.left / b.p.cadenceDays) || a.p.name.localeCompare(b.p.name))
 
@@ -490,13 +498,14 @@ export function PeoplePage() {
               const hh = hOf(p.id)
               const R = TIER[p.tier].size
               const pos = posOf(p)
-              const colour = colourOf(hh)
-              const late = overdue(hh)
+              const tracked = !p.remindersOff
+              const colour = tracked ? colourOf(hh) : OFF_COLOUR
+              const late = tracked && overdue(hh)
               return (
                 <g
                   key={p.id}
                   data-person={p.id}
-                  className={`pp-atom${selected === p.id ? ' is-selected' : ''}${dimmed(p) ? ' is-dim' : ''}${late ? ' is-over' : ''}${dragPos?.id === p.id ? ' is-dragging' : ''}`}
+                  className={`pp-atom${selected === p.id ? ' is-selected' : ''}${dimmed(p) ? ' is-dim' : ''}${late ? ' is-over' : ''}${!tracked ? ' is-untracked' : ''}${dragPos?.id === p.id ? ' is-dragging' : ''}`}
                   transform={`translate(${pos.x} ${pos.y})`}
                   tabIndex={0}
                   role="button"
@@ -507,11 +516,15 @@ export function PeoplePage() {
                   <circle className="pp-atom-body" r={R} style={{ fill: colour }} />
                   <text className="pp-atom-initials" fontSize={Math.round(R * 0.62)}>{initials(p.name)}</text>
                   <text className="pp-atom-name" y={R + 15}>{p.name}</text>
-                  <rect className="pp-atom-track" x={-23} y={R + 22} width={46} height={4} rx={2} />
-                  <rect
-                    className="pp-atom-fill" x={-23} y={R + 22} width={46} height={4} rx={2}
-                    style={{ fill: colour, transform: `scaleX(${Math.max(0.001, hh.h)})` }}
-                  />
+                  {tracked && (
+                    <>
+                      <rect className="pp-atom-track" x={-23} y={R + 22} width={46} height={4} rx={2} />
+                      <rect
+                        className="pp-atom-fill" x={-23} y={R + 22} width={46} height={4} rx={2}
+                        style={{ fill: colour, transform: `scaleX(${Math.max(0.001, hh.h)})` }}
+                      />
+                    </>
+                  )}
                   {late && <text className="pp-atom-late" y={R + 40}>{hh.days === null ? 'never' : `${-hh.left}d late`}</text>}
                   <g className="pp-atom-warn" transform={`translate(${Math.round(R * 0.72)} ${-Math.round(R * 0.72)})`}>
                     <circle r={9} />
@@ -550,7 +563,7 @@ export function PeoplePage() {
                       onMouseEnter={() => setHit(i)} onMouseDown={(e) => e.preventDefault()}
                       onClick={() => { select(p.id); setSearchOpen(false) }}
                     >
-                      <span className="pp-search-dot" style={{ background: colourOf(hOf(p.id)) }} />
+                      <span className="pp-search-dot" style={{ background: p.remindersOff ? OFF_COLOUR : colourOf(hOf(p.id)) }} />
                       <span className="pp-search-name">{p.name}</span>
                       <span className="pp-search-meta">{[p.rel, p.job].filter(Boolean).join(', ') || TIER[p.tier].label}</span>
                     </button>
@@ -678,7 +691,7 @@ function PersonCard({
   contacts: PersonContact[]
   today: string
   onClose: () => void
-  onPatch: (patch: Partial<Pick<Person, 'name' | 'rel' | 'cadenceDays' | 'job' | 'birthday' | 'birthYear' | 'nameDayAs'>>) => void
+  onPatch: (patch: Partial<Pick<Person, 'name' | 'rel' | 'cadenceDays' | 'job' | 'birthday' | 'birthYear' | 'nameDayAs' | 'remindersOff'>>) => void
   onTier: (tier: PersonTier) => void
   onLog: (day: string, ch: ContactChannel) => void
   onUnlog: (id: string) => void
@@ -709,12 +722,14 @@ function PersonCard({
     .filter((x): x is { bond: typeof x.bond; other: Person } => !!x.other)
   const unlinked = people.filter((p) => p.id !== person.id && !linked.some((l) => l.other.id === p.id))
   const history = [...contacts].sort((a, b) => (a.day === b.day ? b.createdAt - a.createdAt : a.day < b.day ? 1 : -1))
-  const colour = colourOf(hh)
-  const dueText = hh.days === null ? 'Log a first one'
-    : hh.left < 0 ? `${-hh.left} days overdue`
-      : hh.left === 0 ? 'Due today'
-        : `Due in ${hh.left} days`
-  const dueTone = overdue(hh) ? 'is-alert' : hh.left <= 7 && hh.h <= 0.5 ? 'is-warn' : 'is-good'
+  const tracked = !person.remindersOff
+  const colour = tracked ? colourOf(hh) : OFF_COLOUR
+  const dueText = !tracked ? 'Reminders are off for them'
+    : hh.days === null ? 'Log a first one'
+      : hh.left < 0 ? `${-hh.left} days overdue`
+        : hh.left === 0 ? 'Due today'
+          : `Due in ${hh.left} days`
+  const dueTone = !tracked ? '' : overdue(hh) ? 'is-alert' : hh.left <= 7 && hh.h <= 0.5 ? 'is-warn' : 'is-good'
 
   return (
     <div className="pp-card-scroll">
@@ -730,11 +745,16 @@ function PersonCard({
       </div>
 
       <div className="pp-health">
-        <div className="pp-health-big"><i style={{ background: colour, transform: `scaleX(${Math.max(0.001, hh.h)})` }} /></div>
+        {tracked && <div className="pp-health-big"><i style={{ background: colour, transform: `scaleX(${Math.max(0.001, hh.h)})` }} /></div>}
         <div className="pp-health-lines">
           <span className="pp-when">{sinceLabel(hh)}</span>
           <span className={`pp-due-txt ${dueTone}`}>{dueText}</span>
         </div>
+        <label className="pp-remind-toggle">
+          <input type="checkbox" checked={tracked} onChange={(e) => onPatch({ remindersOff: !e.target.checked })} />
+          <span className="pp-remind-switch" aria-hidden="true" />
+          Remind me to reach out
+        </label>
       </div>
 
       <AboutPerson person={person} today={today} onPatch={onPatch} />
@@ -742,7 +762,7 @@ function PersonCard({
       <div className="pp-row2">
         <div className="pp-field"><span>Talk to them</span>
           <Select
-            className="pp-dd" ariaLabel="How often to talk to them" value={person.cadenceDays}
+            className="pp-dd" ariaLabel="How often to talk to them" value={person.cadenceDays} disabled={!tracked}
             onChange={(n) => onPatch({ cadenceDays: n })}
             options={[
               ...CADENCES.map(([n, l]) => ({ value: n, label: l })),

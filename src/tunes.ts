@@ -4,9 +4,10 @@
    give-up screen takes reels, and open a list to play any of them directly
    rather than skipping through with the transport.
 
-   The curated Mundi Opus queue stays as what plays when he has added nothing,
-   so the room is never silent on a fresh install. The moment he pastes a
-   library, that is the queue.
+   The live Mundi Opus playlist (mundiplayer.tsx resolves it through the
+   YouTube IFrame API itself, no key needed) stays as what plays when he has
+   added nothing of his own, so the room is never silent on a fresh install.
+   The moment he pastes a library, that is the queue.
 
    TITLES ARE REAL AND FREE. YouTube's oEmbed endpoint returns a video's title
    with no key and no quota, and it sends access-control-allow-origin for this
@@ -15,7 +16,7 @@
    whole life rather than thirty every time the sheet opens. A title that
    cannot be fetched falls back to the video id, which is still something he
    can recognise, and nothing fails. */
-import { MUNDI_OPUS_QUEUE, type Track } from './mundiopus'
+import type { Track } from './mundiopus'
 
 /** The id out of any shape he might paste. Same reading as watchless.ts, and
  *  deliberately forgiving: a link with a playlist or a timestamp on it is
@@ -48,15 +49,13 @@ export function parseTunes(text: string): string[] {
   return out
 }
 
-/** What the player actually plays: his library when he has one, the curated
- *  channel when he does not. */
-export function tunePool(his: string[] | undefined): Track[] {
+/** What the player actually plays: his library when he has one, the live
+ *  Mundi Opus playlist (resolved by the caller, mundiplayer.tsx, since only
+ *  the actual YouTube player can ask it what it currently holds) when he
+ *  does not. */
+export function tunePool(his: string[] | undefined, live: Track[]): Track[] {
   const mine = (his ?? []).map(tuneId).filter((v): v is string => !!v)
-  if (!mine.length) return MUNDI_OPUS_QUEUE
-  /* No title of their own: these are looked up. The curated queue keeps its
-     hand-written names ("You are coding a new exciting project - The Social
-     Network"), which are better than what YouTube would return, so nothing
-     fetches over them. */
+  if (!mine.length) return live
   return mine.map((id) => ({ id, title: '' }))
 }
 

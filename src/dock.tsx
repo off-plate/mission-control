@@ -392,7 +392,11 @@ export function Dock() {
            the menu with no real hover at all. Sitting outside .dock's own
            hover-tracked box means mounting or resizing these can never
            change what .dock thinks is under the pointer. */}
-        {!open && (mo.playing || pomo.phase !== 'idle') && (
+        {/* His report (2026-09-18): this duplicated the Zone's own big
+           countdown and its own player (ZonePlayer) while he was looking
+           right at both. Everywhere else, this is the only notice he has
+           that either is running. */}
+        {!open && page !== 'zone' && (mo.playing || pomo.phase !== 'idle') && (
           <div className="dock-notify">
             {mo.playing && <MediaBadge />}
             {pomo.phase !== 'idle' && <PomodoroBadge />}

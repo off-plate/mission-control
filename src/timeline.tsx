@@ -25,7 +25,7 @@
                manual click. Not scored: see the note in momentum.ts for why
                a 25-point bonus landing on the wheel the day he connects a
                tracker is not a call this column gets to make alone. */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useStore } from './store'
 import { CookieJarNav, readJarView, takeGiveUpRequest, writeJarView } from './cookiejarnav'
 import { dayOf, daysSince, useHealth } from './health'
@@ -773,8 +773,14 @@ function useLocalNames(localReels: LocalReel[]): Map<string, string> {
   return useMemo(() => new Map(localReels.map((r) => [r.url, r.name])), [localReels])
 }
 
-function Reel({ url, label, count, onOpenLibrary, onNext }: {
+function Reel({ url, label, count, onOpenLibrary, onNext, onRatio }: {
   url: string; label?: string; count: number; onOpenLibrary: () => void; onNext: () => void
+  /** His report (2026-09-18): the column was sized to a flat 9:16 guess, and
+   *  a real reel that isn't exactly that (4:5 is common) got cropped harder
+   *  than before to fill a box shaped for a clip it wasn't. Null between
+   *  clips (or for YouTube/Vimeo, which this can't measure) falls back to
+   *  9:16 in the parent rather than carrying over the last clip's shape. */
+  onRatio?: (r: number | null) => void
 }) {
   const vid = useRef<HTMLVideoElement>(null)
   const [sound, setSound] = useState(true)
@@ -802,7 +808,7 @@ function Reel({ url, label, count, onOpenLibrary, onNext }: {
   const cached = kind === 'instagram' ? reelFiles?.[url] : undefined
   const [attempt, setAttempt] = useState<{ url: string; failed: boolean; message: string } | null>(null)
 
-  useEffect(() => { setFailed(false); setSound(true) }, [url])
+  useEffect(() => { setFailed(false); setSound(true); onRatio?.(null) }, [url])
 
   useEffect(() => {
     if (kind !== 'instagram' || cached || attempt?.url === url) return
@@ -852,7 +858,14 @@ function Reel({ url, label, count, onOpenLibrary, onNext }: {
           embed, both used to replay the SAME clip forever -- so nothing here
           ever advanced on its own, only the manual Next button did. */}
       {!failed && effectiveKind === 'file' && (
-        <video ref={vid} className="tl-media" src={playable ?? undefined} autoPlay playsInline onEnded={onNext} onError={() => setFailed(true)} />
+        <video
+          ref={vid} className="tl-media" src={playable ?? undefined} autoPlay playsInline
+          onEnded={onNext} onError={() => setFailed(true)}
+          onLoadedMetadata={(e) => {
+            const v = e.currentTarget
+            if (v.videoWidth > 0 && v.videoHeight > 0) onRatio?.(v.videoWidth / v.videoHeight)
+          }}
+        />
       )}
       {!failed && kind === 'youtube' && (
         <YouTubeReel url={url} sound={sound} paused={paused} onEnded={onNext} onFail={() => setFailed(true)} />
@@ -865,7 +878,15 @@ function Reel({ url, label, count, onOpenLibrary, onNext }: {
         <iframe key={`${url}|${sound}`} className="tl-media" src={embedSrc(url, sound)} title="Reel"
           allow="autoplay; encrypted-media" frameBorder="0" />
       )}
-      {!failed && kind === 'other' && <img className="tl-media" src={url} alt="" onError={() => setFailed(true)} />}
+      {!failed && kind === 'other' && (
+        <img
+          className="tl-media" src={url} alt="" onError={() => setFailed(true)}
+          onLoad={(e) => {
+            const img = e.currentTarget
+            if (img.naturalWidth > 0 && img.naturalHeight > 0) onRatio?.(img.naturalWidth / img.naturalHeight)
+          }}
+        />
+      )}
 
       {fetchingInstagram && (
         <div className="tl-reelempty">
@@ -1209,6 +1230,10 @@ function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney |
     return i
   })
   const url = pool.length ? pool[skip % pool.length] : ''
+  /* Measured from the real clip (see Reel's onRatio); null -- between clips,
+     or for YouTube/Vimeo, which this can't measure -- falls back to 9:16
+     rather than freezing the previous clip's shape. */
+  const [reelRatio, setReelRatio] = useState<number | null>(null)
 
   const clock = useMemo(() => countdown(), [])
 
@@ -1270,8 +1295,8 @@ function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney |
           so the menu never left the screen; he does not want the menu here,
           he wants the screen. The cross is the way out, plus Escape. */}
       <button className="tl-close" onClick={onBack} aria-label="Close">&#10005;</button>
-      <div className="tl-stage">
-        <Reel url={url} label={localNames.get(url)} count={pool.length} onOpenLibrary={() => setLib(true)} onNext={advanceReel} />
+      <div className="tl-stage" style={{ '--reel-ratio': reelRatio ?? 9 / 16 } as CSSProperties}>
+        <Reel url={url} label={localNames.get(url)} count={pool.length} onOpenLibrary={() => setLib(true)} onNext={advanceReel} onRatio={setReelRatio} />
         <div className="tl-status">
           {/* THE COUNTDOWN, his instruction: days, weeks and hours to the
               fourteenth of February. It is the hero because it is the only

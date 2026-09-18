@@ -45,6 +45,20 @@ protocol.registerSchemesAsPrivileged([{
    running process agree with it, including in `npm run desktop`. */
 app.setName('Mission Control')
 
+/* External automations (a Shortcuts.app shortcut, a keyboard-triggered launcher)
+   reach the app through this instead of faking a click or a keystroke -- opening
+   a URL needs no Accessibility or Automation permission, unlike driving the app
+   via System Events. `missioncontrol://new-task` and `missioncontrol://new-idea`
+   are the two actions so far. */
+const DEEPLINK_SCHEME = 'missioncontrol'
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient(DEEPLINK_SCHEME, process.execPath, [path.resolve(process.argv[1])])
+  }
+} else {
+  app.setAsDefaultProtocolClient(DEEPLINK_SCHEME)
+}
+
 /* Development and the QA suites run against their own profile. The single
    -instance lock lives in userData, so without this a dev run cannot start
    while the installed app is open, and worse, a test run would read and write
@@ -143,6 +157,7 @@ function createWindow() {
     if (!url.startsWith(ORIGIN)) { e.preventDefault(); void shell.openExternal(url) }
   })
 
+  win.webContents.once('did-finish-load', flushPendingDeepLink)
   void win.loadURL(START)
 }
 
@@ -153,6 +168,71 @@ function go(page) {
   if (!win) return
   void win.webContents.executeJavaScript(`location.hash = '/${page}'`)
 }
+
+function focusWindow() {
+  if (!win) return
+  if (win.isMinimized()) win.restore()
+  win.show()
+  app.focus({ steal: true })
+  win.focus()
+}
+
+function triggerNewTask() {
+  if (!win) return
+  focusWindow()
+  void win.webContents.executeJavaScript(`window.dispatchEvent(new CustomEvent('mc:new-task'))`)
+}
+
+/* Ideas is lazy-loaded (a separate chunk behind a Suspense boundary) and its
+   "new sticky" state lives inside that page component, not App.tsx -- unlike
+   New Task, there's no listener sitting there permanently to catch the event.
+   A fixed frame count raced the chunk load and lost, so this polls for the
+   board's own root element instead of guessing how long mounting takes. */
+function triggerNewIdea() {
+  if (!win) return
+  focusWindow()
+  void win.webContents.executeJavaScript(`
+    location.hash = '/ideas'
+    ;(function poll(n) {
+      if (document.querySelector('.ib-board')) {
+        /* The element existing only proves React committed the DOM; its
+           useEffect (which is what actually attaches the mc:new-idea
+           listener) runs after paint, a beat later still. Two more frames
+           covers that gap the same way the New Task listener's own comment
+           already reasons about it. */
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          window.dispatchEvent(new CustomEvent('mc:new-idea'))
+        }))
+      } else if (n < 60) {
+        requestAnimationFrame(() => poll(n + 1))
+      }
+    })(0)
+  `)
+}
+
+/* Launched cold via the deep link, `win` doesn't exist (or hasn't finished its
+   first load) yet when `open-url` fires -- queued here and flushed once the
+   window's first page load actually completes. Already-running is the common
+   case and needs none of this: win exists and isn't loading, so it runs right
+   away in handleDeepLink below. */
+let pendingDeepLink = null
+function flushPendingDeepLink() {
+  const action = pendingDeepLink
+  pendingDeepLink = null
+  if (action === 'new-task') triggerNewTask()
+  if (action === 'new-idea') triggerNewIdea()
+}
+function handleDeepLink(url) {
+  let action
+  try { action = new URL(url).hostname || '' } catch { return }
+  if (win && !win.webContents.isLoadingMainFrame()) {
+    pendingDeepLink = action
+    flushPendingDeepLink()
+  } else {
+    pendingDeepLink = action
+  }
+}
+app.on('open-url', (event, url) => { event.preventDefault(); handleDeepLink(url) })
 
 function buildMenu() {
   const isMac = process.platform === 'darwin'
@@ -172,7 +252,7 @@ function buildMenu() {
     {
       label: 'File',
       submenu: [
-        { label: 'New Task', accelerator: 'Cmd+N', click: () => { if (win) void win.webContents.executeJavaScript(`window.dispatchEvent(new CustomEvent('mc:new-task'))`) } },
+        { label: 'New Task', accelerator: 'Cmd+N', click: triggerNewTask },
         { type: 'separator' },
         isMac ? { role: 'close' } : { role: 'quit' },
       ],

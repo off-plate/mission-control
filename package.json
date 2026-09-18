@@ -42,6 +42,14 @@
       "package.json"
     ],
     "asar": true,
+    "protocols": [
+      {
+        "name": "Mission Control Deep Link",
+        "schemes": [
+          "missioncontrol"
+        ]
+      }
+    ],
     "mac": {
       "category": "public.app-category.productivity",
       "target": [

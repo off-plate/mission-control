@@ -14,7 +14,7 @@
    to be able to see: whether the "art" is a still or the frame itself. */
 
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { MUNDI_OPUS_QUEUE, type Track } from './mundiopus'
+import { MUNDI_OPUS_PLAYLIST_ID, readResume, saveResume, type Track } from './mundiopus'
 import { tunePool } from './tunes'
 import { useStore } from './store'
 
@@ -98,20 +98,40 @@ export function MundiOpusProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false)
   const [started, setStarted] = useState(false)
   const { tunes } = useStore()
-  /* His library if he has pasted one, the curated channel if not. */
-  const queue = useMemo(() => tunePool(tunes), [tunes])
+  /* Read once: this is what he was listening to and how far in, from
+     whenever this device last had the player open. */
+  const resumeRef = useRef(readResume())
+  /* The live playlist's own member ids, learned from the player itself once
+     it has actually cued the playlist (see the onStateChange below) -- empty
+     until then, which is also what makes the room silent for the one beat
+     before that happens rather than showing anything stale or wrong. */
+  const [liveQueue, setLiveQueue] = useState<Track[]>([])
+  const gotLiveQueue = useRef(false)
+  /* His library if he has pasted one, the live playlist if not. */
+  const queue = useMemo(() => tunePool(tunes, liveQueue), [tunes, liveQueue])
   const queueRef = useRef(queue)
   useEffect(() => { queueRef.current = queue }, [queue])
-  const [track, setTrack] = useState(0)
+  const [track, setTrack] = useState(resumeRef.current.index)
+  const trackRef = useRef(track)
+  useEffect(() => { trackRef.current = track }, [track])
   const [playing, setPlaying] = useState(false)
   const [pos, setPos] = useState(0)
   const [dur, setDur] = useState(0)
-  const [loop, setLoop] = useState(false)
-  const [shuffle, setShuffle] = useState(false)
+  const [loop, setLoop] = useState(resumeRef.current.loop)
+  const [shuffle, setShuffle] = useState(resumeRef.current.shuffle)
   const loopRef = useRef(loop)
   const shuffleRef = useRef(shuffle)
   useEffect(() => { loopRef.current = loop }, [loop])
   useEffect(() => { shuffleRef.current = shuffle }, [shuffle])
+  /* Set right before an ended-track advance and read once by the load effect
+     below. `playing` itself is already false by then -- onStateChange just
+     set it, for the track that just finished -- so without this the load
+     effect reads a stale "not playing" and only cues the next track instead
+     of starting it: the room would go quiet at the end of every song instead
+     of moving on. */
+  const autoAdvanceRef = useRef(false)
+  /** Set by toggle() when there is no player yet, read once by onReady. */
+  const autoplayOnReadyRef = useRef(false)
 
   /* Nothing is loaded until something asks for it. The provider sits above the
      whole app, so building the player on mount pulled a YouTube embed into
@@ -124,8 +144,13 @@ export function MundiOpusProvider({ children }: { children: ReactNode }) {
     let alive = true
     void loadYouTubeApi().then(() => {
       if (!alive || !mountRef.current) return
+      /* Nothing pasted: there is no video id to hand the constructor, because
+         the whole point is that the real list only exists on YouTube's side.
+         Built with no videoId, then cued to the live playlist in onReady,
+         which is what actually resolves it -- see the onStateChange below. */
+      const initialId = queueRef.current[0]?.id
       playerRef.current = new window.YT.Player(mountRef.current, {
-        videoId: (queueRef.current[0] ?? MUNDI_OPUS_QUEUE[0]).id,
+        ...(initialId ? { videoId: initialId } : {}),
         playerVars: { rel: 0, modestbranding: 1, iv_load_policy: 3, playsinline: 1 },
         events: {
           /* No compute-pressure grant here any more. There was one, setting
@@ -137,9 +162,41 @@ export function MundiOpusProvider({ children }: { children: ReactNode }) {
              on it. The gate treats the resulting console line as the
              third-party noise it is, rather than keeping code that looks
              like a fix and is not one. */
-          onReady: () => setReady(true),
+          onReady: () => {
+            const p = playerRef.current
+            const r = resumeRef.current
+            if (!initialId) {
+              p.cuePlaylist({ listType: 'playlist', list: MUNDI_OPUS_PLAYLIST_ID, index: r.index, startSeconds: r.pos })
+            } else if (r.pos > 3) {
+              p.seekTo(r.pos, true)
+            }
+            setReady(true)
+            /* Pressing play before the player has ever been built (including
+               the `missioncontrol://zone-play` shortcut, which may be the
+               very first thing that opens the Zone this session) used to
+               only get as far as building and cueing it -- cueVideoById and
+               a bare constructor videoId both cue, neither plays, so the
+               room stayed silent until he pressed play a second time.
+               toggle() sets this flag for exactly that case. */
+            if (autoplayOnReadyRef.current) {
+              autoplayOnReadyRef.current = false
+              setStarted(true)
+              p.playVideo()
+            }
+          },
           onStateChange: (e: any) => {
             setPlaying(e.data === 1)
+            /* The live playlist's real member ids, learned the first moment
+               the player actually has them (YouTube's own current list, not
+               anything fetched or guessed here) -- and only the first time:
+               a playlist changing mid-session is not worth re-polling for. */
+            if (!gotLiveQueue.current) {
+              const ids: string[] = playerRef.current?.getPlaylist?.() ?? []
+              if (ids.length) {
+                gotLiveQueue.current = true
+                setLiveQueue(ids.map((id) => ({ id, title: '' })))
+              }
+            }
             if (e.data !== 0) return
             // ENDED: repeat replays what just finished, otherwise move on
             // myself, shuffled or not. Never YouTube's own next pick.
@@ -147,6 +204,7 @@ export function MundiOpusProvider({ children }: { children: ReactNode }) {
               playerRef.current?.seekTo(0, true)
               playerRef.current?.playVideo()
             } else {
+              autoAdvanceRef.current = true
               setTrack((i) => nextIndex(i, shuffleRef.current, queueRef.current.length))
             }
           },
@@ -177,11 +235,23 @@ export function MundiOpusProvider({ children }: { children: ReactNode }) {
     if (first.current) { first.current = false; return }
     const p = playerRef.current
     if (!p || !rowId) return
-    if (playing) p.loadVideoById(rowId)
+    /* Already exactly this video -- the live-playlist bootstrap in onReady
+       just cued it, at his resumed position, before this effect's first real
+       run ever saw a real rowId to compare against. Reloading it here would
+       be a no-op at best and, at worst, throws that resume position away. */
+    if (p.getVideoData?.()?.video_id === rowId) return
+    const shouldPlay = playing || autoAdvanceRef.current
+    autoAdvanceRef.current = false
+    if (shouldPlay) p.loadVideoById(rowId)
     else p.cueVideoById(rowId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rowId, ready])
 
+  /* His report (2026-09-18): the room always came back at 0:00, whatever was
+     playing when he last closed it. Every half-second while the player is
+     up, this hands the current spot to localStorage (mundiopus.ts), and
+     onReady above hands it right back next time -- cued, never auto-played,
+     so it's there to resume rather than something that starts on its own. */
   useEffect(() => {
     if (!ready) return
     const t = window.setInterval(() => {
@@ -189,18 +259,43 @@ export function MundiOpusProvider({ children }: { children: ReactNode }) {
       if (!p?.getCurrentTime) return
       setPos(p.getCurrentTime() ?? 0)
       setDur(p.getDuration() ?? 0)
+      saveResume({ index: trackRef.current, pos: p.getCurrentTime() ?? 0, loop: loopRef.current, shuffle: shuffleRef.current })
     }, 500)
     return () => window.clearInterval(t)
   }, [ready])
 
+  useEffect(() => {
+    const onUnload = () => {
+      const p = playerRef.current
+      if (!p?.getCurrentTime) return
+      saveResume({ index: trackRef.current, pos: p.getCurrentTime() ?? 0, loop: loopRef.current, shuffle: shuffleRef.current })
+    }
+    window.addEventListener('beforeunload', onUnload)
+    return () => window.removeEventListener('beforeunload', onUnload)
+  }, [])
+
   const toggle = () => {
     const p = playerRef.current
-    if (!p) { setWanted(true); setStarted(true); return }
+    if (!p) { autoplayOnReadyRef.current = true; setWanted(true); setStarted(true); return }
     /* Set the instant he asks for it, not on the iframe's own confirmation
        that it actually started: that is a network round trip to YouTube,
        and the corner badge showing up should not wait on it. */
     if (playing) { p.pauseVideo() } else { setStarted(true); p.playVideo() }
   }
+
+  /* The desktop shell's `missioncontrol://zone-play` deep link: open the
+     room and make sure it's actually playing, one press away or none at
+     all. Reuses toggle() rather than reaching for the player directly, so
+     it gets the same "not built yet" handling above for free. */
+  useEffect(() => {
+    const onZonePlay = () => {
+      location.hash = '/zone'
+      if (!playing) toggle()
+    }
+    window.addEventListener('mc:zone-play', onZonePlay)
+    return () => window.removeEventListener('mc:zone-play', onZonePlay)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing])
   const go = (by: 1 | -1) => setTrack((i) => {
     const len = Math.max(1, queueRef.current.length)
     return (i + by + len) % len

@@ -48,8 +48,8 @@ app.setName('Mission Control')
 /* External automations (a Shortcuts.app shortcut, a keyboard-triggered launcher)
    reach the app through this instead of faking a click or a keystroke -- opening
    a URL needs no Accessibility or Automation permission, unlike driving the app
-   via System Events. `missioncontrol://new-task` and `missioncontrol://new-idea`
-   are the two actions so far. */
+   via System Events. `missioncontrol://new-task`, `missioncontrol://new-idea`
+   and `missioncontrol://zone-play` are the actions so far. */
 const DEEPLINK_SCHEME = 'missioncontrol'
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
@@ -177,21 +177,39 @@ function focusWindow() {
   win.focus()
 }
 
+/* A warm app (already open, the common case) has React mounted long before
+   any of this runs, so the dispatch below always lands. A cold launch is a
+   real race, though: `did-finish-load` (what flushes a queued deep link)
+   fires once the document itself has loaded, which is well before React has
+   rendered anything, let alone attached the listener that's supposed to
+   catch this event. `.topbar` is on every page once App.tsx has mounted, so
+   polling for it covers every trigger below with one guard instead of each
+   one guessing its own timing. */
+function runWhenAppReady(script) {
+  if (!win) return
+  void win.webContents.executeJavaScript(`
+    ;(function poll(n) {
+      if (document.querySelector('.topbar')) { ${script} }
+      else if (n < 60) { requestAnimationFrame(() => poll(n + 1)) }
+    })(0)
+  `)
+}
+
 function triggerNewTask() {
   if (!win) return
   focusWindow()
-  void win.webContents.executeJavaScript(`window.dispatchEvent(new CustomEvent('mc:new-task'))`)
+  runWhenAppReady(`window.dispatchEvent(new CustomEvent('mc:new-task'))`)
 }
 
 /* Ideas is lazy-loaded (a separate chunk behind a Suspense boundary) and its
-   "new sticky" state lives inside that page component, not App.tsx -- unlike
-   New Task, there's no listener sitting there permanently to catch the event.
-   A fixed frame count raced the chunk load and lost, so this polls for the
-   board's own root element instead of guessing how long mounting takes. */
+   "new sticky" state lives inside that page component, not App.tsx -- so on
+   top of the app-mount race every trigger has, this needs a second wait for
+   the board's own root element, since that chunk can still load after the
+   topbar is already up. */
 function triggerNewIdea() {
   if (!win) return
   focusWindow()
-  void win.webContents.executeJavaScript(`
+  runWhenAppReady(`
     location.hash = '/ideas'
     ;(function poll(n) {
       if (document.querySelector('.ib-board')) {
@@ -210,6 +228,15 @@ function triggerNewIdea() {
   `)
 }
 
+/* The Mundi Opus provider (mundiplayer.tsx) sits at the app root, so once
+   the topbar guard above has cleared, its mc:zone-play listener is already
+   there -- no second, page-specific wait needed the way Ideas has one. */
+function triggerZonePlay() {
+  if (!win) return
+  focusWindow()
+  runWhenAppReady(`window.dispatchEvent(new CustomEvent('mc:zone-play'))`)
+}
+
 /* Launched cold via the deep link, `win` doesn't exist (or hasn't finished its
    first load) yet when `open-url` fires -- queued here and flushed once the
    window's first page load actually completes. Already-running is the common
@@ -221,6 +248,7 @@ function flushPendingDeepLink() {
   pendingDeepLink = null
   if (action === 'new-task') triggerNewTask()
   if (action === 'new-idea') triggerNewIdea()
+  if (action === 'zone-play') triggerZonePlay()
 }
 function handleDeepLink(url) {
   let action

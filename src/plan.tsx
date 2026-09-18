@@ -635,6 +635,15 @@ export function PlanPage() {
     setFocusTaskId(t.id)
     setSearch('')
   }
+  /* Dismissing the "came back overnight" banner without resolving anything --
+     keyed to the date it was shown, in localStorage so a reload the same day
+     doesn't bring it right back. */
+  const [handoffDismissed, setHandoffDismissed] = useState(() => localStorage.getItem('mc-handoff-dismissed') === localDateKey())
+  const dismissHandoff = (returnedOn: string | undefined) => {
+    if (!returnedOn) return
+    try { localStorage.setItem('mc-handoff-dismissed', returnedOn) } catch { /* private mode */ }
+    setHandoffDismissed(true)
+  }
   const [listDropOver, setListDropOver] = useState(false)
   const [quick, setQuick] = useState('')
   const [breakdownFor, setBreakdownFor] = useState<Task | null>(null)
@@ -919,7 +928,7 @@ export function PlanPage() {
       {/* Counted live against the tasks themselves: the bar names unfinished
           work, so finishing it (or deleting it) takes the bar away. A banner
           about work already done is nagging, not information. */}
-      {plan.returnedOn === localDateKey() && returnedLeft.length > 0 && (
+      {plan.returnedOn === localDateKey() && returnedLeft.length > 0 && !handoffDismissed && (
         <div className="handoff">
           <span className="grow">
             {returnedLeft.length === 1
@@ -935,6 +944,19 @@ export function PlanPage() {
               unsorted, still his to place. */}
           <button className="btn btn-primary" onClick={() => { moveTasksToToday(returnedLeft); setDayOffset(0) }}>
             Replan {returnedLeft.length === 1 ? 'it' : `all ${returnedLeft.length}`} for today
+          </button>
+          {/* His report (2026-09-18): "I should be able to dismiss this
+              notification." Dismissing isn't resolving -- the tasks stay
+              exactly where they are, back on the list -- it just stops
+              saying so again for a day already acknowledged. Keyed to the
+              date it was shown, so a genuinely new rollover on a later day
+              still says its piece once. */}
+          <button
+            className="handoff-close"
+            onClick={() => dismissHandoff(plan.returnedOn)}
+            aria-label="Dismiss"
+          >
+            <Icon.Close size={14} />
           </button>
         </div>
       )}

@@ -21,7 +21,7 @@
 
 import { activeModel, getAiKey, request, stripReasoning } from './ai'
 import { getTtsKey, hasTtsKey } from './speech'
-import type { HabitFrequency, PageId, RoutineCadence } from './types'
+import type { HabitFrequency, PageId, PersonTier, RoutineCadence } from './types'
 
 /** What a card shows. The app owns every one of these; the model only names one. */
 export type CardKind =
@@ -173,6 +173,23 @@ export type Action =
    *  action: running one is ticking its own first step, on the Routines
    *  page itself, the same way it always has been. */
   | { kind: 'addRoutine'; title: string; cadence?: RoutineCadence; blurb?: string }
+  /** "Add my brother Tomáš, inner circle, born March 3rd" -- a real person
+   *  on the People page (the molecule), placed on the ring that circle
+   *  draws automatically the same way the page's own "+" does. Dictating
+   *  several people is several of these in one turn, one per person, his
+   *  own words for name/rel/job -- never invented, and never merged into
+   *  one action. tier is the circle; see CIRCLES below for the words that
+   *  map to each one. birthday is MM-DD only, since that is all the page
+   *  itself ever stores; a year mentioned alongside it is birthYear,
+   *  separate. cadenceDays is never set here -- the circle's own default
+   *  is exactly right unless he explicitly asks to be reminded on a
+   *  different schedule, which is editPerson's job, not this one's. */
+  | { kind: 'addPerson'; name: string; tier: PersonTier; rel?: string; job?: string; birthday?: string; birthYear?: number }
+  /** "Move Tomáš to close friends" / "Jiří's birthday is June 2nd" -- a real
+   *  patch to an EXISTING person, match against their name, only the
+   *  fields he actually named. cadenceDays is the one field addPerson
+   *  never sets: "remind me about her every 30 days" lands here. */
+  | { kind: 'editPerson'; match: string; tier?: PersonTier; rel?: string; job?: string; birthday?: string; birthYear?: number; cadenceDays?: number }
 
 /** A section header naming which part of the day the lines under it belong
  *  to -- "Morning:", "Noon", "Afternoon:", whatever case. */
@@ -234,6 +251,10 @@ const SLOTS_OK: Slot[] = ['morning', 'noon', 'afternoon', 'evening']
 const WHERE_OK: Where[] = ['today', 'backlog']
 const FREQ_OK: HabitFrequency[] = ['daily', 'weekdays', 'times-per-week', 'weekly', 'monthly']
 const CADENCE_OK: RoutineCadence[] = ['daily', 'prework', 'weekly', 'monthly']
+const TIER_OK: PersonTier[] = ['core', 'close', 'friends', 'business', 'wider', 'distant']
+/** Birthday as MM-DD, exactly what the People page itself stores -- see
+ *  Person.birthday in types/people.ts. A year on its own is not a date. */
+const BIRTHDAY_RE = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/
 const SPACE_OK: Space[] = ['personal', 'work', 'offplate', 'corner']
 /** Every real page he can be sent to, and nothing else. 'day' takes a date
  *  in its own route with nowhere for the model to safely supply one;
@@ -368,6 +389,26 @@ function cleanActions(raw: unknown): Action[] {
         const title = str(o.title, 200)
         const cadence = CADENCE_OK.includes(o.cadence as RoutineCadence) ? (o.cadence as RoutineCadence) : undefined
         if (title) out.push({ kind: 'addRoutine', title, cadence, blurb: str(o.blurb, 300) || undefined })
+        break
+      }
+      case 'addPerson': {
+        const name = str(o.name, 120)
+        const tier = TIER_OK.includes(o.tier as PersonTier) ? (o.tier as PersonTier) : undefined
+        const birthday = typeof o.birthday === 'string' && BIRTHDAY_RE.test(o.birthday) ? o.birthday : undefined
+        const birthYear = typeof o.birthYear === 'number' && o.birthYear > 1900 && o.birthYear <= new Date().getFullYear() ? Math.round(o.birthYear) : undefined
+        if (name && tier) {
+          out.push({ kind: 'addPerson', name, tier, rel: str(o.rel, 80) || undefined, job: str(o.job, 120) || undefined, birthday, birthYear })
+        }
+        break
+      }
+      case 'editPerson': {
+        const tier = TIER_OK.includes(o.tier as PersonTier) ? (o.tier as PersonTier) : undefined
+        const birthday = typeof o.birthday === 'string' && BIRTHDAY_RE.test(o.birthday) ? o.birthday : undefined
+        const birthYear = typeof o.birthYear === 'number' && o.birthYear > 1900 && o.birthYear <= new Date().getFullYear() ? Math.round(o.birthYear) : undefined
+        const cadenceDays = typeof o.cadenceDays === 'number' && o.cadenceDays > 0 && o.cadenceDays <= 3650 ? Math.round(o.cadenceDays) : undefined
+        if (match) {
+          out.push({ kind: 'editPerson', match, tier, rel: str(o.rel, 80) || undefined, job: str(o.job, 120) || undefined, birthday, birthYear, cadenceDays })
+        }
         break
       }
       default: break
@@ -575,6 +616,8 @@ The whole vocabulary, and nothing outside it works:
 {"kind":"archiveHabit","match":"..."}                 archives a real habit or quit; history stays
 {"kind":"editHabit","match":"...","name":"...","frequency":"..."}  patches only the fields given
 {"kind":"addRoutine","title":"...","cadence":"daily"|"prework"|"weekly"|"monthly","blurb":"..."}  a real routine
+{"kind":"addPerson","name":"...","tier":"core"|"close"|"friends"|"business"|"wider"|"distant","rel":"...","job":"...","birthday":"MM-DD","birthYear":1990}  a real person on the People page (the molecule); only name and tier are required
+{"kind":"editPerson","match":"person's name","tier":"...","rel":"...","job":"...","birthday":"MM-DD","cadenceDays":30}  patches only the fields given, on a person who already exists
 
 "match" is words out of the real title as it appears in the briefing above, not
 a description of it. "add" carries HIS words for the new task, off the message
@@ -642,6 +685,36 @@ ran.
 There is no "Jarvis mode" or "Ironman mode" anywhere in this app -- if he
 asks for one, say plainly that it does not exist rather than guessing at
 what it might mean or pretending some other action is it.
+
+
+PEOPLE (the molecule): "addPerson" and "editPerson" reach the People page,
+where everyone he keeps in his life sits on a ring around him by how close
+they are. He dictates several at once ("add my brother Tomáš, inner circle,
+and my accountant Petr, business, his birthday's April 4th") -- that is
+several addPerson actions in the same "do", one per person, same rule as a
+pasted day plan: every person he named, not a sample of them.
+
+CIRCLES map from his own words, not a fixed vocabulary he has to use:
+- core: immediate family, his partner, his closest few people ("inner
+  circle", "my closest friends", "family")
+- close: real friends he is actually close with
+- friends: friends, a wider but still personal circle
+- business: a work relationship, a client, a colleague, an accountant --
+  anyone the tie is professional, even if he also likes them
+- wider: people he knows and likes but rarely sees
+- distant: the outer edge, barely in touch
+Pick the tier his words most naturally describe. A bare "add So-and-so" with
+no circle named at all is not enough to guess from -- ask which circle
+rather than placing him in one silently.
+
+"rel" is what they are TO HIM, in his own words ("brother", "gym friend",
+"my accountant") -- never invented, never a guess at the relationship from
+context alone. birthday is MM-DD only; a year mentioned in the same breath
+is birthYear, its own field. cadenceDays (how often he wants to be in
+touch) is never set by addPerson -- the circle's own default is right
+unless he explicitly asks for a different one, which is what editPerson's
+cadenceDays is for. "match" for editPerson is the person's name, the same
+way match works for a task or a habit.
 
 
 QUITTING is a third kind, separate from habits and routines, tracked in

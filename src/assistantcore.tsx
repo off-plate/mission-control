@@ -19,6 +19,7 @@ import {
   type HabitDef, type HabitFrequency, type PageId, type SpaceId, type Task,
 } from './types'
 import { localDateKey, fmtDuration, taskMinutes, goalPeriodKey, goalPeriodRange, periodKeyFor, type GoalTf } from './util'
+import { nextPersonSlot, TIER_CADENCE, TIER_LABEL } from './peoplelayout'
 import { useFirstMove } from './ui'
 import { APPS } from './apps'
 import * as Icon from './icons'
@@ -494,6 +495,11 @@ function useDoer() {
        against s2.tasks alone would miss a duplicate created earlier in this
        exact call. Titles added so far in THIS run close the gap. */
     const addedThisRun = new Set<string>()
+    /* Same reasoning as addedThisRun above, for addPerson: several people
+       dictated in one breath are several actions in this one run, and
+       nextPersonSlot needs to see the ones this run already placed, not
+       just what existed before any of them ran. */
+    let peopleSoFar = live.current.people
     for (const a of actions) {
       const s2 = live.current
       const day = localDateKey()
@@ -778,6 +784,36 @@ function useDoer() {
       if (a.kind === 'addRoutine') {
         s2.addRoutine({ title: a.title, cadence: a.cadence ?? 'daily', blurb: a.blurb })
         out.push({ ok: true, text: `Made a new routine: ${a.title}` })
+        continue
+      }
+      if (a.kind === 'addPerson') {
+        /* Same placement rule as the People page's own "+" (peoplelayout.ts),
+           so a person dictated here and one added by hand land the same way.
+           Against peopleSoFar, not s2.people directly: addPerson's own
+           setState hasn't landed by the time the NEXT action in this same
+           batch runs (his ask is several people in one breath), so reading
+           s2.people again here would still show the state from before any
+           of them were added and place every one of them on the same spot. */
+        const { x, y } = nextPersonSlot(peopleSoFar, a.tier)
+        const now = Date.now()
+        const id = s2.addPerson({
+          name: a.name, rel: a.rel ?? '', tier: a.tier, cadenceDays: TIER_CADENCE[a.tier], x, y,
+        })
+        if (a.job || a.birthday || a.birthYear) s2.updatePerson(id, { job: a.job, birthday: a.birthday, birthYear: a.birthYear })
+        peopleSoFar = [...peopleSoFar, {
+          id, name: a.name, rel: a.rel ?? '', tier: a.tier, cadenceDays: TIER_CADENCE[a.tier], x, y, createdAt: now, updatedAt: now,
+        }]
+        out.push({ ok: true, text: `Added to ${TIER_LABEL[a.tier]}: ${a.name}` })
+        continue
+      }
+      if (a.kind === 'editPerson') {
+        const rows = s2.people.map((p) => ({ ...p, title: p.name }))
+        const { row, why } = pick(rows, a.match)
+        if (!row) { out.push({ ok: false, text: why ?? 'no person matched' }); continue }
+        s2.updatePerson(row.id, {
+          tier: a.tier, rel: a.rel, job: a.job, birthday: a.birthday, birthYear: a.birthYear, cadenceDays: a.cadenceDays,
+        })
+        out.push({ ok: true, text: `Updated: ${row.name}` })
         continue
       }
       if (a.kind === 'habit') {

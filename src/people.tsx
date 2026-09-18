@@ -22,6 +22,7 @@ import { useStore } from './store'
 import { Select } from './ui'
 import { localDateKey } from './util'
 import { ALL_NAMES, daysUntil, nameDayFor } from './namedays'
+import { nextPersonSlot } from './peoplelayout'
 import type { ContactChannel, Person, PersonBond, PersonContact, PersonTier } from './types'
 
 type Tier = { id: PersonTier; label: string; r: number; size: number; cadence: number; bond: number }
@@ -395,16 +396,11 @@ export function PeoplePage() {
 
   /* ---------- add ---------- */
   const add = (name: string, rel: string, tier: PersonTier, cadenceDays: number) => {
-    const t = TIER[tier]
-    // The widest free gap on that ring, so a newcomer never lands on someone.
-    const angles = people.filter((p) => p.tier === tier).map((p) => Math.atan2(p.y, p.x)).sort((a, b) => a - b)
-    let a = -Math.PI / 2
-    let best = -1
-    angles.forEach((cur, i) => {
-      const next = i + 1 < angles.length ? angles[i + 1] : angles[0] + Math.PI * 2
-      if (next - cur > best) { best = next - cur; a = cur + (next - cur) / 2 }
-    })
-    const id = addPerson({ name, rel, tier, cadenceDays, x: Math.cos(a) * t.r, y: Math.sin(a) * t.r })
+    // The widest free gap on that ring, so a newcomer never lands on someone
+    // -- shared with the assistant's own addPerson, so a person dictated and
+    // one added by hand land the same way (peoplelayout.ts).
+    const { x, y } = nextPersonSlot(people, tier)
+    const id = addPerson({ name, rel, tier, cadenceDays, x, y })
     setAdding(false)
     setSelected(id)
     const el = stageRef.current
@@ -412,7 +408,7 @@ export function PeoplePage() {
       const z = Math.max(viewRef.current.z, 0.9)
       const w = el.clientWidth - cardWidth(true)
       const h = phone() ? el.clientHeight * 0.28 : el.clientHeight
-      tween({ z, x: w / 2 - Math.cos(a) * t.r * z, y: h / 2 - Math.sin(a) * t.r * z })
+      tween({ z, x: w / 2 - x * z, y: h / 2 - y * z })
     }
   }
 

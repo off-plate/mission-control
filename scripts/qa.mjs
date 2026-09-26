@@ -4576,6 +4576,71 @@ await step('timeline: the reel answers to Next', async () => {
   await page.keyboard.press('Escape'); await page.waitForTimeout(300)
 })
 
+/* HIS REPORT (2026-09-27), three separate complaints that were one bug: newly
+   added links "not showing up", clips repeating after three or four Next
+   presses, and no way to skip but a fiddly on-screen button. "Any other
+   random index" on every Next lets the birthday paradox repeat a clip long
+   before the pool is exhausted, which is indistinguishable from a link never
+   playing at all if the pool is more than a handful. This proves the actual
+   fix: five real clips, a full pass with no repeat, and the arrow keys he
+   asked for instead of hunting for Next. */
+await step('timeline: the reel shuffles every clip once before any repeat, and the arrow keys skip it', async () => {
+  await fresh('timeline')
+  const FIVE = [
+    'https://www.youtube.com/watch?v=OM3H1J8Ht2o',
+    'https://www.youtube.com/watch?v=yRfK5-7B-SU',
+    'https://www.youtube.com/watch?v=Cw0hZQ8Na_Y',
+    'https://www.youtube.com/watch?v=ZXsQAXx_ao0',
+    'https://www.youtube.com/watch?v=lsSC2vx7zFU',
+  ]
+  await page.evaluate((args) => {
+    const [K, reels] = args
+    const s = JSON.parse(localStorage.getItem(K) || '{}')
+    s.reels = reels
+    localStorage.setItem(K, JSON.stringify(s))
+  }, [KEY, FIVE])
+  await page.reload(); await page.waitForTimeout(700)
+  await page.locator('.tl-giveup').click()
+  const src = () => page.evaluate(() => document.querySelector('iframe.tl-media, video.tl-media')?.getAttribute('src') ?? '')
+  const waitForChange = (prev) => page.waitForFunction(
+    (p) => {
+      const el = document.querySelector('iframe.tl-media, video.tl-media')
+      const cur = el?.getAttribute('src') ?? ''
+      return !!cur && cur !== p
+    },
+    prev, { timeout: 12000 },
+  ).catch(() => {})
+  await page.waitForFunction(
+    () => !!document.querySelector('iframe.tl-media, video.tl-media')?.getAttribute('src'),
+    null, { timeout: 12000 },
+  ).catch(() => {})
+
+  const seen = [await src()]
+  // Four more presses of the arrow key -- his ask, not the on-screen button --
+  // should visit the other four clips, none of them twice.
+  for (let i = 0; i < 4; i++) {
+    await page.keyboard.press('ArrowRight')
+    await waitForChange(seen[seen.length - 1])
+    seen.push(await src())
+  }
+  if (new Set(seen).size !== 5) {
+    throw new Error(`a full pass of 5 clips only showed ${new Set(seen).size} distinct ones: repeated before the pool was exhausted`)
+  }
+  // The 5th press wraps into a freshly dealt pass. It must not immediately
+  // replay the clip the pass just ended on.
+  await page.keyboard.press('ArrowRight')
+  await waitForChange(seen[4])
+  const wrapped = await src()
+  if (wrapped === seen[4]) throw new Error('the new pass opened on the same clip the last one just finished on')
+  // ArrowLeft is the other half of "skip without the button" -- it must move
+  // the clip, whichever direction.
+  const beforeBack = wrapped
+  await page.keyboard.press('ArrowLeft')
+  await waitForChange(beforeBack)
+  if (await src() === beforeBack) throw new Error('ArrowLeft did not move the clip')
+  await page.keyboard.press('Escape'); await page.waitForTimeout(300)
+})
+
 await step('timeline: giving up takes the whole window, and Escape gives it back', async () => {
   await fresh('timeline')
   const skipRoll = page.getByRole('button', { name: 'Not today' })

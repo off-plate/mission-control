@@ -617,15 +617,15 @@ export default function App() {
               for two more squares (the page menu wrapped onto a third line),
               so there they sit in the page menu instead. */}
           <button
-            className={`btn btn-ghost btn-sq hide-phone${page === 'timeline' ? ' is-on' : ''}`}
+            className={`btn btn-ghost btn-sq btn-sq-jar hide-phone${page === 'timeline' ? ' is-on' : ''}`}
+            /* His pick (2026-09-28): the Goggins photo fills the whole box, the name
+               in white over it. A file in public/, never inlined into the bundle. */
+            style={{ '--jar-img': `url(${(import.meta as unknown as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/'}goggins.jpg)` } as React.CSSProperties}
             onClick={() => setPage('timeline')}
             aria-pressed={page === 'timeline'}
             aria-label="Jar"
             title="Jar"
           >
-            {/* His pick (2026-09-28): Goggins, not a glyph. A photo, not an icon, so it
-                sits in public/ and loads as a file, never inlined into the bundle. */}
-            <img className="btn-sq-photo" src={`${(import.meta as unknown as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/"}goggins.jpg`} alt="" width={18} height={18} />
             <span className="btn-sq-label">Jar</span>
           </button>
           {/* Notes and Ideas, back in the top right on his instruction

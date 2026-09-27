@@ -11260,7 +11260,10 @@ body:has(.pp-page) #main { padding-bottom: 0; }
 /* The Jar's header button is his Goggins photo, edge to edge (2026-09-28), with
    the name in white over a dark fade at the bottom so it reads on any frame. */
 .topbar-right .btn-sq-jar {
-  background: linear-gradient(to bottom, transparent 40%, rgba(0, 0, 0, 0.65)), var(--jar-img) center 25% / cover no-repeat;
+  /* Edge to edge, border included: his report (2026-09-28) was the light
+     border and the pale sky reading as a gap round the photo. */
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.18), transparent 30%, transparent 45%, rgba(0, 0, 0, 0.7)), var(--jar-img) center top / cover no-repeat;
+  background-origin: border-box; background-clip: border-box; border-color: transparent;
   justify-content: flex-end; padding-bottom: 6px; overflow: hidden;
 }
 .topbar-right .btn-sq-jar .btn-sq-label { color: #fff; }

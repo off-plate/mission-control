@@ -96,7 +96,18 @@ export function FocusPage() {
         </div>
       )}
 
-      {/* The one number no task can supply. */}
+      {/* The two numbers no task can supply: how long a plain block runs
+          (his ask, 2026-09-27) and the break after it. */}
+      <div className="focus-settings">
+        <span className="microcap">Focus length</span>
+        <Segmented
+          label="Focus length"
+          size="sm"
+          value={String(pomo.focusMin)}
+          options={[...new Set([15, 25, 30, 45, 60, 90, pomo.focusMin])].sort((a, b) => a - b).map((n) => ({ id: String(n), label: `${n}m` }))}
+          onPick={(id) => pomo.setFocusMin(Number(id))}
+        />
+      </div>
       <div className="focus-settings">
         <span className="microcap">Break after each block</span>
         <Segmented

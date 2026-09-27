@@ -173,7 +173,7 @@ export function TimelinePage() {
             that holds the record, the body, the reasons and the give-up
             screen together is that one. The address stays #/timeline so
             nothing that links here breaks. */}
-        <h1>Cookie Jar</h1>
+        <h1>Jar</h1>
         <div className="tl-seg" role="group" aria-label="Zoom">
           {ZOOMS.map((z) => (
             <button key={z.id} className={zoom === z.id ? 'on' : ''} aria-pressed={zoom === z.id} onClick={() => setZoom(z.id)}>{z.label}</button>

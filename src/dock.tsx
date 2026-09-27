@@ -232,7 +232,8 @@ type Mode = 'closed' | 'menu' | PanelFace
    would just be a second, redundant reason for it to rank last. Everything
    else here is a plain shortcut, so everything else competes. */
 /* Health left the dock for a button on the Cookie Jar page (2026-09-15). */
-const RANKABLE_FACES = ['bills', 'timeline', 'assistant', 'skills', 'watchless'] as const
+/* Bills and the Jar left the dock for the header (2026-09-27). */
+const RANKABLE_FACES = ['assistant', 'skills', 'watchless'] as const
 type RankableFace = typeof RANKABLE_FACES[number]
 function isRankable(id: PanelFace): id is RankableFace {
   return (RANKABLE_FACES as readonly string[]).includes(id)
@@ -320,8 +321,6 @@ export function Dock() {
      own repo rather than routed through svgrepo. */
   const panels: { id: PanelFace; label: string; chip: React.ReactNode; switchIcon: React.ReactNode }[] = [
     ...(mo.started ? [{ id: 'media' as const, label: 'Player', chip: <MediaChip />, switchIcon: <Icon.Waveform size={17} /> }] : []),
-    { id: 'bills' as const, label: 'Bills', chip: <BillsChip />, switchIcon: <Icon.DockWallet size={17} /> },
-    { id: 'timeline' as const, label: 'Cookie Jar', chip: <TimelineChip />, switchIcon: <Icon.DockHistory size={17} /> },
     { id: 'assistant' as const, label: 'Assistant', chip: <AssistantChip />, switchIcon: <Icon.Waveform size={17} /> },
     { id: 'skills' as const, label: 'Skills', chip: <SkillsChip />, switchIcon: <Icon.DockBook size={17} /> },
     { id: 'watchless' as const, label: 'Watchless', chip: <WatchlessChip />, switchIcon: <Icon.DockTranscript size={17} /> },

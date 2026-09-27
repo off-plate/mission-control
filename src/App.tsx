@@ -611,6 +611,23 @@ export default function App() {
             <Helmet lit={hud} />
             <span className="btn-sq-label">Jarvis</span>
           </button>
+          {/* Jar (was Cookie Jar) and Bills, out of the floating dock and into
+              the top right on his instruction (2026-09-27): Bills after People.
+              Jar moved between Jarvis and Notes (2026-09-28). On a phone the row has no room
+              for two more squares (the page menu wrapped onto a third line),
+              so there they sit in the page menu instead. */}
+          <button
+            className={`btn btn-ghost btn-sq hide-phone${page === 'timeline' ? ' is-on' : ''}`}
+            onClick={() => setPage('timeline')}
+            aria-pressed={page === 'timeline'}
+            aria-label="Jar"
+            title="Jar"
+          >
+            {/* His pick (2026-09-28): Goggins, not a glyph. A photo, not an icon, so it
+                sits in public/ and loads as a file, never inlined into the bundle. */}
+            <img className="btn-sq-photo" src={`${(import.meta as unknown as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/"}goggins.jpg`} alt="" width={18} height={18} />
+            <span className="btn-sq-label">Jar</span>
+          </button>
           {/* Notes and Ideas, back in the top right on his instruction
               (2026-09-15), next to the Zone and Jarvis. The dock keeps its own
               Note and Ideas for quick capture; these open the full pages. */}
@@ -623,21 +640,6 @@ export default function App() {
           >
             <Icon.DockNote size={16} />
             <span className="btn-sq-label">Notes</span>
-          </button>
-          {/* Jar (was Cookie Jar) and Bills, out of the floating dock and into
-              the top right on his instruction (2026-09-27): Jar between Notes
-              and Ideas, Bills after People. On a phone the row has no room
-              for two more squares (the page menu wrapped onto a third line),
-              so there they sit in the page menu instead. */}
-          <button
-            className={`btn btn-ghost btn-sq hide-phone${page === 'timeline' ? ' is-on' : ''}`}
-            onClick={() => setPage('timeline')}
-            aria-pressed={page === 'timeline'}
-            aria-label="Jar"
-            title="Jar"
-          >
-            <Icon.DockHistory size={16} />
-            <span className="btn-sq-label">Jar</span>
           </button>
           <button
             className={`btn btn-ghost btn-sq${page === 'ideas' ? ' is-on' : ''}`}

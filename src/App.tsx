@@ -624,6 +624,21 @@ export default function App() {
             <Icon.DockNote size={16} />
             <span className="btn-sq-label">Notes</span>
           </button>
+          {/* Jar (was Cookie Jar) and Bills, out of the floating dock and into
+              the top right on his instruction (2026-09-27): Jar between Notes
+              and Ideas, Bills after People. On a phone the row has no room
+              for two more squares (the page menu wrapped onto a third line),
+              so there they sit in the page menu instead. */}
+          <button
+            className={`btn btn-ghost btn-sq hide-phone${page === 'timeline' ? ' is-on' : ''}`}
+            onClick={() => setPage('timeline')}
+            aria-pressed={page === 'timeline'}
+            aria-label="Jar"
+            title="Jar"
+          >
+            <Icon.DockHistory size={16} />
+            <span className="btn-sq-label">Jar</span>
+          </button>
           <button
             className={`btn btn-ghost btn-sq${page === 'ideas' ? ' is-on' : ''}`}
             onClick={() => setPage('ideas')}
@@ -645,18 +660,23 @@ export default function App() {
             <Icon.DockPeople size={16} />
             <span className="btn-sq-label">People</span>
           </button>
-          {/* Bills' own header button retired (2026-09-03), the same way
-             Notes' was above: the floating dock's Bills summary (see
-             billsdock.tsx) plus its hold-for-the-full-page shortcut cover
-             this in fewer moves than the header ever did. The page itself
-             is untouched -- setPage('bills') below still renders it. */}
+          <button
+            className={`btn btn-ghost btn-sq hide-phone${page === 'bills' ? ' is-on' : ''}`}
+            onClick={() => setPage('bills')}
+            aria-pressed={page === 'bills'}
+            aria-label="Bills"
+            title="Bills"
+          >
+            <Icon.DockWallet size={16} />
+            <span className="btn-sq-label">Bills</span>
+          </button>
           {/* Apps and Settings left the header for the dock's More on his
               instruction (2026-09-15). */}
           {/* Assistant was never in this list, same as the Zone: reached from
               the dock now (2026-09-08) rather than its own header button, but
               the picker still has nothing to say about a page that was never
               one of its tabs. */}
-          {page !== 'zone' && page !== 'assistant' && <PhonePages tabs={tabs} page={navPage} setPage={setPage} />}
+          {page !== 'zone' && page !== 'assistant' && <PhonePages tabs={[...tabs, { id: 'timeline', label: 'Jar' }, { id: 'bills', label: 'Bills' }]} page={navPage} setPage={setPage} />}
         </div>
       </header>
 

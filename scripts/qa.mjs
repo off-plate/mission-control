@@ -361,9 +361,14 @@ await step('the menu is five tabs, and what left it is reachable from the header
   /* His instruction (2026-09-15): the top right is the Zone, Jarvis, Notes
      and Ideas. Apps and Settings live in the dock's More instead. */
   const topRight = page.locator('.topbar-right')
-  for (const want of ['Notes', 'Ideas']) {
+  /* Jar and Bills joined the top right, out of the dock (2026-09-27). */
+  for (const want of ['Notes', 'Jar', 'Ideas', 'People', 'Bills']) {
     if (!(await topRight.getByRole('button', { name: want, exact: true }).count())) throw new Error(`${want} is not in the top right`)
   }
+  const order = await topRight.locator('.btn-sq-label').allInnerTexts()
+  const idx = (n) => order.indexOf(n)
+  if (!(idx('Notes') < idx('Jar') && idx('Jar') < idx('Ideas'))) throw new Error(`Jar is not between Notes and Ideas (${order.join(', ')})`)
+  if (!(idx('People') < idx('Bills'))) throw new Error(`Bills is not after People (${order.join(', ')})`)
   if (await topRight.getByRole('button', { name: 'Apps', exact: true }).count()) throw new Error('Apps is still in the header')
   if (await topRight.getByRole('button', { name: /^Settings/ }).count()) throw new Error('Settings is still in the header')
   const dockOpen = page.getByRole('button', { name: 'Open quick tools' })
@@ -380,12 +385,12 @@ await step('the menu is five tabs, and what left it is reachable from the header
   /* His apps sit in More as themselves (2026-09-16), not behind a second
      "Apps" page one more tap away -- Challengers and Nexus stand in for the
      whole APPS list here. */
-  for (const want of ['Bills', 'Cookie Jar', 'Assistant', 'Challengers', 'Nexus', 'Settings']) {
+  for (const want of ['Assistant', 'Challengers', 'Nexus', 'Settings']) {
     if (!allLabels.some((l) => l.trim() === want || l.trim().startsWith(want))) throw new Error(`${want} is not in the dock (${allLabels.join(', ')})`)
   }
   if (allLabels.some((l) => l.trim() === 'Apps')) throw new Error(`Apps is still its own grid cell (${allLabels.join(', ')})`)
   /* Note and Ideas live in the top right, Health on the Cookie Jar page (2026-09-15). */
-  for (const gone of ['Note', 'Ideas', 'Health']) {
+  for (const gone of ['Note', 'Ideas', 'Health', 'Bills', 'Cookie Jar', 'Jar']) {
     if (allLabels.some((l) => l.trim() === gone || l.trim().startsWith(`${gone}\n`))) throw new Error(`${gone} is still in the dock (${allLabels.join(', ')})`)
   }
   await fresh('today')
@@ -963,7 +968,7 @@ await step('the zone: the timer never shrinks, no matter how long the queue gets
   /* .dock is a fixed SIBLING of .shell, so its --z-* custom properties are
      only reachable if they are redeclared reading from body, not merely
      scoped inside .shell.in-zone. Any open panel shows the tint. */
-  await openDockItem('Bills'); await page.waitForTimeout(400)
+  await openDockItem('Assistant'); await page.waitForTimeout(400)
   const bg = await page.locator('.dock-face').evaluate((e) => getComputedStyle(e).backgroundColor)
   if (bg === 'rgba(0, 0, 0, 0)' || /^rgb\(255, 255, 255/.test(bg)) {
     throw new Error(`the dock face is untinted in the Zone (background: ${bg})`)
@@ -1784,6 +1789,28 @@ await step('phone: plan is usable at 390', async () => {
   const s = await mp.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
   if (s.tasks.find((t) => t.title.startsWith('Phone gate'))?.list !== 'today') throw new Error('move failed on phone')
   await mp.close()
+})
+
+/* His ask (2026-09-27): a plain focus block, started without a task, always
+   ran 25 minutes; only the break could be set. The length is now set from the
+   dock's Focus row and from the Focus page, and Start uses it. */
+await step('focus: the length of a plain block is his to set before it starts', async () => {
+  await fresh('focus')
+  await page.evaluate(() => localStorage.removeItem('mc-pomodoro'))
+  await page.reload(); await page.waitForTimeout(600)
+  await page.getByRole('group', { name: 'Focus length' }).getByRole('button', { name: '45m', exact: true }).click()
+  await page.waitForTimeout(200)
+  const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('mc-pomodoro') || '{}').focusMin)
+  if (await saved() !== 45) throw new Error(`the Focus page set ${await saved()}, not 45`)
+  await page.getByRole('button', { name: 'Open quick tools' }).click(); await page.waitForTimeout(300)
+  await page.getByRole('button', { name: '5 minutes longer' }).click(); await page.waitForTimeout(150)
+  if (await saved() !== 50) throw new Error(`the dock + made it ${await saved()}, not 50`)
+  await page.getByRole('button', { name: '5 minutes shorter' }).click(); await page.getByRole('button', { name: '5 minutes shorter' }).click(); await page.waitForTimeout(150)
+  if (await saved() !== 40) throw new Error(`the dock - made it ${await saved()}, not 40`)
+  await page.getByRole('button', { name: 'Start a 40 minute focus' }).click(); await page.waitForTimeout(300)
+  const st = await page.evaluate(() => JSON.parse(localStorage.getItem('mc-pomodoro') || '{}'))
+  if (st.phase !== 'focus' || st.blockMin !== 40) throw new Error(`started ${st.phase} for ${st.blockMin}m, not a 40m focus`)
+  await page.evaluate(() => localStorage.removeItem('mc-pomodoro'))
 })
 
 await step('focus: stopping mid-block banks the elapsed minutes', async () => {
@@ -4118,7 +4145,7 @@ await step('health: the Cookie Jar opens it, and signed out it draws no body til
      must never invent a heart rate: no tile may show a number with no session
      behind it. */
   await fresh('timeline')
-  if (!(await page.locator('h1', { hasText: 'Cookie Jar' }).count())) throw new Error('the page is not called the Cookie Jar')
+  if (!(await page.locator('h1', { hasText: /^Jar$/ }).count())) throw new Error('the page is not called the Jar')
   if (await page.locator('.dock-item, .dock-more-cell').filter({ hasText: 'Health' }).count()) throw new Error('Health is still in the dock')
   await page.locator('.tl-right').getByRole('button', { name: 'Health', exact: true }).click(); await page.waitForTimeout(500)
   if (!(await page.locator('h1', { hasText: 'Health' }).count())) throw new Error('the Health button did not land on the real Health page')

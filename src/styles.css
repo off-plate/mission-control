@@ -11256,3 +11256,7 @@ body:has(.pp-page) #main { padding-bottom: 0; }
 .pp-remind-toggle input:checked + .pp-remind-switch { background: #3E9B4F; }
 .pp-remind-toggle input:checked + .pp-remind-switch::after { transform: translateX(14px); }
 .pp-remind-toggle input:focus-visible + .pp-remind-switch { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* The Jar's header button carries his photo of Goggins (2026-09-28): the same
+   footprint as the 16px glyphs beside it, slightly rounded, never a circle. */
+.btn-sq-photo { width: 18px; height: 18px; border-radius: 4px; object-fit: cover; display: block; }

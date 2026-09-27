@@ -24,3 +24,4 @@ release/
 
 # Local-only screenshots
 .zp-shots/
+node_modules

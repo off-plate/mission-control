@@ -173,7 +173,7 @@ export function TimelinePage() {
             that holds the record, the body, the reasons and the give-up
             screen together is that one. The address stays #/timeline so
             nothing that links here breaks. */}
-        <h1>Cookie Jar</h1>
+        <h1>Jar</h1>
         <div className="tl-seg" role="group" aria-label="Zoom">
           {ZOOMS.map((z) => (
             <button key={z.id} className={zoom === z.id ? 'on' : ''} aria-pressed={zoom === z.id} onClick={() => setZoom(z.id)}>{z.label}</button>
@@ -739,6 +739,17 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 /* ---- the reel ---- */
 
+/** Fisher-Yates. A fresh permutation of 0..len-1, so playing it start to
+ *  finish touches every index once, in an order nobody could predict. */
+function shuffledOrder(len: number): number[] {
+  const arr = Array.from({ length: len }, (_, i) => i)
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
+}
+
 /* The folder on his own machine, read once per visit and shared by the room
    and the library so they cannot disagree about what is in it. Restoring
    never prompts: a browser only grants this off a real click, so a page load
@@ -1221,15 +1232,46 @@ function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney |
   const pool = useReelPool(localReels)
   const localNames = useLocalNames(localReels)
   const [lib, setLib] = useState(false)
-  const [skip, setSkip] = useState(() => (pool.length ? Math.floor(Math.random() * pool.length) : 0))
-  const advanceReel = () => setSkip((s) => {
-    if (pool.length <= 1) return s
-    const cur = s % pool.length
-    let i = cur
-    while (i === cur) i = Math.floor(Math.random() * pool.length)
-    return i
+  /* A shuffled pass through the WHOLE pool, not a fresh coin-flip on every
+     Next. His report (2026-09-27): picking "any other index" at random let
+     the fourth or fifth spin repeat something already seen, and a link he
+     had just added could go many spins without ever coming up -- the
+     birthday paradox, not a bug in what was IN the pool. One order per pass
+     guarantees every clip plays exactly once before any of them plays
+     twice, and a fresh pass is dealt on mount (this screen unmounts on
+     every close, see the `lives ?` above, so opening it again is a reload
+     in every sense he means the word) and again whenever the pool's actual
+     CONTENT changes -- keyed on the joined URLs, not the array reference,
+     because a sync pull hands back a new-but-equal array on every unrelated
+     change elsewhere in the blob (see mundiplayer.tsx's note on the same
+     failure mode) and reshuffling on THAT would restart the pass and repeat
+     a clip he just saw. */
+  const poolKey = pool.join('\n')
+  const [order, setOrder] = useState<number[]>(() => shuffledOrder(pool.length))
+  const [pos, setPos] = useState(0)
+  const poolKeyRef = useRef(poolKey)
+  useEffect(() => {
+    if (poolKeyRef.current === poolKey) return
+    poolKeyRef.current = poolKey
+    setOrder(shuffledOrder(pool.length))
+    setPos(0)
+  }, [poolKey, pool.length])
+  const advanceReel = () => setPos((p) => {
+    const len = order.length
+    if (len <= 1) return p
+    if (p + 1 < len) return p + 1
+    // End of the pass: deal a new one, and never open it on a repeat of
+    // the clip that just finished.
+    const fresh = shuffledOrder(len)
+    if (fresh[0] === order[p]) [fresh[0], fresh[1]] = [fresh[1], fresh[0]]
+    setOrder(fresh)
+    return 0
   })
-  const url = pool.length ? pool[skip % pool.length] : ''
+  const backReel = () => setPos((p) => {
+    const len = order.length
+    return len <= 1 ? p : (p - 1 + len) % len
+  })
+  const url = order.length ? (pool[order[pos] ?? 0] ?? pool[0] ?? '') : ''
   /* Measured from the real clip (see Reel's onRatio); null -- between clips,
      or for YouTube/Vimeo, which this can't measure -- falls back to 9:16
      rather than freezing the previous clip's shape. */
@@ -1282,10 +1324,21 @@ function TwoLives({ onBack, money }: { onBack: () => void; money: CompassMoney |
   const [debt, training, postponed, habitsC, quitting, routinesC, goalsC] = cards.list
 
   useEffect(() => {
-    const k = (e: KeyboardEvent) => { if (e.key === 'Escape' && !lib) onBack() }
+    const k = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !lib) { onBack(); return }
+      /* His report (2026-09-27): the on-screen Next sits low and off to the
+         side, awkward to reach with a click while he's meant to be reading
+         the right side, not hunting for a button. The arrow keys are always
+         under his hand. Ignored while the library panel is open so typing
+         a link that happens to start or end near an arrow key never skips
+         the clip out from under him. */
+      if (lib) return
+      if (e.key === 'ArrowRight') advanceReel()
+      if (e.key === 'ArrowLeft') backReel()
+    }
     addEventListener('keydown', k)
     return () => removeEventListener('keydown', k)
-  }, [onBack, lib])
+  }, [onBack, lib, advanceReel, backReel])
 
   return (
     <div className="tl-lives">

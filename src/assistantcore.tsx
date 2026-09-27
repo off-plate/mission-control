@@ -460,7 +460,7 @@ const OPEN_LABELS: Partial<Record<PageId, string>> = {
   today: 'Today', plan: 'Plan', projects: 'Projects', habits: 'Habits',
   routines: 'Routines', goals: 'Goals', quitting: 'Quitting', settings: 'Settings',
   notes: 'Notes', board: 'the board', apps: 'Apps', focus: 'Focus', zone: 'the Zone',
-  bills: 'Bills', calendar: 'Calendar', timeline: 'Cookie Jar',
+  bills: 'Bills', calendar: 'Calendar', timeline: 'Jar',
   assistant: 'the Assistant', skills: 'Skills', health: 'Health',
 }
 

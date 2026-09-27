@@ -11257,6 +11257,11 @@ body:has(.pp-page) #main { padding-bottom: 0; }
 .pp-remind-toggle input:checked + .pp-remind-switch::after { transform: translateX(14px); }
 .pp-remind-toggle input:focus-visible + .pp-remind-switch { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-/* The Jar's header button carries his photo of Goggins (2026-09-28): the same
-   footprint as the 16px glyphs beside it, slightly rounded, never a circle. */
-.btn-sq-photo { width: 18px; height: 18px; border-radius: 4px; object-fit: cover; display: block; }
+/* The Jar's header button is his Goggins photo, edge to edge (2026-09-28), with
+   the name in white over a dark fade at the bottom so it reads on any frame. */
+.topbar-right .btn-sq-jar {
+  background: linear-gradient(to bottom, transparent 40%, rgba(0, 0, 0, 0.65)), var(--jar-img) center 25% / cover no-repeat;
+  justify-content: flex-end; padding-bottom: 6px; overflow: hidden;
+}
+.topbar-right .btn-sq-jar .btn-sq-label { color: #fff; }
+.topbar-right .btn-sq-jar.is-on { box-shadow: 0 0 0 2px var(--ink); }

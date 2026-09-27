@@ -4641,6 +4641,43 @@ await step('timeline: the reel shuffles every clip once before any repeat, and t
   await page.keyboard.press('Escape'); await page.waitForTimeout(300)
 })
 
+/* HIS FOLLOW-UP REPORT: the arrow keys "don't do anything" once he had
+   actually clicked the video. A YouTube/Vimeo clip plays inside an iframe --
+   a document of its own -- and clicking into it moves keyboard focus off
+   this page entirely, so a keydown inside the iframe can never bubble out to
+   this page's listener no matter what that listener does. Reproduces the
+   real click, not just a key press with focus untouched. */
+await step('timeline: clicking the video does not swallow the arrow keys', async () => {
+  await fresh('timeline')
+  await page.evaluate((K) => {
+    const s = JSON.parse(localStorage.getItem(K) || '{}')
+    s.reels = [
+      'https://www.youtube.com/watch?v=OM3H1J8Ht2o',
+      'https://www.youtube.com/watch?v=yRfK5-7B-SU',
+    ]
+    localStorage.setItem(K, JSON.stringify(s))
+  }, KEY)
+  await page.reload(); await page.waitForTimeout(700)
+  await page.locator('.tl-giveup').click()
+  const src = () => page.evaluate(() => document.querySelector('iframe.tl-media, video.tl-media')?.getAttribute('src') ?? '')
+  await page.waitForFunction(
+    () => !!document.querySelector('iframe.tl-media, video.tl-media')?.getAttribute('src'),
+    null, { timeout: 12000 },
+  ).catch(() => {})
+  // The real repro: click the video itself, which focuses the <iframe> tag
+  // in THIS document (that much always crosses the boundary), then try the
+  // key he reported as dead.
+  await page.locator('iframe.tl-media').click({ force: true })
+  const first = await src()
+  await page.keyboard.press('ArrowRight')
+  await page.waitForFunction(
+    (prev) => (document.querySelector('iframe.tl-media, video.tl-media')?.getAttribute('src') ?? '') !== prev,
+    first, { timeout: 12000 },
+  ).catch(() => {})
+  if (await src() === first) throw new Error('ArrowRight did nothing after the video itself was clicked')
+  await page.keyboard.press('Escape'); await page.waitForTimeout(300)
+})
+
 await step('timeline: giving up takes the whole window, and Escape gives it back', async () => {
   await fresh('timeline')
   const skipRoll = page.getByRole('button', { name: 'Not today' })

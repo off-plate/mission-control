@@ -8180,6 +8180,16 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .tl-stage { position: absolute; inset: 0; display: grid; grid-template-columns: min(50%, calc(100vh * var(--reel-ratio, 0.5625))) minmax(0, 1fr); }
 .tl-reel { position: relative; overflow: hidden; background: #0B0B0C; display: grid; place-items: center; }
 .tl-media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border: 0; }
+/* His report (2026-09-27): the arrow keys "don't do anything" once he'd
+   clicked the video. Play/Pause/Next/Sound are all real buttons of ours,
+   OUTSIDE this element, so nothing is lost by never letting a click reach
+   the iframe itself -- and everything is lost if one does: a YouTube or
+   Vimeo embed is a document of its own, and once a click hands it keyboard
+   focus, a keydown inside it can never bubble out to this page's listener,
+   whatever that listener does. No amount of blur()-ing it back from the
+   parent survives reliably once the frame's own content already has focus,
+   so the fix is to make sure a click never reaches it in the first place. */
+iframe.tl-media { pointer-events: none; }
 .tl-reelempty { position: relative; z-index: 2; max-width: 34ch; padding: 30px; text-align: center; }
 .tl-reelempty p { margin: 10px 0 0; font: 500 13.5px/1.5 var(--font-body); color: var(--tl-faint); }
 .tl-reelempty .tl-l { color: var(--tl-dim); }

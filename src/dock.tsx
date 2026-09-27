@@ -3,8 +3,6 @@ import { useStore } from './store'
 import { useMundiOpus } from './mundiplayer'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange } from './supabase'
 import { MediaBadge, MediaChip, PomodoroBadge, PomodoroInline, usePomodoro } from './pomodoro'
-import { BillsChip, BillsPanel } from './billsdock'
-import { TimelineChip, TimelinePanel } from './timelinedock'
 import { AssistantChip, AssistantPanel } from './assistantdock'
 import { SkillsChip, SkillsPanel } from './skillsdock'
 import { WatchlessChip, WatchlessPanel } from './watchlessdock'
@@ -222,7 +220,7 @@ function useHideOnScroll(active: boolean) {
    puts it inside both the Pomodoro context and the Store context it needs. */
 /* Note and Ideas left the dock for the top right on his instruction
    (2026-09-15): one door each, not two. */
-type PanelFace = 'media' | 'bills' | 'timeline' | 'assistant' | 'skills' | 'watchless'
+type PanelFace = 'media' | 'assistant' | 'skills' | 'watchless'
 type Mode = 'closed' | 'menu' | PanelFace
 
 /* The player is deliberately never in this contest -- his artifact review
@@ -251,12 +249,10 @@ export function Dock() {
   // renders, and only Note, Bills and Timeline have a full page to hold
   // for -- the player has none (see PanelFace/Mode above), so it never
   // gets one.
-  const billsHold = useHoldForFull(() => { bumpDockRank('bills'); setPage('bills'); go('closed') })
-  const timelineHold = useHoldForFull(() => { bumpDockRank('timeline'); setPage('timeline'); go('closed') })
   const assistantHold = useHoldForFull(() => { bumpDockRank('assistant'); setPage('assistant'); go('closed') })
   const skillsHold = useHoldForFull(() => { bumpDockRank('skills'); setPage('skills'); go('closed') })
   const watchlessHold = useHoldForFull(() => { bumpDockRank('watchless'); setPage('watchless'); go('closed') })
-  const holdFor: Partial<Record<PanelFace, ReturnType<typeof useHoldForFull>>> = { bills: billsHold, timeline: timelineHold, assistant: assistantHold, skills: skillsHold, watchless: watchlessHold }
+  const holdFor: Partial<Record<PanelFace, ReturnType<typeof useHoldForFull>>> = { assistant: assistantHold, skills: skillsHold, watchless: watchlessHold }
   const scrollHidden = useHideOnScroll(mode === 'closed')
   const pomo = usePomodoro()
   // A plain click opens the quick popup below, same as it always has -- the
@@ -571,30 +567,6 @@ export function Dock() {
       </button>
     </>
   )
-
-  /* Bills gets the same single-row head as Note, for the same reason --
-     it's the same door-out button (see billsdock.tsx), so the same
-     near-empty-bar-above-a-full-one problem would just repeat here. */
-  if (mode === 'bills') {
-    return (
-      <div className="dock">
-        <div className="dock-face">
-          <BillsPanel dockControls={switchButtons} onOpenFull={() => go('closed')} />
-        </div>
-      </div>
-    )
-  }
-
-
-  if (mode === 'timeline') {
-    return (
-      <div className="dock">
-        <div className="dock-face">
-          <TimelinePanel dockControls={switchButtons} onOpenFull={() => go('closed')} />
-        </div>
-      </div>
-    )
-  }
 
   if (mode === 'assistant') {
     return (

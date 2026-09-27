@@ -362,12 +362,12 @@ await step('the menu is five tabs, and what left it is reachable from the header
      and Ideas. Apps and Settings live in the dock's More instead. */
   const topRight = page.locator('.topbar-right')
   /* Jar and Bills joined the top right, out of the dock (2026-09-27). */
-  for (const want of ['Notes', 'Jar', 'Ideas', 'People', 'Bills']) {
+  for (const want of ['Jar', 'Notes', 'Ideas', 'People', 'Bills']) {
     if (!(await topRight.getByRole('button', { name: want, exact: true }).count())) throw new Error(`${want} is not in the top right`)
   }
   const order = await topRight.locator('.btn-sq-label').allInnerTexts()
   const idx = (n) => order.indexOf(n)
-  if (!(idx('Notes') < idx('Jar') && idx('Jar') < idx('Ideas'))) throw new Error(`Jar is not between Notes and Ideas (${order.join(', ')})`)
+  if (!(idx('Jarvis') < idx('Jar') && idx('Jar') < idx('Notes'))) throw new Error(`Jar is not between Jarvis and Notes (${order.join(', ')})`)
   if (!(idx('People') < idx('Bills'))) throw new Error(`Bills is not after People (${order.join(', ')})`)
   if (await topRight.getByRole('button', { name: 'Apps', exact: true }).count()) throw new Error('Apps is still in the header')
   if (await topRight.getByRole('button', { name: /^Settings/ }).count()) throw new Error('Settings is still in the header')

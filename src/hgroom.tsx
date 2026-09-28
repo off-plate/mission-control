@@ -7,7 +7,6 @@ import { useEffect } from 'react'
 import { HabitsPage } from './habits'
 import { GoalsPage } from './goals'
 import { QuittingPage } from './quitting'
-import { HabitsGoalsSwitch } from './ui'
 
 export type HgSection = 'habits' | 'goals' | 'quitting'
 
@@ -30,7 +29,6 @@ export function HabitsGoalsRoom({ start }: { start: HgSection }) {
   useEffect(() => { if (start !== 'habits') requestAnimationFrame(() => jumpTo(start, false)) }, [start])
   return (
     <div className="hg-room">
-      <div className="hg-stick"><HabitsGoalsSwitch /></div>
       <section id="hg-habits" className="hg-sec"><HabitsPage /></section>
       <section id="hg-goals" className="hg-sec"><GoalsPage /></section>
       <section id="hg-quitting" className="hg-sec"><QuittingPage /></section>

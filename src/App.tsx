@@ -7,9 +7,7 @@ import { SPACE_LABELS } from './mock'
 import { TodayPage } from './today'
 import { PlanPage } from './plan'
 import { ProjectsPage } from './projects'
-import { HabitsPage } from './habits'
-import { GoalsPage } from './goals'
-import { QuittingPage } from './quitting'
+import { HabitsGoalsRoom } from './hgroom'
 import { NotesPage } from './notes'
 import { BillsPage } from './billspage'
 import { DailyReview } from './daily'
@@ -717,9 +715,9 @@ export default function App() {
         {page === 'today' && <TodayPage />}
         {page === 'plan' && <PlanPage />}
         {page === 'projects' && <ProjectsPage />}
-        {(page === 'habits' || page === 'routines') && <HabitsPage />}
-        {page === 'goals' && <GoalsPage />}
-        {page === 'quitting' && <QuittingPage />}
+        {(page === 'habits' || page === 'routines' || page === 'goals' || page === 'quitting') && (
+          <HabitsGoalsRoom start={page === 'goals' || page === 'quitting' ? page : 'habits'} />
+        )}
         {page === 'timeline' && <TimelinePage />}
         {page === 'skills' && <SkillsPage />}
         {page === 'health' && <HealthPage />}

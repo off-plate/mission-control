@@ -88,6 +88,8 @@ const noteError = (text, url = '') => {
 page.on('pageerror', (e) => noteError(e.message))
 page.on('console', (m) => { if (m.type() === 'error') noteError(m.text(), m.location()?.url ?? '') })
 const step = async (name, fn) => {
+  /* QA_ONLY=regex runs just the matching steps, for re-checking a fix without the full 8 minutes. */
+  if (process.env.QA_ONLY && !new RegExp(process.env.QA_ONLY).test(name)) return
   try { await fn(); pass++; console.log(`PASS ${name}`) }
   catch (e) {
     fail++
@@ -2233,10 +2235,11 @@ await step('quitting: its own face, no day dots, a count and a slip on every car
     localStorage.setItem(K, JSON.stringify(s))
   }, KEY)
   await page.reload(); await page.waitForTimeout(900)
-  /* Quits are not on Habits any more; that is the point of the pill. */
-  if (await page.locator('.qcard').count()) throw new Error('quitting cards are still on the Habits face')
-  await page.locator('.hg-pill', { hasText: 'Quitting' }).click(); await page.waitForTimeout(700)
-  if ((await page.evaluate(() => location.hash)) !== '#/quitting') throw new Error('the Quitting pill did not move the address')
+  /* One page since 2026-09-28: the cards live in their own section, and the
+     pill scrolls to it instead of changing page. */
+  if (await page.locator('#hg-habits .qcard').count()) throw new Error('quitting cards are inside the Habits section')
+  await page.locator('.hg-pill', { hasText: 'Quitting' }).click(); await page.waitForTimeout(1200)
+  if (await page.evaluate(() => Math.abs(document.getElementById('hg-quitting').getBoundingClientRect().top) > 400)) throw new Error('the Quitting pill did not scroll to its section')
   const cards = await page.evaluate(() => [...document.querySelectorAll('.qcard')].map((c) => {
     const slip = [...c.querySelectorAll('button')].find((b) => /slipped/i.test(b.textContent))
     return {
@@ -4147,7 +4150,7 @@ await step('health: the Cookie Jar opens it, and signed out it draws no body til
   await fresh('timeline')
   if (!(await page.locator('h1', { hasText: /^Jar$/ }).count())) throw new Error('the page is not called the Jar')
   if (await page.locator('.dock-item, .dock-more-cell').filter({ hasText: 'Health' }).count()) throw new Error('Health is still in the dock')
-  await page.locator('.tl-right').getByRole('button', { name: 'Health', exact: true }).click(); await page.waitForTimeout(500)
+  await page.locator('.jar-bar').getByRole('button', { name: 'Health', exact: true }).click(); await page.waitForTimeout(500)
   if (!(await page.locator('h1', { hasText: 'Health' }).count())) throw new Error('the Health button did not land on the real Health page')
   if (await page.locator('.hp-tile').count()) throw new Error('drew body tiles with nothing signed in behind them')
 })

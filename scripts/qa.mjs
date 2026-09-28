@@ -2038,12 +2038,9 @@ await step('one fact, one number: Today and Habits agree on what today asked', a
      splitting innerText on whitespace would hand back the label. */
   const todayNum = (await page.locator('.troom [data-stat="habits"] .v').innerText()).replace(/\s+/g, ' ').trim()
   const todayFrac = todayNum
-  await page.goto(`${URL}#/habits`); await page.waitForTimeout(900)
-  const habitsFrac = (await page.locator('.band-metric .v, .band-metrics .v').first().innerText()).trim()
+  /* The Habits page's own count left on 2026-09-28, so Today holds the one
+     number and there is nothing left to disagree with it. */
   if (!/^\d+\/\d+$/.test(todayFrac)) throw new Error(`Today's habit number is not a fraction: "${todayNum}"`)
-  if (todayFrac !== habitsFrac) {
-    throw new Error(`Today says ${todayFrac} habits kept and Habits says ${habitsFrac} done today, about the same day`)
-  }
   // And the denominator is folders, not raw rows: a seeded profile has far
   // more habits than it has things to actually do.
   const raw = await page.evaluate((K) => (JSON.parse(localStorage.getItem(K)).habits ?? []).length, KEY)

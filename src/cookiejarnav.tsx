@@ -50,6 +50,8 @@ export function JarBar({ here }: { here: JarHere }) {
   const toggle = () => { if (onJar) set({ view: view === 'ladder' ? 'wheel' : 'ladder', lives: false }); else setPage('timeline') }
   const giveUp = () => { set({ lives: !(onJar && lives) }); if (!onJar) setPage('timeline') }
   const go = (page: 'health' | 'gym' | 'board') => () => { set({ lives: false }); setPage(page) }
+  // The give-up screen covers the window; the bar under it would only make the page scroll.
+  if (onJar && lives) return null
 
   return (
     <header className="jar-bar">

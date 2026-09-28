@@ -11292,3 +11292,21 @@ body:has(.pp-page) #main { padding-bottom: 0; }
 /* Quitting is short: without room below it, jumping there stops early and the
    switch keeps lighting Goals. */
 .hg-sec:last-child { min-height: calc(100vh - var(--topstick-h, 104px) - var(--s3)); }
+
+/* The floating copy of the switch, shown once the one beside the Habits title
+   has scrolled away. z-index stays under .topstick (50), so the header's nav
+   row always wins when it drops down over it. */
+.hg-float {
+  position: fixed; left: 50%; top: calc(var(--topstick-h, 104px) + var(--s2)); z-index: 20;
+  transform: translate(-50%, -6px); opacity: 0; pointer-events: none;
+  transition: opacity 160ms ease-out, transform 160ms ease-out;
+}
+.hg-float.is-on { opacity: 1; transform: translate(-50%, 0); }
+.hg-float.is-on .hg-switch { pointer-events: auto; }
+.hg-float .hg-switch { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08); }
+.hg-sec { scroll-margin-top: calc(var(--topstick-h, 104px) + 56px); }
+@media (prefers-reduced-motion: reduce) { .hg-float { transition: none; } }
+/* The nav row has priority: while it is open the float steps out entirely
+   rather than peeking out beside it. */
+body:has(.topstick.is-navopen) .hg-float.is-on { opacity: 0; transform: translate(-50%, -6px); pointer-events: none; }
+body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none; }

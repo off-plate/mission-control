@@ -2238,7 +2238,7 @@ await step('quitting: its own face, no day dots, a count and a slip on every car
   /* One page since 2026-09-28: the cards live in their own section, and the
      pill scrolls to it instead of changing page. */
   if (await page.locator('#hg-habits .qcard').count()) throw new Error('quitting cards are inside the Habits section')
-  await page.locator('.hg-pill', { hasText: 'Quitting' }).click(); await page.waitForTimeout(1200)
+  await page.locator('#hg-habits .hg-pill', { hasText: 'Quitting' }).click(); await page.waitForTimeout(1200)
   if (await page.evaluate(() => Math.abs(document.getElementById('hg-quitting').getBoundingClientRect().top) > 400)) throw new Error('the Quitting pill did not scroll to its section')
   const cards = await page.evaluate(() => [...document.querySelectorAll('.qcard')].map((c) => {
     const slip = [...c.querySelectorAll('button')].find((b) => /slipped/i.test(b.textContent))

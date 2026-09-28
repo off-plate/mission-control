@@ -11,7 +11,6 @@
    goal cards, and a session body keyed to Hevy's per-exercise numbers rather
    than Zepp's per-session ones. */
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { CookieJarNav, readJarView } from './cookiejarnav'
 import {
   bestE1rmEver, bestRepTotalEver, getAllHevyDayStats, getHevyExerciseHistory, prsOnDay,
   type ExerciseHistory,
@@ -219,13 +218,9 @@ export function GymPage() {
       <div className="hp">
         <header className="hp-head">
           <div>
-            <h1 className="hp-title">Gym</h1>
             <p className="hp-since">
               {sessionDays.length ? `${sessionDays.length} sessions on record from Hevy` : 'Nothing synced from Hevy yet.'}
             </p>
-          </div>
-          <div className="hp-head-right">
-            <CookieJarNav here="gym" view={readJarView()} />
           </div>
         </header>
 

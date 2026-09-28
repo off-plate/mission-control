@@ -1,3 +1,4 @@
+import { JarBar, JAR_PAGES } from './cookiejarnav'
 import { Component, Fragment, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { exceptionsFor, globalExceptions } from './exceptions'
@@ -6,9 +7,7 @@ import { SPACE_LABELS } from './mock'
 import { TodayPage } from './today'
 import { PlanPage } from './plan'
 import { ProjectsPage } from './projects'
-import { HabitsPage } from './habits'
-import { GoalsPage } from './goals'
-import { QuittingPage } from './quitting'
+import { HabitsGoalsRoom } from './hgroom'
 import { NotesPage } from './notes'
 import { BillsPage } from './billspage'
 import { DailyReview } from './daily'
@@ -27,6 +26,8 @@ import { ZonePage, useZoneDepth } from './zone'
    as-speak comment in styles.css making the same call for a slow reply). */
 const SettingsPage = lazy(() => import('./pages2').then((m) => ({ default: m.SettingsPage })))
 const DayPage = lazy(() => import('./day').then((m) => ({ default: m.DayPage })))
+/* The Jar's four sections load together, so switching between them never waits on a chunk. */
+const warmJar = () => Promise.all([import('./board'), import('./healthpage'), import('./gympage')])
 const BoardPage = lazy(() => import('./board').then((m) => ({ default: m.BoardPage })))
 const CalendarPage = lazy(() => import('./calendarpage').then((m) => ({ default: m.CalendarPage })))
 const AssistantPage = lazy(() => import('./assistantpage').then((m) => ({ default: m.AssistantPage })))
@@ -455,6 +456,7 @@ export default function App() {
   const nav = useNavReveal()
   const backFromZone = useRef<PageId>('today')
   useEffect(() => { if (page !== 'zone') backFromZone.current = page }, [page])
+  useEffect(() => { if (JAR_PAGES[page]) void warmJar() }, [page])
 
   /* His catch (2026-09-04): the drawer hangs at a flat `left: var(--gutter)`
      (styles.css, .topstick > .nav), the same edge .topbar itself starts
@@ -495,7 +497,7 @@ export default function App() {
          Jar and the Why wall it opens are dark in both modes, and a paper
          header on top of them read as two apps. Every other page keeps the
          light header, and HUD is already dark, so it is left alone. */
-      className={`shell${page === 'zone' ? ' in-zone' : ''}${hud ? ' is-hud' : ''}${!hud && DARK_CHROME_PAGES.includes(page) ? ' is-dark-chrome' : ''}${!hud && (page === 'health' || page === 'gym') ? ' is-dark-page' : ''}`}
+      className={`shell${page === 'zone' ? ' in-zone' : ''}${hud ? ' is-hud' : ''}${!hud && DARK_CHROME_PAGES.includes(page) ? ' is-dark-chrome' : ''}${!hud && JAR_PAGES[page] ? ' is-dark-page' : ''}`}
       style={page === 'zone' ? ({ '--depth': zoneDepth } as React.CSSProperties) : undefined}
     >
       <a className="skiplink" href="#main">Skip to the page</a>
@@ -707,14 +709,15 @@ export default function App() {
       <DailyReview />
 
       <main id="main" tabIndex={-1}>
+        {JAR_PAGES[page] && <JarBar here={JAR_PAGES[page]} />}
         <PageBoundary page={page}>
         <Suspense fallback={null}>
         {page === 'today' && <TodayPage />}
         {page === 'plan' && <PlanPage />}
         {page === 'projects' && <ProjectsPage />}
-        {(page === 'habits' || page === 'routines') && <HabitsPage />}
-        {page === 'goals' && <GoalsPage />}
-        {page === 'quitting' && <QuittingPage />}
+        {(page === 'habits' || page === 'routines' || page === 'goals' || page === 'quitting') && (
+          <HabitsGoalsRoom start={page === 'goals' || page === 'quitting' ? page : 'habits'} />
+        )}
         {page === 'timeline' && <TimelinePage />}
         {page === 'skills' && <SkillsPage />}
         {page === 'health' && <HealthPage />}

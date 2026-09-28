@@ -168,7 +168,9 @@ export function MundiOpusProvider({ children }: { children: ReactNode }) {
             if (!initialId) {
               p.cuePlaylist({ listType: 'playlist', list: MUNDI_OPUS_PLAYLIST_ID, index: r.index, startSeconds: r.pos })
             } else if (r.pos > 3) {
-              p.seekTo(r.pos, true)
+              // Cue, never seekTo: seeking a cued video starts it playing,
+              // so opening the Zone started the music on its own.
+              p.cueVideoById({ videoId: initialId, startSeconds: r.pos })
             }
             setReady(true)
             /* Pressing play before the player has ever been built (including

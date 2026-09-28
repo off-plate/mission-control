@@ -1,3 +1,4 @@
+import { jumpTo, type HgSection } from './hgroom'
 /* The component library. One location.
 
    These used to live in pages1.tsx, a three-thousand-line page file that every
@@ -440,8 +441,25 @@ export function useOpenToday(): Task[] {
    quitting.tsx needs HabitSheet from habits.tsx), and putting this here too
    avoided the one cycle that would have made (goals.tsx importing this FROM
    habits.tsx, while habits.tsx imports GoalSheet FROM goals.tsx). */
-export function HabitsGoalsSwitch({ on }: { on: 'habits' | 'goals' | 'quitting' }) {
-  const { setPage } = useStore()
+/* Jumps between the three sections of one page, and lights whichever one he
+   is reading, so it works as a place marker as well as a control. */
+export function HabitsGoalsSwitch() {
+  const [on, setOn] = useState<HgSection>('habits')
+  useEffect(() => {
+    const read = () => {
+      const line = window.innerHeight * 0.35
+      let cur: HgSection = 'habits'
+      for (const s of ['habits', 'goals', 'quitting'] as const) {
+        const el = document.getElementById(`hg-${s}`)
+        if (el && el.getBoundingClientRect().top <= line) cur = s
+      }
+      setOn(cur)
+    }
+    read()
+    window.addEventListener('scroll', read, { passive: true })
+    return () => window.removeEventListener('scroll', read)
+  }, [])
+  const setPage = (s: HgSection) => { setOn(s); jumpTo(s) }
   return (
     <span className="hg-switch" role="group" aria-label="Habits or goals">
       <button

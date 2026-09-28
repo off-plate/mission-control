@@ -27,7 +27,7 @@
                tracker is not a call this column gets to make alone. */
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useStore } from './store'
-import { CookieJarNav, readJarView, takeGiveUpRequest, writeJarView } from './cookiejarnav'
+import { jarState, useJarState } from './cookiejarnav'
 import { dayOf, daysSince, useHealth } from './health'
 import {
   countdown, debtCard, goalArcs, goalsCard, habitRings, habitsCard, healthCard, postponedCard,
@@ -129,11 +129,11 @@ export function TimelinePage() {
   const { habits, habitLog, tasks, focusSessions, setPage } = useStore()
   /* Remembered, so the nav on Health and Why can bring him back to the view
      he left rather than always to the ladder. */
-  const [view, setView] = useState<View>(readJarView)
-  useEffect(() => { writeJarView(view) }, [view])
+  const { view: jarView, lives } = useJarState()
+  const view = jarView as View
   const [zoom, setZoom] = useState<Zoom>('d')
   /* Asked for from Health or Why: open straight onto the give-up screen. */
-  const [lives, setLives] = useState(takeGiveUpRequest)
+  const setLives = (v: boolean) => jarState.set({ lives: v })
   /* The desktop shell's `missioncontrol://give-up` deep link -- same screen,
      one more door in. */
   useEffect(() => {
@@ -173,7 +173,6 @@ export function TimelinePage() {
             that holds the record, the body, the reasons and the give-up
             screen together is that one. The address stays #/timeline so
             nothing that links here breaks. */}
-        <h1>Jar</h1>
         <div className="tl-seg" role="group" aria-label="Zoom">
           {ZOOMS.map((z) => (
             <button key={z.id} className={zoom === z.id ? 'on' : ''} aria-pressed={zoom === z.id} onClick={() => setZoom(z.id)}>{z.label}</button>
@@ -185,7 +184,6 @@ export function TimelinePage() {
             <b>{chain.current}</b>
             <span className="tl-l">day chain</span>
           </span>
-          <CookieJarNav here="jar" view={view} onToggleView={() => setView(view === 'ladder' ? 'wheel' : 'ladder')} lives={lives} onGiveUp={() => setLives((v) => !v)} />
         </div>
       </header>
 

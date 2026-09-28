@@ -19,7 +19,6 @@
 
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { useStore } from './store'
-import { CookieJarNav, readJarView } from './cookiejarnav'
 import * as Icon from './icons'
 
 import { wallImage } from './wall-images'
@@ -244,12 +243,6 @@ export function BoardPage() {
 
   return (
     <div className="board-page">
-      <header className="board-head">
-        <h1>The wall</h1>
-        {/* No Close any more (his ask, 2026-09-15): the same Cookie Jar nav as
-            the ladder, the flywheel and Health, top right. Escape still goes back. */}
-        <CookieJarNav here="why" view={readJarView()} />
-      </header>
       <div className="board-wall" ref={wall}>
         {WALL.map((c, i) => {
           const tilt = TILT[i % TILT.length]

@@ -5,7 +5,7 @@ import * as Icon from './icons'
 import { useState } from 'react'
 import { useStore } from './store'
 import { Sheet } from './modals'
-import { Band, Dropdown, Select, SpaceMark, WriteTo, HabitsGoalsSwitch } from './ui'
+import { Band, Dropdown, Select, SpaceMark, WriteTo } from './ui'
 import { GOAL_TIMEFRAMES, goalCurrent, isTimeFed, habitTarget, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone } from './types'
 import { goalPeriodKey, goalPeriodRange, periodIsPast, periodLabel, shiftPeriodKey, fmtNum, goalPace, fmtWhen, type GoalTf } from './util'
 
@@ -373,8 +373,7 @@ export function GoalsPage() {
   return (
     <div className="page">
       <Band
-        title="Habits & Goals"
-        beside={<HabitsGoalsSwitch on="goals" />}
+        title="Goals"
         metrics={[{ v: `${done}/${spaceGoals.length}`, k: 'reached', tone: (done > 0 ? 'pos' : 'info') as 'pos' | 'info' }]}
         actions={<><WriteTo /><button className="btn btn-primary" onClick={() => setAdding(true)}>Add a goal</button></>}
       />

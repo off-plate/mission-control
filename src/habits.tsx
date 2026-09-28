@@ -16,8 +16,8 @@ import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
 import { Sheet } from './modals'
 import { HabitRun, habitHasRun } from './habitrun'
-import { Band, Dropdown, Segmented, Select, WriteTo, HabitsGoalsSwitch } from './ui'
-import { habitsDueToday, HABIT_FREQUENCIES, SLOTS, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, habitGate, habitLocked, isCounted, COUNT_PERIODS, requiredSteps, routineProgress, type PageId, type Goal, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type TimeSlot } from './types'
+import { Band, Dropdown, Segmented, Select, HabitsGoalsSwitch } from './ui'
+import { HABIT_FREQUENCIES, SLOTS, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, habitGate, habitLocked, isCounted, COUNT_PERIODS, requiredSteps, routineProgress, type PageId, type Goal, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type TimeSlot } from './types'
 import { goalPeriodRange, habitPeriodRange, shiftPeriodKey, fmtDuration, fmtWhen, dayOfWeekKey, localDateKey, type GoalTf } from './util'
 import { GoalSheet } from './goals'
 
@@ -755,18 +755,9 @@ export function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; 
   )
 }
 
-/** How far back the habit page is looking. A week is the default because that is
- *  the rhythm; the longer windows are for the sixty and hundred day questions. */
-const HABIT_WINDOWS = [
-  { id: 7, label: 'A week' },
-  { id: 30, label: '30 days' },
-  { id: 90, label: '90 days' },
-  { id: 365, label: 'A year' },
-]
-
 export function HabitsPage() {
   const { habits, goals, space, deleteHabit, togglePauseHabit, routines, stepTicks, habitLog, todayIndex, inView, focusRoutineId, setFocusRoutineId, toggleHabitDay, slips, logSlip, focusSessions } = useStore()
-  const [days, setDays] = useState(7)
+  const days = 7
   const [adding, setAdding] = useState(false)
   // Opening the goal sheet from a habit is the "set a goal on this" path.
   const [goalFor, setGoalFor] = useState<string | null>(null)
@@ -821,10 +812,6 @@ export function HabitsPage() {
      monthlies across four workspaces that he could not reconstruct from
      anything on screen. What he wants on a Sunday morning is what is still
      open TODAY. */
-  /* Folders, not raw rows: the same function Today's headline uses. This page
-     used to count every habit and open with "1/64" while Today said "1/14"
-     about the same morning. */
-  const { due: dueCount, kept: doneToday } = habitsDueToday(spaceHabits, routines, habitLog, todayIndex)
 
   /* Grouped by who keeps it, and inside a group what is still open comes
      first, because a habit already ticked is a record and not a thing
@@ -914,8 +901,6 @@ export function HabitsPage() {
      for a workspace with enough of them that scrolling past open ones to find
      the one he wants is the actual problem. Any open -> shut them all first;
      only once they are all already shut does the same control open them. */
-  const allShut = folderGroups.length > 0 && folderGroups.every((g) => !shutFolders.has(g.id))
-  const toggleAllFolders = () => setShutFolders(allShut ? new Set(folderGroups.map((g) => g.id)) : new Set())
   /* Today's routine strip hands a routine over here the same way it hands a
      task to Plan: open its folder if he had shut it, scroll to it, flash it,
      then forget it -- clicking "Before work routine" on Today should not
@@ -1065,22 +1050,17 @@ export function HabitsPage() {
       <Band
         title="Habits"
         beside={<HabitsGoalsSwitch />}
-        leading={folderGroups.length > 0 && (
-          <button className="btn btn-ghost band-collapseall" onClick={toggleAllFolders}>
-            {allShut ? 'Expand all' : 'Collapse all'}
-          </button>
-        )}
-        metrics={[{ v: `${doneToday}/${dueCount}`, k: 'done today', tone: (doneToday > 0 ? 'pos' : 'info') as 'pos' | 'info' }]}
+        /* One Add for the whole page (his ask, 2026-09-28): the range, the
+           count, expand-all and the per-section buttons are gone. Goal and
+           Quitting open their own sections' sheets. */
         actions={
-          <>
-            <Select
-              className="rangepick" value={days} ariaLabel="How far back to look"
-              onChange={(v) => setDays(v)}
-              options={HABIT_WINDOWS.map((w) => ({ value: w.id, label: w.label }))}
-            />
-            <WriteTo />
-            <button className="btn btn-primary" onClick={() => setAdding(true)}>Add a habit</button>
-          </>
+          <Dropdown label="Add" trigger={({ onClick, open }) => (
+            <button className="btn btn-primary" aria-haspopup="menu" aria-expanded={open} onClick={onClick}>Add</button>
+          )}>
+            <button role="menuitem" onClick={() => setAdding(true)}>Habit</button>
+            <button role="menuitem" onClick={() => window.dispatchEvent(new CustomEvent('hg:add', { detail: 'goals' }))}>Goal</button>
+            <button role="menuitem" onClick={() => window.dispatchEvent(new CustomEvent('hg:add', { detail: 'quitting' }))}>Quitting</button>
+          </Dropdown>
         }
       />
 

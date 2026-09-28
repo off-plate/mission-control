@@ -12,12 +12,11 @@ import { RoutineRunner } from './runner'
 import { HevySync, isHevyHabit } from './hevysync'
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 import { useEffect, useMemo, useState } from 'react'
-import { SPACE_LABELS } from './exceptions'
 import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
 import { Sheet } from './modals'
 import { HabitRun, habitHasRun } from './habitrun'
-import { Band, Dropdown, Segmented, Select, SpaceMark, WriteTo, HabitsGoalsSwitch } from './ui'
+import { Band, Dropdown, Segmented, Select, WriteTo, HabitsGoalsSwitch } from './ui'
 import { habitsDueToday, HABIT_FREQUENCIES, SLOTS, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, habitGate, habitLocked, isCounted, COUNT_PERIODS, requiredSteps, routineProgress, type PageId, type Goal, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type TimeSlot } from './types'
 import { goalPeriodRange, habitPeriodRange, shiftPeriodKey, fmtDuration, fmtWhen, dayOfWeekKey, localDateKey, type GoalTf } from './util'
 import { GoalSheet } from './goals'
@@ -138,7 +137,7 @@ function routineRecord(kept: Set<string>, freq: HabitFrequency | undefined, win:
 }
 
 
-function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy, progress, partOn, goal, qualify, sealed, footLead }: {
+function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy, progress, partOn, goal, sealed, footLead }: {
   h: HabitDef
   todayIndex: number
   /* Why this habit cannot be ticked by hand at all, on any day. The gym habit
@@ -152,7 +151,6 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
      burst straight out of the panel. */
   footLead?: React.ReactNode
   /** The workspace, spelled out, when another visible habit has the same name. */
-  qualify?: string
   /** "done today" / "paused". It goes in the foot column where words fit; in
    *  the menu column it shoved the kebab out of the panel. */
   stateTag?: string | null
@@ -268,8 +266,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
               foot row under it -- padded to clear a caret's width -- lines up
               with the name instead of drifting right of it. */}
           <span className="run-caret is-blank" aria-hidden="true" />
-          <SpaceMark space={h.space} />
-          <span className="habit-name">{h.name}{qualify && <span className="habit-qual">{qualify}</span>}</span>
+          <span className="habit-name">{h.name}</span>
           <span className="habit-count mono">
             {fmtDuration(todayMin)}<span className="habit-freq">of {fmtDuration(need)} today</span>
           </span>
@@ -311,8 +308,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
       <div className="habit-row is-count">
         <div className="habit-row-top">
           <span className="run-caret is-blank" aria-hidden="true" />
-          <SpaceMark space={h.space} />
-          <span className="habit-name">{h.name}{qualify && <span className="habit-qual">{qualify}</span>}</span>
+          <span className="habit-name">{h.name}</span>
           <span className="habit-count mono">
             {have}<span className="habit-freq">of {target} {label}</span>
           </span>
@@ -346,8 +342,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
       <div className="habit-row is-measured">
         <div className="habit-row-top">
           <span className="run-caret is-blank" aria-hidden="true" />
-          <SpaceMark space={h.space} />
-          <span className="habit-name">{h.name}{qualify && <span className="habit-qual">{qualify}</span>}</span>
+          <span className="habit-name">{h.name}</span>
           <span className="habit-count mono">
             {fmtDuration(todayMin)}<span className="habit-freq">of {fmtDuration(target)} today</span>
           </span>
@@ -392,8 +387,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
       <div className="habit-row is-quit">
         <div className="habit-row-top">
           <span className="run-caret is-blank" aria-hidden="true" />
-          <SpaceMark space={h.space} />
-          <span className="habit-name">{h.name}{qualify && <span className="habit-qual">{qualify}</span>}</span>
+          <span className="habit-name">{h.name}</span>
           <span className="habit-count mono">{clean}<span className="habit-freq">{clean === 1 ? 'day' : 'days'} clean</span></span>
         </div>
         <span className="habit-actions">{actions}</span>
@@ -442,8 +436,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
             onClick={() => setOpen((v) => !v)}
           ><Icon.ChevronRight size={12} /></button>
         ) : <span className="run-caret is-blank" aria-hidden="true" />}
-        <SpaceMark space={h.space} />
-        <span className="habit-name">{h.name}{qualify && <span className="habit-qual">{qualify}</span>}</span>
+        <span className="habit-name">{h.name}</span>
         {/* The week's count belongs to the week. Showing 1/7 above a year of
             squares says two different things about the same habit. */}
         {/* A weekly habit has a target of one, and this counted DAYS in the
@@ -840,11 +833,6 @@ export function HabitsPage() {
     (h.auto?.from === 'focus' || h.kind === 'measured') ? 'clock' : drivenBy.has(h.id) ? 'routine' : 'you'
   const rank = (h: HabitDef) =>
     (h.paused ? 2 : h.days[todayIndex] ? 1 : 0) * 10 + (DAYPART_RANK[h.daypart ?? 'anytime'] ?? 4)
-  /* The workspace is said on every row now, not only when two names collide.
-     One list holds all four, so "Focus for 30 minutes" is three rows and the
-     label is the only thing that places them; and a row he cannot place is a
-     row he cannot trust. */
-  const qualifyOf = (h: HabitDef) => SPACE_LABELS[h.space]
   /* Folders first, then whatever is loose. His model: a routine IS a folder of
      habits, and "if a habit doesn't have a folder it is basically just the
      habit". Inside a folder the sequence he wrote is the order, because a
@@ -1048,7 +1036,7 @@ export function HabitsPage() {
             {c.list.map((h) => (
               <div className={`habit-line is-${h.kind ?? 'build'}${h.paused ? ' is-paused' : ''}`} key={h.id}>
                 <HabitRow
-                  h={h} todayIndex={todayIndex} days={days} qualify={qualifyOf(h)}
+                  h={h} todayIndex={todayIndex} days={days}
                   drivenBy={drivenBy.get(h.id)} progress={progressFor.get(h.id)}
                   partOn={partFor.get(h.id)} goal={goalOn.get(h.id)}
                   stateTag={h.paused ? 'paused' : h.days[todayIndex] ? 'done today' : null}
@@ -1162,7 +1150,7 @@ export function HabitsPage() {
                 {autoRows.map((h) => (
                   <div className="hg-row" key={h.id}>
                     <span className="hg-what">
-                      <span className="hg-title">{h.name}{qualifyOf(h) && <span className="habit-qual">{qualifyOf(h)}</span>}</span>
+                      <span className="hg-title">{h.name}</span>
                       <span className="hg-note">{isHevyHabit(h) ? 'Hevy' : 'from your focus blocks'}</span>
                     </span>
                     <span className="hg-do">
@@ -1196,7 +1184,7 @@ export function HabitsPage() {
                 {[...manualRows].sort((a, b) => Number(a.days[todayIndex]) - Number(b.days[todayIndex])).map((h) => (
                   <div className={`hg-row${h.days[todayIndex] ? ' is-done' : ''}`} key={h.id}>
                     <span className="hg-what">
-                      <span className="hg-title">{h.name}{qualifyOf(h) && <span className="habit-qual">{qualifyOf(h)}</span>}</span>
+                      <span className="hg-title">{h.name}</span>
                       {h.note && <span className="hg-note">{h.note}</span>}
                     </span>
                     <span className="hg-do">

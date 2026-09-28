@@ -1,3 +1,4 @@
+import { daysSince } from './health'
 /* THE PLAN PAGE. Split out of pages1.tsx (2026-09-09). Carries the task-row
    pieces (SubEdit, SubtaskRow, EditTaskSheet, ActualLog, EstimateChip,
    TaskActions) and the day-switcher/bucket helpers (prevDay, longDay,
@@ -1012,9 +1013,11 @@ export function PlanPage() {
                   <ProjectMark project={markOf(t)} />
                   <span className={`cat-dot ${t.category}`} aria-hidden="true" />
                   <span className="grow"><Linkify text={t.title} /></span>
-                  {(t.carried ?? 0) > 0 && (
-                    <span className="carried-tag mono" title={`Planned and not finished on ${t.carried} ${t.carried === 1 ? 'day' : 'days'}`}>
-                      {t.carried === 1 ? 'came back' : `came back ${t.carried}x`}
+                  {/* Age since it was written down, not replans: moving it on
+                      and off a day never changes the number. */}
+                  {t.createdAt && daysSince(t.createdAt) > 0 && (
+                    <span className="carried-tag mono" title={`On the list since ${t.createdAt}`}>
+                      {daysSince(t.createdAt) === 1 ? '1 day' : `${daysSince(t.createdAt)} days`}
                     </span>
                   )}
                   <EstimateChip task={t} />

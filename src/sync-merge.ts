@@ -295,6 +295,18 @@ export function mergeStates(a: string, b: string): string {
       out[field] = [...seen.values()]
     }
 
+    /* days[] is a cache of this week's habitLog, so after the merge it is
+       rebuilt from the merged log, as a load does. The row-wise union above
+       could only add ticks, which kept a stale Monday from an earlier week
+       alive on every sync (his report, 2026-09-28: three habits ticked that
+       he never touched, with no log row behind any of them). */
+    if (Array.isArray(out.habits) && Array.isArray(out.habitLog)) {
+      const week = Array.from({ length: 7 }, (_, i) => dayOfWeekKeyFor(i))
+      const kept = new Set((out.habitLog as Row[]).map((t) => `${String(t.habitId)}|${String(t.day)}`))
+      out.habits = (out.habits as Row[]).map((h) =>
+        Array.isArray(h.days) && h.days.length === 7 ? { ...h, days: week.map((d) => kept.has(`${String(h.id)}|${d}`)) } : h)
+    }
+
     /* Seeds he has deleted: a tombstone list already, so it unions. Losing an
        entry here brings a deleted seed back on the next boot. */
     out.removedSeeds = [...new Set([...(older.removedSeeds ?? []), ...(newer.removedSeeds ?? [])])]

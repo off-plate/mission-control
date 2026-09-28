@@ -3,7 +3,8 @@
    three sections of one scroll, and the switch jumps between them. The old
    addresses (#/goals, #/quitting) still work: they open this page, scrolled
    to their section. */
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { HabitsGoalsSwitch } from './ui'
 import { HabitsPage } from './habits'
 import { GoalsPage } from './goals'
 import { QuittingPage } from './quitting'
@@ -26,9 +27,21 @@ export function HabitsGoalsRoom({ start }: { start: HgSection }) {
     ro.observe(top)
     return () => ro.disconnect()
   }, [])
+  /* The switch lives beside the Habits title; once that has scrolled away a
+     copy floats under the header (his ask, 2026-09-28). It sits below the
+     header's layer, so the nav row that drops down on hover covers it. */
+  const [float, setFloat] = useState(false)
+  useEffect(() => {
+    const home = document.querySelector('#hg-habits .hg-switch')
+    if (!home) return
+    const io = new IntersectionObserver(([e]) => setFloat(!e.isIntersecting && e.boundingClientRect.top < 0 + window.innerHeight / 2), { rootMargin: `-${parseInt(getComputedStyle(document.documentElement).getPropertyValue('--topstick-h')) || 104}px 0px 0px 0px` })
+    io.observe(home)
+    return () => io.disconnect()
+  }, [])
   useEffect(() => { if (start !== 'habits') requestAnimationFrame(() => jumpTo(start, false)) }, [start])
   return (
     <div className="hg-room">
+      <div className={`hg-float${float ? ' is-on' : ''}`} aria-hidden={!float}><HabitsGoalsSwitch /></div>
       <section id="hg-habits" className="hg-sec"><HabitsPage /></section>
       <section id="hg-goals" className="hg-sec"><GoalsPage /></section>
       <section id="hg-quitting" className="hg-sec"><QuittingPage /></section>

@@ -197,10 +197,10 @@ const dragToSlot = async (title, slotLabel, p = page) => {
 }
 
 const openRoutines = async () => {
-  const all = page.locator('.band-collapseall')
-  if (await all.count() && /expand/i.test(await all.innerText())) {
-    await all.click(); await page.waitForTimeout(500)
-  }
+  /* Expand-all left the page (2026-09-28); each routine opens by its own caret. */
+  const shut = page.locator('.rtc-open[aria-expanded="false"]')
+  for (let i = 0; i < 30 && await shut.count(); i++) await shut.first().click()
+  await page.waitForTimeout(300)
 }
 
 /* A no-op when QA_OUT is unset, so a flow that calls this stays free to run
@@ -281,9 +281,9 @@ await step('habits: a step with two ways to answer it stays ONE habit', async ()
 })
 await step('goals: add with milestones, tick one on the card', async () => {
   await fresh('goals')
-  await page.getByRole('button', { name: 'Add a goal' }).click()
+  await page.locator('.band').getByRole('button', { name: 'Add', exact: true }).first().click(); await page.getByRole('menuitem', { name: 'Goal', exact: true }).click()
   await page.locator('#gname').fill('Gate goal')
-  await page.locator('#gms').fill('Step one'); await page.getByRole('button', { name: 'Add', exact: true }).click()
+  await page.locator('#gms').fill('Step one'); await page.locator('[role=dialog]').getByRole('button', { name: 'Add', exact: true }).click()
   await page.getByRole('button', { name: 'Add goal' }).click(); await page.waitForTimeout(500)
   const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
   const g = s.goals.find((x) => x.name === 'Gate goal')
@@ -2582,14 +2582,8 @@ await step('habits: a monthly review done last week does not read as done today'
      is still caught twice, above by today's own slot and below by the Habits
      band, which are the two places the bug actually showed. */
 
-  await page.goto(`${URL}#/habits`); await page.reload(); await page.waitForTimeout(800)
-  const band = await page.locator('.band-metric .v').first().innerText()
-  // "done today / due today": the numerator must be 0, since nothing was
-  // actually done today, and the monthly review must not be in the
-  // denominator either, since it is already kept for the month.
-  const m = band.match(/^(\d+)\/(\d+)$/)
-  if (!m) throw new Error(`"done today" reads "${band}", not a done/due pair`)
-  if (m[1] !== '0') throw new Error(`"done today" reads ${band}: the monthly review counted as done today`)
+  /* The Habits page's own done-today count left with the band controls
+     (2026-09-28); Today's widget above still carries the check. */
 })
 
 await step('notes: brain dumps came across, and search reaches every folder', async () => {

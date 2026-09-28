@@ -2,10 +2,10 @@
    (2026-09-09). Imports HabitSheet from habits.tsx -- a quit is a HabitDef
    with kind:'break', so adding/editing one uses the same sheet habits.tsx
    already defines, not a second copy of it. */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { SPACE_LABELS } from './exceptions'
 import { useStore } from './store'
-import { Band, Dropdown, WriteTo } from './ui'
+import { Band, Dropdown } from './ui'
 import { bestCleanRun, daysClean, slipCount, slipDays, type HabitDef, type HabitSlip } from './types'
 import { HabitSheet } from './habits'
 import { localDateKey } from './util'
@@ -32,6 +32,11 @@ const shortDate = (key: string): string => {
 export function QuittingPage() {
   const { habits, inView, slips, logSlip, deleteHabit, togglePauseHabit } = useStore()
   const [adding, setAdding] = useState(false)
+  useEffect(() => {
+    const on = (e: Event) => { if ((e as CustomEvent).detail === 'quitting') setAdding(true) }
+    window.addEventListener('hg:add', on)
+    return () => window.removeEventListener('hg:add', on)
+  }, [])
   const [editHabit, setEditHabit] = useState<HabitDef | null>(null)
 
   /* Ranked by how long it has held. That is the scoreboard, and a page that
@@ -42,14 +47,11 @@ export function QuittingPage() {
     .sort((a, b) => b.clean - a.clean)
 
   const standing = quits.reduce((a, q) => a + q.clean, 0)
-  const cleanToday = quits.filter((q) => !slipDays(slips, q.h.id).has(localDateKey())).length
 
   return (
     <div className="page">
       <Band
         title="Quitting"
-        metrics={quits.length ? [{ v: `${cleanToday}/${quits.length}`, k: 'clean today', tone: (cleanToday === quits.length ? 'pos' : 'info') as 'pos' | 'info' }] : undefined}
-        actions={<><WriteTo /><button className="btn btn-primary" onClick={() => setAdding(true)}>Add a habit</button></>}
       />
 
       {quits.length === 0 && <div className="empty">Nothing you are quitting in this workspace. Add a habit and set it to something you are stopping.</div>}

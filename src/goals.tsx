@@ -2,10 +2,10 @@
    imported by habits.tsx for "set a goal on this habit". Never imports from
    habits.tsx or quitting.tsx itself, so that cross-import stays one-way. */
 import * as Icon from './icons'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from './store'
 import { Sheet } from './modals'
-import { Band, Dropdown, Select, SpaceMark, WriteTo } from './ui'
+import { Band, Dropdown, Select, SpaceMark } from './ui'
 import { GOAL_TIMEFRAMES, goalCurrent, isTimeFed, habitTarget, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone } from './types'
 import { goalPeriodKey, goalPeriodRange, periodIsPast, periodLabel, shiftPeriodKey, fmtNum, goalPace, fmtWhen, type GoalTf } from './util'
 
@@ -344,7 +344,6 @@ export function GoalsPage() {
   const all = goals
   /* A goal belongs to a period. The ones whose period has ended are not deleted
      and do not keep counting: they sit below with the number they finished on. */
-  const spaceGoals = all.filter((g) => !g.closed)
   const past = all.filter((g) => g.closed).sort((a, b) => (a.closed!.on < b.closed!.on ? 1 : -1))
   /* Which period each column is looking at, as steps from now. Zero is today;
      back shows what a finished period ended on, forward is where next week's
@@ -352,8 +351,12 @@ export function GoalsPage() {
   const [offsets, setOffsets] = useState<Record<string, number>>({})
   const shift = (tf: string, d: number) => setOffsets((o) => ({ ...o, [tf]: (o[tf] ?? 0) + d }))
   const nowOf = (g: Goal) => goalCurrent(g, habits, habitLog, goalPeriodRange((g.timeframe ?? 'quarter') as GoalTf, g.periodKey ?? goalPeriodKey((g.timeframe ?? 'quarter') as GoalTf)), slips, focusSessions)
-  const done = spaceGoals.filter((g) => nowOf(g) >= g.target).length
   const [adding, setAdding] = useState(false)
+  useEffect(() => {
+    const on = (e: Event) => { if ((e as CustomEvent).detail === 'goals') setAdding(true) }
+    window.addEventListener('hg:add', on)
+    return () => window.removeEventListener('hg:add', on)
+  }, [])
   const [editing, setEditing] = useState<Goal | null>(null)
   /* "Set it again" used to give no sign a click had landed -- same page,
      same list, nothing visibly changed -- so he clicked it a dozen times
@@ -374,8 +377,6 @@ export function GoalsPage() {
     <div className="page">
       <Band
         title="Goals"
-        metrics={[{ v: `${done}/${spaceGoals.length}`, k: 'reached', tone: (done > 0 ? 'pos' : 'info') as 'pos' | 'info' }]}
-        actions={<><WriteTo /><button className="btn btn-primary" onClick={() => setAdding(true)}>Add a goal</button></>}
       />
 
       <LeftBehind />

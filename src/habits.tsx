@@ -16,7 +16,7 @@ import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
 import { Sheet } from './modals'
 import { HabitRun, habitHasRun } from './habitrun'
-import { Band, Dropdown, Segmented, Select, WriteTo, HabitsGoalsSwitch } from './ui'
+import { Band, Dropdown, Segmented, Select, WriteTo } from './ui'
 import { habitsDueToday, HABIT_FREQUENCIES, SLOTS, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, habitGate, habitLocked, isCounted, COUNT_PERIODS, requiredSteps, routineProgress, type PageId, type Goal, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type TimeSlot } from './types'
 import { goalPeriodRange, habitPeriodRange, shiftPeriodKey, fmtDuration, fmtWhen, dayOfWeekKey, localDateKey, type GoalTf } from './util'
 import { GoalSheet } from './goals'
@@ -1063,8 +1063,7 @@ export function HabitsPage() {
   return (
     <div className="page">
       <Band
-        title="Habits & Goals"
-        beside={<HabitsGoalsSwitch on="habits" />}
+        title="Habits"
         leading={folderGroups.length > 0 && (
           <button className="btn btn-ghost band-collapseall" onClick={toggleAllFolders}>
             {allShut ? 'Expand all' : 'Collapse all'}

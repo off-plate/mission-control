@@ -5,7 +5,7 @@
 import { useState } from 'react'
 import { SPACE_LABELS } from './exceptions'
 import { useStore } from './store'
-import { Band, Dropdown, WriteTo, HabitsGoalsSwitch } from './ui'
+import { Band, Dropdown, WriteTo } from './ui'
 import { bestCleanRun, daysClean, slipCount, slipDays, type HabitDef, type HabitSlip } from './types'
 import { HabitSheet } from './habits'
 import { localDateKey } from './util'
@@ -47,8 +47,7 @@ export function QuittingPage() {
   return (
     <div className="page">
       <Band
-        title="Habits & Goals"
-        beside={<HabitsGoalsSwitch on="quitting" />}
+        title="Quitting"
         metrics={quits.length ? [{ v: `${cleanToday}/${quits.length}`, k: 'clean today', tone: (cleanToday === quits.length ? 'pos' : 'info') as 'pos' | 'info' }] : undefined}
         actions={<><WriteTo /><button className="btn btn-primary" onClick={() => setAdding(true)}>Add a habit</button></>}
       />

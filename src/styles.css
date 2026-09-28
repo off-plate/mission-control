@@ -11284,3 +11284,16 @@ body:has(.pp-page) #main { padding-bottom: 0; }
 /* Wide enough for "The ladder" and "Momentum" both, so a label swap never
    nudges the buttons beside it. */
 .jar-bar .jar-toggle { min-width: 7.5em; justify-content: center; }
+
+/* Habits, Goals and Quitting as one scroll (2026-09-28). The switch rides
+   under the header; each section stops clear of both when jumped to. */
+.hg-stick {
+  position: sticky; top: calc(var(--topstick-h, 104px) + var(--s2)); z-index: 5;
+  display: flex; justify-content: center; margin: var(--s3) 0 var(--s2); pointer-events: none;
+}
+.hg-stick .hg-switch { pointer-events: auto; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08); }
+.hg-sec { scroll-margin-top: calc(var(--topstick-h, 104px) + 56px); }
+.hg-sec + .hg-sec { margin-top: var(--s6); }
+/* Quitting is short: without room below it, jumping there stops early and the
+   switch keeps lighting Goals. */
+.hg-sec:last-child { min-height: calc(100vh - var(--topstick-h, 104px) - 56px); }

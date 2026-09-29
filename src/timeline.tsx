@@ -1064,7 +1064,10 @@ function YouTubeReel({ url, sound, paused, onEnded, onFail }: {
       if (!alive || !host.isConnected) return
       playerRef.current = new window.YT!.Player(mount, {
         videoId: id,
-        playerVars: { autoplay: 1, mute: sound ? 0 : 1, controls: 0, playsinline: 1, rel: 0 },
+        /* Controls on for a touch screen (2026-09-29): with them off there is
+           no play button, so a clip the phone would not autoplay could not
+           be started by hand at all. Desktop keeps the clean frame. */
+        playerVars: { autoplay: 1, mute: sound ? 0 : 1, controls: matchMedia('(pointer: coarse)').matches ? 1 : 0, playsinline: 1, rel: 0 },
         events: {
           onReady: () => kickRef.current(),
           onStateChange: (e: { data: number }) => {

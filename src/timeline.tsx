@@ -854,7 +854,17 @@ function Reel({ url, label, count, onOpenLibrary, onNext, onRatio }: {
     else void v.play().catch(() => { /* autoplay rules, already handled on mount */ })
   }, [paused, playable])
 
-  const hear = () => { const v = vid.current; if (v) { v.muted = false; void v.play() } setSound(true) }
+  /* His call (2026-09-29): no Sound on button, sound is always on while this
+     screen is up. A browser only allows unmuted playback after a gesture, so
+     when autoplay was forced muted, the first tap or key anywhere unmutes it. */
+  useEffect(() => {
+    if (sound) return
+    const hear = () => { const v = vid.current; if (v) { v.muted = false; void v.play() } setSound(true) }
+    const opts = { capture: true, once: true } as const
+    addEventListener('pointerdown', hear, opts)
+    addEventListener('keydown', hear, opts)
+    return () => { removeEventListener('pointerdown', hear, opts); removeEventListener('keydown', hear, opts) }
+  }, [sound])
 
   const deadInstagram = kind === 'instagram' && !cached && attempt?.url === url && attempt.failed
   const fetchingInstagram = kind === 'instagram' && !cached && !deadInstagram
@@ -961,9 +971,6 @@ function Reel({ url, label, count, onOpenLibrary, onNext, onRatio }: {
           </button>
         )}
         {count > 1 && <button className="tl-setshot" onClick={onNext}>Next</button>}
-        {kind && kind !== 'other' && !failed && !sound && (
-          <button className="tl-setshot is-hot" onClick={hear}>Sound on</button>
-        )}
       </div>
     </div>
   )
@@ -1057,6 +1064,16 @@ function YouTubeReel({ url, sound, paused, onEnded, onFail }: {
     if (!p?.mute) return
     if (sound) p.unMute?.()
     else p.mute?.()
+  }, [sound])
+
+  /* The browser can start the player muted without telling this component.
+     Any gesture on the page is the moment it will allow sound, so take it. */
+  useEffect(() => {
+    if (!sound) return
+    const hear = () => { const p = playerRef.current; if (p?.isMuted?.()) p.unMute?.() }
+    addEventListener('pointerdown', hear, true)
+    addEventListener('keydown', hear, true)
+    return () => { removeEventListener('pointerdown', hear, true); removeEventListener('keydown', hear, true) }
   }, [sound])
 
   useEffect(() => {

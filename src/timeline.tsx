@@ -993,6 +993,7 @@ function YouTubeReel({ url, sound, paused, onEnded, onFail }: {
   const stallRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const startedRef = useRef(false)
   const armStallRef = useRef<() => void>(() => {})
+  const kickRef = useRef<() => void>(() => {})
   const pausedRef = useRef(paused)
   useEffect(() => { pausedRef.current = paused }, [paused])
 
@@ -1045,6 +1046,19 @@ function YouTubeReel({ url, sound, paused, onEnded, onFail }: {
     }
     armStallRef.current = armStall
     armStall()
+    /* His report (2026-09-29): "YouTube videos don't play on their own" on his
+       phone. A phone refuses to start a player with sound before a tap, and
+       then it just sits there. Ask for sound first; if nothing is playing
+       1.5s later, take muted playback over none, and his first touch
+       unmutes it (the gesture effect below). */
+    kickRef.current = () => {
+      setTimeout(() => {
+        const p = playerRef.current
+        if (!alive || !p?.getPlayerState || pausedRef.current) return
+        const st = p.getPlayerState()
+        if (st !== 1 && st !== 3) { p.mute?.(); p.playVideo?.() }
+      }, 1500)
+    }
 
     void loadYouTubeApi().then(() => {
       if (!alive || !host.isConnected) return
@@ -1052,6 +1066,7 @@ function YouTubeReel({ url, sound, paused, onEnded, onFail }: {
         videoId: id,
         playerVars: { autoplay: 1, mute: sound ? 0 : 1, controls: 0, playsinline: 1, rel: 0 },
         events: {
+          onReady: () => kickRef.current(),
           onStateChange: (e: { data: number }) => {
             if (e.data === 1 || e.data === 3) { startedRef.current = true; if (stallRef.current) clearTimeout(stallRef.current) }
             if (e.data === 0) onEndedRef.current()
@@ -1081,6 +1096,7 @@ function YouTubeReel({ url, sound, paused, onEnded, onFail }: {
     if (!p?.loadVideoById) return
     armStallRef.current()
     p.loadVideoById(id)
+    kickRef.current()
     if (pausedRef.current) p.pauseVideo?.()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])

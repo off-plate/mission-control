@@ -991,6 +991,10 @@ function YouTubeReel({ url, sound, paused, onEnded, onFail }: {
   const id = url.match(YT)?.[1] ?? ''
 
   const stallRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const startedRef = useRef(false)
+  const armStallRef = useRef<() => void>(() => {})
+  const pausedRef = useRef(paused)
+  useEffect(() => { pausedRef.current = paused }, [paused])
 
   useEffect(() => {
     if (!id) { onFail(); return }
@@ -1029,9 +1033,18 @@ function YouTubeReel({ url, sound, paused, onEnded, onFail }: {
            blocked script, which it left hanging forever.
        Ten seconds either way, and it now surfaces exactly like any other
        failure: the card, the link, Skip. */
-    let started = false
-    const stall = setTimeout(() => { if (alive && !started) onFail() }, 10_000)
-    stallRef.current = stall
+    /* ONE PLAYER FOR EVERY CLIP. His report (2026-09-29): on his phone the
+       sound sometimes did not play. A phone only lets a player make sound
+       after a tap, and a new player per clip lost that permission on every
+       auto-advance. The player is built once and later clips go in with
+       loadVideoById, so the permission from the first tap carries over. */
+    const armStall = () => {
+      startedRef.current = false
+      if (stallRef.current) clearTimeout(stallRef.current)
+      stallRef.current = setTimeout(() => { if (alive && !startedRef.current) onFail() }, 10_000)
+    }
+    armStallRef.current = armStall
+    armStall()
 
     void loadYouTubeApi().then(() => {
       if (!alive || !host.isConnected) return
@@ -1040,10 +1053,10 @@ function YouTubeReel({ url, sound, paused, onEnded, onFail }: {
         playerVars: { autoplay: 1, mute: sound ? 0 : 1, controls: 0, playsinline: 1, rel: 0 },
         events: {
           onStateChange: (e: { data: number }) => {
-            if (e.data === 1 || e.data === 3) { started = true; clearTimeout(stall) }
+            if (e.data === 1 || e.data === 3) { startedRef.current = true; if (stallRef.current) clearTimeout(stallRef.current) }
             if (e.data === 0) onEndedRef.current()
           },
-          onError: () => { clearTimeout(stall); onFail() },
+          onError: () => { if (stallRef.current) clearTimeout(stallRef.current); onFail() },
         },
       })
     })
@@ -1056,6 +1069,19 @@ function YouTubeReel({ url, sound, paused, onEnded, onFail }: {
          children, so clearing them is not touching anything React tracks. */
       host.replaceChildren()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const firstId = useRef(id)
+  useEffect(() => {
+    if (id === firstId.current) return
+    firstId.current = id
+    if (!id) { onFail(); return }
+    const p = playerRef.current
+    if (!p?.loadVideoById) return
+    armStallRef.current()
+    p.loadVideoById(id)
+    if (pausedRef.current) p.pauseVideo?.()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
@@ -1070,7 +1096,13 @@ function YouTubeReel({ url, sound, paused, onEnded, onFail }: {
      Any gesture on the page is the moment it will allow sound, so take it. */
   useEffect(() => {
     if (!sound) return
-    const hear = () => { const p = playerRef.current; if (p?.isMuted?.()) p.unMute?.() }
+    const hear = () => {
+      const p = playerRef.current
+      if (p?.isMuted?.()) p.unMute?.()
+      /* Left unstarted or cued by the browser: the tap is the permission. */
+      const st = p?.getPlayerState?.()
+      if (!pausedRef.current && (st === -1 || st === 5)) p.playVideo?.()
+    }
     addEventListener('pointerdown', hear, true)
     addEventListener('keydown', hear, true)
     return () => { removeEventListener('pointerdown', hear, true); removeEventListener('keydown', hear, true) }

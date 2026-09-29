@@ -11310,3 +11310,14 @@ body:has(.pp-page) #main { padding-bottom: 0; }
    rather than peeking out beside it. */
 body:has(.topstick.is-navopen) .hg-float.is-on { opacity: 0; transform: translateY(-6px); pointer-events: none; }
 body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none; }
+
+/* GIVE-UP ON A PHONE, the video first. His report (2026-09-29): on mobile the
+   reel was a 26vh strip over the panels and he could not see the videos at
+   all, and they are the most important part. The reel now takes most of the
+   phone screen, and the countdown and panels scroll up underneath it as one
+   column instead of scrolling inside their own box. */
+@media (max-width: 900px) {
+  .tl-lives .tl-stage { display: block; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+  .tl-lives .tl-reel { height: 78dvh; min-height: 0; }
+  .tl-lives .tl-status { height: auto; overflow: visible; }
+}

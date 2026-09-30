@@ -1192,6 +1192,15 @@ function loadPersisted(): PersistedState | null {
       }))
     }
 
+    /* Steps added after the folder pass ran (Pray to God in Before bed, the new
+       Work routine) have no habit row inside their routine, so the routine
+       does not list them. Re-run the same pass for just those two routines. */
+    if (!p.removedSeeds.includes('fix:folders-2026-09-30')) {
+      p.removedSeeds.push('fix:folders-2026-09-30')
+      const only = (p.routines ?? []).filter((r) => r.id === 'r-evening' || r.id === 'r-workroutine')
+      p.habits = foldersFromRoutines(only, p.habits ?? [], []).habits
+    }
+
     if (!p.removedSeeds.includes('fix:habit-runners')) {
       p.removedSeeds.push('fix:habit-runners')
       p.habits = foldersFromRoutines(p.routines ?? [], p.habits ?? [], []).habits

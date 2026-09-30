@@ -962,6 +962,8 @@ export function HabitsPage() {
      not on a schedule, so it carries no cadence label and sits with the ones
      that have no set day. */
   const onDemand = (c: { folder?: Routine }) => !!c.folder?.repeatable && c.folder.cadence === 'daily'
+  const schedCols = routineCols.filter((c) => !onDemand(c))
+  const demandCols = routineCols.filter(onDemand)
   const folderIsDone = (c: { list: HabitDef[] }) => { const d = folderDone(c.list); return d.total > 0 && d.done === d.total }
 
   /* Kept days this week over what the habit asks for. One measure for every
@@ -1115,7 +1117,7 @@ export function HabitsPage() {
       })()}
       <div className="hg-two">
         <div className="hg-col">
-          {routineCols.length > 0 && (
+          {schedCols.length > 0 && (
             <div className="panel hg-panel">
               <div className="hg-head">
                 <span className="microcap">Routines</span>
@@ -1127,13 +1129,12 @@ export function HabitsPage() {
                     >{w}</button>
                   ))}
                 </span>
-                <span className="hg-n">{routineCols.filter(folderIsDone).length} of {routineCols.length} done today</span>
+                <span className="hg-n">{schedCols.filter(folderIsDone).length} of {schedCols.length} done today</span>
               </div>
               {(() => {
                 const groups = [
-                  { key: 'daily', label: 'Daily', cols: routineCols.filter((c) => !onDemand(c) && ['daily', 'weekdays'].includes(c.list[0]?.frequency ?? '')) },
-                  { key: 'weekly', label: 'Weekly', cols: routineCols.filter((c) => c.list[0]?.frequency === 'weekly') },
-                  { key: 'loose', label: 'Monthly and no set day', cols: routineCols.filter((c) => onDemand(c) || !['daily', 'weekdays', 'weekly'].includes(c.list[0]?.frequency ?? '')) },
+                  { key: 'daily', label: 'Daily', cols: schedCols.filter((c) => ['daily', 'weekdays'].includes(c.list[0]?.frequency ?? '')) },
+                  { key: 'rare', label: 'Once in a while', cols: schedCols.filter((c) => !['daily', 'weekdays'].includes(c.list[0]?.frequency ?? '')) },
                 ].filter((g) => g.cols.length > 0)
                 return groups.map((g) => (
                   <div key={g.key} className="rtc-group">
@@ -1156,7 +1157,7 @@ export function HabitsPage() {
           <div className="panel hg-panel">
             <div className="hg-head"><span className="microcap">Today</span></div>
             <div className="hg-tally">
-              <span className="hg-fig"><b className="mono">{routineCols.filter(folderIsDone).length}/{routineCols.length}</b><i className="microcap">routines run</i></span>
+              <span className="hg-fig"><b className="mono">{schedCols.filter(folderIsDone).length}/{schedCols.length}</b><i className="microcap">routines run</i></span>
               <span className="hg-fig"><b className="mono">{manualRows.filter((h) => h.days[todayIndex]).length}/{manualRows.length}</b><i className="microcap">manual ticks</i></span>
               <span className="hg-fig"><b className="mono">{looseQuit.filter((h) => !slipDays(slips, h.id).has(localDateKey())).length}/{looseQuit.length}</b><i className="microcap">quits clean</i></span>
             </div>
@@ -1189,13 +1190,33 @@ export function HabitsPage() {
             </div>
           )}
 
-          {(autoRows.length > 0 || firedRows.length > 0) && (
+          {(autoRows.length > 0 || firedRows.length > 0 || demandCols.length > 0) && (
             <div className="panel hg-panel">
               <div className="hg-head">
                 <span className="microcap">Automatic Habits</span>
                 <span className="hg-n">no tick, on purpose</span>
               </div>
               <div className="hg-rows">
+                {/* Routines with no schedule are run when the need comes up, so
+                    they live here rather than among the ones that are due. */}
+                {demandCols.map((c) => {
+                  const { done, total } = folderDone(c.list)
+                  const isRunning = running === c.id
+                  return (
+                    <div className="hg-row" key={c.id}>
+                      <span className="hg-what">
+                        <span className="hg-title">{c.label}</span>
+                        <span className="hg-note">Run when you need it</span>
+                      </span>
+                      <span className="hg-do">
+                        <span className="rtc-count mono">{done} of {total}</span>
+                        <button className="btn btn-sm btn-primary" aria-pressed={isRunning} onClick={() => setRunning(isRunning ? null : c.id)}>
+                          {isRunning ? 'Running' : 'Start'}
+                        </button>
+                      </span>
+                    </div>
+                  )
+                })}
                 {autoRows.map((h) => (
                   <div className="hg-row" key={h.id}>
                     <span className="hg-what">

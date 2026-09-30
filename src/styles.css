@@ -11321,3 +11321,8 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
   .tl-lives .tl-reel { height: 78dvh; min-height: 0; }
   .tl-lives .tl-status { height: auto; overflow: visible; }
 }
+
+/* To-do list sort menu: sits where the "111 waiting" count used to. */
+.col-sort { margin-left: auto; }
+.col-sort .fold-all { display: inline-flex; align-items: center; gap: 4px; }
+.col-sort .kebab-menu button.is-on { font-weight: 700; }

@@ -487,7 +487,35 @@ export function PlanPage() {
      addedAt is a real timestamp. Tasks from before it existed have none, sort
      as 0, and keep their existing order below anything newly added, which is
      already newest-first because the store prepends. */
-  const backlogSorted = [...backlogOpen].sort((a, b) => (b.addedAt ?? 0) - (a.addedAt ?? 0))
+  /* His ask (2026-09-30): a small sort menu on the list instead of the
+     "111 waiting" count (that moved up beside the day's numbers). Newest stays
+     the default, exactly the order above. Most postponed is the carried
+     counter, oldest first within a tie; longest and shortest are the estimate,
+     and a task with no estimate counts as zero. */
+  const SORTS = [
+    { id: 'newest', label: 'Newest' },
+    { id: 'oldest', label: 'Oldest' },
+    { id: 'postponed', label: 'Most postponed' },
+    { id: 'longest', label: 'Longest' },
+    { id: 'shortest', label: 'Shortest' },
+  ] as const
+  type SortId = typeof SORTS[number]['id']
+  const [sortBy, setSortBy] = useState<SortId>(() => {
+    try { const v = localStorage.getItem('mc:todo-sort'); return SORTS.some((x) => x.id === v) ? (v as SortId) : 'newest' } catch { return 'newest' }
+  })
+  const pickSort = (id: SortId) => {
+    setSortBy(id)
+    try { localStorage.setItem('mc:todo-sort', id) } catch { /* private mode */ }
+  }
+  const byNewest = (a: Task, b: Task) => (b.addedAt ?? 0) - (a.addedAt ?? 0)
+  const backlogSorted = [...backlogOpen].sort(
+    sortBy === 'oldest' ? (a, b) => -byNewest(a, b)
+    : sortBy === 'postponed' ? (a, b) => (b.carried ?? 0) - (a.carried ?? 0) || -byNewest(a, b)
+    : sortBy === 'longest' ? (a, b) => taskMinutes(b) - taskMinutes(a) || byNewest(a, b)
+    : sortBy === 'shortest' ? (a, b) => taskMinutes(a) - taskMinutes(b) || byNewest(a, b)
+    : byNewest,
+  )
+  const backlogMins = backlogOpen.reduce((a, t) => a + taskMinutes(t), 0)
   /* Which day the right hand column is laying out. This used to be a single
      step, today or tomorrow, on the argument that Sunday evening is exactly
      when a week gets planned and Monday could not be touched until Monday. He
@@ -790,6 +818,10 @@ export function PlanPage() {
         metrics={[
           { v: fmtDuration(plannedMin), k: `planned ${dayOffset === 0 ? 'today' : offsetWord(dayOffset).toLowerCase()}`, tone: 'info' as const },
           { v: pool.length ? `${donePct}%` : '—', k: pool.length ? 'of planned time done' : 'no tasks yet', tone: (pool.length && donePct > 0 ? 'pos' : 'info') as 'pos' | 'info' },
+          /* Moved up from the to-do list's own header (2026-09-30). No estimates,
+             no duration: "4 waiting · 0m" read like a bug. */
+          { v: String(backlogOpen.length), k: 'waiting', tone: 'info' as const },
+          ...(backlogMins > 0 ? [{ v: fmtDuration(backlogMins), k: 'of waiting work', tone: 'info' as const }] : []),
           ...(loggedAny ? [{ v: savedToday >= 0 ? fmtSigned(savedToday) : fmtDuration(-savedToday), k: savedToday >= 0 ? 'saved today' : 'over your estimates', tone: (savedToday >= 0 ? 'pos' : 'urgent') as 'pos' | 'urgent' }] : []),
         ]}
         /* The way back into the record, or the way back out of a project into
@@ -976,14 +1008,19 @@ export function PlanPage() {
               and the bare "10 here" were three tellings of half a fact. */}
           <div className="col-head">
             <span className="microcap">To-do list</span>
-            {/* This head counts what the list below it shows. The whole pool's
-                "0 of 5 done" over "Nothing waiting" was two truths about two
-                different lists wearing one label. */}
-            <span className="col-tot mono">{(() => {
-              const mins = backlogOpen.reduce((a, t) => a + taskMinutes(t), 0)
-              // "4 waiting · 0m" read like a bug; no estimates, no duration.
-              return `${backlogOpen.length} waiting${mins > 0 ? ` · ${fmtDuration(mins)}` : ''}`
-            })()}</span>
+            <Dropdown
+              label="Sort the to-do list"
+              className="col-sort"
+              trigger={({ onClick, open }) => (
+                <button className="fold-all" onClick={onClick} aria-expanded={open} aria-label="Sort the to-do list">
+                  {SORTS.find((x) => x.id === sortBy)!.label} <Icon.ChevronDown size={12} />
+                </button>
+              )}
+            >
+              {SORTS.map((x) => (
+                <button key={x.id} role="menuitem" aria-checked={x.id === sortBy} className={x.id === sortBy ? 'is-on' : undefined} onClick={() => pickSort(x.id)}>{x.label}</button>
+              ))}
+            </Dropdown>
           </div>
           {/* Add a task; breaking it down is an action on the task itself. */}
           <div className="formrow" style={{ marginBottom: 'var(--s2)' }}>

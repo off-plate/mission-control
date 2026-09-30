@@ -23,13 +23,25 @@ export function writeJarView(v: JarView): void {
 /* View and give-up live here, not in the Jar page, because the bar that
    switches between the four sections is mounted once above all of them (his
    ask, 2026-09-28: switching must not reload or move the buttons). */
-let state = { view: readJarView(), lives: false }
+/* The give-up screen is a real address, `#/give-up` (his ask, 2026-09-29:
+   a link he can bookmark). The hash is the truth: opening writes it, closing
+   replaces it with the Jar's own, and loading or going Back reads it. */
+const GIVE_UP_HASH = '#/give-up'
+let state = { view: readJarView(), lives: location.hash === GIVE_UP_HASH }
 const subs = new Set<() => void>()
 function set(next: Partial<typeof state>) {
+  if (next.lives !== undefined && next.lives !== (location.hash === GIVE_UP_HASH)) {
+    if (next.lives) location.hash = '/give-up'
+    else location.replace('#/timeline')
+  }
   state = { ...state, ...next }
   writeJarView(state.view)
   subs.forEach((f) => f())
 }
+window.addEventListener('hashchange', () => {
+  const lives = location.hash === GIVE_UP_HASH
+  if (lives !== state.lives) set({ lives })
+})
 export const jarState = { set }
 export function useJarState() {
   return useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f) } }, () => state)
@@ -48,8 +60,8 @@ export function JarBar({ here }: { here: JarHere }) {
     ? (view === 'ladder' ? 'Momentum' : 'The ladder')
     : (view === 'ladder' ? 'The ladder' : 'Momentum')
   const toggle = () => { if (onJar) set({ view: view === 'ladder' ? 'wheel' : 'ladder', lives: false }); else setPage('timeline') }
-  const giveUp = () => { set({ lives: !(onJar && lives) }); if (!onJar) setPage('timeline') }
-  const go = (page: 'health' | 'gym' | 'board') => () => { set({ lives: false }); setPage(page) }
+  const giveUp = () => set({ lives: !(onJar && lives) })
+  const go = (page: 'health' | 'gym' | 'board') => () => setPage(page)
   // The give-up screen covers the window; the bar under it would only make the page scroll.
   if (onJar && lives) return null
 

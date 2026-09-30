@@ -1173,6 +1173,8 @@ function routeFromHash(): { page: PageId; day: string | null } {
   const m = h.match(/^day\/(\d{4}-\d{2}-\d{2})$/)
   if (m) return { page: 'day', day: m[1] }
   // The board's old address still resolves: a bookmark lands on its successor.
+  // The give-up screen lives on the Jar page; the Jar reads the same hash.
+  if (h === 'give-up') return { page: 'timeline', day: null }
   if (h === 'braindump') return { page: 'notes', day: null }
   /* Achievements, Money, Reflect and Brand & guidelines were removed (the
      last on his instruction, 2026-09-06: a design-system reference nobody

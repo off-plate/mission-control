@@ -4539,7 +4539,9 @@ await step('timeline: a library of hundreds, pasted in bulk and still there afte
   await page.reload(); await page.waitForTimeout(1000)
   const after = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).reels, KEY)
   if (after?.length !== 202) throw new Error('the library did not survive the reload')
-  await page.locator('.tl-giveup').click(); await page.waitForTimeout(600)
+  /* The screen has its own address now (#/give-up), so a reload lands back on it. */
+  await page.waitForTimeout(600)
+  if (!(await page.locator('.tl-lives').count())) throw new Error('reloading #/give-up did not reopen the give-up screen')
   const label = await page.locator('.tl-reelbar button').first().innerText()
   if (!/202/.test(label)) throw new Error(`the control reads "${label}", so the page did not read the library back`)
   /* Playback itself, and whether the slider is allowed near it, is a separate

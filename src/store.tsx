@@ -730,6 +730,17 @@ function loadPersisted(): PersistedState | null {
       p.goals = (p.goals ?? []).filter((g) => !(g.habitId && goneIds.has(g.habitId)))
     }
 
+    /* Pray to God joins Before bed routine as its last step, 2026-09-30. The
+       habit already exists in his list, so the step points at it and the habit
+       joins the routine with every day it has already been kept. */
+    if (!p.removedSeeds.includes('fix:pray-bedtime')) {
+      p.removedSeeds.push('fix:pray-bedtime', 'r-evening:step:be10')
+      const pray = (p.habits ?? []).find((h) => !h.archivedAt && h.name.trim().toLowerCase() === 'pray to god')
+      p.routines = (p.routines ?? []).map((r) => (r.id !== 'r-evening' || r.steps.some((st) => st.habitId === pray?.id && pray)
+        ? r
+        : { ...r, steps: [...r.steps, { id: 'be10', title: 'Pray to God', kind: 'do' as const, ...(pray ? { habitId: pray.id } : {}) }] }))
+    }
+
     /* Focus for 30 minutes was one habit per workspace, each counting only its
        own workspace's minutes. It is one habit now, counting focus anywhere.
        The work one stays (its id carries the history, and the clock rewrites

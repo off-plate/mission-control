@@ -943,9 +943,13 @@ export function HabitsPage() {
 
   /* Kept days this week over what the habit asks for. One measure for every
      automatic row, so the gym and the focus blocks read the same way. */
-  const weekFrom = dayOfWeekKey(0)
-  const weekTo = dayOfWeekKey(6)
-  const keptThisWeek = (h: HabitDef) => keptDaysIn(habitLog, h.id, weekFrom, weekTo).size
+  /* The Week/Month/Year switch above the routines governs the habit panels
+     too: one window for everything on the page. */
+  const recOf = (h: HabitDef) => routineRecord(keptDaysIn(habitLog, h.id, '0000-01-01', '9999-12-31'), h.frequency, histWin)
+  const tally = (h: HabitDef) => {
+    const r = recOf(h)
+    return r.due > 0 ? <span className="hg-read"><span className="hg-read-n mono">{r.hit}/{r.due} {r.unit}</span></span> : null
+  }
 
   const kebab = (h: HabitDef) => (
     <Dropdown label={`Options for ${h.name}`} className="habit-kebab">
@@ -1134,6 +1138,7 @@ export function HabitsPage() {
                       {h.note && <span className="hg-note">{h.note}</span>}
                     </span>
                     <span className="hg-do">
+                      {tally(h)}
                       {kebab(h)}
                       <button
                         className="daydot" role="checkbox" aria-checked={h.days[todayIndex]} aria-label={h.name}
@@ -1169,7 +1174,7 @@ export function HabitsPage() {
                         const mins = h.auto?.from === 'focus' ? h.auto.minutes : h.dailyTargetMin
                         return mins
                           ? meter(focusMinutesOn(focusSessions, localDateKey(), h.space), mins, 'm')
-                          : meter(keptThisWeek(h), Math.max(1, habitTarget(h)), '', 'this week')
+                          : (() => { const r = recOf(h); return meter(r.hit, Math.max(1, r.due), '', r.unit) })()
                       })()}
                       {isHevyHabit(h) && <HevySync />}
                       {kebab(h)}

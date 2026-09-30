@@ -938,6 +938,10 @@ export function HabitsPage() {
     .filter((h) => isHevyHabit(h) || h.auto?.from === 'focus' || h.kind === 'measured')
     .sort((a, b) => Number(isHevyHabit(b)) - Number(isHevyHabit(a)))
   const manualRows = looseBuild.filter((h) => !autoRows.includes(h))
+  /* A repeatable daily routine (Out Brain Rot) is run when the need comes up,
+     not on a schedule, so it carries no cadence label and sits with the ones
+     that have no set day. */
+  const onDemand = (c: { folder?: Routine }) => !!c.folder?.repeatable && c.folder.cadence === 'daily'
   const folderIsDone = (c: { list: HabitDef[] }) => { const d = folderDone(c.list); return d.total > 0 && d.done === d.total }
 
   /* Kept days this week over what the habit asks for. One measure for every
@@ -993,7 +997,7 @@ export function HabitsPage() {
             onClick={() => toggleFolder(c.id)}
           >
             <span className="rtc-name">{c.label}</span>
-            <span className="rtc-when microcap">{habitFrequencyLabel({ frequency: freq } as HabitDef)}</span>
+            {!onDemand(c) && <span className="rtc-when microcap">{habitFrequencyLabel({ frequency: freq } as HabitDef)}</span>}
           </button>
 
           {/* The six hundred pixels that were doing nothing. The bar is the
@@ -1107,9 +1111,9 @@ export function HabitsPage() {
               </div>
               {(() => {
                 const groups = [
-                  { key: 'daily', label: 'Daily', cols: routineCols.filter((c) => ['daily', 'weekdays'].includes(c.list[0]?.frequency ?? '')) },
+                  { key: 'daily', label: 'Daily', cols: routineCols.filter((c) => !onDemand(c) && ['daily', 'weekdays'].includes(c.list[0]?.frequency ?? '')) },
                   { key: 'weekly', label: 'Weekly', cols: routineCols.filter((c) => c.list[0]?.frequency === 'weekly') },
-                  { key: 'loose', label: 'Monthly and no set day', cols: routineCols.filter((c) => !['daily', 'weekdays', 'weekly'].includes(c.list[0]?.frequency ?? '')) },
+                  { key: 'loose', label: 'Monthly and no set day', cols: routineCols.filter((c) => onDemand(c) || !['daily', 'weekdays', 'weekly'].includes(c.list[0]?.frequency ?? '')) },
                 ].filter((g) => g.cols.length > 0)
                 return groups.map((g) => (
                   <div key={g.key} className="rtc-group">

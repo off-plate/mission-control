@@ -42,7 +42,7 @@ import {
   LATE_STEPS,
   MOCK_ROUTINES,
 } from './mock'
-import { goalCurrent, isTimeFed, routineComplete } from './types'
+import { focusNeedMin, goalCurrent, isTimeFed, routineComplete } from './types'
 import { isSpace, SPACES, spaceFolderId } from './types'
 import type { HabitFrequency } from './types'
 import type {
@@ -1673,7 +1673,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const mins = sessions.filter((s) => s.day === day).reduce((a, s) => a + s.minutes, 0)
           + (day === today ? extra : 0)
         const has = next.some((t) => t.habitId === h.id && t.day === day && t.src === src)
-        const earns = mins >= (h.auto?.minutes ?? 60)
+        const earns = mins >= focusNeedMin(h)
         if (earns && !has) next = [...next, { habitId: h.id, day, src, at: day === today ? new Date().toISOString() : undefined }]
         if (!earns && has) next = next.filter((t) => !(t.habitId === h.id && t.day === day && t.src === src))
       }

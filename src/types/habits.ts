@@ -62,6 +62,9 @@ export type HabitSource = 'focus'
 /** A habit nothing has to tick: it is kept by something the app already
  *  measures. Focus time is the first, and the threshold is the habit's own. */
 export interface AutoRule { from: 'focus'; minutes: number }
+/** Minutes a focus-kept habit asks for. A target he set on the habit itself wins
+ *  over the rule it was seeded with, so editing it is never silently ignored. */
+export const focusNeedMin = (h: HabitDef): number => h.dailyTargetMin ?? h.auto?.minutes ?? 60
 
 export type CountPeriod = 'day' | 'week' | 'month'
 
@@ -513,7 +516,7 @@ export function slipCount(h: HabitDef, slips: HabitSlip[]): number {
 }
 
 export function habitFrequencyLabel(h: HabitDef): string {
-  if (h.auto?.from === 'focus') return `over ${Math.round(h.auto.minutes / 60 * 10) / 10}h of focus a day`
+  if (h.auto?.from === 'focus') return `over ${Math.round(focusNeedMin(h) / 60 * 10) / 10}h of focus a day`
   if (isCounted(h)) return `${countTarget(h)}x ${COUNT_PERIODS.find((p) => p.id === (h.per ?? 'day'))!.label}`
   if (h.kind === 'measured') return `${fmtMins(h.dailyTargetMin ?? 60)} a day`
   if (h.frequency === 'weekdays') return 'Mon to Fri'

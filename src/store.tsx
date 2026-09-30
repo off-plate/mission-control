@@ -1222,6 +1222,21 @@ function loadPersisted(): PersistedState | null {
       p.habits = (p.habits ?? []).map((h) => (h.folderId === 'r-wakeup' && order.has(h.id) ? { ...h, folderOrder: order.get(h.id) } : h))
     }
 
+    /* Tracking my calories becomes the last step of Before bed routine,
+       2026-09-30, linked to the habit he already has. */
+    if (!p.removedSeeds.includes('fix:calories-bedtime')) {
+      p.removedSeeds.push('fix:calories-bedtime', 'r-evening:step:be11')
+      const cal = (p.habits ?? []).find((h) => !h.archivedAt && h.name.trim().toLowerCase() === 'tracking my calories')
+      p.routines = (p.routines ?? []).map((r) => (r.id !== 'r-evening' || (cal && r.steps.some((st) => st.habitId === cal.id))
+        ? r
+        : { ...r, steps: [...r.steps, { id: 'be11', title: 'Track my calories', kind: 'do' as const, ...(cal ? { habitId: cal.id } : {}) }] }))
+      const eve = (p.routines ?? []).filter((r) => r.id === 'r-evening')
+      p.habits = foldersFromRoutines(eve, p.habits ?? [], []).habits
+      const order = new Map<string, number>()
+      eve.forEach((r) => r.steps.forEach((st, i) => order.set(st.habitId ?? `h-${r.id}-${st.id}`, i)))
+      p.habits = (p.habits ?? []).map((h) => (h.folderId === 'r-evening' && order.has(h.id) ? { ...h, folderOrder: order.get(h.id) } : h))
+    }
+
     if (!p.removedSeeds.includes('fix:habit-runners')) {
       p.removedSeeds.push('fix:habit-runners')
       p.habits = foldersFromRoutines(p.routines ?? [], p.habits ?? [], []).habits

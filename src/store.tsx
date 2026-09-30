@@ -718,6 +718,24 @@ function loadPersisted(): PersistedState | null {
       p.habits = (p.habits ?? []).map((h) => (h.id === 'h-nightwork' && h.space === 'offplate' ? { ...h, space: 'personal' } : h))
     }
 
+    /* The monthly gym goal, 2026-09-30: 25 visits, counted by itself from the
+       Workout / Gym / Fitness habit (which Hevy fills). In the last days of a
+       month "this month's goals" means the month ahead, so it goes there. */
+    if (!p.removedSeeds.includes('fix:gym-goal-25')) {
+      p.removedSeeds.push('fix:gym-goal-25')
+      const gym = (p.habits ?? []).find((h) => !h.archivedAt && h.name.trim().toLowerCase() === 'workout / gym / fitness')
+      if (gym && !(p.goals ?? []).some((g) => g.habitId === gym.id && g.timeframe === 'monthly' && !g.closed)) {
+        const now = new Date()
+        const left = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate()
+        const target = goalPeriodKey('monthly', left <= 2 ? new Date(now.getFullYear(), now.getMonth() + 1, 1) : now)
+        const day = localDateKey()
+        p.goals = [...(p.goals ?? []), {
+          id: `g-gym-${target}`, space: gym.space, name: 'Go to the gym', current: 0, target: 25, unit: 'visits', note: '',
+          timeframe: 'monthly', category: 'health', habitId: gym.id, periodKey: target, createdAt: day, touchedAt: day,
+        }]
+      }
+    }
+
     /* Morning Big Time work routine, removed at his request 2026-09-30: the
        routine, its habit, the habits its steps became, and their log rows. */
     if (!p.removedSeeds.includes('fix:morningwork-gone')) {

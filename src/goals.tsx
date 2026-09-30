@@ -264,19 +264,23 @@ function PeriodTasks({ tf, periodKey }: { tf: GoalTimeframe; periodKey: string }
         </button>
       </div>
       {list.map((t) => (
-        <div className={`ptask${t.done ? ' done' : ''}`} key={t.id}>
-          <button
-            className="goal-ms-check"
-            role="checkbox"
-            aria-checked={t.done}
-            aria-label={`${t.title}, ${t.done ? 'done' : 'not done'}`}
-            onClick={() => toggleTask(t.id)}
-          >
-            {t.done && <Icon.Check size={10} strokeWidth={4.4} />}
-          </button>
-          <SpaceMark space={t.space} />
-          <span className="grow">{t.title}</span>
-          <button className="sub-tool" aria-label={`Take “${t.title}” off this period`} onClick={() => commitTask(t.id)}>Take off</button>
+        /* A task under a period looks like a goal of its own: name, count, bar,
+           percent, status. The whole row is the control, so completing one is a
+           big click and the bar fills, not a small box to tick. */
+        <div
+          className={`goal-row is-task${t.done ? ' is-done' : ''}`} key={t.id}
+          role="button" tabIndex={0} aria-pressed={t.done}
+          aria-label={`${t.title}, ${t.done ? 'done' : 'not done'}. Press to ${t.done ? 'reopen' : 'finish'}`}
+          onClick={() => toggleTask(t.id)}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleTask(t.id) } }}
+        >
+          <span className="gr-name"><SpaceMark space={t.space} /><span className="gr-obj">{t.title}</span></span>
+          <span className="gr-count mono">{t.done ? 1 : 0}<i>/1</i></span>
+          <span className="bar prog"><i style={{ width: t.done ? '100%' : '0%' }} /></span>
+          <span className="gr-pct">{t.done ? 100 : 0}<i>%</i></span>
+          <span className={`goal-status ${t.done ? 's-done' : 's-ontrack'}`}>{t.done ? 'done' : 'open'}</span>
+          <span />
+          <button className="sub-tool" aria-label={`Take “${t.title}” off this period`} onClick={(e) => { e.stopPropagation(); commitTask(t.id) }}>Take off</button>
         </div>
       ))}
       {adding && (
@@ -477,22 +481,25 @@ export function GoalsPage() {
                         {g.why && <p className="goal-why">{g.why}</p>}
                         {g.deadline && <p className="goal-deadline">by {/^\d{4}-\d{2}-\d{2}$/.test(g.deadline) ? fmtWhen(g.deadline) : g.deadline}</p>}
                         {g.milestones && g.milestones.length > 0 && (
-                          <ul className="goal-ms">
+                          <div className="goal-ms-rows">
                             {g.milestones.map((m) => (
-                              <li className={`goal-ms-item${m.done ? ' done' : ''}`} key={m.id}>
-                                <button
-                                  className="goal-ms-check"
-                                  role="checkbox"
-                                  aria-checked={m.done}
-                                  aria-label={`${m.label}, ${m.done ? 'done' : 'not done'}`}
-                                  onClick={() => toggleGoalMilestone(g.id, m.id)}
-                                >
-                                  {m.done && <Icon.Check size={10} strokeWidth={4.4} />}
-                                </button>
-                                <span>{m.label}</span>
-                              </li>
+                              <div
+                                className={`goal-row is-task is-ms${m.done ? ' is-done' : ''}`} key={m.id}
+                                role="button" tabIndex={0} aria-pressed={m.done}
+                                aria-label={`${m.label}, ${m.done ? 'done' : 'not done'}`}
+                                onClick={() => toggleGoalMilestone(g.id, m.id)}
+                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleGoalMilestone(g.id, m.id) } }}
+                              >
+                                <span className="gr-name"><span className="gr-obj">{m.label}</span></span>
+                                <span className="gr-count mono">{m.done ? 1 : 0}<i>/1</i></span>
+                                <span className="bar prog"><i style={{ width: m.done ? '100%' : '0%' }} /></span>
+                                <span className="gr-pct">{m.done ? 100 : 0}<i>%</i></span>
+                                <span className={`goal-status ${m.done ? 's-done' : 's-ontrack'}`}>{m.done ? 'done' : 'open'}</span>
+                                <span />
+                                <span />
+                              </div>
                             ))}
-                          </ul>
+                          </div>
                         )}
                       </div>
                     )}

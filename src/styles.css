@@ -9076,10 +9076,22 @@ iframe.tl-media { pointer-events: none; }
 /* Ninety cells inside a 300px card is a 1px bar and a 2px gap, which reads as a
    barcode rather than as a run of days. One pixel of gap gives the cell three
    times the ink and the shape survives. */
-.qstrip { display: flex; gap: 1px; }
-.qstrip i { flex: 1 1 auto; min-width: 2px; height: 20px; border-radius: 1px; background: var(--a-progress-wash); }
-.qstrip i.is-slip { background: var(--a-alert-solid); }
-.qstrip i.is-before { background: var(--a-sunk); }
+.qheat {
+  --q-g1: #d3e7d6; --q-g2: #a9d3b0; --q-g3: #7dbb8a; --q-g4: #4f9c66; --q-g5: #2f7a4b; --q-g6: #185a34;
+  --q-r1: #f1d6cf; --q-r2: #e7ae9f; --q-r3: #d97f6c; --q-r4: #c24f3b; --q-r5: #8f2414;
+  display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, auto); grid-template-columns: repeat(18, 1fr); gap: 3px;
+}
+.shell.is-hud .qheat {
+  --q-g1: #27402e; --q-g2: #2f5a3c; --q-g3: #3b7a4d; --q-g4: #4f9c66; --q-g5: #6fbd86; --q-g6: #9bd8ac;
+  --q-r1: #4a2c26; --q-r2: #6b3429; --q-r3: #933e2e; --q-r4: #c24f3b; --q-r5: #e8735e;
+}
+.qheat i { aspect-ratio: 1; border-radius: 2px; background: var(--a-sunk); display: block; }
+.qheat i.is-none { visibility: hidden; }
+.qheat i.is-before { background: var(--a-sunk); }
+.qheat i.is-g1 { background: var(--q-g1); } .qheat i.is-g2 { background: var(--q-g2); } .qheat i.is-g3 { background: var(--q-g3); }
+.qheat i.is-g4 { background: var(--q-g4); } .qheat i.is-g5 { background: var(--q-g5); } .qheat i.is-g6 { background: var(--q-g6); }
+.qheat i.is-r1 { background: var(--q-r1); } .qheat i.is-r2 { background: var(--q-r2); } .qheat i.is-r3 { background: var(--q-r3); }
+.qheat i.is-r4 { background: var(--q-r4); } .qheat i.is-r5 { background: var(--q-r5); }
 .qcard-slip { align-self: flex-start; }
 
 /* ==========================================================================

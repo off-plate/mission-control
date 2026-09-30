@@ -10,6 +10,9 @@ import * as Icon from './icons'
 import { GiveUpMode } from './giveupmode'
 import { RoutineRunner } from './runner'
 import { HevySync, isHevyHabit } from './hevysync'
+import { cardioDays, isCardioHabit } from './cardio'
+import { getHevyStairDays } from './hevy'
+import { useHealth } from './health'
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 import { useEffect, useMemo, useState } from 'react'
 import { useStore } from './store'
@@ -755,7 +758,7 @@ export function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; 
 }
 
 export function HabitsPage() {
-  const { habits, goals, space, deleteHabit, togglePauseHabit, routines, stepTicks, habitLog, todayIndex, inView, focusRoutineId, setFocusRoutineId, toggleHabitDay, slips, logSlip, focusSessions } = useStore()
+  const { habits, goals, space, deleteHabit, togglePauseHabit, routines, stepTicks, habitLog, markHabitDaysOn, todayIndex, inView, focusRoutineId, setFocusRoutineId, toggleHabitDay, slips, logSlip, focusSessions } = useStore()
   const days = 7
   const [adding, setAdding] = useState(false)
   // Opening the goal sheet from a habit is the "set a goal on this" path.
@@ -938,9 +941,22 @@ export function HabitsPage() {
   /* The gym leads: it is the one with a button, and a control belongs at the
      top of the list it acts on rather than under three rows that have none. */
   const autoRows = looseBuild
-    .filter((h) => isHevyHabit(h) || h.auto?.from === 'focus' || h.kind === 'measured')
+    .filter((h) => isHevyHabit(h) || isCardioHabit(h) || h.auto?.from === 'focus' || h.kind === 'measured')
     .sort((a, b) => Number(isHevyHabit(b)) - Number(isHevyHabit(a)))
   const manualRows = looseBuild.filter((h) => !autoRows.includes(h))
+  /* Bike / Run / Stairs keeps itself: bike and run days from Intervals, stair
+     days from the last Hevy sync. Only ever turns days on, and only the ones
+     not already kept, so this settles after one pass. */
+  const { state: health } = useHealth()
+  useEffect(() => {
+    if (health.status !== 'ok') return
+    const days = cardioDays(health.sessions, getHevyStairDays())
+    for (const h of spaceHabits.filter(isCardioHabit)) {
+      const kept = new Set(habitLog.filter((t) => t.habitId === h.id).map((t) => t.day))
+      const missing = days.filter((d) => !kept.has(d))
+      if (missing.length) markHabitDaysOn(h.id, missing, true)
+    }
+  }, [health, habitLog, spaceHabits, markHabitDaysOn])
   /* A repeatable daily routine (Out Brain Rot) is run when the need comes up,
      not on a schedule, so it carries no cadence label and sits with the ones
      that have no set day. */
@@ -1183,7 +1199,7 @@ export function HabitsPage() {
                   <div className="hg-row" key={h.id}>
                     <span className="hg-what">
                       <span className="hg-title">{h.name}</span>
-                      <span className="hg-note">{isHevyHabit(h) ? 'Hevy' : 'from your focus blocks'}</span>
+                      <span className="hg-note">{isHevyHabit(h) ? 'Hevy' : isCardioHabit(h) ? 'Bike and run from Intervals, stairs from Hevy' : 'from your focus blocks'}</span>
                     </span>
                     <span className="hg-do">
                       {(() => {

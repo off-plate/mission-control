@@ -9,6 +9,7 @@
    later, the Timeline's Health column. */
 
 import { syncHealth } from './health'
+import { isCardioHabit } from './cardio'
 import type { HabitDef } from './types'
 
 const KEY_STORE = 'mc-hevy-key'
@@ -105,6 +106,17 @@ export function getAllHevyDayStats(): Record<string, HevyDayStats> {
    rebuilt every sync, never the synced blob, since it is a straight
    derivation of what Hevy itself already has. */
 const EXERCISE_STORE = 'mc-hevy-exercises'
+/* Days Hevy logged a stair machine, for the Bike / Run / Stairs habit. */
+const STAIRS_STORE = 'mc-hevy-stair-days'
+export function getHevyStairDays(): string[] {
+  try {
+    const raw = localStorage.getItem(STAIRS_STORE)
+    return raw ? JSON.parse(raw) as string[] : []
+  } catch { return [] }
+}
+function setHevyStairDays(days: string[]): void {
+  try { localStorage.setItem(STAIRS_STORE, JSON.stringify(days)) } catch { /* storage unavailable */ }
+}
 export interface ExerciseDayEntry {
   day: string
   /** Epley estimate off the day's single best set for this exercise:
@@ -161,7 +173,7 @@ interface HevyWorkout { start_time?: string; end_time?: string; exercises?: Hevy
 interface HevyWorkoutsPage { workouts?: HevyWorkout[]; page_count?: number }
 
 export type HevySyncResult =
-  | { ok: true; days: string[]; stats: Record<string, HevyDayStats> }
+  | { ok: true; days: string[]; stairDays: string[]; stats: Record<string, HevyDayStats> }
   | { ok: false; reason: 'no-key' | 'bad-key' | 'rate-limit' | 'failed' }
 
 /** Every local date (YYYY-MM-DD) that has at least one workout logged in
@@ -182,6 +194,7 @@ export async function fetchHevyWorkoutDays(): Promise<HevySyncResult> {
   const key = getHevyKey()
   if (!key) return { ok: false, reason: 'no-key' }
   const days = new Set<string>()
+  const stairDays = new Set<string>()
   const stats: Record<string, HevyDayStats> = {}
   /* Exercise -> day -> the day's best set (highest e1rm) and its rep total,
      collected raw across every page before any PR flag is decided, since
@@ -221,6 +234,7 @@ export async function fetchHevyWorkoutDays(): Promise<HevySyncResult> {
 
         for (const ex of w.exercises ?? []) {
           if (!ex.title) continue
+          if (/stair|step ?mill/i.test(ex.title)) stairDays.add(day)
           /* A bodyweight set (a real Pull Up, most of the time) comes back
              with reps but no weight_kg at all -- treated as 0kg here, not
              dropped, or a repTotal goal like his pull-up day total would
@@ -268,7 +282,8 @@ export async function fetchHevyWorkoutDays(): Promise<HevySyncResult> {
     }
     setHevyExerciseHistory(history)
 
-    return { ok: true, days: [...days], stats }
+    setHevyStairDays([...stairDays])
+    return { ok: true, days: [...days], stairDays: [...stairDays], stats }
   } catch {
     return { ok: false, reason: 'failed' }
   }
@@ -302,6 +317,7 @@ export async function syncHevy(
   syncHealth()
   const res = await fetchHevyWorkoutDays()
   if (!res.ok) return res
+  for (const h of habits.filter(isCardioHabit)) if (res.stairDays.length) markHabitDaysOn(h.id, res.stairDays, true)
   const targets = habits.filter((h) => h.name.trim().toLowerCase() === TARGET_HABIT_NAME)
   if (!targets.length) return { ok: false, reason: 'no-habit' }
   for (const h of targets) markHabitDaysOn(h.id, res.days, true)

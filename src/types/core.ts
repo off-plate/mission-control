@@ -66,6 +66,7 @@ export type PageId =
    *  targets against real Hevy history, not the Health page's daily
    *  wellness readout and not the Goals page's periodic goals. */
   | 'gym'
+  | 'longevity'
   /** A YouTube transcript, read instead of watched. The reading is fetched from
    *  the Watchless endpoint, which is the only thing holding keys and the only
    *  thing that can spend against its monthly cap. */

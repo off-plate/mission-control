@@ -718,6 +718,18 @@ function loadPersisted(): PersistedState | null {
       p.habits = (p.habits ?? []).map((h) => (h.id === 'h-nightwork' && h.space === 'offplate' ? { ...h, space: 'personal' } : h))
     }
 
+    /* Morning Big Time work routine, removed at his request 2026-09-30: the
+       routine, its habit, the habits its steps became, and their log rows. */
+    if (!p.removedSeeds.includes('fix:morningwork-gone')) {
+      p.removedSeeds.push('fix:morningwork-gone', 'r-morningwork', 'h-morningwork')
+      const gone = (id: string, folderId?: string) => id === 'h-morningwork' || folderId === 'r-morningwork'
+      const goneIds = new Set((p.habits ?? []).filter((h) => gone(h.id, h.folderId)).map((h) => h.id))
+      p.routines = (p.routines ?? []).filter((r) => r.id !== 'r-morningwork')
+      p.habits = (p.habits ?? []).filter((h) => !goneIds.has(h.id))
+      p.habitLog = (p.habitLog ?? []).filter((t) => !goneIds.has(t.habitId))
+      p.goals = (p.goals ?? []).filter((g) => !(g.habitId && goneIds.has(g.habitId)))
+    }
+
     /* Focus for 30 minutes was one habit per workspace, each counting only its
        own workspace's minutes. It is one habit now, counting focus anywhere.
        The work one stays (its id carries the history, and the clock rewrites

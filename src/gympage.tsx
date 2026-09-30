@@ -12,10 +12,11 @@
    than Zepp's per-session ones. */
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import {
-  bestE1rmEver, bestRepTotalEver, getAllHevyDayStats, getHevyExerciseHistory, prsOnDay,
+  bestE1rmEver, bestRepTotalEver, getAllHevyDayStats, getHevyExerciseHistory, prsOnDay, syncHevy,
   type ExerciseHistory,
 } from './hevy'
 import { useStore } from './store'
+import { useHealthSync } from './health'
 import type { GymGoal } from './types'
 import * as Icon from './icons'
 
@@ -186,7 +187,23 @@ function GymDayRow({ d, hardest }: { d: GymDay; hardest: number }) {
 }
 
 export function GymPage() {
-  const { gymGoals, addGymGoal, updateGymGoal } = useStore()
+  const { gymGoals, addGymGoal, updateGymGoal, habits, markHabitDaysOn } = useStore()
+  /* The same Sync as Health's: Intervals and Hevy together. Hevy's answer is
+     what this page shows, so the page re-reads it when that pull lands. */
+  const { start: startIntervals, sync } = useHealthSync()
+  const [pulling, setPulling] = useState(false)
+  const [reads, setReads] = useState(0)
+  const [said, setSaid] = useState<string | null>(null)
+  const syncBoth = async () => {
+    if (pulling) return
+    setPulling(true); setSaid(null)
+    startIntervals()
+    const res = await syncHevy(habits, markHabitDaysOn)
+    setPulling(false)
+    setReads((n) => n + 1)
+    setSaid(res.ok ? `${res.days} ${res.days === 1 ? 'day' : 'days'} from Hevy` : res.reason === 'no-key' ? 'Add your Hevy key in Settings' : res.reason === 'bad-key' ? 'Hevy refused that key' : res.reason === 'rate-limit' ? 'Hevy is rate limiting, try in a minute' : 'Hevy could not be reached')
+  }
+  const busy = pulling || sync.phase === 'asking' || sync.phase === 'running'
 
   /* Seeded once, the first time this device opens the page with nothing
      saved -- a real, small set of rows, not an empty list waiting for him to
@@ -197,8 +214,8 @@ export function GymPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const history = useMemo(() => getHevyExerciseHistory(), [])
-  const dayStats = useMemo(() => getAllHevyDayStats(), [])
+  const history = useMemo(() => getHevyExerciseHistory(), [reads])
+  const dayStats = useMemo(() => getAllHevyDayStats(), [reads])
 
   const sessionDays = useMemo(() => Object.entries(dayStats)
     .map(([day, stats]): GymDay => {
@@ -240,6 +257,11 @@ export function GymPage() {
           <h2 className="hp-h2">
             Sessions
             <span className="hp-h2-count">{sessionDays.length} logged</span>
+            <button className="hp-sync" style={{ marginLeft: 'auto' }} onClick={() => void syncBoth()} disabled={busy} title="Fetch everything new from Intervals.icu and Hevy">
+              <Icon.Repeat size={13} className={busy ? 'hp-spin' : undefined} />
+              {busy ? 'Syncing' : 'Sync'}
+            </button>
+            {said && !busy && <span className="hp-h2-count">{said}</span>}
           </h2>
           {sessionDays.length === 0 ? (
             <p className="hp-empty hp-empty-flat">Nothing logged yet. Connect Hevy from Health's sync to fill this in.</p>

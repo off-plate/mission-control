@@ -835,6 +835,9 @@ export function HabitsPage() {
         .sort((a, b) => (a.folderOrder ?? 0) - (b.folderOrder ?? 0)),
     }))
     .filter((g) => g.list.length > 0)
+    /* The day ends with Night work, then Before bed. Everything else keeps the
+       order it was made in (the sort is stable). */
+    .sort((a, b) => Number(a.id === 'r-nightwork') + 2 * Number(a.id === 'r-evening') - Number(b.id === 'r-nightwork') - 2 * Number(b.id === 'r-evening'))
   /* The habit a routine already kept ("did I finish Morning Preparation
      today") is the FOLDER's own streak, not a habit sitting beside it. Left in
      the loose list every routine appeared twice, once as its folder and once

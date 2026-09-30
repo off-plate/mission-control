@@ -394,11 +394,11 @@ export function PomodoroInline() {
           starting it, right here, not only through a task. Idle only -- a
           running block has its own controls. */}
       {idle && (
-        <button className="dock-icon dock-focus-step" onClick={(e) => { e.stopPropagation(); p.setFocusMin(Math.max(5, p.focusMin - 5)) }} aria-label="5 minutes shorter" disabled={p.focusMin <= 5}>−</button>
+        <button className="dock-icon dock-focus-step is-minus" onClick={(e) => { e.stopPropagation(); p.setFocusMin(Math.max(5, p.focusMin - 5)) }} aria-label="5 minutes shorter" disabled={p.focusMin <= 5}>−</button>
       )}
       <span className="dock-focus-time mono">{timeText}</span>
       {idle && (
-        <button className="dock-icon dock-focus-step" onClick={(e) => { e.stopPropagation(); p.setFocusMin(Math.min(90, p.focusMin + 5)) }} aria-label="5 minutes longer" disabled={p.focusMin >= 90}>+</button>
+        <button className="dock-icon dock-focus-step is-plus" onClick={(e) => { e.stopPropagation(); p.setFocusMin(Math.min(90, p.focusMin + 5)) }} aria-label="5 minutes longer" disabled={p.focusMin >= 90}>+</button>
       )}
       <button
         className="dock-icon"

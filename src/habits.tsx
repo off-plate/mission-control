@@ -962,7 +962,8 @@ export function HabitsPage() {
      not on a schedule, so it carries no cadence label and sits with the ones
      that have no set day. */
   const onDemand = (c: { folder?: Routine }) => !!c.folder?.repeatable && c.folder.cadence === 'daily'
-  const schedCols = routineCols.filter((c) => !onDemand(c))
+  const schedCols = routineCols.filter((c) => !onDemand(c) && ['daily', 'weekdays'].includes(c.list[0]?.frequency ?? ''))
+  const rareCols = routineCols.filter((c) => !onDemand(c) && !['daily', 'weekdays'].includes(c.list[0]?.frequency ?? ''))
   const demandCols = routineCols.filter(onDemand)
   const folderIsDone = (c: { list: HabitDef[] }) => { const d = folderDone(c.list); return d.total > 0 && d.done === d.total }
 
@@ -1133,8 +1134,7 @@ export function HabitsPage() {
               </div>
               {(() => {
                 const groups = [
-                  { key: 'daily', label: 'Daily', cols: schedCols.filter((c) => ['daily', 'weekdays'].includes(c.list[0]?.frequency ?? '')) },
-                  { key: 'rare', label: 'Once in a while', cols: schedCols.filter((c) => !['daily', 'weekdays'].includes(c.list[0]?.frequency ?? '')) },
+                  { key: 'daily', label: 'Daily', cols: schedCols },
                 ].filter((g) => g.cols.length > 0)
                 return groups.map((g) => (
                   <div key={g.key} className="rtc-group">
@@ -1221,6 +1221,21 @@ export function HabitsPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {rareCols.length > 0 && (
+            <div className="panel hg-panel">
+              <div className="hg-head">
+                <span className="microcap">Once in a while</span>
+              </div>
+              <div className="rtc-list">{rareCols.filter((c) => !folderIsDone(c)).map(routineCard)}</div>
+              {rareCols.some(folderIsDone) && (
+                <>
+                  <div className="microcap hg-sub">Done</div>
+                  <div className="rtc-list">{rareCols.filter(folderIsDone).map(routineCard)}</div>
+                </>
+              )}
             </div>
           )}
 

@@ -11487,3 +11487,18 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 
 /* A goal that counts itself from a habit says so in one small word, beside its name. */
 .gr-auto { flex: none; margin-left: var(--s2); padding: 1px 6px; border-radius: 4px; background: var(--sunk); color: var(--muted); font-size: 0.625rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+
+/* A task under a period, or a step inside a goal, is a small goal of its own:
+   the same row, and the whole row is the control. The bar fills on the click. */
+.goal-row.is-task { cursor: pointer; padding-block: 11px; }
+.goal-row.is-task .gr-obj { font-weight: 500; }
+.goal-row.is-task:focus-visible { outline: 2px solid var(--a-accent); outline-offset: -2px; }
+.goal-row.is-task .bar > i { transition: width 240ms cubic-bezier(0.23, 1, 0.32, 1); }
+.goal-row.is-task:active { transform: scale(0.995); }
+.goal-row.is-task.is-done .gr-obj { color: var(--a-soft); }
+.goal-row.is-task .sub-tool { opacity: 0; transition: opacity var(--t-fast); }
+.goal-row.is-task:hover .sub-tool, .goal-row.is-task .sub-tool:focus-visible { opacity: 1; }
+.goal-ms-rows { width: 100%; margin-left: calc(var(--s5) * -1); }
+.goal-ms-rows .goal-row.is-ms { padding-block: 8px; }
+@media (max-width: 1100px) { .goal-row.is-task { grid-template-columns: minmax(0, 1fr) 84px 68px 40px; } .goal-row.is-task > :nth-child(6) { display: none; } }
+@media (prefers-reduced-motion: reduce) { .goal-row.is-task .bar > i { transition: none; } }

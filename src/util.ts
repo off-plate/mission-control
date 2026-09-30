@@ -43,7 +43,14 @@ export function goalPeriodKey(tf: GoalTf, now = new Date()): string {
   if (tf === 'weekly') return isoWeekKey(now)
   if (tf === 'monthly') return monthKey(now)
   if (tf === 'quarter') return `${now.getFullYear()}-Q${Math.floor(now.getMonth() / 3) + 1}`
-  return `${now.getFullYear()}-H${now.getMonth() < 6 ? 1 : 2}`
+  /* The half year ends on 14 February and 14 August (his call, 2026-09-30):
+     H1 runs 15 Feb to 14 Aug, H2 runs 15 Aug to 14 Feb of the next year, so a
+     date in January or early February still belongs to the H2 that began the
+     August before. */
+  const md = (now.getMonth() + 1) * 100 + now.getDate()
+  if (md >= 815) return `${now.getFullYear()}-H2`
+  if (md >= 215) return `${now.getFullYear()}-H1`
+  return `${now.getFullYear() - 1}-H2`
 }
 
 /** The dates a goal period covers, so its progress can be counted inside it. */
@@ -68,8 +75,9 @@ export function goalPeriodRange(tf: GoalTf, key: string): DateRange {
     return { id: key, label: `Q${q} ${y}`, from: iso2(start), to: iso2(new Date(y, q * 3, 0)) }
   }
   const [y, h] = key.split('-H').map(Number)
-  const start = new Date(y, h === 1 ? 0 : 6, 1)
-  return { id: key, label: `${h === 1 ? 'first' : 'second'} half of ${y}`, from: iso2(start), to: iso2(new Date(y, h === 1 ? 6 : 12, 0)) }
+  const start = h === 1 ? new Date(y, 1, 15) : new Date(y, 7, 15)
+  const end = h === 1 ? new Date(y, 7, 14) : new Date(y + 1, 1, 14)
+  return { id: key, label: `${h === 1 ? 'first' : 'second'} half of ${y}`, from: iso2(start), to: iso2(end) }
 }
 
 /**
@@ -104,7 +112,14 @@ export function shiftPeriodKey(tf: GoalTf, offset: number, now = new Date()): st
     const d = new Date(now); d.setDate(d.getDate() + offset * 7)
     return goalPeriodKey(tf, d)
   }
-  const months = tf === 'monthly' ? offset : tf === 'quarter' ? offset * 3 : offset * 6
+  if (tf === 'half') {
+    /* Stepped from the middle of the current half, so the 14 Feb and 14 Aug
+       edges can never land a step in the same period it started from. */
+    const cur = goalPeriodRange('half', goalPeriodKey('half', now))
+    const [y, m] = cur.from.split('-').map(Number)
+    return goalPeriodKey('half', new Date(y, m - 1 + offset * 6, 15))
+  }
+  const months = tf === 'monthly' ? offset : offset * 3
   return goalPeriodKey(tf, new Date(now.getFullYear(), now.getMonth() + months, 1))
 }
 
@@ -405,8 +420,11 @@ export function goalPace(
     elapsed = (now.getTime() - qStart.getTime()) / (qEnd.getTime() - qStart.getTime())
     daysLeft = daysUntil(qEnd)
   } else {
-    const hStart = new Date(now.getFullYear(), now.getMonth() < 6 ? 0 : 6, 1)
-    const hEnd = new Date(hStart.getFullYear(), hStart.getMonth() + 6, 0)
+    const hr = goalPeriodRange('half', goalPeriodKey('half', now))
+    const [hy, hm, hd] = hr.from.split('-').map(Number)
+    const [ey, em, ed] = hr.to.split('-').map(Number)
+    const hStart = new Date(hy, hm - 1, hd)
+    const hEnd = new Date(ey, em - 1, ed)
     elapsed = (now.getTime() - hStart.getTime()) / (hEnd.getTime() - hStart.getTime())
     daysLeft = daysUntil(hEnd)
   }

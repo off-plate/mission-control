@@ -4566,7 +4566,7 @@ await step('timeline: the reel answers to Next', async () => {
   }, KEY)
   await page.reload(); await page.waitForTimeout(700)
   await page.locator('.tl-giveup').click()
-  const src = () => page.evaluate(() => document.querySelector('iframe.tl-media, video.tl-media')?.getAttribute('src') ?? '')
+  const src = () => page.evaluate(() => ((document.querySelector('iframe.tl-media, video.tl-media')?.getAttribute('src') ?? '') + (document.querySelector('.tl-ythost')?.dataset.clip ?? '')))
   /* Was a fixed 2000ms sleep. The YouTube IFrame API script has to load from
      a real network before it fills the host with a playing element, and how
      long that takes depends on the network this run happens to get -- timed
@@ -4588,7 +4588,7 @@ await step('timeline: the reel answers to Next', async () => {
   await page.waitForFunction(
     (prev) => {
       const el = document.querySelector('iframe.tl-media, video.tl-media')
-      const cur = el?.getAttribute('src') ?? ''
+      const cur = (el?.getAttribute('src') ?? '') + (document.querySelector('.tl-ythost')?.dataset.clip ?? '')
       return !!cur && cur !== prev
     },
     first, { timeout: 12000 },
@@ -4622,11 +4622,11 @@ await step('timeline: the reel shuffles every clip once before any repeat, and t
   }, [KEY, FIVE])
   await page.reload(); await page.waitForTimeout(700)
   await page.locator('.tl-giveup').click()
-  const src = () => page.evaluate(() => document.querySelector('iframe.tl-media, video.tl-media')?.getAttribute('src') ?? '')
+  const src = () => page.evaluate(() => ((document.querySelector('iframe.tl-media, video.tl-media')?.getAttribute('src') ?? '') + (document.querySelector('.tl-ythost')?.dataset.clip ?? '')))
   const waitForChange = (prev) => page.waitForFunction(
     (p) => {
       const el = document.querySelector('iframe.tl-media, video.tl-media')
-      const cur = el?.getAttribute('src') ?? ''
+      const cur = (el?.getAttribute('src') ?? '') + (document.querySelector('.tl-ythost')?.dataset.clip ?? '')
       return !!cur && cur !== p
     },
     prev, { timeout: 12000 },
@@ -4680,7 +4680,7 @@ await step('timeline: clicking the video does not swallow the arrow keys', async
   }, KEY)
   await page.reload(); await page.waitForTimeout(700)
   await page.locator('.tl-giveup').click()
-  const src = () => page.evaluate(() => document.querySelector('iframe.tl-media, video.tl-media')?.getAttribute('src') ?? '')
+  const src = () => page.evaluate(() => ((document.querySelector('iframe.tl-media, video.tl-media')?.getAttribute('src') ?? '') + (document.querySelector('.tl-ythost')?.dataset.clip ?? '')))
   await page.waitForFunction(
     () => !!document.querySelector('iframe.tl-media, video.tl-media')?.getAttribute('src'),
     null, { timeout: 12000 },
@@ -4692,7 +4692,7 @@ await step('timeline: clicking the video does not swallow the arrow keys', async
   const first = await src()
   await page.keyboard.press('ArrowRight')
   await page.waitForFunction(
-    (prev) => (document.querySelector('iframe.tl-media, video.tl-media')?.getAttribute('src') ?? '') !== prev,
+    (prev) => (((document.querySelector('iframe.tl-media, video.tl-media')?.getAttribute('src') ?? '') + (document.querySelector('.tl-ythost')?.dataset.clip ?? ''))) !== prev,
     first, { timeout: 12000 },
   ).catch(() => {})
   if (await src() === first) throw new Error('ArrowRight did nothing after the video itself was clicked')
@@ -5081,7 +5081,7 @@ await step('cookie jar: one nav on the ladder, the flywheel, Health and Why, and
   if (await page.locator('.board-back').count()) throw new Error('the Why wall still has its own Close button')
   if (!(await nav().count())) throw new Error('the Why wall has no Cookie Jar nav')
   await nav().getByRole('button', { name: 'I want to give up' }).click(); await page.waitForTimeout(800)
-  if ((await page.evaluate(() => location.hash)) !== '#/timeline') throw new Error('give up from Why did not go to the Cookie Jar')
+  if ((await page.evaluate(() => location.hash)) !== '#/give-up') throw new Error('give up from Why did not go to the give-up address')
   if (!(await page.locator('.tl-lives').count())) throw new Error('give up from Why did not open the give-up screen')
 })
 

@@ -1138,7 +1138,7 @@ function YouTubeReel({ url, sound, paused, onEnded, onFail }: {
      in place with its generated iframe and carries the className over, so
      tl-media -- the fill rule every other reel kind already answers to --
      lands on the real playing element with no extra wrapper or CSS. */
-  return <div ref={hostRef} className="tl-ythost" />
+  return <div ref={hostRef} className="tl-ythost" data-clip={id} />
 }
 
 /* ---- the library ---- */

@@ -20,7 +20,7 @@ import { usePomodoro } from './pomodoro'
 import { Sheet } from './modals'
 import { HabitRun, habitHasRun } from './habitrun'
 import { Band, Dropdown, Segmented, Select, HabitsGoalsSwitch } from './ui'
-import { HABIT_FREQUENCIES, SLOTS, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, habitGate, habitLocked, isCounted, COUNT_PERIODS, requiredSteps, routineProgress, type PageId, type Goal, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type TimeSlot } from './types'
+import { HABIT_FREQUENCIES, SLOTS, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, focusNeedMin, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, habitGate, habitLocked, isCounted, COUNT_PERIODS, requiredSteps, routineProgress, type PageId, type Goal, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type TimeSlot } from './types'
 import { goalPeriodRange, habitPeriodRange, shiftPeriodKey, fmtDuration, fmtWhen, dayOfWeekKey, localDateKey, type GoalTf } from './util'
 import { GoalSheet } from './goals'
 
@@ -258,7 +258,7 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
   /* Kept by the clock, not by him. It shows how far today has got and says what
      is keeping it, so a tick he cannot press never reads as a tick that failed. */
   if (h.auto?.from === 'focus') {
-    const need = h.auto.minutes
+    const need = focusNeedMin(h)
     const todayMin = (focusMinutesByDay.get(localDateKey()) ?? 0) + liveFocusMin
     const kept7 = [0, 1, 2, 3, 4, 5, 6].filter((i) => keptDaysForHabit.has(dayOfWeekKey(i))).length
     return (
@@ -589,7 +589,7 @@ export function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; 
   const [frequency, setFrequency] = useState<HabitFrequency>(habit?.frequency ?? 'daily')
   const [perWeek, setPerWeek] = useState(habit?.targetPerWeek ?? 3)
   const [kind, setKind] = useState<HabitKind>(habit?.kind ?? 'build')
-  const [targetMin, setTargetMin] = useState(habit?.dailyTargetMin ?? 60)
+  const [targetMin, setTargetMin] = useState(habit ? (habit.auto?.from === 'focus' ? focusNeedMin(habit) : habit.dailyTargetMin ?? 60) : 60)
   const [measure, setMeasure] = useState<'minutes' | 'times'>(habit?.measure ?? 'times')
   const [per, setPer] = useState<CountPeriod>(habit?.per ?? 'day')
   const [count, setCount] = useState(habit?.targetCount ?? 1)
@@ -598,6 +598,7 @@ export function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; 
   const locked = !!drivenBy
   const quitting = kind === 'break'
   const measured = kind === 'measured'
+  const focusKept = habit?.auto?.from === 'focus'
 
   const submit = () => {
     if (!name.trim()) return
@@ -610,7 +611,7 @@ export function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; 
       measure: measured ? measure : undefined,
       per: measured && measure === 'times' ? per : undefined,
       targetCount: measured && measure === 'times' ? Math.max(1, count) : undefined,
-      dailyTargetMin: measured && measure === 'minutes' ? Math.max(5, targetMin) : undefined,
+      dailyTargetMin: (measured && measure === 'minutes') || focusKept ? Math.max(5, targetMin) : undefined,
       // Focus blocks fill minutes. A count is his to log, so it has no source.
       source: measured && measure === 'minutes' ? ('focus' as const) : undefined,
       quitSince: quitting ? (since || localDateKey()) : undefined,
@@ -710,9 +711,9 @@ export function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; 
       )}
 
       {/* The target itself, once he has said what he is counting. */}
-      {measured && (
+      {(measured || focusKept) && (
         <div className="sheet-grid" style={{ marginTop: 'var(--s4)' }}>
-          {measure === 'times' ? (
+          {measure === 'times' && !focusKept ? (
             <>
               <div>
                 <label className="field-label" htmlFor="hcount">How many times?</label>
@@ -1208,7 +1209,7 @@ export function HabitsPage() {
                            measures himself. Either way the honest reading is
                            minutes TODAY; "1 / 7" for a habit whose target is an
                            hour a day was measuring the wrong thing entirely. */
-                        const mins = h.auto?.from === 'focus' ? h.auto.minutes : h.dailyTargetMin
+                        const mins = h.auto?.from === 'focus' ? focusNeedMin(h) : h.dailyTargetMin
                         return mins
                           ? meter(focusSessions.filter((s) => s.day === localDateKey()).reduce((a, s) => a + s.minutes, 0), mins, 'm')
                           : (() => { const r = recOf(h); return meter(r.hit, Math.max(1, r.due), '', r.unit) })()

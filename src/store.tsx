@@ -718,6 +718,19 @@ function loadPersisted(): PersistedState | null {
       p.habits = (p.habits ?? []).map((h) => (h.id === 'h-nightwork' && h.space === 'offplate' ? { ...h, space: 'personal' } : h))
     }
 
+    /* Focus for 30 minutes was one habit per workspace, each counting only its
+       own workspace's minutes. It is one habit now, counting focus anywhere.
+       The work one stays (its id carries the history, and the clock rewrites
+       its days from the sessions); the other two go, with their log rows and
+       any goal that pointed at them. */
+    if (!p.removedSeeds.includes('fix:focus-one')) {
+      const dupes = ['h-focus-offplate', 'h-focus-corner']
+      p.removedSeeds.push('fix:focus-one', ...dupes)
+      p.habits = (p.habits ?? []).filter((h) => !dupes.includes(h.id))
+      p.habitLog = (p.habitLog ?? []).filter((t) => !dupes.includes(t.habitId))
+      p.goals = (p.goals ?? []).map((g) => (g.habitId && dupes.includes(g.habitId) ? { ...g, habitId: 'h-focus-work' } : g))
+    }
+
     /* Notes, 2026-08-03. The Brain Dump board becomes a real notes app, and
        everything already on that board comes across: each sticky becomes a
        note in a "Brain dumps" folder inside the workspace it was captured in,
@@ -1580,8 +1593,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
      over every day in the record, so correcting or deleting a block takes back a
      day it no longer earns. */
   const autoFrom = (sessions: FocusSession[], extra: number, extraLabel?: string) => {
-    // Declared below in this scope; only ever CALLED after both exist.
-    const extraSpace = extra > 0 ? spaceOfLabel(extraLabel) : null
     const today = todayKey()
     const rules = habits.filter((h) => h.auto?.from === 'focus' && !h.archivedAt)
     if (!rules.length) return
@@ -1591,8 +1602,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     for (const h of rules) {
       const src = `auto:focus:${h.id}`
       for (const day of days) {
-        const mins = sessions.filter((s) => s.day === day && s.space === h.space).reduce((a, s) => a + s.minutes, 0)
-          + (day === today && extraSpace === h.space ? extra : 0)
+        const mins = sessions.filter((s) => s.day === day).reduce((a, s) => a + s.minutes, 0)
+          + (day === today ? extra : 0)
         const has = next.some((t) => t.habitId === h.id && t.day === day && t.src === src)
         const earns = mins >= (h.auto?.minutes ?? 60)
         if (earns && !has) next = [...next, { habitId: h.id, day, src, at: day === today ? new Date().toISOString() : undefined }]

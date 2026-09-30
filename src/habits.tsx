@@ -193,11 +193,10 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
   const focusMinutesByDay = useMemo(() => {
     const m = new Map<string, number>()
     for (const s of focusSessions) {
-      if (s.space !== h.space) continue
       m.set(s.day, (m.get(s.day) ?? 0) + s.minutes)
     }
     return m
-  }, [focusSessions, h.space])
+  }, [focusSessions])
   const kept = h.days.filter(Boolean).length
   const target = habitTarget(h)
   /* Once a week or once a month: a row of weekdays is the wrong instrument
@@ -1188,7 +1187,7 @@ export function HabitsPage() {
                            hour a day was measuring the wrong thing entirely. */
                         const mins = h.auto?.from === 'focus' ? h.auto.minutes : h.dailyTargetMin
                         return mins
-                          ? meter(focusMinutesOn(focusSessions, localDateKey(), h.space), mins, 'm')
+                          ? meter(focusSessions.filter((s) => s.day === localDateKey()).reduce((a, s) => a + s.minutes, 0), mins, 'm')
                           : (() => { const r = recOf(h); return meter(r.hit, Math.max(1, r.due), '', r.unit) })()
                       })()}
                       {isHevyHabit(h) && <HevySync />}

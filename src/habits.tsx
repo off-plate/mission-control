@@ -939,12 +939,6 @@ export function HabitsPage() {
     .filter((h) => isHevyHabit(h) || h.auto?.from === 'focus' || h.kind === 'measured')
     .sort((a, b) => Number(isHevyHabit(b)) - Number(isHevyHabit(a)))
   const manualRows = looseBuild.filter((h) => !autoRows.includes(h))
-  /* A routine with a day to put in the calendar: every day, weekdays, or one
-     day a week. Monthly, n-times-a-week and unset have no such day. */
-  const isFixedCadence = (c: { list: HabitDef[] }) => {
-    const f = c.list[0]?.frequency
-    return f === 'daily' || f === 'weekdays' || f === 'weekly'
-  }
   const folderIsDone = (c: { list: HabitDef[] }) => { const d = folderDone(c.list); return d.total > 0 && d.done === d.total }
 
   /* Kept days this week over what the habit asks for. One measure for every
@@ -1112,21 +1106,25 @@ export function HabitsPage() {
                 </span>
                 <span className="hg-n">{routineCols.filter(folderIsDone).length} of {routineCols.length} done today</span>
               </div>
-              {[
-                { key: 'fixed', label: 'Daily and weekly', cols: routineCols.filter(isFixedCadence) },
-                { key: 'loose', label: 'Monthly and no set day', cols: routineCols.filter((c) => !isFixedCadence(c)) },
-              ].filter((g) => g.cols.length > 0).map((g) => (
-                <div key={g.key} className="rtc-group">
-                  {(routineCols.some(isFixedCadence) && routineCols.some((c) => !isFixedCadence(c))) && <div className="microcap hg-sub">{g.label}</div>}
-                  <div className="rtc-list">{g.cols.filter((c) => !folderIsDone(c)).map(routineCard)}</div>
-                  {g.cols.some(folderIsDone) && (
-                    <>
-                      <div className="microcap hg-sub">Done today</div>
-                      <div className="rtc-list">{g.cols.filter(folderIsDone).map(routineCard)}</div>
-                    </>
-                  )}
-                </div>
-              ))}
+              {(() => {
+                const groups = [
+                  { key: 'daily', label: 'Daily', cols: routineCols.filter((c) => ['daily', 'weekdays'].includes(c.list[0]?.frequency ?? '')) },
+                  { key: 'weekly', label: 'Weekly', cols: routineCols.filter((c) => c.list[0]?.frequency === 'weekly') },
+                  { key: 'loose', label: 'Monthly and no set day', cols: routineCols.filter((c) => !['daily', 'weekdays', 'weekly'].includes(c.list[0]?.frequency ?? '')) },
+                ].filter((g) => g.cols.length > 0)
+                return groups.map((g) => (
+                  <div key={g.key} className="rtc-group">
+                    {groups.length > 1 && <div className="microcap hg-sub">{g.label}</div>}
+                    <div className="rtc-list">{g.cols.filter((c) => !folderIsDone(c)).map(routineCard)}</div>
+                    {g.cols.some(folderIsDone) && (
+                      <>
+                        <div className="microcap hg-sub">Done</div>
+                        <div className="rtc-list">{g.cols.filter(folderIsDone).map(routineCard)}</div>
+                      </>
+                    )}
+                  </div>
+                ))
+              })()}
             </div>
           )}
         </div>

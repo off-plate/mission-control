@@ -144,6 +144,7 @@ export const MOCK_HABITS: HabitDef[] = [
   /* One habit, fed by the clock: thirty minutes of focus anywhere, in any
      workspace, keeps it, partial blocks included. */
   { id: 'h-focus-work', space: 'work', name: 'Focus for 30 minutes', frequency: 'daily', paused: false, auto: { from: 'focus', minutes: 30 }, days: [false, false, false, false, false, false, false], history: [] },
+  { id: 'h-workroutine', space: 'work', name: 'Work routine', daypart: 'morning', frequency: 'weekdays', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-weekly', space: 'personal', name: 'Weekly review', frequency: 'weekly', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-invoicing', space: 'work', name: 'Invoicing routine', frequency: 'monthly', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   { id: 'h-monthly', space: 'personal', name: 'Monthly review', frequency: 'monthly', paused: false, days: [false, false, false, false, false, false, false], history: [] },
@@ -189,6 +190,16 @@ export const MOCK_ROUTINES: Routine[] = [
       { id: 'pw3', title: 'Define the specific task', kind: 'do' },
       { id: 'pw4', title: 'Find ambient music', kind: 'do', optional: true },
       { id: 'pw5', title: 'Set the focus for the time you want the task to take', kind: 'do' },
+    ],
+  },
+  {
+    id: 'r-workroutine', space: 'work', title: 'Work routine', cadence: 'prework', habitId: 'h-workroutine',
+    doneStepIds: [],
+    steps: [
+      { id: 'wr1', title: 'Set up the to-do task list', kind: 'do' },
+      { id: 'wr2', title: 'Define and estimate the time for each task', kind: 'do' },
+      { id: 'wr3', title: 'Play ambient music', kind: 'do' },
+      { id: 'wr4', title: 'Finish the to-do list', kind: 'do' },
     ],
   },
   /* Invoicing is a Big Time job with an order to it, and the order is the point:

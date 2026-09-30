@@ -11361,3 +11361,9 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 .qhold-tag.is-steady { background: var(--a-sunk); color: var(--a-progress); }
 .qhold-tag.is-shaky { background: var(--a-warn-wash); color: var(--a-warn); }
 .qhold-tag.is-rough { background: var(--a-alert-wash); color: var(--a-alert); }
+
+/* Two figures: the unbroken streak, and the days since this attempt began. */
+.qcard-top { align-items: flex-start; justify-content: space-between; }
+.qpair { display: flex; gap: var(--s6, 1.5rem); flex-wrap: wrap; }
+.qfig { display: flex; flex-direction: column; gap: var(--s1); }
+.qcard-n2 { color: var(--a-ink); }

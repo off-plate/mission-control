@@ -29,15 +29,15 @@ const HEAT_WEEKS = 18
 /* How reliably a quit holds, from how often it breaks. Falls per 30 days over
    the last 90 (or since the start, if younger), so a long clean run with one
    old slip reads differently from a quit that breaks every week. */
-function holdOf(h: HabitDef, slips: HabitSlip[]): { lvl: 'new' | 'solid' | 'steady' | 'shaky' | 'rough'; word: string; detail: string } {
-  if (!h.quitSince) return { lvl: 'new', word: 'No start date', detail: '' }
+function holdOf(h: HabitDef, slips: HabitSlip[], began: string | undefined): { lvl: 'new' | 'solid' | 'steady' | 'shaky' | 'rough'; word: string; detail: string } {
+  if (!began) return { lvl: 'new', word: 'No start date', detail: '' }
   const today = new Date(); today.setHours(0, 0, 0, 0)
-  const [y, m, d] = h.quitSince.split('-').map(Number)
-  const age = Math.round((today.getTime() - new Date(y, m - 1, d).getTime()) / 86400000) + 1
+  const [y, m, d] = began.split('-').map(Number)
+  const age = Math.max(1, Math.round((today.getTime() - new Date(y, m - 1, d).getTime()) / 86400000) + 1)
   const span = Math.min(90, age)
   const from = new Date(today); from.setDate(from.getDate() - (span - 1))
   const fromKey = localDateKey(from)
-  const n = [...slipDays(slips, h.id)].filter((k) => k >= fromKey && k >= h.quitSince!).length
+  const n = [...slipDays(slips, h.id)].filter((k) => k >= fromKey && k >= began).length
   const detail = n === 0 ? `No slips in ${span} days` : `${n} ${n === 1 ? 'slip' : 'slips'} in ${span} days`
   if (age < 14) return { lvl: 'new', word: 'Just started', detail }
   const per30 = (n / span) * 30
@@ -45,6 +45,25 @@ function holdOf(h: HabitDef, slips: HabitSlip[]): { lvl: 'new' | 'solid' | 'stea
   if (per30 <= 0.5) return { lvl: 'steady', word: 'Steady', detail }
   if (per30 <= 1.5) return { lvl: 'shaky', word: 'Shaky', detail }
   return { lvl: 'rough', word: 'Failing often', detail }
+}
+
+const addDaysKey = (key: string, n: number): string => {
+  const [y, m, d] = key.split('-').map(Number)
+  return localDateKey(new Date(y, m - 1, d + n))
+}
+
+/* Where the current attempt began. A few slips do not end a quit, but four on
+   separate days inside one week do: that resets BOTH counters, and the attempt
+   starts again the day after the fourth. */
+function attemptStart(h: HabitDef, slips: HabitSlip[]): string | undefined {
+  if (!h.quitSince) return undefined
+  const days = [...slipDays(slips, h.id)].filter((k) => k >= h.quitSince!).sort()
+  let start = h.quitSince
+  for (const day of days) {
+    const lo = addDaysKey(day, -6)
+    if (days.filter((k) => k >= lo && k <= day && k >= start).length >= 4) start = addDaysKey(day, 1)
+  }
+  return start
 }
 
 type HeatCell = { cls: string; tip: string } | null
@@ -99,7 +118,11 @@ export function QuittingPage() {
      ordered them any other way would be hiding the only number that matters. */
   const quits = habits
     .filter((h) => h.kind === 'break' && !h.archivedAt)
-    .map((h) => ({ h, clean: daysClean(h, slips) ?? 0, best: bestCleanRun(h, slips), hold: holdOf(h, slips) }))
+    .map((h) => {
+      const began = attemptStart(h, slips)
+      const dIn = began ? Math.max(0, Math.round((Date.parse(localDateKey() + 'T00:00:00') - Date.parse(began + 'T00:00:00')) / 86400000)) : null
+      return { h, clean: daysClean(h, slips) ?? 0, best: bestCleanRun(h, slips), hold: holdOf(h, slips, began), dIn }
+    })
     .sort((a, b) => b.clean - a.clean)
 
   const standing = quits.reduce((a, q) => a + q.clean, 0)
@@ -119,7 +142,7 @@ export function QuittingPage() {
             <span className="hg-n mono">{standing} clean days standing</span>
           </div>
           <div className="qwall">
-            {quits.map(({ h, clean, best, hold }) => {
+            {quits.map(({ h, clean, best, hold, dIn }) => {
               const next = nextMilestone(clean)
               const slippedToday = slipDays(slips, h.id).has(localDateKey())
               const heat = quitHeat(h, slips)
@@ -131,8 +154,16 @@ export function QuittingPage() {
                       and read as a caption on the number rather than the name
                       of the thing. */}
                   <div className="qcard-top">
-                    <span className={`qcard-n mono${slippedToday ? ' is-broken' : ''}`}>{clean}</span>
-                    <span className="microcap qcard-u">{clean === 1 ? 'clean day' : 'clean days'}</span>
+                    <div className="qpair">
+                      <div className="qfig">
+                        <span className={`qcard-n mono${slippedToday ? ' is-broken' : ''}`}>{clean}</span>
+                        <span className="microcap qcard-u">clean streak</span>
+                      </div>
+                      <div className="qfig">
+                        <span className="qcard-n qcard-n2 mono">{dIn ?? '-'}</span>
+                        <span className="microcap qcard-u">days in</span>
+                      </div>
+                    </div>
                     <Dropdown label={`Options for ${h.name}`} className="habit-kebab">
                       <button role="menuitem" onClick={() => setEditHabit(h)}>Edit this habit</button>
                       <button role="menuitem" onClick={() => togglePauseHabit(h.id)}>{h.paused ? 'Resume it' : 'Pause it'}</button>

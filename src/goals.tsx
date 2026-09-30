@@ -405,7 +405,7 @@ export function GoalsPage() {
           const reached = inTf.filter((g) => (g.closed ? g.closed.final : nowOf(g)) >= g.target).length
           return (
             <section className={`goal-band${shutBands.has(tfr.id) ? ' is-shut' : ''}`} key={tfr.id}>
-              <header className="gb-head">
+              <header className="gb-head" onClick={(e) => { if (!(e.target as HTMLElement).closest('.gb-nav, .gb-toggle')) toggleBand(tfr.id) }}>
                 <button
                   className="gb-toggle" aria-expanded={!shutBands.has(tfr.id)}
                   aria-label={`${shutBands.has(tfr.id) ? 'Show' : 'Hide'} ${tfr.label.toLowerCase()}`}
@@ -413,7 +413,7 @@ export function GoalsPage() {
                 ><Icon.ChevronRight size={12} className="gb-caret" /></button>
                 {/* Paged away from now, "This week" would be a lie over last
                     week's dates. The label follows the period being shown. */}
-                <h2 className="gb-name" onClick={() => toggleBand(tfr.id)}>
+                <h2 className="gb-name">
                   {off === 0 ? tfr.label : `${off < 0 ? 'An earlier' : 'A coming'} ${tfr.id === 'weekly' ? 'week' : tfr.id === 'monthly' ? 'month' : 'quarter'}`}
                 </h2>
                 <span className="gb-range">{periodLabel(tfr.id as GoalTf, shownKey)}</span>

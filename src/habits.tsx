@@ -1190,33 +1190,13 @@ export function HabitsPage() {
             </div>
           )}
 
-          {(autoRows.length > 0 || firedRows.length > 0 || demandCols.length > 0) && (
+          {(autoRows.length > 0 || firedRows.length > 0) && (
             <div className="panel hg-panel">
               <div className="hg-head">
                 <span className="microcap">Automatic Habits</span>
                 <span className="hg-n">no tick, on purpose</span>
               </div>
               <div className="hg-rows">
-                {/* Routines with no schedule are run when the need comes up, so
-                    they live here rather than among the ones that are due. */}
-                {demandCols.map((c) => {
-                  const { done, total } = folderDone(c.list)
-                  const isRunning = running === c.id
-                  return (
-                    <div className="hg-row" key={c.id}>
-                      <span className="hg-what">
-                        <span className="hg-title">{c.label}</span>
-                        <span className="hg-note">Run when you need it</span>
-                      </span>
-                      <span className="hg-do">
-                        <span className="rtc-count mono">{done} of {total}</span>
-                        <button className="btn btn-sm btn-primary" aria-pressed={isRunning} onClick={() => setRunning(isRunning ? null : c.id)}>
-                          {isRunning ? 'Running' : 'Start'}
-                        </button>
-                      </span>
-                    </div>
-                  )
-                })}
                 {autoRows.map((h) => (
                   <div className="hg-row" key={h.id}>
                     <span className="hg-what">
@@ -1241,6 +1221,15 @@ export function HabitsPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {demandCols.length > 0 && (
+            <div className="panel hg-panel">
+              <div className="hg-head">
+                <span className="microcap">No set day</span>
+              </div>
+              <div className="rtc-list">{demandCols.map(routineCard)}</div>
             </div>
           )}
         </div>

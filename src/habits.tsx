@@ -878,7 +878,7 @@ export function HabitsPage() {
      Not remembered between visits, for the same reason the cards are always
      shut when he arrives: a setting he did not choose today should not be
      shaping what he reads today. */
-  const [histWin, setHistWin] = useState<'week' | 'month' | 'year'>('month')
+  const [histWin, setHistWin] = useState<'week' | 'month' | 'year'>('week')
   /* Which routine cards are open, for this visit only.
      His instruction, 2026-08-26: "either everything closed or everything
      opened, I would prefer it closed." It used to be remembered, so the page
@@ -939,6 +939,12 @@ export function HabitsPage() {
     .filter((h) => isHevyHabit(h) || h.auto?.from === 'focus' || h.kind === 'measured')
     .sort((a, b) => Number(isHevyHabit(b)) - Number(isHevyHabit(a)))
   const manualRows = looseBuild.filter((h) => !autoRows.includes(h))
+  /* A routine with a day to put in the calendar: every day, weekdays, or one
+     day a week. Monthly, n-times-a-week and unset have no such day. */
+  const isFixedCadence = (c: { list: HabitDef[] }) => {
+    const f = c.list[0]?.frequency
+    return f === 'daily' || f === 'weekdays' || f === 'weekly'
+  }
   const folderIsDone = (c: { list: HabitDef[] }) => { const d = folderDone(c.list); return d.total > 0 && d.done === d.total }
 
   /* Kept days this week over what the habit asks for. One measure for every
@@ -989,10 +995,13 @@ export function HabitsPage() {
             aria-label={`${open ? 'Hide' : 'Show'} the steps of ${c.label}`}
             onClick={() => toggleFolder(c.id)}
           ><Icon.ChevronRight size={12} className="folder-caret" /></button>
-          <span className="rtc-id">
+          <button
+            className="rtc-id rtc-title" aria-expanded={open} tabIndex={-1}
+            onClick={() => toggleFolder(c.id)}
+          >
             <span className="rtc-name">{c.label}</span>
             <span className="rtc-when microcap">{habitFrequencyLabel({ frequency: freq } as HabitDef)}</span>
-          </span>
+          </button>
 
           {/* The six hundred pixels that were doing nothing. The bar is the
               record of a window that has already happened; TODAY is the ring
@@ -1103,13 +1112,21 @@ export function HabitsPage() {
                 </span>
                 <span className="hg-n">{routineCols.filter(folderIsDone).length} of {routineCols.length} done today</span>
               </div>
-              <div className="rtc-list">{routineCols.filter((c) => !folderIsDone(c)).map(routineCard)}</div>
-              {routineCols.some(folderIsDone) && (
-                <>
-                  <div className="microcap hg-sub">Done today</div>
-                  <div className="rtc-list">{routineCols.filter(folderIsDone).map(routineCard)}</div>
-                </>
-              )}
+              {[
+                { key: 'fixed', label: 'Daily and weekly', cols: routineCols.filter(isFixedCadence) },
+                { key: 'loose', label: 'Monthly and no set day', cols: routineCols.filter((c) => !isFixedCadence(c)) },
+              ].filter((g) => g.cols.length > 0).map((g) => (
+                <div key={g.key} className="rtc-group">
+                  {(routineCols.some(isFixedCadence) && routineCols.some((c) => !isFixedCadence(c))) && <div className="microcap hg-sub">{g.label}</div>}
+                  <div className="rtc-list">{g.cols.filter((c) => !folderIsDone(c)).map(routineCard)}</div>
+                  {g.cols.some(folderIsDone) && (
+                    <>
+                      <div className="microcap hg-sub">Done today</div>
+                      <div className="rtc-list">{g.cols.filter(folderIsDone).map(routineCard)}</div>
+                    </>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>

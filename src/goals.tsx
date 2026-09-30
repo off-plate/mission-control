@@ -447,7 +447,7 @@ export function GoalsPage() {
                 const statusLabel = off > 0 ? 'planned'
                   : g.closed ? (g.closed.final >= g.target ? 'reached' : `ended at ${fmtNum(g.closed.final)}`)
                     : status === 'done' ? 'reached' : status === 'behind' ? 'needs a push' : 'on pace'
-                const hasDetail = !!g.why || !!fromHabit || !!g.deadline || !!(g.milestones && g.milestones.length)
+                const hasDetail = !!g.why || !!g.deadline || !!(g.milestones && g.milestones.length)
                 return (
                   <div className={`goal-item${flashGoalId === g.id ? ' flash' : ''}`} key={g.id} data-goal-id={g.id}>
                     <div className="goal-row">
@@ -455,6 +455,7 @@ export function GoalsPage() {
                         <SpaceMark space={g.space} />
                         <span className={`cat-dot goalcat-${g.category ?? 'life'}`} aria-hidden="true" />
                         <span className="gr-obj">{g.name}</span>
+                        {fromHabit && <span className="gr-auto" title={`Counts itself from “${fromHabit.name}”`}>Automatic</span>}
                       </span>
                       <span className="gr-count mono">{fmtNum(current)}<i>/{fmtNum(g.target)}</i></span>
                       <span className={`bar prog${status === 'behind' ? ' warn' : ''}`}><i style={{ width: `${pct}%` }} /></span>
@@ -474,7 +475,6 @@ export function GoalsPage() {
                     {hasDetail && (
                       <div className="goal-detail">
                         {g.why && <p className="goal-why">{g.why}</p>}
-                        {fromHabit && <p className="goal-linked">Counts itself from the “{fromHabit.name}” habit.</p>}
                         {g.deadline && <p className="goal-deadline">by {/^\d{4}-\d{2}-\d{2}$/.test(g.deadline) ? fmtWhen(g.deadline) : g.deadline}</p>}
                         {g.milestones && g.milestones.length > 0 && (
                           <ul className="goal-ms">

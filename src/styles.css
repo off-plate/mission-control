@@ -11484,3 +11484,6 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 }
 .dock-focus-step::before { width: 9px; height: 1.5px; }
 .dock-focus-step.is-plus::after { width: 1.5px; height: 9px; }
+
+/* A goal that counts itself from a habit says so in one small word, beside its name. */
+.gr-auto { flex: none; margin-left: var(--s2); padding: 1px 6px; border-radius: 4px; background: var(--sunk); color: var(--muted); font-size: 0.625rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }

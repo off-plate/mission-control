@@ -9177,29 +9177,12 @@ iframe.tl-media { pointer-events: none; }
 .hist-btn:hover { background: var(--a-accent-wash); color: var(--a-accent-text); }
 .hist-btn.is-on { background: var(--a-accent); color: var(--a-ink); font-weight: 800; }
 
-/* Finished: struck across the WHOLE card, edge to edge. His call and the right
-   one. A line through the name is a typographic detail; a line across a
-   thousand pixels is the card being closed. Everything steps back to half so
-   the line is the loudest thing on the row, except the button, which still has
-   to be readable and pressable through it. */
-.rtc.done { position: relative; }
+/* Finished: the card steps back to half strength and keeps its button. There
+   used to be a line struck across the whole card; he said it did not look good
+   (2026-09-30), so the fade and the "done" tag carry it alone. */
 .rtc.done .rtc-top > * { opacity: .5; }
-/* The button sits ABOVE the line and carries the card's own ground, so the
-   strike appears to pass behind it. A struck-through control reads as
-   disabled, and this one is the way back. */
-.rtc.done .rtc-top > .btn { opacity: 1; position: relative; z-index: 2; background: var(--a-sunk); }
+.rtc.done .rtc-top > .btn { opacity: 1; background: var(--a-sunk); }
 .rtc.done .rtc-top > .btn:hover { background: var(--a-card); }
-.rtc.done::after {
-  content: ''; position: absolute; left: var(--s5); right: var(--s5); top: 50%; height: 2px;
-  background: var(--a-soft); border-radius: 2px; pointer-events: none;
-  transform-origin: left; animation: rtc-strike 260ms cubic-bezier(.22, .61, .36, 1) both;
-}
-@keyframes rtc-strike { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-/* An open card has nothing to strike, and a struck one that is open for editing
-   would draw the line through its own steps. */
-.rtc.done.is-open::after { display: none; }
-.rtc.done.is-open .rtc-top > * { opacity: .5; }
-@media (prefers-reduced-motion: reduce) { .rtc.done::after { animation: none; } }
 
 @media (max-width: 900px) {
   /* No room for a bar beside the name; the count and the ring still fit. */

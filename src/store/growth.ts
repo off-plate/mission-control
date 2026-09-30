@@ -300,6 +300,15 @@ export function useGrowthSlice(
     })))
   }
 
+  /* The routine a habit is a step of: either it was made from the step, or a
+     step points at it by habitId (Take creatine lives as a loose habit AND as a
+     step in After wake up). Both count, so a tick on either side reaches the other. */
+  const routineOfHabit = (h: HabitDef | undefined): string | undefined => {
+    if (!h) return undefined
+    if (h.folderId && h.srcStepId) return h.folderId
+    return routines.find((r) => !r.archivedAt && r.steps.some((st) => st.habitId === h.id))?.id
+  }
+
   /** Tick or untick one day of one habit, in the log and in the week cache. */
   /* By DATE, not by weekday index. The index is a position in THIS week, so on
      a Monday "yesterday" is index 6 and marking it wrote the Sunday that has
@@ -337,7 +346,8 @@ export function useGrowthSlice(
        to reach the routine card on Plan, or one morning reads as done in one
        place and untouched in the other. */
     const h = habits.find((x) => x.id === habitId)
-    if (h?.folderId && h.srcStepId && day === todayKey()) syncRoutineFromHabits(h.folderId, next)
+    const rid = routineOfHabit(h)
+    if (rid && day === todayKey()) syncRoutineFromHabits(rid, next)
   }
 
   /** The same write as markDayOn, for many dates on one habit in a single
@@ -366,7 +376,8 @@ export function useGrowthSlice(
         : h)))
     }
     const h2 = habits.find((x) => x.id === habitId)
-    if (h2?.folderId && h2.srcStepId && set.has(todayKey())) syncRoutineFromHabits(h2.folderId, next)
+    const rid2 = routineOfHabit(h2)
+    if (rid2 && set.has(todayKey())) syncRoutineFromHabits(rid2, next)
   }
 
   /* The routine card and the habit folder are two views of one morning, so a

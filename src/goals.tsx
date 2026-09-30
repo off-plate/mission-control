@@ -349,6 +349,8 @@ export function GoalsPage() {
      back shows what a finished period ended on, forward is where next week's
      goals are planned before next week exists. Half-year stays put. */
   const [offsets, setOffsets] = useState<Record<string, number>>({})
+  const [shutBands, setShutBands] = useState<Set<string>>(new Set())
+  const toggleBand = (id: string) => setShutBands((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
   const shift = (tf: string, d: number) => setOffsets((o) => ({ ...o, [tf]: (o[tf] ?? 0) + d }))
   const nowOf = (g: Goal) => goalCurrent(g, habits, habitLog, goalPeriodRange((g.timeframe ?? 'quarter') as GoalTf, g.periodKey ?? goalPeriodKey((g.timeframe ?? 'quarter') as GoalTf)), slips, focusSessions)
   const [adding, setAdding] = useState(false)
@@ -402,11 +404,16 @@ export function GoalsPage() {
             && (g.periodKey ?? goalPeriodKey(tfr.id as GoalTf)) === shownKey)
           const reached = inTf.filter((g) => (g.closed ? g.closed.final : nowOf(g)) >= g.target).length
           return (
-            <section className="goal-band" key={tfr.id}>
+            <section className={`goal-band${shutBands.has(tfr.id) ? ' is-shut' : ''}`} key={tfr.id}>
               <header className="gb-head">
+                <button
+                  className="gb-toggle" aria-expanded={!shutBands.has(tfr.id)}
+                  aria-label={`${shutBands.has(tfr.id) ? 'Show' : 'Hide'} ${tfr.label.toLowerCase()}`}
+                  onClick={() => toggleBand(tfr.id)}
+                ><Icon.ChevronRight size={12} className="gb-caret" /></button>
                 {/* Paged away from now, "This week" would be a lie over last
                     week's dates. The label follows the period being shown. */}
-                <h2 className="gb-name">
+                <h2 className="gb-name" onClick={() => toggleBand(tfr.id)}>
                   {off === 0 ? tfr.label : `${off < 0 ? 'An earlier' : 'A coming'} ${tfr.id === 'weekly' ? 'week' : tfr.id === 'monthly' ? 'month' : 'quarter'}`}
                 </h2>
                 <span className="gb-range">{periodLabel(tfr.id as GoalTf, shownKey)}</span>

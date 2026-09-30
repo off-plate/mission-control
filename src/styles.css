@@ -11330,3 +11330,11 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 /* The title is a second hit area for the same accordion as the caret. */
 .rtc-title { background: none; border: 0; padding: var(--s2) 0; text-align: left; cursor: pointer; font: inherit; color: inherit; }
 .rtc-group + .rtc-group { margin-top: var(--s4); }
+
+/* A goal band folds down to its header. */
+.gb-toggle { background: none; border: 0; padding: var(--s2); margin-left: calc(var(--s2) * -1); cursor: pointer; color: var(--a-soft); display: inline-flex; border-radius: 6px; }
+.gb-toggle:hover { color: var(--a-ink); background: var(--a-sunk); }
+.gb-caret { transition: transform var(--a-enter); transform: rotate(90deg); }
+.goal-band.is-shut .gb-caret { transform: none; }
+.gb-name { cursor: pointer; }
+.goal-band.is-shut > :not(.gb-head) { display: none; }

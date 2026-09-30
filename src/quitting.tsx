@@ -3,10 +3,9 @@
    with kind:'break', so adding/editing one uses the same sheet habits.tsx
    already defines, not a second copy of it. */
 import { useEffect, useState } from 'react'
-import { SPACE_LABELS } from './exceptions'
 import { useStore } from './store'
 import { Band, Dropdown } from './ui'
-import { bestCleanRun, daysClean, slipCount, slipDays, type HabitDef, type HabitSlip } from './types'
+import { bestCleanRun, daysClean, slipDays, type HabitDef, type HabitSlip } from './types'
 import { HabitSheet } from './habits'
 import { localDateKey } from './util'
 
@@ -26,6 +25,27 @@ const FALLS = [
 const fallOf = (run: number) => FALLS.find((f) => run <= f.max)!
 const strengthLvl = (run: number) => (run >= 60 ? 6 : run >= 30 ? 5 : run >= 21 ? 4 : run >= 14 ? 3 : run >= 7 ? 2 : 1)
 const HEAT_WEEKS = 18
+
+/* How reliably a quit holds, from how often it breaks. Falls per 30 days over
+   the last 90 (or since the start, if younger), so a long clean run with one
+   old slip reads differently from a quit that breaks every week. */
+function holdOf(h: HabitDef, slips: HabitSlip[]): { lvl: 'new' | 'solid' | 'steady' | 'shaky' | 'rough'; word: string; detail: string } {
+  if (!h.quitSince) return { lvl: 'new', word: 'No start date', detail: '' }
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const [y, m, d] = h.quitSince.split('-').map(Number)
+  const age = Math.round((today.getTime() - new Date(y, m - 1, d).getTime()) / 86400000) + 1
+  const span = Math.min(90, age)
+  const from = new Date(today); from.setDate(from.getDate() - (span - 1))
+  const fromKey = localDateKey(from)
+  const n = [...slipDays(slips, h.id)].filter((k) => k >= fromKey && k >= h.quitSince!).length
+  const detail = n === 0 ? `No slips in ${span} days` : `${n} ${n === 1 ? 'slip' : 'slips'} in ${span} days`
+  if (age < 14) return { lvl: 'new', word: 'Just started', detail }
+  const per30 = (n / span) * 30
+  if (n === 0) return { lvl: 'solid', word: 'Solid', detail }
+  if (per30 <= 0.5) return { lvl: 'steady', word: 'Steady', detail }
+  if (per30 <= 1.5) return { lvl: 'shaky', word: 'Shaky', detail }
+  return { lvl: 'rough', word: 'Failing often', detail }
+}
 
 type HeatCell = { cls: string; tip: string } | null
 
@@ -79,7 +99,7 @@ export function QuittingPage() {
      ordered them any other way would be hiding the only number that matters. */
   const quits = habits
     .filter((h) => h.kind === 'break' && !h.archivedAt)
-    .map((h) => ({ h, clean: daysClean(h, slips) ?? 0, best: bestCleanRun(h, slips), slipped: slipCount(h, slips) }))
+    .map((h) => ({ h, clean: daysClean(h, slips) ?? 0, best: bestCleanRun(h, slips), hold: holdOf(h, slips) }))
     .sort((a, b) => b.clean - a.clean)
 
   const standing = quits.reduce((a, q) => a + q.clean, 0)
@@ -99,7 +119,7 @@ export function QuittingPage() {
             <span className="hg-n mono">{standing} clean days standing</span>
           </div>
           <div className="qwall">
-            {quits.map(({ h, clean, best, slipped }) => {
+            {quits.map(({ h, clean, best, hold }) => {
               const next = nextMilestone(clean)
               const slippedToday = slipDays(slips, h.id).has(localDateKey())
               const heat = quitHeat(h, slips)
@@ -123,11 +143,12 @@ export function QuittingPage() {
 
                   <div className="qcard-name">{h.name}</div>
 
-                  <div className="qcard-line">
-                    <span className="habit-qual qcard-space">{SPACE_LABELS[h.space]}</span>
-                    {h.quitSince ? `since ${shortDate(h.quitSince)}` : 'no start date'}
-                    {best > 0 && ` · best ${best}`}
-                    {` · ${slipped} ${slipped === 1 ? 'slip' : 'slips'}`}
+                  <div className="qcard-line">{h.quitSince ? `Since ${shortDate(h.quitSince)}` : 'No start date'}</div>
+
+                  <div className="qhold">
+                    <span className={`qhold-tag is-${hold.lvl}`}>{hold.word}</span>
+                    {hold.detail && <span>{hold.detail}</span>}
+                    {best > 0 && <span>Best run {best} {best === 1 ? 'day' : 'days'}</span>}
                   </div>
 
                   {/* The next rung, with his own best run marked on the same bar.

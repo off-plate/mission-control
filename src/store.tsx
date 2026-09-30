@@ -1201,6 +1201,27 @@ function loadPersisted(): PersistedState | null {
       p.habits = foldersFromRoutines(only, p.habits ?? [], []).habits
     }
 
+    /* Take vitamins moves into After wake up, straight after Take creatine,
+       2026-09-30. The habit already exists, so the step points at it and the
+       habit joins the routine with its history. Orders are rewritten from the
+       step positions so the new row lands where the step sits. */
+    if (!p.removedSeeds.includes('fix:vitamins-wakeup')) {
+      p.removedSeeds.push('fix:vitamins-wakeup', 'r-wakeup:step:wu5')
+      const vit = (p.habits ?? []).find((h) => !h.archivedAt && h.name.trim().toLowerCase() === 'take vitamins')
+      p.routines = (p.routines ?? []).map((r) => {
+        if (r.id !== 'r-wakeup' || (vit && r.steps.some((st) => st.habitId === vit.id))) return r
+        const at = r.steps.findIndex((st) => st.id === 'wu2' || st.title === 'Take creatine')
+        const step = { id: 'wu5', title: 'Take vitamins', kind: 'do' as const, ...(vit ? { habitId: vit.id } : {}) }
+        const steps = at < 0 ? [...r.steps, step] : [...r.steps.slice(0, at + 1), step, ...r.steps.slice(at + 1)]
+        return { ...r, steps }
+      })
+      const wake = (p.routines ?? []).filter((r) => r.id === 'r-wakeup')
+      p.habits = foldersFromRoutines(wake, p.habits ?? [], []).habits
+      const order = new Map<string, number>()
+      wake.forEach((r) => r.steps.forEach((st, i) => order.set(st.habitId ?? `h-${r.id}-${st.id}`, i)))
+      p.habits = (p.habits ?? []).map((h) => (h.folderId === 'r-wakeup' && order.has(h.id) ? { ...h, folderOrder: order.get(h.id) } : h))
+    }
+
     if (!p.removedSeeds.includes('fix:habit-runners')) {
       p.removedSeeds.push('fix:habit-runners')
       p.habits = foldersFromRoutines(p.routines ?? [], p.habits ?? [], []).habits

@@ -11467,3 +11467,9 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 .lv-next-bar { margin-top: var(--s3); height: 5px; }
 
 .lv .hp-section { margin-top: var(--s8); }
+
+.hg-tally-band { gap: var(--s5); flex-wrap: nowrap; margin-right: var(--s4); }
+.hg-tally-band .hg-fig { align-items: flex-start; }
+.hg-tally-band .hg-fig b { font-size: var(--text-lg); }
+.hg-tally-band .hg-fig i { font-size: 0.625rem; white-space: nowrap; }
+@media (max-width: 720px) { .hg-tally-band { display: none; } }

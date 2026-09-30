@@ -1086,7 +1086,14 @@ export function HabitsPage() {
         /* One Add for the whole page (his ask, 2026-09-28): the range, the
            count, expand-all and the per-section buttons are gone. Goal and
            Quitting open their own sections' sheets. */
-        actions={
+        actions={<>
+          {/* Today's three figures live beside Add, where the page's state is
+              read at a glance (his ask, 2026-09-30), not in a panel of their own. */}
+          <div className="hg-tally hg-tally-band">
+            <span className="hg-fig"><b className="mono">{schedCols.filter(folderIsDone).length}/{schedCols.length}</b><i className="microcap">routines run</i></span>
+            <span className="hg-fig"><b className="mono">{manualRows.filter((h) => h.days[todayIndex]).length}/{manualRows.length}</b><i className="microcap">manual ticks</i></span>
+            <span className="hg-fig"><b className="mono">{looseQuit.filter((h) => !slipDays(slips, h.id).has(localDateKey())).length}/{looseQuit.length}</b><i className="microcap">quits clean</i></span>
+          </div>
           <Dropdown label="Add" trigger={({ onClick, open }) => (
             <button className="btn btn-primary" aria-haspopup="menu" aria-expanded={open} onClick={onClick}>Add</button>
           )}>
@@ -1094,7 +1101,7 @@ export function HabitsPage() {
             <button role="menuitem" onClick={() => window.dispatchEvent(new CustomEvent('hg:add', { detail: 'goals' }))}>Goal</button>
             <button role="menuitem" onClick={() => window.dispatchEvent(new CustomEvent('hg:add', { detail: 'quitting' }))}>Quitting</button>
           </Dropdown>
-        }
+        </>}
       />
 
       {/* One panel per group, hairline separated rows inside it, the same shape
@@ -1154,15 +1161,6 @@ export function HabitsPage() {
         </div>
 
         <div className="hg-col">
-          <div className="panel hg-panel">
-            <div className="hg-head"><span className="microcap">Today</span></div>
-            <div className="hg-tally">
-              <span className="hg-fig"><b className="mono">{schedCols.filter(folderIsDone).length}/{schedCols.length}</b><i className="microcap">routines run</i></span>
-              <span className="hg-fig"><b className="mono">{manualRows.filter((h) => h.days[todayIndex]).length}/{manualRows.length}</b><i className="microcap">manual ticks</i></span>
-              <span className="hg-fig"><b className="mono">{looseQuit.filter((h) => !slipDays(slips, h.id).has(localDateKey())).length}/{looseQuit.length}</b><i className="microcap">quits clean</i></span>
-            </div>
-          </div>
-
           {manualRows.length > 0 && (
             <div className="panel hg-panel">
               <div className="hg-head">

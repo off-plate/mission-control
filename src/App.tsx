@@ -35,6 +35,7 @@ const FocusPage = lazy(() => import('./focus').then((m) => ({ default: m.FocusPa
 const SkillsPage = lazy(() => import('./skillspage').then((m) => ({ default: m.SkillsPage })))
 const HealthPage = lazy(() => import('./healthpage').then((m) => ({ default: m.HealthPage })))
 const GymPage = lazy(() => import('./gympage').then((m) => ({ default: m.GymPage })))
+const LongevityPage = lazy(() => import('./longevity').then((m) => ({ default: m.LongevityPage })))
 const WatchlessPage = lazy(() => import('./watchlesspage').then((m) => ({ default: m.WatchlessPage })))
 const IdeasPage = lazy(() => import('./ideaboard').then((m) => ({ default: m.IdeasPage })))
 const PeoplePage = lazy(() => import('./people').then((m) => ({ default: m.PeoplePage })))
@@ -390,7 +391,7 @@ function PhonePages({ tabs, page, setPage }: {
 }
 
 /* Pages that are dark in both modes, so the header goes dark with them. */
-const DARK_CHROME_PAGES: PageId[] = ['timeline', 'board', 'health', 'gym']
+const DARK_CHROME_PAGES: PageId[] = ['timeline', 'board', 'health', 'gym', 'longevity']
 
 export default function App() {
   const { space, view, setView, page, setPage, tasks, routines, goals, habits, markHabitDaysOn } = useStore()
@@ -722,6 +723,7 @@ export default function App() {
         {page === 'skills' && <SkillsPage />}
         {page === 'health' && <HealthPage />}
         {page === 'gym' && <GymPage />}
+        {page === 'longevity' && <LongevityPage />}
         {page === 'watchless' && <WatchlessPage />}
         {page === 'ideas' && <IdeasPage />}
         {page === 'people' && <PeoplePage />}

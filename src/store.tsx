@@ -1262,7 +1262,7 @@ function routeFromHash(): { page: PageId; day: string | null } {
      consults from the app itself). Their addresses land on Today rather than
      on nothing, the same courtesy braindump gets above. */
   if (h === 'achievements' || h === 'money' || h === 'review' || h === 'stats' || h === 'brand') return { page: 'today', day: null }
-  const pages: PageId[] = ['today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting', 'settings', 'notes', 'bills', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant', 'timeline', 'skills', 'health', 'gym', 'watchless', 'ideas', 'people']
+  const pages: PageId[] = ['today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting', 'settings', 'notes', 'bills', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant', 'timeline', 'skills', 'health', 'gym', 'longevity', 'watchless', 'ideas', 'people']
   return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
 }
 

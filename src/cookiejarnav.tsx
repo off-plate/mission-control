@@ -47,9 +47,9 @@ export function useJarState() {
   return useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f) } }, () => state)
 }
 
-export type JarHere = 'jar' | 'health' | 'gym' | 'why'
-export const JAR_PAGES: Record<string, JarHere> = { timeline: 'jar', health: 'health', gym: 'gym', board: 'why' }
-const TITLE: Record<JarHere, string> = { jar: 'Jar', health: 'Health', gym: 'Gym', why: 'The wall' }
+export type JarHere = 'jar' | 'health' | 'gym' | 'longevity' | 'why'
+export const JAR_PAGES: Record<string, JarHere> = { timeline: 'jar', health: 'health', gym: 'gym', longevity: 'longevity', board: 'why' }
+const TITLE: Record<JarHere, string> = { jar: 'Jar', health: 'Health', gym: 'Gym', longevity: 'Longevity', why: 'The wall' }
 
 /** The one header for the Jar's four sections. Same place, same size, every time. */
 export function JarBar({ here }: { here: JarHere }) {
@@ -61,7 +61,7 @@ export function JarBar({ here }: { here: JarHere }) {
     : (view === 'ladder' ? 'The ladder' : 'Momentum')
   const toggle = () => { if (onJar) set({ view: view === 'ladder' ? 'wheel' : 'ladder', lives: false }); else setPage('timeline') }
   const giveUp = () => set({ lives: !(onJar && lives) })
-  const go = (page: 'health' | 'gym' | 'board') => () => setPage(page)
+  const go = (page: 'health' | 'gym' | 'longevity' | 'board') => () => setPage(page)
   // The give-up screen covers the window; the bar under it would only make the page scroll.
   if (onJar && lives) return null
 
@@ -80,6 +80,11 @@ export function JarBar({ here }: { here: JarHere }) {
           aria-current={here === 'gym' ? 'page' : undefined}
           onClick={go('gym')}
         >Gym</button>
+        <button
+          className={`cj-btn tl-health${here === 'longevity' ? ' is-here' : ''}`}
+          aria-current={here === 'longevity' ? 'page' : undefined}
+          onClick={go('longevity')}
+        >Longevity</button>
         {/* Dropped below 639px, as it always was: the wall is a long read built
             for a screen he sits back from, not a one-handed moment. */}
         <button

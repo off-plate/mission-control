@@ -141,7 +141,6 @@ export const MOCK_HABITS: HabitDef[] = [
   /* Kept by the focus timer itself. Nothing to tick: the app already knows how
      long he focused, so asking him to confirm it would be asking twice. */
   { id: 'h-focus1h', space: 'personal', name: 'Focus for more than 1h', frequency: 'daily', paused: false, auto: { from: 'focus', minutes: 60 }, days: [false, false, false, false, false, false, false], history: [] },
-  { id: 'h-morningwork', space: 'work', name: 'Morning Big Time work routine', daypart: 'morning', frequency: 'weekdays', paused: false, days: [false, false, false, false, false, false, false], history: [] },
   /* One habit, fed by the clock: thirty minutes of focus anywhere, in any
      workspace, keeps it, partial blocks included. */
   { id: 'h-focus-work', space: 'work', name: 'Focus for 30 minutes', frequency: 'daily', paused: false, auto: { from: 'focus', minutes: 30 }, days: [false, false, false, false, false, false, false], history: [] },
@@ -190,19 +189,6 @@ export const MOCK_ROUTINES: Routine[] = [
       { id: 'pw3', title: 'Define the specific task', kind: 'do' },
       { id: 'pw4', title: 'Find ambient music', kind: 'do', optional: true },
       { id: 'pw5', title: 'Set the focus for the time you want the task to take', kind: 'do' },
-    ],
-  },
-  /* Big Time's own morning ritual. Weekday-gated like Before work: a work
-     routine has no Saturday. Steps are his to write. */
-  {
-    id: 'r-morningwork', space: 'work', title: 'Morning Big Time work routine', cadence: 'prework', habitId: 'h-morningwork',
-    doneStepIds: [],
-    steps: [
-      { id: 'mw1', title: 'See yesterday’s and last week’s focuses', kind: 'do', note: 'In Google Calendar. Move whatever you did not finish to today or this week.' },
-      { id: 'mw2', title: 'Go through the email notifications and clean the inbox', kind: 'do' },
-      { id: 'mw3', title: 'Go through the Trello notifications and updates', kind: 'do' },
-      { id: 'mw4', title: 'Go through the Jira updates', kind: 'do' },
-      { id: 'mw5', title: 'Define today’s focuses in the calendar', kind: 'do', note: 'And plan ahead, if you can.' },
     ],
   },
   /* Invoicing is a Big Time job with an order to it, and the order is the point:

@@ -7883,6 +7883,23 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 @media (prefers-reduced-motion: reduce) {
   .topstick > .nav, .topstick.is-navopen > .nav { transition: none; }
 }
+/* 1650px and wider there is room, so the page row stops being a drawer and sits
+   in the header beside the workspace switcher, always shown (his call,
+   2026-10-03). Below that it is the hover drawer above, unchanged. Same
+   height and shape as before; only where it sits. The vertical centre and the
+   left edge are measured live in App.tsx, same as --nav-align. */
+@media (min-width: 1650px) {
+  .topstick > .nav, .topstick.is-navopen > .nav, .topstick:has(:focus-visible) > .nav {
+    left: var(--nav-inline-left, var(--gutter));
+    top: var(--nav-mid, 40px);
+    max-width: none;
+    transform: translateY(-50%);
+    clip-path: none;
+    pointer-events: auto;
+    transition: none;
+    z-index: 45; /* the header is 40 and paints its own background */
+  }
+}
 
 /* ==========================================================================
    THE TIMELINE: the ladder, the flywheel, and the give-up screen.

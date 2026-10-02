@@ -1309,13 +1309,18 @@ await step('today: the chain and Why widgets show real local data, Health and De
   if (!state.heads.includes('Why')) throw new Error(`the Why widget did not render: ${state.heads.join(', ')}`)
   if (state.heads.some((h) => /sleep|debt/i.test(h))) throw new Error(`Health or Debt rendered signed out: ${state.heads.join(', ')}`)
 })
-await step('workspaces: write a task into Michael’s Corner', async () => {
-  await fresh('plan')
-  await page.locator('button', { hasText: 'Michael' }).first().click(); await page.waitForTimeout(400)
-  await page.getByRole('textbox', { name: 'New task' }).fill('Corner gate')
-  await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(400)
+await step('workspaces: two of them, with Off-Plate and Michael’s Corner as projects in Personal', async () => {
+  await fresh('projects')
+  const spaces = (await page.locator('.space-btn').allInnerTexts()).map((t) => t.trim())
+  for (const gone of ['Off-Plate', 'Michael’s Corner']) {
+    if (spaces.some((t) => t.includes(gone))) throw new Error(`${gone} is still a workspace button: ${spaces.join(', ')}`)
+  }
+  if (spaces.filter((t) => /Personal|Big Time/.test(t)).length !== 2) throw new Error(`expected Personal and Big Time: ${spaces.join(', ')}`)
   const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
-  if (s.tasks.find((t) => t.title === 'Corner gate')?.space !== 'corner') throw new Error('wrong space')
+  for (const [id, name] of [['proj-offplate', 'Off-Plate'], ['proj-corner', 'Michael’s Corner']]) {
+    const p = (s.projects ?? []).find((x) => x.id === id)
+    if (!p || p.name !== name || p.space !== 'personal') throw new Error(`${name} is not a Personal project: ${JSON.stringify(p)}`)
+  }
 })
 await step('vision + day record render', async () => {
   await fresh('board')
@@ -1761,7 +1766,7 @@ await step('phone: a task can be scheduled and rescheduled without dragging', as
   /* The seven-day "Plan for a day" list, asserted here since 2026-09-09: it
      is touch-only now (it left the desktop menu on 2026-09-04), so this is
      the one place it can be checked. */
-  const days = await p.locator('[role="menuitem"]', { hasText: /^Move to/ }).allInnerTexts()
+  const days = await p.locator('[role="menuitem"]', { hasText: /^Move to (today|tomorrow|[A-Z][a-z]{2} \d)/ }).allInnerTexts()
   if (days.length !== 7) throw new Error(`the phone menu offers ${days.length} days: ${days.join(', ')}`)
   await p.getByRole('menuitem', { name: 'Morning' }).click(); await p.waitForTimeout(500)
   if ((await slotOf()) !== 'morning') throw new Error(`tapping Morning from the list left it at ${await slotOf()}`)
@@ -2192,7 +2197,7 @@ await step('calendar: in every workspace, and it never pretends the day is empty
     await page.waitForTimeout(600)
     return (await page.locator('.nav-tab').allInnerTexts()).map((t) => t.trim().toUpperCase())
   }
-  for (const ws of ['Personal', 'Big Time', 'Off-Plate']) {
+  for (const ws of ['Personal', 'Big Time']) {
     const t = await tabsIn(ws)
     if (!t.includes('CALENDAR')) throw new Error(`Calendar missing in ${ws}: ${t.join(', ')}`)
   }
@@ -2625,8 +2630,8 @@ await step('notes: All notes, date groups, and the folder on every row', async (
       mk('p1', 'nf-tax', 'personal', 'Pinned one', 3, true),
       mk('n1', 'nf-tax', 'personal', 'From today', 0),
       mk('n2', 'nf-tax', 'personal', 'From yesterday', 1),
-      mk('n3', 'nf-space-offplate', 'offplate', 'From last month', 20),
-      mk('n4', 'nf-space-corner', 'corner', 'From last year', 400),
+      mk('n3', 'nf-space-work', 'work', 'From last month', 20),
+      mk('n4', 'nf-space-personal', 'personal', 'From last year', 400),
     ]
     localStorage.setItem(K, JSON.stringify(s))
   }, KEY)
@@ -2639,7 +2644,7 @@ await step('notes: All notes, date groups, and the folder on every row', async (
   const rows = await page.locator('.nt-row').count()
   if (rows !== stored) throw new Error(`All notes shows ${rows} of ${stored}`)
   const spaces = await page.evaluate((K) => [...new Set((JSON.parse(localStorage.getItem(K)).notes ?? []).map((n) => n.space))].length, KEY)
-  if (spaces < 3) throw new Error('the seed did not span enough workspaces to prove anything')
+  if (spaces < 2) throw new Error('the seed did not span enough workspaces to prove anything')
   const heads = await page.locator('.nt-grouphead').allTextContents()
   for (const want of ['Pinned', 'Today', 'Yesterday']) {
     if (!heads.includes(want)) throw new Error(`no ${want} heading: ${heads.join(' | ')}`)
@@ -3345,11 +3350,11 @@ await step('assistant: it answers across every workspace, not the one he is stan
       id, title, space, source: 'mc', estimateMin: 30, done: false,
       list: 'today', category: 'admin', slot: 'morning', plannedOn: day, createdAt: day, addedAt: Date.now(),
     })
-    s.tasks = [task('gate-as-p', 'Gate personal thing', 'personal'), task('gate-as-o', 'Gate offplate thing', 'offplate')]
+    s.tasks = [task('gate-as-p', 'Gate personal thing', 'personal'), { ...task('gate-as-o', 'Gate offplate thing', 'work') }]
     localStorage.setItem(K, JSON.stringify(s))
     localStorage.setItem('mc-groq-key', 'gsk_gatetest')
     /* Standing in Personal on purpose: every other page would hide the
-       Off-Plate row, and this one must not. */
+       Big Time row, and this one must not. */
     localStorage.setItem('mc-view', 'personal')
     localStorage.setItem('mc-space', 'personal')
     return { ok: true }
@@ -3366,14 +3371,14 @@ await step('assistant: it answers across every workspace, not the one he is stan
   await shoot('flow-assistant-cross-workspace')
   const canvas = await page.locator('.as-canvas').innerText()
   if (!/Gate personal thing/.test(canvas)) throw new Error('the Personal task is missing from the canvas')
-  if (!/Gate offplate thing/.test(canvas)) throw new Error('standing in Personal hid the Off-Plate task, which is the whole bug')
+  if (!/Gate offplate thing/.test(canvas)) throw new Error('standing in Personal hid the Big Time task, which is the whole bug')
   /* And each row says which workspace it came from, since they are mixed. */
-  if (!(await page.locator('.as-canvas .as-row .spacemark.s-offplate').count())) throw new Error('the Off-Plate row carries no workspace mark')
+  if (!(await page.locator('.as-canvas .as-row .spacemark.s-work').count())) throw new Error('the Big Time row carries no workspace mark')
   if (!(await page.locator('.as-canvas .as-row .spacemark.s-personal').count())) throw new Error('the Personal row carries no workspace mark')
   /* The model was told the same thing, so its sentence cannot contradict the
      cards: it saw both, and it saw which workspace each one belongs to. */
   if (!/Gate offplate thing/.test(briefed)) throw new Error('the briefing sent to the model was still filtered to one workspace')
-  if (!/\[Off-Plate\]/.test(briefed)) throw new Error('the briefing does not tell the model which workspace anything came from')
+  if (!/\[Big Time\]/.test(briefed)) throw new Error('the briefing does not tell the model which workspace anything came from')
   /* His tasks are largely in Czech. That is data, and it was pulling the
      ANSWER into Czech, on nonsense input especially. English unless he himself
      writes Czech, and the model is told so in the same breath as the briefing. */

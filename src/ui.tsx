@@ -254,7 +254,7 @@ export function WriteTo() {
  *  cards apart, so they cannot be tied to the All view. */
 export function SpaceMark({ space, always }: { space?: SpaceId; always?: boolean }) {
   const { view } = useStore()
-  if ((view !== 'all' && !always) || !space) return null
+  if ((view !== 'all' && !always) || !space || !SPACE_LABELS[space]) return null
   return (
     <span className={`spacemark s-${space}`}>
       <i aria-hidden="true" />
@@ -281,6 +281,19 @@ export function ProjectMark({ project }: { project?: Project }) {
       <b aria-hidden="true">{initials}</b>
       <span className="visually-hidden">{project.name}</span>
     </span>
+  )
+}
+
+/** The mark for a task row: its workspace, plus its project when it has one.
+ *  Off-Plate and Michael's Corner are projects now, so this is what keeps the
+ *  "which one is this from" answer in All and Today. */
+export function TaskMark({ task, always }: { task: { space?: SpaceId; projectId?: string }; always?: boolean }) {
+  const { projects } = useStore()
+  return (
+    <>
+      <SpaceMark space={task.space} always={always} />
+      <ProjectMark project={task.projectId ? projects.find((p) => p.id === task.projectId) : undefined} />
+    </>
   )
 }
 

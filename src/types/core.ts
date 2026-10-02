@@ -1,10 +1,15 @@
-export type SpaceId = 'personal' | 'work' | 'offplate' | 'corner'
+export type SpaceId = 'personal' | 'work'
 
 /** What you are looking at. 'all' is not a space anything can belong to: it is a
- *  view across the three. Storage always uses SpaceId, never this. */
+ *  view across both. Storage always uses SpaceId, never this. */
 export type ViewId = SpaceId | 'all'
 
-export const SPACES: SpaceId[] = ['personal', 'work', 'offplate', 'corner']
+export const SPACES: SpaceId[] = ['personal', 'work']
+
+/** Off-Plate and Michael's Corner were spaces until 2026-10-02. They are
+ *  projects inside Personal now, and these are their ids. */
+export const PROJECT_OFFPLATE = 'proj-offplate'
+export const PROJECT_CORNER = 'proj-corner'
 
 export function isSpace(v: ViewId): v is SpaceId {
   return v !== 'all'

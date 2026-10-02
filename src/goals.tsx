@@ -5,7 +5,7 @@ import * as Icon from './icons'
 import { useEffect, useState } from 'react'
 import { useStore } from './store'
 import { Sheet } from './modals'
-import { Band, Dropdown, Select, SpaceMark } from './ui'
+import { Band, Dropdown, Select, SpaceMark, TaskMark } from './ui'
 import { GOAL_TIMEFRAMES, goalCurrent, isTimeFed, habitTarget, type GoalCategory, type GoalTimeframe, type Goal, type GoalMilestone } from './types'
 import { goalPeriodKey, goalPeriodRange, periodIsPast, periodLabel, shiftPeriodKey, fmtNum, goalPace, fmtWhen, type GoalTf } from './util'
 
@@ -209,7 +209,7 @@ function LeftBehind() {
         const tf = t.horizon as GoalTf
         return (
           <div className="lb-row" key={t.id}>
-            <SpaceMark space={t.space} />
+            <TaskMark task={t} />
             <span className="grow">{t.title}</span>
             <span className="meta mono">{goalPeriodRange(tf, t.horizonKey!).label}</span>
             <button className="btn btn-quiet" onClick={() => commitTask(t.id, t.horizon, goalPeriodKey(tf))}>
@@ -274,7 +274,7 @@ function PeriodTasks({ tf, periodKey }: { tf: GoalTimeframe; periodKey: string }
           onClick={() => toggleTask(t.id)}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleTask(t.id) } }}
         >
-          <span className="gr-name"><SpaceMark space={t.space} /><span className="gr-obj">{t.title}</span></span>
+          <span className="gr-name"><TaskMark task={t} /><span className="gr-obj">{t.title}</span></span>
           <span className="gr-count mono">{t.done ? 1 : 0}<i>/1</i></span>
           <span className="bar prog"><i style={{ width: t.done ? '100%' : '0%' }} /></span>
           <span className="gr-pct">{t.done ? 100 : 0}<i>%</i></span>
@@ -305,7 +305,7 @@ function PeriodTasks({ tf, periodKey }: { tf: GoalTimeframe; periodKey: string }
             <div className="ptask-offer">
               {offer.map((t) => (
                 <button key={t.id} className="ptask-offer-row" onClick={() => put(t.id)}>
-                  <SpaceMark space={t.space} />
+                  <TaskMark task={t} />
                   <span className="grow">{t.title}</span>
                   <span className="mono meta">{t.list === 'today' ? 'today' : 'to-do'}</span>
                 </button>

@@ -44,6 +44,7 @@ import {
 } from './mock'
 import { focusNeedMin, goalCurrent, isTimeFed, routineComplete } from './types'
 import { isSpace, SPACES, spaceFolderId } from './types'
+import { foldSpaces } from './foldspaces'
 import type { HabitFrequency } from './types'
 import type {
   ViewId,
@@ -684,15 +685,6 @@ function loadPersisted(): PersistedState | null {
       }))
     }
 
-    /* Night work moves home to Off-Plate, 2026-08-02: it is business-evening
-       work, not personal life. Space is not something the UI lets him edit on a
-       routine, so this cannot be overriding a choice of his. Runs once. */
-    if (!p.removedSeeds.includes('fix:nightwork-space')) {
-      p.removedSeeds.push('fix:nightwork-space')
-      p.routines = (p.routines ?? []).map((r) => (r.id === 'r-nightwork' && r.space === 'personal' ? { ...r, space: 'offplate' } : r))
-      p.habits = (p.habits ?? []).map((h) => (h.id === 'h-nightwork' && h.space === 'personal' ? { ...h, space: 'offplate' } : h))
-    }
-
     /* Creatine moves out of the morning routine and into After wake up,
        2026-08-02. Only the seeded step is pulled, and only while it still looks
        seeded, so a creatine step he rewrote himself stays where he put it. The
@@ -707,16 +699,9 @@ function loadPersisted(): PersistedState | null {
       }))
     }
 
-    /* Night work moves from Off-Plate to Personal, his call on 2026-08-02. The
-       workspace of a row he owns is never touched by the loader, so this is the
-       explicit one-time move, habit included. Everything logged against either
-       keeps its id and therefore its history; only which workspace shows it
-       changes. */
-    if (!p.removedSeeds.includes('fix:nightwork-personal')) {
-      p.removedSeeds.push('fix:nightwork-personal')
-      p.routines = (p.routines ?? []).map((r) => (r.id === 'r-nightwork' && r.space === 'offplate' ? { ...r, space: 'personal' } : r))
-      p.habits = (p.habits ?? []).map((h) => (h.id === 'h-nightwork' && h.space === 'offplate' ? { ...h, space: 'personal' } : h))
-    }
+    /* Night work briefly lived in Off-Plate (2026-08-02) and went back to
+       Personal the same day. Both moves are gone: Off-Plate is a project now
+       and Personal is where every row ends up (see foldSpaces). */
 
     /* The monthly gym goal, 2026-09-30: 25 visits, counted by itself from the
        Workout / Gym / Fitness habit (which Hevy fills). In the last days of a
@@ -1259,6 +1244,11 @@ function loadPersisted(): PersistedState | null {
       p.removedSeeds.push('fix:habit-runners')
       p.habits = foldersFromRoutines(p.routines ?? [], p.habits ?? [], []).habits
     }
+
+    /* Two workspaces, 2026-10-02: Off-Plate and Michael's Corner are projects
+       inside Personal now. Idempotent, so it also runs on states that arrive
+       from a device still on the old bundle (see applyExternal). */
+    foldSpaces(p as unknown as Record<string, unknown>, localDateKey())
     return p
   } catch {
     return null
@@ -1338,13 +1328,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [view, setViewState] = useState<ViewId>(() => {
     try {
       const v = localStorage.getItem('mc-view')
-      return v === 'work' || v === 'offplate' || v === 'personal' || v === 'corner' || v === 'all' ? v : 'all'
+      return v === 'work' || v === 'personal' || v === 'all' ? v : 'all'
     } catch { return 'all' }
   })
   const [writeSpace, setWriteSpace] = useState<SpaceId>(() => {
     try {
       const s = localStorage.getItem('mc-space')
-      return s === 'work' || s === 'offplate' || s === 'personal' || s === 'corner' ? s : 'personal'
+      return s === 'work' || s === 'personal' ? s : 'personal'
     } catch { return 'personal' }
   })
   // In a single space, new things land there. In All he picks, and the pick sticks.
@@ -1383,7 +1373,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const setView = (v: ViewId) => { setViewState(v); if (isSpace(v)) setWriteSpace(v); setOpenProject(null) }
   /* A record belongs to exactly one space. The old form treated a space-less row
      as belonging to all three at once, so the same ledger row was counted in
-     Personal AND Work AND Off-Plate and every time-saved figure was wrong. Rows
+     Personal AND Work and every time-saved figure was wrong. Rows
      written before spaces existed are stamped on load instead. */
   const inView = (s?: SpaceId) => view === 'all' || s === view
   const [editing, setEditing] = useState(false)
@@ -1507,6 +1497,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     let p: PersistedState
     try { p = JSON.parse(merged) as PersistedState } catch { return }
     if (p.schema !== STORAGE_KEY) return
+    foldSpaces(p as unknown as Record<string, unknown>, localDateKey())
     /* Nothing new once the dates are set aside: stop, or two tabs would answer
        each other's saves forever. */
     if (mine && stripDates(merged) === stripDates(mine)) return

@@ -1,6 +1,6 @@
 import { useStore } from './store'
 import { Linkify } from './widgets'
-import { Band, SpaceMark } from './ui'
+import { Band, SpaceMark, TaskMark } from './ui'
 import { fmtDuration, localDateKey } from './util'
 import { quitKeptDays, slipDays } from './types'
 
@@ -119,7 +119,7 @@ export function DayPage() {
             ))}
             {untimed.map((t) => (
               <div className="day-row" key={t.id}>
-                <SpaceMark space={t.space} />
+                <TaskMark task={t} />
                 <span className="day-row-title">{t.title}</span>
                 <span className="day-row-fig mono day-row-untimed">no time logged</span>
               </div>

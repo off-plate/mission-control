@@ -50,7 +50,7 @@ export interface Card { kind: CardKind; note?: string }
    nothing happens and it says so. */
 export type Slot = 'morning' | 'noon' | 'afternoon' | 'evening'
 export type Where = 'today' | 'backlog'
-export type Space = 'personal' | 'work' | 'offplate' | 'corner'
+export type Space = 'personal' | 'work'
 
 export type Action =
   /** A new task. The only action carrying words of its own, and they are HIS
@@ -255,7 +255,12 @@ const TIER_OK: PersonTier[] = ['core', 'close', 'friends', 'business', 'wider', 
 /** Birthday as MM-DD, exactly what the People page itself stores -- see
  *  Person.birthday in types/people.ts. A year on its own is not a date. */
 const BIRTHDAY_RE = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/
-const SPACE_OK: Space[] = ['personal', 'work', 'offplate', 'corner']
+const SPACE_OK: Space[] = ['personal', 'work']
+/** Off-Plate and Michael's Corner stopped being workspaces on 2026-10-02 and are
+ *  projects inside Personal. A model that still says the old word is answered
+ *  with the project, never dropped. */
+const LEGACY_PROJECT: Record<string, string> = { offplate: 'Off-Plate', corner: "Michael's Corner" }
+const spaceOf = (v: unknown): Space | undefined => (SPACE_OK.includes(v as Space) ? (v as Space) : typeof v === 'string' && v in LEGACY_PROJECT ? 'personal' : undefined)
 /** Every real page he can be sent to, and nothing else. 'day' takes a date
  *  in its own route with nowhere for the model to safely supply one;
  *  'braindump' is a pure legacy alias for 'notes', never a reason to be the
@@ -289,8 +294,8 @@ function cleanActions(raw: unknown): Action[] {
         if (!title) break
         out.push({
           kind: 'add', title, list, slot, min,
-          space: SPACE_OK.includes(o.space as Space) ? (o.space as Space) : undefined,
-          project: str(o.project, 200) || undefined,
+          space: spaceOf(o.space),
+          project: str(o.project, 200) || LEGACY_PROJECT[o.space as string] || undefined,
         })
         break
       }
@@ -319,8 +324,8 @@ function cleanActions(raw: unknown): Action[] {
         if (match) out.push({ kind: 'habit', match, on: o.on !== false })
         break
       case 'workspace':
-        if (o.space === 'all' || SPACE_OK.includes(o.space as Space)) {
-          out.push({ kind: 'workspace', space: o.space as Space | 'all' })
+        if (o.space === 'all' || spaceOf(o.space)) {
+          out.push({ kind: 'workspace', space: o.space === 'all' ? 'all' : spaceOf(o.space)! })
         }
         break
       case 'open':
@@ -368,7 +373,7 @@ function cleanActions(raw: unknown): Action[] {
       }
       case 'project': {
         const name = str(o.name, 200)
-        if (name) out.push({ kind: 'project', name, space: SPACE_OK.includes(o.space as Space) ? (o.space as Space) : undefined })
+        if (name) out.push({ kind: 'project', name, space: spaceOf(o.space) })
         break
       }
       case 'addHabit': {
@@ -530,14 +535,14 @@ this", no exclamation marks, no praise for things he has not done yet. A remark
 about the rain is warmth; "have a great day" is filler.
 
 NEVER WRITE A WORKSPACE TAG. The briefing marks each row [Personal],
-[Big Time], [Off-Plate], [Michael's Corner] so YOU can tell them apart. They are
+[Big Time], or the project's name when the task sits in one (Off-Plate and Michael's Corner are projects inside Personal), so YOU can tell them apart. They are
 plumbing. Writing "start with [Michael's Corner] Build a SoMe post generator"
 reads like a database row. Say "the SoMe post generator, over on Michael's
 Corner" if the workspace matters, and just the title if it does not.
 
 Two or three sentences for an ordinary question. Never more.
 
-YOU SEE ALL THREE WORKSPACES AT ONCE. Every other page in this app is filtered
+YOU SEE BOTH WORKSPACES AT ONCE. Every other page in this app is filtered
 to the one he is standing in; you are not, on purpose, because half a day
 answered confidently is a wrong answer. The briefing marks each item with its
 workspace and the cards show that mark on every row. So you may say the shape of
@@ -588,7 +593,7 @@ the full account of every item is the line the app writes under it, per
 action, same as always.
 
 The whole vocabulary, and nothing outside it works:
-{"kind":"add","title":"...","list":"today"|"backlog","slot":"morning"|"noon"|"afternoon"|"evening","space":"personal"|"work"|"offplate"|"corner","min":30}
+{"kind":"add","title":"...","list":"today"|"backlog","slot":"morning"|"noon"|"afternoon"|"evening","space":"personal"|"work","project":"Off-Plate","min":30}
 {"kind":"done","match":"part of the title"}
 {"kind":"done","match":"...","actualMin":15}         only when he told you, in the same breath, how long it actually took
 {"kind":"undone","match":"..."}
@@ -599,7 +604,7 @@ The whole vocabulary, and nothing outside it works:
 {"kind":"rename","match":"...","title":"..."}         a real title change on an existing task, his words
 {"kind":"drop","match":"..."}                        deletes it, and he can undo
 {"kind":"habit","match":"habit name","on":true}      keeps or un-keeps it today
-{"kind":"workspace","space":"personal"|"work"|"offplate"|"corner"|"all"}  personal=Personal, work=Big Time, offplate=Off-Plate, corner=Michael's Corner, all=every workspace on screen at once. Switches which workspace he is standing in.
+{"kind":"workspace","space":"personal"|"work"|"all"}  personal=Personal, work=Big Time, all=both workspaces on screen at once. Switches which workspace he is standing in.
 {"kind":"open","page":"today"|"plan"|"projects"|"habits"|"routines"|"goals"|"quitting"|"settings"|"notes"|"board"|"apps"|"focus"|"zone"|"bills"|"calendar"|"timeline"|"assistant"}  a real page, not a workspace -- see below.
 {"kind":"app","match":"..."}                          opens one of his real embedded apps on the Apps page
 {"kind":"bill","match":"bill name","paid":true}      marks a real bill paid or unpaid, this cycle only
@@ -611,7 +616,7 @@ The whole vocabulary, and nothing outside it works:
 {"kind":"noteEdit","match":"...","text":"..."}        replaces a real note's body with his words
 {"kind":"noteDelete","match":"..."}                   deletes a real note
 {"kind":"income","amount":45000,"label":"..."}        a real row under Income, this cycle
-{"kind":"project","name":"...","space":"personal"|"work"|"offplate"|"corner"}  a real project, space defaults to where he is standing
+{"kind":"project","name":"...","space":"personal"|"work"}  a real project, space defaults to where he is standing
 {"kind":"addHabit","name":"...","breaking":true,"frequency":"daily"|"weekdays"|"times-per-week"|"weekly"|"monthly"}  a real habit or, breaking:true, a real quit
 {"kind":"archiveHabit","match":"..."}                 archives a real habit or quit; history stays
 {"kind":"editHabit","match":"...","name":"...","frequency":"..."}  patches only the fields given
@@ -629,7 +634,7 @@ done, leave it out and the app asks him afterwards, same as always. "workspace"
 is only for an explicit "open", "switch to" or "go to" a named workspace, never
 inferred from a task he is talking about happening to sit in one.
 
-WORKSPACE vs OPEN: a workspace (personal/work/offplate/corner/all) filters
+WORKSPACE vs OPEN: a workspace (personal/work/all) filters
 what other pages show; it is not a page. A page ("open") is a real screen.
 "open up Big Time" = workspace; "open the bills page" = page. Pages: today,
 plan, projects, habits (tab: "Habits & Goals"), routines, goals, quitting,

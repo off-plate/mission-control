@@ -49,7 +49,10 @@ import * as Icon from './icons'
 
 const dayLabel = () => new Date().toLocaleDateString('en-GB', { weekday: 'long' })
 /** Which workspace a thing came from, in words the model can repeat back. */
-const label = (s?: SpaceId) => (s ? SPACE_LABELS[s] : 'Unfiled')
+/** Where a task lives, for the briefing: its project's name when it has one
+ *  (Off-Plate and Michael's Corner are projects now), otherwise its workspace. */
+const labelOf = (t: { space?: SpaceId; projectId?: string }, projects: { id: string; name: string }[]) =>
+  projects.find((p) => p.id === t.projectId)?.name ?? (t.space ? SPACE_LABELS[t.space] : 'Unfiled')
 /** A URL pasted straight into a task title reads fine as a link on his own
  *  list, and reads as noise once a sentence has to carry it -- on screen as a
  *  wall of characters, out loud as a wall of syllables. Stripped here rather
@@ -58,7 +61,7 @@ const label = (s?: SpaceId) => (s ? SPACE_LABELS[s] : 'Unfiled')
 const dropUrl = (title: string) => title.replace(/https?:\/\/\S+/gi, '').replace(/\s{2,}/g, ' ').trim()
 
 function useBrief(): Brief {
-  const { tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, slips, plan } = useStore()
+  const { tasks, projects, habits, habitLog, routines, focusSessions, goals, todayIndex, slips, plan } = useStore()
   const { state: cal } = useCalendar()
   /* Fetched once when the page opens. It is a garnish on the brief, so it never
      blocks anything and a failure just means no weather line. */
@@ -90,10 +93,10 @@ function useBrief(): Brief {
     const onDay = tasks.filter((t) => t.list === 'today' && (t.plannedOn ?? day) === day)
     const planned = SLOTS.map((s) => ({
       slot: s.label,
-      items: onDay.filter((t) => t.slot === s.id).map((t) => ({ title: dropUrl(t.title) || t.title, done: !!t.done, min: t.estimateMin ?? 0, space: label(t.space) })),
+      items: onDay.filter((t) => t.slot === s.id).map((t) => ({ title: dropUrl(t.title) || t.title, done: !!t.done, min: t.estimateMin ?? 0, space: labelOf(t, projects) })),
     }))
     const unsorted = onDay.filter((t) => !t.slot)
-    if (unsorted.length) planned.unshift({ slot: 'Unsorted', items: unsorted.map((t) => ({ title: dropUrl(t.title) || t.title, done: !!t.done, min: t.estimateMin ?? 0, space: label(t.space) })) })
+    if (unsorted.length) planned.unshift({ slot: 'Unsorted', items: unsorted.map((t) => ({ title: dropUrl(t.title) || t.title, done: !!t.done, min: t.estimateMin ?? 0, space: labelOf(t, projects) })) })
     const backlog = tasks.filter((t) => t.list === 'backlog' && !t.done)
     const age = (t: Task) => {
       if (!t.createdAt) return 0
@@ -144,8 +147,8 @@ function useBrief(): Brief {
       weekday: dayLabel(),
       planned,
       backlogCount: backlog.length,
-      backlog: backlog.slice(0, 25).map((t) => ({ title: dropUrl(t.title), space: label(t.space) })).filter((t) => t.title),
-      oldest: [...backlog].sort((a, b) => age(b) - age(a)).slice(0, 3).map((t) => ({ title: dropUrl(t.title), days: age(t), space: label(t.space) })).filter((t) => t.title),
+      backlog: backlog.slice(0, 25).map((t) => ({ title: dropUrl(t.title), space: labelOf(t, projects) })).filter((t) => t.title),
+      oldest: [...backlog].sort((a, b) => age(b) - age(a)).slice(0, 3).map((t) => ({ title: dropUrl(t.title), days: age(t), space: labelOf(t, projects) })).filter((t) => t.title),
       habits: { due, kept, open: open.slice(0, 6) },
       allHabits: allHabits.slice(0, 40),
       routines: routinesBrief,
@@ -159,14 +162,14 @@ function useBrief(): Brief {
          by it first. plan.returnedIds is where they went. */
       tomorrow: tasks
         .filter((t) => t.list === 'today' && t.plannedOn === tomorrowKey && !t.done)
-        .slice(0, 12).map((t) => ({ title: dropUrl(t.title), space: label(t.space) })).filter((t) => t.title),
+        .slice(0, 12).map((t) => ({ title: dropUrl(t.title), space: labelOf(t, projects) })).filter((t) => t.title),
       tomorrowMeetings: (cal.status === 'ok'
         ? cal.events.filter((e) => e.day === tomorrowKey && e.start !== null && isMeeting(e))
         : []).map((e) => ({ at: at(e), title: e.title })),
       unfinishedYesterday: (plan.returnedOn === day
         ? tasks.filter((t) => new Set(plan.returnedIds ?? []).has(t.id) && !t.done && t.list !== 'today')
         : []
-      ).slice(0, 12).map((t) => ({ title: dropUrl(t.title), space: label(t.space) })).filter((t) => t.title),
+      ).slice(0, 12).map((t) => ({ title: dropUrl(t.title), space: labelOf(t, projects) })).filter((t) => t.title),
       /* By doneAt, not plannedOn: the rollover clears plannedOn off finished
          work on its way to the ledger (see roll.ts), so that field is already
          gone by the time this runs. doneAt is a real timestamp and survives.
@@ -175,7 +178,7 @@ function useBrief(): Brief {
          hand the model a bullet with nothing left to say. */
       completedYesterday: tasks
         .filter((t) => t.done && t.doneAt && localDateKey(new Date(t.doneAt)) === yesterdayKey)
-        .slice(0, 12).map((t) => ({ title: dropUrl(t.title), space: label(t.space) })).filter((t) => t.title),
+        .slice(0, 12).map((t) => ({ title: dropUrl(t.title), space: labelOf(t, projects) })).filter((t) => t.title),
       weather: sky,
       goals: goals.filter((g) => !g.closed).slice(0, 4).map((g) => {
         const tf = (g.timeframe ?? 'quarter') as GoalTf
@@ -189,7 +192,7 @@ function useBrief(): Brief {
         .map((h) => ({ name: h.name, days: daysClean(h, slips) ?? 0 })),
       nextTask: firstMove ? dropUrl(firstMove.title) || firstMove.title : null,
     }
-  }, [tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, slips, cal, sky, plan, billsBrief, firstMove])
+  }, [tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, slips, cal, sky, plan, billsBrief, firstMove, projects])
 }
 
 /* WHAT HAPPENED, in the app's words rather than the model's.

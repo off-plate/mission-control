@@ -2049,7 +2049,9 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
    under each other instead of next to each other is the only thing that's
    actually different here. */
 .projnav-menu {
-  position: fixed; z-index: 40; flex-direction: column; width: max-content;
+  /* Above .topstick (50), which holds the page row: the row is raised past the
+     header on wide screens and the panel went behind it. */
+  position: fixed; z-index: 60; flex-direction: column; width: max-content;
   /* The identical drawer reveal .topstick > .nav uses below, copied rather
      than shared: that selector can't reach a portalled element outside
      .topstick's own DOM, so this carries its own open/close class instead. */

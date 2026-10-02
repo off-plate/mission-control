@@ -484,6 +484,13 @@ export default function App() {
       if (!topstick || !spaces) return
       const offset = spaces.getBoundingClientRect().left - topstick.getBoundingClientRect().left
       topstick.style.setProperty('--nav-align', `${offset}px`)
+      /* Wide screens (styles.css, 1650px) seat the row beside the workspace
+         switcher instead: its left edge is the switcher's right edge plus a
+         gap, and it centres on the switcher's own midline. */
+      const t = topstick.getBoundingClientRect()
+      const r = spaces.getBoundingClientRect()
+      topstick.style.setProperty('--nav-inline-left', `${r.right - t.left + 16}px`)
+      topstick.style.setProperty('--nav-mid', `${r.top - t.top + r.height / 2}px`)
     }
     measure()
     window.addEventListener('resize', measure)

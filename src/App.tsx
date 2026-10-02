@@ -1,4 +1,5 @@
 import { JarBar, JAR_PAGES } from './cookiejarnav'
+import { ProjectMark } from './ui'
 import { Component, Fragment, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { exceptionsFor, globalExceptions } from './exceptions'
@@ -238,7 +239,7 @@ function PageNav({
   setPage: (p: PageId) => void
   onMouseEnter?: () => void
 }) {
-  const { projects, view, setSpace, enterProject } = useStore()
+  const { projects, tasks, openProjectId, view, setSpace, enterProject } = useStore()
   const activeRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     activeRef.current?.scrollIntoView({ inline: 'center', block: 'nearest' })
@@ -304,12 +305,14 @@ function PageNav({
                 onMouseLeave={hideHoverSoon}
               >
                 {hoverProjects.map((p) => (
-                  <button key={p.id} className="nav-tab" role="menuitem" onClick={() => { setSpace(p.space); enterProject(p.id); setHoverOpen(false) }}>
-                    {p.name}
+                  <button key={p.id} className="projrow" role="menuitem" aria-current={openProjectId === p.id ? 'true' : undefined} onClick={() => { setSpace(p.space); enterProject(p.id); setHoverOpen(false) }}>
+                    <ProjectMark project={p} />
+                    <span className="projrow-name">{p.name}</span>
+                    <span className="projrow-n mono">{tasks.filter((t) => t.projectId === p.id && !t.done).length}</span>
                   </button>
                 ))}
-                <button className="nav-tab projnav-all" role="menuitem" onClick={() => { setPage('projects'); setHoverOpen(false) }}>
-                  All projects
+                <button className="projrow projnav-all" role="menuitem" onClick={() => { setPage('projects'); setHoverOpen(false) }}>
+                  <span className="projrow-name">All projects</span>
                 </button>
               </div>,
               document.body,

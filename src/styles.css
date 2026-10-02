@@ -6860,13 +6860,21 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
    that carries ink, plus a dark readable partner for text and borders, because
    the fill/text split is the rule the contrast pass produced and it holds for
    every hue, not only lime. Measured against paper, card and sunk:
-     personal  #DFF24A fill 15.33 on ink   partner #5E6B12  5.52 / 5.85 / 5.01
-     work      #7FD8F5 fill 11.80          partner #1C5772  7.46 / 7.91 / 6.76 */
+     all       #DFF24A fill 15.33 on ink   partner #5E6B12  5.52 / 5.85 / 5.01
+     personal  #C4B0FF fill  9.58          partner #4A3A94  8.36 / 9.04 / 7.39
+     work      #7FD8F5 fill 11.80          partner #1C5772  7.46 / 7.91 / 6.76
+   Personal was lime like All until Off-Plate and Corner stopped being
+   workspaces (2026-10-03); with only two rooms left, All and Personal looked
+   identical. All keeps the base lime, Personal takes lilac. */
+[data-space="personal"] {
+  --a-accent: #C4B0FF; --a-accent-2: #AE95F5; --a-accent-text: #4A3A94;
+  --a-accent-wash: color-mix(in srgb, #C4B0FF 26%, transparent);
+}
 [data-space="work"] {
   --a-accent: #7FD8F5; --a-accent-2: #5FC6EA; --a-accent-text: #1C5772;
   --a-accent-wash: color-mix(in srgb, #7FD8F5 22%, transparent);
 }
-/* "All" and Personal keep the base lime. */
+/* "All" keeps the base lime. */
 
 /* ---- 2. the type scale, on the classes that carry text -------------------
    Nothing in the interface goes below 12px. He reported "everything is small"
@@ -7002,7 +7010,7 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .drift.off { background: var(--a-warn-wash); color: var(--a-warn); }
 
 /* ---- 10. the space mark carries the space's own accent ------------------- */
-.spacemark.s-personal i { background: #DFF24A; }
+.spacemark.s-personal i { background: #C4B0FF; }
 .spacemark.s-work i { background: #7FD8F5; }
 
 /* ---- 11. Projects: a directory of rooms inside a Space, not a filter ----
@@ -7016,7 +7024,7 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .projcard {
   position: relative; background: var(--surface); border: 1px solid var(--hairline); box-shadow: var(--a-lift);
 }
-.projcard.s-personal { --mark: #DFF24A; } .projcard.s-work { --mark: #7FD8F5; }
+.projcard.s-personal { --mark: #C4B0FF; } .projcard.s-work { --mark: #7FD8F5; }
 .projcard::before { content: ''; position: absolute; left: var(--s2); top: 14px; bottom: 14px; width: 3px; border-radius: 2px; background: var(--mark, var(--hairline-strong)); z-index: 1; }
 /* The card's own open button: everything but the kebab in the corner. */
 .projcard-open {

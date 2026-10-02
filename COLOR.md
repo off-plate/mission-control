@@ -36,9 +36,9 @@ One quiet, low-saturation hue per task category, shown **only as an 8px dot** at
 
 The interactive accent changes per space, so switching rooms visibly changes the room (Sunsama's color-by-channel, on the interactive layer):
 
-- **Personal** → burnt orange `#d1502a` (base)
-- **Work** → navy `#1d4e79`
-- **Off-Plate** → gold / ochre `#8a6410`
+- **All** → lime `#DFF24A` (base)
+- **Personal** → lilac `#C4B0FF`, text partner `#4A3A94`
+- **Work** → sky `#7FD8F5`, text partner `#1C5772`
 
 Set via `data-space` on `<html>`. The app is light only: there is no dark mode and no `data-theme`, so nothing here is theme-qualified. All three accents hit WCAG AA on `--bg` and `--surface`.
 

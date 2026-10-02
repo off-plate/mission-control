@@ -30,8 +30,8 @@ await page.evaluate((K) => {
   const yd = new Date(); yd.setDate(yd.getDate() - 1)
   s.tasks = [
     { id: 'fy-t1', title: 'Updated the strategic tabulka', source: 'mc', estimateMin: 20, done: true, doneAt: yd.toISOString(), space: 'personal', list: 'backlog', category: 'admin', createdAt: 'x' },
-    { id: 'fy-t2', title: 'Build a website for this barber: https://www.masdos8.com/galerie', source: 'mc', estimateMin: 20, done: true, doneAt: yd.toISOString(), space: 'offplate', list: 'backlog', category: 'admin', createdAt: 'x' },
-    { id: 'fy-t3', title: 'https://noah-restaurant.com/', source: 'mc', estimateMin: 20, done: true, doneAt: yd.toISOString(), space: 'offplate', list: 'backlog', category: 'admin', createdAt: 'x' },
+    { id: 'fy-t2', title: 'Build a website for this barber: https://www.masdos8.com/galerie', source: 'mc', estimateMin: 20, done: true, doneAt: yd.toISOString(), space: 'personal', list: 'backlog', category: 'admin', createdAt: 'x' },
+    { id: 'fy-t3', title: 'https://noah-restaurant.com/', source: 'mc', estimateMin: 20, done: true, doneAt: yd.toISOString(), space: 'personal', list: 'backlog', category: 'admin', createdAt: 'x' },
     // A task done TODAY must not show up as yesterday's.
     { id: 'fy-t4', title: 'Should not appear as yesterday', source: 'mc', estimateMin: 20, done: true, doneAt: new Date().toISOString(), space: 'personal', list: 'backlog', category: 'admin', createdAt: 'x' },
   ]

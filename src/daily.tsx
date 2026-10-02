@@ -90,10 +90,13 @@ const SHOW_AT_ONCE = 8
 
 export function DailyReview() {
   const {
-    tasks, habits, habitLog, routines, routineLog, stepTicks, slips, focusSessions,
+    tasks, projects, habits, habitLog, routines, routineLog, stepTicks, slips, focusSessions,
     goals, plan, dailyDone, dailySkipped, dailyOpen, openDaily, closeDaily, markHabitOn, assertRoutineOn, logSlipOn,
     moveTasksToToday, deleteTask, setPage,
   } = useStore()
+  /* Where a task came from: its project when it has one (Off-Plate and Michael's
+     Corner are projects), otherwise its workspace when that is not Personal. */
+  const whereOf = (t: Task) => projects.find((p) => p.id === t.projectId)?.name ?? (t.space !== 'personal' ? SPACE_LABELS[t.space] : undefined)
 
   const today = localDateKey()
   const yday = yesterdayKey()
@@ -357,7 +360,7 @@ export function DailyReview() {
     ...froze.un.filter((h) => !fixed.has(`h:${h.id}`))
       .map((h) => ({ id: h.id, name: h.name, where: h.space !== 'personal' ? SPACE_LABELS[h.space] : undefined })),
     ...(left ?? leftOver).filter((t) => taskState(t.id) === null)
-      .map((t) => ({ id: t.id, name: t.title, where: t.space !== 'personal' ? SPACE_LABELS[t.space] : undefined })),
+      .map((t) => ({ id: t.id, name: t.title, where: whereOf(t) })),
   ]
   const primary = stage === 'close'
     ? { label: 'Start the day', run: () => leave(true) }
@@ -548,7 +551,7 @@ export function DailyReview() {
               {(left ?? leftOver).map((t) => {
                 const said = taskState(t.id)
                 const carried = t.carried ?? 0
-                const sub = [carried > 1 && `back ${carried} times`, t.space !== 'personal' && SPACE_LABELS[t.space]].filter(Boolean).join(' · ')
+                const sub = [carried > 1 && `back ${carried} times`, whereOf(t)].filter(Boolean).join(' · ')
                 return (
                   <li key={t.id} className={`dr-row${said ? ' is-fixed' : ''}`}>
                     <span className="dr-rowmain">

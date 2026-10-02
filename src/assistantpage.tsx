@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from './store'
 import { useCalendar } from './calendar'
-import { SpaceMark } from './ui'
+import { SpaceMark, TaskMark } from './ui'
 import { MORNING, SKILLS, type CardKind } from './assistant'
 import { stop as stopSpeech } from './speech'
 import {
@@ -180,7 +180,7 @@ function CardBody({ kind, limit }: { kind: CardKind; limit?: number }) {
               <div className={`as-row${t.done ? ' is-done' : ''}`} key={t.id} style={stagger(i)}>
                 <button className="checkbox" role="checkbox" aria-checked={!!t.done}
                   aria-label={t.title} onClick={() => toggleTask(t.id)}><Tick /></button>
-                <SpaceMark space={t.space} always />
+                <TaskMark task={t} always />
                 <span className="as-row-title">{t.title}</span>
                 {t.estimateMin > 0 && <span className="as-row-min mono">{fmtDuration(t.estimateMin)}</span>}
               </div>
@@ -203,7 +203,7 @@ function CardBody({ kind, limit }: { kind: CardKind; limit?: number }) {
             <div className="as-row" key={t.id} style={stagger(i)}>
               <button className="checkbox" role="checkbox" aria-checked={false}
                 aria-label={t.title} onClick={() => toggleTask(t.id)}><Tick /></button>
-              <SpaceMark space={t.space} always />
+              <TaskMark task={t} always />
               <span className="as-row-title">{t.title}</span>
               {t.carried ? <span className="as-row-min mono">back {t.carried}x</span> : null}
             </div>

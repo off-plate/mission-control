@@ -9,9 +9,16 @@
 import { useState } from 'react'
 import { MOCK_TASKS } from '../mock'
 import { rowKey } from '../sync-merge'
-import type { GoalTimeframe, PlanState, Project, SpaceId, Task, TimeSlot } from '../types'
+import { PROJECT_CORNER, PROJECT_OFFPLATE, type GoalTimeframe, type PlanState, type Project, type SpaceId, type Task, type TimeSlot } from '../types'
 import { goalPeriodKey, slotForTime, type GoalTf } from '../util'
 import { newId, todayKey } from './shared'
+
+/** A fresh install starts with the two businesses as projects inside Personal,
+ *  the same two foldSpaces creates for an existing account. */
+const DEFAULT_PROJECTS: Project[] = [
+  { id: PROJECT_OFFPLATE, name: 'Off-Plate', space: 'personal', createdAt: '' },
+  { id: PROJECT_CORNER, name: 'Michael\u2019s Corner', space: 'personal', createdAt: '' },
+]
 
 export function usePlannerSlice(
   persisted: { tasks?: Task[]; projects?: Project[] } | null,
@@ -26,7 +33,7 @@ export function usePlannerSlice(
 ) {
   const { armUndo, bury, digUp, openProjectId, setOpenProject, setPlan } = deps
   const [tasks, setTasks] = useState(persisted?.tasks ?? MOCK_TASKS)
-  const [projects, setProjects] = useState<Project[]>(persisted?.projects ?? [])
+  const [projects, setProjects] = useState<Project[]>(persisted?.projects ?? DEFAULT_PROJECTS)
 
   return {
     tasks, setTasks, projects, setProjects,

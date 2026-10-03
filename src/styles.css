@@ -11724,3 +11724,18 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 
 @media (max-width: 900px) { .dr-replay { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .dr-tl-item, .dr-big { animation: none !important; } .dr-goalbar i { transition: none; } }
+
+/* The opening screen is the whole overview now: numbers, timeline, what is
+   still open. No full screen for one sentence. */
+.dr-replay { grid-template-columns: minmax(240px, 300px) minmax(0, 1fr) minmax(250px, 320px); }
+.dr-openpanel { gap: var(--s2) !important; }
+.dr-openrow { display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: var(--s3); width: 100%; text-align: left; padding: var(--s3) var(--s3); border: 0; border-radius: var(--r-sm); background: none; font: inherit; color: var(--ink); cursor: pointer; transition: background var(--t-fast, 120ms); }
+.dr-openrow:hover:not(:disabled) { background: var(--accent-wash); }
+.dr-openrow:disabled { cursor: default; opacity: 0.55; }
+.dr-openrow b { font-family: var(--font-display); font-weight: 800; font-size: 2.4rem; line-height: 1; letter-spacing: -0.02em; min-width: 2ch; }
+.dr-openrow span { font-size: 1rem; color: var(--muted); }
+.dr-openrow svg { align-self: center; color: var(--muted); }
+.dr-empty { margin: 0; color: var(--muted); }
+.dr-stage:has(.dr-replay) h1 { margin-bottom: 0; }
+@media (max-width: 1100px) { .dr-replay { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .dr-tlpanel { grid-column: 1 / -1; order: 3; } }
+@media (max-width: 640px) { .dr-replay { grid-template-columns: 1fr; } }

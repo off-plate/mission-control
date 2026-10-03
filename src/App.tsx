@@ -554,6 +554,8 @@ export default function App() {
         >
           <span className="brand-mark" key={hud ? 'j' : 'm'}>{hud ? <Helmet lit /> : <Logo />}</span>
           <span className="brand-name" key={hud ? 'jn' : 'mn'}>{hud ? 'Jarvis' : 'Mission Control'}</span>
+          {/* Always shown, so he remembers the name is a switch. */}
+          <span className="brand-swap" aria-hidden="true"><Icon.Repeat size={13} /></span>
         </button>
         {/* The Zone is a room, not a tab: which workspace you were standing in
             when you walked in has nothing to do with the one thing running

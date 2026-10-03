@@ -11653,3 +11653,7 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 .brand.is-jarvis .brand-mark svg { color: var(--accent); }
 @keyframes brand-swap { from { opacity: 0; transform: translateY(4px); filter: blur(2px); } to { opacity: 1; transform: none; filter: none; } }
 @media (prefers-reduced-motion: reduce) { .brand-mark, .brand .brand-name { animation: none; } }
+.brand-swap { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-left: 2px; border: 1px solid var(--hairline-strong); border-radius: 6px; color: var(--muted); transition: color 140ms var(--ease), border-color 140ms var(--ease), transform 200ms var(--ease); }
+.brand:hover .brand-swap { color: var(--accent-text); border-color: var(--accent-text); transform: rotate(180deg); }
+.brand.is-jarvis .brand-swap { color: var(--accent); border-color: currentColor; }
+@media (prefers-reduced-motion: reduce) { .brand:hover .brand-swap { transform: none; } }

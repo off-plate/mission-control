@@ -160,6 +160,8 @@ export function DailyReview() {
       if (t.day !== yday || t.src?.startsWith('auto:') || seen.has(t.habitId)) continue
       const h = habits.find((x) => x.id === t.habitId)
       if (!h) continue
+      /* A routine's own habit is the routine itself: it shows once, as the routine. */
+      if (routinesYesterday.some((r) => r.habitId === h.id)) continue
       seen.add(t.habitId)
       const at = t.at ? Date.parse(t.at) : NaN
       out.push({ key: `h:${h.id}`, at: Number.isFinite(at) ? at : null, title: h.name, kind: 'habit' })
@@ -291,9 +293,9 @@ export function DailyReview() {
   /* Tasks he chose to leave on the list: answered, not carried, not dropped. */
   const [keep, setKeep] = useState<Set<string>>(new Set())
   useEffect(() => {
-    if (stage === 'unmarked' && !rows) setRows({ un: unmarked, half: halfDone, quit: quitting })
-    if (stage === 'left' && !left) setLeft(leftOver)
-  }, [stage, rows, left, unmarked, halfDone, quitting, leftOver])
+    if (dailyOpen && !rows) setRows({ un: unmarked, half: halfDone, quit: quitting })
+    if (dailyOpen && !left) setLeft(leftOver)
+  }, [dailyOpen, rows, left, unmarked, halfDone, quitting, leftOver])
 
   const hasKept = keptYesterday.length + routinesYesterday.length + doneYesterday.length > 0 || focusYesterday > 0
   const hasUnmarked = unmarked.length + halfDone.length + quitting.length > 0
@@ -412,341 +414,205 @@ export function DailyReview() {
     ...(left ?? leftOver).filter((t) => taskState(t.id) === null)
       .map((t) => ({ id: t.id, name: t.title, where: whereOf(t) })),
   ]
-  const primary = stage === 'close'
-    ? { label: 'Start the day', run: () => leave(true) }
-    : stage === 'ask'
-      ? { label: 'Go through it', run: next }
-      : { label: 'Next', run: next }
+  /* ---- one page (rebuilt 2026-10-04) -------------------------------------
+     No steps: everything yesterday asks of him is on one screen, built from the
+     Today room's own cards, so it looks like Mission Control and Jarvis
+     repaints it with the same tokens. */
+  const ydate = new Date(`${yday}T12:00:00`)
+  const habitsDue = keptYesterday.length + un.length + half.length
+  const keptPct = habitsDue ? Math.round(((keptYesterday.length + [...fixed.keys()].filter((k) => k.startsWith('h:') || k.startsWith('r:')).length) / habitsDue) * 100) : 100
+  /* Quarter hours that held something, for the dot strip. A focus block lights
+     every quarter it ran through, anything else its own quarter. */
+  const lit = new Map<number, 'focus' | 'busy'>()
+  for (const m of moments) {
+    if (m.at === null) continue
+    const d = new Date(m.at)
+    const q = d.getHours() * 4 + Math.floor(d.getMinutes() / 15)
+    if (m.kind === 'focus') {
+      const mins = focusSessions.find((f) => `f:${f.id}` === m.key)?.minutes ?? 15
+      for (let i = 0; i < Math.max(1, Math.round(mins / 15)); i++) lit.set(q - i, 'focus')
+    } else if (!lit.has(q)) lit.set(q, 'busy')
+  }
+  const tasksLeft = left ?? leftOver
+  const openTasks = tasksLeft.filter((t) => taskState(t.id) === null)
+  const unTotal = order.length
+  const unLeft = order.filter((k) => !fixed.has(k)).length
 
   return (
-    <div className="dr-screen" role="dialog" aria-modal="true" aria-label="Daily review">
-      <div className="dr-body" key={stage}>
-        <div className="dr-rail" aria-hidden="true">
-          {stages.slice(1).map((s, i) => <span key={s} className={`dr-seg${at - 1 >= i ? ' on' : ''}`} />)}
-        </div>
-
-        {stage === 'ask' && (
-          <div className="dr-stage">
-            <h1>Yesterday, as it happened.</h1>
-            <p className="dr-fact">{new Date(`${yday}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-            <div className="dr-replay">
-              <div className="panel dr-sum">
-                <span className="microcap">In numbers</span>
-                <div className="dr-bignums">
-                  {[
-                    { n: doneYesterday.length, l: doneYesterday.length === 1 ? 'task finished' : 'tasks finished' },
-                    { n: keptYesterday.length, l: keptYesterday.length === 1 ? 'habit kept' : 'habits kept' },
-                    { n: routinesYesterday.length, l: routinesYesterday.length === 1 ? 'routine run' : 'routines run' },
-                    { n: focusYesterday, l: 'focused', fmt: fmtDuration },
-                  ].map((x, i) => (
-                    <div key={x.l} className={`dr-big${x.n === 0 ? ' is-zero' : ''}`} style={{ animationDelay: `${i * 70}ms` }}>
-                      <b className="dr-bignum mono"><Tally n={x.n} at={160 + i * 80} fmt={x.fmt} /></b>
-                      <span>{x.l}</span>
-                    </div>
-                  ))}
-                </div>
+    <div className="dr-screen" role="dialog" aria-modal="true" aria-label="Yesterday">
+      <div className="dr-body">
+        <div className="troom dr-room">
+          <section className="troom-hero dr-hero">
+            <div className="tr-card tr-card--ink dr-yday">
+              <div>
+                <p className="tr-l">Yesterday</p>
+                <div className="tr-n dr-date">{ydate.getDate()}<span className="tr-mo">{ydate.toLocaleDateString('en-GB', { month: 'short' })}</span></div>
+                <p className="dr-wd">{ydate.toLocaleDateString('en-GB', { weekday: 'long' })}</p>
               </div>
-              <div className="panel dr-tlpanel">
-                <span className="microcap">Through the day</span>
-                {moments.length === 0 && <p className="dr-empty">Nothing was logged with a time yesterday.</p>}
-                <div className="dr-tl">
-                  {PARTS.map((part) => {
-                    const here = moments.filter((m) => partOf(m.at) === part)
-                    if (!here.length) return null
-                    return (
-                      <section key={part} className="dr-tl-part">
-                        <span className="dr-tl-label">{part}</span>
-                        <ul className="dr-tl-list">
-                          {here.map((m, i) => (
-                            <li key={m.key} className={`dr-tl-item k-${m.kind}`} style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
-                              <span className="dr-tl-time mono">{m.at !== null ? hm(m.at) : ''}</span>
-                              <span className="dr-check" aria-hidden="true"><Icon.Check size={12} strokeWidth={3.4} /></span>
-                              <span className="dr-tl-title" title={m.title}>{m.title}</span>
-                              <span className="dr-tl-kind">{m.sub ? `${m.sub}, ` : ''}{KIND_WORD[m.kind]}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </section>
-                    )
-                  })}
-                </div>
-              </div>
-              <div className="panel dr-openpanel">
-                <span className="microcap">Still open</span>
-                {[
-                  { n: unmarked.length + halfDone.length, l: 'not ticked yet', go: 'unmarked' as Stage },
-                  { n: liveGoals.length, l: liveGoals.length === 1 ? 'goal running' : 'goals running', go: 'goals' as Stage },
-                  { n: leftOver.length, l: leftOver.length === 1 ? 'unfinished task' : 'unfinished tasks', go: 'left' as Stage },
-                ].map((x) => (
-                  <button key={x.l} className="dr-openrow" disabled={x.n === 0 || !stages.includes(x.go)} onClick={() => setStage(x.go)}>
-                    <b className="mono">{x.n}</b>
-                    <span>{x.l}</span>
-                    {x.n > 0 && <Icon.ChevronRight size={16} />}
-                  </button>
-                ))}
+              <div className="dr-kept">
+                <p className="tr-l">Habits kept</p>
+                <div className="tr-n">{keptPct}<span className="tr-u">%</span></div>
+                <div className="tr-bar"><i style={{ width: `${keptPct}%` }} /></div>
               </div>
             </div>
-          </div>
-        )}
+            <div className="tr-card tr-tile">
+              <p className="tr-l">Finished</p>
+              <div className="tr-n"><Tally n={doneYesterday.length} at={120} /></div>
+            </div>
+            <div className="tr-card tr-tile">
+              <p className="tr-l">Habits</p>
+              <div className="tr-n"><Tally n={keptYesterday.length} at={180} /><i>/{habitsDue}</i></div>
+            </div>
+            <div className="tr-card tr-card--lime tr-tile">
+              <p className="tr-l">Focused</p>
+              <div className="tr-n">{focusYesterday > 0 ? fmtDuration(focusYesterday) : '0m'}</div>
+            </div>
+            <div className="tr-card tr-tile">
+              <p className="tr-l">Routines</p>
+              <div className="tr-n"><Tally n={routinesYesterday.length} at={240} /></div>
+            </div>
+          </section>
 
-        {stage === 'unmarked' && (
-          <div className="dr-stage">
-            <h1>Did you forget to tick anything?</h1>
-            <p className="dr-fact mono">{order.length} open from yesterday. Tap what you actually did.</p>
-            <ul className="dr-fix dr-cards">
-              {half.filter((x) => shows(`r:${x.r.id}`)).map(({ r, done, total }) => {
-                const k = `r:${r.id}`
-                return (
-                  <li key={k} className={`dr-row${fixed.has(k) ? ' is-fixed' : ''}`}>
-                    <span className="dr-rowmain">
-                      <span className="dr-rowname">{r.title}</span>
-                      <span className="dr-rowsub mono">
-                        {done} of {total}{r.space !== 'personal' && `, ${SPACE_LABELS[r.space]}`}
-                      </span>
-                    </span>
-                    {fixed.has(k)
-                      ? <span className="dr-said mono">{fixed.get(k)}</span>
-                      : (
-                        <button
-                          className="dr-tick"
-                          onClick={() => fix(k, 'marked', () => {
-                            /* Marks the folder's own habits for that day, and
-                               the folder's aggregate habit with them, so the
-                               streak and the rows agree afterwards. */
-                            for (const h of habits.filter((x) => x.folderId === r.id && !x.optional && !x.paused)) {
-                              markHabitOn(h.id, yday, true)
-                            }
-                            if (r.habitId) assertRoutineOn(r.habitId, yday, true)
-                          })}
-                        >
-                          I finished it
-                        </button>
-                      )}
-                  </li>
-                )
-              })}
-              {un.filter((h) => shows(`h:${h.id}`)).map((h) => {
-                const k = `h:${h.id}`
-                const driver = routineDriven.get(h.id)
-                const streak = currentStreak(habitLog, h.id, new Date(`${yday}T12:00:00`))
-                const sub = [
-                  /* Only facts he cannot read off the title. A run he is one day
-                     from losing is worth saying; "every day" under a habit
-                     called Meditation is not. */
-                  streak > 1 && `${streak} day run`,
-                  driver && driver.title !== h.name && `kept by ${driver.title}`,
-                  h.space !== 'personal' && SPACE_LABELS[h.space],
-                ].filter(Boolean).join(', ')
-                return (
-                  <li key={k} className={`dr-row${fixed.has(k) ? ' is-fixed' : ''}`}>
-                    <span className="dr-rowmain">
-                      <span className="dr-rowname">{h.name}</span>
-                      {sub && <span className="dr-rowsub mono">{sub}</span>}
-                    </span>
-                    {fixed.has(k)
-                      ? <span className="dr-said mono">{fixed.get(k)}</span>
-                      : (
-                        <button className="dr-tick" onClick={() => fix(k, 'marked', () => (driver ? assertRoutineOn(h.id, yday, true) : markHabitOn(h.id, yday, true)))}>
-                          I did it
-                        </button>
-                      )}
-                  </li>
-                )
-              })}
-              {hidden && (
-                <li className="dr-row dr-rest">
-                  <button className="dr-more-btn" onClick={() => setShowAll(true)}>
-                    Show the other {order.length - SHOW_AT_ONCE}
-                  </button>
-                </li>
-              )}
+          <section className="tr-card tr-day dr-day">
+            <div className="tr-head">
+              <p className="tr-l">Through the day</p>
+              <span className="tr-count-inline"><span className="tr-n">{moments.length}</span><span className="tr-l">{moments.length === 1 ? 'thing logged' : 'things logged'}</span></span>
+            </div>
+            <div className="tr-dots">
+              {Array.from({ length: 96 }, (_, i) => <span key={i} className={`tr-q${lit.get(i) === 'focus' ? ' is-focus' : lit.get(i) === 'busy' ? ' is-busy' : ' is-spent'}`} />)}
+            </div>
+            {moments.length > 0 ? (
+              <div className="dr-moments">
+                {moments.map((m) => (
+                  <div key={m.key} className={`dr-moment k-${m.kind}`} title={m.title}>
+                    <span className="dr-mt mono">{m.at !== null ? hm(m.at) : ''}</span>
+                    <span className="dr-mn">{m.title}</span>
+                    <span className="dr-mk">{m.sub ?? KIND_WORD[m.kind]}</span>
+                  </div>
+                ))}
+              </div>
+            ) : <p className="tr-empty">Nothing was logged with a time yesterday.</p>}
+          </section>
+
+          <section className="troom-lists dr-lists">
+            <div className="tr-card">
+              <div className="tr-head"><p className="tr-l">Forgot to tick?</p><span className="tr-n tr-sm">{unLeft}<i>/{unTotal}</i></span></div>
+              <div className="tr-rows">
+                {unTotal === 0 && quit.length === 0 && <p className="tr-empty">Every habit was ticked.</p>}
+                {half.map(({ r, done, total }) => {
+                  const k = `r:${r.id}`
+                  const on = fixed.has(k)
+                  return (
+                    <div className={`tr-r${on ? ' is-done' : ''}`} key={k}>
+                      <button className={`tr-box${on ? ' is-on' : ''}`} role="checkbox" aria-checked={on} aria-label={`I finished ${r.title}`} disabled={on}
+                        onClick={() => fix(k, 'marked', () => {
+                          for (const h of habits.filter((x) => x.folderId === r.id && !x.optional && !x.paused)) markHabitOn(h.id, yday, true)
+                          if (r.habitId) assertRoutineOn(r.habitId, yday, true)
+                        })} />
+                      <span className="tr-t">{r.title}</span>
+                      <span className="tr-age is-cool">{done}<u>/{total}</u></span>
+                    </div>
+                  )
+                })}
+                {un.map((h) => {
+                  const k = `h:${h.id}`
+                  const on = fixed.has(k)
+                  const driver = routineDriven.get(h.id)
+                  const streak = currentStreak(habitLog, h.id, new Date(`${yday}T12:00:00`))
+                  return (
+                    <div className={`tr-r${on ? ' is-done' : ''}`} key={k}>
+                      <button className={`tr-box${on ? ' is-on' : ''}`} role="checkbox" aria-checked={on} aria-label={`I did ${h.name}`} disabled={on}
+                        onClick={() => fix(k, 'marked', () => (driver ? assertRoutineOn(h.id, yday, true) : markHabitOn(h.id, yday, true)))} />
+                      <span className="tr-t">{h.name}</span>
+                      {streak > 1 && <span className="tr-age is-cool">{streak}<u>d</u></span>}
+                    </div>
+                  )
+                })}
+              </div>
               {quit.length > 0 && (
-                /* The names ARE the buttons. A single "I slipped" control beside
-                   "4 being quit" read as though it would mark all four, which is
-                   what he thought it did, and a control that looks like it might
-                   do that is not one you press to find out. Each name marks only
-                   itself, and the undo bar takes it straight back. */
-                <li className="dr-row dr-slips">
-                  <span className="dr-rowmain">
-                    <span className="dr-rowname">Slipped on any of these yesterday?</span>
-                    <span className="dr-slipwrap">
-                      {quit.map((h) => {
-                        const k = `s:${h.id}`
-                        return fixed.has(k)
-                          ? <span key={k} className="dr-said mono">{h.name}, logged</span>
-                          : (
-                            <button
-                              key={k} className="dr-tick is-slip"
-                              aria-label={`I slipped on ${h.name} yesterday`}
-                              onClick={() => fix(k, 'logged', () => logSlipOn(h.id, yday))}
-                            >
-                              {h.name}
-                            </button>
-                          )
-                      })}
-                    </span>
-                  </span>
-                </li>
+                <div className="dr-slips">
+                  <p className="tr-l">Slipped on any?</p>
+                  <div className="tr-chips">
+                    {quit.map((h) => {
+                      const k = `s:${h.id}`
+                      return fixed.has(k)
+                        ? <span key={k} className="tr-chip is-said">{h.name}, logged</span>
+                        : <button key={k} className="tr-chip" onClick={() => fix(k, 'logged', () => logSlipOn(h.id, yday))}>{h.name}</button>
+                    })}
+                  </div>
+                </div>
               )}
-            </ul>
-          </div>
-        )}
+            </div>
 
-        {stage === 'goals' && (
-          <div className="dr-stage">
-            <h1>Where your goals stand.</h1>
-            <p className="dr-fact mono">Goals that count a habit moved with what you just ticked. The rest you add to by hand.</p>
-            <ul className="dr-fix dr-cards">
-              {liveGoals.map((g) => {
-                const cur = goalCurrent(g, habits, habitLog, goalRange(g), slips, focusSessions)
-                const pct = Math.min(100, Math.round((cur / g.target) * 100))
-                const added = bumped.get(g.id) ?? 0
-                return (
-                  <li key={g.id} className={`dr-row dr-goal${added ? ' is-fixed' : ''}`}>
-                    <span className="dr-rowname">{g.name}</span>
-                    <span className="dr-goalnum">
-                      <b className="mono">{cur}</b><span className="mono">/ {g.target}{g.unit ? ` ${g.unit}` : ''}</span>
-                      <em className="mono">{pct}%</em>
-                    </span>
-                    <span className="dr-goalbar" aria-hidden="true"><i style={{ width: `${pct}%` }} /></span>
-                    {g.habitId
-                      ? <span className="dr-rowsub">Counts itself from its habit</span>
-                      : (
-                        <span className="dr-rowacts">
-                          <button className="dr-tick" onClick={() => { bumpGoal(g.id, 1); setBumped((m) => new Map(m).set(g.id, (m.get(g.id) ?? 0) + 1)) }}>+1 for yesterday</button>
-                          {added > 0 && <button className="dr-drop" onClick={() => { bumpGoal(g.id, -1); setBumped((m) => new Map(m).set(g.id, (m.get(g.id) ?? 1) - 1)) }}>Undo</button>}
-                        </span>
-                      )}
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
-        )}
+            <div className="tr-card">
+              <div className="tr-head">
+                <p className="tr-l">Did not get done</p>
+                <span className="tr-n tr-sm is-hot">{openTasks.length}</span>
+              </div>
+              <div className="tr-rows">
+                {tasksLeft.length === 0 && <p className="tr-empty">Nothing was left over.</p>}
+                {tasksLeft.map((t) => {
+                  const said = taskState(t.id)
+                  return (
+                    <div className={`tr-r dr-task${said ? ' is-done' : ''}`} key={t.id}>
+                      <span className="tr-t" title={t.title}>{t.title}</span>
+                      {said
+                        ? <span className="dr-said">{said}</span>
+                        : (
+                          <span className="dr-acts">
+                            <button className="dr-a is-go" onClick={() => moveTasksToToday([t.id])}>Today</button>
+                            <button className="dr-a" onClick={() => setKeep((k) => new Set(k).add(t.id))}>Keep</button>
+                            <button className="dr-a is-drop" onClick={() => deleteTask(t.id)}>Drop</button>
+                          </span>
+                        )}
+                    </div>
+                  )
+                })}
+              </div>
+              {openTasks.length > 1 && (
+                <button className="tr-start dr-carry" onClick={() => moveTasksToToday(openTasks.map((t) => t.id))}><span>Carry all {openTasks.length} to today</span></button>
+              )}
+            </div>
 
-        {stage === 'left' && (
-          <div className="dr-stage">
-            <h1>
-              {leftCount === 0 ? 'All of them answered.'
-                : leftCount === 1 ? 'Carry this one over to today?'
-                  : `Carry these ${leftCount} over to today?`}
-            </h1>
-            <p className="dr-fact mono">They did not get done yesterday. Today puts it on today's plan, the list keeps it for later.</p>
-            {leftCount > 1 && (
-              <button className="dr-tick dr-all" onClick={() => moveTasksToToday((left ?? leftOver).filter((t) => taskState(t.id) === null).map((t) => t.id))}>
-                Carry all {leftCount} to today
-              </button>
-            )}
-            <ul className="dr-fix dr-cards">
-              {(left ?? leftOver).map((t) => {
-                const said = taskState(t.id)
-                const carried = t.carried ?? 0
-                const sub = [carried > 1 && `back ${carried} times`, whereOf(t)].filter(Boolean).join(', ')
-                return (
-                  <li key={t.id} className={`dr-row${said ? ' is-fixed' : ''}`}>
-                    <span className="dr-rowmain">
-                      <span className="dr-rowname">{t.title}</span>
-                      {sub && <span className="dr-rowsub mono">{sub}</span>}
-                    </span>
-                    {said
-                      ? <span className="dr-said mono">{said}</span>
-                      : (
-                        <span className="dr-rowacts">
-                          <button className="dr-tick" onClick={() => moveTasksToToday([t.id])}>Today</button>
-                          <button className="dr-drop" onClick={() => setKeep((k) => new Set(k).add(t.id))}>Keep on list</button>
-                          <button className="dr-drop" onClick={() => deleteTask(t.id)}>Drop</button>
-                        </span>
-                      )}
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
-        )}
-
-        {stage === 'today' && (
-          <div className="dr-stage">
-            <h1>{todayTasks.length || events.length ? 'What is in front of you.' : 'Nothing planned.'}</h1>
-            {(events.length > 0 || todayTasks.length > 0) && (
-              <ul className="dr-list dr-plain">
-                {events.slice(0, 4).map((e, i) => (
-                  <li key={e.id} style={{ animationDelay: `${i * 50}ms` }}>
-                    <span className="mono dr-at">{e.start}</span> {e.title}
-                  </li>
-                ))}
-                {todayTasks.slice(0, 6).map((t, i) => (
-                  <li key={t.id} style={{ animationDelay: `${(Math.min(events.length, 4) + i) * 50}ms` }}>
-                    {t.title}
-                    {t.estimated && t.estimateMin > 0 && <span className="mono dr-at"> {fmtDuration(t.estimateMin)}</span>}
-                  </li>
-                ))}
-                {todayTasks.length > 6 && <li className="dr-more">and {todayTasks.length - 6} more</li>}
-              </ul>
-            )}
-            {goalsDue.length > 0 && (
-              <p className="dr-fact mono">
-                {goalsDue.length === 1
-                  ? `${goalsDue[0].name}, due ${goalsDue[0].deadline === today ? 'today' : 'this week'}`
-                  : `${goalsDue.length} goals due this week`}
-              </p>
-            )}
-          </div>
-        )}
-
-        {stage === 'close' && (
-          <div className="dr-stage">
-            {/* The headline may not argue with the line under it. If something
-                is still waiting, that IS the headline. */}
-            <h1>
-              {stillOpen > 0
-                ? `${stillOpen} still waiting.`
-                : putRight > 0 ? 'The record is straight.' : 'Nothing was hanging.'}
-            </h1>
-            {(putRight > 0 || owned > 0) && (
-              <p className="dr-fact mono">
-                {[putRight > 0 && `${putRight} put right`, owned > 0 && `${owned} owned up to`].filter(Boolean).join(', ')}
-              </p>
-            )}
-            {/* Naming a number he cannot act on is a vanity metric. If something
-                is waiting, it gets named, and the foot gets a way back to it. */}
-            {waiting.length > 0 && (
-              <ul className="dr-list dr-plain dr-waiting">
-                {waiting.slice(0, 5).map((w, i) => (
-                  <li key={w.id} style={{ animationDelay: `${i * 50}ms` }}>
-                    {w.name}
-                    {/* Two habits can be called the same thing in two
-                        workspaces, and on this screen nothing else tells
-                        them apart. */}
-                    {w.where && <span className="mono dr-at"> {w.where}</span>}
-                  </li>
-                ))}
-                {waiting.length > 5 && <li className="dr-more">and {waiting.length - 5} more</li>}
-              </ul>
-            )}
-          </div>
-        )}
+            <div className="tr-card">
+              <div className="tr-head"><p className="tr-l">Goals</p><span className="tr-n tr-sm">{liveGoals.length}</span></div>
+              <div className="tr-goals">
+                {liveGoals.length === 0 && <p className="tr-empty">No goal is running.</p>}
+                {liveGoals.map((g) => {
+                  const cur = goalCurrent(g, habits, habitLog, goalRange(g), slips, focusSessions)
+                  const pct = Math.min(100, Math.round((cur / g.target) * 100))
+                  const added = bumped.get(g.id) ?? 0
+                  return (
+                    <div className="tr-goal" key={g.id}>
+                      <div className="tr-goalhead">
+                        <span className="tr-t">{g.name}</span>
+                        <span className="tr-n tr-pct">{pct}%</span>
+                      </div>
+                      <div className="tr-bar"><i style={{ width: `${pct}%` }} /></div>
+                      <div className="dr-goalfoot">
+                        <p className="tr-l tr-of">{cur} of {g.target} {g.unit}</p>
+                        {!g.habitId && (
+                          <span className="dr-acts">
+                            {added > 0 && <button className="dr-a" onClick={() => { bumpGoal(g.id, -1); setBumped((m) => new Map(m).set(g.id, (m.get(g.id) ?? 1) - 1)) }}>Undo</button>}
+                            <button className="dr-a is-go" onClick={() => { bumpGoal(g.id, 1); setBumped((m) => new Map(m).set(g.id, (m.get(g.id) ?? 0) + 1)) }}>+1</button>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </section>
+        </div>
       </div>
 
-      {/* The forward action lives in the foot, so it is reachable at any list
-          length and on a landscape phone, where it used to sit underneath the
-          footer with Back printed across it. */}
       <div className="dr-foot">
-        {/* Leaving lives on the left with Back. Beside Next, on a 390px screen,
-            abandoning the review and advancing it were the same gesture. */}
-        <div className="dr-footleft">
-          {(at > 0 && stage !== 'close') || (stage === 'close' && stillOpen > 0)
-            ? <button className="dr-back" onClick={back}>Back</button>
-            : null}
-          {stage !== 'ask' && stage !== 'close' && <button className="dr-skip" onClick={() => leave(false)}>Close</button>}
-        </div>
-        <div className="dr-footacts">
-          {stage === 'ask' && <button className="dr-skip" onClick={() => leave(false)}>Not today</button>}
-          {stage === 'today' && (
-            <button className="dr-skip" onClick={() => { closeDaily(true); setPage('plan') }}>Open the plan</button>
-          )}
-          <button className="btn btn-primary dr-go" onClick={primary.run}>{primary.label}</button>
-        </div>
+        <button className="dr-skip" onClick={() => leave(false)}>Not now</button>
+        <span className="dr-footnote">{stillOpen > 0 ? `${stillOpen} still open` : 'All answered'}</span>
+        <button className="btn btn-primary dr-go" onClick={() => leave(true)}>Done, start the day</button>
       </div>
     </div>
   )
+
 }

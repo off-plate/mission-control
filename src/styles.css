@@ -11745,3 +11745,67 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 .dr-tl-time, .dr-tl-kind { line-height: 1.6; }
 .dr-tl-item .dr-check { margin-top: 2px; }
 .dr-tl-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.45; }
+
+/* ---- Yesterday, one page in the Today room's own cards (2026-10-04) ------- */
+.dr-screen { background: var(--a-paper, var(--bg)); }
+.dr-body { align-items: stretch; padding: var(--s5) var(--gutter) var(--s4); }
+.dr-room { margin-top: 0; width: 100%; padding: 0; background: none; }
+.dr-hero { grid-template-columns: minmax(0, 1.6fr) repeat(4, minmax(0, 0.5fr)); }
+.dr-yday { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--s5); }
+.dr-date { line-height: 0.95; }
+.dr-wd { margin: 6px 0 0; font-size: 1rem; font-weight: 600; opacity: 0.75; }
+.dr-kept { min-width: 150px; display: flex; flex-direction: column; gap: 8px; }
+.dr-kept .tr-n { font-size: clamp(2.4rem, 1.8rem + 1.6vw, 3.4rem); }
+.dr-day .tr-dots { margin-bottom: var(--s4); }
+.dr-day .tr-q.is-spent { opacity: 0.35; }
+.dr-moments { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+.dr-moment { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--a-r-xs, 8px); background: var(--t-card2); min-height: 48px; }
+.dr-moment.k-focus { background: var(--t-hotdim); }
+.dr-mt { font-weight: 800; font-size: 0.95rem; color: var(--t-ink); }
+.dr-mn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: var(--t-ink); }
+.dr-mk { font-size: 0.75rem; font-weight: 600; color: var(--t-dim); white-space: nowrap; }
+.dr-lists > .tr-card { min-height: 360px; max-height: 52vh; }
+.dr-lists .tr-r.is-done .tr-t { color: var(--t-dim); text-decoration: line-through; }
+.dr-task { gap: 10px; }
+.dr-task .tr-t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dr-acts { display: inline-flex; gap: 4px; flex: none; }
+.dr-a { border: 1px solid var(--t-line); background: var(--t-card); color: var(--t-ink); border-radius: var(--a-r-xs, 8px); padding: 6px 10px; font: 700 0.8125rem/1 var(--font-body); cursor: pointer; transition: background 120ms, border-color 120ms, transform 120ms; }
+.dr-a:hover { border-color: var(--t-ink); }
+.dr-a:active { transform: scale(0.96); }
+.dr-a.is-go { background: var(--t-hot); border-color: var(--t-hot); color: var(--a-on-ink, #12100C); }
+.dr-a.is-drop:hover { border-color: var(--alert); color: var(--alert); }
+.dr-said { font-size: 0.8125rem; font-weight: 700; color: var(--t-hot-text); white-space: nowrap; }
+.dr-carry { margin-top: auto; width: 100%; justify-content: center; }
+.dr-slips { margin-top: auto; padding-top: var(--s3); border-top: 1px solid var(--t-line); display: grid; gap: 8px; }
+.tr-chip.is-said { opacity: 0.6; }
+.dr-goalfoot { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.dr-foot { width: 100%; display: flex; align-items: center; gap: var(--s4); padding: var(--s3) var(--gutter) var(--s4); background: var(--a-paper, var(--bg)); border-top: 1px solid var(--a-line, var(--hairline)); }
+.dr-footnote { margin-left: auto; font-weight: 600; color: var(--muted); }
+@media (max-width: 1100px) { .dr-hero { grid-template-columns: repeat(2, minmax(0, 1fr)); } .dr-yday { grid-column: 1 / -1; } }
+@media (max-width: 900px) { .dr-lists { grid-template-columns: minmax(0, 1fr); } .dr-lists > .tr-card { max-height: none; min-height: 0; } }
+@media (max-width: 560px) { .dr-yday { flex-direction: column; align-items: flex-start; } .dr-footnote { display: none; } }
+.dr-day .tr-q.is-busy { opacity: 1; }
+/* Critic pass 1 (2026-10-04) */
+.dr-date { font-size: clamp(4rem, 2.8rem + 3.4vw, 6.2rem); margin-top: 12px; letter-spacing: -0.04em; }
+.dr-date .tr-mo { font-size: 0.34em; margin-left: 0.14em; letter-spacing: 0; }
+.dr-wd { font-size: 1.125rem; }
+.dr-lists { align-items: start; }
+.dr-lists > .tr-card { min-height: 0; max-height: 60vh; }
+.dr-carry { margin-top: 16px; }
+.dr-slips { margin-top: 16px; }
+.dr-body { padding-bottom: var(--s8, 64px); }
+.dr-mn { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3; }
+.dr-moments { grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.dr-task .tr-t { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.dr-task { align-items: center; }
+.dr-lists .tr-r .tr-t { flex: 1; min-width: 0; }
+.dr-lists .tr-r .tr-age { margin-left: auto; text-align: right; }
+.dr-a.is-go { color: #0E0E10; }
+.dr-skip { color: var(--muted); font-weight: 600; }
+.dr-room .tr-head .tr-n.tr-sm { font-size: 1.75rem; }
+.dr-day .tr-q.is-spent { opacity: 1; background: color-mix(in srgb, var(--t-ink) 9%, transparent); box-shadow: none; }
+@media (max-width: 560px) { .dr-go { flex: 1; min-height: 48px; } }
+.dr-lists { align-items: stretch; }
+.dr-yday .dr-date .tr-mo { color: inherit; opacity: 0.8; }
+@media (max-width: 560px) { .dr-day .tr-q.is-spent { background: color-mix(in srgb, var(--t-ink) 16%, transparent); } }
+@media (max-width: 560px) { .dr-day .tr-q { height: 8px; border-radius: 2px; } }

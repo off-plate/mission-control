@@ -300,7 +300,6 @@ export function DailyReview() {
   const hasLeft = leftOver.length > 0
   const live = useMemo<Stage[]>(() => [
     'ask',
-    ...(hasKept ? ['replay' as Stage] : []),
     ...(hasUnmarked ? ['unmarked' as Stage] : []),
     ...(liveGoals.length ? ['goals' as Stage] : []),
     ...(hasLeft ? ['left' as Stage] : []),
@@ -428,21 +427,8 @@ export function DailyReview() {
 
         {stage === 'ask' && (
           <div className="dr-stage">
-            <h1>Two minutes on yesterday?</h1>
-            {(hasUnmarked || hasLeft) && (
-              <p className="dr-fact mono">
-                {[
-                  hasUnmarked && `${unmarked.length + halfDone.length} unmarked`,
-                  hasLeft && `${leftOver.length} unfinished`,
-                ].filter(Boolean).join(', ')}
-              </p>
-            )}
-          </div>
-        )}
-
-        {stage === 'replay' && (
-          <div className="dr-stage">
             <h1>Yesterday, as it happened.</h1>
+            <p className="dr-fact">{new Date(`${yday}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
             <div className="dr-replay">
               <div className="panel dr-sum">
                 <span className="microcap">In numbers</span>
@@ -462,6 +448,7 @@ export function DailyReview() {
               </div>
               <div className="panel dr-tlpanel">
                 <span className="microcap">Through the day</span>
+                {moments.length === 0 && <p className="dr-empty">Nothing was logged with a time yesterday.</p>}
                 <div className="dr-tl">
                   {PARTS.map((part) => {
                     const here = moments.filter((m) => partOf(m.at) === part)
@@ -483,6 +470,20 @@ export function DailyReview() {
                     )
                   })}
                 </div>
+              </div>
+              <div className="panel dr-openpanel">
+                <span className="microcap">Still open</span>
+                {[
+                  { n: unmarked.length + halfDone.length, l: 'not ticked yet', go: 'unmarked' as Stage },
+                  { n: liveGoals.length, l: liveGoals.length === 1 ? 'goal running' : 'goals running', go: 'goals' as Stage },
+                  { n: leftOver.length, l: leftOver.length === 1 ? 'unfinished task' : 'unfinished tasks', go: 'left' as Stage },
+                ].map((x) => (
+                  <button key={x.l} className="dr-openrow" disabled={x.n === 0 || !stages.includes(x.go)} onClick={() => setStage(x.go)}>
+                    <b className="mono">{x.n}</b>
+                    <span>{x.l}</span>
+                    {x.n > 0 && <Icon.ChevronRight size={16} />}
+                  </button>
+                ))}
               </div>
             </div>
           </div>

@@ -563,7 +563,15 @@ function Composer({ initial, isNew, onSave, onDelete, onClose }: {
         onSubmit={(e) => { e.preventDefault(); save() }}
         onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); close() } }}
       >
-        <h2 className="ib-composer-h">{isNew ? 'New idea' : 'Edit idea'}</h2>
+        <div className="ib-composer-top">
+          <h2 className="ib-composer-h">{isNew ? 'New idea' : 'Edit idea'}</h2>
+          {!isNew && (
+            <button type="button" role="switch" aria-checked={done} className={`ib-done${done ? ' is-on' : ''}`} onClick={() => setDone(!done)}>
+              <Icon.CheckRing size={16} />
+              {done ? 'Done' : 'Mark done'}
+            </button>
+          )}
+        </div>
         <div className="ib-field">
           <input
             ref={titleRef}
@@ -602,12 +610,6 @@ function Composer({ initial, isNew, onSave, onDelete, onClose }: {
             />
           ))}
         </div>
-        {!isNew && (
-          <label className="ib-done-toggle">
-            <input type="checkbox" checked={done} onChange={(e) => setDone(e.target.checked)} />
-            Done
-          </label>
-        )}
         <div className="ib-actions">
           {onDelete && <button type="button" className="btn btn-ghost ib-delete" onClick={() => { dict.stopAll(); onDelete() }}>Delete</button>}
           <span className="ib-actions-grow" />

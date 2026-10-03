@@ -81,3 +81,22 @@ export interface Note {
   dev?: string
 }
 
+
+/* ---- Prompts ---------------------------------------------------------------
+   A prompt he wrote for Claude while the usage window was closed, kept until it
+   reopens. Sorted by the project he is building and the session it belongs to,
+   which are free text on purpose: they name Claude Code projects and sessions,
+   not Mission Control spaces. `sentAt` set means it went through. */
+export type PromptKind = 'Idea' | 'Bug' | 'Update' | 'Version'
+export const PROMPT_KINDS: PromptKind[] = ['Idea', 'Bug', 'Update', 'Version']
+
+export interface PromptItem {
+  id: string
+  project: string
+  session: string
+  kind: PromptKind
+  text: string
+  createdAt: number
+  updatedAt: number
+  sentAt?: number
+}

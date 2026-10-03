@@ -26,6 +26,7 @@ import { noteTitle, useNotesSlice } from './store/notes'
 import { useWidgetsSlice } from './store/widgets'
 import { useTwoLivesSlice } from './store/twolives'
 import { useIdeaBoardSlice, type IdeaBoardSlice } from './store/ideaboard'
+import { usePromptsSlice, type PromptsSlice } from './store/prompts'
 import { usePeopleSlice, type PeopleSlice } from './store/people'
 import { useGymSlice, type GymSlice } from './store/gym'
 import { useConnectionsSlice } from './store/connections'
@@ -62,6 +63,7 @@ import type {
   Goal,
   Idea,
   IdeaCard,
+  PromptItem,
   Person,
   PersonBond,
   PersonContact,
@@ -177,6 +179,8 @@ interface PersistedState {
   reelFiles?: Record<string, string>
   /** The Ideas board: every sticky and where he left it. */
   ideaBoard?: IdeaCard[]
+  /** Prompts waiting for the Claude usage window. */
+  prompts?: PromptItem[]
   /** The People page: who, who knows whom, and every logged contact. */
   people?: Person[]
   personBonds?: PersonBond[]
@@ -230,6 +234,11 @@ interface Store extends PersistedState {
   setReels: (list: string[]) => void
   tunes: string[]
   setTunes: (list: string[]) => void
+  prompts: PromptItem[]
+  addPrompt: PromptsSlice['addPrompt']
+  updatePrompt: PromptsSlice['updatePrompt']
+  setPromptSent: PromptsSlice['setPromptSent']
+  deletePrompt: PromptsSlice['deletePrompt']
   ideaBoard: IdeaCard[]
   addIdeaCard: IdeaBoardSlice['addIdeaCard']
   updateIdeaCard: IdeaBoardSlice['updateIdeaCard']
@@ -1270,7 +1279,7 @@ function routeFromHash(): { page: PageId; day: string | null } {
      consults from the app itself). Their addresses land on Today rather than
      on nothing, the same courtesy braindump gets above. */
   if (h === 'achievements' || h === 'money' || h === 'review' || h === 'stats' || h === 'brand') return { page: 'today', day: null }
-  const pages: PageId[] = ['today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting', 'settings', 'notes', 'bills', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant', 'timeline', 'skills', 'health', 'gym', 'longevity', 'watchless', 'ideas', 'people']
+  const pages: PageId[] = ['today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting', 'settings', 'notes', 'bills', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant', 'timeline', 'skills', 'health', 'gym', 'longevity', 'watchless', 'ideas', 'prompts', 'people']
   return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
 }
 
@@ -1352,6 +1361,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const { notes, setNotes, noteFolders, setNoteFolders } = notesSlice
   const ideaBoardSlice = useIdeaBoardSlice(persisted, { armUndo, bury, digUp })
   const { ideaBoard, setIdeaBoard } = ideaBoardSlice
+  const promptsSlice = usePromptsSlice(persisted, { armUndo, bury, digUp })
+  const { prompts, setPrompts } = promptsSlice
   const peopleSlice = usePeopleSlice(persisted, { armUndo, bury, digUp })
   const { people, setPeople, personBonds, setPersonBonds, personContacts, setPersonContacts } = peopleSlice
   const gymSlice = useGymSlice(persisted, { armUndo, bury, digUp })
@@ -1452,7 +1463,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     const state: PersistedState = {
       version: 3, spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
-      notes, noteFolders, ideaBoard, people, personBonds, personContacts, gymGoals,
+      notes, noteFolders, ideaBoard, prompts, people, personBonds, personContacts, gymGoals,
       savedAt: Date.now(), lastWrite: { dev: deviceId(), name: deviceName(), at: Date.now() },
       weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
       habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, spaceGuessed, graveyard, twoLives, reels, tunes, reelFiles, lastRollDay: lastRollDay ?? localDateKey(),
@@ -1483,7 +1494,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { outbox.push(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels, tunes, reelFiles, ideaBoard, people, personBonds, personContacts, gymGoals, activeFocus])
+  }, [spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels, tunes, reelFiles, ideaBoard, prompts, people, personBonds, personContacts, gymGoals, activeFocus])
 
   /* ---- state that arrived from somewhere else ----
      Another tab of this browser, or this account on another device. Merged in,
@@ -1522,6 +1533,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (Array.isArray(p.notes)) setNotes(p.notes)
     if (Array.isArray(p.noteFolders)) setNoteFolders(p.noteFolders)
     if (Array.isArray(p.ideaBoard)) setIdeaBoard(p.ideaBoard)
+    if (Array.isArray(p.prompts)) setPrompts(p.prompts)
     if (Array.isArray(p.people)) setPeople(p.people)
     if (Array.isArray(p.personBonds)) setPersonBonds(p.personBonds)
     if (Array.isArray(p.personContacts)) setPersonContacts(p.personContacts)
@@ -1932,6 +1944,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     keepNoteConflict: notesSlice.keepNoteConflict, dropNoteConflict: notesSlice.dropNoteConflict,
     addNoteFolder: notesSlice.addNoteFolder, renameNoteFolder: notesSlice.renameNoteFolder,
     deleteNoteFolder: notesSlice.deleteNoteFolder, renameNoteTag: notesSlice.renameNoteTag,
+    prompts, addPrompt: promptsSlice.addPrompt, updatePrompt: promptsSlice.updatePrompt, setPromptSent: promptsSlice.setPromptSent, deletePrompt: promptsSlice.deletePrompt,
     ideaBoard, addIdeaCard: ideaBoardSlice.addIdeaCard, updateIdeaCard: ideaBoardSlice.updateIdeaCard, deleteIdeaCard: ideaBoardSlice.deleteIdeaCard,
     people, personBonds, personContacts,
     addPerson: peopleSlice.addPerson, updatePerson: peopleSlice.updatePerson, deletePerson: peopleSlice.deletePerson,

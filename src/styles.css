@@ -11646,3 +11646,10 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
   .pb-quick .pb-quick-proj { flex: 1 1 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .pb-toast, .pb-tree button, .pb-row { transition: none; } }
+
+/* The brand is the Jarvis switch: mark and name swap with a short fade-up. */
+.brand-mark { display: inline-flex; }
+.brand-mark, .brand .brand-name { animation: brand-swap 220ms var(--ease) both; }
+.brand.is-jarvis .brand-mark svg { color: var(--accent); }
+@keyframes brand-swap { from { opacity: 0; transform: translateY(4px); filter: blur(2px); } to { opacity: 1; transform: none; filter: none; } }
+@media (prefers-reduced-motion: reduce) { .brand-mark, .brand .brand-name { animation: none; } }

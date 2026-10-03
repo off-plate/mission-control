@@ -540,16 +540,20 @@ export default function App() {
             here still reveals the row, since a keyboard user has no hover
             preview to rely on for orientation. */}
         <div className="topbar-left" onMouseEnter={nav.show}>
-        {/* The name is the way home, on his instruction: back to All and
-            Today from wherever he is. It was decoration before. */}
+        {/* The logo and name are the Jarvis switch (his ask, 2026-10-04): a click
+            turns the mark into the helmet and the name into Jarvis, and puts
+            the shell in HUD mode; a second click brings Mission Control back.
+            It replaced both the old "back to Today" link and the helmet button
+            that used to sit in the top right. */}
         <button
-          className="brand"
-          onClick={() => { setView('all'); setPage('today') }}
-          title="All workspaces, Today"
-          aria-label="Mission Control, back to Today"
+          className={`brand${hud ? ' is-jarvis' : ''}`}
+          onClick={() => setHud((v) => !v)}
+          aria-pressed={hud}
+          title={hud ? 'Back to Mission Control' : 'Jarvis mode'}
+          aria-label={hud ? 'Turn Jarvis mode off' : 'Turn Jarvis mode on'}
         >
-          <Logo />
-          <span className="brand-name">Mission Control</span>
+          <span className="brand-mark" key={hud ? 'j' : 'm'}>{hud ? <Helmet lit /> : <Logo />}</span>
+          <span className="brand-name" key={hud ? 'jn' : 'mn'}>{hud ? 'Jarvis' : 'Mission Control'}</span>
         </button>
         {/* The Zone is a room, not a tab: which workspace you were standing in
             when you walked in has nothing to do with the one thing running
@@ -608,26 +612,6 @@ export default function App() {
           >
             <Icon.Focus size={16} />
             <span className="btn-sq-label">Zone</span>
-          </button>
-          {/* The helmet. Its eyes light when the mode is on, so the icon IS the
-              state and the button needs no second indicator.
-
-              Dropped below 639px on his instruction (2026-09-06, mobile
-              review): HUD is an ambient always-on-display look for a screen
-              mounted somewhere, not a phone concept, and it was one of six
-              icons crowding an already tight row. Since HUD is per-device
-              (see the localStorage read above), a phone can never have it on
-              in the first place -- hiding the toggle loses no one a way back
-              to paper. */}
-          <button
-            className={`btn btn-ghost btn-helmet hide-phone${hud ? ' is-on' : ''}`}
-            onClick={() => setHud((v) => !v)}
-            aria-pressed={hud}
-            title={hud ? 'Back to paper' : 'HUD mode'}
-            aria-label={hud ? 'Turn HUD mode off' : 'Turn HUD mode on'}
-          >
-            <Helmet lit={hud} />
-            <span className="btn-sq-label">Jarvis</span>
           </button>
           {/* Jar (was Cookie Jar) and Bills, out of the floating dock and into
               the top right on his instruction (2026-09-27): Bills after People.

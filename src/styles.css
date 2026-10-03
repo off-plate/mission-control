@@ -10783,7 +10783,18 @@ iframe.tl-media { pointer-events: none; }
 .ib-list-item.is-done .ibd-dot { opacity: 0.45; }
 .ib-card.is-done { opacity: 0.5; }
 .ib-card.is-done .ib-card-title { text-decoration: line-through; }
-.ib-done-toggle { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: var(--text-sm); font-weight: 600; cursor: pointer; }
+.ib-composer-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ib-composer-top .ib-composer-h { margin-bottom: 0; }
+.ib-done {
+  flex: none; display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 14px;
+  border-radius: 10px; border: 1px solid rgba(38, 36, 29, 0.22); background: rgba(255, 255, 255, 0.55);
+  color: var(--ink); font: inherit; font-size: var(--text-sm); font-weight: 600; cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 120ms ease;
+}
+.ib-done:hover { background: rgba(255, 255, 255, 0.85); border-color: rgba(38, 36, 29, 0.4); }
+.ib-done:active { transform: scale(0.97); }
+.ib-done.is-on { background: var(--progress); border-color: var(--progress); color: #fff; }
+.ib-done:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .ib-list-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ib-list-row:hover { background: var(--surface-2); }
 .ib-list-row.is-on { background: var(--accent-wash); }

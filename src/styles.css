@@ -11808,4 +11808,4 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 .dr-lists { align-items: stretch; }
 .dr-yday .dr-date .tr-mo { color: inherit; opacity: 0.8; }
 @media (max-width: 560px) { .dr-day .tr-q.is-spent { background: color-mix(in srgb, var(--t-ink) 16%, transparent); } }
-@media (max-width: 560px) { .dr-day .tr-q { height: 8px; border-radius: 2px; } }
+@media (max-width: 560px) { .dr-day .tr-dots { grid-template-columns: repeat(24, minmax(0, 1fr)); row-gap: 6px; } .dr-day .tr-q { aspect-ratio: auto; height: 8px; border-radius: 2px; } }

@@ -35,7 +35,7 @@ import { useStore } from './store'
 import { SPACE_LABELS } from './mock'
 import { MOCK_AGENDA } from './exceptions'
 import { dayIndexOf, fmtDuration, goalPeriodKey, goalPeriodRange, localDateKey, type GoalTf } from './util'
-import { SPACES, currentStreak, focusMinutesOn, goalCurrent, isCounted, type AgendaEvent, type Goal, type HabitDef, type Routine, type Task } from './types'
+import { SPACES, currentStreak, daysClean, focusMinutesOn, goalCurrent, isCounted, type AgendaEvent, type Goal, type HabitDef, type Routine, type Task } from './types'
 import * as Icon from './icons'
 
 const yesterdayKey = () => {
@@ -437,6 +437,7 @@ export function DailyReview() {
     } else if (!lit.has(q)) lit.set(q, 'busy')
   }
   const tasksLeft = left ?? leftOver
+  const quits = habits.filter((h) => h.kind === 'break' && !h.paused && !h.archivedAt && (!h.quitSince || h.quitSince <= yday))
   const openTasks = tasksLeft.filter((t) => taskState(t.id) === null)
   const unTotal = order.length
   const unLeft = order.filter((k) => !fixed.has(k)).length
@@ -501,7 +502,7 @@ export function DailyReview() {
             <div className="tr-card">
               <div className="tr-head"><p className="tr-l">Forgot to tick?</p><span className="tr-n tr-sm">{unLeft}<i>/{unTotal}</i></span></div>
               <div className="tr-rows">
-                {unTotal === 0 && quit.length === 0 && <p className="tr-empty">Every habit was ticked.</p>}
+                {unTotal === 0 && <p className="tr-empty">Every habit was ticked.</p>}
                 {half.map(({ r, done, total }) => {
                   const k = `r:${r.id}`
                   const on = fixed.has(k)
@@ -532,19 +533,6 @@ export function DailyReview() {
                   )
                 })}
               </div>
-              {quit.length > 0 && (
-                <div className="dr-slips">
-                  <p className="tr-l">Slipped on any?</p>
-                  <div className="tr-chips">
-                    {quit.map((h) => {
-                      const k = `s:${h.id}`
-                      return fixed.has(k)
-                        ? <span key={k} className="tr-chip is-said">{h.name}, logged</span>
-                        : <button key={k} className="tr-chip" onClick={() => fix(k, 'logged', () => logSlipOn(h.id, yday))}>{h.name}</button>
-                    })}
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="tr-card">
@@ -578,6 +566,7 @@ export function DailyReview() {
             </div>
 
             <div className="tr-card">
+              <div className="dr-scroll">
               <div className="tr-head"><p className="tr-l">Goals</p><span className="tr-n tr-sm">{liveGoals.length}</span></div>
               <div className="tr-goals">
                 {liveGoals.length === 0 && <p className="tr-empty">No goal is running.</p>}
@@ -604,6 +593,31 @@ export function DailyReview() {
                     </div>
                   )
                 })}
+              </div>
+              <div className="tr-rule" />
+              <div className="tr-head"><p className="tr-l">Quitting</p><span className="tr-n tr-sm">{quits.length}</span></div>
+              <div className="tr-rows">
+                {quits.length === 0 && <p className="tr-empty">Nothing being quit.</p>}
+                {quits.map((h) => {
+                  const slipped = slips.some((x) => x.habitId === h.id && x.day === yday)
+                  const said = slipped ? 'slipped' : fixed.has(`c:${h.id}`) ? 'clean' : null
+                  const clean = daysClean(h, slips)
+                  return (
+                    <div className={`tr-r dr-task${said ? ' is-done' : ''}`} key={h.id}>
+                      <span className="tr-t">{h.name}</span>
+                      {clean !== null && !slipped && <span className="tr-age is-cool">{clean}<u>d</u></span>}
+                      {said
+                        ? <span className={`dr-said${slipped ? ' is-slip' : ''}`}>{said}</span>
+                        : (
+                          <span className="dr-acts">
+                            <button className="dr-a is-go" onClick={() => fix(`c:${h.id}`, 'clean', () => {})}>Clean</button>
+                            <button className="dr-a is-drop" onClick={() => fix(`s:${h.id}`, 'slipped', () => logSlipOn(h.id, yday))}>Slipped</button>
+                          </span>
+                        )}
+                    </div>
+                  )
+                })}
+              </div>
               </div>
             </div>
           </section>

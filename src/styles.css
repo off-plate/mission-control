@@ -11671,31 +11671,56 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 .brand-swap { transform: none !important; }
 .brand:hover .brand-swap { transform: none; }
 
-/* ---- The Replay (2026-10-04): yesterday as a timeline, then cards to answer.
-   Tokens only, so Jarvis mode repaints it like everything else. */
-.dr-tl { display: flex; flex-direction: column; gap: var(--s5); margin-top: var(--s5); max-height: 52vh; overflow-y: auto; padding-right: var(--s2); }
-.dr-tl-part { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: var(--s4); position: relative; }
-.dr-tl-part::before { content: ''; position: absolute; left: 96px; top: 6px; bottom: -14px; width: 2px; background: var(--hairline); transform: translateX(-50%); margin-left: calc(var(--s4) / 2 * -1); }
-.dr-tl-label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding-top: 10px; }
-.dr-tl-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s2); }
-.dr-tl-item { display: flex; align-items: center; gap: var(--s3); padding: 10px var(--s4); border-radius: 12px; background: var(--surface); border: 1px solid var(--hairline); animation: dr-rise var(--t-med) both; }
-.dr-tl-title { flex: 1; min-width: 0; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
-.dr-tl-meta { flex: none; font-size: 0.75rem; color: var(--faint); white-space: pre; }
-.dr-tl-item.k-focus .dr-check { background: var(--accent-text); }
+/* ---- The Replay (2026-10-04, rebuilt the same night) -------------------------
+   Full page width with the app's own gutters, the Habits page's panels, and
+   big display digits. Tokens only, so Jarvis repaints it with everything else. */
+.dr-body { padding-inline: var(--gutter); }
+.dr-stage, .dr-rail { width: 100%; max-width: none; }
+.dr-foot { width: 100%; padding-inline: var(--gutter); }
+.dr-stage h1 { max-width: 24ch; font-size: clamp(2.1rem, 1.4rem + 2.4vw, 3.4rem); }
+.dr-stage > .dr-fact { font-size: var(--text-base, 1rem); margin-bottom: var(--s5); }
 
-/* Open questions are dashed cards; answered ones turn solid and settle. */
-.dr-cards { gap: var(--s2); }
-.dr-cards .dr-row { border: 1.5px dashed var(--hairline-strong); border-radius: 12px; padding: var(--s3) var(--s4); min-height: 64px; background: var(--surface); }
-.dr-cards .dr-row:first-child { border-top: 1.5px dashed var(--hairline-strong); }
-.dr-cards .dr-row.is-fixed { border-style: solid; border-color: var(--progress); background: color-mix(in srgb, var(--progress) 8%, var(--surface)); }
-.dr-cards .dr-row.dr-slips { border-style: solid; border-color: var(--hairline); }
-.dr-all { align-self: flex-start; margin-top: var(--s4); }
-.dr-goalbar { display: block; height: 6px; border-radius: 3px; background: var(--hairline); overflow: hidden; margin: 6px 0 4px; max-width: 360px; }
-.dr-goalbar i { display: block; height: 100%; background: var(--progress); border-radius: 3px; transition: width var(--t-med) var(--ease); }
-@media (max-width: 640px) {
-  .dr-tl-part { grid-template-columns: 1fr; gap: var(--s2); }
-  .dr-tl-part::before { display: none; }
-  .dr-tl-label { padding-top: 0; }
-  .dr-tl { max-height: 58vh; }
+.dr-replay { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: var(--s5); align-items: start; margin-top: var(--s5); }
+.dr-replay .panel { display: flex; flex-direction: column; gap: var(--s4); padding: var(--s6); box-shadow: var(--a-lift); }
+.dr-bignums { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s6) var(--s4); }
+.dr-big { display: flex; flex-direction: column; gap: 4px; animation: dr-pop var(--t-slow) both; }
+.dr-bignum { font-family: var(--font-display); font-weight: 800; font-size: clamp(2.6rem, 2rem + 1.6vw, 3.6rem); line-height: 1; letter-spacing: -0.02em; color: var(--ink); }
+.dr-big span { font-size: 0.9375rem; color: var(--muted); }
+.dr-big.is-zero .dr-bignum { color: var(--faint); }
+.dr-tl { display: flex; flex-direction: column; gap: var(--s5); max-height: 56vh; overflow-y: auto; }
+.dr-tl-part { display: flex; flex-direction: column; gap: var(--s2); }
+.dr-tl-label { font-size: 0.8125rem; font-weight: 700; color: var(--ink); padding-bottom: var(--s1); border-bottom: 1px solid var(--hairline); }
+.dr-tl-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.dr-tl-item { display: grid; grid-template-columns: 52px 22px minmax(0, 1fr) auto; align-items: center; gap: var(--s3); padding: 12px 0; border-bottom: 1px solid var(--hairline); animation: dr-rise var(--t-med) both; }
+.dr-tl-item:last-child { border-bottom: 0; }
+.dr-tl-time { font-size: 0.9375rem; font-weight: 700; color: var(--ink); }
+.dr-tl-title { font-size: 1.0625rem; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
+.dr-tl-kind { font-size: 0.8125rem; color: var(--muted); white-space: nowrap; }
+.dr-tl-item .dr-check { width: 22px; height: 22px; border-radius: 6px; }
+
+/* Answer steps: a grid of the app's own panels, one card per question. */
+.dr-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: var(--s4); margin-top: var(--s5); }
+.dr-cards .dr-row, .dr-cards .dr-row:first-child {
+  flex-direction: column; align-items: stretch; justify-content: space-between; gap: var(--s4);
+  padding: var(--s5); min-height: 160px; border: 1px solid var(--hairline); border-radius: var(--r-md);
+  background: var(--surface); box-shadow: var(--a-lift); transition: border-color var(--t-med), background var(--t-med);
 }
-@media (prefers-reduced-motion: reduce) { .dr-tl-item { animation: none !important; } .dr-goalbar i { transition: none; } }
+.dr-cards .dr-rowname { font-size: 1.25rem; line-height: 1.25; }
+.dr-cards .dr-rowsub { font-size: 0.875rem; color: var(--muted); }
+.dr-cards .dr-rowacts { display: flex; gap: var(--s2); flex-wrap: wrap; }
+.dr-cards .dr-tick { flex: 1; text-align: center; padding-block: 12px; font-size: 0.9375rem; }
+.dr-cards > .dr-row > .dr-tick { width: 100%; }
+.dr-cards .dr-row.is-fixed { border-color: var(--progress); background: color-mix(in srgb, var(--progress) 9%, var(--surface)); box-shadow: none; }
+.dr-cards .dr-said { font-size: 0.875rem; font-weight: 700; align-self: flex-start; }
+.dr-cards .dr-slips { grid-column: 1 / -1; min-height: 0; }
+.dr-all { margin-top: var(--s2); padding: 12px 20px; }
+
+.dr-goalnum { display: flex; align-items: baseline; gap: var(--s2); }
+.dr-goalnum b { font-family: var(--font-display); font-weight: 800; font-size: 2.6rem; line-height: 1; letter-spacing: -0.02em; color: var(--ink); }
+.dr-goalnum span { font-size: 1rem; color: var(--muted); }
+.dr-goalnum em { font-style: normal; margin-left: var(--s2); font-size: 0.9375rem; font-weight: 700; color: var(--progress); }
+.dr-goalbar { display: block; height: 10px; border-radius: 5px; background: var(--hairline); overflow: hidden; }
+.dr-goalbar i { display: block; height: 100%; background: var(--progress); border-radius: 5px; transition: width var(--t-med) var(--ease); }
+
+@media (max-width: 900px) { .dr-replay { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .dr-tl-item, .dr-big { animation: none !important; } .dr-goalbar i { transition: none; } }

@@ -443,33 +443,47 @@ export function DailyReview() {
         {stage === 'replay' && (
           <div className="dr-stage">
             <h1>Yesterday, as it happened.</h1>
-            <p className="dr-fact mono">
-              {[
-                doneYesterday.length > 0 && `${doneYesterday.length} ${doneYesterday.length === 1 ? 'task' : 'tasks'} finished`,
-                keptYesterday.length > 0 && `${keptYesterday.length} ${keptYesterday.length === 1 ? 'habit' : 'habits'} kept`,
-                routinesYesterday.length > 0 && `${routinesYesterday.length} ${routinesYesterday.length === 1 ? 'routine' : 'routines'} run`,
-                focusYesterday > 0 && `${fmtDuration(focusYesterday)} focused`,
-              ].filter(Boolean).join(', ')}
-            </p>
-            <div className="dr-tl">
-              {PARTS.map((part) => {
-                const here = moments.filter((m) => partOf(m.at) === part)
-                if (!here.length) return null
-                return (
-                  <section key={part} className="dr-tl-part">
-                    <span className="dr-tl-label mono">{part}</span>
-                    <ul className="dr-tl-list">
-                      {here.map((m, i) => (
-                        <li key={m.key} className={`dr-tl-item k-${m.kind}`} style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
-                          <span className="dr-check" aria-hidden="true"><Icon.Check size={12} strokeWidth={3.4} /></span>
-                          <span className="dr-tl-title">{m.title}</span>
-                          <span className="dr-tl-meta mono">{[m.sub, KIND_WORD[m.kind], m.at !== null ? hm(m.at) : null].filter(Boolean).join('  ')}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
-                )
-              })}
+            <div className="dr-replay">
+              <div className="panel dr-sum">
+                <span className="microcap">In numbers</span>
+                <div className="dr-bignums">
+                  {[
+                    { n: doneYesterday.length, l: doneYesterday.length === 1 ? 'task finished' : 'tasks finished' },
+                    { n: keptYesterday.length, l: keptYesterday.length === 1 ? 'habit kept' : 'habits kept' },
+                    { n: routinesYesterday.length, l: routinesYesterday.length === 1 ? 'routine run' : 'routines run' },
+                    { n: focusYesterday, l: 'focused', fmt: fmtDuration },
+                  ].map((x, i) => (
+                    <div key={x.l} className={`dr-big${x.n === 0 ? ' is-zero' : ''}`} style={{ animationDelay: `${i * 70}ms` }}>
+                      <b className="dr-bignum mono"><Tally n={x.n} at={160 + i * 80} fmt={x.fmt} /></b>
+                      <span>{x.l}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="panel dr-tlpanel">
+                <span className="microcap">Through the day</span>
+                <div className="dr-tl">
+                  {PARTS.map((part) => {
+                    const here = moments.filter((m) => partOf(m.at) === part)
+                    if (!here.length) return null
+                    return (
+                      <section key={part} className="dr-tl-part">
+                        <span className="dr-tl-label">{part}</span>
+                        <ul className="dr-tl-list">
+                          {here.map((m, i) => (
+                            <li key={m.key} className={`dr-tl-item k-${m.kind}`} style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
+                              <span className="dr-tl-time mono">{m.at !== null ? hm(m.at) : ''}</span>
+                              <span className="dr-check" aria-hidden="true"><Icon.Check size={12} strokeWidth={3.4} /></span>
+                              <span className="dr-tl-title">{m.title}</span>
+                              <span className="dr-tl-kind">{m.sub ? `${m.sub}, ` : ''}{KIND_WORD[m.kind]}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -588,17 +602,17 @@ export function DailyReview() {
                 const added = bumped.get(g.id) ?? 0
                 return (
                   <li key={g.id} className={`dr-row dr-goal${added ? ' is-fixed' : ''}`}>
-                    <span className="dr-rowmain">
-                      <span className="dr-rowname">{g.name}</span>
-                      <span className="dr-goalbar" aria-hidden="true"><i style={{ width: `${pct}%` }} /></span>
-                      <span className="dr-rowsub mono">{cur} of {g.target}{g.unit ? ` ${g.unit}` : ''}{g.habitId ? ', counts itself' : ''}</span>
+                    <span className="dr-rowname">{g.name}</span>
+                    <span className="dr-goalnum">
+                      <b className="mono">{cur}</b><span className="mono">/ {g.target}{g.unit ? ` ${g.unit}` : ''}</span>
+                      <em className="mono">{pct}%</em>
                     </span>
+                    <span className="dr-goalbar" aria-hidden="true"><i style={{ width: `${pct}%` }} /></span>
                     {g.habitId
-                      ? <span className="dr-said mono">{pct}%</span>
+                      ? <span className="dr-rowsub">Counts itself from its habit</span>
                       : (
                         <span className="dr-rowacts">
-                          {added > 0 && <span className="dr-said mono">+{added}</span>}
-                          <button className="dr-tick" onClick={() => { bumpGoal(g.id, 1); setBumped((m) => new Map(m).set(g.id, (m.get(g.id) ?? 0) + 1)) }}>+1</button>
+                          <button className="dr-tick" onClick={() => { bumpGoal(g.id, 1); setBumped((m) => new Map(m).set(g.id, (m.get(g.id) ?? 0) + 1)) }}>+1 for yesterday</button>
                           {added > 0 && <button className="dr-drop" onClick={() => { bumpGoal(g.id, -1); setBumped((m) => new Map(m).set(g.id, (m.get(g.id) ?? 1) - 1)) }}>Undo</button>}
                         </span>
                       )}

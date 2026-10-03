@@ -401,6 +401,7 @@ const DARK_CHROME_PAGES: PageId[] = ['timeline', 'board', 'health', 'gym', 'long
 export default function App() {
   const { space, view, setView, page, setPage, tasks, routines, goals, habits, markHabitDaysOn, prompts } = useStore()
   const waitingPrompts = prompts.filter((p) => !p.sentAt).length
+  useEffect(() => { try { localStorage.setItem('mc-prompts-waiting', String(waitingPrompts)) } catch { /* private mode */ } }, [waitingPrompts])
   const promptsReady = usePromptWindow(waitingPrompts).state === 'open' && waitingPrompts > 0
   /* Projects live under Plan now (2026-09-15), so a project's Plan and the
      project directory both light Plan. This is ONLY the nav's own idea of

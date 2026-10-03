@@ -10,7 +10,7 @@
    while the app is open. The timer lives on this device and is not synced. */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from './store'
-import { activeModel, getAiKey, request, stripReasoning } from './ai'
+import { activeModel, getAiKey, getAiProvider, PROVIDERS, request, stripReasoning } from './ai'
 import { PROMPT_KINDS, type PromptItem, type PromptKind } from './types'
 import { Band, Empty } from './ui'
 import { usePromptWindow, WINDOW_MS } from './promptwindow'
@@ -33,9 +33,10 @@ function templatePolish(p: PromptItem): string {
   return `Context: ${p.project}. Read its CLAUDE.md first.\nTask: ${s}\nDone when: it works, the typecheck and build pass, and you list the files you touched.`
 }
 
-async function polishPrompt(p: PromptItem): Promise<{ text: string; ai: boolean }> {
+async function polishPrompt(p: PromptItem): Promise<{ text: string; ai: boolean; by: string }> {
+  const by = PROVIDERS[getAiProvider()].label
   const key = getAiKey()
-  if (!key) return { text: templatePolish(p), ai: false }
+  if (!key) return { text: templatePolish(p), ai: false, by }
   try {
     const res = await request({
       model: activeModel(),
@@ -45,12 +46,12 @@ async function polishPrompt(p: PromptItem): Promise<{ text: string; ai: boolean 
         { role: 'user', content: `Project: ${p.project}\nSession: ${p.session}\nKind: ${p.kind}\n\n${p.text}` },
       ],
     }, key)
-    if (!res.ok) return { text: templatePolish(p), ai: false }
+    if (!res.ok) return { text: templatePolish(p), ai: false, by }
     const data = await res.json()
     const out = stripReasoning(data.choices?.[0]?.message?.content ?? '').trim()
-    return out ? { text: out, ai: true } : { text: templatePolish(p), ai: false }
+    return out ? { text: out, ai: true, by } : { text: templatePolish(p), ai: false, by }
   } catch {
-    return { text: templatePolish(p), ai: false }
+    return { text: templatePolish(p), ai: false, by }
   }
 }
 
@@ -106,47 +107,60 @@ export function PromptsPage() {
 
   const hoursOn = win.state === 'hit' ? Math.min(5, Math.floor((WINDOW_MS - (win.leftMs ?? 0)) / 3600e3) + 1) : win.state === 'open' ? 5 : 0
 
+  const claudeLine = (() => {
+    const c = win.claude
+    if (win.state === 'hit' && win.hitAt) return `Resets about ${hhmm(win.hitAt + WINDOW_MS)}`
+    if (win.state === 'open') return `${open.length} waiting, oldest first`
+    if (c && c.resetsAt) return c.utilization >= 100 ? `At the limit. Resets about ${hhmm(c.resetsAt)}` : `${Math.round(c.utilization)}% of this window used. Resets about ${hhmm(c.resetsAt)}`
+    return 'Tap the moment Claude says you are out'
+  })()
+
   return (
     <div className="page">
       <Band title="Prompts" metrics={[{ v: String(open.length), k: 'waiting', tone: 'info' as const }]} />
       <div className="pb">
-        <aside className="pb-rail">
-          <div className={`pb-limit is-${win.state}`}>
+        <div className="pb-side">
+          <div className={`panel pb-limit is-${win.state}`}>
+            <span className="microcap">Claude window</span>
             <b className="mono pb-clock">{win.state === 'hit' ? clock(win.leftMs ?? 0) : win.state === 'open' ? 'Open again' : 'Window open'}</b>
             <div className="pb-hours" aria-hidden="true">{[0, 1, 2, 3, 4].map((n) => <i key={n} className={n < hoursOn ? 'on' : ''} />)}</div>
-            <div className="pb-limit-line">
-              {win.state === 'hit' && win.hitAt ? `Resets about ${hhmm(win.hitAt + WINDOW_MS)}` : win.state === 'open' ? `${open.length} waiting, oldest first` : 'Tap when Claude says you are out'}
-            </div>
+            <p className="pb-limit-line">{claudeLine}</p>
             {win.state === 'ready' && <button className="btn btn-primary" onClick={win.hit}>I hit the limit</button>}
-            {win.state === 'hit' && <button className="btn btn-ghost" onClick={win.clear}>Cancel</button>}
-            {win.state === 'open' && <button className="btn btn-primary" onClick={win.clear}>Done</button>}
+            {win.state === 'hit' && <button className="btn btn-quiet" onClick={win.clear}>Cancel the timer</button>}
+            {win.state === 'open' && <button className="btn" onClick={win.clear}>Done</button>}
           </div>
-          <nav className="pb-tree" aria-label="Projects and sessions">
+          <nav className="panel pb-tree" aria-label="Projects and sessions">
+            <span className="microcap">Projects</span>
             <button aria-current={!sel.project && !sel.sent ? 'true' : undefined} onClick={() => setSel({ project: null, session: null, sent: false })}>All prompts<span className="n mono">{open.length}</span></button>
             {tree.map((t) => (
-              <div key={t.project}>
+              <div key={t.project} className="pb-tree-group">
                 <button className="p" aria-current={sel.project === t.project && !sel.session && !sel.sent ? 'true' : undefined} onClick={() => setSel({ project: t.project, session: null, sent: false })}>{t.project}<span className="n mono">{t.n}</span></button>
                 {t.sessions.map(([s, n]) => (
                   <button key={s} className="s" aria-current={sel.project === t.project && sel.session === s && !sel.sent ? 'true' : undefined} onClick={() => setSel({ project: t.project, session: s, sent: false })}>{s}<span className="n mono">{n}</span></button>
                 ))}
               </div>
             ))}
-            <button className="p" aria-current={sel.sent ? 'true' : undefined} onClick={() => setSel({ project: null, session: null, sent: true })}>Sent<span className="n mono">{sentCount}</span></button>
+            <button className="sent" aria-current={sel.sent ? 'true' : undefined} onClick={() => setSel({ project: null, session: null, sent: true })}>Sent<span className="n mono">{sentCount}</span></button>
           </nav>
-        </aside>
+        </div>
 
-        <section className="pb-list">
+        <section className="panel pb-list">
+          <div className="pb-head"><span className="microcap">{sel.sent ? 'Sent' : sel.session ?? sel.project ?? 'Backlog'}</span><span className="pb-n mono">{rows.length}</span></div>
           <form className="pb-quick" onSubmit={(e) => { e.preventDefault(); addQuick() }}>
-            <input className="textinput" value={quick} onChange={(e) => setQuick(e.target.value)} placeholder={`Add to ${nodeName}, press Enter`} aria-label="Quick add a prompt" />
+            <input className="textinput" value={quick} onChange={(e) => setQuick(e.target.value)} placeholder="Write a prompt" aria-label="Write a prompt" />
             {!sel.project && <input className="textinput pb-quick-proj" list="pb-projects" value={quickProject} onChange={(e) => setQuickProject(e.target.value)} placeholder={projects[0] ?? 'Project'} aria-label="Project for the new prompt" />}
-            <button className="btn btn-quiet" type="submit" aria-label="Add prompt" disabled={!quick.trim()}><Icon.Plus size={16} /></button>
+            <button className="btn btn-primary" type="submit" disabled={!quick.trim()}>Add</button>
           </form>
           <datalist id="pb-projects">{projects.map((p) => <option key={p} value={p} />)}</datalist>
           <datalist id="pb-sessions">{sessions.map((s) => <option key={s} value={s} />)}</datalist>
           <div className="pb-rows">
-            {rows.length === 0 && (prompts.length === 0
-              ? <Empty>Nothing waiting. Write the next prompt while you think of it, and it waits here for the window.</Empty>
-              : <Empty>{sel.sent ? 'Nothing sent yet.' : 'Nothing in here. Type above and press Enter.'}</Empty>)}
+            {rows.length === 0 && (
+              <div className="pb-empty">
+                <Icon.DockPrompt size={26} />
+                <b>{sel.sent ? 'Nothing sent yet' : prompts.length === 0 ? 'Nothing waiting' : 'Nothing in here'}</b>
+                <span>{sel.sent ? 'Prompts you copy and mark sent land here.' : 'Write the next prompt while you think of it. It waits here for the window.'}</span>
+              </div>
+            )}
             {rows.map((p) => (
               <button key={p.id} className={`pb-row${p.sentAt ? ' is-sent' : ''}`} aria-current={active?.id === p.id ? 'true' : undefined} onClick={() => setActiveId(p.id)}>
                 <span className="pb-row-t">{p.text}</span>
@@ -156,11 +170,17 @@ export function PromptsPage() {
           </div>
         </section>
 
-        <section className="pb-detail">
+        <section className="panel pb-detail">
           {active
             ? <PromptEditor key={active.id} p={active} update={(patch) => updatePrompt(active.id, patch)} copyAndSend={() => copyAndSend(active)}
               putBack={() => setPromptSent(active.id, false)} remove={() => deletePrompt(active.id)} say={say} />
-            : <Empty>Pick a prompt to edit it.</Empty>}
+            : (
+              <div className="pb-empty">
+                <Icon.Edit size={26} />
+                <b>Pick a prompt</b>
+                <span>It opens here to edit, polish and copy.</span>
+              </div>
+            )}
         </section>
       </div>
       <div className={`pb-toast${note ? ' is-on' : ''}`} role="status">{note}</div>
@@ -179,7 +199,7 @@ function PromptEditor({ p, update, copyAndSend, putBack, remove, say }: {
   const [text, setText] = useState(p.text)
   const [project, setProject] = useState(p.project)
   const [session, setSession] = useState(p.session)
-  const [polished, setPolished] = useState<{ text: string; ai: boolean } | null>(null)
+  const [polished, setPolished] = useState<{ text: string; ai: boolean; by: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const latest = useRef({ text, p })
   latest.current = { text, p }
@@ -206,18 +226,21 @@ function PromptEditor({ p, update, copyAndSend, putBack, remove, say }: {
 
   return (
     <div className="pb-edit">
+      <div className="pb-head"><span className="microcap">Prompt</span><span className={`pb-kind k-${p.kind}`}>{p.kind}</span></div>
       <textarea className="textinput pb-text" value={text} onChange={(e) => setText(e.target.value)} aria-label="Prompt text" />
       <div className="pb-meta">
-        <input className="textinput" list="pb-projects" value={project} onChange={(e) => setProject(e.target.value)} onBlur={() => project.trim() !== p.project && update({ project })} aria-label="Project" />
-        <input className="textinput" list="pb-sessions" value={session} onChange={(e) => setSession(e.target.value)} onBlur={() => session.trim() !== p.session && update({ session })} aria-label="Session" />
-        <select className="textinput pb-kindsel" value={p.kind} onChange={(e) => update({ kind: e.target.value as PromptKind })} aria-label="Kind">
-          {PROMPT_KINDS.map((k) => <option key={k}>{k}</option>)}
-        </select>
+        <label className="pb-field"><span>Project</span><input className="textinput" list="pb-projects" value={project} onChange={(e) => setProject(e.target.value)} onBlur={() => project.trim() !== p.project && update({ project })} /></label>
+        <label className="pb-field"><span>Session</span><input className="textinput" list="pb-sessions" value={session} onChange={(e) => setSession(e.target.value)} onBlur={() => session.trim() !== p.session && update({ session })} /></label>
+        <label className="pb-field pb-field-kind"><span>Kind</span>
+          <select className="textinput" value={p.kind} onChange={(e) => update({ kind: e.target.value as PromptKind })}>
+            {PROMPT_KINDS.map((k) => <option key={k}>{k}</option>)}
+          </select>
+        </label>
       </div>
       {polished && (
         <div className="pb-polish">
           <div><h4>Yours</h4><pre>{text}</pre></div>
-          <div><h4>{polished.ai ? 'Polished' : 'Plain template'}</h4><pre>{polished.text}</pre></div>
+          <div><h4>{polished.ai ? `Polished by ${polished.by}` : 'Plain template'}</h4><pre>{polished.text}</pre></div>
           <div className="pb-polish-acts">
             <button className="btn btn-primary" onClick={() => { setText(polished.text); update({ text: polished.text }); setPolished(null) }}>Use this</button>
             <button className="btn btn-quiet" onClick={() => setPolished(null)}>Keep mine</button>

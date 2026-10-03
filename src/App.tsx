@@ -499,8 +499,14 @@ export default function App() {
     }
     measure()
     window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
-  }, [page])
+    /* The switcher also moves when the brand changes width (Mission Control and
+       Jarvis are different words in different faces), so watch it directly. */
+    const ro = new ResizeObserver(measure)
+    if (spacesRef.current) ro.observe(spacesRef.current)
+    const brand = topstickRef.current?.querySelector('.brand')
+    if (brand) ro.observe(brand)
+    return () => { window.removeEventListener('resize', measure); ro.disconnect() }
+  }, [page, hud])
 
   return (
     /* The Zone is a room, not a dark card: the shell carries the class so the

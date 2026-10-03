@@ -11670,3 +11670,32 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 .brand-swap svg { width: auto; height: 14px; }
 .brand-swap { transform: none !important; }
 .brand:hover .brand-swap { transform: none; }
+
+/* ---- The Replay (2026-10-04): yesterday as a timeline, then cards to answer.
+   Tokens only, so Jarvis mode repaints it like everything else. */
+.dr-tl { display: flex; flex-direction: column; gap: var(--s5); margin-top: var(--s5); max-height: 52vh; overflow-y: auto; padding-right: var(--s2); }
+.dr-tl-part { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: var(--s4); position: relative; }
+.dr-tl-part::before { content: ''; position: absolute; left: 96px; top: 6px; bottom: -14px; width: 2px; background: var(--hairline); transform: translateX(-50%); margin-left: calc(var(--s4) / 2 * -1); }
+.dr-tl-label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding-top: 10px; }
+.dr-tl-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s2); }
+.dr-tl-item { display: flex; align-items: center; gap: var(--s3); padding: 10px var(--s4); border-radius: 12px; background: var(--surface); border: 1px solid var(--hairline); animation: dr-rise var(--t-med) both; }
+.dr-tl-title { flex: 1; min-width: 0; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
+.dr-tl-meta { flex: none; font-size: 0.75rem; color: var(--faint); white-space: pre; }
+.dr-tl-item.k-focus .dr-check { background: var(--accent-text); }
+
+/* Open questions are dashed cards; answered ones turn solid and settle. */
+.dr-cards { gap: var(--s2); }
+.dr-cards .dr-row { border: 1.5px dashed var(--hairline-strong); border-radius: 12px; padding: var(--s3) var(--s4); min-height: 64px; background: var(--surface); }
+.dr-cards .dr-row:first-child { border-top: 1.5px dashed var(--hairline-strong); }
+.dr-cards .dr-row.is-fixed { border-style: solid; border-color: var(--progress); background: color-mix(in srgb, var(--progress) 8%, var(--surface)); }
+.dr-cards .dr-row.dr-slips { border-style: solid; border-color: var(--hairline); }
+.dr-all { align-self: flex-start; margin-top: var(--s4); }
+.dr-goalbar { display: block; height: 6px; border-radius: 3px; background: var(--hairline); overflow: hidden; margin: 6px 0 4px; max-width: 360px; }
+.dr-goalbar i { display: block; height: 100%; background: var(--progress); border-radius: 3px; transition: width var(--t-med) var(--ease); }
+@media (max-width: 640px) {
+  .dr-tl-part { grid-template-columns: 1fr; gap: var(--s2); }
+  .dr-tl-part::before { display: none; }
+  .dr-tl-label { padding-top: 0; }
+  .dr-tl { max-height: 58vh; }
+}
+@media (prefers-reduced-motion: reduce) { .dr-tl-item { animation: none !important; } .dr-goalbar i { transition: none; } }

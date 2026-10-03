@@ -34,8 +34,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from './store'
 import { SPACE_LABELS } from './mock'
 import { MOCK_AGENDA } from './exceptions'
-import { dayIndexOf, fmtDuration, localDateKey } from './util'
-import { SPACES, currentStreak, focusMinutesOn, isCounted, type AgendaEvent, type HabitDef, type Routine, type Task } from './types'
+import { dayIndexOf, fmtDuration, goalPeriodKey, goalPeriodRange, localDateKey, type GoalTf } from './util'
+import { SPACES, currentStreak, focusMinutesOn, goalCurrent, isCounted, type AgendaEvent, type Goal, type HabitDef, type Routine, type Task } from './types'
 import * as Icon from './icons'
 
 const yesterdayKey = () => {
@@ -83,7 +83,21 @@ function Tally({ n, at = 0, fmt }: { n: number; at?: number; fmt?: (v: number) =
   return <>{fmt ? fmt(shown) : shown}</>
 }
 
-type Stage = 'ask' | 'kept' | 'unmarked' | 'left' | 'today' | 'close'
+type Stage = 'ask' | 'replay' | 'unmarked' | 'goals' | 'left' | 'today' | 'close'
+
+/* THE REPLAY (his ask, 2026-10-04): yesterday in the order it happened, then
+   the steps that put it right. Anything with a clock time goes in its part of
+   the day; a routine run or a habit ticked later has no honest time and sits
+   under Anytime rather than being given one. */
+type Moment = { key: string; at: number | null; title: string; kind: 'habit' | 'routine' | 'task' | 'focus'; sub?: string }
+const PARTS = ['Morning', 'Midday', 'Afternoon', 'Evening', 'Late', 'Anytime'] as const
+const partOf = (at: number | null): typeof PARTS[number] => {
+  if (at === null) return 'Anytime'
+  const h = new Date(at).getHours()
+  return h < 5 ? 'Late' : h < 12 ? 'Morning' : h < 14 ? 'Midday' : h < 18 ? 'Afternoon' : 'Evening'
+}
+const hm = (at: number) => { const d = new Date(at); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` }
+const KIND_WORD: Record<Moment['kind'], string> = { habit: 'Habit', routine: 'Routine', task: 'Task', focus: 'Focus' }
 interface Half { r: Routine; done: number; total: number }
 
 const SHOW_AT_ONCE = 8
@@ -92,7 +106,7 @@ export function DailyReview() {
   const {
     tasks, projects, habits, habitLog, routines, routineLog, stepTicks, slips, focusSessions,
     goals, plan, dailyDone, dailySkipped, dailyOpen, openDaily, closeDaily, markHabitOn, assertRoutineOn, logSlipOn,
-    moveTasksToToday, deleteTask, setPage,
+    moveTasksToToday, deleteTask, setPage, bumpGoal,
   } = useStore()
   /* Where a task came from: its project when it has one (Off-Plate and Michael's
      Corner are projects), otherwise its workspace when that is not Personal. */
@@ -137,6 +151,39 @@ export function DailyReview() {
     () => SPACES.reduce((a, sp) => a + focusMinutesOn(focusSessions, yday, sp), 0),
     [focusSessions, yday],
   )
+
+  /* ---- yesterday, in order ---- */
+  const moments = useMemo<Moment[]>(() => {
+    const out: Moment[] = []
+    const seen = new Set<string>()
+    for (const t of habitLog) {
+      if (t.day !== yday || t.src?.startsWith('auto:') || seen.has(t.habitId)) continue
+      const h = habits.find((x) => x.id === t.habitId)
+      if (!h) continue
+      seen.add(t.habitId)
+      const at = t.at ? Date.parse(t.at) : NaN
+      out.push({ key: `h:${h.id}`, at: Number.isFinite(at) ? at : null, title: h.name, kind: 'habit' })
+    }
+    for (const r of routinesYesterday) out.push({ key: `r:${r.id}`, at: null, title: r.title, kind: 'routine' })
+    for (const t of doneYesterday) out.push({ key: `t:${t.id}`, at: t.doneAt ? Date.parse(t.doneAt) : null, title: t.title, kind: 'task', sub: whereOf(t) })
+    for (const f of focusSessions) {
+      if (f.day !== yday) continue
+      const at = f.at ? Date.parse(f.at) : NaN
+      out.push({ key: `f:${f.id}`, at: Number.isFinite(at) ? at : null, title: f.label || 'Focus block', kind: 'focus', sub: fmtDuration(f.minutes) })
+    }
+    return out.sort((a, b) => (a.at ?? Infinity) - (b.at ?? Infinity))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [habitLog, habits, routinesYesterday, doneYesterday, focusSessions, yday])
+
+  /* ---- goals whose period yesterday belongs to ---- */
+  const goalRange = (g: Goal) => { const tf = (g.timeframe ?? 'quarter') as GoalTf; return goalPeriodRange(tf, g.periodKey ?? goalPeriodKey(tf)) }
+  const liveGoals = useMemo(() => goals.filter((g) => {
+    if (g.closed || g.target <= 0) return false
+    const r = goalRange(g)
+    return r.from <= yday && yday <= r.to
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [goals, yday])
+  const [bumped, setBumped] = useState<Map<string, number>>(new Map())
 
   /* ---- what is not written down yet ---- */
   const routineDriven = useMemo(
@@ -232,7 +279,7 @@ export function DailyReview() {
   useEffect(() => {
     if (dailyOpen && !was.current) {
       setRows(null); setLeft(null); setWalk(null)
-      setFixed(new Map()); setShowAll(false); setStage('ask')
+      setFixed(new Map()); setShowAll(false); setStage('ask'); setBumped(new Map()); setKeep(new Set())
     }
     was.current = dailyOpen
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -241,6 +288,8 @@ export function DailyReview() {
   /* Frozen when the stage opens: rule 4. */
   const [rows, setRows] = useState<{ un: HabitDef[]; half: Half[]; quit: HabitDef[] } | null>(null)
   const [left, setLeft] = useState<Task[] | null>(null)
+  /* Tasks he chose to leave on the list: answered, not carried, not dropped. */
+  const [keep, setKeep] = useState<Set<string>>(new Set())
   useEffect(() => {
     if (stage === 'unmarked' && !rows) setRows({ un: unmarked, half: halfDone, quit: quitting })
     if (stage === 'left' && !left) setLeft(leftOver)
@@ -251,12 +300,13 @@ export function DailyReview() {
   const hasLeft = leftOver.length > 0
   const live = useMemo<Stage[]>(() => [
     'ask',
-    ...(hasKept ? ['kept' as Stage] : []),
+    ...(hasKept ? ['replay' as Stage] : []),
     ...(hasUnmarked ? ['unmarked' as Stage] : []),
+    ...(liveGoals.length ? ['goals' as Stage] : []),
     ...(hasLeft ? ['left' as Stage] : []),
     'today',
     'close',
-  ], [hasKept, hasUnmarked, hasLeft])
+  ], [hasKept, hasUnmarked, hasLeft, liveGoals.length])
   /* Frozen with the rows, and for the same reason. Live, the stage he was
      standing on fell out of the list the moment he answered its last row, the
      index went to -1 and Next handed him back the opening screen. Doing the
@@ -336,7 +386,8 @@ export function DailyReview() {
     const t = tasks.find((x) => x.id === id)
     if (!t) return 'dropped'
     if (t.done) return 'done'
-    if (t.list === 'today') return 'on today'
+    if (t.list === 'today') return 'carried to today'
+    if (keep.has(id)) return 'left on the list'
     return null
   }
   const stillOpen = (rows ? [...rows.half.map((x) => `r:${x.r.id}`), ...rows.un.map((h) => `h:${h.id}`)]
@@ -383,62 +434,51 @@ export function DailyReview() {
                 {[
                   hasUnmarked && `${unmarked.length + halfDone.length} unmarked`,
                   hasLeft && `${leftOver.length} unfinished`,
-                ].filter(Boolean).join(' · ')}
+                ].filter(Boolean).join(', ')}
               </p>
             )}
           </div>
         )}
 
-        {stage === 'kept' && (
+        {stage === 'replay' && (
           <div className="dr-stage">
-            <h1>What held.</h1>
-            <div className="dr-score">
-              {doneYesterday.length > 0 && (
-                <div className="dr-tile" style={{ animationDelay: '0ms' }}>
-                  <span className="dr-num"><Tally n={doneYesterday.length} at={180} /></span>
-                  <span className="dr-lab">{doneYesterday.length === 1 ? 'task finished' : 'tasks finished'}</span>
-                </div>
-              )}
-              {keptYesterday.length > 0 && (
-                <div className="dr-tile" style={{ animationDelay: '80ms' }}>
-                  <span className="dr-num"><Tally n={keptYesterday.length} at={260} /></span>
-                  <span className="dr-lab">{keptYesterday.length === 1 ? 'habit kept' : 'habits kept'}</span>
-                </div>
-              )}
-              {routinesYesterday.length > 0 && (
-                <div className="dr-tile" style={{ animationDelay: '160ms' }}>
-                  <span className="dr-num"><Tally n={routinesYesterday.length} at={340} /></span>
-                  <span className="dr-lab">{routinesYesterday.length === 1 ? 'routine run' : 'routines run'}</span>
-                </div>
-              )}
-              {focusYesterday > 0 && (
-                <div className="dr-tile" style={{ animationDelay: '240ms' }}>
-                  <span className="dr-num"><Tally n={focusYesterday} at={420} fmt={fmtDuration} /></span>
-                  <span className="dr-lab">focused</span>
-                </div>
-              )}
+            <h1>Yesterday, as it happened.</h1>
+            <p className="dr-fact mono">
+              {[
+                doneYesterday.length > 0 && `${doneYesterday.length} ${doneYesterday.length === 1 ? 'task' : 'tasks'} finished`,
+                keptYesterday.length > 0 && `${keptYesterday.length} ${keptYesterday.length === 1 ? 'habit' : 'habits'} kept`,
+                routinesYesterday.length > 0 && `${routinesYesterday.length} ${routinesYesterday.length === 1 ? 'routine' : 'routines'} run`,
+                focusYesterday > 0 && `${fmtDuration(focusYesterday)} focused`,
+              ].filter(Boolean).join(', ')}
+            </p>
+            <div className="dr-tl">
+              {PARTS.map((part) => {
+                const here = moments.filter((m) => partOf(m.at) === part)
+                if (!here.length) return null
+                return (
+                  <section key={part} className="dr-tl-part">
+                    <span className="dr-tl-label mono">{part}</span>
+                    <ul className="dr-tl-list">
+                      {here.map((m, i) => (
+                        <li key={m.key} className={`dr-tl-item k-${m.kind}`} style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
+                          <span className="dr-check" aria-hidden="true"><Icon.Check size={12} strokeWidth={3.4} /></span>
+                          <span className="dr-tl-title">{m.title}</span>
+                          <span className="dr-tl-meta mono">{[m.sub, KIND_WORD[m.kind], m.at !== null ? hm(m.at) : null].filter(Boolean).join('  ')}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )
+              })}
             </div>
-            {doneYesterday.length > 0 && (
-              <ul className="dr-list">
-                {doneYesterday.slice(0, 6).map((t, i) => (
-                  <li key={t.id} style={{ animationDelay: `${520 + i * 50}ms` }}>
-                    <span className="dr-check" aria-hidden="true">
-                      <Icon.Check size={12} strokeWidth={3.4} />
-                    </span>
-                    {t.title}
-                  </li>
-                ))}
-                {doneYesterday.length > 6 && <li className="dr-more">and {doneYesterday.length - 6} more</li>}
-              </ul>
-            )}
           </div>
         )}
 
         {stage === 'unmarked' && (
           <div className="dr-stage">
-            <h1>Anything you did and did not tick?</h1>
-            <p className="dr-fact mono">{order.length} from yesterday</p>
-            <ul className="dr-fix">
+            <h1>Did you forget to tick anything?</h1>
+            <p className="dr-fact mono">{order.length} open from yesterday. Tap what you actually did.</p>
+            <ul className="dr-fix dr-cards">
               {half.filter((x) => shows(`r:${x.r.id}`)).map(({ r, done, total }) => {
                 const k = `r:${r.id}`
                 return (
@@ -446,7 +486,7 @@ export function DailyReview() {
                     <span className="dr-rowmain">
                       <span className="dr-rowname">{r.title}</span>
                       <span className="dr-rowsub mono">
-                        {done} of {total}{r.space !== 'personal' && ` · ${SPACE_LABELS[r.space]}`}
+                        {done} of {total}{r.space !== 'personal' && `, ${SPACE_LABELS[r.space]}`}
                       </span>
                     </span>
                     {fixed.has(k)
@@ -481,7 +521,7 @@ export function DailyReview() {
                   streak > 1 && `${streak} day run`,
                   driver && driver.title !== h.name && `kept by ${driver.title}`,
                   h.space !== 'personal' && SPACE_LABELS[h.space],
-                ].filter(Boolean).join(' · ')
+                ].filter(Boolean).join(', ')
                 return (
                   <li key={k} className={`dr-row${fixed.has(k) ? ' is-fixed' : ''}`}>
                     <span className="dr-rowmain">
@@ -537,21 +577,56 @@ export function DailyReview() {
           </div>
         )}
 
+        {stage === 'goals' && (
+          <div className="dr-stage">
+            <h1>Where your goals stand.</h1>
+            <p className="dr-fact mono">Goals that count a habit moved with what you just ticked. The rest you add to by hand.</p>
+            <ul className="dr-fix dr-cards">
+              {liveGoals.map((g) => {
+                const cur = goalCurrent(g, habits, habitLog, goalRange(g), slips, focusSessions)
+                const pct = Math.min(100, Math.round((cur / g.target) * 100))
+                const added = bumped.get(g.id) ?? 0
+                return (
+                  <li key={g.id} className={`dr-row dr-goal${added ? ' is-fixed' : ''}`}>
+                    <span className="dr-rowmain">
+                      <span className="dr-rowname">{g.name}</span>
+                      <span className="dr-goalbar" aria-hidden="true"><i style={{ width: `${pct}%` }} /></span>
+                      <span className="dr-rowsub mono">{cur} of {g.target}{g.unit ? ` ${g.unit}` : ''}{g.habitId ? ', counts itself' : ''}</span>
+                    </span>
+                    {g.habitId
+                      ? <span className="dr-said mono">{pct}%</span>
+                      : (
+                        <span className="dr-rowacts">
+                          {added > 0 && <span className="dr-said mono">+{added}</span>}
+                          <button className="dr-tick" onClick={() => { bumpGoal(g.id, 1); setBumped((m) => new Map(m).set(g.id, (m.get(g.id) ?? 0) + 1)) }}>+1</button>
+                          {added > 0 && <button className="dr-drop" onClick={() => { bumpGoal(g.id, -1); setBumped((m) => new Map(m).set(g.id, (m.get(g.id) ?? 1) - 1)) }}>Undo</button>}
+                        </span>
+                      )}
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        )}
+
         {stage === 'left' && (
           <div className="dr-stage">
-            {/* It counts down as he answers, so zero needs its own sentence. It
-                used to reach "0 things did not get done." over three rows all
-                saying on today, which nobody would ever write. */}
             <h1>
-              {leftCount === 0 ? 'All of them handled.'
-                : leftCount === 1 ? 'One thing did not get done.'
-                  : `${leftCount} things did not get done.`}
+              {leftCount === 0 ? 'All of them answered.'
+                : leftCount === 1 ? 'Carry this one over to today?'
+                  : `Carry these ${leftCount} over to today?`}
             </h1>
-            <ul className="dr-fix">
+            <p className="dr-fact mono">They did not get done yesterday. Today puts it on today's plan, the list keeps it for later.</p>
+            {leftCount > 1 && (
+              <button className="dr-tick dr-all" onClick={() => moveTasksToToday((left ?? leftOver).filter((t) => taskState(t.id) === null).map((t) => t.id))}>
+                Carry all {leftCount} to today
+              </button>
+            )}
+            <ul className="dr-fix dr-cards">
               {(left ?? leftOver).map((t) => {
                 const said = taskState(t.id)
                 const carried = t.carried ?? 0
-                const sub = [carried > 1 && `back ${carried} times`, whereOf(t)].filter(Boolean).join(' · ')
+                const sub = [carried > 1 && `back ${carried} times`, whereOf(t)].filter(Boolean).join(', ')
                 return (
                   <li key={t.id} className={`dr-row${said ? ' is-fixed' : ''}`}>
                     <span className="dr-rowmain">
@@ -563,7 +638,8 @@ export function DailyReview() {
                       : (
                         <span className="dr-rowacts">
                           <button className="dr-tick" onClick={() => moveTasksToToday([t.id])}>Today</button>
-                          <button className="dr-drop" onClick={() => deleteTask(t.id)}>Drop it</button>
+                          <button className="dr-drop" onClick={() => setKeep((k) => new Set(k).add(t.id))}>Keep on list</button>
+                          <button className="dr-drop" onClick={() => deleteTask(t.id)}>Drop</button>
                         </span>
                       )}
                   </li>
@@ -613,7 +689,7 @@ export function DailyReview() {
             </h1>
             {(putRight > 0 || owned > 0) && (
               <p className="dr-fact mono">
-                {[putRight > 0 && `${putRight} put right`, owned > 0 && `${owned} owned up to`].filter(Boolean).join(' · ')}
+                {[putRight > 0 && `${putRight} put right`, owned > 0 && `${owned} owned up to`].filter(Boolean).join(', ')}
               </p>
             )}
             {/* Naming a number he cannot act on is a vanity metric. If something

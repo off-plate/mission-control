@@ -1254,6 +1254,21 @@ function loadPersisted(): PersistedState | null {
       p.habits = foldersFromRoutines(p.routines ?? [], p.habits ?? [], []).habits
     }
 
+    /* Sleep before 1 AM, 2026-10-04: his one health habit had never been made,
+       so the morning recap could not ask about it. Started yesterday so
+       tonight's recap asks. Fixed id, so two devices make the same row. */
+    if (!p.removedSeeds.includes('fix:sleep-habit')) {
+      p.removedSeeds.push('fix:sleep-habit')
+      if (!(p.habits ?? []).some((h) => h.id === 'h-sleep-1am' || h.name.trim().toLowerCase() === 'sleep before 1 am')) {
+        const y = new Date(); y.setDate(y.getDate() - 1)
+        const start = localDateKey(y)
+        p.habits = [...(p.habits ?? []), {
+          id: 'h-sleep-1am', space: 'personal', name: 'Sleep before 1 AM', daypart: 'evening', frequency: 'daily', kind: 'build',
+          startedOn: start, filledSince: start, days: [false, false, false, false, false, false, false], paused: false,
+        }]
+      }
+    }
+
     /* Two workspaces, 2026-10-02: Off-Plate and Michael's Corner are projects
        inside Personal now. Idempotent, so it also runs on states that arrive
        from a device still on the old bundle (see applyExternal). */

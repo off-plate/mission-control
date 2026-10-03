@@ -10763,6 +10763,27 @@ iframe.tl-media { pointer-events: none; }
   border: 0; border-radius: 7px; background: none; color: var(--ink);
   font: inherit; font-size: var(--text-sm); text-align: left; cursor: pointer;
 }
+.ib-list-item { display: flex; align-items: center; gap: 2px; }
+.ib-list-item .ib-list-row { flex: 1; min-width: 0; }
+.ib-check {
+  flex: none; width: 32px; height: 32px; display: grid; place-items: center; padding: 0;
+  border: 0; background: none; color: var(--surface); cursor: pointer; border-radius: 7px;
+}
+.ib-check::before {
+  content: ''; position: absolute; width: 16px; height: 16px; border-radius: 4px;
+  border: 1.5px solid var(--hairline-strong); background: var(--surface);
+}
+.ib-check { position: relative; }
+.ib-check > * { position: relative; }
+.ib-check[aria-checked="true"]::before { background: var(--progress); border-color: var(--progress); }
+.ib-check:hover::before { border-color: var(--ink); }
+.ib-check:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.ib-list-item.is-done .ib-list-row { color: var(--muted); }
+.ib-list-item.is-done .ib-list-row span { text-decoration: line-through; }
+.ib-list-item.is-done .ibd-dot { opacity: 0.45; }
+.ib-card.is-done { opacity: 0.5; }
+.ib-card.is-done .ib-card-title { text-decoration: line-through; }
+.ib-done-toggle { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: var(--text-sm); font-weight: 600; cursor: pointer; }
 .ib-list-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ib-list-row:hover { background: var(--surface-2); }
 .ib-list-row.is-on { background: var(--accent-wash); }

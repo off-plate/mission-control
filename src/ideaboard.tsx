@@ -70,6 +70,7 @@ const dayLabel = (ms: number) => new Date(ms).toLocaleDateString('en-GB', { day:
 
 export function IdeasPage() {
   const { ideaBoard, addIdeaCard, updateIdeaCard, deleteIdeaCard } = useStore()
+  const openCount = ideaBoard.filter((c) => !c.doneAt).length
   const boardRef = useRef<HTMLDivElement>(null)
   const [view, setView] = useState<View>(() => readView() ?? HOME)
   const viewRef = useRef(view)
@@ -357,7 +358,8 @@ export function IdeasPage() {
   }, [carry])
 
   const sorted = useMemo(() => [...ideaBoard].sort((a, b) => a.updatedAt - b.updatedAt), [ideaBoard])
-  const listed = useMemo(() => [...ideaBoard].sort((a, b) => b.createdAt - a.createdAt), [ideaBoard])
+  /* Open ideas newest first, then the done ones, so finished work sinks out of the way without leaving. */
+  const listed = useMemo(() => [...ideaBoard].sort((a, b) => Number(!!a.doneAt) - Number(!!b.doneAt) || b.createdAt - a.createdAt), [ideaBoard])
   const editing = draft?.mode === 'edit' ? ideaBoard.find((c) => c.id === draft.id) : undefined
   // Deleted on another device while open here: nothing left to edit.
   useEffect(() => { if (draft?.mode === 'edit' && !editing) setDraft(null) }, [draft, editing])
@@ -387,7 +389,7 @@ export function IdeasPage() {
                 key={c.id}
                 role="button"
                 tabIndex={0}
-                className={`ib-card${isHeld ? ' is-dragging' : ''}${flash === c.id ? ' is-flash' : ''}`}
+                className={`ib-card${isHeld ? ' is-dragging' : ''}${flash === c.id ? ' is-flash' : ''}${c.doneAt ? ' is-done' : ''}`}
                 style={{ transform: `translate(${pos.x}px, ${pos.y}px) rotate(${isHeld ? 0 : tilt(c.id)}deg)`, background: ideaBg(c.color) }}
                 onPointerDown={(e) => onCardDown(e, c)}
                 onPointerMove={onCardMove}
@@ -421,7 +423,7 @@ export function IdeasPage() {
         <div className="ib-bar" onPointerDown={stop} onDoubleClick={stop}>
           <div className="ib-bar-head">
             <h1 className="ib-h1">Ideas</h1>
-            <span className="ib-count">{ideaBoard.length}</span>
+            <span className="ib-count">{openCount}</span>
           </div>
           <div className="ib-pad" title="Click a sticky to pick it up, or drag it onto the board">
             {IDEA_COLORS.map((c) => (
@@ -457,7 +459,17 @@ export function IdeasPage() {
             {listed.length ? (
               <ul className="ib-list-rows">
                 {listed.map((c) => (
-                  <li key={c.id}>
+                  <li key={c.id} className={`ib-list-item${c.doneAt ? ' is-done' : ''}`}>
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={!!c.doneAt}
+                      aria-label={`${c.title}: done`}
+                      className="ib-check"
+                      onClick={() => updateIdeaCard(c.id, { done: !c.doneAt })}
+                    >
+                      {c.doneAt && <Icon.Check size={14} />}
+                    </button>
                     <button type="button" className={`ib-list-row${flash === c.id ? ' is-on' : ''}`} onClick={() => flyTo(c)} title={c.title}>
                       <i className="ibd-dot" style={{ background: ideaBg(c.color) }} aria-hidden="true" />
                       <span>{c.title}</span>
@@ -501,10 +513,10 @@ export function IdeasPage() {
           key={draft.mode === 'edit' ? draft.id : `new-${draft.x}-${draft.y}`}
           isNew={draft.mode === 'new'}
           initial={editing
-            ? { title: editing.title, body: editing.body, color: editing.color }
-            : { title: '', body: '', color: draft.mode === 'new' ? draft.color : 'amber' }}
+            ? { title: editing.title, body: editing.body, color: editing.color, done: !!editing.doneAt }
+            : { title: '', body: '', color: draft.mode === 'new' ? draft.color : 'amber', done: false }}
           onSave={(v) => {
-            if (draft.mode === 'new') addIdeaCard({ ...v, x: draft.x, y: draft.y })
+            if (draft.mode === 'new') addIdeaCard({ title: v.title, body: v.body, color: v.color, x: draft.x, y: draft.y })
             else updateIdeaCard(draft.id, v)
             setDraft(null)
           }}
@@ -516,7 +528,7 @@ export function IdeasPage() {
   )
 }
 
-type Values = { title: string; body: string; color: string }
+type Values = { title: string; body: string; color: string; done: boolean }
 
 function Composer({ initial, isNew, onSave, onDelete, onClose }: {
   initial: Values
@@ -528,6 +540,7 @@ function Composer({ initial, isNew, onSave, onDelete, onClose }: {
   const [title, setTitle] = useState(initial.title)
   const [body, setBody] = useState(initial.body)
   const [color, setColor] = useState(initial.color)
+  const [done, setDone] = useState(initial.done)
   const dict = useFieldDictation<'title' | 'body'>()
   const titleRef = useRef<HTMLInputElement>(null)
   useEffect(() => { titleRef.current?.focus() }, [])
@@ -535,7 +548,7 @@ function Composer({ initial, isNew, onSave, onDelete, onClose }: {
   const save = () => {
     if (!title.trim()) { titleRef.current?.focus(); return }
     dict.stopAll()
-    onSave({ title, body, color })
+    onSave({ title, body, color, done })
   }
   const close = () => { dict.stopAll(); onClose() }
 
@@ -589,6 +602,12 @@ function Composer({ initial, isNew, onSave, onDelete, onClose }: {
             />
           ))}
         </div>
+        {!isNew && (
+          <label className="ib-done-toggle">
+            <input type="checkbox" checked={done} onChange={(e) => setDone(e.target.checked)} />
+            Done
+          </label>
+        )}
         <div className="ib-actions">
           {onDelete && <button type="button" className="btn btn-ghost ib-delete" onClick={() => { dict.stopAll(); onDelete() }}>Delete</button>}
           <span className="ib-actions-grow" />

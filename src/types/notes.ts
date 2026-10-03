@@ -24,6 +24,8 @@ export interface IdeaCard {
   y: number
   createdAt: number
   updatedAt: number
+  /** When he marked it done. Absent means still open. A done idea stays on the board, faded. */
+  doneAt?: number
 }
 
 /* ---- Notes ----------------------------------------------------------------

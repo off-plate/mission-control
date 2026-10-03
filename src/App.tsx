@@ -1,5 +1,6 @@
 import { JarBar, JAR_PAGES } from './cookiejarnav'
 import { ProjectMark } from './ui'
+import { usePromptWindow } from './promptwindow'
 import { Component, Fragment, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { exceptionsFor, globalExceptions } from './exceptions'
@@ -25,6 +26,7 @@ import { ZonePage, useZoneDepth } from './zone'
    null, not a spinner -- these chunks are a few KB to 50KB on the same
    origin, well under what a loading state is worth drawing for (see the
    as-speak comment in styles.css making the same call for a slow reply). */
+const PromptsPage = lazy(() => import('./promptspage').then((m) => ({ default: m.PromptsPage })))
 const SettingsPage = lazy(() => import('./pages2').then((m) => ({ default: m.SettingsPage })))
 const DayPage = lazy(() => import('./day').then((m) => ({ default: m.DayPage })))
 /* The Jar's four sections load together, so switching between them never waits on a chunk. */
@@ -397,7 +399,9 @@ function PhonePages({ tabs, page, setPage }: {
 const DARK_CHROME_PAGES: PageId[] = ['timeline', 'board', 'health', 'gym', 'longevity']
 
 export default function App() {
-  const { space, view, setView, page, setPage, tasks, routines, goals, habits, markHabitDaysOn } = useStore()
+  const { space, view, setView, page, setPage, tasks, routines, goals, habits, markHabitDaysOn, prompts } = useStore()
+  const waitingPrompts = prompts.filter((p) => !p.sentAt).length
+  const promptsReady = usePromptWindow(waitingPrompts).state === 'open' && waitingPrompts > 0
   /* Projects live under Plan now (2026-09-15), so a project's Plan and the
      project directory both light Plan. This is ONLY the nav's own idea of
      which tab is lit; setPage below still gets the real page id. */
@@ -664,6 +668,20 @@ export default function App() {
             <Icon.DockBulb size={16} />
             <span className="btn-sq-label">Ideas</span>
           </button>
+          {/* Prompts, next to Notes (his ask, 2026-10-04): what to say to Claude
+              once the usage window is open again. The dot says it is open and
+              something is waiting. */}
+          <button
+            className={`btn btn-ghost btn-sq${page === 'prompts' ? ' is-on' : ''}`}
+            onClick={() => setPage('prompts')}
+            aria-pressed={page === 'prompts'}
+            aria-label="Prompts"
+            title="Prompts"
+          >
+            <Icon.DockPrompt size={16} />
+            <span className="btn-sq-label">Prompts</span>
+            {promptsReady && <span className="btn-sq-dot" aria-hidden="true" />}
+          </button>
           {/* People, next to Ideas on his instruction (2026-09-17). */}
           <button
             className={`btn btn-ghost btn-sq${page === 'people' ? ' is-on' : ''}`}
@@ -736,6 +754,7 @@ export default function App() {
         {page === 'longevity' && <LongevityPage />}
         {page === 'watchless' && <WatchlessPage />}
         {page === 'ideas' && <IdeasPage />}
+        {page === 'prompts' && <PromptsPage />}
         {page === 'people' && <PeoplePage />}
         {page === 'focus' && <FocusPage />}
         {page === 'board' && <BoardPage />}

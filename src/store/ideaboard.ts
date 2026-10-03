@@ -19,7 +19,7 @@ export const IDEA_W = 220
 export const IDEA_H = 150
 
 export type IdeaInput = { title: string; body?: string; color?: string; x: number; y: number }
-type IdeaPatch = Partial<Pick<IdeaCard, 'title' | 'body' | 'color' | 'x' | 'y'>>
+type IdeaPatch = Partial<Pick<IdeaCard, 'title' | 'body' | 'color' | 'x' | 'y'>> & { done?: boolean }
 
 export interface IdeaBoardSlice {
   ideaBoard: IdeaCard[]
@@ -46,9 +46,11 @@ export function useIdeaBoardSlice(
     return id
   }
 
-  const updateIdeaCard = (id: string, patch: IdeaPatch): void => setIdeaBoard((prev) => prev.map((c) => (c.id === id
+  const updateIdeaCard = (id: string, { done, ...patch }: IdeaPatch): void => setIdeaBoard((prev) => prev.map((c) => (c.id === id
     ? {
       ...c, ...patch,
+      /* Only a real change re-stamps it, so saving an untouched idea keeps its done date. */
+      ...(done !== undefined && done !== !!c.doneAt ? { doneAt: done ? Date.now() : undefined } : {}),
       ...(patch.title !== undefined ? { title: patch.title.trim() } : {}),
       ...(patch.body !== undefined ? { body: patch.body.trim() } : {}),
       ...(patch.x !== undefined ? { x: Math.round(patch.x) } : {}),

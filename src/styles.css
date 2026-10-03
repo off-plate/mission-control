@@ -7893,12 +7893,18 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 @media (prefers-reduced-motion: reduce) {
   .topstick > .nav, .topstick.is-navopen > .nav { transition: none; }
 }
-/* 1650px and wider there is room, so the page row stops being a drawer and sits
+/* 1400px and wider there is room, so the page row stops being a drawer and sits
    in the header beside the workspace switcher, always shown (his call,
    2026-10-03). Below that it is the hover drawer above, unchanged. Same
    height and shape as before; only where it sits. The vertical centre and the
    left edge are measured live in App.tsx, same as --nav-align. */
-@media (min-width: 1650px) {
+/* Between 1400 and 1650 the inline row leaves no room for the sync words, so
+   a healthy or local-only status is the dot alone (its title still says it).
+   Anything wrong, or news from another device, keeps its words. */
+@media (min-width: 1400px) and (max-width: 1649px) {
+  .syncpip[data-quiet] .syncpip-text, .syncpip:has(.status-dot.off) .syncpip-text { display: none; }
+}
+@media (min-width: 1400px) {
   .topstick > .nav, .topstick.is-navopen > .nav, .topstick:has(:focus-visible) > .nav {
     left: var(--nav-inline-left, var(--gutter));
     top: var(--nav-mid, 40px);

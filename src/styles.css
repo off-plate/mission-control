@@ -11809,3 +11809,5 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 .dr-yday .dr-date .tr-mo { color: inherit; opacity: 0.8; }
 @media (max-width: 560px) { .dr-day .tr-q.is-spent { background: color-mix(in srgb, var(--t-ink) 16%, transparent); } }
 @media (max-width: 560px) { .dr-day .tr-dots { grid-template-columns: repeat(24, minmax(0, 1fr)); row-gap: 6px; } .dr-day .tr-q { aspect-ratio: auto; height: 8px; border-radius: 2px; } }
+/* Goals scroll inside their card like the other two lists, never past it. */
+.dr-lists .tr-goals { flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px; }

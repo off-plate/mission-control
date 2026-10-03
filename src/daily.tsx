@@ -181,10 +181,13 @@ export function DailyReview() {
   const goalRange = (g: Goal) => { const tf = (g.timeframe ?? 'quarter') as GoalTf; return goalPeriodRange(tf, g.periodKey ?? goalPeriodKey(tf)) }
   const liveGoals = useMemo(() => goals.filter((g) => {
     if (g.closed || g.target <= 0) return false
+    /* Only goals he moves himself, and the ones about something he is quitting.
+       A goal that counts itself off a habit needs nothing from him here. */
+    if (g.habitId && habits.find((h) => h.id === g.habitId)?.kind !== 'break') return false
     const r = goalRange(g)
     return r.from <= yday && yday <= r.to
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [goals, yday])
+  }), [goals, habits, yday])
   const [bumped, setBumped] = useState<Map<string, number>>(new Map())
 
   /* ---- what is not written down yet ---- */

@@ -11739,3 +11739,9 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 .dr-stage:has(.dr-replay) h1 { margin-bottom: 0; }
 @media (max-width: 1100px) { .dr-replay { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .dr-tlpanel { grid-column: 1 / -1; order: 3; } }
 @media (max-width: 640px) { .dr-replay { grid-template-columns: 1fr; } }
+/* Long titles (a task can be a paragraph) stay two lines and keep the row's
+   time, check and label on its first line. Full text on hover. */
+.dr-tl-item { align-items: start; }
+.dr-tl-time, .dr-tl-kind { line-height: 1.6; }
+.dr-tl-item .dr-check { margin-top: 2px; }
+.dr-tl-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.45; }

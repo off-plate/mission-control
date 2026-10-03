@@ -461,7 +461,7 @@ export function DailyReview() {
                             <li key={m.key} className={`dr-tl-item k-${m.kind}`} style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
                               <span className="dr-tl-time mono">{m.at !== null ? hm(m.at) : ''}</span>
                               <span className="dr-check" aria-hidden="true"><Icon.Check size={12} strokeWidth={3.4} /></span>
-                              <span className="dr-tl-title">{m.title}</span>
+                              <span className="dr-tl-title" title={m.title}>{m.title}</span>
                               <span className="dr-tl-kind">{m.sub ? `${m.sub}, ` : ''}{KIND_WORD[m.kind]}</span>
                             </li>
                           ))}

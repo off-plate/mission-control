@@ -7,9 +7,27 @@ const HIT_KEY = 'mc-prompt-hit'
 const NOTIFIED_KEY = 'mc-prompt-notified'
 export const WINDOW_MS = 5 * 3600e3
 const EVT = 'mc-prompt-window'
+const CLAUDE_KEY = 'mc-claude-window'
+const CLAUDE_EVT = 'mc-claude-window'
+const FRESH_MS = 15 * 60e3
 
 const readHit = (): number | null => {
   try { const n = Number(localStorage.getItem(HIT_KEY)); return Number.isFinite(n) && n > 0 ? n : null } catch { return null }
+}
+
+/** What Tokenly (the Chrome extension) last read from Claude: how much of the
+ *  five-hour window is used and when it resets. Absent when the extension is not
+ *  installed, was not heard from for 15 minutes, or there is no live window. */
+export interface ClaudeWindow { utilization: number; resetsAt: number | null; fetchedAt: number }
+const readClaude = (): ClaudeWindow | null => {
+  try {
+    const raw = localStorage.getItem(CLAUDE_KEY)
+    if (!raw) return null
+    const j = JSON.parse(raw) as { utilization?: number; resetsAt?: string | null; fetchedAt?: number }
+    if (typeof j.utilization !== 'number' || typeof j.fetchedAt !== 'number' || Date.now() - j.fetchedAt > FRESH_MS) return null
+    const at = j.resetsAt ? Date.parse(j.resetsAt) : NaN
+    return { utilization: j.utilization, resetsAt: Number.isFinite(at) ? at : null, fetchedAt: j.fetchedAt }
+  } catch { return null }
 }
 
 export type WindowState = 'ready' | 'hit' | 'open'
@@ -19,11 +37,13 @@ export type WindowState = 'ready' | 'hit' | 'open'
 export function usePromptWindow(waiting: number) {
   const [hitAt, setHit] = useState<number | null>(readHit)
   const [now, setNow] = useState(Date.now())
+  const [claude, setClaude] = useState<ClaudeWindow | null>(readClaude)
   useEffect(() => {
-    const sync = () => setHit(readHit())
+    const sync = () => { setHit(readHit()); setClaude(readClaude()) }
     window.addEventListener(EVT, sync)
+    window.addEventListener(CLAUDE_EVT, sync)
     window.addEventListener('storage', sync)
-    return () => { window.removeEventListener(EVT, sync); window.removeEventListener('storage', sync) }
+    return () => { window.removeEventListener(EVT, sync); window.removeEventListener(CLAUDE_EVT, sync); window.removeEventListener('storage', sync) }
   }, [])
   useEffect(() => {
     if (!hitAt) return
@@ -51,10 +71,14 @@ export function usePromptWindow(waiting: number) {
     setHit(v)
     window.dispatchEvent(new Event(EVT))
   }
+  /* Tapping is still his confirmation that he is out. What changes is the end
+     of the timer: with Tokenly's reading it is the real reset time, not five
+     hours from the tap. */
   const hit = () => {
-    set(Date.now())
+    const exact = claude?.resetsAt && claude.resetsAt > Date.now() ? claude.resetsAt : null
+    set(exact ? exact - WINDOW_MS : Date.now())
     try { if ('Notification' in window && Notification.permission === 'default') void Notification.requestPermission() } catch { /* ignore */ }
   }
-  return { state, leftMs, hitAt, hit, clear: () => set(null) }
+  return { state, leftMs, hitAt, claude, hit, clear: () => set(null) }
 }
 

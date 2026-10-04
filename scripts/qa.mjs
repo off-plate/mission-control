@@ -57,7 +57,26 @@ if (SHOTS_DIR) {
 
 let pass = 0, fail = 0
 const errors = []
-const b = await chromium.launch()
+/* SILENT, ALWAYS (his report, 2026-10-04): for two months a voice on his Mac
+   would start a "test sentence" out of nowhere, cut off, make a noise and
+   stop, at random, with Mission Control closed, and it changed voice when
+   the app's default voice changed. It was this suite: a hidden Chromium on a
+   Mac still speaks through the system's own voice, and the voice steps read
+   a long sentence and interrupt it on purpose, whenever any session ran the
+   gate. Every page this suite opens now speaks at volume zero (the steps can
+   still see speechSynthesis.speaking) and plays no audio at all. */
+const b = await chromium.launch({ args: ['--mute-audio'] })
+const SILENCE = () => {
+  const s = window.speechSynthesis
+  if (!s) return
+  const speak = s.speak.bind(s)
+  s.speak = (u) => { u.volume = 0; speak(u) }
+}
+{
+  const newPage = b.newPage.bind(b), newContext = b.newContext.bind(b)
+  b.newPage = async (o) => { const p = await newPage(o); await p.addInitScript(SILENCE); return p }
+  b.newContext = async (o) => { const c = await newContext(o); await c.addInitScript(SILENCE); return c }
+}
 const page = await b.newPage({ viewport: { width: 1500, height: 1200 } })
 /* The Mundi Opus player embeds YouTube, and YouTube's own scripts complain
    from inside that iframe about things this page neither caused nor can fix:

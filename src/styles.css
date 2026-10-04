@@ -582,13 +582,6 @@ main { padding-inline: var(--gutter); }
 .goalcat-habits { background: var(--cat-quick); }
 
 /* goals: cards inside timeframe columns */
-.goal-col .goal-card { padding: var(--s3) 0; border-bottom: 1px solid var(--hairline); }
-.goal-col .goal-card:last-child { border-bottom: none; }
-.goal-card .goal-line { display: flex; align-items: center; gap: var(--s2); font-size: var(--text-sm); font-weight: 500; }
-.goal-card .goal-line .grow { flex: 1; min-width: 0; }
-.goal-card .bar { margin-top: var(--s2); }
-.goal-foot { display: flex; align-items: center; gap: 4px; margin-top: var(--s2); }
-.goal-note { font-size: var(--text-xs); color: var(--faint); margin-top: 4px; }
 .est-vs-actual { font-size: 0.75rem; color: var(--info); white-space: nowrap; }
 .est-vs-actual b { font-weight: 600; }
 
@@ -599,7 +592,6 @@ main { padding-inline: var(--gutter); }
   border: 1px solid var(--hairline-strong); font-family: var(--font-mono);
   font-size: 0.625rem; letter-spacing: 0.04em; color: var(--muted); vertical-align: 2px;
 }
-.savings-months { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.625rem; color: var(--faint); margin-top: 2px; }
 
 /* ---------- Pomodoro (global) ---------- */
 /* A quiet edge, not four pulsing corner glows. The glow version was the
@@ -835,7 +827,6 @@ body:has(.shell.in-zone) .dock-more-cell { color: var(--z-bone); }
 body:has(.shell.in-zone) .dock-more-cell:hover { background: rgba(237, 230, 216, 0.08); color: var(--z-bone); }
 body:has(.shell.in-zone) .dock-more-cell-icon { background: var(--z-deep); color: var(--z-bone); }
 
-
 /* The stack: labelled pills growing upward from the FAB. .dock's own gap
    (above) now supplies the space between the stack and the FAB below it,
    so the FAB's size and position never change between the closed and open
@@ -893,7 +884,6 @@ body:has(.shell.in-zone) .dock-more-cell-icon { background: var(--z-deep); color
    rule above (dock-item-in); only the exit needs its own trigger, since
    nothing here ever gets .dock-menu's sibling context (.dock.is-closing /
    .dock.is-open) to read animation state off of. */
-.dock-toast.is-hiding .dock-item { animation: dock-item-out 140ms var(--ease) forwards; }
 .dock-item-label {
   display: inline-flex; align-items: center; gap: 8px;
   background: var(--surface); border: 1px solid var(--hairline-strong); color: var(--ink);
@@ -1045,24 +1035,6 @@ body:has(.shell.is-hud) .dock-more-cell-icon { border-radius: var(--a-r-sm); }
   background: none; border: none; box-shadow: none; border-radius: 0;
   padding: var(--s2) var(--s4) var(--s4);
 }
-
-/* The note face is its own full head row now, not content sitting under a
-   near-empty facebar -- his correction (2026-09-01). Same padding/border
-   .dock-facebar used, since this row now does that row's job too (the
-   switch/close controls arrive as dockControls, folded in at the end). */
-.notedock-panel { display: flex; flex-direction: column; min-height: 0; flex: 1; }
-.notedock-head { flex: none; display: flex; align-items: center; gap: 6px; padding: var(--s2); border-bottom: 1px solid var(--hairline); }
-/* The app's own dropdown (Select, from ui.tsx), not the OS one the native
-   <select> here used to open -- his rule: nothing here is ever a default
-   macOS control. Trimmed down from Select's normal 40px form-field size to
-   sit at the same visual weight as the icon buttons beside it in this one
-   compact row. */
-.notedock-switch { flex: 1; min-width: 0; }
-.notedock-switch .dd-trigger {
-  min-height: 30px; border: none; background: none; padding: 0 var(--s1);
-  font-weight: 600; font-size: var(--text-sm); color: var(--ink);
-}
-.notedock-switch .dd-trigger:hover:not(:disabled) { color: var(--accent-text); }
 /* The real .btn-primary fill (see the note in notedock.tsx for why it isn't
    a hand-rolled background) -- this override is sizing only, to sit at the
    same 30px weight as the icon buttons and the switcher beside it in this
@@ -1073,28 +1045,6 @@ body:has(.shell.is-hud) .dock-more-cell-icon { border-radius: var(--a-r-sm); }
 .dock-face .dock-open-btn {
   flex: none; min-height: 30px; padding: 0 var(--s3); gap: 5px; white-space: nowrap;
 }
-.notedock-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 var(--s4) var(--s4); }
-/* His report: a long note wouldn't scroll at all. The shared <Editor> (see
-   notes.tsx) brings its own .nt-panebody wrapper along -- on the real Notes
-   page that IS the scroll container, and overscroll-behavior:contain there
-   is deliberate, stopping a scroll at its end from also dragging the whole
-   page. In the dock it's nested one level deeper, inside .notedock-body
-   (the actual scrollable region here), with no height of its own to fill --
-   its content and its own box are the same height, so it never scrolls
-   itself, but `contain` still blocks the wheel event from chaining up to
-   the container that DOES need it. Confirmed directly: scrollTop moved fine
-   on a direct assignment, proving .notedock-body itself was never the
-   problem, but a real wheel event over the text left it at 0. Neutralised
-   here, scoped to the dock only -- the standalone Notes page keeps its own
-   .nt-panebody scrolling exactly as before. */
-.notedock-body .nt-panebody { overflow-y: visible; overscroll-behavior: auto; }
-.notedock-title {
-  width: 100%; border: none; background: none; resize: none;
-  font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg);
-  color: var(--ink); padding: 0; margin-bottom: var(--s2);
-}
-.notedock-title:focus { outline: none; }
-.notedock-empty { color: var(--muted); font-size: var(--text-sm); padding: 0 var(--s4); }
 
 /* THE BILLS SUMMARY, same shell shape as Note's own head/body split. His
    scope call (2026-09-02): a glance, not the page -- free-to-spend and where
@@ -1108,40 +1058,6 @@ body:has(.shell.is-hud) .dock-more-cell-icon { border-radius: var(--a-r-sm); }
 .billsdock-head { flex: none; display: flex; align-items: center; gap: 6px; padding: var(--s2); border-bottom: 1px solid var(--hairline); }
 .billsdock-title { flex: 1; min-width: 0; font-weight: 600; font-size: var(--text-sm); color: var(--muted); padding: 0 var(--s1); }
 .billsdock-body { flex: 1; min-height: 0; overflow-y: auto; padding: var(--s2) var(--s4) var(--s4); }
-.billsdock-empty { color: var(--muted); font-size: var(--text-sm); padding: var(--s2) 0; }
-.billsdock-hero { font-family: var(--font-display); font-weight: 800; font-size: 34px; letter-spacing: -0.01em; color: var(--progress); font-variant-numeric: tabular-nums; }
-.billsdock-hero.is-neg { color: var(--alert); }
-.billsdock-sub { color: var(--muted); font-size: var(--text-sm); margin-bottom: var(--s3); }
-
-.billsdock-rows { display: flex; flex-direction: column; }
-.bdr { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); padding: 8px 0; border-top: 1px solid var(--hairline); font-size: var(--text-sm); }
-.bdr:first-child { border-top: none; }
-.bdr .pos { color: var(--progress); }
-.bdr .neg { color: var(--alert); }
-/* Timeline's own promise sentence (timelinedock.tsx, reusing
-   chainPromiseLine straight from timeline.tsx) -- not the page's own
-   .tl-promise/.tl-txt/--tl-hot, which only exist inside .tline and would
-   be unreachable here, the exact "adapter token scoped to one page"
-   mistake this file already paid for once on Bills' --positive/--negative.
-   Named the real global tokens directly instead. */
-.tldock-promise { font-family: var(--font-display); font-weight: 700; font-size: 15px; line-height: 1.5; color: var(--ink); margin: 0 0 var(--s3); }
-.tldock-promise em { font-style: normal; color: var(--accent-text); }
-.tldock-unit { color: var(--muted); font-weight: 500; font-size: 0.85em; }
-/* His catch (2026-09-03): a blank body while the account check and the
-   Supabase round trip were in flight read as broken, not loading. Shaped
-   to match the real content's own layout (billsdock-hero/-sub/-rows above)
-   so nothing jumps in height when the numbers actually land -- reuses
-   pomo-pulse (pomo.tsx's mic, the await ring), the app's existing rhythm
-   for "something is happening, wait", not a new one invented here. */
-.billsdock-skeleton { animation: pomo-pulse 1.3s var(--ease-loop) infinite; }
-.bds-bar { background: var(--surface-2); border-radius: 4px; }
-.bds-hero { width: 120px; height: 34px; margin-bottom: 10px; }
-.bds-sub { width: 150px; height: 13px; margin-bottom: var(--s3); }
-.bds-rows { display: flex; flex-direction: column; }
-.bds-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--hairline); }
-.bds-row:first-child { border-top: none; }
-.bds-label { width: 90px; height: 12px; }
-.bds-value { width: 55px; height: 12px; }
 /* His follow-up (2026-09-03): cache the last-seen summary instead of
    skeletoning every open (see LAST_KEY in billsdock.tsx) -- this is the
    ONE tell that what's on screen is last known rather than freshly
@@ -1211,9 +1127,6 @@ body:has(.shell.is-hud) .dock-more-cell-icon { border-radius: var(--a-r-sm); }
 .sechead { display: flex; align-items: baseline; gap: var(--s3); margin: var(--s6) 0 var(--s3); padding-bottom: var(--s2); border-bottom: 1px solid var(--hairline); }
 .sechead:first-of-type { margin-top: var(--s4); }
 /* No .sechead-note. Section headings carry no explanatory subtitle. */
-
-/* ---------- Break it down: pull the eye with the icon ---------- */
-.btn-breakdown svg { opacity: 0.9; }
 
 /* Just the hover-trigger boundary for the nav reveal (App.tsx) -- same gap
    .topbar already used for these children directly, so wrapping them here
@@ -1325,24 +1238,6 @@ body:has(.shell.is-hud) .dock-more-cell-icon { border-radius: var(--a-r-sm); }
 .band-metric .k { color: var(--muted); font-size: 0.6875rem; font-family: var(--font-body); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
 .band-actions { display: flex; gap: var(--s2); align-items: center; }
 
-/* first move card */
-.pin-row { display: flex; gap: var(--s4); flex-wrap: wrap; margin-bottom: var(--s4); }
-.firstmove {
-  display: flex;
-  align-items: center;
-  gap: var(--s5);
-  border: 1px solid var(--hairline-strong);
-  background: var(--surface);
-  border-radius: var(--r-md);
-  padding: var(--s4) var(--s5);
-  flex: 1 1 480px;
-  min-width: 0;
-  flex-wrap: wrap;
-}
-.firstmove .fm-label { color: var(--accent-text); }
-.firstmove .fm-title { font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); min-width: 0; }
-.firstmove .chip { font-size: 0.8125rem; }
-
 /* exceptions */
 .exceptions {
   display: flex;
@@ -1352,26 +1247,8 @@ body:has(.shell.is-hud) .dock-more-cell-icon { border-radius: var(--a-r-sm); }
   border-radius: var(--r-md);
   overflow: hidden;
 }
-.exception-row {
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  padding: var(--s3) var(--s4);
-  background: var(--alert-wash);
-  font-size: var(--text-sm);
-  font-weight: 500;
-}
-.exception-row + .exception-row { border-top: 1px solid var(--hairline); }
-/* The row is already fully alert-coloured and inside an alert-bordered band.
-   A red dot on top of that says "urgent" for the fourth time. */
-.exception-row .dot { display: none; }
 /* Deadline pills are data, not controls: no border, so they stop outranking
    the actual buttons beside them. Bordered = pressable, filled = data. */
-.exception-row .when {
-  color: var(--alert); font-size: var(--text-xs); white-space: nowrap; font-family: var(--font-mono);
-  font-weight: 600; border: none; background: var(--alert-wash); border-radius: 3px; padding: 1px 6px;
-}
-.exception-row button { margin-left: var(--s2); color: var(--accent-text); font-weight: 600; font-size: var(--text-sm); white-space: nowrap; }
 
 .allclear {
   margin-bottom: var(--s4);
@@ -1399,78 +1276,6 @@ body:has(.shell.is-hud) .dock-more-cell-icon { border-radius: var(--a-r-sm); }
 }
 .editing .widget { border-style: dashed; border-color: var(--hairline-strong); }
 
-.widget-head {
-  display: flex;
-  align-items: center;
-  gap: var(--s2);
-  padding: var(--s3) var(--s4) 0;
-}
-.widget-title-btn {
-  display: flex; align-items: center; gap: var(--s2);
-  min-width: 0; padding: 0; text-align: left;
-}
-.widget-title-btn:hover .widget-title { color: var(--accent-text); }
-.widget-title {
-  font-family: var(--font-body);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-.widget-fresh {
-  margin-left: auto;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--info);
-  white-space: nowrap;
-}
-.widget-fresh.stale { color: var(--alert); font-weight: 600; }
-.widget.is-stale .widget-body { opacity: 0.78; }
-.widget-menu-btn { color: var(--faint); padding: 0 var(--s1); line-height: 1; }
-.widget-menu-btn:hover { color: var(--ink); }
-
-/* Tiles scroll their overflow. With plain `hidden` the Goals tile ended
-   mid-glyph and silently dropped its last row. */
-.widget-body { flex: 1; padding: var(--s3) var(--s4) var(--s4); overflow: hidden auto; scrollbar-width: thin; position: relative;
-  /* Content taller than the cell dissolves instead of being sliced mid-row.
-     Sixteen pixels could not soften a forty-pixel habit pill, which left hard
-     half-chips at the card edge reading as broken rendering. */
-  mask-image: linear-gradient(#000 calc(100% - 52px), transparent);
-}
-.widget-body.scroll { overflow-y: auto; scrollbar-width: thin; }
-
-.widget-menu {
-  position: absolute;
-  top: var(--s8);
-  right: var(--s2);
-  z-index: 40;
-  background: var(--surface);
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--r-md);
-  box-shadow: var(--shadow-pop);
-  padding: var(--s2);
-  display: flex;
-  flex-direction: column;
-  gap: var(--s1);
-  min-width: 150px;
-}
-.widget-menu .size-row { display: flex; gap: var(--s1); }
-.size-opt {
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--r-sm);
-  padding: var(--s1) var(--s2);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--muted);
-}
-.size-opt[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-.widget-menu .remove { color: var(--alert); font-size: var(--text-xs); font-weight: 600; text-align: left; padding: var(--s1) var(--s2); }
-
 /* ---------- widget internals ---------- */
 .kpi {
   font-family: var(--font-display);
@@ -1481,7 +1286,6 @@ body:has(.shell.is-hud) .dock-more-cell-icon { border-radius: var(--a-r-sm); }
   color: var(--ink);
 }
 .kpi .unit { font-family: var(--font-body); font-size: 0.28em; color: var(--muted); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; margin-left: 0.45em; }
-.kpi-sub { color: var(--muted); font-size: var(--text-xs); margin-top: var(--s2); }
 /* .kpi sets an explicit ink colour, which silently beat the semantic value
    classes, so a positive or urgent KPI rendered plain black. */
 .kpi.val-pos { color: var(--progress); }
@@ -1531,11 +1335,6 @@ button.chip:hover { color: var(--accent-text); background: var(--accent-wash); }
 
 /* Charts are data, not actions. Defaulting every sparkline to the accent
    spent the "you can act on this" colour on read-only trend lines. */
-.spark { color: var(--info); }
-.spark.pos { color: var(--progress); }
-.spark-base { color: var(--hairline-strong); }
-
-.habit-chips { display: flex; flex-wrap: wrap; gap: var(--s2); }
 .habit {
   display: flex;
   align-items: center;
@@ -1555,13 +1354,9 @@ button.chip:hover { color: var(--accent-text); background: var(--accent-wash); }
 
 .goal-row { padding: var(--s3) 0; border-bottom: 1px solid var(--hairline); }
 .goal-row:last-child { border-bottom: none; }
-.goal-line { display: flex; gap: var(--s3); align-items: baseline; font-size: var(--text-sm); font-weight: 500; }
-.goal-line .grow { flex: 1; min-width: 0; }
-.goal-line .drift { font-family: var(--font-mono); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
 .drift.ok { color: var(--progress); }
 .drift.off { color: var(--warn); }
 .goal-row .bar { margin-top: var(--s2); }
-.goal-row .kpi-sub { margin-top: var(--s1); }
 
 /* ---------- phone stack ---------- */
 .stack { display: flex; flex-direction: column; gap: var(--s3); }
@@ -1574,18 +1369,12 @@ button.chip:hover { color: var(--accent-text); background: var(--accent-wash); }
    and the week behind a scroll nobody would finish. Same 68vh the day's
    schedule already uses, so the cap is one decision and not two. */
 .stack .widget { min-height: 88px; max-height: 68vh; }
-.stack-reorder { display: flex; gap: var(--s1); }
-.stack-reorder button { color: var(--faint); padding: 0 var(--s2); font-size: var(--text-sm); }
-.stack-reorder button:hover { color: var(--ink); }
 
 /* ---------- pages ---------- */
 .page { animation: pagein var(--t-med); }
 /* Content-light pages sit in one centered column so the band metric tracks
    the content, never floats to the far screen edge on ultrawide. */
 .page.narrow { max-width: 1180px; margin-inline: auto; }
-/* One shell strategy: every page runs full-bleed like Today.
-   Standalone flow cards center themselves; grids span the width. */
-.grid-2 { display: grid; gap: var(--s5); grid-template-columns: 1fr; }
 /* Settings is one column now that Connected sources is gone, and it takes the
    whole page. */
 /* No cap meant the label-left/button-right rows (Save, Get a free key, Open,
@@ -1594,34 +1383,14 @@ button.chip:hover { color: var(--accent-text); background: var(--accent-wash); }
    3440px. A form is read top to bottom, not edge to edge. */
 .settings-col { width: 100%; max-width: 820px; }
 .grid-3 { display: grid; gap: var(--s5); grid-template-columns: 1fr; }
-.grid-4 { display: grid; gap: var(--s5); grid-template-columns: 1fr; align-items: stretch; }
 .grid-2 > *, .grid-3 > *, .grid-4 > * { min-width: 0; }
-@media (min-width: 900px) { .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1280px) { .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (min-width: 720px) { .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 1200px) { .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.grid-3 .panel-wide, .grid-2 .panel-wide, .grid-4 .panel-wide { grid-column: 1 / -1; }
 @keyframes pagein { from { opacity: 0; transform: translateY(4px); } }
-
-.page-grid { display: grid; gap: var(--s5); grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); align-items: start; }
-.page-grid > * { min-width: 0; }
 /* Cards in a row end on a shared baseline instead of stair-stepping. */
 .grid-2, .grid-3 { align-items: stretch; }
 .grid-2 > .panel, .grid-3 > .panel, .grid-4 > .panel { display: flex; flex-direction: column; }
 
 /* tasks board: one column filtered on small screens, three side by side on wide */
-.tasks-board { display: grid; gap: var(--s5); grid-template-columns: 1fr; }
-.tasks-col { display: none; min-width: 0; }
-.tasks-col.active { display: block; }
-.tasks-col .colhead { display: none; }
-@media (min-width: 1280px) {
-  .tasks-board { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .tasks-col { display: block; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-md); padding: var(--s4) var(--s5); }
-  .tasks-col .colhead { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: var(--s2); }
-  .tasks-seg { display: none; }
-  .tasks-col .rowitem { flex-wrap: wrap; row-gap: var(--s1); }
-  .tasks-col .rowitem .grow { flex: 1 1 calc(100% - 22px - var(--s3)); white-space: normal; overflow: visible; text-overflow: clip; }
-}
 .panel {
   background: var(--surface);
   border: 1px solid var(--hairline);
@@ -1631,7 +1400,6 @@ button.chip:hover { color: var(--accent-text); background: var(--accent-wash); }
 /* Card titles read as titles. They were the same muted grey as body meta,
    which is a big part of why the pages felt flat. */
 .panel > .microcap { display: block; margin-bottom: var(--s3); color: var(--ink); }
-.panel-wide { grid-column: 1 / -1; }
 
 .formrow { display: flex; gap: var(--s2); margin-bottom: var(--s3); flex-wrap: wrap; }
 .textinput, .numinput {
@@ -1680,42 +1448,14 @@ select.textinput { flex: 0 0 auto; min-width: 110px; }
 }
 .seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
 
-/* habits week table */
-.habit-week { width: 100%; border-collapse: collapse; }
-.habit-week th {
-  font-family: var(--font-body); font-size: 0.75rem; font-weight: 600;
-  letter-spacing: 0.1em; color: var(--muted); text-transform: uppercase;
-  padding: var(--s2); text-align: center;
-}
-.habit-week th:first-child { text-align: left; }
-.habit-week td { padding: var(--s2); border-top: 1px solid var(--hairline); text-align: center; }
-.habit-week td:first-child { text-align: left; font-weight: 500; font-size: var(--text-sm); }
-.habit-week .today-col { background: var(--surface-2); }
-.habit-week { width: auto; }
-.habit-week th, .habit-week td { padding-inline: var(--s2); }
-.habit-history { display: flex; gap: 3px; align-items: flex-end; height: 26px; }
-.habit-history i { width: 10px; min-height: 4px; background: var(--progress-wash); box-shadow: inset 0 0 0 1px var(--hairline); border-radius: 2px 2px 0 0; }
-.habit-history i.hi { background: var(--progress); }
-
 /* habits grouped by part of day */
-.habit-group { margin-top: var(--s5); }
-.habit-group:first-of-type { margin-top: var(--s4); }
-.habit-group-head { border-bottom: 1px solid var(--hairline-strong); padding-bottom: var(--s2); margin-bottom: var(--s2); }
 .habit-row { padding: var(--s3) 0; border-bottom: 1px solid var(--hairline); }
 .habit-row:last-child { border-bottom: none; }
-.habit-row.habit-paused { opacity: 0.5; }
 .habit-row-top { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
 .habit-name { font-weight: 600; font-size: var(--text-sm); }
-.habit-start { min-height: 30px; font-size: var(--text-xs); padding-inline: var(--s3); }
 .habit-count { margin-left: auto; font-size: 0.75rem; color: var(--info); }
-.routine-preview { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s2); }
 .habit-days { display: flex; gap: var(--s3); align-items: flex-end; margin-top: var(--s3); flex-wrap: wrap; }
 .day-cell { display: grid; justify-items: center; gap: 4px; }
-.day-lab { font-family: var(--font-mono); font-size: 0.625rem; color: var(--faint); }
-.day-lab.today { color: var(--ink); font-weight: 700; }
-.habit-days .habit-history { margin-left: auto; }
-.only-wide { display: none; }
-@media (min-width: 720px) { .only-wide { display: flex; } }
 
 .daydot {
   width: 26px; height: 26px; border-radius: 50%;
@@ -1729,30 +1469,8 @@ select.textinput { flex: 0 0 auto; min-width: 110px; }
    as an empty circle and the card read "1 of 7" over seven blanks. */
 .daydot[aria-checked="true"], .daydot.kept { background: var(--progress); border-color: var(--progress); color: var(--bg); }
 .daydot:disabled { opacity: 0.65; cursor: default; }
-.habit-paused td { opacity: 0.75; }
-
-/* money */
-.oblig { padding: var(--s4) 0; border-bottom: 1px solid var(--hairline); }
-.oblig:last-child { border-bottom: none; }
-.oblig-line { display: flex; align-items: baseline; gap: var(--s2) var(--s3); flex-wrap: wrap; }
-.oblig-line .name { font-weight: 600; font-size: var(--text-base); flex: 1 1 100%; }
-.oblig-line .monthly { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); }
-.oblig .bar { margin-top: var(--s3); }
-.oblig .next { margin-top: var(--s2); font-size: var(--text-xs); color: var(--muted); }
-.coach-nav { display: flex; gap: var(--s3); margin-top: var(--s4); align-items: center; }
-.coach-nav .btn-primary { margin-left: auto; }
 
 /* stats */
-.ledger-row { display: flex; gap: var(--s3); align-items: baseline; padding: var(--s2) 0; border-bottom: 1px solid var(--hairline); font-size: var(--text-sm); }
-.ledger-title { flex: 1 1 auto; min-width: 0; }
-.ledger-list { max-width: 100%; }
-@media (min-width: 2000px) {
-  /* Two columns only where the panel is the full width of the page. Inside a
-     half-width panel they put 11 Jul to the left of 5 Jul, which reads as a
-     jumbled date order rather than as two columns. */
-  .ledger-list:not(.one-col) { columns: 2; column-gap: var(--s12); }
-  .ledger-row { break-inside: avoid; }
-}
 .rowitem.flash, .todo-row.flash, .nt-row.flash, .goal-item.flash { animation: flashrow 2.4s var(--ease); }
 @keyframes flashrow { 0%, 55% { background: var(--accent-wash); box-shadow: inset 0 0 0 1px var(--accent); border-radius: var(--r-sm); } }
 /* Same wash, but for a .panel-shaped flash target: flashrow's --r-sm corner
@@ -1765,33 +1483,13 @@ select.textinput { flex: 0 0 auto; min-width: 110px; }
    the row was protecting its own tidiness at the cost of the only thing on
    it that matters. */
 .wrap2 { white-space: normal; overflow-wrap: anywhere; }
-.ledger-row:last-child { border-bottom: none; }
-.ledger-row .delta { margin-left: auto; font-family: var(--font-mono); font-size: var(--text-xs); font-weight: 600; }
 .delta.saved { color: var(--progress); }
 .delta.over { color: var(--alert); }
 
 /* Quick-log chips take no layout space until the row is hovered or focused,
    and never render on touch devices (no hover, no chips). */
-.actual-chips { display: none; gap: var(--s1); flex-wrap: wrap; }
-.actual-chips.open { display: flex; }
-@media (hover: hover) {
-  .rowitem:hover .actual-chips, .rowitem:focus-within .actual-chips { display: flex; }
-}
 button.chip { cursor: pointer; }
 button.chip:hover { border-color: var(--accent-text); color: var(--accent-text); }
-.actual-chips button {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  font-weight: 600;
-  border: 1px solid var(--hairline-strong);
-  border-radius: 3px;
-  padding: 2px 8px;
-  color: var(--muted);
-}
-.actual-chips button:hover { border-color: var(--accent-text); color: var(--accent-text); }
-
-.rowitem.wrap-row { flex-wrap: wrap; row-gap: var(--s1); min-height: 0; padding-block: var(--s3); }
-.wrap-row .grow { white-space: normal; overflow: visible; text-overflow: clip; min-width: 16ch; }
 
 /* settings */
 .source-row { display: flex; align-items: center; gap: var(--s4); padding: var(--s3) 0; border-bottom: 1px solid var(--hairline); }
@@ -1834,9 +1532,6 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 .capacity { display: flex; align-items: baseline; gap: var(--s4); margin-bottom: var(--s3); flex-wrap: wrap; }
 .capacity .v { font-family: var(--font-mono); font-weight: 600; }
 .capacity .over { color: var(--alert); font-weight: 600; }
-.pickrow { display: flex; align-items: center; gap: var(--s3); padding: var(--s2) 0; border-bottom: 1px solid var(--hairline); font-size: var(--text-sm); }
-.pickrow:last-child { border-bottom: none; }
-.pickrow-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .radio { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--hairline-strong); flex: none; padding: 0; }
 .radio[aria-checked="true"] { border: 5px solid var(--accent); }
 
@@ -1918,25 +1613,6 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 .total-line { display: flex; align-items: baseline; gap: var(--s4); padding-top: var(--s4); font-size: var(--text-sm); flex-wrap: wrap; }
 .total-line .mono { font-weight: 600; }
 
-/* The sheet's subtitle slot is gone: a title does not get one, and the two
-   notes worth keeping are lines inside the body where the reader already is. */
-.field-hint { font-size: var(--text-xs); color: var(--muted); margin: 4px 0 var(--s3); }
-
-/* add widget */
-.addw-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--s2); }
-.addw-item {
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--r-md);
-  padding: var(--s3);
-  text-align: left;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--ink);
-}
-.addw-item:hover:not(:disabled) { border-color: var(--accent-text); background: var(--accent-wash); }
-.addw-item:disabled { opacity: 0.4; cursor: default; }
-.addw-item .d { display: block; color: var(--muted); font-size: var(--text-xs); font-weight: 400; margin-top: 2px; }
-
 /* footer */
 .foot {
   margin-top: var(--s12);
@@ -1965,43 +1641,6 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 .col-head .microcap { margin-bottom: 0; }
 .col-tot { margin-left: auto; font-size: 0.75rem; color: var(--info); }
 .col-note { font-size: var(--text-xs); color: var(--muted); margin-top: var(--s3); }
-
-/* vertical schedule / timeline: full height, the page scrolls, not the section */
-/* The schedule always draws a full 24 hours. Unbounded, it forced the whole
-   Plan row to its height and left the neighbouring panels as tall empty boxes. */
-.vsched { position: relative; border: 1px solid var(--hairline); border-radius: var(--r-md); background: var(--bg); max-height: 68vh; overflow-y: auto; scrollbar-width: thin; }
-.vsched-inner { position: relative; margin-left: 52px; }
-.hline { position: absolute; left: 0; right: var(--s2); border-top: 1px solid var(--hairline); }
-.hlabel { position: absolute; left: -52px; top: -0.55em; width: 48px; text-align: right; font-family: var(--font-mono); font-size: 0.625rem; color: var(--info); }
-.vev { position: absolute; left: var(--s2); right: var(--s3); border-radius: var(--r-sm); padding: 2px 6px; overflow: hidden; line-height: 1.2; }
-/* A calendar block is something that exists, not something to click. Solid
-   border still means calendar, dashed still means a task you placed. */
-.vev-cal { background: var(--info-wash); border: 1px solid var(--info); }
-.vev-task { background: var(--info-wash); border: 1px dashed var(--info); }
-.vev .t { font-size: 0.6875rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-.vev .rng { font-family: var(--font-mono); font-size: 0.5625rem; color: var(--info); white-space: nowrap; }
-.vev-cal .rng { color: var(--info); }
-
-/* The task name IS the link, so it carries a resting hairline underline.
-   Previously it was plain dark text and the page needed a caption telling
-   you the names were clickable. */
-.task-link {
-  color: var(--ink);
-  text-decoration: underline;
-  text-decoration-color: var(--hairline-strong);
-  text-decoration-thickness: 1px;
-  text-underline-offset: 3px;
-}
-.task-link:hover { color: var(--accent-text); text-decoration-color: currentColor; }
-.vev .task-link { color: var(--ink); }
-
-/* to-do progress: done vs time left */
-.todo-progress { margin-bottom: var(--s4); }
-.todo-progress-label { display: block; margin-top: var(--s2); font-size: var(--text-xs); color: var(--muted); }
-.on-today-tag {
-  font-family: var(--font-mono); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
-  color: var(--accent-text); background: var(--accent-wash); border-radius: 3px; padding: 1px 5px; white-space: nowrap;
-}
 
 /* drag-and-drop between time buckets */
 .drop-zone { border-radius: var(--r-md); transition: background var(--t-fast); }
@@ -2040,8 +1679,6 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 }
 .kebab-menu button:hover, .kebab-menu a:hover { background: var(--accent-wash); color: var(--accent-text); }
 .kebab-menu button[aria-checked="true"] { color: var(--accent-text); font-weight: 600; }
-.apps-shelf-menu .kebab-menu { min-width: 190px; }
-.apps-shelf-menu .kebab-menu svg { flex: none; color: var(--faint); }
 
 /* The Projects hover preview: the exact .nav object (its background, its
    radius, its padding and gap, its .nav-tab rows), on its side. Not a menu
@@ -2116,7 +1753,6 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 .projrow-name { flex: 1; min-width: 0; }
 .projrow-n { color: var(--muted); font-size: 0.8125rem; }
 .projrow:active { transform: scale(0.98); }
-.apps-shelf-menu .kebab-menu button:hover svg, .apps-shelf-menu .kebab-menu a:hover svg { color: var(--accent-text); }
 
 /* ---------- Select: every dropdown that used to be a native <select> ----------
    Same floating-panel language as .kebab-menu (surface, hairline-strong,
@@ -2172,7 +1808,6 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
   content: ''; position: absolute; left: 4px; top: 7px; bottom: 7px; width: 3px;
   border-radius: 2px; background: var(--accent);
 }
-.rangepick .dd-trigger { min-width: 190px; padding: 7px 12px; font-size: var(--text-sm); }
 .writeto .dd-trigger { padding: 7px 10px; font-size: var(--text-sm); min-width: 110px; }
 
 /* today buckets */
@@ -2491,7 +2126,6 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 .weekplan-item .cat-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; flex: none; margin-top: 3px; }
 .weekplan-item.is-done { opacity: 0.6; color: var(--wk-item-faint); text-decoration: line-through; text-decoration-color: var(--wk-item-faint); }
 .weekplan-item.is-done .cat-dot { opacity: 0.6; }
-.weekplan-more { display: block; font-size: 0.625rem; font-weight: 600; color: var(--wk-faint); padding-left: 1px; }
 .weekplan-empty { font-size: 0.6875rem; color: var(--wk-faint); }
 @media (max-width: 1180px) {
   .weekplan-grid { grid-template-columns: repeat(4, minmax(180px, 1fr)); }
@@ -2522,28 +2156,12 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 .today-task:last-child { border-bottom: none; }
 .today-task .grow { flex: 1 1 58%; min-width: 12ch; white-space: normal; }
 .today-task.done { opacity: 0.6; }
-.today-task.done .task-link { text-decoration: line-through; color: var(--faint); }
-
-.slot-pick { display: inline-flex; gap: 2px; flex: none; }
-.slot-pick button {
-  width: 24px; height: 24px; border: 1px solid var(--hairline-strong); border-radius: var(--r-sm);
-  font-family: var(--font-mono); font-size: 0.6875rem; font-weight: 600; color: var(--muted); padding: 0;
-}
-.slot-pick button:hover { border-color: var(--accent-text); color: var(--accent-text); }
-.slot-pick button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-text); }
 
 /* to-do builder */
 .todo-item { border-bottom: 1px solid var(--hairline); }
 .todo-item:last-of-type { border-bottom: none; }
 .todo-row { display: flex; align-items: center; flex-wrap: wrap; row-gap: var(--s1); gap: var(--s2); padding: var(--s2) 0; font-size: var(--text-sm); min-height: 42px; }
 .todo-row .grow { flex: 1 1 58%; min-width: 12ch; white-space: normal; }
-.select-box {
-  width: 22px; height: 22px; border: 1.5px solid var(--hairline-strong); border-radius: 6px; flex: none;
-  display: grid; place-items: center; color: transparent; padding: 0; position: relative;
-}
-.select-box::after { content: ''; position: absolute; inset: -11px; }
-.select-box:hover { border-color: var(--accent-text); }
-.select-box.on { background: var(--accent); border-color: var(--accent-text); color: var(--accent-ink); }
 .expand-btn { font-family: var(--font-mono); font-size: 0.6875rem; color: var(--info); white-space: nowrap; padding: 0 var(--s1); flex: none; }
 .expand-btn:hover { color: var(--accent-text); }
 .subtask-list { margin: 0 0 var(--s2) 34px; }
@@ -2638,7 +2256,6 @@ button.chip:hover { filter: brightness(0.96); }
 }
 
 /* review flow success */
-.done-mark { color: var(--progress); font-family: var(--font-display); font-weight: 800; font-size: var(--text-xl); }
 
 @media (max-width: 639px) {
   /* A plain display:none here lost to whatever component the class was added
@@ -2661,10 +2278,6 @@ button.chip:hover { filter: brightness(0.96); }
   .space-btn { min-height: 44px; font-size: var(--text-xs); }
   .habit { min-height: 44px; }
   .band-status { margin-left: 0; width: 100%; justify-content: space-between; }
-  .exception-row { flex-wrap: wrap; }
-  .exception-row > span:not(.dot):not(.when) { flex: 1 1 0; min-width: 180px; }
-  .exception-row button { white-space: nowrap; margin-left: calc(8px + var(--s3)); }
-  .page-grid { grid-template-columns: 1fr; }
 
   /* The tabs WRAP on a phone rather than scrolling sideways. His words: the
      menu "is somehow movable, it's not like a slider, it exists in its own
@@ -2683,13 +2296,8 @@ button.chip:hover { filter: brightness(0.96); }
   .rowitem .btn { padding-inline: var(--s2); min-height: 44px; font-size: 0.75rem; flex: none; }
   .rowitem .btn-danger { margin-left: auto; }
   .rowitem .grow { flex: 1 1 calc(100% - 22px - var(--s3)); white-space: normal; overflow: visible; text-overflow: clip; }
-  .pickrow-label { white-space: normal; }
 
   /* ledger rows stack */
-  .ledger-row { flex-wrap: wrap; }
-  .ledger-row .ledger-title { flex: 1 1 100%; order: -1; }
-
-  .widget-title-btn { padding-block: var(--s2); }
   .timeline .ev span { display: none; }
 
   /* Plan: title owns line one, controls wrap to line two */
@@ -2701,7 +2309,6 @@ button.chip:hover { filter: brightness(0.96); }
     flex: 1 1 auto; min-width: 56% !important;
     white-space: normal; overflow: visible; text-overflow: clip;
   }
-  .today-task .slot-pick button { width: 32px; height: 32px; }
   .todo-row { flex-wrap: wrap; }
   /* HTML5 drag does not exist on touch: the grip was a dead control eating
      title width. Moving between parts of the day lives in the row's menu. */
@@ -2721,145 +2328,15 @@ button.chip:hover { filter: brightness(0.96); }
   /* To-do rows match the day rows: title line, then a controls line. Without
      this, adjacent rows wrapped differently and the two lists disagreed. */
   .todo-row .grow { flex-basis: 100% !important; }
-  /* The alert row's one action must be tappable on the device it fires on. */
-  .exception-row button { min-height: 44px; }
 }
 .rowitem .btn-danger { position: relative; }
 .rowitem .btn-danger::after { content: ''; position: absolute; inset: -9px; }
-
-/* ---------- Routines: named checklists you run on repeat ---------- */
-.routine-group { margin-bottom: var(--s4); }
-/* auto-FILL, not auto-fit: fit collapses the empty tracks, so a workspace with
-   one routine stretched its card across the entire page while Personal's five
-   sat in neat columns. The empty tracks are what hold a lone card to the same
-   width its siblings get elsewhere. */
-/* Cards of wildly different heights: Out Brain Rot is four times the height of
-   an empty card, and on a grid every row is as tall as its tallest card, so the
-   page filled with holes. Rows of 4px with each card spanning as many as it
-   needs packs them without changing the reading order, which stays left to
-   right, day order first. Falls back to a plain grid if the measuring never
-   runs. */
-.routine-cards { display: flex; align-items: flex-start; gap: var(--s4); }
-.routine-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: var(--s4); }
-.routine-card { display: flex; flex-direction: column; }
-.routine-card.is-complete { border-color: var(--progress); }
-/* Head of a card: the title is the control that opens and shuts it, the state
-   sits at the end of the same line and never wraps, and the menu stays put.
-   Baseline alignment made a two-line title drag the state down with it. */
-.routine-tag { display: flex; align-items: center; gap: var(--s3); margin-bottom: var(--s2); }
-.routine-open {
-  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: var(--s3);
-  text-align: left; padding: 0; color: inherit; font: inherit;
-}
-.routine-open::before {
-  content: ''; flex: none; width: 7px; height: 7px; margin-right: 1px;
-  border-right: 1.6px solid var(--faint); border-bottom: 1.6px solid var(--faint);
-  transform: rotate(-45deg); transition: transform var(--t-fast);
-}
-.routine-open.is-open::before { transform: rotate(45deg); }
-.routine-open:hover::before { border-color: var(--accent-text); }
-.routine-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
-.routine-open .spacemark { align-self: center; }
-.routine-tag .routine-card-title { flex: 1 1 auto; min-width: 0; }
-.routine-tag .routine-progress, .routine-tag .col-tot { margin-left: auto; flex: none; white-space: nowrap; }
-/* Shut, a card is one line. Ten of them read as a list of what he has, which is
-   what the page is for when he is not running one. */
-/* Shut, a card is the same height whatever the length of its name, so a row of
-   them lines up instead of stepping up and down. It holds the name, how far
-   through it is, and the first step it is still asking for, drawn as the step it
-   is: a real checkbox he can tick from here.
-
-   The height is not a number any more. A fixed 132px was a guess that held at
-   one width and nowhere else: a two line name over a two line step needs 188,
-   so the card cut its own text off at the bottom edge. Instead both blocks
-   reserve their two lines, which makes every card the same height by
-   construction, at any width, with nothing clipped. */
-/* No clipping on the card itself: the two blocks inside it clamp their own
-   text, and hiding the overflow here cut the options menu in half the moment it
-   opened over the bottom edge. */
-.routine-card.is-shut { overflow: visible; }
-.routine-card.is-shut .routine-tag { margin-bottom: 0; align-items: flex-start; }
-.routine-card.is-shut .routine-open { align-items: flex-start; }
-.routine-card.is-shut .routine-open::before { margin-top: 0.42em; }
-.routine-card.is-shut .spacemark { margin-top: 0.2em; }
-.routine-card.is-shut .routine-progress,
-.routine-card.is-shut .col-tot { margin-top: 0.2em; }
-.routine-card.is-shut .routine-card-title {
-  font-size: var(--text-base); line-height: 1.3; min-height: 2.6em; text-wrap: balance;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
-.routine-steplist.is-peek { margin-top: auto; padding-top: var(--s3); border-top: 1px solid var(--hairline); }
-.routine-steplist.is-peek .routine-step { border: 0; padding: var(--s3) 0 0; }
-.routine-steplist.is-peek .routine-step-body { flex: 1 1 auto; }
-.routine-steplist.is-peek .routine-step-body .l {
-  line-height: 1.35; min-height: 2.7em; text-wrap: pretty;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
-.routine-peek-note {
-  margin-top: auto; padding-top: var(--s3); border-top: 1px solid var(--hairline);
-  font-size: var(--text-sm); color: var(--faint); min-height: calc(2.7em + var(--s3));
-}
-.routine-card.is-shut.is-complete .routine-peek-note { color: var(--progress); }
-.routine-card-title { font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); line-height: 1.15; }
-.routine-progress { color: var(--faint); font-size: var(--text-sm); }
-.routine-blurb { font-size: var(--text-sm); color: var(--muted); margin: var(--s2) 0 var(--s3); max-width: 54ch; }
-.routine-steplist { display: flex; flex-direction: column; margin-top: var(--s3); }
-.routine-step { display: flex; gap: var(--s3); align-items: flex-start; padding: var(--s3) 0; border-top: 1px solid var(--hairline); }
-.routine-step:first-child { border-top: none; }
-.routine-check {
-  flex: none; width: 24px; height: 24px; margin-top: 1px; border-radius: 6px;
-  border: 1.5px solid var(--hairline-strong); color: transparent; display: grid; place-items: center;
-  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
-}
-.routine-check:hover { border-color: var(--accent-text); }
-/* Done is green everywhere, including here. This tick was the one checkbox in
-   the app that turned orange when completed. */
-.routine-step.checked .routine-check { background: var(--progress); border-color: var(--progress); color: var(--bg); }
-.routine-step-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.routine-step-body .l { font-weight: 600; font-size: var(--text-base); display: flex; align-items: center; gap: var(--s2); }
-.routine-step.checked .routine-step-body .l { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
-.routine-step-body .h { font-size: var(--text-sm); color: var(--muted); line-height: 1.4; }
-.routine-step-body .ex { font-size: var(--text-sm); color: var(--info); }
-/* A step with two ways to answer it. The two sit under the step title as one
-   pair, hairline-boxed, with the word between them doing the explaining. The
-   step above them keeps a blank the width of a checkbox so every title on the
-   card still starts on the same vertical line. */
-/* Not a checkbox, and it must not look like one even when the step is done: it
-   only holds the width so titles stay on one vertical line. */
-.routine-step .routine-check.is-blank,
-.routine-step.checked .routine-check.is-blank { border-color: transparent; background: none; }
-.alt-set { display: flex; flex-direction: column; gap: var(--s1); margin-top: var(--s2); }
-.alt-opt {
-  display: flex; align-items: flex-start; gap: var(--s2); text-align: left; width: 100%;
-  padding: var(--s2) var(--s3); border: 1px solid var(--hairline); border-radius: 4px;
-  transition: border-color var(--t-fast), background var(--t-fast);
-}
-.alt-opt:hover { border-color: var(--accent-text); }
-.alt-tick { flex: none; width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; border: 1.5px solid var(--faint); }
-.alt-opt.picked { border-color: var(--progress); background: var(--progress-wash); }
-.alt-opt.picked .alt-tick { background: var(--progress); border-color: var(--progress); }
-/* Own class names, not the step's l/h: inside a finished step those inherit the
-   strikethrough, which struck out the option he did NOT pick and read as a
-   refusal rather than a choice. */
-.alt-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.alt-l { font-weight: 600; font-size: var(--text-sm); }
-.alt-h { font-size: var(--text-sm); color: var(--muted); line-height: 1.4; }
-.alt-opt:not(.picked) .alt-l { color: var(--muted); font-weight: 500; }
-.alt-or { font-size: var(--text-xs); color: var(--faint); padding-left: var(--s3); }
 /* In the compact list under a Today row the same choice is two plain rows. */
 .subtask.alt { padding-left: var(--s2); }
-
-.routine-dur { font-size: 0.6875rem; color: var(--faint); font-weight: 400; margin-left: 6px; }
 .step-optional {
   font-size: 0.625rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint);
   font-weight: 500; border: 1px solid var(--hairline); border-radius: 3px; padding: 1px 5px;
 }
-.routine-step.checked .step-optional { text-decoration: none; }
-.routine-link { font-size: var(--text-sm); color: var(--accent-text); align-self: flex-start; }
-.routine-link:hover { text-decoration: underline; }
-.routine-card-foot { display: flex; align-items: center; gap: var(--s3); margin-top: auto; padding-top: var(--s3); }
-.routine-card-foot .assist-note { flex: 1; min-width: 0; }
-.routine-reset { min-height: 30px; font-size: var(--text-xs); margin-left: auto; }
 
 /* .mr-lead is still live -- habitrun.tsx's own AI News step reuses it, see
    the note on that file about the deliberate Pronunciation/MouthStretch
@@ -2887,22 +2364,7 @@ a.pron-src:hover { color: var(--accent-text); text-decoration: underline; }
 /* typing */
 .mr-typing { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s2); }
 
-/* ---------- Brand & guidelines page ---------- */
-.brand-block { margin-bottom: var(--s6); }
-.brand-swatches { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: var(--s3); }
-.brand-swatch { display: flex; gap: var(--s3); align-items: stretch; border: 1px solid var(--hairline); border-radius: var(--r-md); background: var(--surface); overflow: hidden; }
-.brand-chip { flex: 0 0 96px; display: grid; place-items: center; font-family: var(--font-mono); font-size: 0.6875rem; letter-spacing: 0.02em; }
-.brand-swatch-body { display: flex; flex-direction: column; gap: 2px; padding: var(--s3); min-width: 0; }
-.brand-swatch-name { font-weight: 700; font-size: var(--text-sm); }
-.brand-swatch-use { font-size: var(--text-xs); color: var(--muted); line-height: 1.4; }
-.brand-rules { list-style: none; display: flex; flex-direction: column; gap: var(--s2); margin-top: var(--s3); }
-.brand-rules li { font-size: var(--text-sm); color: var(--ink); padding-left: var(--s4); position: relative; }
-.brand-rules li::before { content: ''; position: absolute; left: 0; top: 0.6em; width: 6px; height: 6px; border-radius: 50%; background: var(--hairline-strong); }
-
 /* ---------- Goals v2: real goal anatomy ---------- */
-.goal-card.v2 { padding: var(--s4) 0; border-top: 1px solid var(--hairline); }
-.goal-card.v2:first-of-type { border-top: none; }
-.goal-obj { font-family: var(--font-display); font-weight: 700; font-size: var(--text-base); }
 .goal-status { flex: none; font-family: var(--font-mono); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; border-radius: 3px; padding: 2px 7px; }
 /* On track is green like every other "this is going well" signal; done is the
    filled terminal state so the two stay distinguishable. */
@@ -2910,24 +2372,6 @@ a.pron-src:hover { color: var(--accent-text); text-decoration: underline; }
 .goal-status.s-ontrack { color: var(--progress); background: var(--progress-wash); }
 .goal-status.s-behind { color: var(--warn); background: var(--warn-wash); }
 .goal-why { font-size: var(--text-sm); color: var(--muted); line-height: 1.45; margin: var(--s2) 0 var(--s3); max-width: 60ch; }
-.goal-measure { display: flex; align-items: baseline; gap: var(--s3); margin-top: var(--s2); font-size: var(--text-xs); }
-.goal-measure .meas { color: var(--ink); }
-.goal-measure .pct { color: var(--faint); }
-.goal-measure .goal-deadline { margin-left: auto; color: var(--info); font-family: var(--font-mono); }
-.goal-ms { list-style: none; display: flex; flex-direction: column; gap: 5px; margin-top: var(--s3); }
-.goal-ms-item { display: flex; align-items: center; gap: var(--s2); font-size: var(--text-sm); color: var(--muted); }
-/* Milestones are real controls again: ticking one advances the goal it belongs
-   to, so the checkbox now behaves the way it always looked. */
-.goal-ms-check {
-  flex: none; width: 17px; height: 17px; border-radius: 4px;
-  border: 1.5px solid var(--hairline-strong); background: transparent;
-  display: inline-flex; align-items: center; justify-content: center;
-  cursor: pointer; transition: background var(--t-fast), border-color var(--t-fast);
-}
-.goal-ms-check:hover { border-color: var(--accent-text); }
-.goal-ms-item.done .goal-ms-check { background: var(--progress); border-color: var(--progress); color: var(--bg); }
-.goal-ms-item.done { color: var(--progress); }
-.goal-ms-item.done span:last-child { text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
 
 /* ---------- Notes ----------
    Three columns, all of them draggable, the way TickTick and Apple Notes do it.
@@ -3003,8 +2447,6 @@ body.is-colresize { cursor: col-resize; user-select: none; }
   font-size: var(--text-sm); color: var(--muted); min-height: 44px; border-radius: 0;
 }
 .nt-newfolder:hover { color: var(--accent-text); }
-.nt-newwhere { margin-left: auto; font-size: 0.6875rem; color: var(--faint); }
-.nt-newfolder:hover .nt-newwhere { color: var(--accent-text); opacity: .7; }
 
 /* ---- the list ---- */
 .nt-list { display: flex; flex-direction: column; padding-bottom: var(--s8); }
@@ -3070,9 +2512,6 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 /* Pinned folds. The chevron turns, and where it points is the state. */
 .nt-groupfold { cursor: pointer; }
 .nt-groupfold:hover { color: var(--accent-text); }
-.nt-chev { margin-left: auto; color: var(--faint); transition: transform var(--t-fast); }
-.nt-chev.open { transform: rotate(90deg); }
-.nt-groupfold:hover .nt-chev { color: var(--accent-text); }
 .nt-row {
   width: 100%; display: flex; flex-direction: column; gap: 4px; text-align: left;
   padding: var(--s3); border-radius: 7px; min-height: 72px;
@@ -3091,8 +2530,6 @@ body.is-colresize { cursor: col-resize; user-select: none; }
   white-space: nowrap; overflow: hidden;
 }
 .nt-rowname { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.nt-pin { color: var(--accent-text); font-size: 0.625rem; flex: none; }
-.nt-swatch { flex: none; width: 7px; height: 7px; border-radius: 50%; border: 1px solid rgba(26,23,18,.16); }
 .nt-rowsub { display: flex; gap: 8px; min-width: 0; font-size: 0.8125rem; color: var(--muted); line-height: 1.35; }
 /* The date reads as part of the line, not as a data field bolted to the front. */
 .nt-when { flex: none; color: var(--ink); }
@@ -3119,7 +2556,6 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 .nt-topbar .nt-toolbar::-webkit-scrollbar { display: none; }
 .nt-back { display: inline-flex; align-items: center; gap: 5px; color: var(--accent-text); font-size: var(--text-sm); font-weight: 600; padding: 8px 10px 8px 4px; border-radius: var(--r-sm); min-height: 44px; }
 .nt-back:hover { background: var(--accent-wash); }
-.nt-stamp { font-size: 0.6875rem; color: var(--faint); }
 .nt-kebab { margin-left: auto; }
 .nt-swatches { display: flex; gap: var(--s2); padding: var(--s2) var(--s3); }
 .note-swatch { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--hairline-strong); cursor: pointer; }
@@ -3140,9 +2576,6 @@ body.is-colresize { cursor: col-resize; user-select: none; }
 .nt-title:focus { outline: none; }
 .nt-title:focus-visible { outline: none; box-shadow: -6px 0 0 -4px var(--accent); }
 .nt-title::placeholder { color: var(--faint); }
-
-/* ---- the editor ---- */
-.nt-editwrap { display: flex; flex-direction: column; gap: var(--s2); }
 /* No rule under the editor's own top edge any more: the bar above the note
    carries it, and two lines across the pane is one too many. */
 .nt-sheet .nt-editor { margin-top: var(--s2); }
@@ -3155,7 +2588,6 @@ body.is-colresize { cursor: col-resize; user-select: none; }
   display: inline-grid; place-items: center; color: var(--muted); font-size: 0.9375rem; line-height: 1;
 }
 .nt-tool:hover { background: var(--bg); color: var(--accent-text); box-shadow: 0 1px 3px -1px rgba(0,0,0,.18); }
-.nt-toolsep { width: 1px; height: 18px; background: var(--hairline-strong); margin: 0 var(--s2); }
 
 /* It has to LOOK like the place you type in, which the old read view did not. */
 .nt-editor {
@@ -3263,7 +2695,6 @@ mark { background: var(--accent-wash); color: var(--accent-text); font-weight: 6
   .nt-slash-row { flex-direction: column; gap: 2px; }
 }
 
-
 /* ---- a body that lost the merge, still on the note ---- */
 .nt-conflict { margin-bottom: var(--s4); border: 1px solid var(--alert); border-radius: 6px; padding: var(--s3) var(--s4); }
 .nt-conflict-head { font-size: var(--text-sm); color: var(--alert); }
@@ -3296,7 +2727,6 @@ mark { background: var(--accent-wash); color: var(--accent-text); font-weight: 6
   .nt-fkebab { visibility: visible; width: 24px; }
   .nt-fscroll { flex-direction: row; align-items: center; gap: var(--s4); overflow-x: auto; overflow-y: hidden; padding-bottom: 0; }
   .nt-newfolder { width: auto; flex: none; margin: 0; padding: 8px var(--s3); border-top: none; min-height: 38px; white-space: nowrap; }
-  .nt-newwhere { display: none; }
   .nt-rename { margin: 0; width: 150px; flex: none; }
 }
 
@@ -3333,12 +2763,7 @@ mark { background: var(--accent-wash); color: var(--accent-text); font-weight: 6
    ============================================================ */
 
 /* ---- Fill the screen: no card strands itself on a wide monitor ---- */
-/* The tall list inside one stat card no longer sets the height of the row. */
-.grid-4 > .panel .rowlist { max-height: 15rem; overflow-y: auto; scrollbar-width: thin; }
 /* Four goal timeframes read as one row on an ultrawide instead of a 2x2 block. */
-@media (min-width: 2000px) {
-  .grid-2.goal-cols { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-}
 /* The missing middle step: two columns before three. */
 @media (min-width: 900px) and (max-width: 1279px) {
   .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -3351,42 +2776,16 @@ mark { background: var(--accent-wash); color: var(--accent-text); font-weight: 6
 }
 /* Content caps in rem so they grow with the root-font ramp on big monitors. */
 .textinput { max-width: 44rem; }
-/* Calendar blocks keep their label on one baseline instead of being sliced. */
-.vev { padding: 3px 6px; display: flex; align-items: baseline; gap: 6px; }
-/* A planned task has no length yet, so it gets a readable box. A block that
-   ran has a real one, and stretching it to fit its own text told him he had
-   worked half an hour when he had stopped after ten minutes. */
-.vev-task { min-height: 22px; }
-.vev.is-thin { padding: 0; overflow: visible; display: block; }
-.vev.is-thin > .t, .vev.is-thin > .rng { position: absolute; top: 100%; font-size: 0.625rem; line-height: 1.15; white-space: nowrap; }
-.vev.is-thin > .t { left: 6px; max-width: 62%; overflow: hidden; text-overflow: ellipsis; }
-.vev.is-thin > .rng { right: 6px; }
-.vev .t { flex: 1 1 auto; min-width: 0; }
-.vev .rng { flex: none; }
 
 /* ---- Affordances: bordered means pressable, filled means data ---- */
 button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .expand-btn { border: 1px solid var(--hairline-strong); border-radius: 3px; padding: 1px 6px; }
-.exception-row button { text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px; }
-.exception-row button:hover { color: var(--accent-hover); text-decoration-color: currentColor; }
-/* Widget titles navigate, so they get a resting cue. */
-.widget-title-btn::after { content: '\203A'; font-size: 0.95rem; line-height: 1; color: var(--faint); margin-left: 2px; }
-.widget-title-btn:hover::after { color: var(--accent-text); }
 /* The inert marker is a solid bullet; only the ring shape means checkable. */
 .subtask-row .sub-tick { width: 5px; height: 5px; border-radius: 50%; background: var(--faint); border: none; flex: none; }
 /* Quick-log chips hold their space so rows do not jump on hover. */
-@media (hover: hover) {
-  .rowitem .actual-chips { display: flex; visibility: hidden; }
-  .rowitem:hover .actual-chips, .rowitem:focus-within .actual-chips { visibility: visible; }
-}
 .habit:hover .tick { border-color: var(--accent-text); }
 
-/* ---- Money rows line up as columns ---- */
-.rowitem.wrap-row > .mono:not(.meta) { min-width: 9ch; text-align: right; }
-
 /* ---- Habits: missed days stay genuinely quiet ---- */
-.habit-history i { background: transparent; box-shadow: none; border-bottom: 1px solid var(--hairline); }
-.habit-history i.hi { background: var(--progress); border-bottom-color: var(--progress); }
 .status-dot.manual { background: var(--warn); }
 
 /* ---- Touch: small controls get a 44px hit area without growing visually ----
@@ -3412,7 +2811,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
     position: absolute;
     inset: -9px;
   }
-  .widget-title-btn { padding-block: var(--s3); }
 }
 
 /* ---- Phone: the header is a header, not a quarter of the screen ----
@@ -3459,14 +2857,8 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .bucket, .bucket.drop-zone { box-shadow: none; border-radius: 0; }
 /* Restore the drop-target highlight only while a task is actually over it. */
 .bucket.drop-zone.drop-over { border-radius: var(--r-md); }
-/* Cadence label pops in the accent so each routine reads as a titled thing. */
-.routine-tag .microcap { color: var(--accent-text); }
-.routine-progress { color: var(--muted); font-weight: 600; }
 /* "done today" and positive counts go green. */
 .col-tot.val-pos { color: var(--progress); font-weight: 600; }
-/* Checkboxes read as tappable: heavier border, accent on hover. */
-.routine-check { border-width: 2px; }
-.routine-check:hover { background: var(--accent-wash); border-color: var(--accent-text); }
 /* Goal status chips carry more weight. */
 .goal-status { font-weight: 700; }
 
@@ -3476,7 +2868,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
    makes it olive, and every page heading turned green. A heading takes the
    accent only when the accent means something about the heading. */
 .band h1 { color: var(--ink); }
-.routine-card-title { color: var(--ink); }
 
 /* Drop zones are full-width targets, not prose (override the global p measure). */
 .empty.is-boxed { max-width: none; width: 100%; }
@@ -3493,7 +2884,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .habit-kebab { margin-left: var(--s2); }
 
 /* Goals: log progress, drop a goal, add a new one. */
-.goal-actions { display: flex; align-items: center; gap: var(--s3); margin-top: var(--s3); }
 .goal-bump { display: inline-flex; align-items: center; gap: var(--s2); }
 .goal-bump button {
   width: 26px; height: 26px; border-radius: var(--r-sm); border: 1px solid var(--hairline-strong);
@@ -3502,11 +2892,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .goal-bump button:hover:not(:disabled) { border-color: var(--accent-text); color: var(--accent-text); }
 .goal-bump button:disabled { opacity: 0.35; cursor: default; }
 .goal-bump .mono { font-size: 0.625rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); }
-.goal-drop { margin-left: auto; font-size: var(--text-xs); color: var(--faint); padding: 2px 6px; border-radius: var(--r-sm); }
-.goal-drop:hover { color: var(--alert); background: var(--alert-wash); }
-.goal-add { margin-bottom: var(--s5); }
-.goal-add .formrow + .formrow { margin-top: var(--s3); }
-
 
 /* Pomodoro: blocks finished today. */
 .pomo-cycles { font-size: var(--text-xs); color: var(--faint); padding-right: 4px; }
@@ -3521,30 +2906,12 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .today-task .kebab-wrap, .today-task .chip, .today-task .expand-btn,
 .todo-row .kebab-wrap, .todo-row .chip, .todo-row .expand-btn { flex: none; }
 
-/* ---------- Ideology pass: cross-space alerts and momentum ---------- */
-
-/* An alert raised in Personal but shown while you are in Work or Off-Plate. */
-.exception-row.from-other { opacity: 0.92; }
-.exc-origin {
-  flex: none; font-family: var(--font-mono); font-size: 0.625rem; letter-spacing: 0.04em;
-  text-transform: uppercase; color: var(--muted); border: 1px solid var(--hairline-strong);
-  border-radius: 3px; padding: 1px 6px;
-}
-.exc-drop { color: var(--faint) !important; }
-.exc-drop:hover { color: var(--alert) !important; }
-
 /* What is actually going right, from real events only. */
 .momentum {
   display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap;
   padding: var(--s3) 0; margin-bottom: var(--s4);
   border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline);
 }
-.momentum-item { font-size: var(--text-sm); color: var(--progress); }
-.momentum-item + .momentum-item { padding-left: var(--s3); border-left: 1px solid var(--hairline); }
-.cs-age { font-family: var(--font-mono); font-size: 0.625rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); }
-
-/* Savings sparkline endpoints, so five numbers about his money are readable. */
-.savings-range { display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--faint); margin-top: 4px; }
 
 /* ---------- Design-gate fixes ---------- */
 
@@ -3562,7 +2929,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
    2000px of empty tint between a sentence and its button. */
 @media (min-width: 1600px) {
   .exception-row, .firstmove, .momentum { --rail: 1400px; }
-  .exception-row > span:nth-of-type(2) { max-width: var(--rail); }
   .widget .rowitem > .grow { max-width: 900px; }
 }
 
@@ -3584,10 +2950,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .sheet-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s4); align-items: start; }
 .sheet-grid > * { min-width: 0; }
 @media (max-width: 560px) { .sheet-grid { grid-template-columns: 1fr; } }
-
-/* A goal that counts itself off a habit says so, and offers no manual logger. */
-.goal-linked { font-size: var(--text-xs); color: var(--progress); margin-top: 6px; }
-.goal-line .kebab-wrap { margin-left: var(--s2); }
 
 /* Status and menu sit on the habit's own name row, never on a line of their own. */
 .habit-row-top { display: flex; align-items: baseline; gap: var(--s2); }
@@ -3655,10 +3017,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .habit-actions { display: flex; align-items: center; gap: var(--s2); }
 .habit-list.w7 .habit-actions { grid-area: menu; }
 /* The workspace, when the name alone cannot tell two habits apart. */
-.habit-qual {
-  font-family: var(--font-mono); font-size: 0.625rem; font-weight: 400;
-  color: var(--faint); margin-left: var(--s2); text-transform: uppercase; letter-spacing: 0.04em;
-}
 .habit-list.w7 .habit-row-top { grid-area: name; min-width: 0; }
 .habit-list.w7 .habit-days { grid-area: days; margin-top: 0; justify-content: space-between; }
 .habit-list.w7 .count-bar { grid-area: days; margin: 0; }
@@ -3689,7 +3047,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .habit-list.w7 .habit-goal { margin-top: 0; min-width: 0; overflow: visible; text-overflow: clip; }
 /* The legend is a row of the same grid, so it cannot drift out of line. */
 .habit-list .habit-row.is-legend { padding: 0 0 var(--s1); }
-.habit-list .habit-row.is-legend .day-lab { width: 26px; text-align: center; }
 .habit-list .habit-row.is-legend .habit-days { justify-content: space-between; }
 /* Today is a column, not a bold letter under one dot. */
 .day-cell.is-today .daydot { box-shadow: 0 0 0 1px var(--hairline-strong); }
@@ -3723,8 +3080,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
    Preparation" above it, his report. Two real columns, each its own block
    flow, can only ever move a section within its own side. */
 @media (min-width: 1800px) {
-  .habit-cols { display: flex; align-items: flex-start; gap: var(--s5); }
-  .habit-col { flex: 1 1 0; min-width: 0; }
   .habit-section + .habit-section { margin-top: var(--s5); }
 }
 /* A weekday-only habit does not expect the weekend. */
@@ -3775,14 +3130,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
   letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); margin-bottom: 6px;
 }
 
-/* An empty routine sizes to its content instead of standing as a hollow box. */
-
-/* Where the workspace you are standing in ends and the rest of the day begins. */
-.routine-split { display: flex; align-items: center; gap: var(--s3); margin: var(--s8) 0 var(--s4); }
-.routine-split span { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--faint); }
-.routine-split::after { content: ''; flex: 1; height: 1px; background: var(--hairline); }
-.routine-empty { font-size: var(--text-sm); color: var(--faint); padding: var(--s3) 0; }
-
 /* The tab bar scrolls inside itself; as a flex child it needs min-width:0 or its
    content pushes the whole page sideways instead. */
 .topstick, .nav { min-width: 0; }
@@ -3800,7 +3147,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 }
 .task-act:hover:not(:disabled) { color: var(--accent-text); background: var(--accent-wash); }
 .task-act:disabled { opacity: 0.3; cursor: default; }
-.task-flash { font-size: var(--text-xs); color: var(--progress); margin-right: 4px; }
 .sheet-task {
   font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg);
   margin-bottom: var(--s3);
@@ -3817,9 +3163,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .subtask-wrap > .actual-log { flex: 1 0 100%; padding: var(--s1) 0 var(--s2) 16px; }
 .sub-focus { width: 26px; height: 26px; flex: none; }
 /* The now line on the day column. */
-.vnow { position: absolute; left: 0; right: 0; border-top: 1px solid var(--accent); z-index: 3; pointer-events: none; }
-.vnow-dot { position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
-.vnow-label { position: absolute; right: 2px; top: -8px; font-size: 0.5625rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent-text); background: var(--bg); padding: 0 3px; }
 
 .sheet-warn { font-size: var(--text-xs); color: var(--warn); background: var(--warn-wash); border-radius: var(--r-sm); padding: var(--s2) var(--s3); margin-top: var(--s3); }
 
@@ -3949,14 +3292,10 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .detail-seg { margin-bottom: var(--s4); }
 
 /* A habit you are quitting: days clean, and one honest button. */
-.habit-row.is-quit .quit-run { display: flex; align-items: baseline; gap: var(--s2); margin: var(--s2) 0; }
-.quit-days { font-family: var(--font-display); font-size: 2rem; font-weight: 700; line-height: 1; color: var(--progress); }
-.quit-unit { font-size: var(--text-sm); color: var(--muted); }
 .quit-slip { font-size: var(--text-xs); color: var(--faint); padding: 2px 6px; border-radius: var(--r-sm); border: 1px dashed var(--hairline-strong); cursor: pointer; }
 .quit-slip:hover { color: var(--alert); border-color: var(--alert); }
 .quit-giveup { font-size: var(--text-xs); color: var(--faint); padding: 2px 6px; border-radius: var(--r-sm); border: 1px dashed var(--hairline-strong); cursor: pointer; }
 .quit-giveup:hover { color: var(--info); border-color: var(--info); }
-.kind-seg button { flex: 1 1 auto; }
 
 /* An estimate you can type over. */
 .est-edit { cursor: pointer; }
@@ -3973,16 +3312,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 
 /* Assistant: the two ways in sit side by side, and what they filed runs under
    both, because the history belongs to neither one on its own. */
-/* ---------- Today's assistant rail ----------
-   One column beside the day, always open. Below 1100px there is not room for
-   both, so it falls under the grid rather than squeezing the day into a
-   gutter. The rail sticks while the day scrolls past it. */
-.today-shell { display: grid; gap: var(--s5); grid-template-columns: minmax(0, 1fr); align-items: start; }
-/* One column, because there is no second one. The assistant rail was taken off
-   this page on 2026-08-11 and this rule kept holding its 340px open, so the day
-   ran at 76% of the window and the rest was reserved for nothing. Measured at
-   1600px before the fix: 1170 of 1530. */
-.today-main { min-width: 0; }
 
 /* A habit feeding a goal says so on the card, and opens it. */
 .habit-goal {
@@ -3998,17 +3327,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .autogrow { flex: none; }
 
 /* ---------- Writing the steps of a routine ---------- */
-.step-editor { display: flex; flex-direction: column; gap: var(--s2); margin-top: var(--s3); }
-.step-edit-row { display: flex; align-items: flex-start; gap: var(--s2); }
-.step-order { display: flex; flex-direction: column; gap: 2px; flex: none; padding-top: 4px; }
-.step-order button {
-  width: 22px; height: 18px; border-radius: 3px; border: 1px solid var(--hairline-strong);
-  color: var(--faint); font-size: 0.625rem; line-height: 1; cursor: pointer;
-}
-.step-order button:hover:not(:disabled) { color: var(--accent-text); border-color: var(--accent-text); }
-.step-order button:disabled { opacity: 0.3; cursor: default; }
-.step-edit-fields { display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; min-width: 0; }
-.step-note { font-size: var(--text-xs); color: var(--muted); }
 .step-drop {
   flex: none; width: 28px; height: 28px; border-radius: var(--r-sm); color: var(--faint);
   font-size: var(--text-base); line-height: 1; cursor: pointer; margin-top: 3px;
@@ -4020,8 +3338,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 }
 .step-add > .textinput { flex: 1 1 auto; min-width: 0; }
 .step-add > .btn { flex: none; }
-.mr-edit { font-size: var(--text-xs); color: var(--faint); padding: 2px 6px; border-radius: var(--r-sm); cursor: pointer; }
-.mr-edit:hover { color: var(--accent-text); background: var(--accent-wash); }
 
 /* ---------- A routine standing on the day's list ---------- */
 /* It is a task row. The only mark of difference is the tag, because two layouts
@@ -4033,8 +3349,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 }
 .rod-empty { font-size: var(--text-xs); color: var(--faint); padding: 4px 0 0 26px; }
 .rod-link { color: var(--accent-text); text-decoration: underline; cursor: pointer; padding: 0; }
-.rod-done { font-size: var(--text-xs); color: var(--progress); padding: 4px 0 0 26px; }
-.rod-bucket { border-bottom: 1px solid var(--hairline); padding-bottom: var(--s3); margin-bottom: var(--s3); }
 
 /* A step the day's list cannot tick, because it is earned elsewhere. */
 .subtask:disabled { opacity: 0.6; cursor: pointer; }
@@ -4073,35 +3387,11 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 @keyframes undo-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (max-width: 639px) { .undo-bar { left: 12px; right: 12px; bottom: 80px; } .undo-what { flex: 1; } }
 
-/* Something in Settings wants attention: sync is off, so nothing is backed up. */
-.btn.has-dot { position: relative; }
-.btn.has-dot::after {
-  content: ''; position: absolute; top: 4px; right: 4px;
-  width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
-}
-
 /* An inline action inside a sentence, not a button sitting next to one. */
 .linkish {
   color: var(--accent-text); text-decoration: underline; text-underline-offset: 2px;
   cursor: pointer; font-size: inherit; font-family: inherit;
 }
-
-/* Where a dragged task would land on the day. */
-.vdrop { position: absolute; left: 0; right: 0; border-top: 2px solid var(--accent); pointer-events: none; }
-.vdrop-label {
-  position: absolute; top: -9px; left: 0; background: var(--accent); color: var(--bg);
-  font-size: 0.625rem; padding: 1px 6px; border-radius: 3px;
-}
-.vev-task { cursor: grab; }
-.vev-task:active { cursor: grabbing; }
-.vev-x {
-  position: absolute; top: 3px; right: 4px; color: var(--muted);
-  font-size: 0.75rem; line-height: 1; padding: 2px 4px; cursor: pointer; opacity: 0;
-}
-.vev-task:hover .vev-x, .vev-x:focus-visible { opacity: 1; }
-.vev-x:hover { color: var(--alert); }
-.kebab-timerow { display: flex; align-items: center; gap: var(--s2); padding: 4px 10px 6px; }
-.kebab-timerow .textinput { padding: 4px 8px; font-size: var(--text-sm); }
 
 /* ---------- sign in ---------- */
 .signin {
@@ -4153,17 +3443,11 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
    panel above it. */
 .panel + .sechead, .grid-2 + .sechead, .grid-4 + .sechead { margin-top: var(--s6); }
 
-/* A window picked by hand, named above it by the same heading as any other. */
-.daterange { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s4); flex-wrap: wrap; }
-.daterange label { font-size: var(--text-sm); color: var(--muted); }
-.daterange .textinput { padding: 6px 10px; font-size: var(--text-sm); }
-
 /* ---------- a habit over a longer window ---------- */
 /* One square a day, oldest on the left. Green means kept, the same green as
    everywhere else. A missed day is simply not green: no wall of misses. */
 .habit-trail-wrap { margin-top: var(--s2); }
 .habit-trail { display: grid; gap: 2px; grid-auto-flow: column; grid-template-rows: repeat(7, 1fr); }
-.habit-trail.w30 { grid-template-rows: repeat(5, 1fr); }
 .trail-day {
   width: 100%; aspect-ratio: 1; min-width: 5px; border-radius: 2px;
   background: var(--surface-2); border: 1px solid transparent;
@@ -4172,17 +3456,11 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 /* Before the habit existed. Not a missed day, so not drawn as one. */
 .trail-day.before-start { background: transparent; box-shadow: inset 0 0 0 1px var(--hairline); }
 .trail-day.is-today { border-color: var(--accent-text); }
-.habit-trail.w30 .trail-day { border-radius: 3px; }
 /* A slip is a fact, drawn as one. Not red: it is a day on the record, not an
    alarm, and the run either side of it is the thing worth reading. */
 .trail-day.slipped { background: var(--surface-3, var(--line)); border-color: var(--line); }
-.routine-trail-wrap { display: flex; flex-direction: column; gap: 6px; margin: var(--s3) 0; }
 /* One square per chance the routine had. Thirteen weeks fit in a row; ninety
    days need the packed grid. */
-.routine-trail { display: flex; flex-wrap: wrap; gap: 3px; }
-.routine-trail .trail-day { width: 11px; height: 11px; aspect-ratio: auto; flex: none; border-radius: 3px; }
-.routine-trail.dense { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 1fr); gap: 2px; }
-.routine-trail.dense .trail-day { width: 100%; height: auto; aspect-ratio: 1; min-width: 5px; border-radius: 2px; }
 .past-goal { gap: var(--s3); }
 .past-goal .btn { flex: none; padding: 3px 10px; font-size: var(--text-xs); }
 
@@ -4319,27 +3597,6 @@ button.chip { background: none; border: 1px solid var(--hairline-strong); }
 .pomo-ambient.await { animation: pomo-pulse 1.2s var(--ease-loop) infinite; }
 @keyframes pomo-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
 .pomo-badge.await .pomo-phase { color: var(--progress); }
-
-/* ---------- the clock widget ----------
-   The time carries the widget, so it is set at display size with tabular
-   figures; nothing under it repeats what it already says. */
-/* The shelf sets one height for every tile on its row, so a one-cell clock
-   beside a two-cell list is a tall box. The time sits in the middle of it on
-   purpose rather than clinging to the top with 200px of nothing below. */
-.clockw { display: flex; flex-direction: column; gap: 2px; height: 100%; justify-content: center; }
-.clockw-time {
-  font-size: clamp(2.25rem, 4.5vw, 3rem); font-weight: 700; line-height: 1;
-  letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--ink);
-}
-.clockw-day { font-size: var(--text-base); font-weight: 600; color: var(--ink); margin-top: var(--s2); }
-.clockw-date {
-  display: flex; align-items: baseline; gap: var(--s2); flex-wrap: wrap;
-  font-size: var(--text-sm); color: var(--muted);
-}
-.clockw-week {
-  font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint);
-  border-left: 1px solid var(--hairline-strong); padding-left: var(--s2);
-}
 
 /* ---------- THE ZONE: deep water ----------
    Fifth pass, and a deliberate break from the four bordered tiles that came
@@ -4583,7 +3840,6 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .znow-settings-row:hover { color: var(--z-ice); }
 .znow-settings-row svg { flex: none; color: var(--z-ice); }
 .znow-settings-row span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: var(--s3); }
-.znow-picker-list { flex: 1; min-height: 0; overflow-y: auto; }
 .znow-stepper { flex: 1; display: flex; align-items: center; justify-content: center; gap: var(--s6); }
 .znow-stepper button {
   width: 44px; height: 44px; border-radius: 50%; font-size: 1.5rem; line-height: 1;
@@ -4614,69 +3870,6 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 }
 .zpanel { min-width: 0; min-height: 0; display: flex; overflow: hidden; }
 .zpanel-player { padding-left: var(--s8); border-left: 1px solid var(--z-line); }
-
-/* The note: no box, no fill, just the writing surface on the field. */
-.znote { display: flex; flex-direction: column; gap: var(--s3); width: 100%; min-width: 0; }
-/* Capped to the editor's own measure so the label and the folder control
-   stay one object instead of drifting 1240px apart on an ultrawide screen. */
-.znote-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); max-width: 68ch; }
-.znote-heading {
-  display: flex; align-items: center; gap: var(--s2);
-  font-family: 'Technor', var(--font-display); font-weight: 500;
-  font-size: var(--text-xs); letter-spacing: 0.22em; text-transform: uppercase; color: var(--z-muted);
-}
-.znote-folder {
-  appearance: none; -webkit-appearance: none; max-width: 60%;
-  font-family: 'Technor', var(--font-display); font-size: var(--text-xs); font-weight: 500;
-  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%238FB2C4' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 2px center / 9px;
-  border: none; border-bottom: 1px solid var(--z-line); border-radius: 0;
-  padding: 4px 18px 4px 0; color: var(--z-bone);
-}
-.znote-folder:hover { border-bottom-color: var(--z-ice); }
-.znote-folder option { color: var(--ink); background: var(--surface); }
-.znote-rich { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.znote-rich .nt-topbar { padding: 0 0 var(--s2); border-bottom: none; }
-.znote-rich .nt-toolbar { padding-bottom: 0; border-bottom: none; gap: var(--s2); }
-.znote-rich .nt-toolgroup { background: none; padding: 0; gap: 2px; }
-.znote-rich .nt-tool { min-width: 26px; height: 26px; border-radius: 6px; color: var(--z-muted); }
-.znote-rich .nt-tool:hover { background: transparent; box-shadow: none; color: var(--z-ice); }
-.znote-rich .nt-panebody { flex: 1; min-height: 0; overflow-y: auto; }
-.znote-rich .nt-sheet { padding: 0; }
-.znote-rich .nt-editor {
-  min-height: 100%; margin-top: 0; padding: var(--s1) 0; border-radius: 0;
-  /* A measure. Un-boxed on a full-bleed field the line ran the whole width
-     of the room, about 135 characters at 2560, well past the 45-75ch the
-     house rules lock. */
-  max-width: 68ch;
-  font-size: var(--text-base); line-height: 1.65; color: var(--z-bone); caret-color: var(--z-ice);
-}
-.znote-rich .nt-editor:focus { background: none; box-shadow: none; }
-/* No placeholder text: he asked for it gone by name. An empty writing
-   surface with no card and no fill still needs to say it can be written in,
-   so the affordance is a rule you write on rather than words to delete. */
-.znote-rich .nt-editor[data-empty]::before { content: none; }
-.znote-rich .nt-editor[data-empty] {
-  background-image: linear-gradient(var(--z-track), var(--z-track));
-  background-repeat: no-repeat;
-  background-size: min(100%, 68ch) 1px;
-  background-position: 0 1.5em;
-}
-.znote-rich .nt-editor ul:not(.todo) > li::before { color: var(--z-muted); }
-.znote-rich .nt-editor a { color: var(--z-ice); }
-/* Same measure as the head and the editor, so the status and the new-note
-   button stay one object rather than drifting to opposite edges of a wide
-   screen. */
-.znote-foot { display: flex; align-items: center; justify-content: space-between; padding-top: var(--s3); max-width: 68ch; }
-.znote-status {
-  font-family: 'Technor', var(--font-display); font-size: var(--text-xs); font-weight: 500;
-  text-transform: uppercase; letter-spacing: 0.18em; color: var(--z-muted);
-}
-.znote-status.is-saved { color: var(--z-ice); }
-.znote-add {
-  flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
-  background: transparent; color: var(--z-muted); border: 1px solid var(--z-line);
-}
-.znote-add:hover { border-color: var(--z-ice); color: var(--z-ice); }
 
 /* ---- the player ---- */
 .zplayer { display: flex; flex-direction: column; justify-content: center; gap: var(--s4); width: 100%; height: 100%; }
@@ -4752,19 +3945,16 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   .znow-face { width: min(74vw, 340px); }
   .zroom-rail { grid-template-columns: minmax(0, 1fr); gap: var(--s6); min-height: 0; }
   .zpanel-player { padding-left: 0; border-left: none; border-top: 1px solid var(--z-line); padding-top: var(--s5); }
-  .znote-rich .nt-editor { min-height: 120px; }
 }
 
 /* ---------- focus history ---------- */
 .focus-row { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) 0; border-top: 1px solid var(--hairline); }
 .focus-row:first-child { border-top: none; }
 .focus-row .grow { flex: 1; min-width: 0; font-size: var(--text-sm); }
-.focus-tag { font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--faint); }
 .focus-label { flex: 1 1 220px; min-width: 0; min-height: 34px; }
 /* Fixed, not flexed: a minutes box stretched across a wide screen invites a
    four-digit answer to a two-digit question. */
 .focus-min { flex: 0 0 76px; width: 76px; min-height: 34px; }
-.focus-day { flex: 0 0 160px; width: 160px; min-height: 34px; }
 .focus-btn { min-height: 34px; font-size: var(--text-xs); }
 /* The page takes the whole width it is given. What keeps the rows readable is
    the column count, not a 940px cap on the page: past 1100px the days lay out
@@ -4798,16 +3988,6 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 /* Two columns: the list, and the day beside it. */
 .plan-two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 /* the record, drawn on the clock */
-.vev-done { border-left: 3px solid var(--progress); background: var(--progress-wash); }
-.vev-done.k-focus { border-left-color: var(--info); }
-.vev-live { border-left: 3px solid var(--accent); background: var(--accent-wash); }
-.vmark { position: absolute; left: 0; right: 8px; display: flex; align-items: center; gap: var(--s2); transform: translateY(-50%); pointer-events: none; }
-.vmark-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--progress); flex: none; }
-.vmark.k-routine .vmark-dot { background: var(--accent); }
-.vmark-t {
-  font-size: var(--text-xs); color: var(--muted); background: var(--bg);
-  padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 85%;
-}
 
 @media (max-width: 900px) {
   .plan-two { grid-template-columns: 1fr; }
@@ -4816,8 +3996,6 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .txt-link { color: var(--accent-text); text-decoration: underline; text-decoration-color: var(--hairline-strong); text-underline-offset: 2px; word-break: keep-all; }
 .txt-link:hover { text-decoration-color: var(--accent-text); }
 .today-task.done .txt-link, .subtask.done .txt-link { color: var(--faint); }
-/* travelling between goal periods */
-.goal-nav { display: flex; gap: 2px; margin-left: var(--s2); }
 /* What a period promised and did not deliver, at the top of the page so it is
    answered rather than scrolled past. Warm border, not red: this is a decision
    to make, not a failure to be shouted at. */
@@ -4843,17 +4021,6 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .ptask-head .microcap { margin-bottom: 0; }
 .ptask-head .col-tot { margin-left: 0; }
 .ptask-add { margin-left: auto; }
-.ptask {
-  display: flex; align-items: center; gap: var(--s2);
-  font-size: var(--text-sm); padding: var(--s2) 0; border-top: 1px solid var(--hairline);
-}
-.ptask:first-of-type { border-top: none; }
-.ptask .grow { min-width: 0; }
-.ptask.done { color: var(--progress); }
-.ptask.done .goal-ms-check { background: var(--progress); border-color: var(--progress); color: var(--bg); }
-.ptask.done .grow { text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
-.ptask .sub-tool { flex: none; opacity: 0; transition: opacity var(--t-fast); }
-.ptask:hover .sub-tool, .ptask .sub-tool:focus-visible { opacity: 1; }
 .ptask-add-box { margin-top: var(--s3); display: flex; flex-direction: column; gap: var(--s2); }
 .ptask-offer { display: flex; flex-direction: column; border: 1px solid var(--hairline); border-radius: var(--r-sm); overflow: hidden; }
 .ptask-offer-row {
@@ -4866,14 +4033,10 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .ptask-offer-row .meta { font-size: 0.6875rem; color: var(--faint); flex: none; }
 .ptask-new { align-self: flex-start; }
 /* Touch has no hover, so the way off a period must be there without one. */
-@media (hover: none) {
-  .ptask .sub-tool { opacity: 1; }
-}
 .goal-nav-btn { min-width: 26px; min-height: 24px; border: 1px solid var(--hairline); border-radius: 4px; color: var(--muted); font-size: var(--text-sm); line-height: 1; }
 .goal-nav-btn:hover { border-color: var(--hairline-strong); color: var(--ink); }
 .goal-nav-btn.now { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.03em; padding: 0 6px; }
 /* the clock button while the model is thinking */
-.est-thinking { width: 13px; height: 13px; border: 2px solid var(--hairline-strong); border-top-color: var(--accent-text); border-radius: 50%; display: inline-block; animation: est-spin 0.7s linear infinite; }
 @keyframes est-spin { to { transform: rotate(360deg); } }
 /* which hours a part of the day means */
 .bucket-hours { font-size: 0.6875rem; color: var(--faint); margin-left: var(--s2); }
@@ -4895,18 +4058,6 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   padding: var(--s10) var(--gutter) var(--s12);
   min-height: calc(100dvh - 108px);
 }
-/* The title gets air under it. This padding used to name --s7, which is not a
-   token in the scale, so the whole shorthand was invalid and computed to zero:
-   the wall started hard against the nav. */
-/* The heading and the way out, on one line, the door on the right where he
-   asked for it. .btn-ghost does the looks: this page gets no button of its
-   own invention. */
-.board-head {
-  margin: 0 0 var(--s10);
-  display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s5);
-}
-.board-back { flex: none; }
-.board-head h1 { font-size: clamp(2.6rem, 6vw, 5rem); line-height: 0.95; letter-spacing: -0.02em; }
 /* A grid, not CSS columns. A multi-column layout gives an item one column or
    all of them and nothing in between, so a landscape photograph had no way to
    be wider than a line of text and sat in a 300px lane as a strip. Rows are
@@ -4974,7 +4125,6 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 @media (max-width: 700px) {
   .board-wall { --bp-col: 160px; column-gap: 12px; }
   .board-page { padding: var(--s6) var(--s4) var(--s10); }
-  .board-head { margin-bottom: var(--s6); }
 }
 /* milestone rows in the goal sheet */
 .ms-list { display: flex; flex-direction: column; margin-bottom: var(--s2); }
@@ -5031,127 +4181,45 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   justify-content: flex-start;
   padding: clamp(var(--s6), 7vh, var(--s12)) var(--gutter) var(--s6);
 }
-.dr-stage {
-  /* Scales with the screen instead of sitting as a 680px stamp in the middle of
-     an ultrawide with 1380px of cream either side. */
-  width: min(920px, 100%); animation: dr-rise var(--t-med) both;
-}
-.dr-rail { display: flex; gap: 5px; width: min(920px, 100%); margin-bottom: var(--s6); flex: none; }
-.dr-seg { flex: 1; height: 3px; border-radius: 2px; background: var(--hairline-strong); transition: background var(--t-med); }
-.dr-seg.on { background: var(--accent); }
 @keyframes dr-rise { from { opacity: 0; transform: translateY(14px) } to { opacity: 1; transform: none } }
-
-.dr-stage h1 {
-  font-family: var(--disp); font-weight: 700; line-height: 1.1; color: var(--ink);
-  font-size: clamp(1.9rem, 1.3rem + 2.2vw, 3.1rem); margin-bottom: var(--s3);
-  max-width: 18ch;
-}
-/* Not a subtitle: a count, off the log, that appears nowhere else. */
-.dr-fact { font-size: 0.8125rem; color: var(--muted); }
 
 /* The scoreboard. Each tile draws itself in turn and its number counts up once
    it is actually visible. This is the one celebration in here, and it is his
    own week arriving rather than confetti. */
-.dr-score { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--s6) var(--s5); margin: var(--s6) 0 var(--s5); }
-.dr-tile { display: flex; flex-direction: column; gap: 2px; animation: dr-pop var(--t-slow) both; }
 @keyframes dr-pop { from { opacity: 0; transform: translateY(10px) scale(.96) } to { opacity: 1; transform: none } }
-.dr-num { font-family: var(--disp); font-weight: 700; font-size: clamp(2.2rem, 1.6rem + 2vw, 3.4rem); line-height: 1; color: var(--accent-text); }
-.dr-lab { font-size: var(--text-sm); color: var(--muted); }
-
-.dr-list { list-style: none; display: flex; flex-direction: column; gap: var(--s2); margin-top: var(--s4); }
-.dr-list li { display: flex; align-items: center; gap: var(--s3); font-size: var(--text-base); color: var(--ink); animation: dr-rise var(--t-med) both; }
-.dr-plain li { color: var(--muted); }
-.dr-at { font-size: 0.75rem; color: var(--faint); }
-.dr-more { color: var(--faint); font-size: var(--text-sm); }
-/* A tick, and no strikethrough. This screen exists to show him what held;
-   crossing his own wins out is the wrong signal on it. */
-.dr-check { flex: none; width: 19px; height: 19px; border-radius: 5px; display: grid; place-items: center; background: var(--progress); color: #fff; }
-
-/* Six names on a landscape phone pushed the stage past the screen. Scrolls in
-   place rather than shortening the list, which would make the count under it
-   wrong. */
-.dr-waiting { max-height: 34vh; overflow-y: auto; }
-.dr-fix { list-style: none; display: flex; flex-direction: column; margin-top: var(--s5); }
-.dr-row { display: flex; align-items: center; gap: var(--s4); padding: var(--s3) 0; border-top: 1px solid var(--hairline); min-height: 62px; }
-.dr-row:first-child { border-top: none; }
-.dr-rowmain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.dr-rowname { font-family: var(--disp); font-weight: 600; font-size: 1.0625rem; color: var(--ink); }
-.dr-rowsub { font-size: 0.6875rem; color: var(--faint); }
-.dr-rowacts { display: flex; gap: var(--s2); flex: none; }
-.dr-tick, .dr-drop, .dr-more-btn {
-  flex: none; min-height: 42px; padding: 9px 16px; border-radius: 999px;
-  border: 1px solid var(--hairline-strong); font-size: var(--text-sm); color: var(--ink); white-space: nowrap;
-}
-.dr-tick:hover, .dr-more-btn:hover { border-color: var(--accent-text); color: var(--accent-text); background: var(--accent-wash); }
-.dr-tick.is-slip:hover, .dr-drop:hover { border-color: var(--alert); color: var(--alert); background: var(--alert-wash); }
 /* Less weight than Today, but still visibly a control. With no border at all it
    stopped reading as tappable and the row looked like one button and a caption.
    A hairline, muted text, and it never takes half the row on a phone. */
-.dr-drop { color: var(--muted); border-color: var(--hairline); padding-inline: var(--s3); }
-.dr-drop:hover { border-color: var(--alert); }
-.dr-rest { justify-content: center; }
-.dr-more-btn { color: var(--muted); }
 .dr-said { font-size: 0.6875rem; color: var(--progress); flex: none; animation: dr-said var(--t-slow) both; }
 @keyframes dr-said { from { opacity: 0; transform: translateX(8px) } to { opacity: 1; transform: none } }
 /* The signature: a row he has just settled fills green and stays put. It stays
    in the list rather than vanishing, which is what made the list jump. */
-.dr-row.is-fixed { animation: dr-settle var(--t-slow) both; }
 @keyframes dr-settle {
   0% { background: color-mix(in srgb, var(--progress) 20%, transparent) }
   100% { background: transparent }
 }
-.dr-row.is-fixed .dr-rowname { color: var(--muted); }
-.dr-slips { flex-wrap: wrap; }
-.dr-slipwrap { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s2); }
 
 .dr-foot {
   flex: none; width: min(920px, 100%); display: flex; align-items: center; gap: var(--s4);
   padding: var(--s4) var(--gutter) var(--s5); border-top: 1px solid var(--hairline); background: var(--bg);
 }
-.dr-footleft { display: flex; align-items: center; gap: var(--s4); }
-.dr-footacts { margin-left: auto; display: flex; align-items: center; gap: var(--s4); }
 .dr-back, .dr-skip { font-size: var(--text-sm); color: var(--faint); padding: 10px 6px; min-height: 44px; }
 .dr-back:hover, .dr-skip:hover { color: var(--accent-text); }
 .dr-go { padding: 12px 22px; font-size: var(--text-base); }
 
 @media (max-width: 640px) {
   .dr-body { padding-top: var(--s4); }
-  .dr-rail { margin-bottom: var(--s4); }
-  .dr-row { flex-wrap: wrap; }
-  /* Only the two-button task rows split the width. On a single-button habit row
-     this gave a 420px pill next to a name squeezed onto two lines. */
-  .dr-rowacts { width: 100%; }
-  .dr-rowacts .dr-tick { flex: 1; text-align: center; }
-  .dr-rowacts .dr-drop { flex: none; }
-  .dr-footacts { gap: var(--s2); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .dr-screen, .dr-stage, .dr-tile, .dr-list li, .dr-said, .dr-row.is-fixed { animation: none !important; }
-  .dr-seg { transition: none; }
 }
 
 /* ---------- a folder of habits ----------
    His model, 2026-08-11: a routine is a folder and its steps are the habits
    inside it. The head is the routine, the rows are its habits, and the count
    is how far through today it is. */
-.folder-head {
-  width: 100%; display: flex; align-items: center; gap: var(--s3);
-  background: none; border: none; text-align: left; cursor: pointer; min-height: 44px;
-}
 .folder-caret { color: var(--faint); width: 12px; flex: none; transition: transform var(--t-fast); }
-.folder-head[aria-expanded="true"] .folder-caret { transform: rotate(90deg); }
-.folder-head:hover .folder-name { color: var(--accent-text); }
-.folder-name {
-  font-family: var(--font-display); font-weight: 700; font-size: var(--text-base);
-  color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.folder-when { color: var(--faint); white-space: nowrap; }
-.folder-head .col-tot { margin-left: auto; }
-.folder-streak {
-  margin-left: auto; font-size: var(--text-xs); color: var(--progress); font-weight: 600;
-}
-.folder-streak + .col-tot { margin-left: var(--s3); }
 /* The step's own description, kept when steps became habits. One line, and it
    yields to the numbers beside it rather than pushing them off the row. */
 .habit-note {
@@ -5179,7 +4247,6 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   padding-left: var(--s4); border-left: 2px solid var(--hairline-strong);
   max-width: 72ch;
 }
-.run-note { font-size: var(--text-sm); color: var(--muted); line-height: 1.6; }
 .run-example { font-size: var(--text-base); line-height: 1.55; margin-top: var(--s2); }
 .run-alts { display: flex; gap: var(--s3); flex-wrap: wrap; margin-top: var(--s3); }
 .run-alt {
@@ -5194,7 +4261,6 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .run-verdict { display: flex; align-items: baseline; gap: var(--s3); font-size: var(--text-sm); color: var(--muted); }
 .run-verdict.pass { color: var(--progress); }
 .run-best { font-size: var(--text-xs); color: var(--faint); }
-.run-links { display: flex; gap: var(--s2); flex-wrap: wrap; margin-top: var(--s3); }
 .habit-run .mr-typing, .habit-run .mr-pron, .habit-run .mr-stretch { margin-top: var(--s3); }
 
 /* ---------- phone chrome: two dropdowns, nothing that scrolls ----------
@@ -5231,66 +4297,6 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   .phone-pages .kebab-menu { right: 0; left: auto; min-width: 168px; }
   .phone-pages .kebab-menu .is-on { color: var(--accent-text); font-weight: 700; }
 }
-
-/* ---------- Precedent ----------
-   His own evening, quoted back to him. It is deliberately quiet furniture: a
-   hairline and a rule, no card, no shadow, no colour of its own. The only
-   emphasis in it is his own sentence, because that is the part doing the work
-   and everything around it is scaffolding. */
-.precedent {
-  margin: var(--s4) 0;
-  padding: var(--s4) 0 var(--s4) var(--s4);
-  border-left: 2px solid var(--accent);
-}
-.pr-head { font-size: var(--text-base); color: var(--ink); line-height: 1.5; max-width: 62ch; }
-.pr-quote {
-  margin: var(--s3) 0 0; display: flex; flex-direction: column; gap: 2px;
-  max-width: 62ch;
-}
-.pr-quote-text {
-  font-family: var(--font-display); font-size: var(--text-lg); line-height: 1.4; color: var(--ink);
-}
-.pr-quote-day { font-size: var(--text-xs); color: var(--faint); }
-.pr-turn { margin-top: var(--s3); font-size: var(--text-sm); color: var(--muted); max-width: 62ch; }
-.pr-do { display: flex; gap: var(--s2); margin-top: var(--s4); flex-wrap: wrap; }
-
-/* ---- Apps ----
-   A shelf of icons, and one app at a time when he opens one. */
-
-/* The same air every other page gets from its Band. Without it the heading sits
-   on the navigation with nothing between them. */
-.apps-h { padding: var(--s6) 0 var(--s5); }
-
-.apps-shelf {
-  list-style: none;
-  display: flex; flex-wrap: wrap; gap: var(--s3);
-}
-.apps-tile {
-  /* Fixed, so six apps read as six icons on a shelf rather than stretching into
-     a toolbar the width of an ultrawide. */
-  width: 132px;
-  display: flex; flex-direction: column; align-items: center; gap: var(--s2);
-  padding: var(--s4) var(--s2);
-  border: 1px solid var(--hairline-strong); border-radius: var(--r-md);
-  background: var(--card);
-  /* The shelf mixes <a> (an app that opens in a tab) with <button> (an app that
-     frames here). Without this the anchor picks up the browser's blue underline
-     and one tile in the row looks broken. */
-  color: var(--ink); text-decoration: none;
-  transition: border-color var(--t-fast), background var(--t-fast), transform var(--t-fast);
-}
-.apps-tile:hover {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 6%, var(--card));
-  transform: translateY(-1px);
-}
-.apps-ico {
-  width: 46px; height: 46px; flex: none; border-radius: 12px;
-  display: grid; place-items: center; color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-}
-.apps-ico svg { width: 25px; height: 25px; }
-.apps-name { font-weight: 600; text-align: center; }
 
 /* One app, open. */
 .apps-open { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; padding: var(--s5) 0 var(--s4); }
@@ -5544,16 +4550,12 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 
 /* The helmet button. Square, so it reads as an instrument switch beside the
    Zone's pill rather than as a second label. */
-.btn-helmet { padding: 0 var(--s3); }
 .helmet { display: block; }
-.btn-helmet.is-on { color: var(--accent-text); border-color: var(--accent); }
 /* His artwork is one filled silhouette with the eyes cut out of it, so the
    whole helmet carries the state rather than the eyes alone. Quiet when the
    mode is off, lit when it is on, and it comes up rather than snapping. */
 .helmet { transition: color var(--t-med), opacity var(--t-med); opacity: 0.62; }
-.btn-helmet:hover .helmet { opacity: 1; }
 .helmet.lit { opacity: 1; }
-.shell.is-hud .btn-helmet { color: var(--accent-text); }
 
 /* ---------- Assistant ----------
    Two states, and they are different rooms.
@@ -5988,10 +4990,6 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .as-voice-btn:active:not(:disabled) { transform: translateY(0); transition-duration: 60ms; }
 .as-voice-btn:disabled { cursor: default; opacity: 0.55; }
 
-@media (prefers-reduced-motion: reduce) {
-  .as-wave-bar { transition: none; }
-}
-
 /* The doorway's row of things he does rather than types: the morning brief
    and the five skills beside it, one design throughout. Filled rather than
    outlined, because these are buttons, not suggestions, and used to be split
@@ -6273,19 +5271,13 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   overflow: visible;
 }
 .as-mark path { fill: currentColor; }
-.as-mark-far { opacity: 0.14; }
-.as-mark-mid { opacity: 0.3; }
-.as-mark-core { opacity: 0.85; }
 
 /* Working. The body swells and churns, which is the one place motion here
    stands for effort rather than for a measurement. */
-.as-mark.is-thinking .as-mark-far { opacity: 0.2; }
-.as-mark.is-thinking .as-mark-mid { opacity: 0.38; }
 
 @media (prefers-reduced-motion: reduce) {
   /* The component stops its own frame loop as well; this is the paint. */
   .as-mark path { opacity: 0.5; }
-  .as-mark-core { opacity: 0.85; }
 }
 
 /* ==========================================================================
@@ -6691,7 +5683,6 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   --a-r-xs: 2px; --a-r-sm: 3px; --a-r-md: 4px; --a-r-lg: 5px;
 }
 
-
 /* ---- direction A: the room's own components, on the system ---- */
 /* Hover is the accent wiping in from the left with a bar down the edge. It was
    a grey wash, and he said so plainly. */
@@ -6748,12 +5739,10 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   .troom *, .troom *::before, .troom *::after { animation: none !important; transition-duration: 1ms !important; }
 }
 
-
 /* On the ink card lime is a foreground again: 15.33:1 there, against 1.17:1 on
    paper. The rule is about the surface, not about the colour. */
 .troom .tr-card--ink .tr-hot,
 .troom .tr-card--ink .tr-n.is-hot { color: var(--t-hot); }
-
 
 /* ---- contrast corrections, measured not eyeballed ----
    Every one of these was found by reading the computed colour of each text node
@@ -7029,100 +6018,12 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 }
 .projcard-new:hover { border-color: var(--a-accent-text); color: var(--a-accent-text); box-shadow: none; }
 
-.statusbadge { display: inline-flex; align-items: center; gap: 6px; font: 800 12px/1 var(--font-body); letter-spacing: 0.12em; text-transform: uppercase; padding: 7px 11px; border-radius: var(--a-r-xs); white-space: nowrap; }
-.statusbadge.s-track { background: var(--a-accent-wash); color: var(--a-accent-text); }
-.statusbadge.s-soon { background: var(--a-warn-wash); color: var(--a-warn); }
-.statusbadge.s-quiet { background: var(--a-alert-wash); color: var(--a-alert); }
-.statusbadge.s-never { background: var(--surface-2); color: var(--soft); }
-/* The evidence column is the reason to pick up the phone, and a fixed 220px ellipsis cut it off
-   on every row while the name column took 1450px it had no use for. */
-.ctable { table-layout: fixed; }
-/* Name takes what its content needs, the score sits next to it rather than 770px away, and the
-   number is in the row so the list can actually be dialled from. */
-/* Fixed, not a percentage. Under table-layout: fixed a percentage on the first column absorbs
-   every extra pixel of a wide screen, which left "Why call them" stuck at 88px and ellipsised at
-   1440, 2560 and 3440 alike: the one column the table is opened for. Everything else is fixed too,
-   so the slack lands on the last column, which is the one that wants it. */
-.ctable th:nth-child(1), .ctable td:nth-child(1) { width: 290px; }
-.ctable td.name b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.ctable th:nth-child(2), .ctable td:nth-child(2) { width: 104px; }
-.ctable th:nth-child(3), .ctable td:nth-child(3) { width: 176px; }
-.ctable th:nth-child(4), .ctable td:nth-child(4) { width: 116px; }
-.ctable th:nth-child(5), .ctable td:nth-child(5) { width: 210px; }
-.ctable th:nth-child(6), .ctable td:nth-child(6) { width: 86px; }
-.ctable th:last-child, .ctable td:last-child { width: auto; }
-.ctable th { white-space: nowrap; }
-.ctable td { vertical-align: top; }
-/* Eight thousand rows of the same colour and the eye loses its place mid-row. Every other row
-   gets a shade, and the row under the cursor gets a stronger one. */
-.ctable tbody tr:nth-child(even) { background: var(--surface-2); }
-.ctable tbody tr:hover td { background: var(--a-accent-wash); }
-.ctable td.col-phone-none, .col-phone-none { color: var(--faint); font-size: 0.78rem; }
-/* Reason wraps and the row grows with it, the way a spreadsheet cell does, instead of clamping. */
-.ctable td.col-why { max-width: none; white-space: normal; overflow: visible; color: var(--soft); font-size: 0.8125rem; line-height: 1.45; padding-block: 11px; }
-/* Category is a real column now, so it gets to be read rather than ellipsised at 220px. */
-.ctable td:nth-child(5).ellipsis { max-width: none; white-space: normal; }
-
-/* One cell, three ways to reach them. display:flex on a <td> is unreliable, so the box is inside. */
-.cta-call { color: var(--a-accent-text); font-weight: 600; font-size: 0.84rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.cta-call:hover { text-decoration: underline; }
-.cta-row { display: flex; gap: var(--s2); }
-.cta-mail, .cta-web { color: var(--soft); font-size: 0.76rem; text-decoration: underline; }
-.cta-mail:hover, .cta-web:hover { color: var(--a-accent-text); }
-
-.th-info {
-  display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px;
-  margin-left: 6px; border-radius: 50%; border: 1px solid var(--a-line-2); background: none;
-  color: var(--faint); font: 700 10px/1 var(--font-body); cursor: pointer; vertical-align: 1px;
-}
-.th-info:hover { color: var(--a-accent-text); border-color: var(--a-accent-text); }
-.scorehelp {
-  background: var(--surface); border: 1px solid var(--a-line-2); border-radius: var(--a-r-lg);
-  padding: var(--s4); margin-bottom: var(--s4); font-size: 0.875rem; line-height: 1.55; max-width: 780px;
-}
-.scorehelp ul { margin: var(--s3) 0; padding-left: 1.1rem; }
-.scorehelp li { margin-bottom: 4px; color: var(--soft); }
-.scorehelp li b { color: var(--ink); font-weight: 600; }
-
-/* Row one: which list on the left, how it is drawn on the right. */
-.kindrow-right { display: flex; align-items: center; gap: var(--s2); }
-.kind-sm button { padding: 8px 16px; font-size: 0.8125rem; }
-.iconbtn {
-  display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px;
-  border: 1px solid var(--a-line-2); border-radius: 999px; background: var(--surface);
-  color: var(--soft); cursor: pointer; flex: none;
-}
-.iconbtn:hover { color: var(--a-accent-text); border-color: var(--a-accent-text); }
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-
 /* Row two: search, the score floor, and everything else behind one toggle. */
-.cpage-morefilters { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; flex-basis: 100%; margin-top: var(--s2); }
-.filtercount {
-  display: inline-flex; align-items: center; justify-content: center; min-width: 17px; height: 17px;
-  margin-left: 6px; padding: 0 4px; border-radius: 999px; background: var(--a-accent); color: var(--a-ink);
-  font: 700 10px/1 var(--font-body);
-}
-.pager { display: flex; align-items: center; gap: var(--s3); padding: var(--s3); border-top: 1px solid var(--a-line-2); flex-wrap: wrap; }
-.pager-at { font-size: 0.8125rem; color: var(--soft); font-variant-numeric: tabular-nums; }
-.pager-size { width: 150px; margin-left: auto; }
-@media (max-width: 700px) { .pager-size { margin-left: 0; width: 100%; } }
-/* The clamp goes on an inner box. Putting -webkit-box on the <td> itself broke the cell at 390px:
-   the third line was sliced through the glyphs and row heights went irregular. */
-.clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-
-/* Pipeline stage badges -- same shape, a five-step semantic run from
-   not-yet-started to closed, not the three-step relationship-freshness
-   colors above. */
-.statusbadge.st-reach_out { background: var(--a-info-wash); color: var(--a-info); }
-.statusbadge.st-conversation { background: var(--a-progress-wash); color: var(--a-progress); }
-.statusbadge.st-acquired { background: var(--a-accent-wash); color: var(--a-accent-text); }
-.statusbadge.st-lost { background: var(--a-alert-wash); color: var(--a-alert); }
 
 /* Kind is the primary decision on this page -- People or Pipeline changes
    what the whole board means -- so it gets the same visual weight as the
    app's own Space switcher: big filled pills, not a small Segmented tucked
    in a corner next to Board/Table, which is a secondary choice. */
-.kindrow { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); flex-wrap: wrap; margin-bottom: var(--s4); }
 .kind { display: inline-flex; gap: 3px; border: 1px solid var(--a-line-2); border-radius: 999px; padding: 4px; background: var(--surface); box-shadow: var(--a-lift); }
 .kind button {
   border: none; background: none; padding: 11px 22px; border-radius: 999px; font-size: var(--text-sm); font-weight: 700;
@@ -7130,14 +6031,8 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 }
 .kind button[aria-pressed="true"] { background: var(--a-accent); color: var(--a-ink); }
 .kind button:not([aria-pressed="true"]):hover { color: var(--ink); }
-.cpage-subrow { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; margin-bottom: var(--s3); }
 /* The search takes the slack but stops short of the full width, so it reads as a field rather
    than a banner. */
-.cpage-search { flex: 1 1 260px; max-width: 420px; }
-.cpage-filter { width: 200px; }
-@media (max-width: 520px) { .cpage-filter { width: 100%; } }
-
-.cboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s4); align-items: start; }
 /* align-items: stretch (not the base's start) is load-bearing for drag and
    drop: with "start" a short column's box is only as tall as its own
    content, so dropping into the empty-looking space below a one-card
@@ -7147,207 +6042,34 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    An earlier pass here narrowed empty lanes to reclaim ultrawide space; that
    is dropped, because a lane you cannot drop into is worse than a wide empty
    one, and the table is the default view for a sourced pipeline anyway. */
-.cboard-pipeline { grid-template-columns: repeat(5, minmax(200px, 1fr)); overflow-x: auto; min-width: 0; padding-bottom: 4px; align-items: stretch; }
-@media (max-width: 860px) { .cboard { grid-template-columns: 1fr; } }
-@media (max-width: 1100px) { .cboard-pipeline { grid-template-columns: repeat(5, 220px); } }
-/* Colour lives on the column, once, via --stage-c -- a top stripe and a
-   dot, not five different badge hues repeated on every card inside it. */
-.ccol { border-top: 3px solid var(--stage-c, var(--hairline-strong)); padding-top: var(--s3); min-width: 0; min-height: 90px; }
-.ccol-head { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s3); }
-.ccol-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--stage-c, var(--faint)); flex: none; }
-.ccol-name { font-size: 0.8rem; font-weight: 800; letter-spacing: 0.02em; }
-.ccol-count { font-size: var(--text-xs); color: var(--faint); font-variant-numeric: tabular-nums; margin-left: auto; }
-.ccol-fold { border: none; background: none; color: var(--faint); font-size: var(--text-xs); font-weight: 700; cursor: pointer; padding: 2px 4px; }
-.ccol-fold:hover { color: var(--ink); }
-.ccol-empty { color: var(--faint); font-size: var(--text-sm); }
 
 /* ---- Avatars: a stable colour and initials give a card and a table row
    something to scan by, which plain name-plus-caption text never did. ---- */
 .avatar { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: #fff; font-weight: 800; flex: none; }
-.namecell { display: flex; align-items: center; gap: var(--s2); }
-
-/* Border only, no box-shadow -- matches .ctable-wrap's own flat treatment
-   elsewhere on this page. A shadow here also has nowhere safe to fall:
-   .cboard-pipeline scrolls (overflow-x: auto forces overflow-y non-visible
-   too, per spec, the moment either axis isn't "visible"), so a card near an
-   edge had its shadow hard-clipped into exactly the stray "shading" look
-   flagged as broken, not a soft ambient lift. */
-.leadcard {
-  display: block; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--hairline);
-  border-radius: var(--a-r-lg); padding: var(--s3) var(--s4); margin-bottom: var(--s3);
-  cursor: pointer; transition: border-color var(--t-fast), transform var(--t-fast);
-}
-.leadcard:hover { border-color: var(--a-accent-text); transform: translateY(-1px); }
-.leadcard-top { display: flex; align-items: center; gap: var(--s3); }
-.leadcard-name { font-size: 0.9375rem; font-weight: 700; line-height: 1.25; }
-.leadcard-sub { color: var(--faint); font-size: 0.75rem; margin-top: 1px; }
-.leadcard-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); margin-top: var(--s2); }
-.leadcard-age { font-size: 0.71rem; color: var(--faint); font-weight: 600; }
-.leadcard-age.is-stale { color: var(--a-warn); }
-.leadcard-next { font-size: 0.71rem; color: var(--soft); background: var(--surface-2); padding: 3px 8px; border-radius: 999px; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* Sourced leads. A score is plain data, so it takes info-slate and never the
-   accent: the accent on this page already means the active space and the
-   Acquired lane, and a number that appears on three thousand cards is not
-   competing for that. */
-.leadscore {
-  font-variant-numeric: tabular-nums; font-weight: 800; font-size: 0.8125rem; line-height: 1;
-  color: var(--info); background: var(--info-wash); border-radius: var(--a-r-xs);
-  padding: 6px 8px; flex: none;
-}
-.leadscore-sm { margin-left: auto; align-self: flex-start; }
-.leadcard-offer {
-  display: flex; align-items: baseline; justify-content: space-between; gap: var(--s2);
-  margin-top: var(--s2); padding-top: var(--s2); border-top: 1px solid var(--a-line-2);
-  font-size: 0.75rem; font-weight: 700; min-width: 0;
-}
-.leadcard-offer b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.leadcard-offer span { font-weight: 600; color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; flex: none; }
-.ccol-more {
-  width: 100%; margin-top: var(--s2); padding: 9px; border: 1px dashed var(--a-line-2); background: none;
-  border-radius: var(--a-r-xs); color: var(--soft); font: 600 0.78rem var(--font-body); cursor: pointer;
-}
-.ccol-more:hover { border-color: var(--a-accent-text); color: var(--a-accent-text); }
-.callrow { display: flex; gap: var(--s2); margin: 0 0 var(--s4); flex-wrap: wrap; }
-.callbtn { text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
-.callrow-none { color: var(--soft); font-size: 0.8125rem; margin: 0 0 var(--s4); }
-.leadevidence-top { font-size: 0.9375rem; line-height: 1.5; margin: 0 0 var(--s4); padding-left: var(--s3); border-left: 2px solid var(--info); }
-.leadofferwrap { border: 1px solid var(--a-line-2); border-radius: var(--a-r-xs); padding: var(--s3); margin-top: var(--s3); }
-.leadofferwrap > summary { cursor: pointer; display: flex; justify-content: space-between; gap: var(--s3); align-items: baseline; font-size: 0.875rem; }
-.leadofferwrap > summary span { color: var(--faint); font-size: 0.8125rem; text-align: right; }
-.leadofferwrap[open] > summary { margin-bottom: var(--s3); padding-bottom: var(--s3); border-bottom: 1px solid var(--a-line-2); }
 /* Touch targets. The stage pills are the primary action in the drawer and were 33px. */
 @media (max-width: 640px) {
   .stagepick-btn, .seg.seg-sm button, .cpage-filter, .logbtn { min-height: 44px; }
-  .cpage-subrow { width: 100%; }
 }
-.cpage-import { cursor: pointer; }
 /* No negative top margin: it pulled this line up into the filter row above and the two collided. */
-.cpage-importmsg { color: var(--soft); font-size: 0.8125rem; margin: 0 0 var(--s3); }
-.cpage-warn { background: var(--a-alert-wash); color: var(--a-alert); font-size: 0.8125rem; padding: var(--s3); border-radius: var(--a-r-xs); margin: 0 0 var(--s4); }
-.cpage-search { width: 210px; }
-.leadscore i { font-style: normal; font-weight: 600; opacity: 0.65; font-size: 0.72em; }
-.detailsblock { border: 1px solid var(--a-line-2); border-radius: var(--a-r-xs); padding: var(--s3); margin-bottom: var(--s4); }
-.detailsblock > summary { cursor: pointer; font-size: 0.8125rem; color: var(--soft); }
-.detailsblock[open] > summary { margin-bottom: var(--s3); }
-.cpage-filtertoggle { display: none; }
 @media (max-width: 700px) {
-  .cpage-search { flex: 1; width: auto; min-width: 140px; }
   /* The board is a lane scroller on touch and CLAUDE.md says phone is a stacked list by design,
      so the toggle is a control that only costs a row here. */
-  .cpage-subrow .seg.seg-sm { display: none; }
-  .kindrow { margin-bottom: var(--s3); gap: var(--s2); }
   .page > .band { margin-bottom: var(--s2); }
-  .cpage-importmsg { margin: 0 0 var(--s2); }
-  .cpage-filtertoggle { display: inline-flex; align-items: center; min-height: 44px; }
-  /* Folded away until Filters is pressed: on a phone these five controls were the whole screen. */
-  .cpage-subrow:not(.is-open) .cpage-foldable { display: none; }
-  .cpage-subrow.is-open { flex-wrap: wrap; }
-  .cpage-subrow.is-open .cpage-foldable { width: 100%; }
-}
-
-.leadblock { border-top: 1px solid var(--a-line-2); margin: var(--s4) 0; padding-top: var(--s4); }
-.leadblock-head { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s3); flex-wrap: wrap; }
-.leadband { font: 800 11px/1 var(--font-body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--soft); }
-.leadwhere { font-size: 0.75rem; color: var(--faint); margin-left: auto; }
-.leadevidence { margin: 0 0 var(--s3); font-size: 0.9375rem; line-height: 1.5; }
-.leadevidence-more { margin: 0 0 var(--s3); padding-left: 1.1rem; color: var(--soft); font-size: 0.8125rem; line-height: 1.55; }
-.leadfacts { display: grid; gap: 2px; margin-bottom: var(--s4); }
-.leadfacts > div { display: flex; gap: var(--s3); font-size: 0.8125rem; padding: 5px 0; border-bottom: 1px solid var(--a-line-2); }
-.leadfacts span { color: var(--faint); min-width: 108px; flex: none; }
-.leadfacts b { font-weight: 600; }
-.leadfacts a { color: var(--a-accent-text); overflow-wrap: anywhere; }
-.leadoffer { margin: 0; display: grid; gap: var(--s3); }
-.leadoffer > div { display: grid; grid-template-columns: 112px 1fr; gap: var(--s3); align-items: start; }
-.leadoffer dt { font: 700 11px/1.4 var(--font-body); letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
-.leadoffer dd { margin: 0; font-size: 0.875rem; line-height: 1.55; }
-@media (max-width: 560px) {
-  .leadoffer > div { grid-template-columns: 1fr; gap: 2px; }
-  .leadfacts > div { flex-direction: column; gap: 0; }
 }
 
 /* The table view: same sortable-header recipe used nowhere else yet, so
    this is the one place it's spelled out rather than copied. */
-.ctable-wrap { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--a-r-lg); overflow: hidden auto; }
-.ctable { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
-.ctable th {
-  text-align: left; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
-  padding: var(--s3) var(--s4); border-bottom: 1px solid var(--hairline-strong); cursor: pointer; white-space: nowrap; user-select: none;
-}
-.ctable th:hover { color: var(--ink); }
-.ctable th .arrow { opacity: 0.5; font-size: 10px; margin-left: 3px; }
-.ctable td { padding: var(--s3) var(--s4); border-bottom: 1px solid var(--hairline); vertical-align: middle; }
-.ctable tr:last-child td { border-bottom: none; }
-.ctable tbody tr { cursor: pointer; }
-.ctable tbody tr:hover { background: var(--surface-2); }
-.ctable td.name b { display: block; font-size: 0.9375rem; }
-
-
-.ctable td.name span { color: var(--faint); font-size: var(--text-xs); }
-.ctable td.ellipsis { color: var(--soft); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media (max-width: 720px) { .ctable-wrap { overflow-x: auto; } .ctable { min-width: 640px; } }
 
 /* Below this width the table is a 658px horizontal scroller nobody finds, so each row becomes a
    two-column card: name and score on one line, then where, then why. Stacking every cell into its
    own full-width band made one lead four screens' worth of rules. */
 @media (max-width: 700px) {
-  .ctable-wrap { overflow-x: visible; }
-  /* table-layout: fixed and the percentage widths above are desktop column sizing; left on, they
-     squash every cell of the stacked card to a fraction of the screen. */
-  .ctable { min-width: 0; table-layout: auto; }
-  .ctable th:nth-child(n), .ctable td:nth-child(n) { width: auto !important; }
-  .ctable thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-  .ctable, .ctable tbody { display: block; width: auto; }
-  .ctable tr {
-    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px var(--s3);
-    border-bottom: 1px solid var(--a-line-2); padding: var(--s3) 0;
-  }
-  .ctable td { border: none; padding: 0; width: auto; display: block; }
-  .ctable td:nth-child(1) { grid-column: 1; grid-row: 1; min-width: 0; }
-  .ctable .namecell { align-items: center; }
-  .ctable td.mono { grid-column: 2; grid-row: 1; text-align: right; font-weight: 700; align-self: start; }
-  .ctable td:nth-child(n+3) { grid-column: 1 / -1; font-size: 0.8125rem; color: var(--soft); }
-  .ctable td:empty { display: none; }
   /* Adding by hand is what the floating button is for; the row only crowds the leads out. */
   .page > .formrow:has(.cpage-import) { display: none; }
 }
-
-/* A slide-in from the right, not the app's centred Sheet -- a reviewed,
-   deliberate exception for this page only (Sheet itself is untouched and
-   still what every other sheet in the app uses). A full CRM record needs
-   the room a right-edge panel gives it that a small centred card doesn't. */
-/* Above the Dock FAB (.dock is also z-index 61, fixed bottom-right, and
-   overlaps this panel's own bottom-right corner where its action buttons
-   sit) rather than level with it, so the FAB never steals a click meant for
-   the panel underneath it. */
-.cpanel-scrim { position: fixed; inset: 0; background: rgba(18, 16, 12, 0.36); z-index: 70; }
-.cpanel {
-  position: fixed; top: 0; right: 0; bottom: 0; width: min(460px, 100%); background: var(--surface);
-  border-left: 1px solid var(--hairline-strong); box-shadow: var(--a-lift-2); z-index: 71;
-  display: flex; flex-direction: column; animation: cpanel-in var(--t-med) cubic-bezier(0.22, 1, 0.36, 1);
-}
 /* A 460px drawer on a 2560px screen wrapped the nine-row offer at about 40 characters while
    1600px of board sat dimmed behind it. 55-70ch is the target measure. */
-@media (min-width: 1100px) { .cpanel { width: clamp(460px, 32vw, 660px); } }
 @keyframes cpanel-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
-.cpanel-head { display: flex; align-items: center; gap: var(--s3); padding: var(--s5) var(--s5) var(--s4); border-bottom: 1px solid var(--hairline); flex: none; }
-.cpanel-head h2 { margin: 0; font-size: var(--text-lg); }
-.cpanel-close { margin-left: auto; border: none; background: var(--surface-2); color: var(--muted); width: 30px; height: 30px; border-radius: 50%; font-size: 16px; cursor: pointer; flex: none; }
-.cpanel-close:hover { color: var(--ink); }
-.cpanel-body { padding: var(--s4) var(--s5) var(--s8); overflow-y: auto; flex: 1; }
-.cpanel-actions { display: flex; gap: var(--s2); justify-content: flex-end; margin-top: var(--s5); }
-
-/* The detail panel's own fields. */
-.logbtn { border: 1px solid var(--hairline-strong); background: none; color: var(--ink); font-size: 0.8125rem; font-weight: 700; padding: 8px 13px; border-radius: 999px; cursor: pointer; }
-.logbtn:hover { border-color: var(--a-accent-text); color: var(--a-accent-text); }
-
-/* Stage as a row of pills you press, not a value picked from a closed
-   dropdown -- the CRM Client card note treats a stage move as the whole
-   point of the board, so it gets a one-click control, not a menu. */
-.stagepick { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: var(--s2); }
-.stagepick-btn { border: 1px solid var(--hairline-strong); background: var(--surface); color: var(--muted); font-size: 0.72rem; font-weight: 700; padding: 7px 11px; border-radius: 999px; cursor: pointer; }
-.stagepick-btn:hover:not(.is-active) { border-color: var(--a-accent-text); color: var(--a-accent-text); }
-.cpanel-whybox { border-color: var(--a-alert) !important; background: var(--a-alert-wash); }
 
 /* ==========================================================================
    DIRECTION A, THE TREATMENT
@@ -7681,9 +6403,6 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   padding: 0 var(--s3) 15px calc(var(--s3) + var(--s5));
 }
 .goal-detail p { margin: 0; font-size: 14px; color: var(--a-soft); }
-.goal-detail .goal-ms { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); margin: 0; padding: 0; list-style: none; }
-.goal-detail .goal-ms-item { display: flex; align-items: center; gap: var(--s2); font-size: 14px; }
-.goal-detail .goal-ms-item.done { color: var(--a-soft); text-decoration: line-through; }
 
 @media (max-width: 1100px) {
   .goal-row { grid-template-columns: minmax(0, 1fr) 84px 68px 40px; }
@@ -8225,62 +6944,6 @@ iframe.tl-media { pointer-events: none; }
 .tl-setshot:hover { background: var(--tl-hot); color: #08090A; }
 .tl-setshot.is-hot { background: var(--tl-hot); color: #08090A; }
 
-/* THE RIGHT HALF IS TWO ROWS, top the life he keeps, bottom the one he lets
-   go. No footage here on his instruction: one thing to fill in per stop. */
-/* Was an even 1fr/1fr grid, which is right when both sides are a caption
-   long. The narrative reads much longer now, and a fixed half-height row
-   only ever had one way to handle text taller than that: clip it, silently,
-   at the bottom of whichever screen was short enough to trigger it (a
-   1440x900 laptop, not just a phone). Flex with flex-shrink:0 lets a side
-   grow past its 50% share when its own content needs it, and the column
-   scrolls as one unit instead of clipping either half. */
-/* The footer sits fixed over the bottom of this column (see .tl-livesfoot),
-   so whatever ends up scrolled to the very end has to clear it -- that
-   reserve now lives on the scroll container itself, not on "whichever side
-   happens to render last", since the two are no longer the same thing once
-   either side can outgrow its 50% share. */
-.tl-sides { position: relative; height: 100%; overflow-y: auto; display: flex; flex-direction: column;
-  padding-bottom: clamp(96px, 12vh, 150px); }
-.tl-side { position: relative; display: flex; flex-direction: column; justify-content: center;
-  flex: 0 0 50%; gap: 18px; padding: clamp(24px, 3.2vw, 52px); }
-.tl-side.is-push { background: radial-gradient(120% 130% at 80% 0%, #1A210C, #0C0F06 72%); }
-.tl-side.is-drift { background: radial-gradient(120% 130% at 80% 100%, #141416, #0A0A0B 72%);
-  border-top: 1px solid rgba(242, 240, 234, 0.07); }
-.tl-pill { align-self: flex-start; padding: 9px 15px; border-radius: 999px;
-  font: 700 10px/1 var(--font-body); letter-spacing: 0.2em; text-transform: uppercase;
-  background: #17181A; color: var(--tl-dim); box-shadow: inset 0 0 0 1px rgba(242, 240, 234, 0.09); }
-.tl-side.is-push .tl-pill { background: #1B2109; color: var(--tl-hot);
-  box-shadow: inset 0 0 0 1px rgba(198, 242, 74, 0.28); }
-.tl-said { margin: 0; max-width: 18ch; font-family: var(--font-display); font-weight: 800;
-  letter-spacing: -0.03em; line-height: 1.08; font-size: clamp(20px, 2.3vw, 38px); color: var(--tl-ink); }
-
-/* Six categories, one card each, on both sides -- the paragraph made him read
-   to find the point, so now a category IS the point: a label, a real value,
-   one short line under it. Two columns fit the card's own width without
-   forcing six rows into a narrow strip; three-plus columns will get cramped
-   before the section is, so it stops at two regardless of how wide the
-   screen is. */
-.tl-domains { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; margin: 0; max-width: 54ch; }
-.tl-domain { padding: 12px 14px; border-radius: 10px; background: rgba(242, 240, 234, 0.05);
-  box-shadow: inset 0 0 0 1px rgba(242, 240, 234, 0.08); }
-.tl-domain dt { font: 700 9.5px/1 var(--font-body); letter-spacing: 0.19em; text-transform: uppercase;
-  color: var(--tl-faint); }
-.tl-domain dd { margin: 6px 0 4px; font-family: var(--font-display); font-weight: 800;
-  font-size: clamp(16px, 1.5vw, 21px); letter-spacing: -0.02em; line-height: 1.15; color: var(--tl-hot); }
-.tl-domains.is-dead .tl-domain dd { color: var(--tl-no); }
-.tl-domain p { margin: 0; font: 500 12.5px/1.4 var(--font-body); color: var(--tl-dim); }
-/* A card carrying his own multi-scenario numbers (300 vs 500 vs 1,000 a
-   month, say) needs the full row's width to read as numbers rather than
-   wrap into an unreadable column -- the one card per horizon that actually
-   needs it spans both, the rest stay a normal two-up grid. */
-.tl-domain.has-rows { grid-column: 1 / -1; }
-.tl-domain-rows { list-style: none; margin: 2px 0 6px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
-.tl-domain-rows li { font: 600 12.5px/1.35 var(--font-mono); color: var(--tl-ink); }
-/* Day zero's own honest line still needs somewhere to sit -- the one case
-   with nothing to put in a category yet. */
-.tl-under { margin: 0; font: 600 clamp(16px, 1.7vw, 21px)/1.44 var(--font-body); letter-spacing: -0.006em;
-  color: var(--tl-ink); max-width: 54ch; }
-
 /* On the seam between the two futures, which is what the number measures. */
 /* Used to float at the vertical center of an even 1fr/1fr split, which was
    always exactly the seam between the two futures. Now that either side can
@@ -8289,49 +6952,12 @@ iframe.tl-media { pointer-events: none; }
    whatever text happened to be at that fixed offset. It sits in normal flow
    between the two <section>s instead, which is where the seam actually is
    regardless of how long either side's text runs. */
-.tl-gap { position: relative; flex: none; align-self: flex-start;
-  margin: 0 0 0 clamp(24px, 3.2vw, 52px); text-align: center; background: #08090A;
-  border-radius: 999px; padding: 14px 18px; z-index: 3; box-shadow: 0 0 0 1px rgba(242, 240, 234, 0.1); }
-.tl-gap b { display: block; font-family: var(--font-display); font-weight: 800; font-size: 21px;
-  letter-spacing: -0.03em; color: var(--tl-hot); white-space: nowrap; }
 
 .tl-close { position: absolute; top: 20px; right: 22px; z-index: 5;
   width: 40px; height: 40px; border: 0; border-radius: 50%; cursor: pointer;
   background: #17181A; color: var(--tl-dim); font-size: 14px;
   box-shadow: inset 0 0 0 1px rgba(242, 240, 234, 0.09); }
 .tl-close:hover { background: rgba(242, 240, 234, 0.14); color: var(--tl-ink); }
-
-.tl-livesfoot { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
-  display: flex; align-items: center; gap: clamp(14px, 2.4vw, 34px);
-  padding: 16px clamp(18px, 3vw, 36px) 20px;
-  /* A SOLID BAR, not a fade. The reel underneath can be anything, and a white
-     frame turned the fade into an unreadable strip of grey on white. */
-  background: #08090A; box-shadow: 0 -1px 0 rgba(242, 240, 234, 0.08); }
-/* FIVE FIXED DOTS BECAME A SCRUBBER, then the scrubber grew a Days/Weeks/
-   Months toggle that only changed the drag increment -- the six futures
-   underneath are the same six tiers regardless of grain (see tierOf), so
-   switching it at rest, or dragging inside a tier, visibly did nothing. The
-   handle now always drags a day at a time, and the stops underneath are the
-   points that actually change the picture: tap one to jump straight there. */
-.tl-scrub { flex: 1 1 420px; min-width: 220px; display: flex; flex-direction: column; gap: 10px; }
-
-/* The focus ring goes on the WRAPPER. An outline around a 4px track renders as
-   a lime pill the width of the window, which reads as a component rather than
-   as focus. */
-.tl-slider { display: flex; flex-direction: column; gap: 10px; padding: 10px 12px 0; border-radius: 12px; }
-.tl-slider:has(input:focus-visible) { box-shadow: inset 0 0 0 2px var(--tl-hot); }
-.tl-slider input { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 3px;
-  background: rgba(242, 240, 234, 0.16); cursor: pointer; }
-.tl-slider input::-webkit-slider-thumb { -webkit-appearance: none; appearance: none;
-  width: 20px; height: 20px; border-radius: 50%; background: var(--tl-hot); border: 0; cursor: grab; }
-.tl-slider input::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%;
-  background: var(--tl-hot); border: 0; cursor: grab; }
-.tl-slider input:focus-visible { outline: none; }
-.tl-stops { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px; }
-.tl-stops button { border: 0; background: #131316; cursor: pointer; border-radius: 999px;
-  font: 700 11px/1 var(--font-body); color: var(--tl-dim); padding: 8px 13px; white-space: nowrap;
-  transition: background var(--a-enter), color var(--a-enter); }
-.tl-stops button.on { background: var(--tl-hot); color: #08090A; font-weight: 800; }
 
 /* ---- the library ---- */
 .tl-lib { position: fixed; inset: 0; z-index: 320; background: rgba(4, 5, 6, 0.82);
@@ -8355,7 +6981,6 @@ iframe.tl-media { pointer-events: none; }
 .tl-libcount span.off b { color: var(--tl-faint); }
 .tl-libfoot { display: flex; align-items: center; gap: 10px; }
 .tl-libfoot .tl-back { margin-left: 0; }
-.tl-livesfoot p { margin: 0; font: 500 12.5px/1.5 var(--font-body); color: var(--tl-dim); max-width: 44ch; }
 .tl-back { margin-left: auto; border: 0; cursor: pointer; border-radius: 999px; padding: 15px 26px;
   background: var(--tl-hot); color: #08090A; font: 800 14px/1 var(--font-body); }
 
@@ -8377,28 +7002,11 @@ iframe.tl-media { pointer-events: none; }
      three rows left barely 80px for the words -- the actual argument this
      screen exists to make. */
   .tl-stage { grid-template-columns: 1fr; grid-template-rows: 26vh 1fr; }
-  .tl-said { font-size: clamp(18px, 5vw, 26px); max-width: 24ch; }
-  .tl-under { font-size: clamp(15px, 4.2vw, 18px); max-width: none; }
-  .tl-domains { max-width: none; gap: 8px 10px; }
-  .tl-domain { padding: 10px 12px; }
-  .tl-domain dd { font-size: 16px; }
-  .tl-side { gap: 12px; }
-  .tl-gap { margin-left: clamp(16px, 5vw, 24px); padding: 10px 14px; }
-  .tl-gap b { font-size: 19px; }
-  .tl-livesfoot { flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px 16px; }
   /* .tl-scrub's 420px flex-basis means WIDTH on the desktop row layout --
      column layout here flips the main axis to vertical, so that same 420px
      became a HEIGHT basis and the footer tried to be 420px of scrub block
      alone. Content decides the height on this axis instead. */
-  .tl-scrub { flex: 0 1 auto; }
   .tl-back { margin-left: 0; }
-  /* The footer is fixed over the bottom of this column and stacks into
-     rows here, which is real height a percentage-based .tl-sides can't see
-     coming -- padding at the end of a scrollable region only helps once
-     scrolled there, and the unscrolled view is what actually loads. Its own
-     box has to end where the footer begins instead, a measured value at this
-     one breakpoint rather than a guess. */
-  .tl-sides { height: calc(100% - 260px); }
 }
 @media (prefers-reduced-motion: reduce) {
   .tl-lives { animation: none; }
@@ -8901,13 +7509,6 @@ iframe.tl-media { pointer-events: none; }
   .runner-close { margin-left: auto; }
 }
 
-/* The folder head and its Start button share one line. Start is outside the
-   disclosure: a button inside a button is not a thing, and reading a routine
-   and running it are two different intentions. */
-.folder-bar { display: flex; align-items: center; gap: var(--s3); }
-.folder-bar .col-head { flex: 1 1 auto; margin-bottom: 0; min-width: 0; }
-.folder-start { flex: none; white-space: nowrap; }
-
 /* ==========================================================================
    THE HEVY PULL, ON THE HABIT IT FILLS
    ==========================================================================
@@ -9310,10 +7911,6 @@ iframe.tl-media { pointer-events: none; }
   display: flex; align-items: flex-start; justify-content: space-between;
   gap: var(--s4); flex-wrap: wrap; margin-bottom: var(--s5);
 }
-.hp-title {
-  font-family: var(--font-display);
-  font-size: var(--text-xl); margin: 0; letter-spacing: -0.01em; color: var(--hp-t1);
-}
 .hp-since { margin: 6px 0 0; color: var(--hp-t2); font-size: var(--text-sm); }
 
 /* ---- range tabs ---- */
@@ -9510,7 +8107,6 @@ iframe.tl-media { pointer-events: none; }
   color: var(--hp-t2); background: var(--hp-card-2);
   border: 1px solid var(--hp-line); border-radius: 999px; padding: 2px 9px;
 }
-.hp-day-parts { font-size: var(--text-xs); color: var(--hp-t3); }
 
 .hp-day-stats { display: flex; gap: var(--s5); flex-wrap: wrap; }
 .hp-stat { display: flex; flex-direction: column; line-height: 1.15; }
@@ -9540,13 +8136,6 @@ iframe.tl-media { pointer-events: none; }
 .hp-part-nums { white-space: nowrap; }
 @media (max-width: 860px) { .hp-parts { padding-left: var(--s5); } }
 
-.hp-bodyrange {
-  display: flex; justify-content: space-between; gap: var(--s3); flex-wrap: wrap;
-  margin-top: var(--s3); padding-top: var(--s3); border-top: 1px solid var(--hp-line);
-  font-size: var(--text-xs); color: var(--hp-t3);
-}
-.hp-value.is-quiet { color: var(--hp-t3); }
-
 .hp-empty {
   color: var(--hp-t2); background: var(--hp-card);
   border: 1px solid var(--hp-line); border-radius: 20px;
@@ -9561,23 +8150,10 @@ iframe.tl-media { pointer-events: none; }
 }
 
 /* ---- the dock's glance ---- */
-.hpdock { display: flex; flex-direction: column; gap: var(--s4); }
-.hpdock-lead { display: flex; align-items: baseline; gap: 8px; }
-.hpdock-lead b { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
-.hpdock-lead span { color: var(--muted); font-size: var(--text-sm); }
-.hpdock-rows { display: flex; flex-direction: column; }
-.hpdock-row {
-  display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3);
-  padding: 7px 0; border-top: 1px solid var(--hairline); font-size: var(--text-sm);
-}
-.hpdock-row:first-child { border-top: 0; }
-.hpdock-row span { color: var(--muted); }
-.hpdock-row b { font-weight: 600; }
 
 @media (prefers-reduced-motion: reduce) {
   .hp-ring-arc, .hp-spark-line, .hp-spark-fill, .hp-spark-tip { animation: none; }
   .hp-spark-line { stroke-dashoffset: 0; }
-  .hp-spark-fill, .hp-spark-tip { opacity: 1; }
 }
 
 /* ---- sync: the button, and the worker's own answer ---- */
@@ -9591,7 +8167,6 @@ iframe.tl-media { pointer-events: none; }
 }
 .hp-sync:hover:not(:disabled) { border-color: var(--hp-line-2); }
 .hp-sync:disabled { cursor: default; color: var(--hp-t2); }
-.hp-spin { animation: hp-turn 1.1s linear infinite; }
 @keyframes hp-turn { to { transform: rotate(360deg); } }
 .hp-syncline {
   margin: 0 0 var(--s4); font-size: var(--text-sm); color: var(--hp-t2);
@@ -9607,10 +8182,6 @@ iframe.tl-media { pointer-events: none; }
 .hp-syncline.is-done { color: var(--hp-move); border-color: color-mix(in srgb, var(--hp-move) 30%, transparent); }
 .hp-syncline.is-failed { color: var(--hp-cardio); border-color: color-mix(in srgb, var(--hp-cardio) 30%, transparent); }
 .hp-since-sync { color: var(--hp-t3); margin-left: 14px; }
-.hpdock-sync { width: 100%; justify-content: center; gap: 6px; }
-.hpdock-note { margin: var(--s2) 0 0; font-size: var(--text-xs); color: var(--muted); }
-.hpdock-note.is-bad { color: var(--alert); }
-@media (prefers-reduced-motion: reduce) { .hp-spin { animation: none; } }
 
 /* ---- the room, split ----
    His ask (2026-09-10): today's list on the left of the instrument, mirroring
@@ -10196,14 +8767,6 @@ iframe.tl-media { pointer-events: none; }
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 
-/* ---- debt: the pile he asked for, drawn from the figure ---- */
-.gp-coins { margin-top: auto; }
-.gp-coins svg { display: block; width: 100%; height: auto; }
-.gp-coin-rim { fill: none; stroke: rgba(224, 96, 58, 0.55); stroke-width: 0.8; }
-.gp-coin-rim.is-lit { stroke: rgba(201, 242, 74, 0.75); }
-.gp-coins-scale { display: flex; justify-content: space-between; margin-top: 6px;
-  font: 600 9.5px/1 var(--font-body); color: var(--tl-faint); }
-
 /* ---- postponed: a ridge per task, its height its age ---- */
 .gp-range { position: relative; margin-top: 4px; }
 .gp-range svg { display: block; width: 100%; height: 96px; }
@@ -10227,9 +8790,6 @@ iframe.tl-media { pointer-events: none; }
 .gp-heat-col { display: grid; grid-template-rows: repeat(7, 16px); gap: 4px; }
 .gp-cell { display: block; width: 16px; height: 16px; border-radius: 3px; background: rgba(242, 240, 234, 0.06); }
 .gp-cell.l1 { background: rgba(190, 232, 60, 0.28); }
-.gp-cell.l2 { background: rgba(190, 232, 60, 0.48); }
-.gp-cell.l3 { background: rgba(190, 232, 60, 0.72); }
-.gp-cell.l4 { background: var(--tl-hot); }
 
 /* ---- habit orbit ---- */
 .gp-orbit { position: relative; width: 100%; max-width: 210px; margin: 0 auto; }
@@ -10321,9 +8881,6 @@ iframe.tl-media { pointer-events: none; }
    removing the overrides is the fix, not writing a smarter one. */
 .gp-panel .gp-read { flex: none; }
 .gp-panel .gp-sub, .gp-panel .gp-line { flex: none; }
-/* A list inside a panel scrolls itself rather than pushing the panel past the
-   screen: the panel is the thing that must not grow. */
-.gp-panel .gp-list, .gp-panel .gp-kinds { min-height: 0; overflow: hidden; }
 
 /* Room for the grid: the countdown is the hero but it does not need to be
    ninety pixels tall to say 154. */
@@ -10335,7 +8892,6 @@ iframe.tl-media { pointer-events: none; }
    collide, and a column of overlapping three-letter words is worse than no
    column at all -- the heatmap still reads as a shape without them. */
 .gp-heat-dow { overflow: hidden; }
-
 
 /* ---- COMPACT, his word ----
    The panels are back in half a window rather than seventy percent of one, and
@@ -10843,7 +9399,6 @@ body:has(.ib-page) #main { padding-bottom: 0; }
    icon. The box does not grow: the icon comes down a size and the name sits
    in the room that frees. */
 .topbar-right .btn-sq, .topbar-right .btn-helmet { flex-direction: column; gap: 3px; }
-.topbar-right .btn-helmet .helmet { width: 16px; height: 16px; }
 .btn-sq-label { font: 600 9px/1 var(--font-body); letter-spacing: 0.02em; text-transform: none; white-space: nowrap; }
 
 /* ---- the promise opens to its numbers (his ask, 2026-09-15) ----
@@ -10947,7 +9502,6 @@ body:has(.shell.is-dark-chrome) .projnav-menu,
 /* Health: the nav on top, the range and Sync right under it. */
 .hp-head-right { flex-direction: column; align-items: flex-end; }
 .hp-head-tools { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; justify-content: flex-end; }
-.board-head { align-items: center; }
 @media (max-width: 639px) {
   .hp-head-right { align-items: flex-start; }
   .hp-head-tools { justify-content: flex-start; }
@@ -10976,7 +9530,6 @@ body:has(.shell.is-dark-chrome) .projnav-menu,
   color: var(--ink); cursor: default;
 }
 .pp-h1 { margin: 0; font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--ink); }
-.pp-bar-rule { width: 1px; align-self: stretch; margin: 2px 0; background: var(--hairline-strong); }
 .pp-add { margin-left: auto; }
 .pp-counts { display: flex; gap: 6px; flex-wrap: wrap; }
 .pp-count {
@@ -10989,17 +9542,6 @@ body:has(.shell.is-dark-chrome) .projnav-menu,
 .pp-count.is-alert b { color: var(--pp-alert); }
 .pp-count.is-warn { background: var(--pp-warn-wash); color: var(--pp-warn); }
 .pp-count.is-warn b { color: var(--pp-warn); }
-.pp-filters { display: flex; gap: 6px; flex-wrap: wrap; }
-.pp-chip {
-  display: inline-flex; align-items: center; gap: 7px; padding: 6px 10px; border-radius: 7px;
-  border: 1px solid var(--hairline-strong); background: var(--surface); font-size: 0.8rem; font-weight: 700; color: var(--muted);
-  transition: transform 160ms var(--pp-ease), background-color 150ms ease, color 150ms ease;
-}
-.pp-chip span { font-size: 0.72rem; color: var(--faint); font-variant-numeric: tabular-nums; }
-.pp-chip:active { transform: scale(0.97); }
-@media (hover: hover) and (pointer: fine) { .pp-chip:hover { background: var(--surface-2); color: var(--ink); } }
-.pp-chip.is-on { background: var(--accent-fill); border-color: transparent; color: #12100C; }
-.pp-chip.is-on span { color: #12100C; }
 
 .pp-stage {
   position: relative; overflow: hidden; min-height: 460px; touch-action: none;
@@ -11173,8 +9715,6 @@ body:has(.pp-page) #main { padding-bottom: 0; }
 .pp-x { border: 0; background: none; color: var(--pp-faint); width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; cursor: pointer; }
 @media (hover: hover) and (pointer: fine) { .pp-x:hover { background: var(--pp-sunk); color: var(--pp-alert); } }
 
-
-
 .pp-danger {
   border: 1px solid rgba(var(--pp-ink-rgb), 0.18); background: none; color: var(--pp-alert); border-radius: 8px; cursor: pointer;
   padding: 8px 12px; font-weight: 700; font-size: 0.82rem; align-self: flex-start; transition: background-color 150ms ease, transform 160ms var(--pp-ease);
@@ -11191,17 +9731,9 @@ body:has(.pp-page) #main { padding-bottom: 0; }
 @keyframes pp-in { from { opacity: 0; transform: scale(0.96); } }
 .pp-dialog h2 { margin: 0; font-size: 1.1rem; font-weight: 800; }
 .pp-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
-
-@media (max-width: 1600px) {
-  .pp-bar-rule { display: none; }
-  .pp-filters { order: 5; flex-basis: 100%; }
-}
 @media (max-width: 760px) {
   .pp-bar { max-width: calc(100% - 2 * var(--s4)); right: var(--s4); padding-left: 12px; }
   .pp-due { top: auto; bottom: calc(var(--s4) + 46px); left: var(--s4); right: var(--s4); width: auto; max-height: 40%; }
-  .pp-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-right: -8px; padding-right: 8px; }
-  .pp-filters::-webkit-scrollbar { display: none; }
-  .pp-chip { flex: none; }
   .pp-count { padding: 4px 7px; font-size: 0.74rem; }
   .pp-card { top: auto; left: 0; width: 100%; height: 72%; border-left: 0; border-top: 1px solid rgba(var(--pp-ink-rgb), 0.10); border-radius: 14px 14px 0 0; transform: translateY(104%); }
   .pp-card.is-open { transform: translateY(0); }
@@ -11438,7 +9970,6 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 
 .lv-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); gap: 0 var(--s5); }
 .lv-two-tight { gap: var(--s4); }
-.lv-list { display: grid; gap: var(--s3); }
 
 .lv-chain { padding-bottom: var(--s4); }
 .lv-chain-top { display: flex; justify-content: space-between; align-items: center; gap: var(--s3); }
@@ -11475,11 +10006,6 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 .lv-day { display: block; aspect-ratio: 1; border-radius: 3px; background: var(--hp-ring-track); position: relative; }
 .lv-day.none { visibility: hidden; }
 .lv-day.l1 { background: color-mix(in srgb, var(--hp-move) 18%, transparent); }
-.lv-day.l2 { background: color-mix(in srgb, var(--hp-move) 34%, transparent); }
-.lv-day.l3 { background: color-mix(in srgb, var(--hp-move) 50%, transparent); }
-.lv-day.l4 { background: color-mix(in srgb, var(--hp-move) 68%, transparent); }
-.lv-day.l5 { background: color-mix(in srgb, var(--hp-move) 84%, transparent); }
-.lv-day.l6 { background: var(--hp-move); }
 .lv-day.perfect::after { content: ''; position: absolute; inset: 34%; border-radius: 50%; background: var(--hp-t1); }
 .lv-day.today { outline: 1.5px solid var(--hp-t1); outline-offset: 1px; }
 .lv-wd { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
@@ -11668,76 +10194,12 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
    Full page width with the app's own gutters, the Habits page's panels, and
    big display digits. Tokens only, so Jarvis repaints it with everything else. */
 .dr-body { padding-inline: var(--gutter); }
-.dr-stage, .dr-rail { width: 100%; max-width: none; }
 .dr-foot { width: 100%; padding-inline: var(--gutter); }
-.dr-stage h1 { max-width: 24ch; font-size: clamp(2.1rem, 1.4rem + 2.4vw, 3.4rem); }
-.dr-stage > .dr-fact { font-size: var(--text-base, 1rem); margin-bottom: var(--s5); }
-
-.dr-replay { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: var(--s5); align-items: start; margin-top: var(--s5); }
-.dr-replay .panel { display: flex; flex-direction: column; gap: var(--s4); padding: var(--s6); box-shadow: var(--a-lift); }
-.dr-bignums { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s6) var(--s4); }
-.dr-big { display: flex; flex-direction: column; gap: 4px; animation: dr-pop var(--t-slow) both; }
-.dr-bignum { font-family: var(--font-display); font-weight: 800; font-size: clamp(2.6rem, 2rem + 1.6vw, 3.6rem); line-height: 1; letter-spacing: -0.02em; color: var(--ink); }
-.dr-big span { font-size: 0.9375rem; color: var(--muted); }
-.dr-big.is-zero .dr-bignum { color: var(--faint); }
-.dr-tl { display: flex; flex-direction: column; gap: var(--s5); max-height: 56vh; overflow-y: auto; }
-.dr-tl-part { display: flex; flex-direction: column; gap: var(--s2); }
-.dr-tl-label { font-size: 0.8125rem; font-weight: 700; color: var(--ink); padding-bottom: var(--s1); border-bottom: 1px solid var(--hairline); }
-.dr-tl-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.dr-tl-item { display: grid; grid-template-columns: 52px 22px minmax(0, 1fr) auto; align-items: center; gap: var(--s3); padding: 12px 0; border-bottom: 1px solid var(--hairline); animation: dr-rise var(--t-med) both; }
-.dr-tl-item:last-child { border-bottom: 0; }
-.dr-tl-time { font-size: 0.9375rem; font-weight: 700; color: var(--ink); }
-.dr-tl-title { font-size: 1.0625rem; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
-.dr-tl-kind { font-size: 0.8125rem; color: var(--muted); white-space: nowrap; }
-.dr-tl-item .dr-check { width: 22px; height: 22px; border-radius: 6px; }
 
 /* Answer steps: a grid of the app's own panels, one card per question. */
-.dr-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: var(--s4); margin-top: var(--s5); }
-.dr-cards .dr-row, .dr-cards .dr-row:first-child {
-  flex-direction: column; align-items: stretch; justify-content: space-between; gap: var(--s4);
-  padding: var(--s5); min-height: 160px; border: 1px solid var(--hairline); border-radius: var(--r-md);
-  background: var(--surface); box-shadow: var(--a-lift); transition: border-color var(--t-med), background var(--t-med);
-}
-.dr-cards .dr-rowname { font-size: 1.25rem; line-height: 1.25; }
-.dr-cards .dr-rowsub { font-size: 0.875rem; color: var(--muted); }
-.dr-cards .dr-rowacts { display: flex; gap: var(--s2); flex-wrap: wrap; }
-.dr-cards .dr-tick { flex: 1; text-align: center; padding-block: 12px; font-size: 0.9375rem; }
-.dr-cards > .dr-row > .dr-tick { width: 100%; }
-.dr-cards .dr-row.is-fixed { border-color: var(--progress); background: color-mix(in srgb, var(--progress) 9%, var(--surface)); box-shadow: none; }
-.dr-cards .dr-said { font-size: 0.875rem; font-weight: 700; align-self: flex-start; }
-.dr-cards .dr-slips { grid-column: 1 / -1; min-height: 0; }
-.dr-all { margin-top: var(--s2); padding: 12px 20px; }
-
-.dr-goalnum { display: flex; align-items: baseline; gap: var(--s2); }
-.dr-goalnum b { font-family: var(--font-display); font-weight: 800; font-size: 2.6rem; line-height: 1; letter-spacing: -0.02em; color: var(--ink); }
-.dr-goalnum span { font-size: 1rem; color: var(--muted); }
-.dr-goalnum em { font-style: normal; margin-left: var(--s2); font-size: 0.9375rem; font-weight: 700; color: var(--progress); }
-.dr-goalbar { display: block; height: 10px; border-radius: 5px; background: var(--hairline); overflow: hidden; }
-.dr-goalbar i { display: block; height: 100%; background: var(--progress); border-radius: 5px; transition: width var(--t-med) var(--ease); }
-
-@media (max-width: 900px) { .dr-replay { grid-template-columns: 1fr; } }
-@media (prefers-reduced-motion: reduce) { .dr-tl-item, .dr-big { animation: none !important; } .dr-goalbar i { transition: none; } }
 
 /* The opening screen is the whole overview now: numbers, timeline, what is
    still open. No full screen for one sentence. */
-.dr-replay { grid-template-columns: minmax(240px, 300px) minmax(0, 1fr) minmax(250px, 320px); }
-.dr-openpanel { gap: var(--s2) !important; }
-.dr-openrow { display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: var(--s3); width: 100%; text-align: left; padding: var(--s3) var(--s3); border: 0; border-radius: var(--r-sm); background: none; font: inherit; color: var(--ink); cursor: pointer; transition: background var(--t-fast, 120ms); }
-.dr-openrow:hover:not(:disabled) { background: var(--accent-wash); }
-.dr-openrow:disabled { cursor: default; opacity: 0.55; }
-.dr-openrow b { font-family: var(--font-display); font-weight: 800; font-size: 2.4rem; line-height: 1; letter-spacing: -0.02em; min-width: 2ch; }
-.dr-openrow span { font-size: 1rem; color: var(--muted); }
-.dr-openrow svg { align-self: center; color: var(--muted); }
-.dr-empty { margin: 0; color: var(--muted); }
-.dr-stage:has(.dr-replay) h1 { margin-bottom: 0; }
-@media (max-width: 1100px) { .dr-replay { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .dr-tlpanel { grid-column: 1 / -1; order: 3; } }
-@media (max-width: 640px) { .dr-replay { grid-template-columns: 1fr; } }
-/* Long titles (a task can be a paragraph) stay two lines and keep the row's
-   time, check and label on its first line. Full text on hover. */
-.dr-tl-item { align-items: start; }
-.dr-tl-time, .dr-tl-kind { line-height: 1.6; }
-.dr-tl-item .dr-check { margin-top: 2px; }
-.dr-tl-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.45; }
 
 /* ---- Yesterday, one page in the Today room's own cards (2026-10-04) ------- */
 .dr-screen { background: var(--a-paper, var(--bg)); }
@@ -11769,7 +10231,6 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 .dr-a.is-drop:hover { border-color: var(--alert); color: var(--alert); }
 .dr-said { font-size: 0.8125rem; font-weight: 700; color: var(--t-hot-text); white-space: nowrap; }
 .dr-carry { margin-top: auto; width: 100%; justify-content: center; }
-.dr-slips { margin-top: auto; padding-top: var(--s3); border-top: 1px solid var(--t-line); display: grid; gap: 8px; }
 .tr-chip.is-said { opacity: 0.6; }
 .dr-goalfoot { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .dr-foot { width: 100%; display: flex; align-items: center; gap: var(--s4); padding: var(--s3) var(--gutter) var(--s4); background: var(--a-paper, var(--bg)); border-top: 1px solid var(--a-line, var(--hairline)); }
@@ -11785,7 +10246,6 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 .dr-lists { align-items: start; }
 .dr-lists > .tr-card { min-height: 0; max-height: 60vh; }
 .dr-carry { margin-top: 16px; }
-.dr-slips { margin-top: 16px; }
 .dr-body { padding-bottom: var(--s8, 64px); }
 .dr-mn { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3; }
 .dr-moments { grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }

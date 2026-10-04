@@ -239,8 +239,7 @@ export async function request(body: Record<string, unknown>, key: string, provid
   let headers: Record<string, string> = { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }
   if (provider === 'zai') {
     const session = await sessionToken()
-    if (!session) return new Response('Sign in to use Z.ai.', { status: 401 })
-    headers = { Authorization: `Bearer ${session}`, 'x-zai-key': key, 'Content-Type': 'application/json' }
+    headers = { ...(session ? { Authorization: `Bearer ${session}` } : {}), 'x-zai-key': key, 'Content-Type': 'application/json' }
   }
   const send = (b: Record<string, unknown>) => fetch(cfg.endpoint, {
     method: 'POST',

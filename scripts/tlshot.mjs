@@ -27,9 +27,9 @@ for (const [w,tag] of [[1600,"desktop"],[430,"mobile"]]) {
   await page.evaluate(([K,key0,key9,key40])=>{
     const s=JSON.parse(localStorage.getItem(K))
     s.tasks=[
-      {id:'a1',title:'Email Moneta about the payment plan',list:'today',done:false,space:'personal',createdAt:key40,plannedOn:key0,estimateMin:30,estimated:true},
-      {id:'a2',title:'Confirm VZP got the form',list:'today',done:false,space:'personal',createdAt:key9,plannedOn:key0,estimateMin:20,estimated:true},
-      {id:'a3',title:'Status-check ARSTAS on documents',list:'backlog',done:false,space:'personal',createdAt:key9},
+      {id:'a1',title:'Email the bank about the payment plan',list:'today',done:false,space:'personal',createdAt:key40,plannedOn:key0,estimateMin:30,estimated:true},
+      {id:'a2',title:'Confirm the insurer got the form',list:'today',done:false,space:'personal',createdAt:key9,plannedOn:key0,estimateMin:20,estimated:true},
+      {id:'a3',title:'Status-check the accountant on documents',list:'backlog',done:false,space:'personal',createdAt:key9},
       {id:'a4',title:'Something fresh',list:'today',done:false,space:'personal',createdAt:key0},
     ]
     s.habits=[

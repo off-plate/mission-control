@@ -9,7 +9,7 @@ const URL = process.argv[2] || 'http://localhost:4199/mission-control'
 const fails = []
 const ok = (n, c, d = '') => { console.log(`${c ? 'PASS' : 'FAIL'}  ${n}${d ? '  (' + d + ')' : ''}`); if (!c) fails.push(n) }
 
-const SENTENCE = 'Morning Michael. Start with the VZP letter, it is the only one with a deadline.'
+const SENTENCE = 'Morning Michael. Start with the insurer letter, it is the only one with a deadline.'
 const WHOLE = JSON.stringify({ say: SENTENCE, show: [{ kind: 'today' }], next: ['Put it on the morning'] })
 
 /* Every shape below is one that was, or would be, shown to him as "the answer
@@ -24,7 +24,7 @@ const SHAPES = [
   { name: 'real newlines inside the string instead of \\n',
     body: `{"say": "Morning, Michael.
 
-Start with the VZP letter.", "show": [{"kind":"today"}]}`, cards: 1 },
+Start with the insurer letter.", "show": [{"kind":"today"}]}`, cards: 1 },
   { name: 'a sentence in front of the JSON',
     body: `Here is your brief.
 ${WHOLE}`, cards: 1 },
@@ -67,7 +67,7 @@ async function run(bodyText, label) {
 for (const shape of SHAPES) {
   const r = await run(shape.body, shape.name)
   ok(`${shape.name}: no error is shown`, r.error === 0, `${r.error} error blocks`)
-  ok(`${shape.name}: the sentence survives`, (r.answer ?? '').includes('VZP letter'), JSON.stringify((r.answer ?? '').slice(0, 60)))
+  ok(`${shape.name}: the sentence survives`, (r.answer ?? '').includes('insurer letter'), JSON.stringify((r.answer ?? '').slice(0, 60)))
   ok(`${shape.name}: ${shape.cards} card(s)`, r.cards === shape.cards, `got ${r.cards}`)
 }
 
@@ -163,7 +163,7 @@ const WHOLE_PARSED = { say: SENTENCE, show: [{ kind: 'today' }], next: [] }
 
 const withKeyAndGeminiUp = await run429WithFallback({ geminiKey: 'AIzaFakeButPresent', geminiOk: true })
 ok('with a Gemini key on hand, the real answer arrives instead of a wait',
-   (withKeyAndGeminiUp.answer ?? '').includes('VZP letter'), JSON.stringify(withKeyAndGeminiUp.answer))
+   (withKeyAndGeminiUp.answer ?? '').includes('insurer letter'), JSON.stringify(withKeyAndGeminiUp.answer))
 ok('and no rate-limit message is shown at all', !withKeyAndGeminiUp.errorText, JSON.stringify(withKeyAndGeminiUp.errorText))
 ok('Gemini was actually the one asked', withKeyAndGeminiUp.geminiWasCalled === true)
 

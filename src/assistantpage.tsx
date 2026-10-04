@@ -598,14 +598,14 @@ function jobsFor(done: Done[]): Job[] {
   const jobs: Job[] = []
   for (const d of done) {
     const card = d.ok && !d.undone ? d.at?.card : undefined
-    const shape = card ? SHAPE_OF[card] : undefined
+    const shape = card ? (d.at?.shape ?? SHAPE_OF[card]) : undefined
     if (!card || !shape) continue
     const colon = d.text.indexOf(': ')
     const verb = (colon > 0 ? d.text.slice(0, colon) : d.text).split(' ')[0]
     const value = colon > 0 ? d.text.slice(colon + 2) : undefined
     const last = jobs[jobs.length - 1]
     if (last?.shape === shape) { last.callouts.push({ label: verb, value }); continue }
-    jobs.push({ shape, callouts: [{ label: TITLES[card] }, { label: verb, value }] })
+    jobs.push({ shape, callouts: [{ label: d.at?.shape === 'prospect' ? 'Business' : TITLES[card] }, { label: verb, value }] })
   }
   return jobs
 }

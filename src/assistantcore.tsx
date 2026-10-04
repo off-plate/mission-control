@@ -228,7 +228,7 @@ export interface Done {
    *  the canvas can open there and mark it (2026-10-04, his ask: the right
    *  side shows where every change went). A task's card is worked out after
    *  the write, from where the row actually ended up. */
-  at?: { card?: CardKind; key?: string }
+  at?: { card?: CardKind; key?: string; shape?: 'prospect' }
 }
 
 /** Loose enough to find "the noon testing task" from "test testing website",
@@ -457,6 +457,8 @@ const LANDS: Record<Action['kind'], CardKind | 'task' | null> = {
   prompt: 'prompts', promptSent: 'prompts', promptDelete: 'prompts',
   workspace: null, open: null, day: null, app: null, sync: null, jarvis: null,
 }
+/** Business pipeline actions: same People card, their own core shape. */
+const PROSPECT_KINDS = new Set<Action['kind']>(['addProspect', 'editProspect', 'touch'])
 /** The card a task sits on right now. */
 export const taskCard = (t: Task, day = localDateKey()): CardKind =>
   t.list === 'today' ? ((t.plannedOn ?? day) > day ? 'planned' : 'today') : 'backlog'
@@ -506,7 +508,7 @@ function useDoer() {
         const r = await step(a, addedThisRun)
         const lands = LANDS[a.kind]
         got = Array.isArray(r) ? r
-          : [r.ok && lands && !r.at && (lands !== 'task' || key) ? { ...r, at: { card: lands === 'task' ? undefined : lands, key } } : r]
+          : [r.ok && lands && !r.at && (lands !== 'task' || key) ? { ...r, at: { card: lands === 'task' ? undefined : lands, key, ...(PROSPECT_KINDS.has(a.kind) ? { shape: 'prospect' as const } : {}) } } : r]
       } catch {
         /* A failed network write (Bills) is a failed line, not a dead turn. */
         got = [no(`${a.kind} could not be saved`)]

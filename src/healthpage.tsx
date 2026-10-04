@@ -20,6 +20,7 @@
 
    Verified with his real rows in a browser (scripts/hpshot.mjs) before it
    was committed, which is the step the last two passes skipped. */
+import { DotField } from './dotfield'
 import { Orb } from './orb'
 import { useMemo, useState } from 'react'
 import {
@@ -373,6 +374,7 @@ export function HealthPage() {
   const days = state.status === 'ok' ? state.days : []
   const sessions = state.status === 'ok' ? state.sessions : []
   const lastRun = state.status === 'ok' ? state.lastRun : null
+  const restingHr = days.reduce<number | null>((acc, d) => (d.resting_hr != null ? d.resting_hr : acc), null)
   const busySync = sync.phase === 'asking' || sync.phase === 'running'
 
   const view = useMemo(() => {
@@ -401,8 +403,12 @@ export function HealthPage() {
         <header className="hp-head">
           <div className="hp-head-lead">
             {/* The watch's pulse: listening while its data is under 12 hours old, still once it goes stale. */}
-            <Orb className="hp-orb" state="listening" size={56} surface="dark" dots={1.5}
-              paused={!lastRun || Date.now() - Date.parse(lastRun.ran_at) > 12 * 3600e3} label="Watch data" />
+            {/* Breathes at a pace set by the latest resting pulse (his pick,
+                2026-10-04); holds still once the watch data is over 12 hours old. */}
+            <span className="hp-breath">
+              <DotField kind="breath" value={restingHr ?? 60} hot="var(--accent-text)"
+                still={!lastRun || Date.now() - Date.parse(lastRun.ran_at) > 12 * 3600e3} />
+            </span>
             <p className="hp-since">
               {lastSession
                 ? <>Last session {fmtDay(lastSession.day)}, <Age day={lastSession.day} /></>

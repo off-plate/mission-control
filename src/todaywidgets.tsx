@@ -10,6 +10,7 @@
    "Focus today" is already the Focused stat tile (troom-stats) -- both
    existed before this file did, and building a second version of either
    would just be the same number drawn twice. */
+import { Orb, momentumOrb } from './orb'
 import { useMemo } from 'react'
 import { useStore } from './store'
 import { bodyStat, dayOf, daysSince, series, useHealth } from './health'
@@ -72,11 +73,16 @@ function CookieJarWidget() {
     [habits, habitLog, tasks, focusSessions, trainedDays],
   )
   const chain = chainOf(run)
+  /* The chain's length read as momentum: a week of days already reads as hard to stop. */
+  const chainOrb = momentumOrb(Math.min(100, chain.current * 7))
   if (run.length === 0) return null
   return (
     <button className="tr-card tr-card--hover tr-widget" onClick={() => setPage('timeline')}>
       <div className="tr-head"><p className="tr-l">The chain</p>
-        <span className="tr-n tr-sm">Day {chain.current}</span></div>
+        <span className="trw-chainfig">
+          <Orb state={chainOrb.state} speed={chainOrb.speed} size={32} tone="--t-hot-text" label={`Chain, day ${chain.current}`} />
+          <span className="tr-n tr-sm">Day {chain.current}</span>
+        </span></div>
       <p className="trw-line">{chainPromiseLine(chain)}</p>
       <div className="trw-dots">
         {Array.from({ length: 7 }, (_, i) => <i key={i} className={i < Math.min(chain.current, 7) ? 'is-on' : ''} />)}

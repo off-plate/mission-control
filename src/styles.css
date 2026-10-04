@@ -10387,9 +10387,22 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 .jv-left h2, .jv-grid .as-canvas-head h2 {
   margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 11px; letter-spacing: 0.2em; color: var(--accent); text-transform: none;
 }
-.jv-slot { display: flex; flex-direction: column; gap: 4px; }
-.jv-slot-name { font-family: var(--font-display); font-size: 9px; letter-spacing: 0.2em; color: var(--muted); }
-.jv-slot-item { font-size: var(--text-sm); line-height: 1.4; overflow-wrap: anywhere; }
+.jv-slot { display: flex; flex-direction: column; }
+.jv-slot-name { font-family: var(--font-display); font-size: 9px; letter-spacing: 0.2em; color: var(--muted); margin-bottom: 4px; }
+/* One task, one block (his report, 2026-10-04: long titles ran together and
+   he could not tell where one ended): a hairline between them and a wash on
+   the one under the pointer. */
+.jv-slot-item {
+  font-size: var(--text-sm); line-height: 1.4; overflow-wrap: anywhere;
+  padding: 7px 8px; margin-inline: -8px; border-radius: 2px;
+  border-top: 1px solid var(--hairline);
+  transition: background-color 120ms ease;
+}
+.jv-slot-name + .jv-slot-item { border-top-color: transparent; }
+@media (hover: hover) and (pointer: fine) {
+  .jv-slot-item:hover { background: var(--accent-wash); border-top-color: transparent; }
+  .jv-slot-item:hover + .jv-slot-item { border-top-color: transparent; }
+}
 .jv-slot-item.is-done { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
 .jv-quiet { margin: 0; color: var(--muted); font-size: var(--text-sm); }
 

@@ -1,4 +1,4 @@
-import { Orb, type OrbState } from './orb'
+import { Orb, OrbChip, type OrbState } from './orb'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from './store'
 import { isMeeting, useCalendar } from './calendar'
@@ -317,9 +317,17 @@ const RIPPLE = [
 
 /* The mark is a thinking orb now (2026-10-04, his ask): the same four moods,
    each its own animation instead of one blob changing speed. */
-const ORB_FOR: Record<MarkState, OrbState> = { idle: 'breathing', thinking: 'working', listening: 'listening', speaking: 'composing' }
-export function Mark({ state = 'idle', size = 132 }: { state?: MarkState; size?: number }): JSX.Element {
-  return <Orb state={ORB_FOR[state]} size={size} tone="--a-accent-text" className={`as-mark is-${state}`} label={state === 'thinking' ? 'Thinking' : state === 'listening' ? 'Listening' : state === 'speaking' ? 'Speaking' : 'Jarvis'} />
+const ORB_FOR: Record<MarkState, OrbState> = { idle: 'searching', thinking: 'working', listening: 'listening', speaking: 'composing' }
+export function Mark({ state = 'idle', size = 96 }: { state?: MarkState; size?: number }): JSX.Element {
+  const label = state === 'thinking' ? 'Thinking' : state === 'listening' ? 'Listening' : state === 'speaking' ? 'Speaking' : 'Jarvis'
+  /* Small, it is a status: the reference's capsule with the word beside it. */
+  if (size < 48) return <OrbChip state={ORB_FOR[state]} label={label} />
+  /* Large, it is the assistant's face: a dark porthole with a dense orb. */
+  return (
+    <span className={`as-orbmark as-mark is-${state}`} style={{ width: size, height: size }}>
+      <Orb state={ORB_FOR[state]} surface="dark" size={Math.min(64, Math.round(size * 0.72))} dots={1.6} label={label} />
+    </span>
+  )
 }
 
 /* The answer, drawn while it is being read.

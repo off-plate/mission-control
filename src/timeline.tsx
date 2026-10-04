@@ -309,7 +309,7 @@ function Sums({ run, chain, now, money }: { run: DayScore[]; chain: ReturnType<t
 function Sum({ label, figure, unit, says, win, orb }: { label: string; figure: string; unit: string; says: string; win: boolean; orb?: { state: OrbState; speed: number } }) {
   return (
     <div className={`${win ? 'win' : ''}${orb ? ' has-orb' : ''}`}>
-      {orb && <Orb className="tl-orb" state={orb.state} speed={orb.speed} size={40} tone={win ? '--tl-hot' : '--tl-dim'} label={`Momentum, ${orb.state}`} />}
+      {orb && <Orb className="tl-orb" state={orb.state} speed={orb.speed} size={52} surface="dark" label={`Momentum, ${orb.state}`} />}
       <span className="tl-l">{label}</span>
       <b>{figure}{unit && <small>{unit}</small>}</b>
       <p>{says}</p>

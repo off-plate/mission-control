@@ -80,7 +80,7 @@ function CookieJarWidget() {
     <button className="tr-card tr-card--hover tr-widget" onClick={() => setPage('timeline')}>
       <div className="tr-head"><p className="tr-l">The chain</p>
         <span className="trw-chainfig">
-          <Orb state={chainOrb.state} speed={chainOrb.speed} size={32} tone="--t-hot-text" label={`Chain, day ${chain.current}`} />
+          <Orb state={chain.current === 0 ? 'listening' : chainOrb.state} paused={chain.current === 0} speed={chainOrb.speed} size={32} dotSize={1.6} label={`Chain, day ${chain.current}`} />
           <span className="tr-n tr-sm">Day {chain.current}</span>
         </span></div>
       <p className="trw-line">{chainPromiseLine(chain)}</p>

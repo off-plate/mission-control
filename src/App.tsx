@@ -1,4 +1,4 @@
-import { Orb } from './orb'
+import { OrbChip } from './orb'
 import { JarBar, JAR_PAGES } from './cookiejarnav'
 import { ProjectMark } from './ui'
 import { usePromptWindow } from './promptwindow'
@@ -93,8 +93,8 @@ function SyncPip() {
 
   return (
     <span className="syncpip" data-quiet={quiet || undefined} title={sync.detail || text}>
-      {tone === 'warn' ? <Orb state="connecting" size={20} label="Saving" /> : <span className={`status-dot ${tone}`} />}
-      <span className="syncpip-text">{text}</span>
+      {tone === 'warn' ? <span title="Saving"><OrbChip state="connecting" label="Saving" compact className="is-saving" /></span> : <span className={`status-dot ${tone}`} />}
+      {tone !== 'warn' && <span className="syncpip-text">{text}</span>}
     </span>
   )
 }

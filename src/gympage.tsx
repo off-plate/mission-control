@@ -259,7 +259,7 @@ export function GymPage() {
             Sessions
             <span className="hp-h2-count">{sessionDays.length} logged</span>
             <button className="hp-sync" style={{ marginLeft: 'auto' }} onClick={() => void syncBoth()} disabled={busy} title="Fetch everything new from Intervals.icu and Hevy">
-              {busy ? <Orb state="connecting" size={20} label="Syncing" /> : <Icon.Repeat size={13} />}
+              {busy ? <Orb state="connecting" size={22} surface="dark" label="Syncing" /> : <Icon.Repeat size={13} />}
               {busy ? 'Syncing' : 'Sync'}
             </button>
             {said && !busy && <span className="hp-h2-count">{said}</span>}

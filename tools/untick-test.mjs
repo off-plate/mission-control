@@ -65,5 +65,16 @@ const m3 = JSON.parse(mergeStates(reTick, mine))
 ok(m3.habitLog.length === 1, 'doing it again after an untick digs the row back up')
 ok(m3.habits[0].days[todayIdx] === true, 'and the day reads ticked again')
 
+/* Audit 2026-10-04: dayLog followed the newer blob whole, and reels/tunes
+   unioned with no way to delete. */
+const dl = (savedAt, dayLog, extra = {}) => JSON.stringify({ savedAt, schema: 's', dayLog, ...extra })
+const m4 = JSON.parse(mergeStates(dl(5000, [{ date: '2026-10-02', planned: 3, done: 1 }]), dl(4000, [{ date: '2026-10-01', planned: 2, done: 2 }])))
+ok(m4.dayLog.length === 2, 'a day sealed only on the older device survives a newer save')
+const m5 = JSON.parse(mergeStates(
+  dl(5000, [], { tunes: ['a'], graveyard: [{ k: 'tunes:b', at: 5000 }] }),
+  dl(4000, [], { tunes: ['a', 'b'], reels: ['r1'] })))
+ok(m5.tunes.length === 1 && m5.tunes[0] === 'a', 'a removed tune stays removed')
+ok(m5.reels.length === 1, 'a reel only the other side has still arrives')
+
 console.log(fail ? `\n${fail} failed` : '\nall untick checks passed')
 process.exitCode = fail ? 1 : 0

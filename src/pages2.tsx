@@ -9,7 +9,6 @@ import {
 } from './speech'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange, sendSignInCode, signInWithCode, signOutAccount, type Account } from './supabase'
 import { describe, useSyncStatus } from './sync'
-import { getOpenAtLogin, isDesktop, setOpenAtLogin } from './desktop'
 
 /* ---------------- SETTINGS ---------------- */
 
@@ -112,29 +111,6 @@ function AccountField() {
           </p>
         </>
       )}
-      <OpenAtLogin />
-    </div>
-  )
-}
-
-/* macOS only. Renders nothing in a browser tab, where there is no such thing as
-   launching at login. */
-function OpenAtLogin() {
-  const [on, setOn] = useState<boolean | null>(null)
-  useEffect(() => { void getOpenAtLogin().then(setOn) }, [])
-  if (!isDesktop() || on === null) return null
-  return (
-    <div className="source-row" style={{ marginTop: 'var(--s2)' }}>
-      <span className={`status-dot ${on ? 'connected' : 'off'}`} />
-      <span className="info">
-        <span className="name">Open Mission Control when the Mac starts</span>
-      </span>
-      <button
-        className="btn btn-quiet"
-        onClick={() => { void setOpenAtLogin(!on).then((v) => { if (v !== null) setOn(v) }) }}
-      >
-        {on ? 'Turn off' : 'Turn on'}
-      </button>
     </div>
   )
 }

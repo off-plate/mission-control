@@ -24,8 +24,8 @@ writing and stay his.
 A launchd job on this Mac, every two minutes and once at login:
 `tools/obsidian-sync.mjs`, booked by `scripts/com.michael.mc-obsidian.plist`.
 
-Not the desktop app, and deliberately. He edits Mission Control on the phone and
-in a browser as well, and those edits still have to reach the vault. The vault
+He edits Mission Control on the phone and in a browser, and those edits still
+have to reach the vault. The vault
 exists only on this Mac, so the Mac is the only place the work can happen. The
 cost is that a change made elsewhere waits for the laptop to be open. He agreed
 that trade on 2026-08-25.

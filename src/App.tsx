@@ -5,7 +5,6 @@ import { usePromptWindow } from './promptwindow'
 import { Component, Fragment, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { exceptionsFor, globalExceptions } from './exceptions'
-import { useDockBadge } from './desktop'
 import { SPACE_LABELS } from './mock'
 import { TodayPage } from './today'
 import { PlanPage } from './plan'
@@ -186,9 +185,8 @@ const NAV: { id: PageId; label: string }[] = [
      the moment his own reasons should be one tap away. setPage('board')
      still renders the real page, only this tab in is gone. */
   /* Apps left the menu on his instruction (2026-08-27): seven icons and an
-     otherwise empty page did not earn a tab next to Habits and Goals. It is
-     a header dropdown now, next to Note and Yesterday -- see AppsShelf
-     below. The address still resolves so a bookmark still lands somewhere
+     otherwise empty page did not earn a tab next to Habits and Goals. It
+     opens from the dock's More grid now. The address still resolves so a bookmark still lands somewhere
      real, same as Routines above. */
   /* Assistant left the menu the same day, for the same reason a page he
      starts something from belongs to the header, not a tab he has to
@@ -405,7 +403,7 @@ function PhonePages({ tabs, page, setPage }: {
 const DARK_CHROME_PAGES: PageId[] = ['timeline', 'board', 'health', 'gym', 'longevity']
 
 export default function App() {
-  const { space, view, setView, page, setPage, tasks, routines, goals, habits, markHabitDaysOn, prompts } = useStore()
+  const { space, view, setView, page, setPage, tasks, routines, goals, habits, markHabitDaysOn, prompts, storageFull } = useStore()
   const waitingPrompts = prompts.filter((p) => !p.sentAt).length
   useEffect(() => { try { localStorage.setItem('mc-prompts-waiting', String(waitingPrompts)) } catch { /* private mode */ } }, [waitingPrompts])
   const promptsReady = usePromptWindow(waitingPrompts).state === 'open' && waitingPrompts > 0
@@ -418,8 +416,6 @@ export default function App() {
     ? exceptionsFor(space, { tasks, routines, goals })
     : [...globalExceptions({ tasks, routines }), ...exceptionsFor(space, { tasks, routines, goals })]
 
-  /* macOS dock badge, same list as the alerts above. No-op on the website. */
-  useDockBadge(exceptions.length)
 
   /* File -> New Task (Cmd+N) in the macOS menu. There is no dialog to open:
      adding a task IS the input at the top of Plan's list, so the shortcut goes
@@ -737,6 +733,12 @@ export default function App() {
         <div className="allclear" role="status" aria-live="polite" style={{ borderColor: 'var(--alert)', margin: 'var(--s4) var(--s5) 0' }}>
           <span className="dot" aria-hidden="true" />
           Another device has saved a newer version of your data. Nothing here is being saved until this one is updated, so that version is not overwritten.
+        </div>
+      )}
+      {storageFull && (
+        <div className="allclear" role="alert" style={{ borderColor: 'var(--alert)', margin: 'var(--s4) var(--s5) 0' }}>
+          <span className="dot" aria-hidden="true" />
+          This browser's storage is full, so changes are not being saved on this device. Signed in, they still reach your account.
         </div>
       )}
       {/* One mount for the whole app, so the header button reaches it from

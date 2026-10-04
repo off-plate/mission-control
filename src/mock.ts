@@ -1,104 +1,17 @@
 import type {
   AgendaEvent,
-  CoachScenario,
   Goal,
   HabitDef,
   Idea,
   LedgerEntry,
   Obligation,
   Routine,
-  SocialEntry,
-  SourceState,
   SpaceId,
   Task,
-  WidgetDef,
-  WidgetInstance,
-  WidgetType,
 } from './types'
-import { fmtDayShort, lastBusinessDayOfMonth, nextDow } from './util'
 
 /* All data in this file is invented for the demo. No real accounts,
    no real balances, no real creditors. The real app reads Supabase. */
-
-export const WIDGET_DEFS: Record<WidgetType, WidgetDef> = {
-  clock: {
-    type: 'clock', title: 'Now', description: 'The date and the time, on the page you start from',
-    supportedSizes: ['S', 'M'], defaultSize: 'S', freshMinutes: null, staleAfter: Infinity, page: 'today',
-  },
-  agenda: {
-    type: 'agenda', title: 'Agenda', description: 'Next events from Google Calendar',
-    supportedSizes: ['M', 'T', 'L'], defaultSize: 'T', freshMinutes: 4, staleAfter: 60, page: 'plan',
-  },
-  tasks: {
-    type: 'tasks', title: 'Due today', description: 'TickTick and Trello, one list',
-    supportedSizes: ['M', 'L', 'XL'], defaultSize: 'L', freshMinutes: 2, staleAfter: 60, page: 'plan',
-  },
-  mail: {
-    type: 'mail', title: 'Mail', description: 'Unread counts across accounts',
-    supportedSizes: ['S', 'M', 'T'], defaultSize: 'M', freshMinutes: 11, staleAfter: 60, page: 'settings',
-  },
-  finance: {
-    type: 'finance', title: 'Money', description: 'Cycle budget and next obligation',
-    supportedSizes: ['M', 'L'], defaultSize: 'M', freshMinutes: 60 * 7, staleAfter: 60 * 26, page: 'today',
-  },
-  habits: {
-    type: 'habits', title: 'Habits', description: 'Today’s checkoffs, no guilt attached',
-    supportedSizes: ['M', 'L'], defaultSize: 'M', freshMinutes: null, staleAfter: Infinity, page: 'habits',
-  },
-  training: {
-    type: 'training', title: 'Training', description: 'Hevy: last session and weekly volume',
-    supportedSizes: ['S', 'M', 'L'], defaultSize: 'M', freshMinutes: 95, staleAfter: 60 * 26, page: 'goals',
-  },
-  goals: {
-    type: 'goals', title: 'Goals', description: 'Targets across timeframes and drift',
-    supportedSizes: ['T', 'L'], defaultSize: 'L', freshMinutes: null, staleAfter: Infinity, page: 'goals',
-  },
-  timesaved: {
-    type: 'timesaved', title: 'Time saved', description: 'Estimate minus actual, from your own log',
-    supportedSizes: ['S', 'M'], defaultSize: 'S', freshMinutes: 0, staleAfter: Infinity, page: 'plan',
-  },
-  claude: {
-    type: 'claude', title: 'Claude', description: 'Sessions and tokens this week',
-    supportedSizes: ['S', 'M'], defaultSize: 'S', freshMinutes: 32, staleAfter: 60 * 26, page: 'today',
-  },
-  social: {
-    type: 'social', title: 'Audience', description: 'Followers and last post, entered weekly',
-    supportedSizes: ['M', 'L'], defaultSize: 'M', freshMinutes: 60 * 24 * 9, staleAfter: 60 * 24 * 8, page: 'today',
-  },
-  sources: {
-    type: 'sources', title: 'Sync health', description: 'Every connected source and its state',
-    supportedSizes: ['S', 'T', 'M'], defaultSize: 'S', freshMinutes: 0, staleAfter: Infinity, page: 'settings',
-  },
-  outreach: {
-    type: 'outreach', title: 'Outreach', description: 'The three live commitments and their state',
-    supportedSizes: ['M', 'L'], defaultSize: 'M', freshMinutes: null, staleAfter: Infinity, page: 'goals',
-  },
-}
-
-export const MOCK_OUTREACH: { name: string; state: string; ok: boolean }[] = []
-
-let n = 0
-const wid = (t: WidgetType) => `${t}-${++n}`
-
-/* Only widgets backed by real state in this app. The rest stay available to add
-   once their integration exists, rather than sitting on the page showing nothing. */
-export const DEFAULT_SPACES: Record<SpaceId, WidgetInstance[]> = {
-  personal: [
-    { id: wid('clock'), type: 'clock', size: 'S' },
-    { id: wid('tasks'), type: 'tasks', size: 'L' },
-    { id: wid('habits'), type: 'habits', size: 'M' },
-    { id: wid('goals'), type: 'goals', size: 'L' },
-  ],
-  work: [
-    { id: wid('clock'), type: 'clock', size: 'S' },
-    /* The Big Time calendar, read through the proxy. It sits above the task
-       list on purpose: what the day already owes to other people decides what
-       is left, so it has to be read first. */
-    { id: wid('agenda'), type: 'agenda', size: 'M' },
-    { id: wid('tasks'), type: 'tasks', size: 'L' },
-    { id: wid('goals'), type: 'goals', size: 'M' },
-  ],
-}
 
 export const SPACE_LABELS: Record<SpaceId, string> = {
   personal: 'Personal',
@@ -283,14 +196,6 @@ export const MOCK_LEDGER: LedgerEntry[] = []
 
 export const MOCK_AGENDA: Record<SpaceId, AgendaEvent[]> = { personal: [], work: [] }
 
-export const MOCK_MAIL: Record<SpaceId, { addr: string; unread: number; top: string; age: string }[]> = { personal: [], work: [] }
-
-export const MOCK_SOCIAL: SocialEntry[] = []
-
-export const MOCK_TRAINING: { last: string; next: string; weeklySets: number[] } | null = null
-
-export const MOCK_CLAUDE: { sessionsToday: number; tokensWeek: number[]; note: string } | null = null
-
 /* No invented balances. The real figures live in Compass; until that link
    exists this is empty and the page says so rather than showing fiction. */
 export const MOCK_MONEY: {
@@ -307,16 +212,6 @@ export const MOCK_MONEY: {
   schedule: { date: string; name: string; amount: string; state: string }[]
 } | null = null
 
-/* The integrations this app is meant to read. None are wired yet, and saying
-   "connected" when nothing is would be the same lie as inventing the data. */
-export const MOCK_SOURCES: SourceState[] = [
-  { id: 's1', name: 'Google Calendar', kind: 'calendar', status: 'off', detail: 'Not connected yet' },
-  { id: 's2', name: 'TickTick', kind: 'tasks', status: 'off', detail: 'Not connected yet' },
-  { id: 's5', name: 'Gmail personal', kind: 'mail', status: 'off', detail: 'Not connected yet' },
-  { id: 's6', name: 'Gmail Off-Plate', kind: 'mail', status: 'off', detail: 'Not connected yet' },
-  { id: 's7', name: 'Compass', kind: 'money', status: 'off', detail: 'Not connected yet' },
-  { id: 's8', name: 'Hevy', kind: 'training', status: 'off', detail: 'Not connected yet' },
-]
 
 export interface DecomposedStep { title: string; why?: string; estimateMin: number; category?: 'call' | 'admin' | 'deep' | 'quick' }
 
@@ -369,6 +264,3 @@ export function fakeDecompose(goal: string): DecomposedStep[] {
   return hit ? hit.steps : GENERIC
 }
 
-/* ---- coach scenarios, canned for the demo ---- */
-
-export const COACH_SCENARIOS: CoachScenario[] = []

@@ -9,7 +9,10 @@
    library plays isn't itself playable (it's a page, not a video), so the
    first time it's paged to, reel-fetch downloads the real file once and this
    remembers where it landed. Synced, so a Reel fetched on the laptop doesn't
-   fetch a second time on the phone at midnight -- it's a lookup there. */
+   fetch a second time on the phone at midnight -- it's a lookup there.
+
+   REELS AND TUNES UNION across devices (sync-merge.ts), so a link removed here
+   is buried and a link added is dug up; without that a removal never stuck. */
 import { useState } from 'react'
 
 export interface TwoLivesSlice {
@@ -30,14 +33,21 @@ export interface TwoLivesSlice {
 
 export function useTwoLivesSlice(
   persisted: { twoLives?: Record<string, string>; reels?: string[]; reelFiles?: Record<string, string>; tunes?: string[] } | null,
+  deps: { bury: (...keys: string[]) => void; digUp: (...keys: string[]) => void },
 ): TwoLivesSlice {
   const [twoLives, setTwoLivesRaw] = useState<Record<string, string>>(persisted?.twoLives ?? {})
   const [reels, setReelsRaw] = useState<string[]>(persisted?.reels ?? [])
   const [tunes, setTunesRaw] = useState<string[]>(persisted?.tunes ?? [])
   const [reelFiles, setReelFilesRaw] = useState<Record<string, string>>(persisted?.reelFiles ?? {})
 
-  const setReels = (list: string[]): void => setReelsRaw(list)
-  const setTunes = (list: string[]): void => setTunesRaw(list)
+  const tomb = (field: 'reels' | 'tunes', before: string[], after: string[]): void => {
+    const gone = before.filter((u) => !after.includes(u))
+    const added = after.filter((u) => !before.includes(u))
+    if (gone.length) deps.bury(...gone.map((u) => `${field}:${u}`))
+    if (added.length) deps.digUp(...added.map((u) => `${field}:${u}`))
+  }
+  const setReels = (list: string[]): void => { tomb('reels', reels, list); setReelsRaw(list) }
+  const setTunes = (list: string[]): void => { tomb('tunes', tunes, list); setTunesRaw(list) }
   const setTwoLives = (key: string, url: string): void =>
     setTwoLivesRaw((m) => { const n = { ...m }; if (url.trim()) n[key] = url.trim(); else delete n[key]; return n })
   const setReelFile = (originalUrl: string, fileUrl: string): void =>

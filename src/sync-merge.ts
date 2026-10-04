@@ -61,8 +61,6 @@ export function deviceId(): string {
  *  user agent for a model number is a losing game and tells him nothing extra. */
 export function deviceName(): string {
   try {
-    const w = window as unknown as { mc?: { desktop?: boolean } }
-    if (w.mc?.desktop) return 'the Mac app'
     const ua = navigator.userAgent
     if (/iPhone/.test(ua)) return 'iPhone'
     if (/iPad/.test(ua)) return 'iPad'
@@ -106,6 +104,9 @@ const LOG_KEYS: Record<string, (r: Row) => string> = {
   stepLog: (r) => `stepLog:${r.routineId}|${r.stepId}|${r.at ?? r.day}`,
   stepTicks: (r) => `stepTicks:${r.routineId}|${r.stepId}|${r.day}`,
   slips: (r) => `slips:${r.habitId}|${r.day}`,
+  /* One sealed tally per day. Was newer-blob-wins, so a device saving later
+     without a day's row deleted it everywhere (audit 2026-10-04). */
+  dayLog: (r) => `dayLog:${r.date}`,
 }
 
 /** Identity per collection of things he made. Everything here is created with a
@@ -329,10 +330,15 @@ export function mergeStates(a: string, b: string): string {
        screen de-duplicates by identity when it reads the pool. Fifty links
        pasted on the phone survive a laptop save that never saw them, which a
        newer-wins field would have thrown away. */
-    if (older.reels || newer.reels) {
+    /* Tunes are the same kind of pasted list. Both bury a removed link as
+       `reels:<url>` / `tunes:<url>`, or a removal would never stick. */
+    for (const k of ['reels', 'tunes'] as const) {
+      const a2 = older[k] as string[] | undefined
+      const b2 = newer[k] as string[] | undefined
+      if (!a2 && !b2) continue
       const seen = new Set<string>()
-      out.reels = [...(newer.reels ?? []), ...(older.reels ?? [])].filter((u) => {
-        if (typeof u !== 'string' || !u || seen.has(u)) return false
+      out[k] = [...(b2 ?? []), ...(a2 ?? [])].filter((u) => {
+        if (typeof u !== 'string' || !u || seen.has(u) || buried.has(`${k}:${u}`)) return false
         seen.add(u); return true
       })
     }

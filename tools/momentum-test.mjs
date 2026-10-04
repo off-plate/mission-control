@@ -47,7 +47,7 @@ function run(opts = {}) {
     for (let h = 0; h < habitsPerDay; h++) habitLog.push({ habitId: 'h' + h, day })
     for (let k = 0; k < tasksPerDay; k++) tasks.push({ id: `t${i}-${k}`, title: 'task', done: true, doneAt: `${day}T12:00:00`, space: 'personal', createdAt: day })
     if (focusPerDay) focusSessions.push({ id: 'f' + i, day, minutes: focusPerDay, space: 'personal' })
-    if (hard) tasks.push({ id: `hd${i}`, title: 'The the bank letter', done: true, doneAt: `${day}T18:00:00`, space: 'personal', createdAt: D(i + 14) })
+    if (hard) tasks.push({ id: `hd${i}`, title: 'The bank letter', done: true, doneAt: `${day}T18:00:00`, space: 'personal', createdAt: D(i + 14) })
   }
   return M.momentumRun({ habits, habitLog, tasks, focusSessions, inView }, days, TODAY)
 }
@@ -72,7 +72,7 @@ t('a task finished the day it appeared is not a hard thing', () => {
 })
 t('the oldest finished task is the hard thing', () => {
   const r = run({ fullDays: 1, hard: true })
-  eq(r[r.length - 1].hard.title, 'The the bank letter')
+  eq(r[r.length - 1].hard.title, 'The bank letter')
   eq(r[r.length - 1].hard.waited, 14)
 })
 t('a task with no createdAt is never a hard thing', () => {

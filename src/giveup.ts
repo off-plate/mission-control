@@ -51,8 +51,8 @@ export function giveUpHorizons(habitName?: string): Horizon[] {
     {
       id: 'week',
       label: 'This week',
-      up: `This week you send the email you've been dreading. the bank gets a call instead of your silence. Sunday's Datová schránka check finds nothing scary, because you looked before it could surprise you.`,
-      down: `This week the number in Compass doesn't move. the bank still hasn't heard from you. The schránka stays unchecked, which means whatever's sitting in there gets to surprise you later, on its terms, not yours.`,
+      up: `This week you send the email you've been dreading. The bank gets a call instead of your silence. Sunday's Datová schránka check finds nothing scary, because you looked before it could surprise you.`,
+      down: `This week the number in Compass doesn't move. The bank still hasn't heard from you. The schránka stays unchecked, which means whatever's sitting in there gets to surprise you later, on its terms, not yours.`,
     },
     {
       id: 'month',

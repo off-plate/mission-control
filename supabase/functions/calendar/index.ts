@@ -24,16 +24,12 @@
    so there is one set of rules with one set of tests behind them. */
 
 import { parseIcs } from '../_shared/ical.ts'
+import { isOwner } from '../_shared/owner.ts'
 
 const ALLOW = [
   'https://off-plate.github.io',
   'http://localhost:5173',
   'http://localhost:4173',
-  /* The desktop app's own registered scheme (electron/main.cjs), not a real
-     domain -- his report, 2026-09-16: the calendar wouldn't load there while
-     working fine on the website, same CORS-preflight shape as the fix above,
-     just an origin that hadn't been added yet. */
-  'app://mc',
 ]
 
 /* Every header supabase-js actually sends. It sets `apikey` and `x-client-info`
@@ -52,6 +48,7 @@ const cors = (origin: string | null) => ({
 Deno.serve(async (req: Request) => {
   const origin = req.headers.get('origin')
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(origin) })
+  if (!(await isOwner(req))) return new Response('Not allowed.', { status: 401, headers: { ...cors(origin), 'content-type': 'text/plain' } })
 
   const url = Deno.env.get('MC_CALENDAR_ICS')
   if (!url) {

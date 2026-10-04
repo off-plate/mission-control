@@ -23,7 +23,6 @@ import { newId, todayKey } from './store/shared'
 import { type Undoable, useUndo } from './store/undo'
 import { useGraveyard } from './store/graveyard'
 import { noteTitle, useNotesSlice } from './store/notes'
-import { useWidgetsSlice } from './store/widgets'
 import { useTwoLivesSlice } from './store/twolives'
 import { useIdeaBoardSlice, type IdeaBoardSlice } from './store/ideaboard'
 import { usePromptsSlice, type PromptsSlice } from './store/prompts'
@@ -36,7 +35,6 @@ import { foldersFromRoutines, useGrowthSlice } from './store/growth'
 import { usePlannerSlice } from './store/planner'
 import { dayIndexOf, dayOfWeekKey, goalPeriodKey, goalPeriodRange, isoWeekKey, localDateKey, periodIsPast, periodKeyFor, type GoalTf } from './util'
 import {
-  DEFAULT_SPACES,
   MOCK_GOALS,
   MOCK_HABITS,
   MOCK_LEDGER,
@@ -77,14 +75,9 @@ import type {
   PlanState,
   Project,
   ReviewState,
-  SizeKey,
-  SocialEntry,
-  SourceState,
   SpaceId,
   Task,
   TaskCategory,
-  WidgetInstance,
-  WidgetType,
 } from './types'
 
 export const STORAGE_KEY = 'mission-control-demo-v12'
@@ -99,7 +92,6 @@ export function isReadOnly(): boolean { return futureBlob }
 
 interface PersistedState {
   version: 3
-  spaces: Record<SpaceId, WidgetInstance[]>
   tasks: Task[]
   habits: HabitDef[]
   goals: Goal[]
@@ -108,8 +100,6 @@ interface PersistedState {
   projects?: Project[]
   /** People. Optional for the same reason projects is. */
   ledger: LedgerEntry[]
-  social: SocialEntry[]
-  sources: SourceState[]
   plan: PlanState
   review: ReviewState
   assistantLog: AssistantEntry[]
@@ -189,7 +179,7 @@ interface PersistedState {
    *  these are separate from the main Goals page's periodic ones. */
   gymGoals?: GymGoal[]
   /** The Pomodoro block running right now, synced so it shows the same on
-   *  every device (and in Raycast) rather than living only in this tab's
+   *  every device rather than living only in this tab's
    *  localStorage. Null means nothing is running. */
   activeFocus?: ActiveFocus | null
 }
@@ -217,7 +207,7 @@ export interface ActiveFocus {
   blockMin: number
   /** What it's for, when started from a task. */
   focusLabel: string | null
-  /** Which task, if any -- lets a reader (Raycast, another device) show or
+  /** Which task, if any -- lets a reader (another device) show or
    *  act on the real row rather than just the label text. */
   taskId?: string
   space?: SpaceId
@@ -322,11 +312,6 @@ interface Store extends PersistedState {
   openNote: (id: string | null) => void
   setFocusTaskId: (id: string | null) => void
 
-  reorderSpace: (space: SpaceId, order: string[]) => void
-  resizeWidget: (space: SpaceId, id: string, size: SizeKey) => void
-  removeWidget: (space: SpaceId, id: string) => void
-  addWidget: (space: SpaceId, type: WidgetType) => void
-  moveWidget: (space: SpaceId, id: string, dir: -1 | 1) => void
 
   toggleTask: (id: string) => void
   /** Rename a task or change its estimate. With a breakdown present the
@@ -335,7 +320,6 @@ interface Store extends PersistedState {
   logActual: (id: string, actualMin: number) => void
   /** Returns the new row's id. */
   addTask: (t: Omit<Task, 'id' | 'done'>) => string
-  addTasks: (tasks: Omit<Task, 'id' | 'done'>[]) => void
   addTaskWithSubtasks: (parent: Omit<Task, 'id' | 'done' | 'subtasks'>, subs: { title: string; estimateMin: number }[]) => void
   /** Put a task on a period in Goals, or take it off again with no horizon. The
    *  key defaults to the period running now; a Goals column passes its own when
@@ -396,13 +380,7 @@ interface Store extends PersistedState {
    *  because a lost write must never be a permanent lie. */
   assertRoutineDay: (habitId: string, dayIndex: number) => void
   markHabitDay: (id: string, day: number, value: boolean) => void
-  /** Same write, dated rather than weekday-indexed, for a day outside the
-   *  current week -- a Hevy backfill reaching six months back, say. Days
-   *  inside the current week still update the days[] cache; older ones
-   *  land only in habitLog, which is where a habit's real history lives. */
-  markHabitDayOn: (id: string, day: string, value: boolean) => void
-  /** Many dates on one habit, one state update. See markDaysOn's own comment
-   *  for why a loop of markHabitDayOn calls is not the same thing. */
+  /** Many dates on one habit, one state update. See markDaysOn's own comment. */
   markHabitDaysOn: (id: string, days: string[], value: boolean) => void
   addHabit: (input: { name: string; daypart?: import('./types').TimeSlot; frequency: import('./types').HabitFrequency; targetPerWeek?: number; kind?: import('./types').HabitKind; dailyTargetMin?: number; measure?: 'minutes' | 'times'; per?: import('./types').CountPeriod; targetCount?: number; source?: import('./types').HabitSource; quitSince?: string; startedOn?: string }) => void
   /** Record a slip on a habit you are trying to stop; resets the clean run. */
@@ -421,15 +399,7 @@ interface Store extends PersistedState {
    *  freshly made or already there from an earlier click. */
   repeatGoal: (id: string) => string | null
 
-  setSocial: (entries: SocialEntry[]) => void
-  toggleSource: (id: string) => void
-
-  commitPlan: (taskIds: string[], firstMoveId: string | null) => void
-  /** Close a window: any range, one act. Its outcomes land in the backlog. */
-
   assistantLog: AssistantEntry[]
-  applyDictation: (text: string, items: { kind: 'task' | 'goal' | 'done'; text: string; estimateMin?: number }[]) => void
-  revertAssistantItem: (entryId: string, itemId: string) => void
 
   /* Avoidance, the page, is gone. These sessions are not: they are dated
      records of things he faced, so they keep loading, keep syncing and keep
@@ -444,8 +414,6 @@ interface Store extends PersistedState {
   /** Finish or reopen a whole routine at once, the way ticking a task with
    *  subtasks finishes all of them. */
   setRoutineDone: (routineId: string, done: boolean) => void
-  /** Open a fresh run of a repeatable routine, keeping every run before it. */
-  startAgain: (routineId: string) => void
   /** Put a routine on a day's list before it is started, so a day can be planned
    *  and not only recorded. `slot` undefined takes it back off the list, and
    *  `day` defaults to today. */
@@ -458,12 +426,7 @@ interface Store extends PersistedState {
   updateRoutine: (id: string, patch: Partial<Pick<Routine, 'title' | 'cadence' | 'blurb'>>) => void
   deleteRoutine: (id: string) => void
   addRoutineStep: (routineId: string, step: { title: string; note?: string; link?: string; linkLabel?: string }) => void
-  updateRoutineStep: (routineId: string, stepId: string, patch: Partial<Pick<import('./types').RoutineStep, 'title' | 'note' | 'link' | 'linkLabel'>>) => void
   deleteRoutineStep: (routineId: string, stepId: string) => void
-  moveRoutineStep: (routineId: string, stepId: string, dir: -1 | 1) => void
-  /** Record a number against a routine step (today's typing speed). Keeps the
-   *  all-time best in `records`, which never resets with the period. */
-  setStepData: (routineId: string, stepId: string, value: number) => void
   /** Personal bests, keyed by `routineId:stepId`. Never cleared by a rollover. */
   records: Record<string, number>
 
@@ -555,279 +518,7 @@ function loadPersisted(): PersistedState | null {
     if ((p.version ?? 0) > 3) { futureBlob = true; return null }
     if (p.schema && p.schema !== STORAGE_KEY) return null
     p.version = 3
-    /* A workspace added after this state was saved. His saved record only has
-       the spaces that existed then, so a new one is filled from the defaults
-       while every space he has arranged himself is handed back untouched. */
-    if (p.spaces) p.spaces = { ...DEFAULT_SPACES, ...p.spaces }
-    /* The clock, asked for on 2026-08-07 as a widget in the grid rather than a
-       line in the header. His saved arrangement predates the widget, so it is
-       added once, first in every space, which is where he asked for it. If he
-       removes it later it stays removed: this runs once and never again. */
     p.removedSeeds = p.removedSeeds ?? []
-    if (!p.removedSeeds.includes('fix:clock-widget')) {
-      p.removedSeeds.push('fix:clock-widget')
-      if (p.spaces) {
-        for (const key of Object.keys(p.spaces)) {
-          const list = p.spaces[key as SpaceId] ?? []
-          if (list.some((w) => w.type === 'clock')) continue
-          p.spaces[key as SpaceId] = [{ id: `clock-${key}`, type: 'clock' as const, size: 'S' as const }, ...list]
-        }
-      }
-    }
-
-    /* One-time repair of focus blocks logged at the wrong length. While the
-       timer read its length from the SETTING, a block started from a task was
-       recorded at the setting's minutes, not the task's. The truth is still in
-       the plan: each block names what it was for, and the task, its steps or
-       its ledger row still carry the estimate. Case-blind, because the label
-       may have been typed back before the task was renamed. Runs once. */
-    p.removedSeeds = p.removedSeeds ?? []
-    if (!p.removedSeeds.includes('fix:focus-lengths')) {
-      p.removedSeeds.push('fix:focus-lengths')
-      const estimateFor = (label: string): number | null => {
-        const want = label.trim().toLowerCase()
-        for (const t of p.tasks ?? []) {
-          if (t.title.trim().toLowerCase() === want) {
-            return t.subtasks?.length ? t.subtasks.reduce((a, x) => a + x.estimateMin, 0) : t.estimateMin
-          }
-          const st = t.subtasks?.find((x) => x.title.trim().toLowerCase() === want)
-          if (st) return st.estimateMin
-        }
-        const l = (p.ledger ?? []).find((x) => !x.title.startsWith('Focus:') && x.title.trim().toLowerCase() === want)
-        return l ? l.estimateMin : null
-      }
-      p.focusSessions = (p.focusSessions ?? []).map((f) => {
-        if (!f.label) return f
-        const est = estimateFor(f.label)
-        // Only ever raised: the bug truncated, it never inflated.
-        if (est == null || f.minutes >= est) return f
-        if (f.ledgerId) {
-          p.ledger = (p.ledger ?? []).map((l) => (l.id === f.ledgerId ? { ...l, estimateMin: est, actualMin: est } : l))
-        }
-        return { ...f, minutes: est }
-      })
-    }
-
-    /* Michael's own correction, 2026-08-01: the finish-the-app block actually
-       ran 64 minutes, longer than the estimate the automatic repair raised it
-       to, because he extended it. His number wins over any derived one. Once. */
-    if (!p.removedSeeds.includes('fix:focus-64')) {
-      p.removedSeeds.push('fix:focus-64')
-      const f = (p.focusSessions ?? []).find((x) => /finish fil/i.test(x.label ?? ''))
-      if (f) {
-        f.minutes = 64
-        if (f.ledgerId) p.ledger = (p.ledger ?? []).map((l) => (l.id === f.ledgerId ? { ...l, estimateMin: 64, actualMin: 64 } : l))
-      }
-    }
-
-    /* A block logged across midnight was filed whole onto the day it FINISHED,
-       handing today an hour that was mostly worked yesterday: wrong day record,
-       wrong habit day, wrong goal hours, twice. Any session whose start
-       (finish minus length) lands on an earlier day is split at midnight into
-       two sessions, each on the day its minutes were actually worked. Runs
-       once; the timer itself now banks at midnight so new ones arrive split. */
-    if (!p.removedSeeds.includes('fix:focus-split')) {
-      p.removedSeeds.push('fix:focus-split')
-      const out: FocusSession[] = []
-      for (const f of p.focusSessions ?? []) {
-        if (!f.at) { out.push(f); continue }
-        const end = new Date(f.at)
-        const start = new Date(end.getTime() - f.minutes * 60000)
-        const startDay = localDateKey(start)
-        if (startDay >= f.day) { out.push(f); continue }
-        const midnight = new Date(end.getFullYear(), end.getMonth(), end.getDate())
-        const before = Math.round((midnight.getTime() - start.getTime()) / 60000)
-        const after = f.minutes - before
-        if (before < 1 || after < 1) { out.push(f); continue }
-        const lid = `${f.ledgerId ?? f.id}-pre`
-        out.push({ ...f, id: `${f.id}-pre`, day: startDay, minutes: before, ledgerId: lid, at: new Date(midnight.getTime() - 1000).toISOString() })
-        out.push({ ...f, minutes: after })
-        if (f.ledgerId) {
-          p.ledger = (p.ledger ?? []).flatMap((l) => (l.id === f.ledgerId
-            ? [{ ...l, id: lid, estimateMin: before, actualMin: before, when: startDay }, { ...l, estimateMin: after, actualMin: after }]
-            : [l]))
-        }
-      }
-      p.focusSessions = out
-    }
-
-    /* 2026-08-02: Michael finished Out Brain Rot on the evening of Aug 1 and
-       the rows are simply not in his state; the load path provably keeps them,
-       so the write itself was lost (most likely an older tab writing the blob
-       over the newer one). His word is the record: the finish is put back. */
-    if (!p.removedSeeds.includes('fix:obr-0801')) {
-      p.removedSeeds.push('fix:obr-0801')
-      const day = '2026-08-01'
-      /* Evidence first: only a profile whose log already reaches back before
-         the lost day can have lost it. On a fresh or wiped profile this wrote
-         a first of August that never happened on that device, and Wipe
-         everything quietly un-wiped. */
-      const livedThrough = (p.habitLog ?? []).some((t) => t.day < day)
-      if (livedThrough && !(p.habitLog ?? []).some((t) => t.habitId === 'h-brainrot' && t.day === day)) {
-        p.habitLog = [...(p.habitLog ?? []), { habitId: 'h-brainrot', day }]
-        p.routineLog = [...(p.routineLog ?? []), { routineId: 'r-brainrot', day, periodKey: day, run: 0 }]
-      }
-    }
-
-    /* Reflect is gone, so the two review steps that learned to open it lose the
-       pointer again. Only the pointer: his own words on the step are untouched,
-       and it runs once. */
-    if (!p.removedSeeds.includes('fix:review-goto-drop')) {
-      p.removedSeeds.push('fix:review-goto-drop')
-      p.routines = (p.routines ?? []).map((r) => ({
-        ...r,
-        steps: r.steps.map((st) => ((st.goto as string | undefined) === 'review' ? { ...st, goto: undefined, gotoLabel: undefined } : st)),
-      }))
-    }
-
-    /* Meditation drops from ten minutes to five, 2026-08-02. The step is his
-       once it exists, so the seed cannot reach it; this rewrites the timer ONLY
-       while it still holds the old seeded value, so a length he chose himself
-       is never touched, and it runs once. */
-    if (!p.removedSeeds.includes('fix:mr1-5min')) {
-      p.removedSeeds.push('fix:mr1-5min')
-      p.routines = (p.routines ?? []).map((r) => (r.id !== 'r-morning' ? r : {
-        ...r,
-        steps: r.steps.map((st) => (st.id === 'mr1' && st.seconds === 600
-          ? { ...st, seconds: 300, note: st.note?.includes('Ten minutes') ? st.note.replace('Ten minutes', 'Five minutes') : st.note }
-          : st)),
-      }))
-    }
-
-    /* Creatine moves out of the morning routine and into After wake up,
-       2026-08-02. Only the seeded step is pulled, and only while it still looks
-       seeded, so a creatine step he rewrote himself stays where he put it. The
-       habit is untouched: the new routine's step carries the same habitId, so
-       every tick he has ever logged still belongs to it. */
-    if (!p.removedSeeds.includes('fix:creatine-moves')) {
-      p.removedSeeds.push('fix:creatine-moves', 'r-morning:step:mr0')
-      p.routines = (p.routines ?? []).map((r) => (r.id !== 'r-morning' ? r : {
-        ...r,
-        steps: r.steps.filter((st) => !(st.id === 'mr0' && st.title === 'Take creatine')),
-        doneStepIds: r.doneStepIds.filter((id) => id !== 'mr0'),
-      }))
-    }
-
-    /* Night work briefly lived in Off-Plate (2026-08-02) and went back to
-       Personal the same day. Both moves are gone: Off-Plate is a project now
-       and Personal is where every row ends up (see foldSpaces). */
-
-    /* The monthly gym goal, 2026-09-30: 25 visits, counted by itself from the
-       Workout / Gym / Fitness habit (which Hevy fills). In the last days of a
-       month "this month's goals" means the month ahead, so it goes there. */
-    if (!p.removedSeeds.includes('fix:gym-goal-25')) {
-      p.removedSeeds.push('fix:gym-goal-25')
-      const gym = (p.habits ?? []).find((h) => !h.archivedAt && h.name.trim().toLowerCase() === 'workout / gym / fitness')
-      if (gym && !(p.goals ?? []).some((g) => g.habitId === gym.id && g.timeframe === 'monthly' && !g.closed)) {
-        const now = new Date()
-        const left = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate()
-        const target = goalPeriodKey('monthly', left <= 2 ? new Date(now.getFullYear(), now.getMonth() + 1, 1) : now)
-        const day = localDateKey()
-        p.goals = [...(p.goals ?? []), {
-          id: `g-gym-${target}`, space: gym.space, name: 'Go to the gym', current: 0, target: 25, unit: 'visits', note: '',
-          timeframe: 'monthly', category: 'health', habitId: gym.id, periodKey: target, createdAt: day, touchedAt: day,
-        }]
-      }
-    }
-
-    /* Morning Big Time work routine, removed at his request 2026-09-30: the
-       routine, its habit, the habits its steps became, and their log rows. */
-    if (!p.removedSeeds.includes('fix:morningwork-gone')) {
-      p.removedSeeds.push('fix:morningwork-gone', 'r-morningwork', 'h-morningwork')
-      const gone = (id: string, folderId?: string) => id === 'h-morningwork' || folderId === 'r-morningwork'
-      const goneIds = new Set((p.habits ?? []).filter((h) => gone(h.id, h.folderId)).map((h) => h.id))
-      p.routines = (p.routines ?? []).filter((r) => r.id !== 'r-morningwork')
-      p.habits = (p.habits ?? []).filter((h) => !goneIds.has(h.id))
-      p.habitLog = (p.habitLog ?? []).filter((t) => !goneIds.has(t.habitId))
-      p.goals = (p.goals ?? []).filter((g) => !(g.habitId && goneIds.has(g.habitId)))
-    }
-
-    /* Pray to God joins Before bed routine as its last step, 2026-09-30. The
-       habit already exists in his list, so the step points at it and the habit
-       joins the routine with every day it has already been kept. */
-    if (!p.removedSeeds.includes('fix:pray-bedtime')) {
-      p.removedSeeds.push('fix:pray-bedtime', 'r-evening:step:be10')
-      const pray = (p.habits ?? []).find((h) => !h.archivedAt && h.name.trim().toLowerCase() === 'pray to god')
-      p.routines = (p.routines ?? []).map((r) => (r.id !== 'r-evening' || r.steps.some((st) => st.habitId === pray?.id && pray)
-        ? r
-        : { ...r, steps: [...r.steps, { id: 'be10', title: 'Pray to God', kind: 'do' as const, ...(pray ? { habitId: pray.id } : {}) }] }))
-    }
-
-    /* Focus for 30 minutes was one habit per workspace, each counting only its
-       own workspace's minutes. It is one habit now, counting focus anywhere.
-       The work one stays (its id carries the history, and the clock rewrites
-       its days from the sessions); the other two go, with their log rows and
-       any goal that pointed at them. */
-    if (!p.removedSeeds.includes('fix:focus-one')) {
-      const dupes = ['h-focus-offplate', 'h-focus-corner']
-      p.removedSeeds.push('fix:focus-one', ...dupes)
-      p.habits = (p.habits ?? []).filter((h) => !dupes.includes(h.id))
-      p.habitLog = (p.habitLog ?? []).filter((t) => !dupes.includes(t.habitId))
-      p.goals = (p.goals ?? []).map((g) => (g.habitId && dupes.includes(g.habitId) ? { ...g, habitId: 'h-focus-work' } : g))
-    }
-
-    /* Notes, 2026-08-03. The Brain Dump board becomes a real notes app, and
-       everything already on that board comes across: each sticky becomes a
-       note in a "Brain dumps" folder inside the workspace it was captured in,
-       keeping its text, its colour and its date. His instruction was plain,
-       keep whatever is in the brain dumps.
-
-       The ideas array is left exactly where it is rather than deleted. A phone
-       still running the old bundle renders that array, and an empty one would
-       show him a board he never cleared. It costs a few hundred bytes and it
-       stops a downgrade from looking like a data loss. Runs once. */
-    if (!p.removedSeeds.includes('fix:notes-v1')) {
-      p.removedSeeds.push('fix:notes-v1')
-      const folders: NoteFolder[] = [...(p.noteFolders ?? [])]
-      const notes: Note[] = [...(p.notes ?? [])]
-      for (const i of p.ideas ?? []) {
-        const id = `note-${i.id}`
-        if (notes.some((n) => n.id === id)) continue
-        const space: SpaceId = SPACES.includes(i.space) ? i.space : 'personal'
-        const bin = `nf-braindump-${space}`
-        if (!folders.some((f) => f.id === bin)) {
-          folders.push({ id: bin, space, name: 'Brain dumps', parentId: spaceFolderId(space), order: 0 })
-        }
-        /* The seeded stickies carry the word 'idea' where a date belongs. */
-        const day = /^\d{4}-\d{2}-\d{2}$/.test(i.when ?? '') ? i.when : localDateKey()
-        const body = (i.text ?? '').trim()
-        notes.push({
-          id, space, folderId: bin, title: noteTitle(body), body,
-          color: i.color ?? 'amber', when: day, updatedAt: Date.parse(day) || Date.now(),
-        })
-      }
-      p.noteFolders = folders
-      p.notes = notes
-    }
-
-    /* Michael's ask, 2026-08-03: the money gets looked at before bed, not
-       discovered at the end of the month. The step is his once the routine
-       exists, so the seed cannot reach it; this adds it once, after the to-do
-       list, and only if it is not already there. */
-    if (!p.removedSeeds.includes('fix:bed-compass')) {
-      p.removedSeeds.push('fix:bed-compass')
-      p.routines = (p.routines ?? []).map((r) => {
-        if (r.id !== 'r-evening' || r.steps.some((st) => st.id === 'be8')) return r
-        const step = { id: 'be8', title: 'Review Compass finances', kind: 'do' as const, link: 'https://compass-money.netlify.app', linkLabel: 'Open Compass' }
-        const at = r.steps.findIndex((st) => st.id === 'be1')
-        const steps = [...r.steps]
-        steps.splice(at < 0 ? 0 : at + 1, 0, step)
-        return { ...r, steps }
-      })
-    }
-
-    /* Journaling added to the same routine, 2026-09-06. Last step, after the
-       alarm is set -- the last thing before the light goes off. Same guard as
-       fix:bed-compass just above: runs once, only adds it if it is not
-       already there. */
-    if (!p.removedSeeds.includes('fix:bed-journal')) {
-      p.removedSeeds.push('fix:bed-journal')
-      p.routines = (p.routines ?? []).map((r) => {
-        if (r.id !== 'r-evening' || r.steps.some((st) => st.id === 'be9')) return r
-        const step = { id: 'be9', title: 'Journal', kind: 'do' as const, note: 'A few lines on the day -- what happened, what’s still on your mind.' }
-        return { ...r, steps: [...r.steps, step] }
-      })
-    }
 
     /* A plan is for a day. Yesterday's cannot be allowed to sit on this morning's
        list pretending it was chosen. Tomorrow's is a different matter: he put it
@@ -1159,100 +850,6 @@ function loadPersisted(): PersistedState | null {
       return s?.habitId && !g.habitId ? { ...g, habitId: s.habitId, unit: s.unit } : g
     })
 
-    /* THE MERGE, on his instruction 2026-08-11: "routines and habits are
-       basically the same thing. Routines are just a folder of different
-       habits. Each item in the routine will be a new habit."
-
-       A routine keeps its row and becomes the FOLDER. Every step it held
-       becomes a real habit pointing back at it, carrying the things a step
-       had and a habit did not: the description, the external link (the typing
-       test, a video), the in-app page, optional, the either-or choice, a
-       timer's length.
-
-       History is not reset. Every dated step tick becomes a dated habit tick
-       for the habit that step turned into, so a streak he has already earned
-       is the streak he keeps. That is the whole reason this was safe to do.
-
-       Runs once, and the untouched blob is already in BACKUP_KEY above. */
-    if (!p.removedSeeds.includes('fix:habits-folders')) {
-      p.removedSeeds.push('fix:habits-folders')
-      const merged = foldersFromRoutines(p.routines ?? [], p.habits ?? [], p.stepTicks ?? [])
-      p.habits = merged.habits
-      /* Never a duplicate: a tick for this habit on this day already existing
-         means the merge has partly run before, and his own tick wins. */
-      const seen = new Set((p.habitLog ?? []).map((t) => `${t.habitId}|${t.day}`))
-      p.habitLog = [...(p.habitLog ?? []), ...merged.ticks.filter((t) => !seen.has(`${t.habitId}|${t.day}`))]
-    }
-
-    /* The merge above shipped before the habits carried everything their steps
-       could DO: which step they came from, so a number they record joins the
-       series the step already writes, and the two bodies the app builds fresh
-       each morning. Anyone who ran the first pass has habits without those, so
-       the same function runs again and fills only what is missing. Habits only,
-       because the ticks were already taken across. */
-    /* Goals predate having an age at all. Stamped once, at the day this build
-       first reads them, rather than back-dated: the app does not know when they
-       were set and guessing would put a number on screen that is not true.
-       The clock starts now, and says so. */
-    if (!p.removedSeeds.includes('fix:goal-age')) {
-      p.removedSeeds.push('fix:goal-age')
-      const today = localDateKey()
-      p.goals = (p.goals ?? []).map((g) => ({
-        ...g,
-        createdAt: g.createdAt ?? today,
-        touchedAt: g.touchedAt ?? today,
-      }))
-    }
-
-    /* Steps added after the folder pass ran (Pray to God in Before bed, the new
-       Work routine) have no habit row inside their routine, so the routine
-       does not list them. Re-run the same pass for just those two routines. */
-    if (!p.removedSeeds.includes('fix:folders-2026-09-30')) {
-      p.removedSeeds.push('fix:folders-2026-09-30')
-      const only = (p.routines ?? []).filter((r) => r.id === 'r-evening' || r.id === 'r-workroutine')
-      p.habits = foldersFromRoutines(only, p.habits ?? [], []).habits
-    }
-
-    /* Take vitamins moves into After wake up, straight after Take creatine,
-       2026-09-30. The habit already exists, so the step points at it and the
-       habit joins the routine with its history. Orders are rewritten from the
-       step positions so the new row lands where the step sits. */
-    if (!p.removedSeeds.includes('fix:vitamins-wakeup')) {
-      p.removedSeeds.push('fix:vitamins-wakeup', 'r-wakeup:step:wu5')
-      const vit = (p.habits ?? []).find((h) => !h.archivedAt && h.name.trim().toLowerCase() === 'take vitamins')
-      p.routines = (p.routines ?? []).map((r) => {
-        if (r.id !== 'r-wakeup' || (vit && r.steps.some((st) => st.habitId === vit.id))) return r
-        const at = r.steps.findIndex((st) => st.id === 'wu2' || st.title === 'Take creatine')
-        const step = { id: 'wu5', title: 'Take vitamins', kind: 'do' as const, ...(vit ? { habitId: vit.id } : {}) }
-        const steps = at < 0 ? [...r.steps, step] : [...r.steps.slice(0, at + 1), step, ...r.steps.slice(at + 1)]
-        return { ...r, steps }
-      })
-      const wake = (p.routines ?? []).filter((r) => r.id === 'r-wakeup')
-      p.habits = foldersFromRoutines(wake, p.habits ?? [], []).habits
-      const order = new Map<string, number>()
-      wake.forEach((r) => r.steps.forEach((st, i) => order.set(st.habitId ?? `h-${r.id}-${st.id}`, i)))
-      p.habits = (p.habits ?? []).map((h) => (h.folderId === 'r-wakeup' && order.has(h.id) ? { ...h, folderOrder: order.get(h.id) } : h))
-    }
-
-    /* Tracking my calories becomes the last step of Before bed routine,
-       2026-09-30, linked to the habit he already has. */
-    if (!p.removedSeeds.includes('fix:calories-bedtime')) {
-      p.removedSeeds.push('fix:calories-bedtime', 'r-evening:step:be11')
-      const cal = (p.habits ?? []).find((h) => !h.archivedAt && h.name.trim().toLowerCase() === 'tracking my calories')
-      p.routines = (p.routines ?? []).map((r) => (r.id !== 'r-evening' || (cal && r.steps.some((st) => st.habitId === cal.id))
-        ? r
-        : { ...r, steps: [...r.steps, { id: 'be11', title: 'Track my calories', kind: 'do' as const, ...(cal ? { habitId: cal.id } : {}) }] }))
-      const eve = (p.routines ?? []).filter((r) => r.id === 'r-evening')
-      p.habits = foldersFromRoutines(eve, p.habits ?? [], []).habits
-      const order = new Map<string, number>()
-      eve.forEach((r) => r.steps.forEach((st, i) => order.set(st.habitId ?? `h-${r.id}-${st.id}`, i)))
-      p.habits = (p.habits ?? []).map((h) => (h.folderId === 'r-evening' && order.has(h.id) ? { ...h, folderOrder: order.get(h.id) } : h))
-    }
-
-    if (!p.removedSeeds.includes('fix:habit-runners')) {
-      p.removedSeeds.push('fix:habit-runners')
-      p.habits = foldersFromRoutines(p.routines ?? [], p.habits ?? [], []).habits
-    }
 
     /* Sleep before 1 AM, 2026-10-04: his one health habit had never been made,
        so the morning recap could not ask about it. Started yesterday so
@@ -1285,27 +882,18 @@ function routeFromHash(): { page: PageId; day: string | null } {
   const h = location.hash.replace('#/', '')
   const m = h.match(/^day\/(\d{4}-\d{2}-\d{2})$/)
   if (m) return { page: 'day', day: m[1] }
-  // The board's old address still resolves: a bookmark lands on its successor.
   // The give-up screen lives on the Jar page; the Jar reads the same hash.
   if (h === 'give-up') return { page: 'timeline', day: null }
-  if (h === 'braindump') return { page: 'notes', day: null }
-  /* Achievements, Money, Reflect and Brand & guidelines were removed (the
-     last on his instruction, 2026-09-06: a design-system reference nobody
-     consults from the app itself). Their addresses land on Today rather than
-     on nothing, the same courtesy braindump gets above. */
-  if (h === 'achievements' || h === 'money' || h === 'review' || h === 'stats' || h === 'brand') return { page: 'today', day: null }
   const pages: PageId[] = ['today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting', 'settings', 'notes', 'bills', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant', 'timeline', 'skills', 'health', 'gym', 'longevity', 'watchless', 'ideas', 'prompts', 'people']
   return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
 }
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const persisted = useMemo(loadPersisted, [])
-  const widgetsSlice = useWidgetsSlice(persisted)
-  const { spaces, setSpaces } = widgetsSlice
   const [storageFull, setStorageFull] = useState(false)
   const [ledger, setLedger] = useState(persisted?.ledger ?? MOCK_LEDGER)
   const connectionsSlice = useConnectionsSlice(persisted)
-  const { social, setSocial, sources, setSources, toggleSource, ideas, setIdeas } = connectionsSlice
+  const { ideas, setIdeas } = connectionsSlice
   const coachSlice = useCoachSlice(persisted)
   const { coachSessions, setCoachSessions } = coachSlice
   const [focusSessions, setFocusSessions] = useState<FocusSession[]>(persisted?.focusSessions ?? [])
@@ -1313,8 +901,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
      focusSessions, which only ever holds FINISHED blocks. PomodoroProvider
      owns the countdown itself (still its own localStorage clock, see
      pomodoro.tsx) and mirrors it here so a block started on one device shows
-     up, live, on every other: the phone that started it, the Mac it syncs to,
-     and Raycast, which can only ever see this synced copy. Whichever side
+     up, live, on every other: the phone that started it, the Mac it syncs to. Whichever side
      saved most recently wins outright (see mergeStates -- this field isn't in
      ALL_KEYS, so it follows the newer blob's savedAt like `plan`/`review`
      used to before those needed their own union rules); a single running
@@ -1327,8 +914,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
      laptop lets any phone that still holds the row put it back. */
   /* An empty link is a removal, not a blank entry, so the key does not linger
      and win a merge against a device that still holds the real one. */
-  const twoLivesSlice = useTwoLivesSlice(persisted)
-  const { twoLives, setTwoLivesRaw, setTwoLives, reels, setReelsRaw, setReels, tunes, setTunesRaw, setTunes, reelFiles, setReelFilesRaw, setReelFile } = twoLivesSlice
   const [spaceGuessed] = useState<number>(persisted?.spaceGuessed ?? 0)
   const [lastRollDay] = useState<string | undefined>(persisted?.lastRollDay)
   const remoteSaveTimer = useRef<number | undefined>(undefined)
@@ -1372,6 +957,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
      one of those domains. */
   const { undoable, armUndo, undoDelete, dismissUndo } = useUndo()
   const { graveyard, setGraveyard, bury, digUp } = useGraveyard(persisted?.graveyard)
+  const twoLivesSlice = useTwoLivesSlice(persisted, { bury, digUp })
+  const { twoLives, setTwoLivesRaw, setTwoLives, reels, setReelsRaw, setReels, tunes, setTunesRaw, setTunes, reelFiles, setReelFilesRaw, setReelFile } = twoLivesSlice
   const notesSlice = useNotesSlice(persisted, { space, armUndo, bury, digUp })
   const { notes, setNotes, noteFolders, setNoteFolders } = notesSlice
   const ideaBoardSlice = useIdeaBoardSlice(persisted, { armUndo, bury, digUp })
@@ -1386,15 +973,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const {
     habits, setHabits, goals, setGoals, routines, setRoutines,
     records, setRecords, removedSeeds, setRemovedSeeds,
-    habitLog, setHabitLog, routineLog, setRoutineLog, slips, setSlips,
+    habitLog, setHabitLog, editHabitLog, routineLog, setRoutineLog, slips, setSlips,
     stepLog, setStepLog, dayLog, setDayLog, stepTicks, setStepTicks,
     dailyOpen, dailyDone, setDailyDone, dailySkipped, setDailySkipped, plan, setPlan, review, setReview,
   } = growthSlice
   const [openProjectId, setOpenProject] = useState<string | null>(null)
   const plannerSlice = usePlannerSlice(persisted, { armUndo, bury, digUp, openProjectId, setOpenProject, setPlan })
   const { tasks, setTasks, projects, setProjects } = plannerSlice
-  const assistantSlice = useAssistantSlice(persisted, { space, setTasks, setGoals })
-  const { assistantLog, setAssistantLog, applyDictation, revertAssistantItem } = assistantSlice
+  const { assistantLog, setAssistantLog } = useAssistantSlice(persisted)
   const setSpace = (s: SpaceId) => setWriteSpace(s)
   const setView = (v: ViewId) => { setViewState(v); if (isSpace(v)) setWriteSpace(v); setOpenProject(null) }
   /* A record belongs to exactly one space. The old form treated a space-less row
@@ -1477,7 +1063,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (futureBlob) return
 
     const state: PersistedState = {
-      version: 3, spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
+      version: 3, tasks, habits, goals, projects, ledger, plan, review, assistantLog, coachSessions, routines, ideas,
       notes, noteFolders, ideaBoard, prompts, people, personBonds, personContacts, gymGoals,
       savedAt: Date.now(), lastWrite: { dev: deviceId(), name: deviceName(), at: Date.now() },
       weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
@@ -1509,7 +1095,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { outbox.push(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels, tunes, reelFiles, ideaBoard, prompts, people, personBonds, personContacts, gymGoals, activeFocus])
+  }, [tasks, habits, goals, projects, ledger, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels, tunes, reelFiles, ideaBoard, prompts, people, personBonds, personContacts, gymGoals, activeFocus])
 
   /* ---- state that arrived from somewhere else ----
      Another tab of this browser, or this account on another device. Merged in,
@@ -1567,7 +1153,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (p.dailySkipped && (!dailySkipped || p.dailySkipped > dailySkipped)) setDailySkipped(p.dailySkipped)
     if (p.coachSessions) setCoachSessions(p.coachSessions)
     if (p.assistantLog) setAssistantLog(p.assistantLog)
-    if (p.spaces) setSpaces(p.spaces)
     if (p.plan) setPlan(p.plan)
     if (p.review) setReview(p.review)
     if (p.records) setRecords(p.records)
@@ -1715,7 +1300,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     }
     if (next === habitLog) return
-    setHabitLog(next)
+    editHabitLog(next)
     const idx = (new Date().getDay() + 6) % 7
     setHabits((prev) => prev.map((h) => (rules.some((r) => r.id === h.id)
       ? { ...h, days: h.days.map((d, i) => (i === idx ? next.some((t) => t.habitId === h.id && t.day === today) : d)) }
@@ -1755,7 +1340,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value: Store = {
     version: 3,
-    spaces, tasks, habits, goals, projects, storageFull, ledger, social, sources, plan, review, routines, ideas,
+    tasks, habits, goals, projects, storageFull, ledger, plan, review, routines, ideas,
     openProjectId, setOpenProject, enterProject,
     addProject: plannerSlice.addProject,
     renameProject: plannerSlice.renameProject,
@@ -1806,11 +1391,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     focusAppId, setFocusAppId,
     noteToOpen, openNote: setNoteToOpen,
 
-    reorderSpace: widgetsSlice.reorderSpace,
-    resizeWidget: widgetsSlice.resizeWidget,
-    removeWidget: widgetsSlice.removeWidget,
-    addWidget: widgetsSlice.addWidget,
-    moveWidget: widgetsSlice.moveWidget,
 
     toggleTask: plannerSlice.toggleTask,
     updateTask: plannerSlice.updateTask,
@@ -1841,7 +1421,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
 
     addTask: plannerSlice.addTask,
-    addTasks: plannerSlice.addTasks,
     addTaskWithSubtasks: plannerSlice.addTaskWithSubtasks,
     commitTask: plannerSlice.commitTask,
     moveTaskList: plannerSlice.moveTaskList,
@@ -1889,7 +1468,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     assertRoutineDay: growthSlice.assertRoutineDay,
     toggleHabitDay: growthSlice.toggleHabitDay,
     markHabitDay: growthSlice.markHabitDay,
-    markHabitDayOn: growthSlice.markHabitDayOn,
     markHabitDaysOn: growthSlice.markHabitDaysOn,
     logHabitNumber: growthSlice.logHabitNumber,
     pickHabitAlt: growthSlice.pickHabitAlt,
@@ -1914,41 +1492,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     toggleGoalMilestone: growthSlice.toggleGoalMilestone,
     deleteGoal: growthSlice.deleteGoal,
 
-    setSocial,
-    toggleSource,
 
-    commitPlan: (taskIds, firstMoveId) => {
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.space !== space ? t : {
-            ...t,
-            list: taskIds.includes(t.id) ? 'today' : t.done ? t.list : 'backlog',
-            plannedOn: taskIds.includes(t.id) ? todayKey() : t.done ? t.plannedOn : undefined,
-          },
-        ),
-      )
-      setPlan({ committedDate: todayKey(), firstMoveId })
-    },
 
 
     assistantLog,
-    applyDictation,
-    revertAssistantItem,
 
     coachSessions,
     toggleRoutineStep: growthSlice.toggleRoutineStep,
     toggleRoutineAlt: growthSlice.toggleRoutineAlt,
     records,
-    setStepData: growthSlice.setStepData,
     addRoutine: growthSlice.addRoutine,
     updateRoutine: growthSlice.updateRoutine,
     deleteRoutine: growthSlice.deleteRoutine,
     addRoutineStep: growthSlice.addRoutineStep,
-    updateRoutineStep: growthSlice.updateRoutineStep,
     deleteRoutineStep: growthSlice.deleteRoutineStep,
-    moveRoutineStep: growthSlice.moveRoutineStep,
     logCount: growthSlice.logCount,
-    startAgain: growthSlice.startAgain,
     planRoutine: growthSlice.planRoutine,
     setRoutineDone: growthSlice.setRoutineDone,
 
@@ -1977,7 +1535,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // Cancel any pending mirror first, or it would rewrite the row we just deleted.
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = undefined
-      try { localStorage.removeItem(STORAGE_KEY) } catch { /* noop */ }
+      // The backup copy too: "wipe everything" must not leave his data on the device.
+      try { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(BACKUP_KEY) } catch { /* noop */ }
       const finish = () => { location.hash = ''; location.reload() }
       if (SUPABASE_ENABLED) { void deleteRemoteState().finally(finish) } else finish()
     },

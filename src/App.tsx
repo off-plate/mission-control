@@ -2,6 +2,7 @@ import { Orb } from './orb'
 import { JarBar, JAR_PAGES } from './cookiejarnav'
 import { ProjectMark } from './ui'
 import { usePromptWindow } from './promptwindow'
+import { lastFace } from './ideasswitch'
 import { Component, Fragment, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { exceptionsFor, globalExceptions } from './exceptions'
@@ -679,28 +680,19 @@ export default function App() {
             <Icon.DockNote size={16} />
             <span className="btn-sq-label">Notes</span>
           </button>
+          {/* Ideas holds Prompts too since 2026-10-04 (his ask): one square,
+              two faces switched by the page title. It opens the face he used
+              last, or Prompts when the window is open and something waits,
+              and it carries the dot the Prompts square used to. */}
           <button
-            className={`btn btn-ghost btn-sq${page === 'ideas' ? ' is-on' : ''}`}
-            onClick={() => setPage('ideas')}
-            aria-pressed={page === 'ideas'}
+            className={`btn btn-ghost btn-sq${page === 'ideas' || page === 'prompts' ? ' is-on' : ''}`}
+            onClick={() => setPage(promptsReady ? 'prompts' : lastFace())}
+            aria-pressed={page === 'ideas' || page === 'prompts'}
             aria-label="Ideas"
             title="Ideas"
           >
             <Icon.DockBulb size={16} />
             <span className="btn-sq-label">Ideas</span>
-          </button>
-          {/* Prompts, next to Notes (his ask, 2026-10-04): what to say to Claude
-              once the usage window is open again. The dot says it is open and
-              something is waiting. */}
-          <button
-            className={`btn btn-ghost btn-sq${page === 'prompts' ? ' is-on' : ''}`}
-            onClick={() => setPage('prompts')}
-            aria-pressed={page === 'prompts'}
-            aria-label="Prompts"
-            title="Prompts"
-          >
-            <Icon.DockPrompt size={16} />
-            <span className="btn-sq-label">Prompts</span>
             {promptsReady && <span className="btn-sq-dot" aria-hidden="true" />}
           </button>
           {/* People, next to Ideas on his instruction (2026-09-17). */}

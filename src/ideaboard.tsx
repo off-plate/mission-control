@@ -29,6 +29,7 @@ import type { IdeaCard } from './types'
 import { IDEA_H, IDEA_W } from './store/ideaboard'
 import { IDEA_COLORS, ideaBg, MicButton, useFieldDictation } from './ideasdock'
 import * as Icon from './icons'
+import { IdeasSwitch } from './ideasswitch'
 
 type View = { x: number; y: number; z: number }
 const VIEW_KEY = 'mc-ideaboard-view'
@@ -412,8 +413,7 @@ export function IdeasPage() {
 
         <div className="ib-bar" onPointerDown={stop} onDoubleClick={stop}>
           <div className="ib-bar-head">
-            <h1 className="ib-h1">Ideas</h1>
-            <span className="ib-count">{openCount}</span>
+            <h1 className="ib-h1"><IdeasSwitch face="ideas" count={openCount} /></h1>
           </div>
           <div className="ib-pad" title="Click a sticky to pick it up, or drag it onto the board">
             {IDEA_COLORS.map((c) => (

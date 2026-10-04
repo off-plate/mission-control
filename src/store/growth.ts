@@ -587,7 +587,6 @@ export function useGrowthSlice(
       markDay(id, day, !h.days[day])
     },
     markHabitDay: (id: string, day: number, value: boolean) => markDay(id, day, value),
-    markHabitDayOn: (id: string, day: string, value: boolean) => markDayOn(id, day, value),
     markHabitDaysOn: (id: string, days: string[], value: boolean) => markDaysOn(id, days, value),
     logHabitNumber: (habitId: string, value: number) => {
       const h = habits.find((x) => x.id === habitId)
@@ -813,26 +812,6 @@ export function useGrowthSlice(
         return stamped({ ...r, stepChoice, doneStepIds })
       })
     },
-    /* Logging the number IS completing the step, in one action. Keeping them
-       apart meant the gate read the old score and refused the very result that
-       had just satisfied it. */
-    setStepData: (routineId: string, stepId: string, value: number) => {
-      applyRoutine(routineId, (r) => {
-        const stepData = { ...(r.stepData ?? {}), [stepId]: value }
-        const passes = !stepLocked({ ...r, stepData }, stepId)
-        const doneStepIds = passes && !r.doneStepIds.includes(stepId)
-          ? [...r.doneStepIds, stepId]
-          : !passes ? r.doneStepIds.filter((x) => x !== stepId) : r.doneStepIds
-        return stamped({ ...r, stepData, doneStepIds })
-      })
-      /* Every run is kept, with the moment it happened. Keying by day and
-         replacing meant a second attempt erased the first: run 76 in the
-         morning and 83 in the evening and the 76 was gone, which is the same
-         thing `records` was already doing wrong at a slower rate. */
-      setStepLog((prev) => [...prev, { routineId, stepId, day: todayKey(), at: new Date().toISOString(), value }])
-      const key = `${routineId}:${stepId}`
-      setRecords((prev) => (value > (prev[key] ?? 0) ? { ...prev, [key]: value } : prev))
-    },
     addRoutine: (input: { title: string; cadence: RoutineCadence; blurb?: string; daypart?: TimeSlot }) => {
       const hid = newId('h')
       const rid = newId('r')
@@ -846,65 +825,7 @@ export function useGrowthSlice(
         steps: [], doneStepIds: [], habitId: hid, periodKey: periodKeyFor(input.cadence), stepData: {},
       }])
     },
-    updateRoutine: (id: string, patch: Partial<Pick<Routine, 'title' | 'cadence' | 'blurb'>>) => {
-      setRoutines((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)))
-      // The mirrored habit carries the routine's name, so keep them in step.
-      const r = routines.find((x) => x.id === id)
-      if (r?.habitId && patch.title) setHabits((hs) => hs.map((h) => (h.id === r.habitId ? { ...h, name: patch.title as string } : h)))
-    },
-    /* Deleting a routine takes its habit with it: a habit only a routine could
-       tick would otherwise sit there permanently unfinishable. */
-    deleteRoutine: (id: string) => {
-      const r = routines.find((x) => x.id === id)
-      // A routine takes its habit and its goal's link with it, so undo has to
-      // put all three back, not just the routine.
-      const beforeR = routines, beforeH = habits, beforeG = goals, beforeSeeds = removedSeeds
-      armUndo(r ? `Deleted "${r.title}"` : 'Routine deleted', () => {
-        setRoutines(beforeR); setHabits(beforeH); setGoals(beforeG); setRemovedSeeds(beforeSeeds)
-      })
-      setRoutines((prev) => prev.map((x) => (x.id === id ? { ...x, archivedAt: todayKey() } : x)))
-      if (r?.habitId) {
-        const hid = r.habitId
-        setHabits((hs) => hs.map((h) => (h.id === hid ? { ...h, archivedAt: todayKey() } : h)))
-        /* A goal counting off that habit keeps the progress it earned and goes
-           back to being logged by hand, rather than pointing at nothing and
-           freezing forever. */
-        setGoals((gs) => gs.map((g) => (g.habitId === hid
-          ? { ...g, habitId: undefined, current: goalCurrent(g, habits), unit: g.unit === 'checkoffs' ? 'done' : g.unit }
-          : g)))
-        setRemovedSeeds((prev) => (prev.includes(hid) ? prev : [...prev, hid]))
-      }
-      setRemovedSeeds((prev) => (prev.includes(id) ? prev : [...prev, id]))
-    },
-    addRoutineStep: (routineId: string, step: { title: string; note?: string; link?: string; linkLabel?: string }) =>
-      applyRoutine(routineId, (r) => ({ ...r, steps: [...r.steps, { id: newId('st'), kind: 'do' as const, ...step }] })),
-    updateRoutineStep: (routineId: string, stepId: string, patch: Partial<Pick<RoutineStep, 'title' | 'note' | 'link' | 'linkLabel'>>) =>
-      setRoutines((prev) => prev.map((r) => (r.id === routineId
-        ? { ...r, steps: r.steps.map((s) => (s.id === stepId ? { ...s, ...patch } : s)) }
-        : r))),
-    deleteRoutineStep: (routineId: string, stepId: string) =>
-      applyRoutine(routineId, (r) => ({
-        ...r,
-        steps: r.steps.filter((s) => s.id !== stepId),
-        doneStepIds: r.doneStepIds.filter((x) => x !== stepId),
-      })),
-    moveRoutineStep: (routineId: string, stepId: string, dir: -1 | 1) =>
-      setRoutines((prev) => prev.map((r) => {
-        if (r.id !== routineId) return r
-        const steps = [...r.steps]
-        const i = steps.findIndex((s) => s.id === stepId)
-        const j = i + dir
-        if (i < 0 || j < 0 || j >= steps.length) return r
-        ;[steps[i], steps[j]] = [steps[j], steps[i]]
-        return { ...r, steps }
-      })),
-    /* Not a reset. The run he just finished stays in the log, keeps its habit
-       tick and keeps whatever its steps recorded; this only opens a fresh run on
-       top of it. Nothing he has done can be taken back by starting again. */
     logCount,
-    startAgain: (routineId: string) => applyRoutine(routineId, (r) => ({
-      ...r, run: (r.run ?? 0) + 1, doneStepIds: [], stepData: {}, stepChoice: {}, startedAt: undefined,
-    })),
     /* Planning is the other direction from starting: starting files a routine
        under the clock that has already run, planning says where he intends it to
        go. Nothing is copied, so the row on the day IS the routine and ticking a

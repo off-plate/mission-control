@@ -10605,3 +10605,39 @@ input.pr-big { padding: 0 6px; }
   .pb-bar { right: auto; min-height: 52px; margin: calc(var(--s3) + 1px) 0 var(--s4) calc(var(--s3) - var(--gutter)); }
 }
 .ips button:not([aria-pressed="true"]) .ips-n { color: var(--faint); }
+
+/* ---- People > Business in colour (his pick, 2026-10-04: "B, the bolder
+   one"; artifact YDXRonkhyHu8k2pxo2PNP5) ----
+   One muted hue per pipeline stage, the same everywhere the stage shows: the
+   list row, its chip, the board column and the open prospect. Per COLOR.md
+   no violet, coral stays "urgent" only, green only for won. B is his
+   deliberate exception to COLOR.md's "no large fills": columns, rows and the
+   sheet's header carry a light tint of their stage. Text hues are darker on
+   paper, so every one keeps its contrast in both themes. */
+:root { --st-reach: #3F5F8A; --st-contacted: #8A5A10; --st-talking: #1F6E66; --st-won: #2E7D4F; --st-lost: #8A5246; --st-value: #8A6A12; }
+body:has(.shell.is-hud) { --st-reach: #7C9CC4; --st-contacted: #E0A84A; --st-talking: #4FB3A9; --st-won: #5BC48A; --st-lost: #B27A6E; --st-value: #E3B652; }
+.st-reach { --st: var(--st-reach); } .st-contacted { --st: var(--st-contacted); } .st-talking { --st: var(--st-talking); }
+.st-won { --st: var(--st-won); } .st-lost { --st: var(--st-lost); }
+
+.pr-chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; white-space: nowrap; color: var(--st); background: color-mix(in srgb, var(--st) 15%, transparent); }
+.pr-chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--st); }
+.pr-biz .pr-src { display: inline-flex; align-items: center; height: 18px; margin-left: 4px; font-size: 0.72rem; line-height: 1; border: 1px solid var(--hairline-strong); border-radius: 4px; padding: 0 6px; white-space: nowrap; vertical-align: middle; }
+.pr-row:not(.is-head)[class*="st-"] { background: color-mix(in srgb, var(--st) 7%, transparent); }
+.pr-score.is-value b { color: var(--st-value); }
+.pr-score.is-value s { background: var(--st-value); }
+.pr-score.is-odds b { color: var(--st-talking); }
+.pr-score.is-odds s { background: var(--st-talking); }
+.pr-score.is-value i, .pr-score.is-odds i { background: color-mix(in srgb, currentColor 14%, transparent); }
+
+.pr-col[class*="st-"] { background: color-mix(in srgb, var(--st) 9%, var(--pp-sunk)); border-top: 3px solid var(--st); }
+.pr-col[class*="st-"] h2 { color: var(--st); }
+.pr-col[class*="st-"] .pr-pcard { border-color: color-mix(in srgb, var(--st) 35%, transparent); }
+.pr-col.is-over { border-color: var(--st); }
+
+.pr-sheet[class*="st-"] .pp-card-top { background: color-mix(in srgb, var(--st) 16%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--st) 40%, transparent); margin: calc(var(--s5) * -1) calc(var(--s5) * -1) 0; padding: var(--s5); }
+.pr-stepper { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; font-size: 0.7rem; color: var(--pp-muted); }
+.pr-stepper span { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.pr-stepper i { display: block; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--st) 22%, transparent); }
+.pr-stepper .is-on i { background: var(--st); }
+.pr-stepper .is-on { color: var(--st); }
+.pr-sheet[class*="st-"] .pr-scores > div:first-child .pr-big { color: var(--st-value); }

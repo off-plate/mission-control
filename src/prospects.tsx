@@ -94,9 +94,9 @@ function ProspectList({ prospects, today, onOpen }: { prospects: Prospect[]; tod
     const a = ageLabel(p, today)
     return (
       <li key={p.id}>
-        <button className="pr-row" type="button" onClick={() => onOpen(p.id)}>
-          <span className="pr-biz"><b>{p.name}</b><span>{[p.domain, label(SOURCES, p.source)].filter(Boolean).join(', ')}</span></span>
-          <span className="pr-stage">{label(STAGES, p.stage)}</span>
+        <button className={`pr-row st-${p.stage}`} type="button" onClick={() => onOpen(p.id)}>
+          <span className="pr-biz"><b>{p.name}</b><span>{p.domain}{p.domain ? ' ' : ''}<span className="pr-src">{label(SOURCES, p.source)}</span></span></span>
+          <span className="pr-stage"><span className="pr-chip">{label(STAGES, p.stage)}</span></span>
           <span className="pr-next"><span>{p.stage === 'lost' ? (p.lostReason || 'No reason written') : nextLabel(p)}</span><span className={`pr-age${a.stale ? ' is-stale' : ''}`}>{a.t}</span></span>
           <Meter n={p.value} kind="value" />
           <Meter n={replyOdds(p)} kind="odds" none={p.stage === 'talking' ? 'replied' : ''} />
@@ -138,7 +138,7 @@ function ProspectBoard({ prospects, today, onOpen, onMove }: {
           const rows = prospects.filter((p) => p.stage === s.id)
           return (
             <section
-              key={s.id} className={`pr-col${over === s.id ? ' is-over' : ''}`} aria-label={s.label}
+              key={s.id} className={`pr-col st-${s.id}${over === s.id ? ' is-over' : ''}`} aria-label={s.label}
               onDragOver={(e) => { e.preventDefault(); setOver(s.id) }} onDragLeave={() => setOver(null)} onDrop={drop(s.id)}
             >
               <h2>{s.label} <span className="mono">{rows.length}</span></h2>
@@ -203,7 +203,7 @@ function ProspectCard({ p, today, onClose }: { p: Prospect; today: string; onClo
 
   return (
     <div className="pp-scrim pr-scrim" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <aside className="pp-card is-open pr-sheet" aria-label={p.name}>
+      <aside className={`pp-card is-open pr-sheet st-${p.stage}`} aria-label={p.name}>
         <div className="pp-card-scroll">
           <div className="pp-card-top">
             <div className="pp-card-names">
@@ -215,6 +215,14 @@ function ProspectCard({ p, today, onClose }: { p: Prospect; today: string; onClo
             </button>
           </div>
 
+          {/* Where this business is in the pipeline, in its stage's colour. */}
+          {p.stage !== 'lost' && (
+            <div className="pr-stepper" aria-label={`Stage: ${label(STAGES, p.stage)}`}>
+              {STAGES.filter((s) => s.id !== 'lost').map((s, i, all) => (
+                <span key={s.id} className={i <= all.findIndex((x) => x.id === p.stage) ? 'is-on' : ''}><i />{s.label}</span>
+              ))}
+            </div>
+          )}
           <div className="pr-scores">
             <div><span>Value</span><Field className="pp-inline pr-big" type="number" label="Value, 0 to 100" placeholder="-" value={p.value != null ? String(p.value) : ''}
               onCommit={(v) => { const n = Math.round(Number(v)); set({ value: v === '' || !Number.isFinite(n) ? undefined : Math.max(0, Math.min(100, n)) }) }} /></div>

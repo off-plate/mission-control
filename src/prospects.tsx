@@ -17,10 +17,9 @@ type Layout = 'list' | 'board'
 const LAYOUT_KEY = 'mc-business-layout'
 
 /* FILTERS (his ask, 2026-10-04: "the filtration, like Nexus does it").
-   Nexus's own pattern, one live search plus single-pick chips plus a sort,
-   with the two things Nexus lacks: it is remembered per device, and a view
-   that matches nothing has a way back out. Counts on each chip respect the
-   other filters, so a number is always what clicking it would show. */
+   one live search plus stage, source and sort dropdowns, remembered per
+   device. Counts in each dropdown respect the other filters, so a number is
+   always what picking it would show. */
 type Sort = 'value' | 'odds' | 'age' | 'name'
 interface Filters { q: string; stage: ProspectStage | ''; source: ProspectSource | ''; sort: Sort }
 const FILTER_KEY = 'mc-business-filters'
@@ -44,40 +43,42 @@ function matches(p: Prospect, f: Filters, skip?: 'stage' | 'source'): boolean {
   return fold(f.q.trim()).split(/\s+/).every((w) => hay.includes(w))
 }
 
-function FilterBar({ f, set, all }: { f: Filters; set: (f: Filters) => void; all: Prospect[] }) {
+/* The filters sit in the bar itself, the Personal bar's own pieces (his ask,
+   2026-10-04): its search box and its dropdowns, no chip rows. */
+function FilterTools({ f, set, all }: { f: Filters; set: (f: Filters) => void; all: Prospect[] }) {
   const count = (skip: 'stage' | 'source', extra: (p: Prospect) => boolean) => all.filter((p) => matches(p, f, skip) && extra(p)).length
-  const any = f.q || f.stage || f.source
   return (
-    <div className="pr-filters" role="search" aria-label="Filter prospects">
-      <div className="pr-search">
-        <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" strokeWidth="2" /><path d="M20 20l-4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
-        <input type="search" value={f.q} placeholder="Search a business, domain or person" aria-label="Search prospects" onChange={(e) => set({ ...f, q: e.target.value })} />
-        {f.q && <button type="button" className="pr-search-x" aria-label="Clear search" onClick={() => set({ ...f, q: '' })}>
-          <svg width="10" height="10" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
-        </button>}
+    <>
+      <div className="pp-search">
+        <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" strokeWidth="1.7" /><path d="m10.4 10.4 3.4 3.4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>
+        <input
+          className="pp-search-input" type="search" value={f.q} placeholder="Search prospects" aria-label="Search prospects"
+          onChange={(e) => set({ ...f, q: e.target.value })}
+          onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); if (f.q) set({ ...f, q: '' }); else e.currentTarget.blur() } }}
+        />
       </div>
-      <div className="pr-chips" role="group" aria-label="Stage">
-        <button type="button" className="pr-fchip" aria-pressed={!f.stage} onClick={() => set({ ...f, stage: '' })}>All stages <span>{count('stage', () => true)}</span></button>
-        {STAGES.map((s) => (
-          <button key={s.id} type="button" className={`pr-fchip st-${s.id}`} aria-pressed={f.stage === s.id} onClick={() => set({ ...f, stage: f.stage === s.id ? '' : s.id })}>
-            {s.label} <span>{count('stage', (p) => p.stage === s.id)}</span>
-          </button>
-        ))}
-      </div>
-      <div className="pr-chips" role="group" aria-label="Source">
-        <button type="button" className="pr-fchip" aria-pressed={!f.source} onClick={() => set({ ...f, source: '' })}>Any source <span>{count('source', () => true)}</span></button>
-        {SOURCES.map((s) => (
-          <button key={s.id} type="button" className="pr-fchip" aria-pressed={f.source === s.id} onClick={() => set({ ...f, source: f.source === s.id ? '' : s.id })}>
-            {s.label} <span>{count('source', (p) => p.source === s.id)}</span>
-          </button>
-        ))}
-      </div>
-      <div className="pr-sort">
-        <span>Sort</span>
-        <Select className="pp-dd" ariaLabel="Sort prospects" value={f.sort} onChange={(sort) => set({ ...f, sort })} options={SORTS} />
-        {any ? <button type="button" className="pp-link" onClick={() => set({ ...NO_FILTERS, sort: f.sort })}>Clear filters</button> : null}
-      </div>
-    </div>
+      <Select
+        className="pp-dd pp-circle-pick" ariaLabel="Stage" value={f.stage}
+        onChange={(v) => set({ ...f, stage: v as ProspectStage | '' })}
+        options={[
+          { value: '', label: `All stages (${count('stage', () => true)})` },
+          ...STAGES.map((s) => ({ value: s.id, label: `${s.label} (${count('stage', (p) => p.stage === s.id)})` })),
+        ]}
+      />
+      <Select
+        className="pp-dd pp-circle-pick" ariaLabel="Source" value={f.source}
+        onChange={(v) => set({ ...f, source: v as ProspectSource | '' })}
+        options={[
+          { value: '', label: `All sources (${count('source', () => true)})` },
+          ...SOURCES.map((s) => ({ value: s.id, label: `${s.label} (${count('source', (p) => p.source === s.id)})` })),
+        ]}
+      />
+      <Select
+        className="pp-dd pp-circle-pick" ariaLabel="Sort" value={f.sort}
+        onChange={(sort) => set({ ...f, sort })}
+        options={SORTS.map((o) => ({ value: o.value, label: `Sort: ${o.label}` }))}
+      />
+    </>
   )
 }
 const fmtDay = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
@@ -117,7 +118,11 @@ export function BusinessView({ modeSwitch }: { modeSwitch: JSX.Element }) {
         <h1 className="pp-h1">People</h1>
         {modeSwitch}
         <Segmented size="sm" label="Layout" value={layout} onPick={setLayout} options={[{ id: 'list', label: 'List' }, { id: 'board', label: 'Board' }]} />
-        <button className="btn btn-primary pp-add" type="button" onClick={() => setAdding(true)}>Add prospect</button>
+        {prospects.length > 0 && <FilterTools f={f} set={setF} all={prospects} />}
+        <button className="btn btn-primary pp-add" type="button" onClick={() => setAdding(true)} aria-label="Add prospect">
+          <svg width="13" height="13" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+          Add
+        </button>
       </div>
 
       {prospects.length === 0 ? (
@@ -125,9 +130,7 @@ export function BusinessView({ modeSwitch }: { modeSwitch: JSX.Element }) {
           <p>Every business you reach out to goes here: who they are, who decides, and every email you sent.</p>
           <button className="btn btn-primary" type="button" onClick={() => setAdding(true)}>Add the first prospect</button>
         </div>
-      ) : (
-        <FilterBar f={f} set={setF} all={prospects} />
-      )}
+      ) : null}
       {prospects.length === 0 ? null : shown.length === 0 ? (
         <div className="pr-empty">
           <p>Nothing matches these filters.</p>
@@ -159,7 +162,7 @@ function Meter({ n, kind, none = 'unset' }: { n: number | null | undefined; kind
 }
 
 function ProspectList({ prospects, today, onOpen }: { prospects: Prospect[]; today: string; onOpen: (id: string) => void }) {
-  /* Arrives already filtered and sorted (FilterBar); the groups keep that order. */
+  /* Arrives already filtered and sorted (FilterTools); the groups keep that order. */
   const groups: { title: string; rows: Prospect[]; fold?: boolean }[] = [
     { title: 'Needs a move', rows: prospects.filter(isOpen) },
     { title: 'In conversation', rows: prospects.filter((p) => p.stage === 'talking') },

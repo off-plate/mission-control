@@ -281,10 +281,12 @@ async function fetchGemini(text: string, key: string): Promise<Blob | null> {
    Google US English is still here, at the bottom, for a machine with no local
    voice at all: a good voice with a still waveform beats no voice. */
 export const GOOD_VOICES = [
-  /* Daniel first: the British voice every Mac ships, the nearest the device
-     gets to JARVIS (2026-10-04). Voice mode lands here more often than on
-     Gemini, since it will not wait long for the network. */
-  'Daniel (Enhanced)', 'Daniel',
+  /* Jamie first: his pick for JARVIS from recordings on his own Mac
+     (2026-10-04). Daniel was tried first and rejected out loud as the
+     voice every TikTok voice-over uses, so it is not on this list at all.
+     Voice mode lands here more often than on Gemini, since it will not wait
+     long for the network. */
+  'Jamie (Premium)', 'Jamie (Enhanced)', 'Jamie',
   'Samantha', 'Alex', 'Ava', 'Allison', 'Susan', 'Tom',
   'Microsoft Aria', 'Microsoft Jenny', 'Microsoft Guy',
   'Google US English',

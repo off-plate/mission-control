@@ -1,4 +1,4 @@
-import { OrbChip } from './orb'
+import { Orb } from './orb'
 import { JarBar, JAR_PAGES } from './cookiejarnav'
 import { ProjectMark } from './ui'
 import { usePromptWindow } from './promptwindow'
@@ -93,8 +93,13 @@ function SyncPip() {
 
   return (
     <span className="syncpip" data-quiet={quiet || undefined} title={sync.detail || text}>
-      {tone === 'warn' ? <span title="Saving"><OrbChip state="connecting" label="Saving" compact className="is-saving" /></span> : <span className={`status-dot ${tone}`} />}
-      {tone !== 'warn' && <span className="syncpip-text">{text}</span>}
+      {/* The dot is an orb (his ask, 2026-10-04): a still globe when all is
+          saved, moving only while it saves, tinted when something is wrong. */}
+      <span className="syncorb" title={text}>
+        <Orb state={tone === 'warn' ? 'connecting' : 'searching'} size={22} paused={tone !== 'warn'}
+          color={tone === 'alert' ? '#C2412D' : undefined} label={text} />
+      </span>
+      <span className="syncpip-text">{text}</span>
     </span>
   )
 }

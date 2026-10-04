@@ -399,15 +399,16 @@ export function HealthPage() {
     <div className="page">
       <div className="hp">
         <header className="hp-head">
-          <div>
+          <div className="hp-head-lead">
+            {/* The watch's pulse: listening while its data is under 12 hours old, still once it goes stale. */}
+            <Orb className="hp-orb" state="listening" size={56} surface="dark" dots={1.5}
+              paused={!lastRun || Date.now() - Date.parse(lastRun.ran_at) > 12 * 3600e3} label="Watch data" />
             <p className="hp-since">
               {lastSession
                 ? <>Last session {fmtDay(lastSession.day)}, <Age day={lastSession.day} /></>
                 : 'No sessions on record.'}
               {lastRun && (
                 <span className="hp-since-sync">
-                  {/* Listening while the watch data is fresh (under 12 hours), still once it goes stale. */}
-                  <Orb state="listening" size={26} surface="dark" paused={Date.now() - Date.parse(lastRun.ran_at) > 12 * 3600e3} label="Watch data" />
                   Synced {agoFrom(lastRun.ran_at)}
                 </span>
               )}

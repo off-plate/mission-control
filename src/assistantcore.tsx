@@ -322,10 +322,10 @@ export function Mark({ state = 'idle', size = 96 }: { state?: MarkState; size?: 
   const label = state === 'thinking' ? 'Thinking' : state === 'listening' ? 'Listening' : state === 'speaking' ? 'Speaking' : 'Jarvis'
   /* Small, it is a status: the reference's capsule with the word beside it. */
   if (size < 48) return <OrbChip state={ORB_FOR[state]} label={label} />
-  /* Large, it is the assistant's face: a dark porthole with a dense orb. */
+  /* Large, it is the assistant's face: a dense orb straight on the page. */
   return (
     <span className={`as-orbmark as-mark is-${state}`} style={{ width: size, height: size }}>
-      <Orb state={ORB_FOR[state]} surface="dark" size={Math.min(64, Math.round(size * 0.72))} dots={1.6} label={label} />
+      <Orb state={ORB_FOR[state]} size={Math.min(64, Math.round(size * 0.8))} dots={1.6} label={label} />
     </span>
   )
 }

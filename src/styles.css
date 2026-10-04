@@ -10581,3 +10581,16 @@ input.pr-big { padding: 0 6px; }
   .pr-next { flex-direction: row; flex-wrap: wrap; gap: 0 6px; align-items: baseline; }
 }
 @media (prefers-reduced-motion: reduce) { .pr-col { transition: none; } }
+/* Ideas / Prompts: the page title is the switch (ideasswitch.tsx). Both words
+   take the heading they sit in, so each page keeps its own title size. The
+   open one is ink, the other faded; only the line under it moves. */
+.ips { position: relative; display: inline-flex; align-items: baseline; gap: 0.7em; padding-bottom: 7px; }
+.ips button { position: relative; font: inherit; letter-spacing: inherit; color: var(--faint); background: none; border: 0; padding: 0; cursor: pointer; display: inline-flex; align-items: baseline; gap: 6px; transition: color 150ms ease, transform 160ms cubic-bezier(0.23, 1, 0.32, 1); }
+.ips button[aria-pressed="true"] { color: var(--ink); cursor: default; }
+.ips button:active:not([aria-pressed="true"]) { transform: scale(0.97); }
+@media (hover: hover) and (pointer: fine) { .ips button:not([aria-pressed="true"]):hover { color: var(--muted); } }
+.ips button:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 4px; }
+.ips-line { position: absolute; left: 0; bottom: 0; height: 3px; border-radius: 2px; background: var(--ink); transition: transform 220ms cubic-bezier(0.23, 1, 0.32, 1), width 220ms cubic-bezier(0.23, 1, 0.32, 1); }
+.ips-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--a-accent); box-shadow: 0 0 0 1.5px var(--a-accent-text); align-self: center; }
+@media (prefers-reduced-motion: reduce) { .ips-line { transition: none; } }
+.ips-n { font: 600 var(--text-xs)/1 var(--font-body); font-variant-numeric: tabular-nums; color: var(--muted); align-self: baseline; }

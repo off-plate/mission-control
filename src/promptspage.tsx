@@ -16,6 +16,7 @@ import { PROMPT_KINDS, type PromptItem, type PromptKind } from './types'
 import { Band, Empty } from './ui'
 import { usePromptWindow, WINDOW_MS } from './promptwindow'
 import * as Icon from './icons'
+import { IdeasSwitch } from './ideasswitch'
 
 const clock = (ms: number) => {
   const s = Math.max(0, Math.round(ms / 1000))
@@ -118,7 +119,7 @@ export function PromptsPage() {
 
   return (
     <div className="page">
-      <Band title="Prompts" metrics={[{ v: String(open.length), k: 'waiting', tone: 'info' as const }]} />
+      <Band title={<IdeasSwitch face="prompts" />} metrics={[{ v: String(open.length), k: 'waiting', tone: 'info' as const }]} />
       <div className="pb">
         <div className="pb-side">
           <div className={`panel pb-limit is-${win.state}`}>

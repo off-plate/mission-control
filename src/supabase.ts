@@ -47,9 +47,22 @@ export async function callFunction(
        This used to force everything through a string, which turned a parsed
        object into "[object Object]" the moment the function started answering
        JSON, and the app reported the calendar as unreadable. */
-    const { data, error } = opts
-      ? await c.functions.invoke(name, { method: 'POST', body: opts.body })
-      : await c.functions.invoke(name, { method: 'GET' })
+    /* His session goes on the call explicitly. Left to itself supabase-js
+       sends the publishable key whenever the session is not ready yet, which
+       happens on a cold open while the stored token refreshes; the functions
+       only answer his session, so the calendar failed until a reload
+       (2026-10-04). A 401 gets one refresh and one retry. */
+    const send = (token: string) => (opts
+      ? c.functions.invoke(name, { method: 'POST', body: opts.body, headers: { Authorization: `Bearer ${token}` } })
+      : c.functions.invoke(name, { method: 'GET', headers: { Authorization: `Bearer ${token}` } }))
+    const token = await sessionToken()
+    let res = token ? await send(token) : null
+    if (!res || (res.error as { context?: Response } | null)?.context?.status === 401) {
+      const fresh = (await c.auth.refreshSession()).data.session?.access_token
+      if (!fresh) return { ok: false, reason: 'signed-out' }
+      res = await send(fresh)
+    }
+    const { data, error } = res
     if (error) {
       /* On a non-2xx response supabase-js hands back a generic
          "Edge Function returned a non-2xx status code" and throws the real

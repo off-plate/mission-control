@@ -1226,15 +1226,8 @@ function routeFromHash(): { page: PageId; day: string | null } {
   const h = location.hash.replace('#/', '')
   const m = h.match(/^day\/(\d{4}-\d{2}-\d{2})$/)
   if (m) return { page: 'day', day: m[1] }
-  // The board's old address still resolves: a bookmark lands on its successor.
   // The give-up screen lives on the Jar page; the Jar reads the same hash.
   if (h === 'give-up') return { page: 'timeline', day: null }
-  if (h === 'braindump') return { page: 'notes', day: null }
-  /* Achievements, Money, Reflect and Brand & guidelines were removed (the
-     last on his instruction, 2026-09-06: a design-system reference nobody
-     consults from the app itself). Their addresses land on Today rather than
-     on nothing, the same courtesy braindump gets above. */
-  if (h === 'achievements' || h === 'money' || h === 'review' || h === 'stats' || h === 'brand') return { page: 'today', day: null }
   const pages: PageId[] = ['today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting', 'settings', 'notes', 'bills', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant', 'timeline', 'skills', 'health', 'gym', 'longevity', 'watchless', 'ideas', 'prompts', 'people']
   return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
 }

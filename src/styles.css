@@ -10594,3 +10594,14 @@ input.pr-big { padding: 0 6px; }
 .ips-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--a-accent); box-shadow: 0 0 0 1.5px var(--a-accent-text); align-self: center; }
 @media (prefers-reduced-motion: reduce) { .ips-line { transition: none; } }
 .ips-n { font: 600 var(--text-xs)/1 var(--font-body); font-variant-numeric: tabular-nums; color: var(--muted); align-self: baseline; }
+/* Prompts wears the Ideas board's bar in flow; margins are set so the title
+   lands on the same pixels as on the board. */
+/* The board starts 1px under the header (its hairline) and its bar sits --s4
+   in from the screen edge, ignoring the page gutter. The height matches the
+   board's bar, whose row is as tall as Add idea, so the word sits level too. */
+.pb-bar { position: relative; left: auto; top: auto; display: inline-flex; min-height: 59px;
+  margin: calc(var(--s4) + 1px) 0 var(--s5) calc(var(--s4) - var(--gutter)); }
+@media (max-width: 639px) {
+  .pb-bar { right: auto; min-height: 52px; margin: calc(var(--s3) + 1px) 0 var(--s4) calc(var(--s3) - var(--gutter)); }
+}
+.ips button:not([aria-pressed="true"]) .ips-n { color: var(--faint); }

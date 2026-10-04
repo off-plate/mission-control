@@ -25,9 +25,12 @@ export function usePromptsReady(): boolean {
   return usePromptWindow(waiting).state === 'open' && waiting > 0
 }
 
-/** `count` sits against the open word, so a number never reads as the other face's. */
-export function IdeasSwitch({ face, count }: { face: Face; count?: number }) {
-  const { setPage } = useStore()
+/** Each word carries its own count on both faces, so flipping moves nothing
+ *  but the line, and a number never reads as the other face's. */
+export function IdeasSwitch({ face }: { face: Face }) {
+  const { setPage, ideaBoard, prompts } = useStore()
+  const ideasN = ideaBoard.filter((c) => !c.doneAt).length
+  const promptsN = prompts.filter((p) => !p.sentAt).length
   const ready = usePromptsReady()
   const box = useRef<HTMLSpanElement>(null)
   const [line, setLine] = useState<{ x: number; w: number } | null>(null)
@@ -54,10 +57,10 @@ export function IdeasSwitch({ face, count }: { face: Face; count?: number }) {
   const pick = (f: Face) => { if (f !== face) { slideFrom = face; setPage(f) } }
   return (
     <span className="ips" ref={box} role="group" aria-label="Ideas or Prompts">
-      <button type="button" aria-pressed={face === 'ideas'} onClick={() => pick('ideas')}><span className="ips-w">Ideas</span>{face === 'ideas' && count != null && <span className="ips-n">{count}</span>}</button>
+      <button type="button" aria-pressed={face === 'ideas'} onClick={() => pick('ideas')}><span className="ips-w">Ideas</span><span className="ips-n">{ideasN}</span></button>
       <button type="button" aria-pressed={face === 'prompts'} onClick={() => pick('prompts')}>
         <span className="ips-w">Prompts</span>
-        {face === 'prompts' && count != null && <span className="ips-n">{count}</span>}
+        <span className="ips-n">{promptsN}</span>
         {ready && <i className="ips-dot" aria-label="Claude window open, prompts waiting" />}
       </button>
       {line && <i className="ips-line" aria-hidden="true" style={{ width: line.w, transform: `translateX(${line.x}px)` }} />}

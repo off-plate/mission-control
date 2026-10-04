@@ -686,6 +686,8 @@ export function AssistantPage() {
     return () => { dead = true; core.current?.dispose(); core.current = null }
   }, [])
   useEffect(() => { core.current?.setThinking(busy) }, [busy])
+  /* The left column already shows the day, so the right opens on the list. */
+  useEffect(() => { if (!turns.length) setCanvas(['backlog']) }, [])
   /* Each new answer plays what it actually did. */
   const played = useRef(0)
   useEffect(() => {

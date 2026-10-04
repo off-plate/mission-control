@@ -656,7 +656,8 @@ export class JarvisCore {
       const bw = f.el.offsetWidth
       /* Inside the stage: never over the panels either side of it. */
       const left = Math.max(lo + 8, Math.min(hi - bw - 8, dir > 0 ? lx + 6 : lx - bw - 6))
-      f.el.style.transform = `translate(${left}px, ${Math.max(8, ey - 12)}px)`
+      /* And never up into the JARVIS title on the stage's top edge. */
+      f.el.style.transform = `translate(${left}px, ${Math.max(st.top - box.top + 30, ey - 12)}px)`
     })
   }
 
@@ -666,13 +667,14 @@ export class JarvisCore {
     const w = Math.max(1, box.width), h = Math.max(1, box.height)
     this.renderer.setSize(w, h, false)
     this.camera.aspect = w / h
-    const sx = st.left - box.left + st.width / 2, sy = st.top - box.top + st.height / 2
+    /* A little below the stage's middle: the JARVIS title sits on its top edge. */
+    const sx = st.left - box.left + st.width / 2, sy = st.top - box.top + st.height / 2 + 12
     this.camera.setViewOffset(w, h, w / 2 - sx, h / 2 - sy, w, h)
     this.camera.updateProjectionMatrix()
     /* The rings fill about 90% of the stage's smaller side: at distance 9 and
        a 38 degree field the view is 6.2 units tall across the canvas. */
     const side = Math.min(st.width, st.height)
-    this.group.scale.setScalar(Math.max(0.2, ((0.9 * side) / h) * 6.2 / (2 * 2.4)))
+    this.group.scale.setScalar(Math.max(0.2, ((0.82 * side) / h) * 6.2 / (2 * 2.4)))
   }
 
   /* ---------- look around ---------- */

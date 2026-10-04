@@ -10360,7 +10360,7 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
   display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
   border: 1px solid var(--hairline-strong); background: color-mix(in srgb, var(--bg) 72%, transparent);
 }
-.jv-strip > div { padding: 10px 16px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.jv-strip > div { padding: 10px 16px; display: flex; flex-direction: column; justify-content: space-between; gap: 2px; min-width: 0; }
 .jv-strip > div + div { border-left: 1px solid var(--hairline); }
 .jv-strip .k { font-family: var(--font-display); font-size: 9px; letter-spacing: 0.2em; color: var(--muted); }
 .jv-strip .v { font-size: 19px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -10372,10 +10372,17 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 }
 @media (min-width: 1000px) {
   .jv-grid {
-    grid-template-columns: minmax(160px, 220px) minmax(0, 1fr) minmax(300px, 400px);
-    /* Clear of the side gauges, which reach about 120px in from each edge. */
-    width: 100%; max-width: 1900px; margin-inline: auto; padding-inline: clamp(120px, 9vw, 170px); box-sizing: border-box;
+    grid-template-columns: minmax(160px, 0.55fr) minmax(460px, 1.4fr) minmax(300px, 0.9fr);
+    /* Clear of the side gauges and their labels, which reach about 150px in
+       from each edge. The side columns grow toward them on a wide screen. */
+    width: 100%; max-width: 2600px; margin-inline: auto; padding-inline: clamp(160px, 11vw, 260px); box-sizing: border-box;
   }
+}
+/* A laptop-narrow window cannot hold three columns and the gauges: the day
+   drops out of the left (the strip still counts it) and the margins tighten. */
+@media (min-width: 1000px) and (max-width: 1299px) {
+  .jv-grid { grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); padding-inline: 116px; }
+  .jv-left { display: none !important; }
 }
 .jv-left { display: flex; flex-direction: column; gap: var(--s3); min-width: 0; padding-top: var(--s4); overflow-y: auto; }
 .jv-left h2, .jv-grid .as-canvas-head h2 {
@@ -10388,7 +10395,7 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 .jv-quiet { margin: 0; color: var(--muted); font-size: var(--text-sm); }
 
 .jv-center { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
-.jv-stage { position: relative; flex: none; height: clamp(220px, 34dvh, 460px); cursor: grab; touch-action: none; }
+.jv-stage { position: relative; flex: none; height: clamp(220px, 40dvh, 640px); cursor: grab; touch-action: none; }
 .jv-stage.is-drag { cursor: grabbing; }
 .jv-presence {
   position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 1;
@@ -10396,7 +10403,16 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 }
 .jv-name { font-family: var(--font-display); font-size: 15px; letter-spacing: 0.3em; color: var(--jv-amber); }
 .jv-state { font-family: var(--font-display); font-size: 10px; letter-spacing: 0.2em; color: var(--muted); }
-.jv-thread { padding-top: var(--s5); }
+/* A soft edge where the conversation scrolls under the core, so a line is
+   never cut in half under the shape. A mask, not a painted gradient. */
+.jv-thread { padding-top: var(--s5); -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 28px); mask-image: linear-gradient(to bottom, transparent 0, #000 28px); }
+.as-page.jv .as-ask-foot { align-items: center; }
+.as-page.jv .as-hint { white-space: nowrap; }
+@media (max-width: 1599px) { .as-page.jv .as-hint { display: none; } }
+.as-page.jv .as-send { height: 36px; min-height: 0; }
+/* Disabled reads as waiting, not as broken. */
+.as-page.jv .as-send:disabled { background: none; color: var(--muted); border: 1px solid var(--hairline-strong); opacity: 0.7; }
+.as-page.jv .as-row.is-touched .as-row-min { color: var(--muted); }
 .jv-thread .as-said { text-shadow: 0 0 16px var(--bg); }
 /* The skills, as small amber chips under the core rather than the old
    doorway's big buttons: here they are suggestions, not the whole page. */
@@ -10439,10 +10455,15 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 .jv-fly.is-on { opacity: 1; }
 
 @media (max-width: 999px) {
-  .as-page.jv { height: auto; min-height: calc(100dvh - 150px); padding-bottom: 76px; }
+  .as-page.jv { padding-bottom: 76px; }
   .jv-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .jv-strip > div:nth-child(n+4) { display: none; }
-  .jv-stage { height: clamp(220px, 34dvh, 340px); }
-  .jv-thread { overflow: visible; }
+  .jv-stage { height: clamp(190px, 28dvh, 300px); }
+  .jv-thread { overflow: visible; -webkit-mask-image: none; mask-image: none; }
+  /* The prompts in one row he swipes, at a real finger height, so the box
+     to type in is on screen at rest. */
+  .as-page.jv .jv-skills { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; padding-bottom: 4px; scrollbar-width: none; }
+  .as-page.jv .jv-skills .as-brief { flex: none; min-height: 44px; }
 }
+@media (max-width: 599px) { .jv-bracket { display: none; } }
 @media (prefers-reduced-motion: reduce) { .jv-fly { transition: none; } }

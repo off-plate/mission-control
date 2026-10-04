@@ -387,7 +387,10 @@ await step('the menu is five tabs, and what left it is reachable from the header
   /* His apps sit in More as themselves (2026-09-16), not behind a second
      "Apps" page one more tap away -- Challengers and Nexus stand in for the
      whole APPS list here. */
-  for (const want of ['Assistant', 'Challengers', 'Nexus', 'Settings']) {
+  /* JARVIS left the dock for the header, beside the Zone (2026-10-04). */
+  if (allLabels.some((l) => l.trim() === 'Assistant')) throw new Error(`the assistant is still in the dock (${allLabels.join(', ')})`)
+  if (!(await page.getByRole('button', { name: 'JARVIS, the assistant' }).count())) throw new Error('JARVIS has no header button')
+  for (const want of ['Challengers', 'Nexus', 'Settings']) {
     if (!allLabels.some((l) => l.trim() === want || l.trim().startsWith(want))) throw new Error(`${want} is not in the dock (${allLabels.join(', ')})`)
   }
   if (allLabels.some((l) => l.trim() === 'Apps')) throw new Error(`Apps is still its own grid cell (${allLabels.join(', ')})`)
@@ -956,7 +959,7 @@ await step('the zone: the timer never shrinks, no matter how long the queue gets
   /* .dock is a fixed SIBLING of .shell, so its --z-* custom properties are
      only reachable if they are redeclared reading from body, not merely
      scoped inside .shell.in-zone. Any open panel shows the tint. */
-  await openDockItem('Assistant'); await page.waitForTimeout(400)
+  await openDockItem('Skills'); await page.waitForTimeout(400)
   const bg = await page.locator('.dock-face').evaluate((e) => getComputedStyle(e).backgroundColor)
   if (bg === 'rgba(0, 0, 0, 0)' || /^rgb\(255, 255, 255/.test(bg)) {
     throw new Error(`the dock face is untinted in the Zone (background: ${bg})`)

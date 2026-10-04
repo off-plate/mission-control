@@ -20,6 +20,7 @@
    named 2026 AI defaults and next door to a row already spent on a client
    site, which is exactly why it read like every other focus timer. */
 
+import { Orb } from './orb'
 import { useEffect, useRef, useState } from 'react'
 import { useClockStamp, useFirstMove, useOpenToday } from './ui'
 import { usePomodoro } from './pomodoro'
@@ -377,6 +378,15 @@ function ZoneTask() {
             )}
           </svg>
           <div className="znow-center">
+            {/* The orb tells the stage of the block without a number: it wires
+                up, works, weaves, then solves as the countdown runs down,
+                breathes on a break, and settles into a shape once banked. */}
+            <Orb
+              className="znow-orb" size={64} tone="--z-ice"
+              state={phaseState === 'break' ? 'breathing' : phaseState === 'done' ? 'shaping' : phaseState === 'idle' ? 'breathing'
+                : pct < 0.25 ? 'connecting' : pct < 0.5 ? 'working' : pct < 0.75 ? 'weaving' : 'solving'}
+              paused={phaseState === 'paused'}
+            />
             <span className="znow-clock">{clockText}</span>
             <div className="znow-dots" title={`${filledDots} of 4 blocks done today`} aria-label={`${filledDots} of 4 blocks done today`}>
               {[0, 1, 2, 3].map((i) => <i key={i} className={i < filledDots ? 'is-on' : ''} />)}

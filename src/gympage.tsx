@@ -10,6 +10,7 @@
    for structure (same dark HUD, same day-row shape) and adds only what's new:
    goal cards, and a session body keyed to Hevy's per-exercise numbers rather
    than Zepp's per-session ones. */
+import { Orb } from './orb'
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import {
   bestE1rmEver, bestRepTotalEver, getAllHevyDayStats, getHevyExerciseHistory, prsOnDay, syncHevy,
@@ -258,7 +259,7 @@ export function GymPage() {
             Sessions
             <span className="hp-h2-count">{sessionDays.length} logged</span>
             <button className="hp-sync" style={{ marginLeft: 'auto' }} onClick={() => void syncBoth()} disabled={busy} title="Fetch everything new from Intervals.icu and Hevy">
-              <Icon.Repeat size={13} className={busy ? 'hp-spin' : undefined} />
+              {busy ? <Orb state="connecting" size={20} label="Syncing" /> : <Icon.Repeat size={13} />}
               {busy ? 'Syncing' : 'Sync'}
             </button>
             {said && !busy && <span className="hp-h2-count">{said}</span>}

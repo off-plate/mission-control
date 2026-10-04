@@ -1,3 +1,4 @@
+import { Orb } from './orb'
 import { daysSince } from './health'
 /* THE PLAN PAGE. Split out of pages1.tsx (2026-09-09). Carries the task-row
    pieces (SubEdit, SubtaskRow, EditTaskSheet, ActualLog, EstimateChip,
@@ -267,7 +268,7 @@ function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
         onClick={estimate}
       >
         {thinking
-          ? <span className="est-thinking" aria-label="Estimating" />
+          ? <Orb state="solving" size={20} label="Estimating" />
           : (
             <Icon.Hourglass size={18} />
           )}

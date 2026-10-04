@@ -20,6 +20,7 @@
 
    Verified with his real rows in a browser (scripts/hpshot.mjs) before it
    was committed, which is the step the last two passes skipped. */
+import { Orb } from './orb'
 import { useMemo, useState } from 'react'
 import {
   agoFrom, bodyStat, daysSince, fmtDay, fmtDayFull, fmtHm, fmtWeekday, frames, freshness,
@@ -420,7 +421,7 @@ export function HealthPage() {
               ))}
             </div>
             <button className="hp-sync" onClick={startBoth} disabled={busySync} title="Fetch everything new from Intervals.icu and Hevy">
-              <Icon.Repeat size={13} className={busySync ? 'hp-spin' : undefined} />
+              {busySync ? <Orb state="connecting" size={20} label="Syncing" /> : <Icon.Repeat size={13} />}
               {busySync ? 'Syncing' : 'Sync'}
             </button>
             </div>

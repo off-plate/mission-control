@@ -50,3 +50,7 @@ SOFTWARE.
 The MIT Licence above (Hicon's own text) is byte-identical to Tabler's, aside
 from the copyright holder's name -- one licence block covers both sets.
 Tabler's own copyright line: `Copyright (c) 2020-2026 Paweł Kuna`.
+
+## thinking-orbs
+
+Animated dotted orbs (assistant mark, saving indicator, Zone countdown, inline waits). npm `thinking-orbs`, (c) Jakub Antalik, MIT. https://github.com/Jakubantalik/Libraries.dev

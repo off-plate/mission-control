@@ -1,3 +1,4 @@
+import { Orb } from './orb'
 import { useState } from 'react'
 import { useStore } from './store'
 import { TARGET_HABIT_NAME, getHevyLastSync, hasHevyKey, syncHevy } from './hevy'
@@ -83,7 +84,7 @@ export function HevySync() {
         aria-label="Pull today's workouts from Hevy"
         title="Pull from Hevy now"
       >
-        <Icon.Rewind size={15} />
+        {spinning ? <Orb state="connecting" size={20} label="Syncing" /> : <Icon.Rewind size={15} />}
       </button>
       <span className={`hevy-when${stale && !spinning ? ' is-stale' : ''}`}>
         {spinning ? 'Syncing' : (said ?? ago(at))}

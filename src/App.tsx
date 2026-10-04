@@ -1,3 +1,4 @@
+import { Orb } from './orb'
 import { JarBar, JAR_PAGES } from './cookiejarnav'
 import { ProjectMark } from './ui'
 import { usePromptWindow } from './promptwindow'
@@ -92,7 +93,7 @@ function SyncPip() {
 
   return (
     <span className="syncpip" data-quiet={quiet || undefined} title={sync.detail || text}>
-      <span className={`status-dot ${tone}`} />
+      {tone === 'warn' ? <Orb state="connecting" size={20} label="Saving" /> : <span className={`status-dot ${tone}`} />}
       <span className="syncpip-text">{text}</span>
     </span>
   )

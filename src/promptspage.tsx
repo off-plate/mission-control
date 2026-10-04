@@ -8,6 +8,7 @@
    Code, so a prompt leaves by Copy. The reminder is a Notification when he has
    allowed them, and always the dot on the header button, but both only exist
    while the app is open. The timer lives on this device and is not synced. */
+import { Orb } from './orb'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from './store'
 import { activeModel, getAiKey, getAiProvider, PROVIDERS, request, stripReasoning } from './ai'
@@ -251,7 +252,7 @@ function PromptEditor({ p, update, copyAndSend, putBack, remove, say }: {
         {p.sentAt
           ? <button className="btn btn-primary" onClick={putBack}>Put back in the queue</button>
           : <button className="btn btn-primary" onClick={copyAndSend}><Icon.Copy size={16} />Copy and mark sent</button>}
-        <button className="btn btn-quiet" onClick={() => { void doPolish() }} disabled={busy || !text.trim()}><Icon.Wand size={16} />{busy ? 'Polishing' : 'Polish'}</button>
+        <button className="btn btn-quiet" onClick={() => { void doPolish() }} disabled={busy || !text.trim()}>{busy ? <Orb state="shaping" size={20} label="Polishing" /> : <Icon.Wand size={16} />}{busy ? 'Polishing' : 'Polish'}</button>
         <button className="btn btn-quiet" onClick={() => { void copyOnly() }}>Copy only</button>
         <span className="pb-grow" />
         <button className="btn btn-ghost" onClick={remove}>Delete</button>

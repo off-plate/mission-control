@@ -6,7 +6,7 @@
    it. That is the primary path.
 
    It is missing in Firefox, and present-but-broken in Chromium builds that are
-   not Chrome, the desktop app included: those ship without Google's speech key,
+   not Chrome: those ship without Google's speech key,
    so start() succeeds and then errors. So the fallback records the microphone
    and posts it to Groq's whisper-large-v3-turbo, specifically with his Groq
    key -- not "whichever provider is active" (ai.ts, 2026-09-07 on), because

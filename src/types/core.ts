@@ -79,51 +79,6 @@ export type PageId =
    *  thing that can spend against its monthly cap. */
   | 'watchless'
 
-export type WidgetType =
-  | 'clock'
-  | 'agenda'
-  | 'tasks'
-  | 'mail'
-  | 'finance'
-  | 'habits'
-  | 'training'
-  | 'goals'
-  | 'timesaved'
-  | 'claude'
-  | 'social'
-  | 'sources'
-  | 'outreach'
-
-export type SizeKey = 'S' | 'M' | 'T' | 'L' | 'XL'
-
-/** Widget sizes in grid cells (one cell is roughly 230px square). */
-export const SIZE_UNITS: Record<SizeKey, { w: number; h: number }> = {
-  S: { w: 1, h: 1 },
-  M: { w: 2, h: 1 },
-  T: { w: 1, h: 2 },
-  L: { w: 2, h: 2 },
-  XL: { w: 4, h: 2 },
-}
-
-export interface WidgetInstance {
-  id: string
-  type: WidgetType
-  size: SizeKey
-}
-
-export interface WidgetDef {
-  type: WidgetType
-  title: string
-  description: string
-  supportedSizes: SizeKey[]
-  defaultSize: SizeKey
-  /** Freshness in minutes at demo load; null means human-entered data. */
-  freshMinutes: number | null
-  staleAfter: number
-  /** Page this widget deep-links to. */
-  page: PageId
-}
-
 export type TaskCategory = 'call' | 'admin' | 'deep' | 'quick'
 
 export type TimeSlot = 'morning' | 'noon' | 'afternoon' | 'evening'

@@ -61,8 +61,6 @@ export function deviceId(): string {
  *  user agent for a model number is a losing game and tells him nothing extra. */
 export function deviceName(): string {
   try {
-    const w = window as unknown as { mc?: { desktop?: boolean } }
-    if (w.mc?.desktop) return 'the Mac app'
     const ua = navigator.userAgent
     if (/iPhone/.test(ua)) return 'iPhone'
     if (/iPad/.test(ua)) return 'iPad'

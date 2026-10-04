@@ -5,7 +5,6 @@ import { usePromptWindow } from './promptwindow'
 import { Component, Fragment, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { exceptionsFor, globalExceptions } from './exceptions'
-import { useDockBadge } from './desktop'
 import { SPACE_LABELS } from './mock'
 import { TodayPage } from './today'
 import { PlanPage } from './plan'
@@ -418,8 +417,6 @@ export default function App() {
     ? exceptionsFor(space, { tasks, routines, goals })
     : [...globalExceptions({ tasks, routines }), ...exceptionsFor(space, { tasks, routines, goals })]
 
-  /* macOS dock badge, same list as the alerts above. No-op on the website. */
-  useDockBadge(exceptions.length)
 
   /* File -> New Task (Cmd+N) in the macOS menu. There is no dialog to open:
      adding a task IS the input at the top of Plan's list, so the shortcut goes

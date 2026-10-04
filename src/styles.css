@@ -10327,3 +10327,122 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 .hp-breath { position: relative; display: block; width: 72px; height: 72px; flex: none; color: var(--ink); }
 @media (max-width: 620px) { .dg-dots { height: 27px; } }
 .dg-tile > .tr-l { white-space: nowrap; }
+
+/* ---------- the Jarvis room: the assistant page (his ask, 2026-10-04) ----------
+   Direction D from the board he picked: helmet brackets and side gauges, a
+   strip of real readouts, the day on the left, what changed on the right, and
+   JARVIS's core centre stage above the conversation. It wears the HUD theme
+   (App.tsx turns it on for this page), so every colour below is a HUD token;
+   the one addition is the amber the films give JARVIS himself. Michroma and
+   Saira come with that theme: this page is the second room, after the Zone,
+   allowed its own faces. */
+.as-page.jv {
+  --jv-amber: #E8913A; --jv-amber-text: #F0A65A;
+  /* Sized by the shell like the old split page, never by a height worked out
+     from the header: a wrapped header made that number stale and the whole
+     document scrolled (his photographed "second scrollbar"). */
+  position: relative; flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column; gap: var(--s4);
+  padding: var(--s5) 0 var(--s4); box-sizing: border-box;
+}
+.jv-gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; z-index: 0; }
+.jv-frame { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; overflow: visible; }
+.jv-bracket { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+.jv-g-track { fill: none; stroke: var(--accent); stroke-opacity: 0.18; stroke-width: 3; }
+.jv-g-fill { fill: none; stroke: var(--accent); stroke-width: 3; }
+.jv-g-ticks { fill: none; stroke: var(--accent); stroke-opacity: 0.5; stroke-width: 1; }
+.jv-g-track.is-amber, .jv-g-fill.is-amber, .jv-g-ticks.is-amber { stroke: var(--jv-amber); }
+.jv-g-label { font-family: var(--font-display); font-size: 10px; letter-spacing: 0.2em; fill: var(--muted); }
+.jv-g-label.is-amber { fill: var(--jv-amber-text); }
+
+.jv-strip {
+  position: relative; z-index: 2; flex: none; align-self: center; width: min(980px, 100%);
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+  border: 1px solid var(--hairline-strong); background: color-mix(in srgb, var(--bg) 72%, transparent);
+}
+.jv-strip > div { padding: 10px 16px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.jv-strip > div + div { border-left: 1px solid var(--hairline); }
+.jv-strip .k { font-family: var(--font-display); font-size: 9px; letter-spacing: 0.2em; color: var(--muted); }
+.jv-strip .v { font-size: 19px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.jv-strip .v.is-alert { color: var(--alert); }
+
+.jv-grid {
+  position: relative; z-index: 2; flex: 1 1 auto; min-height: 0;
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s6);
+}
+@media (min-width: 1000px) {
+  .jv-grid {
+    grid-template-columns: minmax(160px, 220px) minmax(0, 1fr) minmax(300px, 400px);
+    /* Clear of the side gauges, which reach about 120px in from each edge. */
+    width: 100%; max-width: 1900px; margin-inline: auto; padding-inline: clamp(120px, 9vw, 170px); box-sizing: border-box;
+  }
+}
+.jv-left { display: flex; flex-direction: column; gap: var(--s3); min-width: 0; padding-top: var(--s4); overflow-y: auto; }
+.jv-left h2, .jv-grid .as-canvas-head h2 {
+  margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 11px; letter-spacing: 0.2em; color: var(--accent); text-transform: none;
+}
+.jv-slot { display: flex; flex-direction: column; gap: 4px; }
+.jv-slot-name { font-family: var(--font-display); font-size: 9px; letter-spacing: 0.2em; color: var(--muted); }
+.jv-slot-item { font-size: var(--text-sm); line-height: 1.4; overflow-wrap: anywhere; }
+.jv-slot-item.is-done { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
+.jv-quiet { margin: 0; color: var(--muted); font-size: var(--text-sm); }
+
+.jv-center { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.jv-stage { position: relative; flex: none; height: clamp(220px, 34dvh, 460px); cursor: grab; touch-action: none; }
+.jv-stage.is-drag { cursor: grabbing; }
+.jv-presence {
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 1;
+  display: flex; align-items: baseline; gap: 12px; white-space: nowrap; pointer-events: none;
+}
+.jv-name { font-family: var(--font-display); font-size: 15px; letter-spacing: 0.3em; color: var(--jv-amber); }
+.jv-state { font-family: var(--font-display); font-size: 10px; letter-spacing: 0.2em; color: var(--muted); }
+.jv-thread { padding-top: var(--s5); }
+.jv-thread .as-said { text-shadow: 0 0 16px var(--bg); }
+/* The skills, as small amber chips under the core rather than the old
+   doorway's big buttons: here they are suggestions, not the whole page. */
+.jv-skills { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.as-page.jv .jv-skills .as-brief {
+  width: auto;
+  height: 36px; padding: 0 12px; gap: 8px; border-radius: 3px; background: none; box-shadow: none;
+  border: 1px solid color-mix(in srgb, var(--jv-amber) 45%, transparent); color: var(--jv-amber-text);
+  font: 400 13px var(--font-body); transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), border-color 160ms ease;
+}
+.as-page.jv .jv-skills .as-brief:active { transform: scale(0.97); }
+@media (hover: hover) and (pointer: fine) { .as-page.jv .jv-skills .as-brief:hover { border-color: var(--jv-amber); background: none; color: var(--jv-amber-text); transform: none; } }
+/* A compact ask box: one line, controls beside it, so the conversation gets
+   the height. */
+.jv-ask { border-radius: 2px; padding: 10px 12px; gap: 6px; background: color-mix(in srgb, var(--surface) 85%, transparent); }
+.jv-ask .as-input { min-height: 0; padding-block: 10px 4px; }
+.jv-grid .as-canvas { border-radius: 2px; background: color-mix(in srgb, var(--surface) 82%, transparent); }
+
+/* The same no-number sizing the old split page used: the shell is the
+   viewport, main takes what is left, the room fills main, and only the
+   conversation scrolls, so the ask box never travels. A phone scrolls the
+   room as a page instead, core first. */
+@media (min-width: 1000px) {
+  .shell:has(.as-page.jv) { height: 100dvh; min-height: 0; padding-bottom: 0; }
+  .shell:has(.as-page.jv) > main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+}
+
+/* Callouts that fly out of the core on their leaders. */
+.jv-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 3; overflow: hidden; }
+.jv-leaders { position: absolute; inset: 0; width: 100%; height: 100%; }
+.jv-leader { fill: none; stroke: var(--jv-amber); stroke-opacity: 0.75; stroke-width: 1; }
+.jv-leader-dot { fill: var(--jv-amber); }
+.jv-fly {
+  position: absolute; left: 0; top: 0; white-space: nowrap;
+  font-family: var(--font-display); font-size: 10px; letter-spacing: 0.18em; color: var(--jv-amber-text);
+  padding: 5px 8px; border: 1px solid color-mix(in srgb, var(--jv-amber) 55%, transparent); background: color-mix(in srgb, var(--bg) 80%, transparent);
+  opacity: 0; transition: opacity 260ms cubic-bezier(0.23, 1, 0.32, 1); will-change: transform;
+}
+.jv-fly b { font-weight: 400; color: var(--ink); margin-left: 8px; letter-spacing: 0.04em; font-family: var(--font-body); font-size: 13px; }
+.jv-fly.is-on { opacity: 1; }
+
+@media (max-width: 999px) {
+  .as-page.jv { height: auto; min-height: calc(100dvh - 150px); padding-bottom: 76px; }
+  .jv-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .jv-strip > div:nth-child(n+4) { display: none; }
+  .jv-stage { height: clamp(220px, 34dvh, 340px); }
+  .jv-thread { overflow: visible; }
+}
+@media (prefers-reduced-motion: reduce) { .jv-fly { transition: none; } }

@@ -463,6 +463,10 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem('mc:hud', hud ? '1' : '0') } catch { /* private mode */ }
   }, [hud])
+  /* The assistant's page IS Jarvis (his ask, 2026-10-04): it wears the HUD
+     theme whether or not the mode is on, the way the Zone is its own room.
+     The switch itself, and every other page, are untouched. */
+  const hudLook = hud || page === 'assistant'
   /* The assistant can ask for it too ("turn on Jarvis mode"). */
   useEffect(() => {
     const on = (e: Event) => setHud((e as CustomEvent<boolean>).detail)
@@ -473,6 +477,8 @@ export default function App() {
   const nav = useNavReveal()
   const backFromZone = useRef<PageId>('today')
   useEffect(() => { if (page !== 'zone') backFromZone.current = page }, [page])
+  const backFromAssistant = useRef<PageId>('today')
+  useEffect(() => { if (page !== 'assistant') backFromAssistant.current = page }, [page])
   useEffect(() => { if (JAR_PAGES[page]) void warmJar() }, [page])
 
   /* His catch (2026-09-04): the drawer hangs at a flat `left: var(--gutter)`
@@ -527,7 +533,7 @@ export default function App() {
          Jar and the Why wall it opens are dark in both modes, and a paper
          header on top of them read as two apps. Every other page keeps the
          light header, and HUD is already dark, so it is left alone. */
-      className={`shell${page === 'zone' ? ' in-zone' : ''}${hud ? ' is-hud' : ''}${!hud && DARK_CHROME_PAGES.includes(page) ? ' is-dark-chrome' : ''}${!hud && JAR_PAGES[page] ? ' is-dark-page' : ''}`}
+      className={`shell${page === 'zone' ? ' in-zone' : ''}${hudLook ? ' is-hud' : ''}${!hudLook && DARK_CHROME_PAGES.includes(page) ? ' is-dark-chrome' : ''}${!hudLook && JAR_PAGES[page] ? ' is-dark-page' : ''}`}
       style={page === 'zone' ? ({ '--depth': zoneDepth } as React.CSSProperties) : undefined}
     >
       <a className="skiplink" href="#main">Skip to the page</a>
@@ -620,6 +626,19 @@ export default function App() {
               It is a toggle: pressing it again puts him back on the page he
               walked in from, because the room has no close of its own and he
               was leaving it by pressing Note to get out. */}
+          {/* JARVIS, out of the floating dock and in beside the Zone (his ask,
+              2026-10-04). A toggle like the Zone: pressing it again goes back
+              to the page he came from. */}
+          <button
+            className={`btn btn-ghost btn-sq${page === 'assistant' ? ' is-on' : ''}`}
+            onClick={() => setPage(page === 'assistant' ? backFromAssistant.current : 'assistant')}
+            aria-pressed={page === 'assistant'}
+            title={page === 'assistant' ? 'Leave JARVIS' : 'JARVIS, the assistant'}
+            aria-label={page === 'assistant' ? 'Leave JARVIS' : 'JARVIS, the assistant'}
+          >
+            <Icon.Waveform size={16} />
+            <span className="btn-sq-label">Jarvis</span>
+          </button>
           <button
             className={`btn btn-ghost btn-sq${page === 'zone' ? ' is-on' : ''}`}
             onClick={() => setPage(page === 'zone' ? backFromZone.current : 'zone')}

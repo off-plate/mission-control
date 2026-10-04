@@ -1174,7 +1174,7 @@ function useFinder() {
   }
 }
 
-export interface Turn { who: 'you' | 'it'; text: string; reply?: Reply; done?: Done[]; touched?: string[] }
+export interface Turn { who: 'you' | 'it'; text: string; reply?: Reply; done?: Done[]; touched?: string[]; /** The LOVE YOU 3000 reply: the core plays its own show. */ egg?: boolean }
 
 /** Where a turn's changes landed: the cards that hold them, in the order they
  *  happened, and the rows to mark. Empty when nothing it did has a place. */

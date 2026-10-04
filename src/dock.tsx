@@ -317,7 +317,9 @@ export function Dock() {
      own repo rather than routed through svgrepo. */
   const panels: { id: PanelFace; label: string; chip: React.ReactNode; switchIcon: React.ReactNode }[] = [
     ...(mo.started ? [{ id: 'media' as const, label: 'Player', chip: <MediaChip />, switchIcon: <Icon.Waveform size={17} /> }] : []),
-    { id: 'assistant' as const, label: 'Assistant', chip: <AssistantChip />, switchIcon: <Icon.Waveform size={17} /> },
+    /* The assistant left the dock for the header, beside the Zone (his ask,
+       2026-10-04). Its panel code stays below, unreachable, until he says
+       whether the quick-ask popup is gone for good. */
     { id: 'skills' as const, label: 'Skills', chip: <SkillsChip />, switchIcon: <Icon.DockBook size={17} /> },
     { id: 'watchless' as const, label: 'Watchless', chip: <WatchlessChip />, switchIcon: <Icon.DockTranscript size={17} /> },
   ]

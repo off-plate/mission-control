@@ -448,41 +448,27 @@ await step('Notes and Ideas open from the top right, and the dock Focus row open
   const h1 = await page.locator('h1').first().innerText()
   if (h1 !== 'Focus') throw new Error(`the dock's Focus avatar went to ${h1}`)
 })
-await step('the dock opens Assistant (click for the quick-ask widget, hold for the full page)', async () => {
-  /* His correction (2026-09-08) of a first pass that gave Assistant the same
-     plain-shortcut shape as Focus's row: "the quick solution, meaning when I
-     only tap it, it should pull up just like a widget... like the notes app
-     or the focus app or the bills app... when I long press it... it should
-     direct me to the AI assistant subpage." So it is a PanelFace like Note,
-     not a shortcut like Focus -- same click-opens-popup/hold-reaches-the-
-     full-page mechanics as the Note test above, asserted the same way. */
+await step('the header opens JARVIS beside the Zone, and pressing it again goes back', async () => {
+  /* His ask (2026-10-04): "pull the AI assistant out of the bottom right
+     floating menu and put it next to the zone button". So it is a header
+     square now, a toggle like the Zone, and it is gone from the dock. */
   await fresh('today')
+  const btn = page.getByRole('button', { name: 'JARVIS, the assistant' })
+  await btn.waitFor({ state: 'visible', timeout: 10000 })
+  const beside = await btn.evaluate((b) => b.nextElementSibling?.getAttribute('aria-label') ?? '')
+  if (!/Zone/.test(beside)) throw new Error(`the JARVIS button is not beside the Zone, its neighbour is "${beside}"`)
+  await btn.click(); await page.waitForTimeout(500)
+  if (!(await page.locator('.as-page.jv').count())) throw new Error('the button did not open the JARVIS room')
+  await page.getByRole('button', { name: 'Leave JARVIS' }).click(); await page.waitForTimeout(400)
+  if (await page.locator('.as-page.jv').count()) throw new Error('pressing it again did not leave the room')
+  if (!/#\/today/.test(page.url())) throw new Error(`leaving went to ${page.url()}, not back to Today`)
   const openDock = page.getByRole('button', { name: 'Open quick tools' })
-  await openDock.waitFor({ state: 'visible', timeout: 10000 })
   await openDock.click(); await page.waitForTimeout(400)
-  await openDockItem('Assistant'); await page.waitForTimeout(400)
-  if (!(await page.locator('.assistantdock-panel').count())) throw new Error('a click on the Assistant dock item did not open the quick widget')
-  if (await page.locator('.as-page').count()) throw new Error('a click on the Assistant dock item jumped straight to the full page')
-  // The same quick-ask skill grid the full page opens on, not a thinned copy.
-  if (!(await page.getByRole('button', { name: /Morning brief/ }).count())) throw new Error('the Assistant widget is missing its quick-ask skills')
-  await page.getByRole('button', { name: 'Close', exact: true }).click(); await page.waitForTimeout(400)
-
-  /* Reopen and reach the full page through the widget's own door-out
-     button rather than repeating the hold gesture: Assistant, fresh, is
-     one of the four folded behind More (see openDockItem above), and a
-     grid cell there is a plain tap-to-open, the same one extra step every
-     other panel already takes to get here -- there is no ranked pill
-     under the cursor left to hold. The quick-popup's own "open in
-     Assistant" button (asserted here, dock-open-btn) is what every other
-     dock panel already uses to reach its own full page from inside the
-     popup, so this exercises the same real door rather than a gesture
-     that no longer has anywhere to land when the item starts out hidden. */
-  await page.getByRole('button', { name: 'Open quick tools' }).click(); await page.waitForTimeout(400)
-  await openDockItem('Assistant'); await page.waitForTimeout(400)
-  await page.locator('.assistantdock-panel .dock-open-btn').click(); await page.waitForTimeout(400)
-  if (!(await page.locator('.as-page').count())) throw new Error('the door-out button did not open the full Assistant page')
-  if (!(await page.getByText('What can I help with?').count())) throw new Error('the full Assistant page did not render its own hero question')
+  if (await page.locator('.dock-more-btn').count()) { await page.locator('.dock-more-btn').click(); await page.waitForTimeout(250) }
+  if (await page.locator('.dock-item, .dock-more-cell').filter({ hasText: /^\s*Assistant\s*$/ }).count()) throw new Error('the assistant is still in the floating dock')
+  await page.keyboard.press('Escape')
 })
+
 await step('the zone: header stays, and the first move starts it', async () => {
   await fresh('today')
   await page.evaluate(() => { localStorage.setItem('mc-view', 'personal'); localStorage.setItem('mc-space', 'personal') })
@@ -3217,47 +3203,30 @@ async function openDockItem(label) {
   await page.locator('.dock-more-cell').filter({ hasText: label }).click()
 }
 
-await step('assistant: the empty page is a doorway, with none of a chatbot’s furniture', async () => {
+await step('assistant: the empty room is JARVIS, with none of a chatbot’s furniture', async () => {
+  /* The doorway (one mark, one question) was replaced on his ask
+     (2026-10-04) by the JARVIS room he picked from the board: the core at
+     the centre, a strip of his own readouts, the day and what changed either
+     side. What the doorway protected still holds below. */
   await fresh('assistant')
-  if (!(await page.locator('.as-mark').count())) throw new Error('the mark is missing')
-  if (await page.locator('.as-mark circle').count()) throw new Error('the mark went back to being a circle')
-  const q = await page.locator('.as-hero-q').innerText()
-  if (q !== 'What can I help with?') throw new Error(`the question reads "${q}"`)
-  /* One design now, not a filled brief button plus five outlined chips below
-     the ask box: all six things he can do live in .as-skills as .as-brief
-     buttons, same style throughout. */
-  const skillButtons = await page.locator('.as-skills .as-brief').count()
+  if (!(await page.locator('.as-page.jv .jv-stage').count())) throw new Error('the core stage is missing')
+  if (!(await page.locator('.shell.is-hud').count())) throw new Error('the room is not wearing the Jarvis theme')
+  if ((await page.locator('.jv-name').innerText()).trim() !== 'JARVIS') throw new Error('JARVIS is not named on the stage')
+  const skillButtons = await page.locator('.jv-skills .as-brief').count()
   if (skillButtons !== 6) throw new Error(`${skillButtons} skill buttons, expected 6 (brief plus five)`)
-  if (await page.locator('.as-starters').count()) throw new Error('the old outlined chip row is still on the page')
-  /* His instruction was, twice over, no voice of any kind, and specifically not
-     attach / search / reason / create an image / summarise / translate. Those
-     belong to a general chatbot and not one of them is a thing this app does.
-
-     Dictation was struck from that list on 2026-08-25 and voice mode on
-     2026-08-26, both on his explicit instruction, the second being "I want you
-     to create the hardest thing ever right now, and that's voice mode... the
-     input box changes to some kind of sound waves design".
-
-     Talking to it is now a thing this app does, so the ban cannot cover it.
-     Attach, image, summarise, translate and reason stay banned: those are a
-     general chatbot's furniture and none of them is a thing this app does. Both
-     controls are asserted present below, so this test still holds a line, it
-     holds a different one. */
+  /* Attach, image, summarise, translate and reason stay banned: a general
+     chatbot's furniture, none of them a thing this app does. Talking to it
+     IS a thing it does (voice mode, 2026-08-26), so both voice controls are
+     asserted present. */
   const text = await page.locator('.as-page').innerText()
   if (!(await page.locator('.as-ask-foot .as-mic').count())) throw new Error('the dictate button is missing from the ask row')
   if (!(await page.locator('.as-ask-foot .as-voice-btn').count())) throw new Error('the voice mode button is missing from the ask row')
   for (const banned of [/attach/i, /create (an )?image/i, /summari[sz]e/i, /translate/i, /\breason\b/i]) {
     if (banned.test(text)) throw new Error(`the page offers ${banned}: ${JSON.stringify(text.slice(0, 200))}`)
   }
-  const audio = await page.evaluate(() =>
-    document.querySelectorAll('.as-page [aria-label*="voice" i], .as-page [aria-label*="mic" i], .as-page audio').length)
-  if (audio) throw new Error(`${audio} voice controls on the page`)
-  /* The counted line under the question is GONE, struck on his instruction
-     2026-08-26: "Remove this text '12 things still open today, 13 in the
-     calendar, 17 habits not kept yet...'". It was true and it was his own data,
-     and he still did not want to be met by a tally of everything undone before
-     he has asked anything. The doorway is a question and a way in, nothing else. */
-  if (await page.locator('.as-hero-now').count()) throw new Error('the counted line is back under the question')
+  /* No greeting by tally (struck on his instruction 2026-08-26). The strip
+     of readouts is his pick from the board; a sentence listing what is
+     undone is still not allowed. */
   if (/still open today|habits not kept|has been waiting/i.test(text)) {
     throw new Error(`the page greets him with a tally: ${JSON.stringify(text.slice(0, 160))}`)
   }
@@ -3298,13 +3267,15 @@ await step('assistant: the answer splits the room and the ask box stops moving',
       chat: Math.round(document.querySelector('.as-chat').getBoundingClientRect().width),
       top: Math.round(document.querySelector('.as-canvas').getBoundingClientRect().top),
       foot: Math.round(innerHeight - document.querySelector('.as-ask').getBoundingClientRect().bottom),
+      room: Math.round(document.querySelector('.jv-grid').getBoundingClientRect().width),
     }))
     if (m.doc > 4) throw new Error(`at ${w}x${h} the document scrolls by ${m.doc}px, which is the extra scrollbar`)
     if (m.foot < 8) throw new Error(`at ${w}x${h} the ask box is ${m.foot}px off the bottom edge`)
     if (m.top < 100) throw new Error(`at ${w}x${h} the canvas starts ${m.top}px down, under the navigation`)
-    /* Both halves take the width they are given. Pinned to 620 and 780 they
-       left a third of a wide monitor empty either side of two narrow columns. */
-    if (m.chat < 640) throw new Error(`at ${w}x${h} the chat column is only ${m.chat}px`)
+    /* The conversation keeps a readable column between the day and the
+       cards, and the room uses a wide monitor rather than a strip of it. */
+    if (m.chat < 460) throw new Error(`at ${w}x${h} the chat column is only ${m.chat}px`)
+    if (m.room < w * 0.6) throw new Error(`at ${w}x${h} the room uses only ${m.room}px of the width`)
   }
   await page.setViewportSize({ width: 1500, height: 1200 })
   await page.waitForTimeout(200)
@@ -3394,23 +3365,12 @@ await step('assistant: it visibly thinks, and says what to do when the model is 
   await page.locator('.as-input').fill('take your time')
   await page.locator('.as-input').press('Enter')
   await page.waitForTimeout(350)
-  /* The three bobbing dots are gone. A 22px mark beside them was two things
-     saying "working" and neither saying it well, so the blob is the whole
-     indicator now and has to carry it on its own. */
-  if (!(await page.locator('.as-thinking .as-mark').isVisible())) throw new Error('nothing on screen says it is working')
-  /* Its outline is generated per frame rather than animated by CSS, so a
-     computed animationName says nothing. Watch the geometry change instead:
-     a still picture is the failure this guards against. */
-  const shapes = await page.evaluate(async () => {
-    const seen = new Set()
-    for (let i = 0; i < 8; i++) {
-      await new Promise((r) => setTimeout(r, 60))
-      seen.add(document.querySelector('.as-thinking .as-mark path')?.getAttribute('d') ?? '')
-    }
-    return seen.size
-  })
-  if (shapes < 3) throw new Error(`the thinking indicator is a still picture (${shapes} shapes in 8 frames)`)
-  await page.waitForSelector('.as-thinking .as-mark', { state: 'detached', timeout: 6000 })
+  /* The core carries "working" now: the stage names it THINKING and the
+     particles swirl into the turbine (the WebGL canvas is there and sized). */
+  if ((await page.locator('.jv-state').innerText()).trim() !== 'THINKING') throw new Error('nothing on screen says it is working')
+  const gl = await page.locator('.jv-gl').boundingBox()
+  if (!gl || gl.width < 200) throw new Error('the core is not drawn')
+  await page.waitForFunction(() => document.querySelector('.jv-state')?.textContent?.trim() !== 'THINKING', null, { timeout: 6000 })
   if (!(await page.locator('.as-turn.is-it .as-said').count())) throw new Error('it stopped thinking without answering')
   /* The failure that started all of this: the model this app named was retired
      and every AI feature died silently. It must now say so, and say what to do. */
@@ -3792,20 +3752,18 @@ await step('assistant: "open the bills page" actually opens it', async () => {
      a page navigating underneath is not one of those two things. The
      popup now stays exactly where he left it; only the real page under
      it is required to have changed. */
-  await fresh('today')
+  await fresh('assistant')
   await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
   await stubAssistant(() => JSON.stringify({
     say: 'Opening Bills.', show: [],
     do: [{ kind: 'open', page: 'bills' }],
   }))
-  const openDock = page.getByRole('button', { name: 'Open quick tools' })
-  await openDock.waitFor({ state: 'visible', timeout: 10000 })
-  await openDock.click(); await page.waitForTimeout(400)
-  await openDockItem('Assistant'); await page.waitForTimeout(400)
-  await page.locator('.assistantdock-panel .as-input').fill('open up the bills page please')
-  await page.locator('.assistantdock-panel .as-input').press('Enter')
+  /* From the room itself now that the dock no longer carries the assistant
+     (2026-10-04). The room unmounts as the page changes, so the real Bills
+     page arriving is the proof. */
+  await page.goto(`${URL}#/assistant`); await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('open up the bills page please')
   await page.waitForTimeout(1200)
-  if (!(await page.locator('.assistantdock-panel').count())) throw new Error('the dock popup closed itself after a navigation he did not ask it to close for')
   if (!(await page.locator('.bills-page').count())) throw new Error('setPage never actually rendered the real Bills page underneath')
 })
 await step('assistant: signed out of Bills, "bill" says so rather than guessing or crashing', async () => {
@@ -4110,11 +4068,9 @@ await step('assistant: "open Watchless" opens a real embedded app', async () => 
     say: 'Opening it.', show: [],
     do: [{ kind: 'app', match: 'Watchless' }],
   }))
-  await page.getByRole('button', { name: 'Open quick tools' }).click(); await page.waitForTimeout(400)
-  await openDockItem('Assistant'); await page.waitForTimeout(400)
-  await page.locator('.assistantdock-panel .as-input').fill('open Watchless')
-  await page.locator('.assistantdock-panel .as-input').press('Enter')
-  await page.waitForSelector('.as-did li.is-ok', { timeout: 4000 })
+  await page.goto(`${URL}#/assistant`); await page.reload(); await page.waitForTimeout(700)
+  await askAssistant('open Watchless')
+  await page.waitForSelector('.apps-frame', { timeout: 4000 })
   await page.waitForTimeout(400)
   const src = await page.evaluate(() => document.querySelector('.apps-frame')?.getAttribute('src') ?? '')
   if (!src.startsWith('https://watchless.netlify.app')) throw new Error(`did not really open the app, frame is: "${src}"`)
@@ -4187,20 +4143,17 @@ await step('assistant: tapping the voice wave while it talks skips straight to l
      playback outright, and voicemode.ts's send(), still sitting on its own
      `await say(...)`, falls straight through to listen() once that
      resolves, with nothing here needing to know that happened. */
-  await fresh('today')
+  await fresh('assistant')
   await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_gatetest'))
   await stubAssistant(() => JSON.stringify({
     say: 'This is a long answer that should take several seconds to read out loud in a device voice, long enough to click the interrupt button while it is still actively speaking the sentence, testing whether the tap actually stops it and moves on to listening again rather than waiting for the whole thing.',
     show: [],
   }))
-  const openDock = page.getByRole('button', { name: 'Open quick tools' })
-  await openDock.waitFor({ state: 'visible', timeout: 10000 })
-  await openDock.click(); await page.waitForTimeout(400)
-  await openDockItem('Assistant'); await page.waitForTimeout(400)
-  // Talk immediately replaces the idle skills grid with the voice panel
-  // itself, so exit straight back out -- the skill button that actually
-  // drives this test lives on the idle screen, not inside voice mode.
-  await page.locator('.assistantdock-talk').click(); await page.waitForTimeout(500)
+  /* From the room's own Voice button, now that the dock no longer carries
+     the assistant (2026-10-04). Enter voice mode and step straight back
+     out: the skill that drives the test lives on the idle screen. */
+  await page.goto(`${URL}#/assistant`); await page.reload(); await page.waitForTimeout(700)
+  await page.locator('.as-voice-btn').click(); await page.waitForTimeout(500)
   await page.locator('.as-voice-exit').click(); await page.waitForTimeout(300)
   // The morning-brief-style opening prompt used by the skill buttons drives
   // straight to 'thinking' then 'speaking' without needing real microphone
@@ -4254,9 +4207,9 @@ await step('assistant: voice mode gives Gemini a short leash, not the Play butto
 
   await page.unroute('https://api.groq.com/**').catch(() => {})
   await stubAssistant(() => JSON.stringify({ say: 'Answer text.', show: [] }))
-  await page.getByRole('button', { name: 'Open quick tools' }).click(); await page.waitForTimeout(400)
-  await openDockItem('Assistant'); await page.waitForTimeout(400)
-  await page.locator('.assistantdock-talk').click(); await page.waitForTimeout(500)
+  /* A fresh room: the skills sit on the empty page, not under a thread. */
+  await page.reload(); await page.waitForTimeout(700)
+  await page.locator('.as-voice-btn').click(); await page.waitForTimeout(500)
   await page.locator('.as-voice-exit').click(); await page.waitForTimeout(300)
   const voiceT0 = Date.now()
   await page.locator('.as-skills .as-brief').first().click()

@@ -4,7 +4,6 @@ import { useStore } from './store'
 import { useCalendar } from './calendar'
 import { SpaceMark, TaskMark } from './ui'
 import { MORNING, SKILLS, type CardKind } from './assistant'
-import { stop as stopSpeech } from './speech'
 import {
   cancel as cancelDictation, dictateState, dictationAvailable, dictationEngine,
   subscribe as subscribeDictation, toggle as toggleDictation,
@@ -17,7 +16,10 @@ import { useAssistantBills } from './assistantbills'
 import { TIER_LABEL } from './peoplelayout'
 import { ActualLog } from './plan'
 import * as Icon from './icons'
-import { Mark, Speak, useAssistantThread, useVoiceGlue, VoicePanel } from './assistantcore'
+import { Speak, useAssistantThread, useVoiceGlue, VoicePanel, type Done } from './assistantcore'
+import type { JarvisCore, Job, Shape } from './jarviscore'
+import { speakingLevel, stop as stopSpeech } from './speech'
+import { voiceLevel } from './voicemode'
 
 /* The assistant, as a room of its own.
 
@@ -576,6 +578,84 @@ function Dictate({ base, onText, busy }: { base: string; onText: (t: string) => 
 
 
 
+/* ---------- the Jarvis room (his ask, 2026-10-04) ----------
+   Direction D of the board he picked: the helmet HUD frame, a strip of real
+   readouts, the day on the left, the cards of what changed on the right, and
+   JARVIS's core centre stage over the conversation. The page wears the
+   Jarvis-mode theme whether or not the mode is on (App.tsx), the same way the
+   Zone is a room of its own. */
+
+/** Which shape the core takes for each card a change landed on. */
+const SHAPE_OF: Partial<Record<CardKind, Shape>> = {
+  today: 'tasks', backlog: 'tasks', stale: 'tasks', planned: 'calendar', calendar: 'calendar',
+  bills: 'bills', gym: 'gym', ideas: 'idea', people: 'person', projects: 'building',
+  notes: 'note', prompts: 'note', habits: 'habit', routines: 'habit', goals: 'focus', focus: 'focus',
+}
+/** One shape per run of changes that landed in the same place, in the order
+ *  they happened, each carrying its own callouts: the card's name, then each
+ *  row he can recognise ("ADDED  Call Petr"). Only what really changed. */
+function jobsFor(done: Done[]): Job[] {
+  const jobs: Job[] = []
+  for (const d of done) {
+    const card = d.ok && !d.undone ? d.at?.card : undefined
+    const shape = card ? SHAPE_OF[card] : undefined
+    if (!card || !shape) continue
+    const colon = d.text.indexOf(': ')
+    const verb = (colon > 0 ? d.text.slice(0, colon) : d.text).split(' ')[0]
+    const value = colon > 0 ? d.text.slice(colon + 2) : undefined
+    const last = jobs[jobs.length - 1]
+    if (last?.shape === shape) { last.callouts.push({ label: verb, value }); continue }
+    jobs.push({ shape, callouts: [{ label: TITLES[card] }, { label: verb, value }] })
+  }
+  return jobs
+}
+/* The film's line, answered by the app itself: no model, no network. */
+const LOVE_YOU_3000 = /love\s*you\s*3\s*0\s*0\s*0/i
+
+/** The frame: helmet brackets in the corners and a curved gauge down each
+ *  side, the left one the day's tasks done, the right one today's habits.
+ *  Drawn to the room's own size, so it is redrawn when that changes. */
+function JvFrame({ left, right, leftLabel, rightLabel }: { left: number; right: number; leftLabel: string; rightLabel: string }) {
+  const ref = useRef<SVGSVGElement>(null)
+  const [size, setSize] = useState({ w: 0, h: 0 })
+  useEffect(() => {
+    const el = ref.current?.parentElement
+    if (!el) return undefined
+    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const { w, h } = size
+  if (!w || !h) return <svg ref={ref} className="jv-frame" aria-hidden="true" />
+  const gauge = (cx: number, r: number, a0: number, a1: number, fill: number) => {
+    const P = (deg: number) => [cx + Math.cos((deg * Math.PI) / 180) * r, h / 2 + Math.sin((deg * Math.PI) / 180) * r]
+    const arc = (s: number, e: number) => { const [x0, y0] = P(s), [x1, y1] = P(e); return `M${x0} ${y0}A${r} ${r} 0 0 ${e > s ? 1 : 0} ${x1} ${y1}` }
+    let t = ''
+    for (let i = 0; i <= 40; i++) {
+      const a = a0 + ((a1 - a0) * i) / 40, k = i % 5 ? 7 : 14
+      const [x0, y0] = P(a)
+      t += `M${x0} ${y0}L${cx + Math.cos((a * Math.PI) / 180) * (r - k)} ${h / 2 + Math.sin((a * Math.PI) / 180) * (r - k)}`
+    }
+    return { track: arc(a0, a1), fill: fill > 0 ? arc(a1 - (a1 - a0) * Math.min(1, fill), a1) : '', ticks: t }
+  }
+  const r = Math.max(340, h * 0.6)
+  const L = gauge(18 + r, r, 145, 215, left), R = gauge(w - 18 - r, r, 35, -35, right)
+  const b = 'M2 44V2H44'
+  return (
+    <svg ref={ref} className="jv-frame" width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true">
+      <path className="jv-bracket" d={`${b}M${w - 44} 2H${w - 2}V44M${w - 2} ${h - 44}V${h - 2}H${w - 44}M44 ${h - 2}H2V${h - 44}`} />
+      {w >= 1000 ? (
+        <>
+          <path className="jv-g-track" d={L.track} /><path className="jv-g-fill" d={L.fill} /><path className="jv-g-ticks" d={L.ticks} />
+          <path className="jv-g-track is-amber" d={R.track} /><path className="jv-g-fill is-amber" d={R.fill} /><path className="jv-g-ticks is-amber" d={R.ticks} />
+          <text className="jv-g-label" x={36} y={h / 2 + 4}>{leftLabel}</text>
+          <text className="jv-g-label is-amber" x={w - 36} y={h / 2 + 4} textAnchor="end">{rightLabel}</text>
+        </>
+      ) : null}
+    </svg>
+  )
+}
+
 export function AssistantPage() {
   const split = useSplit()
   const { logActual } = useStore()
@@ -588,17 +668,43 @@ export function AssistantPage() {
      wraps every call site here instead of living inside the shared hook. */
   const send = (text: string, shown?: string) => sendRaw(text, shown).then((r) => { box.current?.focus(); return r })
 
+  /* ---- the core ---- */
+  const gl = useRef<HTMLCanvasElement>(null)
+  const overlay = useRef<HTMLDivElement>(null)
+  const stage = useRef<HTMLDivElement>(null)
+  const core = useRef<JarvisCore | null>(null)
+  useEffect(() => {
+    let dead = false
+    /* Dynamic, so three.js is its own chunk: the words and the cards are on
+       screen before the core has even downloaded. */
+    void import('./jarviscore').then(({ JarvisCore: Core }) => {
+      if (dead || !gl.current || !overlay.current || !stage.current) return
+      try {
+        core.current = new Core(gl.current, overlay.current, stage.current, { speak: speakingLevel, listen: voiceLevel })
+      } catch { /* no WebGL here: the room works without its core */ }
+    })
+    return () => { dead = true; core.current?.dispose(); core.current = null }
+  }, [])
+  useEffect(() => { core.current?.setThinking(busy) }, [busy])
+  /* Each new answer plays what it actually did. */
+  const played = useRef(0)
+  useEffect(() => {
+    if (turns.length <= played.current) { played.current = turns.length; return }
+    const fresh = turns.slice(played.current)
+    played.current = turns.length
+    const last = [...fresh].reverse().find((t) => t.who === 'it')
+    if (last && !last.egg) core.current?.play(jobsFor(last.done ?? []))
+  }, [turns])
+
   /* Answers the "how long did it take?" prompt under a 'done' line. "Skip"
    *  here is HIS word for it, from asking for this feature: it means the same
    *  time as the estimate, not the task-list page's own "skip", which leaves
-   *  no time logged at all and asks again later. Two different buttons in two
-   *  different places are allowed to mean two different things; this one
-   *  means what he asked it to mean. */
+   *  no time logged at all and asks again later. */
   const logTaskActual = (turnIndex: number, doneIndex: number, taskId: string, minutes: number) => {
     logActual(taskId, minutes)
     setTurns((prev) => prev.map((t, ti) => (ti !== turnIndex
       ? t
-      : { ...t, done: t.done?.map((d, di) => (di !== doneIndex ? d : { ...d, text: `${d.text} — ${fmtDuration(minutes)}`, needsActual: undefined })) }
+      : { ...t, done: t.done?.map((d, di) => (di !== doneIndex ? d : { ...d, text: `${d.text}, ${fmtDuration(minutes)}`, needsActual: undefined })) }
     )))
   }
 
@@ -622,21 +728,34 @@ export function AssistantPage() {
     }))
   }
 
-  useEffect(() => { foot.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }) }, [turns, busy])
+  /* Only once there is a conversation to follow: on an empty page this
+     scrolled a phone straight past the core to the box. */
+  useEffect(() => { if (turns.length || busy) foot.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }) }, [turns, busy])
   /* Instant while it writes. Smooth-scrolling on every token makes each new
      word fight the last one's animation and the column shivers. */
   useEffect(() => { if (live) foot.current?.scrollIntoView({ block: 'end' }) }, [live])
-  /* The caret is in the box when the page opens. Every other page here is a
-     thing to read; this one is a thing to type into. */
-  useEffect(() => { box.current?.focus() }, [])
-  /* Walking off the page stops the voice. Otherwise it keeps reading an answer
-     that is no longer on screen, from a page he has already left. */
+  /* The caret is in the box when the page opens, where there is a keyboard
+     to type with. On a phone, focusing would raise the keyboard and scroll
+     the core away before he has seen it. */
+  useEffect(() => { if (matchMedia('(pointer: fine)').matches) box.current?.focus({ preventScroll: true }) }, [])
+  /* Walking off the page stops the voice. */
   useEffect(() => stopSpeech, [])
 
   const empty = turns.length === 0 && !busy && !err
   /* cancel, not stop: the question has been asked, so the tail of it is not
      wanted back in the box that is about to be cleared. */
-  const submit = () => { const t = q.trim(); if (t) { cancelDictation(); setQ(''); void send(t) } }
+  const submit = () => {
+    const t = q.trim()
+    if (!t) return
+    cancelDictation(); setQ('')
+    if (LOVE_YOU_3000.test(t)) {
+      setTurns((prev) => [...prev, { who: 'you', text: t }, { who: 'it', text: 'Love you 3000, sir.', egg: true }])
+      core.current?.easterEgg()
+      return
+    }
+    void send(t)
+  }
+  const type = (v: string) => { setQ(v); core.current?.type(v) }
 
   const { voice, startVoice, runSkill, endVoice } = useVoiceGlue(
     send,
@@ -644,16 +763,24 @@ export function AssistantPage() {
     () => box.current?.focus(),
   )
 
+  /* ---- the readouts: every number is his own, read from the brief ---- */
+  const dayItems = brief.planned.flatMap((s) => s.items)
+  const dayDone = dayItems.filter((i) => i.done).length
+  const nextMeeting = brief.meetings.find((m) => m.at >= brief.now)
+  const bills = brief.bills
+  const unpaid = bills && bills !== 'loading' ? bills.due - bills.paid : null
+  const state = busy ? 'THINKING' : voice ? 'LISTENING' : q ? 'LISTENING' : 'STANDING BY'
+
   const askBox = voice ? <VoicePanel onExit={endVoice} /> : (
-    <form className="as-ask" onSubmit={(e) => { e.preventDefault(); submit() }}>
+    <form className="as-ask jv-ask" onSubmit={(e) => { e.preventDefault(); submit() }}>
       <textarea
         ref={box}
         className="as-input"
         value={q}
         rows={1}
-        placeholder="Ask anything about your week"
-        aria-label="Ask the assistant"
-        onChange={(e) => setQ(e.target.value)}
+        placeholder="Speak or type to JARVIS"
+        aria-label="Ask JARVIS"
+        onChange={(e) => type(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit() }
         }}
@@ -669,170 +796,147 @@ export function AssistantPage() {
             <span className="as-mic-text">Voice</span>
           </button>
         ) : null}
-        <Dictate base={q} onText={setQ} busy={busy} />
-        <button className="btn btn-primary as-send" disabled={busy || !q.trim()}>Ask</button>
+        <Dictate base={q} onText={type} busy={busy} />
+        <button className="btn btn-primary as-send" disabled={busy || !q.trim()}>Send</button>
       </div>
     </form>
   )
 
   return (
-    <div className={`page as-page${empty ? ' is-empty' : ' is-split'}`}>
-      {/* Before he has asked anything the page is a doorway, not a workspace:
-          one mark, one question, one box. The split arrives with the answer. */}
-      {empty && (
-        <div className="as-open">
-          <div className="as-hero">
-            <Mark state={voice ? 'listening' : 'idle'} />
-            <h1 className="as-hero-q">What can I help with?</h1>
+    <div className="page as-page jv">
+      <canvas ref={gl} className="jv-gl" aria-hidden="true" />
+      <JvFrame
+        left={dayItems.length ? dayDone / dayItems.length : 0}
+        right={brief.habits.due ? brief.habits.kept / brief.habits.due : 0}
+        leftLabel={`DAY ${dayDone} / ${dayItems.length}`}
+        rightLabel={`HABITS ${brief.habits.kept} / ${brief.habits.due}`}
+      />
+      <div className="jv-strip" role="group" aria-label="Today at a glance">
+        <div><span className="k">ON THE DAY</span><span className="v">{dayDone} / {dayItems.length}</span></div>
+        <div><span className="k">NEXT MEETING</span><span className="v">{nextMeeting ? nextMeeting.at : 'None'}</span></div>
+        <div><span className="k">HABITS</span><span className="v">{brief.habits.kept} / {brief.habits.due}</span></div>
+        <div>
+          <span className="k">BILLS</span>
+          <span className={`v${unpaid ? ' is-alert' : ''}`}>{bills === 'loading' ? 'Loading' : unpaid === null ? 'Signed out' : unpaid ? `${unpaid} unpaid` : 'All paid'}</span>
+        </div>
+        <div><span className="k">FOCUS TODAY</span><span className="v">{brief.focusToday ? fmtDuration(brief.focusToday) : '0m'}</span></div>
+      </div>
 
+      <div className="jv-grid">
+        {split && (
+          <aside className="jv-left" aria-label="On the day">
+            <h2>ON THE DAY</h2>
+            {dayItems.length ? brief.planned.filter((s) => s.items.length).map((s) => (
+              <div className="jv-slot" key={s.slot}>
+                <span className="jv-slot-name">{s.slot.toUpperCase()}</span>
+                {s.items.map((it, k) => <span className={`jv-slot-item${it.done ? ' is-done' : ''}`} key={k}>{it.title}</span>)}
+              </div>
+            )) : <p className="jv-quiet">Nothing on the day yet.</p>}
+          </aside>
+        )}
+
+        <section className="as-chat jv-center">
+          <div className="jv-stage" ref={stage} aria-label="JARVIS. Drag to look around.">
+            <div className="jv-presence"><span className="jv-name">JARVIS</span><span className="jv-state" role="status">{state}</span></div>
           </div>
-          {/* Six things he does rather than types, in one row, one design.
-              The chip row that used to sit below the ask box is gone: this was
-              two different weights for buttons that all do the same kind of
-              thing, one filled and central, five outlined and stranded under
-              the box. Not gated on voiceModeAvailable() the way the single
-              button used to be, because runSkill() already falls back to a
-              typed send where voice mode does not exist, and a browser
-              without SpeechRecognition should not lose every one-tap skill on
-              the doorway, only the live listening. Not attach, search, reason,
-              create an image. Those are a general chatbot's furniture and none
-              of them is a thing this app does. These are questions about his
-              own week, each answerable from his own log. */}
-          <div className="as-skills">
-            <button className="as-brief" onClick={() => void runSkill(MORNING)}>
-              <Icon.Waveform size={18} />
-              {MORNING.label}
-            </button>
-            {SKILLS.map((k) => (
-              <button className="as-brief" key={k.label} onClick={() => void runSkill(k)}>
-                <Icon.Waveform size={18} />
-                {k.label}
-              </button>
+          <div className="as-thread jv-thread">
+            {empty && (
+              <div className="as-skills jv-skills">
+                <button className="as-brief" onClick={() => void runSkill(MORNING)}>
+                  <Icon.Waveform size={16} />
+                  {MORNING.label}
+                </button>
+                {SKILLS.map((k) => (
+                  <button className="as-brief" key={k.label} onClick={() => void runSkill(k)}>
+                    <Icon.Waveform size={16} />
+                    {k.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {turns.map((t, i) => (
+              <div className={`as-turn is-${t.who}`} key={i}>
+                <p className="as-said">{t.text}</p>
+                {/* The app's own account of what changed, not the model's. */}
+                {t.done?.length ? (
+                  <>
+                    <ul className="as-did">
+                      {t.done.map((d, k) => (
+                        <li className={`${d.ok ? 'is-ok' : 'is-no'}${d.undone ? ' is-undone' : ''}`} key={k}>
+                          {d.ok ? null : <span className="as-did-head">Nothing changed, </span>}
+                          {d.text}
+                          {d.undone ? <span className="as-did-undone">, reverted</span> : null}
+                          {d.undo && !d.undone ? (
+                            <button className="as-did-undo" onClick={() => undoOne(i, k)} title="Undo this one">
+                              <Icon.Rewind size={13} /> Undo
+                            </button>
+                          ) : null}
+                          {d.needsActual ? (
+                            <ActualLog
+                              est={d.needsActual.est}
+                              onLog={(m) => logTaskActual(i, k, d.needsActual!.taskId, m)}
+                              onSkip={() => logTaskActual(i, k, d.needsActual!.taskId, d.needsActual!.est)}
+                            />
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                    {t.done.filter((d) => d.undo && !d.undone).length > 1 ? (
+                      <div className="as-did-batch">
+                        <span>{t.done.filter((d) => d.undo && !d.undone).length} changes applied</span>
+                        <button className="btn btn-quiet as-did-undoall" onClick={() => undoAll(i)}>Undo all</button>
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
+                {t.who === 'it' && (t.text.trim() || (split && t.reply?.show.length)) ? (
+                  <div className="as-pulled">
+                    {t.text.trim() ? <Speak id={`t${i}`} text={t.text} /> : null}
+                    {split && t.reply?.show.length
+                      ? t.reply.show.map((c, k) => (
+                          <button className="as-pulled-btn" key={k} onClick={() => { setCanvas([c.kind]); setTouched(t.touched ?? []) }}>
+                            {TITLES[c.kind]}
+                          </button>
+                        ))
+                      : null}
+                  </div>
+                ) : null}
+                {t.reply?.show.length && !split ? (
+                  t.reply.show.map((c, k) => (
+                    <section className="as-card" key={k}>
+                      <h3 className="microcap">{TITLES[c.kind]}</h3>
+                      <CardBody kind={c.kind} limit={6} touched={t.touched} />
+                    </section>
+                  ))
+                ) : null}
+                {t.reply?.next && t.reply.next.length > 0 && (
+                  <div className="as-next">
+                    {t.reply.next.map((n, k) => (
+                      <button className="as-chip" key={k} onClick={() => void send(n)}>{n}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
+            {busy && live ? (
+              <div className="as-turn is-it">
+                <p className="as-said is-live" role="status">{live}<span className="as-caret" aria-hidden="true" /></p>
+              </div>
+            ) : null}
+            {err && (
+              <div className="as-error">
+                <p>{err}</p>
+                {errHint && <p className="as-error-hint">{errHint}</p>}
+              </div>
+            )}
+            <div ref={foot} />
           </div>
           {askBox}
-        </div>
-      )}
+        </section>
 
-      {!empty && (
-        <>
-          <div className="as-chat">
-            <div className="as-thread">
-              {turns.map((t, i) => (
-                <div className={`as-turn is-${t.who}`} key={i}>
-                  <p className="as-said">{t.text}</p>
-                  {/* The app's own account of what changed, not the model's.
-                      It sits under the sentence because the sentence is an
-                      intention and this is the fact. */}
-                  {t.done?.length ? (
-                    <>
-                      <ul className="as-did">
-                        {t.done.map((d, k) => (
-                          <li className={`${d.ok ? 'is-ok' : 'is-no'}${d.undone ? ' is-undone' : ''}`} key={k}>
-                            {d.ok ? null : <span className="as-did-head">Nothing changed, </span>}
-                            {d.text}
-                            {d.undone ? <span className="as-did-undone"> — reverted</span> : null}
-                            {d.undo && !d.undone ? (
-                              <button className="as-did-undo" onClick={() => undoOne(i, k)} title="Undo this one">
-                                <Icon.Rewind size={13} /> Undo
-                              </button>
-                            ) : null}
-                            {d.needsActual ? (
-                              <ActualLog
-                                est={d.needsActual.est}
-                                onLog={(m) => logTaskActual(i, k, d.needsActual!.taskId, m)}
-                                onSkip={() => logTaskActual(i, k, d.needsActual!.taskId, d.needsActual!.est)}
-                              />
-                            ) : null}
-                          </li>
-                        ))}
-                      </ul>
-                      {/* A batch worth reviewing as one, not one row at a time --
-                          his ask, verbatim: "are you approving these edits or you
-                          want them revert back". Only past one real change: a
-                          single add already has its own row-level Undo right
-                          there, and a second button next to it would just be
-                          the same choice asked twice. */}
-                      {t.done.filter((d) => d.undo && !d.undone).length > 1 ? (
-                        <div className="as-did-batch">
-                          <span>{t.done.filter((d) => d.undo && !d.undone).length} changes applied</span>
-                          <button className="btn btn-quiet as-did-undoall" onClick={() => undoAll(i)}>Undo all</button>
-                        </div>
-                      ) : null}
-                    </>
-                  ) : null}
-                  {/* One row of things you can do with the answer: hear it, and
-                      go to what it pulled. Play used to sit on its own line above
-                      these and read as a fourth stacked pill, which made a
-                      two-line sentence carry three rows of furniture.
-                      On a wide screen the cards live on the right, so the thread
-                      keeps only a way back to them. On a phone there is no right,
-                      so they render below, full size. */}
-                  {t.who === 'it' && (t.text.trim() || (split && t.reply?.show.length)) ? (
-                    <div className="as-pulled">
-                      {t.text.trim() ? <Speak id={`t${i}`} text={t.text} /> : null}
-                      {split && t.reply?.show.length
-                        ? t.reply.show.map((c, k) => (
-                            <button className="as-pulled-btn" key={k} onClick={() => { setCanvas([c.kind]); setTouched(t.touched ?? []) }}>
-                              {TITLES[c.kind]}
-                            </button>
-                          ))
-                        : null}
-                    </div>
-                  ) : null}
-                  {t.reply?.show.length ? (
-                    split ? null : (
-                      t.reply.show.map((c, k) => (
-                        <section className="as-card" key={k}>
-                          <h3 className="microcap">{TITLES[c.kind]}</h3>
-                          <CardBody kind={c.kind} limit={6} touched={t.touched} />
-                        </section>
-                      ))
-                    )
-                  ) : null}
-                  {t.reply?.next && t.reply.next.length > 0 && (
-                    <div className="as-next">
-                      {t.reply.next.map((n, k) => (
-                        <button className="as-chip" key={k} onClick={() => void send(n)}>{n}</button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-              {busy && (
-                <div className="as-turn is-it">
-                  {live
-                    ? (
-                      <p className="as-said is-live" role="status">
-                        {live}<span className="as-caret" aria-hidden="true" />
-                      </p>
-                    )
-                    : (
-                      <p className="as-thinking" role="status">
-                        {/* ONE indicator, not two. A 22px mark beside three dots
-                            was two things saying "working" and neither saying it
-                            well: at that size the blob read as a speck while the
-                            dots did the actual work. The blob is the whole
-                            indicator now, at a size where its churn is legible. */}
-                        <Mark state="thinking" size={34} />
-                        <span className="visually-hidden">Reading your day</span>
-                      </p>
-                    )}
-                </div>
-              )}
-              {err && (
-                <div className="as-error">
-                  <p>{err}</p>
-                  {errHint && <p className="as-error-hint">{errHint}</p>}
-                </div>
-              )}
-              <div ref={foot} />
-            </div>
-            {askBox}
-          </div>
-          {split && <Canvas kinds={canvas} touched={touched} />}
-        </>
-      )}
+        {split && <Canvas kinds={canvas} touched={touched} />}
+      </div>
+      <div ref={overlay} className="jv-overlay" aria-hidden="true" />
     </div>
   )
 }

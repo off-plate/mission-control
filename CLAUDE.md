@@ -23,6 +23,15 @@ Nothing gets deployed or shown to Michael as "ready" until the release team retu
   the countdown read-out and Technor for everything around it. Both are scoped
   to that page. Do not "fix" either back to the app defaults, and do not let
   them leak onto any other page.
+- **The assistant page is the second room, on his explicit instruction**
+  (2026-10-04: "redo the design so it looks like a Jarvis"). It always wears
+  the HUD theme (App.tsx `hudLook`), header included, with Michroma and Saira
+  and one extra amber (`--jv-amber`) for JARVIS himself. Its centre is a
+  three.js core (`src/jarviscore.ts`, dynamically imported so three.js stays
+  out of the main bundle): spinning LINES at rest, never a dot cloud, which
+  turn into particles shaped by what the assistant actually did. The
+  "LOVE YOU 3000" helmet is traced from `HELMET_D` in helmet.tsx, never drawn
+  by hand. Approved prototype: claude.ai/artifact/CGQ2hNaPABoYhCkS3LhxAj.
 - **Icons come from one set, and it lives in `src/icons.tsx`.** Hicon Circular
   Interface Icons (MIT, credited in `LICENSES.md`), 24x24, stroke 2, `currentColor`.
   Never inline a new `<svg>` in a page: add the icon to `icons.tsx` or reuse the one

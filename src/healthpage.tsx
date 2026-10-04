@@ -404,7 +404,13 @@ export function HealthPage() {
               {lastSession
                 ? <>Last session {fmtDay(lastSession.day)}, <Age day={lastSession.day} /></>
                 : 'No sessions on record.'}
-              {lastRun && <span className="hp-since-sync">Synced {agoFrom(lastRun.ran_at)}</span>}
+              {lastRun && (
+                <span className="hp-since-sync">
+                  {/* Listening while the watch data is fresh (under 12 hours), still once it goes stale. */}
+                  <Orb state="listening" size={20} tone="--accent-text" paused={Date.now() - Date.parse(lastRun.ran_at) > 12 * 3600e3} label="Watch data" />
+                  Synced {agoFrom(lastRun.ran_at)}
+                </span>
+              )}
             </p>
           </div>
           <div className="hp-head-right">

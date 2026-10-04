@@ -24,12 +24,13 @@ function useHud(): boolean {
   return hud
 }
 
-export function Orb({ state, size = 20, tone = '--a-ink', paused, label, className }: {
+export function Orb({ state, size = 20, tone = '--a-ink', paused, speed, label, className }: {
   state: OrbState
   size?: number
   /** A CSS custom property to colour the dots with, read where the orb sits. */
   tone?: string
   paused?: boolean
+  speed?: number
   label?: string
   className?: string
 }) {
@@ -46,10 +47,20 @@ export function Orb({ state, size = 20, tone = '--a-ink', paused, label, classNa
   return (
     <span ref={box} className={`orb${className ? ` ${className}` : ''}`} style={{ width: size, height: size }}>
       <ThinkingOrb
-        state={state} size={preset} paused={paused} color={color} theme={hud ? 'dark' : 'light'}
+        state={state} size={preset} paused={paused} speed={speed} color={color} theme={hud ? 'dark' : 'light'}
         aria-label={label}
         style={k === 1 ? undefined : { transform: `scale(${k})`, transformOrigin: 'center' }}
       />
     </span>
   )
+}
+
+/* Momentum's five states, slow to intense, as orb moods. Cold breathes, a
+   wheel that runs without him solves. Shared by the Jar and the chain card. */
+export function momentumOrb(m: number): { state: OrbState; speed: number } {
+  if (m >= 78) return { state: 'solving', speed: 1.15 }
+  if (m >= 48) return { state: 'weaving', speed: 1 }
+  if (m >= 22) return { state: 'working', speed: 1 }
+  if (m >= 8) return { state: 'connecting', speed: 0.9 }
+  return { state: 'breathing', speed: 0.6 }
 }

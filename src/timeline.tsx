@@ -25,6 +25,7 @@
                manual click. Not scored: see the note in momentum.ts for why
                a 25-point bonus landing on the wheel the day he connects a
                tracker is not a call this column gets to make alone. */
+import { Orb, momentumOrb, type OrbState } from './orb'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useStore } from './store'
 import { jarState, useJarState } from './cookiejarnav'
@@ -291,7 +292,7 @@ function Sums({ run, chain, now, money }: { run: DayScore[]; chain: ReturnType<t
   const paidTotal = money ? Object.values(money.byDay).reduce((a, d) => a + d.paid, 0) : null
   return (
       <div className="tl-sum">
-        <Sum label="Momentum" figure={String(Math.round(now))} unit={`of ${100}`} win={now > 0} says={`${stateFor(now)}. Replayed from the log, never stored.`} />
+        <Sum orb={momentumOrb(now)} label="Momentum" figure={String(Math.round(now))} unit={`of ${100}`} win={now > 0} says={`${stateFor(now)}. Replayed from the log, never stored.`} />
         <Sum label="Chain" figure={String(chain.current)} unit={chain.current === 1 ? 'day' : 'days'} win={chain.current > 0}
           says={chain.longest > chain.current ? `Longest in this window is ${chain.longest}.` : 'This is the longest run in the window.'} />
         <Sum label="Hard things" figure={String(hardTotal)} unit={`in ${run.length} days`} win={hardTotal > 0}
@@ -305,9 +306,10 @@ function Sums({ run, chain, now, money }: { run: DayScore[]; chain: ReturnType<t
   )
 }
 
-function Sum({ label, figure, unit, says, win }: { label: string; figure: string; unit: string; says: string; win: boolean }) {
+function Sum({ label, figure, unit, says, win, orb }: { label: string; figure: string; unit: string; says: string; win: boolean; orb?: { state: OrbState; speed: number } }) {
   return (
-    <div className={win ? 'win' : ''}>
+    <div className={`${win ? 'win' : ''}${orb ? ' has-orb' : ''}`}>
+      {orb && <Orb className="tl-orb" state={orb.state} speed={orb.speed} size={40} tone={win ? '--tl-hot' : '--tl-dim'} label={`Momentum, ${orb.state}`} />}
       <span className="tl-l">{label}</span>
       <b>{figure}{unit && <small>{unit}</small>}</b>
       <p>{says}</p>

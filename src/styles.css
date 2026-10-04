@@ -11821,3 +11821,9 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 .orb { display: inline-block; flex: none; position: relative; line-height: 0; vertical-align: middle; }
 .orb > canvas { position: absolute; left: 50%; top: 50%; translate: -50% -50%; }
 .znow-orb { margin-bottom: 6px; }
+/* Orbs that read a number: momentum on the Jar, the chain on Today, fresh watch data on Health. */
+.tl-sum > div.has-orb { position: relative; }
+.tl-orb { position: absolute; top: 12px; right: 12px; }
+.trw-chainfig { display: inline-flex; align-items: center; gap: 8px; }
+.hp-since-sync { display: inline-flex; align-items: center; gap: 6px; }
+.tl-sum > div.has-orb { padding-right: 64px; }

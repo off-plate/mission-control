@@ -34,18 +34,22 @@ const HOLD = 5000
    and "today at noon" is the day's list. Only for the preview while he types;
    once he sends, the shapes come from what the assistant really did. */
 const RULES: [Shape, RegExp][] = [
+  /* A specific thing beats a generic verb (his report, 2026-10-04: "add X
+     as a business prospect" previewed the task list, because "add" matched
+     first). Dates first, then the named parts of the app, and the plain
+     task words last, as the fallback they are. */
   ['calendar', /\b(tomorrow|next week|monday|tuesday|wednesday|thursday|friday|saturday|sunday|calendar|meeting|schedule)\b/i],
-  ['bills', /\b(bill|pay|paid|money|spotify|income|expense|kč|czk|invoice)\b/i],
+  ['prospect', /\b(prospects?|business|company|companies|leads?|clients?|outreach|cold email|pipeline|reach out)\b/i],
+  ['bills', /\b(bills?|pay|paid|money|spotify|income|expense|kč|czk|invoice)\b/i],
   ['focus', /\b(focus|timer|pomodoro|zone|block)\b/i],
-  ['tasks', /\b(task|to-?do|list|add|remind|today|noon|morning|afternoon|evening|tonight|done|finished|tick)\b/i],
-  ['calendar', /\bplan\b/i],
   ['gym', /\b(gym|workout|bench|squat|hevy|train|lift)\b/i],
-  ['idea', /\bidea/i],
-  ['prospect', /\b(prospect|lead|client|outreach|cold email|pipeline|reach out)/i],
+  ['idea', /\bideas?\b/i],
   ['person', /\b(person|people|brother|sister|friend|contact|called|mum|mom|dad|father|girlfriend)\b/i],
-  ['building', /\b(project|house|kitchen|build|renovat)/i],
-  ['note', /\b(note|write (it|this|that) down|jot)/i],
-  ['habit', /\b(habit|routine|streak|stretch|meditat|goal)/i],
+  ['building', /\b(projects?|house|kitchen|build|renovat\w*)\b/i],
+  ['note', /\b(notes?|write (it|this|that) down|jot)\b/i],
+  ['habit', /\b(habits?|routines?|streak|stretch|meditat\w*|goals?)\b/i],
+  ['tasks', /\b(tasks?|to-?do|list|add|remind|today|noon|morning|afternoon|evening|tonight|done|finished|tick|mark)\b/i],
+  ['calendar', /\bplan\b/i],
 ]
 export function previewShape(text: string): Shape {
   const bits = text.split(/\s*(?:,|;|\band then\b|\bthen\b|\band\b)\s*/i).filter(Boolean)

@@ -320,7 +320,6 @@ interface Store extends PersistedState {
   logActual: (id: string, actualMin: number) => void
   /** Returns the new row's id. */
   addTask: (t: Omit<Task, 'id' | 'done'>) => string
-  addTasks: (tasks: Omit<Task, 'id' | 'done'>[]) => void
   addTaskWithSubtasks: (parent: Omit<Task, 'id' | 'done' | 'subtasks'>, subs: { title: string; estimateMin: number }[]) => void
   /** Put a task on a period in Goals, or take it off again with no horizon. The
    *  key defaults to the period running now; a Goals column passes its own when
@@ -381,13 +380,7 @@ interface Store extends PersistedState {
    *  because a lost write must never be a permanent lie. */
   assertRoutineDay: (habitId: string, dayIndex: number) => void
   markHabitDay: (id: string, day: number, value: boolean) => void
-  /** Same write, dated rather than weekday-indexed, for a day outside the
-   *  current week -- a Hevy backfill reaching six months back, say. Days
-   *  inside the current week still update the days[] cache; older ones
-   *  land only in habitLog, which is where a habit's real history lives. */
-  markHabitDayOn: (id: string, day: string, value: boolean) => void
-  /** Many dates on one habit, one state update. See markDaysOn's own comment
-   *  for why a loop of markHabitDayOn calls is not the same thing. */
+  /** Many dates on one habit, one state update. See markDaysOn's own comment. */
   markHabitDaysOn: (id: string, days: string[], value: boolean) => void
   addHabit: (input: { name: string; daypart?: import('./types').TimeSlot; frequency: import('./types').HabitFrequency; targetPerWeek?: number; kind?: import('./types').HabitKind; dailyTargetMin?: number; measure?: 'minutes' | 'times'; per?: import('./types').CountPeriod; targetCount?: number; source?: import('./types').HabitSource; quitSince?: string; startedOn?: string }) => void
   /** Record a slip on a habit you are trying to stop; resets the clean run. */
@@ -406,13 +399,7 @@ interface Store extends PersistedState {
    *  freshly made or already there from an earlier click. */
   repeatGoal: (id: string) => string | null
 
-
-  commitPlan: (taskIds: string[], firstMoveId: string | null) => void
-  /** Close a window: any range, one act. Its outcomes land in the backlog. */
-
   assistantLog: AssistantEntry[]
-  applyDictation: (text: string, items: { kind: 'task' | 'goal' | 'done'; text: string; estimateMin?: number }[]) => void
-  revertAssistantItem: (entryId: string, itemId: string) => void
 
   /* Avoidance, the page, is gone. These sessions are not: they are dated
      records of things he faced, so they keep loading, keep syncing and keep
@@ -427,8 +414,6 @@ interface Store extends PersistedState {
   /** Finish or reopen a whole routine at once, the way ticking a task with
    *  subtasks finishes all of them. */
   setRoutineDone: (routineId: string, done: boolean) => void
-  /** Open a fresh run of a repeatable routine, keeping every run before it. */
-  startAgain: (routineId: string) => void
   /** Put a routine on a day's list before it is started, so a day can be planned
    *  and not only recorded. `slot` undefined takes it back off the list, and
    *  `day` defaults to today. */
@@ -438,15 +423,6 @@ interface Store extends PersistedState {
   /** A routine and the habit that mirrors it are created together, so finishing
    *  it always has somewhere to land. */
   addRoutine: (input: { title: string; cadence: RoutineCadence; blurb?: string; daypart?: import('./types').TimeSlot }) => void
-  updateRoutine: (id: string, patch: Partial<Pick<Routine, 'title' | 'cadence' | 'blurb'>>) => void
-  deleteRoutine: (id: string) => void
-  addRoutineStep: (routineId: string, step: { title: string; note?: string; link?: string; linkLabel?: string }) => void
-  updateRoutineStep: (routineId: string, stepId: string, patch: Partial<Pick<import('./types').RoutineStep, 'title' | 'note' | 'link' | 'linkLabel'>>) => void
-  deleteRoutineStep: (routineId: string, stepId: string) => void
-  moveRoutineStep: (routineId: string, stepId: string, dir: -1 | 1) => void
-  /** Record a number against a routine step (today's typing speed). Keeps the
-   *  all-time best in `records`, which never resets with the period. */
-  setStepData: (routineId: string, stepId: string, value: number) => void
   /** Personal bests, keyed by `routineId:stepId`. Never cleared by a rollover. */
   records: Record<string, number>
 
@@ -1355,8 +1331,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [openProjectId, setOpenProject] = useState<string | null>(null)
   const plannerSlice = usePlannerSlice(persisted, { armUndo, bury, digUp, openProjectId, setOpenProject, setPlan })
   const { tasks, setTasks, projects, setProjects } = plannerSlice
-  const assistantSlice = useAssistantSlice(persisted, { space, setTasks, setGoals })
-  const { assistantLog, setAssistantLog, applyDictation, revertAssistantItem } = assistantSlice
+  const { assistantLog, setAssistantLog } = useAssistantSlice(persisted)
   const setSpace = (s: SpaceId) => setWriteSpace(s)
   const setView = (v: ViewId) => { setViewState(v); if (isSpace(v)) setWriteSpace(v); setOpenProject(null) }
   /* A record belongs to exactly one space. The old form treated a space-less row
@@ -1797,7 +1772,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
 
     addTask: plannerSlice.addTask,
-    addTasks: plannerSlice.addTasks,
     addTaskWithSubtasks: plannerSlice.addTaskWithSubtasks,
     commitTask: plannerSlice.commitTask,
     moveTaskList: plannerSlice.moveTaskList,
@@ -1845,7 +1819,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     assertRoutineDay: growthSlice.assertRoutineDay,
     toggleHabitDay: growthSlice.toggleHabitDay,
     markHabitDay: growthSlice.markHabitDay,
-    markHabitDayOn: growthSlice.markHabitDayOn,
     markHabitDaysOn: growthSlice.markHabitDaysOn,
     logHabitNumber: growthSlice.logHabitNumber,
     pickHabitAlt: growthSlice.pickHabitAlt,
@@ -1871,38 +1844,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     deleteGoal: growthSlice.deleteGoal,
 
 
-    commitPlan: (taskIds, firstMoveId) => {
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.space !== space ? t : {
-            ...t,
-            list: taskIds.includes(t.id) ? 'today' : t.done ? t.list : 'backlog',
-            plannedOn: taskIds.includes(t.id) ? todayKey() : t.done ? t.plannedOn : undefined,
-          },
-        ),
-      )
-      setPlan({ committedDate: todayKey(), firstMoveId })
-    },
 
 
     assistantLog,
-    applyDictation,
-    revertAssistantItem,
 
     coachSessions,
     toggleRoutineStep: growthSlice.toggleRoutineStep,
     toggleRoutineAlt: growthSlice.toggleRoutineAlt,
     records,
-    setStepData: growthSlice.setStepData,
     addRoutine: growthSlice.addRoutine,
-    updateRoutine: growthSlice.updateRoutine,
-    deleteRoutine: growthSlice.deleteRoutine,
-    addRoutineStep: growthSlice.addRoutineStep,
-    updateRoutineStep: growthSlice.updateRoutineStep,
-    deleteRoutineStep: growthSlice.deleteRoutineStep,
-    moveRoutineStep: growthSlice.moveRoutineStep,
     logCount: growthSlice.logCount,
-    startAgain: growthSlice.startAgain,
     planRoutine: growthSlice.planRoutine,
     setRoutineDone: growthSlice.setRoutineDone,
 

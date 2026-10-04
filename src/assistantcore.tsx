@@ -453,7 +453,7 @@ const LANDS: Record<Action['kind'], CardKind | 'task' | null> = {
   bill: 'bills', skipBill: 'bills', expense: 'bills', income: 'bills',
   gymGoal: 'gym', gymGoalEdit: 'gym', gymGoalDelete: 'gym',
   prompt: 'prompts', promptSent: 'prompts', promptDelete: 'prompts',
-  workspace: null, open: null, day: null, app: null, sync: null,
+  workspace: null, open: null, day: null, app: null, sync: null, jarvis: null,
 }
 /** The card a task sits on right now. */
 export const taskCard = (t: Task, day = localDateKey()): CardKind =>
@@ -971,6 +971,11 @@ function useDoer() {
         s.setPage('apps')
         return yes(`Opened ${row.name}`)
       }
+      case 'jarvis':
+        /* The HUD lives in App's own state (per device, not synced), so the
+           assistant asks for it with the same event App listens for. */
+        window.dispatchEvent(new CustomEvent('mc:hud', { detail: a.on !== false }))
+        return yes(a.on === false ? 'Back to Mission Control' : 'Jarvis mode on')
       case 'sync': {
         /* Exactly what Settings' own "Sync now" makes. */
         if (!hasHevyKey()) return no('No Hevy key set on this device')

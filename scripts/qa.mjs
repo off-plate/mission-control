@@ -1950,7 +1950,7 @@ await step('sync: a phone that slept through the week cannot wipe what happened 
     })]
     st.tasks = [
       { id: 'slept-a', space: 'personal', title: 'Write to FU', list: 'today', plannedOn: gone, done: false, createdAt: gone, estimateMin: 15, category: 'admin' },
-      { id: 'slept-b', space: 'personal', title: 'Call VZP', list: 'today', plannedOn: gone, done: false, createdAt: gone, estimateMin: 15, category: 'admin' },
+      { id: 'slept-b', space: 'personal', title: 'Call the insurer', list: 'today', plannedOn: gone, done: false, createdAt: gone, estimateMin: 15, category: 'admin' },
     ]
     localStorage.setItem(K, JSON.stringify(st))
     return { gone, blob: localStorage.getItem(K) }
@@ -2140,9 +2140,9 @@ await step('notes: a slash command is taken at either end of the line', async ()
   if (onToday !== 0) throw new Error(`/task put ${onToday} straight onto today; it captures to the list only`)
 
   // And at the head of the line.
-  await write('/task Zavolat na VZP')
+  await write('/task Zavolat do banky')
   t = await todays()
-  if (!t.includes('Zavolat na VZP')) throw new Error(`leading /task did not land: ${JSON.stringify(t)}`)
+  if (!t.includes('Zavolat do banky')) throw new Error(`leading /task did not land: ${JSON.stringify(t)}`)
   const before = t.length
 
   // A command with no argument does nothing at all, rather than filing an empty task.
@@ -2596,7 +2596,7 @@ await step('notes: brain dumps came across, and search reaches every folder', as
   if (!(await page.locator('.nt-row', { hasText: 'Rubber band' }).count())) throw new Error('the board did not come across')
   // write one, in Czech, with a tag. A new note starts in its title.
   await page.getByRole('button', { name: 'New note' }).click(); await page.waitForTimeout(300)
-  await page.locator('textarea[aria-label="Note title"]').fill('Zavolat na úkol #vzp')
+  await page.locator('textarea[aria-label="Note title"]').fill('Zavolat na úkol #banka')
   await page.locator('.nt-editor').click()
   await page.keyboard.type('Druhý řádek s detailem'); await page.waitForTimeout(400)
   const saved = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
@@ -2609,7 +2609,7 @@ await step('notes: brain dumps came across, and search reaches every folder', as
   await page.locator('input[aria-label="Search notes"]').fill('ukol'); await page.waitForTimeout(400)
   if (!(await page.locator('.nt-row', { hasText: 'Zavolat' }).count())) throw new Error('accent-blind search missed it')
   await page.locator('input[aria-label="Search notes"]').fill(''); await page.waitForTimeout(200)
-  await page.locator('.nt-chip-tag', { hasText: '#vzp' }).first().click(); await page.waitForTimeout(300)
+  await page.locator('.nt-chip-tag', { hasText: '#banka' }).first().click(); await page.waitForTimeout(300)
   const rows = await page.locator('.nt-row').count()
   if (rows !== 1) throw new Error(`the tag filter showed ${rows} notes`)
 })
@@ -4369,7 +4369,7 @@ await step('timeline: the give-up screen takes the whole window, and the cross i
     const key = (n) => { const x = new Date(d); x.setDate(x.getDate() - n); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}` }
     s.goals = [{ id: 'gq1', name: 'Tax return filed', current: 1, target: 4, unit: 'steps', note: '', space: 'personal' }]
     s.routines = [{ id: 'rq1', title: 'Weekly reset', cadence: 'weekly', space: 'personal' }]
-    s.tasks = [{ id: 'tq1', title: 'Email Moneta about the payment plan', list: 'today', done: false, space: 'personal', createdAt: key(40), plannedOn: key(0) }]
+    s.tasks = [{ id: 'tq1', title: 'Email the bank about the payment plan', list: 'today', done: false, space: 'personal', createdAt: key(40), plannedOn: key(0) }]
     localStorage.setItem(K, JSON.stringify(s))
   }, KEY)
   await page.reload(); await page.waitForTimeout(900)

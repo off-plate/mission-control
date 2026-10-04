@@ -12,7 +12,7 @@
    missing the first time he pastes something unusual. Anything this file does
    not understand is carried through as a plain paragraph rather than dropped. */
 
-const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
 /* Inline marks. The same alternation the reader uses, so what he sees while
    writing and what he sees after are produced by one definition. */

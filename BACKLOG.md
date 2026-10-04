@@ -39,8 +39,8 @@ while switching to a work space walks back to Today. Its alerts still reach ever
 space through `globalExceptions`, so nothing was lost by hiding the page.
 
 Measured reason, not taste: 12 tabs scrolled two viewports at 390px. The three
-cuts took it to 10; these two merges take it to 8, leaving the five-space switcher
-as the only second axis.
+cuts took it to 10; these two merges take it to 8, leaving the space switcher
+(Personal, Work, All) as the only second axis.
 
 ---
 

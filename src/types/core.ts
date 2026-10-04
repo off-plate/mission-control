@@ -34,9 +34,6 @@ export type PageId =
   | 'quitting'
   | 'settings'
   | 'notes'
-  /** The old address of the Brain Dump board. Kept so a bookmark still lands
-   *  somewhere real: the route walks it to Notes. */
-  | 'braindump'
   | 'board'
   /** His other tools, embedded live. */
   | 'apps'
@@ -78,51 +75,6 @@ export type PageId =
    *  the Watchless endpoint, which is the only thing holding keys and the only
    *  thing that can spend against its monthly cap. */
   | 'watchless'
-
-export type WidgetType =
-  | 'clock'
-  | 'agenda'
-  | 'tasks'
-  | 'mail'
-  | 'finance'
-  | 'habits'
-  | 'training'
-  | 'goals'
-  | 'timesaved'
-  | 'claude'
-  | 'social'
-  | 'sources'
-  | 'outreach'
-
-export type SizeKey = 'S' | 'M' | 'T' | 'L' | 'XL'
-
-/** Widget sizes in grid cells (one cell is roughly 230px square). */
-export const SIZE_UNITS: Record<SizeKey, { w: number; h: number }> = {
-  S: { w: 1, h: 1 },
-  M: { w: 2, h: 1 },
-  T: { w: 1, h: 2 },
-  L: { w: 2, h: 2 },
-  XL: { w: 4, h: 2 },
-}
-
-export interface WidgetInstance {
-  id: string
-  type: WidgetType
-  size: SizeKey
-}
-
-export interface WidgetDef {
-  type: WidgetType
-  title: string
-  description: string
-  supportedSizes: SizeKey[]
-  defaultSize: SizeKey
-  /** Freshness in minutes at demo load; null means human-entered data. */
-  freshMinutes: number | null
-  staleAfter: number
-  /** Page this widget deep-links to. */
-  page: PageId
-}
 
 export type TaskCategory = 'call' | 'admin' | 'deep' | 'quick'
 

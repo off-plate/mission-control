@@ -9,16 +9,11 @@ name: Health sync
 # than a cron copy and a button copy free to drift apart. This workflow only
 # presses the same button on a timer.
 #
-# No secrets. The URL and the publishable key below are already in the app's
-# public bundle -- they are what every visitor's browser uses to reach this
-# project -- so putting them here exposes nothing that isn't already served on
-# every page load. What is NOT here, and must never be, is the Intervals key:
-# that lives in Supabase secrets, which the function reads and nothing ships.
-#
-# The old Netlify endpoint this replaces was reachable by anyone who knew the
-# URL (CORS is not an access control; curl ignores it), so this is no wider a
-# door than the one it closes. If it ever needs narrowing, the move is a shared
-# secret header checked inside the function, not a change here.
+# The URL and publishable key below are already in the app's public bundle.
+# What proves this caller is the cron is ZEPP_CRON_SECRET, a repo secret that
+# the function checks on x-cron-secret (2026-10-04: before that, anyone with
+# the public key could trigger a 400-day pull). The Intervals key lives only in
+# Supabase secrets.
 
 on:
   schedule:
@@ -41,6 +36,7 @@ jobs:
     steps:
       - name: Call the sync function
         env:
+          CRON_SECRET: ${{ secrets.ZEPP_CRON_SECRET }}
           DAYS: ${{ github.event.inputs.lookback_days || '60' }}
         run: |
           set -euo pipefail
@@ -50,6 +46,7 @@ jobs:
             -X POST "$URL" \
             -H "Authorization: Bearer $KEY" \
             -H "apikey: $KEY" \
+            -H "x-cron-secret: $CRON_SECRET" \
             -H 'Content-Type: application/json' \
             -d "{\"lookback_days\": $DAYS}")
           echo "HTTP $code"

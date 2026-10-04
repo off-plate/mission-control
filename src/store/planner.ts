@@ -120,8 +120,6 @@ export function usePlannerSlice(
       setTasks((prev) => [{ ...t, id, done: false, createdAt: todayKey(), addedAt: Date.now() }, ...prev])
       return id
     },
-    addTasks: (ts: Omit<Task, 'id' | 'done'>[]) =>
-      setTasks((prev) => [...ts.map((t, i) => ({ ...t, id: newId('t'), done: false, createdAt: todayKey(), addedAt: Date.now() + i })), ...prev]),
     addTaskWithSubtasks: (parent: Omit<Task, 'id' | 'done' | 'subtasks'>, subs: { title: string; estimateMin: number }[]) =>
       setTasks((prev) => {
         const pid = newId('t')

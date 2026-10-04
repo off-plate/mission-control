@@ -31,21 +31,6 @@ export interface Obligation {
   next: string
 }
 
-export interface SocialEntry {
-  platform: string
-  followers: number
-  change: number
-  lastPost: string
-}
-
-export interface SourceState {
-  id: string
-  name: string
-  kind: string
-  status: 'connected' | 'off' | 'manual'
-  detail: string
-}
-
 /** Where the assistant put a dictated item, so you can see and undo it. */
 export interface AssistantItem {
   id: string

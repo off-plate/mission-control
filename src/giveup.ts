@@ -51,8 +51,8 @@ export function giveUpHorizons(habitName?: string): Horizon[] {
     {
       id: 'week',
       label: 'This week',
-      up: `This week you send the email you've been dreading. Moneta gets a call instead of your silence. Sunday's Datová schránka check finds nothing scary, because you looked before it could surprise you.`,
-      down: `This week the number in Compass doesn't move. Moneta still hasn't heard from you. The schránka stays unchecked, which means whatever's sitting in there gets to surprise you later, on its terms, not yours.`,
+      up: `This week you send the email you've been dreading. The bank gets a call instead of your silence. Sunday's Datová schránka check finds nothing scary, because you looked before it could surprise you.`,
+      down: `This week the number in Compass doesn't move. The bank still hasn't heard from you. The schránka stays unchecked, which means whatever's sitting in there gets to surprise you later, on its terms, not yours.`,
     },
     {
       id: 'month',
@@ -69,7 +69,7 @@ export function giveUpHorizons(habitName?: string): Horizon[] {
     {
       id: 'year',
       label: 'A year from now',
-      up: `A year of this and the 400K isn't a weight anymore, it's a story you tell about the year you turned it around. Off-Plate has a real name in Prague. You're not performing "having your life together" for her. You have it.`,
+      up: `A year of this and the debt isn't a weight anymore, it's a story you tell about the year you turned it around. Off-Plate has a real name in Prague. You're not performing "having your life together" for her. You have it.`,
       down: `A year from now Off-Plate is a folder of drafts nobody sent. The debt is still there, bigger, because debt doesn't wait for you to feel ready. You're not "about to turn it around" anymore. You've been about to for a year.`,
     },
     {

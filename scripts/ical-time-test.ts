@@ -71,7 +71,7 @@ const ev = (uid: string, start: string, end: string, title: string) =>
 /* ---- invitations he turned down ----
    Google keeps a declined meeting in the feed. It was being counted, planned
    around and read out to him: "two lunch orders at 16:30" he had declined. */
-const OWNER = 'michael@rvlt.digital'
+const OWNER = 'owner@example.com'
 const withOwner = (vevents: string) =>
   `BEGIN:VCALENDAR\nX-WR-CALNAME:${OWNER}\n${vevents}\nEND:VCALENDAR`
 

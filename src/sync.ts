@@ -10,9 +10,7 @@
 
    So: every push goes through here. A push that fails marks the state dirty and
    is retried on a backoff, on reconnect, and on the next launch. The dirty flag
-   is persisted, so quitting while offline does not lose the intent to sync.
-
-   This is shared code. The website gets it too; the desktop app is not special. */
+   is persisted, so quitting while offline does not lose the intent to sync. */
 
 import { useEffect, useState } from 'react'
 import { saveRemoteState, SUPABASE_ENABLED, type SaveResult } from './supabase'

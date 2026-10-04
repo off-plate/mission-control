@@ -135,13 +135,6 @@ export function TimelinePage() {
   const [zoom, setZoom] = useState<Zoom>('d')
   /* Asked for from Health or Why: open straight onto the give-up screen. */
   const setLives = (v: boolean) => jarState.set({ lives: v })
-  /* The desktop shell's `missioncontrol://give-up` deep link -- same screen,
-     one more door in. */
-  useEffect(() => {
-    const onGiveUp = () => setLives(true)
-    window.addEventListener('mc:give-up', onGiveUp)
-    return () => window.removeEventListener('mc:give-up', onGiveUp)
-  }, [])
   const compass = useCompass().state
 
   /* Days a session was actually recorded, straight from the health pipeline.

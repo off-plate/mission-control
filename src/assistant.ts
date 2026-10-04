@@ -98,7 +98,7 @@ const CHANNEL = oneOf(['inperson', 'call', 'message', 'video', 'email'])
 const PKIND = oneOf(['Idea', 'Bug', 'Update', 'Version'])
 const METRIC = oneOf(['e1rm', 'repTotal', 'sessions', 'manual'])
 /** Every real page he can be sent to. 'day' has its own action, since it
- *  takes a date; 'braindump' is a legacy alias for notes. */
+ *  takes a date. */
 const PAGES: PageId[] = [
   'today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting',
   'settings', 'notes', 'board', 'apps', 'focus', 'zone', 'bills', 'calendar',

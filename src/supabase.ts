@@ -25,9 +25,9 @@ function db(): SupabaseClient | null {
   return client
 }
 
-/** Call an Edge Function as the signed-in user. The calendar proxy verifies
- *  the JWT, so nobody without his session can pull his work calendar through
- *  it: the function is the only thing holding the feed's secret address, and a
+/** Call an Edge Function as the signed-in user. The calendar proxy checks
+ *  that session is his (supabase/functions/_shared/owner.ts), so nobody else
+ *  can pull his work calendar through it: the function is the only thing holding the feed's secret address, and a
  *  function anyone may call is the same as publishing that address. */
 export async function callFunction(
   name: string,
@@ -72,6 +72,15 @@ export async function callFunction(
   } catch (e) {
     return { ok: false, reason: 'error', message: e instanceof Error ? e.message : 'unreachable' }
   }
+}
+
+/** The signed-in session's access token, for the one caller that cannot go
+ *  through functions.invoke: the Z.ai relay streams, invoke buffers. */
+export async function sessionToken(): Promise<string | null> {
+  const c = db()
+  if (!c) return null
+  const { data } = await c.auth.getSession()
+  return data.session?.access_token ?? null
 }
 
 export interface Account { id: string; email: string }

@@ -15,8 +15,9 @@
    weight and resting heart rate on the account.
 
    Deploy:
-     supabase secrets set INTERVALS_API_KEY="..." INTERVALS_ATHLETE_ID="i..."
-     supabase functions deploy zepp-sync
+     supabase secrets set INTERVALS_API_KEY="..." INTERVALS_ATHLETE_ID="i..." ZEPP_CRON_SECRET="..."
+     supabase functions deploy zepp-sync --no-verify-jwt
+   The cron sends ZEPP_CRON_SECRET (also a GitHub Actions secret) as x-cron-secret.
 
    SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are handed to every edge function
    by the platform, so they are not secrets to set. The service role is what
@@ -24,6 +25,7 @@
    not a signed-in person. */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { OWNER_EMAIL, isOwner } from '../_shared/owner.ts'
 
 const ALLOW = [
   'https://off-plate.github.io',
@@ -43,7 +45,7 @@ const cors = (origin: string | null) => ({
   'vary': 'origin',
 })
 
-const OWNER = Deno.env.get('ZEPP_USER_EMAIL') ?? 'mihael.florian@gmail.com'
+const OWNER = OWNER_EMAIL
 /* INTERVALS_API_KE is not a typo here -- it is the name the secret actually
    has in the project, the Y having been lost when it was pasted in. Reading
    both spellings means this keeps working whichever way it is stored, and
@@ -78,6 +80,15 @@ Deno.serve(async (req: Request) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     { auth: { persistSession: false } },
   )
+
+  /* Two callers, nobody else (2026-10-04): the cron with a shared secret,
+     the Sync button with his own session. JWT check is off for the cron. */
+  const CRON = Deno.env.get('ZEPP_CRON_SECRET')
+  const isCron = !!CRON && req.headers.get('x-cron-secret') === CRON
+  if (!isCron && !(await isOwner(req))) {
+    return new Response(JSON.stringify({ ok: false, error: 'Not allowed' }),
+      { status: 401, headers: { ...head, 'content-type': 'application/json' } })
+  }
 
   let days = 60
   try {

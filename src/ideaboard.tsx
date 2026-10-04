@@ -71,7 +71,6 @@ const dayLabel = (ms: number) => new Date(ms).toLocaleDateString('en-GB', { day:
 
 export function IdeasPage() {
   const { ideaBoard, addIdeaCard, updateIdeaCard, deleteIdeaCard } = useStore()
-  const openCount = ideaBoard.filter((c) => !c.doneAt).length
   const boardRef = useRef<HTMLDivElement>(null)
   const [view, setView] = useState<View>(() => readView() ?? HOME)
   const viewRef = useRef(view)
@@ -413,7 +412,7 @@ export function IdeasPage() {
 
         <div className="ib-bar" onPointerDown={stop} onDoubleClick={stop}>
           <div className="ib-bar-head">
-            <h1 className="ib-h1"><IdeasSwitch face="ideas" count={openCount} /></h1>
+            <h1 className="ib-h1"><IdeasSwitch face="ideas" /></h1>
           </div>
           <div className="ib-pad" title="Click a sticky to pick it up, or drag it onto the board">
             {IDEA_COLORS.map((c) => (

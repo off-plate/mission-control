@@ -13,7 +13,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from './store'
 import { activeModel, getAiKey, getAiProvider, PROVIDERS, request, stripReasoning } from './ai'
 import { PROMPT_KINDS, type PromptItem, type PromptKind } from './types'
-import { Band, Empty } from './ui'
 import { usePromptWindow, WINDOW_MS } from './promptwindow'
 import * as Icon from './icons'
 import { IdeasSwitch } from './ideasswitch'
@@ -119,7 +118,11 @@ export function PromptsPage() {
 
   return (
     <div className="page">
-      <Band title={<IdeasSwitch face="prompts" />} metrics={[{ v: String(open.length), k: 'waiting', tone: 'info' as const }]} />
+      {/* The same floating bar as the Ideas board, same size and place, so
+          flipping faces never moves the title (his ask, 2026-10-04). */}
+      <div className="ib-bar pb-bar">
+        <div className="ib-bar-head"><h1 className="ib-h1"><IdeasSwitch face="prompts" /></h1></div>
+      </div>
       <div className="pb">
         <div className="pb-side">
           <div className={`panel pb-limit is-${win.state}`}>

@@ -10652,3 +10652,8 @@ body:has(.shell.is-hud) { --st-reach: #7C9CC4; --st-contacted: #E0A84A; --st-tal
   .pr-bar .pp-search-input { width: 100%; }
   .pr-bar .pp-circle-pick { order: 3; }
 }
+/* The Business bar stands exactly where the Personal bar floats, so switching
+   views does not move it (his report, 2026-10-04): same 16px inset from the
+   page edge, same top, same phone padding. */
+.pr-page { padding: calc(var(--s4) + 1px) var(--s4) var(--s8); }
+@media (max-width: 760px) { .pr-bar { padding-left: 12px; } }

@@ -15,9 +15,14 @@ import { ThinkingOrb, type OrbState } from 'thinking-orbs'
 export type { OrbState }
 
 function useHud(): boolean {
-  const read = () => !!document.querySelector('.shell.is-hud')
+  /* Jarvis, or one of the pages that wear a dark header and ground in both
+     modes (the Jar, Health, Gym, Longevity, Why). */
+  const read = () => !!document.querySelector('.shell.is-hud, .shell.is-dark-chrome')
   const [hud, setHud] = useState(read)
   useEffect(() => {
+    /* Re-read once mounted: an orb in the header renders before the shell
+       itself is in the document, so the first read can only say "paper". */
+    setHud(read())
     const shell = document.querySelector('.shell')
     if (!shell) return
     const mo = new MutationObserver(() => setHud(read()))
@@ -32,7 +37,7 @@ function useHud(): boolean {
  *  the capsule). */
 export type OrbSurface = 'shell' | 'dark' | 'light'
 
-export function Orb({ state, size = 24, surface = 'shell', paused, speed, dots, dotSize, label, className }: {
+export function Orb({ state, size = 24, surface = 'shell', paused, speed, dots, dotSize, color, label, className }: {
   state: OrbState
   size?: number
   surface?: OrbSurface
@@ -40,6 +45,9 @@ export function Orb({ state, size = 24, surface = 'shell', paused, speed, dots, 
   speed?: number
   dots?: number
   dotSize?: number
+  /** A tint for a state the dots must carry, like an error. Otherwise the
+   *  library's own ink, dark on paper and white in Jarvis. */
+  color?: string
   label?: string
   className?: string
 }) {
@@ -54,19 +62,20 @@ export function Orb({ state, size = 24, surface = 'shell', paused, speed, dots, 
         /* Drawn smaller than its preset, a dot would shrink with it and the orb
            goes grey. Grow the dots back by the same factor so it stays bright. */
         dotSize={k < 1 ? (dotSize ?? 1) / k : dotSize}
-        theme={dark ? 'dark' : 'light'} aria-label={label}
+        theme={dark ? 'dark' : 'light'} color={color} aria-label={label}
         style={k === 1 ? undefined : { transform: `scale(${k})`, transformOrigin: 'center' }}
       />
     </span>
   )
 }
 
-/** The reference's status pill: orb plus a shimmering word, on a dark capsule. */
-export function OrbChip({ state, label, compact, className }: { state: OrbState; label: string; compact?: boolean; className?: string }) {
-  const text = `${label}…`
+/** A status: the orb and a shimmering word, sitting straight on the page. No
+ *  capsule behind it (his call, 2026-10-04): dark dots on paper, white in Jarvis. */
+export function OrbChip({ state, label, compact, surface = 'shell', className }: { state: OrbState; label: string; compact?: boolean; surface?: OrbSurface; className?: string }) {
+  const text = `${label}\u2026`
   return (
     <span className={`orb-chip${compact ? ' is-compact' : ''}${className ? ` ${className}` : ''}`} role="status">
-      <Orb state={state} surface="dark" size={compact ? 22 : 48} dots={compact ? undefined : 1.3} />
+      <Orb state={state} surface={surface} size={compact ? 22 : 40} dots={compact ? undefined : 1.3} />
       <span className="orb-shimmer" data-text={text}>{text}</span>
     </span>
   )

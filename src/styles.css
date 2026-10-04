@@ -11828,16 +11828,10 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 .hp-since-sync { display: inline-flex; align-items: center; gap: 6px; }
 .tl-sum > div.has-orb { padding-right: 64px; }
 
-/* ---- Orbs, second pass: the reference's capsule and shimmer ------------- */
-.orb-chip {
-  display: inline-flex; align-items: center; gap: 10px;
-  height: 60px; padding: 0 20px 0 8px; border-radius: 14px;
-  background: #16151A; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-  color: #EDEDED; font-weight: 500; font-size: 1.0625rem; white-space: nowrap;
-  --shimmer-base: rgba(237, 237, 237, 0.55); --shimmer-highlight: #FFFFFF;
-}
-.orb-chip.is-compact { height: 32px; padding: 0 12px 0 5px; gap: 6px; border-radius: 9px; font-size: 0.8125rem; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
-.shell.is-hud .orb-chip { background: #0C121A; box-shadow: inset 0 0 0 1px rgba(79, 216, 232, 0.25); }
+/* ---- Orbs, third pass: no backgrounds, dark dots on paper, white in Jarvis -- */
+.orb-chip { display: inline-flex; align-items: center; gap: 10px; color: var(--muted); font-weight: 500; font-size: 1.0625rem; white-space: nowrap;
+  --shimmer-base: var(--muted); --shimmer-highlight: var(--ink); }
+.orb-chip.is-compact { gap: 6px; font-size: 0.8125rem; }
 .orb-shimmer { position: relative; display: inline-block; color: var(--shimmer-base); }
 .orb-shimmer::before {
   content: attr(data-text); position: absolute; inset: 0; pointer-events: none;
@@ -11849,12 +11843,20 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 @keyframes orb-shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0% 0; } }
 @media (prefers-reduced-motion: reduce) { .orb-shimmer::before { animation: none; } }
 
-/* The assistant's mark: a dark porthole with a full, dense orb in it. */
-.as-orbmark { display: inline-grid; place-items: center; flex: none; border-radius: 28%; background: #16151A; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07); }
-.shell.is-hud .as-orbmark { background: #0C121A; box-shadow: inset 0 0 0 1px rgba(79, 216, 232, 0.28); }
-/* 1400-1650: the page row sits in the header and the word would run under it,
-   so the saving capsule is the orb alone there (the word stays in its title). */
-@media (min-width: 1400px) and (max-width: 1649px) {
-  .syncpip .orb-chip .orb-shimmer { display: none; }
-  .syncpip .orb-chip.is-compact { padding: 0 5px; }
+/* The assistant's mark: the orb alone, centred in its box. */
+.as-orbmark { display: inline-grid; place-items: center; flex: none; }
+
+/* Third pass placements. */
+.syncorb { display: inline-grid; place-items: center; flex: none; }
+.tl-promise-bar .tl-barorb { margin-right: 4px; }
+.tl-wheelread .tl-wheelorb { margin-bottom: 6px; }
+.hp-head-lead { display: flex; align-items: center; gap: 14px; }
+.hp-head-lead .hp-since { margin: 0; }
+.ib-mic .orb, .as-mic .orb { margin: -3px; }
+
+/* The page row matches the workspace switcher's height exactly: the same 1px
+   edge (transparent here) and the same 45px buttons, so 57px both. */
+@media (min-width: 640px) {
+  .topstick > .nav { border: 1px solid transparent; }
+  .topstick > .nav .nav-tab { min-height: 45px; }
 }

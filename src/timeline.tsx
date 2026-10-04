@@ -197,7 +197,7 @@ export function TimelinePage() {
         <TwoLives onBack={() => setLives(false)} money={money} />
       ) : (
         <>
-          <Promise chain={chain} periods={periods} zoom={zoom} sums={<Sums run={run} chain={chain} now={now} money={money} />} />
+          <Promise now={now} chain={chain} periods={periods} zoom={zoom} sums={<Sums run={run} chain={chain} now={now} money={money} />} />
           {view === 'ladder' && <Ladder rows={shown} zoom={zoom} money={money} />}
           {view === 'wheel' && <Flywheel rows={shown} zoom={zoom} now={now} money={money} run={run} />}
         </>
@@ -229,7 +229,8 @@ export function chainPromiseLine(chain: ReturnType<typeof chainOf>): React.React
   return <>Keep this rate for <em>{chain.toBeat} more {chain.toBeat === 1 ? 'day' : 'days'}</em> and the chain is the longest it has ever been.</>
 }
 
-function Promise({ chain, periods, zoom, sums }: { chain: ReturnType<typeof chainOf>; periods: Period[]; zoom: Zoom; sums: React.ReactNode }) {
+function Promise({ now, chain, periods, zoom, sums }: { now: number; chain: ReturnType<typeof chainOf>; periods: Period[]; zoom: Zoom; sums: React.ReactNode }) {
+  const mo = momentumOrb(now)
   /* His ask (2026-09-15): the five numbers were hard to take in as a row of
      their own, so they live inside the promise now, folded shut by default
      the way Plan's week bar is. The whole bar opens and closes it; a click
@@ -250,6 +251,8 @@ function Promise({ chain, periods, zoom, sums }: { chain: ReturnType<typeof chai
         onClick={() => setOpen((v) => !v)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen((v) => !v) } }}
       >
+      {/* The page's pulse: momentum as a living orb, always in view. */}
+      <Orb className="tl-barorb" state={mo.state} speed={mo.speed} size={44} surface="dark" dots={1.4} label={`Momentum ${Math.round(now)}, ${stateFor(now)}`} />
       <p className="tl-txt">{line}</p>
       <span className="tl-arc" aria-label={`The last ${arc.length} ${unit}s`}>
         {arc.map((p) => (
@@ -567,6 +570,7 @@ function Flywheel({ rows, zoom, now, money, run }: {
       <div className="tl-wheel">
         <canvas ref={cv} />
         <div className="tl-wheelread">
+          <Orb className="tl-wheelorb" state={momentumOrb(now).state} speed={momentumOrb(now).speed} size={64} surface="dark" dots={1.6} />
           <b>{Math.round(now)}</b>
           <span className="tl-l">momentum</span>
           <span className="tl-state">{stateFor(now)}</span>

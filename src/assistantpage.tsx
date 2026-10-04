@@ -1,3 +1,4 @@
+import { Orb } from './orb'
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from './store'
 import { useCalendar } from './calendar'
@@ -374,7 +375,7 @@ function Dictate({ base, onText, busy }: { base: string; onText: (t: string) => 
       aria-pressed={st === 'listening'}
       title={st === 'idle' ? how : label}
     >
-      <Icon.Mic size={15} />
+      {st === 'listening' ? <Orb state="listening" size={22} label="Listening" /> : st === 'transcribing' ? <Orb state="composing" size={22} label="Writing it down" /> : <Icon.Mic size={15} />}
       <span className="as-mic-text">{label}</span>
     </button>
   )

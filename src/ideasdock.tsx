@@ -1,6 +1,7 @@
 /* What the Ideas board shares with anything else that captures an idea: the
    sticky palette and the dictation button. The dock's quick-add left with
    Ideas' dock item (2026-09-15); the board is reached from the top right. */
+import { Orb } from './orb'
 import { useEffect, useRef, useState } from 'react'
 import {
   cancel as cancelDictation, dictateState, dictationAvailable, dictationEngine,
@@ -60,7 +61,7 @@ export function MicButton({ on, busy, label, onClick }: { on: boolean; busy: boo
       aria-label={on ? 'Stop dictating' : label}
       title={title}
     >
-      <Icon.Mic size={16} />
+      {on ? <Orb state="listening" size={22} label="Listening" /> : <Icon.Mic size={16} />}
     </button>
   )
 }

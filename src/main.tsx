@@ -10,6 +10,20 @@ import { mergeStates } from './sync-merge'
 import { outbox } from './sync'
 import { LOCAL_ONLY_KEY, SignIn } from './signin'
 
+/* A deploy renames every file. A tab opened before it still asks for the old
+   names, the request 404s, and the page shows "This view hit an error" until
+   he reloads (his report, 2026-10-04: "when I reload the page it works"). So
+   the app reloads itself, at most once a minute so a real outage cannot loop.
+   His data is safe: the store writes to localStorage as it changes and the
+   sync outbox persists its unsent marker. */
+addEventListener('vite:preloadError', (e) => {
+  const last = Number(sessionStorage.getItem('mc-chunk-reload') ?? 0)
+  if (Date.now() - last < 60000) return
+  sessionStorage.setItem('mc-chunk-reload', String(Date.now()))
+  e.preventDefault()
+  location.reload()
+})
+
 // One root for the container's lifetime: choosing "this device only" swaps the
 // sign-in screen for the app, and a second createRoot on the same node warns.
 let _root: ReturnType<typeof createRoot> | null = null

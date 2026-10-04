@@ -451,7 +451,7 @@ const LANDS: Record<Action['kind'], CardKind | 'task' | null> = {
   note: 'notes', noteEdit: 'notes', noteDelete: 'notes', noteMove: 'notes', notePin: 'notes', noteDone: 'notes', folder: 'notes',
   idea: 'ideas', ideaEdit: 'ideas', ideaDelete: 'ideas',
   addPerson: 'people', editPerson: 'people', deletePerson: 'people', contact: 'people',
-  addProspect: 'people', editProspect: 'people', touch: 'people',
+  addProspect: 'business', editProspect: 'business', touch: 'business',
   bill: 'bills', skipBill: 'bills', expense: 'bills', income: 'bills',
   gymGoal: 'gym', gymGoalEdit: 'gym', gymGoalDelete: 'gym',
   prompt: 'prompts', promptSent: 'prompts', promptDelete: 'prompts',

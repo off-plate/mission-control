@@ -38,6 +38,7 @@ export type CardKind =
      ask: the right side has to show where every change went). */
   | 'planned'    // days after today
   | 'projects' | 'routines' | 'notes' | 'people' | 'ideas' | 'bills' | 'gym' | 'prompts'
+  | 'business'   // People > Business: the prospects he is reaching out to
 
 export interface Card { kind: CardKind; note?: string }
 
@@ -338,7 +339,7 @@ export interface Reply {
   more?: boolean
 }
 
-const CARDS: CardKind[] = ['today', 'planned', 'backlog', 'habits', 'routines', 'calendar', 'goals', 'focus', 'stale', 'weather', 'projects', 'notes', 'people', 'ideas', 'bills', 'gym', 'prompts']
+const CARDS: CardKind[] = ['today', 'planned', 'backlog', 'habits', 'routines', 'calendar', 'goals', 'focus', 'stale', 'weather', 'projects', 'notes', 'people', 'ideas', 'bills', 'gym', 'prompts', 'business']
 
 /** A compact picture of his day. Titles and counts, nothing private. */
 export interface Brief {

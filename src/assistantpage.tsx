@@ -14,6 +14,7 @@ import { SLOTS, dueOn, habitStepKey, routineComplete, requiredSteps, type HabitD
 import { localDateKey, fmtDuration, periodKeyFor } from './util'
 import { useAssistantBills } from './assistantbills'
 import { TIER_LABEL } from './peoplelayout'
+import { SOURCES, STAGES, label } from './prospectcalc'
 import { ActualLog } from './plan'
 import * as Icon from './icons'
 import { Speak, useAssistantThread, useVoiceGlue, VoicePanel, type Done } from './assistantcore'
@@ -86,6 +87,7 @@ const MORE_IN: Partial<Record<CardKind, [PageId, string]>> = {
   stale: ['plan', 'Plan'], planned: ['plan', 'Plan'], projects: ['projects', 'Projects'],
   routines: ['routines', 'Routines'], notes: ['notes', 'Notes'], people: ['people', 'People'],
   ideas: ['ideas', 'Ideas'], bills: ['bills', 'Bills'], gym: ['gym', 'Gym'], prompts: ['prompts', 'Prompts'],
+  business: ['people', 'People'],
 }
 
 /* WHAT THE LAST CHANGE TOUCHED. A key is a row's id, or for a row the store
@@ -201,7 +203,7 @@ function WeatherCard(): JSX.Element {
 function CardBody({ kind, limit, touched = [] }: { kind: CardKind; limit?: number; touched?: string[] }) {
   const {
     tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, setPage, toggleTask, toggleHabitDay,
-    projects, notes, noteFolders, people, ideaBoard, gymGoals, prompts,
+    projects, notes, noteFolders, people, ideaBoard, gymGoals, prompts, prospects,
   } = useStore()
   const { state: cal } = useCalendar()
   const day = localDateKey()
@@ -313,6 +315,28 @@ function CardBody({ kind, limit, touched = [] }: { kind: CardKind; limit?: numbe
             <div className={rowCls(hot(p.id, p.name))} key={p.id} style={stagger(i)}>
               <span className="as-row-title">{p.name}{p.rel ? `, ${p.rel}` : ''}</span>
               <span className="as-row-min mono">{TIER_LABEL[p.tier]}</span>
+            </div>
+          ))}
+        </div>
+        <More n={all.length - rows.length} kind={kind} />
+      </div>
+    )
+  }
+
+  if (kind === 'business') {
+    /* People > Business: each prospect with its stage and how he found it,
+       the one JARVIS just touched marked (his report, 2026-10-04: a new
+       prospect landed on the personal People list instead). Newest first. */
+    const all = [...prospects].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
+    if (!all.length) return <p className="as-empty">No prospects yet.</p>
+    const rows = fit(all, limit ?? 20, (p) => hot(p.id, p.name))
+    return (
+      <div className="as-list">
+        <div className="as-group">
+          {rows.map((p, i) => (
+            <div className={rowCls(hot(p.id, p.name), p.stage === 'lost')} key={p.id} style={stagger(i)}>
+              <span className="as-row-title">{p.name}{p.domain ? `, ${p.domain}` : ''}</span>
+              <span className="as-row-min mono">{label(STAGES, p.stage)}, {label(SOURCES, p.source).toLowerCase()}</span>
             </div>
           ))}
         </div>
@@ -514,7 +538,7 @@ const TITLES: Record<CardKind, string> = {
   calendar: 'Calendar', goals: 'Goals', focus: 'Focus', stale: 'Sitting longest',
   weather: 'Prague', planned: 'Coming up', projects: 'Projects', routines: 'Routines',
   notes: 'Notes', people: 'People', ideas: 'Ideas', bills: 'Bills this cycle', gym: 'Gym targets',
-  prompts: 'Prompts',
+  prompts: 'Prompts', business: 'Business',
 }
 
 /** The canvas. One place, swapped, animated on the swap so the change is
@@ -589,7 +613,7 @@ function Dictate({ base, onText, busy }: { base: string; onText: (t: string) => 
 const SHAPE_OF: Partial<Record<CardKind, Shape>> = {
   today: 'tasks', backlog: 'tasks', stale: 'tasks', planned: 'calendar', calendar: 'calendar',
   bills: 'bills', gym: 'gym', ideas: 'idea', people: 'person', projects: 'building',
-  notes: 'note', prompts: 'note', habits: 'habit', routines: 'habit', goals: 'focus', focus: 'focus',
+  notes: 'note', prompts: 'note', habits: 'habit', routines: 'habit', goals: 'focus', focus: 'focus', business: 'prospect',
 }
 /** One shape per run of changes that landed in the same place, in the order
  *  they happened, each carrying its own callouts: the card's name, then each

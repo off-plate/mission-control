@@ -1,7 +1,7 @@
 /* The offline promise, tested.
 
-   "Save offline, sync when the connection comes back" is the reason the desktop
-   app exists, so it gets asserted rather than asserted-to. This drives the real
+   "Save offline, sync when the connection comes back" is a promise the app
+   makes, so it gets asserted rather than asserted-to. This drives the real
    Outbox state machine with a fake saver and a fake clock, in Node, with a
    minimal browser shim. No network, no account, no flakiness. */
 

@@ -185,9 +185,8 @@ const NAV: { id: PageId; label: string }[] = [
      the moment his own reasons should be one tap away. setPage('board')
      still renders the real page, only this tab in is gone. */
   /* Apps left the menu on his instruction (2026-08-27): seven icons and an
-     otherwise empty page did not earn a tab next to Habits and Goals. It is
-     a header dropdown now, next to Note and Yesterday -- see AppsShelf
-     below. The address still resolves so a bookmark still lands somewhere
+     otherwise empty page did not earn a tab next to Habits and Goals. It
+     opens from the dock's More grid now. The address still resolves so a bookmark still lands somewhere
      real, same as Routines above. */
   /* Assistant left the menu the same day, for the same reason a page he
      starts something from belongs to the header, not a tab he has to

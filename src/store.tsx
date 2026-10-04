@@ -423,6 +423,10 @@ interface Store extends PersistedState {
   /** A routine and the habit that mirrors it are created together, so finishing
    *  it always has somewhere to land. */
   addRoutine: (input: { title: string; cadence: RoutineCadence; blurb?: string; daypart?: import('./types').TimeSlot }) => void
+  updateRoutine: (id: string, patch: Partial<Pick<Routine, 'title' | 'cadence' | 'blurb'>>) => void
+  deleteRoutine: (id: string) => void
+  addRoutineStep: (routineId: string, step: { title: string; note?: string; link?: string; linkLabel?: string }) => void
+  deleteRoutineStep: (routineId: string, stepId: string) => void
   /** Personal bests, keyed by `routineId:stepId`. Never cleared by a rollover. */
   records: Record<string, number>
 
@@ -1498,6 +1502,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     toggleRoutineAlt: growthSlice.toggleRoutineAlt,
     records,
     addRoutine: growthSlice.addRoutine,
+    updateRoutine: growthSlice.updateRoutine,
+    deleteRoutine: growthSlice.deleteRoutine,
+    addRoutineStep: growthSlice.addRoutineStep,
+    deleteRoutineStep: growthSlice.deleteRoutineStep,
     logCount: growthSlice.logCount,
     planRoutine: growthSlice.planRoutine,
     setRoutineDone: growthSlice.setRoutineDone,

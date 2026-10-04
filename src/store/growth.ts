@@ -825,6 +825,44 @@ export function useGrowthSlice(
         steps: [], doneStepIds: [], habitId: hid, periodKey: periodKeyFor(input.cadence), stepData: {},
       }])
     },
+    updateRoutine: (id: string, patch: Partial<Pick<Routine, 'title' | 'cadence' | 'blurb'>>) => {
+      setRoutines((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+      // The mirrored habit carries the routine's name, so keep them in step.
+      const r = routines.find((x) => x.id === id)
+      if (r?.habitId && patch.title) setHabits((hs) => hs.map((h) => (h.id === r.habitId ? { ...h, name: patch.title as string } : h)))
+    },
+    /* Deleting a routine takes its habit with it: a habit only a routine could
+       tick would otherwise sit there permanently unfinishable. */
+    deleteRoutine: (id: string) => {
+      const r = routines.find((x) => x.id === id)
+      // A routine takes its habit and its goal's link with it, so undo has to
+      // put all three back, not just the routine.
+      const beforeR = routines, beforeH = habits, beforeG = goals, beforeSeeds = removedSeeds
+      armUndo(r ? `Deleted "${r.title}"` : 'Routine deleted', () => {
+        setRoutines(beforeR); setHabits(beforeH); setGoals(beforeG); setRemovedSeeds(beforeSeeds)
+      })
+      setRoutines((prev) => prev.map((x) => (x.id === id ? { ...x, archivedAt: todayKey() } : x)))
+      if (r?.habitId) {
+        const hid = r.habitId
+        setHabits((hs) => hs.map((h) => (h.id === hid ? { ...h, archivedAt: todayKey() } : h)))
+        /* A goal counting off that habit keeps the progress it earned and goes
+           back to being logged by hand, rather than pointing at nothing and
+           freezing forever. */
+        setGoals((gs) => gs.map((g) => (g.habitId === hid
+          ? { ...g, habitId: undefined, current: goalCurrent(g, habits), unit: g.unit === 'checkoffs' ? 'done' : g.unit }
+          : g)))
+        setRemovedSeeds((prev) => (prev.includes(hid) ? prev : [...prev, hid]))
+      }
+      setRemovedSeeds((prev) => (prev.includes(id) ? prev : [...prev, id]))
+    },
+    addRoutineStep: (routineId: string, step: { title: string; note?: string; link?: string; linkLabel?: string }) =>
+      applyRoutine(routineId, (r) => ({ ...r, steps: [...r.steps, { id: newId('st'), kind: 'do' as const, ...step }] })),
+    deleteRoutineStep: (routineId: string, stepId: string) =>
+      applyRoutine(routineId, (r) => ({
+        ...r,
+        steps: r.steps.filter((s) => s.id !== stepId),
+        doneStepIds: r.doneStepIds.filter((x) => x !== stepId),
+      })),
     logCount,
     /* Planning is the other direction from starting: starting files a routine
        under the clock that has already run, planning says where he intends it to

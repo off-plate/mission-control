@@ -10645,7 +10645,7 @@ body:has(.shell.is-hud) { --st-reach: #7C9CC4; --st-contacted: #E0A84A; --st-tal
 /* ---- Business bar = the Personal bar (his ask, 2026-10-04) ----
    Same card, same search box, same dropdowns; it just sits in the flow
    above the list instead of floating over a canvas. */
-.pr-bar { padding: 8px 8px 8px 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--hairline-strong); box-shadow: var(--shadow-pop); gap: 10px; align-self: flex-start; width: fit-content; max-width: 100%; }
+.pr-bar { padding: 8px 8px 8px 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--hairline-strong); gap: 10px; align-self: flex-start; width: fit-content; max-width: 100%; }
 .pr-bar .pp-circle-pick .dd-panel { min-width: 200px; }
 @media (max-width: 760px) {
   .pr-bar .pp-search { flex: 1 1 100%; order: 2; }

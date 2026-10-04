@@ -13,21 +13,21 @@
    way to make it without his own key in his own browser. This function does
    the fetch server-to-server instead, where CORS never applies.
 
-   NO SECRET LIVES HERE, unlike calendar's. The Authorization header a caller
-   sends IS their own Z.ai key, forwarded through untouched -- never read,
-   never logged, never stored -- so this holds nothing worth protecting with
-   the platform's JWT check, and turning that check off is what lets the
-   assistant keep working exactly as it always has: paste a key in Settings,
-   no Supabase account required. A public URL that only ever relays a key the
-   caller already had to supply is not the same risk calendar's setup note
-   warns about.
+   SIGNED-IN CALLERS ONLY (2026-10-04). It used to run with the JWT check
+   off so a pasted key alone was enough, which made it an open relay: anyone
+   could stream their own Z.ai traffic through his project. Now it asks for
+   his Supabase session on Authorization (see _shared/owner.ts for why the
+   platform's own JWT check is not enough), and his Z.ai key rides in
+   x-zai-key, forwarded upstream untouched, never read, logged or stored.
 
    Streamed straight through both ways: the browser sent stream:true expects
    SSE back, and buffering the whole reply here just to re-emit it would
    trade the live-typing effect for nothing.
 
-   Deploy:
-     supabase functions deploy zai-chat --no-verify-jwt */
+   Deploy (JWT check ON, the default):
+     supabase functions deploy zai-chat */
+
+import { isOwner } from '../_shared/owner.ts'
 
 const ALLOW = [
   'https://off-plate.github.io',
@@ -37,7 +37,7 @@ const ALLOW = [
 
 const cors = (origin: string | null) => ({
   'access-control-allow-origin': origin && ALLOW.includes(origin) ? origin : ALLOW[0],
-  'access-control-allow-headers': 'authorization, content-type',
+  'access-control-allow-headers': 'authorization, x-zai-key, apikey, x-client-info, content-type',
   'access-control-allow-methods': 'POST, OPTIONS',
   'access-control-max-age': '86400',
   'vary': 'origin',
@@ -50,13 +50,14 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(origin) })
   if (req.method !== 'POST') return new Response('POST only.', { status: 405, headers: cors(origin) })
 
-  const auth = req.headers.get('authorization')
-  if (!auth) return new Response('No key.', { status: 401, headers: cors(origin) })
+  if (!(await isOwner(req))) return new Response('Not allowed.', { status: 401, headers: cors(origin) })
+  const key = req.headers.get('x-zai-key')
+  if (!key) return new Response('No key.', { status: 401, headers: cors(origin) })
 
   try {
     const upstream = await fetch(ZAI_ENDPOINT, {
       method: 'POST',
-      headers: { authorization: auth, 'content-type': 'application/json' },
+      headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
       body: req.body,
       // Required by fetch when the request carries a streamed body.
       // @ts-expect-error Deno's fetch accepts this; the DOM lib types do not know it.

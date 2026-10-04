@@ -53,6 +53,7 @@
    same as before this rebuild. */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { isOwner } from '../_shared/owner.ts'
 
 const ALLOW = [
   'https://off-plate.github.io',
@@ -132,6 +133,7 @@ Deno.serve(async (req: Request) => {
   const origin = req.headers.get('origin')
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(origin) })
   if (req.method !== 'POST') return json({ ok: false, message: 'POST only' }, 405, origin)
+  if (!(await isOwner(req))) return json({ ok: false, message: 'Not allowed' }, 401, origin)
 
   let url: string
   try {

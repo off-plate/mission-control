@@ -21,6 +21,7 @@
 
 import type { TaskCategory } from './types'
 import { SUPABASE_URL } from './config'
+import { sessionToken } from './supabase'
 
 export type AiProvider = 'groq' | 'zai'
 
@@ -79,9 +80,9 @@ export const PROVIDERS: Record<AiProvider, ProviderConfig> = {
        (supabase/functions/zai-chat), which makes the same call
        server-to-server, where CORS does not apply, and hands the answer back
        with the header a browser needs to read it. It carries no secret of
-       its own -- the Authorization header IS his key, forwarded through
-       untouched -- so it asks nothing new of him: same key, same field in
-       Settings, one extra hop he never sees. */
+       its own: his key rides in x-zai-key, forwarded untouched. Since
+       2026-10-04 it also needs his Supabase session (see request below), so
+       Z.ai works only while signed in. */
     endpoint: `${SUPABASE_URL}/functions/v1/zai-chat`,
     /* His own trial package, confirmed against his Z.ai console rather than
        their docs (2026-09-07): the GLM-5.3 docs page names only "glm-5.3",
@@ -234,9 +235,16 @@ export function stripReasoning(raw: string): string {
  *  longer the only line of defence. */
 export async function request(body: Record<string, unknown>, key: string, provider: AiProvider = getAiProvider()): Promise<Response> {
   const cfg = PROVIDERS[provider]
+  /* The Z.ai relay takes his session on Authorization and the key beside it. */
+  let headers: Record<string, string> = { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }
+  if (provider === 'zai') {
+    const session = await sessionToken()
+    if (!session) return new Response('Sign in to use Z.ai.', { status: 401 })
+    headers = { Authorization: `Bearer ${session}`, 'x-zai-key': key, 'Content-Type': 'application/json' }
+  }
   const send = (b: Record<string, unknown>) => fetch(cfg.endpoint, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(b),
   })
   const res = await send({ ...body, ...cfg.quiet })

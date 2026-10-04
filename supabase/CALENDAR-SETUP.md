@@ -32,11 +32,13 @@ cd "Claude Helpers/Mission Control"
 supabase login                       # once
 supabase link --project-ref fhfempisopwsdkmvywbt
 supabase secrets set MC_CALENDAR_ICS="https://calendar.google.com/calendar/ical/.../private-xxxx/basic.ics"
+supabase secrets set MC_OWNER_EMAIL="<the email he signs in with>"
 supabase functions deploy calendar
 ```
 
-The function verifies the caller's JWT, so only a signed-in session can pull
-the calendar through it. A function anyone may call is the same as publishing
+The function checks that the caller is his own signed-in session
+(`_shared/owner.ts`). The platform's JWT check alone is not enough: the gateway
+also accepts the publishable key, which ships in the public bundle. A function anyone may call is the same as publishing
 the secret address.
 
 ## Rotating it

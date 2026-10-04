@@ -11861,8 +11861,6 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 
 /* Third pass placements. */
 .syncorb { display: inline-grid; place-items: center; flex: none; }
-.tl-promise-bar .tl-barorb { margin-right: 4px; }
-.tl-wheelread .tl-wheelorb { margin-bottom: 6px; }
 .hp-head-lead { display: flex; align-items: center; gap: 14px; }
 .hp-head-lead .hp-since { margin: 0; }
 .ib-mic .orb, .as-mic .orb { margin: -3px; }
@@ -11873,3 +11871,19 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
   .topstick > .nav { border: 1px solid transparent; }
   .topstick > .nav .nav-tab { min-height: 45px; }
 }
+
+/* ---- Living dot fields (2026-10-04): drawn behind a card's own content ---- */
+.has-field { position: relative; isolation: isolate; overflow: hidden; }
+.dotfield { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+.has-field > :not(canvas) { position: relative; }
+/* Day gone: the percentage beside the title, the dots below it. */
+.dg-tile { justify-content: flex-start; color: var(--t-ink); }
+.dg-tile { gap: 8px; }
+.dg-label { margin: 0; white-space: nowrap; }
+.dg-pct { white-space: nowrap; font-size: clamp(1.9rem, 1.5rem + 0.8vw, 2.4rem); line-height: 1; }
+/* Momentum: the tide fills the Jar's bar, the wheel section and the card. */
+.tl-promise-bar { position: relative; isolation: isolate; overflow: hidden; }
+.tl-promise-bar > .tl-tide { color: var(--tl-ink); }
+.tl-wheel.has-field > .tl-tide, .tl-sum > div.has-field > .tl-tide { color: var(--tl-ink); }
+/* Health: a breathing ring in a fixed box at the head of the page. */
+.hp-breath { position: relative; display: block; width: 72px; height: 72px; flex: none; color: var(--ink); }

@@ -20,6 +20,7 @@
    and ink on every navigation would be worse than anything it fixed. The
    reference does the same thing: a dark dashboard sitting on a light desktop.
    Every token in here is scoped to `.troom` so none of it leaks. */
+import { DotField } from './dotfield'
 import { useEffect, useState } from 'react'
 import { useStore } from './store'
 import { useFirstMove } from './ui'
@@ -276,10 +277,12 @@ export function TodayRoom() {
           <p className="tr-l">Week</p>
           <div className="tr-n">{isoWeek(now)}</div>
         </div>
-        <div className="tr-card tr-card--hover tr-tile is-hot">
-          <p className="tr-l">Day gone</p>
-          <div className="tr-n">{pct}%</div>
-          <div className="tr-bar"><i style={{ width: `${pct}%` }} /></div>
+        {/* The day as 96 quarter hours (his pick, 2026-10-04): spent ones fade
+            and sink, the current one breathes. The number sits by the title. */}
+        <div className="tr-card tr-card--hover tr-tile is-hot has-field dg-tile">
+          <DotField kind="dissolve" value={mins / 1440} hot="var(--t-hot-text)" top={100} />
+          <p className="tr-l dg-label">Day gone</p>
+          <div className="tr-n dg-pct">{pct}<span className="tr-u">%</span></div>
         </div>
         <div className="tr-card tr-card--hover tr-tile is-hot">
           <p className="tr-l">Phase</p>

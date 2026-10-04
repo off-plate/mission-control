@@ -25,7 +25,7 @@
                manual click. Not scored: see the note in momentum.ts for why
                a 25-point bonus landing on the wheel the day he connects a
                tracker is not a call this column gets to make alone. */
-import { Orb, momentumOrb, type OrbState } from './orb'
+import { DotField } from './dotfield'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useStore } from './store'
 import { jarState, useJarState } from './cookiejarnav'
@@ -230,7 +230,6 @@ export function chainPromiseLine(chain: ReturnType<typeof chainOf>): React.React
 }
 
 function Promise({ now, chain, periods, zoom, sums }: { now: number; chain: ReturnType<typeof chainOf>; periods: Period[]; zoom: Zoom; sums: React.ReactNode }) {
-  const mo = momentumOrb(now)
   /* His ask (2026-09-15): the five numbers were hard to take in as a row of
      their own, so they live inside the promise now, folded shut by default
      the way Plan's week bar is. The whole bar opens and closes it; a click
@@ -251,8 +250,8 @@ function Promise({ now, chain, periods, zoom, sums }: { now: number; chain: Retu
         onClick={() => setOpen((v) => !v)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen((v) => !v) } }}
       >
-      {/* The page's pulse: momentum as a living orb, always in view. */}
-      <Orb className="tl-barorb" state={mo.state} speed={mo.speed} size={44} surface="dark" dots={1.4} label={`Momentum ${Math.round(now)}, ${stateFor(now)}`} />
+      {/* The page's pulse: momentum as a tide behind the bar, always in view. */}
+      <DotField kind="tide" value={now} hot="var(--tl-hot)" quiet className="tl-tide" />
       <p className="tl-txt">{line}</p>
       <span className="tl-arc" aria-label={`The last ${arc.length} ${unit}s`}>
         {arc.map((p) => (
@@ -295,7 +294,7 @@ function Sums({ run, chain, now, money }: { run: DayScore[]; chain: ReturnType<t
   const paidTotal = money ? Object.values(money.byDay).reduce((a, d) => a + d.paid, 0) : null
   return (
       <div className="tl-sum">
-        <Sum orb={momentumOrb(now)} label="Momentum" figure={String(Math.round(now))} unit={`of ${100}`} win={now > 0} says={`${stateFor(now)}. Replayed from the log, never stored.`} />
+        <Sum tide={now} label="Momentum" figure={String(Math.round(now))} unit={`of ${100}`} win={now > 0} says={`${stateFor(now)}. Replayed from the log, never stored.`} />
         <Sum label="Chain" figure={String(chain.current)} unit={chain.current === 1 ? 'day' : 'days'} win={chain.current > 0}
           says={chain.longest > chain.current ? `Longest in this window is ${chain.longest}.` : 'This is the longest run in the window.'} />
         <Sum label="Hard things" figure={String(hardTotal)} unit={`in ${run.length} days`} win={hardTotal > 0}
@@ -309,10 +308,10 @@ function Sums({ run, chain, now, money }: { run: DayScore[]; chain: ReturnType<t
   )
 }
 
-function Sum({ label, figure, unit, says, win, orb }: { label: string; figure: string; unit: string; says: string; win: boolean; orb?: { state: OrbState; speed: number } }) {
+function Sum({ label, figure, unit, says, win, tide }: { label: string; figure: string; unit: string; says: string; win: boolean; tide?: number }) {
   return (
-    <div className={`${win ? 'win' : ''}${orb ? ' has-orb' : ''}`}>
-      {orb && <Orb className="tl-orb" state={orb.state} speed={orb.speed} size={52} surface="dark" label={`Momentum, ${orb.state}`} />}
+    <div className={`${win ? 'win' : ''}${tide !== undefined ? ' has-field' : ''}`}>
+      {tide !== undefined && <DotField kind="tide" value={tide} hot="var(--tl-hot)" className="tl-tide" />}
       <span className="tl-l">{label}</span>
       <b>{figure}{unit && <small>{unit}</small>}</b>
       <p>{says}</p>
@@ -567,10 +566,10 @@ function Flywheel({ rows, zoom, now, money, run }: {
 
   return (
     <div className="tl-wheelwrap" ref={wrap}>
-      <div className="tl-wheel">
+      <div className="tl-wheel has-field">
+        <DotField kind="tide" value={now} hot="var(--tl-hot)" className="tl-tide" />
         <canvas ref={cv} />
         <div className="tl-wheelread">
-          <Orb className="tl-wheelorb" state={momentumOrb(now).state} speed={momentumOrb(now).speed} size={64} surface="dark" dots={1.6} />
           <b>{Math.round(now)}</b>
           <span className="tl-l">momentum</span>
           <span className="tl-state">{stateFor(now)}</span>

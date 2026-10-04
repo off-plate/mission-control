@@ -19,10 +19,11 @@
    Where he is looking (pan and zoom) is per device and never synced. */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react'
 import { useStore } from './store'
-import { Select } from './ui'
+import { Segmented, Select } from './ui'
 import { localDateKey } from './util'
 import { ALL_NAMES, daysUntil, nameDayFor } from './namedays'
 import { nextPersonSlot } from './peoplelayout'
+import { BusinessView } from './prospects'
 import type { ContactChannel, Person, PersonBond, PersonContact, PersonTier } from './types'
 
 type Tier = { id: PersonTier; label: string; r: number; size: number; cadence: number; bond: number }
@@ -146,7 +147,17 @@ function readView(): View | null {
   } catch { return null }
 }
 
+/* Personal is the circle; Business is the prospects list and board. Which one
+   he left it on is per device. */
+const MODE_KEY = 'mc-people-mode'
 export function PeoplePage() {
+  const [mode, setMode] = useState<'personal' | 'business'>(() => { try { return localStorage.getItem(MODE_KEY) === 'business' ? 'business' : 'personal' } catch { return 'personal' } })
+  useEffect(() => { try { localStorage.setItem(MODE_KEY, mode) } catch { /* private mode */ } }, [mode])
+  const modeSwitch = <Segmented size="sm" label="Which people" value={mode} onPick={setMode} options={[{ id: 'personal', label: 'Personal' }, { id: 'business', label: 'Business' }]} />
+  return mode === 'business' ? <BusinessView modeSwitch={modeSwitch} /> : <CirclePage modeSwitch={modeSwitch} />
+}
+
+function CirclePage({ modeSwitch }: { modeSwitch: JSX.Element }) {
   const {
     people, personBonds, personContacts,
     addPerson, updatePerson, deletePerson, addPersonBond, setBondLabel, removePersonBond, logContact, removeContact,
@@ -534,6 +545,7 @@ export function PeoplePage() {
 
         <div className="pp-bar" role="toolbar" aria-label="People">
           <h1 className="pp-h1">People</h1>
+          {modeSwitch}
           <div className="pp-search">
             <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" strokeWidth="1.7" /><path d="m10.4 10.4 3.4 3.4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>
             <input

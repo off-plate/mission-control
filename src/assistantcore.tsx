@@ -17,10 +17,11 @@ import { usePomodoro } from './pomodoro'
 import {
   SLOTS, dueOn, habitsDueToday, goalCurrent, habitStepKey, routineComplete, requiredSteps,
   daysClean, spaceFolderId,
-  type GoalTimeframe, type HabitDef, type HabitFrequency, type Note, type PageId, type RoutineCadence, type SpaceId, type Task,
+  type GoalTimeframe, type HabitDef, type HabitFrequency, type Note, type PageId, type ProspectPerson, type RoutineCadence, type SpaceId, type Task, type TouchStep,
 } from './types'
 import { localDateKey, fmtDuration, taskMinutes, goalPeriodKey, goalPeriodRange, periodKeyFor, type GoalTf } from './util'
 import { nextPersonSlot, TIER_CADENCE, TIER_LABEL } from './peoplelayout'
+import { SOURCES, STAGES, STEPS, cleanDomain, label } from './prospectcalc'
 import { useFirstMove } from './ui'
 import { APPS } from './apps'
 import * as Icon from './icons'
@@ -450,6 +451,7 @@ const LANDS: Record<Action['kind'], CardKind | 'task' | null> = {
   note: 'notes', noteEdit: 'notes', noteDelete: 'notes', noteMove: 'notes', notePin: 'notes', noteDone: 'notes', folder: 'notes',
   idea: 'ideas', ideaEdit: 'ideas', ideaDelete: 'ideas',
   addPerson: 'people', editPerson: 'people', deletePerson: 'people', contact: 'people',
+  addProspect: 'people', editProspect: 'people', touch: 'people',
   bill: 'bills', skipBill: 'bills', expense: 'bills', income: 'bills',
   gymGoal: 'gym', gymGoalEdit: 'gym', gymGoalDelete: 'gym',
   prompt: 'prompts', promptSent: 'prompts', promptDelete: 'prompts',
@@ -898,6 +900,42 @@ function useDoer() {
         return yes(`Updated: ${a.name ?? row.name}`)
       }
 
+      case 'addProspect': case 'editProspect': {
+        /* A named contact is matched by name inside the business, else added. */
+        const person = (have: ProspectPerson[]): ProspectPerson[] => {
+          if (!a.contact) return have
+          const f = (x: string) => x.trim().toLowerCase()
+          const fields = { name: a.contact, ...(a.role ? { role: a.role } : {}), ...(a.email ? { email: a.email } : {}), ...(a.phone ? { phone: a.phone } : {}), ...(a.decides !== undefined ? { decides: a.decides } : {}) }
+          return have.some((x) => f(x.name) === f(a.contact!))
+            ? have.map((x) => (f(x.name) === f(a.contact!) ? { ...x, ...fields } : x))
+            : [...have, { id: `pp-${Date.now().toString(36)}`, ...fields }]
+        }
+        const fields = {
+          ...(a.name ? { name: a.name } : {}), ...(a.domain ? { domain: cleanDomain(a.domain) } : {}), ...(a.source ? { source: a.source } : {}),
+          ...(a.stage ? { stage: a.stage } : {}), ...(a.value !== undefined ? { value: a.value } : {}), ...(a.why ? { why: a.why } : {}),
+          ...(a.lostReason ? { lostReason: a.lostReason } : {}),
+        }
+        if (a.kind === 'addProspect') {
+          mark(a.name!)
+          s.addProspect({ name: a.name!, source: a.source!, ...fields, people: person([]) })
+          return yes(`Prospect added: ${a.name}`)
+        }
+        const { row, why } = pickBy(s.prospects, (p) => p.name, m)
+        if (!row) return no(why ?? 'no prospect matched')
+        mark(row.id)
+        s.updateProspect(row.id, { ...fields, people: person(row.people) })
+        return yes(`Updated: ${a.name ?? row.name}`)
+      }
+      case 'touch': {
+        const { row, why } = pickBy(s.prospects, (p) => p.name, m)
+        if (!row) return no(why ?? 'no prospect matched')
+        mark(row.id)
+        const to = a.to ? row.people.find((x) => x.name.toLowerCase().includes(a.to!.toLowerCase()))?.id : row.people.find((x) => x.decides)?.id
+        const step = a.step as TouchStep
+        s.logTouch(row.id, { step, day: a.date ?? day, ...(to ? { to } : {}), ...(a.subject ? { subject: a.subject } : {}), ...(a.body ? { body: a.body } : {}) })
+        return yes(`Logged ${label(STEPS, step).toLowerCase()} for ${row.name}`)
+      }
+
       case 'bill': case 'skipBill': {
         /* ensure(), not this hook's render: a request landing the instant
            Bills opens would otherwise read a fetch that has not resolved and
@@ -1137,6 +1175,11 @@ function useFinder() {
           const last = s.personContacts.filter((x) => x.personId === p.id).map((x) => x.day).sort().at(-1)
           return [p.name, TIER_LABEL[p.tier], p.rel, p.job, p.birthday ? `birthday ${p.birthday}` : '', last ? `last in touch ${last}` : 'no contact logged'].filter(Boolean).join(' | ')
         })
+        rows.push(...s.prospects.filter((p) => hit(`${p.name} ${p.domain ?? ''} ${p.people.map((x) => x.name).join(' ')}`)).map((p) => [
+          `prospect ${p.name}`, p.domain, label(STAGES, p.stage), label(SOURCES, p.source), p.value != null ? `value ${p.value}` : '',
+          p.people.map((x) => [x.name, x.role, x.decides ? 'decides' : ''].filter(Boolean).join(' ')).join('; '),
+          p.touches.map((t) => `${t.step} ${t.day}`).join(', ') || 'no touches',
+        ].filter(Boolean).join(' | ')))
         break
       case 'ideas':
         rows = s.ideaBoard.filter((x) => hit(`${x.title} ${x.body}`)).map((x) => `${x.title}${x.body ? ` | ${x.body.replace(/\s+/g, ' ').slice(0, 120)}` : ''}`)

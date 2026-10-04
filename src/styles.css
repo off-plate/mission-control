@@ -10485,3 +10485,9 @@ body:has(.as-page.jv) .dock { display: none; }
 }
 @media (max-width: 599px) { .jv-bracket { display: none; } }
 @media (prefers-reduced-motion: reduce) { .jv-fly { transition: none; } }
+
+/* In Jarvis mode the projects menu under Plan is portalled to <body>, where
+   the HUD's own tokens apply but --a-card is still the paper white, so light
+   ink sat on a white card (his report, 2026-10-04). It takes the HUD's
+   raised surface instead. */
+body:has(.shell.is-hud) .nav.projnav-menu { background: var(--surface-2); }

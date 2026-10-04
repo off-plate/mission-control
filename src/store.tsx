@@ -1327,8 +1327,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
      laptop lets any phone that still holds the row put it back. */
   /* An empty link is a removal, not a blank entry, so the key does not linger
      and win a merge against a device that still holds the real one. */
-  const twoLivesSlice = useTwoLivesSlice(persisted)
-  const { twoLives, setTwoLivesRaw, setTwoLives, reels, setReelsRaw, setReels, tunes, setTunesRaw, setTunes, reelFiles, setReelFilesRaw, setReelFile } = twoLivesSlice
   const [spaceGuessed] = useState<number>(persisted?.spaceGuessed ?? 0)
   const [lastRollDay] = useState<string | undefined>(persisted?.lastRollDay)
   const remoteSaveTimer = useRef<number | undefined>(undefined)
@@ -1372,6 +1370,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
      one of those domains. */
   const { undoable, armUndo, undoDelete, dismissUndo } = useUndo()
   const { graveyard, setGraveyard, bury, digUp } = useGraveyard(persisted?.graveyard)
+  const twoLivesSlice = useTwoLivesSlice(persisted, { bury, digUp })
+  const { twoLives, setTwoLivesRaw, setTwoLives, reels, setReelsRaw, setReels, tunes, setTunesRaw, setTunes, reelFiles, setReelFilesRaw, setReelFile } = twoLivesSlice
   const notesSlice = useNotesSlice(persisted, { space, armUndo, bury, digUp })
   const { notes, setNotes, noteFolders, setNoteFolders } = notesSlice
   const ideaBoardSlice = useIdeaBoardSlice(persisted, { armUndo, bury, digUp })
@@ -1386,7 +1386,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const {
     habits, setHabits, goals, setGoals, routines, setRoutines,
     records, setRecords, removedSeeds, setRemovedSeeds,
-    habitLog, setHabitLog, routineLog, setRoutineLog, slips, setSlips,
+    habitLog, setHabitLog, editHabitLog, routineLog, setRoutineLog, slips, setSlips,
     stepLog, setStepLog, dayLog, setDayLog, stepTicks, setStepTicks,
     dailyOpen, dailyDone, setDailyDone, dailySkipped, setDailySkipped, plan, setPlan, review, setReview,
   } = growthSlice
@@ -1715,7 +1715,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     }
     if (next === habitLog) return
-    setHabitLog(next)
+    editHabitLog(next)
     const idx = (new Date().getDay() + 6) % 7
     setHabits((prev) => prev.map((h) => (rules.some((r) => r.id === h.id)
       ? { ...h, days: h.days.map((d, i) => (i === idx ? next.some((t) => t.habitId === h.id && t.day === today) : d)) }

@@ -9,7 +9,7 @@
    finished focus block, commitPlan writing both `plan` and `tasks`, a
    dictated goal from the assistant) stay as glue in store.tsx itself, the
    same role applyExternal already plays for every domain. */
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type Dispatch, type SetStateAction } from 'react'
 import { MOCK_GOALS, MOCK_HABITS, MOCK_ROUTINES } from '../mock'
 import { rowKey } from '../sync-merge'
 import {
@@ -210,12 +210,34 @@ export function useGrowthSlice(
   const [records, setRecords] = useState<Record<string, number>>(persisted?.records ?? {})
   // Seeded ids he has deleted, so the forward-fill never resurrects them.
   const [removedSeeds, setRemovedSeeds] = useState<string[]>(persisted?.removedSeeds ?? [])
-  const [habitLog, setHabitLog] = useState<HabitTick[]>(persisted?.habitLog ?? [])
-  const [routineLog, setRoutineLog] = useState<RoutineDone[]>(persisted?.routineLog ?? [])
-  const [slips, setSlips] = useState<HabitSlip[]>(persisted?.slips ?? [])
+  const [habitLog, setHabitLogRaw] = useState<HabitTick[]>(persisted?.habitLog ?? [])
+  const [routineLog, setRoutineLogRaw] = useState<RoutineDone[]>(persisted?.routineLog ?? [])
+  const [slips, setSlipsRaw] = useState<HabitSlip[]>(persisted?.slips ?? [])
   const [stepLog, setStepLog] = useState<StepEntry[]>(persisted?.stepLog ?? [])
   const [dayLog, setDayLog] = useState<DayTaskLog[]>(persisted?.dayLog ?? [])
-  const [stepTicks, setStepTicks] = useState<StepTick[]>(persisted?.stepTicks ?? [])
+  const [stepTicks, setStepTicksRaw] = useState<StepTick[]>(persisted?.stepTicks ?? [])
+
+  /* HIS edits to a log tombstone what they remove and dig up what they add.
+     The logs union across devices, so an untick, a reopened routine or an
+     undone slip that only dropped its row came back on the next sync (audit
+     2026-10-04). Only the actions in this file use these; a merge or a load
+     uses the raw setters, because a row missing from a remote copy is not a
+     deletion. Deferred so no setState runs inside another's updater. */
+  const tracked = <T extends object>(field: string, set: Dispatch<SetStateAction<T[]>>): Dispatch<SetStateAction<T[]>> =>
+    (u) => set((prev) => {
+      const next = typeof u === 'function' ? (u as (p: T[]) => T[])(prev) : u
+      const key = (r: T) => rowKey(field, r as Record<string, unknown>)
+      const was = new Set(prev.map(key))
+      const now = new Set(next.map(key))
+      const gone = [...was].filter((k) => !now.has(k))
+      const added = [...now].filter((k) => !was.has(k))
+      if (gone.length || added.length) queueMicrotask(() => { if (gone.length) bury(...gone); if (added.length) digUp(...added) })
+      return next
+    })
+  const setHabitLog = tracked('habitLog', setHabitLogRaw)
+  const setRoutineLog = tracked('routineLog', setRoutineLogRaw)
+  const setSlips = tracked('slips', setSlipsRaw)
+  const setStepTicks = tracked('stepTicks', setStepTicksRaw)
   const [dailyOpen, setDailyOpen] = useState(false)
   const [dailyDone, setDailyDone] = useState<string | undefined>(persisted?.dailyDone)
   const [dailySkipped, setDailySkipped] = useState<string | undefined>(persisted?.dailySkipped)
@@ -554,8 +576,8 @@ export function useGrowthSlice(
   return {
     habits, setHabits, goals, setGoals, routines, setRoutines,
     records, setRecords, removedSeeds, setRemovedSeeds,
-    habitLog, setHabitLog, routineLog, setRoutineLog, slips, setSlips,
-    stepLog, setStepLog, dayLog, setDayLog, stepTicks, setStepTicks,
+    habitLog, setHabitLog: setHabitLogRaw, editHabitLog: setHabitLog, routineLog, setRoutineLog: setRoutineLogRaw, slips, setSlips: setSlipsRaw,
+    stepLog, setStepLog, dayLog, setDayLog, stepTicks, setStepTicks: setStepTicksRaw,
     dailyOpen, dailyDone, setDailyDone, dailySkipped, setDailySkipped, plan, setPlan, review, setReview,
 
     assertRoutineDay,

@@ -407,7 +407,7 @@ export function HealthPage() {
               {lastRun && (
                 <span className="hp-since-sync">
                   {/* Listening while the watch data is fresh (under 12 hours), still once it goes stale. */}
-                  <Orb state="listening" size={20} tone="--accent-text" paused={Date.now() - Date.parse(lastRun.ran_at) > 12 * 3600e3} label="Watch data" />
+                  <Orb state="listening" size={26} surface="dark" paused={Date.now() - Date.parse(lastRun.ran_at) > 12 * 3600e3} label="Watch data" />
                   Synced {agoFrom(lastRun.ran_at)}
                 </span>
               )}
@@ -427,7 +427,7 @@ export function HealthPage() {
               ))}
             </div>
             <button className="hp-sync" onClick={startBoth} disabled={busySync} title="Fetch everything new from Intervals.icu and Hevy">
-              {busySync ? <Orb state="connecting" size={20} label="Syncing" /> : <Icon.Repeat size={13} />}
+              {busySync ? <Orb state="connecting" size={22} surface="dark" label="Syncing" /> : <Icon.Repeat size={13} />}
               {busySync ? 'Syncing' : 'Sync'}
             </button>
             </div>

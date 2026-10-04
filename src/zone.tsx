@@ -382,8 +382,8 @@ function ZoneTask() {
                 up, works, weaves, then solves as the countdown runs down,
                 breathes on a break, and settles into a shape once banked. */}
             <Orb
-              className="znow-orb" size={64} tone="--z-ice"
-              state={phaseState === 'break' ? 'breathing' : phaseState === 'done' ? 'shaping' : phaseState === 'idle' ? 'breathing'
+              className="znow-orb" size={64} surface="dark" dots={1.6}
+              state={phaseState === 'break' ? 'listening' : phaseState === 'done' ? 'shaping' : phaseState === 'idle' ? 'searching'
                 : pct < 0.25 ? 'connecting' : pct < 0.5 ? 'working' : pct < 0.75 ? 'weaving' : 'solving'}
               paused={phaseState === 'paused'}
             />

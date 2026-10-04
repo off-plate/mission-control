@@ -1,12 +1,15 @@
-/* Thinking orbs (Jakub Antalik, MIT, libraries.dev/orbs), wrapped once so every
-   place in the app gets the same three things for free:
-   - any size: the library draws three tuned presets (20, 32, 64), so a larger
-     mark scales the 64 preset up, which it renders at up to 3x density;
-   - the right ink: its colour is read from a CSS token on the spot it sits in,
-     so paper, Jarvis and the Zone each get their own without a prop per page;
-   - Jarvis: the shell's HUD class is watched, and the token is re-read when it
-     flips. */
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+/* Thinking orbs (Jakub Antalik, MIT, libraries.dev/orbs), done the way the
+   library's own site shows them (rebuilt 2026-10-04 after he called the first
+   pass faint and poorly done):
+   - always drawn from the 64px preset and shown at or below it where possible,
+     because scaling a preset DOWN stays crisp and scaling a small one up goes
+     sparse and soft;
+   - the library's own ink, not a muted app token: bright dots on dark
+     surfaces, dark dots on light ones, picked from what the orb sits on;
+   - status gets a dark capsule with a shimmering word beside the orb (OrbChip),
+     the reference's "Thinking…" pill, with slightly rounded corners because
+     fully round pills are off the table in this app. */
+import { useEffect, useState } from 'react'
 import { ThinkingOrb, type OrbState } from 'thinking-orbs'
 
 export type { OrbState }
@@ -24,43 +27,56 @@ function useHud(): boolean {
   return hud
 }
 
-export function Orb({ state, size = 20, tone = '--a-ink', paused, speed, label, className }: {
+/** 'shell' follows the app: light paper, dark in Jarvis. 'dark' and 'light'
+ *  pin it for surfaces that are always one or the other (the Zone, the Jar,
+ *  the capsule). */
+export type OrbSurface = 'shell' | 'dark' | 'light'
+
+export function Orb({ state, size = 24, surface = 'shell', paused, speed, dots, dotSize, label, className }: {
   state: OrbState
   size?: number
-  /** A CSS custom property to colour the dots with, read where the orb sits. */
-  tone?: string
+  surface?: OrbSurface
   paused?: boolean
   speed?: number
+  dots?: number
+  dotSize?: number
   label?: string
   className?: string
 }) {
   const hud = useHud()
-  const box = useRef<HTMLSpanElement>(null)
-  const [color, setColor] = useState<string | undefined>(undefined)
-  useLayoutEffect(() => {
-    if (!box.current) return
-    const v = getComputedStyle(box.current).getPropertyValue(tone).trim()
-    setColor(v || undefined)
-  }, [tone, hud])
-  const preset: 20 | 32 | 64 = size >= 48 ? 64 : size >= 26 ? 32 : 20
+  const dark = surface === 'dark' || (surface === 'shell' && hud)
+  const preset: 20 | 32 | 64 = size >= 30 ? 64 : size >= 22 ? 32 : 20
   const k = size / preset
   return (
-    <span ref={box} className={`orb${className ? ` ${className}` : ''}`} style={{ width: size, height: size }}>
+    <span className={`orb${className ? ` ${className}` : ''}`} style={{ width: size, height: size }}>
       <ThinkingOrb
-        state={state} size={preset} paused={paused} speed={speed} color={color} theme={hud ? 'dark' : 'light'}
-        aria-label={label}
+        state={state} size={preset} paused={paused} speed={speed} dots={dots}
+        /* Drawn smaller than its preset, a dot would shrink with it and the orb
+           goes grey. Grow the dots back by the same factor so it stays bright. */
+        dotSize={k < 1 ? (dotSize ?? 1) / k : dotSize}
+        theme={dark ? 'dark' : 'light'} aria-label={label}
         style={k === 1 ? undefined : { transform: `scale(${k})`, transformOrigin: 'center' }}
       />
     </span>
   )
 }
 
-/* Momentum's five states, slow to intense, as orb moods. Cold breathes, a
-   wheel that runs without him solves. Shared by the Jar and the chain card. */
+/** The reference's status pill: orb plus a shimmering word, on a dark capsule. */
+export function OrbChip({ state, label, compact, className }: { state: OrbState; label: string; compact?: boolean; className?: string }) {
+  const text = `${label}…`
+  return (
+    <span className={`orb-chip${compact ? ' is-compact' : ''}${className ? ` ${className}` : ''}`} role="status">
+      <Orb state={state} surface="dark" size={compact ? 22 : 48} dots={compact ? undefined : 1.3} />
+      <span className="orb-shimmer" data-text={text}>{text}</span>
+    </span>
+  )
+}
+
+/* Momentum's five states, slow to intense, as orb moods. */
 export function momentumOrb(m: number): { state: OrbState; speed: number } {
   if (m >= 78) return { state: 'solving', speed: 1.15 }
   if (m >= 48) return { state: 'weaving', speed: 1 }
   if (m >= 22) return { state: 'working', speed: 1 }
   if (m >= 8) return { state: 'connecting', speed: 0.9 }
-  return { state: 'breathing', speed: 0.6 }
+  return { state: 'searching', speed: 0.6 }
 }

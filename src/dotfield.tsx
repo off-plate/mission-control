@@ -57,7 +57,8 @@ const DRAW: Record<FieldKind, (f: Frame) => void> = {
     const want = Math.sqrt(96 * (f.w / area))
     const cols = [8, 12, 16, 24].reduce((a, c) => (Math.abs(c - want) < Math.abs(a - want) ? c : a), 12)
     const rows = 96 / cols
-    const pad = 18, gx = (f.w - pad * 2) / Math.max(1, cols - 1), gy = Math.min(gx * 1.1, (area - pad * 1.4) / Math.max(1, rows - 1))
+    /* A small slot (a tile's figure row) is filled edge to edge; a big card keeps a margin. */
+    const pad = f.h < 90 ? 3 : 18, gx = (f.w - pad * 2) / Math.max(1, cols - 1), gy = Math.min(gx * 1.1, (area - pad * 2) / Math.max(1, rows - 1))
     const y0 = f.h - pad - gy * (rows - 1)
     const off = (f.mem.off as number[] | undefined) ?? (f.mem.off = new Array(96).fill(0)) as number[]
     const r = Math.max(1.6, Math.min(3, gx * 0.22))

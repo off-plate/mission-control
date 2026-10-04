@@ -1977,7 +1977,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // Cancel any pending mirror first, or it would rewrite the row we just deleted.
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = undefined
-      try { localStorage.removeItem(STORAGE_KEY) } catch { /* noop */ }
+      // The backup copy too: "wipe everything" must not leave his data on the device.
+      try { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(BACKUP_KEY) } catch { /* noop */ }
       const finish = () => { location.hash = ''; location.reload() }
       if (SUPABASE_ENABLED) { void deleteRemoteState().finally(finish) } else finish()
     },

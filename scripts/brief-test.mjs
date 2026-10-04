@@ -10,7 +10,7 @@ const URL = process.argv[2] || 'http://localhost:4191/mission-control'
 const fails = []
 const ok = (n, c, d = '') => { console.log(`${c ? 'PASS' : 'FAIL'}  ${n}${d ? '  (' + d + ')' : ''}`); if (!c) fails.push(n) }
 
-const REPLY = { say: 'Morning, Michael. It is overcast and 7 out.\n\nStart with the VZP letter.', show: [{ kind: 'today' }, { kind: 'backlog' }], next: ['Put it on the morning'] }
+const REPLY = { say: 'Morning, Michael. It is overcast and 7 out.\n\nStart with the insurer letter.', show: [{ kind: 'today' }, { kind: 'backlog' }], next: ['Put it on the morning'] }
 const b = await chromium.launch()
 const page = await b.newPage()
 let sent = null
@@ -69,7 +69,7 @@ await page.evaluate(() => {
      as list:'today' with plannedOn:yesterday describes a moment that has always
      passed by the time the assistant reads anything. */
   s.tasks = [
-    { id: 'y1', title: 'Send the VZP letter', list: 'backlog', space: 'personal', createdAt: p(d), carried: 1 },
+    { id: 'y1', title: 'Send the insurer letter', list: 'backlog', space: 'personal', createdAt: p(d), carried: 1 },
     { id: 't1', title: 'Draft the Blastburn quote', list: 'today', plannedOn: p(new Date()), slot: 'morning', space: 'work', createdAt: p(new Date()) },
   ]
   s.plan = { ...(s.plan || {}), returnedOn: p(new Date()), returnedIds: ['y1'], returnedCount: 1 }
@@ -121,7 +121,7 @@ ok('but the model was still asked the whole question',
    (msgs.at(-1)?.content ?? '').includes('what did I not finish yesterday'),
    JSON.stringify((msgs.at(-1)?.content ?? '').slice(0, 60)))
 ok('the answer is in the thread as text',
-   (await page.locator('.as-turn.is-it .as-said').first().textContent())?.includes('VZP'))
+   (await page.locator('.as-turn.is-it .as-said').first().textContent())?.includes('insurer'))
 ok('the beats are kept apart rather than run together',
    await page.evaluate(() => getComputedStyle(document.querySelector('.as-turn.is-it .as-said')).whiteSpace === 'pre-line'),
    await page.evaluate(() => getComputedStyle(document.querySelector('.as-turn.is-it .as-said')).whiteSpace))
@@ -172,7 +172,7 @@ ok("the briefing carries the weather, with the app's own figures",
    briefing.includes('7 degrees') && briefing.includes('overcast'),
    (briefing.match(/Weather.*/) ?? ['none'])[0].slice(0, 80))
 ok("the briefing carries yesterday's unfinished work by name",
-   !!leftovers && leftovers.includes('Send the VZP letter'), JSON.stringify(leftovers ?? 'section missing'))
+   !!leftovers && leftovers.includes('Send the insurer letter'), JSON.stringify(leftovers ?? 'section missing'))
 ok("today's own work is not raised as a leftover",
    !!leftovers && !leftovers.includes('Blastburn'), JSON.stringify(leftovers ?? 'section missing'))
 ok("the briefing still carries today's plan",

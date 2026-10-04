@@ -230,7 +230,7 @@ export function BillsPage() {
       await insertRow('compass_transactions', {
         kind: i.kind, amount: i.amount,
         /* A bill ticked in a PAST cycle is dated that cycle's last day, not its
-           due date. His report (2026-09-15): the bank, paid on the 14th and ticked
+           due date. His report (2026-09-15): a card, paid on the 14th and ticked
            in last cycle, was stamped with its August due date. That fell before
            the day the debt started being tracked in Compass, so the payment was
            silently dropped from the Cookie Jar. The last day keeps it paid in

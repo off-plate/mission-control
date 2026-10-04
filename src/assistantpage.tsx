@@ -13,6 +13,8 @@ import { voiceModeAvailable } from './voicemode'
 import { getWeather, type Weather } from './weather'
 import { SLOTS, dueOn, habitStepKey, routineComplete, requiredSteps, type HabitDef, type PageId } from './types'
 import { localDateKey, fmtDuration, periodKeyFor } from './util'
+import { useAssistantBills } from './assistantbills'
+import { TIER_LABEL } from './peoplelayout'
 import { ActualLog } from './plan'
 import * as Icon from './icons'
 import { Mark, Speak, useAssistantThread, useVoiceGlue, VoicePanel } from './assistantcore'
@@ -79,7 +81,47 @@ function Tick() {
 const MORE_IN: Partial<Record<CardKind, [PageId, string]>> = {
   today: ['today', 'Today'], backlog: ['plan', 'Plan'], habits: ['habits', 'Habits'],
   calendar: ['calendar', 'Calendar'], goals: ['goals', 'Goals'], focus: ['focus', 'Focus'],
-  stale: ['plan', 'Plan'],
+  stale: ['plan', 'Plan'], planned: ['plan', 'Plan'], projects: ['projects', 'Projects'],
+  routines: ['routines', 'Routines'], notes: ['notes', 'Notes'], people: ['people', 'People'],
+  ideas: ['ideas', 'Ideas'], bills: ['bills', 'Bills'], gym: ['gym', 'Gym'], prompts: ['prompts', 'Prompts'],
+}
+
+/* WHAT THE LAST CHANGE TOUCHED. A key is a row's id, or for a row the store
+   makes without handing its id back (a new project, habit, goal), its name. */
+type Hot = (id: string, name?: string) => boolean
+const hotFor = (touched: string[]): Hot => {
+  const names = new Set(touched.map((k) => k.trim().toLowerCase()))
+  return (id, name) => touched.includes(id) || (!!name && names.has(name.trim().toLowerCase()))
+}
+/** The head of a list, plus any touched row that sits below the cut, first, so
+ *  a change is never hidden behind "12 more". */
+function fit<T>(all: T[], n: number, isHot: (x: T) => boolean): T[] {
+  return [...all.filter((x, i) => i >= n && isHot(x)), ...all.slice(0, n)]
+}
+const rowCls = (on: boolean, done?: boolean) => `as-row${done ? ' is-done' : ''}${on ? ' is-touched' : ''}`
+
+/** Bills is its own component so the Supabase read only runs when the card is
+ *  actually on screen. */
+function BillsCard({ hot, limit }: { hot: Hot; limit?: number }) {
+  const bills = useAssistantBills()
+  if (bills.loading) return <p className="as-empty">Bills is still loading.</p>
+  if (!bills.ready) return <p className="as-empty">Bills is not signed in on this device.</p>
+  const all = bills.items
+  if (!all.length) return <p className="as-empty">Nothing due this cycle.</p>
+  const rows = fit(all, limit ?? 30, (i) => hot(i.id, i.name))
+  return (
+    <div className="as-list">
+      <div className="as-group">
+        {rows.map((i, k) => (
+          <div className={rowCls(hot(i.id, i.name), i.paid)} key={i.id} style={stagger(k)}>
+            <span className="as-row-title">{i.name}</span>
+            <span className="as-row-min mono">{i.amount} Kč{i.overdue && !i.paid ? ', overdue' : ''}</span>
+          </div>
+        ))}
+      </div>
+      <More n={all.length - rows.length} kind="bills" />
+    </div>
+  )
 }
 
 /** The canvas shows everything; a card inside the thread on a phone shows the
@@ -154,12 +196,152 @@ function WeatherCard(): JSX.Element {
   )
 }
 
-function CardBody({ kind, limit }: { kind: CardKind; limit?: number }) {
-  const { tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, setPage, toggleTask, toggleHabitDay } = useStore()
+function CardBody({ kind, limit, touched = [] }: { kind: CardKind; limit?: number; touched?: string[] }) {
+  const {
+    tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, setPage, toggleTask, toggleHabitDay,
+    projects, notes, noteFolders, people, ideaBoard, gymGoals, prompts,
+  } = useStore()
   const { state: cal } = useCalendar()
   const day = localDateKey()
+  const hot = hotFor(touched)
 
   if (kind === 'weather') return <WeatherCard />
+  if (kind === 'bills') return <BillsCard hot={hot} limit={limit} />
+
+  if (kind === 'planned') {
+    const all = tasks.filter((t) => t.list === 'today' && (t.plannedOn ?? day) > day)
+      .sort((a, b) => (a.plannedOn ?? '').localeCompare(b.plannedOn ?? '') || (a.at ?? '').localeCompare(b.at ?? ''))
+    if (!all.length) return <p className="as-empty">Nothing planned after today.</p>
+    const rows = fit(all, limit ?? 40, (t) => hot(t.id, t.title))
+    const days = [...new Set(rows.map((t) => t.plannedOn as string))].sort()
+    return (
+      <div className="as-list">
+        {days.map((d) => (
+          <div className="as-group" key={d}>
+            <span className="microcap">{new Date(`${d}T12:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })}</span>
+            {rows.filter((t) => t.plannedOn === d).map((t, i) => (
+              <div className={rowCls(hot(t.id, t.title), t.done)} key={t.id} style={stagger(i)}>
+                <button className="checkbox" role="checkbox" aria-checked={!!t.done}
+                  aria-label={t.title} onClick={() => toggleTask(t.id)}><Tick /></button>
+                <TaskMark task={t} always />
+                <span className="as-row-title">{t.title}</span>
+                <span className="as-row-min mono">{t.at ?? (t.estimateMin > 0 ? fmtDuration(t.estimateMin) : '')}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+        <More n={all.length - rows.length} kind={kind} />
+      </div>
+    )
+  }
+
+  if (kind === 'projects') {
+    if (!projects.length) return <p className="as-empty">No projects yet.</p>
+    return (
+      <div className="as-list">
+        <div className="as-group">
+          {projects.map((p, i) => (
+            <div className={rowCls(hot(p.id, p.name))} key={p.id} style={stagger(i)}>
+              <SpaceMark space={p.space} always />
+              <span className="as-row-title">{p.name}</span>
+              <span className="as-row-min mono">{tasks.filter((t) => t.projectId === p.id && !t.done).length} open</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (kind === 'routines') {
+    const all = routines.filter((r) => !r.archivedAt)
+    if (!all.length) return <p className="as-empty">No routines yet.</p>
+    return (
+      <div className="as-list">
+        {all.map((r, i) => {
+          const on = hot(r.id, r.title)
+          return (
+            <div className="as-group" key={r.id}>
+              <div className={rowCls(on, routineComplete(r, periodKeyFor(r.cadence)))} style={stagger(i)}>
+                <SpaceMark space={r.space} always />
+                <span className="as-row-title">{r.title}</span>
+                <span className="as-row-min mono">{r.doneStepIds.length} / {r.steps.length}</span>
+              </div>
+              {/* The steps of the routine he just changed, and only that one:
+                  a routine set runs to forty-odd steps. */}
+              {on && r.steps.map((st, k) => (
+                <div className={`as-row as-row-sub${r.doneStepIds.includes(st.id) ? ' is-done' : ''}`} key={st.id} style={stagger(k)}>
+                  <span className="as-row-title">{st.title}</span>
+                </div>
+              ))}
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  if (kind === 'notes') {
+    const folderName = (id: string) => noteFolders.find((f) => f.id === id)?.name ?? ''
+    const all = [...notes].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
+    if (!all.length) return <p className="as-empty">No notes yet.</p>
+    const rows = fit(all, limit ?? 20, (n) => hot(n.id, n.title))
+    return (
+      <div className="as-list">
+        <div className="as-group">
+          {rows.map((n, i) => (
+            <div className={rowCls(hot(n.id, n.title) || hot(n.folderId, folderName(n.folderId)), !!n.done)} key={n.id} style={stagger(i)}>
+              <span className="as-row-title">{n.title || n.body.split('\n')[0]}</span>
+              <span className="as-row-min mono">{folderName(n.folderId)}</span>
+            </div>
+          ))}
+        </div>
+        <More n={all.length - rows.length} kind={kind} />
+      </div>
+    )
+  }
+
+  if (kind === 'people') {
+    const all = [...people].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
+    if (!all.length) return <p className="as-empty">Nobody on the People page yet.</p>
+    const rows = fit(all, limit ?? 20, (p) => hot(p.id, p.name))
+    return (
+      <div className="as-list">
+        <div className="as-group">
+          {rows.map((p, i) => (
+            <div className={rowCls(hot(p.id, p.name))} key={p.id} style={stagger(i)}>
+              <span className="as-row-title">{p.name}{p.rel ? `, ${p.rel}` : ''}</span>
+              <span className="as-row-min mono">{TIER_LABEL[p.tier]}</span>
+            </div>
+          ))}
+        </div>
+        <More n={all.length - rows.length} kind={kind} />
+      </div>
+    )
+  }
+
+  if (kind === 'ideas' || kind === 'gym' || kind === 'prompts') {
+    const all = kind === 'ideas'
+      ? [...ideaBoard].sort((a, b) => b.createdAt - a.createdAt).map((c) => ({ id: c.id, name: c.title, side: '' }))
+      : kind === 'gym'
+        ? gymGoals.map((g) => ({ id: g.id, name: g.name, side: `${g.current ?? '?'} / ${g.goal} ${g.unit}` }))
+        : [...prompts].sort((a, b) => Number(!!a.sentAt) - Number(!!b.sentAt) || b.createdAt - a.createdAt)
+          .map((p) => ({ id: p.id, name: p.text, side: p.sentAt ? 'sent' : p.project }))
+    if (!all.length) return <p className="as-empty">Nothing here yet.</p>
+    const rows = fit(all, limit ?? 20, (r) => hot(r.id, r.name))
+    return (
+      <div className="as-list">
+        <div className="as-group">
+          {rows.map((r, i) => (
+            <div className={rowCls(hot(r.id, r.name))} key={r.id} style={stagger(i)}>
+              <span className="as-row-title">{r.name}</span>
+              {r.side ? <span className="as-row-min mono">{r.side}</span> : null}
+            </div>
+          ))}
+        </div>
+        <More n={all.length - rows.length} kind={kind} />
+      </div>
+    )
+  }
 
   if (kind === 'today' || kind === 'stale') {
     const all = kind === 'today'
@@ -167,7 +349,7 @@ function CardBody({ kind, limit }: { kind: CardKind; limit?: number }) {
       : tasks.filter((t) => t.list === 'backlog' && !t.done)
         .sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? '')).slice(0, 12)
     if (!all.length) return <p className="as-empty">{kind === 'today' ? 'Nothing on the day yet.' : 'Nothing has been sitting long.'}</p>
-    const rows = limit ? all.slice(0, limit) : all
+    const rows = limit ? fit(all, limit, (t) => hot(t.id, t.title)) : all
     const groups = kind === 'today'
       ? SLOTS.map((s) => ({ label: s.label, items: rows.filter((t) => t.slot === s.id) }))
         .concat([{ label: 'Unsorted', items: rows.filter((t) => !t.slot) }]).filter((g) => g.items.length)
@@ -178,12 +360,12 @@ function CardBody({ kind, limit }: { kind: CardKind; limit?: number }) {
           <div className="as-group" key={g.label}>
             <span className="microcap">{g.label}</span>
             {g.items.map((t, i) => (
-              <div className={`as-row${t.done ? ' is-done' : ''}`} key={t.id} style={stagger(i)}>
+              <div className={rowCls(hot(t.id, t.title), t.done)} key={t.id} style={stagger(i)}>
                 <button className="checkbox" role="checkbox" aria-checked={!!t.done}
                   aria-label={t.title} onClick={() => toggleTask(t.id)}><Tick /></button>
                 <TaskMark task={t} always />
                 <span className="as-row-title">{t.title}</span>
-                {t.estimateMin > 0 && <span className="as-row-min mono">{fmtDuration(t.estimateMin)}</span>}
+                {t.estimateMin > 0 && <span className="as-row-min mono">{t.at ?? fmtDuration(t.estimateMin)}</span>}
               </div>
             ))}
           </div>
@@ -194,15 +376,17 @@ function CardBody({ kind, limit }: { kind: CardKind; limit?: number }) {
   }
 
   if (kind === 'backlog') {
-    const all = tasks.filter((t) => t.list === 'backlog' && !t.done).slice(0, 30)
+    /* A row he just ticked off the list stays in view, struck through, so
+       "done" has somewhere to be seen. */
+    const all = tasks.filter((t) => t.list === 'backlog' && (!t.done || hot(t.id)))
     if (!all.length) return <p className="as-empty">The list is empty.</p>
-    const rows = all.slice(0, limit ?? 20)
+    const rows = fit(all, limit ?? 20, (t) => hot(t.id, t.title))
     return (
       <div className="as-list">
         <div className="as-group">
           {rows.map((t, i) => (
-            <div className="as-row" key={t.id} style={stagger(i)}>
-              <button className="checkbox" role="checkbox" aria-checked={false}
+            <div className={rowCls(hot(t.id, t.title), t.done)} key={t.id} style={stagger(i)}>
+              <button className="checkbox" role="checkbox" aria-checked={!!t.done}
                 aria-label={t.title} onClick={() => toggleTask(t.id)}><Tick /></button>
               <TaskMark task={t} always />
               <span className="as-row-title">{t.title}</span>
@@ -224,12 +408,12 @@ function CardBody({ kind, limit }: { kind: CardKind; limit?: number }) {
        to the text brief, applied here to the card so the two never disagree
        about what counts as a habit. */
     const routineHabitIds = new Set(routines.filter((r) => !r.archivedAt && r.habitId).map((r) => r.habitId as string))
-    const allHabits = [...habits.filter((h) => !h.archivedAt && dueOn(h, todayIndex, habitLog) && !routineHabitIds.has(h.id) && !habitStepKey(h))]
+    const allHabits = [...habits.filter((h) => !h.archivedAt && (hot(h.id, h.name) || (dueOn(h, todayIndex, habitLog) && !routineHabitIds.has(h.id) && !habitStepKey(h))))]
       .sort((a, b) => Number(a.days[todayIndex]) - Number(b.days[todayIndex]))
     const openRoutines = routines
       .filter((r) => !r.archivedAt && requiredSteps(r).length > 0 && !routineComplete(r, periodKeyFor(r.cadence)))
     if (!allHabits.length && !openRoutines.length) return <p className="as-empty">Nothing is due today.</p>
-    const habitRows = limit ? allHabits.slice(0, limit) : allHabits
+    const habitRows = limit ? fit(allHabits, limit, (h) => hot(h.id, h.name)) : allHabits
     return (
       <div className="as-list">
         {openRoutines.length > 0 && (
@@ -248,7 +432,7 @@ function CardBody({ kind, limit }: { kind: CardKind; limit?: number }) {
           <div className="as-group">
             {openRoutines.length > 0 && <span className="microcap">Habits</span>}
             {habitRows.map((h: HabitDef, i) => (
-              <div className={`as-row${h.days[todayIndex] ? ' is-done' : ''}`} key={h.id} style={stagger(i)}>
+              <div className={rowCls(hot(h.id, h.name), h.days[todayIndex])} key={h.id} style={stagger(i)}>
                 <button className="checkbox" role="checkbox" aria-checked={h.days[todayIndex]}
                   aria-label={h.name} onClick={() => toggleHabitDay(h.id, todayIndex)}><Tick /></button>
                 <SpaceMark space={h.space} always />
@@ -304,14 +488,14 @@ function CardBody({ kind, limit }: { kind: CardKind; limit?: number }) {
     )
   }
 
-  const allGoals = goals.filter((g) => !g.closed)
+  const allGoals = goals.filter((g) => !g.closed || hot(g.id, g.name))
   if (!allGoals.length) return <p className="as-empty">No goals set.</p>
-  const gs = limit ? allGoals.slice(0, limit) : allGoals
+  const gs = limit ? fit(allGoals, limit, (g) => hot(g.id, g.name)) : allGoals
   return (
     <div className="as-list">
       <div className="as-group">
         {gs.map((g, i) => (
-          <button className="as-row as-link" key={g.id} style={stagger(i)} onClick={() => setPage('goals')}>
+          <button className={`${rowCls(hot(g.id, g.name))} as-link`} key={g.id} style={stagger(i)} onClick={() => setPage('goals')}>
             <SpaceMark space={g.space} always />
             <span className="as-row-title">{g.name}</span>
             <span className="as-row-min mono">{g.current} / {g.target}</span>
@@ -326,23 +510,32 @@ function CardBody({ kind, limit }: { kind: CardKind; limit?: number }) {
 const TITLES: Record<CardKind, string> = {
   today: 'On the day', backlog: 'The list', habits: 'Habits today',
   calendar: 'Calendar', goals: 'Goals', focus: 'Focus', stale: 'Sitting longest',
-  weather: 'Prague',
+  weather: 'Prague', planned: 'Coming up', projects: 'Projects', routines: 'Routines',
+  notes: 'Notes', people: 'People', ideas: 'Ideas', bills: 'Bills this cycle', gym: 'Gym targets',
+  prompts: 'Prompts',
 }
 
 /** The canvas. One place, swapped, animated on the swap so the change is
  *  visible rather than a silent substitution while he is looking elsewhere. */
-function Canvas({ kinds }: { kinds: CardKind[] }) {
+function Canvas({ kinds, touched }: { kinds: CardKind[]; touched: string[] }) {
   const sig = kinds.join('+')
+  const body = useRef<HTMLDivElement>(null)
+  /* Bring the first changed row into view: a new task at the bottom of a
+     long list is otherwise a change he has to go and find. */
+  useEffect(() => {
+    const id = requestAnimationFrame(() => body.current?.querySelector('.is-touched')?.scrollIntoView({ block: 'center', behavior: 'smooth' }))
+    return () => cancelAnimationFrame(id)
+  }, [sig, touched])
   return (
     <aside className="as-canvas" aria-live="polite">
       <header className="as-canvas-head">
-        <h2 key={sig}>{kinds.map((k) => TITLES[k]).join(' · ')}</h2>
+        <h2 key={sig}>{kinds.map((k) => TITLES[k]).join(', ')}</h2>
       </header>
-      <div className="as-canvas-body" key={sig}>
+      <div className="as-canvas-body" key={sig} ref={body}>
         {kinds.map((k) => (
           <section className="as-pane" key={k}>
             {kinds.length > 1 && <h3 className="microcap as-pane-head">{TITLES[k]}</h3>}
-            <CardBody kind={k} />
+            <CardBody kind={k} touched={touched} />
           </section>
         ))}
       </div>
@@ -386,7 +579,7 @@ function Dictate({ base, onText, busy }: { base: string; onText: (t: string) => 
 export function AssistantPage() {
   const split = useSplit()
   const { logActual } = useStore()
-  const { brief, turns, setTurns, busy, err, errHint, canvas, setCanvas, live, send: sendRaw } = useAssistantThread()
+  const { brief, turns, setTurns, busy, err, errHint, canvas, setCanvas, touched, setTouched, live, send: sendRaw } = useAssistantThread()
   const [q, setQ] = useState('')
   const foot = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLTextAreaElement>(null)
@@ -580,7 +773,7 @@ export function AssistantPage() {
                       {t.text.trim() ? <Speak id={`t${i}`} text={t.text} /> : null}
                       {split && t.reply?.show.length
                         ? t.reply.show.map((c, k) => (
-                            <button className="as-pulled-btn" key={k} onClick={() => setCanvas([c.kind])}>
+                            <button className="as-pulled-btn" key={k} onClick={() => { setCanvas([c.kind]); setTouched(t.touched ?? []) }}>
                               {TITLES[c.kind]}
                             </button>
                           ))
@@ -592,7 +785,7 @@ export function AssistantPage() {
                       t.reply.show.map((c, k) => (
                         <section className="as-card" key={k}>
                           <h3 className="microcap">{TITLES[c.kind]}</h3>
-                          <CardBody kind={c.kind} limit={6} />
+                          <CardBody kind={c.kind} limit={6} touched={t.touched} />
                         </section>
                       ))
                     )
@@ -637,7 +830,7 @@ export function AssistantPage() {
             </div>
             {askBox}
           </div>
-          {split && <Canvas kinds={canvas} />}
+          {split && <Canvas kinds={canvas} touched={touched} />}
         </>
       )}
     </div>

@@ -5839,6 +5839,19 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .as-row > .as-row-title { display: block; height: auto; min-height: var(--line); line-height: var(--line); }
 .as-group > .as-row:first-of-type { border-top: none; }
 .as-row.is-done .as-row-title { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
+/* The row the last change touched: where the work went, marked. A wash, not a
+   coloured edge, and it settles after one pulse so a marked list still reads. */
+.as-row.is-touched {
+  background: var(--accent-wash); border-radius: 6px; border-top-color: transparent;
+  margin-inline: calc(var(--s2) * -1); padding-inline: var(--s2); width: calc(100% + var(--s2) * 2);
+  animation: as-rowin 200ms var(--ease) both, as-touched 1.4s var(--ease) 200ms both;
+}
+.as-row.is-touched + .as-row { border-top-color: transparent; }
+.as-row.is-touched .as-row-title { color: var(--accent-text); }
+.as-row.is-touched.is-done .as-row-title { color: var(--muted); }
+@keyframes as-touched { 0%, 30% { box-shadow: 0 0 0 1px var(--accent); } 100% { box-shadow: 0 0 0 1px transparent; } }
+.as-row-sub { padding-left: var(--s6); }
+.as-row-sub .as-row-title { font-size: var(--text-xs); color: var(--muted); }
 .as-row-title { flex: 1; min-width: 0; font-size: var(--text-sm); text-align: left; overflow-wrap: anywhere; }
 .as-row-min { flex: none; font-size: var(--text-xs); color: var(--faint); white-space: nowrap; }
 .as-row-when { flex: none; font-size: var(--text-xs); color: var(--muted); white-space: nowrap; min-width: 5ch; justify-content: flex-start !important; }

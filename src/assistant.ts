@@ -34,6 +34,10 @@ export type CardKind =
   | 'focus'      // the week's blocks
   | 'stale'      // what has been sitting too long
   | 'weather'    // Prague, out the window, drawn by the app
+  /* One card per part of the app an action can land in (2026-10-04, his
+     ask: the right side has to show where every change went). */
+  | 'planned'    // days after today
+  | 'projects' | 'routines' | 'notes' | 'people' | 'ideas' | 'bills' | 'gym' | 'prompts'
 
 export interface Card { kind: CardKind; note?: string }
 
@@ -325,7 +329,7 @@ export interface Reply {
   more?: boolean
 }
 
-const CARDS: CardKind[] = ['today', 'backlog', 'habits', 'calendar', 'goals', 'focus', 'stale', 'weather']
+const CARDS: CardKind[] = ['today', 'planned', 'backlog', 'habits', 'routines', 'calendar', 'goals', 'focus', 'stale', 'weather', 'projects', 'notes', 'people', 'ideas', 'bills', 'gym', 'prompts']
 
 /** A compact picture of his day. Titles and counts, nothing private. */
 export interface Brief {
@@ -425,7 +429,7 @@ REPLY with ONE JSON object and nothing else, no fence, no prose around it:
 - "find": look things up before acting on anything you cannot see in the briefing (projects, notes, people, goals, routines and their steps, bills, older tasks, calendar beyond tomorrow, focus, ideas, gym, prompts, apps). what = ${FINDS.join('|')}. query narrows by words in the title; leave it out to list them.
 - After a find, a FAILED action, or "more":true, the app sends you RESULTS and you carry on with the same request: fix what failed using the exact title from the results, do what is still left, then answer. Never repeat an action the results list as ok. When nothing is left, reply with "say" only.
 - "more": true when the job was too long for one reply; you get another turn for the rest.
-- "show": cards the app draws from his real data, up to three: today, backlog, habits, calendar, goals, focus, stale, weather. None when he is just talking.
+- "show": cards the app draws from his real data, up to three: ${CARDS.join(', ')}. When you act, the app shows where each change landed by itself; "show" is for questions. None when he is just talking.
 - "next": up to three follow-ups he might ask, in his voice.
 - Act only when he asked for a change; a question is a question. Too vague to act on (which person, which circle, which of two tasks): ask, do not guess.
 - "it" / "that one" is whatever he or you most recently named. "No, I meant X" corrects your last action: undo the wrong one, then do X. Lines in [App results: ...] in the history are what really happened earlier.

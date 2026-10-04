@@ -32,7 +32,12 @@ const GEMINI_TIMEOUT_MS = 6000
 const DIRECTION =
   'Read this aloud as JARVIS: a calm, impeccably polite British AI butler with a refined ' +
   'Received Pronunciation accent. Measured pace, quiet confidence, a hint of dry wit, never ' +
-  'cheerful or salesy. Do not add or change any words.'
+  'cheerful or salesy. Do not add or change any words. ' +
+  /* His briefs mix in Czech task names (his ask, 2026-10-04): same voice,
+     but the Czech parts said the way a Czech speaker says them. */
+  'The text often switches between English and Czech, sometimes mid-sentence. Read every Czech ' +
+  'word, phrase and sentence exactly as a native Czech speaker would pronounce it, then return to ' +
+  'the British voice for the English parts. Names are read as written.'
 
 export function getTtsKey(): string {
   try { return localStorage.getItem(KEY_STORE) ?? '' } catch { return '' }

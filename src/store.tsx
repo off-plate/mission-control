@@ -23,7 +23,6 @@ import { newId, todayKey } from './store/shared'
 import { type Undoable, useUndo } from './store/undo'
 import { useGraveyard } from './store/graveyard'
 import { noteTitle, useNotesSlice } from './store/notes'
-import { useWidgetsSlice } from './store/widgets'
 import { useTwoLivesSlice } from './store/twolives'
 import { useIdeaBoardSlice, type IdeaBoardSlice } from './store/ideaboard'
 import { usePromptsSlice, type PromptsSlice } from './store/prompts'
@@ -36,7 +35,6 @@ import { foldersFromRoutines, useGrowthSlice } from './store/growth'
 import { usePlannerSlice } from './store/planner'
 import { dayIndexOf, dayOfWeekKey, goalPeriodKey, goalPeriodRange, isoWeekKey, localDateKey, periodIsPast, periodKeyFor, type GoalTf } from './util'
 import {
-  DEFAULT_SPACES,
   MOCK_GOALS,
   MOCK_HABITS,
   MOCK_LEDGER,
@@ -77,14 +75,9 @@ import type {
   PlanState,
   Project,
   ReviewState,
-  SizeKey,
-  SocialEntry,
-  SourceState,
   SpaceId,
   Task,
   TaskCategory,
-  WidgetInstance,
-  WidgetType,
 } from './types'
 
 export const STORAGE_KEY = 'mission-control-demo-v12'
@@ -99,7 +92,6 @@ export function isReadOnly(): boolean { return futureBlob }
 
 interface PersistedState {
   version: 3
-  spaces: Record<SpaceId, WidgetInstance[]>
   tasks: Task[]
   habits: HabitDef[]
   goals: Goal[]
@@ -108,8 +100,6 @@ interface PersistedState {
   projects?: Project[]
   /** People. Optional for the same reason projects is. */
   ledger: LedgerEntry[]
-  social: SocialEntry[]
-  sources: SourceState[]
   plan: PlanState
   review: ReviewState
   assistantLog: AssistantEntry[]
@@ -189,7 +179,7 @@ interface PersistedState {
    *  these are separate from the main Goals page's periodic ones. */
   gymGoals?: GymGoal[]
   /** The Pomodoro block running right now, synced so it shows the same on
-   *  every device (and in Raycast) rather than living only in this tab's
+   *  every device rather than living only in this tab's
    *  localStorage. Null means nothing is running. */
   activeFocus?: ActiveFocus | null
 }
@@ -217,7 +207,7 @@ export interface ActiveFocus {
   blockMin: number
   /** What it's for, when started from a task. */
   focusLabel: string | null
-  /** Which task, if any -- lets a reader (Raycast, another device) show or
+  /** Which task, if any -- lets a reader (another device) show or
    *  act on the real row rather than just the label text. */
   taskId?: string
   space?: SpaceId
@@ -322,11 +312,6 @@ interface Store extends PersistedState {
   openNote: (id: string | null) => void
   setFocusTaskId: (id: string | null) => void
 
-  reorderSpace: (space: SpaceId, order: string[]) => void
-  resizeWidget: (space: SpaceId, id: string, size: SizeKey) => void
-  removeWidget: (space: SpaceId, id: string) => void
-  addWidget: (space: SpaceId, type: WidgetType) => void
-  moveWidget: (space: SpaceId, id: string, dir: -1 | 1) => void
 
   toggleTask: (id: string) => void
   /** Rename a task or change its estimate. With a breakdown present the
@@ -421,8 +406,6 @@ interface Store extends PersistedState {
    *  freshly made or already there from an earlier click. */
   repeatGoal: (id: string) => string | null
 
-  setSocial: (entries: SocialEntry[]) => void
-  toggleSource: (id: string) => void
 
   commitPlan: (taskIds: string[], firstMoveId: string | null) => void
   /** Close a window: any range, one act. Its outcomes land in the backlog. */
@@ -555,25 +538,7 @@ function loadPersisted(): PersistedState | null {
     if ((p.version ?? 0) > 3) { futureBlob = true; return null }
     if (p.schema && p.schema !== STORAGE_KEY) return null
     p.version = 3
-    /* A workspace added after this state was saved. His saved record only has
-       the spaces that existed then, so a new one is filled from the defaults
-       while every space he has arranged himself is handed back untouched. */
-    if (p.spaces) p.spaces = { ...DEFAULT_SPACES, ...p.spaces }
-    /* The clock, asked for on 2026-08-07 as a widget in the grid rather than a
-       line in the header. His saved arrangement predates the widget, so it is
-       added once, first in every space, which is where he asked for it. If he
-       removes it later it stays removed: this runs once and never again. */
     p.removedSeeds = p.removedSeeds ?? []
-    if (!p.removedSeeds.includes('fix:clock-widget')) {
-      p.removedSeeds.push('fix:clock-widget')
-      if (p.spaces) {
-        for (const key of Object.keys(p.spaces)) {
-          const list = p.spaces[key as SpaceId] ?? []
-          if (list.some((w) => w.type === 'clock')) continue
-          p.spaces[key as SpaceId] = [{ id: `clock-${key}`, type: 'clock' as const, size: 'S' as const }, ...list]
-        }
-      }
-    }
 
     /* One-time repair of focus blocks logged at the wrong length. While the
        timer read its length from the SETTING, a block started from a task was
@@ -1300,12 +1265,10 @@ function routeFromHash(): { page: PageId; day: string | null } {
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const persisted = useMemo(loadPersisted, [])
-  const widgetsSlice = useWidgetsSlice(persisted)
-  const { spaces, setSpaces } = widgetsSlice
   const [storageFull, setStorageFull] = useState(false)
   const [ledger, setLedger] = useState(persisted?.ledger ?? MOCK_LEDGER)
   const connectionsSlice = useConnectionsSlice(persisted)
-  const { social, setSocial, sources, setSources, toggleSource, ideas, setIdeas } = connectionsSlice
+  const { ideas, setIdeas } = connectionsSlice
   const coachSlice = useCoachSlice(persisted)
   const { coachSessions, setCoachSessions } = coachSlice
   const [focusSessions, setFocusSessions] = useState<FocusSession[]>(persisted?.focusSessions ?? [])
@@ -1313,8 +1276,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
      focusSessions, which only ever holds FINISHED blocks. PomodoroProvider
      owns the countdown itself (still its own localStorage clock, see
      pomodoro.tsx) and mirrors it here so a block started on one device shows
-     up, live, on every other: the phone that started it, the Mac it syncs to,
-     and Raycast, which can only ever see this synced copy. Whichever side
+     up, live, on every other: the phone that started it, the Mac it syncs to. Whichever side
      saved most recently wins outright (see mergeStates -- this field isn't in
      ALL_KEYS, so it follows the newer blob's savedAt like `plan`/`review`
      used to before those needed their own union rules); a single running
@@ -1477,7 +1439,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (futureBlob) return
 
     const state: PersistedState = {
-      version: 3, spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas,
+      version: 3, tasks, habits, goals, projects, ledger, plan, review, assistantLog, coachSessions, routines, ideas,
       notes, noteFolders, ideaBoard, prompts, people, personBonds, personContacts, gymGoals,
       savedAt: Date.now(), lastWrite: { dev: deviceId(), name: deviceName(), at: Date.now() },
       weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
@@ -1509,7 +1471,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { outbox.push(json) }, 800)
     }
-  }, [spaces, tasks, habits, goals, projects, ledger, social, sources, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels, tunes, reelFiles, ideaBoard, prompts, people, personBonds, personContacts, gymGoals, activeFocus])
+  }, [tasks, habits, goals, projects, ledger, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels, tunes, reelFiles, ideaBoard, prompts, people, personBonds, personContacts, gymGoals, activeFocus])
 
   /* ---- state that arrived from somewhere else ----
      Another tab of this browser, or this account on another device. Merged in,
@@ -1567,7 +1529,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (p.dailySkipped && (!dailySkipped || p.dailySkipped > dailySkipped)) setDailySkipped(p.dailySkipped)
     if (p.coachSessions) setCoachSessions(p.coachSessions)
     if (p.assistantLog) setAssistantLog(p.assistantLog)
-    if (p.spaces) setSpaces(p.spaces)
     if (p.plan) setPlan(p.plan)
     if (p.review) setReview(p.review)
     if (p.records) setRecords(p.records)
@@ -1755,7 +1716,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value: Store = {
     version: 3,
-    spaces, tasks, habits, goals, projects, storageFull, ledger, social, sources, plan, review, routines, ideas,
+    tasks, habits, goals, projects, storageFull, ledger, plan, review, routines, ideas,
     openProjectId, setOpenProject, enterProject,
     addProject: plannerSlice.addProject,
     renameProject: plannerSlice.renameProject,
@@ -1806,11 +1767,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     focusAppId, setFocusAppId,
     noteToOpen, openNote: setNoteToOpen,
 
-    reorderSpace: widgetsSlice.reorderSpace,
-    resizeWidget: widgetsSlice.resizeWidget,
-    removeWidget: widgetsSlice.removeWidget,
-    addWidget: widgetsSlice.addWidget,
-    moveWidget: widgetsSlice.moveWidget,
 
     toggleTask: plannerSlice.toggleTask,
     updateTask: plannerSlice.updateTask,
@@ -1914,8 +1870,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     toggleGoalMilestone: growthSlice.toggleGoalMilestone,
     deleteGoal: growthSlice.deleteGoal,
 
-    setSocial,
-    toggleSource,
 
     commitPlan: (taskIds, firstMoveId) => {
       setTasks((prev) =>

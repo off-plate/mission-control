@@ -3,7 +3,6 @@ import { useStore, type ActiveFocus } from './store'
 import { fmtDuration, taskMinutes } from './util'
 import { thumbUrl, useMundiOpus } from './mundiplayer'
 import { onTitles, titlesVersion, trackTitle } from './tunes'
-import { isDesktop, notify as nativeNotify } from './desktop'
 import { deviceId } from './sync-merge'
 import * as Icon from './icons'
 import { Dock } from './dock'
@@ -145,11 +144,8 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     ? Math.max(0, Math.round((endsAt - Date.now()) / 1000))
     : pausedLeft ?? 0
 
-  /* On the desktop this goes through macOS, which means the end of a block still
-     announces itself when the window is closed or behind something. In a browser
-     tab it stays the web notification, which only fires while the tab lives. */
+  /* The web notification, which only fires while the tab lives. */
   const notify = (title: string, body: string) => {
-    if (isDesktop()) { void nativeNotify(title, body); return }
     if ('Notification' in window && Notification.permission === 'granted') {
       try { new Notification(title, { body, tag: 'mc-pomodoro' }) } catch { /* ignore */ }
     }
@@ -231,9 +227,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   /* Started from a task, the block runs for that task's own estimate and carries
      its name, so the badge says what you are actually doing. */
   const startFocus = (minutes?: number, label?: string) => {
-    /* The desktop app needs no permission prompt: macOS asks once, itself, the
-       first time it actually posts one. */
-    if (!isDesktop() && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission()
+    if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission()
     const mins = Math.max(1, Math.round(minutes ?? focusMin))
     setBlockMin(mins)
     setStartedAt(Date.now())
@@ -266,8 +260,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   const dismiss = () => { setPhase('idle'); setEndsAt(null); setPausedLeft(null); setFocusLabel(null) }
 
   /* Mirrors this device's own focus/break block into the synced blob so it
-     shows the same on every device, and in Raycast, which can only ever see
-     this synced copy. 'idle' and 'await' sync to null: a finished block
+     shows the same on every device. 'idle' and 'await' sync to null: a finished block
      waiting on his decision, or nothing running, both read as "nothing
      running" to anyone outside this tab, which is the only thing they need
      to know. Skips the write when nothing meaningful actually changed, so

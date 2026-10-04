@@ -173,9 +173,7 @@ export function MundiOpusProvider({ children }: { children: ReactNode }) {
               p.cueVideoById({ videoId: initialId, startSeconds: r.pos })
             }
             setReady(true)
-            /* Pressing play before the player has ever been built (including
-               the `missioncontrol://zone-play` shortcut, which may be the
-               very first thing that opens the Zone this session) used to
+            /* Pressing play before the player has ever been built used to
                only get as far as building and cueing it -- cueVideoById and
                a bare constructor videoId both cue, neither plays, so the
                room stayed silent until he pressed play a second time.
@@ -285,19 +283,6 @@ export function MundiOpusProvider({ children }: { children: ReactNode }) {
     if (playing) { p.pauseVideo() } else { setStarted(true); p.playVideo() }
   }
 
-  /* The desktop shell's `missioncontrol://zone-play` deep link: open the
-     room and make sure it's actually playing, one press away or none at
-     all. Reuses toggle() rather than reaching for the player directly, so
-     it gets the same "not built yet" handling above for free. */
-  useEffect(() => {
-    const onZonePlay = () => {
-      location.hash = '/zone'
-      if (!playing) toggle()
-    }
-    window.addEventListener('mc:zone-play', onZonePlay)
-    return () => window.removeEventListener('mc:zone-play', onZonePlay)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing])
   const go = (by: 1 | -1) => setTrack((i) => {
     const len = Math.max(1, queueRef.current.length)
     return (i + by + len) % len

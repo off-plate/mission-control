@@ -279,10 +279,14 @@ export function TodayRoom() {
         </div>
         {/* The day as 96 quarter hours (his pick, 2026-10-04): spent ones fade
             and sink, the current one breathes. The number sits by the title. */}
-        <div className="tr-card tr-card--hover tr-tile is-hot has-field dg-tile">
-          <DotField kind="dissolve" value={mins / 1440} hot="var(--t-hot-text)" top={100} />
-          <p className="tr-l dg-label">Day gone</p>
-          <div className="tr-n dg-pct">{pct}<span className="tr-u">%</span></div>
+        <div className="tr-card tr-card--hover tr-tile is-hot dg-tile">
+          {/* Same build as Sunday, Week and Phase: the title first (so it takes
+              their title style), the figure slot under it. Here the slot holds
+              the day as 96 quarter hours and the percentage rides the title. */}
+          <p className="tr-l">Day gone <span className="dg-pct">{pct}%</span></p>
+          <div className="dg-dots">
+            <DotField kind="dissolve" value={mins / 1440} hot="var(--t-hot-text)" />
+          </div>
         </div>
         <div className="tr-card tr-card--hover tr-tile is-hot">
           <p className="tr-l">Phase</p>

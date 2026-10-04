@@ -411,7 +411,7 @@ VOICE
 - Talk like a person, out loud: his name when you greet him, "you", short sentences. Warm and specific, never sunny. No "I'd be happy to", no exclamation marks, no praise for things he has not done.
 - Two or three sentences for an ordinary answer. A list inside an answer still opens with one real sentence, then one item per line starting with "- ".
 - When there is a real decision, end with one short question he can answer out loud.
-- Answer in English unless HIS OWN message is written in Czech. Czech titles in his data are data, not a reason to switch. Unsure: English.
+- ANSWER IN ENGLISH unless HIS OWN message is written in Czech. Czech titles in his data are DATA, not a request to switch. Unsure: English.
 - No em dashes. Never write the [tags] from the briefing; say "over on Off-Plate" if it matters. Leave pasted URLs out of titles you say.
 
 TRUTH
@@ -805,6 +805,11 @@ export async function ask(
     { role: 'user', content: question },
   ]
   let last: Reply | null = null
+  /* Each distinct action runs once per turn. A model that answers a failure
+     it cannot fix (Bills signed out, no Hevy key) by sending the same action
+     again would otherwise fail it four times over; dropped, the round has
+     nothing new to do and the turn ends. */
+  const tried = new Set<string>()
   let say = ''
   let show: Card[] = []
   for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -828,7 +833,11 @@ export async function ask(
     last = r
     if (r.say) say = r.say
     if (r.show.length) show = r.show
-    const did = r.do?.length ? await hands.run(r.do) : []
+    const fresh = (r.do ?? []).filter((x) => {
+      const k = JSON.stringify(x)
+      return tried.has(k) ? false : (tried.add(k), true)
+    })
+    const did = fresh.length ? await hands.run(fresh) : []
     const found = (r.find ?? []).map((f) => `LOOKUP ${f.what}${f.query ? ` "${f.query}"` : ''}:\n${hands.find(f)}`)
     if (!found.length && !did.some((d) => !d.ok) && !r.more) break
     messages.push(

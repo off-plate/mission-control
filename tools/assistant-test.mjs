@@ -70,6 +70,16 @@ assert.equal(ran.length, 2)
 assert.match(sent[1].messages.at(-1).content, /FAILED: nothing here is called "wrong"/)
 assert.equal(r.reply.say, 'Found the right one.')
 
+// 2b. An action that cannot succeed, sent again, runs once and the turn ends.
+sent.length = 0; ran.length = 0
+script = [
+  { say: 'Marking it.', do: [{ kind: 'done', match: 'wrong' }] },
+  { say: 'Still cannot find it.', do: [{ kind: 'done', match: 'wrong' }] },
+]
+r = await A.ask('done with the wrong one', brief, [], hands)
+assert.equal(ran.length, 1, 'a repeated failing action is not run again')
+assert.equal(sent.length, 2)
+
 // 3. Nine dictated tasks arrive as nine, and junk is dropped, not run.
 sent.length = 0; ran.length = 0
 script = [{ say: 'Adding all of them.', do: [
@@ -95,4 +105,4 @@ const chars = body.messages.filter((m) => m.role === 'system').reduce((n, m) => 
 const tokens = Math.round(chars / 3.8)
 assert.ok(tokens < 4500, `prompt is ~${tokens} tokens; the free tier allows 8,000 a minute`)
 
-console.log(`assistant loop: 5 checks passed. Prompt ~${tokens} tokens with an empty briefing.`)
+console.log(`assistant loop: 6 checks passed. Prompt ~${tokens} tokens with an empty briefing.`)

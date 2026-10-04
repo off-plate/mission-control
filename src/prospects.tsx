@@ -15,6 +15,71 @@ import type { Prospect, ProspectPerson, ProspectSource, ProspectStage, TouchStep
 
 type Layout = 'list' | 'board'
 const LAYOUT_KEY = 'mc-business-layout'
+
+/* FILTERS (his ask, 2026-10-04: "the filtration, like Nexus does it").
+   Nexus's own pattern, one live search plus single-pick chips plus a sort,
+   with the two things Nexus lacks: it is remembered per device, and a view
+   that matches nothing has a way back out. Counts on each chip respect the
+   other filters, so a number is always what clicking it would show. */
+type Sort = 'value' | 'odds' | 'age' | 'name'
+interface Filters { q: string; stage: ProspectStage | ''; source: ProspectSource | ''; sort: Sort }
+const FILTER_KEY = 'mc-business-filters'
+const NO_FILTERS: Filters = { q: '', stage: '', source: '', sort: 'age' }
+const fold = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+const SORTS: { value: Sort; label: string }[] = [
+  { value: 'age', label: 'Waiting longest' }, { value: 'value', label: 'Value' },
+  { value: 'odds', label: 'Reply odds' }, { value: 'name', label: 'Name' },
+]
+function sorter(sort: Sort, today: string): (a: Prospect, b: Prospect) => number {
+  if (sort === 'value') return (a, b) => (b.value ?? -1) - (a.value ?? -1)
+  if (sort === 'odds') return (a, b) => (replyOdds(b) ?? -1) - (replyOdds(a) ?? -1)
+  if (sort === 'name') return (a, b) => a.name.localeCompare(b.name)
+  return (a, b) => age(b, today).days - age(a, today).days
+}
+function matches(p: Prospect, f: Filters, skip?: 'stage' | 'source'): boolean {
+  if (skip !== 'stage' && f.stage && p.stage !== f.stage) return false
+  if (skip !== 'source' && f.source && p.source !== f.source) return false
+  if (!f.q.trim()) return true
+  const hay = fold([p.name, p.domain, ...p.people.map((x) => x.name)].filter(Boolean).join(' '))
+  return fold(f.q.trim()).split(/\s+/).every((w) => hay.includes(w))
+}
+
+function FilterBar({ f, set, all }: { f: Filters; set: (f: Filters) => void; all: Prospect[] }) {
+  const count = (skip: 'stage' | 'source', extra: (p: Prospect) => boolean) => all.filter((p) => matches(p, f, skip) && extra(p)).length
+  const any = f.q || f.stage || f.source
+  return (
+    <div className="pr-filters" role="search" aria-label="Filter prospects">
+      <div className="pr-search">
+        <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" strokeWidth="2" /><path d="M20 20l-4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+        <input type="search" value={f.q} placeholder="Search a business, domain or person" aria-label="Search prospects" onChange={(e) => set({ ...f, q: e.target.value })} />
+        {f.q && <button type="button" className="pr-search-x" aria-label="Clear search" onClick={() => set({ ...f, q: '' })}>
+          <svg width="10" height="10" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+        </button>}
+      </div>
+      <div className="pr-chips" role="group" aria-label="Stage">
+        <button type="button" className="pr-fchip" aria-pressed={!f.stage} onClick={() => set({ ...f, stage: '' })}>All stages <span>{count('stage', () => true)}</span></button>
+        {STAGES.map((s) => (
+          <button key={s.id} type="button" className={`pr-fchip st-${s.id}`} aria-pressed={f.stage === s.id} onClick={() => set({ ...f, stage: f.stage === s.id ? '' : s.id })}>
+            {s.label} <span>{count('stage', (p) => p.stage === s.id)}</span>
+          </button>
+        ))}
+      </div>
+      <div className="pr-chips" role="group" aria-label="Source">
+        <button type="button" className="pr-fchip" aria-pressed={!f.source} onClick={() => set({ ...f, source: '' })}>Any source <span>{count('source', () => true)}</span></button>
+        {SOURCES.map((s) => (
+          <button key={s.id} type="button" className="pr-fchip" aria-pressed={f.source === s.id} onClick={() => set({ ...f, source: f.source === s.id ? '' : s.id })}>
+            {s.label} <span>{count('source', (p) => p.source === s.id)}</span>
+          </button>
+        ))}
+      </div>
+      <div className="pr-sort">
+        <span>Sort</span>
+        <Select className="pp-dd" ariaLabel="Sort prospects" value={f.sort} onChange={(sort) => set({ ...f, sort })} options={SORTS} />
+        {any ? <button type="button" className="pp-link" onClick={() => set({ ...NO_FILTERS, sort: f.sort })}>Clear filters</button> : null}
+      </div>
+    </div>
+  )
+}
 const fmtDay = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 const pid = () => `pp-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
 
@@ -42,6 +107,9 @@ export function BusinessView({ modeSwitch }: { modeSwitch: JSX.Element }) {
   const [openId, setOpenId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const open = openId ? prospects.find((p) => p.id === openId) : undefined
+  const [f, setF] = useState<Filters>(() => { try { return { ...NO_FILTERS, ...JSON.parse(localStorage.getItem(FILTER_KEY) ?? '{}') } } catch { return NO_FILTERS } })
+  useEffect(() => { try { localStorage.setItem(FILTER_KEY, JSON.stringify(f)) } catch { /* private mode */ } }, [f])
+  const shown = prospects.filter((p) => matches(p, f)).sort(sorter(f.sort, today))
 
   return (
     <div className="pp-page pr-page">
@@ -57,11 +125,19 @@ export function BusinessView({ modeSwitch }: { modeSwitch: JSX.Element }) {
           <p>Every business you reach out to goes here: who they are, who decides, and every email you sent.</p>
           <button className="btn btn-primary" type="button" onClick={() => setAdding(true)}>Add the first prospect</button>
         </div>
+      ) : (
+        <FilterBar f={f} set={setF} all={prospects} />
+      )}
+      {prospects.length === 0 ? null : shown.length === 0 ? (
+        <div className="pr-empty">
+          <p>Nothing matches these filters.</p>
+          <button className="btn btn-quiet" type="button" onClick={() => setF({ ...NO_FILTERS, sort: f.sort })}>Clear filters</button>
+        </div>
       ) : layout === 'list' ? (
-        <ProspectList prospects={prospects} today={today} onOpen={setOpenId} />
+        <ProspectList prospects={shown} today={today} onOpen={setOpenId} />
       ) : (
         <ProspectBoard
-          prospects={prospects} today={today} onOpen={setOpenId}
+          prospects={shown} stages={f.stage ? [f.stage] : undefined} today={today} onOpen={setOpenId}
           onMove={(id, stage) => { updateProspect(id, { stage }); if (stage === 'lost') setOpenId(id) }}
         />
       )}
@@ -83,10 +159,10 @@ function Meter({ n, kind, none = 'unset' }: { n: number | null | undefined; kind
 }
 
 function ProspectList({ prospects, today, onOpen }: { prospects: Prospect[]; today: string; onOpen: (id: string) => void }) {
-  const byAge = (a: Prospect, b: Prospect) => age(b, today).days - age(a, today).days
+  /* Arrives already filtered and sorted (FilterBar); the groups keep that order. */
   const groups: { title: string; rows: Prospect[]; fold?: boolean }[] = [
-    { title: 'Needs a move', rows: prospects.filter(isOpen).sort(byAge) },
-    { title: 'In conversation', rows: prospects.filter((p) => p.stage === 'talking').sort(byAge) },
+    { title: 'Needs a move', rows: prospects.filter(isOpen) },
+    { title: 'In conversation', rows: prospects.filter((p) => p.stage === 'talking') },
     { title: 'Acquired', rows: prospects.filter((p) => p.stage === 'won'), fold: true },
     { title: 'Lost', rows: prospects.filter((p) => p.stage === 'lost'), fold: true },
   ].filter((g) => g.rows.length)
@@ -122,8 +198,8 @@ function ProspectList({ prospects, today, onOpen }: { prospects: Prospect[]; tod
   )
 }
 
-function ProspectBoard({ prospects, today, onOpen, onMove }: {
-  prospects: Prospect[]; today: string; onOpen: (id: string) => void; onMove: (id: string, stage: ProspectStage) => void
+function ProspectBoard({ prospects, stages, today, onOpen, onMove }: {
+  prospects: Prospect[]; stages?: ProspectStage[]; today: string; onOpen: (id: string) => void; onMove: (id: string, stage: ProspectStage) => void
 }) {
   const [over, setOver] = useState<ProspectStage | null>(null)
   const drop = (stage: ProspectStage) => (e: DragEvent) => {
@@ -133,8 +209,8 @@ function ProspectBoard({ prospects, today, onOpen, onMove }: {
   }
   return (
     <div className="pr-boardwrap">
-      <div className="pr-board">
-        {STAGES.map((s) => {
+      <div className="pr-board" style={stages ? { gridTemplateColumns: `repeat(${stages.length}, minmax(260px, 420px))`, minWidth: 0 } : undefined}>
+        {STAGES.filter((s) => !stages || stages.includes(s.id)).map((s) => {
           const rows = prospects.filter((p) => p.stage === s.id)
           return (
             <section

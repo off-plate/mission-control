@@ -10641,3 +10641,26 @@ body:has(.shell.is-hud) { --st-reach: #7C9CC4; --st-contacted: #E0A84A; --st-tal
 .pr-stepper .is-on i { background: var(--st); }
 .pr-stepper .is-on { color: var(--st); }
 .pr-sheet[class*="st-"] .pr-scores > div:first-child .pr-big { color: var(--st-value); }
+
+/* ---- Business filters (his ask, 2026-10-04, "like Nexus does it") ----
+   A search, two rows of chips and a sort. Chips are small, slightly rounded
+   tags; a stage chip wears its stage colour once it is picked. */
+.pr-filters { display: flex; flex-direction: column; gap: 10px; }
+.pr-search { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 10px 0 12px; max-width: 460px; border: 1px solid var(--hairline-strong); border-radius: 6px; background: var(--pp-card); color: var(--pp-muted); }
+.pr-search:focus-within { border-color: var(--accent); }
+.pr-search input { flex: 1; min-width: 0; border: 0; background: none; outline: none; color: var(--pp-ink); font: inherit; font-size: 0.9rem; }
+.pr-search input::-webkit-search-cancel-button { display: none; }
+.pr-search-x { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border: 0; border-radius: 4px; background: none; color: var(--pp-muted); cursor: pointer; }
+.pr-search-x:hover { color: var(--pp-ink); background: var(--pp-sunk); }
+.pr-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pr-fchip { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 11px; border: 1px solid var(--hairline-strong); border-radius: 4px; background: none; color: var(--pp-muted); font: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease; }
+.pr-fchip span { font-weight: 500; opacity: 0.7; font-variant-numeric: tabular-nums; }
+.pr-fchip:hover { color: var(--pp-ink); border-color: var(--pp-muted); }
+.pr-fchip[aria-pressed="true"] { color: var(--pp-ink); background: var(--pp-sunk); border-color: var(--pp-ink); }
+.pr-fchip[class*="st-"]::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--st); }
+.pr-fchip[class*="st-"][aria-pressed="true"] { color: var(--st); background: color-mix(in srgb, var(--st) 15%, transparent); border-color: var(--st); }
+.pr-fchip:active { transform: scale(0.97); }
+.pr-fchip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pr-sort { display: flex; align-items: center; gap: 10px; font-size: 0.8rem; color: var(--pp-muted); }
+.pr-sort .pp-dd { flex: 0 0 auto; width: 200px; min-width: 0; }
+.pr-sort .pp-link { white-space: nowrap; }

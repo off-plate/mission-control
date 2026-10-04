@@ -331,6 +331,59 @@ function PageNav({
   )
 }
 
+/* People's own hover menu (his ask, 2026-10-04): Personal or Business in one
+   move, the same panel Plan opens for its projects (.nav.projnav-menu,
+   portalled for the same clipping reason). The People page owns which view
+   it shows (mc-people-mode); the menu writes that key and tells an open page
+   with an event, rather than importing the page into the header's bundle. */
+const PEOPLE_MODE_KEY = 'mc-people-mode'
+function PeopleButton({ on, open }: { on: boolean; open: () => void }) {
+  const [shown, setShown] = useState(false)
+  const [rect, setRect] = useState<{ top: number; left: number } | null>(null)
+  const timer = useRef<number | undefined>(undefined)
+  const wrap = useRef<HTMLSpanElement>(null)
+  const show = () => {
+    window.clearTimeout(timer.current)
+    const r = wrap.current?.getBoundingClientRect()
+    /* Right-aligned under the square: it sits near the screen's right edge. */
+    if (r) setRect({ top: r.bottom + 10, left: Math.max(8, r.right - 220) })
+    setShown(true)
+  }
+  const hideSoon = () => { timer.current = window.setTimeout(() => setShown(false), 350) }
+  const go = (mode: 'personal' | 'business') => {
+    try { localStorage.setItem(PEOPLE_MODE_KEY, mode) } catch { /* private mode */ }
+    window.dispatchEvent(new CustomEvent('mc:people-mode', { detail: mode }))
+    open(); setShown(false)
+  }
+  return (
+    <span className="kebab-wrap" ref={wrap} onMouseEnter={show} onMouseLeave={hideSoon}>
+      <button
+        className={`btn btn-ghost btn-sq${on ? ' is-on' : ''}`}
+        onClick={open}
+        aria-pressed={on}
+        aria-label="People"
+        title="People"
+        aria-haspopup="menu"
+      >
+        <Icon.DockPeople size={16} />
+        <span className="btn-sq-label">People</span>
+      </button>
+      {rect && createPortal(
+        <div
+          className={`nav projnav-menu${shown ? ' is-open' : ''}`}
+          role="menu" aria-label="People"
+          style={{ top: rect.top, left: rect.left }}
+          onMouseEnter={show} onMouseLeave={hideSoon}
+        >
+          <button className="projrow" role="menuitem" onClick={() => go('personal')}><span className="projrow-name">Personal</span></button>
+          <button className="projrow" role="menuitem" onClick={() => go('business')}><span className="projrow-name">Business</span></button>
+        </div>,
+        document.body,
+      )}
+    </span>
+  )
+}
+
 /* Phone chrome, on his design: "on mobile this could be one left dropdown
    where I choose which workspace I'm in, and on the right a hamburger menu,
    again with a dropdown, where I choose today, plan, habits, goals, why's.
@@ -696,16 +749,7 @@ export default function App() {
             {promptsReady && <span className="btn-sq-dot" aria-hidden="true" />}
           </button>
           {/* People, next to Ideas on his instruction (2026-09-17). */}
-          <button
-            className={`btn btn-ghost btn-sq${page === 'people' ? ' is-on' : ''}`}
-            onClick={() => setPage('people')}
-            aria-pressed={page === 'people'}
-            aria-label="People"
-            title="People"
-          >
-            <Icon.DockPeople size={16} />
-            <span className="btn-sq-label">People</span>
-          </button>
+          <PeopleButton on={page === 'people'} open={() => setPage('people')} />
           <button
             className={`btn btn-ghost btn-sq hide-phone${page === 'bills' ? ' is-on' : ''}`}
             onClick={() => setPage('bills')}

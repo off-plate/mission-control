@@ -34,9 +34,6 @@ export type PageId =
   | 'quitting'
   | 'settings'
   | 'notes'
-  /** The old address of the Brain Dump board. Kept so a bookmark still lands
-   *  somewhere real: the route walks it to Notes. */
-  | 'braindump'
   | 'board'
   /** His other tools, embedded live. */
   | 'apps'

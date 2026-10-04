@@ -58,3 +58,57 @@ export interface PersonContact {
   channel: ContactChannel
   createdAt: number
 }
+
+/* ---------- Business: prospects (his ask, 2026-10-04) ----------
+   One row per business he is reaching out to. People and touches live inside
+   the row, so a prospect syncs, merges and is deleted as one thing. */
+
+/** The five lanes from his Obsidian CRM board, verbatim: To reach out,
+ *  Contacted, In conversation, Acquired, Lost. */
+export type ProspectStage = 'reach' | 'contacted' | 'talking' | 'won' | 'lost'
+/** Where the lead came from. */
+export type ProspectSource = 'found' | 'inbound' | 'friend' | 'referral' | 'met'
+/** His outreach order: work email, reminder, personal email, then a call or a
+ *  visit if it comes to that. */
+export type TouchStep = 'work' | 'reminder' | 'personal' | 'call' | 'visit'
+
+export interface ProspectPerson {
+  id: string
+  name: string
+  role?: string
+  email?: string
+  phone?: string
+  /** The one who can say yes. */
+  decides?: boolean
+}
+
+export interface ProspectTouch {
+  id: string
+  step: TouchStep
+  /** Local date, YYYY-MM-DD. */
+  day: string
+  /** ProspectPerson id it went to. */
+  to?: string
+  subject?: string
+  /** What he actually sent, so the next message can build on it. */
+  body?: string
+}
+
+export interface Prospect {
+  id: string
+  name: string
+  /** Bare host, "pekarna.cz": no scheme, no www, no path. */
+  domain?: string
+  source: ProspectSource
+  stage: ProspectStage
+  /** How much value he can bring them, 0 to 100, his own judgement. */
+  value?: number
+  /** Why this business caught his eye. */
+  why?: string
+  lostReason?: string
+  notes?: string
+  people: ProspectPerson[]
+  touches: ProspectTouch[]
+  createdAt: number
+  updatedAt: number
+}

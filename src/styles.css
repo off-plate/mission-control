@@ -10491,3 +10491,93 @@ body:has(.as-page.jv) .dock { display: none; }
    ink sat on a white card (his report, 2026-10-04). It takes the HUD's
    raised surface instead. */
 body:has(.shell.is-hud) .nav.projnav-menu { background: var(--surface-2); }
+
+/* ---------- People, Business view (his ask, 2026-10-04) ----------
+   Prospects as a list or as his CRM board's lanes. Borrows the circle's
+   tokens, dialog and card; only the list, board and sheet are its own. Value
+   reads in ink, reply odds in info slate: neither is the accent and neither
+   is green, since neither is money he has. Coral is only for a stale age. */
+.pr-page { padding: var(--s4) var(--gutter) var(--s8); display: flex; flex-direction: column; gap: var(--s4); color: var(--pp-ink); }
+.pr-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pr-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: var(--s8) 0; color: var(--pp-muted); }
+.pr-empty p { margin: 0; max-width: 52ch; }
+
+.pr-list { display: flex; flex-direction: column; border: 1px solid var(--hairline); border-radius: 10px; background: var(--pp-card); overflow: hidden; }
+.pr-list ul { list-style: none; margin: 0; padding: 0; }
+.pr-row {
+  display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1.7fr) 76px 76px; gap: 14px; align-items: center;
+  width: 100%; padding: 12px 18px; border: 0; border-top: 1px solid var(--hairline); background: none; text-align: left;
+  font: inherit; color: inherit; cursor: pointer;
+}
+@media (hover: hover) and (pointer: fine) { button.pr-row:hover { background: var(--pp-paper); } }
+.pr-row.is-head > * { font-size: inherit; color: inherit; }
+.pr-row.is-head { cursor: default; border-top: 0; background: var(--pp-sunk); padding-block: 8px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--pp-muted); }
+.pr-group > h2, .pr-group > summary { margin: 0; padding: 8px 18px; border-top: 1px solid var(--hairline); font-size: 0.78rem; font-weight: 700; color: var(--pp-muted); background: var(--pp-paper); }
+.pr-group > summary { cursor: pointer; }
+.pr-biz, .pr-next { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.pr-biz b { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pr-biz span { font-size: 0.8rem; color: var(--pp-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pr-stage { font-size: 0.84rem; color: var(--pp-muted); }
+.pr-next > span:first-child { font-size: 0.9rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pr-age { font-size: 0.76rem; color: var(--pp-muted); }
+.pr-age.is-stale { color: var(--pp-alert); font-weight: 700; }
+.pr-score { display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+.pr-score b { font-weight: 700; }
+.pr-score i { display: block; height: 4px; border-radius: 2px; background: var(--pp-sunk); overflow: hidden; }
+.pr-score s { display: block; height: 100%; background: var(--pp-ink); transform-origin: left center; }
+.pr-score.is-odds s { background: var(--info); }
+.pr-score.is-none { color: var(--pp-faint); }
+
+.pr-boardwrap { overflow-x: auto; margin: 0 calc(var(--gutter) * -1); padding: 0 var(--gutter) var(--s2); }
+.pr-board { display: grid; grid-template-columns: repeat(5, minmax(200px, 1fr)); gap: 12px; min-width: 1040px; align-items: start; }
+.pr-col { display: flex; flex-direction: column; gap: 8px; min-height: 160px; padding: 8px; border-radius: 10px; background: var(--pp-sunk); border: 1px dashed transparent; transition: border-color 150ms ease; }
+.pr-col.is-over { border-color: var(--pp-olive); }
+.pr-col h2 { margin: 2px 4px 2px; display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 700; color: var(--pp-muted); }
+.pr-pcard {
+  display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; text-align: left; font: inherit; color: inherit;
+  background: var(--pp-card); border: 1px solid var(--hairline); border-radius: 8px; cursor: grab;
+}
+.pr-pcard:active { cursor: grabbing; }
+.pr-pcard b { font-size: 0.9rem; font-weight: 700; }
+.pr-pmeta { display: flex; justify-content: space-between; gap: 8px; font-size: 0.74rem; color: var(--pp-muted); }
+.pr-lost { font-size: 0.76rem; color: var(--pp-alert); }
+
+/* The card: the circle's side card, fixed to the window here because there is
+   no canvas to sit inside. */
+.pr-scrim { place-items: stretch end; padding: 0; }
+.pr-sheet { position: relative; width: min(460px, 100%); height: 100%; transform: none; }
+.pr-scores { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pr-scores > div { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--hairline); border-radius: 10px; }
+.pr-scores > div > span { font-size: 0.74rem; font-weight: 700; color: var(--pp-muted); }
+.pr-scores small { font-size: 0.74rem; color: var(--pp-muted); }
+.pr-big { font-family: var(--font-display); font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+input.pr-big { padding: 0 6px; }
+.pr-people { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.pr-people li { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--hairline); border-radius: 10px; }
+.pr-person-foot { display: flex; justify-content: space-between; align-items: center; }
+.pr-check { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 600; }
+.pr-touches { list-style: none; margin: 0 0 12px; padding: 0; }
+.pr-touches li { display: flex; flex-direction: column; gap: 3px; padding: 8px 0; border-top: 1px solid var(--hairline); font-size: 0.86rem; }
+.pr-touches li:first-child { border-top: 0; }
+.pr-touch-head { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; }
+.pr-touch-head .mono { color: var(--pp-muted); font-size: 0.8rem; }
+.pr-subject { color: var(--pp-muted); }
+.pr-touches details { font-size: 0.82rem; }
+.pr-touches summary { cursor: pointer; color: var(--accent-text); font-weight: 600; }
+.pr-touches details p { margin: 6px 0 0; padding: 10px; white-space: pre-wrap; background: var(--pp-paper); border: 1px solid var(--hairline); border-radius: 8px; }
+.pr-log { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 10px; background: var(--pp-paper); }
+.pr-log .btn { align-self: flex-start; }
+.pr-area { min-height: 84px; resize: vertical; }
+
+@media (max-width: 760px) {
+  /* Phone: the next step drops under the name, so the name gets the width. */
+  .pr-row { grid-template-columns: minmax(0, 1fr) 52px 52px; grid-template-areas: "biz val odds" "next val odds"; gap: 4px 12px; padding-inline: 14px; }
+  .pr-row > :nth-child(1) { grid-area: biz; }
+  .pr-row > :nth-child(3) { grid-area: next; }
+  .pr-row > :nth-child(4) { grid-area: val; }
+  .pr-row > :nth-child(5) { grid-area: odds; }
+  .pr-row .pr-stage, .pr-row.is-head .pr-next { display: none; }
+  .pr-row.is-head { grid-template-areas: "biz val odds"; }
+  .pr-next { flex-direction: row; flex-wrap: wrap; gap: 0 6px; align-items: baseline; }
+}
+@media (prefers-reduced-motion: reduce) { .pr-col { transition: none; } }

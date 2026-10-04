@@ -405,7 +405,7 @@ function PhonePages({ tabs, page, setPage }: {
 const DARK_CHROME_PAGES: PageId[] = ['timeline', 'board', 'health', 'gym', 'longevity']
 
 export default function App() {
-  const { space, view, setView, page, setPage, tasks, routines, goals, habits, markHabitDaysOn, prompts } = useStore()
+  const { space, view, setView, page, setPage, tasks, routines, goals, habits, markHabitDaysOn, prompts, storageFull } = useStore()
   const waitingPrompts = prompts.filter((p) => !p.sentAt).length
   useEffect(() => { try { localStorage.setItem('mc-prompts-waiting', String(waitingPrompts)) } catch { /* private mode */ } }, [waitingPrompts])
   const promptsReady = usePromptWindow(waitingPrompts).state === 'open' && waitingPrompts > 0
@@ -737,6 +737,12 @@ export default function App() {
         <div className="allclear" role="status" aria-live="polite" style={{ borderColor: 'var(--alert)', margin: 'var(--s4) var(--s5) 0' }}>
           <span className="dot" aria-hidden="true" />
           Another device has saved a newer version of your data. Nothing here is being saved until this one is updated, so that version is not overwritten.
+        </div>
+      )}
+      {storageFull && (
+        <div className="allclear" role="alert" style={{ borderColor: 'var(--alert)', margin: 'var(--s4) var(--s5) 0' }}>
+          <span className="dot" aria-hidden="true" />
+          This browser's storage is full, so changes are not being saved on this device. Signed in, they still reach your account.
         </div>
       )}
       {/* One mount for the whole app, so the header button reaches it from

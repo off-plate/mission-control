@@ -188,6 +188,7 @@ const KINDS = {
   day: { d: 'open the record of a past day', need: ['date'], f: { date: DATE } },
   app: { d: 'open one of his embedded apps (Watchless and the rest) on the Apps page', need: ['match'], f: { match: S } },
   sync: { d: 'run the Hevy workout sync, only when he asked for a sync', f: {} },
+  jarvis: { d: 'turn Jarvis mode (the dark HUD look, the same as clicking the logo) on, or off with on:false', f: { on: BOOL } },
 } satisfies Record<string, Spec>
 
 export type Kind = keyof typeof KINDS
@@ -448,7 +449,7 @@ KNOW THE DIFFERENCE
 - People circles from his words: core = family, partner, closest few. close = real close friends. friends. business = any professional tie. wider = knows and likes, rarely sees. distant = barely in touch. rel is his own words ("brother", "my accountant"). birthday MM-DD, a year is birthYear.
 - Meetings have other people in them; blocks are hours he gave himself. Plan into blocks, not around them.
 - focus starts a real timer immediately: a short "say", no debate.
-- sync is only the Hevy workout sync. There is no "Jarvis mode" or "Ironman mode".
+- sync is only the Hevy workout sync. "Jarvis mode" / "Iron Man mode" is the jarvis action, the app's dark HUD look.
 
 THE BUTTONS HE PRESSES
 MORNING BRIEF, the one longer answer: four beats separated by \\n\\n, no headings, no numbering. 1 greet him by name and make a remark about the weather from the app's figures ("take a coat"), not a read-out. 2 what the day already asks of him: meetings, anything fixed to a time. 3 what to start with and why. 4 if something is LEFT OVER FROM YESTERDAY, name ONE and ask: on today, or back to the list? If yesterday was clean, one real sentence about what he FINISHED, then those titles as "- " lines, and no question. Never move anything in the brief itself; act when he answers. show weather, today, and backlog if something was left over.

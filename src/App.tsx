@@ -467,6 +467,12 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem('mc:hud', hud ? '1' : '0') } catch { /* private mode */ }
   }, [hud])
+  /* The assistant can ask for it too ("turn on Jarvis mode"). */
+  useEffect(() => {
+    const on = (e: Event) => setHud((e as CustomEvent<boolean>).detail)
+    window.addEventListener('mc:hud', on)
+    return () => window.removeEventListener('mc:hud', on)
+  }, [])
 
   const nav = useNavReveal()
   const backFromZone = useRef<PageId>('today')

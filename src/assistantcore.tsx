@@ -3,8 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from './store'
 import { isMeeting, useCalendar } from './calendar'
 import { SPACE_LABELS } from './mock'
-import { MORNING, ask, parseBulkPlan, type Action, type Brief, type Card, type CardKind, type Reply } from './assistant'
-import { getAiProvider, PROVIDERS } from './ai'
+import { MORNING, ask, parseBulkPlan, type Action, type Brief, type CardKind, type Find, type Reply } from './assistant'
+import { breakdownTask, getAiProvider, PROVIDERS } from './ai'
 import { engineName, speakingLevel, speakingMeasured, speechState, stop as stopSpeaking, subscribe, toggle } from './speech'
 import {
   enter as enterVoice, exit as exitVoice, subscribe as subscribeVoice,
@@ -17,7 +17,7 @@ import { usePomodoro } from './pomodoro'
 import {
   SLOTS, dueOn, habitsDueToday, goalCurrent, habitStepKey, routineComplete, requiredSteps,
   daysClean, spaceFolderId,
-  type HabitDef, type HabitFrequency, type PageId, type SpaceId, type Task,
+  type GoalTimeframe, type HabitDef, type HabitFrequency, type Note, type PageId, type RoutineCadence, type SpaceId, type Task,
 } from './types'
 import { localDateKey, fmtDuration, taskMinutes, goalPeriodKey, goalPeriodRange, periodKeyFor, type GoalTf } from './util'
 import { nextPersonSlot, TIER_CADENCE, TIER_LABEL } from './peoplelayout'
@@ -405,486 +405,678 @@ const OPEN_LABELS: Partial<Record<PageId, string>> = {
   today: 'Today', plan: 'Plan', projects: 'Projects', habits: 'Habits',
   routines: 'Routines', goals: 'Goals', quitting: 'Quitting', settings: 'Settings',
   notes: 'Notes', board: 'the board', apps: 'Apps', focus: 'Focus', zone: 'the Zone',
-  bills: 'Bills', calendar: 'Calendar', timeline: 'Jar',
-  assistant: 'the Assistant', skills: 'Skills', health: 'Health',
+  bills: 'Bills', calendar: 'Calendar', timeline: 'Jar', ideas: 'Ideas',
+  prompts: 'Prompts', people: 'People', gym: 'Gym', longevity: 'Longevity',
+  assistant: 'the Assistant', skills: 'Skills', health: 'Health', watchless: 'Watchless',
 }
+
+const slotWord = (s?: string) => SLOTS.find((x) => x.id === s)?.label.toLowerCase()
+/** pick() for rows whose name is not called `title`. */
+function pickBy<T>(rows: T[], name: (r: T) => string, match: string): { row?: T; why?: string } {
+  const { row, why } = pick(rows.map((r) => ({ r, title: name(r) })), match)
+  return { row: row?.r, why }
+}
+/** A note has no reliable title -- most are just typed text -- so it is named
+ *  the way its own list names it: the title, else its first line. */
+const noteName = (n: Note) => n.title || n.body.split('\n')[0].slice(0, 60)
+const no = (text: string): Done => ({ ok: false, text })
+const yes = (text: string, undo?: () => void): Done => ({ ok: true, text, ...(undo ? { undo } : {}) })
 
 /** Runs what the model named, against the same store every page writes to, and
  *  reports what it actually did. Nothing here trusts a title: every match is
- *  resolved against his real rows first, and an unresolved one changes nothing.
- *
- *  It reads `tasks` through a ref rather than through the closure, because a
- *  reply naming three changes runs them back to back and each one has to see
- *  the row the last one just wrote. */
+ *  resolved against his real rows first, and an unresolved one changes nothing. */
 function useDoer() {
   const st = useStore()
-  const { space, todayIndex } = st
   const live = useRef(st)
   live.current = st
   const bills = useAssistantBills()
-  const pomo = usePomodoro()
+  /* Through a ref like the store: "start a block, then stop it" in one reply
+     must see the block the first action started. */
+  const pomoLive = usePomodoro()
+  const pomoNow = useRef(pomoLive)
+  pomoNow.current = pomoLive
 
-  /* async now, for "bill" alone -- marking one paid/unpaid is a real
-     Supabase round trip (assistantbills.ts), unlike every other action here,
-     which is a synchronous store write. useAssistantThread already awaits
-     this call, so nothing about the caller changes; every other kind below
-     still resolves on the same tick it always did. */
+  /* A CHAIN SEES ITS OWN WORK (2026-10-04). live.current is the store as of
+     the last render, and every write lands on the NEXT one -- so "make project
+     P and put X in it" looked for P before P existed and reported it missing,
+     and every dependent pair in one reply failed the same way. After each
+     action the doer now waits for that render (or 80ms, when the action
+     changed nothing and no render is coming), so each action reads what the
+     one before it wrote. */
+  const waiters = useRef<(() => void)[]>([])
+  useEffect(() => {
+    const w = waiters.current
+    waiters.current = []
+    w.forEach((f) => f())
+  })
+  const settle = () => new Promise<void>((r) => { waiters.current.push(r); setTimeout(r, 80) })
+
   return async (actions: Action[]): Promise<Done[]> => {
     const out: Done[] = []
-    /* live.current is the store as of the last RENDER, not as of the last
-       loop iteration -- addTask's own update lands on the next render, which
-       has not happened yet while this synchronous loop is still running. Two
-       "add" actions for the same title in the one response (his report,
-       2026-09-08: the model itself answering both attempts of a 400-then-
-       retry turn) both saw the store BEFORE either add, and the check below
-       against s2.tasks alone would miss a duplicate created earlier in this
-       exact call. Titles added so far in THIS run close the gap. */
+    /* Two "add"s for one title in one run (a retried turn answering twice)
+       would otherwise both see the store before either landed. */
     const addedThisRun = new Set<string>()
-    /* Same reasoning as addedThisRun above, for addPerson: several people
-       dictated in one breath are several actions in this one run, and
-       nextPersonSlot needs to see the ones this run already placed, not
-       just what existed before any of them ran. */
-    let peopleSoFar = live.current.people
     for (const a of actions) {
-      const s2 = live.current
-      const day = localDateKey()
-      if (a.kind === 'add') {
-        const slot = a.list === 'backlog' ? undefined : a.slot
-        const list = a.list ?? (a.slot ? 'today' : 'backlog')
-        /* No guard here duplicated the row the moment "add" ran twice for the
-           same title (his report, 2026-09-08) -- and it now can, the same way
-           a rate-limited or 400-then-retried turn already runs the WHOLE
-           request twice: a model that answers on both attempts, or a
-           question asked again before the first answer was back, means two
-           real "do" arrays, not one. Every other action here is written to be
-           safe run twice ("habit" above answers "already kept" rather than
-           toggling itself back off); "add" is the one place creating the
-           second row was silent. An exact, still-open title is treated as the
-           same request repeated, not two things he actually wants. */
-        const key = a.title.trim().toLowerCase()
-        if (addedThisRun.has(key)) { out.push({ ok: true, text: `Already on the list: ${a.title}` }); continue }
-        /* An open row with this exact title already exists -- his own report,
-           2026-09-10: a bulk plan naming a task that was already sitting in
-           the backlog got "Already on the list" and never actually moved,
-           so the noon slot he asked for stayed empty and the line lied by
-           omission. A repeat "add" is his placement for the row, restated,
-           not a no-op: if it is not already where he just asked for it, that
-           is exactly what runs -- the same list/slot writes 'move' makes,
-           just reached from "add" instead. Project is left alone: no "add"
-           he sends ever names one worth trusting over a real pick, and
-           there is no equivalent field to fill in here.
+      try {
+        const r = await step(a, addedThisRun)
+        out.push(...(Array.isArray(r) ? r : [r]))
+      } catch {
+        /* A failed network write (Bills) is a failed line, not a dead turn. */
+        out.push(no(`${a.kind} could not be saved`))
+      }
+      await settle()
+    }
+    return out
+  }
 
-           Estimate is different. A bare "move" never carries one -- the
-           Action type has no field for it -- so an existing number is never
-           at risk from that path. "add" is the one action that DOES name a
-           length, which means a title that already exists with none is a
-           row this exact plan is filling in for the first time, not a
-           number this app is overwriting behind his back. Found the same
-           day: two rows still read "no estimate" after landing in their
-           slot, because the first version of this fix protected an
-           estimate that was never really there to protect. A row that
-           already has its own non-zero number keeps it either way. */
-        const existing = s2.tasks.find((t) => !t.done && t.title.trim().toLowerCase() === key)
+  async function step(a: Action, addedThisRun: Set<string>): Promise<Done | Done[]> {
+    const s = live.current
+    const pomo = pomoNow.current
+    const day = localDateKey()
+    const space = s.space
+    const m = a.match ?? ''
+    const proj = (name: string) => pickBy(s.projects, (p) => p.name, name)
+    const habitRows = s.habits.filter((h) => !h.archivedAt)
+    const routineRows = s.routines.filter((r) => !r.archivedAt)
+
+    switch (a.kind) {
+      case 'add': {
+        const title = a.title!
+        const slot = a.list === 'backlog' ? undefined : a.slot
+        const list = a.list ?? (a.slot || a.date || a.at ? 'today' : 'backlog')
+        const on = list === 'today' ? (a.date ?? day) : undefined
+        const where = a.date && a.date !== day ? a.date : slot ? slotWord(slot) : list === 'today' ? 'today' : 'the list'
+        const key = title.trim().toLowerCase()
+        if (addedThisRun.has(key)) return yes(`Already on the list: ${title}`)
+        /* An open row with this exact title already exists (his report,
+           2026-09-10): a repeated "add" is his placement for that row,
+           restated, so it moves rather than duplicating or no-op'ing. It fills
+           in an estimate only where the row has none of its own. */
+        const existing = s.tasks.find((t) => !t.done && t.title.trim().toLowerCase() === key)
         if (existing) {
           addedThisRun.add(key)
-          const blank = !existing.estimated && !existing.estimateMin
-          const fillsEstimate = a.min != null && blank
-          const alreadyThere = existing.list === list && (!slot || existing.slot === slot) && !fillsEstimate
-          if (alreadyThere) { out.push({ ok: true, text: `Already on the list: ${a.title}` }); continue }
+          const fillsEstimate = a.min != null && !existing.estimated && !existing.estimateMin
+          const alreadyThere = existing.list === list && (!slot || existing.slot === slot) && (!on || existing.plannedOn === on) && !fillsEstimate
+          if (alreadyThere) return yes(`Already on the list: ${title}`)
           const wasList = existing.list, wasSlot = existing.slot, wasPlannedOn = existing.plannedOn, wasMin = existing.estimateMin
-          if (list !== existing.list) s2.moveTaskList(existing.id, list, day)
-          if (slot) s2.assignSlot(existing.id, slot)
-          if (fillsEstimate) s2.setEstimate(existing.id, a.min!)
-          out.push({
-            ok: true,
-            text: `Moved to ${slot ? SLOTS.find((x) => x.id === slot)?.label.toLowerCase() : list === 'today' ? 'today' : 'the list'}: ${a.title}`,
-            undo: () => {
-              s2.moveTaskList(existing.id, wasList, wasPlannedOn)
-              if (wasSlot) s2.assignSlot(existing.id, wasSlot)
-              if (fillsEstimate) s2.setEstimate(existing.id, wasMin)
-            },
+          if (list !== existing.list || (on && existing.plannedOn !== on)) s.moveTaskList(existing.id, list, on)
+          if (slot) s.assignSlot(existing.id, slot)
+          if (fillsEstimate) s.setEstimate(existing.id, a.min!)
+          return yes(`Moved to ${where}: ${title}`, () => {
+            s.moveTaskList(existing.id, wasList, wasPlannedOn)
+            if (wasSlot) s.assignSlot(existing.id, wasSlot)
+            if (fillsEstimate) s.setEstimate(existing.id, wasMin)
           })
-          continue
         }
-        /* "add X to the Y project" -- a real project, not a made-up one. No
-           match means the task still gets added, just without a project,
-           rather than the whole add failing over one unresolved word. */
+        /* "add X to the Y project": a real project or none. No match still
+           adds the task, rather than failing the whole add over one word. */
         let projectId: string | undefined
         let projectNote = ''
         if (a.project) {
-          const { row } = pick(s2.projects.map((p) => ({ ...p, title: p.name })), a.project)
-          if (row) { projectId = row.id; projectNote = ` in ${row.name}` }
-          else projectNote = ` (no project called "${a.project}", added without one)`
+          const { row } = proj(a.project)
+          if (row) { projectId = row.id; projectNote = ` in ${row.name}` } else projectNote = ` (no project called "${a.project}", added without one)`
         }
         addedThisRun.add(key)
-        const newTaskId = s2.addTask({
-          title: a.title,
-          source: 'mc',
-          estimateMin: a.min ?? 15,
-          estimated: a.min != null,
-          space: a.space ?? space,
-          list,
-          category: 'admin',
-          slot,
-          plannedOn: list === 'today' ? day : undefined,
-          projectId,
+        const est = a.min ?? 15
+        const subs = a.steps ?? []
+        const id = s.addTask({
+          title, source: 'mc', estimateMin: est, estimated: a.min != null,
+          space: (a.space as SpaceId | undefined) ?? space, list, category: 'admin', slot, plannedOn: on, projectId,
+          ...(a.at ? { at: a.at } : {}),
+          ...(subs.length ? {
+            subtasks: subs.map((t, i) => ({ id: `${Date.now().toString(36)}s${i}`, title: t, estimateMin: Math.max(5, Math.round(est / subs.length)), done: false })),
+          } : {}),
         })
-        out.push({
-          ok: true,
-          text: `Added to ${slot ? SLOTS.find((x) => x.id === slot)?.label.toLowerCase() : list === 'today' ? 'today' : 'the list'}${projectNote}: ${a.title}`,
-          undo: () => s2.deleteTask(newTaskId),
-        })
-        continue
+        return yes(`Added to ${where}${a.at ? ` at ${a.at}` : ''}${projectNote}: ${title}${subs.length ? ` (${subs.length} steps)` : ''}`, () => s.deleteTask(id))
       }
-      if (a.kind === 'workspace') {
-        /* Not a task action -- no title to resolve against his rows, so it
-           never reaches the pick() below. Voice's own use for this: "open up
-           Big Time" said instead of tapping the workspace switcher. 'all' is
-           a real target too (his report, 2026-09-08: "there is one more
-           workspace and that's called all") -- the same value the header's
-           own switcher already accepts, not a fifth space of its own.
 
-           setView, not setSpace: setSpace alone only moves writeSpace, which
-           the header's own dropdown (view) can silently override the moment
-           he is standing in any OTHER single space -- the visible switcher
-           would still read "Personal" while nothing on screen had actually
-           moved. setView is the same function that dropdown calls, and it
-           already keeps writeSpace in step with it (store.tsx), so this
-           changes what he SEES, not just an internal default. */
-        s2.setView(a.space)
-        out.push({ ok: true, text: `Switched to ${a.space === 'all' ? 'All' : SPACE_LABELS[a.space]}` })
-        continue
-      }
-      if (a.kind === 'open') {
-        /* A page, not a workspace -- "open the bills page" was refused
-           outright before this (his report, 2026-09-08: "I don't open
-           pages, I only switch between workspaces"), a true sentence about
-           a real gap rather than a guardrail worth keeping. setPage is the
-           same function every nav tab and dock door-out button already
-           calls. */
-        s2.setPage(a.page)
-        out.push({ ok: true, text: `Opened ${OPEN_LABELS[a.page] ?? a.page}` })
-        continue
-      }
-      if (a.kind === 'app') {
-        /* A real one of his OTHER tools, embedded on the Apps page -- the
-           same click "Open" on its own tile makes (apps.tsx: setFocusAppId,
-           setPage('apps')), both already on the shared store. */
-        const rows = APPS.map((app) => ({ ...app, title: app.name }))
-        const { row, why } = pick(rows, a.match)
-        if (!row) { out.push({ ok: false, text: why ?? 'no app matched' }); continue }
-        s2.setFocusAppId(row.id)
-        s2.setPage('apps')
-        out.push({ ok: true, text: `Opened ${row.name}` })
-        continue
-      }
-      if (a.kind === 'sync') {
-        /* Exactly the call Settings' own "Sync now" button makes -- same
-           key check, same targets-by-name match inside syncHevy() itself,
-           same markHabitDaysOn write. His report, 2026-09-08: he asked to
-           sync the Hevy habit and was told there was no way to run a sync
-           at all, which was true until this. */
-        if (!hasHevyKey()) { out.push({ ok: false, text: 'No Hevy key set on this device' }); continue }
-        const res = await syncHevy(s2.habits, s2.markHabitDaysOn)
-        out.push(res.ok
-          ? { ok: true, text: `Synced Hevy: ${res.days} day${res.days === 1 ? '' : 's'} of workouts` }
-          : {
-            ok: false,
-            text: res.reason === 'bad-key' ? 'That Hevy key was rejected'
-              : res.reason === 'rate-limit' ? 'Hevy is rate limiting right now'
-                : res.reason === 'no-habit' ? 'No habit named Workout / Gym / Fitness to tick'
-                  : 'Hevy could not be reached',
-          })
-        continue
-      }
-      if (a.kind === 'bill') {
-        /* A different log entirely -- Bills, not tasks -- so it never
-           reaches the task pick() below. His report, 2026-09-08: "it
-           cannot check one simple thing besides the task list."
-
-           ensure(), not bills.ready/bills.items directly: those are this
-           hook's own render, which can be a beat behind a request landing
-           the instant Bills opens (his report, same day: a genuinely
-           signed-in device with real data on screen got told it was
-           signed out, because the fetch that page just kicked off had not
-           resolved yet by the time this ran). ensure() reads the shared
-           store fresh and waits on that same fetch instead of the stale
-           snapshot. */
-        const fresh = await bills.ensure()
-        if (!fresh.ready) { out.push({ ok: false, text: 'Bills is not signed in on this device' }); continue }
-        const rows = fresh.items.map((i) => ({ ...i, title: i.name }))
-        const { row, why } = pick(rows, a.match)
-        if (!row) { out.push({ ok: false, text: why ?? 'no bill matched' }); continue }
-        if (row.paid === a.paid) {
-          out.push({ ok: true, text: `${row.name} was already ${a.paid ? 'paid' : 'unpaid'}` })
-          continue
+      case 'done': case 'undone': case 'drop': case 'move': case 'estimate': case 'rename': {
+        /* inSlot narrows the field BEFORE matching: two rows sharing a title,
+           one at noon and one in the afternoon, are only told apart by the
+           slot he named. */
+        const scoped = a.inSlot ? s.tasks.filter((t) => t.slot === a.inSlot) : s.tasks
+        if (a.all && (a.kind === 'done' || a.kind === 'undone' || a.kind === 'drop')) {
+          const { found, why } = pickAll(scoped, m)
+          return found.length ? found.map((row) => taskStep(a, row)) : no(why ?? 'no task matched')
         }
-        if (a.paid) await bills.markPaid(row); else await bills.markUnpaid(row)
-        out.push({ ok: true, text: a.paid ? `Marked paid: ${row.name}` : `Marked unpaid: ${row.name}` })
-        continue
+        const { row, why } = pick(scoped, m)
+        return row ? taskStep(a, row) : no(why ?? 'no task matched')
       }
-      if (a.kind === 'expense') {
-        /* His report, verbatim: asked to write in an unexpected cost, and
-           the model claimed it "put it on the list" -- there was no list,
-           and nothing this app could do reached that claim. addExpense is
-           the exact insert "Add a one-off" under Unexpected this cycle
-           already makes (billspage.tsx's PlannedSheet). Same ensure()
-           freshness as "bill" above, same reason. */
-        const fresh = await bills.ensure()
-        if (!fresh.ready) { out.push({ ok: false, text: 'Bills is not signed in on this device' }); continue }
-        await bills.addExpense(a.name, a.amount, a.dueOn)
-        out.push({ ok: true, text: `Added to Unexpected this cycle: ${a.name} (${a.amount} Kč)` })
-        continue
-      }
-      if (a.kind === 'income') {
-        const fresh = await bills.ensure()
-        if (!fresh.ready) { out.push({ ok: false, text: 'Bills is not signed in on this device' }); continue }
-        await bills.addIncome(a.amount, a.label)
-        out.push({ ok: true, text: `Added to Income: ${a.amount} Kč${a.label ? ` (${a.label})` : ''}` })
-        continue
-      }
-      if (a.kind === 'slip') {
-        /* Only break-kind habits -- the quitting list, never an ordinary
-           one, and never a routine (routines have no "slip" at all, see the
-           habit/routine split elsewhere in useDoer). logSlip writes today's
-           date; there is no undo, by design (assistant.ts). */
-        const rows = s2.habits.filter((h) => !h.archivedAt && h.kind === 'break').map((h) => ({ ...h, title: h.name }))
-        const { row, why } = pick(rows, a.match)
-        if (!row) { out.push({ ok: false, text: why ?? 'no habit matched' }); continue }
-        s2.logSlip(row.id)
-        out.push({ ok: true, text: `Logged a slip: ${row.name}` })
-        continue
-      }
-      if (a.kind === 'focus') {
-        /* A real timer, starting now -- pomo lives in its own context
-           (PomodoroProvider, mounted around the whole app in main.tsx), not
-           the store, so it is read here rather than through s2. */
-        if (a.match) {
-          const { row, why } = pick(s2.tasks, a.match)
-          if (!row) { out.push({ ok: false, text: why ?? 'no task matched' }); continue }
-          pomo.startFocus(a.min ?? taskMinutes(row), row.title)
-          out.push({ ok: true, text: `Focus started: ${row.title}` })
+
+      case 'steps': case 'breakdown': {
+        const { row, why } = pick(s.tasks, m)
+        if (!row) return no(why ?? 'no task matched')
+        if (row.subtasks?.some((x) => x.done)) return no(`${row.title} already has ticked steps, so they were left as they are`)
+        let subs: { title: string; estimateMin: number }[]
+        if (a.kind === 'steps') {
+          const each = Math.max(5, Math.round(taskMinutes(row) / a.steps!.length))
+          subs = a.steps!.map((title) => ({ title, estimateMin: each }))
         } else {
-          pomo.startFocus(a.min, undefined)
-          out.push({ ok: true, text: a.min ? `Focus started, ${fmtDuration(a.min)}` : 'Focus started' })
+          const res = await breakdownTask(row.title, row.category)
+          if (!res.ok) return no(`The breakdown did not come back (${res.reason})`)
+          subs = res.steps.map((x) => ({ title: x.title, estimateMin: x.estimateMin }))
         }
-        continue
+        s.setSubtasks(row.id, subs)
+        return yes(`${subs.length} steps on ${row.title}`)
       }
-      if (a.kind === 'note') {
-        /* His own words, filed in the space he is currently standing in --
-           the same default NotePanel's own "+ new note" button uses
-           (notedock.tsx: addNote(spaceFolderId(space))), not a folder
-           invented for this. */
-        s2.addNote(spaceFolderId(space), a.text)
-        out.push({ ok: true, text: 'Noted' })
-        continue
+      case 'stepDone': {
+        const { row, why } = pick(s.tasks, m)
+        if (!row) return no(why ?? 'no task matched')
+        const sub = pickBy(row.subtasks ?? [], (x) => x.title, a.step!)
+        if (!sub.row) return no(sub.why ?? `no step like that on ${row.title}`)
+        s.toggleSubtask(row.id, sub.row.id)
+        return yes(`${sub.row.done ? 'Reopened' : 'Ticked'} step: ${sub.row.title}`)
       }
-      if (a.kind === 'noteEdit' || a.kind === 'noteDelete') {
-        /* A note has no reliable title -- most are just typed text -- so it
-           is matched the same way its own briefing line names it: the title
-           when it has one, its first line when it does not. */
-        const rows = s2.notes.map((n) => ({ ...n, title: n.title || n.body.split('\n')[0].slice(0, 60) }))
-        const { row, why } = pick(rows, a.match)
-        if (!row) { out.push({ ok: false, text: why ?? 'no note matched' }); continue }
-        if (a.kind === 'noteEdit') { s2.updateNote(row.id, { body: a.text }); out.push({ ok: true, text: `Updated note: ${row.title}` }) }
-        else { s2.deleteNote(row.id); out.push({ ok: true, text: `Deleted note: ${row.title}` }) }
-        continue
+
+      case 'project': {
+        if (s.projects.some((p) => p.name.trim().toLowerCase() === a.name!.trim().toLowerCase())) return yes(`Already have a project called ${a.name}`)
+        s.addProject(a.name!, (a.space as SpaceId | undefined) ?? space)
+        return yes(`Made a new project: ${a.name}`)
       }
-      if (a.kind === 'project') {
-        const dupe = s2.projects.some((p) => p.name.trim().toLowerCase() === a.name.trim().toLowerCase())
-        if (dupe) { out.push({ ok: true, text: `Already have a project called ${a.name}` }); continue }
-        s2.addProject(a.name, a.space ?? space)
-        out.push({ ok: true, text: `Made a new project: ${a.name}` })
-        continue
+      case 'projectRename': {
+        const { row, why } = proj(m)
+        if (!row) return no(why ?? 'no project matched')
+        s.renameProject(row.id, a.name!)
+        return yes(`Renamed project ${row.name} to ${a.name}`)
       }
-      if (a.kind === 'addHabit') {
-        s2.addHabit({ name: a.name, frequency: a.frequency ?? 'daily', kind: a.breaking ? 'break' : 'build', quitSince: a.breaking ? day : undefined })
-        out.push({ ok: true, text: a.breaking ? `Now tracking: quitting ${a.name}` : `Added a habit: ${a.name}` })
-        continue
+      case 'projectDelete': {
+        const { row, why } = proj(m)
+        if (!row) return no(why ?? 'no project matched')
+        s.deleteProject(row.id, a.deleteTasks ? 'delete' : 'move')
+        return yes(`Deleted project ${row.name}${a.deleteTasks ? ' and its tasks' : ', its tasks kept'}`)
       }
-      if (a.kind === 'archiveHabit') {
-        const rows = s2.habits.filter((h) => !h.archivedAt).map((h) => ({ ...h, title: h.name }))
-        const { row, why } = pick(rows, a.match)
-        if (!row) { out.push({ ok: false, text: why ?? 'no habit matched' }); continue }
-        s2.deleteHabit(row.id)
-        out.push({ ok: true, text: `Archived: ${row.name}` })
-        continue
+
+      case 'habit': {
+        const { row, why } = pickBy(habitRows, (h) => h.name, m)
+        if (!row) return no(why ?? 'no habit matched')
+        const on = a.on !== false
+        if (a.date && a.date !== day) {
+          s.markHabitOn(row.id, a.date, on)
+          return yes(`${on ? 'Kept' : 'Reopened'} on ${a.date}: ${row.name}`)
+        }
+        if (row.days[s.todayIndex] === on) return yes(`${row.name} was already ${on ? 'kept' : 'open'} today`)
+        s.markHabitDay(row.id, s.todayIndex, on)
+        return yes(`${on ? 'Kept today' : 'Reopened today'}: ${row.name}`)
       }
-      if (a.kind === 'editHabit') {
-        const rows = s2.habits.filter((h) => !h.archivedAt).map((h) => ({ ...h, title: h.name }))
-        const { row, why } = pick(rows, a.match)
-        if (!row) { out.push({ ok: false, text: why ?? 'no habit matched' }); continue }
-        if (!a.name && !a.frequency) { out.push({ ok: false, text: 'nothing to change' }); continue }
-        /* updateHabit merges via {...h, ...patch} (store.tsx) -- a key
-           PRESENT with value undefined still overwrites, it does not skip.
-           Building the patch from only the fields he actually named is the
-           difference between "renamed" and "silently wiped the name". */
-        const patch: { name?: string; frequency?: HabitFrequency } = {}
+      case 'habitCount': {
+        const { row, why } = pickBy(habitRows, (h) => h.name, m)
+        if (!row) return no(why ?? 'no habit matched')
+        const v = a.value!
+        if (habitStepKey(row)) { s.logHabitNumber(row.id, v); return yes(`Logged ${v} on ${row.name}`) }
+        if (row.measure !== 'times') return no(`${row.name} is not counted, it is ticked or fed by focus time`)
+        for (let i = 0; i < Math.abs(Math.round(v)); i++) { s.logCount(row.id, v < 0 ? -1 : 1); await settle() }
+        return yes(`${v < 0 ? 'Took' : 'Counted'} ${Math.abs(Math.round(v))} ${v < 0 ? 'off' : 'on'} ${row.name}`)
+      }
+      case 'slip': {
+        /* Only quitting rows, never an ordinary habit or a routine. A slip is
+           a fact about a day, so there is no un-slip. */
+        const { row, why } = pickBy(habitRows.filter((h) => h.kind === 'break'), (h) => h.name, m)
+        if (!row) return no(why ?? 'nothing he is quitting matched')
+        if (a.date && a.date !== day) s.logSlipOn(row.id, a.date); else s.logSlip(row.id)
+        return yes(`Logged a slip${a.date && a.date !== day ? ` on ${a.date}` : ''}: ${row.name}`)
+      }
+      case 'addHabit': {
+        const frequency = a.frequency ?? (a.perWeek ? 'times-per-week' : 'daily')
+        s.addHabit({ name: a.name!, frequency, targetPerWeek: a.perWeek, kind: a.breaking ? 'break' : 'build', quitSince: a.breaking ? day : undefined })
+        return yes(a.breaking ? `Now tracking: quitting ${a.name}` : `Added a habit: ${a.name}`)
+      }
+      case 'editHabit': {
+        const { row, why } = pickBy(habitRows, (h) => h.name, m)
+        if (!row) return no(why ?? 'no habit matched')
+        /* Only the fields he named: updateHabit merges {...h, ...patch}, so a
+           key present as undefined would wipe the field instead of skipping. */
+        const patch: { name?: string; frequency?: HabitFrequency; targetPerWeek?: number } = {}
         if (a.name) patch.name = a.name
         if (a.frequency) patch.frequency = a.frequency
-        s2.updateHabit(row.id, patch)
-        out.push({ ok: true, text: `Updated: ${a.name ?? row.name}` })
-        continue
+        if (a.perWeek) patch.targetPerWeek = a.perWeek
+        s.updateHabit(row.id, patch)
+        return yes(`Updated: ${a.name ?? row.name}`)
       }
-      if (a.kind === 'addRoutine') {
-        s2.addRoutine({ title: a.title, cadence: a.cadence ?? 'daily', blurb: a.blurb })
-        out.push({ ok: true, text: `Made a new routine: ${a.title}` })
-        continue
+      case 'pauseHabit': {
+        const { row, why } = pickBy(habitRows, (h) => h.name, m)
+        if (!row) return no(why ?? 'no habit matched')
+        s.togglePauseHabit(row.id)
+        return yes(`${row.paused ? 'Resumed' : 'Paused'}: ${row.name}`)
       }
-      if (a.kind === 'addPerson') {
-        /* Same placement rule as the People page's own "+" (peoplelayout.ts),
-           so a person dictated here and one added by hand land the same way.
-           Against peopleSoFar, not s2.people directly: addPerson's own
-           setState hasn't landed by the time the NEXT action in this same
-           batch runs (his ask is several people in one breath), so reading
-           s2.people again here would still show the state from before any
-           of them were added and place every one of them on the same spot. */
-        const { x, y } = nextPersonSlot(peopleSoFar, a.tier)
-        const now = Date.now()
-        const id = s2.addPerson({
-          name: a.name, rel: a.rel ?? '', tier: a.tier, cadenceDays: TIER_CADENCE[a.tier], x, y,
+      case 'archiveHabit': {
+        const { row, why } = pickBy(habitRows, (h) => h.name, m)
+        if (!row) return no(why ?? 'no habit matched')
+        s.deleteHabit(row.id)
+        return yes(`Archived: ${row.name}`)
+      }
+
+      case 'addRoutine': {
+        s.addRoutine({ title: a.title!, cadence: a.cadence ?? 'daily', blurb: a.blurb })
+        if (a.steps?.length) {
+          await settle()
+          const made = live.current.routines.filter((r) => r.title === a.title).at(-1)
+          for (const title of made ? a.steps : []) { live.current.addRoutineStep(made!.id, { title }); await settle() }
+        }
+        return yes(`Made a new routine: ${a.title}${a.steps?.length ? ` (${a.steps.length} steps)` : ''}`)
+      }
+      case 'editRoutine': case 'deleteRoutine': case 'routineStep': case 'addRoutineStep': case 'removeRoutineStep': case 'routineDone': case 'planRoutine': {
+        const { row: r, why } = pickBy(routineRows, (x) => x.title, m)
+        if (!r) return no(why ?? 'no routine matched')
+        if (a.kind === 'editRoutine') {
+          const patch: { title?: string; cadence?: RoutineCadence; blurb?: string } = {}
+          if (a.title) patch.title = a.title
+          if (a.cadence) patch.cadence = a.cadence
+          if (a.blurb) patch.blurb = a.blurb
+          s.updateRoutine(r.id, patch)
+          return yes(`Updated routine: ${a.title ?? r.title}`)
+        }
+        if (a.kind === 'deleteRoutine') { s.deleteRoutine(r.id); return yes(`Deleted routine: ${r.title}`) }
+        if (a.kind === 'addRoutineStep') { s.addRoutineStep(r.id, { title: a.step! }); return yes(`Added a step to ${r.title}: ${a.step}`) }
+        if (a.kind === 'routineDone') { s.setRoutineDone(r.id, a.on !== false); return yes(`${a.on === false ? 'Reopened' : 'Done'}: ${r.title}`) }
+        if (a.kind === 'planRoutine') {
+          s.planRoutine(r.id, a.slot, a.date)
+          return yes(`Planned ${r.title} for ${a.date && a.date !== day ? a.date : slotWord(a.slot) ?? 'today'}`)
+        }
+        const st2 = pickBy(r.steps, (x) => x.title, a.step!)
+        if (!st2.row) return no(st2.why ?? `no step like that in ${r.title}`)
+        if (a.kind === 'removeRoutineStep') { s.deleteRoutineStep(r.id, st2.row.id); return yes(`Removed from ${r.title}: ${st2.row.title}`) }
+        const was = r.doneStepIds.includes(st2.row.id)
+        s.toggleRoutineStep(r.id, st2.row.id)
+        await settle()
+        /* A gated step (the typing test) refuses a tick until it is passed,
+           silently. Read it back rather than reporting a tick that never was. */
+        const now = live.current.routines.find((x) => x.id === r.id)?.doneStepIds.includes(st2.row.id)
+        if (now === was) return no(`${st2.row.title} is locked until its own test is passed`)
+        return yes(`${was ? 'Unticked' : 'Ticked'} in ${r.title}: ${st2.row.title}`)
+      }
+
+      case 'addGoal': {
+        const tf = a.timeframe ?? 'monthly'
+        const ms = a.milestones ?? []
+        if (!ms.length && !a.target) return no(`A goal needs a target number or milestones: ${a.name}`)
+        s.addGoal({
+          space: (a.space as SpaceId | undefined) ?? space, name: a.name!, current: 0, note: '',
+          target: ms.length || a.target!, unit: ms.length ? 'milestones' : a.unit ?? 'steps',
+          timeframe: tf, category: a.category ?? 'life', why: a.why, periodKey: goalPeriodKey(tf),
+          milestones: ms.map((label, i) => ({ id: `ms-${Date.now().toString(36)}-${i}`, label, done: false })),
         })
-        if (a.job || a.birthday || a.birthYear) s2.updatePerson(id, { job: a.job, birthday: a.birthday, birthYear: a.birthYear })
-        peopleSoFar = [...peopleSoFar, {
-          id, name: a.name, rel: a.rel ?? '', tier: a.tier, cadenceDays: TIER_CADENCE[a.tier], x, y, createdAt: now, updatedAt: now,
-        }]
-        out.push({ ok: true, text: `Added to ${TIER_LABEL[a.tier]}: ${a.name}` })
-        continue
+        return yes(`Made a new goal: ${a.name}`)
       }
-      if (a.kind === 'editPerson') {
-        const rows = s2.people.map((p) => ({ ...p, title: p.name }))
-        const { row, why } = pick(rows, a.match)
-        if (!row) { out.push({ ok: false, text: why ?? 'no person matched' }); continue }
-        s2.updatePerson(row.id, {
-          tier: a.tier, rel: a.rel, job: a.job, birthday: a.birthday, birthYear: a.birthYear, cadenceDays: a.cadenceDays,
-        })
-        out.push({ ok: true, text: `Updated: ${row.name}` })
-        continue
+      case 'editGoal': case 'goal': case 'milestone': case 'repeatGoal': case 'deleteGoal': {
+        /* An open goal wins over a closed one of the same name, except for
+           repeat, which only makes sense on a closed one. */
+        const rows = a.kind === 'repeatGoal' ? s.goals : s.goals.filter((g) => !g.closed)
+        const { row: g, why } = pickBy(rows, (x) => x.name, m)
+        if (!g) return no(why ?? 'no goal matched')
+        if (a.kind === 'deleteGoal') { s.deleteGoal(g.id); return yes(`Deleted goal: ${g.name}`) }
+        if (a.kind === 'repeatGoal') return s.repeatGoal(g.id) ? yes(`Running again: ${g.name}`) : no(`${g.name} could not be repeated`)
+        if (a.kind === 'editGoal') {
+          const patch: { name?: string; target?: number; unit?: string; timeframe?: GoalTimeframe; why?: string } = {}
+          if (a.name) patch.name = a.name
+          if (a.target) patch.target = a.target
+          if (a.unit) patch.unit = a.unit
+          if (a.timeframe) patch.timeframe = a.timeframe
+          if (a.why) patch.why = a.why
+          s.updateGoal(g.id, patch)
+          return yes(`Updated goal: ${a.name ?? g.name}`)
+        }
+        if (a.kind === 'milestone') {
+          const ms = pickBy(g.milestones ?? [], (x) => x.label, a.step!)
+          if (!ms.row) return no(ms.why ?? `no milestone like that on ${g.name}`)
+          s.toggleGoalMilestone(g.id, ms.row.id)
+          return yes(`${ms.row.done ? 'Reopened' : 'Ticked'} on ${g.name}: ${ms.row.label}`)
+        }
+        /* A goal fed by a habit counts itself; a number typed over it would
+           be overwritten by the next tick and mean nothing meanwhile. */
+        if (g.habitId) return no(`${g.name} counts itself from its habit, so there is no number to set`)
+        const next = a.set != null ? a.set : g.current + (a.by ?? 0)
+        if (a.set != null) s.updateGoal(g.id, { current: a.set }); else s.bumpGoal(g.id, a.by!)
+        return yes(`${g.name}: ${next} of ${g.target} ${g.unit}`, () => s.updateGoal(g.id, { current: g.current }))
       }
-      if (a.kind === 'habit') {
-        const rows = s2.habits.filter((h) => !h.archivedAt).map((h) => ({ ...h, title: h.name }))
-        const { row, why } = pick(rows, a.match)
-        if (!row) { out.push({ ok: false, text: why ?? 'no habit matched' }); continue }
-        const already = row.days[todayIndex]
-        if (already === a.on) { out.push({ ok: true, text: `${row.name} was already ${a.on ? 'kept' : 'open'} today` }); continue }
-        s2.markHabitDay(row.id, todayIndex, a.on)
-        out.push({ ok: true, text: a.on ? `Kept today: ${row.name}` : `Reopened today: ${row.name}` })
-        continue
+
+      case 'focus': {
+        /* A real timer, starting now. pomo lives in its own context, not the
+           store, so it is read here rather than through s. */
+        if (a.match) {
+          const { row, why } = pick(s.tasks, a.match)
+          if (!row) return no(why ?? 'no task matched')
+          pomo.startFocus(a.min ?? taskMinutes(row), row.title)
+          return yes(`Focus started: ${row.title}`)
+        }
+        pomo.startFocus(a.min, undefined)
+        return yes(a.min ? `Focus started, ${fmtDuration(a.min)}` : 'Focus started')
       }
-      /* inSlot narrows the field BEFORE match is ever tried against it --
-         two rows sharing close to one title, one at noon and one in the
-         afternoon (his report, 2026-09-08: two real "Zaplatit AirBank"
-         rows), are the exact case a plain title search cannot tell apart,
-         and the slot he actually named is real, already-known data, never
-         a guess. */
-      const scoped = a.inSlot ? s2.tasks.filter((t) => t.slot === a.inSlot) : s2.tasks
-      const applyToRow = (row: Task): Done => {
-        switch (a.kind) {
-          case 'done': {
-            if (row.done) return { ok: true, text: `${row.title} was already done` }
-            /* He said the real number in the same breath ("done, took me
-               fifteen minutes") -- log it outright rather than asking a
-               question he already answered. logActual is the one function
-               that marks it done, records the actual minutes, and writes
-               the ledger/focus rows behind it, the same path the manual
-               "how long did it take?" prompt already calls into (see
-               ActualLog). */
-            if (a.actualMin != null) {
-              s2.logActual(row.id, a.actualMin)
-              /* toggleTask alone reverses the done flag and clears actualMin
-                 the same way finishing it by hand and reopening it would; the
-                 ledger row and focus block logActual wrote behind it are not
-                 unwound. Same trade already made for logSlip elsewhere in
-                 this file: a full undo here would mean carrying every side
-                 effect back out through Ledger and Focus for one row, and the
-                 common case -- catching a bad bulk add -- never reaches it. */
-              return { ok: true, text: `Done: ${row.title} — ${fmtDuration(a.actualMin)}`, undo: () => s2.toggleTask(row.id) }
-            }
-            s2.toggleTask(row.id)
-            return {
-              ok: true,
-              text: `Done: ${row.title}`,
-              needsActual: row.actualMin == null ? { taskId: row.id, est: taskMinutes(row) } : undefined,
-              undo: () => s2.toggleTask(row.id),
-            }
-          }
-          case 'undone':
-            if (!row.done) return { ok: true, text: `${row.title} was already open` }
-            s2.toggleTask(row.id)
-            return { ok: true, text: `Reopened: ${row.title}`, undo: () => s2.toggleTask(row.id) }
-          case 'move': {
-            /* Snapshot before any of the writes below: row is this call's own
-               argument, never touched by them, so its fields are exactly what
-               undo needs to put back. */
-            const wasList = row.list
-            const wasSlot = row.slot
-            const wasPlannedOn = row.plannedOn
-            const wasProjectId = row.projectId
-            if (a.list && a.list !== row.list) s2.moveTaskList(row.id, a.list, day)
-            if (a.slot) {
-              if (row.list !== 'today' && !a.list) s2.moveTaskList(row.id, 'today', day)
-              s2.assignSlot(row.id, a.slot)
-            }
-            /* "move it into the kitchen remodel project" -- an EXISTING task
-               changing which project owns it, the same setTaskProject the
-               task's own project picker calls. Never invents a project: no
-               match means the rest of the move (slot/list, if any) still
-               happens, just without touching projectId. */
-            let projectNote = ''
-            let movedProject = false
-            if (a.project) {
-              const { row: proj } = pick(s2.projects.map((p) => ({ ...p, title: p.name })), a.project)
-              if (proj) { s2.setTaskProject(row.id, proj.id); projectNote = ` into ${proj.name}`; movedProject = true }
-              else projectNote = ` (no project called "${a.project}")`
-            }
-            return {
-              ok: true,
-              text: (a.slot
-                ? `Moved to ${SLOTS.find((x) => x.id === a.slot)?.label.toLowerCase()}: ${row.title}`
-                : a.list
-                  ? `Moved to ${a.list === 'today' ? 'today' : 'the list'}: ${row.title}`
-                  : `Moved: ${row.title}`) + projectNote,
-              undo: () => {
-                s2.moveTaskList(row.id, wasList, wasPlannedOn)
-                if (wasSlot) s2.assignSlot(row.id, wasSlot)
-                if (movedProject) s2.setTaskProject(row.id, wasProjectId)
-              },
-            }
-          }
-          case 'estimate': {
-            const wasMin = row.estimateMin
-            s2.setEstimate(row.id, a.min)
-            return { ok: true, text: `${fmtDuration(a.min)} on ${row.title}`, undo: () => s2.setEstimate(row.id, wasMin) }
-          }
-          case 'rename': {
-            const was = row.title
-            s2.updateTask(row.id, { title: a.title })
-            return { ok: true, text: `Renamed "${was}" to: ${a.title}`, undo: () => s2.updateTask(row.id, { title: was }) }
-          }
-          case 'drop':
-            s2.deleteTask(row.id)
-            return { ok: true, text: `Deleted: ${row.title}` }
-          default:
-            return { ok: false, text: 'nothing here to run' }
+      case 'focusStop':
+        if (pomo.phase === 'idle') return yes('No focus block was running')
+        pomo.stop()
+        return yes('Focus stopped, the time so far is kept')
+      case 'logFocus': {
+        if (a.date || a.at) s.logFocusOn(a.date ?? day, a.min!, a.label, a.at); else s.logFocus(a.min!, a.label)
+        return yes(`Logged ${fmtDuration(a.min!)} of focus${a.label ? ` on ${a.label}` : ''}${a.date && a.date !== day ? ` on ${a.date}` : ''}`)
+      }
+
+      case 'note': {
+        /* Filed where he is standing, or in the folder he named. A folder that
+           does not exist does not lose the note: it lands in the default. */
+        const f = a.folder ? pickBy(s.noteFolders, (x) => x.name, a.folder) : null
+        /* A note's title IS its first line (store/notes.ts noteTitle), so a
+           title he named is written as that line, not a field that the store
+           would overwrite from the body. */
+        s.addNote(f?.row?.id ?? spaceFolderId(space), a.title ? `${a.title}\n${a.text}` : a.text)
+        return yes(`Noted${f?.row ? ` in ${f.row.name}` : ''}${f && !f.row ? ` (no folder called "${a.folder}", filed in the default)` : ''}`)
+      }
+      case 'noteEdit': case 'noteDelete': case 'noteMove': case 'notePin': case 'noteDone': {
+        const { row, why } = pickBy(s.notes, noteName, m)
+        if (!row) return no(why ?? 'no note matched')
+        const name = noteName(row)
+        if (a.kind === 'noteDelete') { s.deleteNote(row.id); return yes(`Deleted note: ${name}`) }
+        if (a.kind === 'notePin') { s.updateNote(row.id, { pinned: a.on !== false }); return yes(`${a.on === false ? 'Unpinned' : 'Pinned'}: ${name}`) }
+        if (a.kind === 'noteDone') { s.setNoteDone(row.id, a.on !== false); return yes(`${a.on === false ? 'Reopened' : 'Done'}: ${name}`) }
+        if (a.kind === 'noteMove') {
+          const f = pickBy(s.noteFolders, (x) => x.name, a.folder!)
+          if (!f.row) return no(f.why ?? 'no folder matched')
+          s.moveNote(row.id, f.row.id)
+          return yes(`Moved to ${f.row.name}: ${name}`)
+        }
+        const rest = row.body.split('\n').slice(1).join('\n')
+        const body = a.text ? (a.title ? `${a.title}\n${a.text}` : a.text) : `${a.title}\n${rest}`
+        s.updateNote(row.id, { body })
+        return yes(`Updated note: ${a.title ?? name}`)
+      }
+      case 'folder':
+        s.addNoteFolder((a.space as SpaceId | undefined) ?? space, a.name!)
+        return yes(`Made a notes folder: ${a.name}`)
+
+      case 'idea': {
+        /* First free spot on a grid from the board's home corner, so a
+           dictated card never lands on top of one already there. */
+        const taken = (x: number, y: number) => s.ideaBoard.some((c) => Math.abs(c.x - x) < 200 && Math.abs(c.y - y) < 160)
+        let x = 40, y = 40
+        for (let i = 0; i < 200 && taken(x, y); i++) { x = 40 + (i % 6) * 240; y = 40 + Math.floor(i / 6) * 200 }
+        s.addIdeaCard({ title: a.title!, body: a.body ?? '', color: 'amber', /* IDEA_COLORS[0]; importing ideasdock here would pull dictation into the eager bundle */ x, y })
+        return yes(`On the ideas board: ${a.title}`)
+      }
+      case 'ideaEdit': case 'ideaDelete': {
+        const { row, why } = pickBy(s.ideaBoard, (c) => c.title, m)
+        if (!row) return no(why ?? 'no idea card matched')
+        if (a.kind === 'ideaDelete') { s.deleteIdeaCard(row.id); return yes(`Deleted idea: ${row.title}`) }
+        s.updateIdeaCard(row.id, { ...(a.title ? { title: a.title } : {}), ...(a.body ? { body: a.body } : {}) })
+        return yes(`Updated idea: ${a.title ?? row.title}`)
+      }
+
+      case 'addPerson': {
+        /* Same placement rule as the People page's own "+". */
+        const tier = a.tier!
+        const { x, y } = nextPersonSlot(s.people, tier)
+        const id = s.addPerson({ name: a.name!, rel: a.rel ?? '', tier, cadenceDays: TIER_CADENCE[tier], x, y })
+        if (a.job || a.birthday || a.birthYear) { await settle(); live.current.updatePerson(id, { job: a.job, birthday: a.birthday, birthYear: a.birthYear }) }
+        return yes(`Added to ${TIER_LABEL[tier]}: ${a.name}`)
+      }
+      case 'editPerson': case 'deletePerson': case 'contact': {
+        const { row, why } = pickBy(s.people, (p) => p.name, m)
+        if (!row) return no(why ?? 'no person matched')
+        if (a.kind === 'deletePerson') { s.deletePerson(row.id); return yes(`Removed: ${row.name}`) }
+        if (a.kind === 'contact') {
+          s.logContact(row.id, a.date ?? day, a.channel ?? 'inperson')
+          return yes(`Logged contact with ${row.name}${a.date && a.date !== day ? ` on ${a.date}` : ''}`)
+        }
+        const patch: Record<string, unknown> = {}
+        for (const k of ['name', 'tier', 'rel', 'job', 'birthday', 'birthYear', 'cadenceDays'] as const) if (a[k] !== undefined) patch[k] = a[k]
+        s.updatePerson(row.id, patch)
+        return yes(`Updated: ${a.name ?? row.name}`)
+      }
+
+      case 'bill': case 'skipBill': {
+        /* ensure(), not this hook's render: a request landing the instant
+           Bills opens would otherwise read a fetch that has not resolved and
+           report a signed-in device as signed out (his report, 2026-09-08). */
+        const fresh = await bills.ensure()
+        if (!fresh.ready) return no('Bills is not signed in on this device')
+        const { row, why } = pickBy(fresh.items, (i) => i.name, m)
+        if (!row) return no(why ?? 'no bill matched')
+        if (a.kind === 'skipBill') {
+          await bills.setSkip(row.id, a.on !== false)
+          return yes(`${a.on === false ? 'Unskipped' : 'Skipped this cycle'}: ${row.name}`)
+        }
+        const paid = a.paid !== false
+        if (row.paid === paid) return yes(`${row.name} was already ${paid ? 'paid' : 'unpaid'}`)
+        if (paid) await bills.markPaid(row); else await bills.markUnpaid(row)
+        return yes(paid ? `Marked paid: ${row.name}` : `Marked unpaid: ${row.name}`)
+      }
+      case 'expense': case 'income': {
+        const fresh = await bills.ensure()
+        if (!fresh.ready) return no('Bills is not signed in on this device')
+        if (a.kind === 'expense') {
+          await bills.addExpense(a.name!, a.amount!, a.dueOn)
+          return yes(`Added to Unexpected this cycle: ${a.name} (${a.amount} Kč)`)
+        }
+        await bills.addIncome(a.amount!, a.label)
+        return yes(`Added to Income: ${a.amount} Kč${a.label ? ` (${a.label})` : ''}`)
+      }
+
+      case 'gymGoal':
+        s.addGymGoal({ name: a.name!, goal: a.goal!, unit: a.unit!, metric: a.metric ?? (a.exercise ? 'e1rm' : 'manual'), exerciseName: a.exercise, lowerIsBetter: a.lowerIsBetter })
+        return yes(`New gym target: ${a.name}`)
+      case 'gymGoalEdit': case 'gymGoalDelete': {
+        const { row, why } = pickBy(s.gymGoals, (g) => g.name, m)
+        if (!row) return no(why ?? 'no gym target matched')
+        if (a.kind === 'gymGoalDelete') { s.deleteGymGoal(row.id); return yes(`Deleted gym target: ${row.name}`) }
+        s.updateGymGoal(row.id, { ...(a.name ? { name: a.name } : {}), ...(a.goal != null ? { goal: a.goal } : {}), ...(a.current != null ? { current: a.current } : {}) })
+        return yes(`Updated gym target: ${a.name ?? row.name}`)
+      }
+
+      case 'prompt':
+        s.addPrompt({ project: a.project ?? 'General', session: 'General', kind: a.type ?? 'Idea', text: a.text! })
+        return yes('Saved the prompt for later')
+      case 'promptSent': case 'promptDelete': {
+        const { row, why } = pickBy(s.prompts, (p) => p.text.slice(0, 120), m)
+        if (!row) return no(why ?? 'no saved prompt matched')
+        if (a.kind === 'promptDelete') { s.deletePrompt(row.id); return yes('Deleted the prompt') }
+        s.setPromptSent(row.id, a.on !== false)
+        return yes(a.on === false ? 'Back in the queue' : 'Marked sent')
+      }
+
+      case 'workspace':
+        /* setView, not setSpace: it is what the header's own switcher calls,
+           so it changes what he SEES, not only an internal default. */
+        s.setView(a.space!)
+        return yes(`Switched to ${a.space === 'all' ? 'All' : SPACE_LABELS[a.space as SpaceId]}`)
+      case 'open':
+        s.setPage(a.page!)
+        return yes(`Opened ${OPEN_LABELS[a.page!] ?? a.page}`)
+      case 'day':
+        s.openDay(a.date!)
+        return yes(`Opened ${a.date}`)
+      case 'app': {
+        const { row, why } = pickBy(APPS, (x) => x.name, m)
+        if (!row) return no(why ?? 'no app matched')
+        s.setFocusAppId(row.id)
+        s.setPage('apps')
+        return yes(`Opened ${row.name}`)
+      }
+      case 'sync': {
+        /* Exactly what Settings' own "Sync now" makes. */
+        if (!hasHevyKey()) return no('No Hevy key set on this device')
+        const res = await syncHevy(s.habits, s.markHabitDaysOn)
+        return res.ok
+          ? yes(`Synced Hevy: ${res.days} day${res.days === 1 ? '' : 's'} of workouts`)
+          : no(res.reason === 'bad-key' ? 'That Hevy key was rejected'
+            : res.reason === 'rate-limit' ? 'Hevy is rate limiting right now'
+              : res.reason === 'no-habit' ? 'No habit named Workout / Gym / Fitness to tick'
+                : 'Hevy could not be reached')
+      }
+    }
+  }
+
+  /** One task row, one task action. Every write snapshots what it changes
+   *  first, so its undo puts back exactly what was there. */
+  function taskStep(a: Action, row: Task): Done {
+    const s = live.current
+    const day = localDateKey()
+    switch (a.kind) {
+      case 'done': {
+        if (row.done) return yes(`${row.title} was already done`)
+        /* He said the real number in the same breath: log it outright.
+           logActual also writes the ledger and focus rows; undo reverses the
+           done flag only, the same trade logSlip makes. */
+        if (a.actualMin != null) {
+          s.logActual(row.id, a.actualMin)
+          return yes(`Done: ${row.title}, ${fmtDuration(a.actualMin)}`, () => s.toggleTask(row.id))
+        }
+        s.toggleTask(row.id)
+        return {
+          ok: true,
+          text: `Done: ${row.title}`,
+          needsActual: row.actualMin == null ? { taskId: row.id, est: taskMinutes(row) } : undefined,
+          undo: () => s.toggleTask(row.id),
         }
       }
-      /* all is set ONLY when he named more than one himself ("both", "all
-         three") -- never assumed from the count pick() would have refused
-         on. Every row pickAll() still finds after inSlot narrowed the field
-         gets its own line, named, so what actually changed is as legible as
-         a single match always was -- not a summary that hides which rows
-         it touched. */
-      if ((a.kind === 'done' || a.kind === 'undone' || a.kind === 'drop') && a.all) {
-        const { found, why } = pickAll(scoped, a.match)
-        if (!found.length) { out.push({ ok: false, text: why ?? 'no task matched' }); continue }
-        for (const row of found) out.push(applyToRow(row))
-        continue
+      case 'undone':
+        if (!row.done) return yes(`${row.title} was already open`)
+        s.toggleTask(row.id)
+        return yes(`Reopened: ${row.title}`, () => s.toggleTask(row.id))
+      case 'move': {
+        const was = { list: row.list, slot: row.slot, plannedOn: row.plannedOn, projectId: row.projectId, space: row.space, at: row.at }
+        const said: string[] = []
+        if (a.list && a.list !== row.list) { s.moveTaskList(row.id, a.list, a.list === 'today' ? a.date ?? day : undefined); said.push(a.list === 'today' ? 'today' : 'the list') }
+        if (a.date && a.list !== 'backlog') { s.moveTaskList(row.id, 'today', a.date); said.push(a.date === day ? 'today' : a.date) }
+        if (a.slot) {
+          if (row.list !== 'today' && !a.list && !a.date) s.moveTaskList(row.id, 'today', day)
+          s.assignSlot(row.id, a.slot)
+          said.push(slotWord(a.slot) ?? a.slot)
+        }
+        if (a.at) { s.setTaskAt(row.id, a.at === 'none' ? undefined : a.at); said.push(a.at === 'none' ? 'no fixed time' : a.at) }
+        if (a.space && a.space !== 'all' && a.space !== row.space) { s.setTaskSpace(row.id, a.space); said.push(SPACE_LABELS[a.space]) }
+        let movedProject = false
+        if (a.project) {
+          const { row: p } = pickBy(s.projects, (x) => x.name, a.project)
+          if (p) { s.setTaskProject(row.id, p.id); said.push(p.name); movedProject = true } else said.push(`(no project called "${a.project}")`)
+        }
+        return yes(`Moved to ${[...new Set(said)].join(', ')}: ${row.title}`, () => {
+          s.moveTaskList(row.id, was.list, was.plannedOn)
+          if (was.slot) s.assignSlot(row.id, was.slot)
+          if (a.at) s.setTaskAt(row.id, was.at)
+          if (was.space && a.space && a.space !== 'all') s.setTaskSpace(row.id, was.space)
+          if (movedProject) s.setTaskProject(row.id, was.projectId)
+        })
       }
-      const { row, why } = pick(scoped, a.match)
-      if (!row) { out.push({ ok: false, text: why ?? 'no task matched' }); continue }
-      out.push(applyToRow(row))
+      case 'estimate': {
+        const wasMin = row.estimateMin
+        s.setEstimate(row.id, a.min!)
+        return yes(`${fmtDuration(a.min!)} on ${row.title}`, () => s.setEstimate(row.id, wasMin))
+      }
+      case 'rename': {
+        const was = row.title
+        s.updateTask(row.id, { title: a.title })
+        return yes(`Renamed "${was}" to: ${a.title}`, () => s.updateTask(row.id, { title: was }))
+      }
+      case 'drop':
+        s.deleteTask(row.id)
+        return yes(`Deleted: ${row.title}`)
+      default:
+        return no('nothing here to run')
     }
-    return out
+  }
+}
+
+/** The model's eyes: one lookup over his real rows, answered in plain lines
+ *  it can copy titles out of. Read from the latest render each time, so a
+ *  lookup after an action sees what that action wrote. */
+function useFinder() {
+  const st = useStore()
+  const { state: cal } = useCalendar()
+  const bills = useAssistantBills()
+  const live = useRef({ st, cal, bills })
+  live.current = { st, cal, bills }
+
+  return (q: Find): string => {
+    const { st: s, cal: c, bills: b } = live.current
+    const day = localDateKey()
+    const qf = q.query ? fold(q.query) : ''
+    const words = qf.split(' ').filter((w) => w.length > 2)
+    const hit = (t: string) => !qf || fold(t).includes(qf) || (words.length > 0 && words.every((w) => fold(t).includes(w)))
+    const projectName = (id?: string) => s.projects.find((p) => p.id === id)?.name
+    const where = (t: { space?: SpaceId; projectId?: string }) => projectName(t.projectId) ?? (t.space ? SPACE_LABELS[t.space] : 'Unfiled')
+    let rows: string[] = []
+    switch (q.what) {
+      case 'tasks':
+        rows = s.tasks.filter((t) => !t.done && hit(t.title)).map((t) => [
+          dropUrl(t.title) || t.title,
+          t.list === 'today' ? `planned ${t.plannedOn ?? day}${t.slot ? ` ${t.slot}` : ''}${t.at ? ` at ${t.at}` : ''}` : 'on the list',
+          where(t), `${taskMinutes(t)}m`,
+          t.subtasks?.length ? `steps: ${t.subtasks.map((x) => `${x.title}${x.done ? ' (done)' : ''}`).join('; ')}` : '',
+          t.createdAt ? `added ${t.createdAt}` : '',
+        ].filter(Boolean).join(' | '))
+        break
+      case 'done':
+        rows = s.tasks.filter((t) => t.done && hit(t.title))
+          .sort((x, y) => (y.doneAt ?? '').localeCompare(x.doneAt ?? ''))
+          .map((t) => `${dropUrl(t.title) || t.title} | done ${t.doneAt ? localDateKey(new Date(t.doneAt)) : '?'}${t.actualMin != null ? ` | took ${t.actualMin}m` : ''} | ${where(t)}`)
+        break
+      case 'projects':
+        rows = s.projects.filter((p) => hit(p.name)).map((p) => `${p.name} | ${SPACE_LABELS[p.space]} | ${s.tasks.filter((t) => t.projectId === p.id && !t.done).length} open tasks`)
+        break
+      case 'habits':
+        rows = s.habits.filter((h) => !h.archivedAt && hit(h.name)).map((h) => [
+          h.name, h.kind === 'break' ? `quitting, ${daysClean(h, s.slips) ?? 0}d clean` : h.kind, h.frequency,
+          h.paused ? 'paused' : '', h.kind !== 'break' ? (h.days[s.todayIndex] ? 'kept today' : 'open today') : '',
+        ].filter(Boolean).join(' | '))
+        break
+      case 'routines':
+        rows = s.routines.filter((r) => !r.archivedAt && hit(r.title)).map((r) => `${r.title} | ${r.cadence} | steps: ${r.steps.map((x) => `${x.title}${r.doneStepIds.includes(x.id) ? ' (done)' : ''}`).join('; ') || 'none yet'}`)
+        break
+      case 'goals':
+        rows = s.goals.filter((g) => hit(g.name)).map((g) => {
+          const tf = (g.timeframe ?? 'quarter') as GoalTf
+          const cur = goalCurrent(g, s.habits, s.habitLog, goalPeriodRange(tf, g.periodKey ?? goalPeriodKey(tf)), s.slips, s.focusSessions)
+          return [
+            g.name, `${cur} of ${g.target} ${g.unit}`, tf, g.closed ? `closed ${g.closed.on}` : 'open',
+            g.habitId ? 'counts itself from a habit' : '',
+            g.milestones?.length ? `milestones: ${g.milestones.map((x) => `${x.label}${x.done ? ' (done)' : ''}`).join('; ')}` : '',
+          ].filter(Boolean).join(' | ')
+        })
+        break
+      case 'notes':
+        rows = s.notes.filter((n) => hit(`${noteName(n)} ${n.body}`)).map((n) => [
+          noteName(n), s.noteFolders.find((f) => f.id === n.folderId)?.name ?? SPACE_LABELS[n.space],
+          n.pinned ? 'pinned' : '', n.done ? 'done' : '', n.body.replace(/\s+/g, ' ').slice(0, 140),
+        ].filter(Boolean).join(' | '))
+        rows.push(`Folders: ${s.noteFolders.map((f) => f.name).join('; ') || 'none'}`)
+        break
+      case 'people':
+        rows = s.people.filter((p) => hit(`${p.name} ${p.rel ?? ''}`)).map((p) => {
+          const last = s.personContacts.filter((x) => x.personId === p.id).map((x) => x.day).sort().at(-1)
+          return [p.name, TIER_LABEL[p.tier], p.rel, p.job, p.birthday ? `birthday ${p.birthday}` : '', last ? `last in touch ${last}` : 'no contact logged'].filter(Boolean).join(' | ')
+        })
+        break
+      case 'ideas':
+        rows = s.ideaBoard.filter((x) => hit(`${x.title} ${x.body}`)).map((x) => `${x.title}${x.body ? ` | ${x.body.replace(/\s+/g, ' ').slice(0, 120)}` : ''}`)
+        break
+      case 'bills':
+        if (b.loading) return 'Bills is still loading on this device.'
+        if (!b.ready) return 'Bills is not signed in on this device.'
+        rows = b.items.filter((i) => hit(i.name)).map((i) => `${i.name} | ${i.amount} Kč | ${i.paid ? 'paid' : i.overdue ? 'OVERDUE' : 'unpaid'}${i.dueOn ? ` | due ${i.dueOn}` : ''}`)
+        break
+      case 'calendar': {
+        if (c.status !== 'ok') return 'The calendar is not connected or has not loaded.'
+        const from = new Date(); from.setDate(from.getDate() - 7)
+        const to = new Date(); to.setDate(to.getDate() + 21)
+        rows = c.events.filter((e) => e.day >= localDateKey(from) && e.day <= localDateKey(to) && hit(e.title))
+          .sort((x, y) => `${x.day}${String(x.start ?? 0).padStart(4, '0')}`.localeCompare(`${y.day}${String(y.start ?? 0).padStart(4, '0')}`))
+          .map((e) => `${e.day}${e.start != null ? ` ${String(Math.floor(e.start / 60)).padStart(2, '0')}:${String(e.start % 60).padStart(2, '0')}` : ' all day'} | ${e.title} | ${isMeeting(e) ? 'meeting' : 'block'}`)
+        break
+      }
+      case 'focus':
+        rows = s.focusSessions.slice(-60).reverse().filter((f) => hit(f.label ?? '')).map((f) => `${f.day} | ${f.minutes}m${f.label ? ` | ${f.label}` : ''}`)
+        break
+      case 'gym':
+        rows = s.gymGoals.filter((g) => hit(g.name)).map((g) => `${g.name} | ${g.current ?? '?'} of ${g.goal} ${g.unit}${g.exerciseName ? ` | ${g.exerciseName}` : ''}`)
+        break
+      case 'prompts':
+        rows = s.prompts.filter((p) => hit(p.text)).map((p) => `${p.text.replace(/\s+/g, ' ').slice(0, 120)} | ${p.project} | ${p.kind}${p.sentAt ? ' | sent' : ''}`)
+        break
+      case 'apps':
+        rows = APPS.filter((x) => hit(x.name)).map((x) => x.name)
+        break
+    }
+    if (!rows.length) return `Nothing found${q.query ? ` for "${q.query}"` : ''}.`
+    const CAP = 40
+    return rows.slice(0, CAP).map((r) => `- ${r}`).join('\n') + (rows.length > CAP ? `\n(${rows.length - CAP} more: narrow the query)` : '')
   }
 }
 
@@ -904,6 +1096,7 @@ export interface Turn { who: 'you' | 'it'; text: string; reply?: Reply; done?: D
 export function useAssistantThread() {
   const brief = useBrief()
   const run = useDoer()
+  const find = useFinder()
   const [turns, setTurns] = useState<Turn[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -943,30 +1136,26 @@ export function useAssistantThread() {
       setBusy(false); setLive('')
       return say
     }
-    const history = turns.map((t) => ({ role: (t.who === 'you' ? 'user' : 'assistant') as 'user' | 'assistant', content: t.text }))
-    let out = await ask(text, brief, history, setLive)
-    /* A RATE LIMIT WAITS RATHER THAN FAILS, on his instruction: he would rather
-       stare at the thinking mark for twenty seconds than read an error and
-       have to press Ask again himself. `ask()` already tried Gemini once
-       before ever returning this reason, so a retry here is a second full
-       pass at both providers, not a hammer on the same closed door. Capped at
-       two so a key that is genuinely dead, not just busy, still surfaces the
-       real message instead of a mark that spins forever. Groq's own wait time
-       is used when it parsed one; twenty seconds otherwise, matched to what he
-       said he can live with. `live` stays empty through the wait so the plain
-       thinking mark shows, not a caret with nothing after it. */
-    for (let tries = 0; !out.ok && out.reason === 'rate-limit' && tries < 2; tries++) {
-      const waitS = out.detail ? Math.max(1, Number(out.detail)) : 20
-      setLive('')
-      await new Promise((r) => setTimeout(r, waitS * 1000))
-      out = await ask(text, brief, history, setLive)
-    }
+    /* What the app actually did goes back into the history with each answer
+       (2026-10-04). It used to send only the model's own sentences, so a turn
+       later it had no idea which rows it had really touched: "move it to the
+       evening" and "no, I meant X" were guesses about its own past. */
+    const history = turns.map((t) => ({
+      role: (t.who === 'you' ? 'user' : 'assistant') as 'user' | 'assistant',
+      content: t.done?.length ? `${t.text}\n[App results: ${t.done.map((d) => `${d.ok ? '' : 'FAILED '}${d.text}${d.undone ? ' (he undid this)' : ''}`).join('; ')}]` : t.text,
+    }))
+    /* Every line any round ran, kept here with its undo and its actual-time
+       prompt; the loop itself only needs ok/text. The rate-limit wait lives
+       inside ask() now, per round, so a limit hit halfway through a job
+       resumes it instead of re-running its first half. */
+    const done: Done[] = []
+    const out = await ask(text, brief, history, {
+      run: async (acts) => { const d = await run(acts); done.push(...d); return d },
+      find,
+    }, setLive)
     if (out.ok) {
-      /* Performed BEFORE the turn is drawn, so the line under the sentence is
-         the outcome and not a prediction of it. */
-      const done = out.reply.do?.length ? await run(out.reply.do) : undefined
-      setTurns((t) => [...t, { who: 'it', text: out.reply.say, reply: out.reply, done }])
-      let kinds = out.reply.show.map((c: Card) => c.kind)
+      setTurns((t) => [...t, { who: 'it', text: out.reply.say, reply: out.reply, done: done.length ? done : undefined }])
+      let kinds = out.reply.show.map((c) => c.kind)
       /* The brief ALWAYS draws the sky, whether or not the model remembered to
          name it. He asked for the weather to be visible, and that is not a
          thing to leave to whether a sentence came back with the right card in
@@ -975,7 +1164,7 @@ export function useAssistantThread() {
       if (kinds.length) setCanvas(kinds.slice(0, 3))
       /* A change he cannot see is a change he will not believe. Anything that
          touched the day puts the day on the canvas unless it named its own. */
-      else if (done?.some((d) => d.ok)) setCanvas(out.reply.do?.some((a) => a.kind === 'habit') ? ['habits'] : ['today'])
+      else if (done.some((d) => d.ok)) setCanvas(['today'])
     } else {
       /* A 429 used to fall through to `out.detail`, which for a rate limit is
          Groq's raw body: an org id, a token count, a billing upsell link, all

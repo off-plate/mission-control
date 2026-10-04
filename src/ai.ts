@@ -60,7 +60,13 @@ export const PROVIDERS: Record<AiProvider, ProviderConfig> = {
     keyStore: 'mc-groq-key',
     keyPlaceholder: 'gsk_…',
     getKeyUrl: 'https://console.groq.com/keys',
-    quiet: { reasoning_format: 'hidden', reasoning_effort: 'none' },
+    /* Groq's own docs for gpt-oss (checked 2026-10-04): reasoning_format is
+       "not supported" on this model, and reasoning_effort takes only
+       low/medium/high -- "none" belongs to Qwen. Both old flags drew a 400,
+       so every question went out twice (see request() below) and spent the
+       free tier's 8,000 tokens a minute at double speed. include_reasoning
+       is this model's own switch for keeping the thinking out of `content`. */
+    quiet: { include_reasoning: false, reasoning_effort: 'low' },
   },
   zai: {
     label: 'Z.ai (GLM)',

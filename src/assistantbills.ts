@@ -17,7 +17,7 @@ import {
   activeCycleKey, cycleChecklist, cycleForKey, iso, resolveCycleIncome, todayISO,
   type CycleItem,
 } from './compassCalc'
-import { deleteRow, insertRow } from './supabase'
+import { deleteRow, insertRow, upsertCompassProfile } from './supabase'
 
 /** Due/paid/open, the exact shape habits and routines already use in the
  *  brief -- so the model reads this the same way it reads those, not a
@@ -98,6 +98,22 @@ export function useAssistantBills() {
     reload()
   }
 
+  /* Skip, the same settings write Bills' own Skip button makes (billspage.tsx
+     toggleSkip), but SET rather than toggled: "skip it" said twice must not
+     unskip it. Same fresh-snapshot rule as addExpense above. */
+  const setSkip = async (itemId: string, on: boolean): Promise<void> => {
+    const snap = getBillsSnapshot().data
+    if (!snap) throw new Error('Bills data was not loaded')
+    const key = cycleForKey(activeCycleKey(snap.profile)).key
+    const settings = (snap.profile?.settings ?? {}) as Record<string, unknown>
+    const map = { ...((settings.skips as Record<string, string[]>) ?? {}) }
+    const set = new Set(map[key] ?? [])
+    if (on) set.add(itemId); else set.delete(itemId)
+    map[key] = [...set]
+    await upsertCompassProfile(settings, { settings: { skips: map } })
+    reload()
+  }
+
   /* A write action landing the instant Bills opens sees a stale render --
      `data` here is whatever the last render captured, and the real fetch
      this hook's own effect just kicked off is still in flight. His report,
@@ -134,5 +150,5 @@ export function useAssistantBills() {
     open: items.filter((i) => !i.paid).map((i) => i.name).slice(0, 25),
   } : loading ? 'loading' : null
 
-  return { ready, loading, items, brief, markPaid, markUnpaid, addExpense, addIncome, ensure }
+  return { ready, loading, items, brief, markPaid, markUnpaid, addExpense, addIncome, setSkip, ensure }
 }

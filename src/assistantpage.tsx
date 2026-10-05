@@ -875,22 +875,28 @@ export function AssistantPage() {
   return (
     <div className="page as-page jv" ref={room}>
       <canvas ref={gl} className="jv-gl" aria-hidden="true" />
-      <JvFrame
-        left={{ fill: dayLeft, ticks: 24, longEvery: 6, label: `DAY LEFT ${Math.round(dayLeft * 100)}%` }}
-        right={{ fill: brief.focusToday / (FOCUS_SCALE_H * 60), ticks: FOCUS_SCALE_H * 4, longEvery: 4, label: `FOCUS ${brief.focusToday ? fmtDuration(brief.focusToday).toUpperCase() : '0M'}` }}
-      />
-      <div className="jv-strip" role="group" aria-label="Today at a glance">
-        <div><span className="k">ON THE DAY</span><span className="v">{dayDone} / {dayItems.length}</span></div>
-        <div><span className="k">NEXT MEETING</span><span className="v">{nextMeeting ? nextMeeting.at : 'None'}</span></div>
-        <div><span className="k">HABITS</span><span className="v">{brief.habits.kept} / {brief.habits.due}</span></div>
-        <div>
-          <span className="k">BILLS</span>
-          <span className={`v${unpaid ? ' is-alert' : ''}`}>{bills === 'loading' ? 'Loading' : unpaid === null ? 'Signed out' : unpaid ? `${unpaid} unpaid` : 'All paid'}</span>
+      {/* The brackets and gauges are drawn to THIS wrapper's own size, not the
+         full-bleed page (his report, 2026-10-05: a wide monitor stretched the
+         page full width while the grid stayed capped, so the frame sat far
+         out past the actual content). Matching the grid's own max-width here
+         keeps the corners and the gauge tracks on the content's real edge. */}
+      <div className="jv-body">
+        <JvFrame
+          left={{ fill: dayLeft, ticks: 24, longEvery: 6, label: `DAY LEFT ${Math.round(dayLeft * 100)}%` }}
+          right={{ fill: brief.focusToday / (FOCUS_SCALE_H * 60), ticks: FOCUS_SCALE_H * 4, longEvery: 4, label: `FOCUS ${brief.focusToday ? fmtDuration(brief.focusToday).toUpperCase() : '0M'}` }}
+        />
+        <div className="jv-strip" role="group" aria-label="Today at a glance">
+          <div><span className="k">ON THE DAY</span><span className="v">{dayDone} / {dayItems.length}</span></div>
+          <div><span className="k">NEXT MEETING</span><span className="v">{nextMeeting ? nextMeeting.at : 'None'}</span></div>
+          <div><span className="k">HABITS</span><span className="v">{brief.habits.kept} / {brief.habits.due}</span></div>
+          <div>
+            <span className="k">BILLS</span>
+            <span className={`v${unpaid ? ' is-alert' : ''}`}>{bills === 'loading' ? 'Loading' : unpaid === null ? 'Signed out' : unpaid ? `${unpaid} unpaid` : 'All paid'}</span>
+          </div>
+          <div><span className="k">FOCUS TODAY</span><span className="v">{brief.focusToday ? fmtDuration(brief.focusToday) : '0m'}</span></div>
         </div>
-        <div><span className="k">FOCUS TODAY</span><span className="v">{brief.focusToday ? fmtDuration(brief.focusToday) : '0m'}</span></div>
-      </div>
 
-      <div className="jv-grid">
+        <div className="jv-grid">
         {split && (
           <aside className="jv-left" aria-label="On the day">
             <h2>ON THE DAY</h2>
@@ -1003,6 +1009,7 @@ export function AssistantPage() {
         </section>
 
         {split && <Canvas kinds={canvas} touched={touched} />}
+        </div>
       </div>
       <div ref={overlay} className="jv-overlay" aria-hidden="true" />
     </div>

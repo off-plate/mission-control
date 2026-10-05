@@ -10379,6 +10379,16 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 .jv-strip .v { font-size: 19px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .jv-strip .v.is-alert { color: var(--alert); }
 
+/* The frame (brackets + side gauges) is drawn to THIS element's own box, so
+   it has to be the one that carries the width cap: the grid used to cap
+   itself while the frame measured the full-bleed page, which left the
+   brackets stranded out past the content on a wide monitor (his report,
+   2026-10-05). */
+.jv-body {
+  position: relative; z-index: 2; flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column; gap: var(--s4);
+  width: 100%; max-width: 2600px; margin-inline: auto;
+}
 .jv-grid {
   position: relative; z-index: 2; flex: 1 1 auto; min-height: 0;
   display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s6);
@@ -10387,7 +10397,7 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
   .jv-grid {
     grid-template-columns: minmax(160px, 0.55fr) minmax(460px, 1.4fr) minmax(300px, 0.9fr);
     /* Clear of the straight side gauges, which take the outer 70px. */
-    width: 100%; max-width: 2600px; margin-inline: auto; padding-inline: 84px; box-sizing: border-box;
+    padding-inline: 84px; box-sizing: border-box;
   }
 }
 /* A laptop-narrow window cannot hold three columns and the gauges: the day

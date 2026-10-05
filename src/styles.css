@@ -10387,7 +10387,12 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 .jv-body {
   position: relative; z-index: 2; flex: 1 1 auto; min-height: 0;
   display: flex; flex-direction: column; gap: var(--s4);
-  width: 100%; max-width: 2600px; margin-inline: auto;
+  /* His report, 2026-10-05, round two: 2600px read as SMALLER on his 3440px
+     monitor, because it was 2600px centered in 3440px of black either way --
+     matching the frame to it did not widen anything. The room now actually
+     fills a wide screen; 3600px only starts capping past his own monitor, on
+     something wider still. */
+  width: 100%; max-width: 3600px; margin-inline: auto;
 }
 .jv-grid {
   position: relative; z-index: 2; flex: 1 1 auto; min-height: 0;

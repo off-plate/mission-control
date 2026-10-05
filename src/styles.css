@@ -8521,6 +8521,19 @@ iframe.tl-media { pointer-events: none; }
   font-size: 1.12rem; line-height: 1.6; max-width: none;
 }
 .wl-brief p:last-child { margin-bottom: 0; }
+/* The full brief (2026-10-05). */
+.wl-h2-gap { margin-top: var(--s6); }
+.wl-points { margin: 0; padding: 0; list-style: none; counter-reset: wlp; }
+.wl-points li { counter-increment: wlp; position: relative; padding-left: 34px; margin-bottom: var(--s4); }
+.wl-points li::before { content: counter(wlp, decimal-leading-zero); position: absolute; left: 0; top: 4px; font-family: var(--wl-mono); font-size: 11px; color: var(--wl-rust); }
+.wl-brief .wl-point { margin: 0; font-weight: 600; }
+.wl-brief .wl-detail { margin: 4px 0 0; font-size: 1rem; color: var(--wl-faint); }
+.wl-at { margin-left: 8px; font-family: var(--wl-mono); font-size: 11px; font-weight: 400; color: var(--wl-rust); text-decoration: none; border-bottom: 1px solid transparent; }
+.wl-at:hover { border-bottom-color: var(--wl-rust); }
+.wl-list { margin: 0; padding-left: 20px; font-family: var(--wl-serif); font-size: 1.05rem; line-height: 1.6; }
+.wl-list li { margin-bottom: 6px; }
+.wl-brief .wl-verdict { margin-top: var(--s6); font-style: italic; }
+.wl-brief .wl-covers { font-family: var(--wl-mono); font-size: 11px; color: var(--wl-faint); }
 
 /* ---- find, and take it away ---- */
 .wl-tools {

@@ -10369,10 +10369,16 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 .jv-g-label.is-amber { fill: var(--jv-amber-text); }
 
 .jv-strip {
-  position: relative; z-index: 2; flex: none; align-self: center; width: min(980px, 100%);
+  /* Lines up with the grid below it rather than floating as its own centered
+     980px box (his report, 2026-10-05: once the grid actually filled a wide
+     screen, the old centered strip no longer matched anything under it). The
+     margin at >=1000px is the grid's own padding-inline, so the two share an
+     edge. */
+  position: relative; z-index: 2; flex: none; align-self: stretch;
   display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
   border: 1px solid var(--hairline-strong); background: color-mix(in srgb, var(--bg) 72%, transparent);
 }
+@media (min-width: 1000px) { .jv-strip { margin-inline: 84px; } }
 .jv-strip > div { padding: 10px 16px; display: flex; flex-direction: column; justify-content: space-between; gap: 2px; min-width: 0; }
 .jv-strip > div + div { border-left: 1px solid var(--hairline); }
 .jv-strip .k { font-family: var(--font-display); font-size: 9px; letter-spacing: 0.2em; color: var(--muted); }
@@ -10435,7 +10441,14 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 .jv-quiet { margin: 0; color: var(--muted); font-size: var(--text-sm); }
 
 .jv-center { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
-.jv-stage { position: relative; flex: none; height: clamp(220px, 40dvh, 640px); cursor: grab; touch-action: none; }
+/* The circle's own code bounds it by min(box width, box height) -- so on a
+   screen with plenty of WIDTH to spare it never grew, because the height
+   clamp was the one ever in play (his report, 2026-10-05: "why is JARVIS not
+   bigger on bigger displays"). Raised both the share of the viewport height
+   and the ceiling, so a tall or large display actually gets a bigger core;
+   the thread below it still scrolls, so this never forces the ask box off
+   screen. */
+.jv-stage { position: relative; flex: none; height: clamp(220px, 50dvh, 820px); cursor: grab; touch-action: none; }
 .jv-stage.is-drag { cursor: grabbing; }
 .jv-presence {
   position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 1;

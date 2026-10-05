@@ -419,7 +419,7 @@ export function PlanPage() {
   const todayIdx = (new Date().getDay() + 6) % 7
   const pomo = usePomodoro()
   const { startFocus } = pomo
-  const { routines, habits } = useStore()
+  const { routines, habits, openDaily } = useStore()
   const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId, setTaskAt, plan, setPage, openDay, view, inView, focusSessions, dayLog } = useStore()
   const { projects, openProjectId, setTaskProject, setTaskSpace, setSpace, setView, enterProject } = useStore()
   /* A project is a room inside a Space, not a second store: this is the one
@@ -830,7 +830,9 @@ export function PlanPage() {
            one tap further, through Projects then the Space's own Plan. */
         actions={activeProject
           ? <button className="btn btn-ghost" onClick={() => setPage('projects')}>&larr; Projects</button>
-          : <button className="btn btn-ghost" onClick={() => openDay(prevDay())}>Yesterday</button>}
+          /* Yesterday opens the morning recap (his ask, 2026-10-05): he does not
+             always have time for it when the day starts, so it waits here. */
+          : <button className="btn btn-ghost" onClick={openDaily}>Yesterday</button>}
       />
       {/* Every task, every workspace, every project -- the one search that
           isn't scoped to whatever room he's standing in, because "which room

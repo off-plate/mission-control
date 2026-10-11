@@ -318,7 +318,6 @@ function RoutineOnDay({ routine, day }: { routine: Routine; day?: string }) {
         {/* A routine is not dragged into a time, but its checkbox still has to
             line up with the ones under it. */}
         <span className="drag-grip is-blank" aria-hidden="true"><Icon.Grip /></span>
-        <SpaceMark space={routine.space} />
         <button
           className="checkbox"
           role="checkbox"
@@ -334,6 +333,7 @@ function RoutineOnDay({ routine, day }: { routine: Routine; day?: string }) {
         >
           <Icon.Check size={12} strokeWidth={4} />
         </button>
+        <SpaceMark space={routine.space} />
         <span className="grow wrap2">{routine.title}</span>
         {/* One tag, saying the one thing it needs to: this is a routine, it put
             itself here. Cadence words were never asked for. */}
@@ -1368,8 +1368,6 @@ export function PlanPage() {
                           onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move' }}
                         >
                           <span className="drag-grip" aria-hidden="true"><Icon.Grip /></span>
-                          <SpaceMark space={t.space} />
-                          <ProjectMark project={markOf(t)} />
                           <button
                             className="checkbox" role="checkbox" aria-checked={t.done}
                             aria-label={t.done ? `Reopen: ${t.title}` : `Complete: ${t.title}`}
@@ -1382,6 +1380,8 @@ export function PlanPage() {
                           >
                             <Icon.Check size={12} strokeWidth={4} />
                           </button>
+                          <SpaceMark space={t.space} />
+                          <ProjectMark project={markOf(t)} />
                           <span className={`cat-dot ${t.category}`} aria-hidden="true" />
                           <span className="grow wrap2"><Linkify text={t.title} /></span>
                           {t.done && t.actualMin != null ? (

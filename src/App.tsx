@@ -558,11 +558,12 @@ export default function App() {
      leaving Zone needs a fresh measurement waiting for it, not last
      session's. */
   const topstickRef = useRef<HTMLDivElement>(null)
-  const spacesRef = useRef<HTMLElement>(null)
   useEffect(() => {
     const measure = () => {
       const topstick = topstickRef.current
-      const spaces = spacesRef.current
+      /* The workspace switcher left the header (it lives in the Plan and Today
+         titles now), so the page row anchors to the brand instead. */
+      const spaces = topstick?.querySelector('.brand') as HTMLElement | null
       if (!topstick || !spaces) return
       const offset = spaces.getBoundingClientRect().left - topstick.getBoundingClientRect().left
       topstick.style.setProperty('--nav-align', `${offset}px`)
@@ -579,7 +580,6 @@ export default function App() {
     /* The switcher also moves when the brand changes width (Mission Control and
        Jarvis are different words in different faces), so watch it directly. */
     const ro = new ResizeObserver(measure)
-    if (spacesRef.current) ro.observe(spacesRef.current)
     const brand = topstickRef.current?.querySelector('.brand')
     if (brand) ro.observe(brand)
     return () => { window.removeEventListener('resize', measure); ro.disconnect() }
@@ -641,37 +641,6 @@ export default function App() {
               Jarvis is one click away, and in Jarvis the logo means the way back. */}
           <span className="brand-swap" aria-hidden="true">{hud ? <Logo /> : <Helmet lit={false} />}</span>
         </button>
-        {/* The Zone is a room, not a tab: which workspace you were standing in
-            when you walked in has nothing to do with the one thing running
-            now, so the switcher goes quiet rather than sitting there unused. */}
-        {page !== 'zone' && (
-          <label className="phone-space">
-            <span className="visually-hidden">Workspace</span>
-            <select
-              className="textinput"
-              value={view}
-              onChange={(e) => setView(e.target.value as ViewId)}
-            >
-              {(['all', ...Object.keys(SPACE_LABELS)] as ViewId[]).map((s2) => (
-                <option key={s2} value={s2}>{s2 === 'all' ? 'All' : SPACE_LABELS[s2 as SpaceId]}</option>
-              ))}
-            </select>
-          </label>
-        )}
-        {page !== 'zone' && (
-          <nav ref={spacesRef} className="spaces" aria-label="Spaces">
-            {(['all', ...Object.keys(SPACE_LABELS)] as ViewId[]).map((s) => (
-              <button
-                key={s}
-                className="space-btn"
-                aria-pressed={view === s}
-                onClick={() => setView(s)}
-              >
-                {s === 'all' ? 'All' : SPACE_LABELS[s as SpaceId]}
-              </button>
-            ))}
-          </nav>
-        )}
         </div>
         <div className="topbar-right">
           {/* Status before actions, and not in the Zone: that room is one thing

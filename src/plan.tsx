@@ -419,6 +419,17 @@ function RoutineOnDay({ routine, day }: { routine: Routine; day?: string }) {
    project card on the Projects page carries, in one row. Plain click selects
    that one project (click it again to clear); shift/cmd/ctrl-click adds or
    removes; on touch there is no modifier, so a tap toggles. */
+/* The Projects page folder, shrunk to a glyph: back with its tab, one sheet
+   peeking out, the front flap in the workspace colour. Same colour recipe as
+   .folder, so a project looks like itself in both places. */
+function FolderGlyph({ cls }: { cls: string }) {
+  return (
+    <span className={`fg ${cls}`} aria-hidden="true">
+      <i className="fg-back" /><i className="fg-paper" /><i className="fg-front" />
+    </span>
+  )
+}
+
 function ProjectStrip({ projects, tasks, sel, showSpaces, touch, inScope, onAll, onPick, onManage }: {
   projects: Project[]; tasks: Task[]; sel: string[]; showSpaces: boolean; touch: boolean; inScope: (t: Task) => boolean
   onAll: () => void; onPick: (id: string, add: boolean) => void; onManage: () => void
@@ -442,13 +453,13 @@ function ProjectStrip({ projects, tasks, sel, showSpaces, touch, inScope, onAll,
               className={`pstrip-item${on ? ' is-on' : ''}`} aria-pressed={on}
               onClick={(e) => onPick(p.id, touch || e.shiftKey || e.metaKey || e.ctrlKey)}
             >
-              <Icon.Folder size={15} /><span>{p.name}</span><em className="mono">{open(p.id)}</em>
+              <FolderGlyph cls={`s-${p.space}`} /><span>{p.name}</span><em className="mono">{open(p.id)}</em>
             </button>
           </span>
         )
       })}
       <button className={`pstrip-item${sel.includes(UNSORTED) ? ' is-on' : ''}`} aria-pressed={sel.includes(UNSORTED)} onClick={(e) => onPick(UNSORTED, touch || e.shiftKey || e.metaKey || e.ctrlKey)}>
-        <Icon.Folder size={15} /><span>Unsorted</span><em className="mono">{tasks.filter((t) => !t.projectId && !t.done && inScope(t)).length}</em>
+        <FolderGlyph cls="f-unsorted" /><span>Unsorted</span><em className="mono">{tasks.filter((t) => !t.projectId && !t.done && inScope(t)).length}</em>
       </button>
       <button className="pstrip-item pstrip-manage" onClick={onManage} aria-label="Manage projects"><Icon.FolderAdd size={15} /></button>
     </div>

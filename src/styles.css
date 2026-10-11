@@ -10793,3 +10793,18 @@ body:has(.shell.is-hud) { --st-reach: #7C9CC4; --st-contacted: #E0A84A; --st-tal
 .pstrip { margin-inline: calc(var(--gutter) * -1); padding-inline: var(--gutter); scroll-padding-inline: var(--gutter); scrollbar-width: none; -ms-overflow-style: none; padding-bottom: 0; }
 .pstrip::-webkit-scrollbar { display: none; }
 .pstrip::after { content: ''; flex: 0 0 1px; }
+
+/* Spotlight search */
+.plan-actions { display: inline-flex; gap: var(--s2); align-items: center; }
+.plan-search-btn { padding-inline: 10px; }
+.spot-back { position: fixed; inset: 0; z-index: 200; background: rgba(15, 17, 8, 0.38); display: flex; justify-content: center; align-items: flex-start; padding: 18vh 16px 0; animation: spotin 140ms var(--ease); }
+.spot { width: min(640px, 100%); background: var(--surface); border: 1px solid var(--hairline-strong); border-radius: 14px; box-shadow: 0 24px 70px -12px rgba(0,0,0,.4); overflow: hidden; }
+.spot-field { display: flex; align-items: center; gap: 12px; padding: 14px 18px; color: var(--muted); }
+.spot-field input { flex: 1; min-width: 0; border: 0; background: none; outline: none; color: var(--ink); font-size: 1.125rem; }
+.spot-field kbd { font: 600 11px var(--font-body); color: var(--muted); border: 1px solid var(--hairline); border-radius: 4px; padding: 3px 6px; }
+.spot-results { list-style: none; margin: 0; padding: 6px; border-top: 1px solid var(--hairline); max-height: min(50vh, 380px); overflow-y: auto; }
+.spot .plan-search-hit.is-hi { background: var(--accent-wash); }
+.spot .plan-search-hit { padding: 10px 12px; }
+.spot .empty { padding: 12px; color: var(--muted); }
+@keyframes spotin { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .spot-back { animation: none; } }

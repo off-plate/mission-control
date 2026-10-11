@@ -5966,11 +5966,11 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 }
 
 /* ---- 7. surfaces: the system radius, and a lift that answers a pointer ---- */
-.panel, .widget, .card, .goal-card, .routine-card, .habit-card, .projcard {
+.panel, .widget, .card, .goal-card, .routine-card, .habit-card {
   border-radius: var(--a-r-lg);
   transition: box-shadow var(--a-enter), transform var(--a-enter), border-color var(--a-enter);
 }
-.goal-card:hover, .routine-card:hover, .habit-card:hover, .projcard:hover {
+.goal-card:hover, .routine-card:hover, .habit-card:hover {
   box-shadow: var(--a-lift); border-color: var(--a-accent-text);
 }
 
@@ -5997,26 +5997,65 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    second identity system. */
 .projsection { margin-bottom: var(--s6); }
 .projsection-head { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s3); }
-.projgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--s3); }
-.projcard {
-  position: relative; background: var(--surface); border: 1px solid var(--hairline); box-shadow: var(--a-lift);
+.projgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--s5) var(--s4); padding-top: var(--s2); }
+
+/* The folder (2026-10-11). Back panel with a tab, up to three sheets, a front
+   flap carrying the name. The space colour is the folder's own colour now,
+   which is what the old 3px bar was saying. Unsorted is neutral: it is the
+   space's own default drawer, not a room he made. */
+.folder {
+  --mark: #FFC94A;
+  --back: color-mix(in oklab, var(--mark) 78%, #8a5a00);
+  --front: color-mix(in oklab, var(--mark) 88%, white);
+  position: relative; height: 150px; perspective: 900px;
 }
-.projcard.s-personal { --mark: #FFC94A; } .projcard.s-work { --mark: #7FD8F5; }
-.projcard::before { content: ''; position: absolute; left: var(--s2); top: 14px; bottom: 14px; width: 3px; border-radius: 2px; background: var(--mark, var(--hairline-strong)); z-index: 1; }
-/* The card's own open button: everything but the kebab in the corner. */
-.projcard-open {
-  display: block; width: 100%; text-align: left; background: none; border: none; cursor: pointer;
-  padding: var(--s4) calc(var(--s5) + 8px) var(--s4) calc(var(--s4) + 8px);
+.folder.s-work { --mark: #7FD8F5; --back: color-mix(in oklab, var(--mark) 72%, #0b4a63); --front: color-mix(in oklab, var(--mark) 85%, white); }
+.folder.f-unsorted { --mark: #DCD6CA; --back: #C9C2B4; --front: #ECE8E0; }
+.folder-open { position: absolute; inset: 0; z-index: 2; background: none; border: 0; padding: 0; cursor: pointer; border-radius: 14px; }
+.folder-open:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
+.f-back { position: absolute; left: 0; right: 0; top: 14px; bottom: 0; background: var(--back); border-radius: 4px 14px 14px 14px; }
+.f-back::before {
+  content: ''; position: absolute; left: 0; top: -12px; width: 42%; height: 16px;
+  background: var(--back); border-radius: 10px 12px 0 0; clip-path: polygon(0 0, 82% 0, 100% 100%, 0 100%);
 }
-.projcard h3 { margin: 0 0 6px; font-size: 0.9375rem; font-weight: 700; }
-.proj-stats { display: flex; gap: var(--s3); font-size: 0.75rem; color: var(--faint); }
-.proj-stats b { color: var(--soft); font-weight: 600; }
-.projcard-kebab { position: absolute; top: 6px; right: 6px; z-index: 1; }
-.projcard-new {
-  background: none; border: 1.5px dashed var(--hairline-strong); box-shadow: none; cursor: pointer;
-  display: flex; align-items: center; justify-content: center; min-height: 64px; color: var(--faint); font-weight: 600; padding: var(--s4);
+.f-paper {
+  position: absolute; left: 12px; right: 12px; top: 22px; height: 96px;
+  background: var(--surface); border-radius: 6px;
+  box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 2px 6px rgba(40,30,10,.08);
+  padding: 9px 11px; font-size: 11px; line-height: 1.3; color: var(--soft); font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transform: translateY(var(--rest, 0)); transition: transform 320ms cubic-bezier(0.23, 1, 0.32, 1);
 }
-.projcard-new:hover { border-color: var(--a-accent-text); color: var(--a-accent-text); box-shadow: none; }
+.f-paper::after { content: ''; position: absolute; left: 11px; right: 30%; top: 28px; height: 22px; background: repeating-linear-gradient(to bottom, var(--hairline) 0 2px, transparent 2px 8px); }
+.f-paper.p1 { left: 20px; right: 20px; --rest: 6px; }
+.f-paper.p2 { left: 15px; right: 15px; --rest: 3px; }
+.f-paper.p3 { left: 10px; right: 10px; --rest: 0px; }
+.f-front {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 104px; pointer-events: none;
+  background: linear-gradient(to bottom, color-mix(in oklab, var(--front) 70%, white), var(--front));
+  border-radius: 12px 12px 14px 14px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 -1px 0 rgba(0,0,0,.04), 0 10px 24px -12px rgba(60,40,0,.35);
+  transform-origin: 50% 100%; transition: transform 320ms cubic-bezier(0.23, 1, 0.32, 1);
+  padding: 34px var(--s4) 14px; display: flex; flex-direction: column; justify-content: flex-end;
+}
+.f-front h3 { margin: 0 0 4px; font-size: 1.0625rem; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.folder .proj-stats { display: flex; gap: var(--s3); font-size: 0.8125rem; color: color-mix(in oklab, var(--ink) 58%, transparent); }
+.folder .proj-stats b { color: var(--ink); font-weight: 600; }
+.projcard-kebab { position: absolute; top: 50px; right: 8px; z-index: 3; }
+@media (hover: hover) and (pointer: fine) {
+  .folder:hover .f-front, .folder:focus-within .f-front { transform: rotateX(-24deg); }
+  .folder:hover .f-paper.p1, .folder:focus-within .f-paper.p1 { transform: translateY(-30px) rotate(-3deg); transition-delay: 60ms; }
+  .folder:hover .f-paper.p2, .folder:focus-within .f-paper.p2 { transform: translateY(-20px) rotate(2deg); transition-delay: 30ms; }
+  .folder:hover .f-paper.p3, .folder:focus-within .f-paper.p3 { transform: translateY(-10px) rotate(-0.5deg); }
+}
+.folder:active .f-front { transform: rotateX(-14deg) scale(0.98); transition-duration: 120ms; }
+@media (prefers-reduced-motion: reduce) { .f-paper, .f-front { transition: none; } }
+.folder-new {
+  height: 150px; display: flex; align-items: center; justify-content: center; background: none; cursor: pointer;
+  border: 1.5px dashed var(--hairline-strong); border-radius: 14px; color: var(--faint); font-weight: 600;
+  transition: color 160ms ease, border-color 160ms ease;
+}
+.folder-new:hover { color: var(--a-accent-text); border-color: var(--a-accent-text); }
 
 /* Row two: search, the score floor, and everything else behind one toggle. */
 

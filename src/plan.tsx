@@ -19,7 +19,7 @@ import { PLAN_AHEAD_DAYS, WeekGrid, dayPlus, shortDay, weekRangeLabel } from './
 import { useCoarsePointer, Band, Dropdown, ProjectMark, SpaceMark } from './ui'
 import { estimateFor } from './estimate'
 import { estimateTask } from './ai'
-import { SLOTS, SPACES, habitLocked, routineComplete, routineProgress, slotMinutes, TYPING_TARGET_WPM, type Project, type Routine, type SubTask, type Task, type TimeSlot } from './types'
+import { SLOTS, SPACES, UNSORTED, habitLocked, routineComplete, routineProgress, slotMinutes, TYPING_TARGET_WPM, type Project, type Routine, type SubTask, type Task, type TimeSlot } from './types'
 import { periodKeyFor, fmtDuration, fmtSigned, dayOfWeekKey, isEstimated, localDateKey, slotForMoment, taskMinutes } from './util'
 
 const prevDay = (): string => dayPlus(-1)
@@ -426,7 +426,12 @@ export function PlanPage() {
      line that scopes Plan to it. Everything below (backlog, the day, the
      progress bar) is derived from spaceTasks, so nothing downstream has to
      know a project was ever involved. */
-  const activeProject = openProjectId ? projects.find((p) => p.id === openProjectId) ?? null : null
+  const unsorted = openProjectId === UNSORTED
+  const activeProject = unsorted
+    ? { id: UNSORTED, name: 'Unsorted', space }
+    : openProjectId ? projects.find((p) => p.id === openProjectId) ?? null : null
+  /* New tasks typed inside the Unsorted folder stay project-less. */
+  const newProjectId = openProjectId && !unsorted ? openProjectId : undefined
   const addSpace = activeProject ? activeProject.space : space
   /* Only outside a project's own room: standing inside it already says which
      project every task on screen belongs to, so the mark would be repeating
@@ -468,7 +473,7 @@ export function PlanPage() {
     </>
   )
 
-  const spaceTasks = tasks.filter((t) => inView(t.space) && (!openProjectId || t.projectId === openProjectId))
+  const spaceTasks = tasks.filter((t) => inView(t.space) && (!openProjectId || (unsorted ? !t.projectId && t.space === space : t.projectId === openProjectId)))
   const backlogOpen = spaceTasks.filter((t) => !t.done && t.list === 'backlog') // the to-do pool
   /* In All the three rooms would otherwise interleave into one undifferentiated
      pile. Grouped by room, in the order of the switcher above, so the list reads
@@ -1032,10 +1037,10 @@ export function PlanPage() {
               placeholder="Add something to the list…"
               value={quick}
               onChange={(e) => setQuick(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && quick.trim()) { addTask({ title: quick.trim(), source: 'mc', estimateMin: 0, space: addSpace, list: 'backlog', category: 'quick', projectId: openProjectId ?? undefined }); setQuick('') } }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && quick.trim()) { addTask({ title: quick.trim(), source: 'mc', estimateMin: 0, space: addSpace, list: 'backlog', category: 'quick', projectId: newProjectId }); setQuick('') } }}
               aria-label="New task"
             />
-            <button className="btn btn-quiet" disabled={!quick.trim()} onClick={() => { addTask({ title: quick.trim(), source: 'mc', estimateMin: 0, space: addSpace, list: 'backlog', category: 'quick', projectId: openProjectId ?? undefined }); setQuick('') }}>Add</button>
+            <button className="btn btn-quiet" disabled={!quick.trim()} onClick={() => { addTask({ title: quick.trim(), source: 'mc', estimateMin: 0, space: addSpace, list: 'backlog', category: 'quick', projectId: newProjectId }); setQuick('') }}>Add</button>
           </div>
           {backlogSorted.map((t) => {
             const isExp = expanded.has(t.id)

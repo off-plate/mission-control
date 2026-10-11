@@ -17,7 +17,7 @@ import { usePomodoro } from './pomodoro'
 import { BreakdownSheet, Sheet } from './modals'
 import { Linkify } from './widgets'
 import { PLAN_AHEAD_DAYS, WeekGrid, dayPlus, shortDay, weekRangeLabel } from './weekgrid'
-import { useCoarsePointer, Band, Dropdown, ProjectMark, SpaceMark } from './ui'
+import { useCoarsePointer, Band, WorkspaceTitle, Dropdown, ProjectMark, SpaceMark } from './ui'
 import { estimateFor } from './estimate'
 import { estimateTask } from './ai'
 import { SLOTS, SPACES, UNSORTED, habitLocked, routineComplete, routineProgress, slotMinutes, TYPING_TARGET_WPM, type Project, type Routine, type SubTask, type Task, type TimeSlot } from './types'
@@ -972,7 +972,7 @@ export function PlanPage() {
   return (
     <div className="page">
       <Band
-        title={activeProject ? activeProject.name : `Plan ${longDay(planDay)}`}
+        title={activeProject ? activeProject.name : <WorkspaceTitle before="Plan" after={longDay(planDay)} />}
         /* Which room this is, against the title itself, not off in the far
            corner with the buttons: see Band's own note on `beside`. */
         beside={activeProject

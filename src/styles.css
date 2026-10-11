@@ -10818,12 +10818,13 @@ body:has(.shell.is-hud) { --st-reach: #7C9CC4; --st-contacted: #E0A84A; --st-tal
 .band h1 .ws-title { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.1em 0.45em; }
 .ws-pick { position: relative; display: inline-flex; }
 .ws-chip {
-  display: inline-flex; align-items: center; gap: 8px; padding: 2px 10px 2px 12px; border-radius: var(--a-r-lg);
-  background: var(--a-accent); color: var(--a-ink); font: inherit; font-size: 0.62em; font-weight: 800; line-height: 1.25;
-  letter-spacing: 0; transition: background var(--t-med);
+  display: inline-flex; align-items: center; gap: 0.18em; padding: 0; border-radius: var(--a-r-lg);
+  background: none; color: var(--a-accent-text); font: inherit; letter-spacing: inherit; line-height: inherit;
+  transition: color var(--t-med);
 }
-.ws-chip:hover { background: var(--a-accent-2); }
-.ws-chip svg { flex: none; }
+.ws-chip:hover, .ws-chip[aria-expanded="true"] { color: var(--a-accent-text); }
+.ws-chip svg { width: 0.5em; height: 0.5em; flex: none; margin-top: 0.12em; }
+.ws-menu::before { content: ''; position: absolute; left: 0; right: 0; top: -10px; height: 10px; }
 .ws-menu {
   position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; min-width: 170px; display: grid; padding: 5px;
   background: var(--surface); border: 1px solid var(--hairline-strong); border-radius: 10px; box-shadow: var(--shadow-pop);

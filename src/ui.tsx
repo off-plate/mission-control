@@ -315,10 +315,15 @@ export function WorkspaceTitle({ before, after }: { before: string; after?: stri
     return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc) }
   }, [open])
   const label = (v: string) => (v === 'all' ? 'All' : SPACE_LABELS[v as SpaceId])
+  /* Opens on hover (his ask); a click still toggles it, which is the only way
+     in on touch. The short delay lets the pointer cross the gap to the menu. */
+  const timer = useRef<number | undefined>(undefined)
+  const show = () => { window.clearTimeout(timer.current); setOpen(true) }
+  const hideSoon = () => { timer.current = window.setTimeout(() => setOpen(false), 220) }
   return (
     <span className="ws-title">
       <span>{before}</span>
-      <span className="ws-pick" ref={ref}>
+      <span className="ws-pick" ref={ref} onMouseEnter={show} onMouseLeave={hideSoon}>
         <button className="ws-chip" aria-haspopup="menu" aria-expanded={open} aria-label={`Workspace: ${label(view)}`} onClick={() => setOpen((o) => !o)}>
           {label(view)}<Icon.ChevronDown size={14} strokeWidth={3} />
         </button>

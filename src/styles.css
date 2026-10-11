@@ -339,8 +339,10 @@ body:has(.shell.is-hud) { background: var(--bg); }
      partner, because this file uses it for text and borders as well as fills;
      the fills are painted with `--a-accent` by name below, since one token
      cannot be both a foreground and a background. */
-  --progress: var(--a-accent-text);
-  --progress-wash: var(--a-accent-wash);
+  /* Fixed green, never a space accent: saved time and every done state stay
+     green in every workspace (2026-10-11). */
+  --progress: #3F7D4B;
+  --progress-wash: rgba(63, 125, 75, 0.14);
 
   /* Semantic layer. Meaning, not decoration:
      accent  = interactive (you can act; also the active space's identity)
@@ -10580,6 +10582,23 @@ body:has(.as-page.jv) .dock { display: none; }
 @media (max-width: 599px) { .jv-bracket { display: none; } }
 @media (prefers-reduced-motion: reduce) { .jv-fly { transition: none; } }
 
+/* ---- Plan project strip (2026-10-11) -------------------------------------- */
+.pstrip { display: flex; gap: 6px; align-items: center; overflow-x: auto; padding-bottom: 6px; margin-bottom: var(--s4); scrollbar-width: thin; }
+.pstrip-cell { display: flex; gap: 6px; align-items: center; flex: none; }
+.pstrip-item {
+  display: flex; align-items: center; gap: 8px; flex: none; white-space: nowrap;
+  padding: 8px 12px; border: 1px solid var(--hairline); border-radius: var(--a-r-md);
+  background: var(--surface); color: var(--ink); font-weight: 500; font-size: 14px;
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+}
+.pstrip-item svg { color: var(--muted); transition: color var(--t-fast); }
+.pstrip-item em { font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pstrip-item:hover { background: var(--surface-2); }
+.pstrip-item:hover svg { color: var(--accent-text); }
+.pstrip-item.is-on { background: var(--a-accent); border-color: var(--a-accent); color: var(--a-ink); font-weight: 600; }
+.pstrip-item.is-on svg, .pstrip-item.is-on em { color: var(--a-ink); }
+.pstrip-manage { padding: 8px 10px; }
+@media (prefers-reduced-motion: reduce) { .pstrip-item, .pstrip-item svg { transition: none; } }
 /* In Jarvis mode the projects menu under Plan is portalled to <body>, where
    the HUD's own tokens apply but --a-card is still the paper white, so light
    ink sat on a white card (his report, 2026-10-04). It takes the HUD's

@@ -983,7 +983,6 @@ export function PlanPage() {
           { v: pool.length ? `${donePct}%` : '—', k: pool.length ? 'of planned time done' : 'no tasks yet', tone: (pool.length && donePct > 0 ? 'pos' : 'info') as 'pos' | 'info' },
           /* Moved up from the to-do list's own header (2026-09-30). No estimates,
              no duration: "4 waiting · 0m" read like a bug. */
-          { v: String(backlogOpen.length), k: 'waiting', tone: 'info' as const },
           ...(backlogMins > 0 ? [{ v: fmtDuration(backlogMins), k: 'of waiting work', tone: 'info' as const }] : []),
           ...(loggedAny ? [{ v: savedToday >= 0 ? fmtSigned(savedToday) : fmtDuration(-savedToday), k: savedToday >= 0 ? 'saved today' : 'over your estimates', tone: (savedToday >= 0 ? 'pos' : 'urgent') as 'pos' | 'urgent' }] : []),
         ]}

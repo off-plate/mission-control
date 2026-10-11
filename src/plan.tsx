@@ -543,7 +543,12 @@ export function PlanPage() {
   })
   useEffect(() => { if (openProjectId) setPicked([openProjectId]) }, [openProjectId])
   useEffect(() => { try { localStorage.setItem(PICK_KEY, JSON.stringify(picked)) } catch { /* private mode */ } }, [picked])
-  const stripProjects = view === 'all' ? projects : projects.filter((p) => p.space === view)
+  /* Grouped by workspace in the switcher's order, whatever order they were
+     created in, so each workspace's marker appears once. */
+  const stripProjects = (view === 'all' ? projects : projects.filter((p) => p.space === view))
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => SPACES.indexOf(a.p.space) - SPACES.indexOf(b.p.space) || a.i - b.i)
+    .map((x) => x.p)
   const sel = picked.filter((id) => id === UNSORTED || stripProjects.some((p) => p.id === id))
   const activeProject = sel.length !== 1 ? null
     : sel[0] === UNSORTED ? { id: UNSORTED, name: 'Unsorted', space }

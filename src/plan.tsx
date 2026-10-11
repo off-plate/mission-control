@@ -19,7 +19,7 @@ import { PLAN_AHEAD_DAYS, WeekGrid, dayPlus, shortDay, weekRangeLabel } from './
 import { useCoarsePointer, Band, Dropdown, ProjectMark, SpaceMark } from './ui'
 import { estimateFor } from './estimate'
 import { estimateTask } from './ai'
-import { SLOTS, SPACES, habitLocked, routineComplete, routineProgress, slotMinutes, TYPING_TARGET_WPM, type Project, type Routine, type SubTask, type Task, type TimeSlot } from './types'
+import { SLOTS, SPACES, UNSORTED, habitLocked, routineComplete, routineProgress, slotMinutes, TYPING_TARGET_WPM, type Project, type Routine, type SubTask, type Task, type TimeSlot } from './types'
 import { periodKeyFor, fmtDuration, fmtSigned, dayOfWeekKey, isEstimated, localDateKey, slotForMoment, taskMinutes } from './util'
 
 const prevDay = (): string => dayPlus(-1)
@@ -419,8 +419,8 @@ function RoutineOnDay({ routine, day }: { routine: Routine; day?: string }) {
    project card on the Projects page carries, in one row. Plain click selects
    that one project (click it again to clear); shift/cmd/ctrl-click adds or
    removes; on touch there is no modifier, so a tap toggles. */
-function ProjectStrip({ projects, tasks, sel, showSpaces, touch, onAll, onPick, onManage }: {
-  projects: Project[]; tasks: Task[]; sel: string[]; showSpaces: boolean; touch: boolean
+function ProjectStrip({ projects, tasks, sel, showSpaces, touch, inScope, onAll, onPick, onManage }: {
+  projects: Project[]; tasks: Task[]; sel: string[]; showSpaces: boolean; touch: boolean; inScope: (t: Task) => boolean
   onAll: () => void; onPick: (id: string, add: boolean) => void; onManage: () => void
 }) {
   const open = (id: string) => tasks.filter((t) => t.projectId === id && !t.done).length
@@ -447,6 +447,9 @@ function ProjectStrip({ projects, tasks, sel, showSpaces, touch, onAll, onPick, 
           </span>
         )
       })}
+      <button className={`pstrip-item${sel.includes(UNSORTED) ? ' is-on' : ''}`} aria-pressed={sel.includes(UNSORTED)} onClick={(e) => onPick(UNSORTED, touch || e.shiftKey || e.metaKey || e.ctrlKey)}>
+        <Icon.Folder size={15} /><span>Unsorted</span><em className="mono">{tasks.filter((t) => !t.projectId && !t.done && inScope(t)).length}</em>
+      </button>
       <button className="pstrip-item pstrip-manage" onClick={onManage} aria-label="Manage projects"><Icon.FolderAdd size={15} /></button>
     </div>
   )
@@ -456,7 +459,7 @@ export function PlanPage() {
   const todayIdx = (new Date().getDay() + 6) % 7
   const pomo = usePomodoro()
   const { startFocus } = pomo
-  const { routines, habits } = useStore()
+  const { routines, habits, openDaily } = useStore()
   const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId, setTaskAt, plan, setPage, openDay, view, inView, focusSessions, dayLog } = useStore()
   const { projects, openProjectId, setTaskProject, setTaskSpace, setSpace, setView, enterProject } = useStore()
   /* A project is a room inside a Space, not a second store: this is the one
@@ -477,8 +480,12 @@ export function PlanPage() {
   useEffect(() => { if (openProjectId) setPicked([openProjectId]) }, [openProjectId])
   useEffect(() => { try { localStorage.setItem(PICK_KEY, JSON.stringify(picked)) } catch { /* private mode */ } }, [picked])
   const stripProjects = view === 'all' ? projects : projects.filter((p) => p.space === view)
-  const sel = picked.filter((id) => stripProjects.some((p) => p.id === id))
-  const activeProject = sel.length === 1 ? projects.find((p) => p.id === sel[0]) ?? null : null
+  const sel = picked.filter((id) => id === UNSORTED || stripProjects.some((p) => p.id === id))
+  const activeProject = sel.length !== 1 ? null
+    : sel[0] === UNSORTED ? { id: UNSORTED, name: 'Unsorted', space }
+    : projects.find((p) => p.id === sel[0]) ?? null
+  /* New tasks typed inside the Unsorted folder stay project-less. */
+  const newProjectId = activeProject && activeProject.id !== UNSORTED ? activeProject.id : undefined
   const addSpace = activeProject ? activeProject.space : space
   /* Only outside a project's own room: standing inside it already says which
      project every task on screen belongs to, so the mark would be repeating
@@ -520,7 +527,7 @@ export function PlanPage() {
     </>
   )
 
-  const spaceTasks = tasks.filter((t) => inView(t.space) && (sel.length === 0 || (!!t.projectId && sel.includes(t.projectId))))
+  const spaceTasks = tasks.filter((t) => inView(t.space) && (sel.length === 0 || (t.projectId ? sel.includes(t.projectId) : sel.includes(UNSORTED))))
   const backlogOpen = spaceTasks.filter((t) => !t.done && t.list === 'backlog') // the to-do pool
   /* In All the three rooms would otherwise interleave into one undifferentiated
      pile. Grouped by room, in the order of the switcher above, so the list reads
@@ -880,7 +887,7 @@ export function PlanPage() {
         /* The way back into the record, or the way back out of a project into
            its own room's Plan. Never both: a project already has Yesterday
            one tap further, through Projects then the Space's own Plan. */
-        actions={<button className="btn btn-ghost" onClick={() => openDay(prevDay())}>Yesterday</button>}
+        actions={<button className="btn btn-ghost" onClick={openDaily}>Yesterday</button>}
       />
       {/* Every task, every workspace, every project -- the one search that
           isn't scoped to whatever room he's standing in, because "which room
@@ -918,7 +925,7 @@ export function PlanPage() {
         )}
       </div>
       <ProjectStrip
-        projects={stripProjects} tasks={tasks} sel={sel} showSpaces={view === 'all'} touch={coarse}
+        projects={stripProjects} tasks={tasks} sel={sel} showSpaces={view === 'all'} touch={coarse} inScope={(t) => inView(t.space)}
         onAll={() => setPicked([])}
         onPick={(id, add) => setPicked(sel.includes(id)
           ? (add ? sel.filter((x) => x !== id) : sel.length === 1 ? [] : [id])
@@ -1088,10 +1095,10 @@ export function PlanPage() {
               placeholder="Add something to the list…"
               value={quick}
               onChange={(e) => setQuick(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && quick.trim()) { addTask({ title: quick.trim(), source: 'mc', estimateMin: 0, space: addSpace, list: 'backlog', category: 'quick', projectId: activeProject?.id }); setQuick('') } }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && quick.trim()) { addTask({ title: quick.trim(), source: 'mc', estimateMin: 0, space: addSpace, list: 'backlog', category: 'quick', projectId: newProjectId }); setQuick('') } }}
               aria-label="New task"
             />
-            <button className="btn btn-quiet" disabled={!quick.trim()} onClick={() => { addTask({ title: quick.trim(), source: 'mc', estimateMin: 0, space: addSpace, list: 'backlog', category: 'quick', projectId: activeProject?.id }); setQuick('') }}>Add</button>
+            <button className="btn btn-quiet" disabled={!quick.trim()} onClick={() => { addTask({ title: quick.trim(), source: 'mc', estimateMin: 0, space: addSpace, list: 'backlog', category: 'quick', projectId: newProjectId }); setQuick('') }}>Add</button>
           </div>
           {backlogSorted.map((t) => {
             const isExp = expanded.has(t.id)

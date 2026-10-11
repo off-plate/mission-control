@@ -38,7 +38,7 @@ export function momentum(ctx: {
 }
 
 /** A task open this many days counts as avoided, not merely pending. */
-const AVOID_DAYS = 7
+export const AVOID_DAYS = 7
 
 function daysOld(createdAt?: string): number {
   if (!createdAt) return 0

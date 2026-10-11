@@ -48,11 +48,58 @@ function Head({ doc }: { doc: Transcript }) {
   )
 }
 
-function Brief({ text }: { text: string }) {
+/* The brief is the point of the page (his ask, 2026-10-05): what the video is,
+   every key point explained with a jump to where it is said, what to take
+   away, what got named, and whether the video is still worth the time. Older
+   copies carry a plain string or bare takeaways and still read. */
+function Brief({ doc }: { doc: Transcript }) {
+  const b = doc.summary
+  if (!b) return null
+  if (typeof b === 'string') {
+    return (
+      <section className="wl-brief">
+        <h2 className="wl-h2">The brief</h2>
+        {b.split(/\n{2,}/).map((p, i) => <p key={i}>{p.trim()}</p>)}
+      </section>
+    )
+  }
+  const points = b.points?.length ? b.points : (b.takeaways ?? []).map((t) => ({ point: t, detail: '', at: '', sec: null }))
   return (
     <section className="wl-brief">
-      <h2 className="wl-h2">The brief</h2>
-      {text.split(/\n{2,}/).map((p, i) => <p key={i}>{p.trim()}</p>)}
+      <h2 className="wl-h2">What it is about</h2>
+      {b.about && <p>{b.about}</p>}
+      {points.length > 0 && (
+        <>
+          <h2 className="wl-h2 wl-h2-gap">Key points</h2>
+          <ol className="wl-points">
+            {points.map((p, i) => (
+              <li key={i}>
+                <p className="wl-point">
+                  {p.point}
+                  {p.sec != null && (
+                    <a className="wl-at" href={atUrl(doc.videoId, p.sec)} target="_blank" rel="noreferrer">{p.at}</a>
+                  )}
+                </p>
+                {p.detail && <p className="wl-detail">{p.detail}</p>}
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+      {b.outcomes && b.outcomes.length > 0 && (
+        <>
+          <h2 className="wl-h2 wl-h2-gap">What to take away</h2>
+          <ul className="wl-list">{b.outcomes.map((t, i) => <li key={i}>{t}</li>)}</ul>
+        </>
+      )}
+      {b.mentions && b.mentions.length > 0 && (
+        <>
+          <h2 className="wl-h2 wl-h2-gap">Mentioned</h2>
+          <ul className="wl-list">{b.mentions.map((t, i) => <li key={i}>{t}</li>)}</ul>
+        </>
+      )}
+      {b.verdict && <p className="wl-verdict">{b.verdict}</p>}
+      {b.coversUpTo && <p className="wl-covers">This brief covers the first {stamp(b.coversUpTo)} of the video.</p>}
     </section>
   )
 }
@@ -179,7 +226,7 @@ export function WatchlessPage() {
         {doc && (
           <>
             <Head doc={doc} />
-            {doc.summary && <Brief text={doc.summary} />}
+            <Brief doc={doc} />
 
             <div className="wl-tools">
               <div className="wl-find">

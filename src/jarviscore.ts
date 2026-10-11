@@ -18,7 +18,7 @@ import { HELMET_D } from './helmet'
 
 export type Shape =
   | 'core' | 'turbine' | 'tasks' | 'calendar' | 'bills' | 'gym' | 'idea'
-  | 'person' | 'building' | 'note' | 'habit' | 'focus' | 'helmet'
+  | 'person' | 'building' | 'note' | 'habit' | 'focus' | 'helmet' | 'prospect'
 
 export interface Callout { label: string; value?: string }
 export interface Job { shape: Shape; callouts: Callout[] }
@@ -34,17 +34,22 @@ const HOLD = 5000
    and "today at noon" is the day's list. Only for the preview while he types;
    once he sends, the shapes come from what the assistant really did. */
 const RULES: [Shape, RegExp][] = [
+  /* A specific thing beats a generic verb (his report, 2026-10-04: "add X
+     as a business prospect" previewed the task list, because "add" matched
+     first). Dates first, then the named parts of the app, and the plain
+     task words last, as the fallback they are. */
   ['calendar', /\b(tomorrow|next week|monday|tuesday|wednesday|thursday|friday|saturday|sunday|calendar|meeting|schedule)\b/i],
-  ['bills', /\b(bill|pay|paid|money|spotify|income|expense|kč|czk|invoice)\b/i],
+  ['prospect', /\b(prospects?|business|company|companies|leads?|clients?|outreach|cold email|pipeline|reach out)\b/i],
+  ['bills', /\b(bills?|pay|paid|money|spotify|income|expense|kč|czk|invoice)\b/i],
   ['focus', /\b(focus|timer|pomodoro|zone|block)\b/i],
-  ['tasks', /\b(task|to-?do|list|add|remind|today|noon|morning|afternoon|evening|tonight|done|finished|tick)\b/i],
-  ['calendar', /\bplan\b/i],
   ['gym', /\b(gym|workout|bench|squat|hevy|train|lift)\b/i],
-  ['idea', /\bidea/i],
+  ['idea', /\bideas?\b/i],
   ['person', /\b(person|people|brother|sister|friend|contact|called|mum|mom|dad|father|girlfriend)\b/i],
-  ['building', /\b(project|house|kitchen|build|renovat)/i],
-  ['note', /\b(note|write (it|this|that) down|jot)/i],
-  ['habit', /\b(habit|routine|streak|stretch|meditat|goal)/i],
+  ['building', /\b(projects?|house|kitchen|build|renovat\w*)\b/i],
+  ['note', /\b(notes?|write (it|this|that) down|jot)\b/i],
+  ['habit', /\b(habits?|routines?|streak|stretch|meditat\w*|goals?)\b/i],
+  ['tasks', /\b(tasks?|to-?do|list|add|remind|today|noon|morning|afternoon|evening|tonight|done|finished|tick|mark)\b/i],
+  ['calendar', /\bplan\b/i],
 ]
 export function previewShape(text: string): Shape {
   const bits = text.split(/\s*(?:,|;|\band then\b|\bthen\b|\band\b)\s*/i).filter(Boolean)
@@ -68,13 +73,14 @@ const ANCHORS: Partial<Record<Shape, [number, number, number][]>> = {
   note: [[-0.95, 1.15, 0], [1.2, -1.5, 0], [-1.2, -1.2, 0]],
   habit: [[0, 1.6, 1.35], [1.35, -0.6, 0], [-1.35, 0.4, 0]],
   focus: [[0, 1.75, 0], [1.5, 0.3, 0], [-1.6, -0.6, 0]],
+  prospect: [[-1.68, 0.75, 0], [0.4, 2.0, 0], [0.55, -1.55, 0]],
 }
 const VIEWS: Record<Shape, [number, number, number]> = {
   core: [0, 0, 9], turbine: [0.9, 0.25, 9.4], tasks: [-0.35, 0.12, 9], calendar: [0, 0.08, 8.6], bills: [0.5, 0.42, 9],
   gym: [0.55, 0.3, 9], idea: [0.2, 0.05, 8.8], person: [0.3, 0.1, 8.8], building: [0.7, 0.45, 9.6], note: [-0.25, 0.1, 8.8],
-  habit: [0.4, 0.2, 9], focus: [0, 0, 8.8], helmet: [0, 0.04, 8.4],
+  habit: [0.4, 0.2, 9], focus: [0, 0, 8.8], helmet: [0, 0.04, 8.4], prospect: [0.3, 0.42, 9.2],
 }
-const WIRE_AMBER: Shape[] = ['building', 'bills', 'turbine', 'helmet']
+const WIRE_AMBER: Shape[] = ['building', 'bills', 'turbine', 'helmet', 'prospect']
 
 /* Seeded, so every load draws the same shapes. */
 function mulberry32(a: number) {
@@ -127,6 +133,7 @@ export class JarvisCore {
   private speak = 0
   private listen = 0
   private lastKey = 0
+  private words = 0
   private coreVis = 1
   private dots = 0
   private egg = 0
@@ -227,9 +234,16 @@ export class JarvisCore {
   /** A keystroke: a ripple through the core, and a word that names a part of
    *  the app starts shaping it. */
   type(text: string): void {
-    this.U.uKick.value = this.U.uTime.value
-    this.listen = 1
     this.lastKey = performance.now()
+    /* Once per finished WORD, not per key (his ask, 2026-10-04: it felt
+       stuttery). A word is finished when a space or punctuation follows it;
+       deleting never ripples. */
+    const words = (text.match(/\S+(?=[\s.,!?;:])/g) ?? []).length
+    const grew = words > this.words
+    this.words = words
+    if (!grew) return
+    this.U.uKick.value = this.U.uTime.value
+    this.listen = 0.8
     if (this.thinking || this.egg) return
     const s = previewShape(text)
     if (s !== 'core' || this.shape !== 'core') this.morphTo(s)
@@ -476,6 +490,25 @@ export class JarvisCore {
           this.circle(O, 1.75, Z, 0, 0.4, -Math.PI / 2 + Math.PI * 1.2, Math.PI * 1.5),
           this.shell(O, 0.3, 1, 3), this.seg(O, V(Math.cos(0.2) * 1.5, Math.sin(0.2) * 1.5, 0), 1, 2),
         ]
+      case 'prospect': {
+        /* People > Business: his pipeline as a funnel. Five stage rings
+           narrow from reach (top) to won (bottom), struts tie them, and the
+           new business is the bright node dropping in at the top. */
+        const out: Prim[] = []
+        const rings: [number, number][] = [[1.45, 2.1], [0.75, 1.65], [0.05, 1.2], [-0.65, 0.8], [-1.35, 0.5]]
+        rings.forEach(([y, r], i) => out.push(this.circle(V(0, y, 0), r, Y, i === 0 ? 1 : 0, i === 0 ? 1.8 : 1.2)))
+        for (let i = 0; i < 10; i++) {
+          const a = (i / 10) * Math.PI * 2
+          for (let k = 0; k < rings.length - 1; k++) {
+            const [y0, r0] = rings[k], [y1, r1] = rings[k + 1]
+            out.push(this.seg(V(Math.cos(a) * r0, y0, Math.sin(a) * r0), V(Math.cos(a) * r1, y1, Math.sin(a) * r1), 0, 0.35))
+          }
+        }
+        out.push(this.disk(V(0, -1.35, 0), 0.5, Y, 1, 1.4))
+        out.push(this.shell(V(0, 2.0, 0), 0.22, 1, 4), this.circle(V(0, 2.0, 0), 0.38, Z, 1, 1))
+        out.push(this.seg(V(0, 2.0, 0), V(0, 1.45, 0), 1, 1.2))
+        return out
+      }
       case 'helmet': {
         const h = this.trace()
         const out: Prim[] = h.edges.map((e) => ({

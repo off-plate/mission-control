@@ -14,6 +14,7 @@ import { SLOTS, dueOn, habitStepKey, routineComplete, requiredSteps, type HabitD
 import { localDateKey, fmtDuration, periodKeyFor } from './util'
 import { useAssistantBills } from './assistantbills'
 import { TIER_LABEL } from './peoplelayout'
+import { SOURCES, STAGES, label } from './prospectcalc'
 import { ActualLog } from './plan'
 import * as Icon from './icons'
 import { Speak, useAssistantThread, useVoiceGlue, VoicePanel, type Done } from './assistantcore'
@@ -86,6 +87,7 @@ const MORE_IN: Partial<Record<CardKind, [PageId, string]>> = {
   stale: ['plan', 'Plan'], planned: ['plan', 'Plan'], projects: ['projects', 'Projects'],
   routines: ['routines', 'Routines'], notes: ['notes', 'Notes'], people: ['people', 'People'],
   ideas: ['ideas', 'Ideas'], bills: ['bills', 'Bills'], gym: ['gym', 'Gym'], prompts: ['prompts', 'Prompts'],
+  business: ['people', 'People'],
 }
 
 /* WHAT THE LAST CHANGE TOUCHED. A key is a row's id, or for a row the store
@@ -201,7 +203,7 @@ function WeatherCard(): JSX.Element {
 function CardBody({ kind, limit, touched = [] }: { kind: CardKind; limit?: number; touched?: string[] }) {
   const {
     tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, setPage, toggleTask, toggleHabitDay,
-    projects, notes, noteFolders, people, ideaBoard, gymGoals, prompts,
+    projects, notes, noteFolders, people, ideaBoard, gymGoals, prompts, prospects,
   } = useStore()
   const { state: cal } = useCalendar()
   const day = localDateKey()
@@ -313,6 +315,28 @@ function CardBody({ kind, limit, touched = [] }: { kind: CardKind; limit?: numbe
             <div className={rowCls(hot(p.id, p.name))} key={p.id} style={stagger(i)}>
               <span className="as-row-title">{p.name}{p.rel ? `, ${p.rel}` : ''}</span>
               <span className="as-row-min mono">{TIER_LABEL[p.tier]}</span>
+            </div>
+          ))}
+        </div>
+        <More n={all.length - rows.length} kind={kind} />
+      </div>
+    )
+  }
+
+  if (kind === 'business') {
+    /* People > Business: each prospect with its stage and how he found it,
+       the one JARVIS just touched marked (his report, 2026-10-04: a new
+       prospect landed on the personal People list instead). Newest first. */
+    const all = [...prospects].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
+    if (!all.length) return <p className="as-empty">No prospects yet.</p>
+    const rows = fit(all, limit ?? 20, (p) => hot(p.id, p.name))
+    return (
+      <div className="as-list">
+        <div className="as-group">
+          {rows.map((p, i) => (
+            <div className={rowCls(hot(p.id, p.name), p.stage === 'lost')} key={p.id} style={stagger(i)}>
+              <span className="as-row-title">{p.name}{p.domain ? `, ${p.domain}` : ''}</span>
+              <span className="as-row-min mono">{label(STAGES, p.stage)}, {label(SOURCES, p.source).toLowerCase()}</span>
             </div>
           ))}
         </div>
@@ -514,7 +538,7 @@ const TITLES: Record<CardKind, string> = {
   calendar: 'Calendar', goals: 'Goals', focus: 'Focus', stale: 'Sitting longest',
   weather: 'Prague', planned: 'Coming up', projects: 'Projects', routines: 'Routines',
   notes: 'Notes', people: 'People', ideas: 'Ideas', bills: 'Bills this cycle', gym: 'Gym targets',
-  prompts: 'Prompts',
+  prompts: 'Prompts', business: 'Business',
 }
 
 /** The canvas. One place, swapped, animated on the swap so the change is
@@ -589,7 +613,7 @@ function Dictate({ base, onText, busy }: { base: string; onText: (t: string) => 
 const SHAPE_OF: Partial<Record<CardKind, Shape>> = {
   today: 'tasks', backlog: 'tasks', stale: 'tasks', planned: 'calendar', calendar: 'calendar',
   bills: 'bills', gym: 'gym', ideas: 'idea', people: 'person', projects: 'building',
-  notes: 'note', prompts: 'note', habits: 'habit', routines: 'habit', goals: 'focus', focus: 'focus',
+  notes: 'note', prompts: 'note', habits: 'habit', routines: 'habit', goals: 'focus', focus: 'focus', business: 'prospect',
 }
 /** One shape per run of changes that landed in the same place, in the order
  *  they happened, each carrying its own callouts: the card's name, then each
@@ -598,24 +622,26 @@ function jobsFor(done: Done[]): Job[] {
   const jobs: Job[] = []
   for (const d of done) {
     const card = d.ok && !d.undone ? d.at?.card : undefined
-    const shape = card ? SHAPE_OF[card] : undefined
+    const shape = card ? (d.at?.shape ?? SHAPE_OF[card]) : undefined
     if (!card || !shape) continue
     const colon = d.text.indexOf(': ')
     const verb = (colon > 0 ? d.text.slice(0, colon) : d.text).split(' ')[0]
     const value = colon > 0 ? d.text.slice(colon + 2) : undefined
     const last = jobs[jobs.length - 1]
     if (last?.shape === shape) { last.callouts.push({ label: verb, value }); continue }
-    jobs.push({ shape, callouts: [{ label: TITLES[card] }, { label: verb, value }] })
+    jobs.push({ shape, callouts: [{ label: d.at?.shape === 'prospect' ? 'Business' : TITLES[card] }, { label: verb, value }] })
   }
   return jobs
 }
 /* The film's line, answered by the app itself: no model, no network. */
 const LOVE_YOU_3000 = /love\s*you\s*3\s*0\s*0\s*0/i
 
-/** The frame: helmet brackets in the corners and a curved gauge down each
- *  side, the left one the day's tasks done, the right one today's habits.
- *  Drawn to the room's own size, so it is redrawn when that changes. */
-function JvFrame({ left, right, leftLabel, rightLabel }: { left: number; right: number; leftLabel: string; rightLabel: string }) {
+/** The frame: helmet brackets in the corners and a straight gauge down each
+ *  edge (his ask, 2026-10-04: straight, so the content gets the width the
+ *  curves took). Left, how much of today is still left; right, his focus
+ *  time today on a scale marked in hours. Drawn to the room's own size. */
+interface Gauge { fill: number; ticks: number; longEvery: number; label: string }
+function JvFrame({ left, right }: { left: Gauge; right: Gauge }) {
   const ref = useRef<SVGSVGElement>(null)
   const [size, setSize] = useState({ w: 0, h: 0 })
   useEffect(() => {
@@ -627,19 +653,19 @@ function JvFrame({ left, right, leftLabel, rightLabel }: { left: number; right: 
   }, [])
   const { w, h } = size
   if (!w || !h) return <svg ref={ref} className="jv-frame" aria-hidden="true" />
-  const gauge = (cx: number, r: number, a0: number, a1: number, fill: number) => {
-    const P = (deg: number) => [cx + Math.cos((deg * Math.PI) / 180) * r, h / 2 + Math.sin((deg * Math.PI) / 180) * r]
-    const arc = (s: number, e: number) => { const [x0, y0] = P(s), [x1, y1] = P(e); return `M${x0} ${y0}A${r} ${r} 0 0 ${e > s ? 1 : 0} ${x1} ${y1}` }
+  /* A vertical scale at x, ticks pointing inward (dir), filling from the
+     bottom up. */
+  const y0 = h * 0.16, y1 = h * 0.84
+  const scale = (x: number, dir: 1 | -1, g: Gauge) => {
     let t = ''
-    for (let i = 0; i <= 40; i++) {
-      const a = a0 + ((a1 - a0) * i) / 40, k = i % 5 ? 7 : 14
-      const [x0, y0] = P(a)
-      t += `M${x0} ${y0}L${cx + Math.cos((a * Math.PI) / 180) * (r - k)} ${h / 2 + Math.sin((a * Math.PI) / 180) * (r - k)}`
+    for (let i = 0; i <= g.ticks; i++) {
+      const y = y1 - ((y1 - y0) * i) / g.ticks, k = i % g.longEvery ? 7 : 14
+      t += `M${x} ${y}H${x + dir * k}`
     }
-    return { track: arc(a0, a1), fill: fill > 0 ? arc(a1 - (a1 - a0) * Math.min(1, fill), a1) : '', ticks: t }
+    const f = Math.max(0, Math.min(1, g.fill))
+    return { track: `M${x} ${y0}V${y1}`, fill: f > 0 ? `M${x} ${y1}V${y1 - (y1 - y0) * f}` : '', ticks: t }
   }
-  const r = Math.max(340, h * 0.6)
-  const L = gauge(18 + r, r, 145, 215, left), R = gauge(w - 18 - r, r, 35, -35, right)
+  const L = scale(40, 1, left), R = scale(w - 40, -1, right)
   const b = 'M2 44V2H44'
   return (
     <svg ref={ref} className="jv-frame" width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true">
@@ -648,13 +674,23 @@ function JvFrame({ left, right, leftLabel, rightLabel }: { left: number; right: 
         <>
           <path className="jv-g-track" d={L.track} /><path className="jv-g-fill" d={L.fill} /><path className="jv-g-ticks" d={L.ticks} />
           <path className="jv-g-track is-amber" d={R.track} /><path className="jv-g-fill is-amber" d={R.fill} /><path className="jv-g-ticks is-amber" d={R.ticks} />
-          <text className="jv-g-label" x={36} y={h / 2 + 4}>{leftLabel}</text>
-          <text className="jv-g-label is-amber" x={w - 36} y={h / 2 + 4} textAnchor="end">{rightLabel}</text>
+          {/* The labels run along their scales, so they take no width. */}
+          <text className="jv-g-label" x={22} y={h / 2} textAnchor="middle" transform={`rotate(-90 22 ${h / 2})`}>{left.label}</text>
+          <text className="jv-g-label is-amber" x={w - 22} y={h / 2} textAnchor="middle" transform={`rotate(90 ${w - 22} ${h / 2})`}>{right.label}</text>
         </>
       ) : null}
     </svg>
   )
 }
+/** Minutes since midnight, refreshed every minute: the left gauge counts
+ *  down the day as it goes. */
+function useMinuteOfDay(): number {
+  const read = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes() }
+  const [m, setM] = useState(read)
+  useEffect(() => { const id = setInterval(() => setM(read()), 60000); return () => clearInterval(id) }, [])
+  return m
+}
+const FOCUS_SCALE_H = 8
 
 export function AssistantPage() {
   const split = useSplit()
@@ -771,6 +807,38 @@ export function AssistantPage() {
   const nextMeeting = brief.meetings.find((m) => m.at >= brief.now)
   const bills = brief.bills
   const unpaid = bills && bills !== 'loading' ? bills.due - bills.paid : null
+  /* The bottom corners sit as far off the screen's edge as the top corners
+     sit under the header's buttons. Measured, because the header's height
+     moves with the window width; written to the shell, which pads main. */
+  const room = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const shell = document.querySelector<HTMLElement>('.shell')
+    const fit = () => {
+      const page = room.current, btns = document.querySelectorAll('.topstick .btn-sq')
+      if (!page || !shell || !btns.length) return
+      const under = Math.max(...[...btns].map((b) => b.getBoundingClientRect().bottom))
+      const r = page.getBoundingClientRect()
+      const want = r.top - under, have = innerHeight - r.bottom
+      const pad = parseFloat(getComputedStyle(page.parentElement as HTMLElement).paddingBottom) || 0
+      /* Correct against what is actually there, not what padding alone would
+         predict: the shell adds a few pixels of its own under main. */
+      const next = Math.max(0, Math.round(pad + want - have))
+      if (Math.abs(next - pad) >= 1) shell.style.setProperty('--jv-gap', `${next}px`)
+    }
+    fit()
+    /* Again while the header settles: its buttons move a few pixels as the
+       fonts and the theme land, without the header changing size, so no
+       observer would notice. */
+    const timers = [300, 1000, 2500].map((t) => setTimeout(fit, t))
+    const ro = new ResizeObserver(fit)
+    const top = document.querySelector('.topstick')
+    if (top) ro.observe(top)
+    if (room.current) ro.observe(room.current)
+    addEventListener('resize', fit)
+    return () => { timers.forEach(clearTimeout); ro.disconnect(); removeEventListener('resize', fit); shell?.style.removeProperty('--jv-gap') }
+  }, [])
+  /* Left gauge: the share of today, midnight to midnight, still to come. */
+  const dayLeft = 1 - useMinuteOfDay() / 1440
   const state = busy ? 'THINKING' : voice ? 'LISTENING' : q ? 'LISTENING' : 'STANDING BY'
 
   const askBox = voice ? <VoicePanel onExit={endVoice} /> : (
@@ -805,26 +873,30 @@ export function AssistantPage() {
   )
 
   return (
-    <div className="page as-page jv">
+    <div className="page as-page jv" ref={room}>
       <canvas ref={gl} className="jv-gl" aria-hidden="true" />
-      <JvFrame
-        left={dayItems.length ? dayDone / dayItems.length : 0}
-        right={brief.habits.due ? brief.habits.kept / brief.habits.due : 0}
-        leftLabel={`DAY ${dayDone} / ${dayItems.length}`}
-        rightLabel={`HABITS ${brief.habits.kept} / ${brief.habits.due}`}
-      />
-      <div className="jv-strip" role="group" aria-label="Today at a glance">
-        <div><span className="k">ON THE DAY</span><span className="v">{dayDone} / {dayItems.length}</span></div>
-        <div><span className="k">NEXT MEETING</span><span className="v">{nextMeeting ? nextMeeting.at : 'None'}</span></div>
-        <div><span className="k">HABITS</span><span className="v">{brief.habits.kept} / {brief.habits.due}</span></div>
-        <div>
-          <span className="k">BILLS</span>
-          <span className={`v${unpaid ? ' is-alert' : ''}`}>{bills === 'loading' ? 'Loading' : unpaid === null ? 'Signed out' : unpaid ? `${unpaid} unpaid` : 'All paid'}</span>
+      {/* The brackets and gauges are drawn to THIS wrapper's own size, not the
+         full-bleed page (his report, 2026-10-05: a wide monitor stretched the
+         page full width while the grid stayed capped, so the frame sat far
+         out past the actual content). Matching the grid's own max-width here
+         keeps the corners and the gauge tracks on the content's real edge. */}
+      <div className="jv-body">
+        <JvFrame
+          left={{ fill: dayLeft, ticks: 24, longEvery: 6, label: `DAY LEFT ${Math.round(dayLeft * 100)}%` }}
+          right={{ fill: brief.focusToday / (FOCUS_SCALE_H * 60), ticks: FOCUS_SCALE_H * 4, longEvery: 4, label: `FOCUS ${brief.focusToday ? fmtDuration(brief.focusToday).toUpperCase() : '0M'}` }}
+        />
+        <div className="jv-strip" role="group" aria-label="Today at a glance">
+          <div><span className="k">ON THE DAY</span><span className="v">{dayDone} / {dayItems.length}</span></div>
+          <div><span className="k">NEXT MEETING</span><span className="v">{nextMeeting ? nextMeeting.at : 'None'}</span></div>
+          <div><span className="k">HABITS</span><span className="v">{brief.habits.kept} / {brief.habits.due}</span></div>
+          <div>
+            <span className="k">BILLS</span>
+            <span className={`v${unpaid ? ' is-alert' : ''}`}>{bills === 'loading' ? 'Loading' : unpaid === null ? 'Signed out' : unpaid ? `${unpaid} unpaid` : 'All paid'}</span>
+          </div>
+          <div><span className="k">FOCUS TODAY</span><span className="v">{brief.focusToday ? fmtDuration(brief.focusToday) : '0m'}</span></div>
         </div>
-        <div><span className="k">FOCUS TODAY</span><span className="v">{brief.focusToday ? fmtDuration(brief.focusToday) : '0m'}</span></div>
-      </div>
 
-      <div className="jv-grid">
+        <div className="jv-grid">
         {split && (
           <aside className="jv-left" aria-label="On the day">
             <h2>ON THE DAY</h2>
@@ -937,6 +1009,7 @@ export function AssistantPage() {
         </section>
 
         {split && <Canvas kinds={canvas} touched={touched} />}
+        </div>
       </div>
       <div ref={overlay} className="jv-overlay" aria-hidden="true" />
     </div>

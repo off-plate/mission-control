@@ -300,7 +300,7 @@ export function TaskMark({ task, always }: { task: { space?: SpaceId; projectId?
 export function Band({
   title, metrics, actions, leading, beside,
 }: {
-  title: string
+  title: React.ReactNode
   metrics?: { v: string; k: string; tone?: 'pos' | 'urgent' | 'info' }[]
   actions?: React.ReactNode
   /** Sits before the metrics, not after them: for a control the page wants

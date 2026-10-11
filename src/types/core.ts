@@ -18,6 +18,10 @@ export function isSpace(v: ViewId): v is SpaceId {
 /** One shared on-track threshold, so Goals and the widget never disagree. */
 export const ON_TRACK_PCT = 50
 
+/** openProjectId value for a Space's default folder: the tasks in it that
+ *  belong to no project. Never stored on a task. */
+export const UNSORTED = '__unsorted__'
+
 export type PageId =
   | 'today'
   | 'plan'

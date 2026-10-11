@@ -1751,7 +1751,21 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 }
 .projrow:hover { background: var(--a-sunk); }
 .projrow[aria-current="true"] { background: var(--accent-wash); font-weight: 600; }
-.projrow .projectmark { min-width: 28px; }
+/* The mark in this menu is a small static folder (his ask, 2026-10-11): same
+   back panel, tab and front flap as the Projects page folders, no hover. */
+.projrow .projectmark {
+  --back: #C9A23A; --front: #FFD772;
+  position: relative; width: 32px; min-width: 32px; height: 24px; padding: 0; background: none; border-radius: 0; flex: none;
+}
+.projrow[data-space="work"] .projectmark { --back: #5FB4D3; --front: #A6E4F8; }
+.projrow[data-space="none"] .projectmark { --back: #C9C2B4; --front: #ECE8E0; }
+.projrow .projectmark::before { content: ''; position: absolute; inset: 3px 0 0 0; background: var(--back); border-radius: 2px 6px 6px 6px; }
+.projrow .projectmark::after { content: ''; position: absolute; left: 0; top: 0; width: 14px; height: 6px; background: var(--back); border-radius: 4px 5px 0 0; clip-path: polygon(0 0, 80% 0, 100% 100%, 0 100%); }
+.projrow .projectmark b {
+  position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; height: 17px; display: flex; align-items: center; justify-content: center;
+  background: var(--front); border-radius: 4px 4px 6px 6px; box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+  font-size: 9px; font-weight: 800; letter-spacing: 0.02em; color: #2A2418;
+}
 .projrow-name { flex: 1; min-width: 0; }
 .projrow-n { color: var(--muted); font-size: 0.8125rem; }
 .projrow:active { transform: scale(0.98); }
@@ -5968,11 +5982,11 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 }
 
 /* ---- 7. surfaces: the system radius, and a lift that answers a pointer ---- */
-.panel, .widget, .card, .goal-card, .routine-card, .habit-card, .projcard {
+.panel, .widget, .card, .goal-card, .routine-card, .habit-card {
   border-radius: var(--a-r-lg);
   transition: box-shadow var(--a-enter), transform var(--a-enter), border-color var(--a-enter);
 }
-.goal-card:hover, .routine-card:hover, .habit-card:hover, .projcard:hover {
+.goal-card:hover, .routine-card:hover, .habit-card:hover {
   box-shadow: var(--a-lift); border-color: var(--a-accent-text);
 }
 
@@ -5999,26 +6013,65 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    second identity system. */
 .projsection { margin-bottom: var(--s6); }
 .projsection-head { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s3); }
-.projgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--s3); }
-.projcard {
-  position: relative; background: var(--surface); border: 1px solid var(--hairline); box-shadow: var(--a-lift);
+.projgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--s5) var(--s4); padding-top: var(--s2); }
+
+/* The folder (2026-10-11). Back panel with a tab, up to three sheets, a front
+   flap carrying the name. The space colour is the folder's own colour now,
+   which is what the old 3px bar was saying. Unsorted is neutral: it is the
+   space's own default drawer, not a room he made. */
+.folder {
+  --mark: #FFC94A;
+  --back: color-mix(in oklab, var(--mark) 78%, #8a5a00);
+  --front: color-mix(in oklab, var(--mark) 88%, white);
+  position: relative; height: 150px; perspective: 900px;
 }
-.projcard.s-personal { --mark: #FFC94A; } .projcard.s-work { --mark: #7FD8F5; }
-.projcard::before { content: ''; position: absolute; left: var(--s2); top: 14px; bottom: 14px; width: 3px; border-radius: 2px; background: var(--mark, var(--hairline-strong)); z-index: 1; }
-/* The card's own open button: everything but the kebab in the corner. */
-.projcard-open {
-  display: block; width: 100%; text-align: left; background: none; border: none; cursor: pointer;
-  padding: var(--s4) calc(var(--s5) + 8px) var(--s4) calc(var(--s4) + 8px);
+.folder.s-work { --mark: #7FD8F5; --back: color-mix(in oklab, var(--mark) 72%, #0b4a63); --front: color-mix(in oklab, var(--mark) 85%, white); }
+.folder.f-unsorted { --mark: #DCD6CA; --back: #C9C2B4; --front: #ECE8E0; }
+.folder-open { position: absolute; inset: 0; z-index: 2; background: none; border: 0; padding: 0; cursor: pointer; border-radius: 14px; }
+.folder-open:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
+.f-back { position: absolute; left: 0; right: 0; top: 14px; bottom: 0; background: var(--back); border-radius: 4px 14px 14px 14px; }
+.f-back::before {
+  content: ''; position: absolute; left: 0; top: -12px; width: 42%; height: 16px;
+  background: var(--back); border-radius: 10px 12px 0 0; clip-path: polygon(0 0, 82% 0, 100% 100%, 0 100%);
 }
-.projcard h3 { margin: 0 0 6px; font-size: 0.9375rem; font-weight: 700; }
-.proj-stats { display: flex; gap: var(--s3); font-size: 0.75rem; color: var(--faint); }
-.proj-stats b { color: var(--soft); font-weight: 600; }
-.projcard-kebab { position: absolute; top: 6px; right: 6px; z-index: 1; }
-.projcard-new {
-  background: none; border: 1.5px dashed var(--hairline-strong); box-shadow: none; cursor: pointer;
-  display: flex; align-items: center; justify-content: center; min-height: 64px; color: var(--faint); font-weight: 600; padding: var(--s4);
+.f-paper {
+  position: absolute; left: 12px; right: 12px; top: 22px; height: 96px;
+  background: var(--surface); border-radius: 6px;
+  box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 2px 6px rgba(40,30,10,.08);
+  padding: 9px 11px; font-size: 11px; line-height: 1.3; color: var(--soft); font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transform: translateY(var(--rest, 0)); transition: transform 320ms cubic-bezier(0.23, 1, 0.32, 1);
 }
-.projcard-new:hover { border-color: var(--a-accent-text); color: var(--a-accent-text); box-shadow: none; }
+.f-paper::after { content: ''; position: absolute; left: 11px; right: 30%; top: 28px; height: 22px; background: repeating-linear-gradient(to bottom, var(--hairline) 0 2px, transparent 2px 8px); }
+.f-paper.p1 { left: 20px; right: 20px; --rest: 6px; }
+.f-paper.p2 { left: 15px; right: 15px; --rest: 3px; }
+.f-paper.p3 { left: 10px; right: 10px; --rest: 0px; }
+.f-front {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 104px; pointer-events: none;
+  background: linear-gradient(to bottom, color-mix(in oklab, var(--front) 70%, white), var(--front));
+  border-radius: 12px 12px 14px 14px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 -1px 0 rgba(0,0,0,.04), 0 10px 24px -12px rgba(60,40,0,.35);
+  transform-origin: 50% 100%; transition: transform 320ms cubic-bezier(0.23, 1, 0.32, 1);
+  padding: 34px var(--s4) 14px; display: flex; flex-direction: column; justify-content: flex-end;
+}
+.f-front h3 { margin: 0 0 4px; font-size: 1.0625rem; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.folder .proj-stats { display: flex; gap: var(--s3); font-size: 0.8125rem; color: color-mix(in oklab, var(--ink) 58%, transparent); }
+.folder .proj-stats b { color: var(--ink); font-weight: 600; }
+.projcard-kebab { position: absolute; top: 50px; right: 8px; z-index: 3; }
+@media (hover: hover) and (pointer: fine) {
+  .folder:hover .f-front, .folder:focus-within .f-front { transform: rotateX(-24deg); }
+  .folder:hover .f-paper.p1, .folder:focus-within .f-paper.p1 { transform: translateY(-30px) rotate(-3deg); transition-delay: 60ms; }
+  .folder:hover .f-paper.p2, .folder:focus-within .f-paper.p2 { transform: translateY(-20px) rotate(2deg); transition-delay: 30ms; }
+  .folder:hover .f-paper.p3, .folder:focus-within .f-paper.p3 { transform: translateY(-10px) rotate(-0.5deg); }
+}
+.folder:active .f-front { transform: rotateX(-14deg) scale(0.98); transition-duration: 120ms; }
+@media (prefers-reduced-motion: reduce) { .f-paper, .f-front { transition: none; } }
+.folder-new {
+  height: 150px; display: flex; align-items: center; justify-content: center; background: none; cursor: pointer;
+  border: 1.5px dashed var(--hairline-strong); border-radius: 14px; color: var(--faint); font-weight: 600;
+  transition: color 160ms ease, border-color 160ms ease;
+}
+.folder-new:hover { color: var(--a-accent-text); border-color: var(--a-accent-text); }
 
 /* Row two: search, the score floor, and everything else behind one toggle. */
 
@@ -8523,6 +8576,19 @@ iframe.tl-media { pointer-events: none; }
   font-size: 1.12rem; line-height: 1.6; max-width: none;
 }
 .wl-brief p:last-child { margin-bottom: 0; }
+/* The full brief (2026-10-05). */
+.wl-h2-gap { margin-top: var(--s6); }
+.wl-points { margin: 0; padding: 0; list-style: none; counter-reset: wlp; }
+.wl-points li { counter-increment: wlp; position: relative; padding-left: 34px; margin-bottom: var(--s4); }
+.wl-points li::before { content: counter(wlp, decimal-leading-zero); position: absolute; left: 0; top: 4px; font-family: var(--wl-mono); font-size: 11px; color: var(--wl-rust); }
+.wl-brief .wl-point { margin: 0; font-weight: 600; }
+.wl-brief .wl-detail { margin: 4px 0 0; font-size: 1rem; color: var(--wl-faint); }
+.wl-at { margin-left: 8px; font-family: var(--wl-mono); font-size: 11px; font-weight: 400; color: var(--wl-rust); text-decoration: none; border-bottom: 1px solid transparent; }
+.wl-at:hover { border-bottom-color: var(--wl-rust); }
+.wl-list { margin: 0; padding-left: 20px; font-family: var(--wl-serif); font-size: 1.05rem; line-height: 1.6; }
+.wl-list li { margin-bottom: 6px; }
+.wl-brief .wl-verdict { margin-top: var(--s6); font-style: italic; }
+.wl-brief .wl-covers { font-family: var(--wl-mono); font-size: 11px; color: var(--wl-faint); }
 
 /* ---- find, and take it away ---- */
 .wl-tools {
@@ -10358,16 +10424,37 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 .jv-g-label.is-amber { fill: var(--jv-amber-text); }
 
 .jv-strip {
-  position: relative; z-index: 2; flex: none; align-self: center; width: min(980px, 100%);
+  /* Lines up with the grid below it rather than floating as its own centered
+     980px box (his report, 2026-10-05: once the grid actually filled a wide
+     screen, the old centered strip no longer matched anything under it). The
+     margin at >=1000px is the grid's own padding-inline, so the two share an
+     edge. */
+  position: relative; z-index: 2; flex: none; align-self: stretch;
   display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
   border: 1px solid var(--hairline-strong); background: color-mix(in srgb, var(--bg) 72%, transparent);
 }
+@media (min-width: 1000px) { .jv-strip { margin-inline: 84px; } }
 .jv-strip > div { padding: 10px 16px; display: flex; flex-direction: column; justify-content: space-between; gap: 2px; min-width: 0; }
 .jv-strip > div + div { border-left: 1px solid var(--hairline); }
 .jv-strip .k { font-family: var(--font-display); font-size: 9px; letter-spacing: 0.2em; color: var(--muted); }
 .jv-strip .v { font-size: 19px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .jv-strip .v.is-alert { color: var(--alert); }
 
+/* The frame (brackets + side gauges) is drawn to THIS element's own box, so
+   it has to be the one that carries the width cap: the grid used to cap
+   itself while the frame measured the full-bleed page, which left the
+   brackets stranded out past the content on a wide monitor (his report,
+   2026-10-05). */
+.jv-body {
+  position: relative; z-index: 2; flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column; gap: var(--s4);
+  /* His report, 2026-10-05, round two: 2600px read as SMALLER on his 3440px
+     monitor, because it was 2600px centered in 3440px of black either way --
+     matching the frame to it did not widen anything. The room now actually
+     fills a wide screen; 3600px only starts capping past his own monitor, on
+     something wider still. */
+  width: 100%; max-width: 3600px; margin-inline: auto;
+}
 .jv-grid {
   position: relative; z-index: 2; flex: 1 1 auto; min-height: 0;
   display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s6);
@@ -10375,29 +10462,48 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 @media (min-width: 1000px) {
   .jv-grid {
     grid-template-columns: minmax(160px, 0.55fr) minmax(460px, 1.4fr) minmax(300px, 0.9fr);
-    /* Clear of the side gauges and their labels, which reach about 150px in
-       from each edge. The side columns grow toward them on a wide screen. */
-    width: 100%; max-width: 2600px; margin-inline: auto; padding-inline: clamp(160px, 11vw, 260px); box-sizing: border-box;
+    /* Clear of the straight side gauges, which take the outer 70px. */
+    padding-inline: 84px; box-sizing: border-box;
   }
 }
 /* A laptop-narrow window cannot hold three columns and the gauges: the day
    drops out of the left (the strip still counts it) and the margins tighten. */
 @media (min-width: 1000px) and (max-width: 1299px) {
-  .jv-grid { grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); padding-inline: 116px; }
+  .jv-grid { grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); padding-inline: 84px; }
   .jv-left { display: none !important; }
 }
 .jv-left { display: flex; flex-direction: column; gap: var(--s3); min-width: 0; padding-top: var(--s4); overflow-y: auto; }
 .jv-left h2, .jv-grid .as-canvas-head h2 {
   margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 11px; letter-spacing: 0.2em; color: var(--accent); text-transform: none;
 }
-.jv-slot { display: flex; flex-direction: column; gap: 4px; }
-.jv-slot-name { font-family: var(--font-display); font-size: 9px; letter-spacing: 0.2em; color: var(--muted); }
-.jv-slot-item { font-size: var(--text-sm); line-height: 1.4; overflow-wrap: anywhere; }
+.jv-slot { display: flex; flex-direction: column; }
+.jv-slot-name { font-family: var(--font-display); font-size: 9px; letter-spacing: 0.2em; color: var(--muted); margin-bottom: 4px; }
+/* One task, one block (his report, 2026-10-04: long titles ran together and
+   he could not tell where one ended): a hairline between them and a wash on
+   the one under the pointer. */
+.jv-slot-item {
+  font-size: var(--text-sm); line-height: 1.4; overflow-wrap: anywhere;
+  padding: 7px 8px; margin-inline: -8px; border-radius: 2px;
+  border-top: 1px solid var(--hairline);
+  transition: background-color 120ms ease;
+}
+.jv-slot-name + .jv-slot-item { border-top-color: transparent; }
+@media (hover: hover) and (pointer: fine) {
+  .jv-slot-item:hover { background: var(--accent-wash); border-top-color: transparent; }
+  .jv-slot-item:hover + .jv-slot-item { border-top-color: transparent; }
+}
 .jv-slot-item.is-done { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--hairline-strong); }
 .jv-quiet { margin: 0; color: var(--muted); font-size: var(--text-sm); }
 
 .jv-center { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
-.jv-stage { position: relative; flex: none; height: clamp(220px, 40dvh, 640px); cursor: grab; touch-action: none; }
+/* The circle's own code bounds it by min(box width, box height) -- so on a
+   screen with plenty of WIDTH to spare it never grew, because the height
+   clamp was the one ever in play (his report, 2026-10-05: "why is JARVIS not
+   bigger on bigger displays"). Raised both the share of the viewport height
+   and the ceiling, so a tall or large display actually gets a bigger core;
+   the thread below it still scrolls, so this never forces the ask box off
+   screen. */
+.jv-stage { position: relative; flex: none; height: clamp(220px, 50dvh, 820px); cursor: grab; touch-action: none; }
 .jv-stage.is-drag { cursor: grabbing; }
 .jv-presence {
   position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 1;
@@ -10439,8 +10545,14 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
    room as a page instead, core first. */
 @media (min-width: 1000px) {
   .shell:has(.as-page.jv) { height: 100dvh; min-height: 0; padding-bottom: 0; }
-  .shell:has(.as-page.jv) > main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  /* Bottom padding comes from --jv-gap, measured live by the page: the gap
+     between the header's buttons and the top corners, so the bottom corners
+     sit exactly as far off the screen's edge (his ask, 2026-10-04). */
+  .shell:has(.as-page.jv) > main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding-bottom: var(--jv-gap, 17px); }
 }
+/* No floating dock in the room (his ask, 2026-10-04): JARVIS is the tool
+   here, and the dock sat on its corner. Every other page keeps it. */
+body:has(.as-page.jv) .dock { display: none; }
 
 /* Callouts that fly out of the core on their leaders. */
 .jv-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 3; overflow: hidden; }
@@ -10487,3 +10599,174 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 .pstrip-item.is-on svg, .pstrip-item.is-on em { color: var(--a-ink); }
 .pstrip-manage { padding: 8px 10px; }
 @media (prefers-reduced-motion: reduce) { .pstrip-item, .pstrip-item svg { transition: none; } }
+/* In Jarvis mode the projects menu under Plan is portalled to <body>, where
+   the HUD's own tokens apply but --a-card is still the paper white, so light
+   ink sat on a white card (his report, 2026-10-04). It takes the HUD's
+   raised surface instead. */
+body:has(.shell.is-hud) .nav.projnav-menu { background: var(--surface-2); }
+
+/* ---------- People, Business view (his ask, 2026-10-04) ----------
+   Prospects as a list or as his CRM board's lanes. Borrows the circle's
+   tokens, dialog and card; only the list, board and sheet are its own. Value
+   reads in ink, reply odds in info slate: neither is the accent and neither
+   is green, since neither is money he has. Coral is only for a stale age. */
+.pr-page { padding: var(--s4) var(--gutter) var(--s8); display: flex; flex-direction: column; gap: var(--s4); color: var(--pp-ink); }
+.pr-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pr-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: var(--s8) 0; color: var(--pp-muted); }
+.pr-empty p { margin: 0; max-width: 52ch; }
+
+.pr-list { display: flex; flex-direction: column; border: 1px solid var(--hairline); border-radius: 10px; background: var(--pp-card); overflow: hidden; }
+.pr-list ul { list-style: none; margin: 0; padding: 0; }
+.pr-row {
+  display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1.7fr) 76px 76px; gap: 14px; align-items: center;
+  width: 100%; padding: 12px 18px; border: 0; border-top: 1px solid var(--hairline); background: none; text-align: left;
+  font: inherit; color: inherit; cursor: pointer;
+}
+@media (hover: hover) and (pointer: fine) { button.pr-row:hover { background: var(--pp-paper); } }
+.pr-row.is-head > * { font-size: inherit; color: inherit; }
+.pr-row.is-head { cursor: default; border-top: 0; background: var(--pp-sunk); padding-block: 8px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--pp-muted); }
+.pr-group > h2, .pr-group > summary { margin: 0; padding: 8px 18px; border-top: 1px solid var(--hairline); font-size: 0.78rem; font-weight: 700; color: var(--pp-muted); background: var(--pp-paper); }
+.pr-group > summary { cursor: pointer; }
+.pr-biz, .pr-next { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.pr-biz b { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pr-biz span { font-size: 0.8rem; color: var(--pp-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pr-stage { font-size: 0.84rem; color: var(--pp-muted); }
+.pr-next > span:first-child { font-size: 0.9rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pr-age { font-size: 0.76rem; color: var(--pp-muted); }
+.pr-age.is-stale { color: var(--pp-alert); font-weight: 700; }
+.pr-score { display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+.pr-score b { font-weight: 700; }
+.pr-score i { display: block; height: 4px; border-radius: 2px; background: var(--pp-sunk); overflow: hidden; }
+.pr-score s { display: block; height: 100%; background: var(--pp-ink); transform-origin: left center; }
+.pr-score.is-odds s { background: var(--info); }
+.pr-score.is-none { color: var(--pp-faint); }
+
+.pr-boardwrap { overflow-x: auto; margin: 0 calc(var(--gutter) * -1); padding: 0 var(--gutter) var(--s2); }
+.pr-board { display: grid; grid-template-columns: repeat(5, minmax(200px, 1fr)); gap: 12px; min-width: 1040px; align-items: start; }
+.pr-col { display: flex; flex-direction: column; gap: 8px; min-height: 160px; padding: 8px; border-radius: 10px; background: var(--pp-sunk); border: 1px dashed transparent; transition: border-color 150ms ease; }
+.pr-col.is-over { border-color: var(--pp-olive); }
+.pr-col h2 { margin: 2px 4px 2px; display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 700; color: var(--pp-muted); }
+.pr-pcard {
+  display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; text-align: left; font: inherit; color: inherit;
+  background: var(--pp-card); border: 1px solid var(--hairline); border-radius: 8px; cursor: grab;
+}
+.pr-pcard:active { cursor: grabbing; }
+.pr-pcard b { font-size: 0.9rem; font-weight: 700; }
+.pr-pmeta { display: flex; justify-content: space-between; gap: 8px; font-size: 0.74rem; color: var(--pp-muted); }
+.pr-lost { font-size: 0.76rem; color: var(--pp-alert); }
+
+/* The card: the circle's side card, fixed to the window here because there is
+   no canvas to sit inside. */
+.pr-scrim { place-items: stretch end; padding: 0; }
+.pr-sheet { position: relative; width: min(460px, 100%); height: 100%; transform: none; }
+.pr-scores { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pr-scores > div { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--hairline); border-radius: 10px; }
+.pr-scores > div > span { font-size: 0.74rem; font-weight: 700; color: var(--pp-muted); }
+.pr-scores small { font-size: 0.74rem; color: var(--pp-muted); }
+.pr-big { font-family: var(--font-display); font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+input.pr-big { padding: 0 6px; }
+.pr-people { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.pr-people li { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--hairline); border-radius: 10px; }
+.pr-person-foot { display: flex; justify-content: space-between; align-items: center; }
+.pr-check { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 600; }
+.pr-touches { list-style: none; margin: 0 0 12px; padding: 0; }
+.pr-touches li { display: flex; flex-direction: column; gap: 3px; padding: 8px 0; border-top: 1px solid var(--hairline); font-size: 0.86rem; }
+.pr-touches li:first-child { border-top: 0; }
+.pr-touch-head { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; }
+.pr-touch-head .mono { color: var(--pp-muted); font-size: 0.8rem; }
+.pr-subject { color: var(--pp-muted); }
+.pr-touches details { font-size: 0.82rem; }
+.pr-touches summary { cursor: pointer; color: var(--accent-text); font-weight: 600; }
+.pr-touches details p { margin: 6px 0 0; padding: 10px; white-space: pre-wrap; background: var(--pp-paper); border: 1px solid var(--hairline); border-radius: 8px; }
+.pr-log { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 10px; background: var(--pp-paper); }
+.pr-log .btn { align-self: flex-start; }
+.pr-area { min-height: 84px; resize: vertical; }
+
+@media (max-width: 760px) {
+  /* Phone: the next step drops under the name, so the name gets the width. */
+  .pr-row { grid-template-columns: minmax(0, 1fr) 52px 52px; grid-template-areas: "biz val odds" "next val odds"; gap: 4px 12px; padding-inline: 14px; }
+  .pr-row > :nth-child(1) { grid-area: biz; }
+  .pr-row > :nth-child(3) { grid-area: next; }
+  .pr-row > :nth-child(4) { grid-area: val; }
+  .pr-row > :nth-child(5) { grid-area: odds; }
+  .pr-row .pr-stage, .pr-row.is-head .pr-next { display: none; }
+  .pr-row.is-head { grid-template-areas: "biz val odds"; }
+  .pr-next { flex-direction: row; flex-wrap: wrap; gap: 0 6px; align-items: baseline; }
+}
+@media (prefers-reduced-motion: reduce) { .pr-col { transition: none; } }
+/* Ideas / Prompts: the page title is the switch (ideasswitch.tsx). Both words
+   take the heading they sit in, so each page keeps its own title size. The
+   open one is ink, the other faded; only the line under it moves. */
+.ips { position: relative; display: inline-flex; align-items: baseline; gap: 0.7em; padding-bottom: 7px; }
+.ips button { position: relative; font: inherit; letter-spacing: inherit; color: var(--faint); background: none; border: 0; padding: 0; cursor: pointer; display: inline-flex; align-items: baseline; gap: 6px; transition: color 150ms ease, transform 160ms cubic-bezier(0.23, 1, 0.32, 1); }
+.ips button[aria-pressed="true"] { color: var(--ink); cursor: default; }
+.ips button:active:not([aria-pressed="true"]) { transform: scale(0.97); }
+@media (hover: hover) and (pointer: fine) { .ips button:not([aria-pressed="true"]):hover { color: var(--muted); } }
+.ips button:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 4px; }
+.ips-line { position: absolute; left: 0; bottom: 0; height: 3px; border-radius: 2px; background: var(--ink); transition: transform 220ms cubic-bezier(0.23, 1, 0.32, 1), width 220ms cubic-bezier(0.23, 1, 0.32, 1); }
+.ips-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--a-accent); box-shadow: 0 0 0 1.5px var(--a-accent-text); align-self: center; }
+@media (prefers-reduced-motion: reduce) { .ips-line { transition: none; } }
+.ips-n { font: 600 var(--text-xs)/1 var(--font-body); font-variant-numeric: tabular-nums; color: var(--muted); align-self: baseline; }
+/* Prompts wears the Ideas board's bar in flow; margins are set so the title
+   lands on the same pixels as on the board. */
+/* The board starts 1px under the header (its hairline) and its bar sits --s4
+   in from the screen edge, ignoring the page gutter. The height matches the
+   board's bar, whose row is as tall as Add idea, so the word sits level too. */
+.pb-bar { position: relative; left: auto; top: auto; display: inline-flex; min-height: 59px;
+  margin: calc(var(--s4) + 1px) 0 var(--s5) calc(var(--s4) - var(--gutter)); }
+@media (max-width: 639px) {
+  .pb-bar { right: auto; min-height: 52px; margin: calc(var(--s3) + 1px) 0 var(--s4) calc(var(--s3) - var(--gutter)); }
+}
+.ips button:not([aria-pressed="true"]) .ips-n { color: var(--faint); }
+
+/* ---- People > Business in colour (his pick, 2026-10-04: "B, the bolder
+   one"; artifact YDXRonkhyHu8k2pxo2PNP5) ----
+   One muted hue per pipeline stage, the same everywhere the stage shows: the
+   list row, its chip, the board column and the open prospect. Per COLOR.md
+   no violet, coral stays "urgent" only, green only for won. B is his
+   deliberate exception to COLOR.md's "no large fills": columns, rows and the
+   sheet's header carry a light tint of their stage. Text hues are darker on
+   paper, so every one keeps its contrast in both themes. */
+:root { --st-reach: #3F5F8A; --st-contacted: #8A5A10; --st-talking: #1F6E66; --st-won: #2E7D4F; --st-lost: #8A5246; --st-value: #8A6A12; }
+body:has(.shell.is-hud) { --st-reach: #7C9CC4; --st-contacted: #E0A84A; --st-talking: #4FB3A9; --st-won: #5BC48A; --st-lost: #B27A6E; --st-value: #E3B652; }
+.st-reach { --st: var(--st-reach); } .st-contacted { --st: var(--st-contacted); } .st-talking { --st: var(--st-talking); }
+.st-won { --st: var(--st-won); } .st-lost { --st: var(--st-lost); }
+
+.pr-chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; white-space: nowrap; color: var(--st); background: color-mix(in srgb, var(--st) 15%, transparent); }
+.pr-chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--st); }
+.pr-biz .pr-src { display: inline-flex; align-items: center; height: 18px; margin-left: 4px; font-size: 0.72rem; line-height: 1; border: 1px solid var(--hairline-strong); border-radius: 4px; padding: 0 6px; white-space: nowrap; vertical-align: middle; }
+.pr-row:not(.is-head)[class*="st-"] { background: color-mix(in srgb, var(--st) 7%, transparent); }
+.pr-score.is-value b { color: var(--st-value); }
+.pr-score.is-value s { background: var(--st-value); }
+.pr-score.is-odds b { color: var(--st-talking); }
+.pr-score.is-odds s { background: var(--st-talking); }
+.pr-score.is-value i, .pr-score.is-odds i { background: color-mix(in srgb, currentColor 14%, transparent); }
+
+.pr-col[class*="st-"] { background: color-mix(in srgb, var(--st) 9%, var(--pp-sunk)); border-top: 3px solid var(--st); }
+.pr-col[class*="st-"] h2 { color: var(--st); }
+.pr-col[class*="st-"] .pr-pcard { border-color: color-mix(in srgb, var(--st) 35%, transparent); }
+.pr-col.is-over { border-color: var(--st); }
+
+.pr-sheet[class*="st-"] .pp-card-top { background: color-mix(in srgb, var(--st) 16%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--st) 40%, transparent); margin: calc(var(--s5) * -1) calc(var(--s5) * -1) 0; padding: var(--s5); }
+.pr-stepper { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; font-size: 0.7rem; color: var(--pp-muted); }
+.pr-stepper span { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.pr-stepper i { display: block; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--st) 22%, transparent); }
+.pr-stepper .is-on i { background: var(--st); }
+.pr-stepper .is-on { color: var(--st); }
+.pr-sheet[class*="st-"] .pr-scores > div:first-child .pr-big { color: var(--st-value); }
+
+/* ---- Business bar = the Personal bar (his ask, 2026-10-04) ----
+   Same card, same search box, same dropdowns; it just sits in the flow
+   above the list instead of floating over a canvas. */
+.pr-bar { padding: 8px 8px 8px 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--hairline-strong); gap: 10px; align-self: flex-start; width: fit-content; max-width: 100%; }
+.pr-bar .pp-circle-pick .dd-panel { min-width: 200px; }
+@media (max-width: 760px) {
+  .pr-bar .pp-search { flex: 1 1 100%; order: 2; }
+  .pr-bar .pp-search-input { width: 100%; }
+  .pr-bar .pp-circle-pick { order: 3; }
+}
+/* The Business bar stands exactly where the Personal bar floats, so switching
+   views does not move it (his report, 2026-10-04): same 16px inset from the
+   page edge, same top, same phone padding. */
+.pr-page { padding: calc(var(--s4) + 1px) var(--s4) var(--s8); }
+@media (max-width: 760px) { .pr-bar { padding-left: 12px; } }

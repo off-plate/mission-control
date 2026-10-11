@@ -27,6 +27,7 @@ import { useTwoLivesSlice } from './store/twolives'
 import { useIdeaBoardSlice, type IdeaBoardSlice } from './store/ideaboard'
 import { usePromptsSlice, type PromptsSlice } from './store/prompts'
 import { usePeopleSlice, type PeopleSlice } from './store/people'
+import { useProspectsSlice, type ProspectsSlice } from './store/prospects'
 import { useGymSlice, type GymSlice } from './store/gym'
 import { useConnectionsSlice } from './store/connections'
 import { useCoachSlice } from './store/coach'
@@ -64,7 +65,7 @@ import type {
   PromptItem,
   Person,
   PersonBond,
-  PersonContact,
+  PersonContact, Prospect,
   GymGoal,
   Note,
   NoteFolder,
@@ -175,6 +176,8 @@ interface PersistedState {
   people?: Person[]
   personBonds?: PersonBond[]
   personContacts?: PersonContact[]
+  /** People's Business view: every business he is reaching out to. */
+  prospects?: Prospect[]
   /** The Health page's own permanent PR targets -- see types/gym.ts for why
    *  these are separate from the main Goals page's periodic ones. */
   gymGoals?: GymGoal[]
@@ -244,6 +247,12 @@ interface Store extends PersistedState {
   removePersonBond: PeopleSlice['removePersonBond']
   logContact: PeopleSlice['logContact']
   removeContact: PeopleSlice['removeContact']
+  prospects: Prospect[]
+  addProspect: ProspectsSlice['addProspect']
+  updateProspect: ProspectsSlice['updateProspect']
+  deleteProspect: ProspectsSlice['deleteProspect']
+  logTouch: ProspectsSlice['logTouch']
+  removeTouch: ProspectsSlice['removeTouch']
   gymGoals: GymGoal[]
   addGymGoal: GymSlice['addGymGoal']
   updateGymGoal: GymSlice['updateGymGoal']
@@ -967,6 +976,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const { prompts, setPrompts } = promptsSlice
   const peopleSlice = usePeopleSlice(persisted, { armUndo, bury, digUp })
   const { people, setPeople, personBonds, setPersonBonds, personContacts, setPersonContacts } = peopleSlice
+  const prospectsSlice = useProspectsSlice(persisted, { armUndo, bury, digUp })
+  const { prospects, setProspects } = prospectsSlice
   const gymSlice = useGymSlice(persisted, { armUndo, bury, digUp })
   const { gymGoals, setGymGoals } = gymSlice
   const growthSlice = useGrowthSlice(persisted, { space, armUndo, bury, digUp, setPageState })
@@ -1064,7 +1075,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     const state: PersistedState = {
       version: 3, tasks, habits, goals, projects, ledger, plan, review, assistantLog, coachSessions, routines, ideas,
-      notes, noteFolders, ideaBoard, prompts, people, personBonds, personContacts, gymGoals,
+      notes, noteFolders, ideaBoard, prompts, people, personBonds, personContacts, prospects, gymGoals,
       savedAt: Date.now(), lastWrite: { dev: deviceId(), name: deviceName(), at: Date.now() },
       weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
       habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, spaceGuessed, graveyard, twoLives, reels, tunes, reelFiles, lastRollDay: lastRollDay ?? localDateKey(),
@@ -1095,7 +1106,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = window.setTimeout(() => { outbox.push(json) }, 800)
     }
-  }, [tasks, habits, goals, projects, ledger, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels, tunes, reelFiles, ideaBoard, prompts, people, personBonds, personContacts, gymGoals, activeFocus])
+  }, [tasks, habits, goals, projects, ledger, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels, tunes, reelFiles, ideaBoard, prompts, people, personBonds, personContacts, prospects, gymGoals, activeFocus])
 
   /* ---- state that arrived from somewhere else ----
      Another tab of this browser, or this account on another device. Merged in,
@@ -1138,6 +1149,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (Array.isArray(p.people)) setPeople(p.people)
     if (Array.isArray(p.personBonds)) setPersonBonds(p.personBonds)
     if (Array.isArray(p.personContacts)) setPersonContacts(p.personContacts)
+    if (Array.isArray(p.prospects)) setProspects(p.prospects)
     if (Array.isArray(p.gymGoals)) setGymGoals(p.gymGoals)
     if (p.ledger) setLedger(p.ledger)
     if (p.focusSessions) setFocusSessions(p.focusSessions)
@@ -1523,6 +1535,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     addPerson: peopleSlice.addPerson, updatePerson: peopleSlice.updatePerson, deletePerson: peopleSlice.deletePerson,
     addPersonBond: peopleSlice.addPersonBond, setBondLabel: peopleSlice.setBondLabel, removePersonBond: peopleSlice.removePersonBond,
     logContact: peopleSlice.logContact, removeContact: peopleSlice.removeContact,
+    prospects, addProspect: prospectsSlice.addProspect, updateProspect: prospectsSlice.updateProspect, deleteProspect: prospectsSlice.deleteProspect,
+    logTouch: prospectsSlice.logTouch, removeTouch: prospectsSlice.removeTouch,
     gymGoals, addGymGoal: gymSlice.addGymGoal, updateGymGoal: gymSlice.updateGymGoal, deleteGymGoal: gymSlice.deleteGymGoal,
 
     undoable, undoDelete, dismissUndo,

@@ -2,6 +2,7 @@ import { Orb } from './orb'
 import { JarBar, JAR_PAGES } from './cookiejarnav'
 import { ProjectMark } from './ui'
 import { usePromptWindow } from './promptwindow'
+import { lastFace } from './ideasswitch'
 import { Component, Fragment, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { exceptionsFor, globalExceptions } from './exceptions'
@@ -45,7 +46,7 @@ const PeoplePage = lazy(() => import('./people').then((m) => ({ default: m.Peopl
 import { useStore } from './store'
 import { ago, describe, useSyncStatus } from './sync'
 import { isReadOnly } from './store'
-import type { PageId, SpaceId, ViewId } from './types'
+import { SPACES, UNSORTED, type PageId, type SpaceId, type ViewId } from './types'
 
 /* Is this thing up to date, and where did the last change come from.
 
@@ -274,6 +275,8 @@ function PageNav({
   }
   const hideHoverSoon = () => { hoverTimer.current = window.setTimeout(() => setHoverOpen(false), 350) }
   const hoverProjects = view === 'all' ? projects : projects.filter((p) => p.space === view)
+  /* Each workspace's default folder: its tasks with no project. */
+  const unsortedSpaces = view === 'all' ? SPACES : [view]
 
   return (
     <nav className="nav" aria-label="Pages" onMouseEnter={onMouseEnter}>
@@ -310,8 +313,15 @@ function PageNav({
                 onMouseEnter={showHover}
                 onMouseLeave={hideHoverSoon}
               >
+                {unsortedSpaces.map((sp) => (
+                  <button key={`u-${sp}`} className="projrow" data-space="none" role="menuitem" aria-current={openProjectId === UNSORTED && view === sp ? 'true' : undefined} onClick={() => { setSpace(sp); enterProject(UNSORTED); setHoverOpen(false) }}>
+                    <span className="projectmark"><b aria-hidden="true">·</b></span>
+                    <span className="projrow-name">{view === 'all' ? `Unsorted, ${SPACE_LABELS[sp]}` : 'Unsorted'}</span>
+                    <span className="projrow-n mono">{tasks.filter((t) => t.space === sp && !t.projectId && !t.done).length}</span>
+                  </button>
+                ))}
                 {hoverProjects.map((p) => (
-                  <button key={p.id} className="projrow" role="menuitem" aria-current={openProjectId === p.id ? 'true' : undefined} onClick={() => { setSpace(p.space); enterProject(p.id); setHoverOpen(false) }}>
+                  <button key={p.id} className="projrow" data-space={p.space} role="menuitem" aria-current={openProjectId === p.id ? 'true' : undefined} onClick={() => { setSpace(p.space); enterProject(p.id); setHoverOpen(false) }}>
                     <ProjectMark project={p} />
                     <span className="projrow-name">{p.name}</span>
                     <span className="projrow-n mono">{tasks.filter((t) => t.projectId === p.id && !t.done).length}</span>
@@ -327,6 +337,59 @@ function PageNav({
         )
       })}
     </nav>
+  )
+}
+
+/* People's own hover menu (his ask, 2026-10-04): Personal or Business in one
+   move, the same panel Plan opens for its projects (.nav.projnav-menu,
+   portalled for the same clipping reason). The People page owns which view
+   it shows (mc-people-mode); the menu writes that key and tells an open page
+   with an event, rather than importing the page into the header's bundle. */
+const PEOPLE_MODE_KEY = 'mc-people-mode'
+function PeopleButton({ on, open }: { on: boolean; open: () => void }) {
+  const [shown, setShown] = useState(false)
+  const [rect, setRect] = useState<{ top: number; left: number } | null>(null)
+  const timer = useRef<number | undefined>(undefined)
+  const wrap = useRef<HTMLSpanElement>(null)
+  const show = () => {
+    window.clearTimeout(timer.current)
+    const r = wrap.current?.getBoundingClientRect()
+    /* Right-aligned under the square: it sits near the screen's right edge. */
+    if (r) setRect({ top: r.bottom + 10, left: Math.max(8, r.right - 220) })
+    setShown(true)
+  }
+  const hideSoon = () => { timer.current = window.setTimeout(() => setShown(false), 350) }
+  const go = (mode: 'personal' | 'business') => {
+    try { localStorage.setItem(PEOPLE_MODE_KEY, mode) } catch { /* private mode */ }
+    window.dispatchEvent(new CustomEvent('mc:people-mode', { detail: mode }))
+    open(); setShown(false)
+  }
+  return (
+    <span className="kebab-wrap" ref={wrap} onMouseEnter={show} onMouseLeave={hideSoon}>
+      <button
+        className={`btn btn-ghost btn-sq${on ? ' is-on' : ''}`}
+        onClick={open}
+        aria-pressed={on}
+        aria-label="People"
+        title="People"
+        aria-haspopup="menu"
+      >
+        <Icon.DockPeople size={16} />
+        <span className="btn-sq-label">People</span>
+      </button>
+      {rect && createPortal(
+        <div
+          className={`nav projnav-menu${shown ? ' is-open' : ''}`}
+          role="menu" aria-label="People"
+          style={{ top: rect.top, left: rect.left }}
+          onMouseEnter={show} onMouseLeave={hideSoon}
+        >
+          <button className="projrow" role="menuitem" onClick={() => go('personal')}><span className="projrow-name">Personal</span></button>
+          <button className="projrow" role="menuitem" onClick={() => go('business')}><span className="projrow-name">Business</span></button>
+        </div>,
+        document.body,
+      )}
+    </span>
   )
 }
 
@@ -679,41 +742,23 @@ export default function App() {
             <Icon.DockNote size={16} />
             <span className="btn-sq-label">Notes</span>
           </button>
+          {/* Ideas holds Prompts too since 2026-10-04 (his ask): one square,
+              two faces switched by the page title. It opens the face he used
+              last, or Prompts when the window is open and something waits,
+              and it carries the dot the Prompts square used to. */}
           <button
-            className={`btn btn-ghost btn-sq${page === 'ideas' ? ' is-on' : ''}`}
-            onClick={() => setPage('ideas')}
-            aria-pressed={page === 'ideas'}
+            className={`btn btn-ghost btn-sq${page === 'ideas' || page === 'prompts' ? ' is-on' : ''}`}
+            onClick={() => setPage(promptsReady ? 'prompts' : lastFace())}
+            aria-pressed={page === 'ideas' || page === 'prompts'}
             aria-label="Ideas"
             title="Ideas"
           >
             <Icon.DockBulb size={16} />
             <span className="btn-sq-label">Ideas</span>
-          </button>
-          {/* Prompts, next to Notes (his ask, 2026-10-04): what to say to Claude
-              once the usage window is open again. The dot says it is open and
-              something is waiting. */}
-          <button
-            className={`btn btn-ghost btn-sq${page === 'prompts' ? ' is-on' : ''}`}
-            onClick={() => setPage('prompts')}
-            aria-pressed={page === 'prompts'}
-            aria-label="Prompts"
-            title="Prompts"
-          >
-            <Icon.DockPrompt size={16} />
-            <span className="btn-sq-label">Prompts</span>
             {promptsReady && <span className="btn-sq-dot" aria-hidden="true" />}
           </button>
           {/* People, next to Ideas on his instruction (2026-09-17). */}
-          <button
-            className={`btn btn-ghost btn-sq${page === 'people' ? ' is-on' : ''}`}
-            onClick={() => setPage('people')}
-            aria-pressed={page === 'people'}
-            aria-label="People"
-            title="People"
-          >
-            <Icon.DockPeople size={16} />
-            <span className="btn-sq-label">People</span>
-          </button>
+          <PeopleButton on={page === 'people'} open={() => setPage('people')} />
           <button
             className={`btn btn-ghost btn-sq hide-phone${page === 'bills' ? ' is-on' : ''}`}
             onClick={() => setPage('bills')}

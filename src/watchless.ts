@@ -32,8 +32,23 @@ export interface Transcript {
   /** What this copy cost to make, in provider credits. Zero for a cache hit. */
   cost: number
   cached: boolean
-  /** Groq's brief. Optional in the strict sense: no key, no panel. */
-  summary?: string
+  /** Groq's brief. Optional in the strict sense: no key, no panel. A plain
+   *  string, the {about, takeaways} first shape, or the full v2 brief. */
+  summary?: string | Brief
+}
+
+/** The full brief (his ask, 2026-10-05): enough to replace the video. */
+export interface BriefPoint { point: string; detail: string; at: string; sec: number | null }
+export interface Brief {
+  v?: number
+  about?: string
+  verdict?: string
+  points?: BriefPoint[]
+  takeaways?: string[]
+  outcomes?: string[]
+  mentions?: string[]
+  /** Set when the video ran past what the free model reads: seconds covered. */
+  coversUpTo?: number
 }
 
 export type ReadState =
@@ -228,7 +243,20 @@ export function asText(doc: Transcript): string {
   const body = blocks(doc)
     .map((b) => `[${stamp(b.start)}] ${b.title ? `${b.title}\n` : ''}${b.text}`)
     .join('\n\n')
-  return `${head}\n\n${doc.summary ? `${doc.summary}\n\n` : ''}${body}\n`
+  return `${head}\n\n${briefText(doc.summary)}${body}\n`
+}
+
+function briefText(b: Transcript['summary']): string {
+  if (!b) return ''
+  if (typeof b === 'string') return `${b}\n\n`
+  const out: string[] = []
+  if (b.about) out.push(b.about, '')
+  if (b.points?.length) b.points.forEach((p) => out.push(`- ${p.point}${p.at ? ` (${p.at})` : ''}${p.detail ? `\n  ${p.detail}` : ''}`))
+  else (b.takeaways ?? []).forEach((t) => out.push(`- ${t}`))
+  if (b.outcomes?.length) out.push('', 'What to take away:', ...b.outcomes.map((t) => `- ${t}`))
+  if (b.mentions?.length) out.push('', 'Mentioned:', ...b.mentions.map((t) => `- ${t}`))
+  if (b.verdict) out.push('', b.verdict)
+  return `${out.join('\n')}\n\n`
 }
 
 /* ------------------------------------------------------------ tidying up

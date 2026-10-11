@@ -17,9 +17,11 @@ const KEY_STORE = 'mc-gemini-key'
    2.5-flash-preview-tts and 2.5-pro-preview-tts are the other two live names. */
 const TTS_MODEL = 'gemini-3.1-flash-tts-preview'
 const TTS_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models'
-/* Charon reads level and unhurried. The alternative presets are showier and a
-   daily brief is not a performance. */
-const TTS_VOICE = 'Charon'
+/* JARVIS (his pick, 2026-10-04: "the more Jarvis-like voice, for free").
+   Algieba is the preset Google's own list calls "Smooth", the quality
+   JARVIS is made of; Charon ("Informative") read flatter. The accent and the
+   manner come from DIRECTION below, which is how this model takes them. */
+const TTS_VOICE = 'Algieba'
 /* A brief he can read in two seconds is not worth a fifteen-second wait for a
    nicer voice. Past this, the device voice takes over and whatever Gemini
    eventually returns is thrown away for this click -- it is still cached, so
@@ -28,8 +30,14 @@ const GEMINI_TIMEOUT_MS = 6000
 /* How it should sound, not what it should say. The model is being asked to
    perform his own words here, never to write any. */
 const DIRECTION =
-  'Read this aloud as a calm, level chief of staff giving a morning brief. ' +
-  'Unhurried, no cheerfulness, no rising sell. Do not add or change any words.'
+  'Read this aloud as JARVIS: a calm, impeccably polite British AI butler with a refined ' +
+  'Received Pronunciation accent. Measured pace, quiet confidence, a hint of dry wit, never ' +
+  'cheerful or salesy. Do not add or change any words. ' +
+  /* His briefs mix in Czech task names (his ask, 2026-10-04): same voice,
+     but the Czech parts said the way a Czech speaker says them. */
+  'The text often switches between English and Czech, sometimes mid-sentence. Read every Czech ' +
+  'word, phrase and sentence exactly as a native Czech speaker would pronounce it, then return to ' +
+  'the British voice for the English parts. Names are read as written.'
 
 export function getTtsKey(): string {
   try { return localStorage.getItem(KEY_STORE) ?? '' } catch { return '' }
@@ -278,6 +286,12 @@ async function fetchGemini(text: string, key: string): Promise<Blob | null> {
    Google US English is still here, at the bottom, for a machine with no local
    voice at all: a good voice with a still waveform beats no voice. */
 export const GOOD_VOICES = [
+  /* Jamie first: his pick for JARVIS from recordings on his own Mac
+     (2026-10-04). Daniel was tried first and rejected out loud as the
+     voice every TikTok voice-over uses, so it is not on this list at all.
+     Voice mode lands here more often than on Gemini, since it will not wait
+     long for the network. */
+  'Jamie (Premium)', 'Jamie (Enhanced)', 'Jamie',
   'Samantha', 'Alex', 'Ava', 'Allison', 'Susan', 'Tom',
   'Microsoft Aria', 'Microsoft Jenny', 'Microsoft Guy',
   'Google US English',

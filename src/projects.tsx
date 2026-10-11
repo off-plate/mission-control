@@ -1,27 +1,60 @@
 /* THE PROJECTS PAGE. Split out of pages1.tsx (2026-09-09). */
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { SPACE_LABELS } from './exceptions'
 import { useStore } from './store'
 import { Sheet } from './modals'
 import { Band, Dropdown, SpaceMark } from './ui'
-import { SPACES, type Project, type SpaceId } from './types'
+import { SPACES, UNSORTED, type Project, type SpaceId } from './types'
+
+/* A project is drawn as a folder (his ask, 2026-10-11: "Apple style folder",
+   papers peeking out on hover like opening a real one). The sheets are the
+   project's own waiting tasks, oldest first, at most three; an empty project
+   is an empty folder. Hover tips the front flap and slides the sheets up,
+   CSS only, gated to fine pointers so a phone tap just opens it. */
+type Sheet3 = { id: string; title: string }
+function Folder({ cls, name, waiting, total, sheets, onOpen, menu }: {
+  cls: string; name: string; waiting: number; total: number; sheets: Sheet3[]; onOpen: () => void; menu?: ReactNode
+}) {
+  const top = sheets.slice(0, 3)
+  return (
+    <div className={`folder ${cls}`}>
+      <button className="folder-open" onClick={onOpen} aria-label={`Open ${name}`} />
+      <div className="f-back" aria-hidden="true" />
+      {top.map((t, i) => <div key={t.id} className={`f-paper p${i + 1 + 3 - top.length}`} aria-hidden="true">{t.title}</div>)}
+      <div className="f-front" aria-hidden="true">
+        <h3>{name}</h3>
+        <div className="proj-stats"><span><b>{waiting}</b> waiting</span><span><b>{total}</b> total</span></div>
+      </div>
+      {menu}
+    </div>
+  )
+}
 
 function ProjectCard({ p, onOpen, onRename, onDelete }: { p: Project; onOpen: () => void; onRename: () => void; onDelete: () => void }) {
   const { tasks } = useStore()
   const own = tasks.filter((t) => t.projectId === p.id)
-  const waiting = own.filter((t) => t.list === 'backlog' && !t.done).length
+  const open = own.filter((t) => t.list === 'backlog' && !t.done)
   return (
-    <div className={`projcard s-${p.space}`}>
-      <button className="projcard-open" onClick={onOpen}>
-        <h3>{p.name}</h3>
-        <div className="proj-stats"><span><b>{waiting}</b> waiting</span><span><b>{own.length}</b> total</span></div>
-      </button>
-      <Dropdown label={`Options for ${p.name}`} className="projcard-kebab">
-        <button role="menuitem" onClick={onRename}>Rename</button>
-        <button role="menuitem" className="danger" onClick={onDelete}>Delete</button>
-      </Dropdown>
-    </div>
+    <Folder
+      cls={`s-${p.space}`} name={p.name} waiting={open.length} total={own.length} sheets={open} onOpen={onOpen}
+      menu={
+        <Dropdown label={`Options for ${p.name}`} className="projcard-kebab">
+          <button role="menuitem" onClick={onRename}>Rename</button>
+          <button role="menuitem" className="danger" onClick={onDelete}>Delete</button>
+        </Dropdown>
+      }
+    />
   )
+}
+
+/* The default folder, one per workspace (his ask, 2026-10-11): every task in
+   that space that belongs to no project. Not a stored project, so it can't be
+   renamed or deleted; it opens Plan scoped by the UNSORTED sentinel. */
+function UnsortedCard({ space, onOpen }: { space: SpaceId; onOpen: () => void }) {
+  const { tasks } = useStore()
+  const own = tasks.filter((t) => t.space === space && !t.projectId)
+  const open = own.filter((t) => t.list === 'backlog' && !t.done)
+  return <Folder cls="f-unsorted" name="Unsorted" waiting={open.length} total={own.length} sheets={open} onOpen={onOpen} />
 }
 
 function RenameProjectSheet({ project, onClose }: { project: Project; onClose: () => void }) {
@@ -108,10 +141,11 @@ export function ProjectsPage() {
   const bySpace = (sp: SpaceId) => projects.filter((p) => p.space === sp)
   const grid = (sp: SpaceId) => (
     <div className="projgrid">
+      <UnsortedCard space={sp} onOpen={() => { setSpace(sp); enterProject(UNSORTED) }} />
       {bySpace(sp).map((p) => (
         <ProjectCard key={p.id} p={p} onOpen={() => openProject(p)} onRename={() => setRenaming(p)} onDelete={() => askDelete(p)} />
       ))}
-      <button className="projcard projcard-new" onClick={() => setAddingIn(sp)}>+ New project</button>
+      <button className="folder-new" onClick={() => setAddingIn(sp)}>+ New project</button>
     </div>
   )
 

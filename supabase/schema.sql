@@ -38,3 +38,34 @@ delete from mc_state where owner is null;
 -- Authentication -> Sign In / Up -> "Allow new users to sign up" can go off.
 -- A stranger who signed up would only ever see their own empty row, but there
 -- is no reason to leave the door open.
+
+-- Outreach emails, read from his Gmail by a Google Apps Script
+-- (tools/outreach-gmail.gs) through the outreach-ingest function. One row per
+-- message to or from a prospect. The app turns unapplied rows into touches on
+-- the matching prospect, then stamps applied_at. Only the function inserts
+-- (service role); he can read and stamp his own rows.
+create table if not exists mc_outreach_events (
+  id          text primary key,          -- Gmail message id
+  owner       uuid not null references auth.users (id) on delete cascade,
+  kind        text not null check (kind in ('sent', 'reply')),
+  via         text,                      -- 'offplate' alias or 'personal' address, sent only
+  day         date not null,
+  counterpart text not null,             -- the prospect's address, lower case
+  subject     text,
+  body        text,
+  applied_at  timestamptz,
+  created_at  timestamptz not null default now()
+);
+
+alter table mc_outreach_events enable row level security;
+
+drop policy if exists mc_outreach_events_read on mc_outreach_events;
+create policy mc_outreach_events_read
+  on mc_outreach_events for select to authenticated
+  using (owner = auth.uid());
+
+drop policy if exists mc_outreach_events_stamp on mc_outreach_events;
+create policy mc_outreach_events_stamp
+  on mc_outreach_events for update to authenticated
+  using (owner = auth.uid())
+  with check (owner = auth.uid());

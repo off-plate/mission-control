@@ -5019,6 +5019,41 @@ await step('people, business: add a prospect, log the work email, the next step 
   await page.getByRole('group', { name: 'Which people' }).getByRole('button', { name: 'Personal' }).click(); await page.waitForTimeout(300)
   if (!(await page.locator('.pp-canvas').count())) throw new Error('Personal did not bring the circle back')
 })
+await step('people, business: the Gmail sync groups replies and ready steps, a reply waits for his yes, links open', async () => {
+  /* His ask (2026-10-11): know where every client is without moving Drive
+     folders. The sync itself needs his account; this checks what it leaves. */
+  await fresh('today')
+  const day = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+  await page.evaluate(([K, d0, d1, d3]) => {
+    const s = JSON.parse(localStorage.getItem(K))
+    const base = { source: 'found', stage: 'contacted', people: [], createdAt: Date.now(), updatedAt: Date.now() }
+    s.prospects = [
+      { ...base, id: 'gp1', name: 'Gate Replied', touches: [{ id: 'gm-1', step: 'work', day: d3 }], replied: { day: d0, subject: 'Re: Your site', body: 'Dobry den, zavolejte mi.' } },
+      { ...base, id: 'gp2', name: 'Gate Ready', touches: [{ id: 'gm-2', step: 'work', day: d3 }] },
+      { ...base, id: 'gp3', name: 'Gate Waiting', touches: [{ id: 'gm-3', step: 'work', day: d1 }] },
+    ]
+    localStorage.setItem(K, JSON.stringify(s))
+  }, [KEY, day(0), day(1), day(3)])
+  await page.reload(); await page.waitForTimeout(700)
+  await page.locator('.topbar-right').getByRole('button', { name: 'People', exact: true }).click(); await page.waitForTimeout(400)
+  await page.getByRole('group', { name: 'Which people' }).getByRole('button', { name: 'Business' }).click(); await page.waitForTimeout(300)
+  await page.getByRole('group', { name: 'Layout' }).getByRole('button', { name: 'List' }).click(); await page.waitForTimeout(300)
+  const groups = await page.locator('.pr-group h2').allInnerTexts()
+  const order = groups.map((g) => g.replace(/\s*\d+$/, '')).join('|')
+  if (order !== 'Replied|Next step ready|Waiting') throw new Error(`groups: ${order}`)
+  const rows = (await page.locator('.pr-group').allInnerTexts()).join(' ')
+  if (!/Gate Replied[\s\S]*They replied[\s\S]*Gate Ready[\s\S]*Reminder[\s\S]*Gate Waiting/.test(rows)) throw new Error(`rows in the wrong groups: ${rows.replace(/\n/g, ' | ')}`)
+  if (SHOTS_DIR) await page.screenshot({ path: `${SHOTS_DIR}/business-gmail-list.png`, fullPage: false })
+  await page.locator('.pr-row', { hasText: 'Gate Replied' }).click(); await page.waitForTimeout(300)
+  if (!(await page.locator('.pr-replied').count())) throw new Error('the reply banner is missing')
+  await page.locator('.pr-sheet').getByLabel('Drive folder').fill('https://drive.google.com/drive/folders/gate'); await page.locator('.pr-sheet').getByLabel('Drive folder').press('Enter'); await page.waitForTimeout(200)
+  if ((await page.locator('.pr-links a', { hasText: 'Drive folder' }).getAttribute('href')) !== 'https://drive.google.com/drive/folders/gate') throw new Error('the Drive link does not open')
+  if (SHOTS_DIR) await page.screenshot({ path: `${SHOTS_DIR}/business-gmail-card.png`, fullPage: false })
+  await page.getByRole('button', { name: 'Move to In conversation' }).click(); await page.waitForTimeout(300)
+  const saved = await page.evaluate((K) => { const p = JSON.parse(localStorage.getItem(K)).prospects.find((x) => x.id === 'gp1'); return [p.stage, !!p.replied, p.links?.drive].join() }, KEY)
+  if (saved !== 'talking,false,https://drive.google.com/drive/folders/gate') throw new Error(`not saved: ${saved}`)
+  await page.keyboard.press('Escape'); await page.waitForTimeout(300)
+})
 await step('ideas: click to pick up, click to drop, and the list brings the board to any sticky', async () => {
   await page.evaluate(() => { localStorage.removeItem('mc-ideaboard-view'); localStorage.setItem('mc-ideaboard-list', '1') })
   await fresh('ideas')

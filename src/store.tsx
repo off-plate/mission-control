@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { SUPABASE_ENABLED, deleteRemoteState, loadRemoteState } from './supabase'
+import { SUPABASE_ENABLED, deleteRemoteState, loadRemoteState, readOutreachEvents, stampOutreachEvents } from './supabase'
 import { outbox } from './sync'
 
 /* Two blobs are the same work if they differ only in when they were saved.
@@ -28,6 +28,7 @@ import { useIdeaBoardSlice, type IdeaBoardSlice } from './store/ideaboard'
 import { usePromptsSlice, type PromptsSlice } from './store/prompts'
 import { usePeopleSlice, type PeopleSlice } from './store/people'
 import { useProspectsSlice, type ProspectsSlice } from './store/prospects'
+import type { OutreachEvent } from './prospectcalc'
 import { useGymSlice, type GymSlice } from './store/gym'
 import { useConnectionsSlice } from './store/connections'
 import { useCoachSlice } from './store/coach'
@@ -253,6 +254,7 @@ interface Store extends PersistedState {
   deleteProspect: ProspectsSlice['deleteProspect']
   logTouch: ProspectsSlice['logTouch']
   removeTouch: ProspectsSlice['removeTouch']
+  applyOutreach: ProspectsSlice['applyOutreach']
   gymGoals: GymGoal[]
   addGymGoal: GymSlice['addGymGoal']
   updateGymGoal: GymSlice['updateGymGoal']
@@ -978,6 +980,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const { people, setPeople, personBonds, setPersonBonds, personContacts, setPersonContacts } = peopleSlice
   const prospectsSlice = useProspectsSlice(persisted, { armUndo, bury, digUp })
   const { prospects, setProspects } = prospectsSlice
+  /* Emails to and from prospects, found in his Gmail (tools/outreach-gmail.gs).
+     Runs with every pull, so they land on fresh rows. A missing table or a
+     dropped connection just means the next pull tries again. */
+  const applyOutreachRef = useRef(prospectsSlice.applyOutreach)
+  applyOutreachRef.current = prospectsSlice.applyOutreach
+  const pullOutreach = async () => {
+    try {
+      const events = await readOutreachEvents<OutreachEvent>()
+      if (events?.length) await stampOutreachEvents(applyOutreachRef.current(events))
+    } catch { /* next pull */ }
+  }
   const gymSlice = useGymSlice(persisted, { armUndo, bury, digUp })
   const { gymGoals, setGymGoals } = gymSlice
   const growthSlice = useGrowthSlice(persisted, { space, armUndo, bury, digUp, setPageState })
@@ -1226,6 +1239,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const remote = await loadRemoteState()
       if (stop) return
       if (remote) applyExternalRef.current(remote)
+      void pullOutreach()
       /* And the other direction. Without this, work done offline never leaves the
          device: applyExternal finds local is already a superset of the stale
          remote, changes no state, and so never fires the save effect. The device
@@ -1536,7 +1550,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     addPersonBond: peopleSlice.addPersonBond, setBondLabel: peopleSlice.setBondLabel, removePersonBond: peopleSlice.removePersonBond,
     logContact: peopleSlice.logContact, removeContact: peopleSlice.removeContact,
     prospects, addProspect: prospectsSlice.addProspect, updateProspect: prospectsSlice.updateProspect, deleteProspect: prospectsSlice.deleteProspect,
-    logTouch: prospectsSlice.logTouch, removeTouch: prospectsSlice.removeTouch,
+    logTouch: prospectsSlice.logTouch, removeTouch: prospectsSlice.removeTouch, applyOutreach: prospectsSlice.applyOutreach,
     gymGoals, addGymGoal: gymSlice.addGymGoal, updateGymGoal: gymSlice.updateGymGoal, deleteGymGoal: gymSlice.deleteGymGoal,
 
     undoable, undoDelete, dismissUndo,

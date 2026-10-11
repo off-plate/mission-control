@@ -10,8 +10,8 @@ import { useStore } from './store'
 import { Segmented, Select } from './ui'
 import { localDateKey } from './util'
 import { AVOID_DAYS } from './exceptions'
-import { STAGES, SOURCES, STEPS, age, cleanDomain, isOpen, label, nextStep, replyOdds } from './prospectcalc'
-import type { Prospect, ProspectPerson, ProspectSource, ProspectStage, TouchStep } from './types'
+import { STAGES, SOURCES, STEPS, age, cleanDomain, isOpen, isReady, label, nextStep, replyOdds } from './prospectcalc'
+import type { Prospect, ProspectLinks, ProspectPerson, ProspectSource, ProspectStage, TouchStep } from './types'
 
 type Layout = 'list' | 'board'
 const LAYOUT_KEY = 'mc-business-layout'
@@ -85,6 +85,7 @@ const fmtDay = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString('
 const pid = () => `pp-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
 
 function nextLabel(p: Prospect): string {
+  if (p.replied && isOpen(p)) return 'They replied'
   const n = nextStep(p)
   if (n === 'callOrVisit') return 'Call or visit'
   if (n) return label(STEPS, n)
@@ -163,8 +164,16 @@ function Meter({ n, kind, none = 'unset' }: { n: number | null | undefined; kind
 
 function ProspectList({ prospects, today, onOpen }: { prospects: Prospect[]; today: string; onOpen: (id: string) => void }) {
   /* Arrives already filtered and sorted (FilterTools); the groups keep that order. */
+  /* The Gmail sync's answer to "who do I write to today": replies first,
+     then everyone whose 2 days have passed, then the rest of the sequence. */
+  const open = prospects.filter(isOpen)
+  const replied = open.filter((p) => p.replied)
+  const ready = open.filter((p) => !p.replied && isReady(p, today))
   const groups: { title: string; rows: Prospect[]; fold?: boolean }[] = [
-    { title: 'Needs a move', rows: prospects.filter(isOpen) },
+    { title: 'Replied', rows: replied },
+    { title: 'Next step ready', rows: ready },
+    { title: 'Waiting', rows: open.filter((p) => !p.replied && !ready.includes(p) && p.stage === 'contacted') },
+    { title: 'To reach out', rows: open.filter((p) => !p.replied && p.stage === 'reach') },
     { title: 'In conversation', rows: prospects.filter((p) => p.stage === 'talking') },
     { title: 'Acquired', rows: prospects.filter((p) => p.stage === 'won'), fold: true },
     { title: 'Lost', rows: prospects.filter((p) => p.stage === 'lost'), fold: true },
@@ -322,6 +331,20 @@ function ProspectCard({ p, today, onClose }: { p: Prospect; today: string; onClo
               <Field label="Why it was lost" placeholder="No budget until spring" value={p.lostReason ?? ''} onCommit={(v) => set({ lostReason: v || undefined })} />
             </div>
           )}
+          {p.replied && isOpen(p) && (
+            <div className="pr-replied" role="status">
+              <b>They replied, {fmtDay(p.replied.day)}</b>
+              {p.replied.subject && <span className="pr-subject">{p.replied.subject}</span>}
+              {p.replied.body && <details><summary>Show the reply</summary><p>{p.replied.body}</p></details>}
+              <div className="pr-replied-actions">
+                <button className="btn btn-primary" type="button" onClick={() => set({ stage: 'talking', replied: undefined })}>Move to In conversation</button>
+                <button className="btn btn-quiet" type="button" onClick={() => set({ replied: undefined })}>Not a real reply</button>
+              </div>
+            </div>
+          )}
+
+          <Links links={p.links ?? {}} onSet={(links) => set({ links: Object.values(links).some(Boolean) ? links : undefined })} />
+
           <div className="pp-field"><span>Why them</span>
             <Field label="Why them" placeholder="What caught your eye" value={p.why ?? ''} onCommit={(v) => set({ why: v || undefined })} />
           </div>
@@ -384,6 +407,23 @@ function ProspectCard({ p, today, onClose }: { p: Prospect; today: string; onClo
           </button>
         </div>
       </aside>
+    </div>
+  )
+}
+
+const LINKS: { id: keyof ProspectLinks; label: string }[] = [
+  { id: 'drive', label: 'Drive folder' }, { id: 'outreach', label: 'Outreach doc' }, { id: 'proposal', label: 'Proposal' },
+]
+/* Where its files live, one click away (his ask, 2026-10-11). Paste a URL;
+   once set, the label opens it. Nothing in Drive moves. */
+function Links({ links, onSet }: { links: ProspectLinks; onSet: (l: ProspectLinks) => void }) {
+  return (
+    <div className="pr-links">
+      {LINKS.map((l) => (
+        <div key={l.id} className="pp-field"><span>{links[l.id] ? <a href={links[l.id]} target="_blank" rel="noreferrer">{l.label}</a> : l.label}</span>
+          <Field label={l.label} type="url" placeholder="Paste link" value={links[l.id] ?? ''} onCommit={(v) => onSet({ ...links, [l.id]: /^https?:\/\//.test(v) ? v : undefined })} />
+        </div>
+      ))}
     </div>
   )
 }

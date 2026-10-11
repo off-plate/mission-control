@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { rowKey } from '../sync-merge'
 import type { Prospect, ProspectTouch } from '../types'
 import { newId } from './shared'
+import { applyEvents, type OutreachEvent } from '../prospectcalc'
 
 export type ProspectInput = Pick<Prospect, 'name' | 'source'> & Partial<Pick<Prospect, 'domain' | 'stage' | 'value' | 'why' | 'notes' | 'people'>>
 export type ProspectPatch = Partial<Omit<Prospect, 'id' | 'createdAt' | 'updatedAt' | 'touches'>>
@@ -17,6 +18,7 @@ export interface ProspectsSlice {
   /** Logging the first touch moves a prospect out of To reach out. */
   logTouch: (id: string, touch: Omit<ProspectTouch, 'id'>) => void
   removeTouch: (id: string, touchId: string) => void
+  applyOutreach: (events: OutreachEvent[]) => string[]
 }
 
 export function useProspectsSlice(
@@ -48,6 +50,16 @@ export function useProspectsSlice(
     touches: [...p.touches, { ...touch, id: newId('touch') }],
   }))
   const removeTouch = (id: string, touchId: string): void => edit(id, (p) => ({ ...p, touches: p.touches.filter((t) => t.id !== touchId) }))
+  /* Gmail sync events become touches through the same state as everything he
+     logs, so they sync and merge like his own edits. Returns the ids done with. */
+  const applyOutreach = (events: OutreachEvent[]): string[] => {
+    /* Applied inside the updater, against the latest rows rather than this
+       render's copy: it runs right after a pull from another device. Safe to
+       run twice, touch ids come from the Gmail message id. */
+    const { done } = applyEvents(prospects, events)
+    if (done.length) setProspects((prev) => applyEvents(prev, events).prospects)
+    return done
+  }
 
-  return { prospects, setProspects, addProspect, updateProspect, deleteProspect, logTouch, removeTouch }
+  return { prospects, setProspects, addProspect, updateProspect, deleteProspect, logTouch, removeTouch, applyOutreach }
 }

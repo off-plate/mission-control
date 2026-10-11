@@ -82,6 +82,12 @@ export interface ProspectPerson {
   decides?: boolean
 }
 
+export interface ProspectLinks {
+  drive?: string
+  outreach?: string
+  proposal?: string
+}
+
 export interface ProspectTouch {
   id: string
   step: TouchStep
@@ -107,6 +113,10 @@ export interface Prospect {
   why?: string
   lostReason?: string
   notes?: string
+  /** Where its files live. Plain URLs he pastes; nothing here moves them. */
+  links?: ProspectLinks
+  /** A reply the Gmail sync found, waiting for his yes before the stage moves. */
+  replied?: { day: string; subject?: string; body?: string }
   people: ProspectPerson[]
   touches: ProspectTouch[]
   createdAt: number

@@ -46,7 +46,7 @@ const PeoplePage = lazy(() => import('./people').then((m) => ({ default: m.Peopl
 import { useStore } from './store'
 import { ago, describe, useSyncStatus } from './sync'
 import { isReadOnly } from './store'
-import type { PageId, SpaceId, ViewId } from './types'
+import { SPACES, UNSORTED, type PageId, type SpaceId, type ViewId } from './types'
 
 /* Is this thing up to date, and where did the last change come from.
 
@@ -275,6 +275,8 @@ function PageNav({
   }
   const hideHoverSoon = () => { hoverTimer.current = window.setTimeout(() => setHoverOpen(false), 350) }
   const hoverProjects = view === 'all' ? projects : projects.filter((p) => p.space === view)
+  /* Each workspace's default folder: its tasks with no project. */
+  const unsortedSpaces = view === 'all' ? SPACES : [view]
 
   return (
     <nav className="nav" aria-label="Pages" onMouseEnter={onMouseEnter}>
@@ -311,6 +313,13 @@ function PageNav({
                 onMouseEnter={showHover}
                 onMouseLeave={hideHoverSoon}
               >
+                {unsortedSpaces.map((sp) => (
+                  <button key={`u-${sp}`} className="projrow" role="menuitem" aria-current={openProjectId === UNSORTED && view === sp ? 'true' : undefined} onClick={() => { setSpace(sp); enterProject(UNSORTED); setHoverOpen(false) }}>
+                    <span className="projectmark"><b aria-hidden="true">·</b></span>
+                    <span className="projrow-name">{view === 'all' ? `Unsorted, ${SPACE_LABELS[sp]}` : 'Unsorted'}</span>
+                    <span className="projrow-n mono">{tasks.filter((t) => t.space === sp && !t.projectId && !t.done).length}</span>
+                  </button>
+                ))}
                 {hoverProjects.map((p) => (
                   <button key={p.id} className="projrow" role="menuitem" aria-current={openProjectId === p.id ? 'true' : undefined} onClick={() => { setSpace(p.space); enterProject(p.id); setHoverOpen(false) }}>
                     <ProjectMark project={p} />

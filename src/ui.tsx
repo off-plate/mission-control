@@ -17,7 +17,7 @@ import { SPACE_LABELS } from './mock'
 import { exceptionsFor } from './exceptions'
 import { useStore } from './store'
 import { isoWeekKey, localDateKey } from './util'
-import type { Project, SpaceId, Task } from './types'
+import type { Project, SpaceId, Task, ViewId } from './types'
 import * as Icon from './icons'
 
 
@@ -294,6 +294,46 @@ export function TaskMark({ task, always }: { task: { space?: SpaceId; projectId?
       <SpaceMark space={task.space} always={always} />
       <ProjectMark project={task.projectId ? projects.find((p) => p.id === task.projectId) : undefined} />
     </>
+  )
+}
+
+/* The workspace switch, written into a page title: "Plan [Personal v] Monday 12
+   October". The chip is filled with the active workspace's own accent (the
+   [data-space] tokens), so All is lime, Personal gold, Big Time blue. It is the
+   same setView the header switcher calls, so the two always agree. */
+const WS_DOT: Record<string, string> = { all: '#DFF24A', personal: '#FFC94A', work: '#7FD8F5' }
+export function WorkspaceTitle({ before, after }: { before: string; after?: string }) {
+  const { view, setView } = useStore()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', esc)
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc) }
+  }, [open])
+  const label = (v: string) => (v === 'all' ? 'All' : SPACE_LABELS[v as SpaceId])
+  return (
+    <span className="ws-title">
+      <span>{before}</span>
+      <span className="ws-pick" ref={ref}>
+        <button className="ws-chip" aria-haspopup="menu" aria-expanded={open} aria-label={`Workspace: ${label(view)}`} onClick={() => setOpen((o) => !o)}>
+          {label(view)}<Icon.ChevronDown size={14} strokeWidth={3} />
+        </button>
+        {open && (
+          <div className="ws-menu" role="menu">
+            {(['all', ...Object.keys(SPACE_LABELS)] as string[]).map((v) => (
+              <button key={v} role="menuitem" aria-current={view === v ? 'true' : undefined} onClick={() => { setView(v as ViewId); setOpen(false) }}>
+                <i style={{ background: WS_DOT[v] }} />{label(v)}
+              </button>
+            ))}
+          </div>
+        )}
+      </span>
+      {after && <span>{after}</span>}
+    </span>
   )
 }
 

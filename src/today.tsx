@@ -5,7 +5,7 @@
    deleted 2026-10-04. */
 import { useEffect, useState } from 'react'
 import { useCalendar } from './calendar'
-import { useOpenToday, Band } from './ui'
+import { useOpenToday, Band, WorkspaceTitle } from './ui'
 import { TodayRoom } from './todayroom'
 import { localDateKey } from './util'
 
@@ -50,7 +50,7 @@ export function TodayPage() {
   return (
     <div className="page">
       <Band
-        title="Today"
+        title={<WorkspaceTitle before="Today" />}
         metrics={[
           { v: nextEvent.v, k: nextEvent.k, tone: 'info' as const },
           { v: String(open.length), k: 'tasks open' },

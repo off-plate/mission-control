@@ -10813,3 +10813,24 @@ body:has(.shell.is-hud) { --st-reach: #7C9CC4; --st-contacted: #E0A84A; --st-tal
    column otherwise sizes the whole page to its full run of folders (it did in
    All), so the page scrolled sideways. Zero intrinsic width, filled by min-width. */
 .pstrip { width: 0; min-width: calc(100% + var(--gutter) * 2); max-width: none; box-sizing: border-box; }
+
+/* Workspace switch inside the page title */
+.band h1 .ws-title { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.1em 0.45em; }
+.ws-pick { position: relative; display: inline-flex; }
+.ws-chip {
+  display: inline-flex; align-items: center; gap: 8px; padding: 2px 10px 2px 12px; border-radius: var(--a-r-lg);
+  background: var(--a-accent); color: var(--a-ink); font: inherit; font-size: 0.62em; font-weight: 800; line-height: 1.25;
+  letter-spacing: 0; transition: background var(--t-med);
+}
+.ws-chip:hover { background: var(--a-accent-2); }
+.ws-chip svg { flex: none; }
+.ws-menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; min-width: 170px; display: grid; padding: 5px;
+  background: var(--surface); border: 1px solid var(--hairline-strong); border-radius: 10px; box-shadow: var(--shadow-pop);
+  font-size: 0.9375rem; font-weight: 600; letter-spacing: 0; white-space: nowrap;
+}
+.ws-menu button { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: var(--a-r-lg); text-align: left; color: var(--ink); }
+.ws-menu button:hover { background: var(--surface-2); }
+.ws-menu button[aria-current="true"] { background: var(--accent-wash); }
+.ws-menu i { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+@media (prefers-reduced-motion: reduce) { .ws-chip { transition: none; } }

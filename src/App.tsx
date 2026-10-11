@@ -314,14 +314,14 @@ function PageNav({
                 onMouseLeave={hideHoverSoon}
               >
                 {unsortedSpaces.map((sp) => (
-                  <button key={`u-${sp}`} className="projrow" role="menuitem" aria-current={openProjectId === UNSORTED && view === sp ? 'true' : undefined} onClick={() => { setSpace(sp); enterProject(UNSORTED); setHoverOpen(false) }}>
+                  <button key={`u-${sp}`} className="projrow" data-space="none" role="menuitem" aria-current={openProjectId === UNSORTED && view === sp ? 'true' : undefined} onClick={() => { setSpace(sp); enterProject(UNSORTED); setHoverOpen(false) }}>
                     <span className="projectmark"><b aria-hidden="true">·</b></span>
                     <span className="projrow-name">{view === 'all' ? `Unsorted, ${SPACE_LABELS[sp]}` : 'Unsorted'}</span>
                     <span className="projrow-n mono">{tasks.filter((t) => t.space === sp && !t.projectId && !t.done).length}</span>
                   </button>
                 ))}
                 {hoverProjects.map((p) => (
-                  <button key={p.id} className="projrow" role="menuitem" aria-current={openProjectId === p.id ? 'true' : undefined} onClick={() => { setSpace(p.space); enterProject(p.id); setHoverOpen(false) }}>
+                  <button key={p.id} className="projrow" data-space={p.space} role="menuitem" aria-current={openProjectId === p.id ? 'true' : undefined} onClick={() => { setSpace(p.space); enterProject(p.id); setHoverOpen(false) }}>
                     <ProjectMark project={p} />
                     <span className="projrow-name">{p.name}</span>
                     <span className="projrow-n mono">{tasks.filter((t) => t.projectId === p.id && !t.done).length}</span>

@@ -1749,7 +1749,21 @@ button.chip:hover { border-color: var(--accent-text); color: var(--accent-text);
 }
 .projrow:hover { background: var(--a-sunk); }
 .projrow[aria-current="true"] { background: var(--accent-wash); font-weight: 600; }
-.projrow .projectmark { min-width: 28px; }
+/* The mark in this menu is a small static folder (his ask, 2026-10-11): same
+   back panel, tab and front flap as the Projects page folders, no hover. */
+.projrow .projectmark {
+  --back: #C9A23A; --front: #FFD772;
+  position: relative; width: 32px; min-width: 32px; height: 24px; padding: 0; background: none; border-radius: 0; flex: none;
+}
+.projrow[data-space="work"] .projectmark { --back: #5FB4D3; --front: #A6E4F8; }
+.projrow[data-space="none"] .projectmark { --back: #C9C2B4; --front: #ECE8E0; }
+.projrow .projectmark::before { content: ''; position: absolute; inset: 3px 0 0 0; background: var(--back); border-radius: 2px 6px 6px 6px; }
+.projrow .projectmark::after { content: ''; position: absolute; left: 0; top: 0; width: 14px; height: 6px; background: var(--back); border-radius: 4px 5px 0 0; clip-path: polygon(0 0, 80% 0, 100% 100%, 0 100%); }
+.projrow .projectmark b {
+  position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; height: 17px; display: flex; align-items: center; justify-content: center;
+  background: var(--front); border-radius: 4px 4px 6px 6px; box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+  font-size: 9px; font-weight: 800; letter-spacing: 0.02em; color: #2A2418;
+}
 .projrow-name { flex: 1; min-width: 0; }
 .projrow-n { color: var(--muted); font-size: 0.8125rem; }
 .projrow:active { transform: scale(0.98); }

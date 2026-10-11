@@ -10808,3 +10808,8 @@ body:has(.shell.is-hud) { --st-reach: #7C9CC4; --st-contacted: #E0A84A; --st-tal
 .spot .empty { padding: 12px; color: var(--muted); }
 @keyframes spotin { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .spot-back { animation: none; } }
+
+/* The strip must never widen its parent. A block inside a shrink-to-fit
+   column otherwise sizes the whole page to its full run of folders (it did in
+   All), so the page scrolled sideways. Zero intrinsic width, filled by min-width. */
+.pstrip { width: 0; min-width: calc(100% + var(--gutter) * 2); max-width: none; box-sizing: border-box; }

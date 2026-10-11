@@ -9,6 +9,7 @@ import { daysSince } from './health'
    exported: assistantdock.tsx and assistantpage.tsx both import it. */
 import * as Icon from './icons'
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { SPACE_LABELS } from './exceptions'
 import { fakeDecompose } from './mock'
 import { useStore } from './store'
@@ -419,6 +420,58 @@ function RoutineOnDay({ routine, day }: { routine: Routine; day?: string }) {
    project card on the Projects page carries, in one row. Plain click selects
    that one project (click it again to clear); shift/cmd/ctrl-click adds or
    removes; on touch there is no modifier, so a tap toggles. */
+/* Spotlight-style search (his ask, 2026-10-11): a centred box over the page,
+   type, arrow to a task, Enter or click to jump to its project with the row
+   highlighted (jumpTo, unchanged). Every task, every workspace. */
+function Spotlight({ q, setQ, matches, projects, onPick, onClose }: {
+  q: string; setQ: (v: string) => void; matches: Task[]; projects: Project[]
+  onPick: (t: Task) => void; onClose: () => void
+}) {
+  const [hi, setHi] = useState(0)
+  useEffect(() => setHi(0), [q])
+  const ref = useRef<HTMLInputElement>(null)
+  useEffect(() => { ref.current?.focus() }, [])
+  return (
+    <div className="spot-back" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="spot" role="dialog" aria-label="Search every task">
+        <div className="spot-field">
+          <Icon.Search size={18} />
+          <input
+            ref={ref} value={q} onChange={(e) => setQ(e.target.value)}
+            placeholder="Search every task, every workspace"
+            aria-label="Search every task"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') onClose()
+              else if (e.key === 'ArrowDown') { e.preventDefault(); setHi((h) => Math.min(h + 1, matches.length - 1)) }
+              else if (e.key === 'ArrowUp') { e.preventDefault(); setHi((h) => Math.max(h - 1, 0)) }
+              else if (e.key === 'Enter' && matches[hi]) onPick(matches[hi])
+            }}
+          />
+          <kbd>Esc</kbd>
+        </div>
+        {q.trim() && (
+          <ul className="spot-results" role="listbox">
+            {matches.length === 0 && <li className="empty">Nothing matches.</li>}
+            {matches.map((t, i) => {
+              const proj = t.projectId ? projects.find((p) => p.id === t.projectId) : undefined
+              return (
+                <li key={t.id}>
+                  <button className={`plan-search-hit${i === hi ? ' is-hi' : ''}`} onMouseEnter={() => setHi(i)} onClick={() => onPick(t)}>
+                    <SpaceMark space={t.space} always />
+                    <ProjectMark project={proj} />
+                    <span className="plan-search-hit-title"><Linkify text={t.title} /></span>
+                    <span className="plan-search-hit-where mono">{proj ? proj.name : t.list === 'today' ? "today's plan" : 'backlog'}</span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /* The Projects page folder, shrunk to a glyph: back with its tab, one sheet
    peeking out, the front flap in the workspace colour. Same colour recipe as
    .folder, so a project looks like itself in both places. */
@@ -729,9 +782,17 @@ export function PlanPage() {
        belongs in the record, not in a search for where he left something. */
     return tasks.filter((t) => !t.done && t.title.toLowerCase().includes(q)).slice(0, 8)
   })()
+  const [spot, setSpot] = useState(false)
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setSpot(true) } }
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+  }, [])
   const jumpTo = (t: Task) => {
     const proj = t.projectId ? projects.find((p) => p.id === t.projectId) : undefined
-    if (proj) { setSpace(proj.space); enterProject(proj.id) } else { setView(t.space) }
+    /* The strip may be filtered to something that hides this task, so the
+       selection moves to where the task lives, not just the view. */
+    if (proj) { setSpace(proj.space); enterProject(proj.id); setPicked([proj.id]) } else { setView(t.space); setPicked([]) }
     setFocusTaskId(t.id)
     setSearch('')
   }
@@ -898,43 +959,21 @@ export function PlanPage() {
         /* The way back into the record, or the way back out of a project into
            its own room's Plan. Never both: a project already has Yesterday
            one tap further, through Projects then the Space's own Plan. */
-        actions={<button className="btn btn-ghost" onClick={openDaily}>Yesterday</button>}
-      />
-      {/* Every task, every workspace, every project -- the one search that
-          isn't scoped to whatever room he's standing in, because "which room
-          did I leave it in" is exactly the question he can't answer by
-          filtering. */}
-      <div className="plan-search">
-        <Icon.Search size={14} className="plan-search-ico" />
-        <input
-          className="plan-search-input"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Escape') setSearch('') }}
-          placeholder="Search every task, every workspace…"
-          aria-label="Search every task"
-        />
-        {search.trim() && (
-          <ul className="plan-search-results" role="listbox">
-            {searchMatches.length === 0 && <li className="empty">Nothing matches.</li>}
-            {searchMatches.map((t) => {
-              const proj = t.projectId ? projects.find((p) => p.id === t.projectId) : undefined
-              return (
-                <li key={t.id}>
-                  <button className="plan-search-hit" onClick={() => jumpTo(t)}>
-                    <SpaceMark space={t.space} always />
-                    <ProjectMark project={proj} />
-                    <span className="plan-search-hit-title"><Linkify text={t.title} /></span>
-                    <span className="plan-search-hit-where mono">
-                      {proj ? proj.name : t.list === 'today' ? "today's plan" : 'backlog'}
-                    </span>
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
+        actions={(
+          <span className="plan-actions">
+            <button className="btn btn-ghost plan-search-btn" onClick={() => setSpot(true)} aria-label="Search every task" title="Search every task (Cmd K)"><Icon.Search size={16} /></button>
+            <button className="btn btn-ghost" onClick={openDaily}>Yesterday</button>
+          </span>
         )}
-      </div>
+      />
+      {spot && createPortal(
+        <Spotlight
+          q={search} setQ={setSearch} matches={searchMatches} projects={projects}
+          onPick={(t) => { setSpot(false); jumpTo(t) }}
+          onClose={() => { setSpot(false); setSearch('') }}
+        />,
+        document.body,
+      )}
       <ProjectStrip
         projects={stripProjects} tasks={tasks} sel={sel} showSpaces={view === 'all'} touch={coarse} inScope={(t) => inView(t.space)}
         onAll={() => setPicked([])}

@@ -10786,3 +10786,10 @@ body:has(.shell.is-hud) { --st-reach: #7C9CC4; --st-contacted: #E0A84A; --st-tal
   .pstrip-item:hover .fg-paper, .pstrip-item.is-on .fg-paper { transform: translateY(-3px) rotate(-3deg); }
 }
 @media (prefers-reduced-motion: reduce) { .fg-front, .fg-paper { transition: none; } }
+
+/* Plan strip: no scrollbar, and it runs edge to edge. The first folder still
+   starts at the content edge; scrolling carries folders past the gutter to
+   the screen's own edge, and the last one comes to rest at the gutter. */
+.pstrip { margin-inline: calc(var(--gutter) * -1); padding-inline: var(--gutter); scroll-padding-inline: var(--gutter); scrollbar-width: none; -ms-overflow-style: none; padding-bottom: 0; }
+.pstrip::-webkit-scrollbar { display: none; }
+.pstrip::after { content: ''; flex: 0 0 1px; }

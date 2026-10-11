@@ -302,6 +302,27 @@ export async function upsertCompassProfile<T>(currentSettings: Record<string, un
   return data as T
 }
 
+/** Outreach emails the Gmail sync stored and the app has not applied yet
+ *  (mc_outreach_events). Null when signed out or unconfigured. */
+export async function readOutreachEvents<T>(): Promise<T[] | null> {
+  const c = db()
+  const me = await currentAccount()
+  if (!c || !me) return null
+  const { data, error } = await c.from('mc_outreach_events')
+    .select('id,kind,via,day,counterpart,subject,body').is('applied_at', null).order('day').limit(500)
+  if (error) throw new Error(error.message)
+  return (data ?? []) as T[]
+}
+
+/** Mark events as applied so no device applies them twice. */
+export async function stampOutreachEvents(ids: string[]): Promise<void> {
+  const c = db()
+  const me = await currentAccount()
+  if (!c || !me || !ids.length) return
+  const { error } = await c.from('mc_outreach_events').update({ applied_at: new Date().toISOString() }).in('id', ids)
+  if (error) throw new Error(error.message)
+}
+
 /** Clear the saved state (used by Reset). */
 export async function deleteRemoteState(): Promise<void> {
   const c = db()

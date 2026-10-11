@@ -2,8 +2,8 @@
 
    florian@off-plate.com is a "Send mail as" alias of his personal Gmail, so
    every outreach email sits in that Sent folder and every reply lands in that
-   inbox. Once an hour this asks Mission Control which addresses belong to
-   prospects, finds mail to and from them, and hands it to the outreach-ingest
+   inbox. Every morning and evening this asks Mission Control which addresses
+   belong to prospects, finds mail to and from them, and hands it to the outreach-ingest
    function. It reads nothing else.
 
    Setup, once:
@@ -19,7 +19,9 @@ const TZ = 'Europe/Prague'
 
 function setup() {
   ScriptApp.getProjectTriggers().forEach((t) => ScriptApp.deleteTrigger(t))
-  ScriptApp.newTrigger('sync').timeBased().everyHours(1).create()
+  /* Morning and evening is enough (his call, 2026-10-11). */
+  ScriptApp.newTrigger('sync').timeBased().atHour(7).everyDays(1).inTimezone(TZ).create()
+  ScriptApp.newTrigger('sync').timeBased().atHour(21).everyDays(1).inTimezone(TZ).create()
   sync()
 }
 

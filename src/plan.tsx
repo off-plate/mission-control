@@ -415,6 +415,43 @@ function RoutineOnDay({ routine, day }: { routine: Routine; day?: string }) {
   )
 }
 
+/* The strip itself. Folder glyph, name, open-task count: the same facts a
+   project card on the Projects page carries, in one row. Plain click selects
+   that one project (click it again to clear); shift/cmd/ctrl-click adds or
+   removes; on touch there is no modifier, so a tap toggles. */
+function ProjectStrip({ projects, tasks, sel, showSpaces, touch, onAll, onPick, onManage }: {
+  projects: Project[]; tasks: Task[]; sel: string[]; showSpaces: boolean; touch: boolean
+  onAll: () => void; onPick: (id: string, add: boolean) => void; onManage: () => void
+}) {
+  const open = (id: string) => tasks.filter((t) => t.projectId === id && !t.done).length
+  const total = projects.reduce((a, p) => a + open(p.id), 0)
+  let lastSpace = ''
+  return (
+    <div className="pstrip" role="group" aria-label="Filter Plan by project">
+      <button className={`pstrip-item${sel.length === 0 ? ' is-on' : ''}`} aria-pressed={sel.length === 0} onClick={onAll}>
+        <Icon.List size={15} /><span>All</span><em className="mono">{total}</em>
+      </button>
+      {projects.map((p) => {
+        const head = showSpaces && p.space !== lastSpace
+        lastSpace = p.space
+        const on = sel.includes(p.id)
+        return (
+          <span className="pstrip-cell" key={p.id}>
+            {head && <SpaceMark space={p.space} always />}
+            <button
+              className={`pstrip-item${on ? ' is-on' : ''}`} aria-pressed={on}
+              onClick={(e) => onPick(p.id, touch || e.shiftKey || e.metaKey || e.ctrlKey)}
+            >
+              <Icon.Folder size={15} /><span>{p.name}</span><em className="mono">{open(p.id)}</em>
+            </button>
+          </span>
+        )
+      })}
+      <button className="pstrip-item pstrip-manage" onClick={onManage} aria-label="Manage projects"><Icon.FolderAdd size={15} /></button>
+    </div>
+  )
+}
+
 export function PlanPage() {
   const todayIdx = (new Date().getDay() + 6) % 7
   const pomo = usePomodoro()
@@ -426,12 +463,27 @@ export function PlanPage() {
      line that scopes Plan to it. Everything below (backlog, the day, the
      progress bar) is derived from spaceTasks, so nothing downstream has to
      know a project was ever involved. */
-  const activeProject = openProjectId ? projects.find((p) => p.id === openProjectId) ?? null : null
+  /* THE PROJECT STRIP (2026-10-11). Plan used to be scoped by one openProjectId,
+     reached through a hover menu or the Projects page, so seeing two projects
+     together was impossible and one was often four clicks away. The strip under
+     the search bar makes every project in the workspace one click, several at
+     once with shift/cmd (or a plain tap on touch), and remembers the choice.
+     openProjectId is still the door from elsewhere (search hits, the nav
+     menu): when it is set, it becomes the selection. */
+  const PICK_KEY = 'mc:plan-projects'
+  const [picked, setPicked] = useState<string[]>(() => {
+    try { const v = JSON.parse(localStorage.getItem(PICK_KEY) ?? '[]'); return Array.isArray(v) ? v : [] } catch { return [] }
+  })
+  useEffect(() => { if (openProjectId) setPicked([openProjectId]) }, [openProjectId])
+  useEffect(() => { try { localStorage.setItem(PICK_KEY, JSON.stringify(picked)) } catch { /* private mode */ } }, [picked])
+  const stripProjects = view === 'all' ? projects : projects.filter((p) => p.space === view)
+  const sel = picked.filter((id) => stripProjects.some((p) => p.id === id))
+  const activeProject = sel.length === 1 ? projects.find((p) => p.id === sel[0]) ?? null : null
   const addSpace = activeProject ? activeProject.space : space
   /* Only outside a project's own room: standing inside it already says which
      project every task on screen belongs to, so the mark would be repeating
      the room he is already standing in. */
-  const markOf = (t: Task) => (openProjectId ? undefined : projects.find((p) => p.id === t.projectId))
+  const markOf = (t: Task) => (activeProject ? undefined : projects.find((p) => p.id === t.projectId))
 
   /* Moving a task between a project and the Space's own Plan is the same
      move either direction: set or clear projectId. A task's own space never
@@ -468,7 +520,7 @@ export function PlanPage() {
     </>
   )
 
-  const spaceTasks = tasks.filter((t) => inView(t.space) && (!openProjectId || t.projectId === openProjectId))
+  const spaceTasks = tasks.filter((t) => inView(t.space) && (sel.length === 0 || (!!t.projectId && sel.includes(t.projectId))))
   const backlogOpen = spaceTasks.filter((t) => !t.done && t.list === 'backlog') // the to-do pool
   /* In All the three rooms would otherwise interleave into one undifferentiated
      pile. Grouped by room, in the order of the switcher above, so the list reads
@@ -828,9 +880,7 @@ export function PlanPage() {
         /* The way back into the record, or the way back out of a project into
            its own room's Plan. Never both: a project already has Yesterday
            one tap further, through Projects then the Space's own Plan. */
-        actions={activeProject
-          ? <button className="btn btn-ghost" onClick={() => setPage('projects')}>&larr; Projects</button>
-          : <button className="btn btn-ghost" onClick={() => openDay(prevDay())}>Yesterday</button>}
+        actions={<button className="btn btn-ghost" onClick={() => openDay(prevDay())}>Yesterday</button>}
       />
       {/* Every task, every workspace, every project -- the one search that
           isn't scoped to whatever room he's standing in, because "which room
@@ -867,6 +917,14 @@ export function PlanPage() {
           </ul>
         )}
       </div>
+      <ProjectStrip
+        projects={stripProjects} tasks={tasks} sel={sel} showSpaces={view === 'all'} touch={coarse}
+        onAll={() => setPicked([])}
+        onPick={(id, add) => setPicked(sel.includes(id)
+          ? (add ? sel.filter((x) => x !== id) : sel.length === 1 ? [] : [id])
+          : (add ? [...sel, id] : [id]))}
+        onManage={() => setPage('projects')}
+      />
       {/* THE WEEK. Moved above the to-do list and day panel on his instruction
           (2026-08-31, from his own mockup): folded to one bar by default,
           giving context for the day he's about to plan without taking over
@@ -1030,10 +1088,10 @@ export function PlanPage() {
               placeholder="Add something to the list…"
               value={quick}
               onChange={(e) => setQuick(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && quick.trim()) { addTask({ title: quick.trim(), source: 'mc', estimateMin: 0, space: addSpace, list: 'backlog', category: 'quick', projectId: openProjectId ?? undefined }); setQuick('') } }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && quick.trim()) { addTask({ title: quick.trim(), source: 'mc', estimateMin: 0, space: addSpace, list: 'backlog', category: 'quick', projectId: activeProject?.id }); setQuick('') } }}
               aria-label="New task"
             />
-            <button className="btn btn-quiet" disabled={!quick.trim()} onClick={() => { addTask({ title: quick.trim(), source: 'mc', estimateMin: 0, space: addSpace, list: 'backlog', category: 'quick', projectId: openProjectId ?? undefined }); setQuick('') }}>Add</button>
+            <button className="btn btn-quiet" disabled={!quick.trim()} onClick={() => { addTask({ title: quick.trim(), source: 'mc', estimateMin: 0, space: addSpace, list: 'backlog', category: 'quick', projectId: activeProject?.id }); setQuick('') }}>Add</button>
           </div>
           {backlogSorted.map((t) => {
             const isExp = expanded.has(t.id)

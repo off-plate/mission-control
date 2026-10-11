@@ -855,15 +855,41 @@ export function PlanPage() {
      Today and the backlog mark "here it is" with two different classes on
      two different rows, so both fire rather than guessing which one a given
      task is in. */
+  /* Make the task reachable, wait for its row to exist, scroll, THEN flash.
+     The old version looked for the row in the same tick the jump started, so
+     it found nothing whenever the jump also changed the filter or the page
+     (the row did not exist yet), and it flashed before the scroll finished.
+     It also could not reach a task planned for another day or sitting inside
+     a folded part of the day. */
+  const flashTimers = useRef<number[]>([])
   useEffect(() => {
     if (!focusTaskId) return
-    setFlashId(focusTaskId)
-    setFlashIds([focusTaskId])
+    const id = focusTaskId
     setFocusTaskId(null)
-    const el = document.querySelector(`[data-task-id="${focusTaskId}"], [data-todo-id="${focusTaskId}"]`)
-    el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-    const timer = window.setTimeout(() => { setFlashId(null); setFlashIds([]) }, 2600)
-    return () => window.clearTimeout(timer)
+    flashTimers.current.forEach((x) => window.clearTimeout(x))
+    flashTimers.current = []
+    const t = tasks.find((x) => x.id === id)
+    if (t) {
+      if (sel.length && !(t.projectId ? sel.includes(t.projectId) : sel.includes(UNSORTED))) setPicked([])
+      if (t.list === 'today' && !t.done) {
+        const n = Array.from({ length: PLAN_AHEAD_DAYS + 1 }, (_, i) => i).find((i) => dayPlus(i) === (t.plannedOn ?? localDateKey()))
+        if (n !== undefined) setDayOffset(n)
+        const slot = t.slot ?? 'unsorted'
+        if (shutSlots.has(slot)) setShut(slot, false)
+      }
+    }
+    let tries = 0
+    const find = () => {
+      const el = document.querySelector(`[data-task-id="${id}"], [data-todo-id="${id}"]`)
+      if (!el) {
+        if (++tries < 40) flashTimers.current.push(window.setTimeout(find, 50))
+        return
+      }
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      flashTimers.current.push(window.setTimeout(() => { setFlashId(id); setFlashIds([id]) }, 350))
+      flashTimers.current.push(window.setTimeout(() => { setFlashId(null); setFlashIds([]) }, 3000))
+    }
+    flashTimers.current.push(window.setTimeout(find, 60))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusTaskId])
 

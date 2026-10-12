@@ -972,12 +972,9 @@ export function PlanPage() {
   return (
     <div className="page">
       <Band
-        title={activeProject ? activeProject.name : <WorkspaceTitle before="Plan" after={longDay(planDay)} />}
+        title={<WorkspaceTitle before="Plan" after={longDay(planDay)} />}
         /* Which room this is, against the title itself, not off in the far
            corner with the buttons: see Band's own note on `beside`. */
-        beside={activeProject
-          ? <span className="crumb">{SPACE_LABELS[activeProject.space]}</span>
-          : undefined}
         metrics={[
           { v: fmtDuration(plannedMin), k: `planned ${dayOffset === 0 ? 'today' : offsetWord(dayOffset).toLowerCase()}`, tone: 'info' as const },
           { v: pool.length ? `${donePct}%` : '—', k: pool.length ? 'of planned time done' : 'no tasks yet', tone: (pool.length && donePct > 0 ? 'pos' : 'info') as 'pos' | 'info' },

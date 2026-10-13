@@ -14,7 +14,7 @@ import { useStore } from './store'
 import { Segmented, Select } from './ui'
 import { localDateKey } from './util'
 import { AVOID_DAYS } from './exceptions'
-import { LOST, STAGES, SOURCES, STEPS, TALKING, WON, age, cleanDomain, inSequence, isOpen, isReady, label, nextStep, replyOdds, stageRank } from './prospectcalc'
+import { LOST, MC_ONLY, STAGES, SOURCES, STEPS, TALKING, WON, age, cleanDomain, inSequence, isOpen, isReady, label, nextStep, replyOdds, stageRank } from './prospectcalc'
 import type { Prospect, ProspectLinks, ProspectPerson, ProspectSheetRow, ProspectSource, ProspectStage, TouchStep } from './types'
 
 type Layout = 'list' | 'board'
@@ -34,6 +34,12 @@ const st = (s: ProspectStage) => `st-${phase(s)}`
 /** Every status in order, plus any he added to the Sheet that this build does not know. */
 const allStages = (list: Prospect[]): ProspectStage[] =>
   [...new Set([...STAGES.map((s) => s.id), ...list.map((p) => p.stage)])].sort((a, b) => stageRank(a) - stageRank(b))
+/* The Board: lanes that hold a card, then In conversation, Acquired and Lost
+   always. Seventeen lanes put Lost four screens away from a drag, and the
+   Sheet overwrites its own statuses anyway, so the drops that stick here are
+   the three only Mission Control has. */
+const boardStages = (list: Prospect[]): ProspectStage[] =>
+  [...new Set([...list.map((p) => p.stage), ...MC_ONLY])].sort((a, b) => stageRank(a) - stageRank(b))
 
 /* FILTERS (his ask, 2026-10-04: "the filtration, like Nexus does it").
    one live search plus country, status, source and sort dropdowns, remembered
@@ -138,7 +144,7 @@ function nextLabel(p: Prospect): string {
   const n = nextStep(p)
   if (n === 'callOrVisit') return 'Call or visit'
   if (n) return label(STEPS, n)
-  if (!inSequence(p) && isOpen(p)) return '-'
+  if (!inSequence(p) && isOpen(p)) return '' // prep: the audit or build is the work, there is no next email
   return p.stage === TALKING ? 'Their move' : isOpen(p) ? 'Sequence done' : p.stage
 }
 function ageLabel(p: Prospect, today: string): { t: string; stale: boolean } {
@@ -198,7 +204,7 @@ export function BusinessView({ modeSwitch }: { modeSwitch: JSX.Element }) {
         <ProspectTable prospects={shown} today={today} showCountry={showCountry} onOpen={setOpenId} />
       ) : (
         <ProspectBoard
-          prospects={shown} stages={f.stage ? [f.stage] : allStages(prospects)} today={today} onOpen={setOpenId}
+          prospects={shown} stages={f.stage ? [f.stage] : boardStages(shown)} today={today} onOpen={setOpenId}
           onMove={(id, stage) => { updateProspect(id, { stage }); if (stage === LOST) setOpenId(id) }}
         />
       )}
@@ -239,7 +245,7 @@ const COLS: Col[] = [
   sheetCol('Notes', 'notes', 'is-wide'),
   sheetCol('Finance', 'finance', 'is-wide'),
   sheetCol('Finance priority', 'financePriority'),
-  { h: 'Next step', cls: 'is-next', cell: (p, today) => { const a = ageLabel(p, today); return <><span>{nextLabel(p)}</span> <span className={`pr-age${a.stale ? ' is-stale' : ''}`}>{a.t}</span></> } },
+  { h: 'Next step', cls: 'is-next', cell: (p, today) => { const a = ageLabel(p, today); const n = nextLabel(p); return <>{n && <span>{n} </span>}<span className={`pr-age${a.stale ? ' is-stale' : ''}`}>{a.t}</span></> } },
   { h: 'Value', cell: (p) => <Meter n={p.value} kind="value" none="-" /> },
   { h: 'Reply', cell: (p) => <Meter n={replyOdds(p)} kind="odds" none={p.stage === TALKING ? 'replied' : '-'} /> },
 ]
@@ -303,7 +309,7 @@ function ProspectBoard({ prospects, stages, today, onOpen, onMove }: {
                     <b>{p.name}</b>
                     {p.stage === LOST
                       ? <span className="pr-lost">{p.lostReason || 'No reason written'}</span>
-                      : <span className={`pr-age${a.stale ? ' is-stale' : ''}`}>{nextLabel(p)}, {a.t}</span>}
+                      : <span className={`pr-age${a.stale ? ' is-stale' : ''}`}>{[nextLabel(p), a.t].filter(Boolean).join(', ')}</span>}
                     <span className="pr-pmeta mono"><span>Value {p.value ?? '-'}</span>{odds != null && <span>Reply {odds}</span>}</span>
                   </button>
                 )

@@ -10855,3 +10855,12 @@ body:has(.shell.is-hud) { --st-reach: #7C9CC4; --st-contacted: #E0A84A; --st-tal
 .pr-facts div { min-width: 0; }
 .pr-facts dt { font-size: 0.72rem; color: var(--pp-muted); margin-bottom: 2px; }
 .pr-facts dd { margin: 0; font-size: 0.85rem; overflow-wrap: anywhere; white-space: pre-line; }
+/* One line on a desktop: the Country dropdown pushed Add onto a second row.
+   The search box gives up the width instead. */
+@media (min-width: 1200px) {
+  .pr-bar { flex-wrap: nowrap; }
+  .pr-bar .pp-search { flex: 1 1 150px; min-width: 130px; }
+  .pr-bar .pp-search-input { width: 100%; }
+  .pr-bar > * { flex-shrink: 0; }
+  .pr-bar > .pp-search { flex-shrink: 1; }
+}

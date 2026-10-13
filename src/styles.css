@@ -10706,9 +10706,9 @@ input.pr-big { padding: 0 6px; }
    deliberate exception to COLOR.md's "no large fills": columns, rows and the
    sheet's header carry a light tint of their stage. Text hues are darker on
    paper, so every one keeps its contrast in both themes. */
-:root { --st-reach: #3F5F8A; --st-contacted: #8A5A10; --st-talking: #1F6E66; --st-won: #2E7D4F; --st-lost: #8A5246; --st-value: #8A6A12; }
-body:has(.shell.is-hud) { --st-reach: #7C9CC4; --st-contacted: #E0A84A; --st-talking: #4FB3A9; --st-won: #5BC48A; --st-lost: #B27A6E; --st-value: #E3B652; }
-.st-reach { --st: var(--st-reach); } .st-contacted { --st: var(--st-contacted); } .st-talking { --st: var(--st-talking); }
+:root { --st-research: #66707F; --st-build: #6E5A94; --st-reach: #3F5F8A; --st-contacted: #8A5A10; --st-talking: #1F6E66; --st-won: #2E7D4F; --st-lost: #8A5246; --st-value: #8A6A12; }
+body:has(.shell.is-hud) { --st-research: #9AA3B0; --st-build: #A592CC; --st-reach: #7C9CC4; --st-contacted: #E0A84A; --st-talking: #4FB3A9; --st-won: #5BC48A; --st-lost: #B27A6E; --st-value: #E3B652; }
+.st-research { --st: var(--st-research); } .st-build { --st: var(--st-build); } .st-reach { --st: var(--st-reach); } .st-contacted { --st: var(--st-contacted); } .st-talking { --st: var(--st-talking); }
 .st-won { --st: var(--st-won); } .st-lost { --st: var(--st-lost); }
 
 .pr-chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; white-space: nowrap; color: var(--st); background: color-mix(in srgb, var(--st) 15%, transparent); }

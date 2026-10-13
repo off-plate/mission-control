@@ -23,12 +23,16 @@ const LAYOUT_KEY = 'mc-business-layout'
 /* Colour family of a status: the five lane colours the view already had.
    Everything before the first email is prep, the sequence is outreach, a
    reply is a conversation. */
-type Phase = 'reach' | 'contacted' | 'talking' | 'won' | 'lost'
+/* Seven, his ask (2026-10-13: "some colour difference based on the phase"):
+   research, build, ready to send, outreach, replied, acquired, lost. */
+type Phase = 'research' | 'build' | 'reach' | 'contacted' | 'talking' | 'won' | 'lost'
 export function phase(s: ProspectStage): Phase {
   if (s === LOST) return 'lost'
   if (s === WON) return 'won'
   if (s === TALKING || s === 'Responded waiting') return 'talking'
-  return stageRank(s) >= stageRank('Contacted') ? 'contacted' : 'reach'
+  if (stageRank(s) >= stageRank('Contacted')) return 'contacted'
+  if (stageRank(s) >= stageRank('Email to prepare')) return 'reach'
+  return s.startsWith('Build') ? 'build' : 'research'
 }
 const st = (s: ProspectStage) => `st-${phase(s)}`
 /** Every status in order, plus any he added to the Sheet that this build does not know. */
@@ -232,6 +236,8 @@ function Meter({ n, kind, none = 'unset' }: { n: number | null | undefined; kind
    A cell shows one line; the card shows all of it. */
 type Col = { h: string; cls?: string; cell: (p: Prospect, today: string) => ReactNode; title?: (p: Prospect) => string | undefined }
 const sheetCol = (h: string, k: keyof ProspectSheetRow, cls?: string): Col => ({ h, cls, cell: (p) => p.sheet?.[k] ?? '', title: (p) => String(p.sheet?.[k] ?? '') || undefined })
+/* Status sits right after Business, his ask (2026-10-13). */
+const STATUS_COL: Col = { h: 'Status', cell: (p) => <span className={`pr-chip ${st(p.stage)}`}>{p.stage === LOST && p.lostReason ? `${p.stage}: ${p.lostReason}` : p.stage}</span> }
 const COLS: Col[] = [
   sheetCol('Niche', 'niche'),
   sheetCol('Location', 'location'),
@@ -241,7 +247,6 @@ const COLS: Col[] = [
   sheetCol('Website problem', 'webProblem', 'is-wide'),
   sheetCol('Social / ads problem', 'socialProblem', 'is-wide'),
   sheetCol('Date', 'date'),
-  { h: 'Status', cell: (p) => <span className={`pr-chip ${st(p.stage)}`}>{p.stage === LOST && p.lostReason ? `${p.stage}: ${p.lostReason}` : p.stage}</span> },
   sheetCol('Notes', 'notes', 'is-wide'),
   sheetCol('Finance', 'finance', 'is-wide'),
   sheetCol('Finance priority', 'financePriority'),
@@ -259,6 +264,7 @@ function ProspectTable({ prospects, today, showCountry, onOpen }: { prospects: P
           <tr>
             <th className="pr-c-num" scope="col">#</th>
             <th className="pr-c-biz" scope="col">Business</th>
+            <th scope="col">Status</th>
             {showCountry && <th scope="col">Country</th>}
             {COLS.map((c) => <th key={c.h} scope="col" className={c.cls}>{c.h}</th>)}
           </tr>
@@ -268,6 +274,7 @@ function ProspectTable({ prospects, today, showCountry, onOpen }: { prospects: P
             <tr key={p.id} className={st(p.stage)} onClick={() => onOpen(p.id)}>
               <td className="pr-c-num">{i + 1}</td>
               <th className="pr-c-biz" scope="row"><button type="button" onClick={(e) => { e.stopPropagation(); onOpen(p.id) }}>{p.name}</button></th>
+              <td>{STATUS_COL.cell(p, today)}</td>
               {showCountry && <td>{p.sheet?.country ?? 'Not in the Sheet'}</td>}
               {COLS.map((c) => <td key={c.h} className={c.cls} title={c.title?.(p)}>{c.cell(p, today)}</td>)}
             </tr>
@@ -377,7 +384,7 @@ function ProspectCard({ p, today, onClose }: { p: Prospect; today: string; onClo
           {ph !== 'lost' && (
             <div className="pr-stepper" aria-label={`Status: ${p.stage}`}>
               {PHASES.map((x, i) => (
-                <span key={x.id} className={i <= PHASES.findIndex((y) => y.id === ph) ? 'is-on' : ''}><i />{x.label}</span>
+                <span key={x.id} className={i <= PHASES.findIndex((y) => y.id === (ph === 'research' || ph === 'build' ? 'reach' : ph)) ? 'is-on' : ''}><i />{x.label}</span>
               ))}
             </div>
           )}

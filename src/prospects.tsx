@@ -264,9 +264,9 @@ function ProspectTable({ prospects, today, showCountry, onOpen }: { prospects: P
           </tr>
         </thead>
         <tbody>
-          {prospects.map((p) => (
+          {prospects.map((p, i) => (
             <tr key={p.id} className={st(p.stage)} onClick={() => onOpen(p.id)}>
-              <td className="pr-c-num">{p.sheet?.num ?? ''}</td>
+              <td className="pr-c-num">{i + 1}</td>
               <th className="pr-c-biz" scope="row"><button type="button" onClick={(e) => { e.stopPropagation(); onOpen(p.id) }}>{p.name}</button></th>
               {showCountry && <td>{p.sheet?.country ?? 'Not in the Sheet'}</td>}
               {COLS.map((c) => <td key={c.h} className={c.cls} title={c.title?.(p)}>{c.cell(p, today)}</td>)}

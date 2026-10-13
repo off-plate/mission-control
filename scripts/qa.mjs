@@ -5046,7 +5046,7 @@ await step('people, business: the Sheet table, old lanes migrate, who-to-write s
   const heads = (await page.locator('.pr-grid thead th').allInnerTexts()).join('|')
   if (!heads.startsWith('#|Business|Country|Niche|Location|Google rating|Google reviews|Domain|Website problem|Social / ads problem|Date|Status|Notes|Finance|Finance priority|Next step|Value|Reply')) throw new Error(`columns: ${heads}`)
   const first = await page.locator('.pr-grid tbody tr').first().innerText()
-  if (!/^7\s+Gate Sheet Row[\s\S]*Gate niche[\s\S]*Brno[\s\S]*Audit to review/.test(first)) throw new Error(`the Sheet row: ${first.replace(/\s+/g, ' ')}`)
+  if (!/^1\s+Gate Sheet Row[\s\S]*Gate niche[\s\S]*Brno[\s\S]*Audit to review/.test(first)) throw new Error(`the Sheet row: ${first.replace(/\s+/g, ' ')}`)
   /* Cards saved with the old five lanes read as Sheet statuses. */
   const chips = await page.locator('.pr-grid tbody .pr-chip').allInnerTexts()
   if (chips.filter((c) => c === 'Contacted').length !== 3) throw new Error(`old contacted lane not migrated: ${chips}`)

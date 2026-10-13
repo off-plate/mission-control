@@ -206,7 +206,8 @@ export function applySheet(prospects: Prospect[], rows: SheetRow[], now = Date.n
     const sheet: ProspectSheetRow = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== '' && v != null)) as unknown as ProspectSheetRow
     const d = domain ? cleanDomain(domain) : ''
     const st = status?.trim()
-    const i = next.findIndex((p) => p === matchRow(next, r))
+    const hit = matchRow(next, r)
+    const i = hit ? next.indexOf(hit) : -1
     if (i < 0) {
       const id = sheetId(r)
       if (buried(id)) continue

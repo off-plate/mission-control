@@ -1,52 +1,91 @@
 /* PEOPLE, BUSINESS VIEW (his ask, 2026-10-04). The circle is for his personal
-   life; this is every business he is reaching out to, as a list or as his
-   Obsidian CRM board's five lanes, with one card per business holding its
-   people, every touch and what he sent.
+   life; this is every business he is reaching out to, with one card per
+   business holding its people, every touch and what he sent.
+
+   2026-10-13, his ask: it mirrors the Off-Plate Prospects Sheet. The list is
+   the Sheet as a table, its columns in its order, every row of every tab, and
+   the statuses are the Sheet's. /eco-sync sends the whole Sheet each run
+   (prospectcalc applySheet); the Sheet is the master for its columns.
 
    Next step, days since the last touch and reply odds are worked out on every
    render (src/prospectcalc.ts) and never stored. Value is his own number. */
-import { useEffect, useRef, useState, type DragEvent } from 'react'
+import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { useStore } from './store'
 import { Segmented, Select } from './ui'
 import { localDateKey } from './util'
 import { AVOID_DAYS } from './exceptions'
-import { STAGES, SOURCES, STEPS, age, cleanDomain, isOpen, isReady, label, nextStep, replyOdds } from './prospectcalc'
-import type { Prospect, ProspectLinks, ProspectPerson, ProspectSource, ProspectStage, TouchStep } from './types'
+import { LOST, STAGES, SOURCES, STEPS, TALKING, WON, age, cleanDomain, inSequence, isOpen, isReady, label, nextStep, replyOdds, stageRank } from './prospectcalc'
+import type { Prospect, ProspectLinks, ProspectPerson, ProspectSheetRow, ProspectSource, ProspectStage, TouchStep } from './types'
 
 type Layout = 'list' | 'board'
 const LAYOUT_KEY = 'mc-business-layout'
 
+/* Colour family of a status: the five lane colours the view already had.
+   Everything before the first email is prep, the sequence is outreach, a
+   reply is a conversation. */
+type Phase = 'reach' | 'contacted' | 'talking' | 'won' | 'lost'
+export function phase(s: ProspectStage): Phase {
+  if (s === LOST) return 'lost'
+  if (s === WON) return 'won'
+  if (s === TALKING || s === 'Responded waiting') return 'talking'
+  return stageRank(s) >= stageRank('Contacted') ? 'contacted' : 'reach'
+}
+const st = (s: ProspectStage) => `st-${phase(s)}`
+/** Every status in order, plus any he added to the Sheet that this build does not know. */
+const allStages = (list: Prospect[]): ProspectStage[] =>
+  [...new Set([...STAGES.map((s) => s.id), ...list.map((p) => p.stage)])].sort((a, b) => stageRank(a) - stageRank(b))
+
 /* FILTERS (his ask, 2026-10-04: "the filtration, like Nexus does it").
-   one live search plus stage, source and sort dropdowns, remembered per
-   device. Counts in each dropdown respect the other filters, so a number is
-   always what picking it would show. */
-type Sort = 'value' | 'odds' | 'age' | 'name'
-interface Filters { q: string; stage: ProspectStage | ''; source: ProspectSource | ''; sort: Sort }
+   one live search plus country, status, source and sort dropdowns, remembered
+   per device. Counts in each dropdown respect the other filters, so a number
+   is always what picking it would show. */
+type Sort = 'sheet' | 'today' | 'value' | 'odds' | 'age' | 'name'
+type Skip = 'stage' | 'source' | 'country'
+interface Filters { q: string; country: string; stage: ProspectStage | ''; source: ProspectSource | ''; sort: Sort }
 const FILTER_KEY = 'mc-business-filters'
-const NO_FILTERS: Filters = { q: '', stage: '', source: '', sort: 'age' }
-const fold = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+const NO_FILTERS: Filters = { q: '', country: '', stage: '', source: '', sort: 'sheet' }
+/** Cards that are not in the Sheet: friends, inbound, active clients. */
+const NOT_IN_SHEET = '-'
+const fold = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const SORTS: { value: Sort; label: string }[] = [
+  { value: 'sheet', label: 'Sheet order' }, { value: 'today', label: 'Who to write today' },
   { value: 'age', label: 'Waiting longest' }, { value: 'value', label: 'Value' },
   { value: 'odds', label: 'Reply odds' }, { value: 'name', label: 'Name' },
 ]
+/* The old grouped list's order, kept as a sort: replies first, then everyone
+   whose 2 days have passed, then the rest of the sequence, then prep, then
+   the conversations, acquired and lost. */
+function todayRank(p: Prospect, today: string): number {
+  if (isOpen(p) && p.replied) return 0
+  if (isOpen(p) && isReady(p, today)) return 1
+  if (isOpen(p) && inSequence(p)) return 2
+  if (isOpen(p)) return 3
+  return 4 + ['talking', 'won', 'lost'].indexOf(phase(p.stage))
+}
 function sorter(sort: Sort, today: string): (a: Prospect, b: Prospect) => number {
   if (sort === 'value') return (a, b) => (b.value ?? -1) - (a.value ?? -1)
   if (sort === 'odds') return (a, b) => (replyOdds(b) ?? -1) - (replyOdds(a) ?? -1)
   if (sort === 'name') return (a, b) => a.name.localeCompare(b.name)
+  if (sort === 'today') return (a, b) => todayRank(a, today) - todayRank(b, today) || age(b, today).days - age(a, today).days
+  if (sort === 'sheet') return (a, b) => (a.sheet?.row ?? Infinity) - (b.sheet?.row ?? Infinity) || a.name.localeCompare(b.name)
   return (a, b) => age(b, today).days - age(a, today).days
 }
-function matches(p: Prospect, f: Filters, skip?: 'stage' | 'source'): boolean {
+const countryOf = (p: Prospect) => p.sheet?.country ?? NOT_IN_SHEET
+function matches(p: Prospect, f: Filters, skip?: Skip): boolean {
   if (skip !== 'stage' && f.stage && p.stage !== f.stage) return false
   if (skip !== 'source' && f.source && p.source !== f.source) return false
+  if (skip !== 'country' && f.country && countryOf(p) !== f.country) return false
   if (!f.q.trim()) return true
-  const hay = fold([p.name, p.domain, ...p.people.map((x) => x.name)].filter(Boolean).join(' '))
+  const s = p.sheet
+  const hay = fold([p.name, p.domain, s?.niche, s?.location, s?.notes, p.notes, ...p.people.map((x) => x.name)].filter(Boolean).join(' '))
   return fold(f.q.trim()).split(/\s+/).every((w) => hay.includes(w))
 }
 
 /* The filters sit in the bar itself, the Personal bar's own pieces (his ask,
    2026-10-04): its search box and its dropdowns, no chip rows. */
 function FilterTools({ f, set, all }: { f: Filters; set: (f: Filters) => void; all: Prospect[] }) {
-  const count = (skip: 'stage' | 'source', extra: (p: Prospect) => boolean) => all.filter((p) => matches(p, f, skip) && extra(p)).length
+  const count = (skip: Skip, extra: (p: Prospect) => boolean) => all.filter((p) => matches(p, f, skip) && extra(p)).length
+  const countries = [...new Set(all.map(countryOf))].sort((a, b) => (a === NOT_IN_SHEET ? 1 : b === NOT_IN_SHEET ? -1 : 0))
   return (
     <>
       <div className="pp-search">
@@ -57,12 +96,22 @@ function FilterTools({ f, set, all }: { f: Filters; set: (f: Filters) => void; a
           onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); if (f.q) set({ ...f, q: '' }); else e.currentTarget.blur() } }}
         />
       </div>
+      {countries.length > 1 && (
+        <Select
+          className="pp-dd pp-circle-pick" ariaLabel="Country" value={f.country}
+          onChange={(country) => set({ ...f, country })}
+          options={[
+            { value: '', label: `All countries (${count('country', () => true)})` },
+            ...countries.map((c) => ({ value: c, label: `${c === NOT_IN_SHEET ? 'Not in the Sheet' : c} (${count('country', (p) => countryOf(p) === c)})` })),
+          ]}
+        />
+      )}
       <Select
-        className="pp-dd pp-circle-pick" ariaLabel="Stage" value={f.stage}
-        onChange={(v) => set({ ...f, stage: v as ProspectStage | '' })}
+        className="pp-dd pp-circle-pick" ariaLabel="Status" value={f.stage}
+        onChange={(v) => set({ ...f, stage: v })}
         options={[
-          { value: '', label: `All stages (${count('stage', () => true)})` },
-          ...STAGES.map((s) => ({ value: s.id, label: `${s.label} (${count('stage', (p) => p.stage === s.id)})` })),
+          { value: '', label: `All statuses (${count('stage', () => true)})` },
+          ...allStages(all).map((s) => ({ value: s, label: `${s} (${count('stage', (p) => p.stage === s)})` })),
         ]}
       />
       <Select
@@ -89,7 +138,8 @@ function nextLabel(p: Prospect): string {
   const n = nextStep(p)
   if (n === 'callOrVisit') return 'Call or visit'
   if (n) return label(STEPS, n)
-  return p.stage === 'contacted' ? 'Sequence done' : p.stage === 'talking' ? 'Their move' : label(STAGES, p.stage)
+  if (!inSequence(p) && isOpen(p)) return '-'
+  return p.stage === TALKING ? 'Their move' : isOpen(p) ? 'Sequence done' : p.stage
 }
 function ageLabel(p: Prospect, today: string): { t: string; stale: boolean } {
   const a = age(p, today)
@@ -109,16 +159,23 @@ export function BusinessView({ modeSwitch }: { modeSwitch: JSX.Element }) {
   const [openId, setOpenId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const open = openId ? prospects.find((p) => p.id === openId) : undefined
-  const [f, setF] = useState<Filters>(() => { try { return { ...NO_FILTERS, ...JSON.parse(localStorage.getItem(FILTER_KEY) ?? '{}') } } catch { return NO_FILTERS } })
+  const [f, setF] = useState<Filters>(() => {
+    try {
+      const saved = { ...NO_FILTERS, ...JSON.parse(localStorage.getItem(FILTER_KEY) ?? '{}') } as Filters
+      /* Filters saved before the Sheet statuses hold an old lane id. */
+      return { ...saved, stage: STAGES.some((s) => s.id === saved.stage) ? saved.stage : '', sort: SORTS.some((s) => s.value === saved.sort) ? saved.sort : 'sheet' }
+    } catch { return NO_FILTERS }
+  })
   useEffect(() => { try { localStorage.setItem(FILTER_KEY, JSON.stringify(f)) } catch { /* private mode */ } }, [f])
   const shown = prospects.filter((p) => matches(p, f)).sort(sorter(f.sort, today))
+  const showCountry = !f.country && new Set(prospects.map(countryOf)).size > 1
 
   return (
     <div className="pp-page pr-page">
       <div className="pr-bar" role="toolbar" aria-label="People">
         <h1 className="pp-h1">People</h1>
         {modeSwitch}
-        <Segmented size="sm" label="Layout" value={layout} onPick={setLayout} options={[{ id: 'list', label: 'List' }, { id: 'board', label: 'Board' }]} />
+        <Segmented size="sm" label="Layout" value={layout} onPick={setLayout} options={[{ id: 'list', label: 'Table' }, { id: 'board', label: 'Board' }]} />
         {prospects.length > 0 && <FilterTools f={f} set={setF} all={prospects} />}
         <button className="btn btn-primary pp-add" type="button" onClick={() => setAdding(true)} aria-label="Add prospect">
           <svg width="13" height="13" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
@@ -138,11 +195,11 @@ export function BusinessView({ modeSwitch }: { modeSwitch: JSX.Element }) {
           <button className="btn btn-quiet" type="button" onClick={() => setF({ ...NO_FILTERS, sort: f.sort })}>Clear filters</button>
         </div>
       ) : layout === 'list' ? (
-        <ProspectList prospects={shown} today={today} onOpen={setOpenId} />
+        <ProspectTable prospects={shown} today={today} showCountry={showCountry} onOpen={setOpenId} />
       ) : (
         <ProspectBoard
-          prospects={shown} stages={f.stage ? [f.stage] : undefined} today={today} onOpen={setOpenId}
-          onMove={(id, stage) => { updateProspect(id, { stage }); if (stage === 'lost') setOpenId(id) }}
+          prospects={shown} stages={f.stage ? [f.stage] : allStages(prospects)} today={today} onOpen={setOpenId}
+          onMove={(id, stage) => { updateProspect(id, { stage }); if (stage === LOST) setOpenId(id) }}
         />
       )}
 
@@ -162,56 +219,61 @@ function Meter({ n, kind, none = 'unset' }: { n: number | null | undefined; kind
   return <span className={`pr-score is-${kind}`}><b>{n}</b><i><s style={{ transform: `scaleX(${Math.max(0.001, n / 100)})` }} /></i></span>
 }
 
-function ProspectList({ prospects, today, onOpen }: { prospects: Prospect[]; today: string; onOpen: (id: string) => void }) {
-  /* Arrives already filtered and sorted (FilterTools); the groups keep that order. */
-  /* The Gmail sync's answer to "who do I write to today": replies first,
-     then everyone whose 2 days have passed, then the rest of the sequence. */
-  const open = prospects.filter(isOpen)
-  const replied = open.filter((p) => p.replied)
-  const ready = open.filter((p) => !p.replied && isReady(p, today))
-  const groups: { title: string; rows: Prospect[]; fold?: boolean }[] = [
-    { title: 'Replied', rows: replied },
-    { title: 'Next step ready', rows: ready },
-    { title: 'Waiting', rows: open.filter((p) => !p.replied && !ready.includes(p) && p.stage === 'contacted') },
-    { title: 'To reach out', rows: open.filter((p) => !p.replied && p.stage === 'reach') },
-    { title: 'In conversation', rows: prospects.filter((p) => p.stage === 'talking') },
-    { title: 'Acquired', rows: prospects.filter((p) => p.stage === 'won'), fold: true },
-    { title: 'Lost', rows: prospects.filter((p) => p.stage === 'lost'), fold: true },
-  ].filter((g) => g.rows.length)
-  const row = (p: Prospect) => {
-    const a = ageLabel(p, today)
-    return (
-      <li key={p.id}>
-        <button className={`pr-row st-${p.stage}`} type="button" onClick={() => onOpen(p.id)}>
-          <span className="pr-biz"><b>{p.name}</b><span>{p.domain}{p.domain ? ' ' : ''}<span className="pr-src">{label(SOURCES, p.source)}</span></span></span>
-          <span className="pr-stage"><span className="pr-chip">{label(STAGES, p.stage)}</span></span>
-          <span className="pr-next"><span>{p.stage === 'lost' ? (p.lostReason || 'No reason written') : nextLabel(p)}</span><span className={`pr-age${a.stale ? ' is-stale' : ''}`}>{a.t}</span></span>
-          <Meter n={p.value} kind="value" />
-          <Meter n={replyOdds(p)} kind="odds" none={p.stage === 'talking' ? 'replied' : ''} />
-        </button>
-      </li>
-    )
-  }
+/* THE TABLE (his ask, 2026-10-13: "a table like the Sheet, like Excel or
+   Google Sheets"). The Sheet's columns in the Sheet's order, then the three
+   Mission Control works out. Row numbers and the business stay pinned while
+   the rest scrolls sideways, the header stays pinned while it scrolls down.
+   A cell shows one line; the card shows all of it. */
+type Col = { h: string; cls?: string; cell: (p: Prospect, today: string) => ReactNode; title?: (p: Prospect) => string | undefined }
+const sheetCol = (h: string, k: keyof ProspectSheetRow, cls?: string): Col => ({ h, cls, cell: (p) => p.sheet?.[k] ?? '', title: (p) => String(p.sheet?.[k] ?? '') || undefined })
+const COLS: Col[] = [
+  sheetCol('Niche', 'niche'),
+  sheetCol('Location', 'location'),
+  sheetCol('Google rating', 'rating', 'is-n'),
+  sheetCol('Google reviews', 'reviews', 'is-n'),
+  { h: 'Domain', cell: (p) => p.domain ? <a href={`https://${p.domain}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{p.domain}</a> : '' },
+  sheetCol('Website problem', 'webProblem', 'is-wide'),
+  sheetCol('Social / ads problem', 'socialProblem', 'is-wide'),
+  sheetCol('Date', 'date'),
+  { h: 'Status', cell: (p) => <span className={`pr-chip ${st(p.stage)}`}>{p.stage === LOST && p.lostReason ? `${p.stage}: ${p.lostReason}` : p.stage}</span> },
+  sheetCol('Notes', 'notes', 'is-wide'),
+  sheetCol('Finance', 'finance', 'is-wide'),
+  sheetCol('Finance priority', 'financePriority'),
+  { h: 'Next step', cls: 'is-next', cell: (p, today) => { const a = ageLabel(p, today); return <><span>{nextLabel(p)}</span> <span className={`pr-age${a.stale ? ' is-stale' : ''}`}>{a.t}</span></> } },
+  { h: 'Value', cell: (p) => <Meter n={p.value} kind="value" none="-" /> },
+  { h: 'Reply', cell: (p) => <Meter n={replyOdds(p)} kind="odds" none={p.stage === TALKING ? 'replied' : '-'} /> },
+]
+
+function ProspectTable({ prospects, today, showCountry, onOpen }: { prospects: Prospect[]; today: string; showCountry: boolean; onOpen: (id: string) => void }) {
+  /* Arrives already filtered and sorted (FilterTools). */
   return (
-    <div className="pr-list">
-      <div className="pr-row is-head" aria-hidden="true"><span>Business</span><span className="pr-stage">Stage</span><span className="pr-next">Next step</span><span>Value</span><span>Reply</span></div>
-      {groups.map((g) => g.fold ? (
-        <details key={g.title} className="pr-group">
-          <summary>{g.title} <span className="mono">{g.rows.length}</span></summary>
-          <ul>{g.rows.map(row)}</ul>
-        </details>
-      ) : (
-        <section key={g.title} className="pr-group">
-          <h2>{g.title} <span className="mono">{g.rows.length}</span></h2>
-          <ul>{g.rows.map(row)}</ul>
-        </section>
-      ))}
+    <div className="pr-sheetwrap">
+      <table className="pr-grid">
+        <thead>
+          <tr>
+            <th className="pr-c-num" scope="col">#</th>
+            <th className="pr-c-biz" scope="col">Business</th>
+            {showCountry && <th scope="col">Country</th>}
+            {COLS.map((c) => <th key={c.h} scope="col" className={c.cls}>{c.h}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {prospects.map((p) => (
+            <tr key={p.id} className={st(p.stage)} onClick={() => onOpen(p.id)}>
+              <td className="pr-c-num">{p.sheet?.num ?? ''}</td>
+              <th className="pr-c-biz" scope="row"><button type="button" onClick={(e) => { e.stopPropagation(); onOpen(p.id) }}>{p.name}</button></th>
+              {showCountry && <td>{p.sheet?.country ?? 'Not in the Sheet'}</td>}
+              {COLS.map((c) => <td key={c.h} className={c.cls} title={c.title?.(p)}>{c.cell(p, today)}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
 
 function ProspectBoard({ prospects, stages, today, onOpen, onMove }: {
-  prospects: Prospect[]; stages?: ProspectStage[]; today: string; onOpen: (id: string) => void; onMove: (id: string, stage: ProspectStage) => void
+  prospects: Prospect[]; stages: ProspectStage[]; today: string; onOpen: (id: string) => void; onMove: (id: string, stage: ProspectStage) => void
 }) {
   const [over, setOver] = useState<ProspectStage | null>(null)
   const drop = (stage: ProspectStage) => (e: DragEvent) => {
@@ -221,15 +283,15 @@ function ProspectBoard({ prospects, stages, today, onOpen, onMove }: {
   }
   return (
     <div className="pr-boardwrap">
-      <div className="pr-board" style={stages ? { gridTemplateColumns: `repeat(${stages.length}, minmax(260px, 420px))`, minWidth: 0 } : undefined}>
-        {STAGES.filter((s) => !stages || stages.includes(s.id)).map((s) => {
-          const rows = prospects.filter((p) => p.stage === s.id)
+      <div className="pr-board" style={{ gridTemplateColumns: `repeat(${stages.length}, minmax(230px, ${stages.length === 1 ? '420px' : '1fr'}))`, minWidth: stages.length === 1 ? 0 : stages.length * 242 }}>
+        {stages.map((s) => {
+          const rows = prospects.filter((p) => p.stage === s)
           return (
             <section
-              key={s.id} className={`pr-col st-${s.id}${over === s.id ? ' is-over' : ''}`} aria-label={s.label}
-              onDragOver={(e) => { e.preventDefault(); setOver(s.id) }} onDragLeave={() => setOver(null)} onDrop={drop(s.id)}
+              key={s} className={`pr-col ${st(s)}${over === s ? ' is-over' : ''}`} aria-label={s}
+              onDragOver={(e) => { e.preventDefault(); setOver(s) }} onDragLeave={() => setOver(null)} onDrop={drop(s)}
             >
-              <h2>{s.label} <span className="mono">{rows.length}</span></h2>
+              <h2>{s} <span className="mono">{rows.length}</span></h2>
               {rows.map((p) => {
                 const a = ageLabel(p, today)
                 const odds = replyOdds(p)
@@ -239,7 +301,7 @@ function ProspectBoard({ prospects, stages, today, onOpen, onMove }: {
                     onDragStart={(e) => { e.dataTransfer.setData('text/prospect', p.id); e.dataTransfer.effectAllowed = 'move' }}
                   >
                     <b>{p.name}</b>
-                    {p.stage === 'lost'
+                    {p.stage === LOST
                       ? <span className="pr-lost">{p.lostReason || 'No reason written'}</span>
                       : <span className={`pr-age${a.stale ? ' is-stale' : ''}`}>{nextLabel(p)}, {a.t}</span>}
                     <span className="pr-pmeta mono"><span>Value {p.value ?? '-'}</span>{odds != null && <span>Reply {odds}</span>}</span>
@@ -287,11 +349,12 @@ function ProspectCard({ p, today, onClose }: { p: Prospect; today: string; onClo
   const unanswered = isOpen(p) ? p.touches.length : 0
   const touches = [...p.touches].sort((a, b) => a.day.localeCompare(b.day))
   const lostRef = useRef<HTMLDivElement>(null)
-  useEffect(() => { if (p.stage === 'lost' && !p.lostReason) lostRef.current?.querySelector('input')?.focus() }, [p.stage, p.lostReason])
+  useEffect(() => { if (p.stage === LOST && !p.lostReason) lostRef.current?.querySelector('input')?.focus() }, [p.stage, p.lostReason])
+  const ph = phase(p.stage)
 
   return (
     <div className="pp-scrim pr-scrim" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <aside className={`pp-card is-open pr-sheet st-${p.stage}`} aria-label={p.name}>
+      <aside className={`pp-card is-open pr-sheet ${st(p.stage)}`} aria-label={p.name}>
         <div className="pp-card-scroll">
           <div className="pp-card-top">
             <div className="pp-card-names">
@@ -303,30 +366,31 @@ function ProspectCard({ p, today, onClose }: { p: Prospect; today: string; onClo
             </button>
           </div>
 
-          {/* Where this business is in the pipeline, in its stage's colour. */}
-          {p.stage !== 'lost' && (
-            <div className="pr-stepper" aria-label={`Stage: ${label(STAGES, p.stage)}`}>
-              {STAGES.filter((s) => s.id !== 'lost').map((s, i, all) => (
-                <span key={s.id} className={i <= all.findIndex((x) => x.id === p.stage) ? 'is-on' : ''}><i />{s.label}</span>
+          {/* Where this business is, in its status's colour: the Sheet's
+              fourteen statuses read as four phases here. */}
+          {ph !== 'lost' && (
+            <div className="pr-stepper" aria-label={`Status: ${p.stage}`}>
+              {PHASES.map((x, i) => (
+                <span key={x.id} className={i <= PHASES.findIndex((y) => y.id === ph) ? 'is-on' : ''}><i />{x.label}</span>
               ))}
             </div>
           )}
           <div className="pr-scores">
             <div><span>Value</span><Field className="pp-inline pr-big" type="number" label="Value, 0 to 100" placeholder="-" value={p.value != null ? String(p.value) : ''}
               onCommit={(v) => { const n = Math.round(Number(v)); set({ value: v === '' || !Number.isFinite(n) ? undefined : Math.max(0, Math.min(100, n)) }) }} /></div>
-            <div><span>Reply odds</span><b className="pr-big">{odds ?? (p.stage === 'talking' ? 'replied' : '-')}</b>
+            <div><span>Reply odds</span><b className="pr-big">{odds ?? (p.stage === TALKING ? 'replied' : '-')}</b>
               {odds != null && <small>{label(SOURCES, p.source)}{decider ? ', decider +10' : ''}{unanswered ? `, ${unanswered} unanswered -${unanswered * 10}` : ''}</small>}</div>
           </div>
 
           <div className="pp-row2">
-            <div className="pp-field"><span>Stage</span>
-              <Select className="pp-dd" ariaLabel="Stage" value={p.stage} onChange={(stage) => set({ stage })} options={STAGES.map((s) => ({ value: s.id, label: s.label }))} />
+            <div className="pp-field"><span>Status</span>
+              <Select className="pp-dd" ariaLabel="Status" value={p.stage} onChange={(stage) => set({ stage })} options={allStages([p]).map((s) => ({ value: s, label: s }))} />
             </div>
             <div className="pp-field"><span>Source</span>
               <Select className="pp-dd" ariaLabel="Source" value={p.source} onChange={(source) => set({ source })} options={SOURCES.map((s) => ({ value: s.id, label: s.label }))} />
             </div>
           </div>
-          {p.stage === 'lost' && (
+          {p.stage === LOST && (
             <div className="pp-field" ref={lostRef}><span>Why it was lost</span>
               <Field label="Why it was lost" placeholder="No budget until spring" value={p.lostReason ?? ''} onCommit={(v) => set({ lostReason: v || undefined })} />
             </div>
@@ -337,11 +401,13 @@ function ProspectCard({ p, today, onClose }: { p: Prospect; today: string; onClo
               {p.replied.subject && <span className="pr-subject">{p.replied.subject}</span>}
               {p.replied.body && <details><summary>Show the reply</summary><p>{p.replied.body}</p></details>}
               <div className="pr-replied-actions">
-                <button className="btn btn-primary" type="button" onClick={() => set({ stage: 'talking', replied: undefined })}>Move to In conversation</button>
+                <button className="btn btn-primary" type="button" onClick={() => set({ stage: TALKING, replied: undefined })}>Move to In conversation</button>
                 <button className="btn btn-quiet" type="button" onClick={() => set({ replied: undefined })}>Not a real reply</button>
               </div>
             </div>
           )}
+
+          {p.sheet && <SheetFacts s={p.sheet} />}
 
           <Links links={p.links ?? {}} onSet={(links) => set({ links: Object.values(links).some(Boolean) ? links : undefined })} />
 
@@ -408,6 +474,31 @@ function ProspectCard({ p, today, onClose }: { p: Prospect; today: string; onClo
         </div>
       </aside>
     </div>
+  )
+}
+
+const PHASES: { id: Phase; label: string }[] = [
+  { id: 'reach', label: 'Prep' }, { id: 'contacted', label: 'Outreach' }, { id: 'talking', label: 'Replied' }, { id: 'won', label: 'Acquired' },
+]
+
+/* The Sheet's columns for this business, read-only: the Sheet is the master,
+   so they are changed there and arrive with the next /eco-sync. */
+const FACTS: { k: keyof ProspectSheetRow; label: string }[] = [
+  { k: 'country', label: 'Country' }, { k: 'niche', label: 'Niche' }, { k: 'location', label: 'Location' },
+  { k: 'rating', label: 'Google rating' }, { k: 'reviews', label: 'Google reviews' }, { k: 'date', label: 'Date' },
+  { k: 'webProblem', label: 'Website problem' }, { k: 'socialProblem', label: 'Social / ads problem' },
+  { k: 'notes', label: 'Notes' }, { k: 'finance', label: 'Finance' }, { k: 'financePriority', label: 'Finance priority' },
+]
+function SheetFacts({ s }: { s: ProspectSheetRow }) {
+  return (
+    <section className="pp-section">
+      <h3>From the Sheet</h3>
+      <dl className="pr-facts">
+        {FACTS.filter((f) => s[f.k] !== undefined && s[f.k] !== '').map((f) => (
+          <div key={f.k}><dt>{f.label}</dt><dd>{String(s[f.k])}</dd></div>
+        ))}
+      </dl>
+    </section>
   )
 }
 

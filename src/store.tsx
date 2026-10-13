@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { SUPABASE_ENABLED, deleteRemoteState, loadRemoteState, readOutreachEvents, stampOutreachEvents } from './supabase'
+import { SUPABASE_ENABLED, deleteRemoteState, loadRemoteState, readOutreachEvents, readProspectSheet, stampOutreachEvents, stampProspectSheet } from './supabase'
 import { outbox } from './sync'
 
 /* Two blobs are the same work if they differ only in when they were saved.
@@ -28,7 +28,7 @@ import { useIdeaBoardSlice, type IdeaBoardSlice } from './store/ideaboard'
 import { usePromptsSlice, type PromptsSlice } from './store/prompts'
 import { usePeopleSlice, type PeopleSlice } from './store/people'
 import { useProspectsSlice, type ProspectsSlice } from './store/prospects'
-import type { OutreachEvent } from './prospectcalc'
+import type { OutreachEvent, SheetRow } from './prospectcalc'
 import { useGymSlice, type GymSlice } from './store/gym'
 import { useConnectionsSlice } from './store/connections'
 import { useCoachSlice } from './store/coach'
@@ -990,7 +990,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const events = await readOutreachEvents<OutreachEvent>()
       if (events?.length) await stampOutreachEvents(applyOutreachRef.current(events))
     } catch { /* next pull */ }
+    /* Then the Sheet itself (his ask, 2026-10-13): every row, every tab. A card
+       he deleted here stays deleted. */
+    try {
+      const sheet = await readProspectSheet<SheetRow>()
+      if (!sheet) return
+      const dead = new Set(graveyardRef.current.filter((t) => !t.undone).map((t) => t.k))
+      applySheetRef.current(sheet.rows ?? [], (id) => dead.has(`prospects:${id}`))
+      await stampProspectSheet(sheet.synced_at)
+    } catch { /* next pull */ }
   }
+  const applySheetRef = useRef(prospectsSlice.applySheetRows)
+  applySheetRef.current = prospectsSlice.applySheetRows
+  const graveyardRef = useRef(graveyard)
+  graveyardRef.current = graveyard
   const gymSlice = useGymSlice(persisted, { armUndo, bury, digUp })
   const { gymGoals, setGymGoals } = gymSlice
   const growthSlice = useGrowthSlice(persisted, { space, armUndo, bury, digUp, setPageState })

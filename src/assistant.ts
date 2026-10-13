@@ -22,6 +22,7 @@
 
 import { activeModel, getAiKey, request, stripReasoning } from './ai'
 import { getTtsKey, hasTtsKey } from './speech'
+import { STAGES, normStage } from './prospectcalc'
 import type { ProspectSource, ProspectStage, ContactChannel, GoalCategory, GoalTimeframe, GymMetric, HabitFrequency, PageId, PersonTier, PromptKind, RoutineCadence } from './types'
 
 /** What a card shows. The app owns every one of these; the model only names one. */
@@ -97,7 +98,13 @@ const TF = oneOf(['weekly', 'monthly', 'quarter', 'half'])
 const GCAT = oneOf(['money', 'health', 'life', 'work', 'offplate', 'habits'])
 const CHANNEL = oneOf(['inperson', 'call', 'message', 'video', 'email'])
 const PSOURCE = oneOf(['found', 'inbound', 'friend', 'referral', 'met'])
-const PSTAGE = oneOf(['reach', 'contacted', 'talking', 'won', 'lost'])
+/* The Sheet statuses (prospectcalc STAGES); a model writing "contacted" or an
+   old lane name still lands on the right one. */
+const PSTAGE: V = (v) => {
+  if (typeof v !== 'string') return undefined
+  const s = normStage(v.trim())
+  return STAGES.find((x) => x.id.toLowerCase() === s.toLowerCase())?.id
+}
 const PKIND = oneOf(['Idea', 'Bug', 'Update', 'Version'])
 const METRIC = oneOf(['e1rm', 'repTotal', 'sessions', 'manual'])
 /** Every real page he can be sent to. 'day' has its own action, since it
@@ -173,7 +180,7 @@ const KINDS = {
   deletePerson: { d: 'remove a person', need: ['match'], f: { match: S } },
   // People > Business: businesses he is reaching out to. contact/role/email/phone/decides add or update one person there.
   addProspect: { d: 'new business he is reaching out to; source found|inbound|friend|referral|met (friend of a friend = referral)', need: ['name', 'source'], f: { name: str(120), domain: str(120), source: PSOURCE, value: num(0, 100, true), why: str(200), contact: str(120), role: str(80), email: str(160), phone: str(40), decides: BOOL } },
-  editProspect: { d: 'change a prospect; stage reach|contacted|talking|won|lost; value 0-100 only when he gave one', need: ['match'], any: ['name', 'domain', 'source', 'stage', 'value', 'why', 'lostReason', 'contact'], f: { match: S, name: str(120), domain: str(120), source: PSOURCE, stage: PSTAGE, value: num(0, 100, true), why: str(200), lostReason: str(200), contact: str(120), role: str(80), email: str(160), phone: str(40), decides: BOOL } },
+  editProspect: { d: 'change a prospect; stage = a Sheet status (Prospect, Audit to create, Email to prepare, Contacted, 1st reminder sent, Responded waiting...) or In conversation|Acquired|Lost; value 0-100 only when he gave one', need: ['match'], any: ['name', 'domain', 'source', 'stage', 'value', 'why', 'lostReason', 'contact'], f: { match: S, name: str(120), domain: str(120), source: PSOURCE, stage: PSTAGE, value: num(0, 100, true), why: str(200), lostReason: str(200), contact: str(120), role: str(80), email: str(160), phone: str(40), decides: BOOL } },
   touch: { d: 'log an outreach step on a prospect: step work|reminder|personal (emails), call, visit; subject and body = what he sent, word for word', need: ['match', 'step'], f: { match: S, step: oneOf(['work', 'reminder', 'personal', 'call', 'visit']), date: DATE, to: str(120), subject: str(200), body: str(4000) } },
   contact: { d: 'log that he was in touch with someone (default in person, today)', need: ['match'], f: { match: S, channel: CHANNEL, date: DATE } },
   // Money (Bills, this cycle only)

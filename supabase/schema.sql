@@ -73,3 +73,28 @@ create policy mc_outreach_events_stamp
   on mc_outreach_events for update to authenticated
   using (owner = auth.uid())
   with check (owner = auth.uid());
+
+-- The Off-Plate Prospects Sheet, every tab (2026-10-13). /eco-sync (Jarvis) sends
+-- the whole Sheet through outreach-ingest, which keeps one snapshot per owner.
+-- The app applies it to People > Business (prospectcalc applySheet) and stamps
+-- applied_at; a new /eco-sync run clears the stamp. Only the function writes
+-- rows (service role); he can read and stamp his own.
+create table if not exists mc_prospect_sheet (
+  owner      uuid primary key references auth.users (id) on delete cascade,
+  rows       jsonb not null,
+  synced_at  timestamptz not null default now(),
+  applied_at timestamptz
+);
+
+alter table mc_prospect_sheet enable row level security;
+
+drop policy if exists mc_prospect_sheet_read on mc_prospect_sheet;
+create policy mc_prospect_sheet_read
+  on mc_prospect_sheet for select to authenticated
+  using (owner = auth.uid());
+
+drop policy if exists mc_prospect_sheet_stamp on mc_prospect_sheet;
+create policy mc_prospect_sheet_stamp
+  on mc_prospect_sheet for update to authenticated
+  using (owner = auth.uid())
+  with check (owner = auth.uid());

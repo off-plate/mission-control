@@ -5007,19 +5007,20 @@ await step('people, business: add a prospect, log the work email, the next step 
   const odds = await page.locator('.pr-scores b.pr-big').innerText()
   if (odds !== '15') throw new Error(`reply odds after one unanswered email from a found lead with a decider: ${odds}`)
   await page.keyboard.press('Escape'); await page.waitForTimeout(300)
-  const row = await page.locator('.pr-row:not(.is-head)').first().innerText()
+  const row = await page.locator('.pr-grid tbody tr').first().innerText()
   if (!/Contacted/.test(row) || !/Reminder/.test(row)) throw new Error(`the row did not move on: ${row.replace(/\n/g, ' | ')}`)
   await page.getByRole('group', { name: 'Layout' }).getByRole('button', { name: 'Board' }).click(); await page.waitForTimeout(300)
-  if ((await page.locator('.pr-col').count()) !== 5) throw new Error('the board does not have the five vault lanes')
+  /* The Sheet's fourteen statuses, then In conversation, Acquired, Lost (2026-10-13). */
+  if ((await page.locator('.pr-col').count()) !== 17) throw new Error(`the board has ${await page.locator('.pr-col').count()} lanes, not the Sheet statuses plus three`)
   await page.locator('.pr-pcard', { hasText: 'Gate Bakery' }).dragTo(page.locator('.pr-col[aria-label="Lost"]')); await page.waitForTimeout(400)
   if (!(await page.locator('.pr-sheet').getByLabel('Why it was lost').count())) throw new Error('dropping on Lost did not ask why')
   const saved = await page.evaluate((K) => { const p = JSON.parse(localStorage.getItem(K)).prospects?.[0]; return p && [p.stage, p.touches.length, p.touches[0]?.body, p.people[0]?.decides].join() }, KEY)
-  if (saved !== 'lost,1,Dobry den, gate body.,true') throw new Error(`not saved: ${saved}`)
+  if (saved !== 'Lost,1,Dobry den, gate body.,true') throw new Error(`not saved: ${saved}`)
   await page.keyboard.press('Escape'); await page.waitForTimeout(300)
   await page.getByRole('group', { name: 'Which people' }).getByRole('button', { name: 'Personal' }).click(); await page.waitForTimeout(300)
   if (!(await page.locator('.pp-canvas').count())) throw new Error('Personal did not bring the circle back')
 })
-await step('people, business: the Gmail sync groups replies and ready steps, a reply waits for his yes, links open', async () => {
+await step('people, business: the Sheet table, old lanes migrate, who-to-write sort, a reply waits for his yes, links open', async () => {
   /* His ask (2026-10-11): know where every client is without moving Drive
      folders. The sync itself needs his account; this checks what it leaves. */
   await fresh('today')
@@ -5031,27 +5032,45 @@ await step('people, business: the Gmail sync groups replies and ready steps, a r
       { ...base, id: 'gp1', name: 'Gate Replied', touches: [{ id: 'gm-1', step: 'work', day: d3 }], replied: { day: d0, subject: 'Re: Your site', body: 'Dobry den, zavolejte mi.' } },
       { ...base, id: 'gp2', name: 'Gate Ready', touches: [{ id: 'gm-2', step: 'work', day: d3 }] },
       { ...base, id: 'gp3', name: 'Gate Waiting', touches: [{ id: 'gm-3', step: 'work', day: d1 }] },
+      { ...base, id: 'gp4', name: 'Gate Sheet Row', stage: 'Audit to review', touches: [], domain: 'gate-sheet.cz',
+        sheet: { country: 'Czech Republic', num: '7', row: 0, niche: 'Gate niche', location: 'Brno', rating: '4,8', reviews: '120', webProblem: 'Gate web problem that is long enough to need the card to read in full' } },
     ]
     localStorage.setItem(K, JSON.stringify(s))
   }, [KEY, day(0), day(1), day(3)])
   await page.reload(); await page.waitForTimeout(700)
   await page.locator('.topbar-right').getByRole('button', { name: 'People', exact: true }).click(); await page.waitForTimeout(400)
   await page.getByRole('group', { name: 'Which people' }).getByRole('button', { name: 'Business' }).click(); await page.waitForTimeout(300)
-  await page.getByRole('group', { name: 'Layout' }).getByRole('button', { name: 'List' }).click(); await page.waitForTimeout(300)
-  const groups = await page.locator('.pr-group h2').allInnerTexts()
-  const order = groups.map((g) => g.replace(/\s*\d+$/, '')).join('|')
-  if (order !== 'Replied|Next step ready|Waiting') throw new Error(`groups: ${order}`)
-  const rows = (await page.locator('.pr-group').allInnerTexts()).join(' ')
-  if (!/Gate Replied[\s\S]*They replied[\s\S]*Gate Ready[\s\S]*Reminder[\s\S]*Gate Waiting/.test(rows)) throw new Error(`rows in the wrong groups: ${rows.replace(/\n/g, ' | ')}`)
-  if (SHOTS_DIR) await page.screenshot({ path: `${SHOTS_DIR}/business-gmail-list.png`, fullPage: false })
-  await page.locator('.pr-row', { hasText: 'Gate Replied' }).click(); await page.waitForTimeout(300)
+  await page.getByRole('group', { name: 'Layout' }).getByRole('button', { name: 'Table' }).click(); await page.waitForTimeout(300)
+  /* The Sheet's columns in its order, its row first in Sheet order. */
+  const heads = (await page.locator('.pr-grid thead th').allInnerTexts()).join('|')
+  if (!heads.startsWith('#|Business|Country|Niche|Location|Google rating|Google reviews|Domain|Website problem|Social / ads problem|Date|Status|Notes|Finance|Finance priority|Next step|Value|Reply')) throw new Error(`columns: ${heads}`)
+  const first = await page.locator('.pr-grid tbody tr').first().innerText()
+  if (!/^7\s+Gate Sheet Row[\s\S]*Gate niche[\s\S]*Brno[\s\S]*Audit to review/.test(first)) throw new Error(`the Sheet row: ${first.replace(/\s+/g, ' ')}`)
+  /* Cards saved with the old five lanes read as Sheet statuses. */
+  const chips = await page.locator('.pr-grid tbody .pr-chip').allInnerTexts()
+  if (chips.filter((c) => c === 'Contacted').length !== 3) throw new Error(`old contacted lane not migrated: ${chips}`)
+  /* The old Replied / Next step ready / Waiting groups live on as a sort. */
+  await page.locator('.pp-dd[aria-label="Sort"] .dd-trigger, .pp-dd .dd-trigger[aria-label="Sort"]').first().click()
+  await page.locator('.dd-option', { hasText: 'Who to write today' }).click(); await page.waitForTimeout(300)
+  const names = (await page.locator('.pr-grid tbody .pr-c-biz').allInnerTexts()).join('|')
+  if (!names.startsWith('Gate Replied|Gate Ready|Gate Waiting')) throw new Error(`who to write today: ${names}`)
+  const ready = await page.locator('.pr-grid tbody tr', { hasText: 'Gate Ready' }).innerText()
+  if (!/Reminder/.test(ready)) throw new Error(`ready row next step: ${ready.replace(/\s+/g, ' ')}`)
+  const sideways = await page.evaluate(() => { const w = document.querySelector('.pr-sheetwrap'); return document.documentElement.scrollWidth <= innerWidth + 1 && w.scrollWidth > w.clientWidth })
+  if (!sideways) throw new Error('the table should scroll inside its frame, never the page')
+  if (SHOTS_DIR) await page.screenshot({ path: `${SHOTS_DIR}/business-table.png`, fullPage: false })
+  await page.locator('.pr-grid tbody tr', { hasText: 'Gate Sheet Row' }).click(); await page.waitForTimeout(300)
+  const facts = await page.locator('.pr-facts').innerText()
+  if (!/Website problem[\s\S]*read in full/.test(facts)) throw new Error(`the card does not show the Sheet: ${facts}`)
+  await page.keyboard.press('Escape'); await page.waitForTimeout(300)
+  await page.locator('.pr-grid tbody tr', { hasText: 'Gate Replied' }).click(); await page.waitForTimeout(300)
   if (!(await page.locator('.pr-replied').count())) throw new Error('the reply banner is missing')
   await page.locator('.pr-sheet').getByLabel('Drive folder').fill('https://drive.google.com/drive/folders/gate'); await page.locator('.pr-sheet').getByLabel('Drive folder').press('Enter'); await page.waitForTimeout(200)
   if ((await page.locator('.pr-links a', { hasText: 'Drive folder' }).getAttribute('href')) !== 'https://drive.google.com/drive/folders/gate') throw new Error('the Drive link does not open')
   if (SHOTS_DIR) await page.screenshot({ path: `${SHOTS_DIR}/business-gmail-card.png`, fullPage: false })
   await page.getByRole('button', { name: 'Move to In conversation' }).click(); await page.waitForTimeout(300)
   const saved = await page.evaluate((K) => { const p = JSON.parse(localStorage.getItem(K)).prospects.find((x) => x.id === 'gp1'); return [p.stage, !!p.replied, p.links?.drive].join() }, KEY)
-  if (saved !== 'talking,false,https://drive.google.com/drive/folders/gate') throw new Error(`not saved: ${saved}`)
+  if (saved !== 'In conversation,false,https://drive.google.com/drive/folders/gate') throw new Error(`not saved: ${saved}`)
   await page.keyboard.press('Escape'); await page.waitForTimeout(300)
 })
 await step('ideas: click to pick up, click to drop, and the list brings the board to any sticky', async () => {

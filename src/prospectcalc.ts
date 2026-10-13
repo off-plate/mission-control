@@ -1,15 +1,41 @@
 /* The numbers the Business view shows and never stores: next step, days since
    the last touch, and reply odds. Pure, so scripts/prospect-test.ts can hold
    them still. */
-import type { Prospect, ProspectSource, ProspectStage, TouchStep } from './types'
+import type { Prospect, ProspectSheetRow, ProspectSource, ProspectStage, TouchStep } from './types'
 
-export const STAGES: { id: ProspectStage; label: string }[] = [
-  { id: 'reach', label: 'To reach out' },
-  { id: 'contacted', label: 'Contacted' },
-  { id: 'talking', label: 'In conversation' },
-  { id: 'won', label: 'Acquired' },
-  { id: 'lost', label: 'Lost' },
-]
+/* STATUS (his ask, 2026-10-13: "reflect what's in the Off-Plate Prospects
+   Sheet"). The Sheet's Status dropdown verbatim, in its order (Jarvis
+   projects/lead-engine/tools/prospects_sheet.py STATUSES), then the three
+   statuses only Mission Control has. The Sheet is the master: /eco-sync
+   overwrites a card's status with the Sheet's, unless he moved the card past
+   the Sheet into one of the three. */
+export const SHEET_STATUSES = [
+  'Prospect', 'Audit to create', 'Audit to review', 'Build', 'Build: ideas to review', 'Build: building',
+  'Email to prepare', 'Ready to contact', 'Contacted', '1st reminder sent', '2nd reminder sent (personal)',
+  'Letter reminder sent', 'Call / visit', 'Responded waiting',
+] as const
+export const TALKING = 'In conversation', WON = 'Acquired', LOST = 'Lost'
+export const MC_ONLY = [TALKING, WON, LOST]
+export const STAGES: { id: ProspectStage; label: string }[] = [...SHEET_STATUSES, ...MC_ONLY].map((s) => ({ id: s, label: s }))
+
+/** A status he added to the Sheet after this build still sorts, after the
+ *  Sheet's own and before the three Mission Control ones. */
+export const stageRank = (s: ProspectStage): number => {
+  const i = (SHEET_STATUSES as readonly string[]).indexOf(s)
+  if (i >= 0) return i
+  const m = MC_ONLY.indexOf(s)
+  return m >= 0 ? SHEET_STATUSES.length + 1 + m : SHEET_STATUSES.length
+}
+
+/* Cards saved before 2026-10-13 carry the old five lanes. To reach out cards
+   came from audited Drive folders, so they are Email to prepare. */
+const LEGACY: Record<string, ProspectStage> = { reach: 'Email to prepare', contacted: 'Contacted', talking: TALKING, won: WON, lost: LOST }
+export const normStage = (s: unknown): ProspectStage => (typeof s === 'string' && s.trim() ? LEGACY[s] ?? s : 'Prospect')
+/** Same list back when nothing needed changing, so a pull does not re-render. */
+export function normProspects(list: Prospect[]): Prospect[] {
+  return list.some((p) => normStage(p.stage) !== p.stage) ? list.map((p) => ({ ...p, stage: normStage(p.stage) })) : list
+}
+
 export const SOURCES: { id: ProspectSource; label: string }[] = [
   { id: 'found', label: 'Found them' },
   { id: 'inbound', label: 'They reached out' },
@@ -26,8 +52,11 @@ export const STEPS: { id: TouchStep; label: string }[] = [
 ]
 export const label = <T extends string>(list: { id: T; label: string }[], id: T): string => list.find((x) => x.id === id)?.label ?? id
 
-/** Still chasing: the sequence and the odds only mean something here. */
-export const isOpen = (p: Pick<Prospect, 'stage'>): boolean => p.stage === 'reach' || p.stage === 'contacted'
+/** Still chasing: everything before In conversation. */
+export const isOpen = (p: Pick<Prospect, 'stage'>): boolean => !MC_ONLY.includes(p.stage)
+/** In the email sequence: from Email to prepare on. Before that the work is
+ *  the audit and the build, so there is no next email and no reply odds. */
+export const inSequence = (p: Pick<Prospect, 'stage'>): boolean => isOpen(p) && stageRank(p.stage) >= stageRank('Email to prepare')
 
 /** "https://www.Pekarna.cz/kontakt" -> "pekarna.cz". */
 export const cleanDomain = (s: string): string =>
@@ -36,7 +65,7 @@ export const cleanDomain = (s: string): string =>
 /** The first step of the sequence not done yet. After the three emails it is
  *  "call or visit" until one of them is logged, then nothing. */
 export function nextStep(p: Pick<Prospect, 'stage' | 'touches'>): TouchStep | 'callOrVisit' | null {
-  if (!isOpen(p)) return null
+  if (!inSequence(p)) return null
   const done = new Set(p.touches.map((t) => t.step))
   for (const s of ['work', 'reminder', 'personal'] as const) if (!done.has(s)) return s
   return done.has('call') || done.has('visit') ? null : 'callOrVisit'
@@ -56,7 +85,7 @@ const BASE: Record<ProspectSource, number> = { inbound: 60, friend: 50, referral
 /** How likely a reply is, 0 to 100. Null once that question is answered.
  *  ponytail: hand-set weights, refit from his own reply rates after ~30 prospects. */
 export function replyOdds(p: Pick<Prospect, 'stage' | 'source' | 'people' | 'touches'>): number | null {
-  if (!isOpen(p)) return null
+  if (!inSequence(p)) return null
   const decider = p.people.some((x) => x.decides && (x.email || x.phone))
   return Math.max(5, Math.min(100, BASE[p.source] + (decider ? 10 : 0) - 10 * p.touches.length))
 }
@@ -141,8 +170,56 @@ export function applyEvents(prospects: Prospect[], events: OutreachEvent[], now 
     if (!step) continue
     const to = p.people.find((x) => x.email?.trim().toLowerCase() === e.counterpart.trim().toLowerCase())?.id
     p.touches.push({ id, step, day: e.day, ...(to ? { to } : {}), ...(e.subject ? { subject: e.subject } : {}), ...(e.body ? { body: e.body } : {}) })
-    if (p.stage === 'reach') p.stage = 'contacted'
+    if (stageRank(p.stage) < stageRank('Contacted')) p.stage = 'Contacted'
     p.updatedAt = now
   }
   return { prospects: next, done }
+}
+
+/* ---------- The Sheet sync (his ask, 2026-10-13) ----------
+   /eco-sync sends every row of every tab of the Off-Plate Prospects Sheet
+   (outreach-ingest, action 'sheet'). The Sheet is the master: its columns and
+   its status overwrite the card's. His own extras on the card (people,
+   touches, value, his notes) are never touched, and nothing is deleted. */
+export interface SheetRow extends ProspectSheetRow { name: string; domain?: string; status?: string }
+
+const slug = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+/** Stable, so two devices applying the same snapshot make the same card. */
+export const sheetId = (r: Pick<SheetRow, 'name' | 'domain'>): string => `prospect-sheet-${slug(r.domain ? cleanDomain(r.domain) : r.name)}`
+
+/** The card a Sheet row belongs to: same domain, else the same name. */
+export function matchRow<P extends Pick<Prospect, 'id' | 'name' | 'domain'>>(list: P[], r: SheetRow): P | undefined {
+  const d = r.domain ? cleanDomain(r.domain) : ''
+  return (d && !FREEMAIL.has(d) ? list.find((p) => p.domain && cleanDomain(p.domain) === d) : undefined)
+    ?? list.find((p) => slug(p.name) === slug(r.name))
+    ?? list.find((p) => p.id === sheetId(r))
+}
+
+/** Apply a Sheet snapshot. `buried` says a card was deleted on purpose: a
+ *  row whose card he deleted is not brought back. */
+export function applySheet(prospects: Prospect[], rows: SheetRow[], now = Date.now(), buried: (id: string) => boolean = () => false): { prospects: Prospect[]; changed: number; added: number } {
+  const next = [...prospects]
+  let changed = 0, added = 0
+  for (const r of rows) {
+    if (!r?.name?.trim()) continue
+    const { name, domain, status, ...rest } = r
+    const sheet: ProspectSheetRow = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== '' && v != null)) as unknown as ProspectSheetRow
+    const d = domain ? cleanDomain(domain) : ''
+    const st = status?.trim()
+    const i = next.findIndex((p) => p === matchRow(next, r))
+    if (i < 0) {
+      const id = sheetId(r)
+      if (buried(id)) continue
+      next.push({ id, name: name.trim(), ...(d ? { domain: d } : {}), source: 'found', stage: st || 'Prospect', sheet, people: [], touches: [], createdAt: now, updatedAt: now })
+      added++
+      continue
+    }
+    const p = next[i]
+    const stage = st && !MC_ONLY.includes(p.stage) ? st : p.stage
+    const dom = p.domain || d || undefined
+    if (stage === p.stage && dom === p.domain && JSON.stringify(sheet) === JSON.stringify(p.sheet ?? null)) continue
+    next[i] = { ...p, stage, ...(dom ? { domain: dom } : {}), sheet, updatedAt: now }
+    changed++
+  }
+  return { prospects: next, changed, added }
 }

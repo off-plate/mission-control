@@ -5,6 +5,8 @@
 
      { action: 'targets' }          -> which addresses and domains are prospects
      { action: 'events', events }   -> store what it found, once per message
+     { action: 'sheet', rows }       -> the whole Off-Plate Prospects Sheet, every tab
+                                    (2026-10-13), replacing the last snapshot
 
    The script asks for targets first, so it only ever reads mail to or from a
    prospect, never the rest of his inbox. Events are stored, not applied: the
@@ -43,7 +45,7 @@ async function targets(owner: string) {
   const emails = new Set<string>()
   const domains = new Set<string>()
   for (const p of prospects) {
-    if (p.stage === 'won' || p.stage === 'lost') continue
+    if (p.stage && ['won', 'lost', 'Acquired', 'Lost'].includes(p.stage)) continue
     for (const x of p.people ?? []) if (x.email?.includes('@')) emails.add(x.email.trim().toLowerCase())
     const d = p.domain?.trim().toLowerCase()
     if (d && !FREEMAIL.has(d)) domains.add(d)
@@ -75,6 +77,20 @@ Deno.serve(async (req) => {
       }))
     if (!rows.length) return json({ stored: 0 })
     const { error } = await sb().from('mc_outreach_events').upsert(rows, { onConflict: 'id', ignoreDuplicates: true })
+    return error ? json({ error: error.message }, 500) : json({ stored: rows.length })
+  }
+
+  /* The Sheet as text, bounded: one snapshot per owner, unapplied until the
+     app turns it into cards (prospectcalc applySheet) and stamps it. */
+  if (body.action === 'sheet') {
+    const t = (v: unknown, max: number) => (typeof v === 'string' || typeof v === 'number' ? String(v).trim().slice(0, max) : '')
+    const KEYS: [string, number][] = [['country', 60], ['num', 10], ['niche', 200], ['location', 200], ['rating', 10], ['reviews', 12], ['domain', 200], ['webProblem', 2000], ['socialProblem', 2000], ['date', 40], ['status', 80], ['notes', 2000], ['finance', 2000], ['financePriority', 80]]
+    const rows = ((Array.isArray(body.rows) ? body.rows : []) as Record<string, unknown>[])
+      .filter((r) => r && t(r.name, 200))
+      .slice(0, 5000)
+      .map((r, i) => ({ name: t(r.name, 200), row: i, ...Object.fromEntries(KEYS.map(([k, max]) => [k, t(r[k], max)]).filter(([, v]) => v)) }))
+    if (!rows.length) return json({ error: 'no rows' }, 400)
+    const { error } = await sb().from('mc_prospect_sheet').upsert({ owner, rows, synced_at: new Date().toISOString(), applied_at: null }, { onConflict: 'owner' })
     return error ? json({ error: error.message }, 500) : json({ stored: rows.length })
   }
 

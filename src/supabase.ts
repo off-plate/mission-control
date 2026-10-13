@@ -323,6 +323,27 @@ export async function stampOutreachEvents(ids: string[]): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
+/** The Off-Plate Prospects Sheet as /eco-sync last sent it (mc_prospect_sheet),
+ *  or null when it is already applied, signed out or unconfigured. */
+export async function readProspectSheet<T>(): Promise<{ rows: T[]; synced_at: string } | null> {
+  const c = db()
+  const me = await currentAccount()
+  if (!c || !me) return null
+  const { data, error } = await c.from('mc_prospect_sheet').select('rows,synced_at').is('applied_at', null).maybeSingle()
+  if (error) throw new Error(error.message)
+  return (data as { rows: T[]; synced_at: string } | null) ?? null
+}
+
+/** Mark that snapshot applied, so no device applies it twice. Matched on
+ *  synced_at: a newer snapshot that landed meanwhile stays unapplied. */
+export async function stampProspectSheet(syncedAt: string): Promise<void> {
+  const c = db()
+  const me = await currentAccount()
+  if (!c || !me) return
+  const { error } = await c.from('mc_prospect_sheet').update({ applied_at: new Date().toISOString() }).eq('synced_at', syncedAt)
+  if (error) throw new Error(error.message)
+}
+
 /** Clear the saved state (used by Reset). */
 export async function deleteRemoteState(): Promise<void> {
   const c = db()

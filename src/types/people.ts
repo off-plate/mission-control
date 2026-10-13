@@ -63,9 +63,11 @@ export interface PersonContact {
    One row per business he is reaching out to. People and touches live inside
    the row, so a prospect syncs, merges and is deleted as one thing. */
 
-/** The five lanes from his Obsidian CRM board, verbatim: To reach out,
- *  Contacted, In conversation, Acquired, Lost. */
-export type ProspectStage = 'reach' | 'contacted' | 'talking' | 'won' | 'lost'
+/** The Status column of his Off-Plate Prospects Sheet, verbatim (his ask,
+ *  2026-10-13: Business mirrors the Sheet), then the three statuses only
+ *  Mission Control has: In conversation, Acquired, Lost. A string, not a
+ *  union: a status he adds to the Sheet dropdown still arrives and shows. */
+export type ProspectStage = string
 /** Where the lead came from. */
 export type ProspectSource = 'found' | 'inbound' | 'friend' | 'referral' | 'met'
 /** His outreach order: work email, reminder, personal email, then a call or a
@@ -86,6 +88,26 @@ export interface ProspectLinks {
   drive?: string
   outreach?: string
   proposal?: string
+}
+
+/** One Sheet row, its columns as text, in the Sheet's order. */
+export interface ProspectSheetRow {
+  country: string
+  niche?: string
+  location?: string
+  rating?: string
+  reviews?: string
+  webProblem?: string
+  socialProblem?: string
+  /** The Sheet's Date column, as he typed it. */
+  date?: string
+  notes?: string
+  finance?: string
+  financePriority?: string
+  /** The Sheet's own # column, numbered per tab. */
+  num?: string
+  /** Its position across all tabs, so the table can keep the Sheet's order. */
+  row: number
 }
 
 export interface ProspectTouch {
@@ -115,6 +137,9 @@ export interface Prospect {
   notes?: string
   /** Where its files live. Plain URLs he pastes; nothing here moves them. */
   links?: ProspectLinks
+  /** The row from his Off-Plate Prospects Sheet, overwritten on every
+   *  /eco-sync. The Sheet is the master for these and for the status. */
+  sheet?: ProspectSheetRow
   /** A reply the Gmail sync found, waiting for his yes before the stage moves. */
   replied?: { day: string; subject?: string; body?: string }
   people: ProspectPerson[]

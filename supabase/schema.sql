@@ -56,6 +56,10 @@ create table if not exists mc_outreach_events (
   applied_at  timestamptz,
   created_at  timestamptz not null default now()
 );
+-- /eco-sync (Jarvis) reads the step from the subject and wording itself, and names the
+-- business's domain so a freemail address still finds its card.
+alter table mc_outreach_events add column if not exists step   text check (step in ('work', 'reminder', 'personal'));
+alter table mc_outreach_events add column if not exists domain text;
 
 alter table mc_outreach_events enable row level security;
 

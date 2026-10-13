@@ -1,5 +1,6 @@
-/* OUTREACH FROM GMAIL. The door the Apps Script in his Gmail talks through
-   (tools/outreach-gmail.gs). Two calls, both POST, both carrying
+/* OUTREACH FROM GMAIL. The door /eco-sync (Jarvis .claude/skills/eco-sync/sync.py)
+   talks through; it replaced the Apps Script in tools/outreach-gmail.gs. /eco-sync
+   sends the step it read from the subject and wording, and the business domain. Two calls, both POST, both carrying
    OUTREACH_SECRET as x-outreach-secret:
 
      { action: 'targets' }          -> which addresses and domains are prospects
@@ -28,7 +29,8 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 interface Person { email?: string }
 interface Prospect { stage?: string; domain?: string; people?: Person[] }
-interface Incoming { id: string; kind: 'sent' | 'reply'; via?: string; day: string; counterpart: string; subject?: string; body?: string }
+interface Incoming { id: string; kind: 'sent' | 'reply'; via?: string; step?: string; domain?: string; day: string; counterpart: string; subject?: string; body?: string }
+const STEPS = new Set(['work', 'reminder', 'personal'])
 
 async function ownerId(): Promise<string | null> {
   const { data } = await sb().auth.admin.listUsers({ perPage: 1000 })
@@ -66,6 +68,8 @@ Deno.serve(async (req) => {
       .slice(0, 500)
       .map((e) => ({
         id: e.id, owner, kind: e.kind, via: e.via === 'personal' ? 'personal' : e.kind === 'sent' ? 'offplate' : null,
+        step: e.kind === 'sent' && STEPS.has(e.step ?? '') ? e.step : null,
+        domain: e.domain?.trim().toLowerCase() || null,
         day: e.day, counterpart: e.counterpart.trim().toLowerCase(),
         subject: (e.subject ?? '').slice(0, 300), body: (e.body ?? '').slice(0, 4000),
       }))

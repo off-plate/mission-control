@@ -309,7 +309,7 @@ export async function readOutreachEvents<T>(): Promise<T[] | null> {
   const me = await currentAccount()
   if (!c || !me) return null
   const { data, error } = await c.from('mc_outreach_events')
-    .select('id,kind,via,day,counterpart,subject,body').is('applied_at', null).order('day').limit(500)
+    .select('id,kind,via,step,domain,day,counterpart,subject,body').is('applied_at', null).order('day').limit(500)
   if (error) throw new Error(error.message)
   return (data ?? []) as T[]
 }

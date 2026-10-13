@@ -980,7 +980,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const { people, setPeople, personBonds, setPersonBonds, personContacts, setPersonContacts } = peopleSlice
   const prospectsSlice = useProspectsSlice(persisted, { armUndo, bury, digUp })
   const { prospects, setProspects } = prospectsSlice
-  /* Emails to and from prospects, found in his Gmail (tools/outreach-gmail.gs).
+  /* Emails to and from prospects, found in his Gmail by /eco-sync (Jarvis).
      Runs with every pull, so they land on fresh rows. A missing table or a
      dropped connection just means the next pull tries again. */
   const applyOutreachRef = useRef(prospectsSlice.applyOutreach)

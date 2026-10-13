@@ -80,6 +80,10 @@ export interface OutreachEvent {
   id: string
   kind: 'sent' | 'reply'
   via?: 'offplate' | 'personal' | null
+  /** Set by /eco-sync, which reads it from the subject and wording. Wins over stepForSent. */
+  step?: 'work' | 'reminder' | 'personal' | null
+  /** The business's domain from the Prospects sheet, for a freemail counterpart. */
+  domain?: string | null
   day: string
   counterpart: string
   subject?: string | null
@@ -120,7 +124,7 @@ export function applyEvents(prospects: Prospect[], events: OutreachEvent[], now 
   const next = prospects.map((p) => ({ ...p, touches: [...p.touches] }))
   const done: string[] = []
   for (const e of [...events].sort((a, b) => a.day.localeCompare(b.day))) {
-    const p = matchProspect(next, e.counterpart)
+    const p = matchProspect(next, e.counterpart) ?? (e.domain ? matchProspect(next, `x@${e.domain}`) : undefined)
     if (!p) continue
     done.push(e.id)
     if (!isOpen(p)) continue
@@ -133,7 +137,7 @@ export function applyEvents(prospects: Prospect[], events: OutreachEvent[], now 
     }
     const id = `gm-${e.id}`
     if (p.touches.some((t) => t.id === id)) continue
-    const step = stepForSent(p, e.via)
+    const step = e.step ? (p.touches.some((t) => t.step === e.step) ? null : e.step) : stepForSent(p, e.via)
     if (!step) continue
     const to = p.people.find((x) => x.email?.trim().toLowerCase() === e.counterpart.trim().toLowerCase())?.id
     p.touches.push({ id, step, day: e.day, ...(to ? { to } : {}), ...(e.subject ? { subject: e.subject } : {}), ...(e.body ? { body: e.body } : {}) })

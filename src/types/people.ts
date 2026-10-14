@@ -64,8 +64,8 @@ export interface PersonContact {
    the row, so a prospect syncs, merges and is deleted as one thing. */
 
 /** The Status column of his Off-Plate Prospects Sheet, verbatim (his ask,
- *  2026-10-13: Business mirrors the Sheet), then the three statuses only
- *  Mission Control has: In conversation, Acquired, Lost. A string, not a
+ *  2026-10-13: Business mirrors the Sheet; since 2026-10-14 the Sheet holds
+ *  the end states too: Acquired, Lost, Rejected). A string, not a
  *  union: a status he adds to the Sheet dropdown still arrives and shows. */
 export type ProspectStage = string
 /** Where the lead came from. */

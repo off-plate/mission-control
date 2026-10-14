@@ -14,7 +14,7 @@ import { useStore } from './store'
 import { Segmented, Select } from './ui'
 import { localDateKey } from './util'
 import { AVOID_DAYS } from './exceptions'
-import { LOST, MC_ONLY, STAGES, SOURCES, STEPS, TALKING, WON, age, cleanDomain, inSequence, isOpen, isReady, label, nextStep, replyOdds, stageRank } from './prospectcalc'
+import { BOARD_ALWAYS, MEETING, ON_HOLD, STAGES, SOURCES, STEPS, TALKING, WON, age, cleanDomain, inSequence, isDead, isOpen, isReady, label, nextStep, replyOdds, stageRank } from './prospectcalc'
 import type { Prospect, ProspectLinks, ProspectPerson, ProspectSheetRow, ProspectSource, ProspectStage, TouchStep } from './types'
 
 type Layout = 'list' | 'board'
@@ -27,23 +27,21 @@ const LAYOUT_KEY = 'mc-business-layout'
    research, build, ready to send, outreach, replied, acquired, lost. */
 type Phase = 'research' | 'build' | 'reach' | 'contacted' | 'talking' | 'won' | 'lost'
 export function phase(s: ProspectStage): Phase {
-  if (s === LOST) return 'lost'
+  if (isDead(s)) return 'lost'
   if (s === WON) return 'won'
-  if (s === TALKING || s === 'Responded waiting') return 'talking'
+  if (s === TALKING || s === MEETING || s === ON_HOLD) return 'talking'
   if (stageRank(s) >= stageRank('Contacted')) return 'contacted'
-  if (stageRank(s) >= stageRank('Email to prepare')) return 'reach'
+  if (stageRank(s) >= stageRank('Ready to contact')) return 'reach'
   return s.startsWith('Build') ? 'build' : 'research'
 }
 const st = (s: ProspectStage) => `st-${phase(s)}`
 /** Every status in order, plus any he added to the Sheet that this build does not know. */
 const allStages = (list: Prospect[]): ProspectStage[] =>
   [...new Set([...STAGES.map((s) => s.id), ...list.map((p) => p.stage)])].sort((a, b) => stageRank(a) - stageRank(b))
-/* The Board: lanes that hold a card, then In conversation, Acquired and Lost
-   always. Seventeen lanes put Lost four screens away from a drag, and the
-   Sheet overwrites its own statuses anyway, so the drops that stick here are
-   the three only Mission Control has. */
+/* The Board: lanes that hold a card, then Responded waiting, Acquired and
+   Lost always. Sixteen lanes put Lost four screens away from a drag. */
 const boardStages = (list: Prospect[]): ProspectStage[] =>
-  [...new Set([...list.map((p) => p.stage), ...MC_ONLY])].sort((a, b) => stageRank(a) - stageRank(b))
+  [...new Set([...list.map((p) => p.stage), ...BOARD_ALWAYS])].sort((a, b) => stageRank(a) - stageRank(b))
 
 /* FILTERS (his ask, 2026-10-04: "the filtration, like Nexus does it").
    one live search plus country, status, source and sort dropdowns, remembered
@@ -149,7 +147,7 @@ function nextLabel(p: Prospect): string {
   if (n === 'callOrVisit') return 'Call or visit'
   if (n) return label(STEPS, n)
   if (!inSequence(p) && isOpen(p)) return '' // prep: the audit or build is the work, there is no next email
-  return p.stage === TALKING ? 'Their move' : isOpen(p) ? 'Sequence done' : p.stage
+  return p.stage === TALKING || p.stage === MEETING ? 'Their move' : isOpen(p) ? 'Sequence done' : p.stage
 }
 function ageLabel(p: Prospect, today: string): { t: string; stale: boolean } {
   const a = age(p, today)
@@ -209,7 +207,7 @@ export function BusinessView({ modeSwitch }: { modeSwitch: JSX.Element }) {
       ) : (
         <ProspectBoard
           prospects={shown} stages={f.stage ? [f.stage] : boardStages(shown)} today={today} onOpen={setOpenId}
-          onMove={(id, stage) => { updateProspect(id, { stage }); if (stage === LOST) setOpenId(id) }}
+          onMove={(id, stage) => { updateProspect(id, { stage }); if (isDead(stage)) setOpenId(id) }}
         />
       )}
 
@@ -237,7 +235,7 @@ function Meter({ n, kind, none = 'unset' }: { n: number | null | undefined; kind
 type Col = { h: string; cls?: string; cell: (p: Prospect, today: string) => ReactNode; title?: (p: Prospect) => string | undefined }
 const sheetCol = (h: string, k: keyof ProspectSheetRow, cls?: string): Col => ({ h, cls, cell: (p) => p.sheet?.[k] ?? '', title: (p) => String(p.sheet?.[k] ?? '') || undefined })
 /* Status sits right after Business, his ask (2026-10-13). */
-const STATUS_COL: Col = { h: 'Status', cell: (p) => <span className={`pr-chip ${st(p.stage)}`}>{p.stage === LOST && p.lostReason ? `${p.stage}: ${p.lostReason}` : p.stage}</span> }
+const STATUS_COL: Col = { h: 'Status', cell: (p) => <span className={`pr-chip ${st(p.stage)}`}>{isDead(p.stage) && p.lostReason ? `${p.stage}: ${p.lostReason}` : p.stage}</span> }
 const COLS: Col[] = [
   sheetCol('Niche', 'niche'),
   sheetCol('Location', 'location'),
@@ -252,7 +250,7 @@ const COLS: Col[] = [
   sheetCol('Finance priority', 'financePriority'),
   { h: 'Next step', cls: 'is-next', cell: (p, today) => { const a = ageLabel(p, today); const n = nextLabel(p); return <>{n && <span>{n} </span>}<span className={`pr-age${a.stale ? ' is-stale' : ''}`}>{a.t}</span></> } },
   { h: 'Value', cell: (p) => <Meter n={p.value} kind="value" none="-" /> },
-  { h: 'Reply', cell: (p) => <Meter n={replyOdds(p)} kind="odds" none={p.stage === TALKING ? 'replied' : '-'} /> },
+  { h: 'Reply', cell: (p) => <Meter n={replyOdds(p)} kind="odds" none={p.stage === TALKING || p.stage === MEETING ? 'replied' : '-'} /> },
 ]
 
 function ProspectTable({ prospects, today, showCountry, onOpen }: { prospects: Prospect[]; today: string; showCountry: boolean; onOpen: (id: string) => void }) {
@@ -314,7 +312,7 @@ function ProspectBoard({ prospects, stages, today, onOpen, onMove }: {
                     onDragStart={(e) => { e.dataTransfer.setData('text/prospect', p.id); e.dataTransfer.effectAllowed = 'move' }}
                   >
                     <b>{p.name}</b>
-                    {p.stage === LOST
+                    {isDead(p.stage)
                       ? <span className="pr-lost">{p.lostReason || 'No reason written'}</span>
                       : <span className={`pr-age${a.stale ? ' is-stale' : ''}`}>{[nextLabel(p), a.t].filter(Boolean).join(', ')}</span>}
                     <span className="pr-pmeta mono"><span>Value {p.value ?? '-'}</span>{odds != null && <span>Reply {odds}</span>}</span>
@@ -362,7 +360,7 @@ function ProspectCard({ p, today, onClose }: { p: Prospect; today: string; onClo
   const unanswered = isOpen(p) ? p.touches.length : 0
   const touches = [...p.touches].sort((a, b) => a.day.localeCompare(b.day))
   const lostRef = useRef<HTMLDivElement>(null)
-  useEffect(() => { if (p.stage === LOST && !p.lostReason) lostRef.current?.querySelector('input')?.focus() }, [p.stage, p.lostReason])
+  useEffect(() => { if (isDead(p.stage) && !p.lostReason) lostRef.current?.querySelector('input')?.focus() }, [p.stage, p.lostReason])
   const ph = phase(p.stage)
 
   return (
@@ -380,7 +378,7 @@ function ProspectCard({ p, today, onClose }: { p: Prospect; today: string; onClo
           </div>
 
           {/* Where this business is, in its status's colour: the Sheet's
-              fourteen statuses read as four phases here. */}
+              sixteen statuses read as four phases here. */}
           {ph !== 'lost' && (
             <div className="pr-stepper" aria-label={`Status: ${p.stage}`}>
               {PHASES.map((x, i) => (
@@ -391,7 +389,7 @@ function ProspectCard({ p, today, onClose }: { p: Prospect; today: string; onClo
           <div className="pr-scores">
             <div><span>Value</span><Field className="pp-inline pr-big" type="number" label="Value, 0 to 100" placeholder="-" value={p.value != null ? String(p.value) : ''}
               onCommit={(v) => { const n = Math.round(Number(v)); set({ value: v === '' || !Number.isFinite(n) ? undefined : Math.max(0, Math.min(100, n)) }) }} /></div>
-            <div><span>Reply odds</span><b className="pr-big">{odds ?? (p.stage === TALKING ? 'replied' : '-')}</b>
+            <div><span>Reply odds</span><b className="pr-big">{odds ?? (p.stage === TALKING || p.stage === MEETING ? 'replied' : '-')}</b>
               {odds != null && <small>{label(SOURCES, p.source)}{decider ? ', decider +10' : ''}{unanswered ? `, ${unanswered} unanswered -${unanswered * 10}` : ''}</small>}</div>
           </div>
 
@@ -403,7 +401,7 @@ function ProspectCard({ p, today, onClose }: { p: Prospect; today: string; onClo
               <Select className="pp-dd" ariaLabel="Source" value={p.source} onChange={(source) => set({ source })} options={SOURCES.map((s) => ({ value: s.id, label: s.label }))} />
             </div>
           </div>
-          {p.stage === LOST && (
+          {isDead(p.stage) && (
             <div className="pp-field" ref={lostRef}><span>Why it was lost</span>
               <Field label="Why it was lost" placeholder="No budget until spring" value={p.lostReason ?? ''} onCommit={(v) => set({ lostReason: v || undefined })} />
             </div>
@@ -414,7 +412,7 @@ function ProspectCard({ p, today, onClose }: { p: Prospect; today: string; onClo
               {p.replied.subject && <span className="pr-subject">{p.replied.subject}</span>}
               {p.replied.body && <details><summary>Show the reply</summary><p>{p.replied.body}</p></details>}
               <div className="pr-replied-actions">
-                <button className="btn btn-primary" type="button" onClick={() => set({ stage: TALKING, replied: undefined })}>Move to In conversation</button>
+                <button className="btn btn-primary" type="button" onClick={() => set({ stage: TALKING, replied: undefined })}>Move to Responded waiting</button>
                 <button className="btn btn-quiet" type="button" onClick={() => set({ replied: undefined })}>Not a real reply</button>
               </div>
             </div>

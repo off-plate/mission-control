@@ -5010,9 +5010,9 @@ await step('people, business: add a prospect, log the work email, the next step 
   const row = await page.locator('.pr-grid tbody tr').first().innerText()
   if (!/Contacted/.test(row) || !/Reminder/.test(row)) throw new Error(`the row did not move on: ${row.replace(/\n/g, ' | ')}`)
   await page.getByRole('group', { name: 'Layout' }).getByRole('button', { name: 'Board' }).click(); await page.waitForTimeout(300)
-  /* Lanes that hold a card, then In conversation, Acquired, Lost always (2026-10-13). */
+  /* Lanes that hold a card, then Responded waiting, Acquired, Lost always (2026-10-14). */
   const lanes = (await page.locator('.pr-col h2').allInnerTexts()).map((t) => t.replace(/\s*\d+$/, '')).join('|')
-  if (lanes !== 'Contacted|In conversation|Acquired|Lost') throw new Error(`board lanes: ${lanes}`)
+  if (lanes !== 'Contacted|Responded waiting|Acquired|Lost') throw new Error(`board lanes: ${lanes}`)
   await page.locator('.pr-pcard', { hasText: 'Gate Bakery' }).dragTo(page.locator('.pr-col[aria-label="Lost"]')); await page.waitForTimeout(400)
   if (!(await page.locator('.pr-sheet').getByLabel('Why it was lost').count())) throw new Error('dropping on Lost did not ask why')
   const saved = await page.evaluate((K) => { const p = JSON.parse(localStorage.getItem(K)).prospects?.[0]; return p && [p.stage, p.touches.length, p.touches[0]?.body, p.people[0]?.decides].join() }, KEY)
@@ -5046,7 +5046,7 @@ await step('people, business: the Sheet table, old lanes migrate, who-to-write s
   const heads = (await page.locator('.pr-grid thead th').allInnerTexts()).join('|')
   if (!heads.startsWith('#|Business|Status|Country|Niche|Location|Google rating|Google reviews|Domain|Website problem|Social / ads problem|Date|Notes|Finance|Finance priority|Next step|Value|Reply')) throw new Error(`columns: ${heads}`)
   const first = await page.locator('.pr-grid tbody tr').first().innerText()
-  if (!/^1\s+Gate Sheet Row\s+Audit to review[\s\S]*Gate niche[\s\S]*Brno/.test(first)) throw new Error(`the Sheet row: ${first.replace(/\s+/g, ' ')}`)
+  if (!/^1\s+Gate Sheet Row\s+Audited[\s\S]*Gate niche[\s\S]*Brno/.test(first)) throw new Error(`the Sheet row: ${first.replace(/\s+/g, ' ')}`)
   /* Cards saved with the old five lanes read as Sheet statuses. */
   const chips = await page.locator('.pr-grid tbody .pr-chip').allInnerTexts()
   if (chips.filter((c) => c === 'Contacted').length !== 3) throw new Error(`old contacted lane not migrated: ${chips}`)
@@ -5069,9 +5069,9 @@ await step('people, business: the Sheet table, old lanes migrate, who-to-write s
   await page.locator('.pr-sheet').getByLabel('Drive folder').fill('https://drive.google.com/drive/folders/gate'); await page.locator('.pr-sheet').getByLabel('Drive folder').press('Enter'); await page.waitForTimeout(200)
   if ((await page.locator('.pr-links a', { hasText: 'Drive folder' }).getAttribute('href')) !== 'https://drive.google.com/drive/folders/gate') throw new Error('the Drive link does not open')
   if (SHOTS_DIR) await page.screenshot({ path: `${SHOTS_DIR}/business-gmail-card.png`, fullPage: false })
-  await page.getByRole('button', { name: 'Move to In conversation' }).click(); await page.waitForTimeout(300)
+  await page.getByRole('button', { name: 'Move to Responded waiting' }).click(); await page.waitForTimeout(300)
   const saved = await page.evaluate((K) => { const p = JSON.parse(localStorage.getItem(K)).prospects.find((x) => x.id === 'gp1'); return [p.stage, !!p.replied, p.links?.drive].join() }, KEY)
-  if (saved !== 'In conversation,false,https://drive.google.com/drive/folders/gate') throw new Error(`not saved: ${saved}`)
+  if (saved !== 'Responded waiting,false,https://drive.google.com/drive/folders/gate') throw new Error(`not saved: ${saved}`)
   await page.keyboard.press('Escape'); await page.waitForTimeout(300)
 })
 await step('ideas: click to pick up, click to drop, and the list brings the board to any sticky', async () => {

@@ -39,7 +39,7 @@ export function useProspectsSlice(
   const addProspect = (p: ProspectInput): string => {
     const id = newId('prospect')
     const now = Date.now()
-    setProspects((prev) => [...prev, { stage: 'Email to prepare', people: [], ...p, id, name: p.name.trim(), touches: [], createdAt: now, updatedAt: now }])
+    setProspects((prev) => [...prev, { stage: 'Ready to contact', people: [], ...p, id, name: p.name.trim(), touches: [], createdAt: now, updatedAt: now }])
     return id
   }
   const updateProspect = (id: string, patch: ProspectPatch): void => edit(id, (p) => ({ ...p, ...patch }))

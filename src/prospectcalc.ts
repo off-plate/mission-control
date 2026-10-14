@@ -4,33 +4,41 @@
 import type { Prospect, ProspectSheetRow, ProspectSource, ProspectStage, TouchStep } from './types'
 
 /* STATUS (his ask, 2026-10-13: "reflect what's in the Off-Plate Prospects
-   Sheet"). The Sheet's Status dropdown verbatim, in its order (Jarvis
-   projects/lead-engine/tools/prospects_sheet.py STATUSES), then the three
-   statuses only Mission Control has. The Sheet is the master: /eco-sync
-   overwrites a card's status with the Sheet's, unless he moved the card past
-   the Sheet into one of the three. */
+   Sheet"; redefined by him 2026-10-14). The Sheet's Status dropdown verbatim,
+   in its order (Jarvis projects/lead-engine/tools/prospects_sheet.py
+   STATUSES). The Sheet is the master for every status, the end states too:
+   /eco-sync overwrites a card's status with the Sheet's. "In conversation"
+   is retired, a reply is Responded waiting. */
 export const SHEET_STATUSES = [
-  'Prospect', 'Audit to create', 'Audit to review', 'Build', 'Build: ideas to review', 'Build: building',
-  'Email to prepare', 'Ready to contact', 'Contacted', '1st reminder sent', '2nd reminder sent (personal)',
-  'Letter reminder sent', 'Call / visit', 'Responded waiting',
+  'Prospect', 'Audit to create', 'Audited', 'Build', 'Ready to contact', 'Contacted', '1st reminder sent',
+  '2nd reminder sent (personal)', 'Letter reminder sent', 'Call / visit', 'Responded waiting', 'Meeting planned',
+  'On hold', 'Acquired', 'Lost', 'Rejected',
 ] as const
-export const TALKING = 'In conversation', WON = 'Acquired', LOST = 'Lost'
-export const MC_ONLY = [TALKING, WON, LOST]
-export const STAGES: { id: ProspectStage; label: string }[] = [...SHEET_STATUSES, ...MC_ONLY].map((s) => ({ id: s, label: s }))
+export const TALKING = 'Responded waiting', MEETING = 'Meeting planned', ON_HOLD = 'On hold', WON = 'Acquired', LOST = 'Lost', REJECTED = 'Rejected'
+/** Out of the email sequence: they replied, it is paused, or it is over. */
+export const NOT_OPEN: ProspectStage[] = [TALKING, MEETING, ON_HOLD, WON, LOST, REJECTED]
+/** Ended without a deal: both keep a reason. */
+export const isDead = (s: ProspectStage): boolean => s === LOST || s === REJECTED
+/** Board lanes that show even when empty, so a drop is always one drag away. */
+export const BOARD_ALWAYS: ProspectStage[] = [TALKING, WON, LOST]
+export const STAGES: { id: ProspectStage; label: string }[] = SHEET_STATUSES.map((s) => ({ id: s, label: s }))
 
 /** A status he added to the Sheet after this build still sorts, after the
- *  Sheet's own and before the three Mission Control ones. */
+ *  chasing statuses and before Responded waiting. */
 export const stageRank = (s: ProspectStage): number => {
   const i = (SHEET_STATUSES as readonly string[]).indexOf(s)
-  if (i >= 0) return i
-  const m = MC_ONLY.indexOf(s)
-  return m >= 0 ? SHEET_STATUSES.length + 1 + m : SHEET_STATUSES.length
+  return i >= 0 ? i : SHEET_STATUSES.indexOf(TALKING) - 0.5
 }
 
-/* Cards saved before 2026-10-13 carry the old five lanes. To reach out cards
-   came from audited Drive folders, so they are Email to prepare. */
-const LEGACY: Record<string, ProspectStage> = { reach: 'Email to prepare', contacted: 'Contacted', talking: TALKING, won: WON, lost: LOST }
-export const normStage = (s: unknown): ProspectStage => (typeof s === 'string' && s.trim() ? LEGACY[s] ?? s : 'Prospect')
+/* Cards saved before 2026-10-13 carry the old five lanes (to reach out cards
+   came from audited Drive folders, so they are Ready to contact), and cards
+   or an old Sheet snapshot from before 2026-10-14 carry retired statuses. */
+const LEGACY: Record<string, ProspectStage> = {
+  reach: 'Ready to contact', contacted: 'Contacted', talking: TALKING, won: WON, lost: LOST,
+  'Audit to review': 'Audited', 'Build: ideas to review': 'Build', 'Build: building': 'Build',
+  'Email to prepare': 'Ready to contact', 'In conversation': TALKING,
+}
+export const normStage = (s: unknown): ProspectStage => (typeof s === 'string' && s.trim() ? LEGACY[s.trim()] ?? s.trim() : 'Prospect')
 /** Same list back when nothing needed changing, so a pull does not re-render. */
 export function normProspects(list: Prospect[]): Prospect[] {
   return list.some((p) => normStage(p.stage) !== p.stage) ? list.map((p) => ({ ...p, stage: normStage(p.stage) })) : list
@@ -52,11 +60,13 @@ export const STEPS: { id: TouchStep; label: string }[] = [
 ]
 export const label = <T extends string>(list: { id: T; label: string }[], id: T): string => list.find((x) => x.id === id)?.label ?? id
 
-/** Still chasing: everything before In conversation. */
-export const isOpen = (p: Pick<Prospect, 'stage'>): boolean => !MC_ONLY.includes(p.stage)
-/** In the email sequence: from Email to prepare on. Before that the work is
+/** Still chasing: everything before Responded waiting. Responded waiting,
+ *  Meeting planned and On hold are out of the email sequence; Acquired, Lost
+ *  and Rejected are closed. */
+export const isOpen = (p: Pick<Prospect, 'stage'>): boolean => !NOT_OPEN.includes(p.stage)
+/** In the email sequence: from Ready to contact on. Before that the work is
  *  the audit and the build, so there is no next email and no reply odds. */
-export const inSequence = (p: Pick<Prospect, 'stage'>): boolean => isOpen(p) && stageRank(p.stage) >= stageRank('Email to prepare')
+export const inSequence = (p: Pick<Prospect, 'stage'>): boolean => isOpen(p) && stageRank(p.stage) >= stageRank('Ready to contact')
 
 /** "https://www.Pekarna.cz/kontakt" -> "pekarna.cz". */
 export const cleanDomain = (s: string): string =>
@@ -211,12 +221,12 @@ export function applySheet(prospects: Prospect[], rows: SheetRow[], now = Date.n
     if (i < 0) {
       const id = sheetId(r)
       if (buried(id)) continue
-      next.push({ id, name: name.trim(), ...(d ? { domain: d } : {}), source: 'found', stage: st || 'Prospect', sheet, people: [], touches: [], createdAt: now, updatedAt: now })
+      next.push({ id, name: name.trim(), ...(d ? { domain: d } : {}), source: 'found', stage: normStage(st), sheet, people: [], touches: [], createdAt: now, updatedAt: now })
       added++
       continue
     }
     const p = next[i]
-    const stage = st && !MC_ONLY.includes(p.stage) ? st : p.stage
+    const stage = st ? normStage(st) : p.stage
     const dom = p.domain || d || undefined
     if (stage === p.stage && dom === p.domain && JSON.stringify(sheet) === JSON.stringify(p.sheet ?? null)) continue
     next[i] = { ...p, stage, ...(dom ? { domain: dom } : {}), sheet, updatedAt: now }

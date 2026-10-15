@@ -54,12 +54,14 @@ export const POINTS = {
   task: 6,          // one task finished
   focusPer10: 4,    // per ten minutes of focus
   hard: 12,         // the thing that had been waiting: see HARD_MIN_DAYS
+  outreach: 4,      // one touch to an Off-Plate prospect: see OUTREACH_FROM
   workout: 25,      // reserved: see the note above
 } as const
 export const CAPS = {
   habit: 5,         // see HABIT_TARGET below
   task: 5,          // five tasks is a full day of tasks; the sixth is free
   focusMin: 240,    // four hours is a full day of focus
+  outreach: 10,     // the target; the eleventh email of a day is free
 } as const
 
 /* THE HARD THING IS NOT A FIELD HE HAS TO FILL IN, and it is not invented.
@@ -88,6 +90,18 @@ export const TASK_TARGET = 3
 export const FOCUS_TARGET_MIN = 120
 export const HARD_TARGET = 1
 
+/* BUSINESS OUTREACH, his column, 2026-10-15. Every touch logged on People >
+   Business counts: Email 1, the reminder, the personal email, a call, a visit,
+   whether /eco-sync found it in Gmail or he logged it by hand. A status change
+   on its own does not, because only a touch carries the day it happened.
+
+   It joins the full-day bar FROM THE DAY IT WAS ADDED, on his call. Before
+   that the bar is the old one and outreach scores nothing, so the history he
+   built under the old rules reads exactly as it did. The column still shows
+   what he sent on those days. */
+export const OUTREACH_TARGET = 10
+export const OUTREACH_FROM = '2026-10-15'
+
 /** How a day's ratio moves the wheel. His shape: reward the full day, pay a
  *  little for most of it, and charge for the rest. */
 export const GAIN = 4.2
@@ -105,8 +119,8 @@ export type DayScore = {
   earned: number
   baseline: number
   ratio: number
-  parts: { habits: number; tasks: number; focus: number; hard: number; workout: number }
-  counts: { habits: number; habitTarget: number; tasks: number; focusMin: number; workout: boolean }
+  parts: { habits: number; tasks: number; focus: number; hard: number; outreach: number; workout: number }
+  counts: { habits: number; habitTarget: number; tasks: number; focusMin: number; outreach: number; outreachScored: boolean; workout: boolean }
   hard: HardThing | null
   /** What this day did to the wheel, in momentum points. Negative is a penalty. */
   delta: number
@@ -132,6 +146,8 @@ type Input = {
      particular browser, and no amount of syncing elsewhere reaches it. A
      session that actually happened counts whether or not anything ticked. */
   workoutDays?: Iterable<string>
+  /* One entry per outreach touch, its local day. See OUTREACH_FROM. */
+  outreach?: { day: string }[]
 }
 
 const addDays = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x }
@@ -199,6 +215,9 @@ export function momentumRun(input: Input, days = 60, today = new Date()): DaySco
     for (const t of habitLog) if (workoutIds.has(t.habitId)) workoutByDay.add(t.day)
   }
 
+  const outreachByDay = new Map<string, number>()
+  for (const t of input.outreach ?? []) outreachByDay.set(t.day, (outreachByDay.get(t.day) ?? 0) + 1)
+
   /* What a full day asks of him. Fixed across the window so a day is scored
      against the same bar every time, and a day is never easier just because he
      happened to finish fewer tasks that week. */
@@ -207,6 +226,7 @@ export function momentumRun(input: Input, days = 60, today = new Date()): DaySco
     TASK_TARGET * POINTS.task +
     (FOCUS_TARGET_MIN / 10) * POINTS.focusPer10 +
     HARD_TARGET * POINTS.hard
+  const outreachBar = OUTREACH_TARGET * POINTS.outreach
 
   const out: DayScore[] = []
   let m = 0
@@ -217,16 +237,20 @@ export function momentumRun(input: Input, days = 60, today = new Date()): DaySco
     const tk = Math.min(CAPS.task, doneByDay.get(day) ?? 0)
     const fm = Math.min(CAPS.focusMin, focusByDay.get(day) ?? 0)
     const hard = hardByDay.get(day) ?? null
+    const sent = outreachByDay.get(day) ?? 0
+    const outreachScored = day >= OUTREACH_FROM
+    const dayBaseline = baseline + (outreachScored ? outreachBar : 0)
 
     const parts = {
       habits: hk * POINTS.habit,
       tasks: tk * POINTS.task,
       focus: Math.round((fm / 10) * POINTS.focusPer10),
       hard: hard ? POINTS.hard : 0,
+      outreach: outreachScored ? Math.min(CAPS.outreach, sent) * POINTS.outreach : 0,
       workout: 0,                            // see the note at the top
     }
-    const earned = parts.habits + parts.tasks + parts.focus + parts.hard + parts.workout
-    const ratio = baseline > 0 ? earned / baseline : 0
+    const earned = parts.habits + parts.tasks + parts.focus + parts.hard + parts.outreach + parts.workout
+    const ratio = dayBaseline > 0 ? earned / dayBaseline : 0
 
     const before = m
     m *= FRICTION
@@ -235,8 +259,8 @@ export function momentumRun(input: Input, days = 60, today = new Date()): DaySco
     m = Math.max(0, Math.min(CEILING, m))
 
     out.push({
-      day, earned, baseline, ratio, parts, hard,
-      counts: { habits: hkRaw, habitTarget, tasks: doneByDay.get(day) ?? 0, focusMin: focusByDay.get(day) ?? 0, workout: workoutByDay.has(day) },
+      day, earned, baseline: dayBaseline, ratio, parts, hard,
+      counts: { habits: hkRaw, habitTarget, tasks: doneByDay.get(day) ?? 0, focusMin: focusByDay.get(day) ?? 0, outreach: sent, outreachScored, workout: workoutByDay.has(day) },
       delta: +(m - before).toFixed(2),
       momentum: +m.toFixed(2),
       empty: earned === 0,
@@ -300,7 +324,7 @@ export type Period = {
   earned: number
   baseline: number
   ratio: number
-  counts: { habits: number; habitTarget: number; tasks: number; focusMin: number; workoutDays: number }
+  counts: { habits: number; habitTarget: number; tasks: number; focusMin: number; outreach: number; outreachDays: number; workoutDays: number }
   /** How many hard things were done across the period, and the biggest one. */
   hardCount: number
   hard: HardThing | null
@@ -333,7 +357,7 @@ function dayToPeriod(r: DayScore): Period {
     label: String(d.getDate()),
     sub: WD[d.getDay()],
     earned: r.earned, baseline: r.baseline, ratio: r.ratio,
-    counts: { habits: r.counts.habits, habitTarget: r.counts.habitTarget, tasks: r.counts.tasks, focusMin: r.counts.focusMin, workoutDays: r.counts.workout ? 1 : 0 },
+    counts: { habits: r.counts.habits, habitTarget: r.counts.habitTarget, tasks: r.counts.tasks, focusMin: r.counts.focusMin, outreach: r.counts.outreach, outreachDays: r.counts.outreachScored ? 1 : 0, workoutDays: r.counts.workout ? 1 : 0 },
     hardCount: r.hard ? 1 : 0, hard: r.hard,
     keptDays: r.kept ? 1 : 0, totalDays: 1,
     delta: r.delta, momentum: r.momentum,
@@ -382,6 +406,8 @@ export function rollUp(run: DayScore[], zoom: Zoom): Period[] {
         habitTarget: days[0].counts.habitTarget * days.length,
         tasks: days.reduce((a, r) => a + r.counts.tasks, 0),
         focusMin: days.reduce((a, r) => a + r.counts.focusMin, 0),
+        outreach: days.reduce((a, r) => a + r.counts.outreach, 0),
+        outreachDays: days.filter((r) => r.counts.outreachScored).length,
         workoutDays: days.filter((r) => r.counts.workout).length,
       },
       hardCount: hardDays.length,

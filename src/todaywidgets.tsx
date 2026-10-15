@@ -61,15 +61,15 @@ function HealthWidget() {
 /* ---------------- COOKIE JAR ---------------- */
 
 function CookieJarWidget() {
-  const { habits, habitLog, tasks, focusSessions, setPage } = useStore()
+  const { habits, habitLog, tasks, focusSessions, prospects, setPage } = useStore()
   const { state: health } = useHealth()
   const trainedDays = useMemo(
     () => new Set(health.status === 'ok' ? health.sessions.map(dayOf).filter(Boolean) : []),
     [health],
   )
   const run = useMemo(
-    () => momentumRun({ habits, habitLog, tasks, focusSessions, inView: inAllSpaces, workoutDays: trainedDays }, WINDOW),
-    [habits, habitLog, tasks, focusSessions, trainedDays],
+    () => momentumRun({ habits, habitLog, tasks, focusSessions, inView: inAllSpaces, workoutDays: trainedDays, outreach: prospects.flatMap((p) => p.touches) }, WINDOW),
+    [habits, habitLog, tasks, focusSessions, trainedDays, prospects],
   )
   const chain = chainOf(run)
   if (run.length === 0) return null

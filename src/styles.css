@@ -6773,7 +6773,7 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 
 /* ---- the ladder ---- */
 .tl-head, .tl-rung { display: grid;
-  grid-template-columns: 96px repeat(5, minmax(0, 1fr)) 1.7fr 92px; gap: var(--s3); align-items: center; }
+  grid-template-columns: 96px repeat(6, minmax(0, 1fr)) 1.7fr 92px; gap: var(--s3); align-items: center; }
 .tl-head { padding: 0 18px var(--s2); }
 .tl-rungs { display: flex; flex-direction: column; gap: 8px; }
 .tl-rung { background: var(--tl-rung); border-radius: var(--tl-r); padding: 14px 18px;

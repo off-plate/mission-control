@@ -47,7 +47,7 @@ import { getHevyStatsForDay } from './hevy'
 import { localDateKey } from './util'
 import {
   momentumRun, momentumNow, stateFor, chainOf, rollUp,
-  POINTS, CAPS, HABIT_TARGET, TASK_TARGET, FOCUS_TARGET_MIN, HARD_MIN_DAYS,
+  POINTS, CAPS, HABIT_TARGET, TASK_TARGET, FOCUS_TARGET_MIN, HARD_MIN_DAYS, OUTREACH_TARGET,
   EMPTY_WIPE, KEPT_AT, GAIN, FRICTION, CEILING, curveFor, project,
   type DayScore, type Period, type Zoom, type Future,
 } from './momentum'
@@ -127,7 +127,7 @@ const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
 export const inAllSpaces = () => true
 
 export function TimelinePage() {
-  const { habits, habitLog, tasks, focusSessions, setPage } = useStore()
+  const { habits, habitLog, tasks, focusSessions, prospects, setPage } = useStore()
   /* Remembered, so the nav on Health and Why can bring him back to the view
      he left rather than always to the ladder. */
   const { view: jarView, lives } = useJarState()
@@ -147,8 +147,8 @@ export function TimelinePage() {
   )
 
   const run = useMemo(
-    () => momentumRun({ habits, habitLog, tasks, focusSessions, inView: inAllSpaces, workoutDays: trainedDays }, WINDOW),
-    [habits, habitLog, tasks, focusSessions, trainedDays],
+    () => momentumRun({ habits, habitLog, tasks, focusSessions, inView: inAllSpaces, workoutDays: trainedDays, outreach: prospects.flatMap((p) => p.touches) }, WINDOW),
+    [habits, habitLog, tasks, focusSessions, trainedDays, prospects],
   )
   const now = momentumNow(run)
   const chain = chainOf(run)
@@ -263,7 +263,7 @@ function Promise({ now, chain, periods, zoom, sums }: { now: number; chain: Retu
 }
 
 /* ------------------------------------------------------------------ ladder */
-const COLS = ['Finances', 'Health', 'Habits', 'Tasks', 'Focus', 'Hard thing', 'Points']
+const COLS = ['Finances', 'Health', 'Habits', 'Tasks', 'Focus', 'Outreach', 'Hard thing', 'Points']
 
 function Ladder({ rows, zoom, money }: { rows: Period[]; zoom: Zoom; money: CompassMoney | null }) {
   return (
@@ -367,6 +367,12 @@ function Rung({ p, zoom, money, today }: { p: Period; zoom: Zoom; money: Compass
       <Cell figure={String(p.counts.habits)} unit={`of ${p.counts.habitTarget}`} pct={p.counts.habits / Math.max(1, p.counts.habitTarget)} />
       <Cell figure={String(p.counts.tasks)} unit="done" pct={p.counts.tasks / (TASK_TARGET * p.totalDays)} />
       <Cell figure={hm(p.counts.focusMin)} unit="focused" pct={p.counts.focusMin / (FOCUS_TARGET_MIN * p.totalDays)} />
+      {/* OUTREACH. Touches on People > Business. Scored only from
+          OUTREACH_FROM; before that it shows what went out and says so. */}
+      <Cell figure={String(p.counts.outreach)}
+        unit={p.counts.outreachDays ? `of ${OUTREACH_TARGET * p.counts.outreachDays}` : 'sent, not scored'}
+        pct={p.counts.outreachDays ? p.counts.outreach / (OUTREACH_TARGET * p.counts.outreachDays) : 0}
+        muted={!p.counts.outreachDays} />
 
       <span className="tl-hard">
         <span className={`tl-tick${p.hardCount ? '' : ' no'}`} aria-hidden="true">{p.hardCount ? '✓' : '✕'}</span>
@@ -585,12 +591,13 @@ function Flywheel({ rows, zoom, now, money, run }: {
    is worth in MOMENTUM -- and then says which of the sources he is not feeding,
    because a wheel reading zero is otherwise a mystery. */
 function Maths({ run, now }: { run: DayScore[]; now: number }) {
-  const full = HABIT_TARGET * POINTS.habit + TASK_TARGET * POINTS.task + (FOCUS_TARGET_MIN / 10) * POINTS.focusPer10 + POINTS.hard
+  const full = HABIT_TARGET * POINTS.habit + TASK_TARGET * POINTS.task + (FOCUS_TARGET_MIN / 10) * POINTS.focusPer10 + POINTS.hard + OUTREACH_TARGET * POINTS.outreach
   const share = [
     { name: 'Habits', pts: HABIT_TARGET * POINTS.habit, each: `${POINTS.habit} each, ${HABIT_TARGET} counts`, fed: run.some((r) => r.counts.habits > 0) },
     { name: 'Tasks', pts: TASK_TARGET * POINTS.task, each: `${POINTS.task} each, ${CAPS.task} max`, fed: run.some((r) => r.counts.tasks > 0) },
     { name: 'Focus', pts: (FOCUS_TARGET_MIN / 10) * POINTS.focusPer10, each: `${POINTS.focusPer10} per 10 min`, fed: run.some((r) => r.counts.focusMin > 0) },
     { name: 'The hard thing', pts: POINTS.hard, each: `waited ${HARD_MIN_DAYS} days`, fed: run.some((r) => !!r.hard) },
+    { name: 'Outreach', pts: OUTREACH_TARGET * POINTS.outreach, each: `${POINTS.outreach} each, ${OUTREACH_TARGET} counts`, fed: run.some((r) => r.counts.outreach > 0) },
   ]
   const bands = [
     { at: 'All of it', pts: `${full}`, gain: GAIN * curveFor(1) },
@@ -670,6 +677,7 @@ function DayCard({ p, zoom, money }: {
         <div><dt>Habits</dt><dd>{p.counts.habits}<small>of {p.counts.habitTarget}</small></dd></div>
         <div><dt>Tasks</dt><dd>{p.counts.tasks}<small>done</small></dd></div>
         <div><dt>Focus</dt><dd>{hm(p.counts.focusMin)}<small>{zoom === 'd' ? 'today' : 'in total'}</small></dd></div>
+        <div className={p.counts.outreach ? '' : 'off'}><dt>Outreach</dt><dd>{p.counts.outreach}<small>{p.counts.outreachDays ? `of ${OUTREACH_TARGET * p.counts.outreachDays}` : 'sent, not scored'}</small></dd></div>
         <div className={fin ? '' : 'off'}><dt>Finances</dt><dd>{fin ? kc(fin) : '—'}<small>{fin ? 'Kč moved' : money ? 'nothing moved' : 'no Compass'}</small></dd></div>
         {(() => {
           const detail = hevyDetail(p.days.map((d) => d.day), sessionMins)

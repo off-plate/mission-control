@@ -10856,8 +10856,9 @@ body:has(.shell.is-hud) { --st-research: #9AA3B0; --st-build: #A592CC; --st-reac
 
   /* Routine cards: the name had a 34% cap meant for desktop, so on a phone
      "After wake up" broke onto three lines beside empty space. */
-  .rtc-top { flex-wrap: nowrap; }
-  .rtc-id { flex: 1 1 auto; max-width: none; }
+  /* Name takes what is left beside the count and Start; the progress row
+     (.rtc-run, 100% basis) still wraps under it. */
+  .rtc-id { flex: 1 1 0; max-width: none; }
   /* Settings rows: the action drops under the text instead of squeezing it
      into a column a few words wide. */
   .source-row { flex-wrap: wrap; }
@@ -10930,4 +10931,24 @@ body:has(.shell.is-hud) { --st-research: #9AA3B0; --st-build: #A592CC; --st-reac
   .tabsheet, .tabsheet.is-open { transform: none; transition: opacity 160ms ease, visibility 0s; }
   .tabsheet { opacity: 0; }
   .tabsheet.is-open { opacity: 1; }
+}
+
+/* ---------- Phone density (2026-10-15) ----------
+   His note after the tab bar shipped: the pages themselves were not as tight
+   as the approved mockup. They were still on desktop spacing, squeezed. This
+   is the mockup's scale: 16px gutter (already true), 14px inside cards,
+   12-14px between blocks, and no card nested inside another card. */
+@media (max-width: 639px) {
+  .band { padding-block: 14px; gap: 14px; }
+  .troom { padding: 0; }
+  .tr-card, .panel { padding: 14px; }
+  .weekplan-bar { padding-inline: 14px; }
+  .weekplan-collapse-inner { padding-inline: 14px; }
+  .grid-3.plan-cols, .hg-two, .hg-col { gap: 12px; }
+  /* Habits: the routine cards ARE the cards, the panel around them is just
+     a heading and a list, so it loses its own box. */
+  .panel.hg-panel { padding: 0; border: 0; background: none; box-shadow: none; }
+  .rtc { padding: 12px 14px; }
+  .microcap { margin-top: 16px; }
+  .bills-empty { margin-top: 24px; padding-inline: 0; }
 }

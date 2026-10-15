@@ -1,6 +1,6 @@
 import { Orb } from './orb'
 import { JarBar, JAR_PAGES } from './cookiejarnav'
-import { ProjectMark } from './ui'
+import { ProjectMark, WorkspacePick } from './ui'
 import { usePromptWindow } from './promptwindow'
 import { lastFace } from './ideasswitch'
 import { Component, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react'
@@ -401,9 +401,9 @@ function PeopleButton({ on, open }: { on: boolean; open: () => void }) {
    that closes on a pick, a tap outside, the X, Escape or a swipe down.
    Hidden above 640px by CSS, where the header row is better. */
 const TAB_PAGES: { id: PageId; label: string; icon: ReactNode; lit: PageId[] }[] = [
-  { id: 'today', label: 'Today', icon: <Icon.Sun size={22} />, lit: ['today', 'day'] },
-  { id: 'plan', label: 'Plan', icon: <Icon.Checklist size={22} />, lit: ['plan', 'projects'] },
-  { id: 'habits', label: 'Habits', icon: <Icon.CheckRing size={22} />, lit: ['habits', 'routines', 'goals', 'quitting'] },
+  { id: 'today', label: 'Today', icon: <Icon.TabToday size={23} />, lit: ['today', 'day'] },
+  { id: 'plan', label: 'Plan', icon: <Icon.TabPlan size={23} />, lit: ['plan', 'projects'] },
+  { id: 'habits', label: 'Habits', icon: <Icon.TabHabits size={23} />, lit: ['habits', 'routines', 'goals', 'quitting'] },
 ]
 const MORE_PAGES: { id: PageId; label: string; icon: ReactNode }[] = [
   { id: 'calendar', label: 'Calendar', icon: <Icon.DockCalendar size={22} /> },
@@ -473,7 +473,7 @@ function PhoneTabBar({ page, setPage }: { page: PageId; setPage: (p: PageId) => 
           </button>
         ))}
         <button className="tabbar-tab" aria-current={moreLit ? 'page' : undefined} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-          <Icon.AppsGrid size={22} /><span>More</span>
+          <Icon.TabMore size={23} /><span>More</span>
         </button>
       </nav>
       <div className={`tabsheet-scrim${open ? ' is-open' : ''}`} onClick={() => setOpen(false)} aria-hidden="true" />
@@ -684,6 +684,7 @@ export default function App() {
               Jarvis is one click away, and in Jarvis the logo means the way back. */}
           <span className="brand-swap" aria-hidden="true">{hud ? <Logo /> : <Helmet lit={false} />}</span>
         </button>
+        <WorkspacePick className="phone-only" />
         </div>
         <div className="topbar-right">
           {/* Status before actions, and not in the Zone: that room is one thing

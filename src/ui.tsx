@@ -303,6 +303,18 @@ export function TaskMark({ task, always }: { task: { space?: SpaceId; projectId?
    same setView the header switcher calls, so the two always agree. */
 const WS_DOT: Record<string, string> = { all: '#DFF24A', personal: '#FFC94A', work: '#7FD8F5' }
 export function WorkspaceTitle({ before, after }: { before: string; after?: string }) {
+  return (
+    <span className="ws-title">
+      <span>{before}</span>
+      <WorkspacePick />
+      {after && <span>{after}</span>}
+    </span>
+  )
+}
+
+/* The same switch on its own: the phone header carries it (2026-10-15), so it
+   is on every page there, not only the two whose titles hold it. */
+export function WorkspacePick({ className }: { className?: string }) {
   const { view, setView } = useStore()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLSpanElement>(null)
@@ -321,11 +333,9 @@ export function WorkspaceTitle({ before, after }: { before: string; after?: stri
   const show = () => { window.clearTimeout(timer.current); setOpen(true) }
   const hideSoon = () => { timer.current = window.setTimeout(() => setOpen(false), 220) }
   return (
-    <span className="ws-title">
-      <span>{before}</span>
-      <span className="ws-pick" ref={ref} onMouseEnter={show} onMouseLeave={hideSoon}>
+      <span className={`ws-pick${className ? ' ' + className : ''}`} ref={ref} data-space={view} onMouseEnter={show} onMouseLeave={hideSoon}>
         <button className="ws-chip" aria-haspopup="menu" aria-expanded={open} aria-label={`Workspace: ${label(view)}`} onClick={() => setOpen((o) => !o)}>
-          {label(view)}<Icon.ChevronDown size={14} strokeWidth={3} />
+          <i className="ws-dot" style={{ background: WS_DOT[view] }} aria-hidden="true" />{label(view)}<Icon.ChevronDown size={14} strokeWidth={3} />
         </button>
         {open && (
           <div className="ws-menu" role="menu">
@@ -337,8 +347,6 @@ export function WorkspaceTitle({ before, after }: { before: string; after?: stri
           </div>
         )}
       </span>
-      {after && <span>{after}</span>}
-    </span>
   )
 }
 

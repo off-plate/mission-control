@@ -222,6 +222,12 @@ export const DockChartBar = make(<><path d="M3 13a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1
 /* Calendar, for the phone's More sheet (2026-10-15): Hicon has none sourced
    here, so it is Tabler's calendar, same licence and fit as the four above. */
 export const DockCalendar = make(<><path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z" /><path d="M16 3v4" /><path d="M8 3v4" /><path d="M4 11h16" /></>, 16, { k: 1, x: 0, y: 0 })
+/* The phone tab bar's four glyphs, house-drawn for the approved mockup
+   (claude.ai/artifact/NdogniJE4EQa3aPJ6e2p4m) and used only there. */
+export const TabToday = make(<><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></>, 16, { k: 1, x: 0, y: 0 })
+export const TabPlan = make(<><rect x="4" y="4" width="16" height="16" rx="4" /><path d="M8 9h8M8 13h8M8 17h5" /></>, 16, { k: 1, x: 0, y: 0 })
+export const TabHabits = make(<><path d="m5 12 4 4 10-10" /><path d="M5 19h14" /></>, 16, { k: 1, x: 0, y: 0 })
+export const TabMore = make(<><rect x="4" y="4" width="6" height="6" rx="2" /><rect x="14" y="4" width="6" height="6" rx="2" /><rect x="4" y="14" width="6" height="6" rx="2" /><rect x="14" y="14" width="6" height="6" rx="2" /></>, 16, { k: 1, x: 0, y: 0 })
 export const DockUser = make(<><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /></>, 16, { k: 1, x: 0, y: 0 })
 export const DockBook = make(<><path d="M19 4v16h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12" /><path d="M19 16h-12a2 2 0 0 0 -2 2" /><path d="M9 8h6" /></>, 16, { k: 1, x: 0, y: 0 })
 /* Watchless: a transcript, not a video. Tabler's file-text over a play, because

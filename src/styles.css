@@ -10952,3 +10952,53 @@ body:has(.shell.is-hud) { --st-research: #9AA3B0; --st-build: #A592CC; --st-reac
   .microcap { margin-top: 16px; }
   .bills-empty { margin-top: 24px; padding-inline: 0; }
 }
+
+/* ---------- Phone: the mockup's header and type scale (2026-10-15) ----------
+   Second pass, from his own phone: the first pass kept the old header and the
+   desktop type sizes. This matches claude.ai/artifact/NdogniJE4EQa3aPJ6e2p4m:
+   dark logo tile, workspace beside it, two plain icon squares; 30px titles,
+   sentence-case labels, stat tiles, 38px chips, 16px card corners. */
+.phone-only { display: none; }
+.ws-dot { display: none; }
+@media (max-width: 639px) {
+  .phone-only { display: inline-flex; }
+
+  /* Header */
+  .topbar { min-height: 56px; gap: 10px; }
+  .topbar-left { gap: 10px; }
+  .brand { gap: 0; min-height: 0; }
+  .brand-swap { display: none; }
+  .brand-mark { width: 34px; height: 34px; border-radius: 10px; background: var(--a-ink); display: grid; place-items: center; }
+  .brand-mark svg { width: 18px; height: 18px; color: var(--a-accent); }
+  .topbar .ws-chip { font-family: var(--font-display); font-weight: 700; font-size: 17px; letter-spacing: -0.01em; color: var(--ink); gap: 6px; align-items: center; display: inline-flex; min-height: 40px; }
+  .topbar .ws-chip svg { width: 14px; height: 14px; color: var(--muted); margin-top: 0; }
+  .topbar .ws-dot { display: inline-block; width: 9px; height: 9px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(18, 16, 12, 0.25); }
+  .topbar .ws-menu { left: 0; }
+  .syncorb { transform: scale(0.8); }
+  .topbar .btn-sq { width: 40px; height: 40px; min-height: 40px; padding: 0; border-radius: 12px; background: var(--surface); border: 1px solid var(--hairline); display: grid; place-items: center; }
+  .topbar .btn-sq svg { width: 18px; height: 18px; }
+  .topbar .btn-sq-label { display: none; }
+
+  /* Page titles: the workspace lives in the header now, so a title is just
+     its name, and Plan's date sits under it at reading size. */
+  .band h1 { font-size: 30px; line-height: 1.1; letter-spacing: -0.025em; }
+  .band .ws-pick { display: none; }
+  .band h1 .ws-title { display: block; }
+  .band h1 .ws-title > .ws-pick + span { display: block; margin-top: 4px; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; color: var(--muted); }
+
+  /* Band numbers become the mockup's stat tiles. */
+  .band-status { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; width: 100%; margin-left: 0; }
+  .band-status > :not(.band-metric) { grid-column: 1 / -1; }
+  .band-metric { text-align: left; background: var(--surface); border: 1px solid var(--hairline); border-radius: 16px; padding: 12px 14px; min-width: 0; }
+  .band-metric .v { font-size: 24px; line-height: 1.1; letter-spacing: -0.02em; }
+  .band-metric .k { display: block; margin-top: 4px; font-size: 13px; font-weight: 500; letter-spacing: 0; text-transform: none; }
+
+  /* Section headings read as headings, not shouting labels. The dark week
+     card keeps its own. */
+  .col-head .microcap, .hg-head .microcap { font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--ink); }
+
+  /* Controls */
+  .btn { min-height: 40px; }
+  .pstrip-item { height: 38px; padding: 0 12px; border-radius: 10px; }
+  .panel, .tr-card, .rtc, .weekplan-bar { border-radius: 16px; }
+}

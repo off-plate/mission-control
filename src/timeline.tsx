@@ -370,7 +370,7 @@ function Rung({ p, zoom, money, today }: { p: Period; zoom: Zoom; money: Compass
       {/* OUTREACH. Touches on People > Business. Scored only from
           OUTREACH_FROM; before that it shows what went out and says so. */}
       <Cell figure={String(p.counts.outreach)}
-        unit={p.counts.outreachDays ? `of ${OUTREACH_TARGET * p.counts.outreachDays}` : 'sent, not scored'}
+        unit={p.counts.outreachDays ? `of ${OUTREACH_TARGET * p.counts.outreachDays}` : 'sent'}
         pct={p.counts.outreachDays ? p.counts.outreach / (OUTREACH_TARGET * p.counts.outreachDays) : 0}
         muted={!p.counts.outreachDays} />
 
@@ -677,7 +677,7 @@ function DayCard({ p, zoom, money }: {
         <div><dt>Habits</dt><dd>{p.counts.habits}<small>of {p.counts.habitTarget}</small></dd></div>
         <div><dt>Tasks</dt><dd>{p.counts.tasks}<small>done</small></dd></div>
         <div><dt>Focus</dt><dd>{hm(p.counts.focusMin)}<small>{zoom === 'd' ? 'today' : 'in total'}</small></dd></div>
-        <div className={p.counts.outreach ? '' : 'off'}><dt>Outreach</dt><dd>{p.counts.outreach}<small>{p.counts.outreachDays ? `of ${OUTREACH_TARGET * p.counts.outreachDays}` : 'sent, not scored'}</small></dd></div>
+        <div className={p.counts.outreach ? '' : 'off'}><dt>Outreach</dt><dd>{p.counts.outreach}<small>{p.counts.outreachDays ? `of ${OUTREACH_TARGET * p.counts.outreachDays}` : 'sent'}</small></dd></div>
         <div className={fin ? '' : 'off'}><dt>Finances</dt><dd>{fin ? kc(fin) : '—'}<small>{fin ? 'Kč moved' : money ? 'nothing moved' : 'no Compass'}</small></dd></div>
         {(() => {
           const detail = hevyDetail(p.days.map((d) => d.day), sessionMins)

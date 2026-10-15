@@ -17,7 +17,7 @@ import { parseIcs } from '../_shared/ical.ts'
 
 type Task = { title: string; at?: string; slot?: string; done: boolean; list: 'today' | 'backlog'; plannedOn?: string; projectId?: string; estimateMin?: number; subtasks?: { estimateMin: number }[] }
 type Project = { id: string; name: string }
-type Habit = { id: string; kind?: string; frequency?: string; paused?: boolean; archivedAt?: string; folderId?: string; optional?: boolean }
+type Habit = { id: string; name?: string; daypart?: string; folderOrder?: number; kind?: string; frequency?: string; paused?: boolean; archivedAt?: string; folderId?: string; optional?: boolean }
 type Tick = { habitId: string; day: string }
 
 const json = (body: unknown, status = 200) =>
@@ -43,7 +43,7 @@ const iso = (dt: Date) => dt.toISOString().slice(0, 10)
    habits never hold a folder open, a routine's own habit is not a row.
    ponytail: "kept today" reads the dated log, not the app's 7-slot days cache,
    which only rolls when the app is opened. Same answer whenever the app is current. */
-function habitsToday(habits: Habit[], routines: { habitId?: string }[], log: Tick[], now: ReturnType<typeof pragueNow>) {
+function habitsToday(habits: Habit[], routines: { id: string; title?: string; habitId?: string }[], log: Tick[], now: ReturnType<typeof pragueNow>) {
   const monday = new Date(Date.UTC(now.y, now.m - 1, now.d - now.weekday))
   const sunday = new Date(Date.UTC(now.y, now.m - 1, now.d - now.weekday + 6))
   const monthFrom = `${now.day.slice(0, 7)}-01`, monthTo = `${now.day.slice(0, 7)}-31`
@@ -56,14 +56,23 @@ function habitsToday(habits: Habit[], routines: { habitId?: string }[], log: Tic
     && !((h.frequency === 'weekly' || h.frequency === 'monthly') && keptPeriod(h)))
   const doneToday = new Set(log.filter((t) => t.day === now.day).map((t) => t.habitId))
   const folderHabitIds = new Set(routines.map((r) => r.habitId).filter(Boolean))
+  // A folder (routine) is ONE item with its own done/total; a loose habit is one item.
   const folders = [...new Set(due.map((h) => h.folderId).filter(Boolean))]
-    .map((id) => due.filter((h) => h.folderId === id && !h.optional))
-    .filter((need) => need.length > 0)
+    .map((id) => ({ id, need: due.filter((h) => h.folderId === id && !h.optional) }))
+    .filter((f) => f.need.length > 0)
   const loose = due.filter((h) => !h.folderId && !folderHabitIds.has(h.id))
-  return {
-    due: folders.length + loose.length,
-    kept: folders.filter((need) => need.every((h) => doneToday.has(h.id))).length + loose.filter((h) => doneToday.has(h.id)).length,
-  }
+  // Routines in the order he keeps them, then loose habits by part of the day.
+  const DAYPART = ['morning', 'noon', 'afternoon', 'evening']
+  const part = (p?: string) => { const i = DAYPART.indexOf(p ?? ''); return i < 0 ? 9 : i }
+  const items = [
+    ...folders.map((f) => {
+      const done = f.need.filter((h) => doneToday.has(h.id)).length
+      const r = routines.findIndex((x) => x.id === f.id)
+      return { name: routines[r]?.title ?? 'Routine', kept: done === f.need.length, done, total: f.need.length, order: r < 0 ? 900 : r }
+    }),
+    ...loose.map((h) => ({ name: h.name ?? 'Habit', kept: doneToday.has(h.id), done: doneToday.has(h.id) ? 1 : 0, total: 1, order: 1000 + part(h.daypart) })),
+  ].sort((a, b) => a.order - b.order).map(({ order: _o, ...i }) => i)
+  return { due: items.length, kept: items.filter((i) => i.kept).length, items }
 }
 
 // The next timed event from now, today or tomorrow. A dead feed just means no event.
@@ -130,7 +139,7 @@ Deno.serve(async (req: Request) => {
     today: { done: today.length - open.length, total: today.length, openMin: open.reduce((a, t) => a + minutes(t), 0), next: open[0]?.title ?? null, nextMin: open[0] ? minutes(open[0]) : 0 },
     waiting: { count: waiting.length, min: waiting.reduce((a, t) => a + minutes(t), 0) },
     projects: [...perProject].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([id, n]) => ({ name: name(id), waiting: n })),
-    habits: habitsToday(arr<Habit>(s.habits), arr<{ habitId?: string }>(s.routines), arr<Tick>(s.habitLog), now),
+    habits: habitsToday(arr<Habit>(s.habits), arr<{ id: string; title?: string; habitId?: string }>(s.routines), arr<Tick>(s.habitLog), now),
     event: await event,
     syncedAt: row.updated_at,
   })

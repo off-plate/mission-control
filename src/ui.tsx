@@ -477,6 +477,22 @@ export function Segmented<T extends string>({ value, options, onPick, size = 'md
 
    (pointer: coarse) rather than a width, deliberately: a narrow desktop
    window still has a mouse and drag still works in it. */
+/* Phone width, for the few places where a phone gets a different control, not
+   just different spacing (the estimate button, 2026-10-15). Coarse pointer alone
+   misses a phone-sized window on a laptop and catches an iPad. */
+export function usePhone(): boolean {
+  const q = '(max-width: 639px)'
+  const [on, setOn] = useState(() => typeof matchMedia === 'function' && matchMedia(q).matches)
+  useEffect(() => {
+    if (typeof matchMedia !== 'function') return
+    const mq = matchMedia(q)
+    const f = () => setOn(mq.matches)
+    mq.addEventListener('change', f)
+    return () => mq.removeEventListener('change', f)
+  }, [])
+  return on
+}
+
 export function useCoarsePointer(): boolean {
   const [coarse, setCoarse] = useState(
     () => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches,

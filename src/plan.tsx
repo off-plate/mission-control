@@ -17,7 +17,7 @@ import { usePomodoro } from './pomodoro'
 import { BreakdownSheet, Sheet } from './modals'
 import { Linkify } from './widgets'
 import { PLAN_AHEAD_DAYS, WeekGrid, dayPlus, shortDay, weekRangeLabel } from './weekgrid'
-import { useCoarsePointer, Band, WorkspaceTitle, Dropdown, ProjectMark, SpaceMark } from './ui'
+import { useCoarsePointer, usePhone, Band, WorkspaceTitle, Dropdown, ProjectMark, SpaceMark } from './ui'
 import { estimateFor } from './estimate'
 import { estimateTask } from './ai'
 import { SLOTS, SPACES, UNSORTED, habitLocked, routineComplete, routineProgress, slotMinutes, TYPING_TARGET_WPM, type Project, type Routine, type SubTask, type Task, type TimeSlot } from './types'
@@ -195,10 +195,30 @@ export function ActualLog({ est, tracked, onLog, onSkip }: { est: number; tracke
 }
 
 
+/* The AI reads the task; the local rule of thumb only catches the fall. A
+   flat default dressed as an estimate taught him to ignore the button. */
+function useAiEstimate(task: Task) {
+  const { setEstimate } = useStore()
+  const [thinking, setThinking] = useState(false)
+  const estimate = async () => {
+    if (thinking) return
+    setThinking(true)
+    try {
+      const ai = await estimateTask(task.title, task.category)
+      setEstimate(task.id, ai ?? estimateFor(task.title, task.category).minutes)
+    } finally { setThinking(false) }
+  }
+  return { thinking, estimate }
+}
+
 /* The estimate is a number you can argue with. Click it and type your own; the
    generated one is a starting point, not a verdict. */
 function EstimateChip({ task }: { task: Task }) {
   const { setEstimate, inView } = useStore()
+  /* On a phone the hourglass is gone (his ask, 2026-10-15): an unestimated
+     task's chip IS the estimate button, and an estimated one is plain text. */
+  const phone = usePhone()
+  const ai = useAiEstimate(task)
   const [editing, setEditing] = useState(false)
   const [val, setVal] = useState('')
   const fromSteps = !!task.subtasks?.length
@@ -221,6 +241,13 @@ function EstimateChip({ task }: { task: Task }) {
     )
   }
   if (fromSteps) return <span className="chip tone-info" title="Comes from the steps">{fmtDuration(mins)}</span>
+  if (phone && !isEstimated(task)) {
+    return (
+      <button className="chip tone-info est-edit is-none est-ai" disabled={ai.thinking} aria-label={`Estimate how long ${task.title} takes`} onClick={ai.estimate}>
+        {ai.thinking ? '…' : 'Estimate'}
+      </button>
+    )
+  }
   return (
     <button
       className={`chip tone-info est-edit${isEstimated(task) ? '' : ' is-none'}`}
@@ -235,19 +262,8 @@ function EstimateChip({ task }: { task: Task }) {
 
 /* Breaking a task down and estimating it are actions on the task itself. */
 function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
-  const { setEstimate, inView } = useStore()
   const hasSubs = !!task.subtasks?.length
-  const [thinking, setThinking] = useState(false)
-  /* The AI reads the task; the local rule of thumb only catches the fall. A
-     flat default dressed as an estimate taught him to ignore the button. */
-  const estimate = async () => {
-    if (thinking) return
-    setThinking(true)
-    try {
-      const ai = await estimateTask(task.title, task.category)
-      setEstimate(task.id, ai ?? estimateFor(task.title, task.category).minutes)
-    } finally { setThinking(false) }
-  }
+  const { thinking, estimate } = useAiEstimate(task)
   return (
     <span className="task-actions">
       {onFocus && (
@@ -519,6 +535,13 @@ function ProjectStrip({ projects, tasks, sel, showSpaces, touch, inScope, onAll,
   )
 }
 
+/* The phone shows one list at a time (his ask, 2026-10-15). The tab bar's +
+   fires mc:new-task, which lands on Plan's new-task box, and that box lives in
+   the to-do list, so the next Plan render opens on it. Registered at import,
+   ahead of the shell's own listener, so it is set before Plan mounts. */
+let openTodoNext = false
+if (typeof window !== 'undefined') window.addEventListener('mc:new-task', () => { openTodoNext = true })
+
 export function PlanPage() {
   const todayIdx = (new Date().getDay() + 6) % 7
   const pomo = usePomodoro()
@@ -652,7 +675,14 @@ export function PlanPage() {
      more days he can step onto and lay out, one at a time, the same panel he
      already knows. offset 0 is today, 1 is tomorrow, up to 6 days out. */
   const [dayOffset, setDayOffset] = useState(0)
+  const [phoneList, setPhoneList] = useState<'todo' | 'day'>(() => { const v = openTodoNext; openTodoNext = false; return v ? 'todo' : 'day' })
+  useEffect(() => {
+    const on = () => { openTodoNext = false; setPhoneList('todo') }
+    window.addEventListener('mc:new-task', on)
+    return () => window.removeEventListener('mc:new-task', on)
+  }, [])
   const coarse = useCoarsePointer()
+  const phone = usePhone()
   const planDay = dayPlus(dayOffset)
   const onDay = (t: Task) => t.list === 'today' && (t.plannedOn ?? localDateKey()) === planDay
   const todayAll = spaceTasks.filter(onDay)                      // the day incl. finished (they stay, struck)
@@ -988,7 +1018,7 @@ export function PlanPage() {
            one tap further, through Projects then the Space's own Plan. */
         actions={(
           <span className="plan-actions">
-            <button className="btn btn-ghost plan-search-btn" onClick={() => setSpot(true)} aria-label="Search every task" title="Search every task (Cmd K)"><Icon.Search size={16} /></button>
+            <button className="btn btn-ghost plan-search-btn hide-phone" onClick={() => setSpot(true)} aria-label="Search every task" title="Search every task (Cmd K)"><Icon.Search size={16} /></button>
             <button className="btn btn-ghost" onClick={openDaily}>Yesterday</button>
           </span>
         )}
@@ -1138,7 +1168,11 @@ export function PlanPage() {
       )}
 
       {/* The hourly schedule lives on Calendar now; Plan is the list and the day. */}
-      <div className="grid-3 plan-cols plan-two">
+      <div className="seg-phone" role="tablist" aria-label="Which list">
+        <button role="tab" aria-selected={phoneList === 'todo'} onClick={() => setPhoneList('todo')}>To-do list <em>{backlogOpen.length}</em></button>
+        <button role="tab" aria-selected={phoneList === 'day'} onClick={() => setPhoneList('day')}>{offsetWord(dayOffset)}</button>
+      </div>
+      <div className={`grid-3 plan-cols plan-two phone-${phoneList}`}>
         {/* 1. To-do list: everything you added, any day. Drag out to plan it,
             drag back to take it off today. */}
         <div
@@ -1397,6 +1431,7 @@ export function PlanPage() {
                           )}
                           {!t.done && <TaskActions task={t} onFocus={() => startFocus(taskMinutes(t), t.title)} />}
                           <Dropdown label={`Options for ${t.title}`}>
+                            {phone && !t.done && isEstimated(t) && <button role="menuitem" onClick={() => startFocus(taskMinutes(t), t.title)}>Start focus</button>}
                             {!t.done && <button role="menuitem" onClick={() => setBreakdownFor(t)}>Break it down</button>}
                             {/* Both "Move to" (the radio-style time-slot list)
                                 and "At a time" came out of this menu entirely

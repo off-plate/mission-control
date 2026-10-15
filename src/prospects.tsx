@@ -11,6 +11,7 @@
    render (src/prospectcalc.ts) and never stored. Value is his own number. */
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { useStore } from './store'
+import * as Icon from './icons'
 import { Segmented, Select } from './ui'
 import { localDateKey } from './util'
 import { AVOID_DAYS } from './exceptions'
@@ -166,6 +167,9 @@ export function BusinessView({ modeSwitch }: { modeSwitch: JSX.Element }) {
   useEffect(() => { try { localStorage.setItem(LAYOUT_KEY, layout) } catch { /* private mode */ } }, [layout])
   const [openId, setOpenId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
+  /* Phone only (his ask, 2026-10-15): the filters took the whole screen and
+     left the table a sliver, so they fold behind one button there. */
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const open = openId ? prospects.find((p) => p.id === openId) : undefined
   const [f, setF] = useState<Filters>(() => {
     try {
@@ -184,7 +188,17 @@ export function BusinessView({ modeSwitch }: { modeSwitch: JSX.Element }) {
         <h1 className="pp-h1">People</h1>
         {modeSwitch}
         <Segmented size="sm" label="Layout" value={layout} onPick={setLayout} options={[{ id: 'list', label: 'Table' }, { id: 'board', label: 'Board' }]} />
-        {prospects.length > 0 && <FilterTools f={f} set={setF} all={prospects} />}
+        {prospects.length > 0 && (() => {
+          const active = [f.q, f.country, f.stage, f.source].filter(Boolean).length
+          return (
+            <>
+              <button className="btn btn-ghost btn-sq pr-filter-btn" type="button" aria-expanded={filtersOpen} aria-label={active ? `Filters, ${active} on` : 'Filters'} onClick={() => setFiltersOpen((v) => !v)}>
+                <Icon.Sliders size={16} />{active > 0 && <span className="btn-sq-dot" aria-hidden="true" />}
+              </button>
+              <div className={`pr-filters${filtersOpen ? ' is-open' : ''}`}><FilterTools f={f} set={setF} all={prospects} /></div>
+            </>
+          )
+        })()}
         <button className="btn btn-primary pp-add" type="button" onClick={() => setAdding(true)} aria-label="Add prospect">
           <svg width="13" height="13" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
           Add

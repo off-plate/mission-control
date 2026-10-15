@@ -11002,3 +11002,84 @@ body:has(.shell.is-hud) { --st-research: #9AA3B0; --st-build: #A592CC; --st-reac
   .pstrip-item { height: 38px; padding: 0 12px; border-radius: 10px; }
   .panel, .tr-card, .rtc, .weekplan-bar { border-radius: 16px; }
 }
+
+/* ---------- Phone Plan: one list at a time, one line per task (2026-10-15) ----------
+   His words: a task took three rows, the hourglass was heavy, there was no
+   switch between the to-do list and the day, and search is not a phone tool. */
+.seg-phone { display: none; }
+@media (max-width: 639px) {
+  .seg-phone { display: grid; grid-template-columns: 1fr 1fr; background: var(--surface-2); border-radius: 12px; padding: 4px; margin-bottom: 12px; }
+  .seg-phone button { min-height: 38px; border-radius: 9px; border: 0; background: none; color: var(--muted); font-family: var(--font-body); font-size: 14px; font-weight: 600; }
+  .seg-phone button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(18, 16, 12, 0.12); }
+  .seg-phone em { font-style: normal; color: var(--faint); margin-left: 4px; font-variant-numeric: tabular-nums; }
+  .plan-two.phone-todo > :not(.todo-col) { display: none; }
+  .plan-two.phone-day > .todo-col { display: none; }
+
+  .todo-row, .today-task { flex-wrap: nowrap; align-items: center; gap: 10px; min-height: 48px; padding-block: 6px; }
+  .todo-row .drag-grip, .today-task .drag-grip,
+  .todo-row .spacemark, .today-task .spacemark,
+  .todo-row .cat-dot, .today-task .cat-dot,
+  .todo-row .carried-tag, .task-actions { display: none; }
+  .todo-row > .grow, .today-task > .grow { flex: 1 1 auto; flex-basis: auto !important; order: 0 !important; min-width: 0 !important; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 15.5px; }
+  .todo-row .est-edit, .today-task .est-edit, .todo-row .chip.tone-info, .today-task .chip.tone-info {
+    flex: none; min-height: 0; height: auto; padding: 4px 2px; border: 0; background: none;
+    font-size: 13px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums;
+  }
+  .todo-row .chip.est-ai, .today-task .chip.est-ai { color: var(--accent-text); font-weight: 700; }
+
+  /* The day strip scrolls sideways instead of wrapping onto a second line. */
+  .day-switch { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -14px; padding-inline: 14px; }
+  .day-switch::-webkit-scrollbar { display: none; }
+  .day-switch .microcap { flex: none; white-space: nowrap; }
+}
+@media (max-width: 639px) {
+  /* Drag needs a cursor, so "drop a task here" is a promise a phone can't keep;
+     a slot with nothing in it is just its heading. */
+  .plan-two .empty.is-boxed { display: none; }
+  .col-head > .fold-all { display: none; }
+  /* Two or three numbers sit in one row of equal tiles; actions get the row under. */
+  .band-status { display: flex; flex-wrap: wrap; }
+  .band-status > .band-metric { flex: 1 1 0; }
+  .band-status > :not(.band-metric) { flex-basis: 100%; }
+}
+
+/* ---------- Phone Habits and menus (2026-10-15) ----------
+   His words: a habit took four rows, and the dropdowns were too large to get
+   through. A routine is one row now (name with its cadence under it, count,
+   Start); the week bar is a desktop read. Menus are compact and scroll. */
+@media (max-width: 639px) {
+  .rtc { padding: 10px 12px; }
+  .rtc-top { gap: 10px; }
+  .rtc-run { display: none; }
+  .rtc-id { gap: 1px; }
+  .rtc-name { font-size: 15.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+  .rtc-when.microcap { font-size: 12.5px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--muted); }
+  .rtc-open { width: 24px; height: 24px; flex: none; }
+  .rtc-start { min-height: 36px; }
+
+  .hg-row { grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 10px 0; min-height: 48px; }
+  .hg-title { display: block; font-size: 15.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hg-note, .hg-n { display: none; }
+  .hg-do { gap: 8px; }
+  .hg-meter { width: 44px; }
+
+  .kebab-menu { min-width: 0; width: max-content; max-width: min(280px, calc(100vw - 32px)); max-height: 55dvh; overflow-y: auto; overscroll-behavior: contain; padding: 4px; }
+  .kebab-menu button, .kebab-menu a { min-height: 38px; padding: 6px 10px; font-size: 14.5px; }
+  .kebab-menu .kebab-head { padding: 8px 10px 2px; font-size: 11px; }
+}
+@media (max-width: 639px) {
+  .rtc-id { padding: 0; justify-content: center; }
+  .rtc-name, .rtc-when.microcap { margin: 0; }
+  /* The week/month/year switch drives the bars, which a phone doesn't show. */
+  .hg-head .hist-win { display: none; }
+}
+/* People > Business filters: inline on a desktop, behind one button on a phone. */
+.pr-filters { display: contents; }
+.pr-filter-btn { display: none; position: relative; }
+@media (max-width: 639px) {
+  .pr-bar { width: 100%; padding: 8px; }
+  .pr-filter-btn { display: grid; place-items: center; width: 40px; height: 40px; min-height: 40px; padding: 0; }
+  .pr-filters { display: none; }
+  .pr-filters.is-open { display: flex; flex-wrap: wrap; gap: 8px; flex-basis: 100%; }
+  .pr-filters.is-open > * { flex: 1 1 140px; min-width: 0; }
+}

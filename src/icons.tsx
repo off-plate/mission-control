@@ -219,6 +219,9 @@ export const DockNote = make(<><path d="M5 5a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v14a
 export const DockWallet = make(<><path d="M17 8v-3a1 1 0 0 0 -1 -1h-10a2 2 0 0 0 0 4h12a1 1 0 0 1 1 1v3m0 4v3a1 1 0 0 1 -1 1h-12a2 2 0 0 1 -2 -2v-12" /><path d="M20 12v4h-4a2 2 0 0 1 0 -4h4" /></>, 16, { k: 1, x: 0, y: 0 })
 export const DockHistory = make(<><path d="M12 8l0 4l2 2" /><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5" /></>, 16, { k: 1, x: 0, y: 0 })
 export const DockChartBar = make(<><path d="M3 13a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -6" /><path d="M15 9a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -10" /><path d="M9 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -14" /><path d="M4 20h14" /></>, 16, { k: 1, x: 0, y: 0 })
+/* Calendar, for the phone's More sheet (2026-10-15): Hicon has none sourced
+   here, so it is Tabler's calendar, same licence and fit as the four above. */
+export const DockCalendar = make(<><path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z" /><path d="M16 3v4" /><path d="M8 3v4" /><path d="M4 11h16" /></>, 16, { k: 1, x: 0, y: 0 })
 export const DockUser = make(<><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /></>, 16, { k: 1, x: 0, y: 0 })
 export const DockBook = make(<><path d="M19 4v16h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12" /><path d="M19 16h-12a2 2 0 0 0 -2 2" /><path d="M9 8h6" /></>, 16, { k: 1, x: 0, y: 0 })
 /* Watchless: a transcript, not a video. Tabler's file-text over a play, because

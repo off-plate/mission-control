@@ -4279,13 +4279,9 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .run-best { font-size: var(--text-xs); color: var(--faint); }
 .habit-run .mr-typing, .habit-run .mr-pron, .habit-run .mr-stretch { margin-top: var(--s3); }
 
-/* ---------- phone chrome: two dropdowns, nothing that scrolls ----------
-   His design, 2026-08-12: "on mobile this could be one left dropdown where I
-   choose which workspace I'm in, and on the right a hamburger menu, again
-   with a dropdown, where I choose today, plan, habits, goals, why's. And by
-   default, not on scroll." Both strips are hidden on a phone and replaced
-   here; on a desktop the strips are better and these do not exist. */
-.phone-space, .phone-pages { display: none; }
+/* The workspace select (.phone-space, ui.tsx) is the one control left from the
+   2026-08-12 phone chrome; the hamburger was replaced by the tab bar below. */
+.phone-space { display: none; }
 @media (max-width: 639px) {
   .spaces, .nav { display: none; }
   .phone-space { display: block; min-width: 0; flex: 0 1 auto; }
@@ -4293,25 +4289,6 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
     min-width: 0; width: auto; max-width: 42vw; min-height: 44px;
     font-size: var(--text-xs); font-weight: 600; padding-inline: var(--s2);
   }
-  .phone-pages { display: inline-flex; }
-  .phone-burger { gap: 6px; }
-  /* Measured 2026-09-04 at 390px: this label is the only one in the row that
-     shows real text ("Habits & Goals" vs. every other button's bare icon),
-     and at 140px wide it alone pushes the six-button row from 358px
-     available to 404px needed -- just enough to wrap the last icon
-     (Settings) onto its own line. The label itself matters (it's the one
-     thing standing in for a visible active nav tab on a phone, see
-     PhonePages above), so it stays, just capped and truncated instead of
-     removed -- "Habits & Goals" reads as "Habits & G..." rather than
-     costing the whole row its second line. */
-  .phone-burger .btn-label {
-    display: inline; font-size: var(--text-xs); max-width: 46px;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  /* The page menu is the widest thing in the header, so it opens flush to the
-     right edge rather than running off it. */
-  .phone-pages .kebab-menu { right: 0; left: auto; min-width: 168px; }
-  .phone-pages .kebab-menu .is-on { color: var(--accent-text); font-weight: 700; }
 }
 
 /* One app, open. */
@@ -10863,4 +10840,94 @@ body:has(.shell.is-hud) { --st-research: #9AA3B0; --st-build: #A592CC; --st-reac
   .pr-bar .pp-search-input { width: 100%; }
   .pr-bar > * { flex-shrink: 0; }
   .pr-bar > .pp-search { flex-shrink: 1; }
+}
+
+/* ---------- Phone tab bar and More sheet (2026-10-15) ----------
+   His approved mockup: claude.ai/artifact/NdogniJE4EQa3aPJ6e2p4m. One slim
+   header row, a fixed bar under the thumb, everything else in a sheet.
+   None of this exists above 640px. */
+.tabbar, .tabsheet, .tabsheet-scrim { display: none; }
+@media (max-width: 639px) {
+  /* Header: one row. Only the logo, sync dot, Jarvis and Zone are left in it. */
+  .topbar { flex-wrap: nowrap; padding-block: var(--s2); }
+  .topbar-right { flex-wrap: nowrap; }
+  .syncpip-text, .syncpip:not([data-quiet]) .syncpip-text { display: none; }
+  .syncpip, .syncpip:not([data-quiet]) { margin-right: 0; order: 0; flex-basis: auto; }
+
+  /* Routine cards: the name had a 34% cap meant for desktop, so on a phone
+     "After wake up" broke onto three lines beside empty space. */
+  .rtc-top { flex-wrap: nowrap; }
+  .rtc-id { flex: 1 1 auto; max-width: none; }
+  /* Settings rows: the action drops under the text instead of squeezing it
+     into a column a few words wide. */
+  .source-row { flex-wrap: wrap; }
+  .source-row .info { flex-basis: 100%; }
+
+  .tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 70;
+    display: grid; grid-template-columns: repeat(5, 1fr); align-items: center;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+    background: color-mix(in srgb, var(--bg) 94%, transparent);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    border-top: 1px solid var(--hairline);
+  }
+  .tabbar-tab {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    min-height: 52px; justify-content: center; padding: 0;
+    background: none; border: 0; color: var(--faint);
+    font-family: var(--font-body); font-size: 11.5px; font-weight: 600;
+    transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), color 140ms ease;
+  }
+  .tabbar-tab[aria-current="page"] { color: var(--ink); }
+  .tabbar-tab[aria-current="page"] svg { color: var(--accent-text); }
+  .tabbar-add {
+    justify-self: center; width: 52px; height: 52px; border-radius: 16px;
+    display: grid; place-items: center; border: 0;
+    background: var(--accent-fill, var(--accent)); color: var(--ink);
+    box-shadow: inset 0 0 0 1px var(--hairline);
+    transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  .tabbar-tab:active, .tabbar-add:active, .tabsheet-tile:active { transform: scale(0.96); }
+
+  .tabsheet-scrim {
+    display: block; position: fixed; inset: 0; z-index: 80;
+    background: rgba(18, 16, 12, 0.32); opacity: 0; pointer-events: none;
+    transition: opacity 260ms ease;
+  }
+  .tabsheet-scrim.is-open { opacity: 1; pointer-events: auto; }
+  .tabsheet {
+    display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 81;
+    max-height: 85dvh; overflow-y: auto; overscroll-behavior: contain;
+    padding: 10px var(--gutter) calc(20px + env(safe-area-inset-bottom, 0px));
+    background: var(--bg); color: var(--ink); border-radius: 24px 24px 0 0;
+    box-shadow: 0 -10px 30px rgba(18, 16, 12, 0.12);
+    transform: translateY(100%); visibility: hidden; touch-action: none;
+    transition: transform 320ms cubic-bezier(0.32, 0.72, 0, 1), visibility 0s linear 320ms;
+  }
+  .tabsheet.is-open { transform: translateY(0); visibility: visible; transition: transform 320ms cubic-bezier(0.32, 0.72, 0, 1), visibility 0s; }
+  .tabsheet-grab { width: 40px; height: 5px; border-radius: 3px; background: var(--hairline-strong); margin: 0 auto 10px; }
+  .tabsheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .tabsheet-title { font-family: var(--font-display); font-weight: 700; font-size: 1.125rem; }
+  .tabsheet-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .tabsheet-tile {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    padding: 14px 6px 12px; min-height: 80px; justify-content: center;
+    background: var(--surface); color: var(--ink);
+    border: 1px solid var(--hairline); border-radius: 16px;
+    font-family: var(--font-body); font-size: 13.5px; font-weight: 600;
+    transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  .tabsheet-tile[aria-current="page"] { border-color: var(--accent-text); color: var(--accent-text); }
+  .tabsheet-tile.is-jar { background: #12100C; color: #FAF8F4; border-color: #12100C; }
+
+  /* Room for the bar at the end of every page, and the quick-tools dock lives
+     above it instead of under the thumb. Its own + is gone: the bar has one. */
+  #main { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+  .dock-fab { display: none; }
+  .dock, .dock-notify { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (max-width: 639px) and (prefers-reduced-motion: reduce) {
+  .tabsheet, .tabsheet.is-open { transform: none; transition: opacity 160ms ease, visibility 0s; }
+  .tabsheet { opacity: 0; }
+  .tabsheet.is-open { opacity: 1; }
 }

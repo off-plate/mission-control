@@ -26,6 +26,9 @@ addEventListener('vite:preloadError', (e) => {
 
 // One root for the container's lifetime: choosing "this device only" swaps the
 // sign-in screen for the app, and a second createRoot on the same node warns.
+/* Ask the browser to keep this app's storage instead of clearing it under
+   pressure. Granted for an installed home-screen app; harmless where not. */
+void navigator.storage?.persist?.().catch(() => {})
 let _root: ReturnType<typeof createRoot> | null = null
 const root = () => (_root ??= createRoot(document.getElementById('root')!))
 

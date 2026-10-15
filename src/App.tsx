@@ -3,7 +3,7 @@ import { JarBar, JAR_PAGES } from './cookiejarnav'
 import { ProjectMark } from './ui'
 import { usePromptWindow } from './promptwindow'
 import { lastFace } from './ideasswitch'
-import { Component, Fragment, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Component, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { exceptionsFor, globalExceptions } from './exceptions'
 import { SPACE_LABELS } from './mock'
@@ -365,7 +365,7 @@ function PeopleButton({ on, open }: { on: boolean; open: () => void }) {
     open(); setShown(false)
   }
   return (
-    <span className="kebab-wrap" ref={wrap} onMouseEnter={show} onMouseLeave={hideSoon}>
+    <span className="kebab-wrap hide-phone" ref={wrap} onMouseEnter={show} onMouseLeave={hideSoon}>
       <button
         className={`btn btn-ghost btn-sq${on ? ' is-on' : ''}`}
         onClick={open}
@@ -393,72 +393,115 @@ function PeopleButton({ on, open }: { on: boolean; open: () => void }) {
   )
 }
 
-/* Phone chrome, on his design: "on mobile this could be one left dropdown
-   where I choose which workspace I'm in, and on the right a hamburger menu,
-   again with a dropdown, where I choose today, plan, habits, goals, why's.
-   And by default, not on scroll."
+/* Phone chrome, rebuilt on his approval of the mockup (2026-10-15,
+   claude.ai/artifact/NdogniJE4EQa3aPJ6e2p4m). The old hamburger dropdown was
+   small, closed only on a pick or an outside tap, and the header around it
+   took three rows. Now: a fixed bar under the thumb with the three pages he
+   lives in, quick add in the middle, and More for everything else as a sheet
+   that closes on a pick, a tap outside, the X, Escape or a swipe down.
+   Hidden above 640px by CSS, where the header row is better. */
+const TAB_PAGES: { id: PageId; label: string; icon: ReactNode; lit: PageId[] }[] = [
+  { id: 'today', label: 'Today', icon: <Icon.Sun size={22} />, lit: ['today', 'day'] },
+  { id: 'plan', label: 'Plan', icon: <Icon.Checklist size={22} />, lit: ['plan', 'projects'] },
+  { id: 'habits', label: 'Habits', icon: <Icon.CheckRing size={22} />, lit: ['habits', 'routines', 'goals', 'quitting'] },
+]
+const MORE_PAGES: { id: PageId; label: string; icon: ReactNode }[] = [
+  { id: 'calendar', label: 'Calendar', icon: <Icon.DockCalendar size={22} /> },
+  { id: 'notes', label: 'Notes', icon: <Icon.DockNote size={22} /> },
+  { id: 'ideas', label: 'Ideas', icon: <Icon.DockBulb size={22} /> },
+  { id: 'people', label: 'People', icon: <Icon.DockPeople size={22} /> },
+  { id: 'timeline', label: 'Jar', icon: <Icon.DockHistory size={22} /> },
+  { id: 'bills', label: 'Bills', icon: <Icon.DockWallet size={22} /> },
+  { id: 'projects', label: 'Projects', icon: <Icon.Folder size={22} /> },
+  { id: 'skills', label: 'Skills', icon: <Icon.DockBook size={22} /> },
+  { id: 'watchless', label: 'Watchless', icon: <Icon.DockTranscript size={22} /> },
+  { id: 'focus', label: 'Focus', icon: <Icon.DockChartBar size={22} /> },
+  { id: 'apps', label: 'Apps', icon: <Icon.AppsGrid size={22} /> },
+  { id: 'settings', label: 'Settings', icon: <Icon.Settings size={22} /> },
+]
 
-   So neither strip scrolls on a phone any more: the workspace is a real
-   select (the OS picker, which is the one control a thumb is always good at)
-   and the pages are a menu behind a hamburger. Both are hidden on a desktop,
-   where the strips are better. */
-function PhonePages({ tabs, page, setPage }: {
-  tabs: { id: PageId; label: string }[]
-  page: PageId
-  setPage: (p: PageId) => void
-}) {
+function PhoneTabBar({ page, setPage }: { page: PageId; setPage: (p: PageId) => void }) {
   const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLSpanElement>(null)
-  /* No hover on a phone, so the projects Plan lists on hover sit under Plan
-     in this menu instead. */
-  const { projects, view, setSpace, enterProject } = useStore()
-  const phoneProjects = view === 'all' ? projects : projects.filter((p) => p.space === view)
+  const sheet = useRef<HTMLDivElement>(null)
+  const drag = useRef<{ y: number; t: number; dy: number } | null>(null)
+  useEffect(() => { setOpen(false) }, [page])
   useEffect(() => {
     if (!open) return
-    const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
-    document.addEventListener('mousedown', close)
     document.addEventListener('keydown', esc)
-    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc) }
+    return () => document.removeEventListener('keydown', esc)
   }, [open])
-  const here = tabs.find((t) => t.id === page)
+  const go = (p: PageId) => { setOpen(false); setPage(p) }
+  /* Swipe down to close. A flick is enough (velocity), a slow drag needs
+     90px; dragging up meets friction instead of a wall. */
+  const onDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('button')) return
+    drag.current = { y: e.clientY, t: Date.now(), dy: 0 }
+    e.currentTarget.setPointerCapture(e.pointerId)
+    e.currentTarget.style.transition = 'none'
+  }
+  const onMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = drag.current
+    if (!d) return
+    d.dy = e.clientY - d.y
+    e.currentTarget.style.transform = `translateY(${d.dy > 0 ? d.dy : d.dy / 6}px)`
+  }
+  const onUp = () => {
+    const d = drag.current, el = sheet.current
+    drag.current = null
+    if (!d || !el) return
+    el.style.transition = ''
+    el.style.transform = ''
+    const v = Math.abs(d.dy) / Math.max(1, Date.now() - d.t)
+    if (d.dy > 90 || (d.dy > 10 && v > 0.11)) setOpen(false)
+  }
+  const moreLit = MORE_PAGES.some((m) => m.id === page) || page === 'prompts'
   return (
-    <span className="kebab-wrap phone-pages" ref={ref}>
-      <button
-        className="btn btn-ghost phone-burger"
-        aria-expanded={open}
-        aria-haspopup="menu"
-        aria-label={`Pages, currently ${here?.label ?? 'Today'}`}
-        onClick={() => setOpen((v) => !v)}
+    <>
+      <nav className="tabbar" aria-label="Pages">
+        {TAB_PAGES.slice(0, 2).map((t) => (
+          <button key={t.id} className="tabbar-tab" aria-current={t.lit.includes(page) ? 'page' : undefined} onClick={() => go(t.id)}>
+            {t.icon}<span>{t.label}</span>
+          </button>
+        ))}
+        <button className="tabbar-add" aria-label="New task" onClick={() => { setOpen(false); window.dispatchEvent(new Event('mc:new-task')) }}>
+          <Icon.Plus size={24} />
+        </button>
+        {TAB_PAGES.slice(2).map((t) => (
+          <button key={t.id} className="tabbar-tab" aria-current={t.lit.includes(page) ? 'page' : undefined} onClick={() => go(t.id)}>
+            {t.icon}<span>{t.label}</span>
+          </button>
+        ))}
+        <button className="tabbar-tab" aria-current={moreLit ? 'page' : undefined} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+          <Icon.AppsGrid size={22} /><span>More</span>
+        </button>
+      </nav>
+      <div className={`tabsheet-scrim${open ? ' is-open' : ''}`} onClick={() => setOpen(false)} aria-hidden="true" />
+      <div
+        ref={sheet}
+        className={`tabsheet${open ? ' is-open' : ''}`}
+        role="dialog"
+        aria-label="More pages"
+        aria-hidden={!open}
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerCancel={onUp}
       >
-        <Icon.Menu size={18} />
-        <span className="btn-label">{here?.label ?? 'Pages'}</span>
-      </button>
-      {open && (
-        <div className="kebab-menu" role="menu" onClick={() => setOpen(false)}>
-          {tabs.map((t) => (
-            <Fragment key={t.id}>
-              <button
-                role="menuitem"
-                aria-current={page === t.id ? 'page' : undefined}
-                className={page === t.id ? 'is-on' : ''}
-                onClick={() => setPage(t.id)}
-              >
-                {t.label}
-              </button>
-              {t.id === 'plan' && phoneProjects.map((p) => (
-                <button key={p.id} role="menuitem" className="kebab-sub" onClick={() => { setSpace(p.space); enterProject(p.id) }}>
-                  {p.name}
-                </button>
-              ))}
-              {t.id === 'plan' && (
-                <button role="menuitem" className="kebab-sub" onClick={() => setPage('projects')}>All projects</button>
-              )}
-            </Fragment>
+        <div className="tabsheet-grab" aria-hidden="true" />
+        <div className="tabsheet-head">
+          <span className="tabsheet-title">More</span>
+          <button className="btn btn-ghost btn-sq" aria-label="Close" onClick={() => setOpen(false)}><Icon.Close size={18} /></button>
+        </div>
+        <div className="tabsheet-grid">
+          {MORE_PAGES.map((m) => (
+            <button key={m.id} className={`tabsheet-tile${m.id === 'timeline' ? ' is-jar' : ''}`} aria-current={page === m.id ? 'page' : undefined} onClick={() => go(m.id)}>
+              {m.icon}<span>{m.label}</span>
+            </button>
           ))}
         </div>
-      )}
-    </span>
+      </div>
+    </>
   )
 }
 
@@ -702,7 +745,7 @@ export default function App() {
               (2026-09-15), next to the Zone and Jarvis. The dock keeps its own
               Note and Ideas for quick capture; these open the full pages. */}
           <button
-            className={`btn btn-ghost btn-sq${page === 'notes' ? ' is-on' : ''}`}
+            className={`btn btn-ghost btn-sq hide-phone${page === 'notes' ? ' is-on' : ''}`}
             onClick={() => setPage('notes')}
             aria-pressed={page === 'notes'}
             aria-label="Notes"
@@ -716,7 +759,7 @@ export default function App() {
               last, or Prompts when the window is open and something waits,
               and it carries the dot the Prompts square used to. */}
           <button
-            className={`btn btn-ghost btn-sq${page === 'ideas' || page === 'prompts' ? ' is-on' : ''}`}
+            className={`btn btn-ghost btn-sq hide-phone${page === 'ideas' || page === 'prompts' ? ' is-on' : ''}`}
             onClick={() => setPage(promptsReady ? 'prompts' : lastFace())}
             aria-pressed={page === 'ideas' || page === 'prompts'}
             aria-label="Ideas"
@@ -744,7 +787,7 @@ export default function App() {
               the dock now (2026-09-08) rather than its own header button, but
               the picker still has nothing to say about a page that was never
               one of its tabs. */}
-          {page !== 'zone' && page !== 'assistant' && <PhonePages tabs={[...tabs, { id: 'timeline', label: 'Jar' }, { id: 'bills', label: 'Bills' }]} page={navPage} setPage={setPage} />}
+          
         </div>
       </header>
 
@@ -811,6 +854,7 @@ export default function App() {
         </PageBoundary>
       </main>
 
+      {page !== 'zone' && <PhoneTabBar page={page} setPage={setPage} />}
     </div>
   )
 }

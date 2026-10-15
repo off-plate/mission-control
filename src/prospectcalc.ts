@@ -12,13 +12,15 @@ import type { Prospect, ProspectSheetRow, ProspectSource, ProspectStage, TouchSt
 export const SHEET_STATUSES = [
   'Prospect', 'Audit to create', 'Audited', 'Build', 'Ready to contact', 'Contacted', '1st reminder sent',
   '2nd reminder sent (personal)', 'Letter reminder sent', 'Call / visit', 'Responded waiting', 'Meeting planned',
-  'On hold', 'Acquired', 'Lost', 'Rejected',
+  'On hold', 'Acquired', 'Lost', 'Rejected', 'Dropped',
 ] as const
 export const TALKING = 'Responded waiting', MEETING = 'Meeting planned', ON_HOLD = 'On hold', WON = 'Acquired', LOST = 'Lost', REJECTED = 'Rejected'
+/** Ours, after the audit: out of the pipeline, never researched again (Sheet tab "Dropped", 2026-10-15). */
+export const DROPPED = 'Dropped'
 /** Out of the email sequence: they replied, it is paused, or it is over. */
-export const NOT_OPEN: ProspectStage[] = [TALKING, MEETING, ON_HOLD, WON, LOST, REJECTED]
+export const NOT_OPEN: ProspectStage[] = [TALKING, MEETING, ON_HOLD, WON, LOST, REJECTED, DROPPED]
 /** Ended without a deal: both keep a reason. */
-export const isDead = (s: ProspectStage): boolean => s === LOST || s === REJECTED
+export const isDead = (s: ProspectStage): boolean => s === LOST || s === REJECTED || s === DROPPED
 /** Board lanes that show even when empty, so a drop is always one drag away. */
 export const BOARD_ALWAYS: ProspectStage[] = [TALKING, WON, LOST]
 export const STAGES: { id: ProspectStage; label: string }[] = SHEET_STATUSES.map((s) => ({ id: s, label: s }))

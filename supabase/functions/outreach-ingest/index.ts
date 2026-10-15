@@ -45,7 +45,7 @@ async function targets(owner: string) {
   const emails = new Set<string>()
   const domains = new Set<string>()
   for (const p of prospects) {
-    if (p.stage && ['won', 'lost', 'Acquired', 'Lost', 'Rejected'].includes(p.stage)) continue
+    if (p.stage && ['won', 'lost', 'Acquired', 'Lost', 'Rejected', 'Dropped'].includes(p.stage)) continue
     for (const x of p.people ?? []) if (x.email?.includes('@')) emails.add(x.email.trim().toLowerCase())
     const d = p.domain?.trim().toLowerCase()
     if (d && !FREEMAIL.has(d)) domains.add(d)

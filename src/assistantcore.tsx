@@ -25,6 +25,7 @@ import { SOURCES, STAGES, STEPS, cleanDomain, label } from './prospectcalc'
 import { useFirstMove } from './ui'
 import { APPS } from './apps'
 import * as Icon from './icons'
+import { similarTo } from './similar'
 
 /* THE ASSISTANT'S CORE, shared by the full page (assistantpage.tsx, lazy-
    loaded) and the dock's compact widget (assistantdock.tsx, loaded on every
@@ -566,6 +567,13 @@ function useDoer() {
             if (wasSlot) s.assignSlot(existing.id, wasSlot)
             if (fillsEstimate) s.setEstimate(existing.id, wasMin)
           })
+        }
+        /* The same task in other words (his ask, 2026-10-16). Not added; the
+           model is told which row it looks like, and moves it, asks him, or
+           re-sends with fresh:true once he has said they are different. */
+        if (!a.fresh) {
+          const twin = similarTo(title, s.tasks.filter((t) => !t.done))
+          if (twin) return no(`Not added: "${title}" looks like the open task "${dropUrl(twin.title) || twin.title}". Same task: move that one. Not sure: ask him. Different: he has to say so, then add with fresh:true`)
         }
         /* "add X to the Y project": a real project or none. No match still
            adds the task, rather than failing the whole add over one word. */

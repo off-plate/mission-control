@@ -122,7 +122,7 @@ const T = { match: S, inSlot: SLOT }
 const KINDS = {
   // Tasks. inSlot narrows a match to one part of the day; all:true acts on
   // every row that matches, only when HE said "both" / "all of them".
-  add: { d: 'new task in his words; date = plan it for that day; steps = its subtasks', need: ['title'], f: { title: S, list: WHERE, slot: SLOT, date: DATE, at: TIME, space: SPACE, project: S, min: MIN, steps: LIST } },
+  add: { d: 'new task in his words; date = plan it for that day; steps = its subtasks; fresh:true only after he said it is a different task', need: ['title'], f: { fresh: BOOL, title: S, list: WHERE, slot: SLOT, date: DATE, at: TIME, space: SPACE, project: S, min: MIN, steps: LIST } },
   done: { d: 'tick a task; actualMin only when he said how long it took', need: ['match'], f: { ...T, all: BOOL, actualMin: MIN } },
   undone: { d: 'reopen a task', need: ['match'], f: { ...T, all: BOOL } },
   move: { d: 'move a task to a slot, list, date, project or workspace, or pin a clock time (at "none" unpins)', need: ['match'], any: ['slot', 'list', 'date', 'project', 'space', 'at'], f: { ...T, slot: SLOT, list: WHERE, date: DATE, project: S, space: SPACE, at: (v) => (v === 'none' ? v : TIME(v)) } },
@@ -217,7 +217,7 @@ export interface Action {
   date?: string; at?: string; dueOn?: string
   min?: number; actualMin?: number; amount?: number; target?: number; value?: number
   by?: number; set?: number; perWeek?: number; goal?: number; current?: number
-  on?: boolean; all?: boolean; breaking?: boolean; paid?: boolean; deleteTasks?: boolean; lowerIsBetter?: boolean
+  on?: boolean; all?: boolean; fresh?: boolean; breaking?: boolean; paid?: boolean; deleteTasks?: boolean; lowerIsBetter?: boolean
   frequency?: HabitFrequency; cadence?: RoutineCadence; blurb?: string
   timeframe?: GoalTimeframe; category?: GoalCategory; unit?: string; why?: string
   tier?: PersonTier; rel?: string; job?: string; birthday?: string; birthYear?: number; cadenceDays?: number
@@ -442,7 +442,7 @@ TRUTH
 
 REPLY with ONE JSON object and nothing else, no fence, no prose around it:
 {"say":"...","do":[{"kind":"add","title":"..."}],"find":[{"what":"notes","query":"vzp"}],"more":false,"show":[{"kind":"today"}],"next":["..."]}
-- "do": every change he asked for, in order. A list he gives (dictated, pasted, several things in one breath) is one action per item, every item, never a sample. Several different requests in one message: do all of them. A long spoken ramble: each item becomes a short clean task title in his words, minus the filler; something already on the list (briefing or a find) is a move, never a second add.
+- "do": every change he asked for, in order. A list he gives (dictated, pasted, several things in one breath) is one action per item, every item, never a sample. Several different requests in one message: do all of them. A long spoken ramble: each item becomes a short clean task title in his words, minus the filler; something already on the list (briefing or a find), even in other words, is a move, never a second add. The briefing shows only part of the list, so look up tasks before adding from a long list. Not sure two are the same: leave that item and ask him.
 - "find": look things up before acting on anything you cannot see in the briefing (projects, notes, people, goals, routines and their steps, bills, older tasks, calendar beyond tomorrow, focus, ideas, gym, prompts, apps). what = ${FINDS.join('|')}. query narrows by words in the title; leave it out to list them.
 - After a find, a FAILED action, or "more":true, the app sends you RESULTS and you carry on with the same request: fix what failed using the exact title from the results, do what is still left, then answer. Never repeat an action the results list as ok. When nothing is left, reply with "say" only.
 - "more": true when the job was too long for one reply; you get another turn for the rest.

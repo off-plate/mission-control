@@ -28,8 +28,10 @@ export type DictateState = 'idle' | 'listening' | 'transcribing'
 
 /* A microphone left open is a microphone left open. If nothing has been heard
    for this long he has finished, or he walked off, and either way the browser
-   should stop listening rather than hold the mic for the rest of the session. */
-const SILENCE = 6000
+   should stop listening rather than hold the mic for the rest of the session.
+   6s until 2026-10-16: he dictates whole days in one go and stops to think
+   between items, and every pause longer than a breath ended the take. */
+const SILENCE = 30000
 
 type Recognition = {
   lang: string
@@ -146,7 +148,7 @@ function releaseMic(): void {
   recorder = null
 }
 
-function startBrowser(base: string, onText: OnText): void {
+function startBrowser(base: string, onText: OnText, resume = false): void {
   const Ctor = RecognitionCtor()
   if (!Ctor) return
   const r = new Ctor()
@@ -170,10 +172,22 @@ function startBrowser(base: string, onText: OnText): void {
   }
   /* `no-speech` and `aborted` are ordinary: he opened it and said nothing, or
      clicked it off. Only a real failure should look like one. */
-  r.onerror = () => { rec = null; set('idle') }
-  r.onend = () => { if (rec === r) { rec = null; set('idle') } }
+  /* `no-speech` is a pause, not a failure: Chrome raises it after a few quiet
+     seconds, then ends the session. Only a real error stops the take. */
+  r.onerror = (e) => { if (e?.error === 'no-speech') return; rec = null; set('idle') }
+  /* Chrome ends a continuous session on its own (a pause, about a minute of
+     talking). He did not press Stop, so a fresh session picks up where this
+     one left off, keeping every word said so far. */
+  r.onend = () => {
+    if (rec !== r) return
+    rec = null
+    if (state === 'listening') startBrowser(`${base}${finals} `.replace(/\s+/g, ' ').trimStart(), onText, true)
+    else set('idle')
+  }
   rec = r
-  try { r.start(); set('listening'); armSilence() } catch { rec = null; set('idle') }
+  /* A resumed session keeps the running silence clock; re-arming it here would
+     let Chrome's own pause-ends keep the mic open forever. */
+  try { r.start(); set('listening'); if (!resume) armSilence() } catch { rec = null; set('idle') }
 }
 
 async function startWhisper(base: string, onText: OnText): Promise<void> {

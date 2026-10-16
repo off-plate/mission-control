@@ -442,7 +442,7 @@ TRUTH
 
 REPLY with ONE JSON object and nothing else, no fence, no prose around it:
 {"say":"...","do":[{"kind":"add","title":"..."}],"find":[{"what":"notes","query":"vzp"}],"more":false,"show":[{"kind":"today"}],"next":["..."]}
-- "do": every change he asked for, in order. A list he gives (dictated, pasted, several things in one breath) is one action per item, every item, never a sample. Several different requests in one message: do all of them.
+- "do": every change he asked for, in order. A list he gives (dictated, pasted, several things in one breath) is one action per item, every item, never a sample. Several different requests in one message: do all of them. A long spoken ramble: each item becomes a short clean task title in his words, minus the filler; something already on the list (briefing or a find) is a move, never a second add.
 - "find": look things up before acting on anything you cannot see in the briefing (projects, notes, people, goals, routines and their steps, bills, older tasks, calendar beyond tomorrow, focus, ideas, gym, prompts, apps). what = ${FINDS.join('|')}. query narrows by words in the title; leave it out to list them.
 - After a find, a FAILED action, or "more":true, the app sends you RESULTS and you carry on with the same request: fix what failed using the exact title from the results, do what is still left, then answer. Never repeat an action the results list as ok. When nothing is left, reply with "say" only.
 - "more": true when the job was too long for one reply; you get another turn for the rest.
@@ -455,7 +455,7 @@ REPLY with ONE JSON object and nothing else, no fence, no prose around it:
 ACTIONS. * = required. "match" is words from the real title (task, habit, routine, goal, note, person, project, bill, card, prompt, app).
 ${VOCAB}
 
-FIELD VALUES: slot morning|noon|afternoon|evening. list today|backlog. space personal|work (work = Big Time; Off-Plate and Michael's Corner are projects, so use "project"). date YYYY-MM-DD, worked out from Now in the briefing ("tomorrow", "Friday"). at HH:MM. min = minutes, only a number HE said. frequency daily|weekdays|times-per-week|weekly|monthly. cadence daily|prework|weekly|monthly. timeframe weekly|monthly|quarter|half. category money|health|life|work|offplate|habits. tier core|close|friends|business|wider|distant. channel inperson|call|message|video|email. type Idea|Bug|Update|Version. metric e1rm|repTotal|sessions|manual. page ${PAGES.join('|')}.
+FIELD VALUES: slot morning|noon|afternoon|evening. list today|backlog. space personal|work (work = Big Time; Off-Plate and Michael's Corner are projects, so use "project"). date YYYY-MM-DD, worked out from Now in the briefing ("tomorrow", "Friday"). at HH:MM. min = minutes: a number he said, or your own honest estimate when he asks you to estimate. frequency daily|weekdays|times-per-week|weekly|monthly. cadence daily|prework|weekly|monthly. timeframe weekly|monthly|quarter|half. category money|health|life|work|offplate|habits. tier core|close|friends|business|wider|distant. channel inperson|call|message|video|email. type Idea|Bug|Update|Version. metric e1rm|repTotal|sessions|manual. page ${PAGES.join('|')}.
 
 KNOW THE DIFFERENCE
 - Workspace vs page vs app: "open up Big Time" = workspace. "open the bills page" = open. "turn on the Zone" = open zone. A tool by name ("open Watchless") = app.
@@ -657,7 +657,7 @@ function firstObject(text: string): string | null {
  *  the page-only extras (undo, the actual-time prompt). */
 export interface Ran { ok: boolean; text: string }
 
-type Failure = { ok: false; reason: 'no-key' | 'rejected' | 'offline' | 'unreadable' | 'model-gone' | 'rate-limit'; detail?: string }
+type Failure = { ok: false; reason: 'no-key' | 'rejected' | 'offline' | 'unreadable' | 'model-gone' | 'rate-limit' | 'too-big'; detail?: string }
 export type Outcome = { ok: true; reply: Reply } | Failure
 
 type Msg = { role: 'system' | 'user' | 'assistant'; content: string }
@@ -698,8 +698,22 @@ async function askGemini(messages: Msg[], onSay?: (partial: string) => void): Pr
   }
 }
 
-/** One call to the active provider, with the Gemini fallback on a 429. */
+/* Groq's free tier allows 8,000 tokens a minute and counts the 3,000 a reply
+   may use, so a request much past 4,500 tokens in cannot fit at all. His
+   dictated days (2026-10-16: a thousand spoken words, twenty-odd items, on top
+   of the prompt and his briefing) came to about 10,000, and Groq refused every
+   one. Those go to Gemini first: free, the same key the voice uses, and a
+   budget that fits a whole day. Short questions stay on Groq, which is faster. */
+const BIG = 4500
+const sizeOf = (messages: Msg[]) => Math.round(messages.reduce((n, m) => n + m.content.length, 0) / 3.8)
+
+/** One call to the active provider, with the Gemini fallback on a 429 or 413,
+ *  and Gemini first for anything too big for Groq's minute. */
 async function once(messages: Msg[], key: string, onSay?: (partial: string) => void): Promise<Outcome> {
+  if (sizeOf(messages) > BIG && hasTtsKey()) {
+    const big = await askGemini(messages, onSay)
+    if (big?.ok) return big
+  }
   let res: Response
   try {
     res = await request({
@@ -727,7 +741,9 @@ async function once(messages: Msg[], key: string, onSay?: (partial: string) => v
     return { ok: false, reason: 'offline' }
   }
   if (res.status === 401 || res.status === 403) return { ok: false, reason: 'rejected' }
-  if (res.status === 429) {
+  /* 413 is Groq's "request too large for your tokens per minute": the same
+     wall as a 429, only no amount of waiting gets this request under it. */
+  if (res.status === 429 || res.status === 413) {
     /* THE ACTIVE PROVIDER SAYS NO -- Groq or Z.ai, whichever the toggle in
        Settings points at. Before he sees a word about it, try Gemini with the
        exact same question, because he probably already has the key: it is the
@@ -749,6 +765,9 @@ async function once(messages: Msg[], key: string, onSay?: (partial: string) => v
        would surface Gemini's own confusing failure instead of falling through
        to the one message he already understands. */
     if (fallback?.ok) return fallback
+    /* Waiting never shrinks a request, so a 413 fails at once instead of
+       sitting through the rate-limit retries. */
+    if (res.status === 413) return { ok: false, reason: 'too-big' }
 
     /* A 429 body is a wall of text he should never see: an org id, a service
        tier, a token accounting, and a billing upsell link, ending in "Ask

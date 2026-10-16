@@ -1340,6 +1340,7 @@ export function useAssistantThread() {
           : out.reason === 'rejected' ? `That ${provider.label} key was rejected.`
             : out.reason === 'offline' ? 'Could not reach the model.'
               : out.reason === 'rate-limit' ? 'Too many questions in the last minute.'
+                : out.reason === 'too-big' ? `Too long for ${provider.label}'s free tier.`
                 : out.detail ?? 'The answer came back unreadable.',
       )
       setErrHint(
@@ -1348,6 +1349,7 @@ export function useAssistantThread() {
             : out.reason === 'model-gone' ? 'The model this app used was retired. This build already moved to its replacement, so reload the page.'
               : out.reason === 'offline' ? 'Check the connection and ask again.'
                 : out.reason === 'rate-limit' ? (out.detail ? `Wait about ${out.detail}s and ask again.` : 'Wait a few seconds and ask again.')
+                  : out.reason === 'too-big' ? 'Add a Gemini key in Settings (the voice key) and long requests go there.'
                   : 'Ask again, or rephrase it.',
       )
     }

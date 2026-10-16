@@ -105,4 +105,27 @@ const chars = body.messages.filter((m) => m.role === 'system').reduce((n, m) => 
 const tokens = Math.round(chars / 3.8)
 assert.ok(tokens < 4500, `prompt is ~${tokens} tokens; the free tier allows 8,000 a minute`)
 
-console.log(`assistant loop: 6 checks passed. Prompt ~${tokens} tokens with an empty briefing.`)
+// 6. A dictated day too big for Groq's minute goes to Gemini first.
+const urls = []
+const realFetch = globalThis.fetch
+globalThis.fetch = async (url, init) => { urls.push(String(url)); return realFetch(url, init) }
+store['mc-gemini-key'] = 'AIzaTest'
+sent.length = 0; ran.length = 0
+script = [{ say: 'All of it.', do: [{ kind: 'add', title: 'Domain' }] }]
+r = await A.ask('next up '.repeat(2400), brief, [], hands)
+assert.equal(r.ok, true)
+assert.match(urls[0], /generativelanguage/, 'an oversized request goes to Gemini, not Groq')
+assert.equal(ran.length, 1)
+
+// 7. Groq's 413 with no Gemini key fails at once, with no rate-limit waits.
+delete store['mc-gemini-key']
+urls.length = 0
+globalThis.fetch = async (url) => { urls.push(String(url)); return new Response('{}', { status: 413 }) }
+const t0 = Date.now()
+r = await A.ask('next up '.repeat(2400), brief, [], hands)
+assert.equal(r.ok, false)
+assert.equal(r.reason, 'too-big')
+assert.equal(urls.length, 1, 'one request, no retries')
+assert.ok(Date.now() - t0 < 1000, 'no waiting on a request that can never fit')
+
+console.log(`assistant loop: 8 checks passed. Prompt ~${tokens} tokens with an empty briefing.`)

@@ -11232,3 +11232,16 @@ body:has(.shell.is-hud) { --st-research: #9AA3B0; --st-build: #A592CC; --st-reac
   .kebab-menu [role="menuitem"] > span:not(.plan-proj-n) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .plan-actions .kebab-menu { max-width: calc(100vw - 32px); }
 }
+.plan-proj-btn { display: inline-flex; align-items: center; justify-content: center; }
+.plan-proj-btn svg { display: block; flex: none; width: 20px; height: 20px; min-width: 20px; }
+@media (max-width: 639px) {
+  /* Plan's three figures: equal columns, everything centred in its column. */
+  .band:has(.plan-actions) .band-status { margin-top: 6px; padding: 10px 0; background: var(--surface); border: 1px solid var(--hairline); border-radius: 16px; align-items: center; }
+  .band:has(.plan-actions) .band-metric,
+  .band:has(.plan-actions) .band-metric:first-child { padding: 0 6px; text-align: center; }
+  .band:has(.plan-actions) .band-metric .v { font-size: 19px; }
+  .band:has(.plan-actions) .band-metric .k { font-size: 12px; max-width: 12ch; margin-inline: auto; }
+}
+@media (max-width: 639px) {
+  .band:has(.plan-actions) .band-status { align-items: start; margin-bottom: 0; }
+}

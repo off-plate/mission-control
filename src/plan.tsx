@@ -1210,8 +1210,8 @@ export function PlanPage() {
 
       {/* The hourly schedule lives on Calendar now; Plan is the list and the day. */}
       <div className="seg-phone" role="tablist" aria-label="Which list">
-        <button role="tab" aria-selected={phoneList === 'todo'} onClick={() => setPhoneList('todo')}>To-do list <em>{backlogOpen.length}</em></button>
         <button role="tab" aria-selected={phoneList === 'day'} onClick={() => setPhoneList('day')}>{offsetWord(dayOffset)}</button>
+        <button role="tab" aria-selected={phoneList === 'todo'} onClick={() => setPhoneList('todo')}>To-do list <em>{backlogOpen.length}</em></button>
       </div>
       <div className={`grid-3 plan-cols plan-two phone-${phoneList}`}>
         {/* 1. To-do list: everything you added, any day. Drag out to plan it,

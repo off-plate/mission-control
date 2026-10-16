@@ -11200,3 +11200,13 @@ body:has(.shell.is-hud) { --st-research: #9AA3B0; --st-build: #A592CC; --st-reac
   .hevy-when { white-space: nowrap; }
 }
 .shell.in-zone .topbar .ws-chip { color: var(--z-bone); }
+
+/* The project chips scroll sideways. Their folder glyphs are positioned
+   (relative, with absolute layers), and WebKit counted that overflow into the
+   PAGE's width, so with enough projects iOS zoomed the whole of Plan out to
+   fit it. paint containment makes the strip its own clip and containing block. */
+.pstrip { contain: paint; }
+@media (max-width: 639px) {
+  /* The day panel's header held only the day strip, which phone replaces with the switch above. */
+  .plan-two > .panel:not(.todo-col) > .col-head { display: none; }
+}

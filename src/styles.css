@@ -11257,3 +11257,29 @@ body:has(.shell.is-hud) { --st-research: #9AA3B0; --st-build: #A592CC; --st-reac
   .weekplan-sentence { grid-column: 1; margin: 0; line-height: 1.4; }
   .weekplan-nav { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
 }
+@media (max-width: 639px) {
+  /* An expanded habit: one left edge for the name, the days and the text. */
+  .habit-row-top > .run-caret { display: none; }
+  .habit-foot { padding: 0; flex-direction: column; align-items: flex-start; gap: 2px; }
+  .habit-note { -webkit-line-clamp: 1; line-clamp: 1; }
+  .habit-row { padding: 12px 0; row-gap: 10px; }
+}
+@media (max-width: 639px) {
+  .habit-list.w7 .habit-foot,
+  .habit-list.w7 .habit-row:has(.habit-row-top .spacemark) .habit-foot { padding-left: 0; }
+}
+
+/* Habits, Goals and Quitting as an accordion on a phone (2026-10-16). The section
+   header is the title, so the page's own title and switch are not repeated. */
+@media (max-width: 639px) {
+  .hg-room.is-acc { display: flex; flex-direction: column; gap: 10px; }
+  .hg-acc { background: var(--surface); border: 1px solid var(--hairline); border-radius: 16px; overflow: hidden; }
+  .hg-acc-head { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 56px; padding: 0 16px; background: none; border: 0; color: var(--ink); font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: -0.015em; text-align: left; }
+  .hg-acc-caret { color: var(--muted); transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1); }
+  .hg-acc.is-open .hg-acc-caret { transform: rotate(180deg); }
+  .hg-acc-body { padding: 0 12px 12px; }
+  .hg-acc .band h1, .hg-acc .hg-switch { display: none; }
+  .hg-acc .band { padding-block: 0 8px; }
+  .hg-acc .panel, .hg-acc .rtc { background: var(--bg); }
+  .hg-float { display: none; }
+}

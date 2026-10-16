@@ -4,7 +4,8 @@
    addresses (#/goals, #/quitting) still work: they open this page, scrolled
    to their section. */
 import { useEffect, useState } from 'react'
-import { HabitsGoalsSwitch } from './ui'
+import { HabitsGoalsSwitch, usePhone } from './ui'
+import * as Icon from './icons'
 import { HabitsPage } from './habits'
 import { GoalsPage } from './goals'
 import { QuittingPage } from './quitting'
@@ -44,6 +45,31 @@ export function HabitsGoalsRoom({ start }: { start: HgSection }) {
     return () => { io.disconnect(); window.removeEventListener('resize', align) }
   }, [])
   useEffect(() => { if (start !== 'habits') requestAnimationFrame(() => jumpTo(start, false)) }, [start])
+  /* Phone (his ask, 2026-10-16): the floating switch is out, the three faces are
+     an accordion he can close with one tap. The one he came for starts open. */
+  const phone = usePhone()
+  const [shut, setShut] = useState<Set<HgSection>>(() => new Set((['habits', 'goals', 'quitting'] as HgSection[]).filter((x) => x !== start)))
+  useEffect(() => { setShut((c) => { if (!c.has(start)) return c; const n = new Set(c); n.delete(start); return n }) }, [start])
+  const toggle = (x: HgSection) => setShut((c) => { const n = new Set(c); if (n.has(x)) n.delete(x); else n.add(x); return n })
+  if (phone) {
+    const secs: { id: HgSection; label: string; page: React.ReactNode }[] = [
+      { id: 'habits', label: 'Habits', page: <HabitsPage /> },
+      { id: 'goals', label: 'Goals', page: <GoalsPage /> },
+      { id: 'quitting', label: 'Quitting', page: <QuittingPage /> },
+    ]
+    return (
+      <div className="hg-room is-acc">
+        {secs.map(({ id, label, page }) => (
+          <section id={`hg-${id}`} className={`hg-sec hg-acc${shut.has(id) ? '' : ' is-open'}`} key={id}>
+            <button className="hg-acc-head" aria-expanded={!shut.has(id)} aria-controls={`hg-${id}-body`} onClick={() => toggle(id)}>
+              <span>{label}</span><Icon.ChevronDown size={18} className="hg-acc-caret" />
+            </button>
+            {!shut.has(id) && <div className="hg-acc-body" id={`hg-${id}-body`}>{page}</div>}
+          </section>
+        ))}
+      </div>
+    )
+  }
   return (
     <div className="hg-room">
       <div className={`hg-float${float ? ' is-on' : ''}`} aria-hidden={!float} style={left !== undefined ? { left } : undefined}><HabitsGoalsSwitch /></div>

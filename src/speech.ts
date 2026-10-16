@@ -48,8 +48,12 @@ export function setTtsKey(key: string): void {
     else localStorage.removeItem(KEY_STORE)
   } catch { /* storage unavailable */ }
 }
+/* Google issues two shapes: the classic "AIza..." and, since 2026, "AQ."
+   keys. His main key is the new kind, and checking only for AIza made the
+   app treat a saved, working key as no key at all (2026-10-16). */
 export function hasTtsKey(): boolean {
-  return getTtsKey().startsWith('AIza')
+  const k = getTtsKey()
+  return k.startsWith('AIza') || k.startsWith('AQ.')
 }
 
 /** His own pick of the machine's own voice, by name -- Settings' voice picker

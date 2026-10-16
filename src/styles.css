@@ -10482,6 +10482,9 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
    screen. */
 .jv-stage { position: relative; flex: none; height: clamp(220px, 50dvh, 820px); cursor: grab; touch-action: none; }
 .jv-stage.is-drag { cursor: grabbing; }
+/* Once there is a conversation the core steps back and the thread gets the room
+   (his report, 2026-10-16: "I barely can see the chat"). */
+.jv-stage.is-talking { height: clamp(160px, 26dvh, 340px); }
 .jv-presence {
   position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 1;
   display: flex; align-items: baseline; gap: 12px; white-space: nowrap; pointer-events: none;

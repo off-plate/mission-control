@@ -7,7 +7,7 @@ import assert from 'assert/strict'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const out = await build({ entryPoints: [resolve(HERE, '../src/similar.ts')], bundle: true, write: false, format: 'esm', logLevel: 'error' })
-const { similarTo } = await import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`)
+const { similarTo, spaceFrom } = await import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`)
 
 const open = ["Buy Michael's Corner domain", 'Send reminders to prospects', 'HWBT website', 'Email ARSTAS about documents', 'Redesign Sonar UI', 'VZP letter', 'Poslat Korejšovi dokument'].map((title) => ({ title }))
 const same = {
@@ -20,4 +20,9 @@ const same = {
 const different = ['Send 10 new outreach emails', 'Email Moneta about payment plan', 'Record morning coffee video with Claude', 'Website for Off-Plate']
 for (const [said, row] of Object.entries(same)) assert.equal(similarTo(said, open)?.title, row, `"${said}" should match "${row}"`)
 for (const said of different) assert.equal(similarTo(said, open), null, `"${said}" is a new task`)
+assert.equal(similarTo('Send prospect reminder emails', [{ title: 'Send 10 outreach emails' }]), null, 'sharing only "send" and "emails" is not the same task')
+const history = [{ title: 'Sonar onboarding screens', space: 'work' }, { title: 'Big Time standup notes', space: 'work' }, { title: 'Off-Plate cold emails', space: 'personal' }, { title: 'VZP payment plan', space: 'personal' }]
+assert.equal(spaceFrom('Redesign the Sonar app UI', history), 'work', 'Sonar lives in Big Time')
+assert.equal(spaceFrom('Send 10 cold emails', history), 'personal', 'outreach lives in Personal')
+assert.equal(spaceFrom('Buy a new kettle', history), undefined, 'nothing similar: no guess')
 console.log(`similar: ${Object.keys(same).length} rephrasings caught, ${different.length} new tasks left alone.`)

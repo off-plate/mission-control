@@ -25,7 +25,7 @@ import { SOURCES, STAGES, STEPS, cleanDomain, label } from './prospectcalc'
 import { useFirstMove } from './ui'
 import { APPS } from './apps'
 import * as Icon from './icons'
-import { similarTo } from './similar'
+import { similarTo, spaceFrom } from './similar'
 
 /* THE ASSISTANT'S CORE, shared by the full page (assistantpage.tsx, lazy-
    loaded) and the dock's compact widget (assistantdock.tsx, loaded on every
@@ -583,19 +583,23 @@ function useDoer() {
           const { row } = proj(a.project)
           if (row) { projectId = row.id; projectNote = ` in ${row.name}` } else projectNote = ` (no project called "${a.project}", added without one)`
         }
+        /* Never the workspace he happens to be looking at (his ask, 2026-10-16):
+           the model names it from the task itself; failing that, where his most
+           similar task lives; only then the current view. */
+        const sp: SpaceId = (a.space as SpaceId | undefined) ?? (projectId ? s.projects.find((p) => p.id === projectId)?.space : undefined) ?? spaceFrom<SpaceId, Task>(title, s.tasks) ?? space
         addedThisRun.add(key)
         const est = a.min ?? 15
         const subs = a.steps ?? []
         const id = s.addTask({
           title, source: 'mc', estimateMin: est, estimated: a.min != null,
-          space: (a.space as SpaceId | undefined) ?? space, list, category: 'admin', slot, plannedOn: on, projectId,
+          space: sp, list, category: 'admin', slot, plannedOn: on, projectId,
           ...(a.at ? { at: a.at } : {}),
           ...(subs.length ? {
             subtasks: subs.map((t, i) => ({ id: `${Date.now().toString(36)}s${i}`, title: t, estimateMin: Math.max(5, Math.round(est / subs.length)), done: false })),
           } : {}),
         })
         mark(id)
-        return yes(`Added to ${where}${a.at ? ` at ${a.at}` : ''}${projectNote}: ${title}${subs.length ? ` (${subs.length} steps)` : ''}`, () => s.deleteTask(id))
+        return yes(`Added to ${where}${a.at ? ` at ${a.at}` : ''}${projectNote}, ${SPACE_LABELS[sp]}: ${title}${subs.length ? ` (${subs.length} steps)` : ''}`, () => s.deleteTask(id))
       }
 
       case 'done': case 'undone': case 'drop': case 'move': case 'estimate': case 'rename': {

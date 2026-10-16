@@ -910,7 +910,7 @@ export function AssistantPage() {
         )}
 
         <section className="as-chat jv-center">
-          <div className="jv-stage" ref={stage} aria-label="JARVIS. Drag to look around.">
+          <div className={`jv-stage${empty ? '' : ' is-talking'}`} ref={stage} aria-label="JARVIS. Drag to look around.">
             <div className="jv-presence"><span className="jv-name">JARVIS</span><span className="jv-state" role="status">{state}</span></div>
           </div>
           <div className="as-thread jv-thread">

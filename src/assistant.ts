@@ -442,7 +442,7 @@ TRUTH
 
 REPLY with ONE JSON object and nothing else, no fence, no prose around it:
 {"say":"...","do":[{"kind":"add","title":"..."}],"find":[{"what":"notes","query":"vzp"}],"more":false,"show":[{"kind":"today"}],"next":["..."]}
-- "do": every change he asked for, in order. A list he gives (dictated, pasted, several things in one breath) is one action per item, every item, never a sample. Several different requests in one message: do all of them. A long spoken ramble: each item becomes a short clean task title in his words, minus the filler; something already on the list (briefing or a find), even in other words, is a move, never a second add. The briefing shows only part of the list, so look up tasks before adding from a long list. Not sure two are the same: leave that item and ask him.
+- "do": every change he asked for, in order. A list he gives (dictated, pasted, several things in one breath) is one action per item, every item, never a sample. Several different requests in one message: do all of them. A long spoken ramble: each item becomes a short clean task title in his words, minus the filler; something already on the list (briefing or a find), even in other words, is a move, never a second add. The briefing shows only part of the list, so look up tasks before adding from a long list. Not sure two are the same: leave that item and ask him. Every add names its space from the task itself (his Big Time job is work, everything else personal), never from the workspace he is viewing. When a turn adds to both, "say" lists them under Big Time and Personal so he can correct one; unsure which: ask.
 - "find": look things up before acting on anything you cannot see in the briefing (projects, notes, people, goals, routines and their steps, bills, older tasks, calendar beyond tomorrow, focus, ideas, gym, prompts, apps). what = ${FINDS.join('|')}. query narrows by words in the title; leave it out to list them.
 - After a find, a FAILED action, or "more":true, the app sends you RESULTS and you carry on with the same request: fix what failed using the exact title from the results, do what is still left, then answer. Never repeat an action the results list as ok. When nothing is left, reply with "say" only.
 - "more": true when the job was too long for one reply; you get another turn for the rest.
@@ -673,7 +673,12 @@ type Msg = { role: 'system' | 'user' | 'assistant'; content: string }
 const GEMINI_MODEL = 'gemini-3.6-flash'
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
 
-async function askGemini(messages: Msg[], onSay?: (partial: string) => void): Promise<Outcome | null> {
+const oneSystem = (messages: Msg[]): Msg[] => {
+  const sys = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n')
+  return [{ role: 'system', content: sys }, ...messages.filter((m) => m.role !== 'system')]
+}
+
+async function askGemini(messages: Msg[], onSay?: (partial: string) => void, retried = false): Promise<Outcome | null> {
   const key = getTtsKey()
   try {
     const res = await fetch(GEMINI_ENDPOINT, {
@@ -683,12 +688,20 @@ async function askGemini(messages: Msg[], onSay?: (partial: string) => void): Pr
         model: GEMINI_MODEL,
         temperature: 0.3,
         stream: !!onSay,
-        messages,
+        /* Without these two, Gemini answered his dictated day (2026-10-16) as
+           a markdown plan that said "(Added)" beside every item and carried no
+           "do" at all, so nothing ran. It keeps only one system message, which
+           lost the reply format, and it needs JSON mode to stay in it. */
+        response_format: { type: 'json_object' },
+        messages: oneSystem(messages),
       }),
     })
     /* Not ok: Gemini is having its own bad day, or this key is not the right
        shape for chat. Either way, that is not news he needs; the caller falls
        through to the ordinary "Groq is busy" message as if this never ran. */
+    /* 503 is Gemini's "overloaded", common and brief: one more try a moment
+       later costs a second, falling through costs a rate-limit wait. */
+    if (res.status >= 500 && !retried) { await new Promise((r) => setTimeout(r, 1500)); return askGemini(messages, onSay, true) }
     if (!res.ok) return null
     if (onSay && res.body) return await readStream(res.body, onSay)
     const data = await res.json()

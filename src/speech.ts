@@ -73,8 +73,10 @@ export function setDeviceVoicePref(name: string): void {
 
 /** Which engine a click would use right now. The settings page says this out loud. */
 export function engineName(): 'Gemini' | 'device' {
-  return hasTtsKey() ? 'Gemini' : 'device'
+  return GEMINI_VOICE && hasTtsKey() ? 'Gemini' : 'device'
 }
+
+const GEMINI_VOICE = false
 
 export type SpeechState = 'idle' | 'loading' | 'playing' | 'paused'
 
@@ -448,7 +450,12 @@ export async function toggle(id: string, text: string, geminiTimeoutMs = GEMINI_
   const clean = speakable(text.trim())
   if (!clean) return
 
-  const key = getTtsKey()
+  /* The device voice, always (his call, 2026-10-16). The Gemini key now runs
+     the assistant's thinking, and the same Google project voices his reels,
+     whose TTS allowance matters far more than JARVIS reading answers out.
+     The device voice (Jamie) is instant, free and unlimited. Flip
+     GEMINI_VOICE to bring the Gemini voice back. */
+  const key = GEMINI_VOICE ? getTtsKey() : ''
   if (!key) { await speakOnDevice(id, clean); return }
 
   set(id, 'loading')

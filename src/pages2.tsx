@@ -183,11 +183,11 @@ function VoiceKeyField() {
             which voice you get, not whether the feature exists. */}
         <span className={`status-dot ${live ? 'connected' : 'partial'}`} />
         <span className="info">
-          <span className="name">Gemini, for the voice that reads answers aloud</span>
+          <span className="name">Gemini, the brain JARVIS thinks with</span>
           <span className="detail" style={{ display: 'block' }}>
             {live
-              ? 'Connected. Play on an answer is read by Gemini, and it can be told how to deliver a line.'
-              : 'Not set. Play still works, read by the voice built into this machine. Gemini sounds better.'}
+              ? 'Connected. JARVIS answers with Gemini. Answers are still read aloud by the voice on this machine.'
+              : 'Not set. JARVIS answers with Groq or Z.ai instead, and long requests may not fit.'}
           </span>
         </span>
         <a className="btn btn-quiet" href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">Get a free key ↗</a>

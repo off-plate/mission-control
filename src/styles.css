@@ -11245,3 +11245,15 @@ body:has(.shell.is-hud) { --st-research: #9AA3B0; --st-build: #A592CC; --st-reac
 @media (max-width: 639px) {
   .band:has(.plan-actions) .band-status { align-items: start; margin-bottom: 0; }
 }
+@media (max-width: 639px) {
+  /* Plan: stats card and week card sit 12px apart, not 34. */
+  .band:has(.plan-actions) { padding-bottom: 0; }
+  .weekplan { margin: 12px 0; }
+  /* The week bar: title over sentence on the left, the chevron centred on the
+     whole card, equal 14px above and below. */
+  .weekplan-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 6px; align-items: center; padding: 14px; }
+  .weekplan-title { grid-column: 1; align-items: center; margin: 0; line-height: 1.25; min-height: 0; }
+  .weekplan-title > * { margin: 0; line-height: 1.25; }
+  .weekplan-sentence { grid-column: 1; margin: 0; line-height: 1.4; }
+  .weekplan-nav { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+}

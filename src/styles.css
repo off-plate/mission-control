@@ -11299,3 +11299,16 @@ body:has(.shell.is-hud) { --st-research: #9AA3B0; --st-build: #A592CC; --st-reac
   .habit-foot:not(:has(button)) { display: none; }
   .habit-line { border-top: 1px solid var(--hairline); }
 }
+@media (max-width: 639px) {
+  /* The accordion header is the title, so the band's own title block is empty;
+     left in, its 12px column gap pushed Add away from the heading's edge. */
+  .hg-acc .band-day { display: none; }
+  .hg-acc-body { padding: 0 16px 12px; }
+}
+@media (max-width: 639px) {
+  /* Cards 8px apart (the desktop 24px margin between sections no longer applies),
+     12px of air under the header, and a little before a card's first row. */
+  .hg-room.is-acc { gap: 8px; padding-top: 12px; }
+  .hg-room.is-acc .hg-sec + .hg-sec { margin-top: 0; }
+  .hg-acc-body { padding-top: 6px; }
+}

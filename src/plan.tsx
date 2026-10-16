@@ -535,6 +535,39 @@ function ProjectStrip({ projects, tasks, sel, showSpaces, touch, inScope, onAll,
   )
 }
 
+/* The phone's version of the strip above: one folder icon beside Yesterday that
+   opens the same choices as a menu (his ask, 2026-10-16). A dot says a filter is
+   on. Picks add and remove, like a tap on the strip does on touch. */
+function PhoneProjectFilter({ projects, tasks, sel, inScope, onAll, onPick, onManage }: {
+  projects: Project[]; tasks: Task[]; sel: string[]; inScope: (t: Task) => boolean
+  onAll: () => void; onPick: (id: string, add: boolean) => void; onManage: () => void
+}) {
+  const open = (id: string) => tasks.filter((t) => t.projectId === id && !t.done).length
+  const total = projects.reduce((a, p) => a + open(p.id), 0)
+  return (
+    <Dropdown
+      label="Filter Plan by project" className="phone-only"
+      trigger={({ onClick, open: isOpen }) => (
+        <button className="btn btn-ghost plan-proj-btn" aria-haspopup="menu" aria-expanded={isOpen} aria-label={sel.length ? `Projects, ${sel.length} picked` : 'Projects'} onClick={onClick}>
+          <Icon.Folder size={20} />{sel.length > 0 && <span className="plan-proj-dot" aria-hidden="true" />}
+        </button>
+      )}
+    >
+      <button role="menuitem" aria-checked={sel.length === 0} onClick={onAll}>All <em className="mono plan-proj-n">{total}</em></button>
+      {projects.map((p) => (
+        <button key={p.id} role="menuitem" aria-checked={sel.includes(p.id)} onClick={() => onPick(p.id, true)}>
+          <FolderGlyph cls={`s-${p.space}`} /><span>{p.name}</span><em className="mono plan-proj-n">{open(p.id)}</em>
+        </button>
+      ))}
+      <button role="menuitem" aria-checked={sel.includes(UNSORTED)} onClick={() => onPick(UNSORTED, true)}>
+        <FolderGlyph cls="f-unsorted" /><span>Unsorted</span><em className="mono plan-proj-n">{tasks.filter((t) => !t.projectId && !t.done && inScope(t)).length}</em>
+      </button>
+      <span className="kebab-sep" />
+      <button role="menuitem" onClick={onManage}>Manage projects</button>
+    </Dropdown>
+  )
+}
+
 /* The phone shows one list at a time (his ask, 2026-10-15). The tab bar's +
    fires mc:new-task, which lands on Plan's new-task box, and that box lives in
    the to-do list, so the next Plan render opens on it. Registered at import,
@@ -1019,6 +1052,14 @@ export function PlanPage() {
         actions={(
           <span className="plan-actions">
             <button className="btn btn-ghost plan-search-btn hide-phone" onClick={() => setSpot(true)} aria-label="Search every task" title="Search every task (Cmd K)"><Icon.Search size={16} /></button>
+            <PhoneProjectFilter
+              projects={stripProjects} tasks={tasks} sel={sel} inScope={(t) => inView(t.space)}
+              onAll={() => setPicked([])}
+              onPick={(id, add) => setPicked(sel.includes(id)
+                ? (add ? sel.filter((x) => x !== id) : sel.length === 1 ? [] : [id])
+                : (add ? [...sel, id] : [id]))}
+              onManage={() => setPage('projects')}
+            />
             <button className="btn btn-ghost" onClick={openDaily}>Yesterday</button>
           </span>
         )}

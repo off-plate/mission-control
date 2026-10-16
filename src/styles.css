@@ -11210,3 +11210,25 @@ body:has(.shell.is-hud) { --st-research: #9AA3B0; --st-build: #A592CC; --st-reac
   /* The day panel's header held only the day strip, which phone replaces with the switch above. */
   .plan-two > .panel:not(.todo-col) > .col-head { display: none; }
 }
+
+/* Plan on a phone: projects live behind a folder icon, and the three figures
+   are three even columns, value over label (2026-10-16). */
+@media (max-width: 639px) {
+  .pstrip { display: none; }
+  .plan-proj-btn { position: relative; width: 36px; height: 36px; min-height: 36px; padding: 0; display: grid; place-items: center; border-radius: 10px; }
+  .plan-proj-dot { position: absolute; top: 5px; right: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--a-accent); box-shadow: 0 0 0 2px var(--bg); }
+  .plan-actions { gap: 8px; }
+  .kebab-menu [role="menuitem"] .plan-proj-n { margin-left: auto; font-style: normal; color: var(--muted); padding-left: 12px; }
+  .kebab-menu [role="menuitem"][aria-checked="true"] { color: var(--accent-text); font-weight: 700; }
+
+  .band:has(.plan-actions) .band-status { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; align-items: start; padding-top: 4px; }
+  .band:has(.plan-actions) .band-metric { display: block; padding: 0 0 0 12px; text-align: left; }
+  .band:has(.plan-actions) .band-metric:first-child { padding-left: 0; }
+  .band:has(.plan-actions) .band-metric + .band-metric { border-left: 1px solid var(--hairline); }
+  .band:has(.plan-actions) .band-metric .v { display: block; font-size: 18px; line-height: 1.15; letter-spacing: -0.01em; }
+  .band:has(.plan-actions) .band-metric .k { display: block; margin: 2px 0 0; font-size: 12px; line-height: 1.25; }
+}
+@media (max-width: 639px) {
+  .kebab-menu [role="menuitem"] > span:not(.plan-proj-n) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .plan-actions .kebab-menu { max-width: calc(100vw - 32px); }
+}

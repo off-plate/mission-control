@@ -516,11 +516,11 @@ export function GoalsPage() {
           any of them can be set again for the period we are in now. */}
       {past.length > 0 && (
         <>
-          <div className="sechead" style={{ marginTop: 'var(--s6)' }}>
+          <div className="sechead hide-phone" style={{ marginTop: 'var(--s6)' }}>
             <span className="microcap">Finished periods</span>
             <span className="section-count mono">{past.length}</span>
           </div>
-          <div className="panel">
+          <div className="panel hide-phone">
             <div className="rowlist">
               {past.map((g) => {
                 const tf = (g.timeframe ?? 'quarter') as GoalTf

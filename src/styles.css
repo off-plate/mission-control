@@ -4006,7 +4006,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 /* the record, drawn on the clock */
 
 @media (max-width: 900px) {
-  .plan-two { grid-template-columns: 1fr; }
+  .plan-two { grid-template-columns: minmax(0, 1fr); }
 }
 /* a pasted URL, shortened to its address and made clickable */
 .txt-link { color: var(--accent-text); text-decoration: underline; text-decoration-color: var(--hairline-strong); text-underline-offset: 2px; word-break: keep-all; }
@@ -4526,7 +4526,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   .cal-grid { max-width: 420px; grid-template-rows: auto repeat(6, clamp(38px, 7vh, 56px)); }
 }
 @media (max-width: 700px) {
-  .cal-row { grid-template-columns: 1fr; gap: var(--s1); }
+  .cal-row { grid-template-columns: minmax(0, 1fr); gap: var(--s1); }
   .cal-do { margin-top: var(--s2); }
 }
 
@@ -5001,7 +5001,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 }
 .as-skills .as-brief { width: 100%; }
 @media (max-width: 639px) {
-  .as-skills { grid-template-columns: 1fr; }
+  .as-skills { grid-template-columns: minmax(0, 1fr); }
 }
 .as-brief {
   display: flex; align-items: center; justify-content: center; gap: var(--s2);
@@ -5233,7 +5233,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 }
 
 @media (max-width: 1180px) {
-  .troom-lists { grid-template-columns: 1fr; }
+  .troom-lists { grid-template-columns: minmax(0, 1fr); }
   .troom-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .troom-hero { grid-template-columns: 1fr 1fr; }
   .tr-clock { grid-column: 1 / -1; min-height: 0; }
@@ -5451,7 +5451,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .tr-pips i.is-on { background: var(--t-hot); }
 
 @media (max-width: 1180px) {
-  .troom-lists { grid-template-columns: 1fr; }
+  .troom-lists { grid-template-columns: minmax(0, 1fr); }
   .troom-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .troom-hero { grid-template-columns: 1fr 1fr; }
   .tr-clock { grid-column: 1 / -1; min-height: 0; }
@@ -6925,7 +6925,7 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    strip of page showing under it. */
 .tl-lives { height: 100dvh; }
 @media (max-width: 900px) {
-  .tl-lives .tl-stage { grid-template-columns: 1fr; }
+  .tl-lives .tl-stage { grid-template-columns: minmax(0, 1fr); }
   .tl-lives .tl-reel { min-height: 46vw; }
 }
 @keyframes tlrise { from { opacity: 0; transform: scale(0.99); } to { opacity: 1; transform: none; } }
@@ -7022,18 +7022,18 @@ iframe.tl-media { pointer-events: none; }
   .tl-rung { grid-template-columns: 84px repeat(3, minmax(0, 1fr)); row-gap: 14px; }
   .tl-hard { grid-column: 1 / -1; }
   .tl-pts { grid-column: 1 / -1; flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 10px; }
-  .tl-wheelwrap { grid-template-columns: 1fr; height: auto; grid-template-rows: 460px auto; }
+  .tl-wheelwrap { grid-template-columns: minmax(0, 1fr); height: auto; grid-template-rows: 460px auto; }
   .tl-days { height: auto; overflow: visible; }
 }
 @media (max-width: 700px) {
   .tl-rung { grid-template-columns: 76px repeat(2, minmax(0, 1fr)); }
-  .tl-bd { grid-template-columns: 1fr; }
+  .tl-bd { grid-template-columns: minmax(0, 1fr); }
   /* The reel keeps the top of a phone and the two futures share the rest.
      Was 42vh: real text taking priority over the video is the entire point
      of this screen, and 42vh of the reel plus a footer that stacks into
      three rows left barely 80px for the words -- the actual argument this
      screen exists to make. */
-  .tl-stage { grid-template-columns: 1fr; grid-template-rows: 26vh 1fr; }
+  .tl-stage { grid-template-columns: minmax(0, 1fr); grid-template-rows: 26vh 1fr; }
   /* .tl-scrub's 420px flex-basis means WIDTH on the desktop row layout --
      column layout here flips the main axis to vertical, so that same 420px
      became a HEIGHT basis and the footer tried to be 420px of scrub block
@@ -7870,7 +7870,7 @@ iframe.tl-media { pointer-events: none; }
 .skillspage-rowhead h3 { margin: 0; font-size: var(--text-base); }
 .skillspage-desc { margin: 6px 0 0; color: var(--muted); line-height: 1.5; }
 @media (max-width: 720px) {
-  .skillspage-list { grid-template-columns: 1fr; }
+  .skillspage-list { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ==========================================================================
@@ -8226,7 +8226,7 @@ iframe.tl-media { pointer-events: none; }
 }
 .znow-main { display: flex; flex-direction: column; min-width: 0; }
 @media (max-width: 900px) {
-  .znow-split { grid-template-columns: 1fr; gap: var(--s5); }
+  .znow-split { grid-template-columns: minmax(0, 1fr); gap: var(--s5); }
   .zlist { max-height: 34vh; }
 }
 
@@ -8623,8 +8623,8 @@ iframe.tl-media { pointer-events: none; }
 .wl-text mark { background: color-mix(in srgb, var(--wl-rust) 24%, transparent); color: inherit; padding: 0 2px; }
 @media (max-width: 700px) {
   .wl { padding-top: 40px; }
-  .wl-block { grid-template-columns: 1fr; gap: 6px; }
-  .wl-head { grid-template-columns: 1fr; align-items: start; }
+  .wl-block { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .wl-head { grid-template-columns: minmax(0, 1fr); align-items: start; }
 }
 
 /* ---- the dock panel keeps the app's chrome: it is dock furniture, not the
@@ -10214,8 +10214,8 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
   .pb-detail { grid-column: 1 / -1; }
 }
 @media (max-width: 720px) {
-  .pb { grid-template-columns: 1fr; }
-  .pb-meta, .pb-polish { grid-template-columns: 1fr; }
+  .pb { grid-template-columns: minmax(0, 1fr); }
+  .pb-meta, .pb-polish { grid-template-columns: minmax(0, 1fr); }
   .pb-quick { flex-wrap: wrap; }
   .pb-quick .pb-quick-proj { flex: 1 1 100%; }
 }
@@ -11199,3 +11199,4 @@ body:has(.shell.is-hud) { --st-research: #9AA3B0; --st-build: #A592CC; --st-reac
   .hg-do > .hevy-sync { grid-column: 1 / -1; grid-row: 3; display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
   .hevy-when { white-space: nowrap; }
 }
+.shell.in-zone .topbar .ws-chip { color: var(--z-bone); }

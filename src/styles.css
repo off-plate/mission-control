@@ -11280,6 +11280,22 @@ body:has(.shell.is-hud) { --st-research: #9AA3B0; --st-build: #A592CC; --st-reac
   .hg-acc-body { padding: 0 12px 12px; }
   .hg-acc .band h1, .hg-acc .hg-switch { display: none; }
   .hg-acc .band { padding-block: 0 8px; }
-  .hg-acc .panel, .hg-acc .rtc { background: var(--bg); }
   .hg-float { display: none; }
+}
+
+/* Habits on a phone, second pass (2026-10-16). One line per habit: today's check,
+   the name, and how many of the last seven days. Earlier days are not edited on
+   a phone. No tinted panels: the card is white and rows are divided by hairlines. */
+@media (max-width: 639px) {
+  .hg-room.is-acc .hg-sec:last-child { min-height: 0; }
+  .hg-acc .panel, .hg-acc .hg-panel { background: none; border: 0; box-shadow: none; padding: 0; }
+  .hg-acc .rtc { background: none; border: 0; border-bottom: 1px solid var(--hairline); border-radius: 0; padding: 10px 0; box-shadow: none; }
+  .hg-acc .rtc:last-child { border-bottom: 0; }
+
+  .habit-row:not(.is-count):not(.is-measured):not(.is-quit) { position: relative; padding: 8px 0 8px 38px; row-gap: 0; min-height: 48px; }
+  .habit-row:not(.is-count):not(.is-measured):not(.is-quit) > .habit-days:not(.is-period) { position: absolute; grid-area: auto; left: 0; top: 50%; transform: translateY(-50%); margin: 0; }
+  .habit-row:not(.is-count):not(.is-measured):not(.is-quit) .day-cell:not(.is-today) { display: none; }
+  .habit-weeks, .habit-note { display: none; }
+  .habit-foot:not(:has(button)) { display: none; }
+  .habit-line { border-top: 1px solid var(--hairline); }
 }

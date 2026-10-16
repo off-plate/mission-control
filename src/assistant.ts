@@ -703,17 +703,23 @@ async function askGemini(messages: Msg[], onSay?: (partial: string) => void): Pr
    dictated days (2026-10-16: a thousand spoken words, twenty-odd items, on top
    of the prompt and his briefing) came to about 10,000, and Groq refused every
    one. Those go to Gemini first: free, the same key the voice uses, and a
-   budget that fits a whole day. Short questions stay on Groq, which is faster. */
-const BIG = 4500
-const sizeOf = (messages: Msg[]) => Math.round(messages.reduce((n, m) => n + m.content.length, 0) / 3.8)
+   budget that fits a whole day.
+   Since the same day, on his call, Gemini answers EVERY turn whenever the key
+   is there, and Groq is the backup for when Gemini is busy or out of quota.
+   Its text quota is its own bucket, separate from the voice models the reels
+   use. */
 
-/** One call to the active provider, with the Gemini fallback on a 429 or 413,
- *  and Gemini first for anything too big for Groq's minute. */
+/** One call: Gemini first when its key is saved, then the active provider,
+ *  which itself falls back to Gemini on a 429 or 413 when Gemini was not
+ *  already tried this call. */
 async function once(messages: Msg[], key: string, onSay?: (partial: string) => void): Promise<Outcome> {
-  if (sizeOf(messages) > BIG && hasTtsKey()) {
-    const big = await askGemini(messages, onSay)
-    if (big?.ok) return big
+  const gemini = hasTtsKey()
+  if (gemini) {
+    const g = await askGemini(messages, onSay)
+    if (g?.ok) return g
+    onSay?.('')
   }
+  if (!key) return { ok: false, reason: gemini ? 'rate-limit' : 'no-key' }
   let res: Response
   try {
     res = await request({
@@ -759,7 +765,7 @@ async function once(messages: Msg[], key: string, onSay?: (partial: string) => v
        Falls through to the clean rate-limit message below only when there is
        no Gemini key, or Gemini also fails. It never shows the WAIT for the
        real answer he was already given a chance at. */
-    const fallback = hasTtsKey() ? await askGemini(messages, onSay) : null
+    const fallback = hasTtsKey() && !gemini ? await askGemini(messages, onSay) : null
     /* Only a REAL answer is worth using. A failed fallback returns an Outcome
        too, {ok:false,...}, and that object is truthy: returning it unchecked
        would surface Gemini's own confusing failure instead of falling through
@@ -837,7 +843,7 @@ export async function ask(
   onSay?: (partial: string) => void,
 ): Promise<Outcome> {
   const key = getAiKey()
-  if (!key) return { ok: false, reason: 'no-key' }
+  if (!key && !hasTtsKey()) return { ok: false, reason: 'no-key' }
   const messages: Msg[] = [
     { role: 'system', content: SYSTEM },
     { role: 'system', content: `Today's briefing, read from his own log:\n${briefText(brief)}` },

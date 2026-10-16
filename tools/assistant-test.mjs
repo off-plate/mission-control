@@ -105,7 +105,7 @@ const chars = body.messages.filter((m) => m.role === 'system').reduce((n, m) => 
 const tokens = Math.round(chars / 3.8)
 assert.ok(tokens < 4500, `prompt is ~${tokens} tokens; the free tier allows 8,000 a minute`)
 
-// 6. A dictated day too big for Groq's minute goes to Gemini first.
+// 6. With a Gemini key saved, Gemini answers first, even a big dictated day.
 const urls = []
 const realFetch = globalThis.fetch
 globalThis.fetch = async (url, init) => { urls.push(String(url)); return realFetch(url, init) }
@@ -114,8 +114,17 @@ sent.length = 0; ran.length = 0
 script = [{ say: 'All of it.', do: [{ kind: 'add', title: 'Domain' }] }]
 r = await A.ask('next up '.repeat(2400), brief, [], hands)
 assert.equal(r.ok, true)
-assert.match(urls[0], /generativelanguage/, 'an oversized request goes to Gemini, not Groq')
+assert.match(urls[0], /generativelanguage/, 'Gemini is the primary brain when its key is saved')
 assert.equal(ran.length, 1)
+
+// 6b. Gemini out of quota: Groq answers instead.
+urls.length = 0; sent.length = 0
+globalThis.fetch = async (url, init) => { urls.push(String(url)); return /generativelanguage/.test(String(url)) ? new Response('{}', { status: 429 }) : realFetch(url, init) }
+script = [{ say: 'Done on Groq.' }]
+r = await A.ask('short one', brief, [], hands)
+assert.equal(r.ok, true)
+assert.equal(urls.length, 2, 'Gemini once, then Groq once, no second Gemini try')
+assert.match(urls[1], /groq/)
 
 // 7. Groq's 413 with no Gemini key fails at once, with no rate-limit waits.
 delete store['mc-gemini-key']
@@ -128,4 +137,4 @@ assert.equal(r.reason, 'too-big')
 assert.equal(urls.length, 1, 'one request, no retries')
 assert.ok(Date.now() - t0 < 1000, 'no waiting on a request that can never fit')
 
-console.log(`assistant loop: 8 checks passed. Prompt ~${tokens} tokens with an empty briefing.`)
+console.log(`assistant loop: 9 checks passed. Prompt ~${tokens} tokens with an empty briefing.`)

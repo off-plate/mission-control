@@ -11030,10 +11030,12 @@ body:has(.shell.is-hud) { --st-research: #9AA3B0; --st-build: #A592CC; --st-reac
   }
   .todo-row .chip.est-ai, .today-task .chip.est-ai { color: var(--accent-text); font-weight: 700; }
 
-  /* The day strip scrolls sideways instead of wrapping onto a second line. */
-  .day-switch { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -14px; padding-inline: 14px; }
-  .day-switch::-webkit-scrollbar { display: none; }
-  .day-switch .microcap { flex: none; white-space: nowrap; }
+  /* The To-do / Today switch above is the day control on a phone; Tomorrow and
+     the rest are one tap away in a task's menu ("Move to tomorrow"). The no-wrap
+     strip that stood here also widened the whole page, because a flex child that
+     cannot shrink pushes its parent wider than the screen. */
+  .day-switch { display: none; }
+  .col-head { min-width: 0; flex-wrap: wrap; }
 }
 @media (max-width: 639px) {
   /* Drag needs a cursor, so "drop a task here" is a promise a phone can't keep;
@@ -11041,8 +11043,8 @@ body:has(.shell.is-hud) { --st-research: #9AA3B0; --st-build: #A592CC; --st-reac
   .plan-two .empty.is-boxed { display: none; }
   .col-head > .fold-all { display: none; }
   /* Two or three numbers sit in one row of equal tiles; actions get the row under. */
-  .band-status { display: flex; flex-wrap: wrap; }
-  .band-status > .band-metric { flex: 1 1 0; }
+  .band-status { display: flex; flex-wrap: wrap; align-items: stretch; }
+  .band-status > .band-metric { flex: 1 1 0; min-width: 0; }
   .band-status > :not(.band-metric) { flex-basis: 100%; }
 }
 
@@ -11085,4 +11087,115 @@ body:has(.shell.is-hud) { --st-research: #9AA3B0; --st-build: #A592CC; --st-reac
   .pr-filters { display: none; }
   .pr-filters.is-open { display: flex; flex-wrap: wrap; gap: 8px; flex-basis: 100%; }
   .pr-filters.is-open > * { flex: 1 1 140px; min-width: 0; }
+}
+@media (max-width: 639px) {
+  /* Plan: Yesterday shares the title row instead of taking a row of its own. */
+  .band:has(.plan-actions) { position: relative; }
+  .band:has(.plan-actions) .band-actions { position: absolute; top: 14px; right: 0; flex: none; width: auto; }
+  .band:has(.plan-actions) .band-actions .btn { min-height: 36px; padding-inline: 14px; font-size: 14px; }
+}
+
+/* Week card on a phone: seven day pills, one day open (2026-10-16). */
+.weekplan-strip { display: none; }
+@media (max-width: 639px) {
+  .weekplan-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin-bottom: 10px; }
+  .weekplan-pill {
+    display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 54px; padding: 7px 0 6px;
+    border-radius: 10px; border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+    background: none; color: inherit; font-family: var(--font-body); font-size: 11px; font-weight: 600;
+  }
+  .weekplan-pill b { font-size: 15px; font-weight: 700; line-height: 1.1; }
+  .weekplan-pill i { width: 5px; height: 5px; border-radius: 50%; }
+  .weekplan-pill i.has { background: currentColor; }
+  .weekplan-pill.is-today { color: var(--wk-hot); }
+  .weekplan-pill[aria-pressed="true"] { background: var(--wk-hot); border-color: transparent; color: #12100C; }
+  .weekplan-grid { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .weekplan-grid > .weekplan-day:not(.is-picked) { display: none; }
+}
+
+/* ---------- Phone: nothing wider than the screen, tighter Today (2026-10-16) ---------- */
+@media (max-width: 639px) {
+  /* A grid or flex child defaults to min-width:auto, so one long unbroken task
+     title made its whole card wider than the screen and the page drifted. */
+  .troom, .troom-lists, .troom-lower, .tr-card, .tr-rows, .tr-r { min-width: 0; max-width: 100%; }
+  .tr-r > .tr-t { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tr-r { gap: 10px; }
+
+  /* The countdown and the wall clock share one row. */
+  .tr-clock { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 14px; }
+  .tr-clock .tr-count { font-size: clamp(34px, 11vw, 44px); }
+  .tr-wall { text-align: right; flex: none; }
+  .tr-clock .tr-nowt { font-size: 22px; }
+
+  /* The figures under a title are small text beside it, not tiles. */
+  .band { display: flex; flex-wrap: wrap; align-items: flex-start; column-gap: 12px; row-gap: 4px; }
+  .band-day { flex: 0 0 auto; }
+  .band-status { display: flex; flex-direction: column; align-items: flex-end; flex: 1 1 150px; width: auto; gap: 2px; text-align: right; }
+  .band-metric { background: none; border: 0; padding: 0; border-radius: 0; text-align: right; display: block; }
+  .band-metric .v { display: inline; font-size: 14px; font-weight: 700; letter-spacing: 0; }
+  .band-metric .k { display: inline; margin: 0 0 0 4px; font-size: 13px; }
+  /* Plan has more to say and Yesterday on the title row, so its figures run
+     in one wrapped line under the title. */
+  .band:has(.plan-actions) .band-status { flex: 1 1 100%; flex-direction: row; flex-wrap: wrap; justify-content: flex-start; align-items: baseline; gap: 2px 14px; text-align: left; }
+  .band:has(.plan-actions) .band-metric { text-align: left; }
+}
+@media (max-width: 1180px) {
+  /* 1fr is minmax(auto, 1fr): the track grows to its widest row. These must be
+     able to shrink, or one long row widens the card past the screen. */
+  .troom-lists, .troom-lower { grid-template-columns: minmax(0, 1fr); }
+  .troom-hero { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 639px) {
+  /* A net, not the fix: if any future row is wider than the screen it is
+     clipped at the edge rather than dragging the whole page sideways. */
+  html, body { overflow-x: clip; }
+}
+
+/* ---------- Phone polish: Goals, expanded habits, Automatic Habits (2026-10-16) ----------
+   His words: "polished and aligned", and six rows for one habit. Each of these
+   was desktop columns wrapped by accident; here each is laid out on purpose. */
+@media (max-width: 639px) {
+  /* Goals: header is two tidy lines (name, then range and tally), arrows to the right. */
+  .gb-head { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; grid-template-areas: "c n x" ". r x"; column-gap: 8px; row-gap: 2px; align-items: center; padding-block: 10px; }
+  .gb-toggle { grid-area: c; }
+  .gb-name { grid-area: n; font-size: 18px; line-height: 1.15; margin: 0; white-space: nowrap; }
+  .gb-range { grid-area: r; justify-self: start; font-size: 11px; letter-spacing: 0.08em; white-space: nowrap; }
+  .gb-tally { grid-area: r; justify-self: end; font-size: 13px; white-space: nowrap; margin: 0; }
+  .gb-nav { grid-area: x; display: inline-flex; gap: 6px; }
+  .goal-nav-btn { width: 34px; height: 34px; min-height: 34px; padding: 0; border-radius: 10px; }
+
+  /* Goal row: name and menu on top; count, bar, percent and bump under. */
+  .goal-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; grid-template-areas: "name name name menu" "count bar pct bump"; column-gap: 10px; row-gap: 6px; align-items: center; padding: 10px 0; }
+  .goal-row > .gr-name { grid-area: name; display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .gr-obj { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15.5px; }
+  .gr-auto { flex: none; font-size: 10.5px; letter-spacing: 0.08em; }
+  .goal-row > .kebab-wrap { grid-area: menu; }
+  .goal-row > .gr-count { grid-area: count; font-size: 14px; }
+  .goal-row > .bar.prog { grid-area: bar; display: block; height: 6px; min-width: 0; }
+  .goal-row > .gr-pct { grid-area: pct; font-size: 14px; min-width: 3.2ch; text-align: right; }
+  .goal-row > .goal-bump { grid-area: bump; }
+  .goal-row > .goal-status { display: none; }
+
+  /* An expanded habit: name, count and menu on one line, the seven days
+     spread evenly under it, the average and the note as small text. */
+  .habit-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; row-gap: 8px; align-items: center; padding: 10px 0; }
+  .habit-row-top { grid-column: 1; grid-row: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .habit-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15.5px; }
+  .habit-count { flex: none; font-size: 13px; }
+  .habit-row > .habit-actions { grid-column: 2; grid-row: 1; }
+  .habit-row > .habit-days, .habit-row > .habit-foot, .habit-row > .habit-note { grid-column: 1 / -1; margin: 0; }
+  .habit-days { display: flex; flex-wrap: nowrap; justify-content: space-between; gap: 6px; }
+  .habit-foot { font-size: 12.5px; color: var(--muted); }
+  .habit-note { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 13.5px; }
+
+  /* Automatic Habits: name and count on one line, a full-width thin bar under
+     it, and the Hevy sync as small text under that. */
+  .hg-row { grid-template-columns: minmax(0, 1fr) auto auto; row-gap: 6px; align-items: center; }
+  .hg-do, .hg-read { display: contents; }
+  .hg-what { grid-column: 1; grid-row: 1; }
+  .hg-read-n { grid-column: 2; grid-row: 1; font-size: 13px; text-align: right; }
+  .hg-do > .kebab-wrap { grid-column: 3; grid-row: 1; }
+  .hg-meter { grid-column: 1 / -1; grid-row: 2; width: 100%; height: 4px; }
+  .hg-do > .hevy-sync { grid-column: 1 / -1; grid-row: 3; display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+  .hevy-when { white-space: nowrap; }
 }

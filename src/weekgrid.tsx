@@ -3,7 +3,7 @@
    Its own module rather than living in either: today.tsx already imports
    TodayRoom, so pulling WeekGrid the other way (todayroom.tsx importing
    today.tsx) would have made the two files import each other. */
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { SLOTS, type DayTaskLog, type Task } from './types'
 import { fmtDuration, localDateKey, taskMinutes } from './util'
 
@@ -99,8 +99,28 @@ export function WeekGrid({
     ])),
     [weekDays.join(',')],
   )
+  /* Phone: one day open at a time under a strip of seven (his ask,
+     2026-10-16: "show days instead of all week"). Default is today, or the
+     first day when he has paged to another week. The strip and the hiding are
+     CSS-gated to phone width; a desktop never sees either. */
+  const [picked, setPicked] = useState(today)
+  const pick = weekDays.includes(picked) ? picked : weekDays.includes(today) ? today : weekDays[0]
   return (
-    <div className="weekplan-grid">
+    <>
+    <div className="weekplan-strip" role="group" aria-label="Which day of the week">
+      {weekDays.map((iso) => {
+        const { dnum, name } = dayMeta.get(iso)!
+        const mins = weekTasks.filter((t) => !t.done && (t.plannedOn ?? today) === iso).reduce((a, t) => a + taskMinutes(t), 0)
+        return (
+          <button key={iso} className={`weekplan-pill${iso === today ? ' is-today' : ''}`} aria-pressed={iso === pick} onClick={() => setPicked(iso)}>
+            <span>{name}</span>
+            <b className="mono">{Number(dnum)}</b>
+            <i aria-hidden="true" className={mins > 0 ? 'has' : undefined} />
+          </button>
+        )
+      })}
+    </div>
+    <div className="weekplan-grid" data-pick={pick}>
       {weekDays.map((iso) => {
         const { dnum, name } = dayMeta.get(iso)!
         const dayTasks = weekTasks.filter((t) => (t.plannedOn ?? today) === iso)
@@ -141,7 +161,7 @@ export function WeekGrid({
         })).filter((g) => g.here.length)
         if (doneItems.length) groups.push({ slot: { id: 'done', label: 'Done' }, here: doneItems })
         return (
-          <div className={`weekplan-day${iso === today ? ' is-today' : ''}${out < 0 ? ' is-past' : ''}`} key={iso}>
+          <div className={`weekplan-day${iso === today ? ' is-today' : ''}${out < 0 ? ' is-past' : ''}${iso === pick ? ' is-picked' : ''}`} key={iso}>
             <button
               className="weekplan-daybtn"
               onClick={() => onDayClick(iso)}
@@ -173,5 +193,6 @@ export function WeekGrid({
         )
       })}
     </div>
+    </>
   )
 }

@@ -323,6 +323,31 @@ export async function stampOutreachEvents(ids: string[]): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
+/** What the iPhone shortcuts sent (2026-10-17): "add" puts a task on the to-do
+ *  list, "done" finishes one with the time it took. The shortcut function only
+ *  queues them in mc_inbox; the app applies them through its own actions, so a
+ *  shortcut can never collide with a save. */
+export interface InboxItem { id: string; op: 'add' | 'done'; title: string | null; space: 'personal' | 'work' | null; task_id: string | null; actual_min: number | null }
+
+export async function readInbox(): Promise<InboxItem[] | null> {
+  const c = db()
+  const me = await currentAccount()
+  if (!c || !me) return null
+  const { data, error } = await c.from('mc_inbox')
+    .select('id,op,title,space,task_id,actual_min').is('applied_at', null).order('created_at').limit(200)
+  if (error) throw new Error(error.message)
+  return (data ?? []) as InboxItem[]
+}
+
+/** Mark inbox rows as applied so no device applies them twice. */
+export async function stampInbox(ids: string[]): Promise<void> {
+  const c = db()
+  const me = await currentAccount()
+  if (!c || !me || !ids.length) return
+  const { error } = await c.from('mc_inbox').update({ applied_at: new Date().toISOString() }).in('id', ids)
+  if (error) throw new Error(error.message)
+}
+
 /** The Off-Plate Prospects Sheet as /eco-sync last sent it (mc_prospect_sheet),
  *  or null when it is already applied, signed out or unconfigured. */
 export async function readProspectSheet<T>(): Promise<{ rows: T[]; synced_at: string } | null> {

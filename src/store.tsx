@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { SUPABASE_ENABLED, deleteRemoteState, loadRemoteState, readOutreachEvents, readProspectSheet, stampOutreachEvents, stampProspectSheet } from './supabase'
+import { SUPABASE_ENABLED, deleteRemoteState, loadRemoteState, readInbox, readOutreachEvents, readProspectSheet, stampInbox, stampOutreachEvents, stampProspectSheet } from './supabase'
 import { outbox } from './sync'
 
 /* Two blobs are the same work if they differ only in when they were saved.
@@ -985,7 +985,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
      dropped connection just means the next pull tries again. */
   const applyOutreachRef = useRef(prospectsSlice.applyOutreach)
   applyOutreachRef.current = prospectsSlice.applyOutreach
+  /* The iPhone shortcuts' inbox (2026-10-17): tasks he added and tasks he
+     finished without opening the app. Applied with the app's own addTask and
+     logActual, so a finished task gets its time, its ledger row and its focus
+     block exactly as if he had ticked it here. A task already done or gone is
+     stamped and skipped. Read through a ref: the actions are built further down. */
+  const inboxRef = useRef<{ add: Store['addTask']; done: Store['logActual']; tasks: Task[] } | null>(null)
+  const pullInbox = async () => {
+    try {
+      const items = await readInbox()
+      const io = inboxRef.current
+      if (!items?.length || !io) return
+      for (const it of items) {
+        if (it.op === 'add' && it.title?.trim()) {
+          io.add({ title: it.title.trim(), source: 'mc', estimateMin: 0, space: it.space === 'work' ? 'work' : 'personal', list: 'backlog', category: 'quick' })
+        } else if (it.op === 'done' && it.task_id) {
+          const t = io.tasks.find((x) => x.id === it.task_id)
+          if (t && !t.done) io.done(t.id, Math.max(1, Math.round(it.actual_min ?? t.estimateMin ?? 0)))
+        }
+      }
+      await stampInbox(items.map((i) => i.id))
+    } catch { /* next pull */ }
+  }
   const pullOutreach = async () => {
+    void pullInbox()
     try {
       const events = await readOutreachEvents<OutreachEvent>()
       if (events?.length) await stampOutreachEvents(applyOutreachRef.current(events))
@@ -1583,6 +1606,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
   }
 
+  inboxRef.current = { add: value.addTask, done: value.logActual, tasks }
   return <Ctx.Provider value={value}>{children}<UndoToast /></Ctx.Provider>
 }
 

@@ -98,3 +98,24 @@ create policy mc_prospect_sheet_stamp
   on mc_prospect_sheet for update to authenticated
   using (owner = auth.uid())
   with check (owner = auth.uid());
+
+-- The iPhone shortcuts' inbox (2026-10-17). The `shortcut` function (service role,
+-- its own MC_SHORTCUT_SECRET) queues "add" (a to-do list task) and "done" (task id
+-- plus the minutes it took); the app applies them through its own actions and
+-- stamps applied_at. He can read and stamp his own rows, never insert.
+create table if not exists mc_inbox (
+  id          text primary key,
+  owner       uuid not null references auth.users (id) on delete cascade,
+  op          text not null check (op in ('add', 'done')),
+  title       text,
+  space       text check (space in ('personal', 'work')),
+  task_id     text,
+  actual_min  integer,
+  applied_at  timestamptz,
+  created_at  timestamptz not null default now()
+);
+alter table mc_inbox enable row level security;
+drop policy if exists mc_inbox_read on mc_inbox;
+create policy mc_inbox_read on mc_inbox for select to authenticated using (owner = auth.uid());
+drop policy if exists mc_inbox_stamp on mc_inbox;
+create policy mc_inbox_stamp on mc_inbox for update to authenticated using (owner = auth.uid()) with check (owner = auth.uid());

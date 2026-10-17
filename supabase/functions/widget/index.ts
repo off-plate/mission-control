@@ -19,7 +19,7 @@ import { parseIcs } from '../_shared/ical.ts'
 import { activeCycleKey, addMonthsToKey, cycleForKey, cycleChecklist } from '../../../src/compassCalc.ts'
 import { NAME_DAYS } from '../../../src/namedays-data.ts'
 
-type Task = { title: string; carried?: number; space?: string; at?: string; slot?: string; done: boolean; list: 'today' | 'backlog'; plannedOn?: string; projectId?: string; estimateMin?: number; subtasks?: { estimateMin: number }[] }
+type Task = { id?: string; title: string; carried?: number; space?: string; at?: string; slot?: string; done: boolean; list: 'today' | 'backlog'; plannedOn?: string; projectId?: string; estimateMin?: number; subtasks?: { estimateMin: number }[] }
 type Project = { id: string; name: string }
 type Habit = { id: string; name?: string; daypart?: string; folderOrder?: number; kind?: string; frequency?: string; paused?: boolean; archivedAt?: string; folderId?: string; optional?: boolean }
 type Tick = { habitId: string; day: string }
@@ -187,7 +187,13 @@ Deno.serve(async (req: Request) => {
 
   const s = row.data
   const arr = <T>(v: unknown) => (Array.isArray(v) ? v : []) as T[]
-  const tasks = arr<Task>(s.tasks), projects = arr<Project>(s.projects)
+  const projects = arr<Project>(s.projects)
+  /* What the shortcuts queued and the app has not applied yet (mc_inbox): a task
+     finished from the phone reads as done here at once, an added one counts as waiting. */
+  const { data: queued } = await sb.from('mc_inbox').select('op,task_id').eq('owner', owner.id).is('applied_at', null)
+  const doneIds = new Set((queued ?? []).filter((q) => q.op === 'done').map((q) => q.task_id))
+  const queuedAdds = (queued ?? []).filter((q) => q.op === 'add').length
+  const tasks = arr<Task>(s.tasks).map((t) => (t.id && doneIds.has(t.id) ? { ...t, done: true } : t))
 
   // Plan's own definitions (plan.tsx): onDay and backlogOpen, in the All view.
   const today = tasks.filter((t) => t.list === 'today' && (t.plannedOn ?? now.day) === now.day)
@@ -205,14 +211,16 @@ Deno.serve(async (req: Request) => {
     ok: true,
     day: now.day,
     today: { done: today.length - open.length, total: today.length, openMin: open.reduce((a, t) => a + minutes(t), 0), next: open[0]?.title ?? null, nextMin: open[0] ? minutes(open[0]) : 0 },
-    waiting: { count: waiting.length, min: waiting.reduce((a, t) => a + minutes(t), 0) },
+    waiting: { count: waiting.length + queuedAdds, min: waiting.reduce((a, t) => a + minutes(t), 0) },
     projects: [...perProject].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([id, n]) => ({ name: name(id), waiting: n })),
     habits: habitsToday(arr<Habit>(s.habits), arr<{ id: string; title?: string; habitId?: string }>(s.routines), arr<Tick>(s.habitLog), now),
     event: (await cal).next,
     events: (await cal).today,
     tomorrowFirst: (await cal).tomorrowFirst,
+    // Every open task on today's plan, for the Done shortcut's list.
+    openToday: open.map((t) => ({ id: t.id ?? null, title: t.title, min: minutes(t) })),
     todayItems: [...today].sort((a, b) => Number(a.done) - Number(b.done) || rank(a).localeCompare(rank(b))).slice(0, 7)
-      .map((t) => ({ title: t.title, done: t.done, min: minutes(t), space: t.space ?? null, at: t.at ?? null })),
+      .map((t) => ({ id: t.id ?? null, title: t.title, done: t.done, min: minutes(t), space: t.space ?? null, at: t.at ?? null })),
     stuck: (() => {
       const t = tasks.filter((x) => !x.done && (x.carried ?? 0) >= 2).sort((a, b) => (b.carried ?? 0) - (a.carried ?? 0))[0]
       return t ? { title: t.title, carried: t.carried } : null

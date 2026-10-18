@@ -329,23 +329,20 @@ export async function stampOutreachEvents(ids: string[]): Promise<void> {
  *  shortcut can never collide with a save. */
 export interface InboxItem { id: string; op: 'add' | 'done'; title: string | null; space: 'personal' | 'work' | null; task_id: string | null; actual_min: number | null }
 
-export async function readInbox(): Promise<InboxItem[] | null> {
+/** Claim what is waiting and hand it back, in ONE update: only rows still
+ *  unclaimed are stamped, and the database gives each row to exactly one caller.
+ *  Reading first and stamping after let three overlapping pulls (open, wake,
+ *  the minute timer) all read the same row, and one shortcut task landed three
+ *  times (2026-10-17). */
+export async function claimInbox(): Promise<InboxItem[] | null> {
   const c = db()
   const me = await currentAccount()
   if (!c || !me) return null
   const { data, error } = await c.from('mc_inbox')
-    .select('id,op,title,space,task_id,actual_min').is('applied_at', null).order('created_at').limit(200)
+    .update({ applied_at: new Date().toISOString() }).is('applied_at', null)
+    .select('id,op,title,space,task_id,actual_min,created_at')
   if (error) throw new Error(error.message)
-  return (data ?? []) as InboxItem[]
-}
-
-/** Mark inbox rows as applied so no device applies them twice. */
-export async function stampInbox(ids: string[]): Promise<void> {
-  const c = db()
-  const me = await currentAccount()
-  if (!c || !me || !ids.length) return
-  const { error } = await c.from('mc_inbox').update({ applied_at: new Date().toISOString() }).in('id', ids)
-  if (error) throw new Error(error.message)
+  return ((data ?? []) as (InboxItem & { created_at: string })[]).sort((a, b) => a.created_at.localeCompare(b.created_at))
 }
 
 /** The Off-Plate Prospects Sheet as /eco-sync last sent it (mc_prospect_sheet),

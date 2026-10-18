@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { SUPABASE_ENABLED, deleteRemoteState, loadRemoteState, readInbox, readOutreachEvents, readProspectSheet, stampInbox, stampOutreachEvents, stampProspectSheet } from './supabase'
+import { SUPABASE_ENABLED, deleteRemoteState, claimInbox, loadRemoteState, readOutreachEvents, readProspectSheet, stampOutreachEvents, stampProspectSheet } from './supabase'
 import { outbox } from './sync'
 
 /* Two blobs are the same work if they differ only in when they were saved.
@@ -991,12 +991,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
      block exactly as if he had ticked it here. A task already done or gone is
      stamped and skipped. Read through a ref: the actions are built further down. */
   const inboxRef = useRef<{ add: Store['addTask']; done: Store['logActual']; tasks: Task[] } | null>(null)
+  const inboxBusy = useRef(false)
   const pullInbox = async () => {
+    // One pull at a time on this device; claimInbox keeps other devices out.
+    if (inboxBusy.current || !inboxRef.current) return
+    inboxBusy.current = true
     try {
-      const items = await readInbox()
+      const items = await claimInbox()
       const io = inboxRef.current
-      if (!items?.length || !io) return
-      for (const it of items) {
+      for (const it of items ?? []) {
         if (it.op === 'add' && it.title?.trim()) {
           io.add({ title: it.title.trim(), source: 'mc', estimateMin: 0, space: it.space === 'work' ? 'work' : 'personal', list: 'backlog', category: 'quick' })
         } else if (it.op === 'done' && it.task_id) {
@@ -1004,8 +1007,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           if (t && !t.done) io.done(t.id, Math.max(1, Math.round(it.actual_min ?? t.estimateMin ?? 0)))
         }
       }
-      await stampInbox(items.map((i) => i.id))
-    } catch { /* next pull */ }
+    } catch { /* next pull */ } finally { inboxBusy.current = false }
   }
   const pullOutreach = async () => {
     void pullInbox()

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { SUPABASE_ENABLED, deleteRemoteState, claimInbox, loadRemoteState, readOutreachEvents, readProspectSheet, stampOutreachEvents, stampProspectSheet } from './supabase'
+import { SUPABASE_ENABLED, deleteRemoteState, claimInbox, onAccountChange, loadRemoteState, readOutreachEvents, readProspectSheet, stampOutreachEvents, stampProspectSheet } from './supabase'
 import { outbox } from './sync'
 
 /* Two blobs are the same work if they differ only in when they were saved.
@@ -1010,7 +1010,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     } catch { /* next pull */ } finally { inboxBusy.current = false }
   }
   const pullOutreach = async () => {
-    void pullInbox()
     try {
       const events = await readOutreachEvents<OutreachEvent>()
       if (events?.length) await stampOutreachEvents(applyOutreachRef.current(events))
@@ -1296,6 +1295,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       stop = true
       document.removeEventListener('visibilitychange', onWake)
       window.removeEventListener('focus', onWake)
+      window.clearInterval(id)
+    }
+  }, [])
+
+  /* The shortcuts' inbox has its own quick loop (2026-10-18). It used to ride
+     the full pull, which never runs on page load and only every 60 s, so a
+     refresh restarted the wait and a shortcut task took minutes to show. Now:
+     on load as soon as the session is there, on every return to the tab, and
+     every 15 s while the app is on screen. An empty claim is one tiny update. */
+  useEffect(() => {
+    if (!SUPABASE_ENABLED) return
+    const tick = () => { if (document.visibilityState === 'visible') void pullInbox() }
+    const first = window.setTimeout(tick, 1500)
+    const off = onAccountChange((a) => { if (a) tick() })
+    document.addEventListener('visibilitychange', tick)
+    window.addEventListener('focus', tick)
+    const id = window.setInterval(tick, 15000)
+    return () => {
+      window.clearTimeout(first); off()
+      document.removeEventListener('visibilitychange', tick)
+      window.removeEventListener('focus', tick)
       window.clearInterval(id)
     }
   }, [])

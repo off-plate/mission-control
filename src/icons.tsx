@@ -185,6 +185,9 @@ export const Edit = make(<><path d="M14.767 5.01352L17.5484 7.88824L7.48685 17.6
 
 /* A table. Hicon's closest are `grid` and `layout`, which both read as a
    page layout, not a table you type into. */
+/* A window with its left column marked: the sidebar toggle. Same box and fit
+   as Table, so it sits level with the toolbar beside it. */
+export const Sidebar = make(<><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></>, 16, { k: 1.0944, x: -1.133, y: -1.133 })
 export const Table = make(<><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 10h18M9 10v10M15 10v10" /></>, 16, { k: 1.0944, x: -1.133, y: -1.133 })
 
 /* Add a row / add a column. Nothing in Hicon is about table structure. */

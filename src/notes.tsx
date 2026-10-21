@@ -12,7 +12,7 @@
    survives the blob merge, gets searched and gets hashed for the conflict
    check; src/richtext.ts is the hinge, and its round trip is tested. */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { AutoTextarea, Dropdown } from './ui'
 import { useStore } from './store'
 import { MeetingPrompt } from './meetingprompt'
@@ -737,6 +737,7 @@ const ALL = 'nf-all'
 const DONE = 'nf-done'
 const SORT_KEY = 'mc:notes-sort'
 const PIN_KEY = 'mc:notes-pinshut'
+const FOCUS_KEY = 'mc:notes-only'
 type Sort = 'edited' | 'created' | 'title'
 const SORT_LABEL: Record<Sort, string> = { edited: 'Date edited', created: 'Date created', title: 'Title' }
 
@@ -807,11 +808,23 @@ export function NotesPage() {
   useEffect(() => { try { localStorage.setItem(COLS_KEY, JSON.stringify(cols)) } catch { /* quota */ } }, [cols])
   const phone = vw < 1000
   const wide = vw >= 1180
-  /* Screen-share safe: hides the folders and the note list, leaving only the
-     one note he means to show. Not persisted on purpose -- coming back to
-     Notes tomorrow with everyone able to see it again is the safer default
-     than a meeting mode that silently stuck. */
-  const [presenting, setPresenting] = useState(false)
+  /* Notes only: the folders and the note list step out and the note takes the
+     row. He asked for it as a way of working, not a one-off for a screen share,
+     so it is remembered on this device and has a key (Cmd-\, the sidebar key
+     in most Mac apps). */
+  const [presenting, setPresenting] = useState(() => {
+    try { return localStorage.getItem(FOCUS_KEY) === '1' } catch { return false }
+  })
+  useEffect(() => { try { localStorage.setItem(FOCUS_KEY, presenting ? '1' : '0') } catch { /* quota */ } }, [presenting])
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => {
+      if (e.key !== '\\' || !(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return
+      e.preventDefault()
+      setPresenting((v) => !v)
+    }
+    window.addEventListener('keydown', on)
+    return () => window.removeEventListener('keydown', on)
+  }, [])
 
   const finding = query.trim().length > 0 || tag !== null
   const spaceOf = (id: string) => id.match(/^nf-space-(.+)$/)?.[1] as SpaceId | undefined
@@ -834,11 +847,15 @@ export function NotesPage() {
     return s ? n.space === s : n.folderId === id
   }
 
+  /* Only worked out while the tag strip is on screen. It reads every note, and
+     the notes change on every keystroke he types into one. */
+  const tagsShown = searching || tag !== null
   const allTags = useMemo(() => {
+    if (!tagsShown) return []
     const count = new Map<string, number>()
     for (const n of notes) for (const t of new Set(tagsOf(n.body))) count.set(t, (count.get(t) ?? 0) + 1)
     return [...count.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 12)
-  }, [notes])
+  }, [notes, tagsShown])
 
   const shown = useMemo(() => {
     const q = query.trim()
@@ -949,6 +966,17 @@ export function NotesPage() {
     [noteFolders],
   )
 
+  /* Every folder's count in one walk over the notes, rather than one walk per
+     folder on every render. */
+  const counts = useMemo(() => {
+    const c = new Map<string, number>()
+    for (const n of notes) {
+      if (n.done) { c.set(DONE, (c.get(DONE) ?? 0) + 1); continue }
+      if (n.folderId) c.set(n.folderId, (c.get(n.folderId) ?? 0) + 1)
+    }
+    return c
+  }, [notes])
+
   const submitName = () => {
     if (!naming) return
     const v = naming.value.trim()
@@ -1004,6 +1032,11 @@ export function NotesPage() {
     </Dropdown>
   )
 
+  /* Stable across renders, so a row only re-renders when its own note does. */
+  const phoneRef = useRef(phone)
+  phoneRef.current = phone
+  const openRow = useMemo(() => (id: string) => { setOpenId(id); if (phoneRef.current) window.scrollTo({ top: 0 }) }, [])
+
   const reading = phone && open
   return (
     <div
@@ -1036,7 +1069,7 @@ export function NotesPage() {
                 <button className="nt-folder" aria-current={!finding && openFolder === DONE ? 'true' : undefined} onClick={() => goFolder(DONE)}>
                   <Icon.Check size={16} strokeWidth={2.2} className="nt-doneicon" />
                   <span className="nt-fname">Done</span>
-                  <span className="nt-count mono">{notes.filter((n) => n.done).length}</span>
+                  <span className="nt-count mono">{counts.get(DONE)}</span>
                 </button>
                 <span className="nt-slot" aria-hidden="true" />
               </div>
@@ -1057,7 +1090,7 @@ export function NotesPage() {
               <button className="nt-folder" aria-current={!finding && openFolder === f.id ? 'true' : undefined} onClick={() => goFolder(f.id)}>
                 <FolderIcon open={!finding && openFolder === f.id} />
                 <span className="nt-fname">{f.name}</span>
-                <span className="nt-count mono">{notes.filter((n) => inFolder(n, f.id)).length || ''}</span>
+                <span className="nt-count mono">{counts.get(f.id) || ''}</span>
               </button>
               <Dropdown label={`${f.name} options`} className="nt-fkebab">
                 <button role="menuitem" onClick={() => setNaming({ folder: f.id, value: f.name })}>Rename</button>
@@ -1161,44 +1194,11 @@ export function NotesPage() {
               )}
               <ul hidden={g.head === 'Pinned' && pinShut}>
                 {g.rows.map((n) => (
-                  <li key={n.id} className="nt-rowli">
-                    <button
-                      className={`nt-tick${n.done ? ' on' : ''}`}
-                      role="checkbox"
-                      aria-checked={n.done ? 'true' : 'false'}
-                      aria-label={n.done ? `Put ${headOf(n.body) || 'Untitled'} back` : `Mark ${headOf(n.body) || 'Untitled'} done`}
-                      onClick={() => setNoteDone(n.id, !n.done)}
-                    >
-                      <Icon.Check size={13} strokeWidth={3.4} />
-                    </button>
-                    <button
-                      className={`nt-row has-tick${n.id === openId ? ' on' : ''}${n.done ? ' is-done' : ''}${n.id === flashNoteId ? ' flash' : ''}`}
-                      aria-current={n.id === openId ? 'true' : undefined}
-                      data-note-id={n.id}
-                      onClick={() => { setOpenId(n.id); if (phone) window.scrollTo({ top: 0 }) }}
-                    >
-                      {/* No dot. His words: "in the notes it should not have
-                          any fucking dots". The colour swatch that sat here said
-                          nothing the note's own title does not, and it pushed
-                          every title in the list off the left edge for the sake
-                          of a decoration. */}
-                      <span className="nt-rowtitle">
-                        <span className="nt-rowname">{headOf(n.body) || 'Untitled'}</span>
-                      </span>
-                      <span className="nt-rowsub">
-                        <span className="nt-when">{fmtWhen(sort === 'created' ? n.when : localDateKey(new Date(n.updatedAt)))}</span>
-                        {snippet(n, query) && <span className="nt-rowsnip">{snippet(n, query)}</span>}
-                      </span>
-                      {/* Which folder it lives in, on every row, not only in a
-                          search. In All notes that is the whole point of the
-                          row, and everywhere else it costs one quiet line. */}
-                      <span className="nt-rowtail">
-                        <FolderIcon small />
-                        {nameOf(n.folderId)}
-                        {n.conflict && <span className="nt-flag"> · two versions</span>}
-                      </span>
-                    </button>
-                  </li>
+                  <NoteRow
+                    key={n.id} n={n} on={n.id === openId} flash={n.id === flashNoteId}
+                    sort={sort} query={query} folder={nameOf(n.folderId)}
+                    onOpen={openRow} onTick={setNoteDone}
+                  />
                 ))}
               </ul>
             </li>
@@ -1223,10 +1223,11 @@ export function NotesPage() {
             ) : (
               <button
                 className="nt-presenttoggle" aria-pressed={presenting}
-                title={presenting ? 'Show folders and the note list' : 'Hide folders and the note list'}
+                aria-label={presenting ? 'Show folders and the note list' : 'Hide folders and the note list'}
+                title={presenting ? 'Show folders and the note list (⌘\\)' : 'Hide folders and the note list (⌘\\)'}
                 onClick={() => setPresenting((v) => !v)}
               >
-                {presenting ? <Icon.ChevronRight size={15} /> : <Icon.ChevronLeft size={15} />}
+                <Icon.Sidebar size={17} />
               </button>
             )}
             trail={kebab(open)}
@@ -1265,7 +1266,7 @@ export function NotesPage() {
 
       {/* The grips. Absolutely placed over the column edges so they do not take
           a grid track of their own and cannot shift what they resize. */}
-      {wide && (
+      {wide && !presenting && (
         <>
           <div className="nt-grip" style={{ left: cols.side }} onPointerDown={drag('side')} role="separator" aria-label="Resize the folder column" />
           <div className="nt-grip" style={{ left: cols.side + cols.list }} onPointerDown={drag('list')} role="separator" aria-label="Resize the note list" />
@@ -1274,6 +1275,52 @@ export function NotesPage() {
     </div>
   )
 }
+
+/** One row of the list. Memoised, so typing in the open note re-renders that
+ *  note's row and leaves the other eighty alone. */
+const NoteRow = memo(function NoteRow({ n, on, flash, sort, query, folder, onOpen, onTick }: {
+  n: Note; on: boolean; flash: boolean; sort: Sort; query: string; folder: string
+  onOpen: (id: string) => void; onTick: (id: string, done: boolean) => void
+}) {
+  const title = headOf(n.body) || 'Untitled'
+  const snip = snippet(n, query)
+  return (
+    <li className="nt-rowli">
+      <button
+        className={`nt-tick${n.done ? ' on' : ''}`}
+        role="checkbox"
+        aria-checked={n.done ? 'true' : 'false'}
+        aria-label={n.done ? `Put ${title} back` : `Mark ${title} done`}
+        onClick={() => onTick(n.id, !n.done)}
+      >
+        <Icon.Check size={13} strokeWidth={3.4} />
+      </button>
+      <button
+        className={`nt-row has-tick${on ? ' on' : ''}${n.done ? ' is-done' : ''}${flash ? ' flash' : ''}`}
+        aria-current={on ? 'true' : undefined}
+        data-note-id={n.id}
+        onClick={() => onOpen(n.id)}
+      >
+        {/* No dot. His words: "in the notes it should not have any fucking
+            dots". The colour swatch that sat here said nothing the note's own
+            title does not. */}
+        <span className="nt-rowtitle">
+          <span className="nt-rowname">{title}</span>
+        </span>
+        <span className="nt-rowsub">
+          <span className="nt-when">{fmtWhen(sort === 'created' ? n.when : localDateKey(new Date(n.updatedAt)))}</span>
+          {snip && <span className="nt-rowsnip">{snip}</span>}
+        </span>
+        {/* Which folder it lives in, on every row, not only in a search. */}
+        <span className="nt-rowtail">
+          <FolderIcon small />
+          {folder}
+          {n.conflict && <span className="nt-flag"> · two versions</span>}
+        </span>
+      </button>
+    </li>
+  )
+})
 
 /** The one line under a row's title: in a search, the line that matched,
  *  otherwise whatever follows the title. Never the title again. */

@@ -929,6 +929,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [lastRollDay] = useState<string | undefined>(persisted?.lastRollDay)
   const remoteSaveTimer = useRef<number | undefined>(undefined)
   const latestJson = useRef<string>('')
+  const localSaveTimer = useRef<number | undefined>(undefined)
+  const pendingSave = useRef<(() => void) | null>(null)
+  /** Runs the save the last state change scheduled, now, if it has not run. */
+  const flushLocal = () => {
+    window.clearTimeout(localSaveTimer.current)
+    const run = pendingSave.current
+    pendingSave.current = null
+    run?.()
+  }
   /* Where the copy on screen last came from, when that was somewhere else.
      Deliberately NOT persisted: it answers "did my phone's edit land here yet",
      which is a question about this device right now, and a stored answer would
@@ -1131,31 +1140,40 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, spaceGuessed, graveyard, twoLives, reels, tunes, reelFiles, lastRollDay: lastRollDay ?? localDateKey(),
       activeFocus,
     }
-    const json = JSON.stringify(state)
     /* His own writing is the one thing that makes "updated from your iPhone"
        stale, so it is what takes the line down. The save that applyExternal
        itself triggers is not his writing, and says so through the flag. */
     if (fromExternal.current) fromExternal.current = false
     else setSyncOrigin(null)
-    latestJson.current = json
-    try {
-      localStorage.setItem(STORAGE_KEY, json)
-      if (storageFull) setStorageFull(false)
-    } catch {
-      /* This used to be swallowed. With Supabase off, a full quota means every edit from here on
-         is lost on reload and nothing on screen says so. Measured after importing one city of
-         leads: the state and its backup mirror together reach 3.8 MB of a ~5.2 MB quota, so this
-         is a reachable state rather than a theoretical one. */
-      if (!storageFull) setStorageFull(true)
+    /* The write itself waits for a pause. Stringifying and storing the whole
+       blob is several milliseconds once his data is in it, and typing in a note
+       ran it on every keystroke, which is where the lag in Notes came from.
+       Anything that reads latestJson calls flushLocal() first, and so does the
+       page hiding, so no reader ever sees an older blob than memory holds. */
+    pendingSave.current = () => {
+      const json = JSON.stringify(state)
+      latestJson.current = json
+      try {
+        localStorage.setItem(STORAGE_KEY, json)
+        if (storageFull) setStorageFull(false)
+      } catch {
+        /* This used to be swallowed. With Supabase off, a full quota means every edit from here on
+           is lost on reload and nothing on screen says so. Measured after importing one city of
+           leads: the state and its backup mirror together reach 3.8 MB of a ~5.2 MB quota, so this
+           is a reachable state rather than a theoretical one. */
+        if (!storageFull) setStorageFull(true)
+      }
+      /* Mirror to Supabase when configured, debounced so rapid edits collapse into
+         one write. The outbox owns the write from here: a failure is retried on a
+         backoff and on reconnect rather than dropped, and the intent to sync is
+         persisted so quitting while offline does not lose it. */
+      if (SUPABASE_ENABLED) {
+        window.clearTimeout(remoteSaveTimer.current)
+        remoteSaveTimer.current = window.setTimeout(() => { outbox.push(json) }, 800)
+      }
     }
-    /* Mirror to Supabase when configured, debounced so rapid edits collapse into
-       one write. The outbox owns the write from here: a failure is retried on a
-       backoff and on reconnect rather than dropped, and the intent to sync is
-       persisted so quitting while offline does not lose it. */
-    if (SUPABASE_ENABLED) {
-      window.clearTimeout(remoteSaveTimer.current)
-      remoteSaveTimer.current = window.setTimeout(() => { outbox.push(json) }, 800)
-    }
+    window.clearTimeout(localSaveTimer.current)
+    localSaveTimer.current = window.setTimeout(flushLocal, 300)
   }, [tasks, habits, goals, projects, ledger, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels, tunes, reelFiles, ideaBoard, prompts, people, personBonds, personContacts, prospects, gymGoals, activeFocus])
 
   /* ---- state that arrived from somewhere else ----
@@ -1164,6 +1182,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
      work on this device survives it. Applying it makes the save effect fire,
      which is how the merged truth goes back out to everyone. */
   const applyExternal = (incoming: string) => {
+    flushLocal()
     const mine = latestJson.current || localStorage.getItem(STORAGE_KEY) || ''
     if (!incoming || incoming === mine) return
     const merged = mine ? mergeStates(mine, incoming) : incoming
@@ -1282,6 +1301,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
          remote, changes no state, and so never fires the save effect. The device
          stayed correct and the server stayed behind, silently, until he happened
          to edit something else while connected. */
+      flushLocal()
       const mine = latestJson.current
       if (!mine) return
       const united = remote ? mergeStates(mine, remote) : mine
@@ -1329,8 +1349,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   /* Closing the tab inside the debounce window must not lose the last change:
      flush the pending remote write the moment the page starts hiding. */
   useEffect(() => {
-    if (!SUPABASE_ENABLED) return
     const flush = () => {
+      flushLocal()
+      if (!SUPABASE_ENABLED) return
       if (remoteSaveTimer.current !== undefined && latestJson.current) {
         window.clearTimeout(remoteSaveTimer.current)
         remoteSaveTimer.current = undefined
@@ -1619,6 +1640,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     accuracyPct,
     resetDemo: () => {
       // Cancel any pending mirror first, or it would rewrite the row we just deleted.
+      window.clearTimeout(localSaveTimer.current)
+      pendingSave.current = null
       window.clearTimeout(remoteSaveTimer.current)
       remoteSaveTimer.current = undefined
       // The backup copy too: "wipe everything" must not leave his data on the device.

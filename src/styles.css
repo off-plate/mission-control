@@ -2420,6 +2420,9 @@ a.pron-src:hover { color: var(--accent-text); text-decoration: underline; }
 }
 .nt-presenttoggle:hover { background: var(--a-sunk); color: var(--ink); }
 .nt-presenttoggle[aria-pressed="true"] { color: var(--accent-text); }
+/* With the columns gone the pane can be 3000px wide, and a line that long
+   cannot be read. The note keeps a reading measure and sits in the middle. */
+.nt-app.is-presenting .nt-sheet { max-width: 920px; margin-inline: auto; }
 
 /* The grips sit ON the column edges rather than taking a track of their own,
    so dragging one cannot shift the thing it is resizing. */

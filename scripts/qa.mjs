@@ -2111,6 +2111,27 @@ await step('a task finished without a time is finished on every page that counts
   }
 })
 
+await step('notes: a pasted table is still a table after a reload', async () => {
+  /* His report, 2026-10-21: "the tables that I pasted in the notes are all
+     fucked up". A table pasted from ChatGPT or a web page arrives inside a
+     wrapper <div> and was stored as one glued sentence; a line break inside a
+     Sheets cell cut its row in two. Pasted through the real clipboard, so
+     Chrome's own paste handling is what gets tested. */
+  await fresh('notes')
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new globalThis.URL(URL).origin })
+  await page.locator('.nt-new').click(); await page.waitForTimeout(300)
+  await page.locator('.nt-editor').click()
+  await page.evaluate(async () => {
+    const h = '<meta charset="utf-8"><div class="prose"><table><thead><tr><th><p>Service</p></th><th>What</th></tr></thead><tbody><tr><td><p>Domains</p><p>.cz and .com</p></td><td>3 000 | 4 000</td></tr><tr><td>SEO<br>monthly</td><td><ul><li>pixel</li><li>GA4</li></ul></td></tr></tbody></table></div>'
+    await navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([h], { type: 'text/html' }), 'text/plain': new Blob(['x'], { type: 'text/plain' }) })])
+  })
+  await page.keyboard.press('Meta+V'); await page.waitForTimeout(800)
+  await page.reload(); await page.waitForTimeout(900)
+  const cells = await page.locator('.nt-editor table td, .nt-editor table th').allInnerTexts()
+  const want = ['Service', 'What', 'Domains\n.cz and .com', '3 000 | 4 000', 'SEO\nmonthly', '• pixel\n• GA4']
+  if (JSON.stringify(cells) !== JSON.stringify(want)) throw new Error(`table came back as ${JSON.stringify(cells)}`)
+})
+
 await step('notes: a slash command is taken at either end of the line', async () => {
   /* He wrote "33 tis vyfaktuovat /help", pressed Enter, and got silence, which
      is indistinguishable from the feature being deleted. It was anchored to the
@@ -2897,6 +2918,8 @@ await step('notes: /help drafts through Groq, and cites what it actually searche
   const body = await page.locator('.nt-editor').innerText()
   if (!/Oat milk foams well/.test(body)) throw new Error(`the drafted text is not in the note: ${JSON.stringify(body)}`)
   if (/\/help/i.test(body)) throw new Error('the /help instruction line is still in the note after it answered')
+  /* The save lands after a 300ms pause in edits (store.tsx), not on the frame. */
+  await page.waitForTimeout(450)
   const saved = await page.evaluate((K) => (JSON.parse(localStorage.getItem(K)).notes ?? []).find((n) => n.title === 'Help gate 2')?.body ?? '', KEY)
   if (!/example\.com\/oat-milk/.test(saved)) throw new Error(`the source link did not save into the note: ${JSON.stringify(saved)}`)
 })

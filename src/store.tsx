@@ -931,6 +931,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const latestJson = useRef<string>('')
   const localSaveTimer = useRef<number | undefined>(undefined)
   const pendingSave = useRef<(() => void) | null>(null)
+  const firstSave = useRef(true)
   /** Runs the save the last state change scheduled, now, if it has not run. */
   const flushLocal = () => {
     window.clearTimeout(localSaveTimer.current)
@@ -1172,6 +1173,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         remoteSaveTimer.current = window.setTimeout(() => { outbox.push(json) }, 800)
       }
     }
+    /* The save on load goes at once: it carries migrations and the unsent
+       marker, and nothing is being typed yet to make it expensive. */
+    if (firstSave.current) { firstSave.current = false; flushLocal(); return }
     window.clearTimeout(localSaveTimer.current)
     localSaveTimer.current = window.setTimeout(flushLocal, 300)
   }, [tasks, habits, goals, projects, ledger, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels, tunes, reelFiles, ideaBoard, prompts, people, personBonds, personContacts, prospects, gymGoals, activeFocus])

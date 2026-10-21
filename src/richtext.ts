@@ -57,13 +57,26 @@ export function mdToHtml(md: string): string {
     if (/^\s*\|.*\|\s*$/.test(line) && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1] ?? '')) {
       shut()
       const rows: string[][] = []
-      const cells = (l: string) => l.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim())
+      /* Split on the pipes that are not escaped, then unescape: a cell that
+         says "3 000 | 4 000" is one cell, not two. */
+      const cells = (l: string) => l.trim().replace(/^\|/, '').replace(/(?<!\\)\|$/, '')
+        .split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, '|'))
       const head = cells(line)
       i += 1
-      while (i + 1 < lines.length && /^\s*\|.*\|\s*$/.test(lines[i + 1] ?? '')) { i += 1; rows.push(cells(lines[i])) }
+      while (i + 1 < lines.length && /^\s*\|/.test(lines[i + 1] ?? '')) {
+        i += 1
+        /* A row that starts with a pipe but does not end with one was cut in
+           half by a line break inside a cell, which is how pasted tables used
+           to be stored before cells kept their breaks as <br>. Glue the pieces
+           back until the row closes, so those notes mend themselves. */
+        let row = lines[i].replace(/\s+$/, '')
+        while (!/\|$/.test(row) && i + 1 < lines.length) { i += 1; row += `<br>${lines[i].replace(/\s+$/, '')}` }
+        rows.push(cells(row))
+      }
       const width = Math.max(head.length, ...rows.map((r) => r.length), 1)
+      const cellHtml = (t: string) => t.split(/<br\s*\/?>/i).map((x) => inlineToHtml(x.trim())).join('<br>')
       const cellsOf = (r: string[], tag: string) =>
-        Array.from({ length: width }, (_, c) => `<${tag}>${inlineToHtml(r[c] ?? '')}</${tag}>`).join('')
+        Array.from({ length: width }, (_, c) => `<${tag}>${cellHtml(r[c] ?? '')}</${tag}>`).join('')
       out.push(`<table><thead><tr>${cellsOf(head, 'th')}</tr></thead><tbody>${rows.map((r) => `<tr>${cellsOf(r, 'td')}</tr>`).join('')}</tbody></table>`)
       continue
     }
@@ -114,6 +127,9 @@ function inlineToMd(node: Node): string {
   const el = node as HTMLElement
   const kids = () => [...el.childNodes].map(inlineToMd).join('')
   switch (el.tagName) {
+    /* Pasting from Sheets or Word brings a <style> along, and its CSS is not
+       something he wrote. */
+    case 'STYLE': case 'SCRIPT': case 'META': case 'TITLE': case 'COLGROUP': return ''
     case 'BR': return '\n'
     case 'STRONG': case 'B': { const t = kids(); return t.trim() ? `**${t}**` : t }
     case 'EM': case 'I': { const t = kids(); return t.trim() ? `*${t}*` : t }
@@ -151,6 +167,28 @@ export function htmlToMd(root: HTMLElement): string {
     }
   }
 
+  /* One cell as one line of markdown. A table row is one line, so a break inside
+     a cell is written as <br> rather than a newline, which used to cut the row
+     in two and spill the rest of the table out as loose text. Paragraphs and
+     list items inside a cell (ChatGPT and web pages paste them) become lines. */
+  const cellMd = (c: HTMLElement): string => {
+    const parts: string[] = []
+    const walk = (n: Node, lead = '') => {
+      if (n.nodeType === 1 && /^(P|DIV|LI|H[1-6]|BLOCKQUOTE)$/.test((n as HTMLElement).tagName)) {
+        parts.push('\n')
+        if ((n as HTMLElement).tagName === 'LI') parts.push('• ')
+        for (const k of [...n.childNodes]) walk(k, lead)
+        parts.push('\n')
+        return
+      }
+      if (n.nodeType === 1 && /^(UL|OL)$/.test((n as HTMLElement).tagName)) { for (const k of [...n.childNodes]) walk(k); return }
+      parts.push(inlineToMd(n))
+    }
+    for (const k of [...c.childNodes]) walk(k)
+    return parts.join('').split('\n').map((l) => l.trim()).filter(Boolean).join('<br>').replace(/\|/g, '\\|')
+  }
+
+  const BLOCKY = 'TABLE, UL, OL, P, DIV, H1, H2, H3, H4, H5, H6, BLOCKQUOTE, HR'
   const block = (el: HTMLElement) => {
     switch (el.tagName) {
       case 'H1': case 'H2': case 'H3': push(`# ${inlineToMd(el).trim()}`); return
@@ -161,7 +199,7 @@ export function htmlToMd(root: HTMLElement): string {
       case 'TABLE': {
         const rows = [...el.querySelectorAll('tr')]
         if (!rows.length) return
-        const cellsOf = (tr: Element) => [...tr.children].map((c) => inlineToMd(c).trim().replace(/\|/g, '\\|') || ' ')
+        const cellsOf = (tr: Element) => [...tr.children].map((c) => cellMd(c as HTMLElement) || ' ')
         const width = Math.max(...rows.map((r) => r.children.length), 1)
         const pad = (r: string[]) => Array.from({ length: width }, (_, i) => r[i] ?? ' ')
         push(`| ${pad(cellsOf(rows[0])).join(' | ')} |`)
@@ -170,6 +208,20 @@ export function htmlToMd(root: HTMLElement): string {
         return
       }
       case 'UL': case 'OL': { list(el, 0); return }
+      case 'STYLE': case 'SCRIPT': case 'META': case 'TITLE': return
+    }
+    /* A wrapper around real blocks: a pasted table usually arrives inside a
+       <div> or a <google-sheets-html-origin>, and reading the wrapper as one
+       line of text glued every cell of the table into a single sentence. Walk
+       into it and read its children as the blocks they are. */
+    if (el.querySelector(BLOCKY)) {
+      for (const node of [...el.childNodes]) {
+        if (node.nodeType === 3) { const t = (node.nodeValue ?? '').trim(); if (t) push(t); continue }
+        if (node.nodeType === 1) block(node as HTMLElement)
+      }
+      return
+    }
+    switch (el.tagName) {
       /* A bare <br> paragraph is a blank line he typed on purpose. */
       default: push(inlineToMd(el).replace(/ /g, ' ').replace(/\s+$/, ''))
     }

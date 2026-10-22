@@ -11031,7 +11031,6 @@ body:has(.shell.is-hud) { --st-research: #9AA3B0; --st-build: #A592CC; --st-reac
     flex: none; min-height: 0; height: auto; padding: 4px 2px; border: 0; background: none;
     font-size: 13px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums;
   }
-  .todo-row .chip.est-ai, .today-task .chip.est-ai { color: var(--accent-text); font-weight: 700; }
 
   /* The To-do / Today switch above is the day control on a phone; Tomorrow and
      the rest are one tap away in a task's menu ("Move to tomorrow"). The no-wrap

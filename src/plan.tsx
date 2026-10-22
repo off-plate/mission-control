@@ -1,4 +1,3 @@
-import { Orb } from './orb'
 import { daysSince } from './health'
 /* THE PLAN PAGE. Split out of pages1.tsx (2026-09-09). Carries the task-row
    pieces (SubEdit, SubtaskRow, EditTaskSheet, ActualLog, EstimateChip,
@@ -18,8 +17,6 @@ import { BreakdownSheet, Sheet } from './modals'
 import { Linkify } from './widgets'
 import { PLAN_AHEAD_DAYS, WeekGrid, dayPlus, shortDay, weekRangeLabel } from './weekgrid'
 import { useCoarsePointer, usePhone, Band, WorkspaceTitle, Dropdown, ProjectMark, SpaceMark } from './ui'
-import { estimateFor } from './estimate'
-import { estimateTask } from './ai'
 import { SLOTS, SPACES, UNSORTED, habitLocked, routineComplete, routineProgress, slotMinutes, TYPING_TARGET_WPM, type Project, type Routine, type SubTask, type Task, type TimeSlot } from './types'
 import { periodKeyFor, fmtDuration, fmtSigned, dayOfWeekKey, isEstimated, localDateKey, slotForMoment, taskMinutes } from './util'
 
@@ -194,31 +191,10 @@ export function ActualLog({ est, tracked, onLog, onSkip }: { est: number; tracke
   )
 }
 
-
-/* The AI reads the task; the local rule of thumb only catches the fall. A
-   flat default dressed as an estimate taught him to ignore the button. */
-function useAiEstimate(task: Task) {
-  const { setEstimate } = useStore()
-  const [thinking, setThinking] = useState(false)
-  const estimate = async () => {
-    if (thinking) return
-    setThinking(true)
-    try {
-      const ai = await estimateTask(task.title, task.category)
-      setEstimate(task.id, ai ?? estimateFor(task.title, task.category).minutes)
-    } finally { setThinking(false) }
-  }
-  return { thinking, estimate }
-}
-
 /* The estimate is a number you can argue with. Click it and type your own; the
    generated one is a starting point, not a verdict. */
 function EstimateChip({ task }: { task: Task }) {
   const { setEstimate, inView } = useStore()
-  /* On a phone the hourglass is gone (his ask, 2026-10-15): an unestimated
-     task's chip IS the estimate button, and an estimated one is plain text. */
-  const phone = usePhone()
-  const ai = useAiEstimate(task)
   const [editing, setEditing] = useState(false)
   const [val, setVal] = useState('')
   const fromSteps = !!task.subtasks?.length
@@ -241,13 +217,6 @@ function EstimateChip({ task }: { task: Task }) {
     )
   }
   if (fromSteps) return <span className="chip tone-info" title="Comes from the steps">{fmtDuration(mins)}</span>
-  if (phone && !isEstimated(task)) {
-    return (
-      <button className="chip tone-info est-edit is-none est-ai" disabled={ai.thinking} aria-label={`Estimate how long ${task.title} takes`} onClick={ai.estimate}>
-        {ai.thinking ? '…' : 'Estimate'}
-      </button>
-    )
-  }
   return (
     <button
       className={`chip tone-info est-edit${isEstimated(task) ? '' : ' is-none'}`}
@@ -260,35 +229,20 @@ function EstimateChip({ task }: { task: Task }) {
   )
 }
 
-/* Breaking a task down and estimating it are actions on the task itself. */
+/* Estimating is automatic (store.tsx), so the only action left on a task row is
+   starting a focus block. */
 function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
-  const hasSubs = !!task.subtasks?.length
-  const { thinking, estimate } = useAiEstimate(task)
+  if (!onFocus) return null
   return (
     <span className="task-actions">
-      {onFocus && (
-        <button
-          className="task-act task-focus"
-          disabled={!isEstimated(task)}
-          aria-label={isEstimated(task) ? `Focus on ${task.title} for ${taskMinutes(task)} minutes` : `Estimate ${task.title} before starting a focus block`}
-          title={isEstimated(task) ? `Focus ${taskMinutes(task)}m on this` : 'Estimate it first'}
-          onClick={onFocus}
-        >
-          <Icon.Play size={18} />
-        </button>
-      )}
       <button
-        className="task-act"
-        disabled={hasSubs}
-        aria-label={hasSubs ? `${task.title} takes its estimate from its steps` : `Estimate how long ${task.title} takes`}
-        title={hasSubs ? 'Estimate comes from the steps' : 'Estimate the time'}
-        onClick={estimate}
+        className="task-act task-focus"
+        disabled={!isEstimated(task)}
+        aria-label={isEstimated(task) ? `Focus on ${task.title} for ${taskMinutes(task)} minutes` : `Estimating ${task.title}`}
+        title={isEstimated(task) ? `Focus ${taskMinutes(task)}m on this` : 'Estimating...'}
+        onClick={onFocus}
       >
-        {thinking
-          ? <Orb state="solving" size={20} label="Estimating" />
-          : (
-            <Icon.Hourglass size={18} />
-          )}
+        <Icon.Play size={18} />
       </button>
     </span>
   )

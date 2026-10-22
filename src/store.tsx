@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { SUPABASE_ENABLED, deleteRemoteState, claimInbox, onAccountChange, loadRemoteState, readOutreachEvents, readProspectSheet, stampOutreachEvents, stampProspectSheet } from './supabase'
 import { outbox } from './sync'
+import { estimateTask } from './ai'
+import { estimateFor } from './estimate'
 
 /* Two blobs are the same work if they differ only in when they were saved.
    Used both to stop two tabs answering each other's saves forever, and to decide
@@ -1051,6 +1053,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [openProjectId, setOpenProject] = useState<string | null>(null)
   const plannerSlice = usePlannerSlice(persisted, { armUndo, bury, digUp, openProjectId, setOpenProject, setPlan })
   const { tasks, setTasks, projects, setProjects } = plannerSlice
+  /* Every task without an estimate gets one, as it appears. The model reads
+     the title; the local rule of thumb only catches a failed call. One at a
+     time, so a pasted list never bursts the provider; each id is tried once a
+     session, so a failure cannot loop. */
+  const autoEstimated = useRef(new Set<string>())
+  const estimating = useRef(false)
+  useEffect(() => {
+    if (estimating.current) return
+    const next = tasks.find((t) => !t.done && !t.subtasks?.length && !t.estimated && !autoEstimated.current.has(t.id))
+    if (!next) return
+    estimating.current = true
+    autoEstimated.current.add(next.id)
+    void (async () => {
+      let min: number
+      try { min = (await estimateTask(next.title, next.category)) ?? estimateFor(next.title, next.category).minutes }
+      catch { min = estimateFor(next.title, next.category).minutes }
+      plannerSlice.setEstimate(next.id, min)
+      estimating.current = false
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks])
   const { assistantLog, setAssistantLog } = useAssistantSlice(persisted)
   const setSpace = (s: SpaceId) => setWriteSpace(s)
   const setView = (v: ViewId) => { setViewState(v); if (isSpace(v)) setWriteSpace(v); setOpenProject(null) }

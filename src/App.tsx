@@ -506,9 +506,7 @@ function PhoneTabBar({ page, setPage }: { page: PageId; setPage: (p: PageId) => 
 }
 
 /* Pages that are dark in both modes, so the header goes dark with them. */
-/* Habits & Goals joined the dark pages on 2026-10-25: the HabitKit rebuild,
-   with colours he freed for it ("you're free to adjust any colors"). */
-const DARK_CHROME_PAGES: PageId[] = ['timeline', 'board', 'health', 'gym', 'longevity', 'habits', 'routines', 'goals', 'quitting']
+const DARK_CHROME_PAGES: PageId[] = ['timeline', 'board', 'health', 'gym', 'longevity']
 
 export default function App() {
   const { space, view, setView, page, setPage, tasks, routines, goals, habits, markHabitDaysOn, prompts, storageFull } = useStore()

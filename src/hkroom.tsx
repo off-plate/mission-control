@@ -84,6 +84,12 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
   const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null)
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 3800); return () => clearTimeout(t) }, [toast])
   const today = localDateKey()
+  /* Five days on the phone; on a wider screen as many weeks as fill the row,
+     so the days spread across the page instead of huddling at its edge. */
+  const daysFor = () => { const w = typeof window === 'undefined' ? 390 : window.innerWidth; return w >= 1500 ? 28 : w >= 1200 ? 21 : w >= 900 ? 14 : 5 }
+  const [nDays, setNDays] = useState(daysFor)
+  useEffect(() => { const on = () => setNDays(daysFor()); window.addEventListener('resize', on); return () => window.removeEventListener('resize', on) }, [])
+  const weekDays = Array.from({ length: nDays }, (_, i) => nDays - 1 - i)
 
   /* Which days each habit was kept, and the amount rows, read once per change
      of the log rather than once per tile. */
@@ -184,7 +190,9 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
     const status = goalPace(total, g.target, tf, new Date(), !!fed && !isTimeFed(fed))
     return { total, pace, left, reach, weekNeed, ahead: status !== 'behind', status, end: range.to }
   }
-  const tileSize = (target: number) => { const raw = target / 40; const steps = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000]; return steps.find((x) => x >= raw) ?? 100000 }
+  /* Goal tiles are the same size as a habit's day dots: a 26-wide grid, at
+     most two rows, so 1 goal is one small dot and 100 000 CZK is fifty. */
+  const tileSize = (target: number) => { const raw = target / 52; const steps = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000]; return steps.find((x) => x >= raw) ?? 100000 }
 
   /* ---------- actions ---------- */
   const say = (text: string, undo?: () => void) => setToast({ text, undo })
@@ -212,7 +220,7 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
     return (
       <span className="hk-ringwrap" style={{ width: size, height: size }}>
         <svg className="hk-ring" viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
-          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={`color-mix(in oklab, ${c} 18%, #22242A)`} strokeWidth={w} />
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={`color-mix(in oklab, ${c} 18%, var(--hk-dot))`} strokeWidth={w} />
           <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={c} strokeWidth={w} strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - Math.min(1, Math.max(0, f)))} />
         </svg>
         {children}
@@ -225,8 +233,7 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
     if (it.kind === 'goal') {
       const g = it.goal!, info = goalInfo(g), size = tileSize(g.target)
       const n = Math.ceil(g.target / size), filled = Math.floor(info.total / size), pace = Math.floor(info.pace / size)
-      const cols = Math.max(10, Math.ceil(n / 6))
-      return <div className="hk-tiles is-goal" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }} aria-label={`${fmt(info.total)} of ${fmt(g.target)} ${g.unit}, one tile per ${fmt(size)}`}>
+      return <div className="hk-tiles is-goal" style={{ gridTemplateColumns: 'repeat(26, 1fr)' }} aria-label={`${fmt(info.total)} of ${fmt(g.target)} ${g.unit}, one tile per ${fmt(size)}`}>
         {Array.from({ length: n }, (_, i) => <i key={i} className={`${i < filled ? 'f' : ''}${i === pace && pace >= filled && info.total < g.target ? ' pace' : ''}`} />)}
       </div>
     }
@@ -332,12 +339,22 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
   const sheetItem = sheet?.key ? items.find((x) => x.key === sheet.key) ?? null : null
 
   return (
-    <div className="hk">
+    <div className="page hk">
       <div className="hk-bar">
         <div className="hk-today">
           <Ring f={tally.due ? tally.kept / tally.due : 0} c="#8E88FF" size={38} w={4} />
           <div><b>{tally.kept} of {tally.due} today</b><span>{new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>
         </div>
+        {/* On a wide screen the views sit here, named; on the phone they are the floating pill. */}
+        <div className="hk-views" role="group" aria-label="View">
+          {(['cards', 'list', 'week'] as const).map((v) => (
+            <button key={v} aria-pressed={view === v} onClick={() => setView(v)}>
+              {v === 'cards' ? <Icon.AppsGrid size={16} /> : v === 'list' ? <Icon.Checklist size={16} /> : <Icon.Table size={16} />}
+              {{ cards: 'Cards', list: 'Checklist', week: 'Week' }[v]}
+            </button>
+          ))}
+        </div>
+        <button className="hk-newbtn" onClick={() => setSheet({ kind: 'new' })}><Icon.Plus size={16} />New</button>
         <button className="hk-round is-plus" aria-label="New" onClick={() => setSheet({ kind: 'new' })}><Icon.Plus size={18} /></button>
       </div>
       <div className="hk-chips" role="group" aria-label="Show">
@@ -361,12 +378,12 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
       })()}
 
       {view === 'week' && (
-        <div className="hk-week">
-          <div className="hk-wrow is-head"><span className="hk-sub">{shown.length} items</span>{[4, 3, 2, 1, 0].map((a) => { const d = new Date(`${keyAgo(a)}T12:00:00`); return <span key={a} className={`hk-wday${a ? '' : ' is-today'}`}>{d.toLocaleDateString('en-GB', { weekday: 'short' }).slice(0, 2)}<b>{d.getDate()}</b></span> })}</div>
+        <div className="hk-week" style={{ ['--days' as string]: weekDays.length }}>
+          <div className="hk-wrow is-head"><span className="hk-sub">{shown.length} items</span>{weekDays.map((a) => { const d = new Date(`${keyAgo(a)}T12:00:00`); return <span key={a} className={`hk-wday${a ? '' : ' is-today'}`}>{d.toLocaleDateString('en-GB', { weekday: 'short' }).slice(0, 2)}<b>{d.getDate()}</b></span> })}</div>
           {[...(pinned ? [pinned] : []), ...sorted].map((it) => (
             <div key={it.key} className="hk-wrow" style={{ ['--c' as string]: it.color }}>
               <button className="hk-wname" onClick={() => setSheet({ kind: 'detail', key: it.key })}><Ico it={it} small /><span>{it.name}</span></button>
-              {[4, 3, 2, 1, 0].map((a) => {
+              {weekDays.map((a) => {
                 const v = it.kind === 'goal' ? ((it.goal!.entries ?? []).some((e) => e.day === keyAgo(a)) ? 1 : 0) : dayVal(it, keyAgo(a), a)
                 if (v === null) return <span key={a} className="hk-sq is-x" />
                 const cls = `hk-sq${v >= 1 ? ' is-f' : v > 0 ? ' is-p' : ''}${a ? '' : ' is-t'}`

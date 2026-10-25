@@ -305,7 +305,8 @@ await step('goals: add with milestones, tick one on the card', async () => {
   /* Milestones alone make a goal measured in them: one written, a target of one.
      Made from the + sheet and ticked in the goal's own sheet. */
   await fresh('goals')
-  await page.locator('.hk-round.is-plus').click(); await page.waitForTimeout(450)
+  /* The labelled New in the bar on a wide screen, the round + on a phone. */
+  await page.locator('.hk-newbtn:visible, .hk-round.is-plus:visible').first().click(); await page.waitForTimeout(450)
   await page.locator('#hk-name').fill('Gate goal')
   await page.locator('.hk-seg button', { hasText: 'Goal' }).click()
   await page.locator('#hk-ms').fill('Step one')

@@ -273,15 +273,18 @@ await step('breakdown: his own steps, his own minutes', async () => {
 })
 
 await step('habits: tick a build habit and persist', async () => {
+  /* The HabitKit page (2026-10-25): one button per card, a tick for yes/no. */
   await fresh('habits')
-  await openRoutines()
-  const dot = page.locator('.habit-line', { hasText: 'Meditation' }).first().locator('.daydot:not([disabled])').last()
-  await dot.click(); await page.waitForTimeout(400)
-  await page.reload(); await page.waitForTimeout(600)
+  /* Meditation is a step in Morning Preparation since the step merge; a step
+     can be ticked from its routine's sheet without running the routine. */
+  await page.locator('.hk-card', { hasText: 'Morning Preparation' }).first().locator('.hk-name').click(); await page.waitForTimeout(450)
+  await page.locator('.hk-sheet .hk-mstick[aria-label="Meditation"]').click(); await page.waitForTimeout(500)
+  await page.reload(); await page.waitForTimeout(700)
   await shoot('flow-habit-ticked')
   const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
   if (!s.habitLog.some((t) => t.habitId === 'h-meditation')) throw new Error('tick not persisted')
 })
+
 await step('habits: a step with two ways to answer it stays ONE habit', async () => {
   /* "Move or caffeine" is one either-or, not two streaks. The merge keeps it
      as a single habit carrying both alternatives, which is the one shape of
@@ -299,15 +302,23 @@ await step('habits: a step with two ways to answer it stays ONE habit', async ()
   }
 })
 await step('goals: add with milestones, tick one on the card', async () => {
+  /* Milestones alone make a goal measured in them: one written, a target of one.
+     Made from the + sheet and ticked in the goal's own sheet. */
   await fresh('goals')
-  await page.locator('.band').getByRole('button', { name: 'Add', exact: true }).first().click(); await page.getByRole('menuitem', { name: 'Goal', exact: true }).click()
-  await page.locator('#gname').fill('Gate goal')
-  await page.locator('#gms').fill('Step one'); await page.locator('[role=dialog]').getByRole('button', { name: 'Add', exact: true }).click()
-  await page.getByRole('button', { name: 'Add goal' }).click(); await page.waitForTimeout(500)
-  const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
+  await page.locator('.hk-round.is-plus').click(); await page.waitForTimeout(450)
+  await page.locator('#hk-name').fill('Gate goal')
+  await page.locator('.hk-seg button', { hasText: 'Goal' }).click()
+  await page.locator('#hk-ms').fill('Step one')
+  await page.locator('.hk-new .hk-bigbtn').click(); await page.waitForTimeout(500)
+  let s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
   const g = s.goals.find((x) => x.name === 'Gate goal')
   if (!g || g.milestones?.length !== 1 || g.target !== 1) throw new Error('milestones not saved')
+  await page.locator('.hk-card', { hasText: 'Gate goal' }).first().locator('.hk-name').click(); await page.waitForTimeout(450)
+  await page.locator('.hk-mstick').first().click(); await page.waitForTimeout(400)
+  s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
+  if (!s.goals.find((x) => x.name === 'Gate goal').milestones[0].done) throw new Error('the milestone did not tick')
 })
+
 await step('focus: timer start writes state', async () => {
   /* .pomo-start (the old standalone Focus pill, PomodoroBadge) was retired
      with the dock rebuild (2026-09-01/02) and PomodoroBadge is dead code as
@@ -1562,19 +1573,20 @@ await step('goals: a promised task ticks from the plan', async () => {
   await fresh('plan')
   await page.getByRole('combobox', { name: 'New task' }).fill('Gate promise')
   await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(300)
-  await page.goto(`${URL}#/goals`); await page.waitForTimeout(500)
-  /* The period container is `.goal-band` since the ladder replaced the four
-     cards. Same fact asserted, same rows, new container name. */
-  const col = page.locator('.goal-band', { hasText: 'This month' }).first()
-  await col.locator('.ptask-add').click(); await page.waitForTimeout(200)
-  await col.locator('.ptask-offer-row', { hasText: 'Gate promise' }).click(); await page.waitForTimeout(300)
+  await page.goto(`${URL}#/goals`); await page.waitForTimeout(600)
+  /* The Promised card among the goals (HabitKit page, 2026-10-25). */
+  const card = page.locator('.hk-promised')
+  await card.locator('.hk-seg button', { hasText: 'This month' }).click()
+  await card.getByRole('button', { name: 'Promise a task' }).click(); await page.waitForTimeout(200)
+  await card.locator('.hk-offer button', { hasText: 'Gate promise' }).click(); await page.waitForTimeout(300)
   await page.goto(`${URL}#/plan`); await page.waitForTimeout(500)
   await dragToSlot('Gate promise', 'Morning')
   await page.locator('.today-task', { hasText: 'Gate promise' }).locator('.checkbox').click()
   await page.locator('.actual-chip').first().click(); await page.waitForTimeout(400)
-  await page.goto(`${URL}#/goals`); await page.waitForTimeout(500)
-  const row = page.locator('.goal-band', { hasText: 'This month' }).first().locator('.ptask', { hasText: 'Gate promise' })
-  if (!(await row.count()) || !(await row.evaluate((el) => el.classList.contains('done')))) throw new Error('promise not marked done')
+  await page.goto(`${URL}#/goals`); await page.waitForTimeout(600)
+  await page.locator('.hk-promised .hk-seg button', { hasText: 'This month' }).click(); await page.waitForTimeout(200)
+  const row = page.locator('.hk-promised .hk-ptask', { hasText: 'Gate promise' })
+  if (!(await row.count()) || !(await row.evaluate((el) => el.classList.contains('is-d')))) throw new Error('promise not marked done')
 })
 await step('habits: a routine is a folder, and its habits tick on their own', async () => {
   /* This used to assert the opposite: that a routine-kept habit's dot was
@@ -2230,16 +2242,10 @@ await step('calendar: in every workspace, and it never pretends the day is empty
 })
 
 await step('quitting: its own face, no day dots, a count and a slip on every card', async () => {
-  /* This used to check that the slip button cleared the day dots, because a
-     quit row was a build row with a button bolted under it. It is a CARD now
-     (2026-08-26): the win is absence, so there is nothing to tick and the
-     stronger assertion is that no tickable dot exists on it at all. A row of
-     empty circles told him he was failing on the days he was succeeding.
-     And the cards left the Habits face for their own pill the same day, so the
-     test follows them there and checks the wall's own parts: the milestone and
-     the ninety-day strip. */
-  await fresh('habits')
-  await openRoutines()
+  /* A quit is a card on the HabitKit page (2026-10-25): its tiles fill from the
+     day it was quit, slip days stay empty, and its one button is a slip, never
+     a tick, because the win is absence. */
+  await fresh('quitting')
   await page.evaluate((K) => {
     const s = JSON.parse(localStorage.getItem(K))
     const mk = (id, name, since) => ({ id, space: 'personal', name, kind: 'break', frequency: 'daily', days: [false, false, false, false, false, false, false], history: [], quitSince: since })
@@ -2248,39 +2254,19 @@ await step('quitting: its own face, no day dots, a count and a slip on every car
     localStorage.setItem(K, JSON.stringify(s))
   }, KEY)
   await page.reload(); await page.waitForTimeout(900)
-  /* One page since 2026-09-28: the cards live in their own section, and the
-     pill scrolls to it instead of changing page. */
-  if (await page.locator('#hg-habits .qcard').count()) throw new Error('quitting cards are inside the Habits section')
-  await page.locator('#hg-habits .hg-pill', { hasText: 'Quitting' }).click(); await page.waitForTimeout(1200)
-  if (await page.evaluate(() => Math.abs(document.getElementById('hg-quitting').getBoundingClientRect().top) > 400)) throw new Error('the Quitting pill did not scroll to its section')
-  const cards = await page.evaluate(() => [...document.querySelectorAll('.qcard')].map((c) => {
-    const slip = [...c.querySelectorAll('button')].find((b) => /slipped/i.test(b.textContent))
-    return {
-      name: (c.querySelector('.qcard-name')?.textContent ?? '').trim(),
-      days: Number((c.querySelector('.qcard-n')?.textContent ?? '').trim()),
-      dots: c.querySelectorAll('.daydot').length,
-      strip: c.querySelectorAll('.qstrip i').length,
-      milestone: !!c.querySelector('.qmile-bar'),
-      slipLeft: slip ? Math.round(slip.getBoundingClientRect().left) : null,
-    }
-  }))
+  const cards = await page.evaluate(() => [...document.querySelectorAll('.hk-card')].map((c) => ({
+    name: (c.querySelector('.hk-title')?.textContent ?? '').trim(),
+    ticks: c.querySelectorAll('.hk-act.is-check').length,
+    slip: !!c.querySelector('.hk-act.is-slip'),
+    clean: Number((c.querySelector('.hk-amt b')?.textContent ?? '').replace(/\s/g, '')),
+  })))
   if (cards.length < 3) throw new Error(`only ${cards.length} quitting cards rendered`)
-  const tickable = cards.find((c) => c.dots > 0)
-  if (tickable) throw new Error(`"${tickable.name}" still offers ${tickable.dots} dots to tick`)
-  const noSlip = cards.find((c) => c.slipLeft === null)
+  const tickable = cards.find((c) => c.ticks > 0)
+  if (tickable) throw new Error(`"${tickable.name}" offers a tick`)
+  const noSlip = cards.find((c) => !c.slip)
   if (noSlip) throw new Error(`"${noSlip.name}" has no slip button`)
-  /* Every quit says how long it has been true. Smoking was quit in April, so
-     it must read in the hundreds and never zero. */
   const smoking = cards.find((c) => c.name === 'Smoking')
-  if (!smoking || !(smoking.days > 100)) throw new Error(`Smoking reads ${smoking ? smoking.days : 'nothing'} clean days`)
-  /* The wall's own two parts, on every card. */
-  const noStrip = cards.find((c) => c.strip !== 90)
-  if (noStrip) throw new Error(`"${noStrip.name}" shows ${noStrip.strip} days instead of ninety`)
-  const noMile = cards.find((c) => !c.milestone)
-  if (noMile) throw new Error(`"${noMile.name}" has no milestone bar`)
-  /* Ranked by how long each has held, which is the whole ordering rule. */
-  const runs = cards.map((c) => c.days)
-  if (runs.join() !== [...runs].sort((a, b) => b - a).join()) throw new Error(`not ranked by run: ${runs.join(', ')}`)
+  if (!smoking || smoking.clean < 100) throw new Error(`"Smoking" shows ${smoking?.clean} clean days`)
 })
 
 await step('daily review: offered once, fixes yesterday, and stays shut', async () => {

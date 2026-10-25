@@ -18,10 +18,10 @@ import { useStore } from './store'
 import { RoutineRunner } from './runner'
 import * as Icon from './icons'
 import {
-  bestCleanRun, countTarget, daysClean, dueOn, focusMinutesOn, focusNeedMin, goalCurrent, habitsDueToday, slipDays,
+  bestCleanRun, countTarget, daysClean, dueOn, focusMinutesOn, focusNeedMin, goalCurrent, habitsDueToday, isTimeFed, slipDays,
   type Goal, type GoalTimeframe, type HabitDef, type Routine, type RoutineCadence, type TimeSlot,
 } from './types'
-import { goalPeriodKey, goalPeriodRange, localDateKey } from './util'
+import { goalPace, goalPeriodKey, goalPeriodRange, localDateKey } from './util'
 
 /* ---------- colour and icon ---------- */
 const PALETTE = ['#A3E635', '#A78BFA', '#38BDF8', '#F472B6', '#FB923C', '#2DD4BF', '#22D3EE', '#FACC15', '#4ADE80', '#818CF8', '#F87171', '#E879F9', '#60A5FA', '#34D399', '#F59E0B', '#FB7185', '#C084FC', '#5EEAD4', '#FDBA74', '#94A3B8']
@@ -177,7 +177,12 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
     const pace = g.target * gone / days, perDay = total / gone, left = Math.max(0, g.target - total)
     const reach = perDay > 0 && left > 0 ? localDateKey(new Date(Date.now() + Math.ceil(left / perDay) * DAY)) : null
     const weekNeed = left / Math.max(1, (days - gone) / 7)
-    return { total, pace, left, reach, weekNeed, ahead: total >= pace, end: range.to }
+    /* The status words are the shared rule's, so this page and every other
+       place a goal is read agree: a goal that counts DAYS can't be caught up
+       faster than a day a day, which is what makes "No lust" honest. */
+    const fed = g.habitId ? habits.find((h) => h.id === g.habitId) : undefined
+    const status = goalPace(total, g.target, tf, new Date(), !!fed && !isTimeFed(fed))
+    return { total, pace, left, reach, weekNeed, ahead: status !== 'behind', status, end: range.to }
   }
   const tileSize = (target: number) => { const raw = target / 40; const steps = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000]; return steps.find((x) => x >= raw) ?? 100000 }
 
@@ -246,8 +251,10 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
     const h = it.habit
     if (it.kind === 'goal') {
       const g = it.goal!, info = goalInfo(g)
-      if (g.habitId) return `Fills from ${habits.find((x) => x.id === g.habitId)?.name ?? 'a habit'}`
-      return info.total >= g.target ? <b>Reached</b> : info.ahead ? <><b>Ahead of pace</b>, to {short(info.end)}</> : <><b>{fmt(info.weekNeed)} {g.unit}</b> a week to make it</>
+      const word = info.status === 'done' ? 'Reached' : info.status === 'behind' ? 'Needs a push' : 'On pace'
+      if (g.habitId) return <><b>{word}</b>, fills from {habits.find((x) => x.id === g.habitId)?.name ?? 'a habit'}</>
+      if (info.status === 'done') return <b>Reached</b>
+      return info.status === 'behind' ? <><b>Needs a push</b>, {fmt(info.weekNeed)} {g.unit} a week makes it</> : <><b>On pace</b>, to {short(info.end)}</>
     }
     if (!h) return ''
     if (it.kind === 'amount') { const v = kept.get(h.id)?.get(today)?.v ?? 0; return <><b>{fmt(v)} / {fmt(h.targetAmount ?? 0)} {h.unit}</b>{v < (h.targetAmount ?? 0) ? `, ${fmt((h.targetAmount ?? 0) - v)} left` : ''}</> }
@@ -339,7 +346,7 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
 
       {items.length === 0 && <p className="hk-empty">Nothing here yet. Tap + to add a habit, a routine, a goal or something you are quitting.</p>}
 
-      {view === 'cards' && <div className="hk-cards">{pinned && <Card it={pinned} next />}{sorted.map((it) => <Card key={it.key} it={it} />)}</div>}
+      {view === 'cards' && <div className="hk-cards">{pinned && <Card it={pinned} next />}{sorted.map((it) => <Card key={it.key} it={it} />)}{(filter === 'all' || filter === 'goal') && <Promised />}</div>}
 
       {view === 'list' && (() => {
         const open = sorted.filter((it) => (it.kind === 'routine' || isHabitKind(it.kind)) && !doneToday(it) && !(it.kind === 'routine' && (routineState(it).off || it.part >= 8)))
@@ -406,6 +413,33 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
   )
 }
 
+/* ---------- promised tasks: tasks committed to this week, month or quarter ----------
+   The old Goals page held these; they stay, as one card among the goals. The
+   task is the same task as on Plan, so finishing it there finishes it here. */
+function Promised() {
+  const { tasks, toggleTask, commitTask } = useStore()
+  const [tf, setTf] = useState<GoalTimeframe>('monthly')
+  const [adding, setAdding] = useState(false)
+  const key = goalPeriodKey(tf)
+  const mine = tasks.filter((t) => t.horizon === tf && t.horizonKey === key)
+  const offer = tasks.filter((t) => !t.done && !(t.horizon === tf && t.horizonKey === key)).slice(0, 12)
+  return (
+    <article className="hk-card hk-promised" style={{ ['--c' as string]: '#8E88FF' }}>
+      <div className="hk-top">
+        <span className="hk-ico"><Icon.Flag size={21} /></span>
+        <div className="hk-name"><span className="hk-title">Promised</span><span className="hk-sub"><b>{mine.filter((t) => t.done).length} of {mine.length}</b> done</span></div>
+        <button className="hk-act is-ring" aria-label="Promise a task" aria-expanded={adding} onClick={() => setAdding(!adding)}><Icon.Plus size={18} /></button>
+      </div>
+      <div className="hk-seg">{(['weekly', 'monthly', 'quarter'] as const).map((x) => <button key={x} aria-pressed={tf === x} onClick={() => setTf(x)}>{{ weekly: 'This week', monthly: 'This month', quarter: 'This quarter' }[x]}</button>)}</div>
+      {adding && (
+        <ul className="hk-offer">{offer.length ? offer.map((t) => <li key={t.id}><button onClick={() => { commitTask(t.id, tf, key); setAdding(false) }}>{t.title}</button></li>) : <li className="hk-sub">No open tasks to promise.</li>}</ul>
+      )}
+      <ul className="hk-steps">{mine.map((t) => <li key={t.id} className={`hk-ptask${t.done ? ' is-d' : ''}`}><button className="hk-mstick" role="checkbox" aria-checked={t.done} aria-label={t.title} onClick={() => toggleTask(t.id)}><i /></button><span>{t.title}</span></li>)}</ul>
+      {!mine.length && !adding && <p className="hk-sub">Nothing promised for this stretch. Tap + to promise a task from your list.</p>}
+    </article>
+  )
+}
+
 /* ---------- the quick log: presets, a typed amount, today's rows ---------- */
 function LogSheet({ it, onClose, onAdd, kept, today, goalTotal }: {
   it: Item; onClose: () => void; onAdd: (it: Item, v: number, note?: string) => void
@@ -449,7 +483,7 @@ function DetailSheet({ it, onClose, onRun, onLog, dayVal, Tiles }: {
   dayVal: (it: Item, day: string, a: number) => number | null
   Tiles: (p: { it: Item; weeks: number }) => ReactNode
 }) {
-  const { markHabitOn, logSlipOn, setLook, todayIndex, slips } = useStore()
+  const { markHabitOn, logSlipOn, setLook, todayIndex, slips, toggleGoalMilestone, toggleHabitDay } = useStore()
   const [month, setMonth] = useState(0)
   const editable = it.kind === 'check' || it.kind === 'quit'
   const m = new Date(); m.setDate(1); m.setMonth(m.getMonth() + month)
@@ -465,11 +499,15 @@ function DetailSheet({ it, onClose, onRun, onLog, dayVal, Tiles }: {
       {it.kind !== 'goal' && <div className="hk-dchips"><span>{pct}% of the last 30 days</span>{it.kind === 'quit' && it.habit && <span>Longest {bestCleanRun(it.habit, slips)} days</span>}</div>}
       {it.kind === 'routine' && (
         <>
-          <ul className="hk-steps">{it.list!.map((h) => <li key={h.id} className={h.days[todayIndex] ? 'is-d' : ''}><i /><span>{h.name}</span><small>{h.optional ? 'optional' : h.seconds ? `${Math.round(h.seconds / 60)} min` : ''}</small></li>)}</ul>
+          {/* Each step is tickable right here, for the one he did without running the routine. */}
+          <ul className="hk-steps">{it.list!.map((h) => <li key={h.id} className={h.days[todayIndex] ? 'is-d' : ''}><button className="hk-mstick" role="checkbox" aria-checked={h.days[todayIndex]} aria-label={h.name} onClick={() => toggleHabitDay(h.id, todayIndex)}><i /></button><span>{h.name}</span><small>{h.optional ? 'optional' : h.seconds ? `${Math.round(h.seconds / 60)} min` : ''}</small></li>)}</ul>
           {!(it.list![0]?.frequency === 'weekdays' && todayIndex >= 5) && <button className="hk-bigbtn is-c" onClick={onRun}>Start {it.name}</button>}
         </>
       )}
-      {it.kind === 'goal' && !it.goal!.habitId && <button className="hk-bigbtn is-c" onClick={onLog}>Log an amount</button>}
+      {it.kind === 'goal' && !!it.goal!.milestones?.length && (
+        <ul className="hk-steps">{it.goal!.milestones!.map((ms) => <li key={ms.id} className={ms.done ? 'is-d' : ''}><button className="hk-mstick" role="checkbox" aria-checked={ms.done} aria-label={ms.label} onClick={() => toggleGoalMilestone(it.id, ms.id)}><i /></button><span>{ms.label}</span></li>)}</ul>
+      )}
+      {it.kind === 'goal' && !it.goal!.habitId && !(it.goal!.milestones?.length && it.goal!.target === it.goal!.milestones.length) && <button className="hk-bigbtn is-c" onClick={onLog}>Log an amount</button>}
       {it.kind === 'amount' && <button className="hk-bigbtn is-c" onClick={onLog}>Log {it.habit?.unit}</button>}
       {it.kind !== 'goal' && (
         <div className="hk-cal">
@@ -532,6 +570,7 @@ function NewSheet({ onClose, onMade }: { onClose: () => void; onMade: (name: str
   const [period, setPeriod] = useState<GoalTimeframe>('quarter')
   const [since, setSince] = useState(localDateKey())
   const [cost, setCost] = useState('')
+  const [milestones, setMilestones] = useState('')
   const hint = { habit: 'Something you do on a day.', routine: 'Steps you go through in order, one tap to start.', goal: 'A total to reach in a period, like 40 000 CZK this quarter.', quit: 'Every day counts as clean until you log a slip.' }[kind]
   const save = () => {
     const n = name.trim(); if (!n) return
@@ -546,14 +585,18 @@ function NewSheet({ onClose, onMade }: { onClose: () => void; onMade: (name: str
       if (!list.length) return
       addRoutineWithSteps({ title: n, cadence: cadence === 'demand' ? 'daily' : cadence, repeatable: cadence === 'demand', daypart: part || undefined, steps: list, color, icon })
     } else if (kind === 'goal') {
-      const t = parseAmount(target); if (!t) return
-      addGoal({ space, name: n, current: 0, target: t, unit: unit.trim() || 'CZK', note: '', timeframe: period, category: /czk|eur|\$/i.test(unit) ? 'money' : 'life', color, icon, entries: [] })
+      /* Milestones alone make a goal measured in its milestones, the way the
+         old sheet did: three steps written, a target of three. */
+      const ms = milestones.split('\n').map((x) => x.trim()).filter(Boolean).map((label, i) => ({ id: `m${Date.now().toString(36)}${i}`, label, done: false }))
+      const t = parseAmount(target) ?? (ms.length || null); if (!t) return
+      const byMs = !parseAmount(target) && ms.length > 0
+      addGoal({ space, name: n, current: 0, target: t, unit: byMs ? 'milestones' : unit.trim() || 'CZK', note: '', timeframe: period, category: /czk|eur|\$/i.test(unit) ? 'money' : 'life', color, icon, entries: [], milestones: ms.length ? ms : undefined })
     } else {
       addHabit({ name: n, frequency: 'daily', kind: 'break', quitSince: since, color, icon, dailyCost: parseAmount(cost) ?? undefined })
     }
     onMade(n)
   }
-  const canSave = !!name.trim() && (kind !== 'routine' || !!steps.trim()) && (kind !== 'goal' || !!parseAmount(target))
+  const canSave = !!name.trim() && (kind !== 'routine' || !!steps.trim()) && (kind !== 'goal' || !!parseAmount(target) || !!milestones.trim())
   return (
     <div className="hk-new">
       <div className="hk-stop"><button className="hk-round" aria-label="Close" onClick={onClose}><Icon.Close size={16} /></button><h3>New</h3><span className="hk-spacer" /></div>
@@ -585,6 +628,7 @@ function NewSheet({ onClose, onMade }: { onClose: () => void; onMade: (name: str
           <div className="hk-field"><label htmlFor="hk-gt">Target</label><input id="hk-gt" inputMode="decimal" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="40 000" /></div>
           <div className="hk-field"><label htmlFor="hk-gu">Unit</label><input id="hk-gu" value={unit} onChange={(e) => setUnit(e.target.value)} /></div>
         </div>
+        <div className="hk-field"><label htmlFor="hk-ms">Milestones, one per line (optional)</label><textarea id="hk-ms" value={milestones} onChange={(e) => setMilestones(e.target.value)} placeholder={'First client signed\nCase study published'} /></div>
         <div className="hk-field"><label htmlFor="hk-gp">By</label><select id="hk-gp" value={period} onChange={(e) => setPeriod(e.target.value as GoalTimeframe)}><option value="weekly">End of this week</option><option value="monthly">End of this month</option><option value="quarter">End of this quarter</option><option value="half">End of this half year</option></select></div>
       </>}
       {kind === 'quit' && <div className="hk-two">

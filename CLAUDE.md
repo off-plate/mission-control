@@ -32,6 +32,15 @@ Nothing gets deployed or shown to Michael as "ready" until the release team retu
   turn into particles shaped by what the assistant actually did. The
   "LOVE YOU 3000" helmet is traced from `HELMET_D` in helmet.tsx, never drawn
   by hand. Approved prototype: claude.ai/artifact/CGQ2hNaPABoYhCkS3LhxAj.
+- **Habits & Goals is the third dark room, on his explicit instruction**
+  (2026-10-25: "you're free to adjust any colors", after approving the HabitKit
+  mockup claude.ai/artifact/WSuH22RPsKzs6TYW8zMSHt). `src/hkroom.tsx`: one card
+  per routine, habit, goal or quit, each in its own colour with a grid of day
+  tiles, one button per card, three views in a floating pill. Its tokens are
+  local to `.hk`; the header and phone tab bar go dark on its pages only. The
+  routine run is still `RoutineRunner`, restyled inside the sheet. The old
+  `habits.tsx`, `goals.tsx`, `quitting.tsx` and `hgroom.tsx` stay in the repo
+  (other pages import pieces of them) but no route renders their pages.
 - **Icons come from one set, and it lives in `src/icons.tsx`.** Hicon Circular
   Interface Icons (MIT, credited in `LICENSES.md`), 24x24, stroke 2, `currentColor`.
   Never inline a new `<svg>` in a page: add the icon to `icons.tsx` or reuse the one

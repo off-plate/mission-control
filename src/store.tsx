@@ -396,7 +396,7 @@ interface Store extends PersistedState {
   markHabitDay: (id: string, day: number, value: boolean) => void
   /** Many dates on one habit, one state update. See markDaysOn's own comment. */
   markHabitDaysOn: (id: string, days: string[], value: boolean) => void
-  addHabit: (input: { name: string; daypart?: import('./types').TimeSlot; frequency: import('./types').HabitFrequency; targetPerWeek?: number; kind?: import('./types').HabitKind; dailyTargetMin?: number; measure?: 'minutes' | 'times'; per?: import('./types').CountPeriod; targetCount?: number; source?: import('./types').HabitSource; quitSince?: string; startedOn?: string }) => void
+  addHabit: (input: { name: string; daypart?: import('./types').TimeSlot; frequency: import('./types').HabitFrequency; targetPerWeek?: number; kind?: import('./types').HabitKind; dailyTargetMin?: number; measure?: 'minutes' | 'times' | 'amount'; per?: import('./types').CountPeriod; targetCount?: number; source?: import('./types').HabitSource; quitSince?: string; startedOn?: string; unit?: string; targetAmount?: number; presets?: number[]; color?: string; icon?: string; dailyCost?: number }) => void
   /** Record a slip on a habit you are trying to stop; resets the clean run. */
   logSlip: (id: string) => void
   togglePauseHabit: (id: string) => void
@@ -434,6 +434,15 @@ interface Store extends PersistedState {
   planRoutine: (routineId: string, slot?: import('./types').TimeSlot, day?: string) => void
   /** Log one occurrence of a counted habit, or take the last one back. */
   logCount: (habitId: string, delta: 1 | -1) => void
+  /** An amount habit (water in ml): one dated row per log. Returns the row's
+   *  src, which is what removeAmount takes to undo exactly that log. */
+  logAmount: (habitId: string, v: number) => string | undefined
+  removeAmount: (habitId: string, src: string) => void
+  /** A typed amount on a goal, with an optional note. Returns the entry id. */
+  logGoalAmount: (id: string, v: number, note?: string) => string
+  removeGoalEntry: (id: string, entryId: string) => void
+  addRoutineWithSteps: (input: { title: string; cadence: RoutineCadence; daypart?: import('./types').TimeSlot; steps: string[]; color?: string; icon?: string; repeatable?: boolean }) => void
+  setLook: (kind: 'habit' | 'routine' | 'goal', id: string, look: { color?: string; icon?: string; dailyCost?: number; presets?: number[]; name?: string }) => void
   /** A routine and the habit that mirrors it are created together, so finishing
    *  it always has somewhere to land. */
   addRoutine: (input: { title: string; cadence: RoutineCadence; blurb?: string; daypart?: import('./types').TimeSlot }) => void
@@ -677,9 +686,15 @@ function loadPersisted(): PersistedState | null {
           .filter((t) => isoWeekKey(new Date(t.day)) === wk)
           .map((t) => `${t.habitId}|${t.day}`),
       )
+      /* An amount habit's day is kept by its TOTAL, not by any one row: a
+         glass of water is a log, 2.5 litres is the day. */
+      const amountSum = new Map<string, number>()
+      for (const t of p.habitLog ?? []) if (t.v != null && isoWeekKey(new Date(t.day)) === wk) amountSum.set(`${t.habitId}|${t.day}`, (amountSum.get(`${t.habitId}|${t.day}`) ?? 0) + t.v)
       p.habits = p.habits.map((h) => ({
         ...h,
-        days: Array.from({ length: 7 }, (_, i) => thisWeek.has(`${h.id}|${dayOfWeekKey(i)}`)),
+        days: Array.from({ length: 7 }, (_, i) => h.measure === 'amount'
+          ? (amountSum.get(`${h.id}|${dayOfWeekKey(i)}`) ?? 0) >= (h.targetAmount ?? 1)
+          : thisWeek.has(`${h.id}|${dayOfWeekKey(i)}`)),
       }))
     }
 
@@ -1641,6 +1656,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     addRoutineStep: growthSlice.addRoutineStep,
     deleteRoutineStep: growthSlice.deleteRoutineStep,
     logCount: growthSlice.logCount,
+    logAmount: growthSlice.logAmount,
+    removeAmount: growthSlice.removeAmount,
+    logGoalAmount: growthSlice.logGoalAmount,
+    removeGoalEntry: growthSlice.removeGoalEntry,
+    addRoutineWithSteps: growthSlice.addRoutineWithSteps,
+    setLook: growthSlice.setLook,
     planRoutine: growthSlice.planRoutine,
     setRoutineDone: growthSlice.setRoutineDone,
 

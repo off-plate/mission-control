@@ -590,7 +590,7 @@ export function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; 
   const [perWeek, setPerWeek] = useState(habit?.targetPerWeek ?? 3)
   const [kind, setKind] = useState<HabitKind>(habit?.kind ?? 'build')
   const [targetMin, setTargetMin] = useState(habit ? (habit.auto?.from === 'focus' ? focusNeedMin(habit) : habit.dailyTargetMin ?? 60) : 60)
-  const [measure, setMeasure] = useState<'minutes' | 'times'>(habit?.measure ?? 'times')
+  const [measure, setMeasure] = useState<'minutes' | 'times'>((habit?.measure === 'amount' ? 'times' : habit?.measure) ?? 'times')
   const [per, setPer] = useState<CountPeriod>(habit?.per ?? 'day')
   const [count, setCount] = useState(habit?.targetCount ?? 1)
   const [since, setSince] = useState(habit?.quitSince ?? localDateKey())

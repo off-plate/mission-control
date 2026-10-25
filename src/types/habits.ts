@@ -110,6 +110,9 @@ export interface HabitTick {
   /** The moment the tick was made, only when it was made ON its day. A past
    *  day ticked by hand on Friday has no honest clock time, so it gets none. */
   at?: string
+  /** An amount habit's measure for this one log, e.g. 250 (ml). Several rows a
+   *  day add up; the day is kept once they reach the habit's targetAmount. */
+  v?: number
 }
 
 /** How many times a habit was kept on one day, not merely whether it was. */
@@ -267,7 +270,18 @@ export interface HabitDef {
    *  only ever fitted work you sit and time. Times are things you DO, logged one
    *  tap each, which is what most of them actually are. Absent means minutes,
    *  because that is what every measured habit was before this existed. */
-  measure?: 'minutes' | 'times'
+  measure?: 'minutes' | 'times' | 'amount'
+  /** Amount habits (2026-10-25, the HabitKit page): what one log is measured
+   *  in, how much a day asks for, and the quick amounts offered as buttons. */
+  unit?: string
+  targetAmount?: number
+  presets?: number[]
+  /** The card's own colour and icon on the Habits page. Unset = picked from the
+   *  name and id, so every existing habit has one without being edited. */
+  color?: string
+  icon?: string
+  /** A quit's daily cost, for "money saved". */
+  dailyCost?: number
   /** For a 'times' habit: the stretch the target is counted over. */
   per?: CountPeriod
   /** For a 'times' habit: how many in that stretch. */
@@ -533,6 +547,8 @@ export type RoutineCadence = 'daily' | 'prework' | 'weekly' | 'monthly'
  *  the period; if it mirrors a habit, that habit checks off automatically. */
 export interface Routine {
   id: string
+  color?: string
+  icon?: string
   /** Which space this routine belongs to. */
   space: SpaceId
   /** The day it was retired. Its record of which days it was finished stays. */

@@ -25,6 +25,13 @@ export const GOAL_CATEGORIES: { id: GoalCategory; label: string }[] = [
   { id: 'habits', label: 'Habits' },
 ]
 
+export interface GoalEntry {
+  id: string
+  day: string
+  v: number
+  note?: string
+}
+
 export interface GoalMilestone {
   id: string
   label: string
@@ -48,6 +55,12 @@ export interface Goal {
   deadline?: string
   /** The concrete steps that ladder up to the objective. */
   milestones?: GoalMilestone[]
+  /** Each amount he logged, dated and with an optional note ("who paid"), so a
+   *  money goal is also its own ledger and a wrong entry can be taken back.
+   *  `current` stays the total; these explain it. */
+  entries?: GoalEntry[]
+  color?: string
+  icon?: string
   /** Track this goal straight off a habit: every checkoff counts toward it, so
    *  "twelve gym sessions" fills itself as you tick the gym habit. */
   habitId?: string

@@ -573,7 +573,79 @@ export function useGrowthSlice(
     })
   }
 
+  /* THE HABITKIT PAGE'S WRITES (2026-10-25).
+
+     Amounts: each log is its own dated row in habitLog carrying `v`, so it
+     syncs, unions and tombstones exactly like every other tick (the row key has
+     a unique src). The week cache calls the day kept only once the day's total
+     reaches the habit's target, here and in the loader's rebuild, so one glass
+     of water never reads as "Water done" anywhere else in the app. */
+  const amountOn = (log: HabitTick[], habitId: string, day: string) =>
+    log.filter((t) => t.habitId === habitId && t.day === day).reduce((a, t) => a + (t.v ?? 0), 0)
+  const setAmountKept = (habitId: string, total: number) => {
+    const idx = (new Date().getDay() + 6) % 7
+    setHabits((prev) => prev.map((x) => (x.id === habitId
+      ? { ...x, days: x.days.map((d, i) => (i === idx ? total >= (x.targetAmount ?? 1) : d)) }
+      : x)))
+  }
+  const logAmount = (habitId: string, v: number): string | undefined => {
+    if (!(v > 0) || !habits.some((x) => x.id === habitId)) return
+    const day = todayKey()
+    const src = `amt#${Date.now()}${Math.round(performance.now())}`
+    setHabitLog((prev) => [...prev, { habitId, day, src, at: new Date().toISOString(), v }])
+    setAmountKept(habitId, amountOn(habitLog, habitId, day) + v)
+    return src
+  }
+  const removeAmount = (habitId: string, src: string) => {
+    const day = todayKey()
+    const row = habitLog.find((t) => t.habitId === habitId && t.src === src)
+    if (!row) return
+    setHabitLog((prev) => prev.filter((t) => !(t.habitId === habitId && t.src === src)))
+    if (row.day === day) setAmountKept(habitId, amountOn(habitLog, habitId, day) - (row.v ?? 0))
+  }
+  /* Goal amounts: the total moves (never capped at the target: earning past
+     40 000 is still earning) and the entry explains it. */
+  const logGoalAmount = (id: string, v: number, note?: string): string => {
+    const eid = newId('ge')
+    setGoals((prev) => prev.map((g) => (g.id === id
+      ? { ...g, current: Math.max(0, g.current + v), entries: [...(g.entries ?? []), { id: eid, day: todayKey(), v, note: note || undefined }], touchedAt: todayKey() }
+      : g)))
+    return eid
+  }
+  const removeGoalEntry = (id: string, eid: string) =>
+    setGoals((prev) => prev.map((g) => {
+      if (g.id !== id) return g
+      const e = g.entries?.find((x) => x.id === eid)
+      if (!e) return g
+      return { ...g, current: Math.max(0, g.current - e.v), entries: (g.entries ?? []).filter((x) => x.id !== eid), touchedAt: todayKey() }
+    }))
+  /* A routine made on the new page arrives with its steps already as habits in
+     its folder, under the same ids the loader's step merge would give them, so
+     it runs today rather than after the next reload. */
+  const addRoutineWithSteps = (input: { title: string; cadence: RoutineCadence; daypart?: TimeSlot; steps: string[]; color?: string; icon?: string; repeatable?: boolean }) => {
+    const rid = newId('r'), hid = newId('h')
+    const frequency: HabitFrequency = input.cadence === 'weekly' ? 'weekly' : input.cadence === 'monthly' ? 'monthly' : input.cadence === 'prework' ? 'weekdays' : 'daily'
+    const stamp = Date.now().toString(36)
+    const steps = input.steps.map((title, i) => ({ id: `st${stamp}${i}`, title, kind: 'do' as const }))
+    const blank = [false, false, false, false, false, false, false]
+    setHabits((prev) => [
+      ...prev,
+      { id: hid, space, name: input.title, daypart: input.daypart, kind: 'build', frequency, days: blank, paused: false, history: [], startedOn: todayKey() },
+      ...steps.map((st, i) => ({ id: `h-${rid}-${st.id}`, space, name: st.title, kind: 'build' as const, frequency, daypart: input.daypart, days: blank, paused: false, history: [], folderId: rid, folderOrder: i, startedOn: todayKey() })),
+    ])
+    setRoutines((prev) => [...prev, {
+      id: rid, space, title: input.title, cadence: input.cadence, steps, doneStepIds: [], habitId: hid,
+      periodKey: periodKeyFor(input.cadence), stepData: {}, color: input.color, icon: input.icon, repeatable: input.repeatable,
+    }])
+  }
+  const setLook = (kind: 'habit' | 'routine' | 'goal', id: string, look: { color?: string; icon?: string; dailyCost?: number; presets?: number[]; name?: string }) => {
+    if (kind === 'habit') setHabits((prev) => prev.map((x) => (x.id === id ? { ...x, ...look } : x)))
+    else if (kind === 'routine') setRoutines((prev) => prev.map((x) => (x.id === id ? { ...x, color: look.color ?? x.color, icon: look.icon ?? x.icon, title: look.name ?? x.title } : x)))
+    else setGoals((prev) => prev.map((x) => (x.id === id ? { ...x, color: look.color ?? x.color, icon: look.icon ?? x.icon, name: look.name ?? x.name } : x)))
+  }
+
   return {
+    logAmount, removeAmount, logGoalAmount, removeGoalEntry, addRoutineWithSteps, setLook,
     habits, setHabits, goals, setGoals, routines, setRoutines,
     records, setRecords, removedSeeds, setRemovedSeeds,
     habitLog, setHabitLog: setHabitLogRaw, editHabitLog: setHabitLog, routineLog, setRoutineLog: setRoutineLogRaw, slips, setSlips: setSlipsRaw,
@@ -642,8 +714,9 @@ export function useGrowthSlice(
     },
     addHabit: (input: {
       name: string; daypart?: TimeSlot; frequency: HabitFrequency; targetPerWeek?: number
-      kind?: HabitKind; dailyTargetMin?: number; measure?: 'minutes' | 'times'; per?: CountPeriod
+      kind?: HabitKind; dailyTargetMin?: number; measure?: 'minutes' | 'times' | 'amount'; per?: CountPeriod
       targetCount?: number; source?: HabitSource; quitSince?: string; startedOn?: string
+      unit?: string; targetAmount?: number; presets?: number[]; color?: string; icon?: string; dailyCost?: number
     }) => {
       const id = newId('h')
       setHabits((prev) => [...prev, {
@@ -657,6 +730,12 @@ export function useGrowthSlice(
         per: input.per,
         targetCount: input.targetCount,
         source: input.source,
+        unit: input.unit,
+        targetAmount: input.targetAmount,
+        presets: input.presets,
+        color: input.color,
+        icon: input.icon,
+        dailyCost: input.dailyCost,
         // A quit runs from the day he says he stopped, not from the day he got
         // round to typing it in.
         quitSince: input.kind === 'break' ? (input.quitSince ?? todayKey()) : undefined,

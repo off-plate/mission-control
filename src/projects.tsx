@@ -5,6 +5,7 @@ import { useStore } from './store'
 import { Sheet } from './modals'
 import { Band, Dropdown, SpaceMark } from './ui'
 import { SPACES, UNSORTED, type Project, type SpaceId } from './types'
+import { freeTag, slugTag, tagOf } from './tags'
 
 /* A project is drawn as a folder (his ask, 2026-10-11: "Apple style folder",
    papers peeking out on hover like opening a real one). The sheets are the
@@ -12,8 +13,8 @@ import { SPACES, UNSORTED, type Project, type SpaceId } from './types'
    is an empty folder. Hover tips the front flap and slides the sheets up,
    CSS only, gated to fine pointers so a phone tap just opens it. */
 type Sheet3 = { id: string; title: string }
-function Folder({ cls, name, waiting, total, sheets, onOpen, menu }: {
-  cls: string; name: string; waiting: number; total: number; sheets: Sheet3[]; onOpen: () => void; menu?: ReactNode
+function Folder({ cls, name, tag, waiting, total, sheets, onOpen, menu }: {
+  cls: string; name: string; tag?: string; waiting: number; total: number; sheets: Sheet3[]; onOpen: () => void; menu?: ReactNode
 }) {
   const top = sheets.slice(0, 3)
   return (
@@ -23,7 +24,7 @@ function Folder({ cls, name, waiting, total, sheets, onOpen, menu }: {
       {top.map((t, i) => <div key={t.id} className={`f-paper p${i + 1 + 3 - top.length}`} aria-hidden="true">{t.title}</div>)}
       <div className="f-front" aria-hidden="true">
         <h3>{name}</h3>
-        <div className="proj-stats"><span><b>{waiting}</b> waiting</span><span><b>{total}</b> total</span></div>
+        <div className="proj-stats">{tag && <span className="f-tag">#{tag}</span>}<span><b>{waiting}</b> waiting</span><span><b>{total}</b> total</span></div>
       </div>
       {menu}
     </div>
@@ -36,10 +37,10 @@ function ProjectCard({ p, onOpen, onRename, onDelete }: { p: Project; onOpen: ()
   const open = own.filter((t) => t.list === 'backlog' && !t.done)
   return (
     <Folder
-      cls={`s-${p.space}`} name={p.name} waiting={open.length} total={own.length} sheets={open} onOpen={onOpen}
+      cls={`s-${p.space}`} name={p.name} tag={tagOf(p)} waiting={open.length} total={own.length} sheets={open} onOpen={onOpen}
       menu={
         <Dropdown label={`Options for ${p.name}`} className="projcard-kebab">
-          <button role="menuitem" onClick={onRename}>Rename</button>
+          <button role="menuitem" onClick={onRename}>Rename or retag</button>
           <button role="menuitem" className="danger" onClick={onDelete}>Delete</button>
         </Dropdown>
       }
@@ -57,10 +58,20 @@ function UnsortedCard({ space, onOpen }: { space: SpaceId; onOpen: () => void })
   return <Folder cls="f-unsorted" name="Unsorted" waiting={open.length} total={own.length} sheets={open} onOpen={onOpen} />
 }
 
+/* The tag follows the name until he types his own; clearing the field hands
+   it back to the name. Tasks hold the project, not the tag text, so a new
+   tag shows on every task at once. */
 function RenameProjectSheet({ project, onClose }: { project: Project; onClose: () => void }) {
-  const { renameProject } = useStore()
+  const { renameProject, setProjectTag, projects } = useStore()
   const [name, setName] = useState(project.name)
-  const save = () => { if (!name.trim()) return; renameProject(project.id, name); onClose() }
+  const [tag, setTag] = useState(project.tag ?? '')
+  const shown = tag.trim() ? freeTag(tag, projects, project.id, true) : freeTag(name, projects, project.id)
+  const save = () => {
+    if (!name.trim()) return
+    renameProject(project.id, name)
+    setProjectTag(project.id, tag.trim().replace(/^#/, ''))
+    onClose()
+  }
   return (
     <Sheet title="Rename project" onClose={onClose}>
       <label className="field-label" htmlFor="rp-name">Name</label>
@@ -70,6 +81,14 @@ function RenameProjectSheet({ project, onClose }: { project: Project; onClose: (
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) save() }}
       />
+      <label className="field-label" htmlFor="rp-tag" style={{ marginTop: 'var(--s3)' }}>Hashtag</label>
+      <input
+        id="rp-tag" className="textinput" style={{ width: '100%' }}
+        value={tag} placeholder={`#${slugTag(name)}`}
+        onChange={(e) => setTag(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) save() }}
+      />
+      <p className="f-tag-note">Tasks file here with <b>#{shown}</b></p>
       <div className="sheet-actions">
         <button className="btn btn-quiet" onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" disabled={!name.trim()} onClick={save}>Save</button>
@@ -103,7 +122,7 @@ function DeleteProjectSheet({ project, count, onClose }: { project: Project; cou
    this already lives inside one Space's own section, in Projects and in
    every grouping under All alike, so the answer is already known. */
 function NewProjectSheet({ space, onClose }: { space: SpaceId; onClose: () => void }) {
-  const { addProject } = useStore()
+  const { addProject, projects } = useStore()
   const [name, setName] = useState('')
   const save = () => { if (!name.trim()) return; addProject(name.trim(), space); onClose() }
   return (
@@ -115,6 +134,7 @@ function NewProjectSheet({ space, onClose }: { space: SpaceId; onClose: () => vo
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) save() }}
       />
+      {name.trim() && <p className="f-tag-note">Tasks file here with <b>#{freeTag(name, projects)}</b></p>}
       <div className="sheet-actions">
         <button className="btn btn-quiet" onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" disabled={!name.trim()} onClick={save}>Create project</button>

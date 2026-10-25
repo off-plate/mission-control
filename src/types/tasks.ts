@@ -66,6 +66,9 @@ export interface Project {
   name: string
   space: SpaceId
   createdAt: string
+  /** The hashtag it answers to, without the `#`. Unset means it follows the
+   *  name (tags.ts slugTag), so most projects never store one. */
+  tag?: string
 }
 
 export interface PlanState {

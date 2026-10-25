@@ -10,6 +10,7 @@ import { useState } from 'react'
 import { MOCK_TASKS } from '../mock'
 import { rowKey } from '../sync-merge'
 import { PROJECT_CORNER, PROJECT_OFFPLATE, type GoalTimeframe, type PlanState, type Project, type SpaceId, type Task, type TimeSlot } from '../types'
+import { freeTag, slugTag } from '../tags'
 import { goalPeriodKey, slotForTime, type GoalTf } from '../util'
 import { newId, todayKey } from './shared'
 
@@ -38,11 +39,22 @@ export function usePlannerSlice(
   return {
     tasks, setTasks, projects, setProjects,
 
-    addProject: (name: string, sp: SpaceId) => {
+    /** Returns the new id, so the hashtag picker can file the task it is
+     *  typing into a project it created a moment ago. */
+    addProject: (name: string, sp: SpaceId): string | undefined => {
       const trimmed = name.trim()
       if (!trimmed) return
-      setProjects((prev) => [...prev, { id: newId('proj'), name: trimmed, space: sp, createdAt: todayKey() }])
+      const id = newId('proj')
+      setProjects((prev) => {
+        // Two projects named alike would answer to one tag; the second gets "-2".
+        const free = freeTag(trimmed, prev)
+        return [...prev, { id, name: trimmed, space: sp, createdAt: todayKey(), ...(free !== slugTag(trimmed) ? { tag: free } : {}) }]
+      })
+      return id
     },
+    /** A hand-picked hashtag. Empty puts it back to following the name. */
+    setProjectTag: (id: string, tag: string) =>
+      setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, tag: tag ? freeTag(tag, prev, id, true) : undefined } : p))),
     renameProject: (id: string, name: string) => {
       const trimmed = name.trim()
       if (!trimmed) return
@@ -71,7 +83,13 @@ export function usePlannerSlice(
         : 'Project deleted'
       armUndo(label, () => { setProjects(beforeProjects); setTasks(beforeTasks); digUp(...keys) })
     },
-    setTaskProject: (id: string, projectId: string | undefined) => setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, projectId } : t))),
+    /* A hashtag can name a project in the other workspace, and a project only
+       holds tasks of its own space (see setTaskSpace), so the task follows
+       the project there rather than pointing at one it cannot see. */
+    setTaskProject: (id: string, projectId: string | undefined) => {
+      const sp = projectId ? projects.find((p) => p.id === projectId)?.space : undefined
+      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, projectId, space: sp ?? t.space } : t)))
+    },
 
     /* His ask (2026-09-12): move a task across workspaces from its own
        kebab menu, the same reach the project move already has. A project

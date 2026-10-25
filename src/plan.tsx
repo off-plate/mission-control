@@ -16,7 +16,9 @@ import { usePomodoro } from './pomodoro'
 import { BreakdownSheet, Sheet } from './modals'
 import { Linkify } from './widgets'
 import { PLAN_AHEAD_DAYS, WeekGrid, dayPlus, shortDay, weekRangeLabel } from './weekgrid'
-import { useCoarsePointer, usePhone, Band, WorkspaceTitle, Dropdown, ProjectMark, SpaceMark } from './ui'
+import { useCoarsePointer, usePhone, Band, WorkspaceTitle, Dropdown, SpaceMark, TagMark } from './ui'
+import { TagField } from './tagfield'
+import { matchProjects, tagOf, takeTag } from './tags'
 import { SLOTS, SPACES, UNSORTED, habitLocked, routineComplete, routineProgress, slotMinutes, TYPING_TARGET_WPM, type Project, type Routine, type SubTask, type Task, type TimeSlot } from './types'
 import { periodKeyFor, fmtDuration, fmtSigned, dayOfWeekKey, isEstimated, localDateKey, slotForMoment, taskMinutes } from './util'
 
@@ -137,21 +139,26 @@ function SubtaskRow({ taskId, sub }: { taskId: string; sub: SubTask }) {
    is his, generated or typed, so every row can be corrected without a detour
    through delete-and-retype. */
 function EditTaskSheet({ task, onClose }: { task: Task; onClose: () => void }) {
-  const { updateTask } = useStore()
-  const [title, setTitle] = useState(task.title)
-  /* Only the words. The minutes already have a home of their own, on the
-     estimate chip and on each step, and a second door to the same number is
-     how two numbers disagree. */
+  const { updateTask, projects, setTaskProject } = useStore()
+  /* The words and the hashtag, nothing else. The minutes already have a home
+     of their own, on the estimate chip and on each step, and a second door to
+     the same number is how two numbers disagree. The tag is written into the
+     field so moving a task is the same act as filing it: change the hashtag,
+     or delete it to take the task out of its project. */
+  const own = projects.find((p) => p.id === task.projectId)
+  const [title, setTitle] = useState(own ? `${task.title} #${tagOf(own)}` : task.title)
+  const choices = [...projects.filter((p) => p.space === task.space), ...projects.filter((p) => p.space !== task.space)]
   const save = () => {
-    updateTask(task.id, { title })
+    const got = takeTag(title, projects)
+    if (!got.title) return
+    updateTask(task.id, { title: got.title })
+    if (got.project?.id !== task.projectId) setTaskProject(task.id, got.project?.id)
     onClose()
   }
   return (
     <Sheet title="Edit this task" onClose={onClose}>
       <label className="field-label" htmlFor="et-title">What is it?</label>
-      <input id="et-title" className="textinput" style={{ width: '100%' }} value={title} autoFocus
-        onChange={(e) => setTitle(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter' && title.trim()) save() }} />
+      <TagField id="et-title" label="What is it?" value={title} onChange={setTitle} onSubmit={save} projects={choices} createSpace={task.space} autoFocus />
       <div className="sheet-actions">
         <button className="btn btn-quiet" onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" disabled={!title.trim()} onClick={save}>Save changes</button>
@@ -428,8 +435,7 @@ function Spotlight({ q, setQ, matches, projects, onPick, onClose }: {
                 <li key={t.id}>
                   <button className={`plan-search-hit${i === hi ? ' is-hi' : ''}`} onMouseEnter={() => setHi(i)} onClick={() => onPick(t)}>
                     <SpaceMark space={t.space} always />
-                    <ProjectMark project={proj} />
-                    <span className="plan-search-hit-title"><Linkify text={t.title} /></span>
+                    <span className="plan-search-hit-title"><Linkify text={t.title} /> <TagMark project={proj} /></span>
                     <span className="plan-search-hit-where mono">{proj ? proj.name : t.list === 'today' ? "today's plan" : 'backlog'}</span>
                   </button>
                 </li>
@@ -439,17 +445,6 @@ function Spotlight({ q, setQ, matches, projects, onPick, onClose }: {
         )}
       </div>
     </div>
-  )
-}
-
-/* The Projects page folder, shrunk to a glyph: back with its tab, one sheet
-   peeking out, the front flap in the workspace colour. Same colour recipe as
-   .folder, so a project looks like itself in both places. */
-function FolderGlyph({ cls }: { cls: string }) {
-  return (
-    <span className={`fg ${cls}`} aria-hidden="true">
-      <i className="fg-back" /><i className="fg-paper" /><i className="fg-front" />
-    </span>
   )
 }
 
@@ -473,16 +468,16 @@ function ProjectStrip({ projects, tasks, sel, showSpaces, touch, inScope, onAll,
           <span className="pstrip-cell" key={p.id}>
             {head && <SpaceMark space={p.space} always />}
             <button
-              className={`pstrip-item${on ? ' is-on' : ''}`} aria-pressed={on}
+              className={`pstrip-item pstrip-tag${on ? ' is-on' : ''}`} aria-pressed={on} title={p.name}
               onClick={(e) => onPick(p.id, touch || e.shiftKey || e.metaKey || e.ctrlKey)}
             >
-              <FolderGlyph cls={`s-${p.space}`} /><span>{p.name}</span><em className="mono">{open(p.id)}</em>
+              <span>#{tagOf(p)}</span><em className="mono">{open(p.id)}</em>
             </button>
           </span>
         )
       })}
       <button className={`pstrip-item${sel.includes(UNSORTED) ? ' is-on' : ''}`} aria-pressed={sel.includes(UNSORTED)} onClick={(e) => onPick(UNSORTED, touch || e.shiftKey || e.metaKey || e.ctrlKey)}>
-        <FolderGlyph cls="f-unsorted" /><span>Unsorted</span><em className="mono">{tasks.filter((t) => !t.projectId && !t.done && inScope(t)).length}</em>
+        <span>Untagged</span><em className="mono">{tasks.filter((t) => !t.projectId && !t.done && inScope(t)).length}</em>
       </button>
       <button className="pstrip-item pstrip-manage" onClick={onManage} aria-label="Manage projects"><Icon.FolderAdd size={15} /></button>
     </div>
@@ -510,11 +505,11 @@ function PhoneProjectFilter({ projects, tasks, sel, inScope, onAll, onPick, onMa
       <button role="menuitem" aria-checked={sel.length === 0} onClick={onAll}>All <em className="mono plan-proj-n">{total}</em></button>
       {projects.map((p) => (
         <button key={p.id} role="menuitem" aria-checked={sel.includes(p.id)} onClick={() => onPick(p.id, true)}>
-          <FolderGlyph cls={`s-${p.space}`} /><span>{p.name}</span><em className="mono plan-proj-n">{open(p.id)}</em>
+          <span>#{tagOf(p)}</span><em className="mono plan-proj-n">{open(p.id)}</em>
         </button>
       ))}
       <button role="menuitem" aria-checked={sel.includes(UNSORTED)} onClick={() => onPick(UNSORTED, true)}>
-        <FolderGlyph cls="f-unsorted" /><span>Unsorted</span><em className="mono plan-proj-n">{tasks.filter((t) => !t.projectId && !t.done && inScope(t)).length}</em>
+        <span>Untagged</span><em className="mono plan-proj-n">{tasks.filter((t) => !t.projectId && !t.done && inScope(t)).length}</em>
       </button>
       <span className="kebab-sep" />
       <button role="menuitem" onClick={onManage}>Manage projects</button>
@@ -569,7 +564,23 @@ export function PlanPage() {
   /* Only outside a project's own room: standing inside it already says which
      project every task on screen belongs to, so the mark would be repeating
      the room he is already standing in. */
-  const markOf = (t: Task) => (activeProject ? undefined : projects.find((p) => p.id === t.projectId))
+  /* Always drawn now (2026-10-25): the hashtag IS how a task says where it
+     lives, and a tap on it narrows the list to that project. */
+  const markOf = (t: Task) => (t.projectId ? projects.find((p) => p.id === t.projectId) : undefined)
+  const pickTag = (p: Project) => setPicked((prev) => (prev.length === 1 && prev[0] === p.id ? [] : [p.id]))
+  /* Offered in the add box: this workspace's projects first, then the rest,
+     because a hashtag can file a task anywhere. */
+  const tagChoices = view === 'all' ? stripProjects : [...stripProjects, ...projects.filter((p) => p.space !== view)]
+  const submitQuick = () => {
+    const got = takeTag(quick, projects)
+    if (!got.title) return
+    const proj = got.project ?? (newProjectId ? projects.find((p) => p.id === newProjectId) : undefined)
+    addTask({ title: got.title, source: 'mc', estimateMin: 0, space: proj?.space ?? addSpace, list: 'backlog', category: 'quick', projectId: proj?.id })
+    /* Filed somewhere the list is not showing: widen the filter to it, so the
+       task he just wrote does not vanish the moment he presses Enter. */
+    if (got.project && sel.length && !sel.includes(got.project.id)) setPicked((prev) => [...prev, got.project!.id])
+    setQuick('')
+  }
 
   /* Moving a task between a project and the Space's own Plan is the same
      move either direction: set or clear projectId. A task's own space never
@@ -802,6 +813,12 @@ export function PlanPage() {
        still waiting somewhere. Search exists to find something he still has
        to act on -- a task he already finished isn't lost, it's done, and
        belongs in the record, not in a search for where he left something. */
+    /* "#off" finds what is filed under a project, the same matching the add
+       box uses, so a tag is also the fastest way back to everything in it. */
+    if (q.startsWith('#')) {
+      const ids = new Set(matchProjects(q.slice(1), projects).map((p) => p.id))
+      return tasks.filter((t) => !t.done && t.projectId && ids.has(t.projectId)).slice(0, 8)
+    }
     return tasks.filter((t) => !t.done && t.title.toLowerCase().includes(q)).slice(0, 8)
   })()
   const [spot, setSpot] = useState(false)
@@ -1196,15 +1213,12 @@ export function PlanPage() {
           </div>
           {/* Add a task; breaking it down is an action on the task itself. */}
           <div className="formrow" style={{ marginBottom: 'var(--s2)' }}>
-            <input
-              className="textinput"
-              placeholder="Add something to the list…"
-              value={quick}
-              onChange={(e) => setQuick(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && quick.trim()) { addTask({ title: quick.trim(), source: 'mc', estimateMin: 0, space: addSpace, list: 'backlog', category: 'quick', projectId: newProjectId }); setQuick('') } }}
-              aria-label="New task"
+            <TagField
+              id="plan-add" label="New task" placeholder="Add something to the list… #project to file it"
+              value={quick} onChange={setQuick} onSubmit={submitQuick}
+              projects={tagChoices} createSpace={addSpace}
             />
-            <button className="btn btn-quiet" disabled={!quick.trim()} onClick={() => { addTask({ title: quick.trim(), source: 'mc', estimateMin: 0, space: addSpace, list: 'backlog', category: 'quick', projectId: newProjectId }); setQuick('') }}>Add</button>
+            <button className="btn btn-quiet" disabled={!takeTag(quick, projects).title} onClick={submitQuick}>Add</button>
           </div>
           {backlogSorted.map((t) => {
             const isExp = expanded.has(t.id)
@@ -1219,9 +1233,8 @@ export function PlanPage() {
                 >
                   <span className="drag-grip" aria-hidden="true"><Icon.Grip /></span>
                   <SpaceMark space={t.space} />
-                  <ProjectMark project={markOf(t)} />
                   <span className={`cat-dot ${t.category}`} aria-hidden="true" />
-                  <span className="grow"><Linkify text={t.title} /></span>
+                  <span className="grow"><Linkify text={t.title} /> <TagMark project={markOf(t)} onPick={pickTag} /></span>
                   {/* Age since it was written down, not replans: moving it on
                       and off a day never changes the number. */}
                   {t.createdAt && daysSince(t.createdAt) > 0 && (
@@ -1411,9 +1424,8 @@ export function PlanPage() {
                             <Icon.Check size={12} strokeWidth={4} />
                           </button>
                           <SpaceMark space={t.space} />
-                          <ProjectMark project={markOf(t)} />
                           <span className={`cat-dot ${t.category}`} aria-hidden="true" />
-                          <span className="grow wrap2"><Linkify text={t.title} /></span>
+                          <span className="grow wrap2"><Linkify text={t.title} /> <TagMark project={markOf(t)} onPick={pickTag} /></span>
                           {t.done && t.actualMin != null ? (
                             <span className="est-vs-actual mono">{fmtDuration(taskMinutes(t))} → {fmtDuration(t.actualMin)} <b className={taskMinutes(t) - t.actualMin >= 0 ? 'val-pos' : 'val-urgent'}>{taskMinutes(t) - t.actualMin >= 0 ? '+' : ''}{taskMinutes(t) - t.actualMin}m</b></span>
                           ) : (

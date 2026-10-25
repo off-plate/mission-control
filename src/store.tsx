@@ -276,7 +276,8 @@ interface Store extends PersistedState {
   page: PageId
   setPage: (p: PageId) => void
   projects: Project[]
-  addProject: (name: string, space: SpaceId) => void
+  addProject: (name: string, space: SpaceId) => string | undefined
+  setProjectTag: (id: string, tag: string) => void
   renameProject: (id: string, name: string) => void
   /** 'move' (default meaning, always pass explicitly) clears projectId on its
    *  tasks and leaves them in the Space's own Plan; 'delete' removes them too. */
@@ -1476,6 +1477,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     openProjectId, setOpenProject, enterProject,
     addProject: plannerSlice.addProject,
     renameProject: plannerSlice.renameProject,
+    setProjectTag: plannerSlice.setProjectTag,
     deleteProject: plannerSlice.deleteProject,
     setTaskProject: plannerSlice.setTaskProject,
     setTaskSpace: plannerSlice.setTaskSpace,

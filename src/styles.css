@@ -11314,3 +11314,33 @@ body:has(.shell.is-hud) { --st-research: #9AA3B0; --st-build: #A592CC; --st-reac
   .hg-room.is-acc .hg-sec + .hg-sec { margin-top: 0; }
   .hg-acc-body { padding-top: 6px; }
 }
+
+/* PROJECT HASHTAGS (2026-10-25). The tag sits after the task's words, in the
+   body face, quieter than the title: it says where the task lives without
+   competing with what it is. No fill and no border, so it reads as part of
+   the sentence, and it darkens on hover because a tap filters by it. */
+.tagmark {
+  display: inline; padding: 0; border: 0; background: none;
+  font: inherit; font-weight: 600; font-size: 0.92em; color: var(--muted);
+  white-space: nowrap; cursor: default;
+}
+button.tagmark { cursor: pointer; border-radius: 3px; }
+button.tagmark:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+button.tagmark:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+
+/* The add box and its list. The list opens under the field, left aligned
+   with it, so the tag being typed and its matches share one edge. */
+.tagfield { position: relative; flex: 1 1 220px; min-width: 0; display: flex; }
+.tagfield > .textinput { flex: 1; width: 100%; min-width: 0; }
+.tagpop { left: 0; right: auto; min-width: 260px; max-width: min(360px, 100%); }
+.tagpop button { gap: 10px; }
+.tagpop button b { font-weight: 600; color: var(--ink); }
+.tagpop .tagpop-name { color: var(--muted); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.tagpop button.is-hi { background: var(--accent-wash); }
+.tagpop button.is-hi b { color: var(--accent-text); }
+.tagpop .spacemark { flex: none; }
+
+.pstrip-tag span { font-weight: 600; }
+.folder .proj-stats .f-tag { font-weight: 600; color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.f-tag-note { margin: var(--s2) 0 0; font-size: var(--text-sm); color: var(--muted); }
+.f-tag-note b { color: var(--ink); font-weight: 600; }

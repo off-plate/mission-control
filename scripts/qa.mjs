@@ -231,7 +231,7 @@ const shoot = async (name) => {
 
 await step('plan: add, estimate visible, complete via chips', async () => {
   await fresh('plan')
-  await page.getByRole('textbox', { name: 'New task' }).fill('Gate task')
+  await page.getByRole('combobox', { name: 'New task' }).fill('Gate task')
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await dragToSlot('Gate task', 'Morning')
   await page.locator('.today-task', { hasText: 'Gate task' }).first().locator('.checkbox').click()
@@ -243,7 +243,7 @@ await step('plan: add, estimate visible, complete via chips', async () => {
 })
 await step('breakdown: his own steps, his own minutes', async () => {
   await fresh('plan')
-  await page.getByRole('textbox', { name: 'New task' }).fill('Gate breakdown task')
+  await page.getByRole('combobox', { name: 'New task' }).fill('Gate breakdown task')
   await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(400)
   await page.locator('.todo-row', { hasText: 'Gate breakdown' }).first().getByRole('button', { name: /Options/ }).click()
   await page.getByRole('menuitem', { name: /Break it down/i }).click(); await page.waitForTimeout(2200)
@@ -1337,7 +1337,7 @@ await step('vision + day record render', async () => {
 })
 await step('plan: tomorrow holds its own day', async () => {
   await fresh('plan')
-  await page.getByRole('textbox', { name: 'New task' }).fill('Gate tomorrow task')
+  await page.getByRole('combobox', { name: 'New task' }).fill('Gate tomorrow task')
   await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(300)
   /* Step the panel onto tomorrow first, then drop: dropTo() plans onto the
      day the panel is showing, which is the whole point of the switcher. */
@@ -1364,7 +1364,7 @@ await step('plan: tomorrow holds its own day', async () => {
    specifically about the pause in the middle of one. */
 await step('plan: holding a drag over a day pill steps the panel onto it', async () => {
   await fresh('plan')
-  await page.getByRole('textbox', { name: 'New task' }).fill('Gate hover-arm task')
+  await page.getByRole('combobox', { name: 'New task' }).fill('Gate hover-arm task')
   await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(300)
   const row = page.locator('.todo-row', { hasText: 'Gate hover-arm' })
   const taskId = await row.evaluate((el) => el.closest('[data-todo-id]').dataset.todoId)
@@ -1420,7 +1420,7 @@ await step('plan: the day switcher reaches six days out, one real day each', asy
   const wedPill = page.locator('.day-switch .microcap').nth(5)
   await wedPill.click(); await page.waitForTimeout(300)
   if ((await wedPill.getAttribute('aria-pressed')) !== 'true') throw new Error('the fifth pill did not become the active day')
-  await page.getByRole('textbox', { name: 'New task' }).fill('Gate five-out task')
+  await page.getByRole('combobox', { name: 'New task' }).fill('Gate five-out task')
   await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(300)
   /* The kebab's own seven-day "Plan for a day" list was asserted here until
      2026-09-04, when it was cut from the desktop menu on his word. It lives
@@ -1454,7 +1454,7 @@ await step('plan: the week widget is a real Monday-to-Sunday, not the switcher a
   if (before !== after) throw new Error(`the week range moved with the switcher: ${before} -> ${after}`)
   // A task planned onto a day, with a slot, shows up in that day's column, in that slot.
   await page.locator('.day-switch .microcap').first().click(); await page.waitForTimeout(300)
-  await page.getByRole('textbox', { name: 'New task' }).fill('Gate week widget task')
+  await page.getByRole('combobox', { name: 'New task' }).fill('Gate week widget task')
   await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(300)
   await dragToSlot('Gate week widget', 'Afternoon')
   const todayCol = page.locator('.weekplan-day.is-today')
@@ -1576,7 +1576,7 @@ await step('plan: the week bar folds shut by default, and only the bar itself op
 
 await step('goals: a promised task ticks from the plan', async () => {
   await fresh('plan')
-  await page.getByRole('textbox', { name: 'New task' }).fill('Gate promise')
+  await page.getByRole('combobox', { name: 'New task' }).fill('Gate promise')
   await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(300)
   await page.goto(`${URL}#/goals`); await page.waitForTimeout(500)
   /* The period container is `.goal-band` since the ladder replaced the four
@@ -1765,7 +1765,7 @@ await step('phone: a task can be scheduled and rescheduled without dragging', as
   await p.goto(`${URL}#/plan`); await p.reload(); await p.waitForTimeout(1000)
   const skip = p.getByRole('button', { name: 'Not today' })
   if (await skip.count()) { await skip.first().click(); await p.waitForTimeout(400) }
-  await p.getByRole('textbox', { name: 'New task' }).fill('Thumb scheduling')
+  await p.getByRole('combobox', { name: 'New task' }).fill('Thumb scheduling')
   await p.getByRole('button', { name: 'Add', exact: true }).click(); await p.waitForTimeout(500)
   const slotOf = () => p.evaluate((K) => JSON.parse(localStorage.getItem(K)).tasks.find((t) => t.title === 'Thumb scheduling')?.slot ?? null, KEY)
 
@@ -1790,7 +1790,7 @@ await step('phone: plan is usable at 390', async () => {
   await mp.goto(URL); await mp.waitForTimeout(300)
   await mp.evaluate((K) => localStorage.removeItem(K), KEY)
   await mp.goto(`${URL}#/plan`); await mp.reload(); await mp.waitForTimeout(700)
-  await mp.getByRole('textbox', { name: 'New task' }).fill('Phone gate task with a long name')
+  await mp.getByRole('combobox', { name: 'New task' }).fill('Phone gate task with a long name')
   await mp.getByRole('button', { name: 'Add', exact: true }).click(); await mp.waitForTimeout(300)
   const row = mp.locator('.todo-row', { hasText: 'Phone gate' }).first()
   const grow = row.locator('.grow')
@@ -1895,7 +1895,7 @@ await step('sync: two tabs both keep what they added', async () => {
   const add = async (page, title) => {
     await page.bringToFront()
     if (!/#\/plan/.test(page.url())) { await page.goto(`${URL}#/plan`); await page.waitForTimeout(600) }
-    await page.getByRole('textbox', { name: 'New task' }).fill(title)
+    await page.getByRole('combobox', { name: 'New task' }).fill(title)
     await page.getByRole('button', { name: 'Add', exact: true }).click()
     await page.waitForTimeout(500)
   }
@@ -2074,7 +2074,7 @@ await step('a task finished without a time is finished on every page that counts
      one of them works. */
   const doIt = async (title, skip) => {
     await page.goto(`${URL}#/plan`); await page.waitForTimeout(700)
-    await page.getByRole('textbox', { name: 'New task' }).fill(title)
+    await page.getByRole('combobox', { name: 'New task' }).fill(title)
     await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(500)
     await dragToSlot(title, 'Morning')
     await page.locator('.today-task', { hasText: title }).first().locator('.checkbox').click()

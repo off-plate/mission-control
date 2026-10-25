@@ -19,6 +19,7 @@ import { useStore } from './store'
 import { isoWeekKey, localDateKey } from './util'
 import type { Project, SpaceId, Task, ViewId } from './types'
 import * as Icon from './icons'
+import { tagOf } from './tags'
 
 
 /* A field that grows with what you type, up to a ceiling, then scrolls. Dragging
@@ -284,6 +285,17 @@ export function ProjectMark({ project }: { project?: Project }) {
   )
 }
 
+/** A task's project, written as the hashtag it was filed with (2026-10-25,
+ *  replacing the lettered badge on task rows). Clickable where a caller can
+ *  filter by it; plain text everywhere else. */
+export function TagMark({ project, onPick }: { project?: Project; onPick?: (p: Project) => void }) {
+  if (!project) return null
+  const tag = `#${tagOf(project)}`
+  return onPick
+    ? <button type="button" className="tagmark" title={`Show only ${project.name}`} onClick={(e) => { e.stopPropagation(); onPick(project) }}>{tag}</button>
+    : <span className="tagmark" title={project.name}>{tag}</span>
+}
+
 /** The mark for a task row: its workspace, plus its project when it has one.
  *  Off-Plate and Michael's Corner are projects now, so this is what keeps the
  *  "which one is this from" answer in All and Today. */
@@ -292,7 +304,7 @@ export function TaskMark({ task, always }: { task: { space?: SpaceId; projectId?
   return (
     <>
       <SpaceMark space={task.space} always={always} />
-      <ProjectMark project={task.projectId ? projects.find((p) => p.id === task.projectId) : undefined} />
+      <TagMark project={task.projectId ? projects.find((p) => p.id === task.projectId) : undefined} />
     </>
   )
 }

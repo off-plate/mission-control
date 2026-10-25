@@ -11379,3 +11379,10 @@ button.tagmark:focus-visible { outline: 2px solid var(--accent-text); outline-of
 .nt-hidedone input { width: 16px; height: 16px; margin: 0; accent-color: var(--a-accent-text); cursor: pointer; }
 .nt-hidedone:hover { color: var(--ink); }
 .nt-listhead .nt-sortkebab { margin-left: 0; }
+
+/* The meeting banner at the head of the Notes list sits on the same 16px inset
+   as the title and search under it. Without one its border ran along the
+   window edge and over the column line (his report, 2026-10-25, once the
+   folder column that used to sit to its left was removed). */
+.nt-list > .meet-prompt { margin: var(--s3) var(--s4) 0; }
+@media (max-width: 999px) { .nt-list > .meet-prompt { margin-inline: 0; } }

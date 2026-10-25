@@ -18,7 +18,7 @@ import { useStore } from './store'
 import { RoutineRunner } from './runner'
 import * as Icon from './icons'
 import {
-  bestCleanRun, countTarget, daysClean, dueOn, focusMinutesOn, focusNeedMin, goalCurrent, habitsDueToday, isTimeFed, slipDays,
+  bestCleanRun, countTarget, daysClean, dueOn, focusMinutesOn, focusNeedMin, goalCurrent, isTimeFed, slipDays,
   type Goal, type GoalTimeframe, type HabitDef, type Routine, type RoutineCadence, type TimeSlot,
 } from './types'
 import { goalPace, goalPeriodKey, goalPeriodRange, localDateKey } from './util'
@@ -70,7 +70,16 @@ interface Item {
   /** 0 morning, 1 day, 2 evening, 8 weekly or monthly, 9 whenever */
   part: number
 }
-const FILTERS: [string, string][] = [['all', 'All'], ['routine', 'Routines'], ['habit', 'Habits'], ['goal', 'Goals'], ['quit', 'Quitting']]
+const FILTERS: [string, string][] = [['all', 'All'], ['routine', 'Routines'], ['habit', 'Habits'], ['auto', 'Automatic'], ['goal', 'Goals'], ['quit', 'Quitting']]
+/** The page's sections, in the order a day runs: what he starts, what he
+ *  ticks, what the app keeps for him, what he is reaching for, what he stopped. */
+const CATS: { id: string; label: string; has: (k: Kind) => boolean }[] = [
+  { id: 'routine', label: 'Routines', has: (k) => k === 'routine' },
+  { id: 'habit', label: 'Habits', has: (k) => k === 'check' || k === 'count' || k === 'amount' },
+  { id: 'auto', label: 'Automatic', has: (k) => k === 'auto' },
+  { id: 'goal', label: 'Goals', has: (k) => k === 'goal' },
+  { id: 'quit', label: 'Quitting', has: (k) => k === 'quit' },
+]
 const isHabitKind = (k: Kind) => k === 'check' || k === 'count' || k === 'amount' || k === 'auto'
 
 export function HabitKitRoom({ start = 'all' }: { start?: string }) {
@@ -171,7 +180,6 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
     return items.find((it) => it.kind === 'routine' && it.part === p && !routineState(it).off && !routineState(it).complete) ?? null
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, todayIndex, habitLog])
-  const tally = habitsDueToday(habits.filter((h) => !h.archivedAt && h.kind !== 'break'), routines, habitLog, todayIndex)
 
   /* ---------- goals ---------- */
   const goalInfo = (g: Goal) => {
@@ -234,7 +242,7 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
       const g = it.goal!, info = goalInfo(g), size = tileSize(g.target)
       const n = Math.ceil(g.target / size), filled = Math.floor(info.total / size), pace = Math.floor(info.pace / size)
       return <div className="hk-tiles is-goal" style={{ gridTemplateColumns: 'repeat(26, 1fr)' }} aria-label={`${fmt(info.total)} of ${fmt(g.target)} ${g.unit}, one tile per ${fmt(size)}`}>
-        {Array.from({ length: n }, (_, i) => <i key={i} className={`${i < filled ? 'f' : ''}${i === pace && pace >= filled && info.total < g.target ? ' pace' : ''}`} />)}
+        {Array.from({ length: n }, (_, i) => <i key={i} style={{ ['--col' as string]: i % 26 }} className={`${i < filled ? 'f' : ''}${i === pace && pace >= filled && info.total < g.target ? ' pace' : ''}`} />)}
       </div>
     }
     const pad = todayIndex // Monday on top, today's row
@@ -243,7 +251,7 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
       const a = (weeks - 1 - col) * 7 + (pad - row)
       if (a < 0) { cells.push(<i key={`${col}-${row}`} className="x" />); continue }
       const v = dayVal(it, keyAgo(a), a)
-      cells.push(<i key={`${col}-${row}`} className={v === null ? 'x' : `${v >= 1 ? 'f' : v > 0 ? 'p' : ''}${a === 0 ? ' t' : ''}`} />)
+      cells.push(<i key={`${col}-${row}`} style={{ ['--col' as string]: col }} className={v === null ? 'x' : `${v >= 1 ? 'f' : v > 0 ? 'p' : ''}${a === 0 ? ' t' : ''}`} />)
     }
     return <div className="hk-tiles" style={{ gridTemplateColumns: `repeat(${weeks}, 1fr)` }} aria-hidden="true">{cells}</div>
   }
@@ -288,63 +296,71 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
       return <button className={`hk-act is-play${big ? ' is-big' : ''}`} style={{ ['--c' as string]: c }} onClick={() => setSheet({ kind: 'run', key: it.key })}><Icon.Play size={14} />{st.complete ? 'Again' : st.done ? 'Resume' : 'Start'}</button>
     }
     if (it.kind === 'check') { const on = todayVal(it) >= 1; return <button className={`hk-act is-check${on ? ' is-on' : ''}`} style={{ ['--c' as string]: c }} role="checkbox" aria-checked={on} aria-label={it.name} onClick={() => tick(it)}><Icon.Check size={22} strokeWidth={3} /></button> }
-    if (it.kind === 'count') return <button className="hk-act is-ring" aria-label={`One more ${it.name}`} onClick={() => { s.logCount(it.id, 1); say(`${it.name} +1`, () => s.logCount(it.id, -1)) }}><Ring f={todayVal(it)} c={c}><Icon.Plus size={18} /></Ring></button>
-    if (it.kind === 'amount') return <button className="hk-act is-ring" aria-label={`Log ${it.name}`} onClick={() => setSheet({ kind: 'log', key: it.key })}><Ring f={todayVal(it)} c={c}><Icon.Plus size={18} /></Ring></button>
-    if (it.kind === 'auto') { const h = it.habit!; return <span className="hk-act is-ring" aria-label={`${focusMinutesOn(focusSessions, today, h.space)} of ${focusNeedMin(h)} minutes`}><Ring f={todayVal(it)} c={c}><span className="hk-ringnum">{focusMinutesOn(focusSessions, today, h.space)}m</span></Ring></span> }
+    if (it.kind === 'count') return <button className="hk-act is-ring" aria-label={`One more ${it.name}`} onClick={() => { s.logCount(it.id, 1); say(`${it.name} +1`, () => s.logCount(it.id, -1)) }}>{Ring({ f: todayVal(it), c, children: <Icon.Plus size={18} /> })}</button>
+    if (it.kind === 'amount') return <button className="hk-act is-ring" aria-label={`Log ${it.name}`} onClick={() => setSheet({ kind: 'log', key: it.key })}>{Ring({ f: todayVal(it), c, children: <Icon.Plus size={18} /> })}</button>
+    if (it.kind === 'auto') { const h = it.habit!; return <span className="hk-act is-ring" aria-label={`${focusMinutesOn(focusSessions, today, h.space)} of ${focusNeedMin(h)} minutes`}>{Ring({ f: todayVal(it), c, children: <span className="hk-ringnum">{focusMinutesOn(focusSessions, today, h.space)}m</span> })}</span> }
     if (it.kind === 'quit') { const slipped = slipSet.get(it.id)?.has(today); return <button className="hk-act is-slip" disabled={slipped} onClick={() => s.logSlip(it.id)}>{slipped ? 'Slipped today' : 'Slipped'}</button> }
     if (it.kind === 'goal') {
       const g = it.goal!
-      if (g.habitId) return <Ring f={goalInfo(g).total / g.target} c={c}><span className="hk-ringnum">{Math.round(goalInfo(g).total / g.target * 100)}%</span></Ring>
-      return <button className="hk-act is-ring" aria-label={`Log an amount for ${it.name}`} onClick={() => setSheet({ kind: 'log', key: it.key })}><Ring f={goalInfo(g).total / g.target} c={c}><Icon.Plus size={18} /></Ring></button>
+      if (g.habitId) return Ring({ f: goalInfo(g).total / g.target, c, children: <span className="hk-ringnum">{Math.round(goalInfo(g).total / g.target * 100)}%</span> })
+      return <button className="hk-act is-ring" aria-label={`Log an amount for ${it.name}`} onClick={() => setSheet({ kind: 'log', key: it.key })}>{Ring({ f: goalInfo(g).total / g.target, c, children: <Icon.Plus size={18} /> })}</button>
     }
     return null
   }
 
-  const Card = ({ it, next }: { it: Item; next?: boolean }) => {
+  const Card = ({ it, next, i = 0 }: { it: Item; next?: boolean; i?: number }) => {
     const g = it.goal, h = it.habit
     return (
-      <article className={`hk-card${next ? ' is-next' : ''}`} style={{ ['--c' as string]: it.color }}>
+      <article key={it.key} className={`hk-card${next ? ' is-next' : ''}`} style={{ ['--c' as string]: it.color, ['--i' as string]: Math.min(i, 14) }}>
         <div className="hk-top">
-          <Ico it={it} />
+          {Ico({ it })}
           <button className="hk-name" onClick={() => setSheet({ kind: 'detail', key: it.key })}>
             {next && <span className="hk-next">Up next</span>}
             <span className="hk-title">{it.name}</span>
             <span className="hk-sub">{subLine(it)}</span>
           </button>
-          <Action it={it} big={next} />
+          {Action({ it, big: next })}
         </div>
         {g && <div className="hk-amt"><b>{fmt(goalInfo(g).total)}</b><span>/ {fmt(g.target)} {g.unit}</span>{goalInfo(g).reach && <em className={goalInfo(g).ahead ? 'ok' : ''}>{fmt(g.target)} by {short(goalInfo(g).reach!)}</em>}</div>}
         {it.kind === 'quit' && h && <div className="hk-amt"><b>{quitClean(h).clean}</b><span>of {quitClean(h).daysIn} days clean</span><em>longest {bestCleanRun(h, slips)} days</em></div>}
-        <Tiles it={it} weeks={26} />
+        {Tiles({ it, weeks: 26 })}
       </article>
     )
   }
-  const Row = ({ it, next }: { it: Item; next?: boolean }) => (
-    <div className={`hk-row${it.kind === 'routine' && routineState(it).off ? ' is-dim' : ''}`} style={{ ['--c' as string]: it.color }}>
-      <Ico it={it} />
+  const Row = ({ it, next, i = 0 }: { it: Item; next?: boolean; i?: number }) => (
+    <div key={it.key} className={`hk-row${it.kind === 'routine' && routineState(it).off ? ' is-dim' : ''}`} style={{ ['--c' as string]: it.color, ['--i' as string]: Math.min(i, 18) }}>
+      {Ico({ it })}
       <button className="hk-name" onClick={() => setSheet({ kind: 'detail', key: it.key })}>
         {next && <span className="hk-next">Up next</span>}
         <span className="hk-title">{it.name}</span>
         <span className="hk-sub">{subLine(it)}</span>
       </button>
-      <Action it={it} big={next} />
+      {Action({ it, big: next })}
     </div>
   )
 
-  const shown = items.filter((it) => filter === 'all' || (filter === 'habit' ? isHabitKind(it.kind) : it.kind === filter))
+  const shown = items.filter((it) => filter === 'all' || (CATS.find((c) => c.id === filter)?.has(it.kind) ?? false))
   const order = (a: Item, b: Item) => (a.kind === 'routine' ? 0 : isHabitKind(a.kind) ? 1 : a.kind === 'goal' ? 2 : 3) - (b.kind === 'routine' ? 0 : isHabitKind(b.kind) ? 1 : b.kind === 'goal' ? 2 : 3) || a.part - b.part
   const sorted = shown.filter((it) => it !== nextUp).sort(order)
   const pinned = nextUp && shown.includes(nextUp) ? nextUp : null
   const doneToday = (it: Item) => it.kind === 'routine' ? routineState(it).complete : isHabitKind(it.kind) ? todayVal(it) >= 1 : false
   const sheetItem = sheet?.key ? items.find((x) => x.key === sheet.key) ?? null : null
 
+  /* THE CATEGORIES (his ask, 2026-10-25): cards and week are sectioned so it is
+     plain at a glance what is a routine, a habit he ticks, a habit the app
+     keeps for him, a goal, a quit. Up next stays above them all. */
+  const sections = CATS.map((c) => ({ ...c, list: sorted.filter((it) => c.has(it.kind)) }))
+    .filter((c) => c.list.length > 0 || (c.id === 'goal' && (filter === 'all' || filter === 'goal')))
+  const todayOf = (list: Item[]) => {
+    const doable = list.filter((it) => (it.kind === 'routine' || isHabitKind(it.kind)) && !(it.kind === 'routine' && (routineState(it).off || it.part >= 8)))
+    return doable.length ? `${doable.filter(doneToday).length} of ${doable.length} done today` : ''
+  }
+  let n = pinned ? 1 : 0
+
   return (
     <div className="page hk">
       <div className="hk-bar">
-        <div className="hk-today">
-          <Ring f={tally.due ? tally.kept / tally.due : 0} c="#8E88FF" size={38} w={4} />
-          <div><b>{tally.kept} of {tally.due} today</b><span>{new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>
-        </div>
+        <h1 className="hk-h1">Habits &amp; Goals</h1>
         {/* On a wide screen the views sit here, named; on the phone they are the floating pill. */}
         <div className="hk-views" role="group" aria-label="View">
           {(['cards', 'list', 'week'] as const).map((v) => (
@@ -363,38 +379,59 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
 
       {items.length === 0 && <p className="hk-empty">Nothing here yet. Tap + to add a habit, a routine, a goal or something you are quitting.</p>}
 
-      {view === 'cards' && <div className="hk-cards">{pinned && <Card it={pinned} next />}{sorted.map((it) => <Card key={it.key} it={it} />)}{(filter === 'all' || filter === 'goal') && <Promised />}</div>}
+      {/* Keyed on view and filter: switching either replays the entrance; a tick does not. */}
+      <div className="hk-anim" key={`${view}-${filter}`}>
+      {view === 'cards' && <>
+        {pinned && <div className="hk-cards is-pinned">{Card({ it: pinned, next: true, i: 0 })}</div>}
+        {sections.map((c) => (
+          <section key={c.id} className="hk-sec">
+            {/* Counted with the pinned card, which still belongs to its section. */}
+            <h2 className="hk-sech" style={{ ['--i' as string]: Math.min(n, 14) }}>{c.label}<span className="hk-secn">{c.list.length + (pinned && c.has(pinned.kind) ? 1 : 0)}</span><span className="hk-sect">{todayOf(pinned && c.has(pinned.kind) ? [pinned, ...c.list] : c.list)}</span></h2>
+            <div className="hk-cards">
+              {c.list.map((it) => Card({ it, i: n++ }))}
+              {c.id === 'goal' && (filter === 'all' || filter === 'goal') && <Promised />}
+            </div>
+          </section>
+        ))}
+      </>}
 
       {view === 'list' && (() => {
         const open = sorted.filter((it) => (it.kind === 'routine' || isHabitKind(it.kind)) && !doneToday(it) && !(it.kind === 'routine' && (routineState(it).off || it.part >= 8)))
         const other = sorted.filter((it) => it.kind === 'goal' || it.kind === 'quit' || (it.kind === 'routine' && !doneToday(it) && (routineState(it).off || it.part >= 8)))
         const done = sorted.filter(doneToday)
+        let k = pinned ? 1 : 0
         return <div className="hk-list">
-          {pinned && <Row it={pinned} next />}
-          {open.length > 0 && <><div className="hk-head">Still to do</div>{open.map((it) => <Row key={it.key} it={it} />)}</>}
-          {other.length > 0 && <><div className="hk-head">Goals, quitting, not today</div>{other.map((it) => <Row key={it.key} it={it} />)}</>}
-          {done.length > 0 && <><div className="hk-head">Done today</div>{done.map((it) => <Row key={it.key} it={it} />)}</>}
+          {pinned && Row({ it: pinned, next: true, i: 0 })}
+          {open.length > 0 && <><div className="hk-head">Still to do</div>{open.map((it) => Row({ it, i: k++ }))}</>}
+          {other.length > 0 && <><div className="hk-head">Goals, quitting, not today</div>{other.map((it) => Row({ it, i: k++ }))}</>}
+          {done.length > 0 && <><div className="hk-head">Done today</div>{done.map((it) => Row({ it, i: k++ }))}</>}
         </div>
       })()}
 
       {view === 'week' && (
         <div className="hk-week" style={{ ['--days' as string]: weekDays.length }}>
           <div className="hk-wrow is-head"><span className="hk-sub">{shown.length} items</span>{weekDays.map((a) => { const d = new Date(`${keyAgo(a)}T12:00:00`); return <span key={a} className={`hk-wday${a ? '' : ' is-today'}`}>{d.toLocaleDateString('en-GB', { weekday: 'short' }).slice(0, 2)}<b>{d.getDate()}</b></span> })}</div>
-          {[...(pinned ? [pinned] : []), ...sorted].map((it) => (
-            <div key={it.key} className="hk-wrow" style={{ ['--c' as string]: it.color }}>
-              <button className="hk-wname" onClick={() => setSheet({ kind: 'detail', key: it.key })}><Ico it={it} small /><span>{it.name}</span></button>
-              {weekDays.map((a) => {
-                const v = it.kind === 'goal' ? ((it.goal!.entries ?? []).some((e) => e.day === keyAgo(a)) ? 1 : 0) : dayVal(it, keyAgo(a), a)
-                if (v === null) return <span key={a} className="hk-sq is-x" />
-                const cls = `hk-sq${v >= 1 ? ' is-f' : v > 0 ? ' is-p' : ''}${a ? '' : ' is-t'}`
-                return a === 0 && (it.kind === 'check' || it.kind === 'amount' || it.kind === 'routine' || it.kind === 'goal' || it.kind === 'count')
-                  ? <button key={a} className={cls} style={{ ['--pct' as string]: `${Math.round(v * 100)}%` }} aria-label={`${it.name} today`} onClick={() => it.kind === 'check' ? tick(it) : it.kind === 'count' ? s.logCount(it.id, 1) : setSheet({ kind: it.kind === 'routine' ? 'run' : 'log', key: it.key })} />
-                  : <span key={a} className={cls} style={{ ['--pct' as string]: `${Math.round(v * 100)}%` }} />
-              })}
+          {CATS.map((c) => ({ ...c, list: [...(pinned ? [pinned] : []), ...sorted].filter((it) => c.has(it.kind)) })).filter((c) => c.list.length).map((c) => (
+            <div key={c.id} className="hk-wgroup">
+              <div className="hk-wcat">{c.label}<span className="hk-secn">{c.list.length}</span></div>
+              {c.list.map((it) => (
+                <div key={it.key} className="hk-wrow" style={{ ['--c' as string]: it.color, ['--i' as string]: Math.min(n++, 20) }}>
+                  <button className="hk-wname" onClick={() => setSheet({ kind: 'detail', key: it.key })}>{Ico({ it, small: true })}<span>{it.name}</span></button>
+                  {weekDays.map((a) => {
+                    const v = it.kind === 'goal' ? ((it.goal!.entries ?? []).some((e) => e.day === keyAgo(a)) ? 1 : 0) : dayVal(it, keyAgo(a), a)
+                    if (v === null) return <span key={a} className="hk-sq is-x" />
+                    const cls = `hk-sq${v >= 1 ? ' is-f' : v > 0 ? ' is-p' : ''}${a ? '' : ' is-t'}`
+                    return a === 0 && (it.kind === 'check' || it.kind === 'amount' || it.kind === 'routine' || it.kind === 'goal' || it.kind === 'count')
+                      ? <button key={a} className={cls} style={{ ['--pct' as string]: `${Math.round(v * 100)}%` }} aria-label={`${it.name} today`} onClick={() => it.kind === 'check' ? tick(it) : it.kind === 'count' ? s.logCount(it.id, 1) : setSheet({ kind: it.kind === 'routine' ? 'run' : 'log', key: it.key })} />
+                      : <span key={a} className={cls} style={{ ['--pct' as string]: `${Math.round(v * 100)}%` }} />
+                  })}
+                </div>
+              ))}
             </div>
           ))}
         </div>
       )}
+      </div>
 
       <nav className="hk-pill" aria-label="View">
         {(['cards', 'list', 'week'] as const).map((v) => (
@@ -512,7 +549,7 @@ function DetailSheet({ it, onClose, onRun, onLog, dayVal, Tiles }: {
   return (
     <div className="hk-detail">
       <div className="hk-stop"><span className="hk-spacer" /><h3>{it.name}</h3><button className="hk-round" aria-label="Close" onClick={onClose}><Icon.Close size={16} /></button></div>
-      <div className="hk-dgrid"><Tiles it={it} weeks={26} /></div>
+      <div className="hk-dgrid">{Tiles({ it, weeks: 26 })}</div>
       {it.kind !== 'goal' && <div className="hk-dchips"><span>{pct}% of the last 30 days</span>{it.kind === 'quit' && it.habit && <span>Longest {bestCleanRun(it.habit, slips)} days</span>}</div>}
       {it.kind === 'routine' && (
         <>

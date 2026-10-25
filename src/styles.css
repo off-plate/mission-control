@@ -11622,3 +11622,28 @@ button.tagmark:focus-visible { outline: 2px solid var(--accent-text); outline-of
 .hk-offer button:hover { background: #2C2E35; }
 /* Last, so it beats the pill's own display: on a wide screen the views live in the bar. */
 @media (min-width: 900px) { .hk-pill, .hk .hk-round.is-plus { display: none; } }
+
+/* ---- Habits & Goals: title, sections, motion (2026-10-25) ---- */
+.hk-h1 { flex: 1; min-width: 0; margin: 0; font-family: var(--font-display); font-size: clamp(26px, 3vw, 34px); font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
+.hk .hk-bar { padding: 10px 0 14px; }
+.hk-cards.is-pinned { margin-bottom: 6px; }
+.hk-sec { margin-top: 22px; }
+.hk-sech { display: flex; align-items: baseline; gap: 10px; margin: 0 2px 10px; font-family: var(--font-display); font-size: 19px; font-weight: 800; letter-spacing: -0.01em; color: var(--hk-ink); }
+.hk-secn { font-size: 13px; font-weight: 700; color: var(--hk-muted); font-variant-numeric: tabular-nums; padding: 2px 8px; border-radius: 8px; background: var(--hk-card-2); }
+.hk-sect { margin-left: auto; font-family: var(--font-body); font-size: 13px; font-weight: 600; color: var(--hk-muted); }
+.hk-wgroup + .hk-wgroup { margin-top: 6px; }
+.hk-wcat { display: flex; align-items: center; gap: 8px; padding: 14px 0 6px; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; font-weight: 800; color: var(--hk-muted); border-top: 1px solid var(--hk-line); }
+.hk-wgroup:first-of-type .hk-wcat { border-top: 0; }
+.hk-wcat .hk-secn { letter-spacing: 0; }
+
+/* Motion, on arrival only: the wrapper is keyed on view and filter, and the
+   cards keep their DOM between ticks, so logging never replays it. Cards rise
+   one after another; inside each, the dots appear column by column, so the
+   grid draws itself left to right and today lands last. */
+@keyframes hk-rise { from { opacity: 0; transform: translateY(16px) scale(0.985); } to { opacity: 1; transform: none; } }
+@keyframes hk-dot { from { opacity: 0; transform: scale(0.3); } to { opacity: 1; transform: none; } }
+@keyframes hk-head { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.hk-anim .hk-card, .hk-anim .hk-row, .hk-anim .hk-wrow:not(.is-head) { animation: hk-rise 460ms var(--hk-ease) both; animation-delay: calc(var(--i, 0) * 45ms); }
+.hk-anim .hk-sech { animation: hk-head 360ms var(--hk-ease) both; animation-delay: calc(var(--i, 0) * 45ms); }
+.hk-anim .hk-tiles i { animation: hk-dot 340ms var(--hk-ease) both; animation-delay: calc(var(--i, 0) * 45ms + 160ms + var(--col, 0) * 13ms); }
+@media (prefers-reduced-motion: reduce) { .hk-anim .hk-card, .hk-anim .hk-row, .hk-anim .hk-wrow, .hk-anim .hk-sech, .hk-anim .hk-tiles i { animation: none; } }

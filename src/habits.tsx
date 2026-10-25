@@ -1192,7 +1192,6 @@ export function HabitsPage() {
             <div className="panel hg-panel">
               <div className="hg-head">
                 <span className="microcap">Automatic Habits</span>
-                <span className="hg-n">no tick, on purpose</span>
               </div>
               <div className="hg-rows">
                 {autoRows.map((h) => (

@@ -10,7 +10,7 @@ import { SPACE_LABELS } from './mock'
 import { TodayPage } from './today'
 import { PlanPage } from './plan'
 import { ProjectsPage } from './projects'
-import { HabitsGoalsRoom } from './hgroom'
+import { HabitKitRoom } from './hkroom'
 import { NotesPage } from './notes'
 import { BillsPage } from './billspage'
 import { DailyReview } from './daily'
@@ -506,7 +506,9 @@ function PhoneTabBar({ page, setPage }: { page: PageId; setPage: (p: PageId) => 
 }
 
 /* Pages that are dark in both modes, so the header goes dark with them. */
-const DARK_CHROME_PAGES: PageId[] = ['timeline', 'board', 'health', 'gym', 'longevity']
+/* Habits & Goals joined the dark pages on 2026-10-25: the HabitKit rebuild,
+   with colours he freed for it ("you're free to adjust any colors"). */
+const DARK_CHROME_PAGES: PageId[] = ['timeline', 'board', 'health', 'gym', 'longevity', 'habits', 'routines', 'goals', 'quitting']
 
 export default function App() {
   const { space, view, setView, page, setPage, tasks, routines, goals, habits, markHabitDaysOn, prompts, storageFull } = useStore()
@@ -830,7 +832,7 @@ export default function App() {
         {page === 'plan' && <PlanPage />}
         {page === 'projects' && <ProjectsPage />}
         {(page === 'habits' || page === 'routines' || page === 'goals' || page === 'quitting') && (
-          <HabitsGoalsRoom start={page === 'goals' || page === 'quitting' ? page : 'habits'} />
+          <HabitKitRoom start={page === 'goals' ? 'goal' : page === 'quitting' ? 'quit' : page === 'routines' ? 'routine' : 'all'} />
         )}
         {page === 'timeline' && <TimelinePage />}
         {page === 'skills' && <SkillsPage />}

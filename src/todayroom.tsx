@@ -27,7 +27,7 @@ import { useFirstMove } from './ui'
 import { dayOfWeekKey, fmtDuration, fmtNum, fmtSigned, goalPace, goalPeriodKey, goalPeriodRange, isEstimated, localDateKey, taskMinutes, type GoalTf } from './util'
 import { SLOTS, dueOn, goalCurrent, habitsDueToday, isTimeFed, type Task } from './types'
 import { PLAN_AHEAD_DAYS, WeekGrid, dayPlus, weekRangeLabel } from './weekgrid'
-import { SpaceMark } from './ui'
+import { SpaceMark, TagMark } from './ui'
 import { SPACE_LABELS } from './mock'
 import { TodayWidgets } from './todaywidgets'
 import { usePomodoro } from './pomodoro'
@@ -103,7 +103,9 @@ function isoWeek(d: Date): number {
 }
 
 export function TodayRoom() {
-  const { tasks, habits, habitLog, routines, focusSessions, goals, slips, savedMin, todayIndex, inView, setPage, setFocusTaskId, setFocusRoutineId, toggleTask, toggleHabitDay, dayLog, openDay } = useStore()
+  const { tasks, habits, habitLog, routines, focusSessions, goals, slips, savedMin, todayIndex, inView, setPage, setFocusTaskId, setFocusRoutineId, toggleTask, toggleHabitDay, dayLog, openDay, projects } = useStore()
+  /* The project's coloured hashtag after each title (2026-10-25), same as Plan. */
+  const tagFor = (t: { projectId?: string }) => (t.projectId ? projects.find((p) => p.id === t.projectId) : undefined)
   const pomo = usePomodoro()
   const now = useNow()
   const firstMove = useFirstMove()
@@ -348,7 +350,7 @@ export function TodayRoom() {
             {todo.map((t) => (
               <div className="tr-r" key={t.id}>
                 <button className="tr-box" role="checkbox" aria-checked={false} aria-label={t.title} onClick={() => toggleTask(t.id)} />
-                <span className="tr-t">{t.title}</span>
+                <span className="tr-t">{t.title}</span><TagMark project={tagFor(t)} />
                 <span className="tr-age is-cool">{ageDays(t)}<u>d</u></span>
               </div>
             ))}
@@ -363,7 +365,7 @@ export function TodayRoom() {
               <div className={`tr-r${t.done ? ' is-done' : ''}`} key={t.id}>
                 <span className="tr-tick" aria-hidden="true" />
                 <span className="tr-slot">{SLOTS.find((sl) => sl.id === t.slot)?.label ?? '—'}</span>
-                <span className="tr-t">{t.title}</span>
+                <span className="tr-t">{t.title}</span><TagMark project={tagFor(t)} />
               </div>
             ))}
           </div>
@@ -376,7 +378,7 @@ export function TodayRoom() {
             {standing.map(({ t, d }) => (
               <div className="tr-r" key={t.id}>
                 <span className={`tr-age${d >= 30 ? '' : ' is-cool'}`}>{d}<u>d</u></span>
-                <span className="tr-t">{t.title}</span>
+                <span className="tr-t">{t.title}</span><TagMark project={tagFor(t)} />
               </div>
             ))}
           </div>

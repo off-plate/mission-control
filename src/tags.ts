@@ -23,6 +23,15 @@ export function cleanTag(want: string): string {
   return fold(want).replace(/^#+/, '').replace(/[^a-z0-9_-]+/g, '').replace(/^[-_]+|[-_]+$/g, '').slice(0, 40)
 }
 
+/** Which of the six tag tones a project wears (his ask, 2026-10-25: tell
+ *  tasks apart at a glance by their hashtag's colour). Handed out in project
+ *  order, so the first six projects never share one. */
+export const TAG_TONES = 6
+export const toneOf = (p: Project, projects: Project[]): number => {
+  const i = projects.findIndex((x) => x.id === p.id)
+  return (i < 0 ? 0 : i) % TAG_TONES
+}
+
 /** A project's tag, without the `#`. Unset means "follow the name". */
 export const tagOf = (p: Pick<Project, 'name' | 'tag'>): string => p.tag || slugTag(p.name)
 

@@ -448,6 +448,17 @@ function Spotlight({ q, setQ, matches, projects, onPick, onClose }: {
   )
 }
 
+/* The Projects page folder, shrunk to a glyph: back with its tab, one sheet
+   peeking out, the front flap in the workspace colour. Same colour recipe as
+   .folder, so a project looks like itself in both places. */
+function FolderGlyph({ cls }: { cls: string }) {
+  return (
+    <span className={`fg ${cls}`} aria-hidden="true">
+      <i className="fg-back" /><i className="fg-paper" /><i className="fg-front" />
+    </span>
+  )
+}
+
 function ProjectStrip({ projects, tasks, sel, showSpaces, touch, inScope, onAll, onPick, onManage }: {
   projects: Project[]; tasks: Task[]; sel: string[]; showSpaces: boolean; touch: boolean; inScope: (t: Task) => boolean
   onAll: () => void; onPick: (id: string, add: boolean) => void; onManage: () => void
@@ -468,16 +479,16 @@ function ProjectStrip({ projects, tasks, sel, showSpaces, touch, inScope, onAll,
           <span className="pstrip-cell" key={p.id}>
             {head && <SpaceMark space={p.space} always />}
             <button
-              className={`pstrip-item pstrip-tag${on ? ' is-on' : ''}`} aria-pressed={on} title={p.name}
+              className={`pstrip-item${on ? ' is-on' : ''}`} aria-pressed={on}
               onClick={(e) => onPick(p.id, touch || e.shiftKey || e.metaKey || e.ctrlKey)}
             >
-              <span>#{tagOf(p)}</span><em className="mono">{open(p.id)}</em>
+              <FolderGlyph cls={`s-${p.space}`} /><span>{p.name}</span><em className="mono">{open(p.id)}</em>
             </button>
           </span>
         )
       })}
       <button className={`pstrip-item${sel.includes(UNSORTED) ? ' is-on' : ''}`} aria-pressed={sel.includes(UNSORTED)} onClick={(e) => onPick(UNSORTED, touch || e.shiftKey || e.metaKey || e.ctrlKey)}>
-        <span>Untagged</span><em className="mono">{tasks.filter((t) => !t.projectId && !t.done && inScope(t)).length}</em>
+        <FolderGlyph cls="f-unsorted" /><span>Unsorted</span><em className="mono">{tasks.filter((t) => !t.projectId && !t.done && inScope(t)).length}</em>
       </button>
       <button className="pstrip-item pstrip-manage" onClick={onManage} aria-label="Manage projects"><Icon.FolderAdd size={15} /></button>
     </div>
@@ -505,11 +516,11 @@ function PhoneProjectFilter({ projects, tasks, sel, inScope, onAll, onPick, onMa
       <button role="menuitem" aria-checked={sel.length === 0} onClick={onAll}>All <em className="mono plan-proj-n">{total}</em></button>
       {projects.map((p) => (
         <button key={p.id} role="menuitem" aria-checked={sel.includes(p.id)} onClick={() => onPick(p.id, true)}>
-          <span>#{tagOf(p)}</span><em className="mono plan-proj-n">{open(p.id)}</em>
+          <FolderGlyph cls={`s-${p.space}`} /><span>{p.name}</span><em className="mono plan-proj-n">{open(p.id)}</em>
         </button>
       ))}
       <button role="menuitem" aria-checked={sel.includes(UNSORTED)} onClick={() => onPick(UNSORTED, true)}>
-        <span>Untagged</span><em className="mono plan-proj-n">{tasks.filter((t) => !t.projectId && !t.done && inScope(t)).length}</em>
+        <FolderGlyph cls="f-unsorted" /><span>Unsorted</span><em className="mono plan-proj-n">{tasks.filter((t) => !t.projectId && !t.done && inScope(t)).length}</em>
       </button>
       <span className="kebab-sep" />
       <button role="menuitem" onClick={onManage}>Manage projects</button>

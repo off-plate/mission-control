@@ -8,7 +8,7 @@ import { useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { SPACE_LABELS } from './exceptions'
 import { useStore } from './store'
 import { SpaceMark } from './ui'
-import { activeTag, cleanTag, matchProjects, tagOf } from './tags'
+import { activeTag, cleanTag, matchProjects, tagOf, toneOf } from './tags'
 import type { Project, SpaceId } from './types'
 
 type Opt = { kind: 'project'; p: Project } | { kind: 'create'; name: string; tag: string }
@@ -24,7 +24,7 @@ export function TagField({ value, onChange, onSubmit, projects, createSpace, id,
   createSpace: SpaceId
   id?: string; placeholder?: string; label: string; autoFocus?: boolean
 }) {
-  const { addProject, setProjectTag } = useStore()
+  const { addProject, setProjectTag, projects: all } = useStore()
   const ref = useRef<HTMLInputElement>(null)
   const [caret, setCaret] = useState(0)
   const [hi, setHi] = useState(0)
@@ -108,7 +108,7 @@ export function TagField({ value, onChange, onSubmit, projects, createSpace, id,
               {o.kind === 'project' ? (
                 <>
                   <SpaceMark space={o.p.space} always />
-                  <b>#{tagOf(o.p)}</b>
+                  <b className={`tt${toneOf(o.p, all)}`}>#{tagOf(o.p)}</b>
                   <span className="tagpop-name">{o.p.name}</span>
                 </>
               ) : (

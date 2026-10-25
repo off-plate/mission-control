@@ -83,3 +83,11 @@ surface dark — each earned its own case:
   active-state fill silently goes near-invisible (~1.5:1), which is exactly
   what happened to the active nav tab and the active Habits/Goals toggle
   until fixed 2026-09-04.
+
+## Project tag tones (2026-10-25)
+
+A task's `#hashtag` is coloured by its project so related tasks can be spotted
+at a glance (his ask). Six quiet text tones, `.tt0` to `.tt5` in styles.css:
+denim, teal, rust, bronze, wine, slate. Text only, never a fill or a border,
+each at 4.5:1 or better on the card. None is green, coral, amber or violet, so
+a tag never borrows a functional meaning. Folders keep their workspace colour.

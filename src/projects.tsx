@@ -24,7 +24,8 @@ function Folder({ cls, name, tag, waiting, total, sheets, onOpen, menu }: {
       {top.map((t, i) => <div key={t.id} className={`f-paper p${i + 1 + 3 - top.length}`} aria-hidden="true">{t.title}</div>)}
       <div className="f-front" aria-hidden="true">
         <h3>{name}</h3>
-        <div className="proj-stats">{tag && <span className="f-tag">#{tag}</span>}<span><b>{waiting}</b> waiting</span><span><b>{total}</b> total</span></div>
+        {tag && <span className="f-tag">#{tag}</span>}
+        <div className="proj-stats"><span><b>{waiting}</b> waiting</span><span><b>{total}</b> total</span></div>
       </div>
       {menu}
     </div>

@@ -19,7 +19,7 @@ import { useStore } from './store'
 import { isoWeekKey, localDateKey } from './util'
 import type { Project, SpaceId, Task, ViewId } from './types'
 import * as Icon from './icons'
-import { tagOf } from './tags'
+import { tagOf, toneOf } from './tags'
 
 
 /* A field that grows with what you type, up to a ceiling, then scrolls. Dragging
@@ -289,11 +289,13 @@ export function ProjectMark({ project }: { project?: Project }) {
  *  replacing the lettered badge on task rows). Clickable where a caller can
  *  filter by it; plain text everywhere else. */
 export function TagMark({ project, onPick }: { project?: Project; onPick?: (p: Project) => void }) {
+  const { projects } = useStore()
   if (!project) return null
   const tag = `#${tagOf(project)}`
+  const cls = `tagmark tt${toneOf(project, projects)}`
   return onPick
-    ? <button type="button" className="tagmark" title={`Show only ${project.name}`} onClick={(e) => { e.stopPropagation(); onPick(project) }}>{tag}</button>
-    : <span className="tagmark" title={project.name}>{tag}</span>
+    ? <button type="button" className={cls} title={`Show only ${project.name}`} onClick={(e) => { e.stopPropagation(); onPick(project) }}>{tag}</button>
+    : <span className={cls} title={project.name}>{tag}</span>
 }
 
 /** The mark for a task row: its workspace, plus its project when it has one.

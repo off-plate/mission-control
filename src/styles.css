@@ -11325,7 +11325,16 @@ body:has(.shell.is-hud) { --st-research: #9AA3B0; --st-build: #A592CC; --st-reac
   white-space: nowrap; cursor: default;
 }
 button.tagmark { cursor: pointer; border-radius: 3px; }
-button.tagmark:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+button.tagmark:hover { text-decoration: underline; text-underline-offset: 3px; }
+/* Six tag tones (his ask, 2026-10-25), text only: quiet, dark enough for
+   4.5:1 on the card, and none of them green, coral, amber or violet, so a
+   tag never reads as progress, debt or a warning. See COLOR.md. */
+.tt0 { color: oklch(0.47 0.09 255) !important; } /* denim */
+.tt1 { color: oklch(0.47 0.07 195) !important; } /* teal */
+.tt2 { color: oklch(0.48 0.09 45) !important; }  /* rust */
+.tt3 { color: oklch(0.48 0.07 80) !important; }  /* bronze */
+.tt4 { color: oklch(0.45 0.09 5) !important; }   /* wine */
+.tt5 { color: oklch(0.45 0.025 240) !important; } /* slate */
 button.tagmark:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
 
 /* The add box and its list. The list opens under the field, left aligned
@@ -11337,10 +11346,21 @@ button.tagmark:focus-visible { outline: 2px solid var(--accent-text); outline-of
 .tagpop button b { font-weight: 600; color: var(--ink); }
 .tagpop .tagpop-name { color: var(--muted); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .tagpop button.is-hi { background: var(--accent-wash); }
-.tagpop button.is-hi b { color: var(--accent-text); }
 .tagpop .spacemark { flex: none; }
 
 .pstrip-tag span { font-weight: 600; }
-.folder .proj-stats .f-tag { font-weight: 600; color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The tag gets its own line between name and counts (his report, 2026-10-25:
+   squeezed into the counts row it truncated, wrapped "waiting" and pushed the
+   name into the folder's top edge). The folder grows 16px to hold the third
+   line, so the name sits exactly where it did. Tagless folders grow too, so a
+   row of folders keeps one height. */
+.folder { height: 166px; }
+.folder .f-front { height: 120px; }
+.folder .f-tag { display: block; margin: 0 0 6px; font-size: 0.8125rem; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.folder .proj-stats { white-space: nowrap; }
 .f-tag-note { margin: var(--s2) 0 0; font-size: var(--text-sm); color: var(--muted); }
 .f-tag-note b { color: var(--ink); font-weight: 600; }
+
+/* On Today the title truncates, the tag never does: it sits beside the
+   title (gap 12px pulled to 6px) so a long title gives way, not the tag. */
+.tr-r > .tagmark { flex: none; margin-left: -6px; max-width: 45%; overflow: hidden; text-overflow: ellipsis; }

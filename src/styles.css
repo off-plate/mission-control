@@ -11364,3 +11364,18 @@ button.tagmark:focus-visible { outline: 2px solid var(--accent-text); outline-of
 /* On Today the title truncates, the tag never does: it sits beside the
    title (gap 12px pulled to 6px) so a long title gives way, not the tag. */
 .tr-r > .tagmark { flex: none; margin-left: -6px; max-width: 45%; overflow: hidden; text-overflow: ellipsis; }
+
+/* NOTES, ONE LIST (2026-10-25). The folder column is gone: the list and the
+   note share the row. 16px of air under the header (it sat flush against it),
+   and the height comes from NotesPage measuring where the app starts, so the
+   app reaches the bottom of the window instead of stopping 46px short. */
+.nt-app { grid-template-columns: 372px minmax(0, 1fr); margin-top: var(--s4); border-top-color: var(--hairline); }
+@media (max-width: 1179px) { .nt-app { grid-template-columns: 320px minmax(0, 1fr); } }
+@media (max-width: 999px) { .nt-app { grid-template-columns: minmax(0, 1fr); margin-top: var(--s2); } }
+.nt-hidedone {
+  flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--text-sm); color: var(--muted); cursor: pointer; user-select: none; white-space: nowrap;
+}
+.nt-hidedone input { width: 16px; height: 16px; margin: 0; accent-color: var(--a-accent-text); cursor: pointer; }
+.nt-hidedone:hover { color: var(--ink); }
+.nt-listhead .nt-sortkebab { margin-left: 0; }

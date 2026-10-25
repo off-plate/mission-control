@@ -1089,38 +1089,22 @@ await step('mundi opus: leaving the zone does not stop the music, and the corner
   if ((await page.locator('.zplayer-title').innerText()) !== trackAfterCornerSkip) throw new Error('the zone and the dock disagree about what is playing')
 })
 
-await step('notes: folders are folders, with no workspace above them', async () => {
+await step('notes: one list, no folders, done hidden by default', async () => {
+  /* His ask (2026-10-25): no folders on the Notes page, only All notes, with
+     "Hide done" ticked by default. */
   await fresh('notes')
-  const names = await page.locator('.nt-side .nt-fname').allInnerTexts()
-  if (names[0] !== 'All notes') throw new Error(`the rail opens with ${names[0]}`)
-  for (const space of ['Personal', 'Big Time', 'Off-Plate', 'Michael’s Corner']) {
-    if (names.includes(space)) throw new Error(`${space} is still a row in the folder rail`)
-  }
-  if (!names.includes('Brain dumps')) throw new Error('his own folders are missing from the flat rail')
-  // The list opens on everything, not on the workspace he happens to be in.
+  if (await page.locator('.nt-side').count()) throw new Error('the folder column is still there')
   if ((await page.locator('.nt-listhead h1').innerText()) !== 'All notes') throw new Error('notes did not open on All notes')
-  // A folder he makes lands in the same flat list.
-  await page.getByRole('button', { name: /New folder/ }).click()
-  await page.locator('.nt-rename').fill('Gate folder')
-  await page.keyboard.press('Enter'); await page.waitForTimeout(500)
-  const after = await page.locator('.nt-side .nt-fname').allInnerTexts()
-  if (!after.includes('Gate folder')) throw new Error('the folder he made is not in the rail')
-
-  /* Filing must not move a note between workspaces. It used to: a note adopted
-     its folder's space, so a folder made while standing in one workspace
-     quietly reassigned everything dropped into it. */
-  await page.getByRole('button', { name: 'New note' }).click(); await page.waitForTimeout(300)
-  await page.locator('textarea[aria-label="Note title"]').fill('Gate filing'); await page.waitForTimeout(400)
-  const readNote = async () => (await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)).notes.find((n) => n.title === 'Gate filing')
-  const was = (await readNote()).space
-  /* It was written inside Gate folder, so the move that proves the point is
-     the one out of it. */
-  await page.locator('.nt-kebab button').first().click(); await page.waitForTimeout(200)
-  await page.getByRole('menuitem', { name: 'No folder' }).click(); await page.waitForTimeout(500)
-  const now = await readNote()
-  if (!now) throw new Error('the note vanished when it was filed')
-  if (now.space !== was) throw new Error(`filing moved the note from ${was} to ${now.space}`)
+  if (!(await page.getByRole('checkbox', { name: 'Hide done' }).isChecked())) throw new Error('Hide done is not ticked by default')
+  // The app starts 8px+ under the header and reaches the bottom of the window.
+  const m = await page.evaluate(() => {
+    const h = document.querySelector('.topstick, header').getBoundingClientRect(), a = document.querySelector('.nt-app').getBoundingClientRect()
+    return { gap: a.top - h.bottom, short: innerHeight - a.bottom }
+  })
+  if (m.gap < 8) throw new Error(`the notes sit ${Math.round(m.gap)}px under the header`)
+  if (Math.abs(m.short) > 1) throw new Error(`the notes stop ${Math.round(m.short)}px short of the window`)
 })
+
 await step('today: the room says the real minute, the real weekday, and the band does not', async () => {
   await fresh('today')
   /* This asserted a `.clockw` widget sitting leftmost in the react-grid on
@@ -1858,7 +1842,6 @@ await step('sync: typing a note fast never accuses your own device', async () =>
      pushes rolled the older body off the end of its own history and the merge
      read it as a stranger. Typed here at 90 characters, well past the cap. */
   await fresh('notes')
-  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(300)
   await page.getByRole('button', { name: 'New note' }).click(); await page.waitForTimeout(300)
   await page.locator('textarea[aria-label="Note title"]').fill('Johny meeting')
   await page.locator('.nt-editor').click()
@@ -1880,7 +1863,6 @@ await step('sync: typing a note fast never accuses your own device', async () =>
 
   // And end to end: reload, which boots through the merge, and no banner.
   await page.reload(); await page.waitForTimeout(900)
-  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(300)
   await page.locator('.nt-row', { hasText: 'Johny meeting' }).first().click(); await page.waitForTimeout(500)
   if (await page.locator('.nt-conflict').count()) throw new Error('a note typed on one device only still shows the another-device banner')
   const kept = await page.evaluate((K) => (JSON.parse(localStorage.getItem(K)).notes ?? []).find((n) => n.title === 'Johny meeting'), KEY)
@@ -2617,11 +2599,8 @@ await step('habits: a monthly review done last week does not read as done today'
      (2026-09-28); Today's widget above still carries the check. */
 })
 
-await step('notes: brain dumps came across, and search reaches every folder', async () => {
+await step('notes: brain dumps came across, and search reaches every note', async () => {
   await fresh('notes')
-  const bin = page.locator('.nt-folder', { hasText: 'Brain dumps' }).first()
-  if (!(await bin.count())) throw new Error('no Brain dumps folder')
-  await bin.click(); await page.waitForTimeout(200)
   if (!(await page.locator('.nt-row', { hasText: 'Rubber band' }).count())) throw new Error('the board did not come across')
   // write one, in Czech, with a tag. A new note starts in its title.
   await page.getByRole('button', { name: 'New note' }).click(); await page.waitForTimeout(300)
@@ -2632,9 +2611,7 @@ await step('notes: brain dumps came across, and search reaches every folder', as
   const mine = (saved.notes ?? []).find((n) => n.title.startsWith('Zavolat'))
   if (!mine) throw new Error('the note was not saved')
   if (!mine.body.includes('Druhý řádek')) throw new Error('the body was not saved with the title')
-  if (mine.folderId !== 'nf-braindump-personal') throw new Error(`landed in ${mine.folderId}`)
   // back to the list, stand somewhere else, then search without the accents
-  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(200)
   await page.locator('input[aria-label="Search notes"]').fill('ukol'); await page.waitForTimeout(400)
   if (!(await page.locator('.nt-row', { hasText: 'Zavolat' }).count())) throw new Error('accent-blind search missed it')
   await page.locator('input[aria-label="Search notes"]').fill(''); await page.waitForTimeout(200)
@@ -2643,7 +2620,7 @@ await step('notes: brain dumps came across, and search reaches every folder', as
   if (rows !== 1) throw new Error(`the tag filter showed ${rows} notes`)
 })
 
-await step('notes: All notes, date groups, and the folder on every row', async () => {
+await step('notes: All notes and date groups', async () => {
   await fresh('notes')
   await page.evaluate((K) => {
     const s = JSON.parse(localStorage.getItem(K))
@@ -2666,7 +2643,6 @@ await step('notes: All notes, date groups, and the folder on every row', async (
   }, KEY)
   await page.reload(); await page.waitForTimeout(800)
   // one row that gathers every workspace, above the folders
-  await page.locator('.nt-folder', { hasText: 'All notes' }).click(); await page.waitForTimeout(500)
   /* Against the store rather than a hardcoded number: a fresh profile may carry
      a seeded note of its own, and the point is that ALL of them are gathered. */
   const stored = await page.evaluate((K) => (JSON.parse(localStorage.getItem(K)).notes ?? []).length, KEY)
@@ -2689,7 +2665,6 @@ await step('notes: All notes, date groups, and the folder on every row', async (
      to walk back to All notes before it measures anything. */
   await page.evaluate(() => localStorage.removeItem('mc:notes-pinshut'))
   await page.reload(); await page.waitForTimeout(800)
-  await page.locator('.nt-folder', { hasText: 'All notes' }).click(); await page.waitForTimeout(400)
   // the headings are headings, not captions, and each carries its own rule
   const g = await page.evaluate(() => {
     const h = document.querySelector('.nt-grouphead')
@@ -2698,9 +2673,6 @@ await step('notes: All notes, date groups, and the folder on every row', async (
   })
   if (g.size < 15) throw new Error(`group headings are ${g.size}px`)
   if (g.rule === '0px') throw new Error('no rule under the group heading')
-  // every row says which folder it is in, not only in a search
-  const tails = await page.locator('.nt-row .nt-rowtail').allTextContents()
-  if (tails.length !== rows || tails.some((t) => !t.trim())) throw new Error(`a row does not say its folder: ${tails.join(' | ')}`)
   // and the count in the head is the count in the list
   const head = (await page.locator('.nt-headcount').textContent()) ?? ''
   if (!head.startsWith(`${rows} note`)) throw new Error(`the head says "${head}" over ${rows} rows`)
@@ -2732,58 +2704,6 @@ await step('notes: All notes, date groups, and the folder on every row', async (
   if (await page.evaluate(() => localStorage.getItem('mc:notes-sort')) !== 'title') throw new Error('the sort was not remembered')
 })
 
-await step('notes: the folder panel is one list at one size', async () => {
-  /* Apple's sidebar, on his instruction: every folder row the same height and
-     the same type, and ONE New folder control rather than one per workspace. */
-  await fresh('notes')
-  const m = await page.evaluate(() => {
-    const rows = [...document.querySelectorAll('.nt-folder')]
-    return {
-      rows: rows.length,
-      heights: [...new Set(rows.map((r) => Math.round(r.getBoundingClientRect().height)))],
-      sizes: [...new Set(rows.map((r) => getComputedStyle(r).fontSize))],
-      families: [...new Set(rows.map((r) => getComputedStyle(r).fontFamily))],
-      adders: document.querySelectorAll('.nt-newfolder').length,
-    }
-  })
-  if (m.rows < 2) throw new Error('the folder panel did not render')
-  if (m.heights.length !== 1) throw new Error(`folder rows are ${m.heights.join(', ')}px tall`)
-  if (m.heights[0] < 38) throw new Error(`folder rows are only ${m.heights[0]}px tall`)
-  if (m.sizes.length !== 1 || m.families.length !== 1) throw new Error(`mixed type in the folder list: ${m.sizes.join(', ')} / ${m.families.join(' | ')}`)
-  if (m.adders !== 1) throw new Error(`${m.adders} New folder controls`)
-})
-
-await step('notes: a folder he made, and its notes surviving its deletion', async () => {
-  await fresh('notes')
-  // One flat rail: All notes at the top, then every folder he made. One New
-  // folder control at the foot, and it no longer names a workspace.
-  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(300)
-  await page.locator('.nt-newfolder').click()
-  await page.locator('input[aria-label="New folder"]').fill('Taxes')
-  await page.keyboard.press('Enter'); await page.waitForTimeout(400)
-  await page.getByRole('button', { name: 'New note' }).click(); await page.waitForTimeout(300)
-  await page.locator('textarea[aria-label="Note title"]').fill('Do not lose me'); await page.waitForTimeout(400)
-  let s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
-  const f = (s.noteFolders ?? []).find((x) => x.name === 'Taxes')
-  if (!f) throw new Error('the folder was not created')
-  const wrote = (s.notes ?? []).find((n) => n.title === 'Do not lose me')
-  if (wrote?.folderId !== f.id) throw new Error('the note did not land in the new folder')
-  // Filing must not move a note between workspaces. It used to: the note
-  // adopted its folder's space, so a folder made in one workspace reassigned
-  // everything dropped into it.
-  // deleting the shelf must not burn the books
-  await page.locator('.nt-folder-row', { hasText: 'Taxes' }).getByRole('button', { name: /options/i }).click()
-  await page.getByRole('menuitem', { name: /Delete folder/ }).click(); await page.waitForTimeout(500)
-  s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
-  if ((s.noteFolders ?? []).some((x) => x.id === f.id)) throw new Error('the folder is still there')
-  const after = (s.notes ?? []).find((n) => n.title === 'Do not lose me')
-  if (!after) throw new Error('the note went with the folder')
-  // Out of the deleted folder and into no folder, which is the note's own
-  // space marker. Which space that is depends on where he was standing when he
-  // wrote it, and is no longer visible anywhere in the page.
-  if (!/^nf-space-/.test(after.folderId ?? '')) throw new Error(`the note ended up in ${after.folderId}`)
-})
-
 await step('notes: a body from another device is kept, never dropped', async () => {
   await page.goto(URL); await page.waitForTimeout(300)
   await page.evaluate((K) => {
@@ -2798,7 +2718,6 @@ await step('notes: a body from another device is kept, never dropped', async () 
   await page.goto(`${URL}#/notes`); await page.reload(); await page.waitForTimeout(700)
   // An earlier step left the workspace switcher somewhere else, and the switcher
   // is what decides which folder opens. Stand in Personal first.
-  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(200)
   await page.locator('.nt-row', { hasText: 'Laptop version' }).first().click(); await page.waitForTimeout(200)
   if (!(await page.locator('.nt-conflict').count())) throw new Error('the other version was not shown')
   await page.getByRole('button', { name: 'Add it to this note' }).click(); await page.waitForTimeout(400)
@@ -2835,7 +2754,6 @@ await step('notes: the editor formats as he types, and the marks survive a reloa
      works, and a checkbox is something you click. All of it round-trips
      through markdown, which is what the sync and the search read. */
   await fresh('notes')
-  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(300)
   await page.getByRole('button', { name: 'New note' }).click(); await page.waitForTimeout(300)
   await page.locator('textarea[aria-label="Note title"]').fill('Formatting')
   await page.locator('.nt-editor').click()
@@ -2855,7 +2773,6 @@ await step('notes: the editor formats as he types, and the marks survive a reloa
     if (!md.includes(want)) throw new Error(`${want} is not in the stored note: ${JSON.stringify(md)}`)
   }
   await page.reload(); await page.waitForTimeout(800)
-  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(400)
   await page.locator('.nt-row', { hasText: 'Formatting' }).first().click(); await page.waitForTimeout(400)
   if ((await page.locator('.nt-editor ul li').count()) < 3) throw new Error('the formatting did not come back after a reload')
   /* Tab nests the item and Shift-Tab lifts it back, and the nesting has to
@@ -2875,13 +2792,11 @@ await step('notes: the editor formats as he types, and the marks survive a reloa
   const nested = await page.evaluate((K) => (JSON.parse(localStorage.getItem(K)).notes ?? []).find((n) => n.title === 'Formatting')?.body ?? '', KEY)
   if (!/\n {2}- .*child/.test(nested)) throw new Error(`the nested item was not stored indented: ${JSON.stringify(nested.split('\n').slice(-3))}`)
   await page.reload(); await page.waitForTimeout(800)
-  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(400)
   await page.locator('.nt-row', { hasText: 'Formatting' }).first().click(); await page.waitForTimeout(400)
   if (!(await page.locator('.nt-editor li > ul li').count())) throw new Error('the nesting did not come back after a reload')
 })
 await step('notes: /help with no key hands his request back rather than losing it', async () => {
   await fresh('notes')
-  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(300)
   await page.getByRole('button', { name: 'New note' }).click(); await page.waitForTimeout(300)
   await page.locator('textarea[aria-label="Note title"]').fill('Help gate')
   await page.locator('.nt-editor').click()
@@ -2906,7 +2821,6 @@ await step('notes: /help drafts through Groq, and cites what it actually searche
       body: JSON.stringify({ choices: [{ message: { content: 'Oat milk foams well and works in coffee.\n\nSources:\nOat milk basics: https://example.com/oat-milk' } }] }),
     })
   })
-  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(300)
   await page.getByRole('button', { name: 'New note' }).click(); await page.waitForTimeout(300)
   await page.locator('textarea[aria-label="Note title"]').fill('Help gate 2')
   await page.locator('.nt-editor').click()
@@ -2926,7 +2840,6 @@ await step('notes: /help drafts through Groq, and cites what it actually searche
 
 await step('notes: three dashes make a divider, and a table he sized himself', async () => {
   await fresh('notes')
-  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(300)
   await page.getByRole('button', { name: 'New note' }).click(); await page.waitForTimeout(300)
   await page.locator('textarea[aria-label="Note title"]').fill('Divider and table')
   await page.locator('.nt-editor').click()
@@ -2953,7 +2866,6 @@ await step('notes: three dashes make a divider, and a table he sized himself', a
   if (!md.includes('---')) throw new Error(`no divider stored: ${JSON.stringify(md)}`)
   if (!/\| Věřitel \|/.test(md)) throw new Error(`the cell text was not stored: ${JSON.stringify(md)}`)
   await page.reload(); await page.waitForTimeout(800)
-  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(300)
   await page.locator('.nt-row', { hasText: 'Divider and table' }).first().click(); await page.waitForTimeout(400)
   if (!(await page.locator('.nt-editor hr').count())) throw new Error('the divider did not come back')
   if ((await page.locator('.nt-editor table tr').count()) < 4) throw new Error('the table did not come back whole')
@@ -3021,31 +2933,24 @@ await step('habits: the Compass link survived the move onto its habit', async ()
   const link = page.getByRole('link', { name: /Compass/ })
   if (!(await link.count())) throw new Error('the Compass link does not render on the habit row')
 })
-await step('notes: the columns drag, and nothing jumps when a folder is clicked', async () => {
+await step('notes: the list column drags, and the width is remembered', async () => {
   await fresh('notes')
-  const before = (await page.locator('.nt-side').boundingBox()).width
+  const before = (await page.locator('.nt-list').boundingBox()).width
   const g = await page.locator('.nt-grip').first().boundingBox()
   await page.mouse.move(g.x + 5, g.y + 200)
   await page.mouse.down()
   await page.mouse.move(g.x + 125, g.y + 200, { steps: 8 })
   await page.mouse.up(); await page.waitForTimeout(300)
-  const after = (await page.locator('.nt-side').boundingBox()).width
-  if (after - before < 80) throw new Error(`the sidebar went ${Math.round(before)} -> ${Math.round(after)}`)
+  const after = (await page.locator('.nt-list').boundingBox()).width
+  if (after - before < 80) throw new Error(`the list went ${Math.round(before)} -> ${Math.round(after)}`)
   await page.reload(); await page.waitForTimeout(800)
-  if (Math.abs((await page.locator('.nt-side').boundingBox()).width - after) > 3) throw new Error('the width was not remembered')
-  // a folder row must not change shape when it becomes the open one
-  const row = page.locator('.nt-folder-row').nth(1)
-  const a = await row.locator('.nt-folder').boundingBox()
-  await row.locator('.nt-folder').click(); await page.waitForTimeout(300)
-  const c = await row.locator('.nt-folder').boundingBox()
-  if (Math.abs(a.width - c.width) > 1 || Math.abs(a.x - c.x) > 1) throw new Error('the row shifted when it was selected')
+  if (Math.abs((await page.locator('.nt-list').boundingBox()).width - after) > 3) throw new Error('the width was not remembered')
 })
 
 await step('notes: the note menu opens where it can be reached', async () => {
   await fresh('notes')
   // An earlier step left the workspace switcher elsewhere; stand where the
   // seeded note actually is, or there is no open note to have a menu.
-  await page.locator('.nt-folder', { hasText: 'All notes' }).first().click(); await page.waitForTimeout(400)
   await page.locator('.nt-pane').getByRole('button', { name: 'Note options' }).click(); await page.waitForTimeout(300)
   if (!(await page.locator('.nt-pane .kebab-menu').count())) throw new Error('the menu did not open')
   const m = await page.locator('.nt-pane .kebab-menu').boundingBox()
@@ -3139,32 +3044,26 @@ await step('apps: opening one from More frames it, Escape leaves for Today, brow
   if (back.hash !== '#/today') throw new Error(`Escape left the app on ${back.hash}, not Today`)
 })
 
-await step('notes: ticking one files it under Done and takes it out of the folder', async () => {
+await step('notes: ticking one hides it, and unticking Hide done brings it back', async () => {
   await fresh('notes')
   const before = await page.evaluate(() => document.querySelectorAll('.nt-row').length)
   if (!before) throw new Error('no notes to tick')
   const title = await page.evaluate(() => document.querySelector('.nt-rowname')?.textContent.trim())
   await page.locator('.nt-tick').first().click()
   await page.waitForTimeout(500)
-  const after = await page.evaluate(() => ({
-    rows: document.querySelectorAll('.nt-row').length,
-    doneChip: [...document.querySelectorAll('.nt-fname')].some((el) => el.textContent.trim() === 'Done'),
-  }))
-  if (after.rows !== before - 1) throw new Error(`list went ${before} -> ${after.rows}; a ticked note must leave the list`)
-  if (!after.doneChip) throw new Error('no Done folder appeared')
-  // and it is in Done, struck through, and can come back
-  await page.evaluate(() => { [...document.querySelectorAll('.nt-folder')].find((b) => b.textContent.includes('Done'))?.click() })
-  await page.waitForTimeout(400)
-  const inDone = await page.evaluate((t) => {
+  const rows = await page.evaluate(() => document.querySelectorAll('.nt-row').length)
+  if (rows !== before - 1) throw new Error(`list went ${before} -> ${rows}; a ticked note must leave the list`)
+  await page.getByRole('checkbox', { name: 'Hide done' }).uncheck(); await page.waitForTimeout(400)
+  const shown = await page.evaluate((t) => {
     const row = [...document.querySelectorAll('.nt-row')].find((r) => r.textContent.includes(t))
     return { found: !!row, struck: row ? getComputedStyle(row.querySelector('.nt-rowname')).textDecorationLine.includes('line-through') : false }
   }, title)
-  if (!inDone.found) throw new Error('the ticked note is not in Done')
-  if (!inDone.struck) throw new Error('the done note does not read as done')
-  await page.locator('.nt-tick.on').first().click()
-  await page.waitForTimeout(500)
-  const restored = await page.evaluate(() => document.querySelectorAll('.nt-row').length)
-  if (restored !== 0) throw new Error('un-ticking did not take it out of Done')
+  if (!shown.found) throw new Error('unticking Hide done did not show the done note')
+  if (!shown.struck) throw new Error('the done note does not read as done')
+  await page.locator('.nt-tick.on').first().click(); await page.waitForTimeout(400)
+  await page.getByRole('checkbox', { name: 'Hide done' }).check(); await page.waitForTimeout(400)
+  const back = await page.evaluate(() => document.querySelectorAll('.nt-row').length)
+  if (back !== before) throw new Error(`un-ticking the note did not bring it back (${back} of ${before})`)
 })
 
 /* ---------- The assistant, as a room with two halves ----------

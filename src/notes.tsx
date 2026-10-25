@@ -12,13 +12,13 @@
    survives the blob merge, gets searched and gets hashed for the conflict
    check; src/richtext.ts is the hinge, and its round trip is tested. */
 
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AutoTextarea, Dropdown } from './ui'
 import { useStore } from './store'
 import { MeetingPrompt } from './meetingprompt'
 import { fmtWhen, localDateKey } from './util'
 import { htmlToMd, mdToHtml } from './richtext'
-import { spaceFolderId, type Note, type SpaceId } from './types'
+import { spaceFolderId, type Note } from './types'
 import { helpWithNote, type HelpResult } from './notesai'
 import * as Icon from './icons'
 
@@ -30,11 +30,6 @@ const NOTE_COLORS: { id: string; bg: string; label: string }[] = [
   { id: 'clay', bg: '#e4d8cb', label: 'Clay' },
   { id: 'paper', bg: '#fbf8f1', label: 'Paper' },
 ]
-/** The folder mark, filled when it is the one he is standing in. */
-function FolderIcon({ open, small }: { open?: boolean; small?: boolean }) {
-  return <Icon.Folder size={small ? 11 : 14} filled={open} className={`nt-ficon${open ? ' on' : ''}`} />
-}
-
 
 const TAG_RE = /#[\p{L}\d_/-]+/gu
 const tagsOf = (t: string) => (t.match(TAG_RE) ?? []).map((x) => x.toLowerCase())
@@ -730,11 +725,7 @@ function TablePicker({ onPick }: { onPick: (rows: number, cols: number) => void 
 
 /* ---- the page ------------------------------------------------------------ */
 
-/** Everything, everywhere, the way All iCloud sits above the folders. */
-const ALL = 'nf-all'
-/* Not a real folder: nothing is filed into it and it cannot be renamed or
-   deleted. A note is in Done because it is ticked, and nowhere else while it is. */
-const DONE = 'nf-done'
+const HIDE_DONE_KEY = 'mc:notes-hidedone'
 const SORT_KEY = 'mc:notes-sort'
 const PIN_KEY = 'mc:notes-pinshut'
 const FOCUS_KEY = 'mc:notes-only'
@@ -768,17 +759,19 @@ const readCols = (): { side: number; list: number } => {
 
 export function NotesPage() {
   const {
-    notes, noteFolders, view, space, addNote, updateNote, moveNote, deleteNote,
-    addNoteFolder, renameNoteFolder, deleteNoteFolder, renameNoteTag,
+    notes, space, addNote, updateNote, deleteNote, renameNoteTag,
     keepNoteConflict, dropNoteConflict, addTask, setPage, setNoteDone,
     noteToOpen, openNote,
   } = useStore()
 
-  /* Notes are not filed by workspace any more, on his instruction: folders are
-     just folders, and the app opens on all of them. A note still carries the
-     space it was written in, because other pages read it, but nothing here is
-     decided by which workspace he happens to be standing in. */
-  const [openFolder, setOpenFolder] = useState<string>(ALL)
+  /* ONE LIST (his ask, 2026-10-25): no folders on this page any more, only
+     every note, with done ones hidden unless he unticks "Hide done". A note
+     still carries its folderId and space underneath, because the Obsidian
+     mirror and other pages read them; nothing here shows or changes them. */
+  const [hideDone, setHideDone] = useState(() => {
+    try { return localStorage.getItem(HIDE_DONE_KEY) !== '0' } catch { return true }
+  })
+  useEffect(() => { try { localStorage.setItem(HIDE_DONE_KEY, hideDone ? '1' : '0') } catch { /* quota */ } }, [hideDone])
   const [openId, setOpenId] = useState<string | null>(null)
   /* A note the handoff below just opened, briefly. Same flash-then-fade the
      habit folders use, so a note landing in a list of many is easy to pick
@@ -788,7 +781,6 @@ export function NotesPage() {
   const [tag, setTag] = useState<string | null>(null)
   const [searching, setSearching] = useState(false)
   const [fresh, setFresh] = useState<string | null>(null)
-  const [naming, setNaming] = useState<{ space?: SpaceId; folder?: string; value: string } | null>(null)
   const [pinShut, setPinShut] = useState(() => {
     try { return localStorage.getItem(PIN_KEY) === '1' } catch { return false }
   })
@@ -799,6 +791,22 @@ export function NotesPage() {
   })
   useEffect(() => { try { localStorage.setItem(SORT_KEY, sort) } catch { /* quota */ } }, [sort])
   const [cols, setCols] = useState(readCols)
+  /* The app fills the window from wherever it actually starts, measured,
+     instead of guessing the header's height (the old 116px guess left a strip
+     of dead page under it once the header changed). */
+  const appRef = useRef<HTMLDivElement>(null)
+  const [fitH, setFitH] = useState<number | null>(null)
+  useLayoutEffect(() => {
+    const fit = () => {
+      const el = appRef.current
+      if (!el) return
+      const top = el.getBoundingClientRect().top + window.scrollY
+      setFitH(Math.max(460, Math.round(window.innerHeight - top)))
+    }
+    fit()
+    window.addEventListener('resize', fit)
+    return () => window.removeEventListener('resize', fit)
+  }, [])
   const [vw, setVw] = useState(() => window.innerWidth)
   useEffect(() => {
     const on = () => setVw(window.innerWidth)
@@ -827,26 +835,6 @@ export function NotesPage() {
   }, [])
 
   const finding = query.trim().length > 0 || tag !== null
-  const spaceOf = (id: string) => id.match(/^nf-space-(.+)$/)?.[1] as SpaceId | undefined
-  /* A note that is in no folder of his own says so. It used to say the name of
-     the workspace it happened to be written in, which is exactly the filing he
-     asked to be rid of. */
-  const nameOf = (id: string) => {
-    if (id === ALL) return 'All notes'
-    if (id === DONE) return 'Done'
-    if (spaceOf(id)) return 'No folder'
-    return noteFolders.find((f) => f.id === id)?.name ?? 'No folder'
-  }
-  /* Done is a state, not a place: a ticked note keeps the folder it was filed
-     in, and simply stops appearing there until it is un-ticked. */
-  const inFolder = (n: Note, id: string) => {
-    if (id === DONE) return !!n.done
-    if (n.done) return false
-    if (id === ALL) return true
-    const s = spaceOf(id)
-    return s ? n.space === s : n.folderId === id
-  }
-
   /* Only worked out while the tag strip is on screen. It reads every note, and
      the notes change on every keystroke he types into one. */
   const tagsShown = searching || tag !== null
@@ -859,21 +847,16 @@ export function NotesPage() {
 
   const shown = useMemo(() => {
     const q = query.trim()
-    /* Searching inside Done searches Done. Searching anywhere else does not drag
-       ticked notes back into the results. */
-    const rows = finding
-      ? notes.filter((n) => (openFolder === DONE ? !!n.done : !n.done)
-        && (!tag || tagsOf(n.body).includes(tag)) && (!q || flat(n.body).includes(flat(q))))
-      : notes.filter((n) => inFolder(n, openFolder))
+    const rows = notes.filter((n) => (!hideDone || !n.done)
+      && (!tag || tagsOf(n.body).includes(tag)) && (!q || flat(n.body).includes(flat(q))))
     const by = sort === 'title'
       ? (a: Note, b: Note) => (headOf(a.body) || 'Untitled').localeCompare(headOf(b.body) || 'Untitled')
       : sort === 'created'
         ? (a: Note, b: Note) => (b.when > a.when ? 1 : b.when < a.when ? -1 : 0)
         : (a: Note, b: Note) => b.updatedAt - a.updatedAt
-    if (openFolder === DONE) return rows.sort((a, b) => (b.done ?? 0) - (a.done ?? 0))
     return rows.sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || by(a, b))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notes, finding, tag, query, openFolder, noteFolders, sort])
+  }, [notes, tag, query, hideDone, sort])
 
   /* Grouped the way a notes list has always been grouped: pinned first, then by
      date under real headings. A flat run of eighty rows has no shape and gives
@@ -881,8 +864,7 @@ export function NotesPage() {
   const groups = useMemo(() => {
     const out: { head: string; rows: Note[] }[] = []
     for (const n of shown) {
-      const head = n.done ? bucketOf(localDateKey(new Date(n.done)))
-        : n.pinned ? 'Pinned'
+      const head = n.pinned ? 'Pinned'
         : sort === 'title' ? (headOf(n.body) || 'U').slice(0, 1).toUpperCase()
           : bucketOf(sort === 'created' ? n.when : localDateKey(new Date(n.updatedAt)))
       const last = out[out.length - 1]
@@ -921,7 +903,7 @@ export function NotesPage() {
     if (!noteToOpen) return
     const n = notes.find((x) => x.id === noteToOpen)
     if (n && !shown.some((x) => x.id === n.id)) {
-      setOpenFolder(n.done ? DONE : (n.folderId ?? spaceFolderId(n.space)))
+      if (n.done) setHideDone(false)
       setQuery('')
       setTag(null)
     }
@@ -948,51 +930,19 @@ export function NotesPage() {
   const open = notes.find((n) => n.id === openId) ?? null
 
   const create = () => {
-    const id = addNote(finding || openFolder === ALL ? spaceFolderId(space) : openFolder)
+    const id = addNote(spaceFolderId(space))
     setOpenId(id)
     setFresh(id)
     window.scrollTo({ top: 0 })
   }
-  /* A folder still records a space, because the stored shape has one and a
-     migration would risk his notes for nothing. It is no longer shown, chosen
-     or meaningful in this page: every folder is listed in one flat rail. */
-  const newFolderIn: SpaceId = space
-  const goFolder = (id: string) => { setOpenFolder(id); setOpenId(null); setQuery(''); setTag(null) }
-
-  /* Every folder he made, in one list. Sorted by the order he dragged them
-     into, then by name, and never by which workspace they were created in. */
-  const folderList = useMemo(
-    () => [...noteFolders].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name)),
-    [noteFolders],
-  )
-
-  /* Every folder's count in one walk over the notes, rather than one walk per
-     folder on every render. */
-  const counts = useMemo(() => {
-    const c = new Map<string, number>()
-    for (const n of notes) {
-      if (n.done) { c.set(DONE, (c.get(DONE) ?? 0) + 1); continue }
-      if (n.folderId) c.set(n.folderId, (c.get(n.folderId) ?? 0) + 1)
-    }
-    return c
-  }, [notes])
-
-  const submitName = () => {
-    if (!naming) return
-    const v = naming.value.trim()
-    if (v && naming.space) { const id = addNoteFolder(naming.space, v); goFolder(id) }
-    if (v && naming.folder) renameNoteFolder(naming.folder, v)
-    setNaming(null)
-  }
-
   /* Columns he can drag. The widths live in localStorage, not in the synced
      state: how wide his sidebar is on this screen is not a fact about his life. */
-  const drag = (which: 'side' | 'list') => (e: React.PointerEvent) => {
+  const drag = (which: 'list') => (e: React.PointerEvent) => {
     e.preventDefault()
     const from = e.clientX
     const start = cols[which]
-    const lo = which === 'side' ? 150 : 240
-    const hi = which === 'side' ? 460 : 760
+    const lo = 240
+    const hi = 760
     const move = (ev: PointerEvent) => setCols((c) => ({ ...c, [which]: Math.max(lo, Math.min(hi, start + ev.clientX - from)) }))
     const up = () => {
       window.removeEventListener('pointermove', move)
@@ -1013,12 +963,6 @@ export function NotesPage() {
         addTask({ title: (headOf(n.body) || n.body).replace(TAG_RE, '').trim().slice(0, 120), source: 'mc', estimateMin: 0, space: n.space, list: 'backlog', category: 'deep' })
         setPage('plan')
       }}>Make it a task</button>
-      <span className="kebab-head">Move to</span>
-      {[{ id: spaceFolderId(n.space), name: 'No folder' }, ...folderList]
-        .filter((f) => f.id !== (n.folderId ?? spaceFolderId(n.space)))
-        .map((f) => (
-          <button key={f.id} role="menuitem" onClick={() => moveNote(n.id, f.id)}>{f.name}</button>
-        ))}
       <span className="kebab-head">Colour</span>
       <div className="nt-swatches" role="radiogroup" aria-label="Note colour">
         {NOTE_COLORS.map((c) => (
@@ -1041,86 +985,12 @@ export function NotesPage() {
   return (
     <div
       className={`nt-app${reading ? ' is-reading' : ''}${presenting ? ' is-presenting' : ''}`}
-      style={wide && !presenting ? { gridTemplateColumns: `${cols.side}px ${cols.list}px minmax(0, 1fr)` } : undefined}
+      ref={appRef}
+      style={{
+        ...(wide && !presenting ? { gridTemplateColumns: `${cols.list}px minmax(0, 1fr)` } : {}),
+        ...(!phone && fitH ? { height: fitH } : {}),
+      }}
     >
-      {/* ---- folders ----
-           Shaped after the Notes sidebar, on his instruction: one row per
-           folder at one size, the account row above its own folders, the count
-           right-aligned and quiet, and the folder mark filled and in the accent
-           on the one he is standing in. What went: four "New folder" buttons
-           scattered down the panel, which is four times the noise for a thing
-           he does once a month. There is one, at the foot, and it makes the
-           folder inside whichever workspace he is standing in. */}
-      <aside className="nt-side" aria-label="Folders">
-        <div className="nt-fscroll">
-          <div className="nt-group">
-            <div className={`nt-folder-row${!finding && openFolder === ALL ? ' on' : ''}`}>
-              <button className="nt-folder" aria-current={!finding && openFolder === ALL ? 'true' : undefined} onClick={() => goFolder(ALL)}>
-                <FolderIcon open={!finding && openFolder === ALL} />
-                <span className="nt-fname">All notes</span>
-                <span className="nt-count mono">{notes.length || ''}</span>
-              </button>
-              <span className="nt-slot" aria-hidden="true" />
-            </div>
-            {/* Only once there is something in it: an empty Done is a row that
-                asks a question nobody has. */}
-            {notes.some((n) => n.done) && (
-              <div className={`nt-folder-row${!finding && openFolder === DONE ? ' on' : ''}`}>
-                <button className="nt-folder" aria-current={!finding && openFolder === DONE ? 'true' : undefined} onClick={() => goFolder(DONE)}>
-                  <Icon.Check size={16} strokeWidth={2.2} className="nt-doneicon" />
-                  <span className="nt-fname">Done</span>
-                  <span className="nt-count mono">{counts.get(DONE)}</span>
-                </button>
-                <span className="nt-slot" aria-hidden="true" />
-              </div>
-            )}
-          </div>
-          {/* One flat list. It used to be four workspace sections with their own
-              folders nested inside, which meant a note's home depended on which
-              workspace was selected when he wrote it. He asked for that gone. */}
-          {folderList.map((f) => (naming?.folder === f.id ? (
-            <input
-              key={f.id} className="nt-rename textinput" autoFocus value={naming.value} aria-label={`Rename ${f.name}`}
-              onChange={(e) => setNaming({ ...naming, value: e.target.value })}
-              onBlur={submitName}
-              onKeyDown={(e) => { if (e.key === 'Enter') submitName(); if (e.key === 'Escape') setNaming(null) }}
-            />
-          ) : (
-            <div className={`nt-folder-row${!finding && openFolder === f.id ? ' on' : ''}`} key={f.id}>
-              <button className="nt-folder" aria-current={!finding && openFolder === f.id ? 'true' : undefined} onClick={() => goFolder(f.id)}>
-                <FolderIcon open={!finding && openFolder === f.id} />
-                <span className="nt-fname">{f.name}</span>
-                <span className="nt-count mono">{counts.get(f.id) || ''}</span>
-              </button>
-              <Dropdown label={`${f.name} options`} className="nt-fkebab">
-                <button role="menuitem" onClick={() => setNaming({ folder: f.id, value: f.name })}>Rename</button>
-                <button role="menuitem" className="danger" onClick={() => deleteNoteFolder(f.id)}>Delete folder, keep the notes</button>
-              </Dropdown>
-            </div>
-          )))}
-          {naming?.space && (
-            <input
-              className="nt-rename textinput" autoFocus value={naming.value} placeholder="Folder name…"
-              aria-label="New folder"
-              onChange={(e) => setNaming({ ...naming, value: e.target.value })}
-              onBlur={submitName}
-              onKeyDown={(e) => { if (e.key === 'Enter') submitName(); if (e.key === 'Escape') setNaming(null) }}
-            />
-          )}
-        </div>
-
-        {/* One button, at the foot, naming where the folder will land. Four of
-            them down the panel was four times the noise for a monthly act. */}
-        <button
-          className="nt-newfolder"
-          title="New folder"
-          onClick={() => setNaming({ space: newFolderIn, value: '' })}
-        >
-          <Icon.FolderAdd size={14} />
-          New folder
-        </button>
-      </aside>
-
       {/* ---- the list ---- */}
       <div className="nt-list">
         {/* Only in Big Time, where a calendar exists, and only when there is a
@@ -1132,11 +1002,16 @@ export function NotesPage() {
         <MeetingPrompt />
         <div className="nt-listhead">
           <div className="nt-headmain">
-            <h1>{finding ? 'Everything' : nameOf(openFolder)}</h1>
+            <h1>All notes</h1>
             {/* A count, not a caption: it is the one thing the folder name does
                 not already tell him. */}
             <span className="nt-headcount mono">{shown.length} {shown.length === 1 ? 'note' : 'notes'}</span>
           </div>
+          {/* Ticked by default: done notes stay out of the way until he asks. */}
+          <label className="nt-hidedone">
+            <input type="checkbox" checked={hideDone} onChange={(e) => setHideDone(e.target.checked)} />
+            Hide done
+          </label>
           <Dropdown label="List options" className="nt-sortkebab">
             <span className="kebab-head">Sort by</span>
             {(['edited', 'created', 'title'] as Sort[]).map((k) => (
@@ -1196,7 +1071,7 @@ export function NotesPage() {
                 {g.rows.map((n) => (
                   <NoteRow
                     key={n.id} n={n} on={n.id === openId} flash={n.id === flashNoteId}
-                    sort={sort} query={query} folder={nameOf(n.folderId)}
+                    sort={sort} query={query}
                     onOpen={openRow} onTick={setNoteDone}
                   />
                 ))}
@@ -1218,13 +1093,13 @@ export function NotesPage() {
             lead={phone ? (
               <button className="nt-back" onClick={() => setOpenId(null)}>
                 <Icon.ChevronLeft size={15} />
-                {nameOf(open.folderId)}
+                All notes
               </button>
             ) : (
               <button
                 className="nt-presenttoggle" aria-pressed={presenting}
-                aria-label={presenting ? 'Show folders and the note list' : 'Hide folders and the note list'}
-                title={presenting ? 'Show folders and the note list (⌘\\)' : 'Hide folders and the note list (⌘\\)'}
+                aria-label={presenting ? 'Show the note list' : 'Hide the note list'}
+                title={presenting ? 'Show the note list (⌘\\)' : 'Hide the note list (⌘\\)'}
                 onClick={() => setPresenting((v) => !v)}
               >
                 <Icon.Sidebar size={17} />
@@ -1268,8 +1143,7 @@ export function NotesPage() {
           a grid track of their own and cannot shift what they resize. */}
       {wide && !presenting && (
         <>
-          <div className="nt-grip" style={{ left: cols.side }} onPointerDown={drag('side')} role="separator" aria-label="Resize the folder column" />
-          <div className="nt-grip" style={{ left: cols.side + cols.list }} onPointerDown={drag('list')} role="separator" aria-label="Resize the note list" />
+          <div className="nt-grip" style={{ left: cols.list }} onPointerDown={drag('list')} role="separator" aria-label="Resize the note list" />
         </>
       )}
     </div>
@@ -1278,8 +1152,8 @@ export function NotesPage() {
 
 /** One row of the list. Memoised, so typing in the open note re-renders that
  *  note's row and leaves the other eighty alone. */
-const NoteRow = memo(function NoteRow({ n, on, flash, sort, query, folder, onOpen, onTick }: {
-  n: Note; on: boolean; flash: boolean; sort: Sort; query: string; folder: string
+const NoteRow = memo(function NoteRow({ n, on, flash, sort, query, onOpen, onTick }: {
+  n: Note; on: boolean; flash: boolean; sort: Sort; query: string
   onOpen: (id: string) => void; onTick: (id: string, done: boolean) => void
 }) {
   const title = headOf(n.body) || 'Untitled'
@@ -1311,12 +1185,7 @@ const NoteRow = memo(function NoteRow({ n, on, flash, sort, query, folder, onOpe
           <span className="nt-when">{fmtWhen(sort === 'created' ? n.when : localDateKey(new Date(n.updatedAt)))}</span>
           {snip && <span className="nt-rowsnip">{snip}</span>}
         </span>
-        {/* Which folder it lives in, on every row, not only in a search. */}
-        <span className="nt-rowtail">
-          <FolderIcon small />
-          {folder}
-          {n.conflict && <span className="nt-flag"> · two versions</span>}
-        </span>
+        {n.conflict && <span className="nt-rowtail"><span className="nt-flag">Two versions</span></span>}
       </button>
     </li>
   )

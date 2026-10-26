@@ -22,7 +22,7 @@
 
 import { Orb } from './orb'
 import { useEffect, useRef, useState } from 'react'
-import { useClockStamp, useFirstMove, useOpenToday } from './ui'
+import { useClockStamp, useFirstMove, useOpenToday, usePhone } from './ui'
 import { usePomodoro } from './pomodoro'
 import { ZonePlayer, ZoneQueue } from './zoneplayer'
 import { useStore } from './store'
@@ -263,6 +263,8 @@ function PhaseIcon({ state }: { state: PhaseState }) {
 }
 
 function ZoneTask() {
+  const phone = usePhone()
+  const [listOpen, setListOpen] = useState(false)
   const pomo = usePomodoro()
   const { setFocusTaskId, tasks } = useStore()
   const firstMove = useFirstMove()
@@ -336,8 +338,15 @@ function ZoneTask() {
   return (
     <div className={`znow zn-${phaseState}`}>
       <div className="znow-split">
-      <ZoneList activeId={activeTask?.id ?? null} onPick={pick} />
+      {/* THE PHONE (his ask, 2026-10-26): the timer is reached without
+          scrolling, so the list folds into one button and opens on demand. */}
+      {(!phone || listOpen) && <ZoneList activeId={activeTask?.id ?? null} onPick={(id) => { pick(id); setListOpen(false) }} />}
       <div className="znow-main">
+      {phone && (
+        <button className="zpick-btn" aria-expanded={listOpen} onClick={() => setListOpen((v) => !v)}>
+          <Icon.List size={15} />{listOpen ? 'Hide the list' : activeTask ? 'Change task' : 'Pick a task'}
+        </button>
+      )}
       {/* The band: what he is on, and the real hour, set as type on the field
           rather than boxed. The hour earns its place here because the whole
           point of this room is losing track of it. */}
@@ -516,6 +525,7 @@ export function useZoneDepth(): number {
 }
 
 export function ZonePage() {
+  const phone = usePhone()
   /* His instruction (2026-09-12): drop the room's own Note editor -- Note
      already has a home in the floating dock, reopened for the Zone in the
      same change -- and give its spot to the queue instead, since that is
@@ -524,10 +534,13 @@ export function ZonePage() {
   return (
     <div className="zroom">
       <ZoneTask />
-      <div className="zroom-rail">
-        <section className="zpanel zpanel-queue" aria-label="Queue"><ZoneQueue /></section>
-        <section className="zpanel zpanel-player" aria-label="Mundi Opus"><ZonePlayer /></section>
-      </div>
+      {/* No music on the phone (his ask, 2026-10-26): the room there is the timer. */}
+      {!phone && (
+        <div className="zroom-rail">
+          <section className="zpanel zpanel-queue" aria-label="Queue"><ZoneQueue /></section>
+          <section className="zpanel zpanel-player" aria-label="Mundi Opus"><ZonePlayer /></section>
+        </div>
+      )}
     </div>
   )
 }

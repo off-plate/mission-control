@@ -11726,3 +11726,21 @@ button.tagmark:focus-visible { outline: 2px solid var(--accent-text); outline-of
    screen are not laid out or painted until they come near it. Safe now that
    the strip filters rather than jump-scrolls (the jump was what it upset). */
 .hk-card { content-visibility: auto; contain-intrinsic-size: auto 200px; }
+
+/* THE ZONE ON THE PHONE (2026-10-26): one screen, no music, no scrolling to
+   reach the timer. The list is behind one button; title, clock and ring are
+   sized so Start sits above the tab bar on a 390 by 844 phone. */
+.zpick-btn { display: none; }
+@media (max-width: 639px) {
+  .zroom { min-height: 0; padding-top: var(--s3); }
+  .zpick-btn { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; height: 36px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--z-line); background: none; color: var(--z-bone); font-size: 14px; font-weight: 600; margin-bottom: var(--s3); }
+  .znow-band { gap: var(--s2); padding-bottom: var(--s2); }
+  .znow-title { font-size: 1.35rem; line-height: 1.2; }
+  .znow-title > span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .znow-title[data-len] { font-size: 1.1rem; }
+  .zclock { flex-direction: row; align-items: baseline; gap: var(--s3); }
+  .zclock-time { font-size: 1.5rem; }
+  .zclock-date { margin-top: 0; font-size: 13px; }
+  .znow-face-wrap { min-height: min(84vw, 340px); }
+  .znow-face { width: min(78vw, 320px); }
+}

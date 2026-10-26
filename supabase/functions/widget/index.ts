@@ -21,8 +21,10 @@ import { NAME_DAYS } from '../../../src/namedays-data.ts'
 
 type Task = { id?: string; title: string; carried?: number; space?: string; at?: string; slot?: string; done: boolean; list: 'today' | 'backlog'; plannedOn?: string; projectId?: string; estimateMin?: number; subtasks?: { estimateMin: number }[] }
 type Project = { id: string; name: string }
-type Habit = { id: string; name?: string; daypart?: string; folderOrder?: number; kind?: string; frequency?: string; paused?: boolean; archivedAt?: string; folderId?: string; optional?: boolean }
-type Tick = { habitId: string; day: string }
+type Habit = { id: string; name?: string; daypart?: string; folderOrder?: number; kind?: string; frequency?: string; paused?: boolean; archivedAt?: string; folderId?: string; optional?: boolean
+  measure?: string; unit?: string; targetAmount?: number; targetCount?: number; per?: string; targetPerWeek?: number; auto?: { from?: string }; source?: string; quitSince?: string }
+type Tick = { habitId: string; day: string; v?: number }
+type Slip = { habitId: string; day: string }
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } })
@@ -80,6 +82,45 @@ function habitsToday(habits: Habit[], routines: { id: string; title?: string; ha
     ...loose.map((h) => ({ name: h.name ?? 'Habit', kept: doneToday.has(h.id), done: doneToday.has(h.id) ? 1 : 0, total: 1, week: keptOn([h]), order: 1000 + part(h.daypart) })),
   ].sort((a, b) => a.order - b.order).map(({ order: _o, ...i }) => i)
   return { due: items.length, kept: items.filter((i) => i.kept).length, items }
+}
+
+/* THE "HABITS LEFT" SHORTCUT (his ask, 2026-10-26): the loose habits he
+   still has to do today, and how each quit stands. Not routines (they are
+   folders he runs), not the automatic ones (focus time keeps those).
+   Done means what it means on the Habits page: an amount habit by the day's
+   total, a count habit by the day's count, a weekly-target habit once the
+   week's target is met. */
+function habitsLeft(habits: Habit[], routines: { habitId?: string }[], log: Tick[], slips: Slip[], now: ReturnType<typeof pragueNow>) {
+  const mirror = new Set(routines.map((r) => r.habitId).filter(Boolean))
+  const monday = iso(new Date(Date.UTC(now.y, now.m - 1, now.d - now.weekday)))
+  const sunday = iso(new Date(Date.UTC(now.y, now.m - 1, now.d - now.weekday + 6)))
+  const auto = (h: Habit) => h.auto?.from === 'focus' || (h.kind === 'measured' && h.measure !== 'times' && h.measure !== 'amount')
+  const todayRows = (h: Habit) => log.filter((t) => t.habitId === h.id && t.day === now.day)
+  const loose = habits.filter((h) => !h.archivedAt && !h.paused && !h.folderId && !mirror.has(h.id) && h.kind !== 'break' && !auto(h))
+  const left: { name: string; note?: string }[] = []
+  for (const h of loose) {
+    if (h.frequency === 'weekdays' && now.weekday >= 5) continue
+    const weekDays = new Set(log.filter((t) => t.habitId === h.id && t.day >= monday && t.day <= sunday).map((t) => t.day)).size
+    if (h.frequency === 'times-per-week' && weekDays >= (h.targetPerWeek ?? 3)) continue
+    if ((h.frequency === 'weekly') && weekDays >= 1) continue
+    const rows = todayRows(h)
+    if (h.measure === 'amount') {
+      const got = rows.reduce((a, t) => a + (t.v ?? 0), 0), need = h.targetAmount ?? 1
+      if (got < need) left.push({ name: h.name ?? 'Habit', note: `${Math.round(need - got)} ${h.unit ?? ''} to go`.trim() })
+    } else if (h.measure === 'times') {
+      const need = h.targetCount ?? 1
+      if ((h.per ?? 'day') === 'day' && rows.length < need) left.push({ name: h.name ?? 'Habit', note: `${rows.length} of ${need}` })
+    } else if (!rows.length) {
+      left.push({ name: h.name ?? 'Habit', note: h.frequency === 'times-per-week' ? `${weekDays} of ${h.targetPerWeek ?? 3} this week` : undefined })
+    }
+  }
+  const quits = habits.filter((h) => !h.archivedAt && h.kind === 'break').map((h) => {
+    const mine = slips.filter((x) => x.habitId === h.id).map((x) => x.day).sort()
+    const last = mine.length ? mine[mine.length - 1] : (h.quitSince ?? now.day)
+    const days = Math.max(0, Math.round((Date.parse(`${now.day}T12:00:00Z`) - Date.parse(`${last}T12:00:00Z`)) / 86400000))
+    return { name: h.name ?? 'Quit', days, slippedToday: last === now.day && mine.length > 0 }
+  })
+  return { left, quits }
 }
 
 // Today's and tomorrow's timed events from the same feed and parser the Calendar page uses.
@@ -214,6 +255,7 @@ Deno.serve(async (req: Request) => {
     waiting: { count: waiting.length + queuedAdds, min: waiting.reduce((a, t) => a + minutes(t), 0) },
     projects: [...perProject].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([id, n]) => ({ name: name(id), waiting: n })),
     habits: habitsToday(arr<Habit>(s.habits), arr<{ id: string; title?: string; habitId?: string }>(s.routines), arr<Tick>(s.habitLog), now),
+    habitsLeft: habitsLeft(arr<Habit>(s.habits), arr<{ habitId?: string }>(s.routines), arr<Tick>(s.habitLog), arr<Slip>(s.slips), now),
     event: (await cal).next,
     events: (await cal).today,
     tomorrowFirst: (await cal).tomorrowFirst,

@@ -16,7 +16,7 @@ import { usePomodoro } from './pomodoro'
 import { BreakdownSheet, Sheet } from './modals'
 import { Linkify } from './widgets'
 import { PLAN_AHEAD_DAYS, WeekGrid, dayPlus, shortDay, weekRangeLabel } from './weekgrid'
-import { useCoarsePointer, usePhone, Band, WorkspaceTitle, Dropdown, SpaceMark, TagMark } from './ui'
+import { useCoarsePointer, usePhone, Band, WorkspaceTitle, Dropdown, SpaceMark, TagMark, openRowMenu } from './ui'
 import { TagField } from './tagfield'
 import { matchProjects, tagOf, takeTag } from './tags'
 import { SLOTS, SPACES, UNSORTED, habitLocked, routineComplete, routineProgress, slotMinutes, TYPING_TARGET_WPM, type Project, type Routine, type SubTask, type Task, type TimeSlot } from './types'
@@ -507,8 +507,10 @@ function PhoneProjectFilter({ projects, tasks, sel, inScope, onAll, onPick, onMa
   return (
     <Dropdown
       label="Filter Plan by project" className="phone-only"
-      trigger={({ onClick, open: isOpen }) => (
-        <button className="btn btn-ghost plan-proj-btn" aria-haspopup="menu" aria-expanded={isOpen} aria-label={sel.length ? `Projects, ${sel.length} picked` : 'Projects'} onClick={onClick}>
+      /* The folder goes straight to the Projects page (his ask, 2026-10-26),
+         not to a dropdown of them; the strip above still filters. */
+      trigger={() => (
+        <button className="btn btn-ghost plan-proj-btn" aria-label="Open Projects" onClick={onManage}>
           <Icon.Folder size={20} />{sel.length > 0 && <span className="plan-proj-dot" aria-hidden="true" />}
         </button>
       )}
@@ -583,6 +585,10 @@ export function PlanPage() {
   const [openTitles, setOpenTitles] = useState<Set<string>>(() => new Set())
   const toggleTitle = (e: React.MouseEvent, id: string) => {
     if ((e.target as HTMLElement).closest('a, button')) return
+    /* On the phone a tap on a task opens its menu as a sheet instead (his ask,
+       2026-10-26): the kebab was too small to hit, and the sheet shows the
+       whole title, so the fold-open is no longer needed there. */
+    if (phone) { openRowMenu(id); return }
     setOpenTitles((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
   }
   const markOf = (t: Task) => (t.projectId ? projects.find((p) => p.id === t.projectId) : undefined)
@@ -692,9 +698,12 @@ export function PlanPage() {
      more days he can step onto and lay out, one at a time, the same panel he
      already knows. offset 0 is today, 1 is tomorrow, up to 6 days out. */
   const [dayOffset, setDayOffset] = useState(0)
-  const [phoneList, setPhoneList] = useState<'todo' | 'day'>(() => { const v = openTodoNext; openTodoNext = false; return v ? 'todo' : 'day' })
+  /* Read in the initialiser, cleared after mount: an initialiser can run twice
+     (StrictMode), and clearing there let the second run land on the day list. */
+  const [phoneList, setPhoneList] = useState<'todo' | 'day'>(() => (openTodoNext || (window as Window & { __mcNewTask?: boolean }).__mcNewTask ? 'todo' : 'day'))
+  useEffect(() => { openTodoNext = false; (window as Window & { __mcNewTask?: boolean }).__mcNewTask = false }, [])
   useEffect(() => {
-    const on = () => { openTodoNext = false; setPhoneList('todo') }
+    const on = () => { openTodoNext = false; (window as Window & { __mcNewTask?: boolean }).__mcNewTask = false; setPhoneList('todo') }
     window.addEventListener('mc:new-task', on)
     return () => window.removeEventListener('mc:new-task', on)
   }, [])
@@ -1268,7 +1277,8 @@ export function PlanPage() {
                     </button>
                   )}
                   <TaskActions task={t} />
-                  <Dropdown label={`Options for ${t.title}`}>
+                  <Dropdown label={`Options for ${t.title}`} sheet={t.title} menuId={t.id}>
+                    {phone && <button role="menuitem" onClick={() => toggleTask(t.id)}>Mark done</button>}
                     <button role="menuitem" onClick={() => setEditingTask(t)}>Edit</button>
                     <button role="menuitem" onClick={() => setBreakdownFor(t)}>Break it down</button>
                     {/* ON A TOUCH SCREEN ONLY, restored 2026-09-09. These two
@@ -1456,7 +1466,8 @@ export function PlanPage() {
                             </button>
                           )}
                           {!t.done && <TaskActions task={t} onFocus={() => startFocus(taskMinutes(t), t.title)} />}
-                          <Dropdown label={`Options for ${t.title}`}>
+                          <Dropdown label={`Options for ${t.title}`} sheet={t.title} menuId={t.id}>
+                            {phone && <button role="menuitem" onClick={() => { if (t.done) toggleTask(t.id); else setLogging(t.id) }}>{t.done ? 'Not done yet' : 'Mark done'}</button>}
                             {phone && !t.done && isEstimated(t) && <button role="menuitem" onClick={() => startFocus(taskMinutes(t), t.title)}>Start focus</button>}
                             {!t.done && <button role="menuitem" onClick={() => setBreakdownFor(t)}>Break it down</button>}
                             {/* Both "Move to" (the radio-style time-slot list)

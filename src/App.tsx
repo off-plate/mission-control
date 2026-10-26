@@ -401,6 +401,35 @@ function PeopleButton({ on, open }: { on: boolean; open: () => void }) {
    lives in, quick add in the middle, and More for everything else as a sheet
    that closes on a pick, a tap outside, the X, Escape or a swipe down.
    Hidden above 640px by CSS, where the header row is better. */
+/* iOS only raises the keyboard for a focus that happens inside the tap itself.
+   The + button's box lives on Plan, which mounts a frame or two later, so its
+   focus came too late and no keyboard appeared (his report, 2026-10-26). A
+   throwaway field takes the focus inside the tap, holding the keyboard up, and
+   hands it to the real box once that exists. */
+let keyProxy: HTMLInputElement | null = null
+function holdKeyboard() {
+  if (!matchMedia('(pointer: coarse)').matches) return
+  releaseKeyboard()
+  keyProxy = document.createElement('input')
+  keyProxy.setAttribute('aria-hidden', 'true')
+  keyProxy.tabIndex = -1
+  keyProxy.style.cssText = 'position:fixed;top:30%;left:0;width:1px;height:1px;opacity:0;font-size:16px;border:0;padding:0'
+  document.body.appendChild(keyProxy)
+  keyProxy.focus()
+  window.setTimeout(releaseKeyboard, 2000)
+}
+function releaseKeyboard() { keyProxy?.remove(); keyProxy = null }
+
+/* The bottom bars step aside only while the keyboard is actually up, read from
+   how much of the screen the visual viewport has lost, not from focus: a
+   focused field with no keyboard (as after the + button used to) must not
+   take the tab bar away. */
+if (typeof window !== 'undefined' && window.visualViewport) {
+  const vv = window.visualViewport
+  const check = () => document.documentElement.classList.toggle('kb-open', window.innerHeight - vv.height > 150)
+  vv.addEventListener('resize', check)
+}
+
 const TAB_PAGES: { id: PageId; label: string; icon: ReactNode; lit: PageId[] }[] = [
   { id: 'today', label: 'Today', icon: <Icon.TabToday size={23} />, lit: ['today', 'day'] },
   { id: 'plan', label: 'Plan', icon: <Icon.TabPlan size={23} />, lit: ['plan', 'projects'] },
@@ -465,7 +494,7 @@ function PhoneTabBar({ page, setPage }: { page: PageId; setPage: (p: PageId) => 
             {t.icon}<span>{t.label}</span>
           </button>
         ))}
-        <button className="tabbar-add" aria-label="New task" onClick={() => { setOpen(false); window.dispatchEvent(new Event('mc:new-task')) }}>
+        <button className="tabbar-add" aria-label="New task" onClick={() => { setOpen(false); holdKeyboard(); window.dispatchEvent(new Event('mc:new-task')) }}>
           <Icon.Plus size={24} />
         </button>
         {TAB_PAGES.slice(2).map((t) => (
@@ -530,12 +559,19 @@ export default function App() {
      never fires because nothing dispatches the event outside the app shell. */
   useEffect(() => {
     const onNewTask = () => {
+      /* Plan is loaded on demand, so on a first visit its own listener for
+         this event does not exist yet. The flag survives until it mounts. */
+      ;(window as Window & { __mcNewTask?: boolean }).__mcNewTask = true
       location.hash = '/plan'
-      /* After the page mounts. Two frames, not a timeout: the second frame is
-         the first one in which the new page's DOM exists. */
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        document.querySelector<HTMLInputElement>('input[aria-label="New task"]')?.focus()
-      }))
+      /* Wait for the box to exist AND be on screen (the phone shows one list
+         at a time), up to about a second, then focus it. */
+      let n = 0
+      const tryFocus = () => {
+        const el = [...document.querySelectorAll<HTMLInputElement>('input[aria-label="New task"]')].find((i) => i.offsetParent)
+        if (el) { el.focus(); releaseKeyboard(); return }
+        if (n++ < 60) requestAnimationFrame(tryFocus); else releaseKeyboard()
+      }
+      requestAnimationFrame(tryFocus)
     }
     window.addEventListener('mc:new-task', onNewTask)
     return () => window.removeEventListener('mc:new-task', onNewTask)

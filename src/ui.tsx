@@ -12,7 +12,9 @@ import { jumpTo, type HgSection } from './hgroom'
    primitive genuinely needs, and one class per primitive with modifiers rather
    than a new class per call site. */
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { slideOut, useSwipeDown } from './sheetdrag'
 import { SPACE_LABELS } from './mock'
 import { exceptionsFor } from './exceptions'
 import { useStore } from './store'
@@ -174,7 +176,7 @@ export function Select<T extends string | number>({
 
 /* A dropdown that opens upward when there is no room below it. Menus near the
    bottom of the page were opening off-screen with no way to reach the items. */
-export function Dropdown({ label, children, className = '', trigger }: {
+export function Dropdown({ label, children, className = '', trigger, sheet, menuId }: {
   label: string
   children: React.ReactNode
   className?: string
@@ -183,13 +185,28 @@ export function Dropdown({ label, children, className = '', trigger }: {
    *  row" trigger. Gets the same open state every other call site drives
    *  off `.kebab` internally. */
   trigger?: (p: { onClick: () => void; open: boolean }) => React.ReactNode
+  /** On a phone, show this menu as a bottom sheet headed by this text, with no
+   *  kebab: the row itself opens it, by firing openRowMenu(menuId). */
+  sheet?: string
+  menuId?: string
 }) {
   const [open, setOpen] = useState(false)
   const [up, setUp] = useState(false)
   const ref = useRef<HTMLSpanElement>(null)
+  const sheetRef = useRef<HTMLDivElement>(null)
+  const scrimRef = useRef<HTMLDivElement>(null)
+  const phone = usePhone()
+  const asSheet = !!sheet && phone
 
   useEffect(() => {
-    if (!open) return
+    if (!menuId) return
+    const on = (e: Event) => { if ((e as CustomEvent<string>).detail === menuId) setOpen(true) }
+    window.addEventListener('mc:row-menu', on)
+    return () => window.removeEventListener('mc:row-menu', on)
+  }, [menuId])
+
+  useEffect(() => {
+    if (!open || asSheet) return
     const btn = ref.current?.getBoundingClientRect()
     const menu = ref.current?.querySelector('.kebab-menu') as HTMLElement | null
     if (btn && menu) {
@@ -201,10 +218,13 @@ export function Dropdown({ label, children, className = '', trigger }: {
     document.addEventListener('mousedown', close)
     document.addEventListener('keydown', esc)
     return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc) }
-  }, [open])
+  }, [open, asSheet])
+
+  const shut = useCallback(() => slideOut(sheetRef.current, scrimRef.current, () => setOpen(false)), [])
+  useSwipeDown(sheetRef, shut, open && asSheet)
 
   return (
-    <span className={`kebab-wrap ${className}${open ? ' is-open' : ''}`} ref={ref}>
+    <span className={`kebab-wrap ${className}${open ? ' is-open' : ''}${sheet ? ' is-sheetable' : ''}`} ref={ref}>
       {trigger ? trigger({ onClick: () => setOpen((v) => !v), open }) : (
         /* Drawn, not typed. The midline-ellipsis character sits wherever the
             font puts it, which is why it never looked centred in a circle. */
@@ -212,13 +232,32 @@ export function Dropdown({ label, children, className = '', trigger }: {
           <Icon.More size={17} />
         </button>
       )}
-      {open && (
+      {open && !asSheet && (
         <div className={`kebab-menu${up ? ' opens-up' : ''}`} role="menu" onClick={() => setOpen(false)}>
           {children}
         </div>
       )}
+      {/* The phone's version: the same items, as an iOS action sheet. Portalled
+          so no row's transform or overflow can trap a fixed layer. */}
+      {open && asSheet && createPortal(
+        <div ref={scrimRef} className="overlay rowsheet-scrim" onClick={(e) => { if (e.target === e.currentTarget) shut() }}>
+          <div ref={sheetRef} className="sheet rowsheet" role="dialog" aria-modal="true" aria-label={label}>
+            <div className="sheet-grab" aria-hidden="true" />
+            <p className="rowsheet-title">{sheet}</p>
+            <div className="rowsheet-menu" role="menu" onClick={(e) => { if ((e.target as HTMLElement).closest('button')) shut() }}>
+              {children}
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
     </span>
   )
+}
+
+/** Opens the row menu registered under this id (see Dropdown's `sheet`). */
+export function openRowMenu(id: string) {
+  window.dispatchEvent(new CustomEvent('mc:row-menu', { detail: id }))
 }
 
 /* No `sub`. A page title does not get a subtitle restating it.

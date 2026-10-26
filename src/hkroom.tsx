@@ -59,26 +59,30 @@ function parseAmount(s: string, unit?: string): number | null {
   const m = t.match(/^(\d+(?:\.\d+)?)(k)?$/)
   return m ? parseFloat(m[1]) * (m[2] ? 1000 : 1) : null
 }
-const partNow = () => { const h = new Date().getHours(); return h < 12 ? 0 : h < 18 ? 1 : 2 }
-const PART_OF: Record<string, number> = { morning: 0, noon: 1, afternoon: 1, evening: 2 }
+const partNow = () => { const h = new Date().getHours(); return h < 12 ? 0 : h < 14 ? 1 : h < 18 ? 2 : 3 }
 
 /* ---------- the page's own view of everything ---------- */
 type Kind = 'routine' | 'check' | 'count' | 'amount' | 'auto' | 'quit' | 'goal'
 interface Item {
   key: string; kind: Kind; id: string; name: string; color: string; icon: string
   habit?: HabitDef; routine?: Routine; list?: HabitDef[]; goal?: Goal
-  /** 0 morning, 1 day, 2 evening, 8 weekly or monthly, 9 whenever */
+  /** Index into PARTS for a habit (4 = Any time); 5 goals, 6 quits. */
   part: number
+  /** Order inside its part: the routine's own running order first, then loose habits. */
+  ord: number
 }
-const FILTERS: [string, string][] = [['all', 'All'], ['routine', 'Routines'], ['habit', 'Habits'], ['auto', 'Automatic'], ['goal', 'Goals'], ['quit', 'Quitting']]
-/** The page's sections, in the order a day runs: what he starts, what he
- *  ticks, what the app keeps for him, what he is reaching for, what he stopped. */
-const CATS: { id: string; label: string; has: (k: Kind) => boolean }[] = [
-  { id: 'routine', label: 'Routines', has: (k) => k === 'routine' },
-  { id: 'habit', label: 'Habits', has: (k) => k === 'check' || k === 'count' || k === 'amount' },
-  { id: 'auto', label: 'Automatic', has: (k) => k === 'auto' },
-  { id: 'goal', label: 'Goals', has: (k) => k === 'goal' },
-  { id: 'quit', label: 'Quitting', has: (k) => k === 'quit' },
+/* PARTS OF THE DAY (his call, 2026-10-26): routines stopped being cards; every
+   habit, the ones that used to be a routine's steps included, sits in the part
+   of the day it belongs to. Goals and quits keep their own sections. */
+const PARTS: { slot?: TimeSlot; label: string }[] = [
+  { slot: 'morning', label: 'Morning' }, { slot: 'noon', label: 'Noon' }, { slot: 'afternoon', label: 'Afternoon' }, { slot: 'evening', label: 'Evening' }, { label: 'Any time' },
+]
+const partOf = (h: HabitDef) => { const i = PARTS.findIndex((p) => p.slot === h.daypart); return i < 0 ? 4 : i }
+const FILTERS: [string, string][] = [['all', 'All'], ...PARTS.map((p, i) => [`p${i}`, p.label] as [string, string]), ['goal', 'Goals'], ['quit', 'Quitting']]
+const CATS: { id: string; label: string; has: (it: Item) => boolean }[] = [
+  ...PARTS.map((p, i) => ({ id: `p${i}`, label: p.label, has: (it: Item) => isHabitKind(it.kind) && it.part === i })),
+  { id: 'goal', label: 'Goals', has: (it: Item) => it.kind === 'goal' },
+  { id: 'quit', label: 'Quitting', has: (it: Item) => it.kind === 'quit' },
 ]
 const isHabitKind = (k: Kind) => k === 'check' || k === 'count' || k === 'amount' || k === 'auto'
 
@@ -87,9 +91,10 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
   const { habits, routines, goals, habitLog, slips, focusSessions, todayIndex } = s
   const [view, setView] = useState<'cards' | 'list' | 'week'>(() => { try { return (localStorage.getItem('mc:hk-view') as 'cards') || 'cards' } catch { return 'cards' } })
   useEffect(() => { try { localStorage.setItem('mc:hk-view', view) } catch { /* private mode */ } }, [view])
-  const [filter, setFilter] = useState(start)
-  useEffect(() => setFilter(start), [start])
-  const [sheet, setSheet] = useState<{ kind: 'run' | 'log' | 'detail' | 'new'; key?: string } | null>(null)
+  const startFilter = start === 'goal' || start === 'quit' ? start : 'all'
+  const [filter, setFilter] = useState(startFilter)
+  useEffect(() => setFilter(startFilter), [startFilter])
+  const [sheet, setSheet] = useState<{ kind: 'run' | 'log' | 'detail' | 'new'; key?: string; part?: string } | null>(null)
   const [openFolders, setOpenFolders] = useState<Set<string>>(() => new Set())
   /* SWIPE DOWN TO CLOSE (his ask, 2026-10-26), the way the More sheet works:
      drag the sheet down from anywhere while its own content is scrolled to the
@@ -171,26 +176,20 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
     const live = habits.filter((h) => !h.archivedAt)
     const folderHabitIds = new Set(routines.map((r) => r.habitId).filter(Boolean) as string[])
     const out: Item[] = []
-    for (const r of routines.filter((x) => !x.archivedAt)) {
-      const list = live.filter((h) => h.folderId === r.id).sort((a, b) => (a.folderOrder ?? 0) - (b.folderOrder ?? 0))
-      if (!list.length) continue
-      const mirror = live.find((h) => h.id === r.habitId)
-      const dp = mirror?.daypart ?? list[0].daypart
-      const part = r.repeatable && r.cadence === 'daily' ? 9 : r.cadence === 'weekly' || r.cadence === 'monthly' ? 8 : dp ? PART_OF[dp] ?? 1 : r.cadence === 'prework' ? 1 : 1
-      out.push({ key: `r:${r.id}`, kind: 'routine', id: r.id, name: r.title, color: colorFor(r.id, r.color), icon: r.icon ?? guessIcon(r.title, 'checklist'), routine: r, list, part })
-    }
-    for (const h of live.filter((x) => !x.folderId && !folderHabitIds.has(x.id))) {
+    const rIndex = new Map(routines.map((r, k) => [r.id, k]))
+    live.filter((x) => !folderHabitIds.has(x.id)).forEach((h, k) => {
       const kind: Kind = h.kind === 'break' ? 'quit'
         : h.measure === 'amount' ? 'amount'
         : h.auto?.from === 'focus' || (h.kind === 'measured' && h.measure !== 'times') ? 'auto'
         : h.kind === 'measured' && h.measure === 'times' ? 'count' : 'check'
-      out.push({ key: `h:${h.id}`, kind, id: h.id, name: h.name, color: colorFor(h.id, h.color), icon: h.icon ?? guessIcon(h.name, kind === 'quit' ? 'eye' : 'checklist'), habit: h, part: h.daypart ? PART_OF[h.daypart] ?? 1 : 1 })
-    }
+      const ord = h.folderId ? (rIndex.get(h.folderId) ?? 50) * 100 + (h.folderOrder ?? 0) : 10000 + k
+      out.push({ key: `h:${h.id}`, kind, id: h.id, name: h.name, color: colorFor(h.id, h.color), icon: h.icon ?? guessIcon(h.name, kind === 'quit' ? 'eye' : 'checklist'), habit: h, part: kind === 'quit' ? 6 : partOf(h), ord })
+    })
     for (const g of goals) {
       const tf = (g.timeframe ?? 'quarter') as GoalTimeframe
       if (g.closed) continue
       if (g.periodKey && g.periodKey !== goalPeriodKey(tf)) continue
-      out.push({ key: `g:${g.id}`, kind: 'goal', id: g.id, name: g.name, color: colorFor(g.id, g.color), icon: g.icon ?? guessIcon(g.name, 'flag'), goal: g, part: 5 })
+      out.push({ key: `g:${g.id}`, kind: 'goal', id: g.id, name: g.name, color: colorFor(g.id, g.color), icon: g.icon ?? guessIcon(g.name, 'flag'), goal: g, part: 5, ord: 0 })
     }
     return out
   }, [habits, routines, goals])
@@ -207,6 +206,7 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
     }
     const h = it.habit
     if (!h) return 0
+    if (h.frequency === 'weekdays') { const wd = new Date(`${day}T12:00:00`).getDay(); if (wd === 0 || wd === 6) return null }
     if (it.kind === 'quit') {
       if (!h.quitSince || day < h.quitSince) return null
       return slipSet.get(h.id)?.has(day) ? 0 : 1
@@ -228,11 +228,8 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
     const keptPeriod = rare && it.routine!.habitId ? !dueOn(habits.find((h) => h.id === it.routine!.habitId) ?? list[0], todayIndex, habitLog) : false
     return { off, done, total: need.length, complete: keptPeriod || (need.length > 0 && done === need.length) }
   }
-  const nextUp = useMemo(() => {
-    const p = partNow()
-    return items.find((it) => it.kind === 'routine' && it.part === p && !routineState(it).off && !routineState(it).complete) ?? null
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, todayIndex, habitLog])
+  /* No pinned card any more: each part of the day has its own Start. */
+  const nextUp = null as Item | null
 
   /* ---------- goals ---------- */
   const goalInfo = (g: Goal) => {
@@ -330,8 +327,9 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
     if (it.kind === 'auto') { const m = focusMinutesOn(focusSessions, today, h.space); return <><b>{m}m of {focusNeedMin(h)}m</b>, from focus blocks</> }
     if (it.kind === 'quit') { const run = daysClean(h, slips) ?? 0; return <><b>{run} {run === 1 ? 'day' : 'days'} clean</b>{h.dailyCost ? `, ${fmt(h.dailyCost * quitClean(h).clean)} CZK saved` : `, longest ${bestCleanRun(h, slips)}`}</> }
     if (h.frequency === 'times-per-week') { const wk = h.days.filter(Boolean).length; return <><b>{wk} of {h.targetPerWeek ?? 3}</b> this week</> }
-    if (h.frequency === 'weekly' || h.frequency === 'monthly') return h.frequency === 'weekly' ? 'Once a week' : 'Once a month'
-    return h.frequency === 'weekdays' ? 'Mon to Fri' : 'Every day'
+    const extra = h.optional ? ', optional' : h.seconds ? `, ${Math.round(h.seconds / 60)} min` : ''
+    if (h.frequency === 'weekly' || h.frequency === 'monthly') return (h.frequency === 'weekly' ? 'Once a week' : 'Once a month') + extra
+    return (h.frequency === 'weekdays' ? 'Mon to Fri' : 'Every day') + extra
   }
   const quitClean = (h: HabitDef) => {
     const since = h.quitSince ? new Date(`${h.quitSince}T12:00:00`).getTime() : Date.now()
@@ -348,6 +346,7 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
       if (st.complete && !it.routine!.repeatable) return <button className="hk-act is-check is-on" style={{ ['--c' as string]: c }} onClick={() => setSheet({ kind: 'detail', key: it.key })} aria-label={`${it.name}, done. Open`}><Icon.Check size={22} strokeWidth={3} /></button>
       return <button className={`hk-act is-play${big ? ' is-big' : ''}`} style={{ ['--c' as string]: c }} onClick={() => setSheet({ kind: 'run', key: it.key })}><Icon.Play size={14} />{st.complete ? 'Again' : st.done ? 'Resume' : 'Start'}</button>
     }
+    if (it.habit?.frequency === 'weekdays' && todayIndex >= 5) return <span className="hk-off">Mon to Fri</span>
     if (it.kind === 'check') { const on = todayVal(it) >= 1; return <button className={`hk-act is-check${on ? ' is-on' : ''}`} style={{ ['--c' as string]: c }} role="checkbox" aria-checked={on} aria-label={it.name} onClick={() => tick(it)}><Icon.Check size={22} strokeWidth={3} /></button> }
     if (it.kind === 'count') return <button className="hk-act is-ring" aria-label={`One more ${it.name}`} onClick={() => { s.logCount(it.id, 1); say(`${it.name} +1`, () => s.logCount(it.id, -1)) }}>{Ring({ f: todayVal(it), c, children: <Icon.Plus size={18} /> })}</button>
     if (it.kind === 'amount') return <button className="hk-act is-ring" aria-label={`Log ${it.name}`} onClick={() => setSheet({ kind: 'log', key: it.key })}>{Ring({ f: todayVal(it), c, children: <Icon.Plus size={18} /> })}</button>
@@ -415,8 +414,8 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
     </div>
   )
 
-  const shown = items.filter((it) => filter === 'all' || (CATS.find((c) => c.id === filter)?.has(it.kind) ?? false))
-  const order = (a: Item, b: Item) => (a.kind === 'routine' ? 0 : isHabitKind(a.kind) ? 1 : a.kind === 'goal' ? 2 : 3) - (b.kind === 'routine' ? 0 : isHabitKind(b.kind) ? 1 : b.kind === 'goal' ? 2 : 3) || a.part - b.part
+  const shown = items.filter((it) => filter === 'all' || (CATS.find((c) => c.id === filter)?.has(it) ?? false))
+  const order = (a: Item, b: Item) => a.part - b.part || a.ord - b.ord
   const sorted = shown.filter((it) => it !== nextUp).sort(order)
   const pinned = nextUp && shown.includes(nextUp) ? nextUp : null
   const doneToday = (it: Item) => it.kind === 'routine' ? routineState(it).complete : isHabitKind(it.kind) ? todayVal(it) >= 1 : false
@@ -425,11 +424,13 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
   /* THE CATEGORIES (his ask, 2026-10-25): cards and week are sectioned so it is
      plain at a glance what is a routine, a habit he ticks, a habit the app
      keeps for him, a goal, a quit. Up next stays above them all. */
-  const sections = CATS.map((c) => ({ ...c, list: sorted.filter((it) => c.has(it.kind)) }))
+  const sections = CATS.map((c) => ({ ...c, list: sorted.filter((it) => c.has(it)) }))
     .filter((c) => c.list.length > 0 || (c.id === 'goal' && (filter === 'all' || filter === 'goal')))
+  /* What a part's Start walks through: its yes/no habits that count today, in order. */
+  const startList = (list: Item[]) => list.filter((it) => it.kind === 'check' && dayVal(it, today, 0) !== null).map((it) => it.habit!)
   const todayOf = (list: Item[]) => {
-    const doable = list.filter((it) => (it.kind === 'routine' || isHabitKind(it.kind)) && !(it.kind === 'routine' && (routineState(it).off || it.part >= 8)))
-    return doable.length ? `${doable.filter(doneToday).length} of ${doable.length} done today` : ''
+    const doable = list.filter((it) => isHabitKind(it.kind) && dayVal(it, today, 0) !== null)
+    return doable.length ? `${doable.filter(doneToday).length} of ${doable.length} today` : ''
   }
   let n = pinned ? 1 : 0
 
@@ -462,7 +463,7 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
         {sections.map((c) => (
           <section key={c.id} id={`hk-sec-${c.id}`} className="hk-sec" data-sec={c.id}>
             {/* Counted with the pinned card, which still belongs to its section. */}
-            <h2 className="hk-sech" style={{ ['--i' as string]: Math.min(n, 14) }}>{c.label}<span className="hk-secn">{c.list.length + (pinned && c.has(pinned.kind) ? 1 : 0)}</span><span className="hk-sect">{todayOf(pinned && c.has(pinned.kind) ? [pinned, ...c.list] : c.list)}</span></h2>
+            <h2 className={`hk-sech${c.id === `p${partNow()}` ? ' is-now' : ''}`} style={{ ['--i' as string]: Math.min(n, 14) }}>{c.label}<span className="hk-secn">{c.list.length}</span><span className="hk-sect">{todayOf(c.list)}</span>{startList(c.list).length > 0 && <button className="hk-partplay" onClick={() => setSheet({ kind: 'run', part: c.id })}><Icon.Play size={12} />{c.list.some((it) => it.kind === 'check' && todayVal(it) >= 1) ? 'Resume' : 'Start'}</button>}</h2>
             <div className="hk-cards">
               {c.list.map((it) => Card({ it, i: n++ }))}
               {c.id === 'goal' && (filter === 'all' || filter === 'goal') && <Promised />}
@@ -472,8 +473,8 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
       </>}
 
       {view === 'list' && (() => {
-        const open = sorted.filter((it) => (it.kind === 'routine' || isHabitKind(it.kind)) && !doneToday(it) && !(it.kind === 'routine' && (routineState(it).off || it.part >= 8)))
-        const other = sorted.filter((it) => it.kind === 'goal' || it.kind === 'quit' || (it.kind === 'routine' && !doneToday(it) && (routineState(it).off || it.part >= 8)))
+        const open = sorted.filter((it) => isHabitKind(it.kind) && !doneToday(it) && dayVal(it, today, 0) !== null)
+        const other = sorted.filter((it) => it.kind === 'goal' || it.kind === 'quit' || (isHabitKind(it.kind) && dayVal(it, today, 0) === null))
         const done = sorted.filter(doneToday)
         let k = pinned ? 1 : 0
         return <div className="hk-list">
@@ -487,7 +488,7 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
       {view === 'week' && (
         <div className="hk-week" style={{ ['--days' as string]: weekDays.length }}>
           <div className="hk-wrow is-head"><span className="hk-sub">{shown.length} items</span>{weekDays.map((a) => { const d = new Date(`${keyAgo(a)}T12:00:00`); return <span key={a} className={`hk-wday${a ? '' : ' is-today'}`}>{d.toLocaleDateString('en-GB', { weekday: 'short' }).slice(0, 2)}<b>{d.getDate()}</b></span> })}</div>
-          {CATS.map((c) => ({ ...c, list: [...(pinned ? [pinned] : []), ...sorted].filter((it) => c.has(it.kind)) })).filter((c) => c.list.length).map((c) => (
+          {CATS.map((c) => ({ ...c, list: [...(pinned ? [pinned] : []), ...sorted].filter((it) => c.has(it)) })).filter((c) => c.list.length).map((c) => (
             <div key={c.id} id={`hk-sec-${c.id}`} className="hk-wgroup" data-sec={c.id}>
               <div className="hk-wcat">{c.label}<span className="hk-secn">{c.list.length}</span></div>
               {c.list.map((it) => (
@@ -529,6 +530,16 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
           <div className="hk-scrim" onClick={() => setSheet(null)} />
           <div className="hk-sheet" ref={sheetRef} role="dialog" aria-modal="true" aria-label={sheetItem?.name ?? 'New'} style={{ ['--c' as string]: sheetItem?.color ?? '#8E88FF' }}>
             <div className="hk-grab" />
+            {/* A part of the day run the way a routine was: its open yes/no habits, in order. */}
+            {sheet.kind === 'run' && sheet.part && (() => {
+              const c = sections.find((x) => x.id === sheet.part) ?? CATS.find((x) => x.id === sheet.part)
+              const list = startList(sorted.filter((it) => c?.has(it)))
+              if (!c || !list.length) return null
+              return <RoutineRunner folder={{ id: `part-${c.id}`, title: c.label } as Routine} list={list} todayIndex={todayIndex} onClose={() => {
+                setSheet(null)
+                if (list.filter((h) => !h.optional).every((h) => h.days[todayIndex])) say(`${c.label} done`)
+              }} />
+            })()}
             {sheet.kind === 'run' && sheetItem?.routine && (
               <RoutineRunner folder={sheetItem.routine} list={sheetItem.list!} todayIndex={todayIndex} onClose={() => {
                 setSheet(null)
@@ -668,6 +679,11 @@ function DetailSheet({ it, onClose, onRun, onLog, dayVal, Tiles }: {
             <span>{m.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}{editable ? (it.kind === 'quit' ? '. Tap a clean day to log a slip on it.' : '. Tap a day to fill or clear it.') : ''}</span>
             <button className="hk-round is-sm" aria-label="Next month" disabled={month >= 0} onClick={() => setMonth(month + 1)}><Icon.ChevronRight size={16} /></button>
           </div>
+        </div>
+      )}
+      {isHabitKind(it.kind) && it.habit && (
+        <div className="hk-field"><label>When</label>
+          <div className="hk-seg is-wrap">{PARTS.map((p) => <button key={p.label} aria-pressed={(it.habit!.daypart ?? undefined) === p.slot} onClick={() => setLook('habit', it.id, { daypart: p.slot ?? null })}>{p.label}</button>)}</div>
         </div>
       )}
       <div className="hk-field"><label>Colour</label>

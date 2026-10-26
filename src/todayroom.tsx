@@ -350,7 +350,7 @@ export function TodayRoom() {
             {todo.map((t) => (
               <div className="tr-r" key={t.id}>
                 <button className="tr-box" role="checkbox" aria-checked={false} aria-label={t.title} onClick={() => toggleTask(t.id)} />
-                <span className="tr-t">{t.title}</span><TagMark project={tagFor(t)} />
+                <span className="tr-tt"><span className="tr-t">{t.title}</span><TagMark project={tagFor(t)} /></span>
                 <span className="tr-age is-cool">{ageDays(t)}<u>d</u></span>
               </div>
             ))}
@@ -365,7 +365,7 @@ export function TodayRoom() {
               <div className={`tr-r${t.done ? ' is-done' : ''}`} key={t.id}>
                 <span className="tr-tick" aria-hidden="true" />
                 <span className="tr-slot">{SLOTS.find((sl) => sl.id === t.slot)?.label ?? '—'}</span>
-                <span className="tr-t">{t.title}</span><TagMark project={tagFor(t)} />
+                <span className="tr-tt"><span className="tr-t">{t.title}</span><TagMark project={tagFor(t)} /></span>
               </div>
             ))}
           </div>
@@ -378,7 +378,7 @@ export function TodayRoom() {
             {standing.map(({ t, d }) => (
               <div className="tr-r" key={t.id}>
                 <span className={`tr-age${d >= 30 ? '' : ' is-cool'}`}>{d}<u>d</u></span>
-                <span className="tr-t">{t.title}</span><TagMark project={tagFor(t)} />
+                <span className="tr-tt"><span className="tr-t">{t.title}</span><TagMark project={tagFor(t)} /></span>
               </div>
             ))}
           </div>

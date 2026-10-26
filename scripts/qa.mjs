@@ -277,9 +277,8 @@ await step('habits: tick a build habit and persist', async () => {
   await fresh('habits')
   /* Meditation is a step in Morning Preparation since the step merge; a step
      can be ticked from its routine's sheet without running the routine. */
-  /* A routine is a folder: tapping it opens its steps in place (2026-10-26). */
-  await page.locator('.hk-card', { hasText: 'Morning Preparation' }).first().locator('.hk-name').click(); await page.waitForTimeout(350)
-  await page.locator('.hk-folder .hk-mstick[aria-label="Meditation"]').first().click(); await page.waitForTimeout(500)
+  /* Every routine step is its own habit card since 2026-10-26 (parts of the day). */
+  await page.locator('.hk-card', { has: page.locator('.hk-title', { hasText: /^Meditation$/ }) }).first().locator('.hk-act.is-check').click(); await page.waitForTimeout(500)
   await page.reload(); await page.waitForTimeout(700)
   await shoot('flow-habit-ticked')
   const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)

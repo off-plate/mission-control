@@ -48,7 +48,7 @@ export function TodayPage() {
      decision back to him instead of making it. Habits, goals and the week are
      inside the room now, in the room's language, each said once. */
   return (
-    <div className="page">
+    <div className="page is-today">
       <Band
         title={<WorkspaceTitle before="Today" />}
         metrics={[

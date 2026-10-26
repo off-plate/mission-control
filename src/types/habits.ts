@@ -282,6 +282,10 @@ export interface HabitDef {
   icon?: string
   /** A quit's daily cost, for "money saved". */
   dailyCost?: number
+  /** Its part of the day has been decided (2026-10-26, routines became parts
+   *  of the day): set once from the routine it came from, then his to change.
+   *  Without the mark, a step he moved to "Any time" would be put back. */
+  partSet?: boolean
   /** For a 'times' habit: the stretch the target is counted over. */
   per?: CountPeriod
   /** For a 'times' habit: how many in that stretch. */

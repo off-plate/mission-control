@@ -631,15 +631,19 @@ export function useGrowthSlice(
     setHabits((prev) => [
       ...prev,
       { id: hid, space, name: input.title, daypart: input.daypart, kind: 'build', frequency, days: blank, paused: false, history: [], startedOn: todayKey() },
-      ...steps.map((st, i) => ({ id: `h-${rid}-${st.id}`, space, name: st.title, kind: 'build' as const, frequency, daypart: input.daypart, days: blank, paused: false, history: [], folderId: rid, folderOrder: i, startedOn: todayKey() })),
+      ...steps.map((st, i) => ({ id: `h-${rid}-${st.id}`, space, name: st.title, kind: 'build' as const, frequency, daypart: input.daypart, partSet: true, days: blank, paused: false, history: [], folderId: rid, folderOrder: i, startedOn: todayKey() })),
     ])
     setRoutines((prev) => [...prev, {
       id: rid, space, title: input.title, cadence: input.cadence, steps, doneStepIds: [], habitId: hid,
       periodKey: periodKeyFor(input.cadence), stepData: {}, color: input.color, icon: input.icon, repeatable: input.repeatable,
     }])
   }
-  const setLook = (kind: 'habit' | 'routine' | 'goal', id: string, look: { color?: string; icon?: string; dailyCost?: number; presets?: number[]; name?: string }) => {
-    if (kind === 'habit') setHabits((prev) => prev.map((x) => (x.id === id ? { ...x, ...look } : x)))
+  const setLook = (kind: 'habit' | 'routine' | 'goal', id: string, look: { color?: string; icon?: string; dailyCost?: number; presets?: number[]; name?: string; daypart?: TimeSlot | null }) => {
+    if (kind === 'habit') setHabits((prev) => prev.map((x) => {
+      if (x.id !== id) return x
+      const { daypart, ...rest } = look
+      return daypart === undefined ? { ...x, ...rest } : { ...x, ...rest, daypart: daypart ?? undefined, partSet: true }
+    }))
     else if (kind === 'routine') setRoutines((prev) => prev.map((x) => (x.id === id ? { ...x, color: look.color ?? x.color, icon: look.icon ?? x.icon, title: look.name ?? x.title } : x)))
     else setGoals((prev) => prev.map((x) => (x.id === id ? { ...x, color: look.color ?? x.color, icon: look.icon ?? x.icon, name: look.name ?? x.name } : x)))
   }

@@ -11363,7 +11363,17 @@ button.tagmark:focus-visible { outline: 2px solid var(--accent-text); outline-of
 
 /* On Today the title truncates, the tag never does: it sits beside the
    title (gap 12px pulled to 6px) so a long title gives way, not the tag. */
-.tr-r > .tagmark { flex: none; margin-left: -6px; max-width: 45%; overflow: hidden; text-overflow: ellipsis; }
+/* Today rows (his report, 2026-10-26): the hashtag beside the title squeezed
+   the slot label into the title and pushed the day counts out of line. The
+   title and its tag now share one column, tag on a small line underneath; the
+   slot and the age keep their own width, the age right-aligned in a column. */
+.tr-tt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.tr-tt > .tr-t { flex: none; }
+.tr-tt > .tagmark { font-size: 12.5px; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.troom .tr-r > .tr-slot, .troom .tr-r > .tr-box, .troom .tr-r > .tr-tick { flex: none; }
+.troom .tr-r > .tr-age { flex: none; min-width: 44px; text-align: right; margin-left: auto; }
+/* The phone's Today band keeps the next event and drops the open-task count. */
+@media (max-width: 639px) { .page.is-today > .band .band-metric + .band-metric { display: none; } }
 
 /* NOTES, ONE LIST (2026-10-25). The folder column is gone: the list and the
    note share the row. 16px of air under the header (it sat flush against it),
@@ -11706,3 +11716,13 @@ button.tagmark:focus-visible { outline: 2px solid var(--accent-text); outline-of
 /* On a touch screen the sheet closes by pulling it down, so the X goes. */
 @media (pointer: coarse) { .hk-sheet .hk-stop .hk-round[aria-label="Close"] { visibility: hidden; } }
 .hk-sheet .hk-grab { cursor: grab; }
+
+/* Parts of the day: each heading can start its part; the part he is in is marked. */
+.hk-partplay { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 10px; border: 0; background: var(--hk-accent); color: var(--hk-accent-ink); font-family: var(--font-body); font-weight: 800; font-size: 13px; margin-left: 8px; transition: transform 140ms var(--hk-ease); }
+.hk-partplay:active { transform: scale(0.96); }
+.hk-sech.is-now::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--hk-accent); box-shadow: 0 0 0 3px color-mix(in oklab, var(--hk-accent) 35%, transparent); align-self: center; }
+.hk-seg.is-wrap { grid-auto-flow: row; grid-template-columns: repeat(3, 1fr); }
+/* Sixty-odd cards now that every routine step is its own habit: cards off the
+   screen are not laid out or painted until they come near it. Safe now that
+   the strip filters rather than jump-scrolls (the jump was what it upset). */
+.hk-card { content-visibility: auto; contain-intrinsic-size: auto 200px; }

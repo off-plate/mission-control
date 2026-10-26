@@ -442,7 +442,7 @@ interface Store extends PersistedState {
   logGoalAmount: (id: string, v: number, note?: string) => string
   removeGoalEntry: (id: string, entryId: string) => void
   addRoutineWithSteps: (input: { title: string; cadence: RoutineCadence; daypart?: import('./types').TimeSlot; steps: string[]; color?: string; icon?: string; repeatable?: boolean }) => void
-  setLook: (kind: 'habit' | 'routine' | 'goal', id: string, look: { color?: string; icon?: string; dailyCost?: number; presets?: number[]; name?: string }) => void
+  setLook: (kind: 'habit' | 'routine' | 'goal', id: string, look: { color?: string; icon?: string; dailyCost?: number; presets?: number[]; name?: string; daypart?: import('./types').TimeSlot | null }) => void
   /** A routine and the habit that mirrors it are created together, so finishing
    *  it always has somewhere to land. */
   addRoutine: (input: { title: string; cadence: RoutineCadence; blurb?: string; daypart?: import('./types').TimeSlot }) => void
@@ -696,6 +696,26 @@ function loadPersisted(): PersistedState | null {
           ? (amountSum.get(`${h.id}|${dayOfWeekKey(i)}`) ?? 0) >= (h.targetAmount ?? 1)
           : thisWeek.has(`${h.id}|${dayOfWeekKey(i)}`)),
       }))
+    }
+
+    /* ROUTINES BECOME PARTS OF THE DAY (his call, 2026-10-26): every habit a
+       routine holds takes that routine's part of the day, once, as he approved
+       it: wake-up, morning preparation and both work routines in the Morning,
+       night work and bed in the Evening, and the weekly, monthly and on-demand
+       ones at Any time (they keep their own rhythm). After that the part is
+       his: `partSet` stops this from ever putting one back. Nothing is removed;
+       the routine rows still drive Today, Plan and the widgets. */
+    {
+      const PART: Record<string, import('./types').TimeSlot> = { 'r-wakeup': 'morning', 'r-morning': 'morning', 'r-prework': 'morning', 'r-workroutine': 'morning', 'r-nightwork': 'evening', 'r-evening': 'evening' }
+      const routineOf = new Map((p.routines ?? []).map((r) => [r.id, r]))
+      p.habits = p.habits.map((h) => {
+        if (!h.folderId || h.partSet) return h
+        const r = routineOf.get(h.folderId)
+        const rare = !!r && (r.cadence === 'weekly' || r.cadence === 'monthly' || (!!r.repeatable && r.cadence === 'daily'))
+        const mirror = r?.habitId ? p.habits.find((x) => x.id === r.habitId) : undefined
+        const daypart = rare ? undefined : (PART[h.folderId] ?? mirror?.daypart ?? h.daypart)
+        return { ...h, daypart, partSet: true }
+      })
     }
 
     /* A rename of a SEEDED row has to reach state that already exists. Renaming

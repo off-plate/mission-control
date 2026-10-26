@@ -21,7 +21,7 @@ import { NAME_DAYS } from '../../../src/namedays-data.ts'
 
 type Task = { id?: string; title: string; carried?: number; space?: string; at?: string; slot?: string; done: boolean; list: 'today' | 'backlog'; plannedOn?: string; projectId?: string; estimateMin?: number; subtasks?: { estimateMin: number }[] }
 type Project = { id: string; name: string }
-type Habit = { id: string; name?: string; daypart?: string; folderOrder?: number; kind?: string; frequency?: string; paused?: boolean; archivedAt?: string; folderId?: string; optional?: boolean
+type Habit = { id: string; name?: string; daypart?: string; partSet?: boolean; folderOrder?: number; kind?: string; frequency?: string; paused?: boolean; archivedAt?: string; folderId?: string; optional?: boolean
   measure?: string; unit?: string; targetAmount?: number; targetCount?: number; per?: string; targetPerWeek?: number; auto?: { from?: string }; source?: string; quitSince?: string }
 type Tick = { habitId: string; day: string; v?: number }
 type Slip = { habitId: string; day: string }
@@ -96,22 +96,28 @@ function habitsLeft(habits: Habit[], routines: { habitId?: string }[], log: Tick
   const sunday = iso(new Date(Date.UTC(now.y, now.m - 1, now.d - now.weekday + 6)))
   const auto = (h: Habit) => h.auto?.from === 'focus' || (h.kind === 'measured' && h.measure !== 'times' && h.measure !== 'amount')
   const todayRows = (h: Habit) => log.filter((t) => t.habitId === h.id && t.day === now.day)
-  const loose = habits.filter((h) => !h.archivedAt && !h.paused && !h.folderId && !mirror.has(h.id) && h.kind !== 'break' && !auto(h))
-  const left: { name: string; note?: string }[] = []
+  /* Since 2026-10-26 a routine's steps are habits in their own right, sorted by
+     part of the day, so they are listed too; only the routine's own mirror
+     habit (its "done" tick) is left out. */
+  const loose = habits.filter((h) => !h.archivedAt && !h.paused && !mirror.has(h.id) && h.kind !== 'break' && !auto(h))
+  const monthFrom = `${now.day.slice(0, 7)}-01`
+  const left: { name: string; note?: string; part: string }[] = []
   for (const h of loose) {
     if (h.frequency === 'weekdays' && now.weekday >= 5) continue
     const weekDays = new Set(log.filter((t) => t.habitId === h.id && t.day >= monday && t.day <= sunday).map((t) => t.day)).size
     if (h.frequency === 'times-per-week' && weekDays >= (h.targetPerWeek ?? 3)) continue
     if ((h.frequency === 'weekly') && weekDays >= 1) continue
+    if (h.frequency === 'monthly' && log.some((t) => t.habitId === h.id && t.day >= monthFrom && t.day <= now.day)) continue
+    const part = h.daypart === 'morning' || h.daypart === 'noon' || h.daypart === 'afternoon' || h.daypart === 'evening' ? h.daypart : 'any'
     const rows = todayRows(h)
     if (h.measure === 'amount') {
       const got = rows.reduce((a, t) => a + (t.v ?? 0), 0), need = h.targetAmount ?? 1
-      if (got < need) left.push({ name: h.name ?? 'Habit', note: `${Math.round(need - got)} ${h.unit ?? ''} to go`.trim() })
+      if (got < need) left.push({ part, name: h.name ?? 'Habit', note: `${Math.round(need - got)} ${h.unit ?? ''} to go`.trim() })
     } else if (h.measure === 'times') {
       const need = h.targetCount ?? 1
-      if ((h.per ?? 'day') === 'day' && rows.length < need) left.push({ name: h.name ?? 'Habit', note: `${rows.length} of ${need}` })
+      if ((h.per ?? 'day') === 'day' && rows.length < need) left.push({ part, name: h.name ?? 'Habit', note: `${rows.length} of ${need}` })
     } else if (!rows.length) {
-      left.push({ name: h.name ?? 'Habit', note: h.frequency === 'times-per-week' ? `${weekDays} of ${h.targetPerWeek ?? 3} this week` : undefined })
+      left.push({ part, name: h.name ?? 'Habit', note: h.frequency === 'times-per-week' ? `${weekDays} of ${h.targetPerWeek ?? 3} this week` : h.optional ? 'optional' : undefined })
     }
   }
   const quits = habits.filter((h) => !h.archivedAt && h.kind === 'break').map((h) => {

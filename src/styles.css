@@ -11517,7 +11517,7 @@ button.tagmark:focus-visible { outline: 2px solid var(--accent-text); outline-of
 
 /* sheets */
 .hk-scrim { position: fixed; inset: 0; background: rgba(18,16,12,.32); z-index: 89; animation: hk-fade 220ms ease both; }
-.hk-sheet { position: fixed; left: 50%; bottom: 0; width: min(560px, 100%); max-height: 92dvh; overflow-y: auto; overscroll-behavior: contain; transform: translateX(-50%); background: var(--hk-sheet); color: var(--hk-ink); border-radius: 26px 26px 0 0; box-shadow: 0 -10px 40px rgba(18,16,12,.18); z-index: 90; padding: 10px 18px max(22px, env(safe-area-inset-bottom, 0px)); animation: hk-up 380ms var(--hk-drawer) both; }
+.hk-sheet { position: fixed; left: 50%; bottom: 0; width: min(560px, 100%); max-height: 92dvh; overflow-y: auto; overscroll-behavior: contain; transform: translateX(-50%); background: var(--hk-sheet); color: var(--hk-ink); border-radius: 26px 26px 0 0; box-shadow: 0 -10px 40px rgba(18,16,12,.18); z-index: 90; padding: 10px 18px max(22px, env(safe-area-inset-bottom, 0px)); animation: hk-up 380ms var(--hk-drawer) backwards; }
 @keyframes hk-up { from { transform: translate(-50%, 100%); } to { transform: translate(-50%, 0); } }
 @keyframes hk-fade { from { opacity: 0; } to { opacity: 1; } }
 .hk-grab { width: 40px; height: 5px; border-radius: 3px; background: var(--hk-line-2); margin: 0 auto 12px; }
@@ -11689,3 +11689,20 @@ button.tagmark:focus-visible { outline: 2px solid var(--accent-text); outline-of
   .hk-sq { width: 30px; height: 30px; border-radius: 9px; }
 }
 .hk-promised p.hk-sub { white-space: normal; overflow: visible; }
+
+/* Plan on the phone: a tapped title shows all of itself (2026-10-26). */
+@media (max-width: 639px) {
+  .todo-row > .grow.is-open, .today-task > .grow.is-open { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; overflow-wrap: anywhere; }
+  .todo-row > .grow, .today-task > .grow { cursor: pointer; }
+}
+
+/* Routines as folders: the chevron says it opens, the steps sit in place. */
+.hk-chev { display: inline-block; vertical-align: -2px; margin-left: 6px; color: var(--hk-faint); transition: transform 200ms var(--hk-ease); }
+.hk-chev.is-open { transform: rotate(180deg); }
+.hk-folder { animation: hk-head 260ms var(--hk-ease) both; }
+.hk-row .hk-folder { grid-column: 1 / -1; }
+.hk-folder .hk-steps { margin: 2px 0 6px; }
+.hk .hk-folderlink { border: 0; font-family: var(--font-body); background: none; padding: 6px 0 0; font-size: 13px; font-weight: 700; color: color-mix(in oklab, var(--c) var(--hk-cpct), #12100C); }
+/* On a touch screen the sheet closes by pulling it down, so the X goes. */
+@media (pointer: coarse) { .hk-sheet .hk-stop .hk-round[aria-label="Close"] { visibility: hidden; } }
+.hk-sheet .hk-grab { cursor: grab; }

@@ -577,6 +577,14 @@ export function PlanPage() {
      the room he is already standing in. */
   /* Always drawn now (2026-10-25): the hashtag IS how a task says where it
      lives, and a tap on it narrows the list to that project. */
+  /* On the phone a title is one line with an ellipsis, three or four words of
+     it (his report, 2026-10-26). A tap on the words opens that one task's full
+     title, a second tap folds it again. A link inside the title still opens. */
+  const [openTitles, setOpenTitles] = useState<Set<string>>(() => new Set())
+  const toggleTitle = (e: React.MouseEvent, id: string) => {
+    if ((e.target as HTMLElement).closest('a, button')) return
+    setOpenTitles((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  }
   const markOf = (t: Task) => (t.projectId ? projects.find((p) => p.id === t.projectId) : undefined)
   const pickTag = (p: Project) => setPicked((prev) => (prev.length === 1 && prev[0] === p.id ? [] : [p.id]))
   /* Offered in the add box: this workspace's projects first, then the rest,
@@ -1245,7 +1253,7 @@ export function PlanPage() {
                   <span className="drag-grip" aria-hidden="true"><Icon.Grip /></span>
                   <SpaceMark space={t.space} />
                   <span className={`cat-dot ${t.category}`} aria-hidden="true" />
-                  <span className="grow"><Linkify text={t.title} /> <TagMark project={markOf(t)} onPick={pickTag} /></span>
+                  <span className={`grow${openTitles.has(t.id) ? ' is-open' : ''}`} onClick={(e) => toggleTitle(e, t.id)}><Linkify text={t.title} /> <TagMark project={markOf(t)} onPick={pickTag} /></span>
                   {/* Age since it was written down, not replans: moving it on
                       and off a day never changes the number. */}
                   {t.createdAt && daysSince(t.createdAt) > 0 && (
@@ -1436,7 +1444,7 @@ export function PlanPage() {
                           </button>
                           <SpaceMark space={t.space} />
                           <span className={`cat-dot ${t.category}`} aria-hidden="true" />
-                          <span className="grow wrap2"><Linkify text={t.title} /> <TagMark project={markOf(t)} onPick={pickTag} /></span>
+                          <span className={`grow wrap2${openTitles.has(t.id) ? ' is-open' : ''}`} onClick={(e) => toggleTitle(e, t.id)}><Linkify text={t.title} /> <TagMark project={markOf(t)} onPick={pickTag} /></span>
                           {t.done && t.actualMin != null ? (
                             <span className="est-vs-actual mono">{fmtDuration(taskMinutes(t))} → {fmtDuration(t.actualMin)} <b className={taskMinutes(t) - t.actualMin >= 0 ? 'val-pos' : 'val-urgent'}>{taskMinutes(t) - t.actualMin >= 0 ? '+' : ''}{taskMinutes(t) - t.actualMin}m</b></span>
                           ) : (

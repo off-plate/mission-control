@@ -90,6 +90,38 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
   const [filter, setFilter] = useState(start)
   useEffect(() => setFilter(start), [start])
   const [sheet, setSheet] = useState<{ kind: 'run' | 'log' | 'detail' | 'new'; key?: string } | null>(null)
+  const [openFolders, setOpenFolders] = useState<Set<string>>(() => new Set())
+  /* SWIPE DOWN TO CLOSE (his ask, 2026-10-26), the way the More sheet works:
+     drag the sheet down from anywhere while its own content is scrolled to the
+     top; a long enough or quick enough pull closes it, a short one springs back. */
+  const sheetRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = sheetRef.current
+    if (!el || !sheet) return
+    let y0 = 0, t0 = 0, dy = 0, dragging = false
+    const start = (e: TouchEvent) => { y0 = e.touches[0].clientY; t0 = Date.now(); dy = 0; dragging = false }
+    const move = (e: TouchEvent) => {
+      const d = e.touches[0].clientY - y0
+      if (!dragging && d > 6 && el.scrollTop <= 0) { dragging = true; el.style.transition = 'none' }
+      if (!dragging) return
+      e.preventDefault()
+      dy = Math.max(0, d)
+      el.style.transform = `translate(-50%, ${dy}px)`
+    }
+    const end = () => {
+      if (!dragging) return
+      dragging = false
+      const fast = dy / Math.max(1, Date.now() - t0) > 0.5
+      el.style.transition = 'transform 220ms cubic-bezier(0.32, 0.72, 0, 1)'
+      if (dy > 110 || (fast && dy > 30)) { el.style.transform = 'translate(-50%, 100%)'; setTimeout(() => setSheet(null), 200) }
+      else el.style.transform = 'translate(-50%, 0)'
+    }
+    el.addEventListener('touchstart', start, { passive: true })
+    el.addEventListener('touchmove', move, { passive: false })
+    el.addEventListener('touchend', end)
+    el.addEventListener('touchcancel', end)
+    return () => { el.removeEventListener('touchstart', start); el.removeEventListener('touchmove', move); el.removeEventListener('touchend', end); el.removeEventListener('touchcancel', end) }
+  }, [sheet])
   const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null)
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 3800); return () => clearTimeout(t) }, [toast])
   const today = localDateKey()
@@ -329,19 +361,41 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
     return null
   }
 
+  /* ROUTINES AS FOLDERS (his ask, 2026-10-26): a tap on a routine opens it in
+     place to show its habits, each tickable, instead of sending him to a sheet.
+     The sheet (history, colour) is one tap further, at the foot of the folder. */
+  const openTap = (it: Item) => {
+    if (it.kind !== 'routine') { setSheet({ kind: 'detail', key: it.key }); return }
+    setOpenFolders((prev) => { const n = new Set(prev); if (n.has(it.key)) n.delete(it.key); else n.add(it.key); return n })
+  }
+  const Folder = (it: Item) => !openFolders.has(it.key) || !it.list ? null : (
+    <div className="hk-folder">
+      <ul className="hk-steps">
+        {it.list.map((h) => (
+          <li key={h.id} className={h.days[todayIndex] ? 'is-d' : ''}>
+            <button className="hk-mstick" role="checkbox" aria-checked={h.days[todayIndex]} aria-label={h.name} onClick={() => s.toggleHabitDay(h.id, todayIndex)}><i /></button>
+            <span>{h.name}</span>
+            <small>{h.optional ? 'optional' : h.seconds ? `${Math.round(h.seconds / 60)} min` : ''}</small>
+          </li>
+        ))}
+      </ul>
+      <button className="hk-folderlink" onClick={() => setSheet({ kind: 'detail', key: it.key })}>History and colour</button>
+    </div>
+  )
   const Card = ({ it, next, i = 0 }: { it: Item; next?: boolean; i?: number }) => {
     const g = it.goal, h = it.habit
     return (
       <article key={it.key} className={`hk-card${next ? ' is-next' : ''}`} style={{ ['--c' as string]: it.color, ['--i' as string]: Math.min(i, 14) }}>
         <div className="hk-top">
           {Ico({ it })}
-          <button className="hk-name" onClick={() => setSheet({ kind: 'detail', key: it.key })}>
+          <button className="hk-name" aria-expanded={it.kind === 'routine' ? openFolders.has(it.key) : undefined} onClick={() => openTap(it)}>
             {next && <span className="hk-next">Up next</span>}
-            <span className="hk-title">{it.name}</span>
+            <span className="hk-title">{it.name}{it.kind === 'routine' && <Icon.ChevronDown size={14} className={`hk-chev${openFolders.has(it.key) ? ' is-open' : ''}`} />}</span>
             <span className="hk-sub">{subLine(it)}</span>
           </button>
           {Action({ it, big: next })}
         </div>
+        {Folder(it)}
         {g && <div className="hk-amt"><b>{fmt(goalInfo(g).total)}</b><span>/ {fmt(g.target)} {g.unit}</span>{goalInfo(g).reach && <em className={goalInfo(g).ahead ? 'ok' : ''}>{fmt(g.target)} by {short(goalInfo(g).reach!)}</em>}</div>}
         {it.kind === 'quit' && h && <div className="hk-amt"><b>{quitClean(h).clean}</b><span>of {quitClean(h).daysIn} days clean</span><em>longest {bestCleanRun(h, slips)} days</em></div>}
         {Tiles({ it, weeks: 26 })}
@@ -351,12 +405,13 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
   const Row = ({ it, next, i = 0 }: { it: Item; next?: boolean; i?: number }) => (
     <div key={it.key} className={`hk-row${it.kind === 'routine' && routineState(it).off ? ' is-dim' : ''}`} style={{ ['--c' as string]: it.color, ['--i' as string]: Math.min(i, 18) }}>
       {Ico({ it })}
-      <button className="hk-name" onClick={() => setSheet({ kind: 'detail', key: it.key })}>
+      <button className="hk-name" aria-expanded={it.kind === 'routine' ? openFolders.has(it.key) : undefined} onClick={() => openTap(it)}>
         {next && <span className="hk-next">Up next</span>}
-        <span className="hk-title">{it.name}</span>
+        <span className="hk-title">{it.name}{it.kind === 'routine' && <Icon.ChevronDown size={14} className={`hk-chev${openFolders.has(it.key) ? ' is-open' : ''}`} />}</span>
         <span className="hk-sub">{subLine(it)}</span>
       </button>
       {Action({ it, big: next })}
+      {Folder(it)}
     </div>
   )
 
@@ -472,7 +527,7 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
       {sheet && (
         <>
           <div className="hk-scrim" onClick={() => setSheet(null)} />
-          <div className="hk-sheet" role="dialog" aria-modal="true" aria-label={sheetItem?.name ?? 'New'} style={{ ['--c' as string]: sheetItem?.color ?? '#8E88FF' }}>
+          <div className="hk-sheet" ref={sheetRef} role="dialog" aria-modal="true" aria-label={sheetItem?.name ?? 'New'} style={{ ['--c' as string]: sheetItem?.color ?? '#8E88FF' }}>
             <div className="hk-grab" />
             {sheet.kind === 'run' && sheetItem?.routine && (
               <RoutineRunner folder={sheetItem.routine} list={sheetItem.list!} todayIndex={todayIndex} onClose={() => {

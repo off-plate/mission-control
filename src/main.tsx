@@ -2,6 +2,8 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
 import App from './App'
+import { installRubberBand } from './rubberband'
+installRubberBand()
 import { StoreProvider, STORAGE_KEY } from './store'
 import { PomodoroProvider } from './pomodoro'
 import { MundiOpusProvider } from './mundiplayer'

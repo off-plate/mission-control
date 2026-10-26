@@ -16,7 +16,8 @@ import { usePomodoro } from './pomodoro'
 import { BreakdownSheet, Sheet } from './modals'
 import { Linkify } from './widgets'
 import { PLAN_AHEAD_DAYS, WeekGrid, dayPlus, shortDay, weekRangeLabel } from './weekgrid'
-import { useCoarsePointer, usePhone, Band, WorkspaceTitle, Dropdown, SpaceMark, TagMark, openRowMenu } from './ui'
+import { useCoarsePointer, usePhone, Band, WorkspaceTitle, Dropdown, SpaceMark, TagMark } from './ui'
+import { TaskSheet } from './tasksheet'
 import { TagField } from './tagfield'
 import { matchProjects, tagOf, takeTag } from './tags'
 import { SLOTS, SPACES, UNSORTED, habitLocked, routineComplete, routineProgress, slotMinutes, TYPING_TARGET_WPM, type Project, type Routine, type SubTask, type Task, type TimeSlot } from './types'
@@ -583,12 +584,14 @@ export function PlanPage() {
      it (his report, 2026-10-26). A tap on the words opens that one task's full
      title, a second tap folds it again. A link inside the title still opens. */
   const [openTitles, setOpenTitles] = useState<Set<string>>(() => new Set())
+  /** The task whose sheet is open on the phone. */
+  const [sheetId, setSheetId] = useState<string | null>(null)
   const toggleTitle = (e: React.MouseEvent, id: string) => {
     if ((e.target as HTMLElement).closest('a, button')) return
     /* On the phone a tap on a task opens its menu as a sheet instead (his ask,
        2026-10-26): the kebab was too small to hit, and the sheet shows the
        whole title, so the fold-open is no longer needed there. */
-    if (phone) { openRowMenu(id); return }
+    if (phone) { setSheetId(id); return }
     setOpenTitles((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
   }
   const markOf = (t: Task) => (t.projectId ? projects.find((p) => p.id === t.projectId) : undefined)
@@ -875,6 +878,7 @@ export function PlanPage() {
   const [listDropOver, setListDropOver] = useState(false)
   const [quick, setQuick] = useState('')
   const [breakdownFor, setBreakdownFor] = useState<Task | null>(null)
+  const sheetTask = sheetId ? tasks.find((x) => x.id === sheetId) ?? null : null
   const [editingTask, setEditingTask] = useState<Task | null>(null)
 
   /* On a laptop the four parts of the day run well past the fold, so each part
@@ -1277,8 +1281,7 @@ export function PlanPage() {
                     </button>
                   )}
                   <TaskActions task={t} />
-                  <Dropdown label={`Options for ${t.title}`} sheet={t.title} menuId={t.id}>
-                    {phone && <button role="menuitem" onClick={() => toggleTask(t.id)}>Mark done</button>}
+                  <Dropdown label={`Options for ${t.title}`}>
                     <button role="menuitem" onClick={() => setEditingTask(t)}>Edit</button>
                     <button role="menuitem" onClick={() => setBreakdownFor(t)}>Break it down</button>
                     {/* ON A TOUCH SCREEN ONLY, restored 2026-09-09. These two
@@ -1466,8 +1469,7 @@ export function PlanPage() {
                             </button>
                           )}
                           {!t.done && <TaskActions task={t} onFocus={() => startFocus(taskMinutes(t), t.title)} />}
-                          <Dropdown label={`Options for ${t.title}`} sheet={t.title} menuId={t.id}>
-                            {phone && <button role="menuitem" onClick={() => { if (t.done) toggleTask(t.id); else setLogging(t.id) }}>{t.done ? 'Not done yet' : 'Mark done'}</button>}
+                          <Dropdown label={`Options for ${t.title}`}>
                             {phone && !t.done && isEstimated(t) && <button role="menuitem" onClick={() => startFocus(taskMinutes(t), t.title)}>Start focus</button>}
                             {!t.done && <button role="menuitem" onClick={() => setBreakdownFor(t)}>Break it down</button>}
                             {/* Both "Move to" (the radio-style time-slot list)
@@ -1578,6 +1580,18 @@ export function PlanPage() {
 
       {breakdownFor && <BreakdownSheet task={breakdownFor} onClose={() => setBreakdownFor(null)} />}
       {editingTask && <EditTaskSheet task={editingTask} onClose={() => setEditingTask(null)} />}
+      {phone && sheetTask && (
+        <TaskSheet
+          key={sheetTask.id}
+          task={sheetTask}
+          onClose={() => setSheetId(null)}
+          onDone={() => { if (sheetTask.list === 'today') setLogging(sheetTask.id); else toggleTask(sheetTask.id) }}
+          onEdit={() => setEditingTask(sheetTask)}
+          onBreakdown={() => setBreakdownFor(sheetTask)}
+          onFocus={isEstimated(sheetTask) ? () => startFocus(taskMinutes(sheetTask), sheetTask.title) : undefined}
+          onPlaced={(n) => setDayOffset(n)}
+        />
+      )}
 
     </div>
   )

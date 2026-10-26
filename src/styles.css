@@ -11871,3 +11871,41 @@ html { background: var(--bg); }
   .shell, .page:not(.hk) { padding-bottom: 0; }
   #main { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
 }
+
+/* ---------- The task sheet on the phone (2026-10-26) ----------
+   Same family as the Habits sheets: big primary button, tiles, controls that
+   show their current value. Lives in .hk tokens (light, the app's paper). */
+@media (max-width: 639px) {
+  .todo-row > .kebab-wrap, .today-task > .kebab-wrap { display: none; }
+}
+.ts-sheet { left: 0; right: 0; width: 100%; transform: none; animation: sheet-rise 420ms var(--ease-drawer, cubic-bezier(0.32, 0.72, 0, 1)); padding-top: 10px; }
+.ts-title { margin: 2px 2px 10px; font-family: var(--font-display); font-size: 22px; line-height: 1.25; letter-spacing: -0.015em; font-weight: 700; color: var(--hk-ink); text-wrap: pretty; }
+.ts-meta { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
+.ts-chip { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px; border-radius: 8px; background: var(--hk-card-2); color: var(--hk-muted); font-size: 13px; font-weight: 600; }
+.ts-done { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0 0 10px; }
+.ts-done.is-undo { background: var(--hk-card-2); color: var(--hk-ink); }
+.ts-tiles { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; margin-bottom: 18px; }
+.ts-tiles button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; height: 72px; border: 0; border-radius: 16px; background: var(--hk-card-2); color: var(--hk-ink); font-size: 13px; font-weight: 700; }
+.ts-tiles button svg { color: var(--hk-muted); }
+.ts-days { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 -18px; padding: 0 18px 2px; scroll-padding-inline: 18px; }
+.ts-days::-webkit-scrollbar { display: none; }
+.ts-days button { flex: 0 0 auto; width: 54px; height: 62px; border: 0; border-radius: 14px; background: var(--hk-card-2); color: var(--hk-ink); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.ts-days small { font-size: 11.5px; font-weight: 700; color: var(--hk-muted); }
+.ts-days b { font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ts-days button[aria-pressed="true"] { background: var(--hk-ink); color: var(--hk-sheet); }
+.ts-days button[aria-pressed="true"] small { color: inherit; opacity: 0.75; }
+.ts-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ts-slots button { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; height: 58px; padding: 0 14px; border: 0; border-radius: 14px; background: var(--hk-card-2); color: var(--hk-ink); text-align: left; }
+.ts-slots b { font-size: 15px; font-weight: 700; }
+.ts-slots small { font-size: 12px; color: var(--hk-muted); font-weight: 600; }
+.ts-slots button[aria-pressed="true"] { background: var(--hk-accent); color: var(--hk-accent-ink); }
+.ts-slots button[aria-pressed="true"] small { color: inherit; opacity: 0.7; }
+.ts-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ts-chips button { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border: 0; border-radius: 12px; background: var(--hk-card-2); color: var(--hk-ink); font-size: 14px; font-weight: 600; }
+.ts-chips button[aria-pressed="true"] { background: var(--hk-ink); color: var(--hk-sheet); }
+.ts-dot { width: 9px; height: 9px; border-radius: 3px; background: currentColor; flex: none; }
+.ts-chips button[aria-pressed="true"] .ts-dot { filter: brightness(1.8); }
+.ts-sheet .hk-seg button { font-size: 13px; }
+.ts-foot { display: flex; justify-content: space-between; gap: 10px; margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--hk-line, var(--hairline)); }
+.ts-link { height: 44px; padding: 0 4px; border: 0; background: none; font-size: 15px; font-weight: 700; color: var(--hk-ink); }
+.ts-link.is-danger { margin-left: auto; color: var(--alert); }

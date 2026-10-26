@@ -27,12 +27,12 @@ export function useSwipeDown(ref: RefObject<HTMLElement | null>, onClose: () => 
       const t = e.target as HTMLElement
       if (t.closest('input, textarea, select, [contenteditable="true"]')) return
       scroller = scrollerOf(t)
-      if (scroller && scroller.scrollTop > 0) return
+      if ((scroller && scroller.scrollTop > 0) || el.scrollTop > 0) return
       y0 = lastY = e.touches[0].clientY; lastT = e.timeStamp; dy = 0; v = 0; live = true
     }
     const move = (e: TouchEvent) => {
       if (!live) return
-      if (scroller && scroller.scrollTop > 0) { live = false; el.style.transform = ''; return }
+      if ((scroller && scroller.scrollTop > 0) || el.scrollTop > 0) { live = false; el.style.transform = ''; return }
       const y = e.touches[0].clientY
       dy = y - y0
       if (dy <= 0) { el.style.transform = ''; return }

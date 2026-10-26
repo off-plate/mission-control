@@ -1382,11 +1382,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (!remote || stripDates(united) !== stripDates(remote)) outbox.push(mine)
     }
     const onWake = () => { void pull() }
+    /* Pull to refresh on Today: the same pull, with the orb saving meanwhile. */
+    const onRefresh = () => { void outbox.during(pull()) }
     document.addEventListener('visibilitychange', onWake)
     window.addEventListener('focus', onWake)
+    window.addEventListener('mc:refresh', onRefresh)
     const id = window.setInterval(onWake, 60000)
     return () => {
       stop = true
+      window.removeEventListener('mc:refresh', onRefresh)
       document.removeEventListener('visibilitychange', onWake)
       window.removeEventListener('focus', onWake)
       window.clearInterval(id)

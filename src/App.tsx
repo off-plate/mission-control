@@ -45,6 +45,7 @@ const WatchlessPage = lazy(() => import('./watchlesspage').then((m) => ({ defaul
 const IdeasPage = lazy(() => import('./ideaboard').then((m) => ({ default: m.IdeasPage })))
 const PeoplePage = lazy(() => import('./people').then((m) => ({ default: m.PeoplePage })))
 import { useStore } from './store'
+import { SKINS, useSkin } from './skins'
 import { ago, describe, useSyncStatus } from './sync'
 import { isReadOnly } from './store'
 import { SPACES, UNSORTED, type PageId, type SpaceId, type ViewId } from './types'
@@ -611,6 +612,15 @@ export default function App() {
      theme whether or not the mode is on, the way the Zone is its own room.
      The switch itself, and every other page, are untouched. */
   const hudLook = hud || page === 'assistant'
+  /* The look (Settings > Look). HUD, the Jarvis room and the Zone keep their
+     own, so a skin only applies where none of them does. */
+  const pickedSkin = useSkin()
+  const skin = hudLook || page === 'zone' ? 'classic' : pickedSkin
+  useEffect(() => {
+    const s = SKINS.find((x) => x.id === skin)!
+    document.documentElement.style.colorScheme = s.dark ? 'dark' : ''
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', s.bar)
+  }, [skin])
   /* The assistant can ask for it too ("turn on Jarvis mode"). */
   useEffect(() => {
     const on = (e: Event) => setHud((e as CustomEvent<boolean>).detail)
@@ -677,7 +687,7 @@ export default function App() {
          Jar and the Why wall it opens are dark in both modes, and a paper
          header on top of them read as two apps. Every other page keeps the
          light header, and HUD is already dark, so it is left alone. */
-      className={`shell${page === 'zone' ? ' in-zone' : ''}${hudLook ? ' is-hud' : ''}${!hudLook && DARK_CHROME_PAGES.includes(page) ? ' is-dark-chrome' : ''}${!hudLook && JAR_PAGES[page] ? ' is-dark-page' : ''}`}
+      className={`shell${page === 'zone' ? ' in-zone' : ''}${hudLook ? ' is-hud' : ''}${!hudLook && DARK_CHROME_PAGES.includes(page) ? ' is-dark-chrome' : ''}${!hudLook && JAR_PAGES[page] ? ' is-dark-page' : ''}${skin !== 'classic' ? ` skin-${skin}` : ''}`}
       style={page === 'zone' ? ({ '--depth': zoneDepth } as React.CSSProperties) : undefined}
     >
       <a className="skiplink" href="#main">Skip to the page</a>

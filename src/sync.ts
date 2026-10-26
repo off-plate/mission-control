@@ -165,6 +165,14 @@ export class Outbox {
     if (res.ok) { writeNum(DIRTY_KEY, null); writeNum(LAST_KEY, Date.now()); this.set('synced', '') }
   }
 
+  /** Shows "saving" while some other sync work runs (pull to refresh). */
+  async during(p: Promise<unknown>): Promise<void> {
+    if (!this.enabled || this.inFlight) { await p; return }
+    const was = this.phase
+    this.set('saving', '')
+    try { await p } finally { if (this.phase === 'saving' && !this.inFlight) this.set(was === 'saving' ? 'synced' : was, this.detail) }
+  }
+
   /** True when this device holds work the server has not acknowledged. */
   get dirty(): boolean { return readNum(DIRTY_KEY) !== null }
 }

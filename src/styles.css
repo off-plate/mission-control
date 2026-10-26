@@ -11923,3 +11923,15 @@ html { background: var(--bg); }
   .projcard-kebab { top: 40px; right: 4px; }
   .f-paper { display: none; }
 }
+
+/* ---------- Swipe rows, toasts (2026-10-27, every look) ----------
+   swipe.ts moves the row; vertical panning stays the browser's. The tint says
+   which way it will go: green for done, a quiet wash for the actions. */
+@media (max-width: 639px) {
+  :is(.today-task, .todo-row, .tr-r, .hk-card, .hk-row) { touch-action: pan-y; }
+  .is-swipe-done { background-color: var(--progress-wash); }
+  .is-swipe-more { background-color: color-mix(in srgb, var(--ink) 7%, transparent); }
+  /* One toast at a time, above the tab bar with a gap. */
+  .undo-bar { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+  body:has(.undo-bar) .hk-toast { opacity: 0; pointer-events: none; }
+}

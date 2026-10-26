@@ -17,7 +17,7 @@ const band = (x: number, dim: number) => (x * dim * 0.55) / (dim + 0.55 * Math.a
 
 export function installRubberBand() {
   if (typeof window === 'undefined' || !window.matchMedia) return
-  let y0 = 0, edge: 'top' | 'bottom' | null = null, targets: HTMLElement[] = [], pulled = false
+  let y0 = 0, edge: 'top' | 'bottom' | null = null, targets: HTMLElement[] = [], pulled = false, down = 0
 
   const pick = (): HTMLElement[] => {
     const main = document.getElementById('main')
@@ -59,15 +59,18 @@ export function installRubberBand() {
     const dy = e.touches[0].clientY - y0
     const atTop = window.scrollY <= 0
     const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 1
-    if (dy > 0 && atTop) { pulled = true; set(band(dy, window.innerHeight), false) }
-    else if (dy < 0 && atBottom) { pulled = true; set(band(dy, window.innerHeight), false) }
-    else if (pulled) { pulled = false; set(0, false); y0 = e.touches[0].clientY }
+    if (dy > 0 && atTop) { pulled = true; down = band(dy, window.innerHeight); set(down, false) }
+    else if (dy < 0 && atBottom) { pulled = true; down = 0; set(band(dy, window.innerHeight), false) }
+    else if (pulled) { pulled = false; down = 0; set(0, false); y0 = e.touches[0].clientY }
     else y0 = e.touches[0].clientY
   }, { passive: true })
 
+  /* Pull to refresh, on Today only: far enough down and let go runs the same
+     pull the app does when it comes back to the front (store.tsx). */
   const end = () => {
     if (pulled) set(0, true)
-    edge = null; pulled = false
+    if (pulled && down > 64 && document.querySelector('#main .page.is-today')) window.dispatchEvent(new Event('mc:refresh'))
+    edge = null; pulled = false; down = 0
     window.setTimeout(() => { for (const el of targets) { if (!el.style.transform) el.style.transition = '' } }, 450)
   }
   window.addEventListener('touchend', end, { passive: true })

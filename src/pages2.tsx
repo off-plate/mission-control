@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { SKINS, setSkin, useSkin } from './skins'
 import { useStore } from './store'
 import { PROVIDERS, getAiKey, getAiProvider, hasAiKey, setAiKey, setAiProvider, type AiProvider } from './ai'
 import { Band, Segmented, Select } from './ui'
@@ -353,6 +354,14 @@ function DeviceVoiceField() {
   )
 }
 
+/* Per device, like Jarvis mode. Classic is the app as designed. */
+function LookPick() {
+  const skin = useSkin()
+  return (
+    <Segmented label="Look" value={skin} options={SKINS.map((s) => ({ id: s.id, label: s.label }))} onPick={setSkin} />
+  )
+}
+
 export function SettingsPage() {
   const { resetDemo } = useStore()
   return (
@@ -377,6 +386,8 @@ export function SettingsPage() {
               browser was serving an older bundle, and neither of us could see
               which. Now the screen says so, and Reload gets past a cached copy
               without going anywhere near developer tools. */}
+          <span className="microcap" style={{ marginTop: 24, display: 'block' }}>Look</span>
+          <LookPick />
           <span className="microcap" style={{ marginTop: 24, display: 'block' }}>This build</span>
           <div className="source-row">
             <span className="info">

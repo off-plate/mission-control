@@ -11649,8 +11649,11 @@ button.tagmark:focus-visible { outline: 2px solid var(--accent-text); outline-of
    view lagged on the phone, where a few thousand dots each ran their own).
    The grid is wiped in left to right, so it still draws itself and today
    still lands last, at the cost of a single clip-path per card. */
-@keyframes hk-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
-.hk-anim .hk-tiles { animation: hk-wipe 620ms cubic-bezier(0.25, 1, 0.5, 1) both; animation-delay: calc(var(--i, 0) * 45ms + 140ms); }
+/* `backwards`, never `both`: holding the end frame kept a clip on the grid for
+   good, which shaved the edge dots and the today and pace rings (his report,
+   2026-10-26). The clip reaches past the box so the last frame cuts nothing. */
+@keyframes hk-wipe { from { clip-path: inset(-6px 100% -6px -6px); } to { clip-path: inset(-6px -6px -6px -6px); } }
+.hk-anim .hk-tiles { animation: hk-wipe 620ms cubic-bezier(0.25, 1, 0.5, 1) backwards; animation-delay: calc(var(--i, 0) * 45ms + 140ms); }
 @media (prefers-reduced-motion: reduce) { .hk-anim .hk-card, .hk-anim .hk-row, .hk-anim .hk-wrow, .hk-anim .hk-sech, .hk-anim .hk-tiles { animation: none; } }
 
 
@@ -11668,13 +11671,16 @@ button.tagmark:focus-visible { outline: 2px solid var(--accent-text); outline-of
 .hk-dock { position: fixed; left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(18px, env(safe-area-inset-bottom, 0px)); z-index: 60; display: flex; align-items: center; gap: 8px; pointer-events: none; }
 .hk-dock > * { pointer-events: auto; }
 .hk-dock .hk-pill { position: static; left: auto; bottom: auto; transform: none; flex: none; }
-.hk-jump { flex: 1; min-width: 0; display: flex; gap: 2px; padding: 5px; border-radius: 18px; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; scroll-snap-type: x proximity;
+.hk-jump { flex: 1; min-width: 0; display: flex; gap: 4px; padding: 6px; scroll-padding-inline: 6px; border-radius: 18px; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; scroll-snap-type: x proximity;
   background: var(--hk-pillbg); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: 0 10px 30px rgba(0,0,0,.18);
   -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 22px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 22px), transparent); }
 .hk-jump::-webkit-scrollbar { display: none; }
 .hk-jump button { flex: none; height: 40px; padding: 0 14px; border-radius: 13px; border: 0; background: none; color: var(--hk-muted); font-weight: 700; font-size: 14px; white-space: nowrap; scroll-snap-align: start; transition: background 160ms ease, color 160ms ease; }
-.hk-jump button[aria-current="true"] { background: var(--hk-sel); color: var(--hk-ink); }
-.hk-jump button:last-child { margin-right: 18px; }
+.hk-jump button[aria-pressed="true"] { background: var(--hk-sel); color: var(--hk-ink); }
+.hk-jump button:first-child { margin-left: 2px; }
+.hk-jump button:last-child { margin-right: 22px; }
+/* On the phone the filters are the bottom strip only. */
+@media (max-width: 899px) { .hk-chips { display: none; } }
 @media (max-width: 639px) { .hk-dock { bottom: calc(78px + env(safe-area-inset-bottom, 0px)); } }
 @media (min-width: 900px) { .hk-dock { display: none; } }
 /* Phone week: the name gives way, the days never fall off the edge. */

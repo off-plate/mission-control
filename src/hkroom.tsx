@@ -111,36 +111,15 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
     ro.observe(top)
     return () => ro.disconnect()
   }, [])
-  /* Which section he is in: the last one whose top has passed under the header. */
-  const [activeSec, setActiveSec] = useState<string | null>(null)
+  /* The bottom strip is the phone's filter (his ask, 2026-10-26: one set of
+     filters, at the bottom, not a second copy at the top). Keep the chosen
+     chip in view inside the strip, with room around it, without moving the page. */
   const jumpRef = useRef<HTMLElement>(null)
   useEffect(() => {
-    let raf = 0
-    const read = () => {
-      raf = 0
-      const off = (parseInt(getComputedStyle(document.documentElement).getPropertyValue('--topstick-h')) || 64) + 60
-      let cur: string | null = null
-      document.querySelectorAll<HTMLElement>('[data-sec]').forEach((el) => { if (el.getBoundingClientRect().top <= off) cur = el.dataset.sec ?? null })
-      const first = document.querySelector<HTMLElement>('[data-sec]')?.dataset.sec ?? null
-      setActiveSec(cur ?? first)
-    }
-    const on = () => { if (!raf) raf = requestAnimationFrame(read) }
-    read()
-    window.addEventListener('scroll', on, { passive: true })
-    return () => { window.removeEventListener('scroll', on); if (raf) cancelAnimationFrame(raf) }
-  }, [view, filter])
-  /* Keep the lit chip in view inside the strip, without moving the page. */
-  useEffect(() => {
     const strip = jumpRef.current
-    const chip = strip?.querySelector<HTMLElement>(`[data-jump="${activeSec}"]`)
-    if (strip && chip) strip.scrollTo({ left: chip.offsetLeft - 8, behavior: 'smooth' })
-  }, [activeSec])
-  const jump = (id: string) => {
-    const el = document.getElementById(`hk-sec-${id}`)
-    if (!el) return
-    const off = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--topstick-h')) || 64
-    window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - off + 1, behavior: 'smooth' })
-  }
+    const chip = strip?.querySelector<HTMLElement>(`[data-filter="${filter}"]`)
+    if (strip && chip) strip.scrollTo({ left: Math.max(0, chip.offsetLeft - 10), behavior: 'smooth' })
+  }, [filter])
 
   /* Which days each habit was kept, and the amount rows, read once per change
      of the log rather than once per tile. */
@@ -398,9 +377,6 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
     return doable.length ? `${doable.filter(doneToday).length} of ${doable.length} done today` : ''
   }
   let n = pinned ? 1 : 0
-  const jumpTo = view === 'week'
-    ? CATS.filter((c) => [...(pinned ? [pinned] : []), ...sorted].some((it) => c.has(it.kind)))
-    : sections
 
   return (
     <div className="page hk">
@@ -479,8 +455,7 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
       </div>
 
       {/* THE PHONE'S DOCK (his ask, 2026-10-26): the three views on the left,
-          and on the same line a strip of the page's sections he can swipe
-          through and tap to jump to. The one he is in is lit as he scrolls. */}
+          and on the same line the filters, swiped sideways. In every view. */}
       <div className="hk-dock">
         <nav className="hk-pill" aria-label="View">
           {(['cards', 'list', 'week'] as const).map((v) => (
@@ -489,11 +464,9 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
             </button>
           ))}
         </nav>
-        {view !== 'list' && jumpTo.length > 1 && (
-          <nav className="hk-jump" aria-label="Jump to section" ref={jumpRef}>
-            {jumpTo.map((c) => <button key={c.id} data-jump={c.id} aria-current={activeSec === c.id ? 'true' : undefined} onClick={() => jump(c.id)}>{c.label}</button>)}
-          </nav>
-        )}
+        <nav className="hk-jump" aria-label="Show" ref={jumpRef}>
+          {FILTERS.map(([k, l]) => <button key={k} data-filter={k} aria-pressed={filter === k} onClick={() => { setFilter(k); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>{l}</button>)}
+        </nav>
       </div>
 
       {sheet && (

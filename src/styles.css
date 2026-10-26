@@ -11760,3 +11760,76 @@ button.tagmark:focus-visible { outline: 2px solid var(--accent-text); outline-of
   .znow-face-wrap { min-height: min(84vw, 340px); }
   .znow-face { width: min(78vw, 320px); }
 }
+
+/* ---------- Native iOS feel (2026-10-26) ----------
+   His ask: the installed web app should feel like an iOS app. One motion
+   vocabulary for all of it: the iOS drawer curve for sheets, a strong ease-out
+   for everything that enters, nothing over 300ms except a sheet's own rise. */
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+html { background: var(--bg); }
+
+/* Page switches crossfade, as an iOS tab bar does. The header and the tab bar
+   are their own layers, so they hold still instead of fading with the page. */
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 160ms; animation-timing-function: ease-out; }
+.topstick { view-transition-name: mc-top; }
+.tabbar { view-transition-name: mc-tabs; }
+::view-transition-group(mc-top), ::view-transition-group(mc-tabs) { animation: none; }
+
+/* Touch: feedback lands on the finger going down, not on the lift. A press
+   sinks a little; no grey flash, no text selection or callout on a long press
+   of a control. `scale` composes with any transform a control already has, and
+   :where() keeps these at zero weight so every control's own transition wins. */
+@media (pointer: coarse) {
+  :where(button, a, [role="button"], [role="tab"], [role="checkbox"]) { -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+  :where(button:not(:disabled), [role="button"], a[href]) { transition-property: scale, background-color, color, opacity, box-shadow, border-color; transition-duration: 160ms; transition-timing-function: var(--ease-out); }
+  :where(button:not(:disabled), [role="button"], a[href]):active { scale: 0.96; transition-duration: 60ms; }
+  /* Wide rows and cards would lurch at 0.96; they dim instead. */
+  .tabbar-tab:active { scale: 0.9; }
+  .hk-name:active, .tr-row:active, .plan-row:active, .tabsheet-tile:active { scale: 1; opacity: 0.6; }
+}
+
+/* iOS zooms the page into any field under 16px and never zooms back out. */
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select { font-size: max(16px, 1em); }
+  /* With the keyboard up the bottom bars would ride on top of it. */
+  body:has(:is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, [contenteditable="true"]):focus) :is(.tabbar, .hk-dock, .hk-pill) { display: none; }
+}
+
+/* Sheets on a phone: rise from the bottom edge, grabber on top, no X. */
+.sheet-grab { display: none; }
+@media (max-width: 639px) {
+  .overlay:not(.giveup-overlay) { place-items: end stretch; padding: max(24px, env(safe-area-inset-top, 0px)) 0 0; animation: fadein 300ms ease; }
+  .overlay:not(.giveup-overlay) > .sheet { width: 100%; max-height: 92dvh; border: 0; border-radius: 16px 16px 0 0; padding-bottom: env(safe-area-inset-bottom, 0px); animation: sheet-rise 420ms var(--ease-drawer); will-change: transform; }
+  .sheet-grab { display: block; width: 36px; height: 5px; border-radius: 3px; background: var(--hairline-strong); margin: 8px auto 0; flex: none; }
+  .overlay:not(.giveup-overlay) .sheet-head { padding-top: var(--s3); }
+  .overlay:not(.giveup-overlay) .sheet-head .close { display: none; }
+  .sheet-body { -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+}
+@keyframes sheet-rise { from { transform: translateY(100%); } }
+
+/* Header: clear at the top, frosted once something scrolls under it. */
+@media (max-width: 639px) {
+  .shell:not(.is-hud):not(.in-zone):not(.is-dark-chrome):not(.is-dark-page) .topstick { transition: background-color 200ms ease, box-shadow 200ms ease; }
+  .shell:not(.is-hud):not(.in-zone):not(.is-dark-chrome):not(.is-dark-page) .topstick:not(.is-under) { box-shadow: none; }
+  .shell:not(.is-hud):not(.in-zone):not(.is-dark-chrome):not(.is-dark-page) .topstick.is-under { background: color-mix(in srgb, var(--bg) 86%, transparent); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); box-shadow: 0 0.5px 0 var(--hairline-strong); }
+}
+@media (max-width: 639px) and (prefers-reduced-transparency: reduce) {
+  .shell:not(.is-hud):not(.in-zone):not(.is-dark-chrome):not(.is-dark-page) .topstick.is-under { background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+/* The large title's small twin in the header. */
+.topbar { position: relative; }
+.topbar-mini { display: none; }
+@media (max-width: 639px) {
+  .topbar-mini { display: block; position: absolute; left: 50%; top: 50%; max-width: 34%; translate: -50% -50%; font-family: var(--font-display); font-weight: 700; font-size: 17px; letter-spacing: -0.01em; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; opacity: 0; transform: translateY(6px); transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out); }
+  .topbar-mini.is-on { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay:not(.giveup-overlay) > .sheet { animation: fadein 200ms ease; }
+  .topbar-mini { transform: none; }
+  ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+}

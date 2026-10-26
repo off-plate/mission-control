@@ -1,5 +1,6 @@
 import { Segmented } from './ui'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { slideOut, useSwipeDown } from './sheetdrag'
 import { fakeDecompose, type DecomposedStep } from './mock'
 import { BUFFER } from './estimate'
 import type { Task } from './types'
@@ -15,17 +16,32 @@ export function Sheet({ title, onClose, children, steady }: {
    *  changes the questions rather than the size of the window asking them. */
   steady?: boolean
 }) {
+  /* On a phone this is an iOS sheet (2026-10-26): it rises from the bottom,
+     carries a grabber, follows a downward drag and closes along the same path
+     it came in. The X goes on the phone, as it did on the Habits sheets. */
+  const sheetRef = useRef<HTMLDivElement>(null)
+  const scrimRef = useRef<HTMLDivElement>(null)
+  const closeRef = useRef(onClose)
+  closeRef.current = onClose
+  const shutting = useRef(false)
+  const close = useCallback(() => {
+    if (shutting.current) return
+    shutting.current = true
+    slideOut(sheetRef.current, scrimRef.current, () => closeRef.current())
+  }, [])
+  useSwipeDown(sheetRef, close)
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [close])
   return (
-    <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="sheet" role="dialog" aria-modal="true" aria-label={title}>
+    <div ref={scrimRef} className="overlay" onClick={(e) => { if (e.target === e.currentTarget) close() }}>
+      <div ref={sheetRef} className="sheet" role="dialog" aria-modal="true" aria-label={title}>
+        <div className="sheet-grab" aria-hidden="true" />
         <div className="sheet-head">
           <h2>{title}</h2>
-          <button className="close" onClick={onClose} aria-label="Close">×</button>
+          <button className="close" onClick={close} aria-label="Close">×</button>
         </div>
         <div className={`sheet-body${steady ? ' is-steady' : ''}`}>{children}</div>
       </div>

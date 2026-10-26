@@ -3,6 +3,7 @@ import { JarBar, JAR_PAGES } from './cookiejarnav'
 import { ProjectMark, WorkspacePick } from './ui'
 import { usePromptWindow } from './promptwindow'
 import { lastFace } from './ideasswitch'
+import { MiniTitle } from './minititle'
 import { Component, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { exceptionsFor, globalExceptions } from './exceptions'
@@ -654,6 +655,7 @@ export default function App() {
         onBlur={nav.hideSoon}
       >
       <header className="topbar">
+        <MiniTitle page={page} stick={topstickRef} />
         {/* Only this cluster (name, workspace) triggers the reveal on hover,
             on his instruction: the right side (sync, Zone, the helmet, Note,
             Yesterday, the page menu, Settings) is stuff he reaches for

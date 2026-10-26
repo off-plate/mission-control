@@ -1,3 +1,5 @@
+import { haptic } from './haptic'
+import { flushSync } from 'react-dom'
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { SUPABASE_ENABLED, deleteRemoteState, claimInbox, onAccountChange, loadRemoteState, readOutreachEvents, readProspectSheet, stampOutreachEvents, stampProspectSheet } from './supabase'
 import { outbox } from './sync'
@@ -1168,10 +1170,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
        way into a project's Plan is enterProject, below. Without this, clicking
        Plan while standing inside a project did nothing (already on 'plan'),
        which read as the nav lying about where he was and left no fast way out. */
-    setOpenProject(null)
-    location.hash = `/${p}`
-    setRoute({ page: p, day: null })
-    window.scrollTo({ top: 0 })
+    const swap = () => {
+      setOpenProject(null)
+      location.hash = `/${p}`
+      setRoute({ page: p, day: null })
+      window.scrollTo({ top: 0 })
+    }
+    /* A short crossfade between pages, as an iOS tab bar does (2026-10-26),
+       instead of the page snapping. Skipped for the page he is already on,
+       for reduced motion, and where the browser has no view transitions. */
+    const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown }
+    if (p !== route.page && doc.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      doc.startViewTransition(() => flushSync(swap))
+    } else swap()
   }
   /** The one door into a project's Plan. Order matters: setPage clears
    *  openProjectId as part of leaving wherever he was, so the id has to be set
@@ -1561,7 +1572,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     noteToOpen, openNote: setNoteToOpen,
 
 
-    toggleTask: plannerSlice.toggleTask,
+    toggleTask: (...a: Parameters<typeof plannerSlice.toggleTask>) => { haptic(); return plannerSlice.toggleTask(...a) },
     updateTask: plannerSlice.updateTask,
 
     logActual: (id, actualMin) => {
@@ -1635,7 +1646,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
        the week rolling over. days[] is a cache of the current week and is kept in
        step here, and rebuilt from the log on every load. */
     assertRoutineDay: growthSlice.assertRoutineDay,
-    toggleHabitDay: growthSlice.toggleHabitDay,
+    toggleHabitDay: (...a: Parameters<typeof growthSlice.toggleHabitDay>) => { haptic(); return growthSlice.toggleHabitDay(...a) },
     markHabitDay: growthSlice.markHabitDay,
     markHabitDaysOn: growthSlice.markHabitDaysOn,
     logHabitNumber: growthSlice.logHabitNumber,
@@ -1649,7 +1660,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     assertRoutineOn: growthSlice.assertRoutineOn,
     logSlipOn: growthSlice.logSlipOn,
     addHabit: growthSlice.addHabit,
-    logSlip: growthSlice.logSlip,
+    logSlip: (...a: Parameters<typeof growthSlice.logSlip>) => { haptic(); return growthSlice.logSlip(...a) },
     updateHabit: growthSlice.updateHabit,
     togglePauseHabit: growthSlice.togglePauseHabit,
     deleteHabit: growthSlice.deleteHabit,
@@ -1675,8 +1686,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     deleteRoutine: growthSlice.deleteRoutine,
     addRoutineStep: growthSlice.addRoutineStep,
     deleteRoutineStep: growthSlice.deleteRoutineStep,
-    logCount: growthSlice.logCount,
-    logAmount: growthSlice.logAmount,
+    logCount: (...a: Parameters<typeof growthSlice.logCount>) => { haptic(); return growthSlice.logCount(...a) },
+    logAmount: (...a: Parameters<typeof growthSlice.logAmount>) => { haptic(); return growthSlice.logAmount(...a) },
     removeAmount: growthSlice.removeAmount,
     logGoalAmount: growthSlice.logGoalAmount,
     removeGoalEntry: growthSlice.removeGoalEntry,

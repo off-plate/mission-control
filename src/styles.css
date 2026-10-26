@@ -11909,3 +11909,17 @@ html { background: var(--bg); }
 .ts-foot { display: flex; justify-content: space-between; gap: 10px; margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--hk-line, var(--hairline)); }
 .ts-link { height: 44px; padding: 0 4px; border: 0; background: none; font-size: 15px; font-weight: 700; color: var(--hk-ink); }
 .ts-link.is-danger { margin-left: auto; color: var(--alert); }
+
+/* Projects on the phone: two folders a row (his ask, 2026-10-26), the way
+   iOS Files lays out a folder grid, not one full-width folder per row. */
+@media (max-width: 639px) {
+  .projgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; }
+  .folder, .folder-new { height: 132px; }
+  .folder .f-front { height: 96px; padding: 26px 12px 12px; }
+  .f-back { top: 12px; }
+  .folder .f-front h3 { font-size: 15px; }
+  .folder .f-tag { font-size: 12px; margin-bottom: 4px; }
+  .folder .proj-stats { gap: 8px; font-size: 12px; }
+  .projcard-kebab { top: 40px; right: 4px; }
+  .f-paper { display: none; }
+}

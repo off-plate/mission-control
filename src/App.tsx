@@ -485,7 +485,8 @@ function PhoneTabBar({ page, setPage }: { page: PageId; setPage: (p: PageId) => 
     const v = Math.abs(d.dy) / Math.max(1, Date.now() - d.t)
     if (d.dy > 90 || (d.dy > 10 && v > 0.11)) setOpen(false)
   }
-  const moreLit = MORE_PAGES.some((m) => m.id === page) || page === 'prompts'
+  /* One tab lit at a time: a page a tab already claims (Projects belongs to Plan) never also lights More. */
+  const moreLit = (MORE_PAGES.some((m) => m.id === page) || page === 'prompts') && !TAB_PAGES.some((t) => t.lit.includes(page))
   return (
     <>
       <nav className="tabbar" aria-label="Pages">

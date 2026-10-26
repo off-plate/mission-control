@@ -301,7 +301,7 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
       const a = (weeks - 1 - col) * 7 + (pad - row)
       if (a < 0) { cells.push(<i key={`${col}-${row}`} className="x" />); continue }
       const v = dayVal(it, keyAgo(a), a)
-      cells.push(<i key={`${col}-${row}`} className={v === null ? 'x' : `${v >= 1 ? 'f' : v > 0 ? 'p' : ''}${a === 0 ? ' t' : ''}`} />)
+      cells.push(<i key={`${col}-${row}`} className={v === null ? (it.kind === 'quit' ? '' : 'x') : `${v >= 1 ? 'f' : v > 0 ? 'p' : ''}${a === 0 ? ' t' : ''}`} />)
     }
     return <div className="hk-tiles" style={{ gridTemplateColumns: `repeat(${weeks}, 1fr)` }} aria-hidden="true">{cells}</div>
   }

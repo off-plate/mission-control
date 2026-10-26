@@ -13,7 +13,7 @@
    adds is how they look and three writes the old page did not have: an amount
    with its own unit (water in ml), a typed goal amount with a note, and a
    routine created together with its steps. */
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useStore } from './store'
 import { RoutineRunner } from './runner'
 import * as Icon from './icons'
@@ -99,6 +99,48 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
   const [nDays, setNDays] = useState(daysFor)
   useEffect(() => { const on = () => setNDays(daysFor()); window.addEventListener('resize', on); return () => window.removeEventListener('resize', on) }, [])
   const weekDays = Array.from({ length: nDays }, (_, i) => nDays - 1 - i)
+
+  /* The header is sticky and changes height (the nav row drops down), so the
+     section headings stick under its MEASURED height, never a guessed one. */
+  useEffect(() => {
+    const top = document.querySelector('.topstick')
+    if (!top) return
+    const set = () => document.documentElement.style.setProperty('--topstick-h', `${Math.ceil(top.getBoundingClientRect().height)}px`)
+    set()
+    const ro = new ResizeObserver(set)
+    ro.observe(top)
+    return () => ro.disconnect()
+  }, [])
+  /* Which section he is in: the last one whose top has passed under the header. */
+  const [activeSec, setActiveSec] = useState<string | null>(null)
+  const jumpRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    let raf = 0
+    const read = () => {
+      raf = 0
+      const off = (parseInt(getComputedStyle(document.documentElement).getPropertyValue('--topstick-h')) || 64) + 60
+      let cur: string | null = null
+      document.querySelectorAll<HTMLElement>('[data-sec]').forEach((el) => { if (el.getBoundingClientRect().top <= off) cur = el.dataset.sec ?? null })
+      const first = document.querySelector<HTMLElement>('[data-sec]')?.dataset.sec ?? null
+      setActiveSec(cur ?? first)
+    }
+    const on = () => { if (!raf) raf = requestAnimationFrame(read) }
+    read()
+    window.addEventListener('scroll', on, { passive: true })
+    return () => { window.removeEventListener('scroll', on); if (raf) cancelAnimationFrame(raf) }
+  }, [view, filter])
+  /* Keep the lit chip in view inside the strip, without moving the page. */
+  useEffect(() => {
+    const strip = jumpRef.current
+    const chip = strip?.querySelector<HTMLElement>(`[data-jump="${activeSec}"]`)
+    if (strip && chip) strip.scrollTo({ left: chip.offsetLeft - 8, behavior: 'smooth' })
+  }, [activeSec])
+  const jump = (id: string) => {
+    const el = document.getElementById(`hk-sec-${id}`)
+    if (!el) return
+    const off = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--topstick-h')) || 64
+    window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - off + 1, behavior: 'smooth' })
+  }
 
   /* Which days each habit was kept, and the amount rows, read once per change
      of the log rather than once per tile. */
@@ -242,7 +284,7 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
       const g = it.goal!, info = goalInfo(g), size = tileSize(g.target)
       const n = Math.ceil(g.target / size), filled = Math.floor(info.total / size), pace = Math.floor(info.pace / size)
       return <div className="hk-tiles is-goal" style={{ gridTemplateColumns: 'repeat(26, 1fr)' }} aria-label={`${fmt(info.total)} of ${fmt(g.target)} ${g.unit}, one tile per ${fmt(size)}`}>
-        {Array.from({ length: n }, (_, i) => <i key={i} style={{ ['--col' as string]: i % 26 }} className={`${i < filled ? 'f' : ''}${i === pace && pace >= filled && info.total < g.target ? ' pace' : ''}`} />)}
+        {Array.from({ length: n }, (_, i) => <i key={i} className={`${i < filled ? 'f' : ''}${i === pace && pace >= filled && info.total < g.target ? ' pace' : ''}`} />)}
       </div>
     }
     const pad = todayIndex // Monday on top, today's row
@@ -251,7 +293,7 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
       const a = (weeks - 1 - col) * 7 + (pad - row)
       if (a < 0) { cells.push(<i key={`${col}-${row}`} className="x" />); continue }
       const v = dayVal(it, keyAgo(a), a)
-      cells.push(<i key={`${col}-${row}`} style={{ ['--col' as string]: col }} className={v === null ? 'x' : `${v >= 1 ? 'f' : v > 0 ? 'p' : ''}${a === 0 ? ' t' : ''}`} />)
+      cells.push(<i key={`${col}-${row}`} className={v === null ? 'x' : `${v >= 1 ? 'f' : v > 0 ? 'p' : ''}${a === 0 ? ' t' : ''}`} />)
     }
     return <div className="hk-tiles" style={{ gridTemplateColumns: `repeat(${weeks}, 1fr)` }} aria-hidden="true">{cells}</div>
   }
@@ -356,6 +398,9 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
     return doable.length ? `${doable.filter(doneToday).length} of ${doable.length} done today` : ''
   }
   let n = pinned ? 1 : 0
+  const jumpTo = view === 'week'
+    ? CATS.filter((c) => [...(pinned ? [pinned] : []), ...sorted].some((it) => c.has(it.kind)))
+    : sections
 
   return (
     <div className="page hk">
@@ -384,7 +429,7 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
       {view === 'cards' && <>
         {pinned && <div className="hk-cards is-pinned">{Card({ it: pinned, next: true, i: 0 })}</div>}
         {sections.map((c) => (
-          <section key={c.id} className="hk-sec">
+          <section key={c.id} id={`hk-sec-${c.id}`} className="hk-sec" data-sec={c.id}>
             {/* Counted with the pinned card, which still belongs to its section. */}
             <h2 className="hk-sech" style={{ ['--i' as string]: Math.min(n, 14) }}>{c.label}<span className="hk-secn">{c.list.length + (pinned && c.has(pinned.kind) ? 1 : 0)}</span><span className="hk-sect">{todayOf(pinned && c.has(pinned.kind) ? [pinned, ...c.list] : c.list)}</span></h2>
             <div className="hk-cards">
@@ -412,7 +457,7 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
         <div className="hk-week" style={{ ['--days' as string]: weekDays.length }}>
           <div className="hk-wrow is-head"><span className="hk-sub">{shown.length} items</span>{weekDays.map((a) => { const d = new Date(`${keyAgo(a)}T12:00:00`); return <span key={a} className={`hk-wday${a ? '' : ' is-today'}`}>{d.toLocaleDateString('en-GB', { weekday: 'short' }).slice(0, 2)}<b>{d.getDate()}</b></span> })}</div>
           {CATS.map((c) => ({ ...c, list: [...(pinned ? [pinned] : []), ...sorted].filter((it) => c.has(it.kind)) })).filter((c) => c.list.length).map((c) => (
-            <div key={c.id} className="hk-wgroup">
+            <div key={c.id} id={`hk-sec-${c.id}`} className="hk-wgroup" data-sec={c.id}>
               <div className="hk-wcat">{c.label}<span className="hk-secn">{c.list.length}</span></div>
               {c.list.map((it) => (
                 <div key={it.key} className="hk-wrow" style={{ ['--c' as string]: it.color, ['--i' as string]: Math.min(n++, 20) }}>
@@ -433,13 +478,23 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
       )}
       </div>
 
-      <nav className="hk-pill" aria-label="View">
-        {(['cards', 'list', 'week'] as const).map((v) => (
-          <button key={v} aria-pressed={view === v} aria-label={{ cards: 'Cards', list: 'Checklist', week: 'Week' }[v]} onClick={() => setView(v)}>
-            {v === 'cards' ? <Icon.AppsGrid size={20} /> : v === 'list' ? <Icon.Checklist size={20} /> : <Icon.Table size={20} />}
-          </button>
-        ))}
-      </nav>
+      {/* THE PHONE'S DOCK (his ask, 2026-10-26): the three views on the left,
+          and on the same line a strip of the page's sections he can swipe
+          through and tap to jump to. The one he is in is lit as he scrolls. */}
+      <div className="hk-dock">
+        <nav className="hk-pill" aria-label="View">
+          {(['cards', 'list', 'week'] as const).map((v) => (
+            <button key={v} aria-pressed={view === v} aria-label={{ cards: 'Cards', list: 'Checklist', week: 'Week' }[v]} onClick={() => setView(v)}>
+              {v === 'cards' ? <Icon.AppsGrid size={20} /> : v === 'list' ? <Icon.Checklist size={20} /> : <Icon.Table size={20} />}
+            </button>
+          ))}
+        </nav>
+        {view !== 'list' && jumpTo.length > 1 && (
+          <nav className="hk-jump" aria-label="Jump to section" ref={jumpRef}>
+            {jumpTo.map((c) => <button key={c.id} data-jump={c.id} aria-current={activeSec === c.id ? 'true' : undefined} onClick={() => jump(c.id)}>{c.label}</button>)}
+          </nav>
+        )}
+      </div>
 
       {sheet && (
         <>

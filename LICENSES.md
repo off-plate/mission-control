@@ -54,3 +54,7 @@ Tabler's own copyright line: `Copyright (c) 2020-2026 Paweł Kuna`.
 ## thinking-orbs
 
 Animated dotted orbs (assistant mark, saving indicator, Zone countdown, inline waits). npm `thinking-orbs`, (c) Jakub Antalik, MIT. https://github.com/Jakubantalik/Libraries.dev
+
+## Space Grotesk and Sora (skins)
+
+Self-hosted in `public/fonts/` for the Lime Cards and Night Wallet looks. Space Grotesk (c) Florian Karsten, Sora (c) Jonathan Barnbrook and Julián Moncada. Both SIL Open Font License 1.1, from Google Fonts.

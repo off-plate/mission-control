@@ -106,7 +106,7 @@ body:has(.shell.skin-lime) {
   & .btn::before { display: none; }
   & .btn-primary { background: var(--a-ink); color: #FFFFFF; }
   & .btn-primary:hover:not(:disabled) { background: var(--a-ink); color: #FFFFFF; }
-  & :is(.btn-quiet, .btn-ghost) { border-color: transparent; background: color-mix(in srgb, var(--a-ink) 6%, transparent); color: var(--a-ink); }
+  & :is(.btn-quiet, .btn-ghost):not(.btn-sq-jar) { border-color: transparent; background: color-mix(in srgb, var(--a-ink) 6%, transparent); color: var(--a-ink); }
   & .btn:active:not(:disabled), & button.chip:hover, & button.chip:active { transform: none; }
   @media (hover: hover) and (pointer: fine) {
     & .btn-primary:hover:not(:disabled) { background: #2A2A28; }
@@ -242,7 +242,7 @@ body:has(.shell.skin-night) {
   & .btn::before { display: none; }
   & .btn-primary, & .btn-primary:hover:not(:disabled) { background: var(--a-accent); color: #111111; }
   & .btn-primary:disabled { background: var(--glass); color: var(--a-faint); box-shadow: none; }
-  & :is(.btn-quiet, .btn-ghost) { border-color: transparent; background: var(--glass-2); color: var(--a-ink); }
+  & :is(.btn-quiet, .btn-ghost):not(.btn-sq-jar) { border-color: transparent; background: var(--glass-2); color: var(--a-ink); }
   & .btn:active:not(:disabled), & button.chip:hover, & button.chip:active { transform: none; }
   @media (hover: hover) and (pointer: fine) {
     & :is(.btn-quiet, .btn-ghost):hover:not(:disabled) { border-color: transparent; background: rgba(255, 255, 255, 0.15); color: var(--a-ink); }
@@ -297,6 +297,8 @@ body:has(.shell.skin-night) {
   & .undo-do { border-radius: 10px; color: var(--a-ink); }
 
   /* Sticky bands that painted the page colour sit as glass on the sky. */
+  & .hk-sech { background: rgba(28, 24, 38, 0.6); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
+  & .hk-sech::after { display: none; }
   & :is(.nt-listhead, .nt-search) { background: rgba(28, 24, 38, 0.6); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
   & .pp-page {
     --pp-canvas: transparent; --pp-glow: rgba(255,255,255,.04); --pp-card: #2A2338; --pp-ink: #F3F0FA;
@@ -308,7 +310,7 @@ body:has(.shell.skin-night) {
 
   /* Habits room: glass on the sky. */
   & :is(.hk, .hk-sheet, .hk-toast, .hk-pill) {
-    --hk-bg: transparent; --hk-card: rgba(255,255,255,.06); --hk-card-2: rgba(255,255,255,.1); --hk-line: rgba(255,255,255,.08); --hk-line-2: rgba(255,255,255,.16);
+    --hk-bg: #1C1826; --hk-card: rgba(255,255,255,.06); --hk-card-2: rgba(255,255,255,.1); --hk-line: rgba(255,255,255,.08); --hk-line-2: rgba(255,255,255,.16);
     --hk-ink: #F3F0FA; --hk-muted: #B7AFC8; --hk-faint: #8F87A3; --hk-accent: var(--a-accent); --hk-accent-ink: #111111;
     --hk-dot: rgba(255,255,255,.08); --hk-cpct: 100%; --hk-sheet: #2A2338; --hk-scrim: rgba(10,8,14,.55); --hk-pillbg: rgba(30,25,42,.72); --hk-sel: rgba(255,255,255,.14);
     --hk-toast-bg: rgba(48,41,62,.94); --hk-toast-ink: #F3F0FA; --hk-toast-act: var(--a-accent);

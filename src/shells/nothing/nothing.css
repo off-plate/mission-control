@@ -504,3 +504,37 @@ textarea.fld{height:auto;min-height:120px;padding:14px;line-height:1.5;resize:no
 .dv-card{position:absolute;left:0;right:0;top:0;min-height:450px;margin:0;transition:transform .42s var(--dr),opacity .3s;touch-action:pan-y}
 .cd .dm+.lb,.cd .dm+div.lb{margin-top:8px}
 .pm{grid-template-columns:1fr 1fr;row-gap:16px}
+
+/* ===== habit sheet ===== */
+.hsheet{max-height:92%}
+.hstat .cd{padding:14px}
+.hk .dt.hk-now{stroke:var(--red);stroke-width:1.2}
+.hk.big .dt{transition:fill .2s}
+.hkm{display:grid;grid-template-columns:repeat(3,1fr);margin-top:8px;font:700 9.5px/1 var(--mono);letter-spacing:.06em;color:var(--dim)}
+.hweek{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:10px}
+.hday{height:70px;border-radius:14px;background:var(--t);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;transition:background-color .2s,color .2s,transform .18s var(--eo)}
+.hday:active{transform:scale(.93)}
+.hday span{font:700 9px/1 var(--mono);letter-spacing:.06em;color:var(--dim)}
+.hday b{font:800 19px/1 var(--doto)}
+.hday i{width:6px;height:6px;border-radius:50%;background:var(--off)}
+.hday.on{background:var(--ink);color:var(--cv)}
+.hday.on span{color:var(--cv);opacity:.7}
+.hday.on i{background:var(--cv)}
+.hday.today span{color:var(--red)}
+.hday.today.on i{background:var(--red)}
+.hday[disabled]{opacity:.6}
+.hedit .chip{background:var(--soft)}
+.hedit .chip.on{background:var(--ink)}
+.hedit .fld{background:var(--soft)}
+.hamt .key.sm{min-width:52px}
+.hamt .key.t{background:var(--soft)}
+/* ===== routine sheet ===== */
+.rtc{cursor:pointer;transition:transform .18s var(--eo)}
+.rtc:active{transform:scale(.98)}
+.rstep .rs .px{width:10px;height:10px;display:inline-block;vertical-align:-1px}
+.rsalts{margin:10px 0 2px;gap:8px}
+.rsalts .alt{text-align:left;padding:12px;background:var(--soft)}
+.rsalts .alt.k{background:var(--ink);--fg:var(--cv);--fd:var(--cv)}
+.rse .fld{height:42px;font-size:13.5px}
+.hedit .kb{background:var(--soft)}
+.hedit .kb[disabled]{opacity:.35}

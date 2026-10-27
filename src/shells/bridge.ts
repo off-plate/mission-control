@@ -23,7 +23,7 @@ import { getHevyLastSync, hasHevyKey, syncHevy, TARGET_HABIT_NAME } from '../hev
 import { SKINS, setSkin, type SkinId } from '../skins'
 import { SPACE_LABELS } from '../mock'
 import {
-  SLOTS, bestCleanRun, countTarget, currentStreak, daysClean, dueOn, focusMinutesOn, focusNeedMin, goalCurrent,
+  SLOTS, bestCleanRun, bestStreak, countTarget, currentStreak, daysClean, dueOn, focusMinutesOn, focusNeedMin, goalCurrent,
   habitGate, habitTarget, isTimeFed, slipCount, slipDays, spaceFolderId,
   type ContactChannel, type PageId, type PersonTier, type SpaceId, type TaskCategory, type TouchStep, type ViewId,
 } from '../types'
@@ -108,7 +108,7 @@ export function toMC(inp: ShellInput) {
     const r = ownOf.get(h.id)
     const base = {
       id: h.id, name: h.name, space: h.space, routine: r?.id, daypart: h.daypart, frequency: h.frequency,
-      streak: currentStreak(s.habitLog, h.id), due: dueOn(h, TI, s.habitLog),
+      streak: currentStreak(s.habitLog, h.id), best: bestStreak(s.habitLog, h.id), due: dueOn(h, TI, s.habitLog),
       week: h.days.map((d, i) => (i > TI ? null : d ? 1 : 0)),
     }
     if (r) {
@@ -146,6 +146,7 @@ export function toMC(inp: ShellInput) {
         optional: !!h.optional, link: h.link ? (h.linkLabel || 'Open the link') : undefined, href: h.link,
         alts: h.alts?.length ? h.alts.map((a) => ({ id: a.id, title: a.title, note: a.note ?? '' })) : undefined,
         gate: gate ? `${gate.target} ${gate.unit} to pass` : undefined, gateTarget: gate?.target, done: !!h.days[TI],
+        alt: ((k) => (k >= 0 ? k : undefined))(h.alts?.length ? h.alts.findIndex((a) => logToday.some((t) => t.habitId === h.id && t.src === `alt:${a.id}`)) : -1),
       }
     })
     const own = r.habitId ? live.find((h) => h.id === r.habitId) : undefined

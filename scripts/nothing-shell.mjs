@@ -129,6 +129,29 @@ await step('Habits: tick a habit, the real habitLog changes', async () => {
   if (!(await blob()).habitLog.some((x) => x.habitId === id && x.day === today())) throw new Error(`no log row for ${id}`)
 })
 
+await step('habit sheet: rises on tap, a past day toggles the real log', async () => {
+  const id = await page.locator('section.view.on [data-a="habitSheet"]').first().getAttribute('data-x')
+  await tap(`section.view.on [data-a="habitSheet"][data-x="${id}"]`); await wait(500)
+  await page.screenshot({ path: `${SHOTS}/light-habitsheet.png` })
+  const day = await page.locator('.sheet.on [data-a="hsDay"]').first()
+  const x = await day.getAttribute('data-x'); const before = (await blob()).habitLog.filter((t) => t.habitId === id).length
+  await day.click(); await wait(1300)
+  const after = (await blob()).habitLog.filter((t) => t.habitId === id).length
+  if (after === before) throw new Error(`habitLog for ${id} unchanged after ${x}`)
+  await tap('.sheet.on [data-a="sheetX"]')
+})
+
+await step('routine sheet: opens from the card, a step tick persists', async () => {
+  await tap('section.view.on .rtc[data-a="routineSheet"]'); await wait(500)
+  await page.screenshot({ path: `${SHOTS}/light-routinesheet.png` })
+  const before = (await blob()).habitLog.filter((x) => x.day === today()).length
+  const ck = page.locator('.sheet.on [data-a="rsStep"]:not(.on)').first()
+  await ck.click(); await wait(1300)
+  const after = (await blob()).habitLog.filter((x) => x.day === today()).length
+  if (after === before) throw new Error('no log row from the sheet')
+  await tap('.sheet.on [data-a="sheetX"]')
+})
+
 await step('routine runner: a step tick persists', async () => {
   await tap('section.view.on [data-a="openRunner"]'); await wait(600)
   await page.screenshot({ path: `${SHOTS}/light-runner.png` })

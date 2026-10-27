@@ -1860,10 +1860,14 @@ A.openDayRec = () => B.openClassic('day', isoOff(-1));
 /* =====================================================================
    Habits room: Habits / Goals / Quitting, routine runner, give-up screen
    ===================================================================== */
-function hkGrid(id, done) {
-  const g = MC.habitGrid(id); let s = '';
-  g.forEach((v, i) => { const c = Math.floor(i / 7), r = i % 7; let cls = v == null ? '' : v >= 1 ? 'on' : v > 0 ? 'half' : 'miss'; if (i === 77 + TI() && done) cls = 'on'; s += `<circle class="dt ${cls}" cx="${c * 9 + 4.5}" cy="${r * 9 + 4.5}" r="${v == null ? 1.4 : 3}"/>`; });
-  return `<svg class="dts hk" viewBox="0 0 108 63" width="100%" aria-hidden="true">${s}</svg>`;
+/* 12-week HabitKit grid: columns are weeks, rows Mon..Sun, from the real habit log; today sits at 77 + weekday */
+const hkToday = () => 77 + TI();
+function hkVal(h, i) { if (i === hkToday()) return h.doneToday ? 1 : 0; return MC.habitGrid(h.id)[i]; }
+function hkGrid(id, done, big) {
+  const h = typeof id === 'object' ? id : habit(id) || { id, doneToday: done };
+  const g = big ? 13 : 9, r = big ? 4.6 : 3, HT = hkToday(); let s = '';
+  for (let i = 0; i < 84; i++) { const v = hkVal(h, i), c = Math.floor(i / 7), w = i % 7; const cls = v == null ? '' : v >= 1 ? 'on' : v > 0 ? 'half' : 'miss'; s += `<circle class="dt ${cls}${i === HT ? ' hk-now' : ''}" cx="${c * g + g / 2}" cy="${w * g + g / 2}" r="${v == null ? r * .35 : r}"/>`; }
+  return `<svg class="dts hk${big ? ' big' : ''}" viewBox="0 0 ${12 * g} ${7 * g}" width="100%" aria-hidden="true">${s}</svg>`;
 }
 V.habits = {
   title: () => ({ habits: 'Habits', goals: 'Goals', quit: 'Quitting' }[S.ui.hSeg || 'habits']),
@@ -1883,13 +1887,13 @@ function habitsBody() {
   const auto = S.habits.filter(h => h.kind === 'measured');
   const once = S.routines.filter(r => ['weekly', 'monthly'].includes(r.cadence));
   const nos = S.routines.filter(r => r.repeatable);
-  const rcard = r => { const d = routineDone(r), n = r.steps.length, fin = d >= routineReq(r); return `<div class="cd rtc ${fin ? '' : ''}"><div class="hstack">${dring({ n: 20, on: d / n * 20, size: 46, r: 1.9, pad: 3, cls: '', k: 'hr' + r.id })}<div class="grow"><div class="rt one" style="font-weight:700">${esc(r.title)}</div><div class="rs">${r.cadence === 'prework' ? 'Before work' : r.cadence}<span>${d} of ${n}</span>${habit(r.habitId) ? `<span>${(habit(r.habitId) || {}).streak || 0}D streak</span>` : ''}</div></div><button class="key ${fin ? 't' : 'red'} sm" data-a="openRunner" data-x="${r.id}">${fin ? 'Again' : 'Start'}</button></div></div>`; };
+  const rcard = r => { const d = routineDone(r), n = r.steps.length, fin = d >= routineReq(r); return `<div class="cd rtc" role="button" tabindex="0" data-a="routineSheet" data-x="${r.id}"><div class="hstack">${dring({ n: 20, on: d / n * 20, size: 46, r: 1.9, pad: 3, cls: '', k: 'hr' + r.id })}<div class="grow"><div class="rt one" style="font-weight:700">${esc(r.title)}</div><div class="rs">${r.cadence === 'prework' ? 'Before work' : r.cadence}<span>${d} of ${n}</span>${habit(r.habitId) ? `<span>${(habit(r.habitId) || {}).streak || 0}D streak</span>` : ''}</div></div><button class="key ${fin ? 't' : 'red'} sm" data-a="openRunner" data-x="${r.id}">${fin ? 'Again' : 'Start'}</button></div></div>`; };
   return `<div class="g3" style="margin-bottom:6px">${[[rdone + '/' + daily.length, 'Routines run'], [manual.filter(habitKept).length + '/' + manual.length, 'Manual ticks'], [S.quitting.filter(q => q.today !== 'slip').length + '/' + S.quitting.length, 'Quits clean']].map(([v, l], i) => `<div class="cd ${i === 0 ? 'k' : ''}" style="padding:14px">${dm(v, 3, { k: 'hs' + i })}<div class="lb" style="margin-top:8px">${l}</div></div>`).join('')}</div>
   <div class="sl">Routines<b>${rdone} of ${daily.length} done today</b></div>${daily.map(rcard).join('')}
   <div class="sl">Manual habits<b>${manual.filter(habitKept).length}/${manual.length}</b></div>
-  ${manual.map(h => `<div class="sw hcard" data-sw="habit" data-id="${h.id}"><div class="sw-l">${ico('check')} Kept</div><div class="sw-fg"><div style="padding:14px 16px"><div class="hstack"><div class="grow"><div class="rt one" style="font-weight:700">${esc(h.name)}</div><div class="rs"><span>${h.streak} day streak</span><span>${h.daypart || 'anytime'}</span></div></div>${ck(h.doneToday, `data-a="habitTick" data-x="${h.id}" aria-label="Tick ${esc(h.name)}"`)}</div><div style="margin-top:12px">${hkGrid(h.id, h.doneToday)}</div><div class="lb" style="margin-top:6px">12 weeks</div></div></div></div>`).join('')}
+  ${manual.map(h => `<div class="sw hcard" data-sw="habit" data-id="${h.id}"><div class="sw-l">${ico('check')} Kept</div><div class="sw-fg"><div style="padding:14px 16px"><div class="hstack"><div class="grow" data-a="habitSheet" data-x="${h.id}"><div class="rt one" style="font-weight:700">${esc(h.name)}</div><div class="rs"><span>${h.streak} day streak</span><span>${h.daypart || 'anytime'}</span></div></div>${ck(h.doneToday, `data-a="habitTick" data-x="${h.id}" aria-label="Tick ${esc(h.name)}"`)}</div><div style="margin-top:12px" data-a="habitSheet" data-x="${h.id}">${hkGrid(h)}</div><div class="lb" style="margin-top:6px">12 weeks</div></div></div></div>`).join('')}
   <div class="sl">Amounts and automatic</div>
-  ${auto.map(h => { const v = h.per === 'week' ? h.current : h.today, p = clamp(v / h.target, 0, 1); return `<div class="cd"><div class="hstack"><div style="position:relative;width:64px;height:64px;flex:none">${dring({ n: 28, on: p * 28, size: 64, r: 1.9, pad: 3, red: !h.auto && !h.hevy && p < 1, k: 'ha' + h.id })}<div class="wcenter">${dm(v, 2.2)}</div></div><div class="grow"><div class="rt one" style="font-weight:700">${esc(h.name)}</div><div class="rs"><span>${v} of ${h.target}${h.measure === 'minutes' ? ' min' : ''} ${h.per === 'week' ? 'this week' : 'today'}</span></div><div class="rs">${h.auto ? 'Fills itself from your focus blocks' : h.hevy ? esc(S.gym.lastSync) : h.streak + ' day streak'}</div></div></div>
+  ${auto.map(h => { const v = h.per === 'week' ? h.current : h.today, p = clamp(v / h.target, 0, 1); return `<div class="cd"><div class="hstack"><div style="position:relative;width:64px;height:64px;flex:none">${dring({ n: 28, on: p * 28, size: 64, r: 1.9, pad: 3, red: !h.auto && !h.hevy && p < 1, k: 'ha' + h.id })}<div class="wcenter">${dm(v, 2.2)}</div></div><div class="grow" data-a="habitSheet" data-x="${h.id}"><div class="rt one" style="font-weight:700">${esc(h.name)}</div><div class="rs"><span>${v} of ${h.target}${h.measure === 'minutes' ? ' min' : ''} ${h.per === 'week' ? 'this week' : 'today'}</span></div><div class="rs">${h.auto ? 'Fills itself from your focus blocks' : h.hevy ? esc(S.gym.lastSync) : h.streak + ' day streak'}</div></div></div>
     ${h.hevy ? `<button class="key t sm" style="margin-top:12px" data-a="hevySync" ${S.hevyBusy ? 'disabled' : ''}>${S.hevyBusy ? `<span class="chase8">${spinSVG()}</span> Syncing` : ico('sync') + ' Sync Hevy'}</button>` : h.auto ? '' : `<div class="hstack" style="margin-top:12px;gap:6px">${(h.presets || [1]).map(n => `<button class="key t sm" data-a="logAmount" data-x="${h.id}:${n}">+${n}</button>`).join('')}${v > 0 && h.measure === 'times' ? `<button class="key t sm" data-a="logAmount" data-x="${h.id}:-1">Take one back</button>` : ''}</div>`}</div>`; }).join('')}
   <div class="sl">Once in a while</div>${once.map(rcard).join('')}
   <div class="sl">No set day</div>${nos.map(rcard).join('')}`;
@@ -1950,7 +1954,7 @@ V.runner = {
   title: 'Routine', noSwipeClose: true,
   render(a, e) {
     const r = routine(a.id), n = r.steps.length;
-    if (e.i == null) { e.i = r.steps.findIndex(s => !s.done); if (e.i < 0) e.i = 0; }
+    if (e.i == null) { e.i = a.again ? 0 : r.steps.findIndex(s => !s.done); if (e.i < 0) e.i = 0; }
     if (e.finished) return `<div class="runfin">${burst()}<div style="text-align:center">${dm('DONE', 9, { k: 'rf' })}<div class="wt" style="margin:22px 0 8px">${esc(r.title)} finished. ${routineDone(r)} of ${n} steps.</div><div class="lb">${habit(r.habitId) ? 'Streak ' + habit(r.habitId).streak + ' days' : ''}</div></div><button class="key red wide" style="margin-top:30px;height:56px" data-a="back">Close</button></div>`;
     const s = r.steps[e.i], timer = s.kind === 'timer';
     const left = timer ? (e.tLeft ?? s.seconds) : 0;
@@ -2012,6 +2016,117 @@ V.giveup = {
   }
 };
 A.ghz = (el, i) => { S.ui.gh = +i; refresh(); };
+
+
+/* ---------------- habit sheet: rises from the bottom like the real MC habit sheet ---------------- */
+const hBest = h => h.best || h.streak || 0;
+const L7 = () => { const t = hkToday(); return [t - 6, t - 5, t - 4, t - 3, t - 2, t - 1, t]; };
+const gridMonths = () => [0, 6, 11].map(c => MONTHS[dayDate(c * 7 - hkToday()).getMonth()]);
+function openHabitSheet(id) {
+  const h = habit(id); if (!h) return;
+  S.ui.hsEdit = { daypart: h.daypart || 'anytime', freq: h.frequency || 'daily' };
+  sheet('habit', {
+    cls: 'hsheet', live: true, title: () => habit(id) ? habit(id).name : '', body: () => {
+      const h = habit(id); if (!h) return '';
+      const HT = hkToday(), meas = h.kind === 'measured', v = meas ? (h.per === 'week' ? h.current : h.today || 0) : 0;
+      const kept = L7().filter(i => hkVal(h, i) >= 1).length, r = h.routine && routine(h.routine);
+      const days = L7().map((i, k) => { const d = dayDate(k - 6), val = hkVal(h, i); return `<button class="hday ${val >= 1 ? 'on' : ''} ${i === HT ? 'today' : ''}" data-a="hsDay" data-x="${id}:${i}" aria-pressed="${val >= 1}" ${h.auto || meas ? 'disabled' : ''}><span>${DAYS[(d.getDay() + 6) % 7]}</span><b>${d.getDate()}</b><i></i></button>`; }).join('');
+      const e = S.ui.hsEdit;
+      return `<div class="g3 hstat"><div class="cd k">${dm(h.streak, 3.6, { k: 'hss' + id })}<div class="lb">Day streak</div></div><div class="cd">${dm(hBest(h), 3.6)}<div class="lb">Best run</div></div><div class="cd">${dm(kept + ' OF 7', 2.6, { k: 'hsk' + id })}<div class="lb">Last 7 days</div></div></div>
+      <div class="cd">${lbRow('12 weeks', h.auto ? 'Fills itself' : 'Kept dots are solid')}<div style="margin-top:12px">${hkGrid(h, 0, true)}</div><div class="hkm">${gridMonths().map(m => `<span>${m}</span>`).join('')}</div></div>
+      <div class="sl">This week<b>${h.auto ? 'From your focus blocks' : meas ? 'Kept by the amount' : 'Tap a day to fix it'}</b></div><div class="hweek">${days}</div>
+      ${meas ? `<div class="sl">Amount<b>${v} of ${h.target}${h.unit ? ' ' + h.unit : ''} ${h.per === 'week' ? 'this week' : 'today'}</b></div><div class="cd hamt"><div class="hstack"><div style="position:relative;width:96px;height:96px;flex:none">${dring({ n: 32, on: clamp(v / h.target, 0, 1) * 32, size: 96, r: 2.4, pad: 5, red: !h.auto && v < h.target, cls: '', k: 'hsa' + id })}<div class="wcenter">${dm(v, 3, { k: 'hsv' + id })}</div></div><div class="grow">${h.auto ? `<div class="wt" style="color:var(--dim)">Counts your focus minutes. Start a block to move it.</div><button class="key sm red" style="margin-top:10px" data-a="hsFocus" data-x="${id}">${ico('play')} Start a block</button>` : `<div class="hstack" style="flex-wrap:wrap;gap:6px">${(h.presets || [1]).map(n => `<button class="key sm" data-a="logAmount" data-x="${id}:${n}">+${n}</button>`).join('')}${v > 0 && h.measure === 'times' ? `<button class="key sm t" data-a="logAmount" data-x="${id}:-1">-1</button>` : ''}</div>${h.measure === 'amount' ? `<div class="hstack" style="margin-top:8px"><input class="fld" id="hsamt" inputmode="numeric" placeholder="Custom amount" data-enter="hsCustom" data-x="${id}" style="height:42px"><button class="key" data-a="hsCustom" data-x="${id}">Log</button></div>` : ''}`}</div></div></div>` : ''}
+      ${r ? `<div class="sl">Routine</div><div class="cd"><div class="hstack">${dring({ n: 20, on: routineDone(r) / r.steps.length * 20, size: 46, r: 1.9, pad: 3, cls: '', k: 'hsr' + r.id })}<div class="grow"><div class="rt one" style="font-weight:700">${esc(r.title)}</div><div class="rs"><span>${routineDone(r)} of ${r.steps.length} steps today</span></div></div><button class="key red sm" data-a="hsRoutine" data-x="${r.id}">${routineDone(r) >= r.steps.length ? 'Again' : 'Start'}</button></div></div>` : ''}
+      <div class="sl">Edit</div><div class="cd hedit">
+        <input class="fld" id="hsname" value="${esc(h.name)}" aria-label="Name" ${r ? 'disabled' : ''}>${r ? `<div class="lb" style="margin-top:6px">Name and days follow the routine</div>` : ''}
+        <div class="lb" style="margin:14px 0 8px">How often</div><div class="chips">${[['daily', 'Every day'], ['weekdays', 'Mon to Fri'], ['times-per-week', 'A few times a week'], ['weekly', 'Once a week']].map(([f, l]) => `<button class="chip ${e.freq === f ? 'on' : ''}" data-a="hsFreq" data-x="${f}" ${r ? 'disabled' : ''}>${l}</button>`).join('')}</div>
+        ${meas && h.measure !== 'amount' ? `<div class="lb" style="margin:14px 0 8px">Target</div><input class="fld" id="hstgt" inputmode="numeric" value="${h.target}" aria-label="Target" style="width:120px">` : ''}
+        <div class="lb" style="margin:14px 0 8px">When in the day</div><div class="chips">${['morning', 'noon', 'afternoon', 'evening', 'anytime'].map(d => `<button class="chip ${e.daypart === d ? 'on' : ''}" data-a="hsPart" data-x="${d}">${d}</button>`).join('')}</div>
+        <button class="key wide" style="margin-top:16px" data-a="hsSave" data-x="${id}">Save changes</button>
+      </div>
+      <button class="key t wide" style="color:var(--red);margin-top:4px" data-a="hsArchive" data-x="${id}">${ico('trash')} Archive this habit</button>`;
+    }
+  });
+}
+A.habitSheet = (el, id) => openHabitSheet(id);
+/* A past day is the store's dated toggle (markHabitOn); today is the ordinary tick. */
+A.hsDay = (el, x) => {
+  const [id, i] = x.split(':'), h = habit(id), k = +i, HT = hkToday();
+  if (k === HT) { A.habitTick(null, id); return; }
+  B.store().markHabitOn(id, isoOff(k - HT), !(hkVal(h, k) >= 1));
+};
+A.hsCustom = (el, id) => { const f = $('#hsamt'), n = +(f && f.value); if (!n) return; A.logAmount(null, id + ':' + n); };
+A.hsFocus = () => { closeSheet('habit'); startFocus({}); };
+A.hsRoutine = (el, rid) => { closeSheet('habit'); setTimeout(() => open('runner', { id: rid }), 200); };
+A.hsFreq = (el, f) => { S.ui.hsEdit.freq = f; repaintSheets(); };
+A.hsPart = (el, d) => { S.ui.hsEdit.daypart = d; repaintSheets(); };
+A.hsSave = (el, id) => {
+  const h = habit(id), n = $('#hsname'), t = $('#hstgt'), patch = { daypart: S.ui.hsEdit.daypart === 'anytime' ? undefined : S.ui.hsEdit.daypart };
+  if (n && !n.disabled && n.value.trim()) patch.name = n.value.trim();
+  if (!h.routine) patch.frequency = S.ui.hsEdit.freq;
+  if (t && +t.value > 0) { if (h.measure === 'times') patch.targetCount = +t.value; else if (h.measure === 'minutes') patch.dailyTargetMin = +t.value; }
+  B.store().updateHabit(id, patch);
+  if (S.ui.hsEdit.daypart === 'anytime') B.store().setLook('habit', id, { daypart: null });
+  toast('Habit saved');
+};
+A.hsArchive = (el, id) => { const h = habit(id); closeSheet('habit'); B.store().deleteHabit(id); undoable('Archived: ' + h.name, () => B.store().undoDelete()); };
+/* the amount widget on Home opens the same sheet */
+W.measure.tap = (inst) => { const h = habit(inst.arg) || S.habits.find(x => x.kind === 'measured' && !x.auto && inSp(x, PAGES[S.page])); if (h) openHabitSheet(h.id); };
+
+/* ---------------- routine sheet: same bottom-up mechanics; its steps are the folder's habits ---------------- */
+const CAD = { daily: 'Every day', prework: 'Before work', weekly: 'Once a week', monthly: 'Once a month' };
+const rHabit = r => habit(r.habitId) || { id: r.habitId || r.id, streak: 0, best: 0, doneToday: routineDone(r) >= routineReq(r) };
+function openRoutineSheet(id) {
+  const r0 = routine(id); if (!r0) return;
+  S.ui.rsEdit = { cadence: r0.cadence, daypart: r0.daypart || 'anytime', open: false };
+  sheet('routine', {
+    cls: 'hsheet', live: true, title: () => routine(id) ? routine(id).title : '', body: () => {
+      const r = routine(id); if (!r) return '';
+      const d = routineDone(r), n = r.steps.length, h = rHabit(r), e = S.ui.rsEdit, fin = d >= routineReq(r);
+      const steps = r.steps.map((st, i) => `<div class="row rstep" style="align-items:flex-start">${ck(st.done, `data-a="rsStep" data-x="${id}:${i}" aria-label="Tick ${esc(st.title)}"`)}
+        <div class="grow"><div class="hstack" style="gap:8px;align-items:baseline">${dm(pad(i + 1), 2, { cls: 'dim' })}<span class="rt ${st.done ? 'done' : ''}">${esc(st.title)}</span></div>
+        <div class="rs">${st.optional ? '<span>Optional</span>' : ''}${st.kind === 'timer' ? `<span>${ico('clock')} ${Math.round(st.seconds / 60)} min timer</span>` : ''}${st.gate ? `<span class="red">${esc(st.gate)}</span>` : ''}${st.link ? `<span>${esc(st.link)}</span>` : ''}</div>
+        ${st.alts ? `<div class="g2 rsalts">${st.alts.map((al, k) => `<button class="cd alt ${st.alt === k ? 'k' : ''}" data-a="rsAlt" data-x="${id}:${i}:${k}" aria-pressed="${st.alt === k}"><div class="rt" style="font-weight:700;color:var(--fg)">${esc(al.title)}</div><div class="wt" style="font-size:11.5px;color:var(--fd);margin-top:4px">${esc(al.note)}</div></button>`).join('')}</div>` : ''}</div></div>`).join('');
+      const ed = r.steps.map((st, i) => `<div class="hstack rse"><input class="fld rse-step" data-i="${i}" value="${esc(st.title)}" aria-label="Step ${i + 1}"><button class="kb sm" data-a="rsMove" data-x="${id}:${i}:-1" aria-label="Move up" ${i ? '' : 'disabled'}>${ico('up')}</button><button class="kb sm" data-a="rsMove" data-x="${id}:${i}:1" aria-label="Move down" ${i < n - 1 ? '' : 'disabled'}>${ico('down')}</button><button class="kb sm" data-a="rsDel" data-x="${id}:${i}" aria-label="Remove step">${ico('close')}</button></div>`).join('');
+      return `<div class="lb" style="margin:-4px 2px 12px">${CAD[r.cadence] || r.cadence}${r.daypart ? ', ' + r.daypart : ''}${r.repeatable ? ', no set day' : ''}</div>
+      <div class="cd k"><div class="hstack" style="justify-content:space-between">${lb('Today')}${dm(d + ' OF ' + n, 3.2, { k: 'rsd' + id })}</div><div style="margin-top:14px">${drow(n, d, { gap: 22, r: 6, k: 'rsr' + id })}</div></div>
+      <div class="g2 hstat"><div class="cd">${dm(h.streak, 3.6)}<div class="lb">Day streak</div></div><div class="cd">${dm(hBest(h), 3.6)}<div class="lb">Best run</div></div></div>
+      <div class="cd">${lbRow('Finished days, 12 weeks', fin ? 'Done today' : d + ' of ' + n + ' today')}<div style="margin-top:12px">${hkGrid(h, 0, true)}</div></div>
+      <div class="hstack" style="gap:8px;margin-bottom:10px"><button class="key red grow" style="height:52px" data-a="rsStart" data-x="${id}">${ico('play')} ${fin ? 'Run it again' : d ? 'Continue' : 'Start'}</button>${r.repeatable ? `<button class="key t" style="height:52px" data-a="rsAgain" data-x="${id}">${ico('undo')} Run again</button>` : ''}</div>
+      <div class="sl">Steps<b>${d} of ${n} done</b></div><div class="cd tight rows">${steps}</div>
+      <div class="sl"><span>Edit</span><button class="lb fg" data-a="rsEditToggle">${e.open ? 'Close' : 'Open'}</button></div>
+      ${e.open ? `<div class="cd hedit"><input class="fld" id="rsname" value="${esc(r.title)}" aria-label="Name">
+        <div class="lb" style="margin:14px 0 8px">Cadence</div><div class="chips">${Object.entries(CAD).map(([c, l]) => `<button class="chip ${e.cadence === c ? 'on' : ''}" data-a="rsCad" data-x="${c}">${l}</button>`).join('')}</div>
+        <div class="lb" style="margin:14px 0 8px">When in the day</div><div class="chips">${['morning', 'noon', 'afternoon', 'evening', 'anytime'].map(p => `<button class="chip ${e.daypart === p ? 'on' : ''}" data-a="rsPart" data-x="${p}">${p}</button>`).join('')}</div>
+        <div class="lb" style="margin:14px 0 8px">Steps</div><div style="display:grid;gap:6px">${ed}</div>
+        <div class="hstack" style="margin-top:8px"><input class="fld" id="rsnew" placeholder="Add a step" data-enter="rsAdd" data-x="${id}"><button class="key" data-a="rsAdd" data-x="${id}">Add</button></div>
+        <button class="key wide" style="margin-top:16px" data-a="rsSave" data-x="${id}">Save changes</button></div>` : ''}
+      <button class="key t wide" style="color:var(--red);margin-top:4px" data-a="rsArchive" data-x="${id}">${ico('trash')} Archive this routine</button>`;
+    }
+  });
+}
+/* Renamed steps are written when they change, through the step habit's own edit. */
+function rsKeepNames(id) { const r = routine(id); $$('.sheet .rse-step').forEach(f => { const st = r.steps[+f.dataset.i]; if (st && f.value.trim() && f.value.trim() !== st.title) B.store().updateHabit(st.id, { name: f.value.trim() }); }); }
+A.routineSheet = (el, id) => openRoutineSheet(id);
+A.rsStep = (el, x) => { const [id, i] = x.split(':'), st = routine(id).steps[+i]; if (st.alts && st.alt == null && !st.done) { toast('Pick one of the two first'); return; } B.store().toggleHabitDay(st.id, TI()); };
+A.rsAlt = (el, x) => { const [id, i, k] = x.split(':'), st = routine(id).steps[+i]; B.store().pickHabitAlt(st.id, st.alts[+k].id); };
+A.rsStart = (el, id) => { closeSheet('routine'); setTimeout(() => open('runner', { id }), 220); };
+A.rsAgain = (el, id) => { closeSheet('routine'); setTimeout(() => open('runner', { id, again: 1 }), 220); };
+A.rsEditToggle = () => { S.ui.rsEdit.open = !S.ui.rsEdit.open; repaintSheets(); };
+A.rsCad = (el, c) => { S.ui.rsEdit.cadence = c; repaintSheets(); };
+A.rsPart = (el, p) => { S.ui.rsEdit.daypart = p; repaintSheets(); };
+A.rsMove = () => toast('Step order is not editable in the real app yet');
+A.rsDel = (el, x) => { const [id, i] = x.split(':'), st = routine(id).steps[+i]; rsKeepNames(id); B.store().deleteHabit(st.id); undoable('Step removed: ' + st.title, () => B.store().undoDelete()); };
+A.rsAdd = () => toast('Adding steps is not in the real app yet. Add it as a habit in the routine for now.');
+A.rsSave = (el, id) => {
+  const r = routine(id), n = $('#rsname'); rsKeepNames(id);
+  B.store().updateRoutine(id, { title: n && n.value.trim() ? n.value.trim() : r.title, cadence: S.ui.rsEdit.cadence });
+  if (r.habitId) B.store().setLook('habit', r.habitId, { daypart: S.ui.rsEdit.daypart === 'anytime' ? null : S.ui.rsEdit.daypart });
+  S.ui.rsEdit.open = false; toast('Routine saved');
+};
+A.rsArchive = (el, id) => { const r = routine(id); closeSheet('routine'); B.store().deleteRoutine(id); undoable('Archived: ' + r.title, () => B.store().undoDelete()); };
+/* the routine widget on Home opens the sheet; its START key still goes straight to the runner */
+W.routine.tap = (inst) => { const r = routineFor(inst, PAGES[S.page]); if (r) openRoutineSheet(r.id); };
 
 /* ---- 53-zone.js ---- */
 /* =====================================================================

@@ -14,7 +14,7 @@ const setInterval = (f, ms) => { const id = window.setInterval(() => { if (!dead
 const clearInterval = id => { IV.delete(id); window.clearInterval(id); };
 const requestAnimationFrame = f => { const id = window.requestAnimationFrame(t => { RAF.delete(id); if (!dead) f(t); }); RAF.add(id); return id; };
 const onWin = (t, f, o) => { window.addEventListener(t, f, o); WINL.push([t, f, o]); };
-ROOT.querySelector('#app') || ROOT.insertAdjacentHTML('beforeend', `<div id="app">
+if (!ROOT.querySelector('#app')) { const box = document.createElement('div'); box.innerHTML = `<div id="app">
   <section class="view home root on" data-view="home" id="home"></section>
   <div id="views"></div>
   <nav class="dock" id="dock" aria-label="Main"></nav>
@@ -24,7 +24,7 @@ ROOT.querySelector('#app') || ROOT.insertAdjacentHTML('beforeend', `<div id="app
   <div class="sbar" id="sbar"></div>
   <canvas class="dz" id="dz"></canvas>
   <div class="homeind"></div>
-</div>`);
+</div>`; ROOT.append(box.firstElementChild); }
 /* ---- 30-core.js ---- */
 /* =====================================================================
    Core: utils, simulated clock, state store, actions bus, toast + undo

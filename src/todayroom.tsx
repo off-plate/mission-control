@@ -22,7 +22,6 @@
    Every token in here is scoped to `.troom` so none of it leaks. */
 import { DotField } from './dotfield'
 import { Roll, useSkin } from './skins'
-import { NothingHome } from './skinbits'
 import { useEffect, useState } from 'react'
 import { useStore } from './store'
 import { useFirstMove } from './ui'
@@ -257,13 +256,6 @@ export function TodayRoom() {
      skin is showing; the clock re-renders every second, so this stays current. */
   const night = !!document.querySelector('.shell.skin-night')
   const R = (t: string) => (night ? <Roll text={t} /> : t)
-  /* Lime and Nothing draw their own Today on a phone, from the numbers above. */
-  const phoneSkin = narrowPhaseRow && !document.querySelector('.shell.is-hud') ? pickedSkin : 'classic'
-  if (phoneSkin.startsWith('nothing')) {
-    return <NothingHome h={h} m={m} s={s} quarter={quarter} busy={busy} focusQ={focusQ} next={firstMove ?? null} start={start}
-      onClock={onClock} kept={kept} due={due} focusedMin={focusedMin} routines={routineRows} goals={goalRows} setPage={setPage} now={now} />
-  }
-
   return (
     <div className="troom">
 

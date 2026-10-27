@@ -1230,7 +1230,9 @@ function tileDrag(tile, st) {
       const others = $$('.w', grid).filter(t => t !== tile);
       let best = null, bd = 1e9;
       others.forEach(t => { const r = t.getBoundingClientRect(); const d = Math.hypot(r.left - ar.left + r.width / 2 - x, r.top - ar.top + r.height / 2 - y); if (d < bd) { bd = d; best = t; } });
-      if (best && bd < Math.max(40, best.offsetWidth / 2.2)) {
+      /* Swap only once the finger is over the other tile, so it can never flip back and forth while it sits between two. */
+      const br = best && best.getBoundingClientRect(), inside = br && x >= br.left - ar.left && x <= br.right - ar.left && y >= br.top - ar.top && y <= br.bottom - ar.top;
+      if (best && inside) {
         const arr = S.layout[p], from = arr.findIndex(i => i.id === tile.dataset.wid), to = arr.findIndex(i => i.id === best.dataset.wid);
         if (from >= 0 && to >= 0 && from !== to) {
           lastSwap = performance.now();

@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react'
    skins.css, scoped to `.shell.skin-<id>`, plus one entry here. */
 export const SKINS = [
   { id: 'classic', label: 'Classic', dark: false, bar: '#FAF8F4' },
-  { id: 'lime', label: 'Lime Cards', dark: false, bar: '#F1F1EF' },
   { id: 'night', label: 'Night Wallet', dark: true, bar: '#3A3150' },
   { id: 'nothing-light', label: 'Nothing Light', dark: false, bar: '#E8E8E8' },
   { id: 'nothing-dark', label: 'Nothing Dark', dark: true, bar: '#000000' },

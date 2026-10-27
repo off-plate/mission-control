@@ -22,7 +22,7 @@
    Every token in here is scoped to `.troom` so none of it leaks. */
 import { DotField } from './dotfield'
 import { Roll, useSkin } from './skins'
-import { LimeCards, NothingHome } from './skinbits'
+import { NothingHome } from './skinbits'
 import { useEffect, useState } from 'react'
 import { useStore } from './store'
 import { useFirstMove } from './ui'
@@ -266,7 +266,6 @@ export function TodayRoom() {
 
   return (
     <div className="troom">
-      {phoneSkin === 'lime' && <LimeCards />}
 
       {/* ---- the figures ---- */}
       <section className="troom-hero">

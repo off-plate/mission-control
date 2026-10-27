@@ -120,21 +120,3 @@ export function NothingHome(d: HomeData) {
   )
 }
 
-/* Lime: the three workspaces as bank cards in a snap row. A tap is the same
-   switch the header's workspace picker makes. */
-const CARD: Record<string, string> = { all: '#DFF24A', personal: '#FFC94A', work: '#7FD8F5' }
-export function LimeCards() {
-  const { view, setView, tasks } = useStore()
-  const open = (v: string) => tasks.filter((t) => !t.done && (v === 'all' || t.space === v)).length
-  return (
-    <div className="lc-row" role="radiogroup" aria-label="Workspace">
-      {(['all', ...Object.keys(SPACE_LABELS)] as string[]).map((v) => (
-        <button key={v} role="radio" aria-checked={view === v} className="lc-card" style={{ ['--c' as string]: CARD[v] }} onClick={() => setView(v as SpaceId | 'all')}>
-          <span className="lc-name">{v === 'all' ? 'All' : SPACE_LABELS[v as SpaceId]}</span>
-          <span className="lc-n">{open(v)}</span>
-          <span className="lc-k">open</span>
-        </button>
-      ))}
-    </div>
-  )
-}

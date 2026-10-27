@@ -17,18 +17,6 @@
    ========================================================================== */
 
 @font-face {
-  font-family: 'Space Grotesk';
-  src: url('/mission-control/fonts/space-grotesk-var-latin-ext.woff2') format('woff2');
-  font-weight: 300 700; font-style: normal; font-display: swap;
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-@font-face {
-  font-family: 'Space Grotesk';
-  src: url('/mission-control/fonts/space-grotesk-var-latin.woff2') format('woff2');
-  font-weight: 300 700; font-style: normal; font-display: swap;
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
   font-family: 'Sora';
   src: url('/mission-control/fonts/sora-var-latin-ext.woff2') format('woff2');
   font-weight: 100 800; font-style: normal; font-display: swap;
@@ -59,98 +47,6 @@ body:has(.shell[class*="skin-"]) {
   & :is(.nt-tool) { border-radius: 9px; }
   /* No lift on hover. */
   & .troom .tr-card--hover:hover, & button.chip:hover { transform: none; }
-}
-
-/* ==========================================================================
-   LIME CARDS. Light grey canvas, white cards with no outline, black primary
-   buttons, Space Grotesk. The accent is still the space's own colour.
-   ========================================================================== */
-body:has(.shell.skin-lime) {
-  --a-paper: #F1F1EF; --a-card: #FFFFFF; --a-sunk: #F1F1EF; --a-feature: #111111;
-  --a-on-ink: #FFFFFF;
-  --a-ink: #111111; --a-muted: #5F5F58; --a-soft: #6E6E67; --a-faint: #A2A29B;
-  --a-line: rgba(17, 17, 17, 0.07); --a-line-2: rgba(17, 17, 17, 0.14);
-  --a-alert: #C9353A; --a-alert-wash: #FCE9E9; --a-alert-solid: #E5484D;
-  --a-warn: #A86A00; --a-warn-wash: #FBF0DA;
-  --a-progress: #1F8A49; --a-progress-wash: #E3F5EA; --a-progress-solid: #3DBE6E;
-  --a-lift: none; --a-lift-2: none;
-  --a-r-xs: 10px; --a-r-sm: 14px; --a-r-md: 18px; --a-r-lg: 22px;
-
-  --bg: var(--a-paper); --surface: var(--a-card); --surface-2: var(--a-sunk);
-  --ink: var(--a-ink); --muted: var(--a-muted); --faint: var(--a-soft);
-  --hairline: var(--a-line); --hairline-strong: var(--a-line-2);
-  --accent: var(--a-accent-text); --accent-text: var(--a-accent-text); --accent-hover: var(--a-ink);
-  --accent-ink: var(--a-ink); --accent-wash: var(--a-accent-wash); --accent-fill: var(--a-accent);
-  --focus: var(--a-accent-text); --focus-text: var(--a-accent-text);
-  --alert: var(--a-alert); --alert-wash: var(--a-alert-wash);
-  --progress: var(--a-progress); --progress-wash: var(--a-progress-wash);
-  --warn: var(--a-warn); --warn-wash: var(--a-warn-wash);
-  --shadow-pop: 0 18px 50px rgba(17, 17, 17, 0.14);
-  --r-sm: 10px; --r-md: 16px;
-  --font-display: 'Space Grotesk', system-ui, sans-serif;
-  --font-body: 'Space Grotesk', system-ui, sans-serif;
-  --font-mono: 'Space Grotesk', system-ui, sans-serif;
-  font-family: var(--font-body);
-  background: var(--bg);
-
-  & h1, & h2, & h3 { letter-spacing: -0.03em; }
-
-  /* Surfaces: a white card is its own edge. */
-  & :is(.panel, .widget, .card, .troom .tr-card, .tr-card, .sheet, .kebab-menu) { border-color: transparent; box-shadow: none; }
-  & :is(.panel, .widget, .troom .tr-card) { border-radius: 22px; }
-  & .troom { background: transparent; }
-  & .kebab-menu, & .sheet { box-shadow: 0 18px 50px rgba(17, 17, 17, 0.14); }
-
-  /* Buttons: black primary, quiet ones a soft fill. */
-  & .btn { border-radius: 14px; }
-  & .btn::before { display: none; }
-  & .btn-primary { background: var(--a-ink); color: #FFFFFF; }
-  & .btn-primary:hover:not(:disabled) { background: var(--a-ink); color: #FFFFFF; }
-  & :is(.btn-quiet, .btn-ghost):not(.btn-sq-jar) { border-color: transparent; background: color-mix(in srgb, var(--a-ink) 6%, transparent); color: var(--a-ink); }
-  & .btn:active:not(:disabled), & button.chip:hover, & button.chip:active { transform: none; }
-  @media (hover: hover) and (pointer: fine) {
-    & .btn-primary:hover:not(:disabled) { background: #2A2A28; }
-    & :is(.btn-quiet, .btn-ghost):hover:not(:disabled) { border-color: transparent; background: color-mix(in srgb, var(--a-ink) 11%, transparent); }
-  }
-
-  /* Segmented controls: the picked one is black. */
-  & .seg:not(.has-hints) { border: 0; background: color-mix(in srgb, var(--a-ink) 6%, transparent); border-radius: 13px; padding: 4px; }
-  & .seg:not(.has-hints) button { border-radius: 10px; }
-  & .seg:not(.has-hints) button[aria-pressed="true"] { background: var(--a-ink); color: #FFFFFF; }
-  & .seg-phone { background: transparent; padding: 0; gap: 8px; }
-  & .seg-phone button { border-radius: 13px; color: var(--a-ink); }
-  & .seg-phone button[aria-selected="true"] { background: var(--a-ink); color: #FFFFFF; box-shadow: none; }
-
-  /* Inputs: a well, no outline. */
-  & :is(.textinput, .numinput) { border-color: transparent; background: var(--a-sunk); border-radius: 13px; }
-  & .panel :is(.textinput, .numinput) { background: var(--a-sunk); }
-
-  /* Checkboxes: a soft square, green when done. */
-  & .checkbox { border-radius: 8px; }
-
-  /* Header. White squares, the mark black with the space colour inside. */
-  & .topbar .btn-sq:not(.btn-sq-jar), & .band :is(.btn-quiet, .btn-ghost) { background: var(--a-card); border-color: transparent; }
-  & .topbar .btn-sq.is-on { background: var(--a-ink); color: #FFFFFF; }
-
-  /* Phone tab bar: a white sheet with rounded top corners. */
-  & .tabbar { background: var(--a-card); border-top: 0; border-radius: 24px 24px 0 0; box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.05); }
-  & .tabbar-tab { color: #9A9A93; }
-  & .tabbar-tab[aria-current="page"] svg { background: none; color: var(--a-ink); }
-  & .tabbar-add { box-shadow: none; color: #111111; border-radius: 14px; }
-  & .tabsheet { background: var(--a-paper); border-radius: 26px 26px 0 0; }
-  & .tabsheet-tile:not(.is-jar) { border-color: transparent; background: var(--a-card); border-radius: 18px; }
-  & .tabsheet-tile[aria-current="page"] { background: var(--a-ink); color: #FFFFFF; }
-
-  & .undo-bar { border-radius: 14px; }
-  & .undo-do { border-radius: 9px; }
-
-  & .pp-page { --pp-canvas: #F1F1EF; --pp-glow: #F7F7F5; --pp-paper: #F1F1EF; --pp-sunk: #F1F1EF; --pp-muted: #5F5F58; }
-
-  /* Habits room: the same canvas and cards. */
-  & :is(.hk, .hk-sheet, .hk-toast, .hk-pill) {
-    --hk-bg: #F1F1EF; --hk-card: #FFFFFF; --hk-card-2: #F1F1EF; --hk-line: rgba(17,17,17,.07); --hk-line-2: rgba(17,17,17,.14);
-    --hk-ink: #111111; --hk-muted: #5F5F58; --hk-faint: #A2A29B; --hk-sel: #E7E7E3;
-  }
 }
 
 /* ==========================================================================
@@ -328,22 +224,6 @@ body:has(.shell.skin-night) {
   body:has(.shell.skin-night) .band-status .band-metric:first-of-type .v { font-size: 64px; font-weight: 300; letter-spacing: -0.045em; line-height: 1.05; }
   body:has(.shell.skin-night) .band-status .band-metric:first-of-type .k { color: var(--a-soft); font-size: 13.5px; }
 }
-
-/* Lime: the workspaces as bank cards (skinbits.tsx). */
-.lc-row { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 -16px 4px; padding: 0 16px 4px; scrollbar-width: none; }
-.lc-row::-webkit-scrollbar { display: none; }
-.lc-card {
-  flex: 0 0 72%; scroll-snap-align: start; position: relative; overflow: hidden; text-align: left;
-  min-height: 132px; padding: 16px; border-radius: 22px; border: 0; color: #111111;
-  background-color: var(--c);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='28'%3E%3Ctext x='0' y='20' font-family='Space Grotesk,sans-serif' font-weight='700' font-size='18' fill='%23111111' fill-opacity='.07'%3EMC.%3C/text%3E%3C/svg%3E");
-  display: grid; grid-template-rows: 1fr auto auto; transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
-}
-.lc-card[aria-checked="false"] { opacity: 0.72; }
-.lc-card:active { transform: scale(0.98); }
-.lc-name { font-weight: 600; font-size: 17px; }
-.lc-n { font-size: 40px; font-weight: 600; letter-spacing: -0.035em; line-height: 1; font-variant-numeric: tabular-nums; }
-.lc-k { font-size: 13px; font-weight: 500; opacity: 0.7; }
 
 /* ==========================================================================
    NOTHING (light and dark). A widget OS: Doto for figures, Space Mono for
@@ -562,4 +442,4 @@ body:has(.shell:is(.skin-nothing-light, .skin-nothing-dark)) {
 .nh-goals { gap: 10px; }
 .nh-goal { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; font: 400 13px/1.3 'Space Mono', monospace; }
 .nh-goal .nh-dots { grid-column: 1 / -1; gap: 3px; }
-@media (prefers-reduced-motion: reduce) { .nh-t, .lc-card { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .nh-t { transition: none; } }

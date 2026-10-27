@@ -546,6 +546,7 @@ function buildView(e) {
   $('#views').append(el);
   e.el = el;
   renderTop(e);
+  const sc0 = $('.vsc', el); sc0.addEventListener('scroll', () => $('.vtop', el).classList.toggle('compact', sc0.scrollTop > 8), { passive: true });
   const first = !SEEN.has(e.id + (e.args.key || '')); SEEN.add(e.id + (e.args.key || ''));
   if (d.lazy && first && !RM) {
     $('.vsc', el).innerHTML = `<div class="skel" aria-label="Loading"><i></i><i></i><i></i><i></i></div>`;
@@ -556,7 +557,8 @@ function buildView(e) {
 function renderTop(e) {
   const d = V[e.id], el = e.el;
   const showBack = !(e.root && !e.tile);
-  $('.vtop', el).innerHTML = `${showBack ? `<button class="kb" data-a="back" aria-label="Back">${ico('back')}</button>` : '<span class="sp"></span>'}<div class="vtt">${esc(vTitle(e))}</div>${d.action ? d.action(e.args) : '<span class="sp"></span>'}`;
+  $('.vtop', el).innerHTML = `${showBack ? `<button class="kb" data-a="back" aria-label="Back">${ico('back')}</button>` : d.lead ? d.lead(e.args) : '<span class="sp"></span>'}<div class="vtt">${esc(vTitle(e))}</div>${d.action ? d.action(e.args, showBack) : '<span class="sp"></span>'}`;
+  el.classList.toggle('haslead', !showBack && !!d.lead);
 }
 function renderBody(e, fresh) {
   const d = V[e.id], sc = $('.vsc', e.el), y = sc.scrollTop;
@@ -1152,6 +1154,14 @@ A.spacePick = () => sheet('space', {
 A.goPage = (el, i) => { closeSheet('space'); setTimeout(() => { setPage(+i); refresh(); }, 120); };
 /* Change where things land: the same space switch as swiping Home. */
 A.ctxSpace = () => A.spacePick();
+/* The Plan header chip: which space, and which project, in one picker. */
+A.ctxPick = () => sheet('ctx', {
+  title: 'Showing', live: true, body: () => { const sp = viewSpace(), pf = S.ui.planProj, ps = MC.projects.filter(p => inSp(p, sp));
+    return `<div class="sl">Space</div><div class="rows cd tight">${SPACES.map((z, i) => `<button class="row" data-a="ctxGo" data-x="${i}" style="width:100%"><span class="cat" style="background:${i === S.page ? 'var(--red)' : 'var(--off)'};width:9px;height:9px"></span><span class="grow rt one">${z.label}</span>${i === S.page ? ico('check') : ''}</button>`).join('')}</div>
+    <div class="sl">Project</div><div class="cd tight rows"><button class="row" style="width:100%" data-a="ctxProj" data-x=""><span class="grow rt one">All projects</span>${!pf ? ico('check') : ''}</button>${ps.map(p => `<button class="row" style="width:100%" data-a="ctxProj" data-x="${p.id}">${ico('folder')}<span class="grow rt one">${esc(p.name)}</span>${pf === p.id ? ico('check') : ''}</button>`).join('')}<button class="row" style="width:100%" data-a="ctxProj" data-x="__u"><span class="grow rt one">Unsorted</span>${pf === '__u' ? ico('check') : ''}</button></div>`; }
+});
+A.ctxGo = (el, i) => { setPage(+i, false); if (S.ui.planProj && S.ui.planProj !== '__u' && !inSp(MC.projects.find(p => p.id === S.ui.planProj) || {}, curSpace())) S.ui.planProj = null; refresh(); };
+A.ctxProj = (el, x) => { S.ui.planProj = x || null; closeSheet('ctx'); refresh(); };
 
 /* tile tap: open its view with the morph */
 A.wtap = (el) => {
@@ -1669,11 +1679,11 @@ A.qaGo = () => {
   if (q.type === 'task') {
     if (!v) return;
     const dated = q.day !== null && q.day !== undefined;
-    B.store().addTask({ title: v, source: 'mc', estimateMin: 0, space: sp, projectId: pj ? pj.id : undefined, list: dated ? 'today' : 'backlog', ...(dated ? { plannedOn: isoOff(q.day), ...(q.slot ? { slot: q.slot } : {}) } : {}), category: 'quick' });
-    toast(dated ? 'On ' + dayShort(q.day).toLowerCase() + (q.slot ? ', ' + q.slot : '') : 'Added to the to-do list', { act: dated ? 'goPlan' : 'goPlanTodo', actLabel: 'See it' });
+    const id = B.store().addTask({ title: v, source: 'mc', estimateMin: 0, space: sp, projectId: pj ? pj.id : undefined, list: dated ? 'today' : 'backlog', ...(dated ? { plannedOn: isoOff(q.day), ...(q.slot ? { slot: q.slot } : {}) } : {}), category: 'quick' });
+    toast(dated ? 'On ' + dayShort(q.day).toLowerCase() + (q.slot ? ', ' + q.slot : '') : 'Added to the to-do list', { act: 'seeTask', x: id, actLabel: 'See it' });
   }
   if (q.type === 'habit') { if (!q.habit) return; const h = habit(q.habit); const n = h.measure === 'amount' ? (+v || (h.presets || [1])[0]) : 1; A.logAmount(null, q.habit + ':' + n); }
-  if (q.type === 'note') { if (!v) return; B.addNote(sp, v); toast('Note saved', { act: 'goNotes', actLabel: 'Open' }); }
+  if (q.type === 'note') { if (!v) return; const nid = B.addNote(sp, v); toast('Note saved', { act: 'seeNote', x: nid, actLabel: 'Open' }); }
   if (q.type === 'focus') { startFocus({ label: v || 'Focus block', min: q.min || 25 }); }
   if (q.type === 'contact') { const p = S.people.find(p => p.id === q.person); if (!p) return; B.logContact(p.id, q.channel); toast(`Logged: ${q.channel === 'inperson' ? 'in person' : q.channel} with ${p.name}`); }
   if (q.type === 'expense') { toast('Expenses are logged in Compass. Nothing was saved here.'); return; }
@@ -1792,8 +1802,10 @@ function goalRowMini(g) {
 }
 
 /* ---------------- PLAN ---------------- */
+const ctxChip = () => { const sp = viewSpace(), pf = S.ui.planProj; return `<button class="ctxchip" data-a="ctxPick" aria-label="Space and project"><span class="sd"></span><span class="ct"><b>${esc(sp === 'all' ? 'All' : spLabel(sp))}</b><i>${esc(!pf ? 'All projects' : pf === '__u' ? 'Unsorted' : projName(pf))}</i></span></button>`; };
 V.plan = {
-  title: 'Plan', action: () => `<button class="kb" data-a="open" data-x="search" aria-label="Search">${ico('search')}</button>`,
+  title: 'Plan', lead: () => ctxChip(),
+  action: (a, back) => back ? `<span class="vact">${ctxChip()}<button class="kb" data-a="open" data-x="search" aria-label="Search">${ico('search')}</button></span>` : `<button class="kb" data-a="open" data-x="search" aria-label="Search">${ico('search')}</button>`,
   render(a) {
     const sp = viewSpace(a), seg = S.ui.planSeg || 'day', day = S.ui.planDay || 0, pf = S.ui.planProj;
     const inP = t => !pf || (pf === '__u' ? !t.projectId : t.projectId === pf);
@@ -1823,26 +1835,26 @@ V.plan = {
       let rows = backlog(sp).filter(inP);
       const by = { Newest: (x, y) => x.ageDays - y.ageDays || x.order - y.order, Oldest: (x, y) => y.ageDays - x.ageDays, 'Most postponed': (x, y) => (y.carried || 0) - (x.carried || 0), Longest: (x, y) => y.est - x.est, Shortest: (x, y) => x.est - y.est };
       rows.sort(S.ui.todoManual ? (x, y) => x.order - y.order : by[sort]);
-      body = `<div class="hstack"><input class="fld" id="newtask" aria-label="New task" placeholder="Add to ${esc(spLabel(wsp()))}, ${esc(projFor(wsp()) ? projFor(wsp()).name : 'Unsorted')}" data-enter="addTask"><button class="key" data-a="addTask">Add</button></div>
+      body = `<div class="hstack"><input class="fld" id="newtask" aria-label="New task" placeholder="Add to ${esc(spLabel(wsp()))}, ${esc(projFor(wsp()) ? projFor(wsp()).name : 'Unsorted')}" data-enter="addTask"><button class="key red" data-a="addTask">Add</button></div>
         <div class="chips" style="margin:10px 0">${Object.keys(by).map(k => `<button class="chip ${sort === k && !S.ui.todoManual ? 'on' : ''}" data-a="todoSort" data-x="${k}">${k}</button>`).join('')}</div>
         <div class="cd tight rows scan">${rows.length ? rows.map(t => taskRow(t, { reorder: 'todo', space: sp === 'all' })).join('') : `<div class="empty">${pf ? 'Nothing in this project. Clear the filter to see everything.' : 'Nothing waiting. Add the first task above.'}</div>`}</div>
         <div class="lb" style="margin:4px 6px">${S.backlogExtra} more in other lists. Hold a row to reorder.</div>`;
     }
     const week = `<div class="sl">The week<button class="lb fg" data-a="weekToggle">${S.ui.weekOpen ? 'Hide' : 'Show'}</button></div>${S.ui.weekOpen ? `<div class="cd"><div class="wkg">${[0, 1, 2, 3, 4, 5, 6].map(o => { const m = plannedMin(sp, o), n = S.tasks.filter(t => t.list === 'today' && t.day === o && inSp(t, sp)).length; return `<button class="wkd" data-a="pickDay" data-x="planDay:${o}">${dring({ n: 16, on: m / 240 * 16, size: 40, r: 1.6, pad: 3, cls: 'wkr', red: m > 600 })}<div class="lb fg">${DAYS[(TI() + o) % 7]}</div><div class="lb">${m ? fmtMin(m) : '-'}</div></button>`; }).join('')}</div><div class="wt" style="margin-top:12px;font-size:12.5px">You have ${openToday(sp).length} tasks planned for today, taking ${fmtMinL(plannedMin(sp))} of your day.</div></div>` : ''}`;
-    const ctx = `<div class="ctx"><span class="sd"></span><button data-a="ctxSpace" style="display:flex;gap:6px;align-items:center"><b>${esc(sp === 'all' ? 'All spaces' : spLabel(sp))}</b>${ico('down')}</button><span>,</span><button data-a="planFilter" style="display:flex;gap:6px;align-items:center"><b>${esc(!pf ? 'All projects' : pf === '__u' ? 'Unsorted' : projName(pf))}</b>${ico('down')}</button></div>`;
-    return ctx + head + handoff + ctrl + (pf ? `<div class="chips" style="margin-bottom:10px"><button class="chip on" data-a="planProj" data-x="">${ico('folder')} ${esc(pf === '__u' ? 'Unsorted' : projName(pf))} ${ico('close')}</button></div>` : '') + body + week +
+    return head + handoff + ctrl + (pf ? `<div class="chips" style="margin-bottom:10px"><button class="chip on" data-a="planProj" data-x="">${ico('folder')} ${esc(pf === '__u' ? 'Unsorted' : projName(pf))} ${ico('close')}</button></div>` : '') + body + week +
       `<button class="key t wide" style="margin-top:14px" data-a="open" data-x="projects">${ico('projects')} Projects</button>`;
   },
   after(el, a, fresh) {
     S.ui.dayDir = 0;
-    if (S.ui.flash) { const r = $(`.sw[data-id="${S.ui.flash}"]`, el); if (r) { r.scrollIntoView({ block: 'center' }); r.classList.add('flash'); } S.ui.flash = null; }
+    if (S.ui.flash) { const r = $(`.sw[data-id="${S.ui.flash}"]`, el); if (r) { S.ui.flash = null; setTimeout(() => { r.scrollIntoView({ block: 'center', behavior: RM ? 'auto' : 'smooth' }); r.classList.remove('flash'); void r.offsetWidth; r.classList.add('flash'); }, 60); } }
     if (S.ui.focusNew) { S.ui.focusNew = 0; setTimeout(() => { const f = $('#newtask', el); f && f.focus(); }, 300); }
   }
 };
 function bucket(sl, tasks, sp, day, rts = []) {
   const m = tasks.reduce((a, t) => a + t.est, 0), over = sl.capMin && m > sl.capMin;
   const shut = S.ui['shut' + sl.id];
-  return `<div class="bk"><button class="bkh" data-a="bkToggle" data-x="${sl.id}"><span class="lb fg">${shut ? '▸' : '▾'} ${sl.label}</span><span class="lb">${sl.hours}</span><span class="grow"></span><span class="lb ${over ? 'red' : 'fg'}">${sl.capMin ? (over ? `${fmtMin(m)} OF ${fmtMin(sl.capMin)}, ${fmtMin(m - sl.capMin)} OVER` : `${fmtMin(m)} OF ${fmtMin(sl.capMin)}`) : tasks.length + ' tasks'}</span></button>
+  const nowSl = day === 0 && phaseOf().toLowerCase() === sl.id;
+  return `<div class="bk"><button class="bkh ${nowSl ? 'now' : ''}" data-a="bkToggle" data-x="${sl.id}"><span class="lb fg">${shut ? '▸' : '▾'} ${sl.label}</span><span class="lb">${sl.hours}</span><span class="grow"></span><span class="lb ${over ? 'red' : 'fg'}">${sl.capMin ? (over ? `${fmtMin(m)} OF ${fmtMin(sl.capMin)}, ${fmtMin(m - sl.capMin)} OVER` : `${fmtMin(m)} OF ${fmtMin(sl.capMin)}`) : tasks.length + ' tasks'}</span></button>
   ${sl.capMin ? `<div style="margin:0 2px 8px">${drow(sl.capMin / 15, Math.min(sl.capMin / 15, Math.ceil(m / 15)), { gap: 7.4, r: 2.2, over: over ? Math.ceil((m - sl.capMin) / 15) : 0, k: 'bk' + sl.id + day + sp })}</div>` : ''}
   ${shut ? `<div class="lb" style="margin:0 4px 10px">${tasks.length} left</div>` : `<div class="cd tight rows">${tasks.map(t => taskRow(t, { reorder: 'slot-' + sl.id, play: true })).join('')}${rts.map(r => `<button class="row" style="width:100%" data-a="openRunner" data-x="${r.id}">${dring({ n: 12, on: routineDone(r) / r.steps.length * 12, size: 28, r: 1.5, pad: 2, cls: '' })}<span class="grow rt one">${esc(r.title)}</span><span class="lb">Routine ${routineDone(r)}/${r.steps.length}</span></button>`).join('')}${!tasks.length && !rts.length ? '<div class="empty" style="padding:14px">Nothing here yet.</div>' : ''}</div>`}</div>`;
 }
@@ -1893,11 +1905,20 @@ V.search = {
     f.oninput = run; run(); if (fresh) setTimeout(() => f.focus(), 450);
   }
 };
-A.jumpTask = (el, id) => {
-  const t = task(id); S.page = t.space === 'work' ? 2 : 1;
-  if (t.list === 'today') { S.ui.planSeg = 'day'; S.ui.planDay = t.day || 0; } else S.ui.planSeg = 'todo';
-  S.ui.planProj = null; S.ui.flash = id; tab('plan');
-};
+/* One way to a task: its space, its day (or the to-do list), its part of the day open, its project, the row flashed. */
+function jumpTo(id, tries = 0) {
+  const t = task(id);
+  if (!t) { if (tries < 3) afterUpdate(() => jumpTo(id, tries + 1)); return; }
+  if (curSpace() !== 'all' && curSpace() !== t.space) setPage(PAGES.indexOf(t.space), false);
+  if (t.list === 'today' && !t.done && (t.day || 0) <= 6) { S.ui.planSeg = 'day'; S.ui.planDay = t.day || 0; S.ui['shut' + (t.slot || 'uns')] = false; }
+  else if (t.done) { S.ui.planSeg = 'day'; S.ui.planDay = 0; }
+  else { S.ui.planSeg = 'todo'; S.ui.todoManual = false; S.ui.todoSort = 'Newest'; }
+  S.ui.planProj = t.projectId || '__u'; S.ui.flash = id;
+  if (top_().id === 'plan' && STACK.length === 1) { const e = top_(); renderTop(e); renderBody(e, false); } else tab('plan');
+}
+A.jumpTask = (el, id) => jumpTo(id);
+A.seeTask = (el, id) => { A.toastX(); jumpTo(id); };
+A.seeNote = (el, id) => { A.toastX(); const go = () => S.notes.some(n => n.id === id) ? open('note', { id }) : afterUpdate(go); go(); };
 
 /* ---------------- DAY RECORD: the real Day page, read only ---------------- */
 A.openDayRec = () => B.openClassic('day', isoOff(-1));
@@ -2321,7 +2342,7 @@ A.noteMenu = (el, id) => {
   });
 };
 A.notePin = (el, id) => { const n = S.notes.find(x => x.id === id); B.store().updateNote(id, { pinned: !n.pinned }); closeSheet('notemenu'); toast(!n.pinned ? 'Pinned' : 'Unpinned'); };
-A.noteTask = (el, id) => { const n = S.notes.find(x => x.id === id); B.store().addTask({ title: n.title || 'Note task', source: 'mc', estimateMin: 0, space: n.space, list: 'backlog', category: 'deep' }); closeSheet('notemenu'); toast('On the to-do list', { act: 'goPlanTodo', actLabel: 'See it' }); };
+A.noteTask = (el, id) => { const n = S.notes.find(x => x.id === id); const tid = B.store().addTask({ title: n.title || 'Note task', source: 'mc', estimateMin: 0, space: n.space, list: 'backlog', category: 'deep' }); closeSheet('notemenu'); toast('On the to-do list', { act: 'seeTask', x: tid, actLabel: 'See it' }); };
 A.noteMove = (el, x) => { const [id, f] = x.split(':'); B.store().moveNote(id, f); closeSheet('notemenu'); afterUpdate(() => renderTop(top_())); toast('Moved to ' + S.folders.find(z => z.id === f).name); };
 A.noteDel = (el, id) => { B.store().deleteNote(id); closeSheet('notemenu'); back(); undoable('Note deleted', () => B.store().undoDelete()); };
 

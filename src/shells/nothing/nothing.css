@@ -197,7 +197,7 @@ textarea.fld{height:auto;min-height:120px;padding:14px;line-height:1.5;resize:no
 .view{position:absolute;inset:0;background:var(--cv);display:flex;flex-direction:column;z-index:10;visibility:hidden;transition:background-color .3s}
 .view.on,.view.vis{visibility:visible}
 .view.root{z-index:5}
-.vtop{flex:none;display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:8px;padding:calc(var(--st) + 6px) 16px 8px;position:relative;z-index:3}
+.vtop{flex:none;display:grid;grid-template-columns:44px minmax(0,1fr) 44px;grid-auto-rows:48px;align-items:center;gap:8px;padding:calc(var(--st) + 2px) 16px 4px;position:relative;z-index:3;transition:padding .2s}
 .vtt{text-align:center;font:800 25px/1 var(--doto);text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-top:2px}
 .vtop .sp{width:44px;height:44px}
 .vsc{flex:1;overflow-y:auto;overflow-x:hidden;padding:6px 16px calc(var(--sb) + 40px);position:relative}
@@ -544,14 +544,36 @@ textarea.fld{height:auto;min-height:120px;padding:14px;line-height:1.5;resize:no
 .toast.top{top:calc(var(--st) + 8px);bottom:auto}
 .w .wt{word-break:normal;overflow-wrap:normal;hyphens:none}
 
-/* ===== shell: the accent follows the space page; alert stays red ===== */
-#app{--alert:#D71921;--red:#D71921;--on:#FFFFFF;--redtx:#D71921}
-#app[data-sp=personal]{--red:#FFC94A;--on:#0A0A0A;--redtx:#7C5A0E}
-#app[data-sp=work]{--red:#7FD8F5;--on:#0A0A0A;--redtx:#1C5772}
-:host([data-theme=dark]) #app[data-sp=personal]{--redtx:#FFC94A}
-:host([data-theme=dark]) #app[data-sp=work]{--redtx:#7FD8F5}
-#app[data-sp=all] .dock button.qa,#app .dock button.qa{transition:background-color .35s,color .35s,transform .18s var(--eo)}
-.wkey,.key.red,.kb.red,.cd.r,.w.r,.spc .sd,.tg.live{transition:background-color .35s,color .35s,transform .18s var(--eo)}
+/* ===== shell: the accent follows the space; each home page carries its own ===== */
+#app{--alert:#D71921;--on:#FFFFFF}
+#app,.hp[data-page=all]{--red:#D71921;--redtx:#D71921}
+#app[data-sp=personal],.hp[data-page=personal]{--red:#DB3A12;--redtx:#C23510}
+#app[data-sp=work],.hp[data-page=work]{--red:#C8174F;--redtx:#B5154A}
+:host([data-theme=dark]) #app[data-sp=personal],:host([data-theme=dark]) .hp[data-page=personal]{--redtx:#FF6A4D}
+:host([data-theme=dark]) #app[data-sp=work],:host([data-theme=dark]) .hp[data-page=work]{--redtx:#FF5C8A}
+.dock button.qa,.wkey,.key.red,.kb.red,.cd.r,.w.r,.spc .sd,.tg.live,.dpill,.seg button{transition:background-color .35s,color .35s,transform .18s var(--eo)}
+/* alerts are outlined, so they never read as the accent */
+.av.late{background:transparent!important;box-shadow:inset 0 0 0 2px var(--alert);color:var(--alert)!important;--fg:var(--alert)!important}
+.dapp.r{background:var(--t)!important;box-shadow:inset 0 0 0 2px var(--alert);--fg:var(--alert)}
+.dapp .bd,.dapp.r .bd{background:var(--cv);color:var(--alert);box-shadow:inset 0 0 0 1.5px var(--alert)}
+/* Plan wears its accent on what is current or tappable */
+section[data-view=plan] .dpill.on{background:var(--red);color:var(--on)}
+section[data-view=plan] .dpill.on span{color:var(--on)}
+section[data-view=plan] .dpill.on i.has{background:var(--on)}
+section[data-view=plan] .seg button.on{background:var(--red);color:var(--on)}
+.bkh.now .lb.fg{color:var(--redtx)}
+.bkh.now::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--red);flex:none;margin-right:-4px}
+/* the header: as high as Home's, compact once the page scrolls */
+.view.haslead .vtop{grid-template-columns:auto minmax(0,1fr) 44px}
+.vtop.compact .vtt{font-size:19px}
+.vtt{transition:font-size .2s var(--eo)}
+.vact{display:flex;gap:6px;justify-content:flex-end}
+.view:has(.vact) .vtop{grid-template-columns:44px minmax(0,1fr) auto}
+.ctxchip{display:flex;align-items:center;gap:7px;height:44px;max-width:150px;padding:0 10px;border-radius:14px;background:var(--t);text-align:left}
+.ctxchip .sd{width:8px;height:8px;border-radius:50%;background:var(--red);flex:none}
+.ctxchip .ct{display:grid;min-width:0;gap:3px}
+.ctxchip b,.ctxchip i{font:700 9.5px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-style:normal}
+.ctxchip i{color:var(--dim)}
 /* ===== shell: horizontal strips run edge to edge, nothing cut by the container ===== */
 .chips{margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:0;scroll-padding-left:16px}
 .chips::after{content:'';flex:0 0 10px}

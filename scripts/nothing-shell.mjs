@@ -95,7 +95,31 @@ await step('home: swipe between spaces, the accent follows the page', async () =
   await drag('#home .hp:nth-child(3) .grid', 260)
   if ((await dot()) !== 1) throw new Error(`page dot ${await dot()} after swiping back to Personal`)
   if (new Set([all, work, pers]).size !== 3) throw new Error(`accents ${all} ${work} ${pers}`)
-  if (pers.toUpperCase() !== '#FFC94A' || work.toUpperCase() !== '#7FD8F5') throw new Error(`accents ${pers} ${work}`)
+  if (all.toUpperCase() !== '#D71921' || pers.toUpperCase() !== '#DB3A12' || work.toUpperCase() !== '#C8174F') throw new Error(`accents ${all} ${pers} ${work}`)
+})
+
+await step('mid-swipe each page shows its own accent', async () => {
+  await drag('#home .hp:nth-child(2) .grid', 260)
+  if ((await dot()) !== 0) throw new Error('not back on All')
+  const box = await page.locator('#home .hp:nth-child(1) .grid').boundingBox()
+  await wait(950); await page.mouse.move(box.x + 300, box.y + 60); await page.mouse.down()
+  for (let i = 1; i <= 6; i++) { await page.mouse.move(box.x + 300 - i * 25, box.y + 60); await wait(16) }
+  const acc = await page.evaluate(() => { const r = document.querySelector('.nshell').shadowRoot, g = (p) => getComputedStyle(r.querySelector(`.hp[data-page="${p}"]`)).getPropertyValue('--red').trim().toUpperCase(); return { all: g('all'), personal: g('personal') } })
+  await page.screenshot({ path: `${SHOTS}/light-midswipe.png` })
+  await page.mouse.move(box.x + 300, box.y + 60); await page.mouse.up(); await wait(500)
+  if (acc.all !== '#D71921' || acc.personal !== '#DB3A12') throw new Error(JSON.stringify(acc))
+  await drag('#home .hp:nth-child(1) .grid', -260)
+  if ((await dot()) !== 1) throw new Error('not on Personal again')
+})
+
+await step('Plan, Habits and Apps headers sit as high as Home', async () => {
+  const mid = (sel) => page.locator(sel).first().evaluate((e) => { const b = e.getBoundingClientRect(); return b.top + b.height / 2 })
+  const home = await mid('#home .hp:nth-child(2) .htop')
+  const bad = []
+  for (const id of ['plan', 'habits', 'apps']) { await tap(`#dock [data-x="${id}"]`); const v = await mid('section.view.on .vtop .vtt'); if (Math.abs(v - home) > 3) bad.push(`${id} ${v} vs home ${home}`) }
+  await page.screenshot({ path: `${SHOTS}/light-apps.png` })
+  await tap('#dock [data-x="home"]')
+  if (bad.length) throw new Error(bad.join(' | '))
 })
 
 await step('dock sits on the safe area, no extra gap', async () => {
@@ -177,7 +201,7 @@ await step('adding on the Big Time page makes a Big Time task', async () => {
   const t = (await blob()).tasks.find((x) => x.title === 'Shell Big Time task')
   if (t?.space !== 'work') throw new Error(`landed in ${t?.space}`)
   await tap('#dock [data-x="plan"]')
-  const ctx = await page.locator('section.view.on .ctx').textContent()
+  const ctx = await page.locator('section.view.on .ctxchip').textContent()
   if (!/Big Time/.test(ctx) || !/All projects/.test(ctx)) throw new Error(`context line: ${ctx}`)
   await tap('section.view.on [data-a="planSeg"][data-x="todo"]')
   const ph = await page.locator('#newtask').getAttribute('placeholder')
@@ -273,6 +297,21 @@ await step('add button: a task goes into the real store', async () => {
   const t2 = (await blob()).tasks.find((x) => x.title === 'Shell tomorrow evening task')
   const tom = await page.evaluate(() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') })
   if (t2?.list !== 'today' || t2.plannedOn !== tom || t2.slot !== 'evening') throw new Error(`tomorrow evening: ${t2?.list} ${t2?.plannedOn} ${t2?.slot}`)
+  await tap('#toast [data-a="seeTask"]'); await wait(900)
+  if (!(await page.locator('section.view.on[data-view="plan"]').count())) throw new Error('See it did not open Plan')
+  const pill = await page.locator('section.view.on .dpill').evaluateAll((ps) => ps.findIndex((p) => p.classList.contains('on')))
+  if (pill !== 1) throw new Error(`day pill ${pill} selected, want tomorrow`)
+  const row = page.locator(`section.view.on .sw[data-id="${t2.id}"]`)
+  if (!(await row.count())) throw new Error('the task row is not on screen (slot shut or wrong filter)')
+  const vis = await row.evaluate((r) => { const b = r.getBoundingClientRect(); return b.top >= 0 && b.bottom <= innerHeight })
+  if (!vis || !(await row.evaluate((r) => r.classList.contains('flash')))) throw new Error(`row visible ${vis}, flashed ${await row.evaluate((r) => r.classList.contains('flash'))}`)
+  await page.screenshot({ path: `${SHOTS}/light-seeit.png` })
+  const pc = await page.locator('section.view.on .dpill.on').evaluate((e) => getComputedStyle(e).backgroundColor)
+  const ac = await page.locator('#app').evaluate((e) => getComputedStyle(e).getPropertyValue('--red').trim())
+  const hex = (c) => '#' + c.match(/\d+/g).slice(0, 3).map((n) => (+n).toString(16).padStart(2, '0')).join('').toUpperCase()
+  if (hex(pc) !== ac.toUpperCase()) throw new Error(`selected day pill ${hex(pc)}, accent ${ac}`)
+  await tap('section.view.on [data-a="ctxPick"]'); await tap('.sheet.on [data-a="ctxProj"][data-x=""]'); await wait(300)
+  await tap('#dock [data-x="home"]')
   await tap('#dock [data-a="quickAdd"]')
   await page.locator('#qat').fill('Shell no date task')
   await tap('.sheet.on [data-a="qaDay"][data-x="none"]')

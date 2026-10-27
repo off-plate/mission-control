@@ -53,6 +53,18 @@ const tapJ = async (sel) => { await page.locator(sel).first().click({ force: tru
 const onView = (id) => page.locator(`section.view.on[data-view="${id}"]`).count()
 
 // ---- seed: a fresh install, then real tasks in the saved blob ----
+/* The weather is a network call. Fixed here, so a slow connection never changes which widgets the home shows. */
+await page.route('https://api.open-meteo.com/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ current: { time: '2026-10-27T12:00', temperature_2m: 9, apparent_temperature: 7, weather_code: 1 }, daily: { temperature_2m_max: [12], temperature_2m_min: [5], precipitation_probability_max: [20] }, hourly: { time: Array.from({ length: 48 }, (_, i) => `2026-10-27T${String(i % 24).padStart(2, '0')}:00`), temperature_2m: Array(48).fill(9), precipitation_probability: Array(48).fill(10), weather_code: Array(48).fill(1) } }) }))
+/* ---- Jarvis: the prototype's view, driven by the real assistant. The model is ALWAYS stubbed here, never reached. ---- */
+const sse = (text) => `data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\ndata: [DONE]\n\n`
+let jvReply = () => ({ say: 'All good.', show: [] }), jvDelay = 0
+await page.route('https://api.groq.com/**', async (route) => {
+  const req = route.request().postDataJSON()
+  const asked = String(req.messages[req.messages.length - 1]?.content ?? '')
+  if (jvDelay) await new Promise((r) => setTimeout(r, jvDelay))
+  await route.fulfill({ status: 200, contentType: 'text/event-stream', body: sse(JSON.stringify(jvReply(asked))) })
+})
+
 await page.goto(URL); await wait(1200)
 await page.evaluate(({ K, day }) => {
   const s = JSON.parse(localStorage.getItem(K))
@@ -63,6 +75,9 @@ await page.evaluate(({ K, day }) => {
     ...Array.from({ length: 10 }, (_, i) => t(`nv-d${i}`, long(i), 'today', { slot: ['morning', 'noon', 'afternoon', 'evening'][i % 4], addedAt: Date.now() - 1e6 })),
     ...Array.from({ length: 45 }, (_, i) => t(`nv-b${i}`, i % 3 ? `Backlog ${i} ${long(i)}` : `Short ${i}`, 'backlog', { addedAt: Date.now() - (i + 2) * 864e5, category: ['call', 'admin', 'deep', 'quick'][i % 4] }))]
   s.dailySkipped = day
+  const longBody = Array.from({ length: 9 }, (_, i) => `Line ${i + 1}: the interior studio wants the site in Czech first, with the three room demos, a price table per item and one question on the last slide.`).join('\n') + '\nLAST LINE MARKER'
+  s.ideaBoard = [{ id: 'idea-seed', title: 'Seed idea', body: longBody, color: 'amber', x: 40, y: 40, createdAt: Date.now() - 5 * 864e5, updatedAt: Date.now() - 864e5 }, { id: 'idea-two', title: 'Short idea', body: '', color: 'blue', x: 280, y: 40, createdAt: Date.now() - 864e5, updatedAt: Date.now() - 864e5 }]
+  s.prompts = [{ id: 'prompt-seed', project: 'Mission Control', session: 'General', kind: 'Update', text: 'Prompt seed text for the sheet', createdAt: Date.now() - 864e5, updatedAt: Date.now() - 864e5 }]
   localStorage.setItem(K, JSON.stringify(s))
   localStorage.setItem('mc-view', 'personal'); localStorage.setItem('mc-space', 'personal')
 }, { K: KEY, day: today() })
@@ -156,6 +171,164 @@ await step('quick add: the type strip runs edge to edge, first and last fully vi
   if (!(await page.locator('.sheet.on .ctx').count())) throw new Error('no "Adding to" line')
   await page.screenshot({ path: `${SHOTS}/light-quickadd.png` })
   await tap('.sheet.on [data-a="sheetX"]')
+})
+
+const overflowNow = () => page.evaluate(() => {
+  const r = document.querySelector('.nshell').shadowRoot, bad = []
+  if (document.documentElement.scrollWidth > innerWidth) bad.push('document')
+  for (const el of r.querySelectorAll('#app, section.view.on .vsc, .sheet.on .sh-b, #home .hp .hsc')) if (el.scrollWidth > el.clientWidth + 1) bad.push(el.className || el.id)
+  return bad
+})
+const goHome = async (i) => { for (let n = 0; n < 4 && (await dot()) !== i; n++) await drag(`#home .hp:nth-child(${(await dot()) + 1}) .grid`, (await dot()) > i ? 260 : -260) }
+const inJarvis = () => page.locator('section.view.on[data-view="jarvis"]').count()
+const closeJarvis = async () => { await tap('section.view.on [data-a="back"]'); await wait(500) }
+const msgs = () => page.locator('section.view.on .thread .msg').count()
+
+await step('Jarvis opens from the home widget as the shell view, not the classic page', async () => {
+  await goHome(0)
+  await tap('#home .hp:nth-child(1) [data-type="jarvis"]'); await wait(700)
+  if (!(await inJarvis())) throw new Error('no Jarvis view')
+  if (await page.locator('.topbar').count()) throw new Error('the classic page opened')
+  if (!(await page.locator('section.view.on .jface svg.face').count())) throw new Error('no face')
+  await page.screenshot({ path: `${SHOTS}/light-jarvis-empty.png` })
+  await closeJarvis()
+})
+
+await step('Jarvis opens from the dock + long-press and from the Apps drawer', async () => {
+  const box = await page.locator('#dock .qa').boundingBox()
+  await wait(950); await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down(); await wait(750); await page.mouse.up(); await wait(900)
+  if (!(await inJarvis())) throw new Error('long-press did not open Jarvis')
+  await closeJarvis()
+  await tap('#dock [data-x="apps"]'); await tap('[data-a="drawerOpen"][data-x="jarvis"]'); await wait(700)
+  if (!(await inJarvis())) throw new Error('Apps tile did not open Jarvis')
+  if (await page.locator('.topbar').count()) throw new Error('the Apps tile opened the classic page')
+})
+
+await step('Jarvis: with no key the thread says so, with a way to Settings', async () => {
+  await page.locator('#jvq').fill('hello there'); await tap('#jvsend'); await wait(900)
+  const err = await page.locator('section.view.on .msg.err').textContent()
+  if (!/key/i.test(err) || !/Settings/.test(err)) throw new Error(`err: ${err}`)
+  if (!(await page.locator('section.view.on .msg.err [data-a="openClassic"]').count())) throw new Error('no Settings button')
+  await page.screenshot({ path: `${SHOTS}/light-jarvis-nokey.png` })
+})
+
+await step('Jarvis: a suggestion sends, the face thinks, an action lands as a chip and in the real store', async () => {
+  await page.evaluate(() => localStorage.setItem('mc-groq-key', 'gsk_shelltest'))
+  jvDelay = 1600
+  jvReply = (asked) => /Plan my evening/.test(asked) ? { say: 'Gym at 18:30, then the evening is yours.', show: [{ kind: 'today' }] } : { say: 'Putting it on noon.', show: [{ kind: 'today' }], do: [{ kind: 'add', title: 'Jarvis stub task', list: 'today', slot: 'noon' }] }
+  await tap('#jvchips .chip[data-l="Plan my evening"]'); await wait(500)
+  const mode = await page.locator('#jvface').getAttribute('class')
+  if (!/think/.test(mode)) throw new Error(`face is "${mode}" while the model works`)
+  await page.screenshot({ path: `${SHOTS}/light-jarvis-thinking.png` })
+  await page.waitForSelector('section.view.on .msg.it .jvcard', { timeout: 8000 })
+  jvDelay = 0
+  await page.locator('#jvq').fill('add a task called Jarvis stub task to noon'); await tap('#jvsend')
+  await page.waitForSelector('section.view.on .msg.it .did:not(.no)', { timeout: 8000 }); await wait(900)
+  const line = await page.locator('section.view.on .msg .did').first().textContent()
+  if (!/Jarvis stub task/.test(line)) throw new Error(`chip: ${line}`)
+  const t = (await blob()).tasks.find((x) => x.title === 'Jarvis stub task')
+  if (!t || t.slot !== 'noon' || t.list !== 'today') throw new Error(`store: ${JSON.stringify(t && { slot: t.slot, list: t.list })}`)
+  await page.screenshot({ path: `${SHOTS}/light-jarvis-thread.png` })
+})
+
+await step('Jarvis: the input is 16px, nothing overflows at 375 and 390', async () => {
+  const bad = []
+  for (const w of [390, 375]) {
+    await page.setViewportSize({ width: w, height: 844 }); await wait(500)
+    bad.push(...(await overflowNow()).map((x) => `${w} ${x}`))
+    const fs = await page.locator('#jvq').evaluate((e) => parseFloat(getComputedStyle(e).fontSize))
+    if (fs < 16) bad.push(`input ${fs}px`)
+  }
+  await page.setViewportSize({ width: 390, height: 844 }); await wait(300)
+  if (bad.length) throw new Error(bad.join(' | '))
+})
+
+await step('Jarvis: the conversation is still there after closing and reopening', async () => {
+  const before = await msgs()
+  await closeJarvis()
+  await tap('#dock [data-x="apps"]'); await tap('[data-a="drawerOpen"][data-x="jarvis"]'); await wait(700)
+  if ((await msgs()) !== before) throw new Error(`${before} messages before, ${await msgs()} after`)
+  await closeJarvis()
+  await tap('#dock [data-x="apps"]'); await tap('[data-a="drawerOpen"][data-x="settings"]'); await wait(500)
+  await tap('section.view.on [data-a="openClassic"][data-x="settings"]'); await wait(1200)
+  if (await page.locator('.nshell').count()) throw new Error('Settings did not leave the shell')
+  await page.evaluate(() => { location.hash = '#/today' }); await wait(1800)
+  if (!(await page.locator('.nshell').count())) throw new Error('the shell did not come back')
+  await goHome(0)
+  await tap('#home .hp:nth-child(1) [data-type="jarvis"]'); await wait(800)
+  if ((await msgs()) !== before) throw new Error(`after Settings: ${await msgs()} vs ${before}`)
+  await closeJarvis()
+  await goHome(1)
+})
+
+const card = async (id) => (await blob()).ideaBoard.find((c) => c.id === id)
+const closeSheetX = () => tap('.sheet.on [data-a="sheetX"]')
+await step('Ideas: the list shows two lines of body under the title', async () => {
+  await tap('#dock [data-x="apps"]'); await tap('[data-a="drawerOpen"][data-x="ideas"]'); await wait(900)
+  const r = await page.locator('section.view.on .idea[data-x="idea-seed"] .idprev').evaluate((e) => ({ h: e.clientHeight, lh: parseFloat(getComputedStyle(e).lineHeight), t: e.textContent.length }))
+  if (!(r.t > 100) || r.h > r.lh * 2 + 2) throw new Error(`preview ${JSON.stringify(r)}`)
+  await page.screenshot({ path: `${SHOTS}/light-ideas.png` })
+})
+
+await step('Ideas: tapping a card opens the whole text, readable and scrollable', async () => {
+  await tap('section.view.on .idea[data-x="idea-seed"]'); await wait(700)
+  const r = await page.evaluate(() => {
+    const R = document.querySelector('.nshell').shadowRoot, ta = R.querySelector('.sheet.on .idbody'), sb = R.querySelector('.sheet.on .sh-b')
+    sb.scrollTop = sb.scrollHeight
+    const tr = ta.getBoundingClientRect(), br = sb.getBoundingClientRect()
+    return { len: ta.value.length, lines: ta.value.split('\n').length, grown: ta.scrollHeight <= ta.clientHeight + 2, scrollable: sb.scrollHeight > sb.clientHeight, fs: parseFloat(getComputedStyle(ta).fontSize), tfs: parseFloat(getComputedStyle(R.querySelector('.sheet.on #idt')).fontSize), lastVisible: tr.bottom <= br.bottom + 1 }
+  })
+  if (r.len < 600 || r.lines < 5) throw new Error(`body ${r.len} chars, ${r.lines} lines`)
+  if (!r.grown || !r.scrollable || !r.lastVisible) throw new Error(JSON.stringify(r))
+  if (r.fs < 16 || r.tfs < 16) throw new Error(`font ${r.fs}/${r.tfs}`)
+  await page.screenshot({ path: `${SHOTS}/light-idea-sheet.png` })
+})
+
+await step('Ideas: edit title and body, the real card is updated and survives a reload', async () => {
+  await page.locator('.sheet.on #idt').fill('Edited idea title')
+  await page.locator('.sheet.on .idbody').fill('Edited body line one\nEdited body line two')
+  await wait(1100)
+  const c = await card('idea-seed')
+  if (c.title !== 'Edited idea title' || !/line two/.test(c.body)) throw new Error(JSON.stringify(c))
+  /* closing right after typing must not lose it */
+  await page.locator('.sheet.on .idbody').fill('Quick close marker body')
+  await closeSheetX(); await wait(900)
+  if (!/Quick close marker/.test((await card('idea-seed')).body)) throw new Error('lost text closed mid-typing')
+  await page.reload(); await wait(2000)
+  const c2 = await card('idea-seed')
+  if (c2.title !== 'Edited idea title' || !/Quick close marker/.test(c2.body)) throw new Error('not kept after reload')
+})
+
+await step('Ideas: done, make it a task, delete and undo', async () => {
+  await tap('#dock [data-x="apps"]'); await tap('[data-a="drawerOpen"][data-x="ideas"]'); await wait(900)
+  await tap('section.view.on .idea[data-x="idea-seed"]'); await wait(600)
+  await tap('#idtgl'); await wait(1000)
+  if (!(await card('idea-seed')).doneAt) throw new Error('not done')
+  await tap('#idtgl'); await wait(1000)
+  if ((await card('idea-seed')).doneAt) throw new Error('not reopened')
+  await tap('.sheet.on [data-a="ideaTask"]'); await wait(1000)
+  if (!(await blob()).tasks.some((t) => t.title === 'Edited idea title')) throw new Error('no task made')
+  if (!(await page.locator('#toast [data-a="seeTask"]').count())) throw new Error('no See it')
+  await tap('.sheet.on [data-a="ideaDel"]'); await wait(1000)
+  if (await card('idea-seed')) throw new Error('not deleted')
+  await tap('#toast [data-a="undo"]'); await wait(1000)
+  if (!(await card('idea-seed'))) throw new Error('undo did not bring it back')
+})
+
+await step('Ideas: a new idea is saved from the empty sheet', async () => {
+  await tap('section.view.on [data-a="ideaAdd"]'); await wait(600)
+  await page.locator('.sheet.on #idt').fill('Brand new idea'); await page.locator('.sheet.on .idbody').fill('A body for the new one\nsecond line')
+  await closeSheetX(); await wait(1000)
+  const c = (await blob()).ideaBoard.find((x) => x.title === 'Brand new idea')
+  if (!c || !/second line/.test(c.body)) throw new Error(JSON.stringify(c))
+})
+
+await step('Prompts: tapping one opens its sheet and edits the real prompt', async () => {
+  await tap('section.view.on [data-a="iface"][data-x="prompts"]'); await wait(500)
+  await tap('section.view.on [data-a="promptOpen"]'); await wait(600)
+  await page.locator('.sheet.on .idbody').fill('Prompt edited in the sheet'); await closeSheetX(); await wait(900)
+  if (!(await blob()).prompts.some((p) => p.id === 'prompt-seed' && p.text === 'Prompt edited in the sheet')) throw new Error('prompt not updated')
+  await closeJarvis(); await tap('#dock [data-x="home"]'); await wait(300); await goHome(1)
 })
 
 const homeTypes = () => page.locator('#home .hp:nth-child(2) .grid > .w').evaluateAll((ws) => ws.map((w) => w.dataset.type + ':' + [...w.classList].find((c) => /^s\d\d$/.test(c))))
@@ -272,6 +445,7 @@ await step('Plan: swipe to complete, How long, the real task is done', async () 
 
 await step('Plan: delete, then undo, restores the real task', async () => {
   await page.locator('#toast [data-a="toastX"]').click().catch(() => {}); await wait(300)
+  await page.locator('.sw[data-id="ns-2"]').evaluate((e) => e.scrollIntoView({ block: 'center' })); await wait(300)
   await drag('.sw[data-id="ns-2"] .sw-fg', -170)
   await tap('.sw[data-id="ns-2"] [data-a="taskDel"]'); await wait(1300)
   if ((await blob()).tasks.some((x) => x.id === 'ns-2')) throw new Error('not deleted in the store')
@@ -394,6 +568,14 @@ await step('dark: the Nothing Dark look', async () => {
   await tap('#dock [data-x="habits"]'); await page.screenshot({ path: `${SHOTS}/dark-habits.png` })
   await page.locator('section.view.on .vsc').evaluate((e) => { e.scrollTop = 600 }); await wait(300); await page.screenshot({ path: `${SHOTS}/dark-habits-scrolled.png` })
   await tap('#dock [data-x="apps"]'); await page.screenshot({ path: `${SHOTS}/dark-apps.png` })
+  await tap('[data-a="drawerOpen"][data-x="jarvis"]'); await wait(900)
+  await page.screenshot({ path: `${SHOTS}/dark-jarvis.png` })
+  await tap('section.view.on [data-a="back"]'); await wait(500)
+  await tap('[data-a="drawerOpen"][data-x="ideas"]'); await wait(900)
+  await tap('section.view.on .idea[data-x="idea-seed"]'); await wait(700)
+  await page.screenshot({ path: `${SHOTS}/dark-idea-sheet.png` })
+  await tap('.sheet.on [data-a="sheetX"]'); await wait(400)
+  await tap('section.view.on [data-a="back"]'); await wait(500)
 })
 
 await step('switch back to Classic, the classic app returns with the same data', async () => {

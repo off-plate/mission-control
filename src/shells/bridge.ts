@@ -19,6 +19,9 @@ import { WALL } from '../board'
 import { SHEET_STATUSES, STEPS, label as stepLabel, nextStep, replyOdds } from '../prospectcalc'
 import { nextPersonSlot } from '../peoplelayout'
 import { breakdownTask, hasAiKey } from '../ai'
+import { useAssistantThread, type Turn } from '../assistantcore'
+import { MORNING, SKILLS } from '../assistant'
+import * as dict from '../dictation'
 import { getHevyLastSync, hasHevyKey, syncHevy, TARGET_HABIT_NAME } from '../hevy'
 import { SKINS, setSkin, type SkinId } from '../skins'
 import { SPACE_LABELS } from '../mock'
@@ -330,8 +333,8 @@ export function toMC(inp: ShellInput) {
     habits, habitGrid, routines, goals, quitting,
     notes: { items: notes, folders, defaultFolder: { personal: dumpFolder('personal'), work: dumpFolder('work') }, aiActions: [] as string[] },
     people, prospectStages: [...SHEET_STATUSES] as string[], prospects,
-    bills, ideas: s.ideaBoard.map((c) => ({ id: c.id, title: c.title, kind: 'Idea', done: !!c.doneAt })),
-    prompts: [...s.prompts].sort((a, b) => a.createdAt - b.createdAt).map((p) => ({ id: p.id, text: p.text, project: p.project, kind: p.kind, age: agoOf(p.createdAt), sent: !!p.sentAt })),
+    bills, ideas: s.ideaBoard.map((c) => ({ id: c.id, title: c.title, body: c.body ?? '', color: c.color, kind: 'Idea', done: !!c.doneAt, createdAt: c.createdAt, updatedAt: c.updatedAt })),
+    prompts: [...s.prompts].sort((a, b) => a.createdAt - b.createdAt).map((p) => ({ id: p.id, text: p.text, project: p.project, kind: p.kind, age: agoOf(p.createdAt), sent: !!p.sentAt, createdAt: p.createdAt, updatedAt: p.updatedAt })),
     focusToday, focusWeek, pomo, momentum,
     timeSaved: { weekMin: s.savedMin, todaySavedMin: ledgerToday.reduce((a, l) => a + (l.estimateMin - (l.actualMin ?? l.estimateMin)), 0) },
     exceptions: { all: exc.map(mapExc), personal: excP.map(mapExc), work: excW.map(mapExc) },
@@ -350,7 +353,24 @@ export type MC = ReturnType<typeof toMC>
 /* What a shell is handed to act with. Every write is an existing store or
    pomodoro function, read through a ref so a call always reaches the current
    one (the store's functions close over the state of the render that made them). */
+/* The real assistant, as the shell sees it. Not part of `mc`: a streaming reply
+   changes many times a second and must not rebuild the whole shell. */
+export interface AssistantState { turns: Turn[]; busy: boolean; err: string | null; errHint: string | null; live: string }
+export interface ShellAssistant {
+  send: (text: string, shown?: string) => Promise<string>
+  state: () => AssistantState
+  subscribe: (cb: () => void) => () => void
+  undo: (turn: number, done: number) => void
+  skills: { label: string; ask: string }[]
+  /** The same dictation the Notes page uses. */
+  mic: { available: () => boolean; toggle: (base: string, on: (t: string) => void) => void; state: () => string; subscribe: (cb: () => void) => () => void }
+}
+/* The conversation outlives the shell: leaving for a classic page (Settings,
+   to add a key) unmounts it, and coming back must not forget what was said. */
+let keptTurns: Turn[] = []
+
 export interface ShellApi {
+  assistant: ShellAssistant
   store: () => Store
   pomo: () => Pomo
   setSkin: (id: SkinId) => void
@@ -387,6 +407,15 @@ export function useShellBridge(skin: SkinId): { mc: MC; api: ShellApi } {
 
   const sRef = useRef(s); sRef.current = s
   const pRef = useRef(pomo); pRef.current = pomo
+  const thread = useAssistantThread()
+  const tRef = useRef(thread); tRef.current = thread
+  const subs = useRef(new Set<() => void>())
+  const restored = useRef(false)
+  useEffect(() => { if (keptTurns.length) thread.setTurns(keptTurns); restored.current = true }, [])
+  useEffect(() => {
+    if (restored.current && thread.turns.length) keptTurns = thread.turns
+    subs.current.forEach((f) => f())
+  }, [thread.turns, thread.busy, thread.err, thread.errHint, thread.live])
   const mc = useMemo(
     () => toMC({ s, pomo: { focusMin: pomo.focusMin, breakMin: pomo.breakMin, cyclesDone: pomo.cyclesDone }, cal, health, compass, weather, sync, skin, day }),
     // The store object is new on every render; the pomodoro's secondsLeft ticks
@@ -398,6 +427,19 @@ export function useShellBridge(skin: SkinId): { mc: MC; api: ShellApi } {
   )
 
   const api = useMemo<ShellApi>(() => ({
+    assistant: {
+      send: (text, shown) => tRef.current.send(text, shown),
+      state: () => { const t = tRef.current; return { turns: t.turns, busy: t.busy, err: t.err, errHint: t.errHint, live: t.live } },
+      subscribe: (cb) => { subs.current.add(cb); return () => { subs.current.delete(cb) } },
+      undo: (ti, di) => {
+        const d = tRef.current.turns[ti]?.done?.[di]
+        if (!d?.undo || d.undone) return
+        d.undo()
+        tRef.current.setTurns((ts) => ts.map((t, i) => (i !== ti ? t : { ...t, done: t.done?.map((x, k) => (k !== di ? x : { ...x, undone: true })) })))
+      },
+      skills: [MORNING, ...SKILLS],
+      mic: { available: dict.dictationAvailable, toggle: dict.toggle, state: dict.dictateState, subscribe: dict.subscribe },
+    },
     store: () => sRef.current,
     pomo: () => pRef.current,
     setSkin,

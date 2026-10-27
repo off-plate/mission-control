@@ -577,7 +577,7 @@ function setChrome() {
 
 /* open a view. from = a widget tile element for the morph; push = slide in from the right */
 /* Pages this look does not draw itself: they open the real page in the classic app. */
-const CLASSIC_V = { jarvis: 'assistant', longevity: 'longevity', watchless: 'watchless', skills: 'skills' };
+const CLASSIC_V = { longevity: 'longevity', watchless: 'watchless', skills: 'skills' };
 function open(id, args = {}, from = null) {
   if (CLASSIC_V[id]) { B.openClassic(CLASSIC_V[id]); return; }
   if (!V[id]) { console.warn('no view', id); return; }
@@ -1051,7 +1051,7 @@ W.jarvis = {
   name: 'Jarvis', sizes: ['22', '21'], tone: 'k', open: 'jarvis',
   render(sz) {
     if (sz === '21') return `<div class="wi" style="flex-direction:row;align-items:center;gap:12px">${faceSVG(70)}<div>${lb('Jarvis', 'fg')}${lb(S.cc.dnd ? 'Holding messages' : 'Ask anything')}</div></div>`;
-    return `<div class="wi" style="gap:8px">${lbRow('Jarvis', S.cc.dnd ? 'DND' : 'Listening')}<div style="flex:1;display:grid;place-items:center">${faceSVG(120)}</div>${lb(S.cc.dnd ? 'Holding your messages' : 'Ask anything')}</div>`;
+    return `<div class="wi" style="gap:8px">${lbRow('Jarvis', S.cc.dnd ? 'DND' : 'Ready')}<div style="flex:1;display:grid;place-items:center">${faceSVG(120)}</div>${lb(S.cc.dnd ? 'Holding your messages' : 'Ask anything')}</div>`;
   }
 };
 
@@ -1698,7 +1698,7 @@ A.qaGo = () => {
   if (q.type === 'expense') { toast('Expenses are logged in Compass. Nothing was saved here.'); return; }
   q.text = ''; closeSheet('qa'); refresh();
 };
-A.jarvis = () => B.openClassic('assistant');
+A.jarvis = () => open('jarvis');
 
 /* ---- 51-today-plan.js ---- */
 /* =====================================================================
@@ -2359,18 +2359,79 @@ V.ideas = {
   render() {
     const f = S.ui.iface || 'ideas';
     const seg = `<div class="seg" style="margin-bottom:12px"><button class="${f === 'ideas' ? 'on' : ''}" data-a="iface" data-x="ideas">Ideas <span class="n">${S.ideas.length}</span></button><button class="${f === 'prompts' ? 'on' : ''}" data-a="iface" data-x="prompts">Prompts <span class="n">${S.prompts.filter(p => !p.sent).length}</span></button></div>`;
-    if (f === 'ideas') return seg + `<div class="g2">${S.ideas.map((x, i) => `<div class="cd idea ${x.kind === 'Bug' ? 'r' : i % 3 === 0 ? 'k' : ''}">${lb(x.kind)}<div class="wt up" style="font-size:13px;margin:10px 0 16px;color:var(--fg);font-weight:700">${esc(x.title)}</div><button class="lb" data-a="ideaDone" data-x="${i}" style="color:var(--fd)">${x.done ? 'Done' : 'Mark done'}</button></div>`).join('')}</div>`;
+    if (f === 'ideas') return seg + (S.ideas.length ? `<div class="g2">${S.ideas.map((x, i) => `<div class="cd idea ${i % 3 === 0 ? 'k' : ''}" role="button" tabindex="0" data-a="ideaOpen" data-x="${esc(x.id)}">${lb(x.done ? 'Done' : x.kind)}<div class="wt up" style="font-size:13px;margin:10px 0 6px;color:var(--fg);font-weight:700">${esc(x.title)}</div>${x.body ? `<div class="idprev">${esc(x.body)}</div>` : ''}<button class="lb" data-a="ideaDone" data-x="${i}" style="color:var(--fd);margin-top:10px">${x.done ? 'Reopen' : 'Mark done'}</button></div>`).join('')}</div>` : '<div class="empty">No ideas yet. Tap + to write one down.</div>');
     const waiting = S.prompts.filter(p => !p.sent);
     return seg + `<div class="cd k"><div class="hstack"><div class="grow">${lb('Claude window')}<div class="wt" style="margin-top:6px;color:var(--fg)">${waiting.length} waiting, oldest first.</div></div>${dm(waiting.length, 4)}</div></div>
     <div class="hstack" style="margin-bottom:10px"><input class="fld" id="pq" placeholder="Write a prompt" data-enter="promptAdd"><button class="key" data-a="promptAdd">Add</button></div>
-    <div class="cd tight rows">${S.prompts.map(p => `<div class="row" style="align-items:flex-start;padding:14px 0"><div class="grow"><div class="rt">${esc(p.text)}</div><div class="rs"><span>${p.kind}</span><span>${esc(p.project)}</span><span>${p.age}</span>${p.sent ? '<span>Sent</span>' : ''}</div></div>${p.sent ? '' : `<button class="key xs" data-a="promptSend" data-x="${p.id}">${ico('copy')} Copy</button>`}</div>`).join('')}</div>`;
+    <div class="cd tight rows">${S.prompts.map(p => `<div class="row" style="align-items:flex-start;padding:14px 0"><div class="grow" data-a="promptOpen" data-x="${esc(p.id)}"><div class="rt">${esc(p.text)}</div><div class="rs"><span>${p.kind}</span><span>${esc(p.project)}</span><span>${p.age}</span>${p.sent ? '<span>Sent</span>' : ''}</div></div>${p.sent ? '' : `<button class="key xs" data-a="promptSend" data-x="${p.id}">${ico('copy')} Copy</button>`}</div>`).join('')}</div>`;
   }
 };
 A.iface = (el, x) => { S.ui.iface = x; const e = top_(); renderTop(e); renderBody(e, false); };
 A.ideaDone = (el, i) => { const x = S.ideas[+i]; B.store().updateIdeaCard(x.id, { done: !x.done }); };
-A.ideaAdd = () => { if (S.ui.iface === 'prompts') { $('#pq') && $('#pq').focus(); return; } sheet('idea', { title: 'New idea', focus: '#idt', body: () => `<input class="fld" id="idt" placeholder="Name it" data-enter="ideaSave"><div class="chips" style="margin-top:10px">${['Idea', 'Bug', 'Update'].map((k, i) => `<button class="chip ${i ? '' : 'on'}" data-a="ideaKind" data-x="${k}">${k}</button>`).join('')}</div>`, foot: () => `<button class="key t" data-a="sheetX">Cancel</button><button class="key" data-a="ideaSave">Add idea</button>` }); };
-A.ideaKind = (el, k) => { S.ui.ik = k; $$('.sheet .chip').forEach(c => c.classList.toggle('on', c === el)); };
-A.ideaSave = () => { const v = $('#idt').value.trim(); if (!v) return; const n = S.ideas.length; B.store().addIdeaCard({ title: v, x: 40 + (n % 6) * 240, y: 40 + Math.floor(n / 6) * 170 }); closeSheet('idea'); };
+/* ---------------- idea and prompt sheets: rise from the bottom, edit in place, save by themselves ---------------- */
+const fmtDay = ms => new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+const growTa = t => { t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; };
+/* One saver for both: edits go to the store 600 ms after the last key and again when the sheet closes, so closing mid-typing loses nothing. */
+function noteSheet(key, st, o) {
+  S.ui[key] = st; st.t = 0;
+  const flush = () => { clearTimeout(st.t); if (S.ui[key] === st) o.save(st); };
+  sheet(key === 'ideaSt' ? 'idea' : 'prompt', {
+    cls: 'hsheet', live: false, title: o.title, focus: o.focus, onClose: () => { flush(); if (S.ui[key] === st) S.ui[key] = null; },
+    body: () => o.body(st),
+    after(el) {
+      const ta = $('.idbody', el), ti = $('#idt', el);
+      const sched = () => { clearTimeout(st.t); st.t = setTimeout(flush, 600); };
+      if (ti) ti.addEventListener('input', () => { st.title = ti.value; sched(); });
+      ta.addEventListener('input', () => { st.body = ta.value; growTa(ta); sched(); });
+      requestAnimationFrame(() => growTa(ta)); setTimeout(() => growTa(ta), 460);
+    }
+  });
+  st.flush = flush;
+}
+function openIdeaSheet(id) {
+  const x = id ? S.ideas.find(i => i.id === id) : null; if (id && !x) return;
+  const st = { id: x ? x.id : null, title: x ? x.title : '', body: x ? x.body : '', done: x ? x.done : false, saved: x ? { title: x.title, body: x.body.trim() } : { title: '', body: '' } };
+  noteSheet('ideaSt', st, {
+    title: x ? 'Idea' : 'New idea', focus: x ? null : '#idt',
+    save(st) {
+      const title = st.title.trim(), body = st.body.trim();
+      if (title === st.saved.title && body === st.saved.body) return;
+      if (st.id) B.store().updateIdeaCard(st.id, { title: title || st.saved.title, body });
+      else if (title || body) { const n = S.ideas.length; st.id = B.store().addIdeaCard({ title: title || body.split('\n')[0].slice(0, 60), body, x: 40 + (n % 6) * 240, y: 40 + Math.floor(n / 6) * 170 }); }
+      else return;
+      st.saved = { title: title || st.saved.title, body };
+    },
+    body: st => `<input class="fld" id="idt" value="${esc(st.title)}" placeholder="Title" aria-label="Title" autocomplete="off"><textarea class="fld idbody" placeholder="Write it out" aria-label="Idea text">${esc(st.body)}</textarea>
+      ${x ? `<div class="lb" style="margin:10px 4px 0">Written ${fmtDay(x.createdAt)}, changed ${fmtDay(x.updatedAt)}</div>` : ''}
+      <div class="g2" style="margin-top:14px">${x ? `<button class="key t" id="idtgl" data-a="ideaTgl">${st.done ? 'Reopen' : 'Mark done'}</button>` : ''}<button class="key t" data-a="ideaTask">Make it a task</button></div>
+      ${x ? `<button class="key t wide" style="color:var(--alert);margin-top:10px" data-a="ideaDel">${ico('trash')} Delete</button>` : `<button class="key wide" style="margin-top:10px" data-a="sheetX">Save idea</button>`}`
+  });
+}
+A.ideaOpen = (el, id) => openIdeaSheet(id);
+A.ideaAdd = () => { if (S.ui.iface === 'prompts') { $('#pq') && $('#pq').focus(); return; } openIdeaSheet(null); };
+A.ideaTgl = () => { const st = S.ui.ideaSt; if (!st || !st.id) return; st.flush(); st.done = !st.done; B.store().updateIdeaCard(st.id, { done: st.done }); $('#idtgl').textContent = st.done ? 'Reopen' : 'Mark done'; };
+A.ideaTask = () => {
+  const st = S.ui.ideaSt || S.ui.promptSt; if (!st) return; st.flush();
+  const t = (st.title || st.body || '').trim().split('\n')[0].slice(0, 120); if (!t) { toast('Write something first'); return; }
+  const tid = B.store().addTask({ title: t, source: 'mc', estimateMin: 0, space: wsp(), list: 'backlog', category: 'quick' });
+  toast('On the to-do list', { act: 'seeTask', x: tid, actLabel: 'See it' });
+};
+A.ideaDel = () => { const st = S.ui.ideaSt; if (!st || !st.id) return; const id = st.id; S.ui.ideaSt = null; clearTimeout(st.t); closeSheet('idea'); B.store().deleteIdeaCard(id); undoable('Idea deleted', () => B.store().undoDelete()); };
+function openPromptSheet(id) {
+  const x = S.prompts.find(p => p.id === id); if (!x) return;
+  const st = { id, body: x.text, sent: x.sent, saved: { body: x.text.trim() } };
+  noteSheet('promptSt', st, {
+    title: 'Prompt',
+    save(st) { const body = st.body.trim(); if (!body || body === st.saved.body) return; B.store().updatePrompt(st.id, { text: body }); st.saved = { body }; },
+    body: st => `<div class="lb" style="margin:-4px 2px 10px">${esc(x.kind)}, ${esc(x.project)}</div><textarea class="fld idbody" aria-label="Prompt text">${esc(st.body)}</textarea>
+      <div class="lb" style="margin:10px 4px 0">Written ${fmtDay(x.createdAt)}, changed ${fmtDay(x.updatedAt)}</div>
+      <div class="g2" style="margin-top:14px"><button class="key" id="pmsent" data-a="promptSentTgl">${st.sent ? 'Put back' : 'Copy and mark sent'}</button><button class="key t" data-a="ideaTask">Make it a task</button></div>
+      <button class="key t wide" style="color:var(--alert);margin-top:10px" data-a="promptDel">${ico('trash')} Delete</button>`
+  });
+}
+A.promptOpen = (el, id) => openPromptSheet(id);
+A.promptSentTgl = () => { const st = S.ui.promptSt; if (!st) return; st.flush(); st.sent = !st.sent; B.store().setPromptSent(st.id, st.sent); if (st.sent) { try { navigator.clipboard && navigator.clipboard.writeText(st.body); } catch (e) { } toast('Copied. Marked sent.'); } $('#pmsent').textContent = st.sent ? 'Put back' : 'Copy and mark sent'; };
+A.promptDel = () => { const st = S.ui.promptSt; if (!st) return; const id = st.id; S.ui.promptSt = null; clearTimeout(st.t); closeSheet('prompt'); B.store().deletePrompt(id); undoable('Prompt deleted', () => B.store().undoDelete()); };
 A.promptAdd = () => { const v = $('#pq').value.trim(); if (!v) return; B.store().addPrompt({ project: 'General', session: 'General', kind: 'Idea', text: v }); };
 A.promptSend = (el, id) => { const p = S.prompts.find(x => x.id === id); B.store().setPromptSent(id, true); try { navigator.clipboard && navigator.clipboard.writeText(p.text); } catch (e) { } toast('Copied. Marked sent.'); };
 
@@ -2525,7 +2586,116 @@ V.why = {
   }
 };
 
-/* Jarvis is the real assistant page (CLASSIC_V in the router). */
+/* ---------------- JARVIS: the prototype's face and thread, driven by the real assistant ---------------- */
+/* The conversation, the model calls, the actions and their undo all live in the app's own assistant
+   (assistantcore.tsx). This view only draws what B.assistant hands it, and never re-renders its own
+   input: the thread repaints in place, so the keyboard stays up while a reply streams in. */
+function jvFace() {
+  let s = '';
+  for (let y = 0; y < 11; y++) for (let x = 0; x < 15; x++) s += `<circle class="fo" cx="${x + .5}" cy="${y + .5}" r=".22"/>`;
+  [[3, 2], [4, 2], [3, 3], [4, 3], [10, 2], [11, 2], [10, 3], [11, 3]].forEach(([x, y]) => { s += `<circle class="fe eye" cx="${x + .5}" cy="${y + .5}" r=".44"/>`; });
+  s += '<g class="m0">' + [[5, 7], [9, 7], [6, 8], [7, 8], [8, 8]].map(([x, y]) => `<circle class="fe" cx="${x + .5}" cy="${y + .5}" r=".44"/>`).join('') + '</g>';
+  s += '<g class="m1">' + [[4, 7], [10, 7], [5, 8], [6, 8], [7, 8], [8, 8], [9, 8]].map(([x, y]) => `<circle class="fe" cx="${x + .5}" cy="${y + .5}" r=".44"/>`).join('') + '</g>';
+  return `<svg class="face" viewBox="0 0 15 11" aria-hidden="true">${s}</svg>`;
+}
+const JV_LABEL = { today: 'Today', backlog: 'The list', habits: 'Habits', calendar: 'Calendar', goals: 'Goals', focus: 'Focus', stale: 'Waiting longest', weather: 'Weather', planned: 'Planned', projects: 'Projects', routines: 'Routines', notes: 'Notes', people: 'People', ideas: 'Ideas', bills: 'Bills', gym: 'Gym', prompts: 'Prompts', business: 'Pipeline' };
+const JV_STATIC = ['Plan my evening', 'What is overdue?', 'Start a focus block'];
+const jvRow = (text, right, a, x) => `<button class="row" style="width:100%" ${a ? `data-a="${a}" data-x="${esc(x || '')}"` : ''}><span class="grow rt one">${esc(text)}</span>${right ? `<span class="lb">${esc(right)}</span>` : ''}</button>`;
+function jvRows(kind) {
+  const cut = (a, n) => a.slice(0, n), t0 = isoOff(0);
+  const open_ = S.tasks.filter(t => !t.done);
+  switch (kind) {
+    case 'today': return cut(open_.filter(t => t.list === 'today' && t.day === 0), 6).map(t => jvRow(t.title, t.slot || (t.est ? fmtMin(t.est) : ''), 'seeTask', t.id));
+    case 'planned': return cut(open_.filter(t => t.list === 'today' && t.day > 0).sort((a, b) => a.day - b.day), 6).map(t => jvRow(t.title, dayShort(t.day), 'seeTask', t.id));
+    case 'backlog': return cut(open_.filter(t => t.list === 'backlog').sort((a, b) => b.ageDays - a.ageDays), 6).map(t => jvRow(t.title, t.ageDays + 'D', 'seeTask', t.id));
+    case 'stale': return cut(open_.filter(t => t.ageDays >= 14).sort((a, b) => b.ageDays - a.ageDays), 6).map(t => jvRow(t.title, t.ageDays + 'D', 'seeTask', t.id));
+    case 'habits': return cut(S.habits.filter(h => h.due && h.kind !== 'break'), 7).map(h => jvRow(h.name, habitKept(h) ? 'Done' : h.streak + 'D', 'jvTab', 'habits'));
+    case 'routines': return cut(S.routines, 7).map(r => jvRow(r.title, routineDone(r) + '/' + r.steps.length, 'jvTab', 'habits'));
+    case 'goals': return cut(S.goals.filter(g => g.status !== 'reached'), 6).map(g => jvRow(g.name, Math.round(goalPct(g) * 100) + '%', 'jvOpen', 'goals'));
+    case 'calendar': return cut(MC.calendar.filter(e => e.day >= t0), 6).map(e => jvRow(e.title, (e.day === t0 ? '' : shortDayIso(e.day) + ' ') + (e.allDay ? 'All day' : e.start), 'jvOpen', 'calendar'));
+    case 'focus': return [jvRow(fmtMin(focusMinToday()) + ' focused today', S.focus.sessions.length + ' blocks', 'jvOpen', 'focus'), jvRow('Last 7 days', fmtMinL(Math.round(S.focusWeek.reduce((a, d) => a + d.h, 0) * 60)), 'jvOpen', 'focus')];
+    case 'weather': return MC.weather ? [jvRow(MC.weather.now + ' degrees, ' + MC.weather.sky, 'H ' + MC.weather.high + ' L ' + MC.weather.low, 'jvOpen', 'weather')] : [];
+    case 'projects': return cut(MC.projects, 7).map(p => jvRow(p.name, p.open + ' open', 'jvProj', p.id));
+    case 'notes': return cut(S.notes.filter(n => !n.done), 5).map(n => jvRow(n.title || 'Untitled', n.ago, 'seeNote', n.id));
+    case 'people': return cut(overdue(), 6).map(p => jvRow(p.name, (p.lastDays - p.cadenceDays) + 'D late', 'jvOpen', 'people'));
+    case 'ideas': return cut(S.ideas, 5).map(i => jvRow(i.title, i.done ? 'Done' : '', 'jvOpen', 'ideas'));
+    case 'prompts': return cut(S.prompts.filter(p => !p.sent), 5).map(p => jvRow(p.text, p.kind, 'jvOpen', 'ideas'));
+    case 'business': return cut(inPlay(), 6).map(p => jvRow(p.name, p.stage, 'jvOpen', 'people'));
+    case 'bills': return S.bills ? cut(S.bills.items, 6).map(i => jvRow(i.name, kc(i.amount) + ' KC', 'jvOpen', 'bills')) : [];
+    case 'gym': return [jvRow('Sessions this week', S.gym.target ? S.gym.week + '/' + S.gym.target : String(S.gym.week), 'jvOpen', 'gym')];
+  }
+  return [];
+}
+const shortDayIso = iso => { const d = new Date(iso + 'T12:00:00'); return d.getDate() + ' ' + MONTHS[d.getMonth()]; };
+function jvCard(kind) {
+  if (!JV_LABEL[kind]) return '';
+  const rows = jvRows(kind);
+  return `<div class="jvcard">${lb(JV_LABEL[kind])}<div class="rows">${rows.join('') || '<div class="empty" style="padding:12px 0">Nothing here.</div>'}</div></div>`;
+}
+const jvDone = (d, ti, di) => `<div class="did ${d.ok ? '' : 'no'} ${d.undone ? 'undone' : ''}"><span class="lb">${ico(d.ok ? 'check' : 'close')}<span>${esc(d.text)}${d.undone ? ', reverted' : ''}</span></span>${d.needsActual && !d.undone ? `<button class="key xs t" data-a="jvLog" data-x="${esc(d.needsActual.taskId)}">How long?</button>` : ''}${d.ok && !d.undone && d.at && d.at.key && task(d.at.key) ? `<button class="key xs t" data-a="jvGo" data-x="${ti}:${di}">Open</button>` : ''}${d.undo && !d.undone ? `<button class="key xs t" data-a="jvUndo" data-x="${ti}:${di}">${ico('undo')} Undo</button>` : ''}</div>`;
+function jvThread(st) {
+  const out = st.turns.map((t, ti) => {
+    if (t.who === 'you') return `<div class="msg you">${esc(t.text)}</div>`;
+    const cards = (t.reply && t.reply.show ? [...new Set(t.reply.show.map(c => c.kind))] : []).slice(0, 3).map(jvCard).join('');
+    const done = (t.done || []).map((d, di) => jvDone(d, ti, di)).join('');
+    return `<div class="msg it">${esc(t.text)}${done}${cards}</div>`;
+  });
+  if (st.busy) out.push(st.live ? `<div class="msg it" id="jvlive">${esc(st.live)}</div>` : `<div class="msg it" id="jvlive"><span class="blink3"><i></i><i></i><i></i></span></div>`);
+  if (st.err) out.push(`<div class="msg it err">${esc(st.err)}${st.errHint ? `<div class="lb" style="margin-top:8px">${esc(st.errHint)}</div>` : ''}${/Settings/.test(st.errHint || '') ? `<button class="key sm" style="margin-top:10px" data-a="openClassic" data-x="settings">${ico('gear')} Open Settings</button>` : ''}</div>`);
+  if (!out.length) out.push(`<div class="msg it">Ask anything. I can add and move tasks, tick habits, log amounts, write notes and start a focus block.</div>`);
+  return out.join('');
+}
+function jvChips(st) {
+  const last = st.turns[st.turns.length - 1], next = last && last.who === 'it' && last.reply && last.reply.next ? last.reply.next.slice(0, 3) : [];
+  const items = [...next.map(x => [x, x]), ...B.assistant.skills.map(k => [k.label, k.ask]), ...JV_STATIC.map(x => [x, x])];
+  return items.map(([l, ask], i) => `<button class="chip" data-a="jvAsk" data-x="${i}" data-q="${esc(ask)}" data-l="${esc(l)}">${esc(l)}</button>`).join('');
+}
+let jvSig = '';
+function jvPaint(e, force) {
+  if (!e.el.isConnected) { e.jvOff && e.jvOff(); return; }
+  const st = B.assistant.state(), face = $('#jvface', e.el); if (!face) return;
+  const typing = !!($('#jvq', e.el) || {}).value, mic = B.assistant.mic.state() !== 'idle';
+  if (st.turns.length > (e.jvN || 0) && st.turns[st.turns.length - 1].who === 'it') { e.jvTalk = Date.now() + 1800; setTimeout(() => jvPaint(e), 1900); }
+  e.jvN = st.turns.length;
+  const mode = st.busy && st.live ? 'talk' : st.busy ? 'think' : Date.now() < (e.jvTalk || 0) ? 'talk' : (typing || mic) ? 'listen' : 'idle';
+  face.className = 'jface ' + mode + (st.err ? ' err' : '');
+  $('#jvstat', e.el).innerHTML = { idle: 'Standing by', listen: mic ? 'Listening' : 'Reading', think: 'Thinking', talk: 'Speaking' }[mode] + (mode === 'think' || mode === 'listen' ? ' <span class="blink3"><i></i><i></i><i></i></span>' : '');
+  const sig = st.turns.length + '|' + st.busy + '|' + (st.busy && st.live ? 1 : 0) + '|' + st.err + '|' + st.turns.map(t => (t.done || []).map(d => d.undone ? 1 : 0).join('')).join(',');
+  const th = $('#jvthread', e.el), sc = $('.vsc', e.el), near = sc.scrollHeight - sc.scrollTop - sc.clientHeight < 140;
+  if (force || sig !== jvSig + e.id) { th.innerHTML = jvThread(st); $('#jvchips', e.el).innerHTML = jvChips(st); jvSig = sig + e.id; hydrate(th); }
+  else { const lv = $('#jvlive', e.el); if (lv && st.live) lv.textContent = st.live; }
+  $('#jvmic', e.el).classList.toggle('red', mic);
+  $('#jvmic', e.el).innerHTML = mic ? '<span class="wave"><i></i><i></i><i></i><i></i></span>' : ico('mic');
+  const send = $('#jvsend', e.el); send.disabled = st.busy;
+  if (near || st.busy) sc.scrollTop = sc.scrollHeight;
+}
+V.jarvis = {
+  title: 'Jarvis', live: false, noSwipeClose: true,
+  render() {
+    return `<div class="jface idle" id="jvface">${jvFace()}<div class="lb" id="jvstat"></div></div>
+    <div class="thread" id="jvthread"></div>
+    <div class="chips" id="jvchips"></div>
+    <div class="hstack jask"><input class="fld" id="jvq" placeholder="Speak or type to Jarvis" enterkeyhint="send" autocomplete="off" data-enter="jvSend"><button class="kb" id="jvmic" data-a="jvMic" aria-label="Dictate"></button><button class="kb red" id="jvsend" data-a="jvSend" aria-label="Send">${ico('send')}</button></div>`;
+  },
+  after(el, a, fresh, e) {
+    if (!e || e.jvOff) return;
+    jvSig = '';
+    const go = () => jvPaint(e), off1 = B.assistant.subscribe(go), off2 = B.assistant.mic.subscribe(go);
+    e.jvOff = () => { off1(); off2(); }; e.onclose = e.jvOff;
+    const q = $('#jvq', el); q.addEventListener('input', go);
+    jvPaint(e, true);
+    const sc = $('.vsc', el); sc.scrollTop = sc.scrollHeight;
+  }
+};
+A.jvSend = () => { const e = top_(), q = $('#jvq', e.el), v = (q.value || '').trim(), st = B.assistant.state(); if (!v || st.busy) return; q.value = ''; B.assistant.send(v); jvPaint(e); };
+A.jvAsk = (el) => { const st = B.assistant.state(); if (st.busy) return; B.assistant.send(el.dataset.q, el.dataset.l !== el.dataset.q ? el.dataset.l : undefined); };
+A.jvMic = () => { const e = top_(), q = $('#jvq', e.el); if (!B.assistant.mic.available()) { toast('Dictation needs a Groq key or a browser that can listen'); return; } B.assistant.mic.toggle(q.value, t => { q.value = t; jvPaint(e); }); };
+A.jvUndo = (el, x) => { const [ti, di] = x.split(':'); B.assistant.undo(+ti, +di); };
+A.jvLog = (el, id) => { const t = task(id); if (t) howLong(t); };
+A.jvGo = (el, x) => { const [ti, di] = x.split(':'), d = B.assistant.state().turns[+ti].done[+di]; if (d && d.at && d.at.key && task(d.at.key)) jumpTo(d.at.key); };
+A.jvTab = (el, id) => tab(id);
+A.jvProj = (el, id) => { S.ui.planProj = id; S.ui.planSeg = 'todo'; tab('plan'); };
+A.jvOpen = (el, id) => { if (id === 'goals') { S.ui.hSeg = 'goals'; tab('habits'); } else open(id, id === 'people' ? { mode: 'personal' } : {}); };
 /* ---------------- APPS DRAWER (root tab) ---------------- */
 const DRAWER = [['today', 'clock', 'Today'], ['plan', 'plan', 'Plan'], ['habits', 'habits', 'Habits'], ['calendar', 'calendar', 'Calendar'], ['notes', 'note', 'Notes'], ['ideas', 'ideas', 'Ideas'], ['people', 'people', 'People'], ['bills', 'bills', 'Bills'], ['jar', 'jar', 'Jar'], ['health', 'heart', 'Health'], ['gym', 'dumbbell', 'Gym'], ['longevity', 'pulse', 'Longevity'], ['zone', 'zone', 'Zone'], ['focus', 'bolt', 'Focus'], ['projects', 'projects', 'Projects'], ['jarvis', 'face', 'Jarvis'], ['skills', 'skills', 'Skills'], ['watchless', 'eyeoff', 'Watchless'], ['weather', 'sun', 'Weather'], ['why', 'quote', 'The wall'], ['search', 'search', 'Search'], ['settings', 'gear', 'Settings']];
 V.apps = {
@@ -2616,7 +2786,7 @@ if (!NOREVIEW) setTimeout(() => { if (!S.dailyDone && top_().id === 'home') open
 
 
 return {
-  update(mc) { loadMC(mc); HOST.dataset.theme = mc.theme; refresh(); requestAnimationFrame(() => AFTER.splice(0).forEach(fn => fn())); },
+  update(mc) { loadMC(mc); HOST.dataset.theme = mc.theme; refresh(); requestAnimationFrame(() => { AFTER.splice(0).forEach(fn => fn()); const e = STACK.find(x => x.id === 'jarvis'); if (e) jvPaint(e, true); }); },
   unmount() {
     dead = true;
     TM.forEach(id => window.clearTimeout(id)); IV.forEach(id => window.clearInterval(id)); RAF.forEach(id => window.cancelAnimationFrame(id));

@@ -582,3 +582,42 @@ section[data-view=plan] .seg button.on{background:var(--red);color:var(--on)}
 .ctxchip{max-width:100%;min-width:0}
 .vact{min-width:0;max-width:100%}
 .vact .ctxchip{flex:1 1 auto}
+
+/* ===== Jarvis: the face and the thread, in the page's own theme and accent ===== */
+.jface{padding:4px 0 8px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.jface .face{width:min(60vw,236px);height:auto}
+.jface .face .fo{fill:var(--off)}
+.jface .face .fe{fill:var(--ink);transition:fill .3s}
+.jface.think .face .fe,.jface.listen .face .eye{fill:var(--red)}
+.jface.think .face .eye{animation:jvscan 1s ease-in-out infinite alternate}
+@keyframes jvscan{from{transform:translateX(-.7px)}to{transform:translateX(.7px)}}
+.face .m1{opacity:0}
+.jface.talk .face .m0{animation:jvm0 .38s steps(1) infinite}
+.jface.talk .face .m1{animation:jvm1 .38s steps(1) infinite}
+@keyframes jvm0{0%{opacity:1}50%{opacity:0}}
+@keyframes jvm1{0%{opacity:0}50%{opacity:1}}
+.jface.err .face .fe{fill:var(--alert)}
+.jface .lb{display:flex;gap:8px;align-items:center}
+.thread{display:flex;flex-direction:column;gap:10px;margin:4px 0 12px}
+.msg{background:var(--t);color:var(--ink);-webkit-user-select:text;user-select:text;overflow-wrap:anywhere}
+.msg.you{background:var(--ink);color:var(--cv)}
+.msg.err{box-shadow:inset 0 0 0 2px var(--alert)}
+.msg .did{background:radial-gradient(circle,var(--off) .9px,transparent 1.3px) 0 0/6px 2px repeat-x;flex-wrap:wrap}
+.msg .did .lb{color:var(--ink);flex:1;min-width:0;align-items:flex-start;text-transform:none;letter-spacing:.02em;font-size:11px;line-height:1.4}
+.msg .did .lb .px{margin-top:1px;flex:none}
+.msg .did.no .lb{color:var(--alert)}
+.msg .did.undone .lb{opacity:.55}
+.msg .did .key.xs{background:var(--soft);color:var(--ink)}
+.jvcard{margin-top:10px;padding:10px 12px 4px;border-radius:16px;background:var(--soft)}
+.jvcard .row{min-height:42px;padding:6px 0}
+.jvcard .rt{font-size:13px}
+.jask{position:sticky;bottom:0;padding:8px 0 calc(var(--sb) + 4px);background:var(--cv);z-index:2}
+#jvchips{margin-bottom:6px}
+
+.idprev{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font:400 11.5px/1.45 var(--mono);color:var(--fd);overflow-wrap:anywhere}
+.idea{text-align:left}
+.sheet .idbody{margin-top:10px;min-height:180px;overflow:hidden;height:auto}
+/* Jarvis: the ask bar rests at the bottom even with a short thread */
+section[data-view=jarvis] .vsc>.vin{display:flex;flex-direction:column;min-height:100%}
+section[data-view=jarvis] .thread{flex:1}
+section[data-view=jarvis] .vsc{padding-bottom:0}

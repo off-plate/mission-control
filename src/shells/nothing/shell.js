@@ -38,8 +38,6 @@ const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const FRAME = /[?&]frame=1/.test(location.search);
 const NOREVIEW = /[?&]noreview=1/.test(location.search);
 const APP = ROOT.getElementById('app');
-const wait = ms => new Promise(r => setTimeout(r, ms));
-const uid = (p = 'x') => p + Math.random().toString(36).slice(2, 8);
 
 /* ---------- the real clock ---------- */
 const NOW = () => new Date();
@@ -140,7 +138,7 @@ const goalPct = g => clamp(g.current / g.target, 0, 1);
 /* ---------- render scheduling ---------- */
 const R = { home: () => { }, view: () => { }, cc: () => { }, dock: () => { } };
 let rq = 0;
-function refresh() { if (rq) return; rq = requestAnimationFrame(() => { rq = 0; for (const f of [R.home, R.view, R.cc, R.dock, () => repaintSheets()]) { try { f(); } catch (err) { console.warn('nothing shell render', err); } } }); }
+function refresh() { if (rq) return; rq = requestAnimationFrame(() => { rq = 0; for (const f of [() => { const t = top_(); if (!t || t.id === 'home') R.home(); } /* a covered Home is rebuilt by back()/tab() when it returns */, R.view, R.cc, R.dock, () => repaintSheets()]) { try { f(); } catch (err) { console.warn('nothing shell render', err); } } }); }
 
 /* ---------- actions bus ---------- */
 const A = {};
@@ -770,7 +768,6 @@ function closeSheet(key, instant) {
 function closeTopSheet() { const s = SHEETS[SHEETS.length - 1]; return s ? closeSheet(s.key) : false; }
 function closeAllSheets() { [...SHEETS].forEach(s => closeSheet(s.key)); }
 A.sheetX = () => closeTopSheet();
-const _r = refresh;
 addRec({
   axis: 'y', test(st, dx, dy) {
     const el = st.target.closest && st.target.closest('.sheet'); if (!el) return null;
@@ -1120,11 +1117,16 @@ R.home = () => {
   });
   setPage(S.page, false);
 };
+/* The store update and the chrome accent re-render the whole app, so a swiped
+   page commits them once it has settled, never while the slide is running. */
+let COMMIT_T = 0;
+function commitPage() { const sp = PAGES[S.page]; B.setView(sp); APP.dataset.sp = sp; R.dock(); }
 function setPage(i, anim = true) {
-  S.page = i; B.setView(PAGES[i]); APP.dataset.sp = PAGES[i];
+  S.page = i;
+  clearTimeout(COMMIT_T); if (anim) COMMIT_T = setTimeout(commitPage, 440); else { B.setView(PAGES[i]); APP.dataset.sp = PAGES[i]; }
   const tr = $('#home .hp-track'); tr.classList.toggle('drag', !anim);
   tr.style.transform = `translateX(${-i * 100 / 3}%)`;
-  $$('#home .hp').forEach((h, k) => { h.style.setProperty('--p', 0); });
+  $$('#home .hp').forEach(h => h._par && h._par.forEach(e => { e.style.transform = ''; }));
   $$('#home .pdots i').forEach((d, k) => { d.classList.toggle('on', k === i); d.style.width = k === i ? '18px' : '6px'; });
 }
 /* page swipe with parallax */
@@ -1133,19 +1135,19 @@ addRec({
     if (top_().id !== 'home' || EDIT || CC.open || $('.sheet.on')) return null;
     if (!st.target.closest('#home') || st.target.closest('.wx,.wz')) return null;
     const tr = $('#home .hp-track'), W0 = APP.clientWidth, pages = $$('#home .hp'), dots = $$('#home .pdots i');
+    pages.forEach(p => { p._par = p._par || [$('.htop', p), $('.grid', p)]; });
     tr.classList.add('drag');
     return {
       move(dx) {
         let f = S.page - dx / W0; if (f < 0) f = -rubber(-f * W0, 80) / W0; if (f > 2) f = 2 + rubber((f - 2) * W0, 80) / W0;
         tr.style.transform = `translateX(${-f * W0}px)`;
-        pages.forEach((p, k) => p.style.setProperty('--p', clamp(k - f, -1, 1)));
+        pages.forEach((p, k) => { const q = clamp(k - f, -1, 1); p._par[0].style.transform = `translateX(${q * 70}px)`; p._par[1].style.transform = `translateX(${q * 26}px)`; });
         dots.forEach((d, k) => { const a = clamp(1 - Math.abs(k - f), 0, 1); d.style.width = (6 + 12 * a) + 'px'; d.style.opacity = .25 + .75 * a; });
       },
       end(dx, dy, vx) {
         let n = S.page; if (dx < -W0 * .3 || vx < -.3) n++; else if (dx > W0 * .3 || vx > .3) n--; n = clamp(n, 0, 2);
         tr.classList.remove('drag'); dots.forEach(d => d.style.opacity = '');
-        pages.forEach(p => p.style.setProperty('--p', 0));
-        setPage(n); if (n !== S.page || true) R.dock();
+        setPage(n);
       }
     };
   }
@@ -1396,20 +1398,25 @@ function hevySync() {
 
 /* ---------- live ticker: clocks, rings, timers ---------- */
 function tick() {
+  pomoTick();
+  if (document.hidden) return;
+  /* Only what is on screen: not the two off-screen home pages, not a Home hidden under another view. */
+  const on = e => { const v = e.closest('.view'); if (v && !v.classList.contains('on')) return false; const h = e.closest('.hp'); return !h || h.dataset.page === PAGES[S.page]; };
+  const live = sel => $$(sel).filter(on);
   const d = NOW(), l = leftStr(), s = d.getSeconds();
-  $$('.dm.lvh').forEach(e => dmLive(e, l.slice(0, 2)));
-  $$('.dm.lvm').forEach(e => dmLive(e, l.slice(3)));
-  $$('svg[data-live="sec"]').forEach(svg => { const n = +svg.dataset.n, on = Math.round(s * n / 60); $$('.dt', svg).forEach((c, i) => c.classList.toggle('on', i < on)); });
-  $$('svg[data-live="analog"]').forEach(svg => {
+  if (s % 4 === 0) live('.face').forEach(f => { f.classList.add('bl'); setTimeout(() => f.classList.remove('bl'), 400); }); /* a blink every 4 s, not an endless animation */
+  live('.dm.lvh').forEach(e => dmLive(e, l.slice(0, 2)));
+  live('.dm.lvm').forEach(e => dmLive(e, l.slice(3)));
+  live('svg[data-live="sec"]').forEach(svg => { const n = +svg.dataset.n, on = Math.round(s * n / 60); $$('.dt', svg).forEach((c, i) => c.classList.toggle('on', i < on)); });
+  live('svg[data-live="analog"]').forEach(svg => {
     const c = 50; $('.hh', svg).setAttribute('transform', `rotate(${(d.getHours() % 12 + d.getMinutes() / 60) * 30} ${c} ${c})`);
     $('.mh', svg).setAttribute('transform', `rotate(${(d.getMinutes() + s / 60) * 6} ${c} ${c})`); $('.sh', svg).setAttribute('transform', `rotate(${s * 6} ${c} ${c})`);
   });
   const st = $('#sbar .t'); if (st) st.textContent = d.getHours() + ':' + pad(d.getMinutes());
-  $$('[data-live="sbt2"]').forEach(e => e.textContent = 'WEEK ' + MC.isoWeek);
-  $$('[data-live="hd1"]').forEach(e => e.textContent = todayLabel());
-  $$('[data-live="left"]').forEach(e => { const L = leftOfDay(); dmLive($('.dm', e), pad(L.h) + ':' + pad(L.m) + ':' + pad(L.s)); });
-  $$('[data-live="now"]').forEach(e => e.textContent = hm(d));
-  pomoTick();
+  live('[data-live="sbt2"]').forEach(e => e.textContent = 'WEEK ' + MC.isoWeek);
+  live('[data-live="hd1"]').forEach(e => e.textContent = todayLabel());
+  live('[data-live="left"]').forEach(e => { const L = leftOfDay(); dmLive($('.dm', e), pad(L.h) + ':' + pad(L.m) + ':' + pad(L.s)); });
+  live('[data-live="now"]').forEach(e => e.textContent = hm(d));
 }
 function sbar() {
   $('#sbar').innerHTML = `<span class="t">9:41</span><span class="r"><i class="jd"></i><svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 11.5 5.6 9a3.4 3.4 0 0 1 4.8 0zM3.5 7a6.4 6.4 0 0 1 9 0l-1.4 1.4a4.4 4.4 0 0 0-6.2 0zM1.3 4.8a9.5 9.5 0 0 1 13.4 0l-1.4 1.4a7.5 7.5 0 0 0-10.6 0z"/></svg><svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="17" height="9" rx="2"/><rect x="24.5" y="4.5" width="1.6" height="4" rx=".8" opacity=".45"/></svg></span>`;
@@ -1691,9 +1698,6 @@ A.qaGo = () => {
   if (q.type === 'expense') { toast('Expenses are logged in Compass. Nothing was saved here.'); return; }
   q.text = ''; closeSheet('qa'); refresh();
 };
-A.goPlanTodo = () => { A.toastX(); S.ui.planSeg = 'todo'; tab('plan'); };
-A.goPlan = () => { A.toastX(); S.ui.planSeg = 'day'; S.ui.planDay = (S.ui.qa && S.ui.qa.day) || 0; tab('plan'); };
-A.goNotes = () => { A.toastX(); open('notes'); };
 A.jarvis = () => B.openClassic('assistant');
 
 /* ---- 51-today-plan.js ---- */
@@ -1740,7 +1744,7 @@ V.today = {
   render(a) {
     const sp = viewSpace(a), L = leftOfDay(), d = NOW(), q = Math.floor(minsOfDay(d) / 15);
     const nx = firstMove(sp), hd = habitsDue(sp), fin = doneToday(sp).length, saved = MC.timeSaved.todaySavedMin;
-    const ex = MC.exceptions.map(x => `<div class="cd xc"><div class="hstack" style="align-items:flex-start"><span class="xdot ${x.tone}"></span><div class="grow wt">${esc(x.text)}</div></div><div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="key sm ${x.tone === 'alert' ? 'red' : ''}" data-a="exAct" data-x="${x.id}">${x.action}</button></div></div>`).join('');
+    const ex = (MC.exceptions[curSpace()] || []).map(x => `<div class="cd xc"><div class="hstack" style="align-items:flex-start"><span class="xdot ${x.tone}"></span><div class="grow wt">${esc(x.text)}</div></div><div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="key sm ${x.tone === 'alert' ? 'red' : ''}" data-a="exAct" data-x="${x.id}">${x.action}</button></div></div>`).join('');
     const list = S.ui.todayList || 'todo';
     const lists = {
       todo: backlog(sp).sort((x, y) => x.ageDays - y.ageDays).slice(0, 10),
@@ -1787,7 +1791,7 @@ V.today = {
 A.todayList = (el, x) => { S.ui.todayList = x; refresh(); };
 /* The alert's own action, the same four Today offers: put the task on today, add the task it names, or open the page. */
 A.exAct = (el, id) => {
-  const x = MC.exceptions.find(e => e.id === id); if (!x) return;
+  const x = Object.values(MC.exceptions).flat().find(e => e.id === id); if (!x) return;
   if (x.kind === 'do-today' && x.taskId) { B.store().moveTaskList(x.taskId, 'today'); toast('On today'); return; }
   if (x.kind === 'add-task' && x.task) { B.store().addTask({ title: x.task.title, source: 'mc', estimateMin: x.task.estimateMin, estimated: true, space: 'personal', list: 'today', category: 'admin', plannedOn: isoOff(0) }); toast('On today'); return; }
   if (x.kind === 'open-goals') { S.ui.hSeg = 'goals'; tab('habits'); return; }

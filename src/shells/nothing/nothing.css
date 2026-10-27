@@ -21,7 +21,7 @@ svg{display:block}
 .lb.fg{color:var(--fg,var(--ink))}.lb.red{color:var(--fr,var(--alert))}
 .mono{font-family:var(--mono)}
 .up{text-transform:uppercase;letter-spacing:.04em}
-.dimt{color:var(--dim)}.redt{color:var(--redtx)}
+.dimt{color:var(--dim)}
 
 /* ===== dots ===== */
 .px{width:18px;height:18px;fill:currentColor;flex:none}
@@ -64,7 +64,6 @@ svg{display:block}
 .key .px{width:14px;height:14px}
 .key.red{background:var(--red);color:var(--on)}
 .key.t{background:var(--t);color:var(--ink)}
-.key.soft{background:var(--soft);color:var(--ink)}
 .key.sm{height:32px;padding:0 10px;border-radius:9px;font-size:10.5px}
 .key.xs{height:28px;padding:0 9px;border-radius:8px;font-size:10px}
 .key.wide{width:100%}
@@ -216,14 +215,14 @@ textarea.fld{height:auto;min-height:120px;padding:14px;line-height:1.5;resize:no
 .home{z-index:5}
 .hp-track{position:absolute;inset:0;display:flex;width:300%;will-change:transform;transition:transform .42s var(--dr)}
 .hp-track.drag{transition:none}
-.hp{width:33.3333%;height:100%;position:relative;--p:0}
+.hp{width:33.3333%;height:100%;position:relative}
 .hsc{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding:calc(var(--st) + 2px) 16px calc(var(--db) + 122px)}
-.htop{display:flex;align-items:center;justify-content:space-between;height:48px;margin-bottom:6px;transform:translateX(calc(var(--p) * 70px));opacity:calc(1 - var(--pa,0))}
+.htop{display:flex;align-items:center;justify-content:space-between;height:48px;margin-bottom:6px;opacity:calc(1 - var(--pa,0))}
 .spc{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px 0 10px;border-radius:11px;background:var(--t);font:700 11px/1 var(--mono);letter-spacing:.07em;text-transform:uppercase}
 .spc .sd{width:7px;height:7px;border-radius:50%;background:var(--red)}
 .spc .px{width:10px;height:10px;opacity:.6}
 .hdate{font:700 11px/1 var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--dim);text-align:right}
-.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:var(--cell);gap:var(--gap);grid-auto-flow:row dense;transform:translateX(calc(var(--p) * 26px))}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:var(--cell);gap:var(--gap);grid-auto-flow:row dense}
 .ptr{position:absolute;left:0;right:0;top:calc(var(--st) + 4px);height:0;display:flex;justify-content:center;pointer-events:none;z-index:2}
 .ptr .spin{width:30px;height:30px;opacity:0;transform:translateY(-10px);transition:opacity .2s}
 .home.pulling .ptr .spin,.home.refreshing .ptr .spin{opacity:1}
@@ -265,7 +264,6 @@ textarea.fld{height:auto;min-height:120px;padding:14px;line-height:1.5;resize:no
 .wbtn.solid{background:var(--fg);color:var(--tb)}
 .wcenter{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
 .wring{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-.w .ico9{width:42px;height:42px;fill:var(--fg)}
 
 /* edit mode */
 .home.editing .w{animation:jig .32s ease-in-out infinite alternate;animation-delay:var(--jd,0s)}
@@ -279,7 +277,6 @@ textarea.fld{height:auto;min-height:120px;padding:14px;line-height:1.5;resize:no
 .w.circ .wx{left:-3px;top:-3px}.w.circ .wz{right:-3px;bottom:-3px}
 .w .wx .px,.w .wz .px{width:12px;height:12px}
 .w.dragging{animation:none!important;z-index:20;transition:none;box-shadow:0 26px 40px -22px rgba(0,0,0,.5)}
-.w.flipping{transition:none}
 .w.drop{animation:drop .5s var(--eo) both}
 @keyframes drop{from{transform:scale(1.08) translateY(-14px);opacity:0}}
 .sparkle{position:absolute;width:6px;height:6px;border-radius:50%;background:var(--red);pointer-events:none;z-index:30;animation:spk .6s var(--eo) forwards}
@@ -390,6 +387,9 @@ textarea.fld{height:auto;min-height:120px;padding:14px;line-height:1.5;resize:no
 .wave i:nth-child(2){animation-delay:.15s}.wave i:nth-child(3){animation-delay:.3s}.wave i:nth-child(4){animation-delay:.45s}
 @keyframes wv{from{transform:scaleY(.25)}}
 .chase circle{fill:var(--ink);animation:ch .72s linear infinite}
+/* the pull-to-refresh spinner sits in Home all the time: paused until it is shown, or it ticks every frame for nothing */
+.ptr .chase circle{animation-play-state:paused}
+.home.pulling .ptr .chase circle,.home.refreshing .ptr .chase circle{animation-play-state:running}
 @keyframes ch{0%{opacity:1}100%{opacity:.12}}
 .chase8 svg{width:18px;height:18px}
 .chase8{display:inline-flex}
@@ -462,28 +462,22 @@ textarea.fld{height:auto;min-height:120px;padding:14px;line-height:1.5;resize:no
 .stp div{display:flex;flex-direction:column;gap:8px}
 .stp i{height:6px;border-radius:2px;background:var(--fo)}
 .stp .on i{background:var(--red)}
-.rail{overflow-x:auto;margin:0 -4px;scrollbar-width:none}
-.rail svg{display:block}
 .hrs{display:grid;grid-template-columns:repeat(8,1fr);text-align:center;gap:4px}
 .hrs>div{display:flex;flex-direction:column;align-items:center;gap:8px}
 .hrs b{font:700 12px var(--mono)}
 
 /* ===== jarvis ===== */
-.jface{padding:6px 0 10px;display:flex;flex-direction:column;align-items:center}
 .face .fo{fill:#2C2C2C}
 .face .fe{fill:var(--fg,#F2F2F2)}
-.jface .face .fe{fill:#F2F2F2}
-.face .eye{transform-box:fill-box;transform-origin:center;animation:blink 4.2s infinite}
-@keyframes blink{0%,92%,100%{transform:none}95%{transform:scaleY(.15)}}
-.jface.think .face .fe{fill:var(--red)}
+.face .eye{transform-box:fill-box;transform-origin:center}
+.face.bl .eye{animation:blink .35s ease-in-out 1}
+@keyframes blink{0%,100%{transform:none}50%{transform:scaleY(.15)}}
 .w .face .fo{fill:var(--fo)}
-.thread{display:flex;flex-direction:column;gap:10px}
 .msg{max-width:86%;padding:12px 14px;border-radius:18px;font:400 14px/1.5 var(--mono);background:#161616;color:#F2F2F2;align-self:flex-start;animation:vin .3s var(--eo) both}
 .msg.you{align-self:flex-end;background:#F2F2F2;color:#0A0A0A}
 .did{margin-top:10px;padding-top:10px;display:flex;align-items:center;justify-content:space-between;gap:8px;background:radial-gradient(circle,#444 .9px,transparent 1.3px) 0 0/6px 2px repeat-x}
 .did .lb{color:#F2F2F2;display:flex;gap:6px;align-items:center}
 .did .px{width:12px;height:12px}
-.jask{position:sticky;bottom:0;padding:8px 0 4px;background:#000}
 
 /* ===== apps drawer ===== */
 .drawer{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}

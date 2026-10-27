@@ -71,12 +71,17 @@ export function toMC(inp: ShellInput) {
   const today = inp.day
   const TI = wIdx(today)
   const yday = addDays(today, -1)
-  const view: ViewId = s.view
+  /* All three spaces' alerts, so the shell picks the page's own and a page swipe never rebuilds this. */
+  const ex = { tasks: s.tasks, routines: s.routines, goals: s.goals }
+  const excP = exceptionsFor('personal', ex)
+  const excW = [...globalExceptions({ tasks: s.tasks, routines: s.routines }), ...exceptionsFor('work', ex)]
+  const exc = [...excP, ...exceptionsFor('work', ex)]
+  const mapExc = (x: (typeof exc)[number]) => ({
+    id: x.id, text: x.text, action: x.actionLabel ?? (x.action === 'do-today' ? 'Do it today' : 'Open'), kind: x.action, taskId: x.taskId, task: x.task,
+    tone: x.id.startsWith('x-money') || x.id === 'x-datovka' ? 'alert' : 'warn',
+  })
 
   /* ---- tasks ---- */
-  const exc = view === 'personal' ? exceptionsFor('personal', { tasks: s.tasks, routines: s.routines, goals: s.goals })
-    : view === 'work' ? [...globalExceptions({ tasks: s.tasks, routines: s.routines }), ...exceptionsFor('work', { tasks: s.tasks, routines: s.routines, goals: s.goals })]
-      : [...exceptionsFor('personal', { tasks: s.tasks, routines: s.routines, goals: s.goals }), ...exceptionsFor('work', { tasks: s.tasks, routines: s.routines, goals: s.goals })]
   const alertTitles = new Set(exc.map((x) => x.task?.title).filter(Boolean) as string[])
   const alertIds = new Set(exc.map((x) => x.taskId).filter(Boolean) as string[])
   const doneOn = (t: { doneAt?: string }) => (t.doneAt ? localDateKey(new Date(t.doneAt)) : null)
@@ -319,7 +324,7 @@ export function toMC(inp: ShellInput) {
   const fromElsewhere = Boolean(s.syncOrigin) && (sync.phase === 'synced' || sync.phase === 'off')
   return {
     today, todayIndex: TI, isoWeek: isoWeekNo(new Date(`${today}T12:00:00`)),
-    view, writeSpace: s.space, projects, tasks, backlogTotal: tasks.filter((t) => t.list === 'backlog' && !t.done).length,
+    writeSpace: s.space, projects, tasks, backlogTotal: tasks.filter((t) => t.list === 'backlog' && !t.done).length,
     categories: { call: '#B5714F', admin: '#6C82A6', deep: '#8A6A4E', quick: '#5E9A96' },
     slots: SLOTS.map((sl) => ({ id: sl.id, label: sl.label, hours: sl.hint, capMin: (sl.to - sl.from) * 60 })),
     habits, habitGrid, routines, goals, quitting,
@@ -329,10 +334,7 @@ export function toMC(inp: ShellInput) {
     prompts: [...s.prompts].sort((a, b) => a.createdAt - b.createdAt).map((p) => ({ id: p.id, text: p.text, project: p.project, kind: p.kind, age: agoOf(p.createdAt), sent: !!p.sentAt })),
     focusToday, focusWeek, pomo, momentum,
     timeSaved: { weekMin: s.savedMin, todaySavedMin: ledgerToday.reduce((a, l) => a + (l.estimateMin - (l.actualMin ?? l.estimateMin)), 0) },
-    exceptions: exc.map((x) => ({
-      id: x.id, text: x.text, action: x.actionLabel ?? (x.action === 'do-today' ? 'Do it today' : 'Open'), kind: x.action, taskId: x.taskId, task: x.task,
-      tone: x.id.startsWith('x-money') || x.id === 'x-datovka' ? 'alert' : 'warn',
-    })),
+    exceptions: { all: exc.map(mapExc), personal: excP.map(mapExc), work: excW.map(mapExc) },
     calendar, calNote: cal.status === 'ok' ? 'Nothing ahead in the next month.' : 'The calendar is not connected on this device.', weather: wx, health: healthMC, gym, dayDots,
     why: WALL.filter((c) => c.kind !== 'image'),
     dailyReview, dailyDone: !(everLogged && s.dailyDone !== today && s.dailySkipped !== today),
@@ -391,7 +393,7 @@ export function useShellBridge(skin: SkinId): { mc: MC; api: ShellApi } {
     // every second and is deliberately not a dependency (the shell counts down itself).
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [s.tasks, s.habits, s.habitLog, s.routines, s.routineLog, s.goals, s.slips, s.focusSessions, s.notes, s.noteFolders, s.people, s.personContacts,
-      s.prospects, s.projects, s.ideaBoard, s.prompts, s.plan, s.ledger, s.gymGoals, s.activeFocus, s.dailyDone, s.dailySkipped, s.view, s.space, s.syncOrigin,
+      s.prospects, s.projects, s.ideaBoard, s.prompts, s.plan, s.ledger, s.gymGoals, s.activeFocus, s.dailyDone, s.dailySkipped, s.space, s.syncOrigin,
       pomo.focusMin, pomo.breakMin, pomo.cyclesDone, cal, health, compass, weather, sync.phase, sync.lastSyncedAt, skin, day],
   )
 

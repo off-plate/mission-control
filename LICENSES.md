@@ -58,3 +58,7 @@ Animated dotted orbs (assistant mark, saving indicator, Zone countdown, inline w
 ## Space Grotesk and Sora (skins)
 
 Self-hosted in `public/fonts/` for the Lime Cards and Night Wallet looks. Space Grotesk (c) Florian Karsten, Sora (c) Jonathan Barnbrook and Julián Moncada. Both SIL Open Font License 1.1, from Google Fonts.
+
+## Doto and Space Mono (Nothing skins)
+
+Self-hosted in `public/fonts/`. Doto (c) Óliver Lalan, Space Mono (c) Colophon Foundry. Both SIL Open Font License 1.1, from Google Fonts.

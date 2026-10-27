@@ -451,7 +451,7 @@ const MORE_PAGES: { id: PageId; label: string; icon: ReactNode }[] = [
   { id: 'settings', label: 'Settings', icon: <Icon.Settings size={22} /> },
 ]
 
-function PhoneTabBar({ page, setPage }: { page: PageId; setPage: (p: PageId) => void }) {
+function PhoneTabBar({ page, setPage, nothing }: { page: PageId; setPage: (p: PageId) => void; nothing?: boolean }) {
   const [open, setOpen] = useState(false)
   const sheet = useRef<HTMLDivElement>(null)
   const drag = useRef<{ y: number; t: number; dy: number } | null>(null)
@@ -493,7 +493,7 @@ function PhoneTabBar({ page, setPage }: { page: PageId; setPage: (p: PageId) => 
       <nav className="tabbar" aria-label="Pages">
         {TAB_PAGES.slice(0, 2).map((t) => (
           <button key={t.id} className="tabbar-tab" aria-current={t.lit.includes(page) ? 'page' : undefined} onClick={() => go(t.id)}>
-            {t.icon}<span>{t.label}</span>
+            {t.icon}<span>{nothing && t.id === 'today' ? 'Home' : t.label}</span>
           </button>
         ))}
         <button className="tabbar-add" aria-label="New task" onClick={() => { setOpen(false); holdKeyboard(); window.dispatchEvent(new Event('mc:new-task')) }}>
@@ -505,7 +505,7 @@ function PhoneTabBar({ page, setPage }: { page: PageId; setPage: (p: PageId) => 
           </button>
         ))}
         <button className="tabbar-tab" aria-current={moreLit ? 'page' : undefined} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-          <Icon.TabMore size={23} /><span>More</span>
+          <Icon.TabMore size={23} /><span>{nothing ? 'Apps' : 'More'}</span>
         </button>
       </nav>
       <div className={`tabsheet-scrim${open ? ' is-open' : ''}`} onClick={() => setOpen(false)} aria-hidden="true" />
@@ -522,7 +522,7 @@ function PhoneTabBar({ page, setPage }: { page: PageId; setPage: (p: PageId) => 
       >
         <div className="tabsheet-grab" aria-hidden="true" />
         <div className="tabsheet-head">
-          <span className="tabsheet-title">More</span>
+          <span className="tabsheet-title">{nothing ? 'Apps' : 'More'}</span>
           <button className="btn btn-ghost btn-sq" aria-label="Close" onClick={() => setOpen(false)}><Icon.Close size={18} /></button>
         </div>
         <div className="tabsheet-grid">
@@ -904,7 +904,7 @@ export default function App() {
         </PageBoundary>
       </main>
 
-      {page !== 'zone' && <PhoneTabBar page={page} setPage={setPage} />}
+      {page !== 'zone' && <PhoneTabBar page={page} setPage={setPage} nothing={skin.startsWith('nothing')} />}
     </div>
   )
 }

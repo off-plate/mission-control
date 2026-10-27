@@ -21,7 +21,8 @@
    reference does the same thing: a dark dashboard sitting on a light desktop.
    Every token in here is scoped to `.troom` so none of it leaks. */
 import { DotField } from './dotfield'
-import { Roll } from './skins'
+import { Roll, useSkin } from './skins'
+import { LimeCards, NothingHome } from './skinbits'
 import { useEffect, useState } from 'react'
 import { useStore } from './store'
 import { useFirstMove } from './ui'
@@ -121,6 +122,7 @@ export function TodayRoom() {
   const s = Math.floor((msLeft % 60000) / 1000)
   const phase = PHASES.find((p) => now.getHours() >= p.from && now.getHours() < p.to) ?? PHASES[0]
   const narrowPhaseRow = useNarrowPhaseRow()
+  const pickedSkin = useSkin()
 
   const mine = tasks.filter((t) => inView(t.space))
   /* The week, full-size and always open here -- his instruction (2026-08-31):
@@ -255,9 +257,16 @@ export function TodayRoom() {
      skin is showing; the clock re-renders every second, so this stays current. */
   const night = !!document.querySelector('.shell.skin-night')
   const R = (t: string) => (night ? <Roll text={t} /> : t)
+  /* Lime and Nothing draw their own Today on a phone, from the numbers above. */
+  const phoneSkin = narrowPhaseRow && !document.querySelector('.shell.is-hud') ? pickedSkin : 'classic'
+  if (phoneSkin.startsWith('nothing')) {
+    return <NothingHome h={h} m={m} s={s} quarter={quarter} busy={busy} focusQ={focusQ} next={firstMove ?? null} start={start}
+      onClock={onClock} kept={kept} due={due} focusedMin={focusedMin} routines={routineRows} goals={goalRows} setPage={setPage} now={now} />
+  }
 
   return (
     <div className="troom">
+      {phoneSkin === 'lime' && <LimeCards />}
 
       {/* ---- the figures ---- */}
       <section className="troom-hero">

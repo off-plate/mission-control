@@ -1,6 +1,6 @@
 import { Orb } from './orb'
 import { JarBar, JAR_PAGES } from './cookiejarnav'
-import { ProjectMark, WorkspacePick } from './ui'
+import { ProjectMark, WorkspacePick, usePhone } from './ui'
 import { usePromptWindow } from './promptwindow'
 import { lastFace } from './ideasswitch'
 import { MiniTitle } from './minititle'
@@ -43,6 +43,8 @@ const GymPage = lazy(() => import('./gympage').then((m) => ({ default: m.GymPage
 const LongevityPage = lazy(() => import('./longevity').then((m) => ({ default: m.LongevityPage })))
 const WatchlessPage = lazy(() => import('./watchlesspage').then((m) => ({ default: m.WatchlessPage })))
 const IdeasPage = lazy(() => import('./ideaboard').then((m) => ({ default: m.IdeasPage })))
+/* The Nothing look on a phone is its own app (the approved prototype), not a restyle. */
+const NothingShell = lazy(() => import('./shells/nothing'))
 const PeoplePage = lazy(() => import('./people').then((m) => ({ default: m.PeoplePage })))
 import { useStore } from './store'
 import { SKINS, useSkin } from './skins'
@@ -616,6 +618,12 @@ export default function App() {
      own, so a skin only applies where none of them does. */
   const pickedSkin = useSkin()
   const skin = hudLook || page === 'zone' ? 'classic' : pickedSkin
+  /* On a phone, Nothing Light/Dark is the shell, standing in for Today. Any
+     page the shell hands back to (Jarvis, Settings, Bills) is the classic one,
+     and Today in its tab bar is the way back. */
+  const phone = usePhone()
+  const shellOn = phone && pickedSkin.startsWith('nothing') && page === 'today'
+  useEffect(() => { if (phone && pickedSkin.startsWith('nothing')) setPage('today') }, [pickedSkin, phone]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const s = SKINS.find((x) => x.id === skin)!
     document.documentElement.style.colorScheme = s.dark ? 'dark' : ''
@@ -675,6 +683,8 @@ export default function App() {
     if (brand) ro.observe(brand)
     return () => { window.removeEventListener('resize', measure); ro.disconnect() }
   }, [page, hud])
+
+  if (shellOn) return <Suspense fallback={null}><NothingShell skin={pickedSkin} /></Suspense>
 
   return (
     /* The Zone is a room, not a dark card: the shell carries the class so the

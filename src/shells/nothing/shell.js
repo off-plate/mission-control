@@ -98,8 +98,13 @@ function loadMC(mc) {
 }
 
 loadMC(INIT);
-S.page = Math.max(0, ['personal', 'work', 'all'].indexOf(INIT.view));
+/* The home page this phone was last on; All on a first launch. */
+S.page = (() => { try { const k = ['personal', 'work', 'all'].indexOf(localStorage.getItem('mc:nothing-page')); return k < 0 ? 2 : k; } catch (e) { return 2; } })();
 
+/* Where a new thing lands, and what Plan is scoped to, as words. */
+const wsp = () => curSpace() === 'all' ? (MC.writeSpace || 'personal') : curSpace();
+const spLabel = id => (SPACES.find(z => z.id === id) || {}).label || 'Personal';
+const projFor = sp => { const pf = S.ui.planProj; if (!pf || pf === '__u') return null; const p = MC.projects.find(x => x.id === pf); return p && p.space === sp ? p : null; };
 const SPACES = [{ id: 'personal', label: 'Personal' }, { id: 'work', label: 'Big Time' }, { id: 'all', label: 'All' }];
 const curSpace = () => SPACES[S.page].id;
 const inSp = (x, sp) => sp === 'all' || x.space === sp;
@@ -889,7 +894,7 @@ W.routine = {
     const r = routineFor(inst, sp);
     if (!r) return `<div class="wi">${lb('Routine')}<div class="wt" style="margin-top:6px">No routine yet.</div></div>`;
     const d = routineDone(r), n = r.steps.length;
-    return `<div class="wi" style="gap:6px;padding-right:12px"><div class="wt up" style="font-size:10.5px;font-weight:700;line-height:1.25;color:var(--fd);padding-right:4px">${esc(wclip(r.title, 30))}</div><div class="wsp"></div><div style="display:flex;align-items:center;gap:8px">${drow(n, d, { gap: 9, r: 2.8, k: inst.id })}<span class="lb fg">${d} of ${n}</span></div></div><button class="wkey" style="bottom:10px" data-a="runRoutine" data-x="${r.id}">${d >= n ? 'Again' : 'Start'}</button>`;
+    return `<div class="wi" style="gap:6px;padding-right:12px"><div class="wt up" style="font-size:10.5px;font-weight:700;line-height:1.25;color:var(--fd);padding-right:4px">${esc(wclip(r.title, 30))}</div><div class="wsp"></div><div style="display:flex;align-items:center;gap:6px;max-width:calc(100% - 68px);overflow:hidden">${drow(n, d, { gap: n > 6 ? 6.5 : 8, r: n > 6 ? 2.2 : 2.6, k: inst.id })}<span class="lb fg" style="flex:none">${d}/${n}</span></div></div><button class="wkey" style="bottom:10px;right:10px;padding:0 9px" data-a="runRoutine" data-x="${r.id}">${d >= n ? 'Again' : 'Start'}</button>`;
   }
 };
 const routineFor = (inst, sp) => routine(inst.arg) || S.routines.find(r => inSp(r, sp) && ['daily', 'prework'].includes(r.cadence) && routineDone(r) < r.steps.length) || S.routines.find(r => inSp(r, sp));
@@ -1112,7 +1117,8 @@ R.home = () => {
   setPage(S.page, false);
 };
 function setPage(i, anim = true) {
-  S.page = i; B.setView(PAGES[i]);
+  S.page = i; B.setView(PAGES[i]); APP.dataset.sp = PAGES[i];
+  try { localStorage.setItem('mc:nothing-page', PAGES[i]); } catch (e) { }
   const tr = $('#home .hp-track'); tr.classList.toggle('drag', !anim);
   tr.style.transform = `translateX(${-i * 100 / 3}%)`;
   $$('#home .hp').forEach((h, k) => { h.style.setProperty('--p', 0); });
@@ -1144,7 +1150,9 @@ addRec({
 A.spacePick = () => sheet('space', {
   title: 'Spaces', body: () => `<div class="rows cd tight">${SPACES.map((s, i) => `<button class="row" data-a="goPage" data-x="${i}" style="width:100%"><span class="cat" style="background:${i === S.page ? 'var(--red)' : 'var(--off)'};width:9px;height:9px"></span><span class="grow rt one">${s.label}</span><span class="lb">${S.layout[s.id].length} widgets</span>${i === S.page ? ico('check') : ''}</button>`).join('')}</div><div class="empty" style="padding-top:6px">Swipe left and right on Home to move between spaces.</div>`
 });
-A.goPage = (el, i) => { closeSheet('space'); setTimeout(() => setPage(+i), 120); };
+A.goPage = (el, i) => { closeSheet('space'); setTimeout(() => { setPage(+i); refresh(); }, 120); };
+/* Change where things land: the same space switch as swiping Home. */
+A.ctxSpace = () => A.spacePick();
 
 /* tile tap: open its view with the morph */
 A.wtap = (el) => {
@@ -1643,7 +1651,7 @@ A.quickAdd = () => {
           : q.type === 'focus' ? `<div class="chips" style="margin-top:10px">${[15, 25, 45, 60].map(m => `<button class="chip ${(q.min || 25) === m ? 'on' : ''}" data-a="qaMin" data-x="${m}">${m} min</button>`).join('')}</div>` : '';
       return `<div class="chips" role="tablist">${QA_TYPES.map(([id, l, ic]) => `<button class="chip ${q.type === id ? 'on' : ''}" data-a="qaType" data-x="${id}">${ico(ic)}${l}</button>`).join('')}</div>
       <div class="hstack" style="margin-top:12px"><input class="fld" id="qat" placeholder="${ph}" value="${esc(q.text || '')}" data-enter="qaGo" ${q.type === 'habit' ? 'inputmode="numeric"' : ''}><button class="kb ${q.listening ? 'red' : ''}" data-a="qaMic" aria-label="Dictate">${q.listening ? `<span class="wave"><i></i><i></i><i></i><i></i></span>` : ico('mic')}</button></div>${extra}
-      ${q.type === 'task' ? `<div class="lb" style="margin:10px 4px 0">Goes to the to-do list in ${SPACES[S.page].id === 'all' ? 'Personal' : SPACES[S.page].label}</div>` : ''}`;
+      ${['task', 'habit', 'note'].includes(q.type) ? `<button class="ctx" style="margin:12px 0 0" data-a="ctxSpace"><span class="sd"></span>Adding to<b>${esc(spLabel(wsp()))}${q.type === 'task' ? ', ' + esc(projFor(wsp()) ? projFor(wsp()).name : 'Unsorted') : ''}</b>${ico('down')}</button>` : ''}`;
     }, foot: () => `<button class="key red wide" data-a="qaGo">${ico('plus')} Add</button>`
   });
 };
@@ -1655,8 +1663,8 @@ A.qaMin = (el, m) => { S.ui.qa.text = $('#qat').value; S.ui.qa.min = +m; repaint
 A.qaMic = () => toast('Dictation is not wired into this look yet. The keyboard mic works.');
 A.qaGo = () => {
   const q = S.ui.qa, v = ($('#qat').value || '').trim();
-  const sp = curSpace() === 'all' ? 'personal' : curSpace();
-  if (q.type === 'task') { if (!v) return; B.store().addTask({ title: v, source: 'mc', estimateMin: 0, space: sp, list: 'backlog', category: 'quick' }); toast('Added to the to-do list', { act: 'goPlanTodo', actLabel: 'See it' }); }
+  const sp = wsp(), pj = projFor(sp);
+  if (q.type === 'task') { if (!v) return; B.store().addTask({ title: v, source: 'mc', estimateMin: 0, space: sp, projectId: pj ? pj.id : undefined, list: 'backlog', category: 'quick' }); toast('Added to the to-do list', { act: 'goPlanTodo', actLabel: 'See it' }); }
   if (q.type === 'habit') { if (!q.habit) return; const h = habit(q.habit); const n = h.measure === 'amount' ? (+v || (h.presets || [1])[0]) : 1; A.logAmount(null, q.habit + ':' + n); }
   if (q.type === 'note') { if (!v) return; B.addNote(sp, v); toast('Note saved', { act: 'goNotes', actLabel: 'Open' }); }
   if (q.type === 'focus') { startFocus({ label: v || 'Focus block', min: q.min || 25 }); }
@@ -1672,7 +1680,7 @@ A.jarvis = () => B.openClassic('assistant');
 /* =====================================================================
    Today, Plan, Projects, Search, Day record
    ===================================================================== */
-const viewSpace = a => a.space || curSpace();
+const viewSpace = () => curSpace();
 const card = (inner, cls = '') => `<div class="cd ${cls}">${inner}</div>`;
 const fig = (v, k, o = {}) => `<div class="fig">${dm(v, o.cell || 3.6, { k: o.k, cls: o.cls, count: o.count })}<div class="lb ${o.lcls || ''}" style="margin-top:8px">${k}</div></div>`;
 
@@ -1807,13 +1815,14 @@ V.plan = {
       let rows = backlog(sp).filter(inP);
       const by = { Newest: (x, y) => x.ageDays - y.ageDays || x.order - y.order, Oldest: (x, y) => y.ageDays - x.ageDays, 'Most postponed': (x, y) => (y.carried || 0) - (x.carried || 0), Longest: (x, y) => y.est - x.est, Shortest: (x, y) => x.est - y.est };
       rows.sort(S.ui.todoManual ? (x, y) => x.order - y.order : by[sort]);
-      body = `<div class="hstack"><input class="fld" id="newtask" aria-label="New task" placeholder="Add something to the list" data-enter="addTask"><button class="key" data-a="addTask">Add</button></div>
+      body = `<div class="hstack"><input class="fld" id="newtask" aria-label="New task" placeholder="Add to ${esc(spLabel(wsp()))}, ${esc(projFor(wsp()) ? projFor(wsp()).name : 'Unsorted')}" data-enter="addTask"><button class="key" data-a="addTask">Add</button></div>
         <div class="chips" style="margin:10px 0">${Object.keys(by).map(k => `<button class="chip ${sort === k && !S.ui.todoManual ? 'on' : ''}" data-a="todoSort" data-x="${k}">${k}</button>`).join('')}</div>
         <div class="cd tight rows scan">${rows.length ? rows.map(t => taskRow(t, { reorder: 'todo', space: sp === 'all' })).join('') : `<div class="empty">${pf ? 'Nothing in this project. Clear the filter to see everything.' : 'Nothing waiting. Add the first task above.'}</div>`}</div>
         <div class="lb" style="margin:4px 6px">${S.backlogExtra} more in other lists. Hold a row to reorder.</div>`;
     }
     const week = `<div class="sl">The week<button class="lb fg" data-a="weekToggle">${S.ui.weekOpen ? 'Hide' : 'Show'}</button></div>${S.ui.weekOpen ? `<div class="cd"><div class="wkg">${[0, 1, 2, 3, 4, 5, 6].map(o => { const m = plannedMin(sp, o), n = S.tasks.filter(t => t.list === 'today' && t.day === o && inSp(t, sp)).length; return `<button class="wkd" data-a="pickDay" data-x="planDay:${o}">${dring({ n: 16, on: m / 240 * 16, size: 40, r: 1.6, pad: 3, cls: 'wkr', red: m > 600 })}<div class="lb fg">${DAYS[(TI() + o) % 7]}</div><div class="lb">${m ? fmtMin(m) : '-'}</div></button>`; }).join('')}</div><div class="wt" style="margin-top:12px;font-size:12.5px">You have ${openToday(sp).length} tasks planned for today, taking ${fmtMinL(plannedMin(sp))} of your day.</div></div>` : ''}`;
-    return head + handoff + ctrl + (pf ? `<div class="chips" style="margin-bottom:10px"><button class="chip on" data-a="planProj" data-x="">${ico('folder')} ${esc(pf === '__u' ? 'Unsorted' : projName(pf))} ${ico('close')}</button></div>` : '') + body + week +
+    const ctx = `<div class="ctx"><span class="sd"></span><button data-a="ctxSpace" style="display:flex;gap:6px;align-items:center"><b>${esc(sp === 'all' ? 'All spaces' : spLabel(sp))}</b>${ico('down')}</button><span>,</span><button data-a="planFilter" style="display:flex;gap:6px;align-items:center"><b>${esc(!pf ? 'All projects' : pf === '__u' ? 'Unsorted' : projName(pf))}</b>${ico('down')}</button></div>`;
+    return ctx + head + handoff + ctrl + (pf ? `<div class="chips" style="margin-bottom:10px"><button class="chip on" data-a="planProj" data-x="">${ico('folder')} ${esc(pf === '__u' ? 'Unsorted' : projName(pf))} ${ico('close')}</button></div>` : '') + body + week +
       `<button class="key t wide" style="margin-top:14px" data-a="open" data-x="projects">${ico('projects')} Projects</button>`;
   },
   after(el, a, fresh) {
@@ -1838,7 +1847,7 @@ A.replanAll = () => { B.store().moveTasksToToday(S.plan.returned.filter(id => ta
 A.showReturned = () => { S.ui.planSeg = 'todo'; S.ui.flash = S.plan.returned[0]; refresh(); };
 A.addTask = () => {
   const f = $('#newtask'), v = f.value.trim(); if (!v) return;
-  const sp = curSpace() === 'all' ? 'personal' : curSpace(), pf = S.ui.planProj;
+  const sp = wsp(), pf = S.ui.planProj;
   const proj = pf && pf !== '__u' ? MC.projects.find(p => p.id === pf) : null;
   B.store().addTask({ title: v, source: 'mc', estimateMin: 0, space: proj ? proj.space : sp, projectId: proj ? proj.id : undefined, list: 'backlog', category: 'quick' });
   f.value = ''; S.ui.todoManual = false; S.ui.todoSort = 'Newest'; S.ui.focusNew = 1;

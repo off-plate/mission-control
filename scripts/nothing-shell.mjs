@@ -77,14 +77,46 @@ await step('pick Nothing Light in Settings, the shell mounts', async () => {
   await page.screenshot({ path: `${SHOTS}/light-home.png` })
 })
 
-await step('home: swipe between spaces', async () => {
-  await drag('#home .hp:nth-child(1) .grid', -260)
-  const on = await page.locator('#home .pdots i').evaluateAll((d) => d.findIndex((x) => x.classList.contains('on')))
-  if (on !== 1) throw new Error(`page dot ${on} after a left swipe`)
+const dot = () => page.locator('#home .pdots i').evaluateAll((d) => d.findIndex((x) => x.classList.contains('on')))
+const accent = () => page.locator('#app').evaluate((el) => getComputedStyle(el).getPropertyValue('--red').trim())
+await step('home opens on All the first time', async () => {
+  if ((await dot()) !== 2) throw new Error(`first page is ${await dot()}`)
+})
+
+await step('home: swipe between spaces, the accent follows the page', async () => {
+  const all = await accent()
+  await drag('#home .hp:nth-child(3) .grid', 260)
+  if ((await dot()) !== 1) throw new Error(`page dot ${await dot()} after a right swipe`)
+  const work = await accent()
   await page.screenshot({ path: `${SHOTS}/light-home-bigtime.png` })
   await drag('#home .hp:nth-child(2) .grid', 260)
-  const back = await page.locator('#home .pdots i').evaluateAll((d) => d.findIndex((x) => x.classList.contains('on')))
-  if (back !== 0) throw new Error(`page dot ${back} after a right swipe`)
+  if ((await dot()) !== 0) throw new Error(`page dot ${await dot()} after a second swipe`)
+  const pers = await accent()
+  if (new Set([all, work, pers]).size !== 3) throw new Error(`accents ${all} ${work} ${pers}`)
+  if (pers.toUpperCase() !== '#FFC94A' || work.toUpperCase() !== '#7FD8F5') throw new Error(`accents ${pers} ${work}`)
+})
+
+await step('dock sits on the safe area, no extra gap', async () => {
+  const gap = await page.locator('#dock').evaluate((d) => innerHeight - d.getBoundingClientRect().bottom)
+  if (Math.abs(gap - 8) > 1) throw new Error(`dock gap ${gap}px, want max(8px, inset) = 8 here`)
+})
+
+await step('quick add: the type strip runs edge to edge, first and last fully visible', async () => {
+  await tap('#dock [data-a="quickAdd"]')
+  const r = await page.locator('.sheet.on .chips').first().evaluate(async (c) => {
+    const box = c.getBoundingClientRect(), items = [...c.querySelectorAll('.chip')]
+    const out = { sw: c.scrollWidth, cw: c.clientWidth, left: box.left, right: box.right, vw: innerWidth }
+    out.first = items[0].getBoundingClientRect().left - box.left
+    c.scrollLeft = c.scrollWidth; await new Promise((ok) => setTimeout(ok, 100))
+    out.last = box.right - items[items.length - 1].getBoundingClientRect().right
+    return out
+  })
+  if (!(r.sw > r.cw)) throw new Error('strip does not scroll')
+  if (r.left > 0.5 || r.right < r.vw - 0.5) throw new Error(`strip spans ${r.left}..${r.right} of ${r.vw}`)
+  if (r.first < 0 || r.last < 0) throw new Error(`first ${r.first} last ${r.last}`)
+  if (!(await page.locator('.sheet.on .ctx').count())) throw new Error('no "Adding to" line')
+  await page.screenshot({ path: `${SHOTS}/light-quickadd.png` })
+  await tap('.sheet.on [data-a="sheetX"]')
 })
 
 const homeTypes = () => page.locator('#home .hp:nth-child(1) .grid > .w').evaluateAll((ws) => ws.map((w) => w.dataset.type + ':' + [...w.classList].find((c) => /^s\d\d$/.test(c))))
@@ -130,6 +162,53 @@ await step('long titles stay inside their widgets, cut on a word', async () => {
   if (bad.length) throw new Error(bad.join(' | '))
   const wide = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)
   if (wide) throw new Error('page scrolls sideways')
+})
+
+await step('adding on the Big Time page makes a Big Time task', async () => {
+  await drag('#home .hp:nth-child(1) .grid', -260)
+  if ((await dot()) !== 1) throw new Error('not on Big Time')
+  await tap('#dock [data-a="quickAdd"]')
+  await page.locator('#qat').fill('Shell Big Time task')
+  await tap('.sheet.on [data-a="qaGo"]'); await wait(1300)
+  const t = (await blob()).tasks.find((x) => x.title === 'Shell Big Time task')
+  if (t?.space !== 'work') throw new Error(`landed in ${t?.space}`)
+  await tap('#dock [data-x="plan"]')
+  const ctx = await page.locator('section.view.on .ctx').textContent()
+  if (!/Big Time/.test(ctx) || !/All projects/.test(ctx)) throw new Error(`context line: ${ctx}`)
+  await tap('section.view.on [data-a="planSeg"][data-x="todo"]')
+  const ph = await page.locator('#newtask').getAttribute('placeholder')
+  if (!/Big Time, Unsorted/.test(ph)) throw new Error(`placeholder: ${ph}`)
+  await page.screenshot({ path: `${SHOTS}/light-plan-bigtime.png` })
+  await tap('section.view.on [data-a="planSeg"][data-x="day"]')
+  await tap('#dock [data-x="home"]')
+  await drag('#home .hp:nth-child(2) .grid', 260)
+})
+
+/* iOS zooms into any form control under 16px, and zooms the page out when anything is wider than it. */
+const small = () => page.evaluate(() => [...document.querySelector('.nshell').shadowRoot.querySelectorAll('input,textarea,select')].filter((e) => parseFloat(getComputedStyle(e).fontSize) < 16).map((e) => e.id || e.className))
+const overflow = () => page.evaluate(() => {
+  const r = document.querySelector('.nshell').shadowRoot, bad = []
+  if (document.documentElement.scrollWidth > innerWidth) bad.push('document')
+  for (const el of r.querySelectorAll('#app, section.view.on .vsc, .sheet.on .sh-b, #home .hp .hsc')) if (el.scrollWidth > el.clientWidth + 1) bad.push(el.className || el.id)
+  return bad
+})
+await step('every form control is 16px or more, nothing is wider than the screen (375 and 390)', async () => {
+  const bad = []
+  for (const w of [390, 375]) {
+    await page.setViewportSize({ width: w, height: 844 }); await wait(500)
+    bad.push(...(await overflow()).map((x) => `${w} home ${x}`))
+    for (const id of ['plan', 'habits', 'apps']) { await tap(`#dock [data-x="${id}"]`); bad.push(...(await overflow()).map((x) => `${w} ${id} ${x}`)); bad.push(...(await small()).map((x) => `${w} ${id} input ${x}`)) }
+    await tap('section.view.on [data-a="planSeg"][data-x="todo"]').catch(() => {})
+    for (const id of ['calendar', 'notes', 'ideas', 'people', 'bills', 'jar', 'health', 'gym', 'zone', 'focus', 'projects', 'weather', 'why', 'search', 'settings', 'today']) {
+      await tap('#dock [data-x="apps"]'); await tap(`[data-a="drawerOpen"][data-x="${id}"]`); await wait(650)
+      bad.push(...(await overflow()).map((x) => `${w} ${id} ${x}`)); bad.push(...(await small()).map((x) => `${w} ${id} input ${x}`))
+      await tap('section.view.on [data-a="back"]').catch(() => {})
+    }
+    await tap('#dock [data-a="quickAdd"]'); bad.push(...(await small()).map((x) => `${w} quickadd ${x}`)); bad.push(...(await overflow()).map((x) => `${w} quickadd ${x}`)); await tap('.sheet.on [data-a="sheetX"]')
+    await tap('#dock [data-x="home"]')
+  }
+  await page.setViewportSize({ width: 390, height: 844 }); await wait(400)
+  if (bad.length) throw new Error([...new Set(bad)].slice(0, 12).join(' | '))
 })
 
 await step('open a widget, then close it', async () => {

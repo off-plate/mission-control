@@ -319,7 +319,7 @@ export function toMC(inp: ShellInput) {
   const fromElsewhere = Boolean(s.syncOrigin) && (sync.phase === 'synced' || sync.phase === 'off')
   return {
     today, todayIndex: TI, isoWeek: isoWeekNo(new Date(`${today}T12:00:00`)),
-    view, projects, tasks, backlogTotal: tasks.filter((t) => t.list === 'backlog' && !t.done).length,
+    view, writeSpace: s.space, projects, tasks, backlogTotal: tasks.filter((t) => t.list === 'backlog' && !t.done).length,
     categories: { call: '#B5714F', admin: '#6C82A6', deep: '#8A6A4E', quick: '#5E9A96' },
     slots: SLOTS.map((sl) => ({ id: sl.id, label: sl.label, hours: sl.hint, capMin: (sl.to - sl.from) * 60 })),
     habits, habitGrid, routines, goals, quitting,
@@ -391,7 +391,7 @@ export function useShellBridge(skin: SkinId): { mc: MC; api: ShellApi } {
     // every second and is deliberately not a dependency (the shell counts down itself).
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [s.tasks, s.habits, s.habitLog, s.routines, s.routineLog, s.goals, s.slips, s.focusSessions, s.notes, s.noteFolders, s.people, s.personContacts,
-      s.prospects, s.projects, s.ideaBoard, s.prompts, s.plan, s.ledger, s.gymGoals, s.activeFocus, s.dailyDone, s.dailySkipped, s.view, s.syncOrigin,
+      s.prospects, s.projects, s.ideaBoard, s.prompts, s.plan, s.ledger, s.gymGoals, s.activeFocus, s.dailyDone, s.dailySkipped, s.view, s.space, s.syncOrigin,
       pomo.focusMin, pomo.breakMin, pomo.cyclesDone, cal, health, compass, weather, sync.phase, sync.lastSyncedAt, skin, day],
   )
 

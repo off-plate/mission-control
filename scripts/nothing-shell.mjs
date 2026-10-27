@@ -48,6 +48,8 @@ const drag = async (sel, dx, dy = 0) => {
   await page.mouse.up(); await wait(500)
 }
 const tap = async (sel) => { await page.locator(sel).first().click(); await wait(450) }
+/* Edit mode jiggles the tiles, so their buttons are never "stable". */
+const tapJ = async (sel) => { await page.locator(sel).first().click({ force: true }); await wait(450) }
 const onView = (id) => page.locator(`section.view.on[data-view="${id}"]`).count()
 
 // ---- seed: a fresh install, then real tasks in the saved blob ----
@@ -55,7 +57,11 @@ await page.goto(URL); await wait(1200)
 await page.evaluate(({ K, day }) => {
   const s = JSON.parse(localStorage.getItem(K))
   const t = (id, title, list, extra = {}) => ({ id, title, source: 'mc', estimateMin: 30, estimated: true, done: false, space: 'personal', list, category: 'deep', createdAt: day, addedAt: Date.now(), ...(list === 'today' ? { plannedOn: day, slot: 'morning' } : {}), ...extra })
-  s.tasks = [t('ns-1', 'Shell finish task', 'today'), t('ns-2', 'Shell delete task', 'today', { slot: 'noon' }), t('ns-3', 'Shell backlog task', 'backlog')]
+  /* His real volumes: a long backlog, a full day, long titles. */
+  const long = (i) => `Volume task ${i}: write the second half of the proposal for the interior studio and send it before the call`
+  s.tasks = [t('ns-1', 'Shell finish task', 'today'), t('ns-2', 'Shell delete task', 'today', { slot: 'noon' }), t('ns-3', 'Shell backlog task', 'backlog'),
+    ...Array.from({ length: 10 }, (_, i) => t(`nv-d${i}`, long(i), 'today', { slot: ['morning', 'noon', 'afternoon', 'evening'][i % 4], addedAt: Date.now() - 1e6 })),
+    ...Array.from({ length: 45 }, (_, i) => t(`nv-b${i}`, i % 3 ? `Backlog ${i} ${long(i)}` : `Short ${i}`, 'backlog', { addedAt: Date.now() - (i + 2) * 864e5, category: ['call', 'admin', 'deep', 'quick'][i % 4] }))]
   s.dailySkipped = day
   localStorage.setItem(K, JSON.stringify(s))
   localStorage.setItem('mc-view', 'personal'); localStorage.setItem('mc-space', 'personal')
@@ -81,6 +87,51 @@ await step('home: swipe between spaces', async () => {
   if (back !== 0) throw new Error(`page dot ${back} after a right swipe`)
 })
 
+const homeTypes = () => page.locator('#home .hp:nth-child(1) .grid > .w').evaluateAll((ws) => ws.map((w) => w.dataset.type + ':' + [...w.classList].find((c) => /^s\d\d$/.test(c))))
+let edited = null
+await step('edit mode: long-press, resize, remove + undo, add from gallery, drag, Done', async () => {
+  const first = await page.locator('#home .hp:nth-child(1) .grid > .w').nth(4).boundingBox()
+  await wait(950); await page.mouse.move(first.x + 20, first.y + 20); await page.mouse.down(); await wait(800); await page.mouse.up(); await wait(400)
+  if (!(await page.locator('#home.editing').count())) throw new Error('long-press did not enter edit mode')
+  await page.screenshot({ path: `${SHOTS}/light-edit.png` })
+  const before = await homeTypes()
+  await tapJ('#home .hp:nth-child(1) .w[data-type="habits"] .wz')
+  const resized = await homeTypes()
+  if (resized.join() === before.join()) throw new Error('resize changed nothing')
+  await tapJ('#home .hp:nth-child(1) .w[data-type="chain"] .wx'); await wait(500)
+  if ((await homeTypes()).some((x) => x.startsWith('chain'))) throw new Error('remove did not remove')
+  await tap('#toast [data-a="undo"]'); await wait(400)
+  if (!(await homeTypes()).some((x) => x.startsWith('chain'))) throw new Error('undo did not bring it back')
+  await tap('[data-a="gallery"]'); await wait(400)
+  await page.screenshot({ path: `${SHOTS}/light-gallery.png` })
+  await tap('.sheet.on .gi[data-x="gym"]'); await wait(1200)
+  if (!(await homeTypes()).some((x) => x.startsWith('gym'))) throw new Error('gallery add missing')
+  const order0 = await homeTypes()
+  const a = await page.locator('#home .hp:nth-child(1) .grid > .w').nth(2).boundingBox(), b = await page.locator('#home .hp:nth-child(1) .grid > .w').nth(3).boundingBox()
+  await wait(950); await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2); await page.mouse.down(); await wait(700)
+  for (let i = 1; i <= 12; i++) { await page.mouse.move(a.x + a.width / 2 + (b.x + b.width / 2 - a.x - a.width / 2) * i / 12, a.y + a.height / 2 + (b.y + b.height / 2 - a.y - a.height / 2) * i / 12); await wait(30) }
+  await wait(300); await page.mouse.up(); await wait(500)
+  if ((await homeTypes()).join() === order0.join()) throw new Error('drag did not reorder ' + order0.join())
+  await tap('[data-a="editDone"]')
+  if (await page.locator('#home.editing').count()) throw new Error('Done did not leave edit mode')
+  edited = await homeTypes()
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('mc:nothing-layout')))
+  if (saved?.v !== 1) throw new Error('layout not saved with its version')
+})
+
+await step('edited layout survives a reload', async () => {
+  await page.reload(); await wait(2000)
+  const now = await homeTypes()
+  if (now.join() !== edited.join()) throw new Error(`${now.join()} vs ${edited.join()}`)
+})
+
+await step('long titles stay inside their widgets, cut on a word', async () => {
+  const bad = await page.locator('#home .grid .w .wt').evaluateAll((els) => els.filter((e) => e.scrollWidth > e.clientWidth + 1 || /\w…\w/.test(e.textContent)).map((e) => e.textContent.slice(0, 40)))
+  if (bad.length) throw new Error(bad.join(' | '))
+  const wide = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)
+  if (wide) throw new Error('page scrolls sideways')
+})
+
 await step('open a widget, then close it', async () => {
   await tap('#home .hp:nth-child(1) [data-type="plan"]'); await wait(400)
   if (!(await onView('plan'))) throw new Error('Plan did not open from its tile')
@@ -100,6 +151,7 @@ await step('Plan: swipe to complete, How long, the real task is done', async () 
 })
 
 await step('Plan: delete, then undo, restores the real task', async () => {
+  await page.locator('#toast [data-a="toastX"]').click().catch(() => {}); await wait(300)
   await drag('.sw[data-id="ns-2"] .sw-fg', -170)
   await tap('.sw[data-id="ns-2"] [data-a="taskDel"]'); await wait(1300)
   if ((await blob()).tasks.some((x) => x.id === 'ns-2')) throw new Error('not deleted in the store')
@@ -108,10 +160,19 @@ await step('Plan: delete, then undo, restores the real task', async () => {
 })
 
 await step('Plan: tap a task, its detail sheet opens', async () => {
+  await page.locator('#toast [data-a="toastX"]').click().catch(() => {})
   await tap('.sw[data-id="ns-2"] [data-a="taskMenu"]')
   if (!(await page.locator('.sheet.on [data-a="taskDelM"]').count())) throw new Error('no task sheet')
   await page.screenshot({ path: `${SHOTS}/light-taskmenu.png` })
   await tap('.sheet.on [data-a="sheetX"]')
+})
+
+await step('Plan: the to-do list holds the whole backlog', async () => {
+  await tap('section.view.on [data-a="planSeg"][data-x="todo"]'); await wait(500)
+  const n = await page.locator('section.view.on .sw[data-sw="task"]').count()
+  if (n < 45) throw new Error(`only ${n} rows`)
+  await page.screenshot({ path: `${SHOTS}/light-todo.png` })
+  await tap('section.view.on [data-a="planSeg"][data-x="day"]')
 })
 
 await step('add button: a task goes into the real store', async () => {

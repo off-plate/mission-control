@@ -161,6 +161,7 @@ function toast(text, opts = {}) {
   toastUndo = opts.undo || null;
   el.innerHTML = `<div class="tx">${esc(text)}</div>${opts.undo ? `<button class="key sm" data-a="undo">Undo</button>` : opts.act ? `<button class="key sm" data-a="${opts.act}" data-x="${esc(opts.x || '')}">${esc(opts.actLabel)}</button>` : ''}<button class="x" data-a="toastX" aria-label="Dismiss">${ico('close')}</button>`;
   el.classList.toggle('low', (!$('#dock') || $('#dock').classList.contains('hide')) && !$('#home.editing'));
+  el.classList.toggle('top', SHEETS.length > 0);
   el.classList.add('on');
   clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), opts.ms || (opts.undo ? 4000 : 2500));
 }
@@ -731,6 +732,7 @@ function sheet(key, o) {
   const el = document.createElement('div'); el.className = 'sheet ' + (o.cls || ''); el.dataset.key = key; el.setAttribute('role', 'dialog');
   const sh = { key, el, sc, o };
   SHEETS.push(sh);
+  $('#toast').classList.add('top');
   sheetPaint(sh, true);
   $('#ov').append(sc, el);
   el.getBoundingClientRect();
@@ -749,6 +751,7 @@ function repaintSheets() { SHEETS.forEach(s => { if (s.o.live && !(s.el.contains
 function closeSheet(key, instant) {
   const i = SHEETS.findIndex(s => s.key === key); if (i < 0) return false;
   const [s] = SHEETS.splice(i, 1);
+  $('#toast').classList.toggle('top', SHEETS.length > 0);
   if (instant) { s.el.remove(); s.sc.remove(); return true; }
   s.el.classList.remove('on', 'drag'); s.el.style.transform = ''; s.sc.classList.remove('on');
   setTimeout(() => { s.el.remove(); s.sc.remove(); }, 440);
@@ -788,6 +791,8 @@ addRec({
 const W = {};
 let CELL = 82;
 const px2 = sz => { const c = +sz[0], r = +sz[1]; return [c * CELL + (c - 1) * 10, r * CELL + (r - 1) * 10]; };
+/* Cut a title on a word, never mid-word. */
+const wclip = (t, n) => { t = String(t || ''); if (t.length <= n) return t; const k = t.lastIndexOf(' ', n); return t.slice(0, k > n * .5 ? k : n).replace(/[\s,.;:]+$/, '') + '…'; };
 const lb = (t, cls = '') => `<div class="lb ${cls}">${esc(t)}</div>`;
 const lbRow = (a, b, bcls = '') => `<div style="display:flex;justify-content:space-between;gap:8px">${lb(a)}${b != null ? lb(b, bcls) : ''}</div>`;
 
@@ -841,8 +846,8 @@ W.next = {
   render(sz, sp) {
     const t = firstMove(sp);
     if (!t) return `<div class="wi">${lb('Next')}<div class="wt" style="margin-top:6px">Nothing open today.</div></div>`;
-    if (sz === '22') return `<div class="wi" style="gap:8px">${lbRow('Next', t.est ? fmtMin(t.est) : 'NO ESTIMATE')}<div class="wt" style="font-size:14px;line-height:1.35">${esc(t.title)}</div></div><button class="wkey" data-a="startTask" data-x="${t.id}">Start</button>`;
-    return `<div class="wi" style="flex-direction:row;align-items:center;gap:14px"><div class="grow" style="display:grid;gap:5px">${lbRow('Next', t.est ? fmtMin(t.est) : 'NO ESTIMATE')}<div class="wt" style="font-size:12.5px;line-height:1.3">${esc(t.title)}</div></div><button class="wkey" style="position:static;flex:none;height:40px;padding:0 14px" data-a="startTask" data-x="${t.id}">Start</button></div>`;
+    if (sz === '22') return `<div class="wi" style="gap:8px">${lbRow('Next', t.est ? fmtMin(t.est) : 'NO ESTIMATE')}<div class="wt" style="font-size:14px;line-height:1.35">${esc(wclip(t.title, 64))}</div></div><button class="wkey" data-a="startTask" data-x="${t.id}">Start</button>`;
+    return `<div class="wi" style="flex-direction:row;align-items:center;gap:14px"><div class="grow" style="display:grid;gap:5px">${lbRow('Next', t.est ? fmtMin(t.est) : 'NO ESTIMATE')}<div class="wt" style="font-size:12.5px;line-height:1.3">${esc(wclip(t.title, 52))}</div></div><button class="wkey" style="position:static;flex:none;height:40px;padding:0 14px" data-a="startTask" data-x="${t.id}">Start</button></div>`;
   }
 };
 W.plan = {
@@ -872,7 +877,7 @@ W.measure = {
   name: 'Amount habit', sizes: ['11', '22'], tone: 'w', open: 'habits',
   render(sz, sp, inst) {
     const h = habit(inst.arg) || S.habits.find(x => x.kind === 'measured' && !x.auto && inSp(x, sp)), [w] = px2(sz), n = sz === '11' ? 30 : 40;
-    if (!h) return `<div class="wi">${lb('Amount habit')}<div class="wt" style="margin-top:6px">No amount habit yet.</div></div>`;
+    if (!h) return `${dring({ n, on: 0, size: w, r: sz === '11' ? 1.7 : 2.6, pad: sz === '11' ? 5 : 14 })}<div class="wcenter"><div style="display:grid;justify-items:center;gap:6px">${dm('0', sz === '11' ? 3 : 6)}${lb('Amount')}</div></div>`;
     const on = clamp(h.today / h.target, 0, 1) * n;
     if (sz === '11') return `${dring({ n, on, size: w, r: 1.7, pad: 5, red: true, k: inst.id })}<div class="wcenter">${dm(h.today, 3, { k: inst.id + 'n' })}</div>`;
     return `${dring({ n, on, size: w, r: 2.6, pad: 14, red: true, k: inst.id })}<div class="wcenter"><div style="display:grid;justify-items:center;gap:8px">${dm(h.today, 6, { k: inst.id + 'n' })}${lb('/' + h.target + ' ' + h.name)}</div></div><button class="wbtn br solid" data-a="logAmount" data-x="${h.id}:${(h.presets || [1])[0]}" aria-label="Add ${(h.presets || [1])[0]}">${ico('plus')}</button>`;
@@ -884,7 +889,7 @@ W.routine = {
     const r = routineFor(inst, sp);
     if (!r) return `<div class="wi">${lb('Routine')}<div class="wt" style="margin-top:6px">No routine yet.</div></div>`;
     const d = routineDone(r), n = r.steps.length;
-    return `<div class="wi" style="gap:6px;padding-right:12px"><div class="wt up" style="font-size:10.5px;font-weight:700;line-height:1.25;color:var(--fd);padding-right:4px">${esc(r.title)}</div><div class="wsp"></div><div style="display:flex;align-items:center;gap:8px">${drow(n, d, { gap: 9, r: 2.8, k: inst.id })}<span class="lb fg">${d} of ${n}</span></div></div><button class="wkey" style="bottom:10px" data-a="runRoutine" data-x="${r.id}">${d >= n ? 'Again' : 'Start'}</button>`;
+    return `<div class="wi" style="gap:6px;padding-right:12px"><div class="wt up" style="font-size:10.5px;font-weight:700;line-height:1.25;color:var(--fd);padding-right:4px">${esc(wclip(r.title, 30))}</div><div class="wsp"></div><div style="display:flex;align-items:center;gap:8px">${drow(n, d, { gap: 9, r: 2.8, k: inst.id })}<span class="lb fg">${d} of ${n}</span></div></div><button class="wkey" style="bottom:10px" data-a="runRoutine" data-x="${r.id}">${d >= n ? 'Again' : 'Start'}</button>`;
   }
 };
 const routineFor = (inst, sp) => routine(inst.arg) || S.routines.find(r => inSp(r, sp) && ['daily', 'prework'].includes(r.cadence) && routineDone(r) < r.steps.length) || S.routines.find(r => inSp(r, sp));
@@ -916,7 +921,7 @@ W.goals = {
   name: 'Goals', sizes: ['22'], tone: 'w', open: 'habits', openArgs: { seg: 'goals' },
   render(sz, sp) {
     const gs = S.goals.filter(g => inSp(g, sp) && g.status !== 'reached').slice(0, 3);
-    return `<div class="wi" style="gap:9px">${lb('Goals')}${gs.map(g => `<div><div class="wt" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(g.name)}</div><div style="display:flex;align-items:center;gap:8px;margin-top:3px">${drow(10, Math.round(goalPct(g) * 10), { gap: 9, r: 2.6, red: g.status === 'push', k: 'wg' + g.id + sp })}<span class="lb ${g.status === 'push' ? 'red' : 'fg'}">${Math.round(goalPct(g) * 100)}%</span></div>${g.status === 'push' ? `<div class="lb red" style="font-size:8.5px;margin-top:1px">Needs a push</div>` : ''}</div>`).join('')}</div>`;
+    return `<div class="wi" style="gap:9px">${lb('Goals')}${gs.map(g => `<div><div class="wt" style="font-size:11px;white-space:nowrap;overflow:hidden">${esc(wclip(g.name, 24))}</div><div style="display:flex;align-items:center;gap:8px;margin-top:3px">${drow(10, Math.round(goalPct(g) * 10), { gap: 9, r: 2.6, red: g.status === 'push', k: 'wg' + g.id + sp })}<span class="lb ${g.status === 'push' ? 'red' : 'fg'}">${Math.round(goalPct(g) * 100)}%</span></div>${g.status === 'push' ? `<div class="lb red" style="font-size:8.5px;margin-top:1px">Needs a push</div>` : ''}</div>`).join('')}</div>`;
   }
 };
 W.quit = {
@@ -951,7 +956,7 @@ W.calendar = {
   name: 'Calendar', sizes: ['21'], tone: 'w', open: 'calendar',
   render() {
     const e = nextEvent();
-    return `<div class="wi" style="gap:6px">${lbRow(DAYL[TI()], e ? (e.allDay ? 'ALL DAY' : e.start) : 'FREE')}<div class="wt up" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:11.5px">${e ? esc(e.title) : 'Nothing else today'}</div></div>`;
+    return `<div class="wi" style="gap:6px">${lbRow(DAYL[TI()], e ? (e.allDay ? 'ALL DAY' : e.start) : 'FREE')}<div class="wt up" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:11.5px">${e ? esc(wclip(e.title, 34)) : 'Nothing else today'}</div></div>`;
   }
 };
 const initials = n => n.split(/\s+/).map(s => s[0]).join('').slice(0, 2).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -973,7 +978,7 @@ W.bills = {
 };
 W.debt = {
   name: 'Debt', sizes: ['11'], tone: 'k', circ: true, open: 'bills', openArgs: { at: 'debts' },
-  render(sz, sp, inst) { if (!S.bills) return `<div class="wcenter"><div class="lb" style="font-size:8px">Debt</div></div>`; const p = S.bills.debtPaidPct; return `${dring({ n: 30, on: p / 100 * 30, size: CELL, r: 1.7, pad: 5, k: inst.id })}<div class="wcenter"><div style="display:grid;justify-items:center;gap:5px">${dm(p + '%', 2.6)}<div class="lb" style="font-size:8px">Paid</div></div></div>`; }
+  render(sz, sp, inst) { const p = S.bills ? S.bills.debtPaidPct : 0; return `${dring({ n: 30, on: p / 100 * 30, size: CELL, r: 1.7, pad: 5, k: inst.id })}<div class="wcenter"><div style="display:grid;justify-items:center;gap:5px">${dm(S.bills ? p + '%' : '-', 2.6)}<div class="lb" style="font-size:8px">${S.bills ? 'Paid' : 'Debt'}</div></div></div>`; }
 };
 W.notes = {
   name: 'Notes', sizes: ['22', '21'], tone: 'w', open: 'notes',
@@ -981,8 +986,8 @@ W.notes = {
     const n = (inst.arg ? S.notes.find(x => x.id === inst.arg) : null) || S.notes.find(x => !x.done && inSp(x, sp)) || S.notes[0];
     if (!n) return `<div class="wi">${lb('Notes')}<div class="wt" style="margin-top:6px">No notes yet.</div></div>`;
     const f = S.folders.find(f => f.id === n.folder);
-    if (sz === '21') return `<div class="wi" style="gap:5px">${lb(f ? f.name : 'Notes')}<div class="wt up" style="font-size:11px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(n.title)}</div></div>`;
-    return `<div class="wi" style="gap:8px">${lb('Latest note')}<div class="wt up" style="font-size:12.5px;line-height:1.35">${esc(n.title || 'Untitled')}</div><div class="wt" style="font-size:11px;color:var(--fd);overflow:hidden;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical">${esc(n.body)}</div><div class="wsp"></div>${lb(f ? f.name : '')}</div>`;
+    if (sz === '21') return `<div class="wi" style="gap:5px">${lb(f ? f.name : 'Notes')}<div class="wt up" style="font-size:11px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(wclip(n.title || 'Untitled', 34))}</div></div>`;
+    return `<div class="wi" style="gap:8px">${lb('Latest note')}<div class="wt up" style="font-size:12.5px;line-height:1.35">${esc(wclip(n.title || 'Untitled', 44))}</div><div class="wt" style="font-size:11px;color:var(--fd);overflow:hidden;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical">${esc(n.body)}</div><div class="wsp"></div>${lb(f ? f.name : '')}</div>`;
   }
 };
 const whyToday = () => { const l = MC.why.filter(w => w.text); return l.length ? l[NOW().getDate() % l.length] : null; };
@@ -1017,6 +1022,18 @@ W.apps = {
   name: 'Apps', sizes: ['21'], tone: 'k', open: 'apps',
   render() { return `<div class="wi" style="gap:8px">${lb('Apps')}<div style="display:flex;gap:8px">${['Today', 'Plan', 'Habits', 'Notes'].map(a => `<div style="width:34px;height:34px;border-radius:10px;background:var(--fo);display:grid;place-items:center">${dm(a[0], 2)}</div>`).join('')}</div></div>`; }
 };
+/* Which widgets have something to say in a space. Without it they stay off that home page. */
+W.measure.has = (inst, sp) => !!(habit(inst.arg) || S.habits.find(x => x.kind === 'measured' && !x.auto && inSp(x, sp)));
+W.routine.has = (inst, sp) => !!routineFor(inst, sp);
+W.quit.has = () => S.quitting.length > 0;
+W.bills.has = W.debt.has = () => !!S.bills;
+W.health.has = () => !!MC.health;
+W.weather.has = () => !!MC.weather;
+W.notes.has = (inst, sp) => S.notes.some(x => !x.done && inSp(x, sp)) || (sp === 'all' && S.notes.length > 0);
+W.why.has = () => MC.why.length > 0;
+W.goals.has = (inst, sp) => S.goals.some(g => inSp(g, sp) && g.status !== 'reached');
+W.people.has = () => S.people.length > 0;
+W.pipeline.has = () => S.prospects.length > 0;
 /* Jarvis face: a glyph matrix of dots, eyes blink */
 const FACE = ['...............', '...............', '...##.....##...', '...##.....##...', '...............', '...............', '...............', '.....#...#.....', '......###......', '...............', '...............'];
 function faceSVG(size, mood) {
@@ -1053,8 +1070,18 @@ S.layout = {
 const PAGES = ['personal', 'work', 'all'];
 /* The widget layout is how THIS phone is arranged, like the look itself: kept on the device, never synced. */
 const LKEY = 'mc:nothing-layout';
-try { const L = JSON.parse(localStorage.getItem(LKEY) || 'null'); if (L && PAGES.every(p => Array.isArray(L[p]))) { S.layout = L; WID = Math.max(0, ...PAGES.flatMap(p => L[p].map(i => +String(i.id).slice(1) || 0))); } } catch (e) { }
-const saveLayout = () => { try { localStorage.setItem(LKEY, JSON.stringify(S.layout)); } catch (e) { } };
+const LVER = 1;
+try {
+  const L = JSON.parse(localStorage.getItem(LKEY) || 'null');
+  if (L && L.v === LVER && PAGES.every(p => Array.isArray(L[p]))) {
+    const ok = i => i && W[i.type] && typeof i.id === 'string';
+    const lay = {}; PAGES.forEach(p => { lay[p] = L[p].filter(ok).map(i => ({ ...i, size: W[i.type].sizes.includes(i.size) ? i.size : W[i.type].sizes[0] })); });
+    if (PAGES.some(p => lay[p].length)) { S.layout = lay; WID = Math.max(0, ...PAGES.flatMap(p => lay[p].map(i => +String(i.id).slice(1) || 0))); }
+  }
+} catch (e) { }
+const saveLayout = () => { try { localStorage.setItem(LKEY, JSON.stringify({ v: LVER, ...S.layout })); } catch (e) { } };
+/* A widget with nothing to show for this space stays out of the grid. */
+const shown = (inst, p) => { const d = W[inst.type]; return !d.has || d.has(inst, p); };
 let EDIT = false;
 
 function tileHTML(inst, sp) {
@@ -1079,7 +1106,7 @@ R.home = () => {
   PAGES.forEach((p, i) => {
     const g = $(`#home .hp:nth-child(${i + 1}) .grid`);
     if (DRAG_W && i === S.page) return;
-    g.innerHTML = S.layout[p].map(inst => tileHTML(inst, p)).join('');
+    g.innerHTML = S.layout[p].filter(inst => shown(inst, p)).map(inst => tileHTML(inst, p)).join('');
     hydrate(g);
   });
   setPage(S.page, false);
@@ -1217,7 +1244,7 @@ function tileDrag(tile, st) {
       const b = tile.getBoundingClientRect(); tile.style.transform = '';
       const a = tile.getBoundingClientRect();
       tile.animate([{ transform: `translate(${b.left - a.left}px,${b.top - a.top}px) scale(1.04)` }, { transform: 'none' }], { duration: 260, easing: 'cubic-bezier(.23,1,.32,1)' }).onfinish = () => tile.classList.remove('dragging');
-      DRAG_W = null;
+      DRAG_W = null; saveLayout();
     }
   };
 }
@@ -1233,7 +1260,7 @@ A.wResize = (el, id) => {
   const inst = findInst(id), d = W[inst.type], k = d.sizes.indexOf(inst.size);
   inst.size = d.sizes[(k + 1) % d.sizes.length];
   const grid = el.closest('.grid'), old = el.closest('.w');
-  flipGrid(grid, () => { const t = document.createElement('div'); t.innerHTML = tileHTML(inst, PAGES[S.page]); const n = t.firstChild; old.replaceWith(n); hydrate(n); });
+  flipGrid(grid, () => { const t = document.createElement('div'); t.innerHTML = tileHTML(inst, PAGES[S.page]); const n = t.firstChild; old.replaceWith(n); hydrate(n); }); saveLayout();
 };
 A.gallery = () => sheet('gallery', {
   title: 'Widgets', body: () => `<div class="gal">${Object.entries(W).map(([type, d]) => {

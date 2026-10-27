@@ -534,7 +534,12 @@ textarea.fld{height:auto;min-height:120px;padding:14px;line-height:1.5;resize:no
 .rstep .rs .px{width:10px;height:10px;display:inline-block;vertical-align:-1px}
 .rsalts{margin:10px 0 2px;gap:8px}
 .rsalts .alt{text-align:left;padding:12px;background:var(--soft)}
-.rsalts .alt.k{background:var(--ink);--fg:var(--cv);--fd:var(--cv)}
+.rsalts .alt.k{background:var(--ti);--fg:var(--inki);--fd:var(--dimi)}
 .rse .fld{height:42px;font-size:13.5px}
 .hedit .kb{background:var(--soft)}
 .hedit .kb[disabled]{opacity:.35}
+
+/* ===== shell: toasts sit above everything; at the top while a sheet is up ===== */
+.toast{z-index:75}
+.toast.top{top:calc(var(--st) + 8px);bottom:auto}
+.w .wt{word-break:normal;overflow-wrap:normal;hyphens:none}

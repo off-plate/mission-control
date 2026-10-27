@@ -80,18 +80,20 @@ await step('pick Nothing Light in Settings, the shell mounts', async () => {
 const dot = () => page.locator('#home .pdots i').evaluateAll((d) => d.findIndex((x) => x.classList.contains('on')))
 const accent = () => page.locator('#app').evaluate((el) => getComputedStyle(el).getPropertyValue('--red').trim())
 await step('home opens on All the first time', async () => {
-  if ((await dot()) !== 2) throw new Error(`first page is ${await dot()}`)
+  if ((await dot()) !== 0) throw new Error(`first page is ${await dot()}`)
 })
 
 await step('home: swipe between spaces, the accent follows the page', async () => {
   const all = await accent()
-  await drag('#home .hp:nth-child(3) .grid', 260)
-  if ((await dot()) !== 1) throw new Error(`page dot ${await dot()} after a right swipe`)
+  await drag('#home .hp:nth-child(1) .grid', -260)
+  if ((await dot()) !== 1) throw new Error(`page dot ${await dot()} after a left swipe`)
+  const pers = await accent()
+  await drag('#home .hp:nth-child(2) .grid', -260)
+  if ((await dot()) !== 2) throw new Error(`page dot ${await dot()} after a second swipe`)
   const work = await accent()
   await page.screenshot({ path: `${SHOTS}/light-home-bigtime.png` })
-  await drag('#home .hp:nth-child(2) .grid', 260)
-  if ((await dot()) !== 0) throw new Error(`page dot ${await dot()} after a second swipe`)
-  const pers = await accent()
+  await drag('#home .hp:nth-child(3) .grid', 260)
+  if ((await dot()) !== 1) throw new Error(`page dot ${await dot()} after swiping back to Personal`)
   if (new Set([all, work, pers]).size !== 3) throw new Error(`accents ${all} ${work} ${pers}`)
   if (pers.toUpperCase() !== '#FFC94A' || work.toUpperCase() !== '#7FD8F5') throw new Error(`accents ${pers} ${work}`)
 })
@@ -119,18 +121,18 @@ await step('quick add: the type strip runs edge to edge, first and last fully vi
   await tap('.sheet.on [data-a="sheetX"]')
 })
 
-const homeTypes = () => page.locator('#home .hp:nth-child(1) .grid > .w').evaluateAll((ws) => ws.map((w) => w.dataset.type + ':' + [...w.classList].find((c) => /^s\d\d$/.test(c))))
+const homeTypes = () => page.locator('#home .hp:nth-child(2) .grid > .w').evaluateAll((ws) => ws.map((w) => w.dataset.type + ':' + [...w.classList].find((c) => /^s\d\d$/.test(c))))
 let edited = null
 await step('edit mode: long-press, resize, remove + undo, add from gallery, drag, Done', async () => {
-  const first = await page.locator('#home .hp:nth-child(1) .grid > .w').nth(4).boundingBox()
+  const first = await page.locator('#home .hp:nth-child(2) .grid > .w').nth(4).boundingBox()
   await wait(950); await page.mouse.move(first.x + 20, first.y + 20); await page.mouse.down(); await wait(800); await page.mouse.up(); await wait(400)
   if (!(await page.locator('#home.editing').count())) throw new Error('long-press did not enter edit mode')
   await page.screenshot({ path: `${SHOTS}/light-edit.png` })
   const before = await homeTypes()
-  await tapJ('#home .hp:nth-child(1) .w[data-type="habits"] .wz')
+  await tapJ('#home .hp:nth-child(2) .w[data-type="habits"] .wz')
   const resized = await homeTypes()
   if (resized.join() === before.join()) throw new Error('resize changed nothing')
-  await tapJ('#home .hp:nth-child(1) .w[data-type="chain"] .wx'); await wait(500)
+  await tapJ('#home .hp:nth-child(2) .w[data-type="chain"] .wx'); await wait(500)
   if ((await homeTypes()).some((x) => x.startsWith('chain'))) throw new Error('remove did not remove')
   await tap('#toast [data-a="undo"]'); await wait(400)
   if (!(await homeTypes()).some((x) => x.startsWith('chain'))) throw new Error('undo did not bring it back')
@@ -139,7 +141,7 @@ await step('edit mode: long-press, resize, remove + undo, add from gallery, drag
   await tap('.sheet.on .gi[data-x="gym"]'); await wait(1200)
   if (!(await homeTypes()).some((x) => x.startsWith('gym'))) throw new Error('gallery add missing')
   const order0 = await homeTypes()
-  const a = await page.locator('#home .hp:nth-child(1) .grid > .w').nth(2).boundingBox(), b = await page.locator('#home .hp:nth-child(1) .grid > .w').nth(3).boundingBox()
+  const a = await page.locator('#home .hp:nth-child(2) .grid > .w').nth(2).boundingBox(), b = await page.locator('#home .hp:nth-child(2) .grid > .w').nth(3).boundingBox()
   await wait(950); await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2); await page.mouse.down(); await wait(700)
   for (let i = 1; i <= 12; i++) { await page.mouse.move(a.x + a.width / 2 + (b.x + b.width / 2 - a.x - a.width / 2) * i / 12, a.y + a.height / 2 + (b.y + b.height / 2 - a.y - a.height / 2) * i / 12); await wait(30) }
   await wait(300); await page.mouse.up(); await wait(500)
@@ -155,6 +157,8 @@ await step('edited layout survives a reload', async () => {
   await page.reload(); await wait(2000)
   const now = await homeTypes()
   if (now.join() !== edited.join()) throw new Error(`${now.join()} vs ${edited.join()}`)
+  if ((await dot()) !== 0) throw new Error(`a reload opened page ${await dot()}, not All`)
+  await drag('#home .hp:nth-child(1) .grid', -260)
 })
 
 await step('long titles stay inside their widgets, cut on a word', async () => {
@@ -165,8 +169,8 @@ await step('long titles stay inside their widgets, cut on a word', async () => {
 })
 
 await step('adding on the Big Time page makes a Big Time task', async () => {
-  await drag('#home .hp:nth-child(1) .grid', -260)
-  if ((await dot()) !== 1) throw new Error('not on Big Time')
+  await drag('#home .hp:nth-child(2) .grid', -260)
+  if ((await dot()) !== 2) throw new Error('not on Big Time')
   await tap('#dock [data-a="quickAdd"]')
   await page.locator('#qat').fill('Shell Big Time task')
   await tap('.sheet.on [data-a="qaGo"]'); await wait(1300)
@@ -181,7 +185,7 @@ await step('adding on the Big Time page makes a Big Time task', async () => {
   await page.screenshot({ path: `${SHOTS}/light-plan-bigtime.png` })
   await tap('section.view.on [data-a="planSeg"][data-x="day"]')
   await tap('#dock [data-x="home"]')
-  await drag('#home .hp:nth-child(2) .grid', 260)
+  await drag('#home .hp:nth-child(3) .grid', 260)
 })
 
 /* iOS zooms into any form control under 16px, and zooms the page out when anything is wider than it. */
@@ -212,7 +216,7 @@ await step('every form control is 16px or more, nothing is wider than the screen
 })
 
 await step('open a widget, then close it', async () => {
-  await tap('#home .hp:nth-child(1) [data-type="plan"]'); await wait(400)
+  await tap('#home .hp:nth-child(2) [data-type="plan"]'); await wait(400)
   if (!(await onView('plan'))) throw new Error('Plan did not open from its tile')
   await page.screenshot({ path: `${SHOTS}/light-plan.png` })
   await tap('section.view.on [data-a="back"]'); await wait(400)

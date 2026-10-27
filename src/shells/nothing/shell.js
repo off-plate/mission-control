@@ -67,7 +67,7 @@ const kc = n => Math.round(n).toLocaleString('en-US');
 const clone = o => JSON.parse(JSON.stringify(o));
 const S = {
   theme: 'light',
-  page: 0,                               // home page index: 0 Personal, 1 Big Time, 2 All
+  page: 0,                               // home page index: 0 All, 1 Personal, 2 Big Time
   pomo: { phase: 'idle', endsAt: 0, left: 0, total: 25 * 60, label: '', taskId: null, cycles: 0, focusMin: 25, breakMin: 5 },
   sync: { state: 'connected', label: '' },
   cc: { jarvis: false, dnd: false, sync: true, hevy: 'idle', review: false },
@@ -99,13 +99,13 @@ function loadMC(mc) {
 
 loadMC(INIT);
 /* The home page this phone was last on; All on a first launch. */
-S.page = (() => { try { const k = ['personal', 'work', 'all'].indexOf(localStorage.getItem('mc:nothing-page')); return k < 0 ? 2 : k; } catch (e) { return 2; } })();
+S.page = 0; // his call: the app always opens on All, the first slide
 
 /* Where a new thing lands, and what Plan is scoped to, as words. */
 const wsp = () => curSpace() === 'all' ? (MC.writeSpace || 'personal') : curSpace();
 const spLabel = id => (SPACES.find(z => z.id === id) || {}).label || 'Personal';
 const projFor = sp => { const pf = S.ui.planProj; if (!pf || pf === '__u') return null; const p = MC.projects.find(x => x.id === pf); return p && p.space === sp ? p : null; };
-const SPACES = [{ id: 'personal', label: 'Personal' }, { id: 'work', label: 'Big Time' }, { id: 'all', label: 'All' }];
+const SPACES = [{ id: 'all', label: 'All' }, { id: 'personal', label: 'Personal' }, { id: 'work', label: 'Big Time' }];
 const curSpace = () => SPACES[S.page].id;
 const inSp = (x, sp) => sp === 'all' || x.space === sp;
 const projName = id => (MC.projects.find(p => p.id === id) || {}).name || 'Unsorted';
@@ -1072,7 +1072,7 @@ S.layout = {
   all: [wi('clock', '22', { tone: 'w' }), wi('jar', '21'), wi('bills', '21'), wi('plan', '42'), wi('people', '22'), wi('jarvis', '22'),
     wi('focusweek', '41'), wi('pipeline', '21'), wi('why', '21', { tone: 'w' }), wi('ideas', '11'), wi('gym', '11', { tone: 'k' }), wi('notes', '21', { tone: 'k' })]
 };
-const PAGES = ['personal', 'work', 'all'];
+const PAGES = ['all', 'personal', 'work'];
 /* The widget layout is how THIS phone is arranged, like the look itself: kept on the device, never synced. */
 const LKEY = 'mc:nothing-layout';
 const LVER = 1;
@@ -1118,7 +1118,6 @@ R.home = () => {
 };
 function setPage(i, anim = true) {
   S.page = i; B.setView(PAGES[i]); APP.dataset.sp = PAGES[i];
-  try { localStorage.setItem('mc:nothing-page', PAGES[i]); } catch (e) { }
   const tr = $('#home .hp-track'); tr.classList.toggle('drag', !anim);
   tr.style.transform = `translateX(${-i * 100 / 3}%)`;
   $$('#home .hp').forEach((h, k) => { h.style.setProperty('--p', 0); });
@@ -1886,7 +1885,7 @@ V.search = {
   }
 };
 A.jumpTask = (el, id) => {
-  const t = task(id); S.page = t.space === 'work' ? 1 : 0;
+  const t = task(id); S.page = t.space === 'work' ? 2 : 1;
   if (t.list === 'today') { S.ui.planSeg = 'day'; S.ui.planDay = t.day || 0; } else S.ui.planSeg = 'todo';
   S.ui.planProj = null; S.ui.flash = id; tab('plan');
 };

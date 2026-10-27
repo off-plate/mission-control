@@ -11,7 +11,7 @@
 button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;text-align:inherit}
 input,textarea,select{font:inherit;color:inherit;-webkit-user-select:text;user-select:text}
 svg{display:block}
-#app{position:fixed;inset:0;overflow:hidden;background:var(--cv);--st:max(env(safe-area-inset-top),14px);--sb:env(safe-area-inset-bottom);--db:max(8px,env(safe-area-inset-bottom))}
+#app{position:fixed;inset:0;overflow:hidden;background:var(--cv);--st:max(var(--sat,env(safe-area-inset-top)),14px);--sb:var(--sab,env(safe-area-inset-bottom));--db:max(8px,var(--sab,env(safe-area-inset-bottom)))}
 #app.frame{--st:54px;--sb:30px;--db:30px}
 .noscroll::-webkit-scrollbar,.vsc::-webkit-scrollbar,.hsc::-webkit-scrollbar{display:none}
 
@@ -197,7 +197,7 @@ textarea.fld{height:auto;min-height:120px;padding:14px;line-height:1.5;resize:no
 .view{position:absolute;inset:0;background:var(--cv);display:flex;flex-direction:column;z-index:10;visibility:hidden;transition:background-color .3s}
 .view.on,.view.vis{visibility:visible}
 .view.root{z-index:5}
-.vtop{flex:none;display:grid;grid-template-columns:44px minmax(0,1fr) 44px;grid-auto-rows:48px;align-items:center;gap:8px;padding:calc(var(--st) + 2px) 16px 4px;position:relative;z-index:3;transition:padding .2s}
+.vtop{flex:none;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);grid-auto-rows:48px;align-items:center;gap:8px;padding:calc(var(--st) + 2px) 16px 4px;position:relative;z-index:3;transition:padding .2s}
 .vtt{text-align:center;font:800 25px/1 var(--doto);text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-top:2px}
 .vtop .sp{width:44px;height:44px}
 .vsc{flex:1;overflow-y:auto;overflow-x:hidden;padding:6px 16px calc(var(--sb) + 40px);position:relative}
@@ -547,10 +547,11 @@ textarea.fld{height:auto;min-height:120px;padding:14px;line-height:1.5;resize:no
 /* ===== shell: the accent follows the space; each home page carries its own ===== */
 #app{--alert:#D71921;--on:#FFFFFF}
 #app,.hp[data-page=all]{--red:#D71921;--redtx:#D71921}
-#app[data-sp=personal],.hp[data-page=personal]{--red:#DB3A12;--redtx:#C23510}
-#app[data-sp=work],.hp[data-page=work]{--red:#C8174F;--redtx:#B5154A}
-:host([data-theme=dark]) #app[data-sp=personal],:host([data-theme=dark]) .hp[data-page=personal]{--redtx:#FF6A4D}
-:host([data-theme=dark]) #app[data-sp=work],:host([data-theme=dark]) .hp[data-page=work]{--redtx:#FF5C8A}
+:host([data-theme=dark]) #app,:host([data-theme=dark]) .hp[data-page=all]{--redtx:#FF5A4E}
+#app[data-sp=personal],.hp[data-page=personal]{--red:#00874A;--redtx:#00733F}
+#app[data-sp=work],.hp[data-page=work]{--red:#2453E6;--redtx:#2453E6}
+:host([data-theme=dark]) #app[data-sp=personal],:host([data-theme=dark]) .hp[data-page=personal]{--redtx:#3BC98A}
+:host([data-theme=dark]) #app[data-sp=work],:host([data-theme=dark]) .hp[data-page=work]{--redtx:#6E8EFF}
 .dock button.qa,.wkey,.key.red,.kb.red,.cd.r,.w.r,.spc .sd,.tg.live,.dpill,.seg button{transition:background-color .35s,color .35s,transform .18s var(--eo)}
 /* alerts are outlined, so they never read as the accent */
 .av.late{background:transparent!important;box-shadow:inset 0 0 0 2px var(--alert);color:var(--alert)!important;--fg:var(--alert)!important}
@@ -564,11 +565,9 @@ section[data-view=plan] .seg button.on{background:var(--red);color:var(--on)}
 .bkh.now .lb.fg{color:var(--redtx)}
 .bkh.now::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--red);flex:none;margin-right:-4px}
 /* the header: as high as Home's, compact once the page scrolls */
-.view.haslead .vtop{grid-template-columns:auto minmax(0,1fr) 44px}
 .vtop.compact .vtt{font-size:19px}
 .vtt{transition:font-size .2s var(--eo)}
 .vact{display:flex;gap:6px;justify-content:flex-end}
-.view:has(.vact) .vtop{grid-template-columns:44px minmax(0,1fr) auto}
 .ctxchip{display:flex;align-items:center;gap:7px;height:44px;max-width:150px;padding:0 10px;border-radius:14px;background:var(--t);text-align:left}
 .ctxchip .sd{width:8px;height:8px;border-radius:50%;background:var(--red);flex:none}
 .ctxchip .ct{display:grid;min-width:0;gap:3px}
@@ -581,3 +580,11 @@ section[data-view=plan] .seg button.on{background:var(--red);color:var(--on)}
 .ctx b{color:var(--ink);font-weight:700}
 .ctx .sd{width:8px;height:8px;border-radius:50%;background:var(--red);flex:none}
 .ctx .px{width:12px;height:12px}
+
+/* header: equal outer columns keep the title on the screen's centre line */
+.vtop>:first-child{justify-self:start;max-width:100%}
+.vtop>:last-child{justify-self:end;max-width:100%}
+.vtt{max-width:calc(100vw - 32px - 2 * 52px)}
+.ctxchip{max-width:100%;min-width:0}
+.vact{min-width:0;max-width:100%}
+.vact .ctxchip{flex:1 1 auto}

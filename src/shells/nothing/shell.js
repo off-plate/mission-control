@@ -559,6 +559,8 @@ function renderTop(e) {
   const showBack = !(e.root && !e.tile);
   $('.vtop', el).innerHTML = `${showBack ? `<button class="kb" data-a="back" aria-label="Back">${ico('back')}</button>` : d.lead ? d.lead(e.args) : '<span class="sp"></span>'}<div class="vtt">${esc(vTitle(e))}</div>${d.action ? d.action(e.args, showBack) : '<span class="sp"></span>'}`;
   el.classList.toggle('haslead', !showBack && !!d.lead);
+  /* The header row starts exactly where Home's first row does, read off Home itself. */
+  const hs = $('#home .hsc'); if (hs) $('.vtop', el).style.paddingTop = getComputedStyle(hs).paddingTop;
 }
 function renderBody(e, fresh) {
   const d = V[e.id], sc = $('.vsc', e.el), y = sc.scrollTop;

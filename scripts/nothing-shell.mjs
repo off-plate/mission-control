@@ -95,7 +95,7 @@ await step('home: swipe between spaces, the accent follows the page', async () =
   await drag('#home .hp:nth-child(3) .grid', 260)
   if ((await dot()) !== 1) throw new Error(`page dot ${await dot()} after swiping back to Personal`)
   if (new Set([all, work, pers]).size !== 3) throw new Error(`accents ${all} ${work} ${pers}`)
-  if (all.toUpperCase() !== '#D71921' || pers.toUpperCase() !== '#DB3A12' || work.toUpperCase() !== '#C8174F') throw new Error(`accents ${all} ${pers} ${work}`)
+  if (all.toUpperCase() !== '#D71921' || pers.toUpperCase() !== '#00874A' || work.toUpperCase() !== '#2453E6') throw new Error(`accents ${all} ${pers} ${work}`)
 })
 
 await step('mid-swipe each page shows its own accent', async () => {
@@ -107,18 +107,31 @@ await step('mid-swipe each page shows its own accent', async () => {
   const acc = await page.evaluate(() => { const r = document.querySelector('.nshell').shadowRoot, g = (p) => getComputedStyle(r.querySelector(`.hp[data-page="${p}"]`)).getPropertyValue('--red').trim().toUpperCase(); return { all: g('all'), personal: g('personal') } })
   await page.screenshot({ path: `${SHOTS}/light-midswipe.png` })
   await page.mouse.move(box.x + 300, box.y + 60); await page.mouse.up(); await wait(500)
-  if (acc.all !== '#D71921' || acc.personal !== '#DB3A12') throw new Error(JSON.stringify(acc))
+  if (acc.all !== '#D71921' || acc.personal !== '#00874A') throw new Error(JSON.stringify(acc))
   await drag('#home .hp:nth-child(1) .grid', -260)
   if ((await dot()) !== 1) throw new Error('not on Personal again')
 })
 
-await step('Plan, Habits and Apps headers sit as high as Home', async () => {
-  const mid = (sel) => page.locator(sel).first().evaluate((e) => { const b = e.getBoundingClientRect(); return b.top + b.height / 2 })
-  const home = await mid('#home .hp:nth-child(2) .htop')
-  const bad = []
-  for (const id of ['plan', 'habits', 'apps']) { await tap(`#dock [data-x="${id}"]`); const v = await mid('section.view.on .vtop .vtt'); if (Math.abs(v - home) > 3) bad.push(`${id} ${v} vs home ${home}`) }
-  await page.screenshot({ path: `${SHOTS}/light-apps.png` })
+await step('Plan, Habits and Apps: header row as high as Home (iPhone 15 Pro inset), title centred, at rest and scrolled', async () => {
+  await page.evaluate(() => document.querySelector('.nshell').style.setProperty('--sat', '59px')); await wait(300)
+  const R = (sel) => page.locator(sel).first().evaluate((e) => { const b = e.getBoundingClientRect(); return { top: b.top, bottom: b.bottom, mid: b.left + b.width / 2 } })
+  const home = await R('#home .hp:nth-child(2) .htop')
+  await page.screenshot({ path: `${SHOTS}/light-home-inset.png` })
+  const bad = [], vw = await page.evaluate(() => innerWidth)
+  for (const id of ['plan', 'habits', 'apps']) {
+    await tap(`#dock [data-x="${id}"]`); await wait(300)
+    for (const scroll of [0, 600]) {
+      await page.locator('section.view.on .vsc').evaluate((e, y) => { e.scrollTop = y }, scroll); await wait(350)
+      const row = await R('section.view.on .vtop > :first-child'), top = await R('section.view.on .vtop'), title = await R('section.view.on .vtt')
+      if (Math.abs(row.top - (home.top + 2)) > 2 && Math.abs(row.top - home.top) > 2) bad.push(`${id}@${scroll} row ${row.top} vs home ${home.top}`)
+      if (top.bottom - row.bottom > 8) bad.push(`${id}@${scroll} header block ends ${top.bottom - row.bottom}px below its row`)
+      if (Math.abs(title.mid - vw / 2) > 1) bad.push(`${id}@${scroll} title centre ${title.mid} vs ${vw / 2}`)
+      await page.screenshot({ path: `${SHOTS}/light-${id}-${scroll ? 'scrolled' : 'top'}.png` })
+    }
+    await page.locator('section.view.on .vsc').evaluate((e) => { e.scrollTop = 0 })
+  }
   await tap('#dock [data-x="home"]')
+  await page.evaluate(() => document.querySelector('.nshell').style.removeProperty('--sat'))
   if (bad.length) throw new Error(bad.join(' | '))
 })
 
@@ -379,6 +392,8 @@ await step('dark: the Nothing Dark look', async () => {
   await page.screenshot({ path: `${SHOTS}/dark-home.png` })
   await tap('#dock [data-x="plan"]'); await page.screenshot({ path: `${SHOTS}/dark-plan.png` })
   await tap('#dock [data-x="habits"]'); await page.screenshot({ path: `${SHOTS}/dark-habits.png` })
+  await page.locator('section.view.on .vsc').evaluate((e) => { e.scrollTop = 600 }); await wait(300); await page.screenshot({ path: `${SHOTS}/dark-habits-scrolled.png` })
+  await tap('#dock [data-x="apps"]'); await page.screenshot({ path: `${SHOTS}/dark-apps.png` })
 })
 
 await step('switch back to Classic, the classic app returns with the same data', async () => {

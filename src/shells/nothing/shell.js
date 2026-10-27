@@ -1641,13 +1641,14 @@ A.runRoutine = (el, id) => { const t = el.closest('.w'); open('runner', { id }, 
 /* ---------- quick add ---------- */
 const QA_TYPES = [['task', 'Task', 'list'], ['habit', 'Habit log', 'habits'], ['note', 'Note', 'note'], ['focus', 'Focus', 'zone'], ['contact', 'Contact', 'person'], ['expense', 'Expense', 'money']];
 A.quickAdd = () => {
-  S.ui.qa = S.ui.qa || { type: 'task', habit: (S.habits.find(h => h.kind === 'measured' && !h.auto) || {}).id, person: (S.people[0] || {}).id, channel: 'call' };
+  S.ui.qa = S.ui.qa || { type: 'task', day: 0, slot: null, habit: (S.habits.find(h => h.kind === 'measured' && !h.auto) || {}).id, person: (S.people[0] || {}).id, channel: 'call' };
   sheet('qa', {
     title: 'Add', live: true, focus: '#qat', body: () => {
       const q = S.ui.qa, ph = { task: 'What needs doing?', habit: 'How many?', note: 'Write it down', focus: 'What are you focusing on?', contact: 'How did it go? (optional)', expense: 'What was it, and how much?' }[q.type];
       const extra = q.type === 'habit' ? `<div class="chips" style="margin-top:10px">${S.habits.filter(h => h.kind === 'measured' && !h.auto).map(h => `<button class="chip ${q.habit === h.id ? 'on' : ''}" data-a="qaHabit" data-x="${h.id}">${esc(h.name)}</button>`).join('')}</div>`
         : q.type === 'contact' ? `<div class="chips" style="margin-top:10px">${S.people.slice(0, 8).map(p => `<button class="chip ${q.person === p.id ? 'on' : ''}" data-a="qaPerson" data-x="${p.id}">${esc(p.name)}</button>`).join('')}</div><div class="chips" style="margin-top:6px">${['inperson', 'call', 'message', 'video', 'email'].map(c => `<button class="chip ${q.channel === c ? 'on' : ''}" data-a="qaChan" data-x="${c}">${c === 'inperson' ? 'In person' : c}</button>`).join('')}</div>`
-          : q.type === 'focus' ? `<div class="chips" style="margin-top:10px">${[15, 25, 45, 60].map(m => `<button class="chip ${(q.min || 25) === m ? 'on' : ''}" data-a="qaMin" data-x="${m}">${m} min</button>`).join('')}</div>` : '';
+          : q.type === 'focus' ? `<div class="chips" style="margin-top:10px">${[15, 25, 45, 60].map(m => `<button class="chip ${(q.min || 25) === m ? 'on' : ''}" data-a="qaMin" data-x="${m}">${m} min</button>`).join('')}</div>`
+            : q.type === 'task' ? `<div class="lb" style="margin-top:14px">When</div><div class="chips" style="margin-top:6px">${[0, 1, 2, 3, 4, 5, 6].map(d => `<button class="chip ${q.day === d ? 'on' : ''}" data-a="qaDay" data-x="${d}">${dayShort(d)}</button>`).join('')}<button class="chip ${q.day === null ? 'on' : ''}" data-a="qaDay" data-x="none">NO DATE</button></div>${q.day === null ? '' : `<div class="lb" style="margin-top:12px">Part of the day</div><div class="chips" style="margin-top:6px">${[[null, 'ANY TIME'], ['morning', 'MORNING'], ['noon', 'NOON'], ['afternoon', 'AFTERNOON'], ['evening', 'EVENING']].map(([v, l]) => `<button class="chip ${q.slot === v ? 'on' : ''}" data-a="qaSlot" data-x="${v || 'any'}">${l}</button>`).join('')}</div>`}` : '';
       return `<div class="chips" role="tablist">${QA_TYPES.map(([id, l, ic]) => `<button class="chip ${q.type === id ? 'on' : ''}" data-a="qaType" data-x="${id}">${ico(ic)}${l}</button>`).join('')}</div>
       <div class="hstack" style="margin-top:12px"><input class="fld" id="qat" placeholder="${ph}" value="${esc(q.text || '')}" data-enter="qaGo" ${q.type === 'habit' ? 'inputmode="numeric"' : ''}><button class="kb ${q.listening ? 'red' : ''}" data-a="qaMic" aria-label="Dictate">${q.listening ? `<span class="wave"><i></i><i></i><i></i><i></i></span>` : ico('mic')}</button></div>${extra}
       ${['task', 'habit', 'note'].includes(q.type) ? `<button class="ctx" style="margin:12px 0 0" data-a="ctxSpace"><span class="sd"></span>Adding to<b>${esc(spLabel(wsp()))}${q.type === 'task' ? ', ' + esc(projFor(wsp()) ? projFor(wsp()).name : 'Unsorted') : ''}</b>${ico('down')}</button>` : ''}`;
@@ -1659,11 +1660,18 @@ A.qaHabit = (el, h) => { S.ui.qa.text = $('#qat').value; S.ui.qa.habit = h; repa
 A.qaPerson = (el, p) => { S.ui.qa.text = $('#qat').value; S.ui.qa.person = p; repaintSheets(); };
 A.qaChan = (el, c) => { S.ui.qa.text = $('#qat').value; S.ui.qa.channel = c; repaintSheets(); };
 A.qaMin = (el, m) => { S.ui.qa.text = $('#qat').value; S.ui.qa.min = +m; repaintSheets(); };
+A.qaDay = (el, d) => { S.ui.qa.text = $('#qat').value; S.ui.qa.day = d === 'none' ? null : +d; repaintSheets(); };
+A.qaSlot = (el, v) => { S.ui.qa.text = $('#qat').value; S.ui.qa.slot = v === 'any' ? null : v; repaintSheets(); };
 A.qaMic = () => toast('Dictation is not wired into this look yet. The keyboard mic works.');
 A.qaGo = () => {
   const q = S.ui.qa, v = ($('#qat').value || '').trim();
   const sp = wsp(), pj = projFor(sp);
-  if (q.type === 'task') { if (!v) return; B.store().addTask({ title: v, source: 'mc', estimateMin: 0, space: sp, projectId: pj ? pj.id : undefined, list: 'backlog', category: 'quick' }); toast('Added to the to-do list', { act: 'goPlanTodo', actLabel: 'See it' }); }
+  if (q.type === 'task') {
+    if (!v) return;
+    const dated = q.day !== null && q.day !== undefined;
+    B.store().addTask({ title: v, source: 'mc', estimateMin: 0, space: sp, projectId: pj ? pj.id : undefined, list: dated ? 'today' : 'backlog', ...(dated ? { plannedOn: isoOff(q.day), ...(q.slot ? { slot: q.slot } : {}) } : {}), category: 'quick' });
+    toast(dated ? 'On ' + dayShort(q.day).toLowerCase() + (q.slot ? ', ' + q.slot : '') : 'Added to the to-do list', { act: dated ? 'goPlan' : 'goPlanTodo', actLabel: 'See it' });
+  }
   if (q.type === 'habit') { if (!q.habit) return; const h = habit(q.habit); const n = h.measure === 'amount' ? (+v || (h.presets || [1])[0]) : 1; A.logAmount(null, q.habit + ':' + n); }
   if (q.type === 'note') { if (!v) return; B.addNote(sp, v); toast('Note saved', { act: 'goNotes', actLabel: 'Open' }); }
   if (q.type === 'focus') { startFocus({ label: v || 'Focus block', min: q.min || 25 }); }
@@ -1672,6 +1680,7 @@ A.qaGo = () => {
   q.text = ''; closeSheet('qa'); refresh();
 };
 A.goPlanTodo = () => { A.toastX(); S.ui.planSeg = 'todo'; tab('plan'); };
+A.goPlan = () => { A.toastX(); S.ui.planSeg = 'day'; S.ui.planDay = (S.ui.qa && S.ui.qa.day) || 0; tab('plan'); };
 A.goNotes = () => { A.toastX(); open('notes'); };
 A.jarvis = () => B.openClassic('assistant');
 

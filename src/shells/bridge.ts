@@ -257,7 +257,7 @@ export function toMC(inp: ShellInput) {
   const ledgerToday = s.ledger.filter((l) => l.when === today && l.actualMin != null)
 
   /* ---- calendar, weather, health ---- */
-  const calendar = cal.status === 'ok' ? cal.events.filter((e) => e.day >= today).map((e) => ({
+  const calendar = cal.status === 'ok' ? cal.events.map((e) => ({
     day: e.day, title: e.title, where: e.where ?? '', allDay: e.allDay || e.start == null,
     start: e.start == null ? '00:00' : hhmm(e.start), end: e.start == null ? '23:59' : hhmm(e.end ?? e.start + 60),
   })) : []
@@ -338,7 +338,7 @@ export function toMC(inp: ShellInput) {
     focusToday, focusWeek, pomo, momentum,
     timeSaved: { weekMin: s.savedMin, todaySavedMin: ledgerToday.reduce((a, l) => a + (l.estimateMin - (l.actualMin ?? l.estimateMin)), 0) },
     exceptions: { all: exc.map(mapExc), personal: excP.map(mapExc), work: excW.map(mapExc) },
-    calendar, calNote: cal.status === 'ok' ? 'Nothing ahead in the next month.' : 'The calendar is not connected on this device.', weather: wx, health: healthMC, gym, dayDots,
+    calendar, calStatus: cal.status, calRange: { from: today, to: addDays(today, 30) }, calNote: cal.status === 'ok' ? '' : cal.status === 'loading' ? 'Reading the calendar.' : 'The calendar is not connected on this device.', weather: wx, health: healthMC, gym, dayDots,
     why: WALL.filter((c) => c.kind !== 'image'),
     dailyReview, dailyDone: !(everLogged && s.dailyDone !== today && s.dailySkipped !== today),
     returned: s.plan.returnedOn === today ? (s.plan.returnedIds ?? []) : [],
@@ -390,7 +390,13 @@ export interface ShellApi {
 export function useShellBridge(skin: SkinId): { mc: MC; api: ShellApi } {
   const s = useStore()
   const pomo = usePomodoro()
-  const { state: cal, reload: reloadCal } = useCalendar()
+  const { state: realCal, reload: reloadCal } = useCalendar()
+  /* ?noremote is the app's own test mode (it can never reach live data), and there the calendar is always "off". The shell's test
+     puts a fixed set of events here so the month grid has something to draw; it is ignored everywhere else. */
+  const cal = useMemo<CalState>(() => {
+    try { const raw = /[?&]noremote/.test(location.search) ? localStorage.getItem('mc-shell-test-calendar') : null; if (raw) return { status: 'ok', events: JSON.parse(raw), readAt: Date.now() } } catch { /* fall through */ }
+    return realCal
+  }, [realCal])
   const { state: health } = useHealth()
   const { state: compass } = useCompass()
   const sync = useSyncStatus()

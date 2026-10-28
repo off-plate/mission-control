@@ -61,6 +61,9 @@ const step = async (name, fn, o = {}) => {
 const blob = () => page.evaluate((K) => JSON.parse(localStorage.getItem(K) ?? '{}'), KEY)
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 const wait = (ms) => page.waitForTimeout(ms)
+const raf2 = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+const click = (sel) => page.evaluate((q) => { const e = document.querySelector('.nshell').shadowRoot.querySelector(q); if (!e) throw new Error('missing ' + q); e.click() }, sel)
+const viewReady = (id) => page.waitForFunction((v) => { const x = document.querySelector('.nshell').shadowRoot.querySelector(`section.view.on[data-view="${v}"]`); return !!x && !x.querySelector('.skel') && !x.querySelector('.morphclone') }, id, { timeout: 5000 })
 /* The gesture layer takes mouse drags the same way it takes touch. */
 const drag = async (sel, dx, dy = 0) => {
   const box = await page.locator(sel).first().boundingBox()
@@ -99,6 +102,16 @@ await page.evaluate(({ K, day }) => {
     ...Array.from({ length: 10 }, (_, i) => t(`nv-d${i}`, long(i), 'today', { slot: ['morning', 'noon', 'afternoon', 'evening'][i % 4], addedAt: Date.now() - 1e6 })),
     ...Array.from({ length: 45 }, (_, i) => t(`nv-b${i}`, i % 3 ? `Backlog ${i} ${long(i)}` : `Short ${i}`, 'backlog', { addedAt: Date.now() - (i + 2) * 864e5, category: ['call', 'admin', 'deep', 'quick'][i % 4] }))]
   s.dailySkipped = day
+  {
+    const d = new Date(), dom = d.getDate(), ymd = (n) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(n).padStart(2, '0')}`
+    const nowMin = d.getHours() * 60 + d.getMinutes(), b = dom > 1 ? dom - 1 : dom + 1, c = dom > 3 ? dom - 3 : dom + 3
+    const ev = (n, title, start, end, extra) => ({ uid: `t-${n}-${title}`, day: ymd(n), start, end, title, where: 'Office', allDay: false, people: [], ...extra })
+    localStorage.setItem('mc-shell-test-calendar', JSON.stringify([
+      ev(dom, 'Standup, Big Time', 5, 15), ev(dom, 'Interior studio call', Math.max(0, nowMin - 10), Math.min(1439, nowMin + 50)),
+      ev(b, 'Offsite day', null, null, { allDay: true, where: '' }),
+      ev(c, 'Retail sync', 540, 600), ev(c, 'Design review', 660, 720), ev(c, 'Lunch with Petra', 750, 810), ev(c, 'Gym, push day', 1110, 1180),
+    ]))
+  }
   const ago = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
   const g = (id, name, extra) => ({ id, space: 'personal', name, current: 0, target: 1, unit: 'steps', note: '', timeframe: 'quarter', category: 'life', ...extra })
   s.habits = [...s.habits, { id: 'h-quit-seed', space: 'personal', name: 'Late-night scrolling', kind: 'break', quitSince: ago(10), days: [false, false, false, false, false, false, false], paused: false, frequency: 'daily' }]
@@ -491,6 +504,100 @@ await step('daily review: Quitting buttons fit and write the slip; Start the day
   await tap('#dock [data-x="home"]'); await wait(300); await goHome(1)
 })
 
+/* ---- Calendar: a month grid, then the day ---- */
+const calSnap = (days = []) => page.evaluate((days) => {
+  const R = document.querySelector('.nshell').shadowRoot, v = R.querySelector('section.view.on'), cur = v.querySelector('.calm.cur'), cells = [...cur.querySelectorAll('.cday')]
+  const first = cells.find((c) => !c.classList.contains('out')), r = first.getBoundingClientRect(), today = cur.querySelector('.cday.today')
+  const ind = {}; for (const iso of days) { const c = cur.querySelector(`.cday[data-iso="${iso}"]`); ind[iso] = c ? { dots: c.querySelectorAll('.cind i').length, plus: !!c.querySelector('.cind u'), bar: !!c.querySelector('.cbar') } : null }
+  return {
+    month: v.querySelector('#calmonth').textContent.trim(), cells: cells.length, weekdays: cur.querySelectorAll('.cwd').length, weeks: cur.querySelectorAll('.cwk').length,
+    radius: parseFloat(getComputedStyle(first).borderTopLeftRadius), side: r.width, today: today ? { bg: getComputedStyle(today).backgroundColor, fg: getComputedStyle(today.querySelector('.cn')).color } : null,
+    accent: getComputedStyle(R.querySelector('#app')).getPropertyValue('--red').trim(), rows: [...v.querySelectorAll('#calrows .row')].map((x) => ({ t: x.querySelector('.rt').textContent, now: !!x.querySelector('.nowtag'), past: x.classList.contains('past'), allDay: /all day/i.test(x.querySelector('.ctm').textContent), write: !!x.querySelector('[data-a="writeUp"]') })),
+    empty: !!v.querySelector('#calrows .empty'), chip: !!v.querySelector('.vtop .ctxchip'), note: v.querySelector('.calnote').textContent.trim(), ind,
+    sel: (cur.querySelector('.cday.on') || {}).dataset ? cur.querySelector('.cday.on').dataset.iso : null, title: v.querySelector('.vtt').getBoundingClientRect(), vw: innerWidth,
+  }}, days)
+let calSeed = null
+const calDays = () => page.evaluate(() => { const d = new Date(), dom = d.getDate(), y = (n) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(n).padStart(2, '0')}`; return { today: y(dom), allDay: y(dom > 1 ? dom - 1 : dom + 1), busy: y(dom > 3 ? dom - 3 : dom + 3), quiet: y(dom > 15 ? 5 : 20) } })
+await step('calendar: a month grid with today in the accent, event dots, and the selected day under it', async () => {
+  await click('#dock [data-x="apps"]'); await wait(400)
+  await click('[data-a="drawerOpen"][data-x="calendar"]'); await viewReady('calendar'); await wait(450)
+  const d = await calDays(), sn = await calSnap([d.today, d.allDay, d.busy, d.quiet]), rgb = (h) => 'rgb(' + [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).join(', ') + ')'
+  if (sn.cells !== 42 || sn.weekdays !== 7 || sn.weeks !== 6) throw new Error(`grid ${sn.cells} cells, ${sn.weekdays} weekdays, ${sn.weeks} week numbers`)
+  if (!(sn.radius > 6 && sn.radius < sn.side / 2 - 6)) throw new Error(`cell radius ${sn.radius} on a ${sn.side}px cell`)
+  if (!sn.today || sn.today.bg !== rgb(sn.accent) || sn.today.fg !== 'rgb(255, 255, 255)') throw new Error(`today cell ${JSON.stringify(sn.today)} vs accent ${sn.accent}`)
+  if (sn.ind[d.today].dots !== 2) throw new Error(`today dots ${JSON.stringify(sn.ind[d.today])}`)
+  if (!sn.ind[d.allDay].bar) throw new Error('no bar for the all-day event')
+  const busy = sn.ind[d.busy]; if (busy.dots !== 3 || !busy.plus) throw new Error(`four events should be three dots and a plus: ${JSON.stringify(busy)}`)
+  if (sn.ind[d.quiet].dots !== 0) throw new Error('a quiet day has dots')
+  if (Math.abs(sn.title.left + sn.title.width / 2 - sn.vw / 2) > 1) throw new Error('title off centre')
+  if (sn.chip) throw new Error('the Today chip shows while on today')
+  if (!/feed covers/i.test(sn.note)) throw new Error(`note: ${sn.note}`)
+  if (sn.rows.length !== 2 || !sn.rows.every((r) => r.write)) throw new Error(`today rows ${JSON.stringify(sn.rows)}`)
+  if (!sn.rows.some((r) => r.now)) throw new Error('no NOW tag on the live event')
+  await wait(500); await page.screenshot({ path: `${SHOTS}/light-calendar.png` })
+  /* tapping days swaps the agenda in place */
+  await click(`.calm.cur .cday[data-iso="${d.allDay}"]`); await wait(300)
+  let a = await calSnap(); if (a.rows.length !== 1 || !a.rows[0].allDay || a.sel !== d.allDay) throw new Error(`all-day agenda ${JSON.stringify(a.rows)}`)
+  if (!a.chip) throw new Error('no Today chip off today')
+  await click(`.calm.cur .cday[data-iso="${d.busy}"]`); await wait(300)
+  a = await calSnap(); if (a.rows.length !== 4) throw new Error(`busy day shows ${a.rows.length} rows`)
+  if (!a.rows.every((r) => r.past || d.busy > d.today)) throw new Error('past rows are not dimmed')
+  await click(`.calm.cur .cday[data-iso="${d.quiet}"]`); await wait(300)
+  a = await calSnap(); if (!a.empty) throw new Error('an empty day has no empty state')
+  await page.screenshot({ path: `${SHOTS}/light-calendar-empty-day.png` })
+  await click('section.view.on [data-a="calToday"]'); await wait(400)
+  a = await calSnap(); if (a.chip || a.sel !== d.today || a.rows.length !== 2) throw new Error('the Today chip did not bring today back')
+})
+
+await step('calendar: swipe and arrows change the month, ends are held, Today returns', async () => {
+  const label = async () => (await calSnap()).month
+  const start = await label()
+  const info = await page.evaluate(() => ({ next: !document.querySelector('.nshell').shadowRoot.querySelector('section.view.on [data-a="calNext"]').disabled, prev: !document.querySelector('.nshell').shadowRoot.querySelector('section.view.on [data-a="calPrev"]').disabled }))
+  if (info.prev) throw new Error('can go before the feed')
+  await drag('.calvp', 260); await wait(300)
+  if ((await label()) !== start) throw new Error('swiped back past the start of the feed')
+  await drag('.calvp', -260); await wait(500)
+  const after = await label()
+  if (info.next) {
+    if (after === start) throw new Error('swipe did not change the month')
+    await page.screenshot({ path: `${SHOTS}/light-calendar-next.png` })
+    if (!(await calSnap()).chip) throw new Error('no Today chip in another month')
+    await click('section.view.on [data-a="calToday"]'); await wait(600)
+    if ((await label()) !== start || (await calSnap()).chip) throw new Error('Today did not bring the month back')
+    await click('section.view.on [data-a="calNext"]'); await wait(500)
+    if ((await label()) !== after) throw new Error('the arrow did not move the month')
+    await click('section.view.on [data-a="calPrev"]'); await wait(500)
+    if ((await label()) !== start) throw new Error('the back arrow did not return')
+    await click('section.view.on [data-a="calNext"]'); await click('section.view.on [data-a="calNext"]'); await wait(600)
+    if ((await label()) !== after) throw new Error('arrows are not held at the end of the feed')
+    await click('section.view.on [data-a="calToday"]'); await wait(600)
+  } else if (after !== start) throw new Error('the month moved though the feed ends this month')
+})
+
+await step('calendar: not connected still shows the empty month with today marked, and says so', async () => {
+  calSeed = await page.evaluate(() => { const v = localStorage.getItem('mc-shell-test-calendar'); localStorage.removeItem('mc-shell-test-calendar'); return v }); await page.reload(); await wait(2200)
+  await click('#dock [data-x="apps"]'); await wait(400); await click('[data-a="drawerOpen"][data-x="calendar"]'); await viewReady('calendar'); await wait(450)
+  const sn = await calSnap()
+  if (sn.cells !== 42 || !sn.today || !/not connected/i.test(sn.note) || !sn.empty) throw new Error(`${sn.cells} cells, today ${!!sn.today}, note "${sn.note}"`)
+  await page.screenshot({ path: `${SHOTS}/light-calendar-off.png` })
+})
+
+await step('Bills: every door goes straight to the real Bills page', async () => {
+  if (calSeed) await page.evaluate((v) => localStorage.setItem('mc-shell-test-calendar', v), calSeed)
+  await page.reload(); await wait(2200)
+  await click('#dock [data-x="apps"]'); await wait(400)
+  await click('[data-a="drawerOpen"][data-x="bills"]'); await wait(1200)
+  if (await page.locator('.nshell').count()) throw new Error('the Apps tile stayed in the shell')
+  if (!/bills/.test(await page.evaluate(() => location.hash))) throw new Error(`hash ${await page.evaluate(() => location.hash)}`)
+  await page.evaluate(() => { location.hash = '#/today' }); await wait(1800)
+  if (!(await page.locator('.nshell').count())) throw new Error('the shell did not come back')
+  await goHome(0)
+  const t = await page.locator('#home .hp:nth-child(1) [data-type="bills"]').count() ? '#home .hp:nth-child(1) [data-type="bills"]' : null
+  if (t) { await click(t); await wait(1200); if (await page.locator('.nshell').count()) throw new Error('the Bills widget stayed in the shell'); await page.evaluate(() => { location.hash = '#/today' }); await wait(1800) }
+  if (!(await page.evaluate(() => !document.querySelector('.nshell').shadowRoot.querySelector('section[data-view="bills"]')))) throw new Error('a shell Bills view still exists')
+  await goHome(1)
+})
+
 const homeTypes = () => page.locator('#home .hp:nth-child(2) .grid > .w').evaluateAll((ws) => ws.map((w) => w.dataset.type + ':' + [...w.classList].find((c) => /^s\d\d$/.test(c))))
 let edited = null
 await step('edit mode: long-press, resize, remove + undo, add from gallery, drag, Done', async () => {
@@ -568,9 +675,6 @@ const overflow = () => page.evaluate(() => {
   for (const el of r.querySelectorAll('#app, section.view.on .vsc, .sheet.on .sh-b, #home .hp .hsc')) if (el.scrollWidth > el.clientWidth + 1) bad.push(el.className || el.id)
   return bad
 })
-const raf2 = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
-const click = (sel) => page.evaluate((q) => { const e = document.querySelector('.nshell').shadowRoot.querySelector(q); if (!e) throw new Error('missing ' + q); e.click() }, sel)
-const viewReady = (id) => page.waitForFunction((v) => { const x = document.querySelector('.nshell').shadowRoot.querySelector(`section.view.on[data-view="${v}"]`); return !!x && !x.querySelector('.skel') && !x.querySelector('.morphclone') }, id, { timeout: 5000 })
 await step('every form control is 16px or more, nothing is wider than the screen (375 and 390), on every view', async () => {
   const bad = []
   const audit = async (tag) => {
@@ -586,7 +690,7 @@ await step('every form control is 16px or more, nothing is wider than the screen
   await click('#dock [data-x="plan"]'); await wait(300)
   for (const id of ['projects', 'search']) { await click(`section.view.on [data-a="open"][data-x="${id}"]`); await viewReady(id); await wait(430); await audit(id); await click('section.view.on [data-a="back"]'); await wait(400) }
   await click('#dock [data-x="apps"]'); await wait(300)
-  const drawer = ['calendar', 'notes', 'ideas', 'people', 'bills', 'jar', 'zone', 'focus', 'jarvis', 'weather', 'settings']
+  const drawer = ['calendar', 'notes', 'ideas', 'people', 'jar', 'zone', 'focus', 'jarvis', 'weather', 'settings']
   for (const id of drawer) {
     await click(`[data-a="drawerOpen"][data-x="${id}"]`); await viewReady(id); await wait(430); await audit(id)
     if (id === 'jar') for (const j of ['health', 'gym', 'why']) { await click(`section.view.on [data-a="jarGo"][data-x="${j}"]`); await viewReady(j); await raf2(); await audit(j) }
@@ -790,6 +894,7 @@ await step('dark: the Nothing Dark look', async () => {
   await page.locator('section.view.on .vsc').evaluate((e) => { e.scrollTop = 600 }); await wait(300); await page.screenshot({ path: `${SHOTS}/dark-habits-scrolled.png` })
   await tap('#dock [data-x="habits"]'); await tap('section.view.on .vtop .ctxchip'); await wait(450); await page.screenshot({ path: `${SHOTS}/dark-habits-picker.png` }); await tap('.sheet.on [data-a="sheetX"]'); await wait(400)
   await tap('#dock [data-x="apps"]'); await page.screenshot({ path: `${SHOTS}/dark-apps.png` })
+  await click('[data-a="drawerOpen"][data-x="calendar"]'); await viewReady('calendar'); await wait(600); await page.screenshot({ path: `${SHOTS}/dark-calendar.png` }); await click('section.view.on [data-a="back"]'); await wait(450)
   await tap('[data-a="drawerOpen"][data-x="jarvis"]'); await wait(900)
   await page.screenshot({ path: `${SHOTS}/dark-jarvis.png` })
   await tap('section.view.on [data-a="back"]'); await wait(500)

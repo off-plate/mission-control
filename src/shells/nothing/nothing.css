@@ -660,3 +660,30 @@ section[data-view=daily] .vsc>div{flex:1;min-height:0;display:flex;flex-directio
 .ctxchip.one{gap:8px;padding:0 12px}
 .ctxchip.one .ct{display:block;min-width:0}
 .ctxchip.one .px{width:12px;height:12px;flex:none}
+
+/* ===== calendar: a month grid, then the day ===== */
+.calbar{margin:2px 0 10px;gap:6px}
+.calmonth{font-size:22px;white-space:nowrap}
+.calvp{position:relative;overflow:hidden;height:calc(22px + 6 * 50px + 6 * 4px);touch-action:pan-y;margin:0 -4px;padding:0 4px}
+.calm{position:absolute;inset:0 4px}
+.cgrid{display:grid;grid-template-columns:20px repeat(7,minmax(0,1fr));gap:4px;grid-auto-rows:50px;grid-template-rows:22px}
+.cwd,.cwk{display:grid;place-items:center;font:700 10px/1 var(--mono);letter-spacing:.06em;color:var(--dim)}
+.cwk{font-size:9px;opacity:.7}
+.cwd.we{opacity:.7}
+.cday{border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font:700 14px/1 var(--mono);color:var(--ink);background:var(--t);min-width:0;transition:background-color .2s,color .2s,transform .18s var(--eo)}
+.cday:active{transform:scale(.94)}
+.cday.we .cn{color:var(--dim)}
+.cday.out{background:transparent;opacity:.28;pointer-events:none}
+.cday.today{background:var(--red);color:var(--on)}
+.cday.today .cn{color:var(--on)}
+.cday.on:not(.today){background:var(--ink);color:var(--cv)}
+.cday.on:not(.today) .cn{color:var(--cv)}
+.cind{height:6px;display:flex;align-items:center;justify-content:center;gap:3px}
+.cind i{width:4px;height:4px;border-radius:50%;background:currentColor}
+.cind u{text-decoration:none;font:700 8px/1 var(--mono);margin-left:-1px}
+.cbar{width:9px;height:3px;border-radius:1px;background:currentColor}
+.calnote{margin:10px 4px 0;white-space:normal;text-transform:none;letter-spacing:.02em}
+.ctm{width:52px;flex:none}
+.row.past{opacity:.5}
+.nowtag{background:var(--red);color:var(--on);border-radius:6px;padding:3px 6px;font:700 9px/1 var(--mono);letter-spacing:.07em;text-transform:uppercase}
+#calag{margin-top:14px}

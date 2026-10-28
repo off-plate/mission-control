@@ -577,7 +577,7 @@ function setChrome() {
 
 /* open a view. from = a widget tile element for the morph; push = slide in from the right */
 /* Pages this look does not draw itself: they open the real page in the classic app. */
-const CLASSIC_V = { longevity: 'longevity', watchless: 'watchless', skills: 'skills' };
+const CLASSIC_V = { bills: 'bills', longevity: 'longevity', watchless: 'watchless', skills: 'skills' };
 function open(id, args = {}, from = null) {
   if (CLASSIC_V[id]) { B.openClassic(CLASSIC_V[id]); return; }
   if (!V[id]) { console.warn('no view', id); return; }
@@ -983,7 +983,7 @@ W.bills = {
   render(sz, sp, inst) { if (!S.bills) return `<div class="wi" style="justify-content:space-between">${lb('Bills')}<div class="wt">Sign in to see bills.</div></div>`; const od = billsOverdue().length; return `<div class="wi" style="justify-content:space-between">${lbRow('Bills', od ? od + ' overdue' : 'on track', od ? 'fg' : '')}${dm(kc(billsLeft()), 3.3, { k: inst.id })}${lb('Kč left this month')}</div>`; }
 };
 W.debt = {
-  name: 'Debt', sizes: ['11'], tone: 'k', circ: true, open: 'bills', openArgs: { at: 'debts' },
+  name: 'Debt', sizes: ['11'], tone: 'k', circ: true, open: 'bills',
   render(sz, sp, inst) { const p = S.bills ? S.bills.debtPaidPct : 0; return `${dring({ n: 30, on: p / 100 * 30, size: CELL, r: 1.7, pad: 5, k: inst.id })}<div class="wcenter"><div style="display:grid;justify-items:center;gap:5px">${dm(S.bills ? p + '%' : '-', 2.6)}<div class="lb" style="font-size:8px">${S.bills ? 'Paid' : 'Debt'}</div></div></div>`; }
 };
 W.notes = {
@@ -2296,24 +2296,115 @@ A.brkLen = (el, m) => B.pomo().setBreakMin(+m);
    business pipeline), Bills, Weather
    ===================================================================== */
 
-/* ---------------- CALENDAR ---------------- */
+/* ---------------- CALENDAR: a month grid with the day's agenda under it ---------------- */
+const calIso = (y, m, d) => y + '-' + pad(m + 1) + '-' + pad(d);
+const calIsoWeek = d => { const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7)); return Math.ceil(((+t - +new Date(Date.UTC(t.getUTCFullYear(), 0, 1))) / 86400000 + 1) / 7); };
+const calMonthIdx = (y, m) => y * 12 + m;
+function calBounds() {
+  /* The feed hands over today and the next 30 days, nothing behind it: that is the whole range, said as it is. */
+  const t = NOW(), a = calMonthIdx(t.getFullYear(), t.getMonth()), end = MC.calRange ? new Date(MC.calRange.to + 'T12:00:00') : new Date(t.getFullYear(), t.getMonth(), t.getDate() + 30);
+  return { min: a, max: Math.max(a, calMonthIdx(end.getFullYear(), end.getMonth())) };
+}
+const calCur = () => S.ui.calMonth;
+function calByDay() { const m = {}; MC.calendar.forEach(e => { (m[e.day] = m[e.day] || []).push(e); }); return m; }
+function calPane(y, m, cls) {
+  const by = calByDay(), t0 = isoOff(0), sel = S.ui.calSel, first = new Date(y, m, 1), off = (first.getDay() + 6) % 7;
+  const wk = ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => `<span class="cwd ${i > 4 ? 'we' : ''}">${d}</span>`).join('');
+  let cells = '';
+  for (let r = 0; r < 6; r++) {
+    const mon = new Date(y, m, 1 - off + r * 7);
+    cells += `<span class="cwk">${calIsoWeek(mon)}</span>`;
+    for (let c = 0; c < 7; c++) {
+      const d = new Date(y, m, 1 - off + r * 7 + c), inM = d.getMonth() === m, iso = calIso(d.getFullYear(), d.getMonth(), d.getDate()), es = by[iso] || [];
+      const allDay = es.some(e => e.allDay), timed = es.filter(e => !e.allDay).length, dots = Math.min(3, timed), more = timed > 3;
+      const ind = es.length ? `<span class="cind">${allDay ? '<b class="cbar"></b>' : ''}${'<i></i>'.repeat(dots)}${more ? '<u>+</u>' : ''}</span>` : '<span class="cind"></span>';
+      cells += `<button class="cday ${inM ? '' : 'out'} ${c > 4 ? 'we' : ''} ${iso === t0 ? 'today' : ''} ${iso === sel && inM ? 'on' : ''}" ${inM ? `data-a="calPick" data-x="${iso}" aria-label="${d.getDate()} ${MONTHL[m]}${es.length ? ', ' + es.length + ' events' : ''}"` : 'tabindex="-1" aria-hidden="true"'} data-iso="${iso}"><span class="cn">${d.getDate()}</span>${inM ? ind : ''}</button>`;
+    }
+  }
+  return `<div class="calm ${cls || ''}" data-m="${calMonthIdx(y, m)}"><div class="cgrid"><span></span>${wk}${cells}</div></div>`;
+}
+function calAgendaHTML() {
+  const sel = S.ui.calSel, es = (calByDay()[sel] || []).slice().sort((a, b) => (b.allDay - a.allDay) || a.start.localeCompare(b.start)), t0 = isoOff(0), nm = minsOfDay(NOW()), mm = x => +x.slice(0, 2) * 60 + +x.slice(3);
+  const d = new Date(sel + 'T12:00:00'), when = sel === t0 ? 'Today' : sel === isoOff(1) ? 'Tomorrow' : DAYL[(d.getDay() + 6) % 7];
+  const rows = es.map(e => {
+    const live = sel === t0 && !e.allDay && mm(e.start) <= nm && mm(e.end) > nm, past = sel < t0 || (sel === t0 && !e.allDay && mm(e.end) <= nm);
+    return `<div class="row ${past ? 'past' : ''}"><div class="ctm">${e.allDay ? lb('All day', 'fg') : lb(e.start, 'fg') + lb(e.end)}</div><div class="grow"><div class="rt">${esc(e.title)}</div><div class="rs">${e.where ? `<span>${esc(e.where)}</span>` : ''}${live ? '<span class="nowtag">Now</span>' : ''}</div></div><button class="key xs t" data-a="writeUp" data-x="${esc(e.title)}">Write it up</button></div>`;
+  }).join('');
+  return `<div class="agh">${dm(d.getDate(), 4)}<div><div class="lb fg">${when}</div><div class="lb">${es.length ? es.length + (es.length === 1 ? ' event' : ' events') : MONTHL[d.getMonth()] + ' ' + d.getFullYear()}</div></div></div><div class="cd tight rows scan" id="calrows">${rows || '<div class="empty">Nothing on this day.</div>'}</div>`;
+}
+function calNote() {
+  if (MC.calStatus !== 'ok') return MC.calNote;
+  const f = new Date(MC.calRange.from + 'T12:00:00'), t = new Date(MC.calRange.to + 'T12:00:00');
+  return `The calendar feed covers ${f.getDate()} ${monT(f.getMonth())} to ${t.getDate()} ${monT(t.getMonth())}.`;
+}
+function calBar() {
+  const { y, m } = calCur(), b = calBounds(), i = calMonthIdx(y, m);
+  return `<div class="d1 calmonth" id="calmonth">${MONTHL[m]} ${y}</div><span class="grow"></span><button class="kb" data-a="calPrev" aria-label="Previous month" ${i <= b.min ? 'disabled' : ''}>${ico('left')}</button><button class="kb" data-a="calNext" aria-label="Next month" ${i >= b.max ? 'disabled' : ''}>${ico('right')}</button>`;
+}
 V.calendar = {
-  title: 'Calendar', lazy: true,
-  action: () => `<button class="kb" data-a="calRefresh" aria-label="Refresh">${ico('sync')}</button>`,
-  render() {
-    const now = NOW(), Y = now.getFullYear(), M = now.getMonth(), td = now.getDate(), sel = S.ui.calDay || td;
-    const iso = d => Y + '-' + pad(M + 1) + '-' + pad(d);
-    const first = new Date(Y, M, 1).getDay(), off = (first + 6) % 7, dim = new Date(Y, M + 1, 0).getDate(); let cells = '';
-    for (let i = 0; i < 42; i++) { const d = i - off + 1, inM = d >= 1 && d <= dim, has = inM && MC.calendar.some(e => e.day === iso(d)); cells += `<button class="mc ${inM ? '' : 'out'} ${d === td ? 'today' : ''} ${d === sel ? 'on' : ''}" ${inM ? `data-a="calPick" data-x="${d}"` : ''}><span>${inM ? d : ''}</span>${has ? '<i></i>' : ''}</button>`; }
-    const from = iso(sel), days = [...new Set(MC.calendar.map(e => e.day))].filter(d => d >= from).sort();
-    const nm = minsOfDay(now), mm = x => +x.slice(0, 2) * 60 + +x.slice(3), t0 = isoOff(0), t1 = isoOff(1);
-    return `<div class="cd"><div class="hstack" style="margin-bottom:10px"><div class="grow d1" style="font-size:22px">${MONTHL[M]} ${Y}</div><button class="kb sm" data-a="calMonth" aria-label="Previous month">${ico('left')}</button><button class="kb sm" data-a="calMonth" aria-label="Next month">${ico('right')}</button></div><div class="mgrid">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => `<span class="lb" style="text-align:center">${d}</span>`).join('')}${cells}</div></div>
-    ${days.map(d => { const dd = new Date(d + 'T12:00:00'), n = dd.getDate(), es = MC.calendar.filter(e => e.day === d); return `<div class="agd"><div class="agh">${dm(n, 4)}<div><div class="lb fg">${d === t0 ? 'Today' : d === t1 ? 'Tomorrow' : DAYL[(dd.getDay() + 6) % 7]}</div><div class="lb">${es.length} event${es.length > 1 ? 's' : ''}</div></div></div><div class="cd tight rows">${es.map(e => { const live = d === t0 && !e.allDay && mm(e.start) <= nm && mm(e.end) > nm, past = d === t0 && !e.allDay && mm(e.end) <= nm; return `<div class="row" style="${past ? 'opacity:.5' : ''}"><div style="width:52px">${e.allDay ? lb('All day', 'fg') : lb(e.start, 'fg') + lb(e.end)}</div><div class="grow"><div class="rt">${esc(e.title)}</div><div class="rs"><span>${esc(e.where)}</span>${live ? '<span class="red">Now</span>' : ''}</div></div><button class="key xs t" data-a="writeUp" data-x="${esc(e.title)}">Write it up</button></div>`; }).join('')}</div></div>`; }).join('') || `<div class="empty">${esc(MC.calNote)}</div>`}`;
+  title: 'Calendar',
+  action: () => S.ui.calSel && S.ui.calSel !== isoOff(0) ? `<button class="ctxchip one" data-a="calToday">Today</button>` : '<span class="sp"></span>',
+  render(a, e) {
+    if (!e.calInit) { const t = NOW(); S.ui.calSel = isoOff(0); S.ui.calMonth = { y: t.getFullYear(), m: t.getMonth() }; e.calInit = 1; }
+    const { y, m } = calCur();
+    return `<div class="hstack calbar" id="calbar">${calBar()}</div><div class="calvp">${calPane(y, m, 'cur')}</div>
+    <div class="lb calnote">${esc(calNote())} <button class="lb fg" data-a="calRefresh" style="text-decoration:underline">Refresh</button></div><div id="calag">${calAgendaHTML()}</div>`;
   }
 };
-A.calPick = (el, d) => { S.ui.calDay = +d; refresh(); };
-A.calMonth = () => toast('Other months are not in this look yet');
-A.calRefresh = (el) => { el.innerHTML = spinSVG(); B.refresh(); setTimeout(() => { refresh(); toast('Calendar read again'); }, 900); };
+let calAnim = null;
+const calFinish = () => { if (calAnim) { const f = calAnim; calAnim = null; f(); } };
+/* Slide the grid to the next or previous month. `from` is how far (px) the finger already took it; the same curve as the drawers. */
+function calSlide(dir, from = 0) {
+  calFinish();
+  const e = top_(); if (e.id !== 'calendar') return; const vp = $('.calvp', e.el), cur = $('.calm.cur', vp), W = vp.clientWidth, b = calBounds();
+  const c = calCur(), ni = calMonthIdx(c.y, c.m) + dir; if (ni < b.min || ni > b.max) return;
+  const ny = Math.floor(ni / 12), nm = ni % 12;
+  let nx = $(`.calm[data-m="${ni}"]`, vp); if (!nx) { vp.insertAdjacentHTML('beforeend', calPane(ny, nm, 'nx')); nx = vp.lastElementChild; }
+  const dur = RM ? 1 : 340, o = from;
+  const a1 = cur.animate([{ transform: `translateX(${o}px)` }, { transform: `translateX(${-dir * W}px)` }], { duration: dur, easing: EASE_D, fill: 'forwards' });
+  const a2 = nx.animate([{ transform: `translateX(${dir * W + o}px)` }, { transform: 'translateX(0)' }], { duration: dur, easing: EASE_D, fill: 'forwards' });
+  const done = () => {
+    a1.cancel(); a2.cancel(); cur.remove(); nx.classList.add('cur'); nx.classList.remove('nx'); nx.style.transform = '';
+    S.ui.calMonth = { y: ny, m: nm }; const t = NOW(), isNow = ny === t.getFullYear() && nm === t.getMonth();
+    S.ui.calSel = isNow ? isoOff(0) : calIso(ny, nm, 1);
+    $$('.cday.on', vp).forEach(x => x.classList.remove('on')); const sc = $(`.cday[data-iso="${S.ui.calSel}"]`, nx); if (sc && !sc.classList.contains('out')) sc.classList.add('on');
+    $('#calbar', e.el).innerHTML = calBar(); calRepaintAgenda(); renderTop(e);
+  };
+  calAnim = done; a2.onfinish = () => { if (calAnim === done) { calAnim = null; done(); } };
+}
+function calRepaintAgenda() { const e = top_(); if (e.id !== 'calendar') return; const ag = $('#calag', e.el); ag.innerHTML = calAgendaHTML(); const r = $('#calrows', ag); r.classList.remove('scan'); void r.offsetWidth; r.classList.add('scan'); }
+A.calPrev = () => calSlide(-1);
+A.calNext = () => calSlide(1);
+A.calPick = (el, iso) => { calFinish(); const e = top_(); S.ui.calSel = iso; $$('.cday.on', e.el).forEach(x => x.classList.remove('on')); if (!el.classList.contains('today') || true) el.classList.add('on'); calRepaintAgenda(); renderTop(e); };
+A.calToday = () => {
+  calFinish(); const e = top_(), t = NOW(), c = calCur(), diff = calMonthIdx(t.getFullYear(), t.getMonth()) - calMonthIdx(c.y, c.m);
+  if (diff) { const pane = $('.calm.cur', e.el); calSlide(diff > 0 ? 1 : -1); S.ui.calSel = isoOff(0); }
+  else { S.ui.calSel = isoOff(0); $$('.cday.on', e.el).forEach(x => x.classList.remove('on')); const c0 = $(`.cday[data-iso="${isoOff(0)}"]`, e.el); c0 && c0.classList.add('on'); calRepaintAgenda(); renderTop(e); }
+};
+addRec({
+  axis: 'x', test(st) {
+    const vp = st.target.closest && st.target.closest('.calvp'); if (!vp || top_().id !== 'calendar') return null;
+    calFinish();
+    const e = top_(), cur = $('.calm.cur', vp), W = vp.clientWidth, b = calBounds(), c = calCur(), i = calMonthIdx(c.y, c.m);
+    const mk = dir => { const ni = i + dir; if (ni < b.min || ni > b.max) return null; let p = $(`.calm[data-m="${ni}"]`, vp); if (!p) { vp.insertAdjacentHTML('beforeend', calPane(Math.floor(ni / 12), ni % 12, 'nx')); p = vp.lastElementChild; } return p; };
+    const prev = mk(-1), next = mk(1);
+    return {
+      move(dx) {
+        const side = dx < 0 ? next : prev, other = dx < 0 ? prev : next; let x = dx; if (!side) x = Math.sign(dx) * rubber(Math.abs(dx), 70);
+        cur.style.transform = `translateX(${x}px)`; if (other) other.style.transform = `translateX(${dx < 0 ? -W : W}px)`;
+        if (side) side.style.transform = `translateX(${(dx < 0 ? W : -W) + x}px)`;
+      },
+      end(dx, dy, vx) {
+        const dir = dx < 0 ? 1 : -1, side = dir > 0 ? next : prev;
+        [prev, next].forEach(p => { if (p) p.style.transform = ''; }); cur.style.transform = '';
+        if (side && (Math.abs(dx) > W * .22 || Math.abs(vx) > .35)) { if (side) { side.remove(); } calSlide(dir, dx); return; }
+        cur.animate([{ transform: `translateX(${dx}px)` }, { transform: 'none' }], { duration: RM ? 1 : 300, easing: EASE_D });
+        [prev, next].forEach(p => { if (p && p.classList.contains('nx')) p.remove(); });
+      }
+    };
+  }
+});
+A.calRefresh = (el) => { B.refresh(); toast('Reading the calendar again'); };
 A.writeUp = (el, title) => {
   const id = B.addNote('work', title + '\n\n- ');
   afterUpdate(() => open('note', { id, fresh: 1 }));
@@ -2541,19 +2632,7 @@ A.touchLog = (el, x) => { const [id, s] = x.split('|'); B.logTouch(id, s); toast
 A.prospectAdd = () => sheet('pradd', { title: 'Add a prospect', focus: '#prn', body: () => `<input class="fld" id="prn" placeholder="Business" data-enter="prospectSave"><input class="fld" id="prd" placeholder="Domain" style="margin-top:8px">`, foot: () => `<button class="key t" data-a="sheetX">Cancel</button><button class="key" data-a="prospectSave">Add</button>` });
 A.prospectSave = () => { const v = $('#prn').value.trim(); if (!v) return; const d = ($('#prd').value || '').trim().replace(/^https?:\/\//, ''); const id = B.store().addProspect({ name: v, domain: d || undefined, source: 'found', stage: 'Ready to contact' }); closeSheet('pradd'); afterUpdate(() => A.prospectOpen(null, id)); };
 
-/* ---------------- BILLS: Compass, read only, and only once signed in ---------------- */
-const ordn = n => n + (n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th');
-V.bills = {
-  title: 'Bills', lazy: true, render(a) {
-    const b = S.bills;
-    if (!b) return `<div class="cd k">${lb('Bills')}<div class="wt" style="margin-top:10px">Bills and debts come from Compass. They show here once you are signed in.</div></div><button class="key t wide" data-a="openClassic" data-x="bills">${ico('out')} Open Bills</button>`;
-    const row = x => `<div class="row"><div class="grow"><div class="rt one">${esc(x.name)}</div><div class="rs"><span class="${x.state === 'overdue' ? 'red' : ''}">${x.state === 'paid' ? 'Paid' : x.state === 'overdue' ? 'Overdue' : 'Due the ' + ordn(x.day)}</span></div></div><span class="lb fg">${kc(x.amount)} KČ</span></div>`;
-    return `<div class="cd k" id="bills-hero">${lbRow('Debt paid off', b.openDebts + ' open')}<div style="margin:14px 0 10px">${dm(b.debtPaidPct + '%', 6, { k: 'bfree', count: true })}</div>${lb(kc(b.owed) + ' Kč still owed')}<div style="margin-top:14px">${drow(30, Math.round(b.debtPaidPct / 100 * 30), { gap: 10.8, r: 2.8, fill: true, k: 'bpaid' })}</div></div>
-    <div class="sl" id="bills-debts">This month<b>${kc(b.monthly)} KČ</b></div><div class="cd tight rows">${b.items.map(row).join('') || '<div class="empty">No payments this month.</div>'}</div>
-    <button class="key t wide" style="margin-top:6px" data-a="openClassic" data-x="bills">${ico('out')} Open Bills</button>`;
-  },
-  after(el, a, fresh) { if (fresh && a.at === 'debts') setTimeout(() => { const d = $('#bills-debts', el); d && d.scrollIntoView({ behavior: 'smooth' }); }, 700); }
-};
+/* ---------------- BILLS: no page of its own here; every door goes straight to the real Bills page (CLASSIC_V) ---------------- */
 A.openClassic = (el, x) => B.openClassic(x);
 
 /* ---------------- WEATHER ---------------- */

@@ -1005,16 +1005,16 @@ await step('routine runner: a step tick persists', async () => {
   await tap('section.view.on [data-a="back"]').catch(() => {})
 })
 
-await step('Apps drawer keeps its 13 tiles in a tidy grid; Jar carries Health, Gym, Longevity and The wall; Settings has Embedded apps', async () => {
+await step('Apps drawer keeps its 14 tiles in a tidy grid; Jar carries Health, Gym, Longevity and The wall; Settings has Embedded apps', async () => {
   await click('#dock [data-x="apps"]'); await wait(500)
-  const want = ['calendar', 'notes', 'ideas', 'people', 'bills', 'jar', 'zone', 'focus', 'jarvis', 'skills', 'watchless', 'weather', 'settings']
+  const want = ['calendar', 'notes', 'ideas', 'people', 'bills', 'mymind', 'jar', 'zone', 'focus', 'jarvis', 'skills', 'watchless', 'weather', 'settings']
   const tiles = await page.locator('section.view.on .dapp').evaluateAll((ts) => ts.map((t) => t.dataset.x))
   if (tiles.join() !== want.join()) throw new Error(`tiles ${tiles.join()}`)
   if (await page.locator('section.view.on [data-a="openClassic"]').count()) throw new Error('a wide bar is still under the drawer')
   const g = await page.locator('section.view.on .drawer').evaluate((d) => ({ cols: getComputedStyle(d).gridTemplateColumns.split(' ').length, pos: [...d.children].map((c) => { const r = c.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top)] }) }))
   const rows = new Set(g.pos.map((p) => p[1])).size
   if (g.cols !== 3 || rows !== 5 || g.pos.slice(0, 12).some((p, i) => p[0] !== g.pos[i % 3][0])) throw new Error(`grid ${JSON.stringify(g)}`)
-  await page.screenshot({ path: `${SHOTS}/light-apps-13.png` })
+  await page.screenshot({ path: `${SHOTS}/light-apps-14.png` })
   await click('[data-a="drawerOpen"][data-x="jar"]'); await viewReady('jar'); await wait(450)
   const links = await page.locator('section.view.on .jarlinks .chip').allTextContents()
   if (links.join().toLowerCase() !== 'health,gym,longevity,the wall') throw new Error(`jar links ${links.join()}`)

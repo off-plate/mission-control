@@ -380,4 +380,61 @@ export async function deleteRemoteState(): Promise<void> {
    writes to those two tables directly; nothing here reads them back into
    Mission Control anymore. */
 
+
+/* MyMind (2026-10-28): what he shares into Mission Control. Rows live in
+   mc_mymind under row level security (owner = auth.uid()), previews in the
+   private `mymind` bucket. Saving goes through the `mymind` edge function so
+   the link cleaning and duplicate check live in one place. */
+export interface MyMindRow {
+  id: string
+  kind: 'link' | 'image' | 'text'
+  url: string | null
+  title: string
+  site: string
+  description: string
+  body: string
+  note: string
+  image_path: string | null
+  via: string
+  created_at: string
+  trashed_at: string | null
+}
+const MYMIND_COLS = 'id,kind,url,title,site,description,body,note,image_path,via,created_at,trashed_at'
+
+export async function readMyMind(): Promise<MyMindRow[] | null> {
+  const c = db()
+  const me = await currentAccount()
+  if (!c || !me) return null
+  const { data, error } = await c.from('mc_mymind').select(MYMIND_COLS).order('created_at', { ascending: false }).limit(5000)
+  if (error) throw new Error(error.message)
+  return (data ?? []) as MyMindRow[]
+}
+
+export async function updateMyMind(id: string, patch: Partial<Pick<MyMindRow, 'note' | 'title' | 'trashed_at'>>): Promise<void> {
+  const c = db()
+  if (!c) throw new Error('Not signed in')
+  const { error } = await c.from('mc_mymind').update(patch).eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+/** Forever: the row and its preview file. */
+export async function deleteMyMind(row: Pick<MyMindRow, 'id' | 'image_path'>): Promise<void> {
+  const c = db()
+  if (!c) throw new Error('Not signed in')
+  const { error } = await c.from('mc_mymind').delete().eq('id', row.id)
+  if (error) throw new Error(error.message)
+  if (row.image_path) await c.storage.from('mymind').remove([row.image_path])
+}
+
+/** Short-lived links to the private previews, path -> url. */
+export async function mymindImageUrls(paths: string[]): Promise<Record<string, string>> {
+  const c = db()
+  if (!c || !paths.length) return {}
+  const { data, error } = await c.storage.from('mymind').createSignedUrls(paths, 3600)
+  if (error || !data) return {}
+  const out: Record<string, string> = {}
+  for (const d of data) if (d.path && d.signedUrl) out[d.path] = d.signedUrl
+  return out
+}
+
 export { SUPABASE_ENABLED }

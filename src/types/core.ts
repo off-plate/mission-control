@@ -51,6 +51,7 @@ export type PageId =
    *  not a workspace page, not filtered by space, same shape as Notes and
    *  the Zone. */
   | 'bills'
+  | 'mymind'
   /** The work calendar, read from the feed. Big Time only: see NAV. */
   | 'calendar'
   /** Measured history above a now line, and the same rate carried forward. */

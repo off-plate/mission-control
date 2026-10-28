@@ -557,7 +557,7 @@ export function BillsPage() {
   )
 }
 
-function BillsSignIn() {
+export function BillsSignIn() {
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [sent, setSent] = useState(false)

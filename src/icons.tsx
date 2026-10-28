@@ -219,6 +219,7 @@ export const ClearFormat = make(<><path d="M6 5h13M9.5 5L7 19M14 12l6 7M20 12l-6
    Tabler's own convention, so fit is the identity transform, not
    measured the way Hicon's own uneven padding required above. */
 export const DockNote = make(<><path d="M5 5a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2l0 -14" /><path d="M9 7l6 0" /><path d="M9 11l6 0" /><path d="M9 15l4 0" /></>, 16, { k: 1, x: 0, y: 0 })
+export const DockBookmark = make(<><path d="M9 4h6a2 2 0 0 1 2 2v14l-5 -3l-5 3v-14a2 2 0 0 1 2 -2" /></>, 16, { k: 1, x: 0, y: 0 })
 export const DockWallet = make(<><path d="M17 8v-3a1 1 0 0 0 -1 -1h-10a2 2 0 0 0 0 4h12a1 1 0 0 1 1 1v3m0 4v3a1 1 0 0 1 -1 1h-12a2 2 0 0 1 -2 -2v-12" /><path d="M20 12v4h-4a2 2 0 0 1 0 -4h4" /></>, 16, { k: 1, x: 0, y: 0 })
 export const DockHistory = make(<><path d="M12 8l0 4l2 2" /><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5" /></>, 16, { k: 1, x: 0, y: 0 })
 export const DockChartBar = make(<><path d="M3 13a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -6" /><path d="M15 9a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -10" /><path d="M9 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -14" /><path d="M4 20h14" /></>, 16, { k: 1, x: 0, y: 0 })

@@ -14,6 +14,7 @@ import { ProjectsPage } from './projects'
 import { HabitKitRoom } from './hkroom'
 import { NotesPage } from './notes'
 import { BillsPage } from './billspage'
+import { MyMindPage } from './mymindpage'
 import { DailyReview } from './daily'
 import { AppsPage } from './apps'
 import { Helmet } from './helmet'
@@ -453,6 +454,7 @@ const MORE_PAGES: { id: PageId; label: string; icon: ReactNode }[] = [
   { id: 'people', label: 'People', icon: <Icon.DockPeople size={22} /> },
   { id: 'timeline', label: 'Jar', icon: <Icon.DockHistory size={22} /> },
   { id: 'bills', label: 'Bills', icon: <Icon.DockWallet size={22} /> },
+  { id: 'mymind', label: 'MyMind', icon: <Icon.DockBookmark size={22} /> },
   { id: 'projects', label: 'Projects', icon: <Icon.Folder size={22} /> },
   { id: 'skills', label: 'Skills', icon: <Icon.DockBook size={22} /> },
   { id: 'watchless', label: 'Watchless', icon: <Icon.DockTranscript size={22} /> },
@@ -861,6 +863,17 @@ export default function App() {
             <Icon.DockWallet size={16} />
             <span className="btn-sq-label">Bills</span>
           </button>
+          {/* MyMind, next to Bills (2026-10-28): everything he shares from the phone and Chrome. */}
+          <button
+            className={`btn btn-ghost btn-sq hide-phone${page === 'mymind' ? ' is-on' : ''}`}
+            onClick={() => setPage('mymind')}
+            aria-pressed={page === 'mymind'}
+            aria-label="MyMind"
+            title="MyMind"
+          >
+            <Icon.DockBookmark size={16} />
+            <span className="btn-sq-label">MyMind</span>
+          </button>
           {/* Apps and Settings left the header for the dock's More on his
               instruction (2026-09-15). */}
           {/* Assistant was never in this list, same as the Zone: reached from
@@ -927,6 +940,7 @@ export default function App() {
         {page === 'assistant' && <AssistantPage />}
         {page === 'notes' && <NotesPage />}
         {page === 'bills' && <BillsPage />}
+        {page === 'mymind' && <MyMindPage />}
         {page === 'settings' && <SettingsPage />}
         {page === 'day' && <DayPage />}
         {page === 'zone' && <ZonePage />}

@@ -30,9 +30,33 @@ const errors = []
 page.on('pageerror', (e) => errors.push(e.message))
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
 
+/* SHELL_ONLY=<regex> runs only the steps whose name matches (plus the ones marked always: the mount). Steps build on each other's
+   state (seeded data, the layout edit, the Jarvis thread, the open review), so a step lists what it needs and a filtered run warns
+   when one of those was skipped. Each line carries its own seconds. */
+const ONLY = process.env.SHELL_ONLY ? new RegExp(process.env.SHELL_ONLY, 'i') : null
 let pass = 0, fail = 0
-const step = async (name, fn) => {
-  try { await fn(); pass++; console.log(`PASS ${name}`) } catch (e) { fail++; console.log(`FAIL ${name}: ${e.message.split('\n').slice(0, 12).join(' / ')}`) }
+const skipped = new Set()
+const EDIT = 'edit mode: long-press, resize, remove + undo, add from gallery, drag, Done'
+const NEEDS = {
+  'edited layout survives a reload': [EDIT],
+  'Jarvis: a suggestion sends, the face thinks, an action lands as a chip and in the real store': ['Jarvis: with no key the thread says so, with a way to Settings'],
+  'Jarvis: the input is 16px, nothing overflows at 375 and 390': ['Jarvis: a suggestion sends, the face thinks, an action lands as a chip and in the real store'],
+  'Jarvis: the conversation is still there after closing and reopening': ['Jarvis: a suggestion sends, the face thinks, an action lands as a chip and in the real store'],
+  'Ideas: tapping a card opens the whole text, readable and scrollable': ['Ideas: the list shows two lines of body under the title'],
+  'Ideas: edit title and body, the real card is updated and survives a reload': ['Ideas: tapping a card opens the whole text, readable and scrollable'],
+  'Ideas: done, make it a task, delete and undo': ['Ideas: edit title and body, the real card is updated and survives a reload'],
+  'daily review: swipe and quick taps leave no transform behind; back = previous, X = close': ['daily review: full screen at 390x844 and 430x932, one card at rest, nothing below the frame'],
+  'daily review: each kind of goal has its own control and writes the real store': ['daily review: swipe and quick taps leave no transform behind; back = previous, X = close'],
+  'daily review: Quitting buttons fit and write the slip; Start the day closes it': ['daily review: each kind of goal has its own control and writes the real store'],
+  'adding on the Big Time page makes a Big Time task': ['home: swipe between spaces, the accent follows the page'],
+  'Plan: delete, then undo, restores the real task': ['Plan: swipe to complete, How long, the real task is done'],
+  'Habits: tab chip': [],
+}
+const step = async (name, fn, o = {}) => {
+  if (ONLY && !o.always && !ONLY.test(name)) { skipped.add(name); return }
+  for (const n of o.needs ?? NEEDS[name] ?? []) if (skipped.has(n)) console.log(`WARN  "${name}" builds on "${n}", which SHELL_ONLY skipped`)
+  const t0 = Date.now(), secs = () => `${((Date.now() - t0) / 1000).toFixed(1)}s`
+  try { await fn(); pass++; console.log(`PASS ${secs()} ${name}`) } catch (e) { fail++; console.log(`FAIL ${secs()} ${name}: ${e.message.split('\n').slice(0, 12).join(' / ')}`) }
 }
 const blob = () => page.evaluate((K) => JSON.parse(localStorage.getItem(K) ?? '{}'), KEY)
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
@@ -100,12 +124,30 @@ await step('pick Nothing Light in Settings, the shell mounts', async () => {
   if ((await page.locator('#home .hp').count()) !== 3) throw new Error('home has not three pages')
   if (await page.locator('.topbar').count()) throw new Error('the classic header is still there')
   await page.screenshot({ path: `${SHOTS}/light-home.png` })
-})
+}, { always: true })
 
 const dot = () => page.locator('#home .pdots i').evaluateAll((d) => d.findIndex((x) => x.classList.contains('on')))
 const accent = () => page.locator('#app').evaluate((el) => getComputedStyle(el).getPropertyValue('--red').trim())
 await step('home opens on All the first time', async () => {
   if ((await dot()) !== 0) throw new Error(`first page is ${await dot()}`)
+})
+
+await step('home tiles: Ideas counts ideas (not prompts), text tiles are centred with equal padding', async () => {
+  const r = await page.evaluate(() => {
+    const R = document.querySelector('.nshell').shadowRoot, tile = (t) => R.querySelector(`#home .hp[data-page="all"] .w[data-type="${t}"]`)
+    const ideas = tile('ideas'), out = { ideas: ideas ? ideas.textContent.trim() : null, badge: !!(ideas && ideas.querySelector('.wbd')) }
+    const gaps = (t) => {
+      const w = tile(t); if (!w) return null
+      const b = w.getBoundingClientRect(), kids = [...w.querySelector('.wi').children].filter((c) => c.getBoundingClientRect().height)
+      const u = kids.reduce((a, c) => { const q = c.getBoundingClientRect(); return { t: Math.min(a.t, q.top), b: Math.max(a.b, q.bottom), l: Math.min(a.l, q.left) } }, { t: 1e9, b: -1e9, l: 1e9 })
+      return { top: u.t - b.top, bottom: b.bottom - u.b, left: u.l - b.left }
+    }
+    out.why = gaps('why'); out.notes = gaps('notes'); return out
+  })
+  if (!/2 IDEAS/i.test(r.ideas || '') || /prompt/i.test(r.ideas)) throw new Error(`Ideas widget says "${r.ideas}"`)
+  if (!r.badge) throw new Error('no badge for the waiting prompt')
+  for (const t of ['why', 'notes']) { const g = r[t]; if (!g) throw new Error(`no ${t} tile`); if (Math.abs(g.top - g.bottom) > 3 || g.left < 14 || g.top < 10) throw new Error(`${t} tile gaps ${JSON.stringify(g)}`) }
+  await page.screenshot({ path: `${SHOTS}/light-home-tiles.png` })
 })
 
 await step('home: swipe between spaces, the accent follows the page', async () => {
@@ -509,7 +551,9 @@ await step('adding on the Big Time page makes a Big Time task', async () => {
   await drag('#home .hp:nth-child(3) .grid', 260)
 })
 
-/* iOS zooms into any form control under 16px, and zooms the page out when anything is wider than it. */
+/* iOS zooms into any form control under 16px, and zooms the page out when anything is wider than it.
+   One pass: each view is opened once with a synthetic click inside the shell (no actionability waits), audited at 390, resized to 375 while
+   it is still open and audited again. The only fixed waits left are the slide/morph animation's own 430 ms. */
 const small = () => page.evaluate(() => [...document.querySelector('.nshell').shadowRoot.querySelectorAll('input,textarea,select')].filter((e) => parseFloat(getComputedStyle(e).fontSize) < 16).map((e) => e.id || e.className))
 const overflow = () => page.evaluate(() => {
   const r = document.querySelector('.nshell').shadowRoot, bad = []
@@ -517,22 +561,34 @@ const overflow = () => page.evaluate(() => {
   for (const el of r.querySelectorAll('#app, section.view.on .vsc, .sheet.on .sh-b, #home .hp .hsc')) if (el.scrollWidth > el.clientWidth + 1) bad.push(el.className || el.id)
   return bad
 })
-await step('every form control is 16px or more, nothing is wider than the screen (375 and 390)', async () => {
+const raf2 = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+const click = (sel) => page.evaluate((q) => { const e = document.querySelector('.nshell').shadowRoot.querySelector(q); if (!e) throw new Error('missing ' + q); e.click() }, sel)
+const viewReady = (id) => page.waitForFunction((v) => { const x = document.querySelector('.nshell').shadowRoot.querySelector(`section.view.on[data-view="${v}"]`); return !!x && !x.querySelector('.skel') && !x.querySelector('.morphclone') }, id, { timeout: 5000 })
+await step('every form control is 16px or more, nothing is wider than the screen (375 and 390), on every view', async () => {
   const bad = []
-  for (const w of [390, 375]) {
-    await page.setViewportSize({ width: w, height: 844 }); await wait(500)
-    bad.push(...(await overflow()).map((x) => `${w} home ${x}`))
-    for (const id of ['plan', 'habits', 'apps']) { await tap(`#dock [data-x="${id}"]`); bad.push(...(await overflow()).map((x) => `${w} ${id} ${x}`)); bad.push(...(await small()).map((x) => `${w} ${id} input ${x}`)) }
-    await tap('section.view.on [data-a="planSeg"][data-x="todo"]').catch(() => {})
-    for (const id of ['calendar', 'notes', 'ideas', 'people', 'bills', 'jar', 'health', 'gym', 'zone', 'focus', 'projects', 'weather', 'why', 'search', 'settings', 'today']) {
-      await tap('#dock [data-x="apps"]'); await tap(`[data-a="drawerOpen"][data-x="${id}"]`); await wait(650)
-      bad.push(...(await overflow()).map((x) => `${w} ${id} ${x}`)); bad.push(...(await small()).map((x) => `${w} ${id} input ${x}`))
-      await tap('section.view.on [data-a="back"]').catch(() => {})
+  const audit = async (tag) => {
+    for (const w of [390, 375]) {
+      if (w === 375) { await page.setViewportSize({ width: 375, height: 844 }); await raf2() }
+      bad.push(...(await overflow()).map((x) => `${w} ${tag} ${x}`), ...(await small()).map((x) => `${w} ${tag} input ${x}`))
     }
-    await tap('#dock [data-a="quickAdd"]'); bad.push(...(await small()).map((x) => `${w} quickadd ${x}`)); bad.push(...(await overflow()).map((x) => `${w} quickadd ${x}`)); await tap('.sheet.on [data-a="sheetX"]')
-    await tap('#dock [data-x="home"]')
+    await page.setViewportSize({ width: 390, height: 844 }); await raf2()
   }
-  await page.setViewportSize({ width: 390, height: 844 }); await wait(400)
+  await audit('home')
+  for (const id of ['plan', 'habits', 'apps']) { await click(`#dock [data-x="${id}"]`); await wait(300); await audit(id) }
+  /* from Plan: its own two doors */
+  await click('#dock [data-x="plan"]'); await wait(300)
+  for (const id of ['projects', 'search']) { await click(`section.view.on [data-a="open"][data-x="${id}"]`); await viewReady(id); await wait(430); await audit(id); await click('section.view.on [data-a="back"]'); await wait(400) }
+  await click('#dock [data-x="apps"]'); await wait(300)
+  const drawer = ['calendar', 'notes', 'ideas', 'people', 'bills', 'jar', 'zone', 'focus', 'jarvis', 'weather', 'settings']
+  for (const id of drawer) {
+    await click(`[data-a="drawerOpen"][data-x="${id}"]`); await viewReady(id); await wait(430); await audit(id)
+    if (id === 'jar') for (const j of ['health', 'gym', 'why']) { await click(`section.view.on [data-a="jarGo"][data-x="${j}"]`); await viewReady(j); await raf2(); await audit(j) }
+    await click('section.view.on [data-a="back"]'); await wait(400)
+  }
+  await click('#dock [data-a="quickAdd"]'); await page.waitForSelector('.sheet.on'); await wait(450); await audit('quickadd'); await click('.sheet.on [data-a="sheetX"]'); await wait(450)
+  await click('#dock [data-x="home"]'); await wait(300)
+  await click('#home .hp:nth-child(2) [data-type="clock"]'); await viewReady('today'); await wait(430); await audit('today'); await click('section.view.on [data-a="back"]'); await wait(450)
+  await page.setViewportSize({ width: 390, height: 844 }); await raf2()
   if (bad.length) throw new Error([...new Set(bad)].slice(0, 12).join(' | '))
 })
 
@@ -618,6 +674,31 @@ await step('add button: a task goes into the real store', async () => {
   if (t3?.list !== 'backlog') throw new Error(`no date should go to the list, got ${t3?.list}`)
 })
 
+await step('Habits: a picker in the header switches Habits, Goals and Quitting, in sync with the segmented control', async () => {
+  await tap('#dock [data-x="habits"]'); await wait(500)
+  const read = () => page.evaluate(() => { const R = document.querySelector('.nshell').shadowRoot, v = R.querySelector('section.view.on'), t = v.querySelector('.vtt').getBoundingClientRect(), c = v.querySelector('.vtop .ctxchip').getBoundingClientRect(); return { chip: v.querySelector('.vtop .ctxchip').textContent.trim(), title: v.querySelector('.vtt').textContent.trim(), seg: v.querySelector('.seg button.on').textContent.trim(), mid: t.left + t.width / 2, vw: innerWidth, chipRight: c.right, titleLeft: t.left } })
+  for (const [id, label] of [['goals', 'Goals'], ['quit', 'Quitting'], ['habits', 'Habits']]) {
+    await tap('section.view.on .vtop .ctxchip'); await wait(450)
+    if (id === 'goals') await page.screenshot({ path: `${SHOTS}/light-habits-picker.png` })
+    await tap(`.sheet.on [data-a="hPicked"][data-x="${id}"]`); await wait(500)
+    const r = await read()
+    if (![r.chip, r.title, r.seg].every((x) => x.toLowerCase().startsWith(label.toLowerCase()))) throw new Error(`${label}: ${JSON.stringify(r)}`)
+    if (Math.abs(r.mid - r.vw / 2) > 1 || r.chipRight > r.titleLeft) throw new Error(`header geometry ${JSON.stringify(r)}`)
+  }
+  await tap('section.view.on .seg button[data-x="goals"]'); await wait(400)
+  if (!/^goals/i.test((await read()).chip)) throw new Error('the segmented control did not move the chip')
+  /* + follows the section */
+  await tap('section.view.on [data-a="addHabitMenu"]'); await wait(500)
+  await page.locator('.sheet.on #gnm').fill('Chip goal'); await page.locator('.sheet.on #gtg').fill('5'); await page.locator('.sheet.on #gun').fill('books')
+  await tap('.sheet.on [data-a="goalSave"]'); await wait(1100)
+  if (!(await blob()).goals.some((g) => g.name === 'Chip goal' && g.target === 5 && g.unit === 'books')) throw new Error('goal not saved')
+  await tap('section.view.on .seg button[data-x="quit"]'); await wait(400)
+  await tap('section.view.on [data-a="addHabitMenu"]'); await wait(500)
+  if (!/^quit/i.test(await page.locator('.sheet.on .seg button.on').first().textContent())) throw new Error('+ on Quitting did not open a quit sheet')
+  await tap('.sheet.on [data-a="sheetX"]'); await wait(400)
+  await tap('section.view.on .seg button[data-x="habits"]'); await wait(400)
+})
+
 await step('Habits: tick a habit, the real habitLog changes', async () => {
   await tap('#dock [data-x="habits"]'); await wait(500)
   await page.screenshot({ path: `${SHOTS}/light-habits.png` })
@@ -661,6 +742,28 @@ await step('routine runner: a step tick persists', async () => {
   await tap('section.view.on [data-a="back"]').catch(() => {})
 })
 
+await step('Apps drawer keeps its 13 tiles in a tidy grid; Jar carries Health, Gym, Longevity and The wall; Settings has Embedded apps', async () => {
+  await click('#dock [data-x="apps"]'); await wait(500)
+  const want = ['calendar', 'notes', 'ideas', 'people', 'bills', 'jar', 'zone', 'focus', 'jarvis', 'skills', 'watchless', 'weather', 'settings']
+  const tiles = await page.locator('section.view.on .dapp').evaluateAll((ts) => ts.map((t) => t.dataset.x))
+  if (tiles.join() !== want.join()) throw new Error(`tiles ${tiles.join()}`)
+  if (await page.locator('section.view.on [data-a="openClassic"]').count()) throw new Error('a wide bar is still under the drawer')
+  const g = await page.locator('section.view.on .drawer').evaluate((d) => ({ cols: getComputedStyle(d).gridTemplateColumns.split(' ').length, pos: [...d.children].map((c) => { const r = c.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top)] }) }))
+  const rows = new Set(g.pos.map((p) => p[1])).size
+  if (g.cols !== 3 || rows !== 5 || g.pos.slice(0, 12).some((p, i) => p[0] !== g.pos[i % 3][0])) throw new Error(`grid ${JSON.stringify(g)}`)
+  await page.screenshot({ path: `${SHOTS}/light-apps-13.png` })
+  await click('[data-a="drawerOpen"][data-x="jar"]'); await viewReady('jar'); await wait(450)
+  const links = await page.locator('section.view.on .jarlinks .chip').allTextContents()
+  if (links.join().toLowerCase() !== 'health,gym,longevity,the wall') throw new Error(`jar links ${links.join()}`)
+  await page.screenshot({ path: `${SHOTS}/light-jar-links.png` })
+  await click('section.view.on [data-a="jarGo"][data-x="health"]'); await wait(500)
+  if (!(await page.locator('section.view.on[data-view="health"]').count())) throw new Error('Health link did not open Health')
+  await click('section.view.on [data-a="back"]'); await wait(450)
+  await click('[data-a="drawerOpen"][data-x="settings"]'); await viewReady('settings'); await wait(450)
+  if (!(await page.locator('section.view.on [data-a="openClassic"][data-x="apps"]').count())) throw new Error('Settings has no Embedded apps row')
+  await click('section.view.on [data-a="back"]'); await wait(450)
+})
+
 await step('Apps drawer shows badges, and Settings opens', async () => {
   await tap('#dock [data-x="apps"]'); await wait(400)
   await page.screenshot({ path: `${SHOTS}/light-apps.png` })
@@ -678,6 +781,7 @@ await step('dark: the Nothing Dark look', async () => {
   await tap('#dock [data-x="plan"]'); await page.screenshot({ path: `${SHOTS}/dark-plan.png` })
   await tap('#dock [data-x="habits"]'); await page.screenshot({ path: `${SHOTS}/dark-habits.png` })
   await page.locator('section.view.on .vsc').evaluate((e) => { e.scrollTop = 600 }); await wait(300); await page.screenshot({ path: `${SHOTS}/dark-habits-scrolled.png` })
+  await tap('#dock [data-x="habits"]'); await tap('section.view.on .vtop .ctxchip'); await wait(450); await page.screenshot({ path: `${SHOTS}/dark-habits-picker.png` }); await tap('.sheet.on [data-a="sheetX"]'); await wait(400)
   await tap('#dock [data-x="apps"]'); await page.screenshot({ path: `${SHOTS}/dark-apps.png` })
   await tap('[data-a="drawerOpen"][data-x="jarvis"]'); await wait(900)
   await page.screenshot({ path: `${SHOTS}/dark-jarvis.png` })
@@ -709,6 +813,7 @@ await step('reload: state persists', async () => {
 
 await step('no page errors', async () => { if (errors.length) throw new Error(errors.slice(0, 3).join(' | ')) })
 
+if (skipped.size) console.log(`\nSHELL_ONLY skipped ${skipped.size} step${skipped.size === 1 ? '' : 's'}; state they build (seeded data, layout edits, the Jarvis thread, an open review) may be missing for the ones that ran.`)
 console.log(`\n${pass} passed, ${fail} failed. Shots in ${SHOTS}`)
 await b.close(); server.close()
 process.exit(fail ? 1 : 0)

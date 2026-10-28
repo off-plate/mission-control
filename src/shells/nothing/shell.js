@@ -851,9 +851,9 @@ W.next = {
   name: 'Next', sizes: ['41', '22'], tone: 'w', open: 'plan',
   render(sz, sp) {
     const t = firstMove(sp);
-    if (!t) return `<div class="wi">${lb('Next')}<div class="wt" style="margin-top:6px">Nothing open today.</div></div>`;
+    if (!t) return `<div class="wi tx">${lb('Next')}<div class="wt">Nothing open today.</div></div>`;
     if (sz === '22') return `<div class="wi" style="gap:8px">${lbRow('Next', t.est ? fmtMin(t.est) : 'NO ESTIMATE')}<div class="wt" style="font-size:14px;line-height:1.35">${esc(wclip(t.title, 64))}</div></div><button class="wkey" data-a="startTask" data-x="${t.id}">Start</button>`;
-    return `<div class="wi" style="flex-direction:row;align-items:center;gap:14px"><div class="grow" style="display:grid;gap:5px">${lbRow('Next', t.est ? fmtMin(t.est) : 'NO ESTIMATE')}<div class="wt" style="font-size:12.5px;line-height:1.3">${esc(wclip(t.title, 52))}</div></div><button class="wkey" style="position:static;flex:none;height:40px;padding:0 14px" data-a="startTask" data-x="${t.id}">Start</button></div>`;
+    return `<div class="wi tx" style="flex-direction:row;align-items:center;gap:14px"><div class="grow" style="display:grid;gap:5px">${lbRow('Next', t.est ? fmtMin(t.est) : 'NO ESTIMATE')}<div class="wt" style="font-size:12.5px;line-height:1.3">${esc(wclip(t.title, 52))}</div></div><button class="wkey" style="position:static;flex:none;height:40px;padding:0 14px" data-a="startTask" data-x="${t.id}">Start</button></div>`;
   }
 };
 W.plan = {
@@ -962,7 +962,7 @@ W.calendar = {
   name: 'Calendar', sizes: ['21'], tone: 'w', open: 'calendar',
   render() {
     const e = nextEvent();
-    return `<div class="wi" style="gap:6px">${lbRow(DAYL[TI()], e ? (e.allDay ? 'ALL DAY' : e.start) : 'FREE')}<div class="wt up" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:11.5px">${e ? esc(wclip(e.title, 34)) : 'Nothing else today'}</div></div>`;
+    return `<div class="wi tx" style="gap:6px">${lbRow(DAYL[TI()], e ? (e.allDay ? 'ALL DAY' : e.start) : 'FREE')}<div class="wt up" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:11.5px">${e ? esc(wclip(e.title, 34)) : 'Nothing else today'}</div></div>`;
   }
 };
 const initials = n => n.split(/\s+/).map(s => s[0]).join('').slice(0, 2).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -990,16 +990,21 @@ W.notes = {
   name: 'Notes', sizes: ['22', '21'], tone: 'w', open: 'notes',
   render(sz, sp, inst) {
     const n = (inst.arg ? S.notes.find(x => x.id === inst.arg) : null) || S.notes.find(x => !x.done && inSp(x, sp)) || S.notes[0];
-    if (!n) return `<div class="wi">${lb('Notes')}<div class="wt" style="margin-top:6px">No notes yet.</div></div>`;
+    if (!n) return `<div class="wi tx">${lb('Notes')}<div class="wt">No notes yet.</div></div>`;
     const f = S.folders.find(f => f.id === n.folder);
-    if (sz === '21') return `<div class="wi" style="gap:5px">${lb(f ? f.name : 'Notes')}<div class="wt up" style="font-size:11px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(wclip(n.title || 'Untitled', 34))}</div></div>`;
-    return `<div class="wi" style="gap:8px">${lb('Latest note')}<div class="wt up" style="font-size:12.5px;line-height:1.35">${esc(wclip(n.title || 'Untitled', 44))}</div><div class="wt" style="font-size:11px;color:var(--fd);overflow:hidden;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical">${esc(n.body)}</div><div class="wsp"></div>${lb(f ? f.name : '')}</div>`;
+    if (sz === '21') return `<div class="wi tx" style="gap:6px">${lb(f ? f.name : 'Notes')}<div class="wt up" style="font-size:11px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(wclip(n.title || 'Untitled', 34))}</div></div>`;
+    return `<div class="wi tx" style="gap:8px;justify-content:flex-start">${lb('Latest note')}<div class="wt up" style="font-size:12.5px;line-height:1.35">${esc(wclip(n.title || 'Untitled', 44))}</div><div class="wt" style="font-size:11px;color:var(--fd);overflow:hidden;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical">${esc(n.body)}</div><div class="wsp"></div>${lb(f ? f.name : '')}</div>`;
   }
 };
 const whyToday = () => { const l = MC.why.filter(w => w.text); return l.length ? l[NOW().getDate() % l.length] : null; };
 W.why = {
   name: 'Why', sizes: ['21', '42'], tone: 'k', open: 'why',
-  render(sz) { const q = whyToday(); if (!q) return `<div class="wi">${lb('Why, today')}</div>`; return `<div class="wi" style="gap:8px">${lb('Why, today')}<div class="wt up" style="font-size:${sz === '42' ? 20 : 12}px;line-height:1.3;font-weight:700">${esc(q.text)}</div>${q.by ? `<div class="wsp"></div>${lb('- ' + q.by)}` : ''}</div>`; }
+  /* The quote is the tile: no label on the small one, the size follows the length so it never spills, and the block sits dead centre. */
+  render(sz) {
+    const q = whyToday(); if (!q) return `<div class="wi tx">${lb('Why, today')}</div>`;
+    const big = sz === '42', text = big ? q.text : wclip(q.text, 80), n = text.length, fs = big ? (n > 70 ? 17 : 20) : n <= 36 ? 12 : n <= 52 ? 10.5 : 9;
+    return `<div class="wi tx" style="gap:${big ? 12 : 6}px">${big ? lb('Why, today') : ''}<div class="wt up" style="font-size:${fs}px;line-height:1.3;font-weight:700;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:${big ? 7 : 4};overflow:hidden">${esc(text)}</div>${q.by ? lb('- ' + q.by) : ''}</div>`;
+  }
 };
 W.health = {
   name: 'Health', sizes: ['21'], tone: 'w', open: 'health',
@@ -1018,7 +1023,10 @@ W.jar = {
   render(sz, sp, inst) { return `<div class="wi" style="justify-content:space-between">${lbRow('Momentum', 'of 100')}${dm(S.momentum.value, 3.4, { k: inst.id })}${lb(S.momentum.state, 'fg')}</div>`; }
 };
 const iconW = (name, icon, view, label) => ({ name, sizes: ['11'], tone: 'w', open: view, render() { return `<div class="wi c" style="gap:7px">${icoBig(icon, 26)}<div class="lb fg" style="font-size:8.5px">${label()}</div></div>`; } });
-W.ideas = iconW('Ideas', 'ideas', 'ideas', () => S.prompts.length + ' prompts');
+W.ideas = { name: 'Ideas', sizes: ['11'], tone: 'w', open: 'ideas', render() {
+  const n = S.ideas.filter(i => !i.done).length, pw = S.prompts.filter(p => !p.sent).length;
+  return `<div class="wi c" style="gap:7px">${icoBig('ideas', 26)}<div class="lb fg" style="font-size:8.5px">${n} ${n === 1 ? 'IDEA' : 'IDEAS'}</div>${pw ? `<i class="wbd" aria-label="${pw} prompts waiting">${pw}</i>` : ''}</div>`;
+} };
 W.skills = iconW('Skills', 'skills', 'skills', () => 'Skills');
 W.watchless = iconW('Watchless', 'eyeoff', 'watchless', () => 'Watchless');
 W.settings = iconW('Settings', 'gear', 'settings', () => 'Settings');
@@ -1942,8 +1950,11 @@ function hkGrid(id, done, big) {
   for (let i = 0; i < 84; i++) { const v = hkVal(h, i), c = Math.floor(i / 7), w = i % 7; const cls = v == null ? '' : v >= 1 ? 'on' : v > 0 ? 'half' : 'miss'; s += `<circle class="dt ${cls}${i === HT ? ' hk-now' : ''}" cx="${c * g + g / 2}" cy="${w * g + g / 2}" r="${v == null ? r * .35 : r}"/>`; }
   return `<svg class="dts hk${big ? ' big' : ''}" viewBox="0 0 ${12 * g} ${7 * g}" width="100%" aria-hidden="true">${s}</svg>`;
 }
+const H_SEC = { habits: 'Habits', goals: 'Goals', quit: 'Quitting' };
 V.habits = {
-  title: () => ({ habits: 'Habits', goals: 'Goals', quit: 'Quitting' }[S.ui.hSeg || 'habits']),
+  title: () => H_SEC[S.ui.hSeg || 'habits'],
+  /* The same chip as Plan's, in the same left column: which section, and a picker for the other two. */
+  lead: () => `<button class="ctxchip one" data-a="hPick" aria-label="Section: ${H_SEC[S.ui.hSeg || 'habits']}"><span class="ct"><b>${H_SEC[S.ui.hSeg || 'habits']}</b></span>${ico('down')}</button>`,
   action: () => `<button class="kb" data-a="addHabitMenu" aria-label="Add">${ico('plus')}</button>`,
   render(a, e) {
     if (a.seg && !e.segSet) { S.ui.hSeg = a.seg; e.segSet = 1; }
@@ -1953,6 +1964,10 @@ V.habits = {
   }
 };
 A.hSeg = (el, x) => { S.ui.hSeg = x; const e = top_(); renderTop(e); renderBody(e, true); };
+A.hPick = () => sheet('hpick', {
+  title: 'Show', body: () => `<div class="cd tight rows">${Object.entries(H_SEC).map(([id, l]) => `<button class="row" style="width:100%" data-a="hPicked" data-x="${id}"><span class="grow rt one">${l}</span>${(S.ui.hSeg || 'habits') === id ? ico('check') : ''}</button>`).join('')}</div>`
+});
+A.hPicked = (el, x) => { closeSheet('hpick'); A.hSeg(null, x); };
 function habitsBody() {
   const daily = S.routines.filter(r => ['daily', 'prework'].includes(r.cadence) && !r.repeatable);
   const rdone = daily.filter(r => routineDone(r) >= routineReq(r)).length;
@@ -1972,7 +1987,20 @@ function habitsBody() {
   <div class="sl">No set day</div>${nos.map(rcard).join('')}`;
 }
 A.hevySync = () => hevySync();
-A.addHabitMenu = () => sheet('addh', {
+/* The + follows the section: a goal on Goals, a quit on Quitting, a habit on Habits. */
+A.addHabitMenu = () => { const sec = S.ui.hSeg || 'habits'; if (sec === 'goals') return A.goalNew(); S.ui.hk = sec === 'quit' ? 1 : 0; A.habitNew(); };
+A.goalNew = () => { S.ui.gtf = 'quarter'; sheet('goalnew', {
+  title: 'New goal', focus: '#gnm', live: false,
+  body: () => `<input class="fld" id="gnm" placeholder="e.g. Read 2 books" aria-label="Goal" data-enter="goalSave" autocomplete="off"><div class="hstack" style="margin-top:10px;gap:8px"><input class="fld" id="gtg" inputmode="decimal" placeholder="Target" aria-label="Target" style="flex:1"><input class="fld" id="gun" placeholder="Unit, e.g. books" aria-label="Unit" style="flex:1.4" autocomplete="off"></div><div class="sl">Period</div><div class="chips">${[['weekly', 'This week'], ['monthly', 'This month'], ['quarter', 'This quarter'], ['half', 'Half year']].map(([t, l]) => `<button class="chip ${t === 'quarter' ? 'on' : ''}" data-a="gnTf" data-x="${t}">${l}</button>`).join('')}</div>`,
+  foot: () => `<button class="key t" data-a="sheetX">Cancel</button><button class="key" data-a="goalSave">Add goal</button>`
+}); };
+A.gnTf = (el, t) => { S.ui.gtf = t; $$('.sheet .chip').forEach(c => c.classList.toggle('on', c === el)); };
+A.goalSave = () => {
+  const v = $('#gnm').value.trim(); if (!v) return; const tg = parseFloat(String($('#gtg').value).replace(',', '.'));
+  B.store().addGoal({ space: wsp(), name: v, current: 0, target: tg > 0 ? tg : 1, unit: ($('#gun').value || '').trim() || 'times', note: '', timeframe: S.ui.gtf || 'quarter', category: 'life' });
+  closeSheet('goalnew'); toast('Goal added');
+};
+A.habitNew = () => sheet('addh', {
   title: 'Add', body: () => `<div class="seg" style="margin-bottom:12px">${['Keep', 'Quit', 'Amount'].map((k, i) => `<button class="${(S.ui.hk || 0) === i ? 'on' : ''}" data-a="hkPick" data-x="${i}">${k}</button>`).join('')}</div><input class="fld" id="hname" placeholder="${['e.g. Read 10 pages', 'e.g. Scrolling in bed', 'e.g. Push-ups'][S.ui.hk || 0]}" data-enter="habitAdd"><div class="sl">When in the day</div><div class="chips">${['Morning', 'Noon', 'Afternoon', 'Evening', 'Anytime'].map((s, i) => `<button class="chip ${i === 0 ? 'on' : ''}">${s}</button>`).join('')}</div><div class="sl">How often</div><div class="chips">${['Every day', 'Mon to Fri', 'A few times a week', 'Once a week'].map((s, i) => `<button class="chip ${i === 0 ? 'on' : ''}">${s}</button>`).join('')}</div>`,
   foot: () => `<button class="key t" data-a="sheetX">Cancel</button><button class="key" data-a="habitAdd">Add habit</button>`, live: true
 });
@@ -2545,7 +2573,7 @@ V.weather = {
    Jar world (Jar, Health, Gym, Longevity, Why), Jarvis, Apps drawer,
    Settings, Skills, Watchless, embedded app host, Daily review
    ===================================================================== */
-const jarNav = cur => `<div class="chips" style="margin-bottom:12px">${[['jar', 'Jar'], ['health', 'Health'], ['gym', 'Gym'], ['longevity', 'Longevity'], ['why', 'The wall']].map(([id, l]) => `<button class="chip ${cur === id ? 'on' : ''}" data-a="jarGo" data-x="${id}">${l}</button>`).join('')}</div>`;
+const jarNav = cur => cur === 'jar' ? `<div class="jarlinks">${[['health', 'Health'], ['gym', 'Gym'], ['longevity', 'Longevity'], ['why', 'The wall']].map(([id, l]) => `<button class="chip" data-a="jarGo" data-x="${id}">${l}</button>`).join('')}</div>` : `<div class="chips" style="margin-bottom:12px">${[['jar', 'Jar'], ['health', 'Health'], ['gym', 'Gym'], ['longevity', 'Longevity'], ['why', 'The wall']].map(([id, l]) => `<button class="chip ${cur === id ? 'on' : ''}" data-a="jarGo" data-x="${id}">${l}</button>`).join('')}</div>`;
 A.jarGo = (el, id) => { if (CLASSIC_V[id]) { B.openClassic(CLASSIC_V[id]); return; } const e = top_(); if (e.id === id) return; e.id = id; e.args = {}; e.el.dataset.view = id; e.el.classList.toggle('dark', !!V[id].dark); setChrome(); renderTop(e); renderBody(e, true); };
 
 V.jar = {
@@ -2697,12 +2725,11 @@ A.jvTab = (el, id) => tab(id);
 A.jvProj = (el, id) => { S.ui.planProj = id; S.ui.planSeg = 'todo'; tab('plan'); };
 A.jvOpen = (el, id) => { if (id === 'goals') { S.ui.hSeg = 'goals'; tab('habits'); } else open(id, id === 'people' ? { mode: 'personal' } : {}); };
 /* ---------------- APPS DRAWER (root tab) ---------------- */
-const DRAWER = [['today', 'clock', 'Today'], ['plan', 'plan', 'Plan'], ['habits', 'habits', 'Habits'], ['calendar', 'calendar', 'Calendar'], ['notes', 'note', 'Notes'], ['ideas', 'ideas', 'Ideas'], ['people', 'people', 'People'], ['bills', 'bills', 'Bills'], ['jar', 'jar', 'Jar'], ['health', 'heart', 'Health'], ['gym', 'dumbbell', 'Gym'], ['longevity', 'pulse', 'Longevity'], ['zone', 'zone', 'Zone'], ['focus', 'bolt', 'Focus'], ['projects', 'projects', 'Projects'], ['jarvis', 'face', 'Jarvis'], ['skills', 'skills', 'Skills'], ['watchless', 'eyeoff', 'Watchless'], ['weather', 'sun', 'Weather'], ['why', 'quote', 'The wall'], ['search', 'search', 'Search'], ['settings', 'gear', 'Settings']];
+const DRAWER = [['calendar', 'calendar', 'Calendar'], ['notes', 'note', 'Notes'], ['ideas', 'ideas', 'Ideas'], ['people', 'people', 'People'], ['bills', 'bills', 'Bills'], ['jar', 'jar', 'Jar'], ['zone', 'zone', 'Zone'], ['focus', 'bolt', 'Focus'], ['jarvis', 'face', 'Jarvis'], ['skills', 'skills', 'Skills'], ['watchless', 'eyeoff', 'Watchless'], ['weather', 'sun', 'Weather'], ['settings', 'gear', 'Settings']];
 V.apps = {
   title: 'Apps', render() {
-    const badge = { plan: openToday('all').length, habits: habitsDue('all').due - habitsDue('all').kept, people: overdue().length, bills: billsOverdue().length, ideas: S.prompts.filter(p => !p.sent).length };
-    return `<div class="drawer">${DRAWER.map(([id, ic, l], i) => `<button class="dapp ${[1, 6, 8, 15].includes(i) ? 'k' : ''} ${id === 'bills' && badge.bills ? 'r' : ''}" data-a="drawerOpen" data-x="${id}">${icoBig(ic, 30)}<span class="dl">${l}</span>${badge[id] ? `<i class="bd">${badge[id]}</i>` : ''}</button>`).join('')}</div>
-    <button class="key t wide" style="margin-top:16px" data-a="openClassic" data-x="apps">${ico('apps')} Embedded apps</button>`;
+    const badge = { people: overdue().length, bills: billsOverdue().length, ideas: S.prompts.filter(p => !p.sent).length };
+    return `<div class="drawer">${DRAWER.map(([id, ic, l], i) => `<button class="dapp ${i % 2 === 1 ? 'k' : ''} ${id === 'bills' && badge.bills ? 'r' : ''}" data-a="drawerOpen" data-x="${id}">${icoBig(ic, 30)}<span class="dl">${l}</span>${badge[id] ? `<i class="bd">${badge[id]}</i>` : ''}</button>`).join('')}</div>`;
   }
 };
 A.drawerOpen = (el, id) => { if (id === 'plan' || id === 'habits') tab(id); else open(id); };
@@ -2713,6 +2740,7 @@ V.settings = {
     <div class="cd tight rows"><div class="row"><span class="grow rt one">Dark mode</span><button class="tgl ${S.theme === 'dark' ? 'on' : ''}" data-a="themeTgl" aria-pressed="${S.theme === 'dark'}"><i></i></button></div></div>
     <div class="sl">Sync</div><div class="cd"><div class="hstack"><span class="xdot ${S.sync.state === 'saving' ? 'warn' : S.sync.state === 'error' ? 'alert' : 'ok'}"></span><div class="grow"><div class="rt one">${esc(S.sync.label)}</div><div class="rs">${esc(MC.device)}</div></div></div></div>
     <div class="sl">Keys on this device</div><div class="cd tight rows">${[['AI key', MC.keys.ai], ['Hevy key', MC.keys.hevy]].map(([k, v]) => `<div class="row"><span class="grow rt one">${k}</span><span class="lb">${v ? 'Set' : 'Not set'}</span></div>`).join('')}</div>
+    <button class="key t wide" data-a="openClassic" data-x="apps" style="margin-bottom:8px">${ico('apps')} Embedded apps</button>
     <button class="key t wide" data-a="openClassic" data-x="settings">${ico('gear')} All settings</button>
     <div class="sl">This build</div><div class="cd"><div class="row"><span class="grow rt one">${esc(MC.build)}</span><button class="key xs t" data-a="reload">Reload</button></div></div>`;
   }

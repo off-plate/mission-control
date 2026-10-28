@@ -10,7 +10,7 @@ import { BillsSignIn, useCompassAccount } from './billspage'
 import { Sheet } from './modals'
 import { Band, Select } from './ui'
 import {
-  callFunction, deleteMyMind, mymindImageUrls, readMyMind, SUPABASE_ENABLED, updateMyMind, type MyMindRow,
+  callFunction, deleteMyMind, mymindImageUrls, onMyMindChange, readMyMind, SUPABASE_ENABLED, updateMyMind, type MyMindRow,
 } from './supabase'
 
 const TRASH_DAYS = 30
@@ -100,6 +100,20 @@ export function MyMindPage() {
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not load') }
   }, [])
   useEffect(() => { if (signedIn) void load(); else setRows(null) }, [signedIn, load])
+
+  /* Stays current on its own: the live feed pushes a save the moment it lands; coming back to the tab reloads;
+     a slow poll covers a dropped connection (a phone that slept, a laptop that woke). */
+  useEffect(() => {
+    if (!signedIn) return
+    let t: number | undefined
+    const soon = () => { window.clearTimeout(t); t = window.setTimeout(() => void load(), 250) }
+    const off = onMyMindChange(soon)
+    const visible = () => { if (document.visibilityState === 'visible') soon() }
+    document.addEventListener('visibilitychange', visible)
+    window.addEventListener('focus', visible)
+    const poll = window.setInterval(visible, 30000)
+    return () => { off(); document.removeEventListener('visibilitychange', visible); window.removeEventListener('focus', visible); window.clearInterval(poll); window.clearTimeout(t) }
+  }, [signedIn, load])
 
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase()

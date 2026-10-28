@@ -410,6 +410,16 @@ export async function readMyMind(): Promise<MyMindRow[] | null> {
   return (data ?? []) as MyMindRow[]
 }
 
+/** Calls back whenever a row in mc_mymind is added, changed or removed (RLS keeps it to his own). */
+export function onMyMindChange(fn: () => void): () => void {
+  const c = db()
+  if (!c) return () => {}
+  const ch = c.channel('mc-mymind-live')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'mc_mymind' }, () => fn())
+    .subscribe()
+  return () => { void c.removeChannel(ch) }
+}
+
 export async function updateMyMind(id: string, patch: Partial<Pick<MyMindRow, 'note' | 'title' | 'trashed_at'>>): Promise<void> {
   const c = db()
   if (!c) throw new Error('Not signed in')

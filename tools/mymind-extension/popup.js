@@ -1,24 +1,30 @@
+/* One click saves: the popup opens, grabs the page, sends it, plays a short animation, says it was saved, closes. */
 const $ = (id) => document.getElementById(id)
-let tab = null, info = null
-;(async () => {
-  ;[tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-  info = tab ? await mmPageInfo(tab.id) : null
-  $('site').textContent = tab?.url || ''
-  $('t').value = info?.title || tab?.title || ''
-  if (!/^https?:/.test(tab?.url || '')) { $('go').disabled = true; $('msg').textContent = 'This page cannot be saved.' }
-  $('n').focus()
-})()
-async function save() {
-  $('go').disabled = true; $('msg').className = ''; $('msg').textContent = 'Saving...'
-  const body = info?.selection && !$('t').dataset.edited
-    ? { text: info.selection, url: tab.url, note: $('n').value }
-    : { url: tab.url, title: $('t').value, description: info?.description, ...(await mmPreview(info)), note: $('n').value }
-  const r = await mmSend(body)
-  $('msg').className = r.ok ? 'ok' : 'err'
-  $('msg').textContent = r.ok ? (r.duplicate ? 'Already saved, moved to the top' : 'Saved') : r.error
-  if (r.needsKey) chrome.runtime.openOptionsPage()
-  if (r.ok) setTimeout(() => window.close(), 900); else $('go').disabled = false
+const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+const MIN_SHOW = 1200   // the saving animation always gets this long, so a fast save still reads as something happening
+
+async function run() {
+  document.body.className = ''
+  $('head').textContent = 'Saving to MyMind'; $('sub').textContent = ''
+  /* ?tab=<id> lets a test point the popup at a tab; Chrome itself opens it with the active tab. */
+  const forced = new URLSearchParams(location.search).get('tab')
+  const tab = forced ? await chrome.tabs.get(+forced) : (await chrome.tabs.query({ active: true, currentWindow: true }))[0]
+  if (!tab || !/^https?:/.test(tab.url || '')) return fail('This page cannot be saved.')
+  const info = await mmPageInfo(tab.id)
+  $('sub').textContent = info?.title || tab.title || tab.url
+  const body = info?.selection
+    ? { text: info.selection, url: tab.url }
+    : { url: tab.url, title: info?.title, description: info?.description, ...(await mmPreview(info)) }
+  const [r] = await Promise.all([mmSend(body), wait(MIN_SHOW)])
+  if (!r.ok) { if (r.needsKey) chrome.runtime.openOptionsPage(); return fail(r.error) }
+  document.body.className = 'ok'
+  $('head').textContent = info?.selection ? 'Saved the quote' : r.duplicate ? 'Already saved' : 'Saved to MyMind'
+  $('sub').textContent = r.duplicate ? 'Moved to the top' : (r.title || info?.title || '')
+  setTimeout(() => window.close(), 1700)
 }
-$('go').addEventListener('click', save)
-$('t').addEventListener('input', () => { $('t').dataset.edited = '1' })
-document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey || e.target.id === 't')) save() })
+function fail(msg) {
+  document.body.className = 'err'
+  $('head').textContent = 'Not saved'; $('sub').textContent = msg
+}
+$('retry').addEventListener('click', run)
+run()

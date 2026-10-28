@@ -16,6 +16,12 @@ import {
 const TRASH_DAYS = 30
 const PAGE = 48
 
+type Sort = 'newest' | 'oldest' | 'source' | 'title'
+const SORTS: { id: Sort; label: string }[] = [
+  { id: 'newest', label: 'Newest first' }, { id: 'oldest', label: 'Oldest first' },
+  { id: 'source', label: 'Source A to Z' }, { id: 'title', label: 'Title A to Z' },
+]
+
 type Filter = 'all' | 'instagram' | 'youtube' | 'web' | 'photos' | 'text' | 'trash'
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'all', label: 'All' }, { id: 'instagram', label: 'Instagram' }, { id: 'youtube', label: 'YouTube' },
@@ -72,6 +78,7 @@ export function MyMindPage() {
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
   const [q, setQ] = useState('')
+  const [sort, setSort] = useState<Sort>('newest')
   const [shown, setShown] = useState(PAGE)
   const [urls, setUrls] = useState<Record<string, string>>({})
   const [open, setOpen] = useState<string | null>(null)
@@ -96,10 +103,17 @@ export function MyMindPage() {
 
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase()
-    return (rows ?? []).filter((r) => matches(r, filter) && (!needle ||
+    const out = (rows ?? []).filter((r) => matches(r, filter) && (!needle ||
       `${r.title} ${r.site} ${r.description} ${r.note} ${r.body}`.toLowerCase().includes(needle)))
-  }, [rows, filter, q])
-  useEffect(() => { setShown(PAGE) }, [filter, q])
+    const byDate = (a: MyMindRow, b: MyMindRow) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0)
+    const text = (r: MyMindRow, k: 'site' | 'title') => (r[k] || r.title || r.site).toLowerCase()
+    if (sort === 'oldest') out.sort(byDate)
+    else if (sort === 'source') out.sort((a, b) => text(a, 'site').localeCompare(text(b, 'site')) || byDate(b, a))
+    else if (sort === 'title') out.sort((a, b) => text(a, 'title').localeCompare(text(b, 'title')))
+    else out.sort((a, b) => byDate(b, a))
+    return out
+  }, [rows, filter, q, sort])
+  useEffect(() => { setShown(PAGE) }, [filter, q, sort])
   const visible = list.slice(0, shown)
 
   /* Signed preview links for just the cards on screen. */
@@ -173,10 +187,15 @@ export function MyMindPage() {
           value={adding} onChange={(e) => setAdding(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { void addLink(adding); setAdding('') } }} />
       </div>
+      <div className="mm-chiprow">
       <div className="mm-chips" role="group" aria-label="Show">
         {FILTERS.map((f) => (
           <button key={f.id} className={`mm-chip${filter === f.id ? ' is-on' : ''}`} aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>{f.label}</button>
         ))}
+      </div>
+      <select className="mm-field mm-sort" aria-label="Sort by" value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
+        {SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+      </select>
       </div>
       {status && <div className="mm-status" role="status">{status}</div>}
 

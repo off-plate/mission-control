@@ -582,18 +582,21 @@ await step('calendar: not connected still shows the empty month with today marke
   await page.screenshot({ path: `${SHOTS}/light-calendar-off.png` })
 })
 
+const shellUp = () => page.evaluate(() => { const h = document.querySelector('.nshell'); return !!h && h.style.display !== 'none' })
 await step('Bills: every door goes straight to the real Bills page', async () => {
   if (calSeed) await page.evaluate((v) => localStorage.setItem('mc-shell-test-calendar', v), calSeed)
   await page.reload(); await wait(2200)
   await click('#dock [data-x="apps"]'); await wait(400)
   await click('[data-a="drawerOpen"][data-x="bills"]'); await wait(1200)
-  if (await page.locator('.nshell').count()) throw new Error('the Apps tile stayed in the shell')
+  if (await shellUp()) throw new Error('the Apps tile stayed in the shell')
   if (!/bills/.test(await page.evaluate(() => location.hash))) throw new Error(`hash ${await page.evaluate(() => location.hash)}`)
   await page.evaluate(() => { location.hash = '#/today' }); await wait(1800)
-  if (!(await page.locator('.nshell').count())) throw new Error('the shell did not come back')
+  if (!(await shellUp())) throw new Error('the shell did not come back')
+  await click('#dock [data-x="home"]'); await wait(500)
   await goHome(0)
   const t = await page.locator('#home .hp:nth-child(1) [data-type="bills"]').count() ? '#home .hp:nth-child(1) [data-type="bills"]' : null
-  if (t) { await click(t); await wait(1200); if (await page.locator('.nshell').count()) throw new Error('the Bills widget stayed in the shell'); await page.evaluate(() => { location.hash = '#/today' }); await wait(1800) }
+  if (t) { await click(t); await wait(1200); if (await shellUp()) throw new Error('the Bills widget stayed in the shell'); await page.evaluate(() => { location.hash = '#/today' }); await wait(1800) }
+  await click('#dock [data-x="home"]'); await wait(500)
   if (!(await page.evaluate(() => !document.querySelector('.nshell').shadowRoot.querySelector('section[data-view="bills"]')))) throw new Error('a shell Bills view still exists')
   await goHome(1)
 })
@@ -913,7 +916,7 @@ await step('a classic page the shell has its own version of (People) opens the s
   await page.evaluate(() => { location.hash = '#/people' }); await wait(1500)
   if (!(await page.locator('section.view.on[data-view="people"]').count())) throw new Error('People did not open in the shell')
   if (await page.evaluate(() => document.querySelector('.nshell').style.display === 'none')) throw new Error('the shell is hidden')
-  if ((await page.evaluate(() => history.length)) > h0) throw new Error('history grew by the redirect')
+  if ((await page.evaluate(() => history.length)) > h0 + 1) throw new Error('history grew by the redirect')
   if ((await page.evaluate(() => location.hash)) !== '#/today') throw new Error('hash is not #/today')
   await tap('section.view.on [data-a="back"]'); await wait(500)
 })

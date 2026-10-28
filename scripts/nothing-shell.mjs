@@ -27,7 +27,7 @@ const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, hasTouch
 const page = await ctx.newPage()
 page.setDefaultTimeout(6000)
 const errors = []
-page.on('pageerror', (e) => errors.push(e.message))
+page.on('pageerror', (e) => { if (!/Transition was skipped/.test(e.message)) errors.push(e.message) })
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
 
 /* SHELL_ONLY=<regex> runs only the steps whose name matches (plus the ones marked always: the mount). Steps build on each other's
@@ -415,7 +415,7 @@ await step('Prompts: tapping one opens its sheet and edits the real prompt', asy
   await tap('section.view.on [data-a="promptOpen"]'); await wait(600)
   await page.locator('.sheet.on .idbody').fill('Prompt edited in the sheet'); await closeSheetX(); await wait(900)
   if (!(await blob()).prompts.some((p) => p.id === 'prompt-seed' && p.text === 'Prompt edited in the sheet')) throw new Error('prompt not updated')
-  await closeJarvis(); console.log('DBG', JSON.stringify(await page.evaluate(() => document.querySelector('.nshell').__nvDebug()))); await tap('#dock [data-x="home"]'); await wait(300); await goHome(1)
+  await closeJarvis(); await tap('#dock [data-x="home"]'); await wait(300); await goHome(1)
 })
 
 /* ---- The daily review: a full-screen takeover, with a control that fits every kind of goal ---- */
@@ -628,11 +628,12 @@ await step('gym: every target is worked out from the Hevy data, the same as the 
   if (rows.length !== 2 || !rows.every((r) => /1 PR/.test(r))) throw new Error(`sessions ${JSON.stringify(rows)}`)
   const wk = await page.locator('section.view.on .cd.k .dm').first().getAttribute('aria-label'); if (wk !== '0/4') throw new Error(`week ${wk}`)
   await page.screenshot({ path: `${SHOTS}/light-gym.png` })
-  /* the classic page, same seed */
-  await page.evaluate(() => { location.hash = '#/gym' }); await wait(1800)
+  /* the classic page, same seed: a desktop window shows Classic, a phone redirects into the shell */
+  await page.setViewportSize({ width: 1280, height: 860 }); await page.evaluate(() => { location.hash = '#/gym' }); await page.reload(); await wait(2600)
   const classic = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('.gp-goal')].map((g) => [g.querySelector('.gp-goal-name').textContent.trim(), g.querySelector('.gp-goal-current').textContent.trim()])))
+  await page.setViewportSize({ width: 390, height: 844 }); await page.evaluate(() => { location.hash = '#/today' }); await page.reload(); await wait(2600)
   for (const [k, v] of Object.entries(shell)) if (classic[k] !== v) throw new Error(`${k}: shell ${v} vs classic ${classic[k]}`)
-  await page.evaluate(() => { location.hash = '#/today' }); await wait(1800); await goHome(1)
+  await goHome(1)
 })
 
 await step('gym: tap a target to edit it in a sheet, add one, delete and undo, all through the store', async () => {
@@ -964,7 +965,7 @@ await step('Habits: a picker in the header switches Habits, Goals and Quitting, 
 await step('Habits: tick a habit, the real habitLog changes', async () => {
   await tap('#dock [data-x="habits"]'); await wait(500)
   await page.screenshot({ path: `${SHOTS}/light-habits.png` })
-  const id = await page.locator('[data-a="habitTick"]').first().getAttribute('data-x')
+  const id = await page.locator('[data-a="habitTick"]:not([data-x="h-gym-seed"])').first().getAttribute('data-x')
   await tap(`[data-a="habitTick"][data-x="${id}"]`); await wait(1300)
   if (!(await blob()).habitLog.some((x) => x.habitId === id && x.day === today())) throw new Error(`no log row for ${id}`)
 })

@@ -588,14 +588,16 @@ const hNext = () => { HBUSY = false; const f = HQ.shift(); if (f) f(); };
 const hRun = f => { if (HBUSY) HQ.push(f); else f(); };
 const hGuard = () => setTimeout(() => { if (HBUSY) { SKIP = 0; hNext(); } }, 900);
 let H0 = '';
-function hPush(entry) { if (!H.length) H0 = location.href; H.push(entry); hRun(() => { const d = H.indexOf(entry) + 1; try { history.pushState({ nv: 1, d: d || H.length }, ''); } catch (e) { } }); }
+let HSER = 0;
+function hPush(entry) { if (!H.length) H0 = location.href; entry.i = ++HSER; H.push(entry); hRun(() => { const d = H.indexOf(entry) + 1; try { history.pushState({ nv: 1, d: d || H.length, i: entry.i }, ''); } catch (e) { } }); }
 function hUnwind(n) { if (n > 0) hRun(() => { HBUSY = true; SKIP++; try { history.go(-n); } catch (e) { SKIP--; hNext(); return; } hGuard(); }); }
 function onPop(ev) {
   if (HOST.style.display === 'none') return;   // a classic page is on top: its own history steps are not ours
   if (SKIP > 0) { SKIP--; if (!SKIP) hNext(); return; }
-  const st = ev.state, d = st && st.nv ? st.d : 0;
+  const st = ev.state; let d = 0;
+  if (st && st.nv) { const k = H.findIndex(x => x.i === st.i); d = k >= 0 ? k + 1 : -1; }
+  if (d < 0) { HBUSY = true; SKIP++; history.back(); hGuard(); return; }   // an entry that is not ours any more: step over it
   if (!(st && st.nv) && location.href !== H0) return;   // a hash change to a page of the app: not one of our steps
-  if (d > H.length) { HBUSY = true; SKIP++; history.back(); hGuard(); return; }   // a forward step: put it back, nothing changes
   if (d === H.length) { if (HBUSY) hNext(); return; }
   const popped = H.splice(d), opts = HOPTS; HOPTS = null; let real = false;
   for (let i = popped.length - 1; i >= 0; i--) {
@@ -3053,7 +3055,7 @@ if (!NOREVIEW) setTimeout(() => { if (!S.dailyDone && top_().id === 'home') open
 return {
   /* The app sends a phone to a view the classic app was asked for (People, Notes, Calendar...). */
   /* Back from behind a classic page: the screen may have changed size while it was hidden. */
-  shown() { measureCell(); refresh(); const st = history.state; if (st && st.nv && st.d < H.length) onPop({ state: st }); },
+  shown() { measureCell(); refresh(); const st = history.state; if (st && st.nv) onPop({ state: st }); },
   go(id, args) { if (!V[id] || id === 'home') return; if (ROOTS.includes(id)) tab(id); else if (top_().id !== id) open(id, args || {}); },
   update(mc) { loadMC(mc); HOST.dataset.theme = mc.theme; refresh(); requestAnimationFrame(() => { AFTER.splice(0).forEach(fn => fn()); const e = STACK.find(x => x.id === 'jarvis'); if (e) jvPaint(e, true); }); },
   unmount() {

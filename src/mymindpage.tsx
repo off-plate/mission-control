@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BillsSignIn, useCompassAccount } from './billspage'
 import { Sheet } from './modals'
-import { Band } from './ui'
+import { Band, Select } from './ui'
 import {
   callFunction, deleteMyMind, mymindImageUrls, readMyMind, SUPABASE_ENABLED, updateMyMind, type MyMindRow,
 } from './supabase'
@@ -186,16 +186,12 @@ export function MyMindPage() {
         <input className="mm-field" type="url" inputMode="url" placeholder="Paste a link and press Enter" aria-label="Save a link"
           value={adding} onChange={(e) => setAdding(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { void addLink(adding); setAdding('') } }} />
+        <Select className="mm-sort" ariaLabel="Sort by" value={sort} onChange={setSort} options={SORTS.map((s) => ({ value: s.id, label: s.label }))} />
       </div>
-      <div className="mm-chiprow">
       <div className="mm-chips" role="group" aria-label="Show">
         {FILTERS.map((f) => (
           <button key={f.id} className={`mm-chip${filter === f.id ? ' is-on' : ''}`} aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>{f.label}</button>
         ))}
-      </div>
-      <select className="mm-field mm-sort" aria-label="Sort by" value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
-        {SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-      </select>
       </div>
       {status && <div className="mm-status" role="status">{status}</div>}
 

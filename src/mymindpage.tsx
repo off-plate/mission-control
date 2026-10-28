@@ -22,10 +22,10 @@ const SORTS: { id: Sort; label: string }[] = [
   { id: 'source', label: 'Source A to Z' }, { id: 'title', label: 'Title A to Z' },
 ]
 
-type Filter = 'all' | 'instagram' | 'youtube' | 'web' | 'photos' | 'text' | 'trash'
+type Filter = 'all' | 'instagram' | 'youtube' | 'web' | 'photos' | 'text' | 'done' | 'trash'
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'all', label: 'All' }, { id: 'instagram', label: 'Instagram' }, { id: 'youtube', label: 'YouTube' },
-  { id: 'web', label: 'Web' }, { id: 'photos', label: 'Photos' }, { id: 'text', label: 'Text' }, { id: 'trash', label: 'Trash' },
+  { id: 'web', label: 'Web' }, { id: 'photos', label: 'Photos' }, { id: 'text', label: 'Text' }, { id: 'done', label: 'Done' }, { id: 'trash', label: 'Trash' },
 ]
 
 const isInstagram = (r: MyMindRow) => /(^|\.)instagram\.com$/.test(r.site)
@@ -34,6 +34,8 @@ const isYouTube = (r: MyMindRow) => /youtube\.com$|^youtu\.be$/.test(r.site)
 function matches(r: MyMindRow, f: Filter): boolean {
   if (f === 'trash') return !!r.trashed_at
   if (r.trashed_at) return false
+  if (f === 'done') return !!r.done_at
+  if (r.done_at) return false     // gone through: only the Done list shows it
   if (f === 'instagram') return isInstagram(r)
   if (f === 'youtube') return isYouTube(r)
   if (f === 'web') return r.kind === 'link' && !isInstagram(r) && !isYouTube(r)
@@ -118,7 +120,7 @@ export function MyMindPage() {
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase()
     const out = (rows ?? []).filter((r) => matches(r, filter) && (!needle ||
-      `${r.title} ${r.site} ${r.description} ${r.note} ${r.body}`.toLowerCase().includes(needle)))
+      `${r.title} ${r.site} ${r.description} ${r.body}`.toLowerCase().includes(needle)))
     const byDate = (a: MyMindRow, b: MyMindRow) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0)
     const text = (r: MyMindRow, k: 'site' | 'title') => (r[k] || r.title || r.site).toLowerCase()
     if (sort === 'oldest') out.sort(byDate)
@@ -188,12 +190,12 @@ export function MyMindPage() {
   if (!signedIn) return <div className="page bills-page"><Band title="MyMind" /><BillsSignIn /></div>
 
   const current = open ? (rows ?? []).find((r) => r.id === open) ?? null : null
-  const count = (rows ?? []).filter((r) => !r.trashed_at).length
+  const count = (rows ?? []).filter((r) => !r.trashed_at && !r.done_at).length
 
   return (
     <div className={`page mm-page${drag ? ' is-drag' : ''}`}
       onDragOver={(e) => { e.preventDefault(); setDrag(true) }} onDragLeave={(e) => { if (e.currentTarget === e.target) setDrag(false) }} onDrop={onDrop}>
-      <Band title="MyMind" metrics={rows ? [{ v: String(count), k: 'saved' }] : undefined} />
+      <Band title="MyMind" metrics={rows ? [{ v: String(count), k: 'to go through' }] : undefined} />
 
       <div className="mm-tools">
         <input className="mm-field" type="search" placeholder="Search what you saved" aria-label="Search MyMind" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -212,7 +214,7 @@ export function MyMindPage() {
       {error && <div className="mm-empty">Could not load MyMind: {error}</div>}
       {!error && !rows && <div className="mm-empty">Loading...</div>}
       {rows && !list.length && !error && (
-        <div className="mm-empty">{q ? 'Nothing matches. Try fewer words.' : filter === 'trash' ? 'Trash is empty.' : 'Nothing here yet. Share a link from your phone, or paste one on this page.'}</div>
+        <div className="mm-empty">{q ? 'Nothing matches. Try fewer words.' : filter === 'trash' ? 'Trash is empty.' : filter === 'done' ? 'Nothing marked done yet.' : 'Nothing here yet. Share a link from your phone, or paste one on this page.'}</div>
       )}
 
       <div className="mm-grid">
@@ -234,6 +236,7 @@ export function MyMindPage() {
         <Sheet title="MyMind" onClose={() => setOpen(null)}>
           <Detail row={current} url={current.image_path ? urls[current.image_path] : undefined}
             onChange={(patch) => setRows((rs) => (rs ?? []).map((r) => (r.id === current.id ? { ...r, ...patch } : r)))}
+            onClose={() => setOpen(null)}
             onGone={() => { setRows((rs) => (rs ?? []).filter((r) => r.id !== current.id)); setOpen(null) }}
             onError={flash} />
         </Sheet>
@@ -242,20 +245,21 @@ export function MyMindPage() {
   )
 }
 
-function Detail({ row, url, onChange, onGone, onError }: {
-  row: MyMindRow; url?: string; onChange: (p: Partial<MyMindRow>) => void; onGone: () => void; onError: (m: string) => void
+function Detail({ row, url, onChange, onClose, onGone, onError }: {
+  row: MyMindRow; url?: string; onChange: (p: Partial<MyMindRow>) => void; onClose: () => void; onGone: () => void; onError: (m: string) => void
 }) {
-  const [note, setNote] = useState(row.note)
   const [sure, setSure] = useState(false)
   const run = async (fn: () => Promise<void>) => { try { await fn() } catch (e) { onError(e instanceof Error ? e.message : 'Something went wrong') } }
+  const patch = (p: Partial<Pick<MyMindRow, 'trashed_at' | 'done_at'>>) => run(async () => { await updateMyMind(row.id, p); onChange(p); onClose() })
   return (
     <div className="mm-detail">
       <div className="mm-actions">
         {row.url && <a className="btn btn-primary" href={row.url} target="_blank" rel="noreferrer">Open original</a>}
-        {row.url && <button className="btn" onClick={() => void navigator.clipboard?.writeText(row.url!).then(() => onError('Link copied'))}>Copy link</button>}
+        {!row.trashed_at && !row.done_at && <button className="btn" onClick={() => void patch({ done_at: new Date().toISOString() })}>Mark done</button>}
+        {!row.trashed_at && row.done_at && <button className="btn" onClick={() => void patch({ done_at: null })}>Back to the list</button>}
         {!row.trashed_at && !sure && <button className="btn mm-danger" onClick={() => setSure(true)}>Move to trash</button>}
-        {!row.trashed_at && sure && <button className="btn mm-danger is-sure" onClick={() => void run(async () => { const t = new Date().toISOString(); await updateMyMind(row.id, { trashed_at: t }); onChange({ trashed_at: t }); onGone() })}>Yes, trash it (kept {TRASH_DAYS} days)</button>}
-        {row.trashed_at && <button className="btn btn-primary" onClick={() => void run(async () => { await updateMyMind(row.id, { trashed_at: null }); onChange({ trashed_at: null }); onGone() })}>Restore</button>}
+        {!row.trashed_at && sure && <button className="btn mm-danger is-sure" onClick={() => void patch({ trashed_at: new Date().toISOString() })}>Yes, trash it (kept {TRASH_DAYS} days)</button>}
+        {row.trashed_at && <button className="btn btn-primary" onClick={() => void patch({ trashed_at: null })}>Restore</button>}
         {row.trashed_at && !sure && <button className="btn mm-danger" onClick={() => setSure(true)}>Delete forever</button>}
         {row.trashed_at && sure && <button className="btn mm-danger is-sure" onClick={() => void run(async () => { await deleteMyMind(row); onGone() })}>Yes, delete forever</button>}
       </div>
@@ -265,10 +269,6 @@ function Detail({ row, url, onChange, onGone, onError }: {
       <h3 className="mm-dt">{row.url ? <a href={row.url} target="_blank" rel="noreferrer">{row.title || row.site}</a> : (row.title || row.site)}</h3>
       <div className="mm-mt">{row.kind === 'link' ? row.site : row.kind === 'image' ? 'Photo' : 'Text'} / saved {ago(row.created_at)}{row.via ? ` / via ${row.via}` : ''}</div>
       {row.kind === 'text' && <p className="mm-body">{row.body}</p>}
-      {row.kind === 'link' && row.description && <p className="mm-body">{row.description}</p>}
-      <label className="mm-lab" htmlFor="mm-note">Note</label>
-      <textarea id="mm-note" className="mm-field mm-ta" rows={3} placeholder="Why you saved it" value={note} onChange={(e) => setNote(e.target.value)}
-        onBlur={() => { if (note !== row.note) void run(async () => { await updateMyMind(row.id, { note }); onChange({ note }) }) }} />
     </div>
   )
 }

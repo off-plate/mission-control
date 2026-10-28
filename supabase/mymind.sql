@@ -37,3 +37,6 @@ create policy mymind_files_delete on storage.objects for delete to authenticated
 
 -- Live updates for the MyMind page (2026-10-28): new saves from the phone appear without a refresh.
 alter publication supabase_realtime add table mc_mymind;
+
+-- Done (2026-10-28): gone through and acted on. Leaves every list, lives under Done.
+alter table mc_mymind add column if not exists done_at timestamptz;

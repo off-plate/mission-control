@@ -398,8 +398,10 @@ export interface MyMindRow {
   via: string
   created_at: string
   trashed_at: string | null
+  /** Went through it and acted on it: leaves every list and lives under Done. */
+  done_at: string | null
 }
-const MYMIND_COLS = 'id,kind,url,title,site,description,body,note,image_path,via,created_at,trashed_at'
+const MYMIND_COLS = 'id,kind,url,title,site,description,body,note,image_path,via,created_at,trashed_at,done_at'
 
 export async function readMyMind(): Promise<MyMindRow[] | null> {
   const c = db()
@@ -420,7 +422,7 @@ export function onMyMindChange(fn: () => void): () => void {
   return () => { void c.removeChannel(ch) }
 }
 
-export async function updateMyMind(id: string, patch: Partial<Pick<MyMindRow, 'note' | 'title' | 'trashed_at'>>): Promise<void> {
+export async function updateMyMind(id: string, patch: Partial<Pick<MyMindRow, 'note' | 'title' | 'trashed_at' | 'done_at'>>): Promise<void> {
   const c = db()
   if (!c) throw new Error('Not signed in')
   const { error } = await c.from('mc_mymind').update(patch).eq('id', id)

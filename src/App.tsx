@@ -550,6 +550,8 @@ function PhoneTabBar({ page, setPage, nothing }: { page: PageId; setPage: (p: Pa
 }
 
 /* Pages that are dark in both modes, so the header goes dark with them. */
+/* Pages the Nothing app opens full screen from Apps: they carry the standard back header, so no classic bottom bar, same as Notes or People. */
+const NOTHING_OPENED: PageId[] = ['bills', 'mymind', 'skills', 'longevity', 'watchless']
 const DARK_CHROME_PAGES: PageId[] = ['timeline', 'board', 'health', 'gym', 'longevity']
 
 export default function App() {
@@ -948,7 +950,7 @@ export default function App() {
         </PageBoundary>
       </main>
 
-      {page !== 'zone' && <PhoneTabBar page={page} setPage={setPage} nothing={skin.startsWith('nothing')} />}
+      {page !== 'zone' && !(phone && skin.startsWith('nothing') && NOTHING_OPENED.includes(page)) && <PhoneTabBar page={page} setPage={setPage} nothing={skin.startsWith('nothing')} />}
     </div>
     )}
     </>

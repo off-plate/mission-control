@@ -169,9 +169,9 @@ export function MyMindPage() {
     if (u) void addLink(u.split('\n')[0])
   }
 
-  if (!SUPABASE_ENABLED) return <div className="page mm-page"><div className="mm-empty">Sync is off in this build, so MyMind has nothing to read.</div></div>
-  if (signedIn === null) return <div className="page mm-page" />
-  if (!signedIn) return <div className="page bills-page"><BillsSignIn /></div>
+  if (!SUPABASE_ENABLED) return <div className="page mm-page"><Band title="MyMind" /><div className="mm-empty">Sync is off in this build, so MyMind has nothing to read.</div></div>
+  if (signedIn === null) return <div className="page mm-page"><Band title="MyMind" /></div>
+  if (!signedIn) return <div className="page bills-page"><Band title="MyMind" /><BillsSignIn /></div>
 
   const current = open ? (rows ?? []).find((r) => r.id === open) ?? null : null
   const count = (rows ?? []).filter((r) => !r.trashed_at).length

@@ -117,9 +117,8 @@ await page.evaluate(({ K, day }) => {
 }, { K: KEY, day: today() })
 await page.goto(`${URL}#/settings`); await page.reload(); await wait(1500)
 
-await step('pick Nothing Light in Settings, the shell mounts', async () => {
-  await page.getByRole('radio', { name: 'Nothing Light' }).or(page.getByRole('button', { name: 'Nothing Light' })).first().click()
-  await wait(1500)
+await step('a phone opens the Nothing app by itself, Light by default', async () => {
+  await wait(500)
   if (!(await page.locator('.nshell').count())) throw new Error('no shell host')
   if ((await page.locator('#home .hp').count()) !== 3) throw new Error('home has not three pages')
   if (await page.locator('.topbar').count()) throw new Error('the classic header is still there')
@@ -796,11 +795,10 @@ await step('dark: the Nothing Dark look', async () => {
   await tap('section.view.on [data-a="dvClose"]'); await wait(600)
 })
 
-await step('switch back to Classic, the classic app returns with the same data', async () => {
+await step('Settings > Look offers only Light and Dark, no Classic and no Night', async () => {
   await tap('#dock [data-x="apps"]'); await tap('[data-a="drawerOpen"][data-x="settings"]')
-  await tap('[data-a="skinPick"][data-x="classic"]'); await wait(1200)
-  if (await page.locator('.nshell').count()) throw new Error('shell still mounted')
-  if (!(await page.locator('.shell').count())) throw new Error('no classic shell')
+  const looks = await page.locator('[data-a="skinPick"]').evaluateAll((els) => els.map((e) => e.dataset.x))
+  if (looks.join() !== 'nothing-light,nothing-dark') throw new Error(`looks offered: ${looks.join()}`)
   const t = (await blob()).tasks.find((x) => x.id === 'ns-1')
   if (!t?.done) throw new Error('lost the finished task')
 })

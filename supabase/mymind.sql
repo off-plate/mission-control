@@ -34,3 +34,6 @@ create policy mymind_files_read on storage.objects for select to authenticated
 drop policy if exists mymind_files_delete on storage.objects;
 create policy mymind_files_delete on storage.objects for delete to authenticated
   using (bucket_id = 'mymind' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- Live updates for the MyMind page (2026-10-28): new saves from the phone appear without a refresh.
+alter publication supabase_realtime add table mc_mymind;

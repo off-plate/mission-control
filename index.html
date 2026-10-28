@@ -29,19 +29,113 @@
     <link rel="preload" href="/mission-control/fonts/array-400.woff2" as="font" type="font/woff2" crossorigin />
   </head>
   <body>
-    <!-- Launch splash, phone only (2026-10-26): the mark on the paper colour
-         until React's first render replaces the contents of #root. -->
+    <!-- Launch screen, phone only. It lives OUTSIDE #root on purpose: React replaces #root's contents on its
+         first render, and the Nothing app is a lazy chunk, so a splash inside #root left a blank gap. This one
+         stays until the Nothing app has drawn (src/splash.ts reports the real steps), then the dots collapse. -->
     <style>
-      .boot { display: none; }
+      @font-face { font-family: 'Doto'; src: url('/mission-control/fonts/doto-var-latin.woff2') format('woff2'); font-weight: 100 900; font-style: normal; font-display: block; }
+      #mc-splash { display: none; }
       @media (max-width: 639px) {
-        .boot { display: grid; place-items: center; position: fixed; inset: 0; background: #FAF8F4; }
-        .boot-mark { width: 72px; height: 72px; border-radius: 20px; background: #12120E; display: grid; place-items: center; animation: boot-in 420ms cubic-bezier(0.23, 1, 0.32, 1) both, boot-breathe 1.6s ease-in-out 420ms infinite; }
-        @keyframes boot-in { from { opacity: 0; transform: scale(0.92); } }
-        @keyframes boot-breathe { 50% { transform: scale(0.96); opacity: 0.85; } }
-        @media (prefers-reduced-motion: reduce) { .boot-mark { animation: none; } }
+        #mc-splash {
+          --bg: #E8E8E8; --fg: #0A0A0A; --dim: #8A8A8A; --off: rgba(10, 10, 10, 0.13); --red: #D71921;
+          display: flex; flex-direction: column; position: fixed; inset: 0; z-index: 2147483000; background: var(--bg); color: var(--fg);
+          padding: max(env(safe-area-inset-top, 0px), 18px) 22px max(env(safe-area-inset-bottom, 0px), 22px);
+          font: 700 11px/1 'Space Mono', ui-monospace, Menlo, monospace; letter-spacing: 0.1em; text-transform: uppercase;
+          transition: opacity 280ms ease-out 360ms; touch-action: none;
+        }
+        #mc-splash[data-t="dark"] { --bg: #000000; --fg: #F2F2F2; --dim: #7C7C7C; --off: rgba(242, 242, 242, 0.14); }
+        #mc-splash.out { opacity: 0; pointer-events: none; }
+        .mcs-top { display: flex; justify-content: space-between; color: var(--dim); }
+        .mcs-top b { color: var(--fg); font-weight: 700; }
+        .mcs-mid { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 30px; }
+        .mcs-grid { width: min(76vw, 310px); aspect-ratio: 1; display: grid; grid-template-columns: repeat(25, 1fr); opacity: 0; animation: mcs-in 420ms cubic-bezier(0.23, 1, 0.32, 1) 60ms forwards; }
+        .mcs-grid i { display: block; width: 100%; aspect-ratio: 1; position: relative; }
+        .mcs-grid i.d::after { content: ''; position: absolute; inset: 22%; border-radius: 50%; background: var(--fg); opacity: 0.14; transform: scale(0.8); animation: mcs-sweep 2.2s linear infinite; animation-delay: calc(var(--a) * 2.2s); }
+        .mcs-grid i.c::after { background: var(--red); opacity: 1; transform: none; animation: mcs-beat 1.1s ease-in-out infinite; animation-delay: 0s; }
+        #mc-splash.out .mcs-grid i.d::after { animation: mcs-out 420ms cubic-bezier(0.23, 1, 0.32, 1) forwards; animation-delay: calc(var(--r) * 240ms); }
+        .mcs-word { font: 800 21px/1 'Doto', 'Space Mono', monospace; letter-spacing: 0.16em; text-align: center; }
+        .mcs-read { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+        .mcs-pct { font: 900 64px/1 'Doto', 'Space Mono', monospace; letter-spacing: 0.02em; min-width: 4ch; text-align: center; }
+        .mcs-bar { display: flex; gap: 6px; }
+        .mcs-bar i { width: 7px; height: 7px; border-radius: 50%; background: var(--off); transition: background-color 160ms ease-out, transform 160ms cubic-bezier(0.23, 1, 0.32, 1); }
+        .mcs-bar i.on { background: var(--fg); }
+        .mcs-bar i.lead { background: var(--red); transform: scale(1.25); }
+        @keyframes mcs-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+        @keyframes mcs-sweep {
+          0% { opacity: 1; transform: scale(1.3); background: var(--red); }
+          4% { opacity: 1; transform: scale(1.15); background: var(--fg); }
+          30% { opacity: 0.14; transform: scale(0.8); background: var(--fg); }
+          100% { opacity: 0.14; transform: scale(0.8); background: var(--fg); }
+        }
+        @keyframes mcs-beat { 50% { transform: scale(0.55); opacity: 0.55; } }
+        @keyframes mcs-out { to { opacity: 0; transform: scale(0.2); } }
+        @media (prefers-reduced-motion: reduce) {
+          .mcs-grid i.d::after { animation: none; opacity: 0.3; }
+          .mcs-grid i.c::after { animation: none; }
+          #mc-splash.out .mcs-grid i.d::after { animation: none; opacity: 0; }
+          #mc-splash { transition-delay: 0s; }
+        }
       }
     </style>
-    <div id="root"><div class="boot" aria-hidden="true"><div class="boot-mark"><svg width="38" height="38" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="11" stroke="#DCEB4F" stroke-width="2.6"/><circle cx="16" cy="16" r="3.4" fill="#DCEB4F"/><path d="M16 2v7M16 23v7M2 16h7M23 16h7" stroke="#DCEB4F" stroke-width="2.6" stroke-linecap="round"/></svg></div></div></div>
+    <div id="mc-splash" role="status" aria-label="Loading Mission Control">
+      <div class="mcs-top"><span id="mcs-st"><b>Starting</b></span><span id="mcs-date"></span></div>
+      <div class="mcs-mid">
+        <div class="mcs-grid" id="mcs-grid" aria-hidden="true"></div>
+        <div class="mcs-word" aria-hidden="true">MISSION CONTROL</div>
+        <div class="mcs-read" aria-hidden="true"><div class="mcs-pct" id="mcs-pct">0%</div><div class="mcs-bar" id="mcs-bar"></div></div>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var el = document.getElementById('mc-splash');
+        var none = { set: function () {}, done: function () {} };
+        if (!el || !matchMedia('(max-width: 639px)').matches) { if (el) el.remove(); window.mcSplash = none; return; }
+        try { if (localStorage.getItem('mc:skin') === 'nothing-dark') el.setAttribute('data-t', 'dark'); } catch (e) {}
+        /* The glyph: 25 x 25 cells, the ones inside the circle are dots. --a is how far round the circle a dot sits
+           (0 at the top, clockwise), --r how far out: the sweep and the collapse are both just delays off those. */
+        var N = 25, C = 12, html = '';
+        for (var y = 0; y < N; y++) for (var x = 0; x < N; x++) {
+          var dx = x - C, dy = y - C, r = Math.sqrt(dx * dx + dy * dy);
+          if (r > 12.3) { html += '<i></i>'; continue; }
+          var a = (Math.atan2(dx, -dy) / (2 * Math.PI) + 1) % 1;
+          html += '<i class="d' + (r < 1.6 ? ' c' : '') + '" style="--a:' + a.toFixed(3) + ';--r:' + (r / 12.3).toFixed(3) + '"></i>';
+        }
+        document.getElementById('mcs-grid').innerHTML = html;
+        var bar = document.getElementById('mcs-bar'), BARN = 24, bh = '';
+        for (var i = 0; i < BARN; i++) bh += '<i></i>';
+        bar.innerHTML = bh;
+        var dots = bar.children, pct = document.getElementById('mcs-pct'), st = document.getElementById('mcs-st');
+        var d = new Date(), DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'], MON = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+        document.getElementById('mcs-date').textContent = DAYS[d.getDay()] + ' ' + d.getDate() + ' ' + MON[d.getMonth()];
+        var target = 8, shown = 0, fin = false, ended = false, lastN = -1, lastT = '';
+        function label(p) { return p >= 100 ? 'Ready' : p < 30 ? 'Starting' : p < 62 ? 'Reading your day' : 'Opening'; }
+        function paint() {
+          var n = Math.min(BARN, Math.round(shown / 100 * BARN));
+          if (n !== lastN) { for (var i = 0; i < BARN; i++) dots[i].className = i < n ? (i === n - 1 && n < BARN ? 'on lead' : 'on') : ''; lastN = n; }
+          pct.textContent = Math.round(shown) + '%';
+          var t = label(Math.round(shown)); if (t !== lastT) { st.innerHTML = '<b>' + t + '</b>'; lastT = t; }
+        }
+        function out() {
+          if (ended) return; ended = true; el.classList.add('out');
+          setTimeout(function () { el.remove(); }, 900);
+        }
+        function frame() {
+          /* The number always moves, so a slow cloud read never looks frozen, but it stops short of the end
+             until the Nothing app has really drawn. */
+          if (!fin) target = Math.min(94, target + 0.05);
+          shown += (target - shown) * 0.09;
+          if (fin && shown > 99.4) { shown = 100; paint(); setTimeout(out, 220); return; }
+          paint(); requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+        window.mcSplash = {
+          set: function (p) { if (!fin && p > target) target = Math.min(p, 96); },
+          done: function () { if (fin) return; fin = true; target = 100; },
+        };
+        setTimeout(function () { window.mcSplash.done(); }, 9000); /* never trap him behind it */
+      })();
+    </script>
+    <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

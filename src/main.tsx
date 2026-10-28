@@ -14,6 +14,8 @@ import { SUPABASE_ENABLED, clearAuthFragment, currentAccount, loadRemoteState, o
 import { mergeStates } from './sync-merge'
 import { outbox } from './sync'
 import { LOCAL_ONLY_KEY, SignIn } from './signin'
+import { splash } from './splash'
+splash.set(20)
 
 /* A deploy renames every file. A tab opened before it still asks for the old
    names, the request 404s, and the page shows "This view hit an error" until
@@ -38,6 +40,7 @@ let _root: ReturnType<typeof createRoot> | null = null
 const root = () => (_root ??= createRoot(document.getElementById('root')!))
 
 function render() {
+  splash.set(70)
   root().render(
     <StrictMode>
       <StoreProvider>
@@ -55,6 +58,7 @@ function render() {
    Choosing "this device only" is remembered, so the choice is asked once rather
    than every time the app opens. */
 function renderSignIn() {
+  splash.done() /* the sign-in card is the first screen */
   root().render(
     <StrictMode>
       <SignIn onLocalOnly={() => { try { localStorage.setItem(LOCAL_ONLY_KEY, '1') } catch { /* noop */ } render() }} />
@@ -95,8 +99,10 @@ async function boot() {
     try {
       const me = await accountAfterLink()
       clearAuthFragment()
+      splash.set(38)
       if (me) {
         const remote = await loadRemoteState()
+        splash.set(62)
         if (remote) {
           const schema = (JSON.parse(remote) as { schema?: string }).schema
           if (schema === STORAGE_KEY) {

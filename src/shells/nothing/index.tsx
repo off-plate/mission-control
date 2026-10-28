@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useShellBridge } from '../bridge'
 import type { SkinId } from '../../skins'
 import { takePending } from '../nav'
+import { splash } from '../../splash'
 import { mountNothing, type NothingHandle } from './shell.js'
 import css from './nothing.css?inline'
 
@@ -18,6 +19,9 @@ export default function NothingShell({ skin, hidden = false }: { skin: SkinId; h
     el.dataset.theme = mc.theme
     shell.current = mountNothing(el, api, mc)
     document.documentElement.classList.add('nshell-on')
+    /* The first thing he sees is drawn: the launch screen can let go (two frames, so it is on screen). */
+    splash.set(92)
+    requestAnimationFrame(() => requestAnimationFrame(() => splash.done()))
     const go = (id: string | null) => { if (id) shell.current?.go(id) }
     go(takePending())
     const on = (e: Event) => { go((e as CustomEvent<string>).detail); takePending() }

@@ -145,6 +145,10 @@ await page.evaluate(({ K, day }) => {
 }, { K: KEY, day: today() })
 await page.goto(`${URL}#/settings`); await page.reload(); await wait(1500)
 
+await step('the launch screen lets go once the app is up, and leaves nothing behind', async () => {
+  await page.waitForFunction(() => !document.getElementById('mc-splash'), null, { timeout: 8000 })
+})
+
 await step('a phone opens the Nothing app by itself, Light by default', async () => {
   await wait(500)
   if (!(await page.locator('.nshell').count())) throw new Error('no shell host')

@@ -75,6 +75,16 @@ await page.evaluate(({ K, day }) => {
     ...Array.from({ length: 10 }, (_, i) => t(`nv-d${i}`, long(i), 'today', { slot: ['morning', 'noon', 'afternoon', 'evening'][i % 4], addedAt: Date.now() - 1e6 })),
     ...Array.from({ length: 45 }, (_, i) => t(`nv-b${i}`, i % 3 ? `Backlog ${i} ${long(i)}` : `Short ${i}`, 'backlog', { addedAt: Date.now() - (i + 2) * 864e5, category: ['call', 'admin', 'deep', 'quick'][i % 4] }))]
   s.dailySkipped = day
+  const ago = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+  const g = (id, name, extra) => ({ id, space: 'personal', name, current: 0, target: 1, unit: 'steps', note: '', timeframe: 'quarter', category: 'life', ...extra })
+  s.habits = [...s.habits, { id: 'h-quit-seed', space: 'personal', name: 'Late-night scrolling', kind: 'break', quitSince: ago(10), days: [false, false, false, false, false, false, false], paused: false, frequency: 'daily' }]
+  s.goals = [
+    g('g-steps', 'Every debt on a written plan, with a title long enough to need two lines on a phone', { current: 1, target: 5, milestones: ['Map all debt', 'Real tax number confirmed', 'Insurance plan form filed', 'Bank payment plan requested', 'Bank plan agreed'].map((t, i) => ({ id: 'ms' + i, label: t, done: i === 0 })) }),
+    g('g-yes', 'Tax return filed', { target: 1, unit: 'filed' }),
+    g('g-amt', 'Italy fund', { current: 42000, target: 100000, unit: 'CZK' }),
+    g('g-cnt', 'Gym sessions', { current: 3, target: 4, unit: 'sessions' }),
+    g('g-hab', 'Bed before 1 AM', { target: 7, unit: 'nights', habitId: s.habits[0].id }),
+  ]
   const longBody = Array.from({ length: 9 }, (_, i) => `Line ${i + 1}: the interior studio wants the site in Czech first, with the three room demos, a price table per item and one question on the last slide.`).join('\n') + '\nLAST LINE MARKER'
   s.ideaBoard = [{ id: 'idea-seed', title: 'Seed idea', body: longBody, color: 'amber', x: 40, y: 40, createdAt: Date.now() - 5 * 864e5, updatedAt: Date.now() - 864e5 }, { id: 'idea-two', title: 'Short idea', body: '', color: 'blue', x: 280, y: 40, createdAt: Date.now() - 864e5, updatedAt: Date.now() - 864e5 }]
   s.prompts = [{ id: 'prompt-seed', project: 'Mission Control', session: 'General', kind: 'Update', text: 'Prompt seed text for the sheet', createdAt: Date.now() - 864e5, updatedAt: Date.now() - 864e5 }]
@@ -331,6 +341,107 @@ await step('Prompts: tapping one opens its sheet and edits the real prompt', asy
   await closeJarvis(); await tap('#dock [data-x="home"]'); await wait(300); await goHome(1)
 })
 
+/* ---- The daily review: a full-screen takeover, with a control that fits every kind of goal ---- */
+const sizeOk = async (tag) => {
+  const m = await page.evaluate(() => {
+    const R = document.querySelector('.nshell').shadowRoot, rect = (e) => { const b = e.getBoundingClientRect(); return { t: b.top, b: b.bottom, l: b.left, r: b.right } }
+    const frame = rect(R.querySelector('.dvstack')), ctl = rect(R.querySelector('.dvctl')), cards = [...R.querySelectorAll('.dv-card')].map((c) => ({ ...rect(c), op: getComputedStyle(c).opacity, tf: getComputedStyle(c).transform, k: c.dataset.k }))
+    return { frame, ctl, cards, vh: innerHeight }
+  })
+  const bad = [], vis = m.cards.filter((c) => +c.op > 0.01), sab = 34
+  if (m.ctl.t - m.frame.b > 12 || m.ctl.t - m.frame.b < 0) bad.push(`${tag} card area ends ${m.ctl.t - m.frame.b}px above the controls`)
+  if (m.vh - m.ctl.b > sab + 24 || m.vh - m.ctl.b < 14) bad.push(`${tag} controls sit ${m.vh - m.ctl.b}px from the bottom`)
+  if (vis.length !== 1) bad.push(`${tag} ${vis.length} cards visible at rest`)
+  else { const c = vis[0]; if (['t', 'b', 'l', 'r'].some((k) => Math.abs(c[k] - m.frame[k]) > 1.5)) bad.push(`${tag} card ${JSON.stringify(c)} vs frame ${JSON.stringify(m.frame)}`); if (c.tf !== 'none') bad.push(`${tag} transform ${c.tf}`) }
+  if (m.cards.some((c) => c.b > m.frame.b + 1 || c.b > m.ctl.t)) bad.push(`${tag} a card reaches below the frame`)
+  if (m.frame.t < 100) bad.push(`${tag} frame starts at ${m.frame.t}`)
+  return bad
+}
+const stepDaily = async (n) => { for (let i = 0; i < n; i++) { await page.locator('section.view.on [data-a="dvNext"]').click(); await wait(750) } }
+await step('daily review: full screen at 390x844 and 430x932, one card at rest, nothing below the frame', async () => {
+  const bad = []
+  for (const [w, h] of [[390, 844], [430, 932]]) {
+    await page.setViewportSize({ width: w, height: h }); await wait(400)
+    await page.evaluate(() => { const n = document.querySelector('.nshell'); n.style.setProperty('--sat', '59px'); n.style.setProperty('--sab', '34px') }); await wait(300)
+    await tap('#dock [data-x="plan"]'); await tap('section.view.on [data-a="openDaily"]'); await wait(900)
+    for (let k = 0; k < 6; k++) {
+      bad.push(...(await sizeOk(`${w} card ${k}`)))
+      if (w === 390) await page.screenshot({ path: `${SHOTS}/light-daily-${k}.png` })
+      if (k < 5) await stepDaily(1)
+    }
+    await tap('section.view.on [data-a="dvClose"]'); await wait(600)
+    await tap('#dock [data-x="home"]')
+  }
+  await page.setViewportSize({ width: 390, height: 844 }); await wait(300)
+  if (bad.length) throw new Error(bad.slice(0, 6).join(' | '))
+})
+
+await step('daily review: swipe and quick taps leave no transform behind; back = previous, X = close', async () => {
+  await tap('#dock [data-x="plan"]'); await tap('section.view.on [data-a="openDaily"]'); await wait(900)
+  await drag('.dv-card[data-k="0"]', -260); await wait(500)
+  if (!(await page.locator('.dvdots i').evaluateAll((d) => d.findIndex((x) => x.classList.contains('on')) === 1))) throw new Error('swipe did not advance')
+  await drag('.dv-card[data-k="1"]', 260); await wait(500)
+  await page.locator('section.view.on [data-a="dvNext"]').click(); await page.locator('section.view.on [data-a="dvNext"]').click(); await page.locator('section.view.on [data-a="dvPrev"]').first().click(); await wait(800)
+  const bad = await sizeOk('after taps'); if (bad.length) throw new Error(bad.join(' | '))
+  const first = await page.locator('section.view.on .dvdots i.on').evaluateAll((d) => d.length)
+  await page.locator('section.view.on .vtop [data-a="dvPrev"]').click(); await wait(600)
+  if (!(await page.locator('section.view.on[data-view="daily"]').count())) throw new Error('the header back closed the review instead of going back a card')
+})
+
+await step('daily review: each kind of goal has its own control and writes the real store', async () => {
+  await page.evaluate(() => { const n = document.querySelector('.nshell'); n.style.removeProperty('--sat'); n.style.removeProperty('--sab') })
+  while ((await page.locator('.dvdots i').evaluateAll((d) => d.findIndex((x) => x.classList.contains('on')))) < 3) await stepDaily(1)
+  await page.screenshot({ path: `${SHOTS}/light-daily-goals.png` })
+  const goal = async (id) => (await blob()).goals.find((g) => g.id === id)
+  const title = await page.locator('.dv-card[data-k="3"] .dvg .rt').first().evaluate((e) => ({ full: e.textContent, clipped: e.scrollHeight > e.clientHeight + 1 }))
+  if (title.clipped) throw new Error('goal title is cut off')
+  /* steps */
+  if ((await page.locator('.dvms .row').count()) !== 5) throw new Error('no five-step checklist')
+  await tap('[data-a="dvMs"][data-x="g-steps:ms1"]'); await wait(1100)
+  if (!(await goal('g-steps')).milestones.find((m) => m.id === 'ms1').done) throw new Error('milestone not ticked in the store')
+  /* yes / no */
+  await tap('[data-a="dvYes"][data-x="g-yes:yes"]'); await wait(1100)
+  if ((await goal('g-yes')).current !== 1) throw new Error('yes did not reach the store')
+  await tap('[data-a="dvYes"][data-x="g-yes:no"]'); await wait(1100)
+  if ((await goal('g-yes')).current !== 0) throw new Error('not yet did not reach the store')
+  /* amount: presets scale to the target, custom amount with a note, undo */
+  const pre = await page.locator('.dvpre .chip').allTextContents()
+  if (pre.map((t) => t.replace(/\s|\u00a0/g, '')).join() !== '+1000,+5000,+10000') throw new Error(`presets ${pre.join(' / ')}`)
+  await tap('[data-a="dvAmt"][data-x="g-amt:5000"]'); await wait(1100)
+  if ((await goal('g-amt')).current !== 47000) throw new Error(`amount ${(await goal('g-amt')).current}`)
+  await page.locator('.dvamt').fill('2500'); await page.locator('.dvnote').fill('from the bonus')
+  const shown = await page.locator('.dvamt').inputValue(); const fs = await page.locator('.dvamt').evaluate((e) => parseFloat(getComputedStyle(e).fontSize))
+  if (fs < 16) throw new Error(`amount field ${fs}px`)
+  await tap('[data-a="dvAmt"][data-x="g-amt:custom"]'); await wait(1100)
+  const a1 = await goal('g-amt'); if (a1.current !== 49500 || !(a1.entries || []).some((e) => e.note === 'from the bonus')) throw new Error(`custom ${JSON.stringify(a1.entries)}`)
+  await tap('[data-a="dvAmtUndo"][data-x="g-amt"]'); await wait(1100)
+  if ((await goal('g-amt')).current !== 47000) throw new Error(`undo left ${(await goal('g-amt')).current}`)
+  if (!(await page.locator('.dvg', { hasText: '47' }).count())) throw new Error('amount progress line missing')
+  /* counter */
+  await tap('[data-a="dvStep"][data-x="g-cnt:1"]'); await wait(1100)
+  if ((await goal('g-cnt')).current !== 4) throw new Error('counter + did not reach the store')
+  await tap('[data-a="dvStep"][data-x="g-cnt:-1"]'); await wait(1100)
+  if ((await goal('g-cnt')).current !== 3) throw new Error('counter - did not reach the store')
+  /* habit-linked: read only */
+  const hab = await page.locator('.dvg', { hasText: 'Bed before 1 AM' }).textContent()
+  if (!/fills from/i.test(hab)) throw new Error('habit goal is not read only')
+  if (await page.locator('.dvg', { hasText: 'Bed before 1 AM' }).locator('button,input').count()) throw new Error('habit goal has controls')
+  await page.screenshot({ path: `${SHOTS}/light-daily-goals-done.png` })
+})
+
+await step('daily review: Quitting buttons fit and write the slip; Start the day closes it', async () => {
+  await stepDaily(1)
+  const fits = await page.evaluate(() => { const R = document.querySelector('.nshell').shadowRoot, f = R.querySelector('.dvstack').getBoundingClientRect(); return [...R.querySelectorAll('.dv-card[data-k="4"] .dvacts .key')].every((b) => { const r = b.getBoundingClientRect(); return r.left >= f.left && r.right <= f.right && r.bottom <= f.bottom }) })
+  if (!fits) throw new Error('Quitting buttons stick out')
+  await tap('[data-a="dvQuit"][data-x="0:slip"]'); await wait(1100)
+  const y = await page.evaluate(() => { const d = new Date(); d.setDate(d.getDate() - 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })
+  if (!(await blob()).slips.some((x) => x.habitId === 'h-quit-seed' && x.day === y)) throw new Error('slip not written')
+  await stepDaily(1)
+  await tap('section.view.on [data-a="dvDone"]'); await wait(700)
+  if (await page.locator('section.view.on[data-view="daily"]').count()) throw new Error('review still open')
+  await tap('#dock [data-x="home"]'); await wait(300); await goHome(1)
+})
+
 const homeTypes = () => page.locator('#home .hp:nth-child(2) .grid > .w').evaluateAll((ws) => ws.map((w) => w.dataset.type + ':' + [...w.classList].find((c) => /^s\d\d$/.test(c))))
 let edited = null
 await step('edit mode: long-press, resize, remove + undo, add from gallery, drag, Done', async () => {
@@ -576,6 +687,9 @@ await step('dark: the Nothing Dark look', async () => {
   await page.screenshot({ path: `${SHOTS}/dark-idea-sheet.png` })
   await tap('.sheet.on [data-a="sheetX"]'); await wait(400)
   await tap('section.view.on [data-a="back"]'); await wait(500)
+  await tap('#dock [data-x="plan"]'); await tap('section.view.on [data-a="openDaily"]'); await wait(900)
+  for (let k = 0; k < 6; k++) { await page.screenshot({ path: `${SHOTS}/dark-daily-${k}.png` }); if (k < 5) await stepDaily(1) }
+  await tap('section.view.on [data-a="dvClose"]'); await wait(600)
 })
 
 await step('switch back to Classic, the classic app returns with the same data', async () => {

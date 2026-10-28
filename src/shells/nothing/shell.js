@@ -555,7 +555,7 @@ function buildView(e) {
 function renderTop(e) {
   const d = V[e.id], el = e.el;
   const showBack = !(e.root && !e.tile);
-  $('.vtop', el).innerHTML = `${showBack ? `<button class="kb" data-a="back" aria-label="Back">${ico('back')}</button>` : d.lead ? d.lead(e.args) : '<span class="sp"></span>'}<div class="vtt">${esc(vTitle(e))}</div>${d.action ? d.action(e.args, showBack) : '<span class="sp"></span>'}`;
+  $('.vtop', el).innerHTML = `${showBack ? `<button class="kb" data-a="${d.backAct || 'back'}" aria-label="Back">${ico('back')}</button>` : d.lead ? d.lead(e.args) : '<span class="sp"></span>'}<div class="vtt">${esc(vTitle(e))}</div>${d.action ? d.action(e.args, showBack) : '<span class="sp"></span>'}`;
   el.classList.toggle('haslead', !showBack && !!d.lead);
   /* The header row starts exactly where Home's first row does, read off Home itself. */
   const hs = $('#home .hsc'); if (hs) $('.vtop', el).style.paddingTop = getComputedStyle(hs).paddingTop;
@@ -2725,47 +2725,114 @@ A.reload = () => location.reload();
 function openDaily() {
   if (top_().id === 'daily') return;
   const r = S.ui.dvSnap = { ...MC.dailyReview, quit: S.quitting.map(q => ({ id: q.id, name: q.name, daysClean: q.daysClean })) };
-  S.daily = { forgot: r.forgot.map(() => false), left: r.notDone.map(() => null), goals: r.goals.map(() => 0), quit: r.quit.map(() => null) };
+  S.daily = { forgot: r.forgot.map(() => false), left: r.notDone.map(() => null), quit: r.quit.map(() => null), log: {} };
   S.ui.dv = 0; open('daily');
 }
 A.openDaily = openDaily;
 const DV_N = 6;
+/* ---- goals: every kind gets the control that fits it ---- */
+const AMT_UNIT = /^(czk|kc|kč|eur|usd|gbp|\$|€|£)$/i;
+const goalKind = g => g.habitLinked ? 'habit' : g.milestones && g.milestones.length ? 'steps' : g.target <= 1 ? 'yesno' : AMT_UNIT.test((g.unit || '').trim()) || g.target >= 100 ? 'amount' : 'count';
+const fmtAmt = n => { const [i, d] = String(Math.round(n * 100) / 100).split('.'); return i.replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + (d ? ',' + d : ''); };
+const niceN = x => { if (x <= 1) return 1; const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p; return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p; };
+const amtPresets = g => [...new Set([.01, .05, .1].map(f => niceN(g.target * f)))].filter(v => v >= 1);
+function dvGoalBlock(n) {
+  const g = S.goals.find(x => x.id === n.id); if (!g) return '';
+  const kind = goalKind(g), unit = (g.unit || '').toUpperCase();
+  const done = g.milestones ? g.milestones.filter(m => m.done).length : g.current, tot = g.milestones ? g.milestones.length : g.target;
+  const pct = clamp(tot ? done / tot : 0, 0, 1), reached = tot && done >= tot;
+  const bar = drow(20, Math.round(pct * 20), { gap: 8, r: 2.3, red: g.status === 'push', fill: true, k: 'dg' + g.id });
+  let stat, ctl = '';
+  if (kind === 'steps') {
+    stat = `${done} OF ${tot} STEPS`;
+    ctl = `<div class="dvms">${g.milestones.map(m => `<div class="row">${ck(m.done, `data-a="dvMs" data-x="${esc(g.id)}:${esc(m.id)}" aria-label="${esc(m.title)}"`)}<span class="grow rt ${m.done ? 'done' : ''}">${esc(m.title)}</span></div>`).join('')}</div>`;
+  } else if (kind === 'yesno') {
+    stat = reached ? 'YES, DONE' : 'NOT YET';
+    ctl = `<div class="dvacts"><button class="key ${reached ? '' : 't'}" data-a="dvYes" data-x="${esc(g.id)}:yes" aria-pressed="${!!reached}">Yes</button><button class="key ${reached ? 't' : ''}" data-a="dvYes" data-x="${esc(g.id)}:no" aria-pressed="${!reached}">Not yet</button></div>`;
+  } else if (kind === 'amount') {
+    const left = Math.max(0, g.target - g.current), last = (S.daily.log[g.id] || []).slice(-1)[0];
+    stat = `${fmtAmt(g.current)} OF ${fmtAmt(g.target)} ${unit}`.trim() + (left ? `, ${fmtAmt(left)} LEFT` : ', REACHED');
+    ctl = `<div class="chips dvpre">${amtPresets(g).map(v => `<button class="chip" data-a="dvAmt" data-x="${esc(g.id)}:${v}">+${fmtAmt(v)}</button>`).join('')}</div>
+      <div class="hstack dvcust"><input class="fld dvamt" data-g="${esc(g.id)}" data-f="amt" inputmode="decimal" placeholder="Other amount" aria-label="Amount" autocomplete="off"><input class="fld dvnote" data-g="${esc(g.id)}" data-f="note" placeholder="Note" aria-label="Note" maxlength="60" autocomplete="off"><button class="key" data-a="dvAmt" data-x="${esc(g.id)}:custom">Log</button></div>
+      ${last ? `<div class="hstack" style="margin-top:8px"><span class="lb grow">Logged +${fmtAmt(last.v)}</span><button class="key xs t" data-a="dvAmtUndo" data-x="${esc(g.id)}">${ico('undo')} Undo</button></div>` : ''}`;
+  } else if (kind === 'count') {
+    stat = `${g.current} OF ${g.target} ${unit}`.trim();
+    ctl = `<div class="dvstep"><button class="kb" data-a="dvStep" data-x="${esc(g.id)}:-1" aria-label="One less" ${g.current <= 0 ? 'disabled' : ''}>${ico('minus')}</button><div class="grow lb fg" style="text-align:center">${esc(stat)}</div><button class="kb" data-a="dvStep" data-x="${esc(g.id)}:1" aria-label="One more" ${g.current >= g.target ? 'disabled' : ''}>${ico('plus')}</button></div>`;
+  } else {
+    stat = `${g.current} OF ${g.target} ${unit}`.trim();
+    ctl = `<div class="lb">Fills from ${esc(g.habitName || 'its habit')}</div>`;
+  }
+  return `<div class="dvg"><div class="rt" style="font-weight:700">${esc(g.name)}</div><div class="rs" style="margin-bottom:8px"><span class="${g.status === 'push' && !reached ? 'red' : ''}">${stat}</span></div>${bar}<div class="dvgc">${ctl}</div></div>`;
+}
 V.daily = {
-  title: 'Yesterday', noSwipeClose: true,
-  action: () => `<button class="kb" data-a="dvClose" aria-label="Not now">${ico('close')}</button>`,
+  title: 'Yesterday', noSwipeClose: true, live: false, backAct: 'dvPrev',
+  action: () => `<button class="kb" data-a="dvClose" aria-label="Close">${ico('close')}</button>`,
   render() {
     const r = S.ui.dvSnap, i = S.ui.dv || 0, d = S.daily;
+    const open_ = d.forgot.filter(x => !x).length + d.left.filter(x => !x).length;
     const cards = [
-      `${lb(r.yesterday)}<div class="d1" style="font-size:34px;margin:14px 0">Yesterday</div><div style="position:relative;width:180px;height:180px;margin:6px auto 14px">${dring({ n: 48, on: r.habitsPct / 100 * 48, size: 180, r: 2.8, pad: 8, k: 'dvr' })}<div class="wcenter"><div style="display:grid;justify-items:center;gap:8px">${dm(r.habitsPct + '%', 5, { k: 'dvp', count: true })}${lb('Habits kept')}</div></div></div><div class="facts"><div>${lb('Finished')}<b>${r.finished}</b></div><div>${lb('Habits')}<b>${r.habits}</b></div><div>${lb('Focus')}<b>${fmtMin(r.focusedMin)}</b></div><div>${lb('Routines')}<b>${r.routines}</b></div></div>`,
-      `${lbRow('Forgot to tick?', d.forgot.filter(x => !x).length + ' open')}<div class="rows" style="margin-top:10px">${r.forgot.map((f, k) => `<div class="row">${ck(d.forgot[k], `data-a="dvForgot" data-x="${k}" ${d.forgot[k] ? 'disabled' : ''}`)}<span class="grow rt">${esc(f.name)}</span></div>`).join('') || '<div class="empty">Nothing was left unticked.</div>'}</div>`,
-      `${lbRow('Did not get done', r.notDone.length + '', 'red')}<div class="rows" style="margin-top:10px">${r.notDone.map((t, k) => `<div class="row" style="flex-wrap:wrap"><span class="grow rt" style="min-width:100%">${esc(t.title)}</span>${d.left[k] ? `<span class="lb fg">${{ today: 'Carried to today', keep: 'Left on the list', drop: 'Dropped' }[d.left[k]]}</span>` : `<button class="key xs" data-a="dvLeft" data-x="${k}:today">Today</button><button class="key xs t" data-a="dvLeft" data-x="${k}:keep">Keep</button><button class="key xs t" data-a="dvLeft" data-x="${k}:drop">Drop</button>`}</div>`).join('') || '<div class="empty">Everything planned got done, or went back on purpose.</div>'}</div>`,
-      `${lb('Goals')}<div class="rows" style="margin-top:10px">${r.goals.map((n, k) => { const g = S.goals.find(g => g.id === n.id) || n; return `<div class="row"><div class="grow"><div class="rt one">${esc(n.name)}</div><div class="rs">${g.current} of ${g.target} ${g.unit}</div></div>${d.goals[k] ? `<button class="key xs t" data-a="dvGoal" data-x="${k}:-1">Undo</button>` : `<button class="key xs" data-a="dvGoal" data-x="${k}:1">+1</button>`}</div>`; }).join('')}</div>`,
-      `${lb('Quitting')}<div class="rows" style="margin-top:10px">${r.quit.map((q, k) => `<div class="row"><div class="grow"><div class="rt one">${esc(q.name)}</div><div class="rs">${q.daysClean} days clean</div></div>${d.quit[k] ? `<span class="lb ${d.quit[k] === 'slip' ? 'red' : 'fg'}">${d.quit[k] === 'slip' ? 'Slipped' : 'Clean'}</span>` : `<button class="key xs" data-a="dvQuit" data-x="${k}:clean">Clean</button><button class="key xs t" data-a="dvQuit" data-x="${k}:slip">Slipped</button>`}</div>`).join('')}</div>`,
-      `<div style="text-align:center;padding-top:30px">${icoBig('sunrise', 90)}<div class="d1" style="font-size:30px;margin:22px 0 12px">Start the day</div><div class="wt" style="color:var(--fd);margin-bottom:24px">${d.forgot.filter(x => !x).length + d.left.filter(x => !x).length ? (d.forgot.filter(x => !x).length + d.left.filter(x => !x).length) + ' still open, that is fine.' : 'All answered.'}</div><button class="key red wide" style="height:58px" data-a="dvDone">Done, start the day</button></div>`
+      `<div class="dvh">${lb(r.yesterday)}<div class="d1" style="font-size:34px;margin:12px 0 0">Yesterday</div></div>
+       <div class="dvmid"><div class="dvring">${dring({ n: 48, on: r.habitsPct / 100 * 48, size: 240, r: 3.3, pad: 10, cls: 'wring', k: 'dvr' })}<div class="wcenter"><div style="display:grid;justify-items:center;gap:8px">${dm(r.habitsPct + '%', 5.4, { k: 'dvp', count: true })}${lb('Habits kept')}</div></div></div></div>
+       <div class="facts"><div>${lb('Finished')}<b>${r.finished}</b></div><div>${lb('Habits')}<b>${r.habits}</b></div><div>${lb('Focus')}<b>${fmtMin(r.focusedMin)}</b></div><div>${lb('Routines')}<b>${r.routines}</b></div></div>`,
+      `<div class="dvh">${lbRow('Forgot to tick?', d.forgot.filter(x => !x).length + ' open')}</div><div class="dvb rows">${r.forgot.map((f, k) => `<div class="row">${ck(d.forgot[k], `data-a="dvForgot" data-x="${k}" ${d.forgot[k] ? 'disabled' : ''}`)}<span class="grow rt">${esc(f.name)}</span></div>`).join('') || '<div class="empty dvempty">Nothing was left unticked.</div>'}</div>`,
+      `<div class="dvh">${lbRow('Did not get done', r.notDone.length + '', 'red')}</div><div class="dvb rows">${r.notDone.map((t, k) => `<div class="row dvrow"><span class="rt">${esc(t.title)}</span>${d.left[k] ? `<span class="lb fg">${{ today: 'Carried to today', keep: 'Left on the list', drop: 'Dropped' }[d.left[k]]}</span>` : `<div class="dvacts"><button class="key sm" data-a="dvLeft" data-x="${k}:today">Today</button><button class="key sm t" data-a="dvLeft" data-x="${k}:keep">Keep</button><button class="key sm t" data-a="dvLeft" data-x="${k}:drop">Drop</button></div>`}</div>`).join('') || '<div class="empty dvempty">Everything planned got done, or went back on purpose.</div>'}</div>`,
+      `<div class="dvh">${lbRow('Goals', r.goals.length ? r.goals.length + ' this period' : '')}</div><div class="dvb">${r.goals.map(dvGoalBlock).join('') || '<div class="empty dvempty">No goals are running this period.</div>'}</div>`,
+      `<div class="dvh">${lb('Quitting')}</div><div class="dvb rows">${r.quit.map((q, k) => `<div class="row dvrow"><div><div class="rt">${esc(q.name)}</div><div class="rs">${q.daysClean} ${q.daysClean === 1 ? 'day' : 'days'} clean</div></div>${d.quit[k] ? `<span class="lb ${d.quit[k] === 'slip' ? 'red' : 'fg'}">${d.quit[k] === 'slip' ? 'Slipped' : 'Clean'}</span>` : `<div class="dvacts"><button class="key sm" data-a="dvQuit" data-x="${k}:clean">Clean</button><button class="key sm t" data-a="dvQuit" data-x="${k}:slip">Slipped</button></div>`}</div>`).join('') || '<div class="empty dvempty">Nothing on the Quitting list.</div>'}</div>`,
+      `<div class="dvmid" style="text-align:center"><div>${icoBig('sunrise', 90)}<div class="d1" style="font-size:30px;margin:22px 0 12px">Start the day</div><div class="wt" style="color:var(--fd)">${open_ ? open_ + ' still open, that is fine.' : 'All answered.'}</div></div></div><button class="key red wide" style="height:58px;flex:none" data-a="dvDone">Done, start the day</button>`
     ];
     return `<div class="dvdots">${cards.map((c, k) => `<i class="${k === i ? 'on' : ''} ${k < i ? 'past' : ''}"></i>`).join('')}</div>
     <div class="dvstack">${cards.map((c, k) => `<div class="dv-card cd ${k === 0 || k === 5 ? 'k' : ''}" data-k="${k}" style="${dvStyle(k, i)}">${c}</div>`).join('')}</div>
-    <div class="hstack" style="margin-top:14px"><button class="key t" data-a="dvPrev" ${i === 0 ? 'disabled' : ''}>${ico('back')}</button><span class="grow lb" style="text-align:center">Swipe for the next card</span><button class="key" data-a="dvNext" ${i === DV_N - 1 ? 'disabled' : ''}>${ico('fwd')}</button></div>`;
+    <div class="hstack dvctl"><button class="key t" data-a="dvPrev" aria-label="Previous card" ${i === 0 ? 'disabled' : ''}>${ico('back')}</button><span class="grow lb" style="text-align:center">${i + 1} of ${DV_N}</span><button class="key" data-a="dvNext" aria-label="Next card" ${i === DV_N - 1 ? 'disabled' : ''}>${ico('fwd')}</button></div>`;
   }
 };
-function dvStyle(k, i) { const o = k - i; if (o < 0) return 'transform:translateX(-120%) rotate(-6deg);opacity:0;pointer-events:none'; return `transform:translateY(${o * 10}px) scale(${1 - o * .04});opacity:${o > 2 ? 0 : 1};z-index:${10 - o};${o ? 'pointer-events:none' : ''}`; }
-function dvGo(n) { S.ui.dv = clamp(n, 0, DV_N - 1); const e = top_(); $$('.dv-card', e.el).forEach(c => c.style.cssText = dvStyle(+c.dataset.k, S.ui.dv)); $$('.dvdots i', e.el).forEach((d, k) => { d.classList.toggle('on', k === S.ui.dv); d.classList.toggle('past', k < S.ui.dv); }); const pb = $('[data-a="dvPrev"]', e.el), nb = $('[data-a="dvNext"]', e.el); pb.disabled = S.ui.dv === 0; nb.disabled = S.ui.dv === DV_N - 1; }
+/* At rest only the current card is on screen and it has no transform at all. The next one is only shown while a card is being dragged. */
+function dvStyle(k, i) { const o = k - i; if (o < 0) return 'transform:translateX(-110%);opacity:0;pointer-events:none;z-index:1'; if (o === 0) return 'transform:none;opacity:1;z-index:10'; return `transform:scale(.96);opacity:0;pointer-events:none;z-index:${10 - o}`; }
+function dvGo(n) {
+  S.ui.dv = clamp(n, 0, DV_N - 1); const e = top_(); if (e.id !== 'daily') return;
+  $$('.dv-card', e.el).forEach(c => { c.style.cssText = dvStyle(+c.dataset.k, S.ui.dv); if (+c.dataset.k === S.ui.dv) c.scrollTop = 0; });
+  $$('.dvdots i', e.el).forEach((d, k) => { d.classList.toggle('on', k === S.ui.dv); d.classList.toggle('past', k < S.ui.dv); });
+  $$('[data-a="dvPrev"]', e.el).forEach(b => b.disabled = S.ui.dv === 0); $$('[data-a="dvNext"]', e.el).forEach(b => b.disabled = S.ui.dv === DV_N - 1);
+  const c = $('.dvctl .grow', e.el); if (c) c.textContent = (S.ui.dv + 1) + ' of ' + DV_N;
+}
 A.dvNext = () => dvGo((S.ui.dv || 0) + 1);
 A.dvPrev = () => dvGo((S.ui.dv || 0) - 1);
 addRec({
   axis: 'x', test(st) {
-    const c = st.target.closest && st.target.closest('.dv-card'); if (!c) return null;
-    c.style.transition = 'none';
+    const c = st.target.closest && st.target.closest('.dv-card'); if (!c || st.target.closest('input,.chips,.dvms')) return null;
+    const k = +c.dataset.k, nx = $(`.dv-card[data-k="${k + 1}"]`, c.parentNode);
+    c.style.transition = 'none'; if (nx) { nx.style.transition = 'none'; nx.style.opacity = 1; }
     return {
-      move(dx) { c.style.transform = `translateX(${dx}px) rotate(${dx / 30}deg)`; },
-      end(dx, dy, vx) { c.style.transition = ''; const i = S.ui.dv || 0; if ((dx < -80 || vx < -.4) && i < DV_N - 1) dvGo(i + 1); else if ((dx > 80 || vx > .4) && i > 0) dvGo(i - 1); else c.style.cssText = dvStyle(i, i); }
+      move(dx) { c.style.transform = `translateX(${Math.min(0, dx)}px)`; },
+      end(dx, dy, vx) { const i = S.ui.dv || 0; if ((dx < -80 || vx < -.4) && i < DV_N - 1) dvGo(i + 1); else if ((dx > 80 || vx > .4) && i > 0) dvGo(i - 1); else dvGo(i); }
     };
   }
 });
-const dvRe = () => { const i = S.ui.dv; renderBody(top_(), false); };
+/* Re-render in place, keeping each card's scroll and whatever is typed in the amount fields. */
+const dvRe = () => {
+  const e = top_(); if (e.id !== 'daily') return;
+  const keep = {}, vals = {}; $$('.dv-card', e.el).forEach(c => { keep[c.dataset.k] = c.scrollTop; });
+  $$('input[data-g]', e.el).forEach(f => { vals[f.dataset.g + f.dataset.f] = f.value; });
+  renderBody(e, false);
+  $$('.dv-card', e.el).forEach(c => { c.scrollTop = keep[c.dataset.k] || 0; });
+  $$('input[data-g]', e.el).forEach(f => { const v = vals[f.dataset.g + f.dataset.f]; if (v != null) f.value = v; });
+};
+const dvAfter = () => afterUpdate(dvRe);
 A.dvForgot = (el, k) => { const r = S.ui.dvSnap, it = r.forgot[+k]; S.daily.forgot[+k] = true; if (it.routine) B.store().assertRoutineOn(it.id, r.day, true); else B.store().markHabitOn(it.id, r.day, true); dvRe(); };
 A.dvLeft = (el, x) => { const [k, v] = x.split(':'), t = S.ui.dvSnap.notDone[+k]; S.daily.left[+k] = v; if (v === 'today') B.store().moveTasksToToday([t.id]); if (v === 'drop') { B.store().deleteTask(t.id); undoable('Dropped: ' + t.title, () => { B.store().undoDelete(); S.daily.left[+k] = null; dvRe(); }); } dvRe(); };
-A.dvGoal = (el, x) => { const [k, n] = x.split(':'), g = S.ui.dvSnap.goals[+k]; B.store().bumpGoal(g.id, +n); S.daily.goals[+k] = n > 0 ? 1 : 0; dvRe(); };
+A.dvMs = (el, x) => { const [gid, mid] = x.split(':'); B.store().toggleGoalMilestone(gid, mid); dvAfter(); };
+A.dvYes = (el, x) => { const [gid, v] = x.split(':'), g = S.goals.find(z => z.id === gid), done = g.current >= g.target; if (v === 'yes' && !done) B.store().bumpGoal(gid, Math.max(1, g.target - g.current)); else if (v === 'no' && done) B.store().bumpGoal(gid, -g.current); dvAfter(); };
+A.dvStep = (el, x) => { const [gid, n] = x.split(':'); B.store().bumpGoal(gid, +n); dvAfter(); };
+const dvField = (gid, f) => $$('input[data-g]').find(i => i.dataset.g === gid && i.dataset.f === f);
+A.dvAmt = (el, x) => {
+  const [gid, v] = x.split(':'); let n = +v, note = '';
+  if (v === 'custom') { const f = dvField(gid, 'amt'); n = parseFloat(String(f.value).replace(/[\s ]/g, '').replace(',', '.')); note = (dvField(gid, 'note').value || '').trim(); if (!(n > 0)) { toast('Type an amount first'); return; } }
+  const eid = B.store().logGoalAmount(gid, n, note);
+  S.daily.log[gid] = [...(S.daily.log[gid] || []), { eid, v: n }];
+  if (v === 'custom') { dvField(gid, 'amt').value = ''; dvField(gid, 'note').value = ''; }
+  dvAfter();
+};
+A.dvAmtUndo = (el, gid) => { const l = S.daily.log[gid] || [], last = l.pop(); if (!last) return; B.store().removeGoalEntry(gid, last.eid); dvAfter(); };
+ROOT.addEventListener('input', e => { const f = e.target; if (f && f.matches && f.matches('input.dvamt')) { const raw = f.value.replace(/[^\d.,]/g, ''), [i, ...d] = raw.split(/[.,]/); f.value = i.replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + (d.length ? ',' + d.join('').slice(0, 2) : /[.,]$/.test(raw) ? ',' : ''); } });
 A.dvQuit = (el, x) => { const [k, v] = x.split(':'), r = S.ui.dvSnap; S.daily.quit[+k] = v; if (v === 'slip') { B.store().logSlipOn(r.quit[+k].id, r.day); undoable('Slip logged', () => { B.store().undoDelete(); S.daily.quit[+k] = null; dvRe(); }); } dvRe(); };
 A.dvDone = () => { B.store().closeDaily(true); back(); toast('Have a good day'); };
 A.dvClose = () => { B.store().closeDaily(false); back(); };

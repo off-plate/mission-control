@@ -490,12 +490,6 @@ textarea.fld{height:auto;min-height:120px;padding:14px;line-height:1.5;resize:no
 .dapp.r .bd{background:#fff;color:var(--alert)}
 
 /* ===== daily review ===== */
-.dvdots{display:flex;gap:6px;margin:2px 0 14px}
-.dvdots i{flex:1;height:5px;border-radius:2px;background:var(--off);transition:background-color .3s}
-.dvdots i.past{background:var(--ink)}
-.dvdots i.on{background:var(--red)}
-.dvstack{position:relative;min-height:470px}
-.dv-card{position:absolute;left:0;right:0;top:0;min-height:450px;margin:0;transition:transform .42s var(--dr),opacity .3s;touch-action:pan-y}
 .cd .dm+.lb,.cd .dm+div.lb{margin-top:8px}
 .pm{grid-template-columns:1fr 1fr;row-gap:16px}
 
@@ -621,3 +615,38 @@ section[data-view=plan] .seg button.on{background:var(--red);color:var(--on)}
 section[data-view=jarvis] .vsc>.vin{display:flex;flex-direction:column;min-height:100%}
 section[data-view=jarvis] .thread{flex:1}
 section[data-view=jarvis] .vsc{padding-bottom:0}
+
+/* ===== daily review: a full-screen takeover ===== */
+section[data-view=daily] .vsc{display:flex;flex-direction:column;overflow:hidden;padding:2px 16px max(16px,var(--sb))}
+section[data-view=daily] .vsc>div{flex:1;min-height:0;display:flex;flex-direction:column;animation:none}
+.dvdots{flex:none;display:flex;gap:6px;margin:6px 0 12px}
+.dvdots i{flex:1;height:5px;border-radius:2px;background:var(--off);transition:background-color .3s}
+.dvdots i.past{background:var(--ink)}
+.dvdots i.on{background:var(--red)}
+.dvstack{flex:1;min-height:0;position:relative;overflow:hidden;border-radius:24px}
+.dv-card{position:absolute;inset:0;height:100%;min-height:0;margin:0;padding:18px 16px;border-radius:24px;display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y;transition:transform .42s var(--dr),opacity .3s}
+.dv-card::-webkit-scrollbar{display:none}
+.dvh{flex:none;margin-bottom:12px}
+.dvb{flex:1 0 auto;display:flex;flex-direction:column}
+.dvmid{flex:1 0 auto;display:grid;place-items:center;padding:10px 0}
+.dvring{position:relative;width:min(78%,300px);aspect-ratio:1}
+.dvempty{margin:auto}
+.dv-card>.facts{flex:none;padding-top:8px}
+.dvrow{flex-direction:column;align-items:stretch;gap:10px}
+.dvacts{display:flex;gap:8px}
+.dvacts .key{flex:1}
+.dvctl{flex:none;margin-top:12px}
+.dvg{padding:14px 0;position:relative}
+.dvg+.dvg::before{content:'';position:absolute;left:0;right:0;top:0;height:2px;background:radial-gradient(circle,var(--off) .9px,transparent 1.3px) 0 0/6px 2px repeat-x}
+.dvgc{margin-top:12px}
+.dvms .row{min-height:44px;padding:6px 0;align-items:flex-start}
+.dvpre{margin-bottom:10px}
+.dvcust{gap:6px}
+.dvcust .dvamt{flex:1.2;min-width:0}
+.dvcust .dvnote{flex:1;min-width:0}
+.dvcust .fld{height:44px;padding:0 10px}
+.dvstep{display:flex;align-items:center;gap:10px}
+.dv-card.k .dvg .fld,.dv-card.k .key.t,.dv-card.k .kb{background:var(--soft)}
+.dvg .rt,.dvrow .rt{display:block;-webkit-line-clamp:unset;overflow:visible;overflow-wrap:anywhere}
+.dv-card .chip,.dv-card .key.t,.dv-card .kb,.dv-card .dvg .fld{background:var(--soft)}
+.dv-card .chip.on{background:var(--ink)}

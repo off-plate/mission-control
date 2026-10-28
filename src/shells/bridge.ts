@@ -173,7 +173,7 @@ export function toMC(inp: ShellInput) {
     const behind = goalPace(cur, g.target, tf, new Date(), !!fed && !isTimeFed(fed)) === 'behind'
     return {
       id: g.id, name: g.name, space: g.space, category: g.category, timeframe: tf, current: Math.round(cur * 10) / 10, target: g.target, unit: g.unit,
-      status: g.target > 0 && cur >= g.target ? 'reached' : behind ? 'push' : 'on', habitLinked: !!g.habitId,
+      status: g.target > 0 && cur >= g.target ? 'reached' : behind ? 'push' : 'on', habitLinked: !!g.habitId, habitName: fed?.name, entries: (g.entries ?? []).slice(-3).map((e) => ({ id: e.id, v: e.v })),
       milestones: g.milestones?.length ? g.milestones.map((m) => ({ id: m.id, title: m.label, done: m.done })) : undefined,
     }
   })
@@ -320,7 +320,7 @@ export function toMC(inp: ShellInput) {
       ...forgotHabits.map((h) => ({ id: h.id, routine: false, name: h.name })),
     ],
     notDone: s.plan.returnedOn === today ? s.tasks.filter((t) => (s.plan.returnedIds ?? []).includes(t.id) && !t.done && t.list !== 'today').map((t) => ({ id: t.id, title: t.title })) : [],
-    goals: goals.filter((g) => !g.habitLinked && !g.milestones && g.target > 0).slice(0, 4).map((g) => ({ id: g.id, name: g.name, current: g.current, target: g.target, unit: g.unit })),
+    goals: goals.filter((g) => g.target > 0 || g.milestones).slice(0, 12).map((g) => ({ id: g.id, name: g.name })),
   }
   const everLogged = s.habitLog.length + s.routineLog.length + s.focusSessions.length > 0
 

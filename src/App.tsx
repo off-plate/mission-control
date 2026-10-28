@@ -45,9 +45,17 @@ const WatchlessPage = lazy(() => import('./watchlesspage').then((m) => ({ defaul
 const IdeasPage = lazy(() => import('./ideaboard').then((m) => ({ default: m.IdeasPage })))
 /* The Nothing look on a phone is its own app (the approved prototype), not a restyle. */
 const NothingShell = lazy(() => import('./shells/nothing'))
+/* Classic page id -> the Nothing view that replaces it on a phone. Not here: Bills, Settings, a past Day,
+   Longevity, Watchless, Skills and the Jar page (its reel player), which stay the classic pages. */
+const SHELL_VIEW: Partial<Record<PageId, string>> = {
+  plan: 'plan', projects: 'projects', habits: 'habits', routines: 'habits', goals: 'habits', quitting: 'habits',
+  notes: 'notes', calendar: 'calendar', ideas: 'ideas', prompts: 'ideas', people: 'people', focus: 'focus',
+  zone: 'zone', assistant: 'jarvis', health: 'health', gym: 'gym', board: 'why', apps: 'apps',
+}
 const PeoplePage = lazy(() => import('./people').then((m) => ({ default: m.PeoplePage })))
 import { useStore } from './store'
 import { CLASSIC_LOOK, SKINS, useSkin } from './skins'
+import { openInShell } from './shells/nav'
 import { ago, describe, useSyncStatus } from './sync'
 import { isReadOnly } from './store'
 import { SPACES, UNSORTED, type PageId, type SpaceId, type ViewId } from './types'
@@ -623,8 +631,12 @@ export default function App() {
   /* On a phone, Nothing is the shell, standing in for Today. Any page the shell
      hands back to (Settings, Bills) is the classic one, and Today in its tab
      bar is the way back. */
-  const shellOn = phone && page === 'today'
+  const shellView = phone ? SHELL_VIEW[page] : undefined
+  const shellOn = phone && (page === 'today' || !!shellView)
   useEffect(() => { if (phone) setPage('today') }, [phone]) // eslint-disable-line react-hooks/exhaustive-deps
+  /* A page the Nothing app has its own version of opens that version, wherever it was asked
+     from (the classic More sheet, a link, the assistant), so a phone never shows the desktop one. */
+  useEffect(() => { if (shellView) { openInShell(shellView); history.replaceState(null, '', '#/today'); setPage('today') } }, [shellView, page]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const s = SKINS.find((x) => x.id === skin) ?? CLASSIC_LOOK
     document.documentElement.style.colorScheme = s.dark ? 'dark' : ''
@@ -685,9 +697,16 @@ export default function App() {
     return () => { window.removeEventListener('resize', measure); ro.disconnect() }
   }, [page, hud])
 
-  if (shellOn) return <Suspense fallback={null}><NothingShell skin={pickedSkin} /></Suspense>
+  /* On a phone the Nothing app stays mounted, hidden, while a classic page (Bills, Settings...) is open, so
+     coming back (the back swipe, the Today tab) shows it exactly where it was, not reset to Home. */
+  const shellSeen = useRef(false)
+  if (shellOn) shellSeen.current = true
+  const shellEl = phone && shellSeen.current ? <Suspense fallback={null}><NothingShell skin={pickedSkin} hidden={!shellOn} /></Suspense> : null
 
   return (
+    <>
+    {shellEl}
+    {!shellOn && (
     /* The Zone is a room, not a dark card: the shell carries the class so the
        header goes under the water with everything else, instead of leaving a
        warm-paper bar sitting on top of it. --depth rides along here too,
@@ -917,5 +936,7 @@ export default function App() {
 
       {page !== 'zone' && <PhoneTabBar page={page} setPage={setPage} nothing={skin.startsWith('nothing')} />}
     </div>
+    )}
+    </>
   )
 }

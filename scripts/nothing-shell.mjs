@@ -302,9 +302,17 @@ await step('Jarvis: the conversation is still there after closing and reopening'
   await closeJarvis()
   await tap('#dock [data-x="apps"]'); await tap('[data-a="drawerOpen"][data-x="settings"]'); await wait(500)
   await tap('section.view.on [data-a="openClassic"][data-x="settings"]'); await wait(1200)
-  if (await page.locator('.nshell').count()) throw new Error('Settings did not leave the shell')
-  await page.evaluate(() => { location.hash = '#/today' }); await wait(1800)
-  if (!(await page.locator('.nshell').count())) throw new Error('the shell did not come back')
+  /* The shell stays mounted but hidden behind a classic page, so back lands exactly where it was. */
+  if (!(await page.evaluate(() => document.querySelector('.nshell')?.style.display === 'none'))) throw new Error('the shell still shows over the classic Settings')
+  if (!(await page.locator('.phonehead').count())) throw new Error('the classic page has no standard header')
+  const off = await page.evaluate(() => { const t = document.querySelector('.phonehead h1').getBoundingClientRect(); return Math.abs(t.left + t.width / 2 - innerWidth / 2) })
+  if (off > 1) throw new Error(`the classic page title is ${off}px off centre`)
+  if (await page.evaluate(() => getComputedStyle(document.querySelector('.topstick')).display !== 'none')) throw new Error('the classic header is still showing')
+  await page.goBack(); await wait(1800)
+  if (await page.evaluate(() => document.querySelector('.nshell')?.style.display === 'none')) throw new Error('the shell did not come back on back')
+  if (!(await page.locator('section.view.on[data-view="settings"]').count())) throw new Error('the shell did not keep its place: Settings view is gone')
+  await tap('section.view.on [data-a="back"]'); await wait(500)
+  await tap('#dock [data-x="home"]'); await wait(600)
   await goHome(0)
   await tap('#home .hp:nth-child(1) [data-type="jarvis"]'); await wait(800)
   if ((await msgs()) !== before) throw new Error(`after Settings: ${await msgs()} vs ${before}`)
@@ -793,6 +801,26 @@ await step('dark: the Nothing Dark look', async () => {
   await tap('#dock [data-x="plan"]'); await tap('section.view.on [data-a="openDaily"]'); await wait(900)
   for (let k = 0; k < 6; k++) { await page.screenshot({ path: `${SHOTS}/dark-daily-${k}.png` }); if (k < 5) await stepDaily(1) }
   await tap('section.view.on [data-a="dvClose"]'); await wait(600)
+})
+
+await step('a classic page the shell has its own version of (People) opens the shell view, history does not pile up', async () => {
+  const h0 = await page.evaluate(() => history.length)
+  await page.evaluate(() => { location.hash = '#/people' }); await wait(1500)
+  if (!(await page.locator('section.view.on[data-view="people"]').count())) throw new Error('People did not open in the shell')
+  if (await page.evaluate(() => document.querySelector('.nshell').style.display === 'none')) throw new Error('the shell is hidden')
+  if ((await page.evaluate(() => history.length)) > h0) throw new Error('history grew by the redirect')
+  if ((await page.evaluate(() => location.hash)) !== '#/today') throw new Error('hash is not #/today')
+  await tap('section.view.on [data-a="back"]'); await wait(500)
+})
+
+await step('Jar: a Videos button under the links opens the reels page, back returns to Jar', async () => {
+  await tap('#dock [data-x="apps"]'); await tap('[data-a="drawerOpen"][data-x="jar"]'); await wait(700)
+  if (!(await page.locator('section.view.on[data-view="jar"] [data-a="jarVideos"]').count())) throw new Error('no Videos button on Jar')
+  await tap('section.view.on [data-a="jarVideos"]'); await wait(1500)
+  if ((await page.evaluate(() => location.hash)) !== '#/timeline') throw new Error('Videos did not open the reels page')
+  await page.goBack(); await wait(1500)
+  if (!(await page.locator('section.view.on[data-view="jar"]').count())) throw new Error('back from the reels did not return to Jar')
+  await tap('section.view.on [data-a="back"]'); await wait(500)
 })
 
 await step('Settings > Look offers only Light and Dark, no Classic and no Night', async () => {

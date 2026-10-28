@@ -17,6 +17,7 @@ import { Sheet } from './modals'
 import { CycleRail, type RailIncome } from './cyclerail'
 import { parseDebtLines } from './debtimport'
 import { Band, Segmented } from './ui'
+import { Plus } from './icons'
 import {
   currentAccount, deleteRow, insertRow, onAccountChange, readRows, sendSignInCode, signInWithCode,
   updateRow, upsertCompassProfile, SUPABASE_ENABLED,
@@ -302,7 +303,7 @@ export function BillsPage() {
             Band supplies its own top clearance, so .bills-wrap's own
             padding-top comes back down to nothing here -- Band plus the
             cycle row's own spacing is what clears the overlay now. */}
-        <Band title="Bills" />
+        <Band title="Bills" phoneAction={<button className="ph-back ph-add" type="button" aria-label="Add a one-off" onClick={() => setEditPlanned('new')}><Plus /></button>} />
         <div className="bills-head">
           <div className="bills-cyc">
             <button className="bills-iconbtn" onClick={() => setCycleOffset((n) => n - 1)} aria-label="Previous cycle">‹</button>

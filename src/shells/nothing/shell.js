@@ -2573,7 +2573,9 @@ V.weather = {
    Jar world (Jar, Health, Gym, Longevity, Why), Jarvis, Apps drawer,
    Settings, Skills, Watchless, embedded app host, Daily review
    ===================================================================== */
-const jarNav = cur => cur === 'jar' ? `<div class="jarlinks">${[['health', 'Health'], ['gym', 'Gym'], ['longevity', 'Longevity'], ['why', 'The wall']].map(([id, l]) => `<button class="chip" data-a="jarGo" data-x="${id}">${l}</button>`).join('')}</div>` : `<div class="chips" style="margin-bottom:12px">${[['jar', 'Jar'], ['health', 'Health'], ['gym', 'Gym'], ['longevity', 'Longevity'], ['why', 'The wall']].map(([id, l]) => `<button class="chip ${cur === id ? 'on' : ''}" data-a="jarGo" data-x="${id}">${l}</button>`).join('')}</div>`;
+const jarNav = cur => cur === 'jar' ? `<div class="jarlinks">${[['health', 'Health'], ['gym', 'Gym'], ['longevity', 'Longevity'], ['why', 'The wall']].map(([id, l]) => `<button class="chip" data-a="jarGo" data-x="${id}">${l}</button>`).join('')}</div><button class="key t wide jarvid" data-a="jarVideos">${ico('play')} Videos</button>` : `<div class="chips" style="margin-bottom:12px">${[['jar', 'Jar'], ['health', 'Health'], ['gym', 'Gym'], ['longevity', 'Longevity'], ['why', 'The wall']].map(([id, l]) => `<button class="chip ${cur === id ? 'on' : ''}" data-a="jarGo" data-x="${id}">${l}</button>`).join('')}</div>`;
+/* The reel player lives on the classic Jar page (YouTube, Instagram, Vimeo and local files), so Videos opens it. */
+A.jarVideos = () => B.openClassic('timeline');
 A.jarGo = (el, id) => { if (CLASSIC_V[id]) { B.openClassic(CLASSIC_V[id]); return; } const e = top_(); if (e.id === id) return; e.id = id; e.args = {}; e.el.dataset.view = id; e.el.classList.toggle('dark', !!V[id].dark); setChrome(); renderTop(e); renderBody(e, true); };
 
 V.jar = {
@@ -2881,6 +2883,10 @@ if (!NOREVIEW) setTimeout(() => { if (!S.dailyDone && top_().id === 'home') open
 
 
 return {
+  /* The app sends a phone to a view the classic app was asked for (People, Notes, Calendar...). */
+  /* Back from behind a classic page: the screen may have changed size while it was hidden. */
+  shown() { measureCell(); refresh(); },
+  go(id, args) { if (!V[id] || id === 'home') return; if (ROOTS.includes(id)) tab(id); else if (top_().id !== id) open(id, args || {}); },
   update(mc) { loadMC(mc); HOST.dataset.theme = mc.theme; refresh(); requestAnimationFrame(() => { AFTER.splice(0).forEach(fn => fn()); const e = STACK.find(x => x.id === 'jarvis'); if (e) jvPaint(e, true); }); },
   unmount() {
     dead = true;

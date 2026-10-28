@@ -174,6 +174,15 @@ body:has(.shell:is(.skin-nothing-light, .skin-nothing-dark)) {
 
   /* Phone: the tab bar is the Nothing dock, More is Apps, a grid of dot icons. */
   @media (max-width: 639px) {
+    /* A page the Nothing app hands to the classic app (Bills, Settings, a past Day...) has no classic
+       header: its own title row is the header, at the same height as the Nothing pages. */
+    & .topstick { display: none; }
+    & main { padding-top: max(var(--sat, env(safe-area-inset-top, 0px)), 14px); }
+    & .phonehead { min-height: 48px; margin: 2px 0 10px; }
+    & .phonehead h1 { font-family: 'Doto', 'Space Mono', monospace; font-weight: 800; font-size: 25px; letter-spacing: 0.03em; text-transform: uppercase; }
+    & .ph-back { background: var(--n-t); }
+    & .ph-back svg { width: 22px; height: 22px; }
+    & .bills-endcycle { border: 0; border-radius: 12px; background: var(--n-ink); color: var(--n-inki); }
     & .tabbar {
       left: 16px; right: 16px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); height: 64px; padding: 0 8px; gap: 4px;
       border: 0; border-radius: 22px; background: var(--n-dock); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none;

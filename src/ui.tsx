@@ -404,9 +404,11 @@ export function WorkspacePick({ className }: { className?: string }) {
 }
 
 export function Band({
-  title, metrics, actions, leading, beside,
+  title, metrics, actions, leading, beside, phoneAction,
 }: {
   title: React.ReactNode
+  /** A phone's header has one slot at the right: a single icon button for the page's main action. */
+  phoneAction?: React.ReactNode
   metrics?: { v: string; k: string; tone?: 'pos' | 'urgent' | 'info' }[]
   actions?: React.ReactNode
   /** Sits before the metrics, not after them: for a control the page wants
@@ -417,6 +419,30 @@ export function Band({
    *  across the band with the buttons it read as one more button. */
   beside?: React.ReactNode
 }) {
+  /* A phone's pages share one header: back on the left, the name dead centre, one action on the
+     right. Whatever else the band carries (a switcher, figures, buttons) sits in a row under it. */
+  const phone = usePhone()
+  if (phone) {
+    const sub = beside || leading || actions || metrics?.length
+    return (
+      <>
+        <div className="phonehead">
+          <button className="ph-back" type="button" aria-label="Back" onClick={() => { if (history.length > 1) history.back(); else location.hash = '/today' }}><Icon.ChevronLeft /></button>
+          <h1>{title}</h1>
+          <div className="ph-act">{phoneAction}</div>
+        </div>
+        {sub && (
+          <div className="phonehead-sub">
+            {beside}{leading}
+            {metrics?.map((m) => (
+              <div className="band-metric" key={m.k}><span className={`v${m.tone ? ' val-' + m.tone : ''}`}>{m.v}</span><span className="k">{m.k}</span></div>
+            ))}
+            {actions && <div className="band-actions">{actions}</div>}
+          </div>
+        )}
+      </>
+    )
+  }
   return (
     <div className="band">
       <div className="band-day">

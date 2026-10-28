@@ -122,6 +122,21 @@ await page.evaluate(({ K, day }) => {
     g('g-cnt', 'Gym sessions', { current: 3, target: 4, unit: 'sessions' }),
     g('g-hab', 'Bed before 1 AM', { target: 7, unit: 'nights', habitId: s.habits[0].id }),
   ]
+  /* The Gym: a Hevy history on this device (it lives in localStorage), the workout habit, and a target for every metric. */
+  localStorage.setItem('mc-hevy-key', 'hevy_shelltest'); localStorage.setItem('mc-hevy-last-sync', String(Date.now() - 864e5))
+  localStorage.setItem('mc-hevy-stats', JSON.stringify({ [ago(9)]: { minutes: 62, volumeKg: 9800 }, [ago(2)]: { minutes: 70, volumeKg: 11240 } }))
+  localStorage.setItem('mc-hevy-exercises', JSON.stringify({
+    'Bench Press (Barbell)': [{ day: ago(9), e1rm: 70, weight: 60, reps: 5, repTotal: 15, isPR: true }, { day: ago(2), e1rm: 78.4, weight: 66, reps: 6, repTotal: 18, isPR: true }],
+    'Pull Up': [{ day: ago(2), e1rm: 0, weight: 0, reps: 8, repTotal: 21, isPR: false }],
+  }))
+  s.habits = [...s.habits, { id: 'h-gym-seed', space: 'personal', name: 'Workout / Gym / Fitness', kind: 'build', days: [false, false, false, false, false, false, false], paused: false, frequency: 'times-per-week', targetPerWeek: 4 }]
+  const gg = (id, name, extra) => ({ id, name, goal: 1, unit: 'kg', metric: 'e1rm', createdAt: Date.now(), updatedAt: Date.now(), ...extra })
+  s.gymGoals = [
+    gg('gg-bench', 'Bench e1RM', { goal: 100, exerciseName: 'Bench Press (Barbell)' }),
+    gg('gg-pull', 'Pull-up day total', { goal: 30, unit: 'reps', metric: 'repTotal', exerciseName: 'Pull Up' }),
+    gg('gg-sess', 'Sessions logged', { goal: 20, unit: 'sessions', metric: 'sessions' }),
+    gg('gg-bw', 'Bodyweight', { goal: 91, metric: 'manual', current: 96, lowerIsBetter: true }),
+  ]
   const longBody = Array.from({ length: 9 }, (_, i) => `Line ${i + 1}: the interior studio wants the site in Czech first, with the three room demos, a price table per item and one question on the last slide.`).join('\n') + '\nLAST LINE MARKER'
   s.ideaBoard = [{ id: 'idea-seed', title: 'Seed idea', body: longBody, color: 'amber', x: 40, y: 40, createdAt: Date.now() - 5 * 864e5, updatedAt: Date.now() - 864e5 }, { id: 'idea-two', title: 'Short idea', body: '', color: 'blue', x: 280, y: 40, createdAt: Date.now() - 864e5, updatedAt: Date.now() - 864e5 }]
   s.prompts = [{ id: 'prompt-seed', project: 'Mission Control', session: 'General', kind: 'Update', text: 'Prompt seed text for the sheet', createdAt: Date.now() - 864e5, updatedAt: Date.now() - 864e5 }]
@@ -599,6 +614,139 @@ await step('Bills: every door goes straight to the real Bills page', async () =>
   await click('#dock [data-x="home"]'); await wait(500)
   if (!(await page.evaluate(() => !document.querySelector('.nshell').shadowRoot.querySelector('section[data-view="bills"]')))) throw new Error('a shell Bills view still exists')
   await goHome(1)
+})
+
+/* ---- Gym: the same numbers as the classic page, editable targets, a Hevy sync that moves them ---- */
+const gymReadShell = () => page.evaluate(() => { const R = document.querySelector('.nshell').shadowRoot; return Object.fromEntries([...R.querySelectorAll('section.view.on .gtgt')].map((c) => [c.querySelector('.rt').textContent.trim(), c.querySelector('.dm') ? c.querySelector('.dm').getAttribute('aria-label') : null])) })
+const openGym = async () => { await click('#dock [data-x="apps"]'); await wait(400); await click('[data-a="drawerOpen"][data-x="jar"]'); await viewReady('jar'); await wait(450); await click('section.view.on [data-a="jarGo"][data-x="gym"]'); await viewReady('gym'); await wait(500) }
+await step('gym: every target is worked out from the Hevy data, the same as the classic Gym page', async () => {
+  await openGym()
+  const shell = await gymReadShell()
+  const want = { 'Bench e1RM': '78.4', 'Pull-up day total': '21', 'Sessions logged': '2', 'Bodyweight': '96' }
+  for (const [k, v] of Object.entries(want)) if (shell[k] !== v) throw new Error(`${k}: shell says ${shell[k]}, expected ${v} (${JSON.stringify(shell)})`)
+  const rows = await page.locator('section.view.on .row .rs').allTextContents()
+  if (rows.length !== 2 || !rows.every((r) => /1 PR/.test(r))) throw new Error(`sessions ${JSON.stringify(rows)}`)
+  const wk = await page.locator('section.view.on .cd.k .dm').first().getAttribute('aria-label'); if (wk !== '0/4') throw new Error(`week ${wk}`)
+  await page.screenshot({ path: `${SHOTS}/light-gym.png` })
+  /* the classic page, same seed */
+  await page.evaluate(() => { location.hash = '#/gym' }); await wait(1800)
+  const classic = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('.gp-goal')].map((g) => [g.querySelector('.gp-goal-name').textContent.trim(), g.querySelector('.gp-goal-current').textContent.trim()])))
+  for (const [k, v] of Object.entries(shell)) if (classic[k] !== v) throw new Error(`${k}: shell ${v} vs classic ${classic[k]}`)
+  await page.evaluate(() => { location.hash = '#/today' }); await wait(1800); await goHome(1)
+})
+
+await step('gym: tap a target to edit it in a sheet, add one, delete and undo, all through the store', async () => {
+  const gg = async (id) => ((await blob()).gymGoals || []).find((g) => g.id === id)
+  await openGym()
+  await click('section.view.on .gtgt[data-x="gg-bench"]'); await page.waitForSelector('.sheet.on'); await wait(500)
+  await page.screenshot({ path: `${SHOTS}/light-gym-sheet.png` })
+  const fs = await page.locator('.sheet.on input').evaluateAll((els) => els.map((e) => parseFloat(getComputedStyle(e).fontSize)))
+  if (fs.some((f) => f < 16)) throw new Error(`sheet inputs ${fs}`)
+  await page.locator('.sheet.on [data-gf="goal"]').fill('120'); await wait(1000)
+  if ((await gg('gg-bench')).goal !== 120) throw new Error('goal not saved')
+  await page.locator('.sheet.on [data-gf="name"]').fill('Bench, new name'); await tap('.sheet.on [data-a="sheetX"]'); await wait(900)
+  if ((await gg('gg-bench')).name !== 'Bench, new name') throw new Error('name not saved on close')
+  if (!/Bench, new name/.test(Object.keys(await gymReadShell()).join())) throw new Error('the page did not re-read at once')
+  /* manual target: current by hand */
+  await click('section.view.on .gtgt[data-x="gg-bw"]'); await page.waitForSelector('.sheet.on'); await wait(500)
+  await page.locator('.sheet.on [data-gf="cur"]').fill('94'); await wait(1000)
+  if ((await gg('gg-bw')).current !== 94) throw new Error('manual current not saved')
+  await tap('.sheet.on [data-a="sheetX"]'); await wait(500)
+  if ((await gymReadShell())['Bodyweight'] !== '94') throw new Error('the manual number did not move on the page')
+  /* a new target on an exercise picked from the history */
+  await click('section.view.on [data-a="gymNew"]'); await page.waitForSelector('.sheet.on'); await wait(500)
+  await page.locator('.sheet.on [data-gf="name"]').fill('Pull-up best'); await page.locator('.sheet.on [data-gf="goal"]').fill('30'); await page.locator('.sheet.on [data-gf="unit"]').fill('reps')
+  await tap('.sheet.on [data-a="gtMetric"][data-x="repTotal"]'); await tap('.sheet.on [data-a="gtEx"][data-x="Pull Up"]'); await tap('.sheet.on [data-a="sheetX"]'); await wait(1000)
+  const made = ((await blob()).gymGoals || []).find((g) => g.name === 'Pull-up best')
+  if (!made || made.metric !== 'repTotal' || made.exerciseName !== 'Pull Up' || made.goal !== 30) throw new Error(`new target ${JSON.stringify(made)}`)
+  if ((await gymReadShell())['Pull-up best'] !== '21') throw new Error('the new target has no computed number')
+  /* delete and undo */
+  await click('section.view.on .gtgt[data-x="gg-sess"]'); await page.waitForSelector('.sheet.on'); await wait(500)
+  await tap('.sheet.on [data-a="gtDel"]'); await wait(1000)
+  if (await gg('gg-sess')) throw new Error('not deleted')
+  await tap('#toast [data-a="undo"]'); await wait(1000)
+  if (!(await gg('gg-sess'))) throw new Error('undo did not bring it back')
+})
+
+await step('gym: syncing Hevy brings the new sessions into the numbers', async () => {
+  const today = await page.evaluate(() => new Date().toISOString())
+  await page.route('https://api.hevyapp.com/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ page_count: 1, workouts: [{ start_time: today, end_time: new Date(Date.now() + 3600e3).toISOString(), exercises: [{ title: 'Bench Press (Barbell)', sets: [{ weight_kg: 100, reps: 3 }] }] }] }) }))
+  if ((await gymReadShell())['Bench, new name'] !== '78.4') throw new Error('not starting from the seeded number')
+  await click('section.view.on [data-a="hevySync"]'); await page.waitForFunction(() => { const R = document.querySelector('.nshell').shadowRoot; return [...R.querySelectorAll('section.view.on .gtgt')].some((c) => c.querySelector('.dm') && c.querySelector('.dm').getAttribute('aria-label') === '110.0') }, null, { timeout: 8000 })
+  const rows = await page.locator('section.view.on .row .rs').allTextContents()
+  if (rows.length !== 1) throw new Error(`${rows.length} sessions after the sync`)
+  await page.screenshot({ path: `${SHOTS}/light-gym-synced.png` })
+  await page.unroute('https://api.hevyapp.com/**')
+  await click('section.view.on [data-a="back"]'); await wait(450)
+  await goHome(1)
+})
+
+/* ---- Back is the browser's back: the stack follows history, so the iOS swipe lands where it came from ---- */
+const topViews = () => page.evaluate(() => [...document.querySelector('.nshell').shadowRoot.querySelectorAll('section.view.on')].map((v) => v.dataset.view).join())
+const sheetOpen = () => page.evaluate(() => !!document.querySelector('.nshell').shadowRoot.querySelector('.sheet.on'))
+const toApps = async () => { await click('#dock [data-x="apps"]'); await wait(400) }
+await step('swipe back: a view opened from Apps goes back to Apps, forward does nothing', async () => {
+  await toApps()
+  await click('[data-a="drawerOpen"][data-x="notes"]'); await viewReady('notes'); await wait(450)
+  await page.goBack(); await wait(750)
+  if ((await topViews()) !== 'apps') throw new Error(`back from Notes landed on ${await topViews()}`)
+  await page.goForward(); await wait(750)
+  if ((await topViews()) !== 'apps') throw new Error(`forward moved the app to ${await topViews()}`)
+  await click('[data-a="drawerOpen"][data-x="notes"]'); await viewReady('notes'); await wait(450)
+  await page.goBack(); await wait(750)
+  if ((await topViews()) !== 'apps') throw new Error('back after a forward did not return to Apps')
+})
+
+await step('swipe back: a sheet closes first, then the page behind it, and nested views unwind one by one', async () => {
+  await click('[data-a="drawerOpen"][data-x="ideas"]'); await viewReady('ideas'); await wait(900)
+  await click('section.view.on .idea[data-x="idea-seed"]'); await page.waitForSelector('.sheet.on'); await wait(500)
+  await page.goBack(); await wait(700)
+  if (await sheetOpen()) throw new Error('the sheet is still open after back')
+  if ((await topViews()) !== 'ideas') throw new Error(`the page behind closed too: ${await topViews()}`)
+  await page.goBack(); await wait(750)
+  if ((await topViews()) !== 'apps') throw new Error(`second back landed on ${await topViews()}`)
+  /* two views deep */
+  await click('[data-a="drawerOpen"][data-x="notes"]'); await viewReady('notes'); await wait(450)
+  await click('section.view.on [data-a="newNote"]'); await viewReady('note'); await wait(450)
+  await page.goBack(); await wait(750)
+  if ((await topViews()) !== 'notes') throw new Error(`back from a note landed on ${await topViews()}`)
+  await page.goBack(); await wait(750)
+  if ((await topViews()) !== 'apps') throw new Error(`back from Notes landed on ${await topViews()}`)
+})
+
+await step('swipe back: a view opened from a widget returns to Home with the tile', async () => {
+  await click('#dock [data-x="home"]'); await wait(400)
+  await page.evaluate(() => document.querySelector('.nshell').shadowRoot.querySelector('#home .hp:nth-child(1) [data-a="wtap"][data-wid]').click()); await wait(900)
+  if ((await topViews()) === 'home') throw new Error('the tile did not open a view')
+  await page.goBack()
+  const morph = await page.evaluate(async () => {
+    const sr = document.querySelector('.nshell').shadowRoot
+    for (let i = 0; i < 20; i++) {
+      if (sr.getAnimations().some((a) => a.effect && a.effect.getKeyframes().some((k) => k.clipPath))) return true
+      await new Promise((r) => setTimeout(r, 25))
+    }
+    return false
+  })
+  await wait(650)
+  if ((await topViews()) !== 'home') throw new Error(`back landed on ${await topViews()}`)
+  if (!morph) throw new Error('no morph animation on the way back')
+  if (await page.evaluate(() => !!document.querySelector('.nshell').shadowRoot.querySelector('#home .w.hidden'))) throw new Error('the tile stayed hidden')
+})
+
+await step('swipe back: 30 open and close cycles do not grow the history', async () => {
+  await toApps()
+  const before = await page.evaluate(() => history.length)
+  for (let i = 0; i < 30; i++) {
+    await click('#dock [data-a="quickAdd"]'); await wait(160); await click('.sheet.on [data-a="sheetX"]'); await wait(160)
+    await click('[data-a="drawerOpen"][data-x="weather"]'); await wait(450)
+    if (i % 2) await page.goBack(); else await click('section.view.on [data-a="back"]')
+    await wait(420)
+  }
+  await wait(500)
+  const after = await page.evaluate(() => history.length)
+  if (after > before + 2) throw new Error(`history grew from ${before} to ${after}`)
+  if ((await topViews()) !== 'apps') throw new Error(`ended on ${await topViews()}`)
+  await click('#dock [data-x="home"]'); await wait(300); await goHome(1)
 })
 
 const homeTypes = () => page.locator('#home .hp:nth-child(2) .grid > .w').evaluateAll((ws) => ws.map((w) => w.dataset.type + ':' + [...w.classList].find((c) => /^s\d\d$/.test(c))))

@@ -22,7 +22,8 @@ import { breakdownTask, hasAiKey } from '../ai'
 import { useAssistantThread, type Turn } from '../assistantcore'
 import { MORNING, SKILLS } from '../assistant'
 import * as dict from '../dictation'
-import { getHevyLastSync, hasHevyKey, syncHevy, TARGET_HABIT_NAME } from '../hevy'
+import { getAllHevyDayStats, getHevyExerciseHistory, getHevyLastSync, hasHevyKey, syncHevy, TARGET_HABIT_NAME } from '../hevy'
+import { FORGE_SEED, buildGymDays, currentFor, pctFor } from '../gymcalc'
 import { SKINS, setSkin, type SkinId } from '../skins'
 import { SPACE_LABELS } from '../mock'
 import {
@@ -46,6 +47,8 @@ export interface ShellInput {
   skin: SkinId
   /** Today's date key: the derivation is redone when the day turns. */
   day: string
+  /** Bumped when a Hevy sync finishes: its numbers live in localStorage, so a counter is what makes the shell read them again. */
+  gymReads?: number
 }
 
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
@@ -280,16 +283,24 @@ export function toMC(inp: ShellInput) {
       lastRead: health.lastRun ? health.lastRun.ran_at.slice(11, 16) : null,
     }
   })() : null
+  /* The Gym, read with the same functions the classic Gym page uses (gymcalc.ts), so a target here and there is the same number. */
   const gymHabit = live.find((h) => h.name.trim().toLowerCase() === TARGET_HABIT_NAME)
-  const hevyAt = getHevyLastSync()
+  const hevyAt = getHevyLastSync(), hevyHistory = getHevyExerciseHistory(), hevyStats = getAllHevyDayStats(), hevyDays = Object.keys(hevyStats).length
+  const gymDays = buildGymDays(hevyHistory, hevyStats)
   const gym = {
-    week: health.status === 'ok' ? new Set(health.sessions.map(dayOf).filter((d) => d >= weekFrom)).size : (gymHabit ? gymHabit.days.filter(Boolean).length : 0),
+    week: gymHabit ? gymHabit.days.filter(Boolean).length : Object.keys(hevyStats).filter((d) => d >= weekFrom).length,
     target: gymHabit ? habitTarget(gymHabit) : 0,
+    hasKey: hasHevyKey(), synced: hevyAt != null, sessionsOnRecord: hevyDays,
     lastSync: hevyAt ? `Synced from Hevy ${new Date(hevyAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : 'Not synced from Hevy on this device',
-    workouts: health.status === 'ok' ? [...health.sessions].sort((a, b) => dayOf(b).localeCompare(dayOf(a))).slice(0, 5).map((x) => ({
-      name: x.name || x.type || 'Workout', day: DAYS[wIdx(dayOf(x))].slice(0, 3), min: Math.round((x.moving_time ?? 0) / 60), volume: '', prs: 0,
-    })) : [],
-    targets: s.gymGoals.map((g) => ({ name: g.name, current: g.current ?? 0, goal: g.goal, unit: g.unit })),
+    workouts: gymDays.map((d) => ({
+      name: d.exercises.length === 1 ? d.exercises[0].name : `${d.exercises.length || 'No'} exercises`, day: d.day, dow: DAYS[wIdx(d.day)].slice(0, 3),
+      min: hevyStats[d.day]?.minutes ?? 0, volumeKg: Math.round(d.volumeKg), prs: d.prCount, exercises: d.exercises.map((e) => ({ name: e.name, weight: e.weight, reps: e.reps, e1rm: Math.round(e.e1rm), isPR: e.isPR })),
+    })),
+    targets: s.gymGoals.map((g) => {
+      const cur = currentFor(g, hevyHistory, hevyDays)
+      return { id: g.id, name: g.name, metric: g.metric, exerciseName: g.exerciseName ?? '', current: cur, goal: g.goal, unit: g.unit, lowerIsBetter: !!g.lowerIsBetter, pct: pctFor(g, cur), manual: g.current ?? null, note: g.note ?? '' }
+    }),
+    exercises: Object.entries(hevyHistory).map(([name, rows]) => ({ name, best: Math.round(Math.max(0, ...rows.map((r) => r.e1rm))), last: rows[rows.length - 1]?.day ?? '' })).sort((a, b) => b.last.localeCompare(a.last) || a.name.localeCompare(b.name)),
   }
 
   /* ---- the day field: busy quarters from the calendar, focus from blocks ---- */
@@ -380,6 +391,8 @@ export interface ShellApi {
   refresh: () => void
   breakdown: (title: string, category: TaskCategory) => ReturnType<typeof breakdownTask>
   syncHevy: () => Promise<string>
+  /** The classic Gym page's starter targets, for a Gym with none yet. */
+  seedGym: () => void
   addNote: (space: SpaceId, body?: string) => string
   addPerson: (name: string, rel: string, tier: PersonTier) => string
   logTouch: (id: string, stepLabel: string) => void
@@ -402,6 +415,7 @@ export function useShellBridge(skin: SkinId): { mc: MC; api: ShellApi } {
   const sync = useSyncStatus()
   const [weather, setWeather] = useState<Weather | null>(null)
   const [day, setDay] = useState(localDateKey)
+  const [gymReads, setGymReads] = useState(0)
   useEffect(() => {
     let on = true
     const load = () => { void getWeather().then((w) => { if (on && w) setWeather(w) }).catch(() => {}) }
@@ -423,13 +437,13 @@ export function useShellBridge(skin: SkinId): { mc: MC; api: ShellApi } {
     subs.current.forEach((f) => f())
   }, [thread.turns, thread.busy, thread.err, thread.errHint, thread.live])
   const mc = useMemo(
-    () => toMC({ s, pomo: { focusMin: pomo.focusMin, breakMin: pomo.breakMin, cyclesDone: pomo.cyclesDone }, cal, health, compass, weather, sync, skin, day }),
+    () => toMC({ s, pomo: { focusMin: pomo.focusMin, breakMin: pomo.breakMin, cyclesDone: pomo.cyclesDone }, cal, health, compass, weather, sync, skin, day, gymReads }),
     // The store object is new on every render; the pomodoro's secondsLeft ticks
     // every second and is deliberately not a dependency (the shell counts down itself).
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [s.tasks, s.habits, s.habitLog, s.routines, s.routineLog, s.goals, s.slips, s.focusSessions, s.notes, s.noteFolders, s.people, s.personContacts,
       s.prospects, s.projects, s.ideaBoard, s.prompts, s.plan, s.ledger, s.gymGoals, s.activeFocus, s.dailyDone, s.dailySkipped, s.space, s.syncOrigin,
-      pomo.focusMin, pomo.breakMin, pomo.cyclesDone, cal, health, compass, weather, sync.phase, sync.lastSyncedAt, skin, day],
+      pomo.focusMin, pomo.breakMin, pomo.cyclesDone, cal, health, compass, weather, sync.phase, sync.lastSyncedAt, skin, day, gymReads],
   )
 
   const api = useMemo<ShellApi>(() => ({
@@ -459,10 +473,12 @@ export function useShellBridge(skin: SkinId): { mc: MC; api: ShellApi } {
     syncHevy: async () => {
       if (!hasHevyKey()) return 'No Hevy key on this device. Add it in Settings.'
       const res = await syncHevy(sRef.current.habits, sRef.current.markHabitDaysOn)
+      setGymReads((n) => n + 1)
       return res.ok ? `Synced Hevy: ${res.days} day${res.days === 1 ? '' : 's'} of workouts`
         : res.reason === 'bad-key' ? 'That Hevy key was rejected' : res.reason === 'rate-limit' ? 'Hevy is rate limiting right now'
           : res.reason === 'no-habit' ? 'No habit named Workout / Gym / Fitness to tick' : 'Hevy could not be reached'
     },
+    seedGym: () => { for (const g of FORGE_SEED) sRef.current.addGymGoal(g) },
     addNote: (space, body) => {
       const st = sRef.current
       const f = st.noteFolders.find((x) => x.space === space && /brain dump/i.test(x.name))?.id ?? spaceFolderId(space)

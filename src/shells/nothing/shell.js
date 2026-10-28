@@ -578,6 +578,32 @@ function setChrome() {
 /* open a view. from = a widget tile element for the morph; push = slide in from the right */
 /* Pages this look does not draw itself: they open the real page in the classic app. */
 const CLASSIC_V = { bills: 'bills', longevity: 'longevity', watchless: 'watchless', skills: 'skills' };
+/* ---- the stack follows the browser's history, so the iOS swipe-back and the on-screen Back are the same thing ----
+   Every pushed view and every open sheet owns one history entry. Back (screen, edge swipe, pull-down) just calls history.back(); the popstate
+   below does the real pop with the usual animation. Anything that unwinds on its own (a tab switch, a sheet closing after an action) removes
+   its entries with history.go(-n) and a SKIP count so its own popstate is ignored. Operations on history are queued, because go() and back()
+   are asynchronous and a pushState sent behind one would land in the wrong place. */
+const H = []; let SKIP = 0, HBUSY = false, HOPTS = null; const HQ = [];
+const hNext = () => { HBUSY = false; const f = HQ.shift(); if (f) f(); };
+const hRun = f => { if (HBUSY) HQ.push(f); else f(); };
+const hGuard = () => setTimeout(() => { if (HBUSY) { SKIP = 0; hNext(); } }, 900);
+function hPush(entry) { H.push(entry); hRun(() => { const d = H.indexOf(entry) + 1; try { history.pushState({ nv: 1, d: d || H.length }, ''); } catch (e) { } }); }
+function hUnwind(n) { if (n > 0) hRun(() => { HBUSY = true; SKIP++; try { history.go(-n); } catch (e) { SKIP--; hNext(); return; } hGuard(); }); }
+function onPop(ev) {
+  if (SKIP > 0) { SKIP--; if (!SKIP) hNext(); return; }
+  const st = ev.state, d = st && st.nv ? st.d : 0;
+  if (d > H.length) { HBUSY = true; SKIP++; history.back(); hGuard(); return; }   // a forward step: put it back, nothing changes
+  if (d === H.length) { if (HBUSY) hNext(); return; }
+  const popped = H.splice(d), opts = HOPTS; HOPTS = null; let real = false;
+  for (let i = popped.length - 1; i >= 0; i--) {
+    const en = popped[i]; if (en.dead) continue; real = true;
+    if (en.k === 's') closeSheet(en.key, false, true);
+    else if (STACK.length > 1) back({ ...(i === popped.length - 1 ? opts : null), force: true, fromHist: true });
+  }
+  if (HBUSY) hNext();
+  if (!real && popped.length) history.back();   // only dead entries were behind us: keep going to the one he meant
+}
+onWin('popstate', onPop);
 function open(id, args = {}, from = null) {
   if (CLASSIC_V[id]) { B.openClassic(CLASSIC_V[id]); return; }
   if (!V[id]) { console.warn('no view', id); return; }
@@ -587,7 +613,7 @@ function open(id, args = {}, from = null) {
   if (ROOTS.includes(id) && !from) { tab(id); return; }
   const e = { id, args, root: ROOTS.includes(id), tile: from ? from.dataset.wid : null };
   buildView(e);
-  STACK.push(e);
+  STACK.push(e); hPush({ k: 'v', e });
   e.el.classList.add('on');
   cur.el.classList.remove('on');
   if (from && from.isConnected) morphIn(e, from, cur); else slideIn(e, cur);
@@ -631,6 +657,14 @@ function back(opts = {}) {
   if (busyNav && !opts.force) return;
   if (STACK.length < 2) { if (top_().id !== 'home') tab('home'); return; }
   closeAllSheets();
+  if (!opts.fromHist) {
+    const top = H[H.length - 1];
+    if (top && top.k === 'v' && top.e === top_()) { HOPTS = opts; hRun(() => { HBUSY = true; try { history.back(); } catch (e) { HBUSY = false; HOPTS = null; backReal(opts); return; } hGuard(); }); return; }
+    const k = H.findIndex(x => x.k === 'v' && x.e === top_()); if (k >= 0) H[k].dead = true;
+  }
+  backReal(opts);
+}
+function backReal(opts = {}) {
   const e = STACK.pop(), under = top_();
   under.el.classList.add('on');
   e.el.classList.remove('on');
@@ -667,7 +701,7 @@ function tab(id) {
   const cur = top_();
   if (cur.id === id && STACK.length === 1) { if (id === 'home') { const sc = $(`#home .hp:nth-child(${S.page + 1}) .hsc`); sc && sc.scrollTo({ top: 0, behavior: 'smooth' }); } return; }
   lockNav(260);
-  const old = STACK.splice(0);
+  const old = STACK.splice(0); { const n = H.length; H.length = 0; hUnwind(n); }
   let e;
   if (id === 'home') { e = { id: 'home', el: $('#home'), args: {}, root: true }; R.home(); }
   else { e = { id, args: {}, root: true }; buildView(e); }
@@ -734,11 +768,12 @@ addRec({
 /* ---------- sheets: drawer curve, draggable, velocity dismiss ---------- */
 const SHEETS = [];
 function sheet(key, o) {
+  const had = H.some(x => x.k === 's' && x.key === key);
   closeSheet(key, true);
   const sc = document.createElement('div'); sc.className = 'scrim'; sc.dataset.a = 'sheetX';
   const el = document.createElement('div'); el.className = 'sheet ' + (o.cls || ''); el.dataset.key = key; el.setAttribute('role', 'dialog');
   const sh = { key, el, sc, o };
-  SHEETS.push(sh);
+  SHEETS.push(sh); if (!had) hPush({ k: 's', key });
   $('#toast').classList.add('top');
   sheetPaint(sh, true);
   $('#ov').append(sc, el);
@@ -755,9 +790,10 @@ function sheetPaint(sh, fresh) {
   o.after && o.after(sh.el, fresh);
 }
 function repaintSheets() { SHEETS.forEach(s => { if (s.o.live && !(s.el.contains(ROOT.activeElement) && ROOT.activeElement.matches('input,textarea'))) sheetPaint(s, false); }); }
-function closeSheet(key, instant) {
+function closeSheet(key, instant, fromHist) {
   const i = SHEETS.findIndex(s => s.key === key); if (i < 0) return false;
   const [s] = SHEETS.splice(i, 1);
+  if (!instant && !fromHist) { const k = H.findIndex(x => x.k === 's' && x.key === key); if (k >= 0) { if (k === H.length - 1) { H.pop(); hUnwind(1); } else H[k].dead = true; } }
   $('#toast').classList.toggle('top', SHEETS.length > 0);
   if (instant) { s.el.remove(); s.sc.remove(); return true; }
   s.el.classList.remove('on', 'drag'); s.el.style.transform = ''; s.sc.classList.remove('on');
@@ -766,7 +802,7 @@ function closeSheet(key, instant) {
   return true;
 }
 function closeTopSheet() { const s = SHEETS[SHEETS.length - 1]; return s ? closeSheet(s.key) : false; }
-function closeAllSheets() { [...SHEETS].forEach(s => closeSheet(s.key)); }
+function closeAllSheets() { [...SHEETS].reverse().forEach(s => closeSheet(s.key)); }
 A.sheetX = () => closeTopSheet();
 addRec({
   axis: 'y', test(st, dx, dy) {
@@ -2680,15 +2716,64 @@ V.health = {
     ${h.lastRead ? `<div class="lb" style="text-align:center;margin-top:6px">Last read from the watch ${h.lastRead}</div>` : ''}`;
   }
 };
+/* ---------------- GYM: the same numbers as the classic Gym page (gymcalc.ts), and the targets are editable here ---------------- */
+const gfmt = n => n == null ? '-' : Number.isInteger(n) ? String(n) : n.toFixed(1);
+const GMETRIC = { e1rm: 'Best lift', repTotal: 'Day total', sessions: 'Sessions', manual: 'By hand' };
 V.gym = {
   title: 'Gym', lazy: true, render() {
     const g = S.gym;
-    return jarNav('gym') + `<div class="cd k">${lbRow('This week', esc(g.lastSync))}<div class="hstack" style="margin-top:14px">${icoBig('dumbbell', 48)}${dm(g.target ? g.week + '/' + g.target : String(g.week), 7, { k: 'gw' })}</div></div>
-    <button class="key ${S.hevyBusy ? 't' : ''} wide" style="height:50px;margin-bottom:10px" data-a="hevySync" ${S.hevyBusy ? 'disabled' : ''}>${S.hevyBusy ? `<span class="chase8">${spinSVG()}</span> Syncing from Hevy` : ico('sync') + ' Sync Hevy'}</button>
-    <div class="sl">Targets</div>${g.targets.map(t => `<div class="cd"><div class="hstack"><span class="grow rt" style="font-weight:700">${esc(t.name)}</span>${dm(t.current, 2.6)}<span class="lb">of ${t.goal} ${esc(t.unit)}</span></div><div style="margin-top:12px">${drow(30, Math.round(clamp(t.goal ? t.current / t.goal : 0, 0, 1) * 30), { gap: 10.8, r: 2.8, fill: true, k: 'gt' + t.name })}</div></div>`).join('') || '<div class="empty">No targets set yet.</div>'}
-    <div class="sl">Sessions</div><div class="cd tight rows">${g.workouts.map(w => `<div class="row"><span class="lb" style="width:36px">${w.day}</span><div class="grow"><div class="rt one">${esc(w.name)}</div><div class="rs"><span>${w.min} min</span></div></div></div>`).join('') || '<div class="empty">No sessions read yet.</div>'}</div>`;
+    const key = !g.hasKey ? `<div class="cd"><div class="wt">Hevy is not connected on this device. Add its key in Settings, then sync.</div><button class="key t sm" style="margin-top:10px" data-a="openClassic" data-x="settings">${ico('gear')} Open Settings</button></div>` : '';
+    const targets = g.targets.map(t => {
+      const done = t.pct >= 1, none = t.goal <= 0;
+      return `<button class="cd gtgt" style="width:100%;text-align:left" data-a="gymOpen" data-x="${esc(t.id)}"><div class="hstack"><span class="grow rt" style="font-weight:700">${esc(t.name)}</span><span class="lb">${esc(GMETRIC[t.metric] || '')}</span></div>
+        <div class="hstack" style="margin-top:8px;gap:8px">${dm(t.current == null ? '-' : gfmt(t.current), 2.6)}<span class="lb">${none ? 'No target set' : 'of ' + gfmt(t.goal) + ' ' + esc(t.unit)}</span><span class="grow"></span>${done && !none ? `<span class="lb fg">${ico('check')} Reached</span>` : t.lowerIsBetter ? '<span class="lb">Lower is better</span>' : ''}</div>
+        ${none ? '' : `<div style="margin-top:12px">${drow(30, Math.round(clamp(t.pct, 0, 1) * 30), { gap: 10.8, r: 2.8, fill: true, k: 'gt' + t.id })}</div>`}${t.note ? `<div class="wt" style="font-size:11.5px;color:var(--dim);margin-top:8px">${esc(t.note)}</div>` : ''}</button>`;
+    }).join('');
+    const sessions = g.workouts.map(w => `<div class="row"><span class="lb" style="width:40px">${w.dow}<br>${+w.day.slice(8)}</span><div class="grow"><div class="rt">${esc(w.name)}</div><div class="rs"><span>${kc(w.volumeKg)} kg</span>${w.min ? `<span>${w.min} min</span>` : ''}${w.prs ? `<span class="red">${w.prs} ${w.prs === 1 ? 'PR' : 'PRs'}</span>` : ''}</div></div></div>`).join('');
+    return jarNav('gym') + `<div class="cd k">${lbRow('This week', esc(g.lastSync))}<div class="hstack" style="margin-top:14px">${icoBig('dumbbell', 48)}${dm(g.target ? g.week + '/' + g.target : String(g.week), 7, { k: 'gw' })}</div></div>${key}
+    ${g.hasKey ? `<button class="key ${S.hevyBusy ? 't' : ''} wide" style="height:50px;margin-bottom:10px" data-a="hevySync" ${S.hevyBusy ? 'disabled' : ''}>${S.hevyBusy ? `<span class="chase8">${spinSVG()}</span> Syncing from Hevy` : ico('sync') + ' Sync Hevy'}</button>` : ''}
+    <div class="sl">Targets<button class="key xs" data-a="gymNew">${ico('plus')} Target</button></div>${targets || `<div class="cd"><div class="wt">No targets yet.</div><button class="key t sm" style="margin-top:10px" data-a="gymSeed">Add my Forge starter targets</button></div>`}
+    <div class="sl">Sessions<b>${g.sessionsOnRecord} on record</b></div><div class="cd tight rows">${sessions || `<div class="empty">${g.hasKey ? 'Nothing synced from Hevy yet. Press Sync.' : 'Sessions come from Hevy once it is connected.'}</div>`}</div>`;
   }
 };
+A.gymSeed = () => { B.seedGym(); toast('Starter targets added'); };
+/* The target sheet: edits go to the store 600 ms after the last key and again on close, like the idea sheet. */
+function openGymSheet(id) {
+  const t = id ? S.gym.targets.find(x => x.id === id) : null; if (id && !t) return;
+  const st = S.ui.gymSt = { id: id || null, name: t ? t.name : '', goal: t ? gfmt(t.goal) : '', unit: t ? t.unit : '', metric: t ? t.metric : 'e1rm', ex: t ? t.exerciseName : '', cur: t && t.manual != null ? gfmt(t.manual) : '', low: t ? t.lowerIsBetter : false, saved: null, t: 0 };
+  const num = v => { const n = parseFloat(String(v).replace(',', '.')); return Number.isFinite(n) ? n : null; };
+  const patch = () => ({ name: st.name.trim(), goal: num(st.goal) ?? 0, unit: st.unit.trim(), metric: st.metric, exerciseName: st.metric === 'e1rm' || st.metric === 'repTotal' ? (st.ex || undefined) : undefined, current: st.metric === 'manual' ? (num(st.cur) ?? undefined) : undefined, lowerIsBetter: st.metric === 'manual' ? st.low : false });
+  st.saved = JSON.stringify(t ? patch() : null);
+  const flush = () => {
+    clearTimeout(st.t); if (S.ui.gymSt !== st) return;
+    const p = patch(), sig = JSON.stringify(p); if (sig === st.saved) return;
+    if (st.id) { if (!p.name) return; B.store().updateGymGoal(st.id, p); }
+    else if (p.name) { st.id = B.store().addGymGoal(p); }
+    else return;
+    st.saved = sig;
+  };
+  st.flush = flush;
+  sheet('gym', {
+    cls: 'hsheet', live: true, title: id ? 'Target' : 'New target', focus: id ? null : '#gtn', onClose: () => { flush(); if (S.ui.gymSt === st) S.ui.gymSt = null; },
+    body: () => {
+      const cur = id ? S.gym.targets.find(x => x.id === id) : null, ex = S.gym.exercises, needsEx = st.metric === 'e1rm' || st.metric === 'repTotal';
+      return `<input class="fld" id="gtn" data-gf="name" value="${esc(st.name)}" placeholder="Name, e.g. Bench e1RM" aria-label="Name" autocomplete="off">
+      <div class="hstack" style="margin-top:8px;gap:8px"><input class="fld" data-gf="goal" inputmode="decimal" value="${esc(st.goal)}" placeholder="Goal" aria-label="Goal" style="flex:1"><input class="fld" data-gf="unit" value="${esc(st.unit)}" placeholder="Unit" aria-label="Unit" style="flex:1" autocomplete="off"></div>
+      <div class="sl">What it counts</div><div class="seg">${Object.entries(GMETRIC).map(([m, l]) => `<button class="${st.metric === m ? 'on' : ''}" data-a="gtMetric" data-x="${m}">${l}</button>`).join('')}</div>
+      ${needsEx ? `<div class="sl">Exercise</div>${ex.length ? `<div class="chips gtex">${ex.map(e => `<button class="chip ${st.ex === e.name ? 'on' : ''}" data-a="gtEx" data-x="${esc(e.name)}">${esc(e.name)}</button>`).join('')}</div>` : `<div class="wt" style="color:var(--dim)">Sync Hevy first and its exercises show up here.</div>`}${st.ex && !ex.some(e => e.name === st.ex) ? `<div class="lb" style="margin-top:8px">${esc(st.ex)}</div>` : ''}` : ''}
+      ${st.metric === 'manual' ? `<div class="sl">Where you are now</div><input class="fld" data-gf="cur" inputmode="decimal" value="${esc(st.cur)}" placeholder="Current" aria-label="Current"><div class="chips" style="margin-top:8px"><button class="chip ${st.low ? 'on' : ''}" data-a="gtLow">Lower is better</button></div>` : ''}
+      ${cur ? `<div class="cd" style="margin-top:14px">${lbRow('Right now', cur.pct >= 1 && cur.goal > 0 ? 'Reached' : Math.round(clamp(cur.pct, 0, 1) * 100) + '%')}<div style="margin-top:8px">${dm(cur.current == null ? '-' : gfmt(cur.current), 3.4)}</div></div>` : ''}
+      ${id ? `<button class="key t wide" style="color:var(--alert);margin-top:14px" data-a="gtDel">${ico('trash')} Delete</button>` : `<button class="key wide" style="margin-top:14px" data-a="sheetX">Save target</button>`}`;
+    },
+    after(el) { $$('input[data-gf]', el).forEach(f => f.addEventListener('input', () => { st[f.dataset.gf === 'cur' ? 'cur' : f.dataset.gf] = f.value; clearTimeout(st.t); st.t = setTimeout(flush, 600); })); }
+  });
+}
+A.gymOpen = (el, id) => openGymSheet(id);
+A.gymNew = () => openGymSheet(null);
+A.gtMetric = (el, m) => { const st = S.ui.gymSt; if (!st) return; st.metric = m; st.flush(); repaintSheets(); };
+A.gtEx = (el, n) => { const st = S.ui.gymSt; if (!st) return; st.ex = st.ex === n ? '' : n; if (!st.name) st.name = n.replace(/\s*\(.*\)/, ''); st.flush(); repaintSheets(); };
+A.gtLow = () => { const st = S.ui.gymSt; if (!st) return; st.low = !st.low; st.flush(); repaintSheets(); };
+A.gtDel = () => { const st = S.ui.gymSt; if (!st || !st.id) return; const id = st.id; S.ui.gymSt = null; clearTimeout(st.t); closeSheet('gym'); B.store().deleteGymGoal(id); undoable('Target removed', () => B.store().undoDelete()); };
 V.why = {
   title: 'The wall', dark: true, render() {
     return jarNav('why') + MC.why.map((w, i) => `<div class="cd ${i % 3 === 1 ? 'r' : i % 3 === 2 ? '' : 'k'}" style="transform:rotate(${[-1.2, .8, -.6, 1.1][i % 4]}deg);margin-bottom:14px">${w.kind === 'number' ? `${dm(w.value, 7)}<div class="wt up" style="margin-top:12px;color:var(--fg)">${esc(w.label)}</div>` : `<div class="wt up" style="font-size:${w.kind === 'statement' ? 22 : 17}px;line-height:1.25;font-weight:700;color:var(--fg)">${esc(w.text)}</div>${w.by ? `<div class="lb" style="margin-top:12px">- ${w.by}</div>` : ''}`}</div>`).join('');

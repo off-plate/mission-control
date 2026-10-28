@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BillsSignIn, useCompassAccount } from './billspage'
 import { Sheet } from './modals'
-import { Band, Segmented } from './ui'
+import { Band } from './ui'
 import {
   callFunction, deleteMyMind, mymindImageUrls, readMyMind, SUPABASE_ENABLED, updateMyMind, type MyMindRow,
 } from './supabase'
@@ -173,8 +173,10 @@ export function MyMindPage() {
           value={adding} onChange={(e) => setAdding(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { void addLink(adding); setAdding('') } }} />
       </div>
-      <div className="mm-filters">
-        <Segmented label="Show" size="sm" options={FILTERS} value={filter} onPick={setFilter} />
+      <div className="mm-chips" role="group" aria-label="Show">
+        {FILTERS.map((f) => (
+          <button key={f.id} className={`mm-chip${filter === f.id ? ' is-on' : ''}`} aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>{f.label}</button>
+        ))}
       </div>
       {status && <div className="mm-status" role="status">{status}</div>}
 
@@ -219,14 +221,6 @@ function Detail({ row, url, onChange, onGone, onError }: {
   const run = async (fn: () => Promise<void>) => { try { await fn() } catch (e) { onError(e instanceof Error ? e.message : 'Something went wrong') } }
   return (
     <div className="mm-detail">
-      {url && <img className="mm-big" src={url} alt="" />}
-      <h3 className="mm-dt">{row.title || row.site}</h3>
-      <div className="mm-mt">{row.kind === 'link' ? row.site : row.kind === 'image' ? 'Photo' : 'Text'} / saved {ago(row.created_at)}{row.via ? ` / via ${row.via}` : ''}</div>
-      {row.kind === 'text' && <p className="mm-body">{row.body}</p>}
-      {row.kind === 'link' && row.description && <p className="mm-body">{row.description}</p>}
-      <label className="mm-lab" htmlFor="mm-note">Note</label>
-      <textarea id="mm-note" className="mm-field mm-ta" rows={3} placeholder="Why you saved it" value={note} onChange={(e) => setNote(e.target.value)}
-        onBlur={() => { if (note !== row.note) void run(async () => { await updateMyMind(row.id, { note }); onChange({ note }) }) }} />
       <div className="mm-actions">
         {row.url && <a className="btn btn-primary" href={row.url} target="_blank" rel="noreferrer">Open original</a>}
         {row.url && <button className="btn" onClick={() => void navigator.clipboard?.writeText(row.url!).then(() => onError('Link copied'))}>Copy link</button>}
@@ -236,6 +230,16 @@ function Detail({ row, url, onChange, onGone, onError }: {
         {row.trashed_at && !sure && <button className="btn mm-danger" onClick={() => setSure(true)}>Delete forever</button>}
         {row.trashed_at && sure && <button className="btn mm-danger is-sure" onClick={() => void run(async () => { await deleteMyMind(row); onGone() })}>Yes, delete forever</button>}
       </div>
+      {url && (row.url
+        ? <a className="mm-biglink" href={row.url} target="_blank" rel="noreferrer" aria-label="Open original"><img className="mm-big" src={url} alt="" /></a>
+        : <img className="mm-big" src={url} alt="" />)}
+      <h3 className="mm-dt">{row.url ? <a href={row.url} target="_blank" rel="noreferrer">{row.title || row.site}</a> : (row.title || row.site)}</h3>
+      <div className="mm-mt">{row.kind === 'link' ? row.site : row.kind === 'image' ? 'Photo' : 'Text'} / saved {ago(row.created_at)}{row.via ? ` / via ${row.via}` : ''}</div>
+      {row.kind === 'text' && <p className="mm-body">{row.body}</p>}
+      {row.kind === 'link' && row.description && <p className="mm-body">{row.description}</p>}
+      <label className="mm-lab" htmlFor="mm-note">Note</label>
+      <textarea id="mm-note" className="mm-field mm-ta" rows={3} placeholder="Why you saved it" value={note} onChange={(e) => setNote(e.target.value)}
+        onBlur={() => { if (note !== row.note) void run(async () => { await updateMyMind(row.id, { note }); onChange({ note }) }) }} />
     </div>
   )
 }

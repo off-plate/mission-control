@@ -587,12 +587,14 @@ const H = []; let SKIP = 0, HBUSY = false, HOPTS = null; const HQ = [];
 const hNext = () => { HBUSY = false; const f = HQ.shift(); if (f) f(); };
 const hRun = f => { if (HBUSY) HQ.push(f); else f(); };
 const hGuard = () => setTimeout(() => { if (HBUSY) { SKIP = 0; hNext(); } }, 900);
-function hPush(entry) { H.push(entry); hRun(() => { const d = H.indexOf(entry) + 1; try { history.pushState({ nv: 1, d: d || H.length }, ''); } catch (e) { } }); }
+let H0 = '';
+function hPush(entry) { if (!H.length) H0 = location.href; H.push(entry); hRun(() => { const d = H.indexOf(entry) + 1; try { history.pushState({ nv: 1, d: d || H.length }, ''); } catch (e) { } }); }
 function hUnwind(n) { if (n > 0) hRun(() => { HBUSY = true; SKIP++; try { history.go(-n); } catch (e) { SKIP--; hNext(); return; } hGuard(); }); }
 function onPop(ev) {
   if (HOST.style.display === 'none') return;   // a classic page is on top: its own history steps are not ours
   if (SKIP > 0) { SKIP--; if (!SKIP) hNext(); return; }
   const st = ev.state, d = st && st.nv ? st.d : 0;
+  if (!(st && st.nv) && location.href !== H0) return;   // a hash change to a page of the app: not one of our steps
   if (d > H.length) { HBUSY = true; SKIP++; history.back(); hGuard(); return; }   // a forward step: put it back, nothing changes
   if (d === H.length) { if (HBUSY) hNext(); return; }
   const popped = H.splice(d), opts = HOPTS; HOPTS = null; let real = false;
@@ -605,6 +607,7 @@ function onPop(ev) {
   if (!real && popped.length) history.back();   // only dead entries were behind us: keep going to the one he meant
 }
 onWin('popstate', onPop);
+HOST.__nvDebug = () => ({ H: H.map(x => x.k + (x.dead ? '!' : '') + ':' + (x.e ? x.e.id : x.key)), SKIP, HBUSY, stack: STACK.map(e => e.id), len: history.length, H0, href: location.href, st: history.state });
 function open(id, args = {}, from = null) {
   if (CLASSIC_V[id]) { B.openClassic(CLASSIC_V[id]); return; }
   if (!V[id]) { console.warn('no view', id); return; }

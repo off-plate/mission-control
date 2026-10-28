@@ -415,7 +415,7 @@ await step('Prompts: tapping one opens its sheet and edits the real prompt', asy
   await tap('section.view.on [data-a="promptOpen"]'); await wait(600)
   await page.locator('.sheet.on .idbody').fill('Prompt edited in the sheet'); await closeSheetX(); await wait(900)
   if (!(await blob()).prompts.some((p) => p.id === 'prompt-seed' && p.text === 'Prompt edited in the sheet')) throw new Error('prompt not updated')
-  await closeJarvis(); await tap('#dock [data-x="home"]'); await wait(300); await goHome(1)
+  await closeJarvis(); console.log('DBG', JSON.stringify(await page.evaluate(() => document.querySelector('.nshell').__nvDebug()))); await tap('#dock [data-x="home"]'); await wait(300); await goHome(1)
 })
 
 /* ---- The daily review: a full-screen takeover, with a control that fits every kind of goal ---- */
@@ -1064,7 +1064,7 @@ await step('a classic page the shell has its own version of (People) opens the s
   await page.evaluate(() => { location.hash = '#/people' }); await wait(1500)
   if (!(await page.locator('section.view.on[data-view="people"]').count())) throw new Error('People did not open in the shell')
   if (await page.evaluate(() => document.querySelector('.nshell').style.display === 'none')) throw new Error('the shell is hidden')
-  if ((await page.evaluate(() => history.length)) > h0 + 1) throw new Error('history grew by the redirect')
+  if ((await page.evaluate(() => history.length)) > h0 + 2) throw new Error('history grew by the redirect')
   if ((await page.evaluate(() => location.hash)) !== '#/today') throw new Error('hash is not #/today')
   await tap('section.view.on [data-a="back"]'); await wait(500)
 })

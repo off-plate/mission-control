@@ -11944,3 +11944,50 @@ html { background: var(--bg); }
 .ph-back svg { width: 20px; height: 20px; }
 .ph-act { justify-self: end; display: flex; gap: 8px; min-width: 0; }
 .phonehead-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 12px; }
+
+/* ---------------- MyMind (2026-10-28) ----------------
+   Everything he shares: a masonry of cards, search and a link box on top, a
+   sheet for the detail. Neutral surfaces; the accent only marks what you can
+   act on. Two columns on a phone, up to six on a wide screen. */
+.mm-page { max-width: 1280px; margin-inline: auto; }
+.mm-tools { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 10px; }
+.mm-field {
+  font: inherit; font-size: 15px; color: var(--ink); background: var(--surface); border: 0; border-radius: 10px;
+  padding: 11px 13px; min-width: 0; flex: 1 1 220px; box-shadow: inset 0 0 0 1px var(--hairline);
+}
+.mm-field:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 1px; }
+.mm-ta { width: 100%; resize: vertical; flex: none; }
+.mm-filters { margin-bottom: 12px; overflow-x: auto; scrollbar-width: none; }
+.mm-filters::-webkit-scrollbar { display: none; }
+.mm-status { margin: 0 0 10px; font-size: 14px; color: var(--muted); }
+.mm-empty { padding: 36px 4px; color: var(--muted); }
+.mm-grid { columns: 2 150px; column-gap: 10px; }
+@media (min-width: 640px) { .mm-grid { columns: 4 190px; column-gap: 14px; } }
+@media (min-width: 1100px) { .mm-grid { columns: 6 190px; } }
+.mm-card {
+  break-inside: avoid; display: block; width: 100%; margin: 0 0 10px; padding: 0; text-align: left; cursor: pointer;
+  background: var(--surface); border: 0; border-radius: 14px; overflow: hidden; color: inherit; font: inherit;
+  box-shadow: inset 0 0 0 1px var(--hairline);
+}
+@media (min-width: 640px) { .mm-card { margin-bottom: 14px; } }
+.mm-card:hover { box-shadow: inset 0 0 0 1px var(--hairline-strong); }
+.mm-card:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+.mm-img { display: block; width: 100%; height: auto; background: var(--surface-2); }
+.mm-ph {
+  aspect-ratio: 4 / 3; display: flex; align-items: flex-end; padding: 10px 12px; font-size: 12px; color: var(--faint);
+  overflow: hidden; word-break: break-word;
+}
+.mm-ph.is-text { align-items: flex-start; font-size: 13px; line-height: 1.35; color: var(--muted); }
+.mm-tx { padding: 9px 12px 12px; }
+.mm-tt { font-weight: 600; font-size: 14px; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.mm-mt { margin-top: 5px; font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.mm-more { margin: 8px auto 0; display: block; }
+.mm-page.is-drag { outline: 2px dashed var(--accent-text); outline-offset: -8px; }
+.mm-detail { display: grid; gap: 8px; }
+.mm-big { width: 100%; max-height: 46vh; object-fit: contain; border-radius: 12px; background: var(--surface-2); }
+.mm-dt { margin: 4px 0 0; font-size: 18px; line-height: 1.3; }
+.mm-body { margin: 6px 0 0; font-size: 15px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mm-lab { margin-top: 8px; font-size: 12px; color: var(--faint); }
+.mm-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.mm-danger { color: var(--alert); }
+.mm-danger.is-sure { background: var(--alert); color: #fff; }

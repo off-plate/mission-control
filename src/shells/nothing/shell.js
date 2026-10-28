@@ -330,6 +330,7 @@ const ICONS = {
   zone: ['..#####..', '.#.....#.', '#..###..#', '#.#...#.#', '#.#.#.#.#', '#.#...#.#', '#..###..#', '.#.....#.', '..#####..'],
   ideas: ['..#####..', '.#.....#.', '#.......#', '#...#...#', '.#..#..#.', '..#.#.#..', '...###...', '...###...', '....#....'],
   skills: ['....#....', '....#....', '...###...', '..#####..', '#########', '..#####..', '...###...', '....#....', '....#....'],
+  mymind: ['..#####..', '..#...#..', '..#...#..', '..#...#..', '..#...#..', '..#...#..', '..#.#.#..', '..##.##..', '..#...#..'],
   bills: ['.........', '#########', '#.......#', '#########', '#########', '#.......#', '#.##..#.#', '#########', '.........'],
   projects: ['.........', '####.....', '#...#####', '#.......#', '#########', '#.......#', '#.......#', '#.......#', '#########'],
   pulse: ['.........', '...#.....', '...#.....', '..#.#....', '#.#.#.#.#', '....#.#..', '....#.#..', '.....#...', '.........'],
@@ -577,7 +578,7 @@ function setChrome() {
 
 /* open a view. from = a widget tile element for the morph; push = slide in from the right */
 /* Pages this look does not draw itself: they open the real page in the classic app. */
-const CLASSIC_V = { bills: 'bills', longevity: 'longevity', watchless: 'watchless', skills: 'skills' };
+const CLASSIC_V = { bills: 'bills', mymind: 'mymind', longevity: 'longevity', watchless: 'watchless', skills: 'skills' };
 /* ---- the stack follows the browser's history, so the iOS swipe-back and the on-screen Back are the same thing ----
    Every pushed view and every open sheet owns one history entry. Back (screen, edge swipe, pull-down) just calls history.back(); the popstate
    below does the real pop with the usual animation. Anything that unwinds on its own (a tab switch, a sheet closing after an action) removes
@@ -2897,7 +2898,7 @@ A.jvTab = (el, id) => tab(id);
 A.jvProj = (el, id) => { S.ui.planProj = id; S.ui.planSeg = 'todo'; tab('plan'); };
 A.jvOpen = (el, id) => { if (id === 'goals') { S.ui.hSeg = 'goals'; tab('habits'); } else open(id, id === 'people' ? { mode: 'personal' } : {}); };
 /* ---------------- APPS DRAWER (root tab) ---------------- */
-const DRAWER = [['calendar', 'calendar', 'Calendar'], ['notes', 'note', 'Notes'], ['ideas', 'ideas', 'Ideas'], ['people', 'people', 'People'], ['bills', 'bills', 'Bills'], ['jar', 'jar', 'Jar'], ['zone', 'zone', 'Zone'], ['focus', 'bolt', 'Focus'], ['jarvis', 'face', 'Jarvis'], ['skills', 'skills', 'Skills'], ['watchless', 'eyeoff', 'Watchless'], ['weather', 'sun', 'Weather'], ['settings', 'gear', 'Settings']];
+const DRAWER = [['calendar', 'calendar', 'Calendar'], ['notes', 'note', 'Notes'], ['ideas', 'ideas', 'Ideas'], ['people', 'people', 'People'], ['bills', 'bills', 'Bills'], ['mymind', 'mymind', 'MyMind'], ['jar', 'jar', 'Jar'], ['zone', 'zone', 'Zone'], ['focus', 'bolt', 'Focus'], ['jarvis', 'face', 'Jarvis'], ['skills', 'skills', 'Skills'], ['watchless', 'eyeoff', 'Watchless'], ['weather', 'sun', 'Weather'], ['settings', 'gear', 'Settings']];
 V.apps = {
   title: 'Apps', render() {
     const badge = { people: overdue().length, bills: billsOverdue().length, ideas: S.prompts.filter(p => !p.sent).length };

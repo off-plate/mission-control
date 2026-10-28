@@ -36,9 +36,13 @@ One quiet, low-saturation hue per task category, shown **only as an 8px dot** at
 
 The interactive accent changes per space, so switching rooms visibly changes the room (Sunsama's color-by-channel, on the interactive layer):
 
-- **All** → lime `#DFF24A` (base)
-- **Personal** → gold `#FFC94A`, text partner `#7C5A0E`
-- **Work** → sky `#7FD8F5`, text partner `#1C5772`
+- **All** → red `#D71921` (his call, 2026-10-28: one palette across the Nothing phone app and the classic desktop), hover fill `#B8141C`, text partner `#C4151D`
+- **Personal** → emerald `#00874A`, hover fill `#006B3A`, text partner `#00733F`
+- **Work** → cobalt `#2453E6`, hover fill `#1D44C2`, text partner `#2453E6`
+
+All three are dark fills, so the text on an accent fill is white: the token `--a-on-accent` (`#FFFFFF`), used wherever a rule fills with the accent. The dark rooms keep dark text on their own bright accent (HUD cyan, the Jar pages' lime) by setting `--a-on-accent` in their token blocks. White on each fill is 5.2, 4.6 and 6.1 to 1; each text partner is above 4.5 on `--bg`, `--surface` and `--surface-2`.
+
+Known tension: the All accent is red, and `--alert` (coral, urgent and debt) is a brick red. Buttons are saturated red, alerts are the darker coral: keep alerts to text, dots and outlines, never a filled button, so the two stay apart.
 
 Set via `data-space` on `<html>`. The app is light only: there is no dark mode and no `data-theme`, so nothing here is theme-qualified. All three accents hit WCAG AA on `--bg` and `--surface`.
 

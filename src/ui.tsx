@@ -354,7 +354,7 @@ export function TaskMark({ task, always }: { task: { space?: SpaceId; projectId?
    October". The chip is filled with the active workspace's own accent (the
    [data-space] tokens), so All is lime, Personal gold, Big Time blue. It is the
    same setView the header switcher calls, so the two always agree. */
-const WS_DOT: Record<string, string> = { all: '#DFF24A', personal: '#FFC94A', work: '#7FD8F5' }
+const WS_DOT: Record<string, string> = { all: '#D71921', personal: '#00874A', work: '#2453E6' }
 export function WorkspaceTitle({ before, after }: { before: string; after?: string }) {
   return (
     <span className="ws-title">

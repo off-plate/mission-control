@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { SKINS, setSkin, useSkin } from './skins'
 import { useStore } from './store'
 import { PROVIDERS, getAiKey, getAiProvider, hasAiKey, setAiKey, setAiProvider, type AiProvider } from './ai'
-import { Band, Segmented, Select } from './ui'
+import { Band, Segmented, Select, usePhone } from './ui'
 import { getHevyKey, getHevyLastSync, hasHevyKey, setHevyKey, syncHevy } from './hevy'
 import {
   getDeviceVoicePref, GOOD_VOICES, getTtsKey, hasTtsKey, listDeviceVoices, NOVELTY_VOICES, previewDeviceVoice,
@@ -354,11 +354,16 @@ function DeviceVoiceField() {
   )
 }
 
-/* Per device, like Jarvis mode. Classic is the app as designed. */
+/* Per device, like Jarvis mode. Phone only: the desktop is always Classic and
+   a phone is always Nothing, so the one choice is Light or Dark. */
 function LookPick() {
   const skin = useSkin()
+  if (!usePhone()) return null
   return (
-    <Segmented label="Look" value={skin} options={SKINS.map((s) => ({ id: s.id, label: s.label }))} onPick={setSkin} />
+    <>
+      <span className="microcap" style={{ marginTop: 24, display: 'block' }}>Look</span>
+      <Segmented label="Look" value={skin} options={SKINS.map((s) => ({ id: s.id, label: s.label }))} onPick={setSkin} />
+    </>
   )
 }
 
@@ -386,7 +391,6 @@ export function SettingsPage() {
               browser was serving an older bundle, and neither of us could see
               which. Now the screen says so, and Reload gets past a cached copy
               without going anywhere near developer tools. */}
-          <span className="microcap" style={{ marginTop: 24, display: 'block' }}>Look</span>
           <LookPick />
           <span className="microcap" style={{ marginTop: 24, display: 'block' }}>This build</span>
           <div className="source-row">

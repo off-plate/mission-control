@@ -47,7 +47,7 @@ const IdeasPage = lazy(() => import('./ideaboard').then((m) => ({ default: m.Ide
 const NothingShell = lazy(() => import('./shells/nothing'))
 const PeoplePage = lazy(() => import('./people').then((m) => ({ default: m.PeoplePage })))
 import { useStore } from './store'
-import { SKINS, useSkin } from './skins'
+import { CLASSIC_LOOK, SKINS, useSkin } from './skins'
 import { ago, describe, useSyncStatus } from './sync'
 import { isReadOnly } from './store'
 import { SPACES, UNSORTED, type PageId, type SpaceId, type ViewId } from './types'
@@ -617,15 +617,16 @@ export default function App() {
   /* The look (Settings > Look). HUD, the Jarvis room and the Zone keep their
      own, so a skin only applies where none of them does. */
   const pickedSkin = useSkin()
-  const skin = hudLook || page === 'zone' ? 'classic' : pickedSkin
-  /* On a phone, Nothing Light/Dark is the shell, standing in for Today. Any
-     page the shell hands back to (Jarvis, Settings, Bills) is the classic one,
-     and Today in its tab bar is the way back. */
+  /* A phone is always Nothing (Light or Dark); the desktop is always Classic. */
   const phone = usePhone()
-  const shellOn = phone && pickedSkin.startsWith('nothing') && page === 'today'
-  useEffect(() => { if (phone && pickedSkin.startsWith('nothing')) setPage('today') }, [pickedSkin, phone]) // eslint-disable-line react-hooks/exhaustive-deps
+  const skin = !phone || hudLook || page === 'zone' ? 'classic' : pickedSkin
+  /* On a phone, Nothing is the shell, standing in for Today. Any page the shell
+     hands back to (Settings, Bills) is the classic one, and Today in its tab
+     bar is the way back. */
+  const shellOn = phone && page === 'today'
+  useEffect(() => { if (phone) setPage('today') }, [phone]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    const s = SKINS.find((x) => x.id === skin)!
+    const s = SKINS.find((x) => x.id === skin) ?? CLASSIC_LOOK
     document.documentElement.style.colorScheme = s.dark ? 'dark' : ''
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', s.bar)
   }, [skin])

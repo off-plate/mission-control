@@ -124,7 +124,7 @@ body:has(.shell.is-hud) {
      exists to close. Redeclared here too so the FAB (and anything else
      that ever needs the un-adapted accent) gets the real HUD cyan instead
      of silently falling back to the light theme's lime. */
-  --a-accent: #4FD8E8; --a-accent-2: #7FEBF7; --a-accent-text: #6FE4F2; --a-accent-wash: rgba(79, 216, 232, 0.14);
+  --a-accent: #4FD8E8; --a-accent-2: #7FEBF7; --a-accent-text: #6FE4F2; --a-accent-wash: rgba(79, 216, 232, 0.14); --a-on-accent: #04141A;
   --a-ink: #E6F1F8;
   /* Same gap, the radius tokens instead of the colour ones: --a-r-sm was
      only ever redefined inside .shell.is-hud (2px there), so a fixed
@@ -323,7 +323,7 @@ body:has(.shell.is-hud) { background: var(--bg); }
      background. Deepening this to the fill turned the focus pill's label into
      lime on white at 1.53:1. */
   --accent-hover: var(--a-ink);
-  --accent-ink: var(--a-ink);
+  --accent-ink: var(--a-on-accent, var(--a-ink));
   --accent-wash: var(--a-accent-wash);
   --accent-fill: var(--a-accent);
 
@@ -726,7 +726,7 @@ main { padding-inline: var(--gutter); }
      surfaces COLOR.md carves out for literal accent by name (the checkbox
      tick uses the identical background/color pairing), and --a-accent is
      the one that already changes with whichever space he's standing in. */
-  background: var(--a-accent); color: var(--a-ink);
+  background: var(--a-accent); color: var(--a-on-accent, var(--a-ink));
   box-shadow: var(--shadow-pop);
   transition: transform var(--t-fast);
 }
@@ -5638,7 +5638,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
      Mapping the app's own --faint onto --a-faint is what broke 266 labels the
      first time this retarget ran. */
   --a-soft: #6E6759; --a-faint: #948D7E;
-  --a-accent: #DFF24A; --a-accent-2: #C8DC2E; --a-accent-text: #5E6B12; --a-accent-wash: #F1F8C8;
+  --a-accent: #D71921; --a-accent-2: #B8141C; --a-accent-text: #C4151D; --a-accent-wash: color-mix(in srgb, #D71921 12%, transparent); --a-on-accent: #FFFFFF;
   --a-alert: #B03A22; --a-alert-wash: #F7E1DB; --a-alert-solid: #D2452A;
   --a-warn: #7C5A0E; --a-warn-wash: #F7EBD3;
   --a-progress: #2F6B45; --a-progress-wash: #DBEDE2; --a-progress-solid: #3E8B59;
@@ -5670,7 +5670,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   --a-paper: #070B10; --a-card: #0C121A; --a-sunk: #121A24; --a-feature: #04141A;
   --a-on-ink: #E6F1F8;
   --a-ink: #E6F1F8; --a-muted: #93A7B8; --a-soft: #8CA3B5; --a-faint: #6E8496;
-  --a-accent: #4FD8E8; --a-accent-2: #7FEBF7; --a-accent-text: #6FE4F2; --a-accent-wash: rgba(79, 216, 232, 0.14);
+  --a-accent: #4FD8E8; --a-accent-2: #7FEBF7; --a-accent-text: #6FE4F2; --a-accent-wash: rgba(79, 216, 232, 0.14); --a-on-accent: #04141A;
   --a-alert: #FF6B5A; --a-alert-wash: rgba(255, 107, 90, 0.16); --a-alert-solid: #FF6B5A;
   --a-warn: #FFC46B; --a-warn-wash: rgba(255, 196, 107, 0.16);
   --a-progress: #55E0A0; --a-progress-wash: rgba(85, 224, 160, 0.16); --a-progress-solid: #55E0A0;
@@ -5798,7 +5798,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 .space-btn[aria-pressed="true"],
 .tab.is-on {
   background: var(--a-accent);
-  color: var(--a-ink);
+  color: var(--a-on-accent, var(--a-ink));
   border-color: transparent;
 }
 .btn-primary:hover:not(:disabled) { background: var(--a-ink); color: var(--a-accent); }
@@ -5840,12 +5840,12 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
    workspaces (2026-10-03); with only two rooms left, All and Personal looked
    identical. All keeps the base lime, Personal takes the old Off-Plate gold. */
 [data-space="personal"] {
-  --a-accent: #FFC94A; --a-accent-2: #F0B520; --a-accent-text: #7C5A0E;
-  --a-accent-wash: color-mix(in srgb, #FFC94A 26%, transparent);
+  --a-accent: #00874A; --a-accent-2: #006B3A; --a-accent-text: #00733F;
+  --a-accent-wash: color-mix(in srgb, #00874A 12%, transparent);
 }
 [data-space="work"] {
-  --a-accent: #7FD8F5; --a-accent-2: #5FC6EA; --a-accent-text: #1C5772;
-  --a-accent-wash: color-mix(in srgb, #7FD8F5 22%, transparent);
+  --a-accent: #2453E6; --a-accent-2: #1D44C2; --a-accent-text: #2453E6;
+  --a-accent-wash: color-mix(in srgb, #2453E6 12%, transparent);
 }
 /* "All" keeps the base lime. */
 
@@ -5876,13 +5876,13 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
   color: var(--a-muted);
   transition: background var(--a-enter), color var(--a-enter), transform var(--a-exit);
 }
-.chip.tone-accent { background: var(--a-accent); color: var(--a-ink); }
+.chip.tone-accent { background: var(--a-accent); color: var(--a-on-accent, var(--a-ink)); }
 .chip.tone-info { background: var(--a-accent-wash); color: var(--a-accent-text); }
 .chip.tone-alert { background: var(--a-alert-wash); color: var(--a-alert); }
 .chip.tone-warn { background: var(--a-warn-wash); color: var(--a-warn); }
 .chip.tone-progress { background: var(--a-progress-wash); color: var(--a-progress); }
 .chip.tone-quiet, .chip.is-none { background: var(--a-sunk); color: var(--a-muted); }
-button.chip:hover { background: var(--a-accent); color: var(--a-ink); transform: translateY(-1px); }
+button.chip:hover { background: var(--a-accent); color: var(--a-on-accent, var(--a-ink)); transform: translateY(-1px); }
 button.chip:active { transform: translateY(0) scale(0.96); }
 .chip.is-src { font-size: 12px; }
 
@@ -6064,7 +6064,7 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   border: none; background: none; padding: 11px 22px; border-radius: 999px; font-size: var(--text-sm); font-weight: 700;
   color: var(--muted); cursor: pointer; transition: background var(--t-fast), color var(--t-fast);
 }
-.kind button[aria-pressed="true"] { background: var(--a-accent); color: var(--a-ink); }
+.kind button[aria-pressed="true"] { background: var(--a-accent); color: var(--a-on-accent, var(--a-ink)); }
 .kind button:not([aria-pressed="true"]):hover { color: var(--ink); }
 /* The search takes the slack but stops short of the full width, so it reads as a field rather
    than a banner. */
@@ -6174,7 +6174,7 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   border-color: var(--a-accent);
   /* The tick is INK, not `--bg`. Cream on lime is 1.17:1, so the old rule would
      have drawn an invisible tick the moment the fill stopped being dark green. */
-  color: var(--a-ink);
+  color: var(--a-on-accent, var(--a-ink));
 }
 .checkbox[aria-checked="true"] svg,
 .routine-check[aria-checked="true"] svg,
@@ -6203,7 +6203,7 @@ button.chip:active { transform: translateY(0) scale(0.96); }
   transition: background var(--a-enter), color var(--a-enter);
 }
 .space-btn:hover { background: var(--a-accent-wash); color: var(--a-accent-text); }
-.space-btn[aria-pressed="true"] { background: var(--a-accent); color: var(--a-ink); font-weight: 800; }
+.space-btn[aria-pressed="true"] { background: var(--a-accent); color: var(--a-on-accent, var(--a-ink)); font-weight: 800; }
 
 /* ---- the page tabs are a pill group too ---------------------------------
    His note, 2026-08-26: "make it pill shaped as it's the main menu". Same
@@ -6237,7 +6237,7 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .nav-tab:hover { background: var(--a-accent-wash); color: var(--a-accent-text); }
 .nav-tab[aria-current="page"] {
   background: var(--a-accent);
-  color: var(--a-ink);
+  color: var(--a-on-accent, var(--a-ink));
   font-weight: 800;
   border-bottom-color: transparent;
 }
@@ -6275,7 +6275,7 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 .slot-pick button[aria-pressed="true"],
 .select-box.on {
   background: var(--a-accent);
-  color: var(--a-ink);
+  color: var(--a-on-accent, var(--a-ink));
   border-color: transparent;
 }
 .btn-primary:hover:not(:disabled),
@@ -6303,8 +6303,8 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 
 /* The morning brief is its own component, not a `.btn`, so it needs saying
    here: a fill takes the accent and carries ink, at rest and on hover. */
-.as-brief { background: var(--a-accent); border-color: var(--a-accent); color: var(--a-ink); }
-.as-brief:hover { background: var(--a-accent-2); border-color: var(--a-accent-2); color: var(--a-ink); }
+.as-brief { background: var(--a-accent); border-color: var(--a-accent); color: var(--a-on-accent, var(--a-ink)); }
+.as-brief:hover { background: var(--a-accent-2); border-color: var(--a-accent-2); color: var(--a-on-accent, var(--a-ink)); }
 .shell.is-hud .as-brief, .shell.is-hud .as-brief:hover { color: #04141A; }
 
 /* A danger button wipes to danger, not to the accent. */
@@ -6316,7 +6316,7 @@ button.chip:active { transform: translateY(0) scale(0.96); }
    for the thing he is writing, so they take ink. */
 .nt-tool { color: var(--a-ink); }
 .nt-tool:hover { background: var(--a-accent-wash); color: var(--a-accent-text); }
-.nt-tool[aria-pressed="true"] { background: var(--a-accent); color: var(--a-ink); }
+.nt-tool[aria-pressed="true"] { background: var(--a-accent); color: var(--a-on-accent, var(--a-ink)); }
 
 /* Everything that FILLS with what used to be green takes the accent, so it also
    follows the space you are standing in. */
@@ -6448,7 +6448,7 @@ button.chip:active { transform: translateY(0) scale(0.96); }
 /* The reached badge kept the old green: `.goal-status.s-done` sets its own
    background at a higher specificity than the base rule, so retargeting the
    token was not enough and the green came back on one badge. */
-.goal-status.s-done { background: var(--a-accent); color: var(--a-ink); }
+.goal-status.s-done { background: var(--a-accent); color: var(--a-on-accent, var(--a-ink)); }
 .shell.is-hud .goal-status.s-done { color: #04141A; }
 .goal-status.s-ontrack { background: var(--a-accent-wash); color: var(--a-accent-text); }
 /* A behind bar matches its own badge. It was alert red under an amber badge. */
@@ -7590,7 +7590,7 @@ iframe.tl-media { pointer-events: none; }
   transition: background var(--a-enter), color var(--a-enter);
 }
 .hg-pill:hover { background: var(--a-accent-wash); color: var(--a-accent-text); }
-.hg-pill.is-on { background: var(--a-accent); color: var(--a-ink); font-weight: 800; }
+.hg-pill.is-on { background: var(--a-accent); color: var(--a-on-accent, var(--a-ink)); font-weight: 800; }
 
 /* ==========================================================================
    HABITS & GOALS: RUN AND WATCH
@@ -7830,7 +7830,7 @@ iframe.tl-media { pointer-events: none; }
   transition: background var(--a-enter), color var(--a-enter);
 }
 .hist-btn:hover { background: var(--a-accent-wash); color: var(--a-accent-text); }
-.hist-btn.is-on { background: var(--a-accent); color: var(--a-ink); font-weight: 800; }
+.hist-btn.is-on { background: var(--a-accent); color: var(--a-on-accent, var(--a-ink)); font-weight: 800; }
 
 /* Finished: the card steps back to half strength and keeps its button. There
    used to be a line struck across the whole card; he said it did not look good
@@ -9494,7 +9494,7 @@ body:has(.shell.is-dark-chrome) .projnav-menu,
   --a-paper: #0E0E10; --a-card: #16161A; --a-sunk: #1C1C21; --a-feature: #F2F0EA;
   --a-on-ink: #0E0E10;
   --a-ink: #F2F0EA; --a-muted: #A09D94; --a-soft: #8C897F; --a-faint: #6A675F;
-  --a-accent: #DFF24A; --a-accent-2: #C8DC2E; --a-accent-text: #DFF24A; --a-accent-wash: rgba(223, 242, 74, 0.14);
+  --a-accent: #DFF24A; --a-accent-2: #C8DC2E; --a-accent-text: #DFF24A; --a-accent-wash: rgba(223, 242, 74, 0.14); --a-on-accent: #12100C;
   --a-line: rgba(242, 240, 234, 0.10); --a-line-2: rgba(242, 240, 234, 0.22);
   --bg: #0E0E10; --surface: #16161A; --surface-2: #1C1C21;
   --ink: #F2F0EA; --muted: #A09D94; --faint: #8C897F;
@@ -10578,7 +10578,7 @@ body:has(.as-page.jv) .dock { display: none; }
 .pstrip-item em { font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; }
 .pstrip-item:hover { background: var(--surface-2); }
 .pstrip-item:hover svg { color: var(--accent-text); }
-.pstrip-item.is-on { background: var(--a-accent); border-color: var(--a-accent); color: var(--a-ink); font-weight: 600; }
+.pstrip-item.is-on { background: var(--a-accent); border-color: var(--a-accent); color: var(--a-on-accent, var(--a-ink)); font-weight: 600; }
 .pstrip-item.is-on svg, .pstrip-item.is-on em { color: var(--a-ink); }
 .pstrip-manage { padding: 8px 10px; }
 @media (prefers-reduced-motion: reduce) { .pstrip-item, .pstrip-item svg { transition: none; } }

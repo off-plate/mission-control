@@ -21,7 +21,6 @@
    reference does the same thing: a dark dashboard sitting on a light desktop.
    Every token in here is scoped to `.troom` so none of it leaks. */
 import { DotField } from './dotfield'
-import { Roll, useSkin } from './skins'
 import { useEffect, useState } from 'react'
 import { useStore } from './store'
 import { useFirstMove } from './ui'
@@ -121,7 +120,6 @@ export function TodayRoom() {
   const s = Math.floor((msLeft % 60000) / 1000)
   const phase = PHASES.find((p) => now.getHours() >= p.from && now.getHours() < p.to) ?? PHASES[0]
   const narrowPhaseRow = useNarrowPhaseRow()
-  const pickedSkin = useSkin()
 
   const mine = tasks.filter((t) => inView(t.space))
   /* The week, full-size and always open here -- his instruction (2026-08-31):
@@ -254,8 +252,6 @@ export function TodayRoom() {
   const start = (t: Task) => { setFocusTaskId(t.id); setPage('plan') }
   /* Night's figures roll. Read off the shell, which already knows whether a
      skin is showing; the clock re-renders every second, so this stays current. */
-  const night = !!document.querySelector('.shell.skin-night')
-  const R = (t: string) => (night ? <Roll text={t} /> : t)
   return (
     <div className="troom">
 
@@ -265,8 +261,8 @@ export function TodayRoom() {
           <div>
             <p className="tr-l">Left of today</p>
             <div className="tr-n tr-count">
-              {R(String(h))}<span className="tr-u">h</span>{R(String(m).padStart(2, '0'))}<span className="tr-u">m</span>
-              <span className="tr-hot">{R(String(s).padStart(2, '0'))}</span><span className="tr-u">s</span>
+              {String(h)}<span className="tr-u">h</span>{String(m).padStart(2, '0')}<span className="tr-u">m</span>
+              <span className="tr-hot">{String(s).padStart(2, '0')}</span><span className="tr-u">s</span>
             </div>
           </div>
           {/* The wall clock. It carried its own card on the old page; it is a

@@ -1749,60 +1749,6 @@ await step('habits: the two content steps still generate today\'s real body', as
   const twisters = await stretch.locator('.stretch-item').count()
   if (twisters < 2) throw new Error(`mouth stretch habit shows ${twisters} tongue twisters`)
 })
-await step('phone: a task can be scheduled and rescheduled without dragging', async () => {
-  /* Why he said Plan "doesn't work at all" on mobile: the only way into a
-     time of day was dragging, and drag does not work with a thumb. Getting a
-     task onto the day from the list already had a tap path; moving it once it
-     was there did not. Both are tapped here, on a real touch context, and the
-     stored slot is checked rather than the look of the page. */
-  const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
-  const p = await ctx.newPage()
-  await p.goto(URL); await p.waitForTimeout(400)
-  await p.evaluate((K) => localStorage.removeItem(K), KEY)
-  await p.goto(`${URL}#/plan`); await p.reload(); await p.waitForTimeout(1000)
-  const skip = p.getByRole('button', { name: 'Not today' })
-  if (await skip.count()) { await skip.first().click(); await p.waitForTimeout(400) }
-  await p.getByRole('combobox', { name: 'New task' }).fill('Thumb scheduling')
-  await p.getByRole('button', { name: 'Add', exact: true }).click(); await p.waitForTimeout(500)
-  const slotOf = () => p.evaluate((K) => JSON.parse(localStorage.getItem(K)).tasks.find((t) => t.title === 'Thumb scheduling')?.slot ?? null, KEY)
-
-  await p.locator('.todo-row', { hasText: 'Thumb scheduling' }).first().getByRole('button', { name: /Options/ }).click()
-  await p.waitForTimeout(250)
-  /* The seven-day "Plan for a day" list, asserted here since 2026-09-09: it
-     is touch-only now (it left the desktop menu on 2026-09-04), so this is
-     the one place it can be checked. */
-  const days = await p.locator('[role="menuitem"]', { hasText: /^Move to (today|tomorrow|[A-Z][a-z]{2} \d)/ }).allInnerTexts()
-  if (days.length !== 7) throw new Error(`the phone menu offers ${days.length} days: ${days.join(', ')}`)
-  await p.getByRole('menuitem', { name: 'Morning' }).click(); await p.waitForTimeout(500)
-  if ((await slotOf()) !== 'morning') throw new Error(`tapping Morning from the list left it at ${await slotOf()}`)
-
-  await p.locator('.today-task', { hasText: 'Thumb scheduling' }).first().getByRole('button', { name: /Options/ }).click()
-  await p.waitForTimeout(250)
-  await p.getByRole('menuitem', { name: 'Evening' }).click(); await p.waitForTimeout(500)
-  if ((await slotOf()) !== 'evening') throw new Error(`a task already on the day could not be moved by tap: still ${await slotOf()}`)
-  await ctx.close()
-})
-await step('phone: plan is usable at 390', async () => {
-  const mp = await b.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
-  await mp.goto(URL); await mp.waitForTimeout(300)
-  await mp.evaluate((K) => localStorage.removeItem(K), KEY)
-  await mp.goto(`${URL}#/plan`); await mp.reload(); await mp.waitForTimeout(700)
-  await mp.getByRole('combobox', { name: 'New task' }).fill('Phone gate task with a long name')
-  await mp.getByRole('button', { name: 'Add', exact: true }).click(); await mp.waitForTimeout(300)
-  const row = mp.locator('.todo-row', { hasText: 'Phone gate' }).first()
-  const grow = row.locator('.grow')
-  const w = (await grow.boundingBox()).width
-  if (w < 150) throw new Error(`title squeezed to ${Math.round(w)}px`)
-  const over = await mp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
-  if (over > 0) throw new Error(`horizontal overflow ${over}px`)
-  // the kebab must be inside the screen and clickable
-  await row.getByRole('button', { name: /Options/ }).click()
-  await mp.getByRole('menuitem', { name: 'Move to today' }).click(); await mp.waitForTimeout(300)
-  const s = await mp.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
-  if (s.tasks.find((t) => t.title.startsWith('Phone gate'))?.list !== 'today') throw new Error('move failed on phone')
-  await mp.close()
-})
-
 /* His ask (2026-09-27): a plain focus block, started without a task, always
    ran 25 minutes; only the break could be set. The length is now set from the
    dock's Focus row and from the Focus page, and Start uses it. */
@@ -2714,27 +2660,12 @@ await step('notes: a body from another device is kept, never dropped', async () 
   if (n.conflict) throw new Error('the flag stayed up after he answered it')
 })
 
-await step('phone: notes are usable at 390', async () => {
-  const mp = await b.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
-  await mp.goto(URL); await mp.waitForTimeout(300)
-  await mp.evaluate((K) => localStorage.removeItem(K), KEY)
-  await mp.goto(`${URL}#/notes`); await mp.reload(); await mp.waitForTimeout(700)
-  let over = await mp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
-  if (over > 0) throw new Error(`horizontal overflow ${over}px on the list`)
-  // his own writing must be near the top, not under six bands of chrome
-  const firstRow = (await mp.locator('.nt-row').first().boundingBox()).y
-  if (firstRow > 520) throw new Error(`the first note starts ${Math.round(firstRow)}px down`)
-  await mp.getByRole('button', { name: 'New note' }).click(); await mp.waitForTimeout(300)
-  await mp.locator('textarea[aria-label="Note title"]').fill('Telefonní poznámka #test'); await mp.waitForTimeout(400)
-  over = await mp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
-  if (over > 0) throw new Error(`horizontal overflow ${over}px with a note open`)
-  // the open note has the screen to itself
-  const noteW = (await mp.locator('.nt-sheet').boundingBox()).width
-  if (noteW < 300) throw new Error(`the open note is only ${Math.round(noteW)}px wide`)
-  const s = await mp.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
-  if (!(s.notes ?? []).some((n) => n.title.startsWith('Telefonní'))) throw new Error('the phone note was not saved')
-  await mp.close()
-})
+/* The three classic "phone:" steps (schedule without dragging, plan at 390, notes
+   at 390) are gone on purpose: since 2026-10-28 a phone always opens the Nothing
+   app, so the classic pages at phone width are not what anyone sees there. The
+   same behaviour is covered in scripts/nothing-shell.mjs (add and schedule a task,
+   the Plan day, Notes list and editor, no overflow at 375 and 390). Two of them
+   were already failing on main for the same reason. */
 
 await step('notes: the editor formats as he types, and the marks survive a reload', async () => {
   /* His own list, verbatim: a dash makes a bullet, cmd-B makes bold, italic

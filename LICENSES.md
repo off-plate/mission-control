@@ -55,10 +55,6 @@ Tabler's own copyright line: `Copyright (c) 2020-2026 Paweł Kuna`.
 
 Animated dotted orbs (assistant mark, saving indicator, Zone countdown, inline waits). npm `thinking-orbs`, (c) Jakub Antalik, MIT. https://github.com/Jakubantalik/Libraries.dev
 
-## Sora (skins)
-
-Self-hosted in `public/fonts/` for the Night Wallet look. Sora (c) Jonathan Barnbrook and Julián Moncada. SIL Open Font License 1.1, from Google Fonts.
-
 ## Doto and Space Mono (Nothing skins)
 
 Self-hosted in `public/fonts/`. Doto (c) Óliver Lalan, Space Mono (c) Colophon Foundry. Both SIL Open Font License 1.1, from Google Fonts.

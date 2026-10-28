@@ -1569,10 +1569,9 @@ A.estCustom = (el, id) => { const v = +$('#estc').value; if (v) { B.store().setE
 
 /* task action sheet */
 A.taskMenu = (el, id) => {
-  const t = task(id); if (!t) return;
-  const projs = MC.projects.filter(p => p.space === t.space && p.id !== t.projectId);
+  if (!task(id)) return;
   sheet('taskmenu', {
-    title: () => 'Task', live: true, body: () => `<div class="cd"><div class="rt">${esc(t.title)}</div><div class="rs">${catDot(t.category)}${esc(projName(t.projectId))}<span>${t.est ? fmtMin(t.est) : 'No estimate'}</span>${t.ageDays != null ? `<span>${t.ageDays} days old</span>` : ''}</div></div>
+    title: () => 'Task', live: true, body: () => { const t = task(id) || {}; const projs = MC.projects.filter(p => t.space === 'all' || p.space === t.space || p.id === t.projectId); return `<div class="cd"><div class="rt">${esc(t.title)}</div><div class="rs">${catDot(t.category)}${esc(projName(t.projectId))}<span>${t.est ? fmtMin(t.est) : 'No estimate'}</span>${t.ageDays != null ? `<span>${t.ageDays} days old</span>` : ''}</div></div>
     <div class="g2">
       <button class="key t" style="height:52px" data-a="taskEdit" data-x="${id}">${ico('edit')} Edit</button>
       <button class="key t" style="height:52px" data-a="breakdown" data-x="${id}">${ico('wand')} Break it down</button>
@@ -1581,9 +1580,9 @@ A.taskMenu = (el, id) => {
     </div>
     <div class="sl">Plan for a day</div><div class="chips">${[0, 1, 2, 3, 4, 5, 6].map(o => `<button class="chip ${t.list === 'today' && t.day === o ? 'on' : ''}" data-a="taskDay" data-x="${id}:${o}">${dayShort(o)}</button>`).join('')}</div>
     <div class="sl">Straight into today</div><div class="chips">${MC.slots.map(s => `<button class="chip ${t.list === 'today' && t.day === 0 && t.slot === s.id ? 'on' : ''}" data-a="taskSlot" data-x="${id}:${s.id}">${s.label}</button>`).join('')}</div>
-    <div class="sl">Move to project</div><div class="chips"><button class="chip ${!t.projectId ? 'on' : ''}" data-a="taskProj" data-x="${id}:">Unsorted</button>${projs.map(p => `<button class="chip" data-a="taskProj" data-x="${id}:${p.id}">${esc(p.name)}</button>`).join('')}</div>
-    <div class="sl">Move to space</div><div class="chips">${SPACES.slice(0, 2).map(s => `<button class="chip ${t.space === s.id ? 'on' : ''}" data-a="taskSpace" data-x="${id}:${s.id}">${s.label}</button>`).join('')}</div>
-    <button class="key red wide" style="margin-top:18px" data-a="taskDelM" data-x="${id}">${ico('trash')} Delete</button>`
+    <div class="sl">Move to project</div><div class="chips"><button class="chip ${!t.projectId ? 'on' : ''}" data-a="taskProj" data-x="${id}:">Unsorted</button>${projs.map(p => `<button class="chip ${t.projectId === p.id ? 'on' : ''}" data-a="taskProj" data-x="${id}:${p.id}">${esc(p.name)}</button>`).join('')}</div>
+    <div class="sl">Move to space</div><div class="chips">${SPACES.map(s => `<button class="chip ${t.space === s.id ? 'on' : ''}" data-a="taskSpace" data-x="${id}:${s.id}">${s.label}</button>`).join('')}</div>
+    <button class="key red wide" style="margin-top:18px" data-a="taskDelM" data-x="${id}">${ico('trash')} Delete</button>`; }
   });
 };
 A.taskPlanMenu = A.taskMenu;

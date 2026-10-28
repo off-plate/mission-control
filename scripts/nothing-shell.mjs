@@ -892,6 +892,18 @@ await step('Plan: tap a task, its detail sheet opens', async () => {
   await tap('.sw[data-id="ns-2"] [data-a="taskMenu"]')
   if (!(await page.locator('.sheet.on [data-a="taskDelM"]').count())) throw new Error('no task sheet')
   await page.screenshot({ path: `${SHOTS}/light-taskmenu.png` })
+  /* every tap shows at once, and the current project and all three spaces stay in their rows */
+  const on = () => page.locator('.sheet.on .chip.on').allTextContents().then((a) => a.map((x) => x.trim().toLowerCase()))
+  await tap('.sheet.on [data-a="taskSlot"][data-x="ns-2:morning"]'); await wait(900)
+  let chips = await on(); if (!chips.includes('morning') || !chips.includes('today')) throw new Error(`slot/day not lit at once: ${chips}`)
+  const spaces = (await page.locator('.sheet.on [data-a="taskSpace"]').allTextContents()).map((x) => x.trim())
+  if (spaces.length !== 3) throw new Error(`spaces ${spaces}`)
+  const projBtn = page.locator('.sheet.on [data-a="taskProj"]:not([data-x$=":"])').first()
+  if (await projBtn.count()) {
+    const label = (await projBtn.textContent()).trim().toLowerCase(); await projBtn.evaluate((e) => e.click()); await wait(900)
+    chips = await on(); if (!chips.includes(label)) throw new Error(`project ${label} not lit, row: ${chips}`)
+    if (chips.includes('unsorted')) throw new Error('Unsorted still lit')
+  }
   await tap('.sheet.on [data-a="sheetX"]')
 })
 

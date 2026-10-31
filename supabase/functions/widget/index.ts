@@ -133,14 +133,14 @@ function habitsLeft(habits: Habit[], routines: { habitId?: string }[], log: Tick
 // Today's and tomorrow's timed events from the same feed and parser the Calendar page uses.
 // A dead feed just means no events.
 async function calendar(now: ReturnType<typeof pragueNow>) {
-  const none = { next: null, today: [], tomorrowFirst: null }
+  const none = { next: null, today: [], tomorrowFirst: null, now: null, upcoming: [] }
   const url = Deno.env.get('MC_CALENDAR_ICS')
   if (!url) return none
   try {
     const r = await fetch(url, { headers: { 'user-agent': 'mission-control/1' } })
     if (!r.ok) return none
     const from = new Date(); from.setUTCHours(0, 0, 0, 0); from.setUTCDate(from.getUTCDate() - 1)
-    const to = new Date(from); to.setUTCDate(from.getUTCDate() + 3)
+    const to = new Date(from); to.setUTCDate(from.getUTCDate() + 4)
     const tomorrow = iso(new Date(Date.UTC(now.y, now.m - 1, now.d + 1)))
     const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
     const timed = parseIcs(await r.text(), from, to, Deno.env.get('MC_CALENDAR_EMAIL') ?? undefined)
@@ -152,6 +152,10 @@ async function calendar(now: ReturnType<typeof pragueNow>) {
       next: ev ? { title: ev.title, at: hhmm(ev.start!), today: ev.day === now.day, now: ev.day === now.day && ev.start! <= now.min } : null,
       today: timed.filter((e) => e.day === now.day).slice(0, 6).map((e) => ({ title: e.title, at: hhmm(e.start!) })),
       tomorrowFirst: tf ? { title: tf.title, at: hhmm(tf.start!) } : null,
+      // The home widget's calendar: what is on right now, and the next three after it.
+      now: (() => { const c = timed.find((e) => e.day === now.day && e.start! <= now.min && (e.end ?? e.start! + 30) > now.min); return c ? { title: c.title, at: hhmm(c.start!), until: c.end != null ? hhmm(c.end) : null } : null })(),
+      upcoming: timed.filter((e) => e.day > now.day || (e.day === now.day && e.start! > now.min)).slice(0, 3)
+        .map((e) => ({ title: e.title, at: hhmm(e.start!), day: e.day === now.day ? 'today' : e.day === tomorrow ? 'tomorrow' : e.day })),
     }
   } catch { return none }
 }
@@ -232,9 +236,9 @@ async function workouts(now: ReturnType<typeof pragueNow>) {
   const key = Deno.env.get('HEVY_API_KEY')
   if (!key) return null
   try {
-    const r = await fetch('https://api.hevyapp.com/v1/workouts?page=1&pageSize=10', { headers: { 'api-key': key } })
-    if (!r.ok) return null
-    const ws = ((await r.json()).workouts ?? []) as { start_time: string; end_time: string; exercises?: { sets?: { weight_kg?: number | null; reps?: number | null }[] }[] }[]
+    // Three pages of 10 cover the 28-day chart even at daily training.
+    const pages = await Promise.all([1, 2, 3].map((n) => fetch(`https://api.hevyapp.com/v1/workouts?page=${n}&pageSize=10`, { headers: { 'api-key': key } }).then((r) => (r.ok ? r.json() : { workouts: [] })).catch(() => ({ workouts: [] }))))
+    const ws = pages.flatMap((pg) => pg.workouts ?? []) as { start_time: string; end_time: string; exercises?: { sets?: { weight_kg?: number | null; reps?: number | null }[] }[] }[]
     const pragueDay = (t: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Prague' }).format(new Date(t))
     const monday = iso(new Date(Date.UTC(now.y, now.m - 1, now.d - now.weekday)))
     const week = ws.filter((w) => pragueDay(w.start_time) >= monday)
@@ -244,6 +248,8 @@ async function workouts(now: ReturnType<typeof pragueNow>) {
       week: week.length,
       weekMin: week.reduce((a, w) => a + Math.round((Date.parse(w.end_time) - Date.parse(w.start_time)) / 60000), 0),
       weekKg: Math.round(week.reduce((a, w) => a + kg(w), 0)),
+      // Minutes trained per day, the last 28 days, oldest first, today last.
+      days: Array.from({ length: 28 }, (_, i) => { const day = iso(new Date(Date.UTC(now.y, now.m - 1, now.d - 27 + i))); return ws.filter((w) => pragueDay(w.start_time) === day).reduce((a, w) => a + Math.round((Date.parse(w.end_time) - Date.parse(w.start_time)) / 60000), 0) }),
       last: lastDay, daysSince: lastDay ? Math.round((Date.parse(`${now.day}T12:00:00Z`) - Date.parse(`${lastDay}T12:00:00Z`)) / 86_400_000) : null,
     }
   } catch { return null }
@@ -306,6 +312,8 @@ Deno.serve(async (req: Request) => {
     event: (await cal).next,
     events: (await cal).today,
     tomorrowFirst: (await cal).tomorrowFirst,
+    eventNow: (await cal).now,
+    upcoming: (await cal).upcoming,
     // Every open task on today's plan, for the Done shortcut's list.
     openToday: open.map((t) => ({ id: t.id ?? null, title: t.title, min: minutes(t) })),
     todayItems: [...today].sort((a, b) => Number(a.done) - Number(b.done) || rank(a).localeCompare(rank(b))).slice(0, 7)

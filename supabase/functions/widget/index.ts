@@ -5,7 +5,8 @@
    sits, today's habits (kept of due) and the next calendar event. It never
    writes. Since 2026-10-16 it also returns the next 14 days of bills (his
    pick, the Bills widget), so a leaked key would show those amounts too:
-   rotate it if the phone is ever lost.
+   rotate it if the phone is ever lost. Since 2026-10-31 also the overdue People
+   (names only) and this week's Hevy workouts, for the home widget.
 
    Caller: Scriptable only, sending MC_WIDGET_SECRET as x-widget-secret (kept in
    the iPhone Keychain, never in the script file or this repo). Deployed with
@@ -208,6 +209,46 @@ async function news() {
   } catch { return [] }
 }
 
+/* Who to reach out to: the People page's own red (people.tsx healthOf/overdue).
+   Reminders on, and either never logged or past their cadence. Most overdue for
+   their cadence first, the same order as its Who to reach list. */
+type Person = { id: string; name: string; cadenceDays: number; remindersOff?: boolean }
+type Contact = { personId: string; day: string; createdAt?: number }
+function reachOut(people: Person[], contacts: Contact[], now: ReturnType<typeof pragueNow>) {
+  const last = new Map<string, string>()
+  for (const c of contacts) if (!last.has(c.personId) || c.day > last.get(c.personId)!) last.set(c.personId, c.day)
+  const days = (from: string) => Math.round((Date.parse(`${now.day}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000)
+  const late = people.filter((p) => !p.remindersOff && p.cadenceDays > 0)
+    .map((p) => { const l = last.get(p.id); return { name: p.name, over: l ? days(l) - p.cadenceDays : null, rank: l ? (p.cadenceDays - days(l)) / p.cadenceDays : -Infinity } })
+    .filter((p) => p.over === null || p.over > 0)
+    .sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name))
+  return { count: late.length, people: late.slice(0, 4).map(({ name, over }) => ({ name, over })) }
+}
+
+/* Hevy, read straight from its API with his key (secret HEVY_API_KEY; the app's
+   own key is device-only). This week's sessions, minutes and kg lifted, and the
+   last session's day, so a long gap is visible. Latest 10 workouts is plenty. */
+async function workouts(now: ReturnType<typeof pragueNow>) {
+  const key = Deno.env.get('HEVY_API_KEY')
+  if (!key) return null
+  try {
+    const r = await fetch('https://api.hevyapp.com/v1/workouts?page=1&pageSize=10', { headers: { 'api-key': key } })
+    if (!r.ok) return null
+    const ws = ((await r.json()).workouts ?? []) as { start_time: string; end_time: string; exercises?: { sets?: { weight_kg?: number | null; reps?: number | null }[] }[] }[]
+    const pragueDay = (t: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Prague' }).format(new Date(t))
+    const monday = iso(new Date(Date.UTC(now.y, now.m - 1, now.d - now.weekday)))
+    const week = ws.filter((w) => pragueDay(w.start_time) >= monday)
+    const kg = (w: typeof ws[number]) => (w.exercises ?? []).flatMap((e) => e.sets ?? []).reduce((a, x) => a + (x.weight_kg ?? 0) * (x.reps ?? 0), 0)
+    const lastDay = ws.length ? ws.map((w) => pragueDay(w.start_time)).sort().at(-1)! : null
+    return {
+      week: week.length,
+      weekMin: week.reduce((a, w) => a + Math.round((Date.parse(w.end_time) - Date.parse(w.start_time)) / 60000), 0),
+      weekKg: Math.round(week.reduce((a, w) => a + kg(w), 0)),
+      last: lastDay, daysSince: lastDay ? Math.round((Date.parse(`${now.day}T12:00:00Z`) - Date.parse(`${lastDay}T12:00:00Z`)) / 86_400_000) : null,
+    }
+  } catch { return null }
+}
+
 function sameSecret(a: string, b: string) {
   if (!a || a.length !== b.length) return false
   let diff = 0
@@ -222,7 +263,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const now = pragueNow()
-  const cal = calendar(now), wx = weather(), headlines = news() // run while the state is read
+  const cal = calendar(now), wx = weather(), headlines = news(), gym = workouts(now) // run while the state is read
 
   const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
   // Looked up by email, the same way zepp-sync finds him.
@@ -286,6 +327,8 @@ Deno.serve(async (req: Request) => {
       return w?.sleep_secs ? { min: Math.round(w.sleep_secs / 60), day: w.day } : null
     })(),
     bills: await bills(sb, owner.id, now).catch(() => null),
+    reachOut: reachOut(arr<Person>(s.people), arr<Contact>(s.personContacts), now),
+    workout: await gym,
     nameDay: NAME_DAYS[now.day.slice(5)] ?? [],
     weather: await wx,
     news: await headlines,

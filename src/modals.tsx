@@ -8,10 +8,12 @@ import { PROVIDERS, breakdownTask, getAiProvider, type Detail } from './ai'
 import { useStore } from './store'
 import { fmtDuration } from './util'
 
-export function Sheet({ title, onClose, children, steady }: {
+export function Sheet({ title, onClose, children, steady, wide }: {
   title: string
   onClose: () => void
   children: ReactNode
+  /** A document-sized sheet (an invoice preview), not a form. */
+  wide?: boolean
   /** Hold one height across every state of the form, so switching between kinds
    *  changes the questions rather than the size of the window asking them. */
   steady?: boolean
@@ -37,7 +39,7 @@ export function Sheet({ title, onClose, children, steady }: {
   }, [close])
   return (
     <div ref={scrimRef} className="overlay" onClick={(e) => { if (e.target === e.currentTarget) close() }}>
-      <div ref={sheetRef} className="sheet" role="dialog" aria-modal="true" aria-label={title}>
+      <div ref={sheetRef} className={`sheet${wide ? ' is-wide' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
         <div className="sheet-grab" aria-hidden="true" />
         <div className="sheet-head">
           <h2>{title}</h2>

@@ -325,7 +325,7 @@ function Overview({ onOpen, onList, onContact }: { onOpen: (id: string) => void;
         <div>
           <h2 className="iv-h2 is-center">Invoices</h2>
           <dl className="iv-sumlines">
-            <dt><button type="button" className="iv-a" onClick={() => onList('unpaid')}>Unpaid</button></dt><dd>{sumText(unpaid)}</dd>
+            <dt><button type="button" className="iv-a" onClick={() => onList('unpaid')}>Unpaid</button></dt><dd className="is-wait">{sumText(unpaid)}</dd>
             <dt><button type="button" className="iv-a" onClick={() => onList('overdue')}>Overdue</button></dt><dd className={late.length ? 'is-red' : ''}>{sumText(late)}</dd>
           </dl>
         </div>

@@ -12382,6 +12382,67 @@ textarea.iv-input { height: auto; padding: 10px 12px; resize: vertical; }
   .iv-fnotes { grid-template-columns: minmax(0, 1fr); }
 }
 
+/* Fifth pass, colour (his call, 2026-11-01: "why is it so plain"). COLOR.md's
+   roles used for real: the space accent for everything he can act on, amber
+   for money still on its way, coral for late, green for money that came in. */
+.iv-page { --iv-acc: var(--accent-fill); --iv-acc-t: var(--accent-text); --iv-acc-wash: var(--accent-wash); --iv-on-acc: var(--accent-ink);
+  --iv-wait: var(--warn); --iv-wait-wash: var(--warn-wash); --iv-late: var(--alert); --iv-late-wash: var(--alert-wash);
+  --iv-paid: var(--progress); --iv-paid-wash: var(--progress-wash); }
+.iv-tab[aria-current="page"] { background: var(--iv-acc); color: var(--iv-on-acc); }
+@media (hover: hover) and (pointer: fine) { .iv-tab:not([aria-current="page"]):hover { color: var(--iv-acc-t); text-decoration: none; background: var(--iv-acc-wash); } }
+.iv-subnav > .iv-outline, .iv-notice .iv-outline { background: var(--iv-acc); border-color: var(--iv-acc); color: var(--iv-on-acc); font-weight: 700; }
+.iv-subnav > .iv-outline svg { color: var(--iv-on-acc); }
+@media (hover: hover) and (pointer: fine) { .iv-subnav > .iv-outline:hover { background: var(--a-accent-2, var(--iv-acc)); border-color: var(--a-accent-2, var(--iv-acc)); } }
+.iv-outline svg, .iv-chipbtn, .iv-plus { color: var(--iv-acc-t); }
+.iv-a, .iv-num { color: var(--iv-acc-t); text-decoration-color: color-mix(in srgb, var(--iv-acc-t) 40%, transparent); }
+.iv-a.is-quiet { color: var(--fk-muted); text-decoration-color: var(--fk-line-2); }
+@media (hover: hover) and (pointer: fine) { .iv-a:hover, .iv-num:hover { color: var(--iv-acc-t); text-decoration-color: var(--iv-acc-t); } }
+.iv-iact { color: var(--iv-acc-t); }
+@media (hover: hover) and (pointer: fine) { .iv-iact:hover { background: var(--iv-acc-wash); } }
+.iv-search:focus-within, .iv-search.is-big:focus-within, .iv-input:focus { border-color: var(--iv-acc-t); box-shadow: 0 0 0 3px var(--iv-acc-wash); }
+.iv-page .iv-seg-soft button[aria-pressed="true"], .iv-page .iv-paymethod button[aria-pressed="true"] { background: var(--iv-acc); color: var(--iv-on-acc); box-shadow: none; }
+
+/* Status cards: a coloured tile per status, the active filter in the accent. */
+.iv-scard-ico { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 10px; padding: 0; color: #fff; background: var(--ink); }
+.iv-scard.is-unpaid .iv-scard-ico { background: var(--iv-wait); color: #fff; }
+.iv-scard.is-overdue .iv-scard-ico { background: var(--iv-late); color: #fff; }
+.iv-scard.is-paid .iv-scard-ico { background: var(--iv-paid); color: #fff; }
+.iv-scard.is-cancelled .iv-scard-ico { background: var(--fk-soft); }
+.iv-scard { align-items: center; }
+.iv-scard[aria-pressed="true"] { background: var(--iv-acc-wash); box-shadow: inset 0 0 0 2px var(--iv-acc-t); }
+.iv-scard.is-unpaid .iv-scard-sum { color: var(--iv-wait); }
+.iv-scard.is-overdue .iv-scard-sum { color: var(--iv-late); }
+.iv-scard.is-paid .iv-scard-sum { color: var(--iv-paid); }
+
+/* Status as a small coloured badge. */
+.iv-st { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 700; color: var(--iv-wait); background: var(--iv-wait-wash); }
+.iv-st.is-overdue { color: var(--iv-late); background: var(--iv-late-wash); }
+.iv-st.is-paid { color: var(--iv-paid); background: var(--iv-paid-wash); }
+.iv-st.is-cancelled { color: var(--fk-muted); background: var(--fk-sunk); }
+.iv-row.is-overdue .iv-row-date { color: var(--iv-late); font-weight: 700; }
+.iv-row.is-overdue .iv-row-amt { color: var(--iv-late); }
+.iv-pill { background: var(--iv-wait); color: #fff; }
+.iv-pill.is-overdue { background: var(--iv-late); }
+.iv-pill.is-paid { background: var(--iv-paid); }
+
+/* Chart: paid green, still on its way amber. */
+.iv-bar-unpaid, .iv-tip i.is-unpaid { background: color-mix(in srgb, var(--iv-wait) 70%, #fff); }
+.iv-col.is-on { background: var(--iv-acc-wash); }
+
+/* Overview, statistics, contacts. */
+.iv-sumlines dd.is-wait { color: var(--iv-wait); }
+.iv-sumlines dd.is-red { color: var(--iv-late); }
+.iv-stat td.iv-ch { color: var(--iv-paid); font-weight: 700; }
+.iv-stat td.iv-ch.is-down { color: var(--iv-late); }
+.iv-stat td:nth-child(4) { color: var(--iv-paid); }
+.iv-stat td:nth-child(5) { color: var(--iv-wait); }
+.iv-cunpaid { color: var(--iv-wait); font-weight: 700; }
+.iv-cgroup h3 { color: var(--iv-acc-t); }
+.iv-cstat b { color: var(--iv-paid); }
+.iv-acc-default.is-on { border-color: var(--iv-acc-t); color: var(--iv-acc-t); background: var(--iv-acc-wash); }
+.iv-yellow { background: var(--iv-acc); color: var(--iv-on-acc); }
+@media (hover: hover) and (pointer: fine) { .iv-yellow:hover:not(:disabled) { background: var(--a-accent-2, var(--iv-acc)); } }
+
 /* The A4 sheet: a document, not app chrome. */
 .iv-paper {
   position: relative; box-sizing: border-box; width: 794px; min-height: 1123px; margin: 0 auto; padding: 56px 60px;

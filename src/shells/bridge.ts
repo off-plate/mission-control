@@ -18,6 +18,7 @@ import { inAllSpaces, WINDOW } from '../timeline'
 import { WALL } from '../board'
 import { SHEET_STATUSES, STEPS, label as stepLabel, nextStep, replyOdds } from '../prospectcalc'
 import { nextPersonSlot } from '../peoplelayout'
+import { invoiceTotal, shownStatus } from '../invoicecalc'
 import { breakdownTask, hasAiKey } from '../ai'
 import { useAssistantThread, type Turn } from '../assistantcore'
 import { MORNING, SKILLS } from '../assistant'
@@ -221,6 +222,13 @@ export function toMC(inp: ShellInput) {
     }
   })
 
+  /* ---- invoices: status only on the phone, never created there (his call, 2026-11-01) ---- */
+  const invoices = [...s.invoices].sort((a, b) => a.due.localeCompare(b.due)).map((i) => ({
+    id: i.id, number: i.number, client: i.client.name || 'No client', amount: invoiceTotal(i), currency: i.currency,
+    status: shownStatus(i, today), dueIn: daysBetween(today, i.due), due: shortDay(i.due), issued: shortDay(i.issued),
+    paidOn: i.paidOn ? shortDay(i.paidOn) : '', paidIso: i.paidOn ?? '', sentOn: i.sentOn ?? '', issuedIso: i.issued,
+  }))
+
   /* ---- money: Compass, only when it actually loaded ---- */
   const bills = compass.status === 'ok' ? (() => {
     const m = compass.money, dnow = new Date().getDate()
@@ -343,7 +351,7 @@ export function toMC(inp: ShellInput) {
     slots: SLOTS.map((sl) => ({ id: sl.id, label: sl.label, hours: sl.hint, capMin: (sl.to - sl.from) * 60 })),
     habits, habitGrid, routines, goals, quitting,
     notes: { items: notes, folders, defaultFolder: { personal: dumpFolder('personal'), work: dumpFolder('work') }, aiActions: [] as string[] },
-    people, prospectStages: [...SHEET_STATUSES] as string[], prospects,
+    people, prospectStages: [...SHEET_STATUSES] as string[], prospects, invoices,
     bills, ideas: s.ideaBoard.map((c) => ({ id: c.id, title: c.title, body: c.body ?? '', color: c.color, kind: 'Idea', done: !!c.doneAt, createdAt: c.createdAt, updatedAt: c.updatedAt })),
     prompts: [...s.prompts].sort((a, b) => a.createdAt - b.createdAt).map((p) => ({ id: p.id, text: p.text, project: p.project, kind: p.kind, age: agoOf(p.createdAt), sent: !!p.sentAt, createdAt: p.createdAt, updatedAt: p.updatedAt })),
     focusToday, focusWeek, pomo, momentum,
@@ -442,7 +450,7 @@ export function useShellBridge(skin: SkinId): { mc: MC; api: ShellApi } {
     // every second and is deliberately not a dependency (the shell counts down itself).
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [s.tasks, s.habits, s.habitLog, s.routines, s.routineLog, s.goals, s.slips, s.focusSessions, s.notes, s.noteFolders, s.people, s.personContacts,
-      s.prospects, s.projects, s.ideaBoard, s.prompts, s.plan, s.ledger, s.gymGoals, s.activeFocus, s.dailyDone, s.dailySkipped, s.space, s.syncOrigin,
+      s.prospects, s.invoices, s.projects, s.ideaBoard, s.prompts, s.plan, s.ledger, s.gymGoals, s.activeFocus, s.dailyDone, s.dailySkipped, s.space, s.syncOrigin,
       pomo.focusMin, pomo.breakMin, pomo.cyclesDone, cal, health, compass, weather, sync.phase, sync.lastSyncedAt, skin, day, gymReads],
   )
 

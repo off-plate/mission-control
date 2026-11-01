@@ -32,6 +32,8 @@ import { useIdeaBoardSlice, type IdeaBoardSlice } from './store/ideaboard'
 import { usePromptsSlice, type PromptsSlice } from './store/prompts'
 import { usePeopleSlice, type PeopleSlice } from './store/people'
 import { useProspectsSlice, type ProspectsSlice } from './store/prospects'
+import { useInvoicesSlice, type InvoicesSlice } from './store/invoices'
+import { useInvoiceCloud } from './invoicecloud'
 import type { OutreachEvent, SheetRow } from './prospectcalc'
 import { useGymSlice, type GymSlice } from './store/gym'
 import { useConnectionsSlice } from './store/connections'
@@ -72,6 +74,7 @@ import type {
   PersonBond,
   PersonContact, Prospect,
   GymGoal,
+  Invoice, InvoiceClient, InvoiceProfile,
   Note,
   NoteFolder,
   Routine,
@@ -186,6 +189,10 @@ interface PersistedState {
   /** The Health page's own permanent PR targets -- see types/gym.ts for why
    *  these are separate from the main Goals page's periodic ones. */
   gymGoals?: GymGoal[]
+  /** Invoices, the contacts he bills, and his own supplier row. */
+  invoices?: Invoice[]
+  invoiceClients?: InvoiceClient[]
+  invoiceProfile?: InvoiceProfile[]
   /** The Pomodoro block running right now, synced so it shows the same on
    *  every device rather than living only in this tab's
    *  localStorage. Null means nothing is running. */
@@ -263,6 +270,15 @@ interface Store extends PersistedState {
   addGymGoal: GymSlice['addGymGoal']
   updateGymGoal: GymSlice['updateGymGoal']
   deleteGymGoal: GymSlice['deleteGymGoal']
+  invoices: Invoice[]
+  invoiceClients: InvoiceClient[]
+  invoiceSupplier: InvoiceProfile | undefined
+  saveInvoice: InvoicesSlice['saveInvoice']
+  patchInvoice: InvoicesSlice['patchInvoice']
+  deleteInvoice: InvoicesSlice['deleteInvoice']
+  saveInvoiceClient: InvoicesSlice['saveInvoiceClient']
+  deleteInvoiceClient: InvoicesSlice['deleteInvoiceClient']
+  saveInvoiceProfile: InvoicesSlice['saveInvoiceProfile']
   /** Record where reel-fetch put the downloaded file for an Instagram link. */
   setReelFile: (originalUrl: string, fileUrl: string) => void
   /** What he is looking at. 'all' shows every space at once. */
@@ -935,7 +951,7 @@ function routeFromHash(): { page: PageId; day: string | null } {
   if (m) return { page: 'day', day: m[1] }
   // The give-up screen lives on the Jar page; the Jar reads the same hash.
   if (h === 'give-up') return { page: 'timeline', day: null }
-  const pages: PageId[] = ['today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting', 'settings', 'notes', 'bills', 'mymind', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant', 'timeline', 'skills', 'health', 'gym', 'longevity', 'watchless', 'ideas', 'prompts', 'people']
+  const pages: PageId[] = ['today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting', 'settings', 'notes', 'bills', 'mymind', 'invoices', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant', 'timeline', 'skills', 'health', 'gym', 'longevity', 'watchless', 'ideas', 'prompts', 'people']
   return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
 }
 
@@ -1080,6 +1096,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   graveyardRef.current = graveyard
   const gymSlice = useGymSlice(persisted, { armUndo, bury, digUp })
   const { gymGoals, setGymGoals } = gymSlice
+  const invoicesSlice = useInvoicesSlice(persisted, { armUndo, bury, digUp })
+  const { invoices, setInvoices, invoiceClients, setInvoiceClients, invoiceProfile, setInvoiceProfile } = invoicesSlice
+  /* Every invoice row is mirrored into its own Supabase table (invoicecloud.ts). */
+  type Upd<T> = (f: (prev: T[]) => T[]) => void
+  useInvoiceCloud({
+    invoices, setInvoices: setInvoices as unknown as Upd<Invoice>, invoiceClients, setInvoiceClients: setInvoiceClients as unknown as Upd<InvoiceClient>,
+    invoiceProfile, setInvoiceProfile: setInvoiceProfile as unknown as Upd<InvoiceProfile>,
+    isBuried: (k) => graveyardRef.current.some((t) => t.k === k && !t.undone),
+  })
   const growthSlice = useGrowthSlice(persisted, { space, armUndo, bury, digUp, setPageState })
   const {
     habits, setHabits, goals, setGoals, routines, setRoutines,
@@ -1205,7 +1230,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     const state: PersistedState = {
       version: 3, tasks, habits, goals, projects, ledger, plan, review, assistantLog, coachSessions, routines, ideas,
-      notes, noteFolders, ideaBoard, prompts, people, personBonds, personContacts, prospects, gymGoals,
+      notes, noteFolders, ideaBoard, prompts, people, personBonds, personContacts, prospects, gymGoals, invoices, invoiceClients, invoiceProfile,
       savedAt: Date.now(), lastWrite: { dev: deviceId(), name: deviceName(), at: Date.now() },
       weekKey: isoWeekKey(), records, fixes: 1, schema: STORAGE_KEY, removedSeeds, focusSessions,
       habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, spaceGuessed, graveyard, twoLives, reels, tunes, reelFiles, lastRollDay: lastRollDay ?? localDateKey(),
@@ -1248,7 +1273,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (firstSave.current) { firstSave.current = false; flushLocal(); return }
     window.clearTimeout(localSaveTimer.current)
     localSaveTimer.current = window.setTimeout(flushLocal, 300)
-  }, [tasks, habits, goals, projects, ledger, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels, tunes, reelFiles, ideaBoard, prompts, people, personBonds, personContacts, prospects, gymGoals, activeFocus])
+  }, [tasks, habits, goals, projects, ledger, plan, review, assistantLog, coachSessions, routines, ideas, notes, noteFolders, records, removedSeeds, focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog, dailyDone, dailySkipped, graveyard, twoLives, reels, tunes, reelFiles, ideaBoard, prompts, people, personBonds, personContacts, prospects, gymGoals, invoices, invoiceClients, invoiceProfile, activeFocus])
 
   /* ---- state that arrived from somewhere else ----
      Another tab of this browser, or this account on another device. Merged in,
@@ -1294,6 +1319,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (Array.isArray(p.personContacts)) setPersonContacts(p.personContacts)
     if (Array.isArray(p.prospects)) setProspects(p.prospects)
     if (Array.isArray(p.gymGoals)) setGymGoals(p.gymGoals)
+    if (Array.isArray(p.invoices)) setInvoices(p.invoices)
+    if (Array.isArray(p.invoiceClients)) setInvoiceClients(p.invoiceClients)
+    if (Array.isArray(p.invoiceProfile)) setInvoiceProfile(p.invoiceProfile)
     if (p.ledger) setLedger(p.ledger)
     if (p.focusSessions) setFocusSessions(p.focusSessions)
     if (p.habitLog) setHabitLog(p.habitLog)
@@ -1716,6 +1744,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     prospects, addProspect: prospectsSlice.addProspect, updateProspect: prospectsSlice.updateProspect, deleteProspect: prospectsSlice.deleteProspect,
     logTouch: prospectsSlice.logTouch, removeTouch: prospectsSlice.removeTouch, applyOutreach: prospectsSlice.applyOutreach,
     gymGoals, addGymGoal: gymSlice.addGymGoal, updateGymGoal: gymSlice.updateGymGoal, deleteGymGoal: gymSlice.deleteGymGoal,
+    invoices, invoiceClients, invoiceSupplier: invoiceProfile[0],
+    saveInvoice: invoicesSlice.saveInvoice, patchInvoice: invoicesSlice.patchInvoice, deleteInvoice: invoicesSlice.deleteInvoice,
+    saveInvoiceClient: invoicesSlice.saveInvoiceClient, deleteInvoiceClient: invoicesSlice.deleteInvoiceClient, saveInvoiceProfile: invoicesSlice.saveInvoiceProfile,
 
     undoable, undoDelete, dismissUndo,
 

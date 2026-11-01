@@ -88,7 +88,7 @@ function loadMC(mc) {
   S.routines = mc.routines.map(r => ({ ...r, steps: r.steps.map((st, i) => ({ id: r.id + '-s' + i, ...st, done: !!st.done })) }));
   S.goals = mc.goals; S.quitting = mc.quitting;
   S.notes = mc.notes.items; S.folders = mc.notes.folders;
-  S.people = mc.people; S.prospects = mc.prospects; S.bills = mc.bills; S.ideas = mc.ideas; S.prompts = mc.prompts;
+  S.people = mc.people; S.prospects = mc.prospects; S.invoices = mc.invoices || []; S.bills = mc.bills; S.ideas = mc.ideas; S.prompts = mc.prompts;
   S.focus = { sessions: mc.focusToday.sessions, minutes: mc.focusToday.minutes };
   S.focusWeek = mc.focusWeek; S.gym = mc.gym; S.momentum = mc.momentum;
   S.plan.returned = mc.returned; S.dailyDone = mc.dailyDone;
@@ -331,6 +331,7 @@ const ICONS = {
   ideas: ['..#####..', '.#.....#.', '#.......#', '#...#...#', '.#..#..#.', '..#.#.#..', '...###...', '...###...', '....#....'],
   skills: ['....#....', '....#....', '...###...', '..#####..', '#########', '..#####..', '...###...', '....#....', '....#....'],
   mymind: ['..#####..', '..#...#..', '..#...#..', '..#...#..', '..#...#..', '..#...#..', '..#.#.#..', '..##.##..', '..#...#..'],
+  invoices: ['.######..', '.#....##.', '.#.....#.', '.#.##..#.', '.#.....#.', '.#.####.#', '.#.....#.', '.#...###.', '.#######.'],
   bills: ['.........', '#########', '#.......#', '#########', '#########', '#.......#', '#.##..#.#', '#########', '.........'],
   projects: ['.........', '####.....', '#...#####', '#.......#', '#########', '#.......#', '#.......#', '#.......#', '#########'],
   pulse: ['.........', '...#.....', '...#.....', '..#.#....', '#.#.#.#.#', '....#.#..', '....#.#..', '.....#...', '.........'],
@@ -2674,6 +2675,73 @@ A.touchLog = (el, x) => { const [id, s] = x.split('|'); B.logTouch(id, s); toast
 A.prospectAdd = () => sheet('pradd', { title: 'Add a prospect', focus: '#prn', body: () => `<input class="fld" id="prn" placeholder="Business" data-enter="prospectSave"><input class="fld" id="prd" placeholder="Domain" style="margin-top:8px">`, foot: () => `<button class="key t" data-a="sheetX">Cancel</button><button class="key" data-a="prospectSave">Add</button>` });
 A.prospectSave = () => { const v = $('#prn').value.trim(); if (!v) return; const d = ($('#prd').value || '').trim().replace(/^https?:\/\//, ''); const id = B.store().addProspect({ name: v, domain: d || undefined, source: 'found', stage: 'Ready to contact' }); closeSheet('pradd'); afterUpdate(() => A.prospectOpen(null, id)); };
 
+/* ---------------- INVOICES: status only. Created and edited on the desktop, never here (his call, 2026-11-01) ---------------- */
+const IV_MONEY = (n, c) => c === 'CZK' ? kc(n) + ' Kč' : c === 'EUR' ? '€' + kc(n) : '$' + kc(n);
+const ivSum = l => { const czk = l.filter(i => i.currency === 'CZK').reduce((a, i) => a + i.amount, 0), other = l.length - l.filter(i => i.currency === 'CZK').length; return kc(czk) + ' Kč' + (other ? ' + ' + other + ' other' : ''); };
+const ivWhen = i => i.status === 'paid' ? 'PAID ' + i.paidOn.toUpperCase() : i.status === 'cancelled' ? 'CANCELLED' : i.dueIn < 0 ? -i.dueIn + 'D LATE' : i.dueIn === 0 ? 'DUE TODAY' : 'IN ' + i.dueIn + 'D';
+V.invoices = {
+  title: 'Invoices', lazy: true,
+  render() {
+    const all = S.invoices, od = all.filter(i => i.status === 'overdue'), wait = all.filter(i => i.status === 'open' || i.status === 'sent'), yr = isoOff(0).slice(0, 4);
+    const paid = all.filter(i => i.status === 'paid' && i.paidIso.startsWith(yr)).sort((a, b) => b.paidIso.localeCompare(a.paidIso));
+    const m = S.ui.imode || (od.length ? 'overdue' : 'waiting');
+    const list = m === 'overdue' ? od : m === 'waiting' ? [...od, ...wait] : paid;
+    if (!all.length) return `<div class="cd"><div class="wt">No invoices yet. You create them on the desktop, and they show up here.</div></div>`;
+    return ivInsights() + `<div class="sl">Status</div><div class="g3" style="margin-bottom:10px">
+      <button class="cd ${od.length ? 'r' : ''}" style="padding:14px;text-align:left" data-a="imode" data-x="overdue">${dm(od.length, 4)}<div class="lb" style="margin-top:8px">Overdue</div></button>
+      <button class="cd" style="padding:14px;text-align:left" data-a="imode" data-x="waiting">${dm(od.length + wait.length, 4)}<div class="lb" style="margin-top:8px">Unpaid</div></button>
+      <button class="cd k" style="padding:14px;text-align:left" data-a="imode" data-x="paid">${dm(paid.length, 4)}<div class="lb" style="margin-top:8px">Paid ${yr}</div></button></div>
+    <div class="cd">${lbRow(m === 'paid' ? 'Paid in ' + yr : m === 'overdue' ? 'Overdue' : 'Waiting for payment', list.length + (list.length === 1 ? ' invoice' : ' invoices'))}<div style="margin-top:10px">${dm(kc(list.filter(i => i.currency === 'CZK').reduce((a, i) => a + i.amount, 0)), 3)}</div><div style="margin-top:8px">${lb(ivSum(list).replace(/^[\d,]+ /, ''))}</div></div>
+    <div class="seg" style="margin:12px 0"><button class="${m === 'overdue' ? 'on' : ''}" data-a="imode" data-x="overdue">Overdue</button><button class="${m === 'waiting' ? 'on' : ''}" data-a="imode" data-x="waiting">Unpaid</button><button class="${m === 'paid' ? 'on' : ''}" data-a="imode" data-x="paid">Paid</button></div>
+    <div class="cd tight rows">${list.map(i => `<button class="row" style="width:100%" data-a="invOpen" data-x="${i.id}"><div class="grow"><div class="rt one">${esc(i.client)}</div><div class="rs"><span>${esc(i.number)}</span><span>${IV_MONEY(i.amount, i.currency)}</span></div></div><span class="lb ${i.status === 'overdue' ? 'red' : i.status === 'paid' ? '' : 'fg'}">${ivWhen(i)}</span></button>`).join('') || `<div class="empty">${m === 'overdue' ? 'Nothing late.' : m === 'paid' ? 'Nothing paid yet this year.' : 'Everything is paid.'}</div>`}</div>`;
+  }
+};
+A.imode = (el, x) => { S.ui.imode = x; renderBody(top_(), true); };
+/* Insights with a period picker (his ask, 2026-11-01): what came in, what was billed, month by month. CZK only. */
+const IV_PERIODS = [['30', '30D', 1], ['90', '3M', 3], ['180', '6M', 6], ['365', '12M', 12]];
+function ivInsights() {
+  const per = S.ui.iper || '180', days = +per, from = isoOff(-days), all = S.invoices.filter(i => i.currency === 'CZK' && i.status !== 'cancelled');
+  const earned = all.filter(i => i.status === 'paid' && i.paidIso >= from), billed = all.filter(i => i.issuedIso >= from);
+  const sum = l => l.reduce((a, i) => a + i.amount, 0);
+  const prevFrom = isoOff(-2 * days), prev = sum(all.filter(i => i.status === 'paid' && i.paidIso >= prevFrom && i.paidIso < from));
+  const ch = prev ? Math.round((sum(earned) - prev) / prev * 100) : null;
+  /* Buckets: weeks for 30 days, months otherwise, oldest first. */
+  const n = days === 30 ? 5 : IV_PERIODS.find(p => p[0] === per)[2];
+  const buckets = [];
+  for (let k = n - 1; k >= 0; k--) {
+    let a, b, label;
+    if (days === 30) { a = isoOff(-(k + 1) * 7 + 1); b = isoOff(-k * 7); label = 'W' + (n - k); }
+    else { const d = new Date(isoOff(0) + 'T12:00:00'); d.setDate(1); d.setMonth(d.getMonth() - k); const e = new Date(d); e.setMonth(e.getMonth() + 1); e.setDate(0); a = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-01'; b = e.getFullYear() + '-' + pad(e.getMonth() + 1) + '-' + pad(e.getDate()); label = MONTHS[d.getMonth()]; }
+    buckets.push({ label, v: sum(all.filter(i => i.status === 'paid' && i.paidIso >= a && i.paidIso <= b)) });
+  }
+  const top = Math.max(1, ...buckets.map(x => x.v)), rows = 8, W = 300, cw = W / buckets.length;
+  let svg = '';
+  buckets.forEach((bk, k) => { const lit = Math.round(bk.v / top * rows); for (let r = 0; r < rows; r++) svg += `<circle cx="${cw * k + cw / 2}" cy="${8 + (rows - 1 - r) * 11}" r="3.6" class="dt${r < lit ? ' on' : ''}"/>`; svg += `<text x="${cw * k + cw / 2}" y="${8 + rows * 11 + 8}" text-anchor="middle" font-size="8" font-family="Space Mono" fill="var(--t2, #888)">${bk.label.toUpperCase().slice(0, 3)}</text>`; });
+  const byClient = {}; earned.forEach(i => { byClient[i.client] = (byClient[i.client] || 0) + i.amount; });
+  const best = Object.entries(byClient).sort((a, b) => b[1] - a[1])[0];
+  return `<div class="seg" style="margin-bottom:10px">${IV_PERIODS.map(([v, l]) => `<button class="${per === v ? 'on' : ''}" data-a="iper" data-x="${v}">${l}</button>`).join('')}</div>
+    <div class="cd k">${lbRow('Earned', ch == null ? null : (ch >= 0 ? '+' : '') + ch + '% vs before')}<div style="margin:12px 0 6px">${dm(kc(sum(earned)), 3.4)}</div>${lb('Kč paid to you, last ' + IV_PERIODS.find(p => p[0] === per)[1])}</div>
+    <div class="cd" style="padding:12px 8px 6px"><svg class="dts" viewBox="0 0 ${W} ${rows * 11 + 22}" width="100%" aria-label="Paid per period">${svg}</svg></div>
+    <div class="g2" style="margin-bottom:10px"><div class="cd">${dm(kc(sum(billed)), 2.4)}<div class="lb" style="margin-top:8px">Kč invoiced</div></div><div class="cd">${dm(billed.length, 2.4)}<div class="lb" style="margin-top:8px">Invoices issued</div></div></div>
+    ${best ? `<div class="cd tight rows"><div class="row"><span class="grow rt one">${esc(best[0])}</span><span class="lb fg">TOP ${kc(best[1])} KČ</span></div></div>` : ''}`;
+}
+A.iper = (el, x) => { S.ui.iper = x; renderBody(top_(), true); };
+A.invOpen = (el, id) => {
+  sheet('invoice', {
+    live: true, title: () => (S.invoices.find(i => i.id === id) || {}).number || 'Invoice', body: () => {
+      const i = S.invoices.find(x => x.id === id); if (!i) return '<div class="empty">This invoice is gone.</div>';
+      const st = { open: 'Not sent yet', sent: 'Sent', overdue: 'Overdue', paid: 'Paid', cancelled: 'Cancelled' }[i.status];
+      return `<div class="cd ${i.status === 'overdue' ? 'r' : i.status === 'paid' ? 'k' : ''}">${lbRow(esc(i.client), st)}<div style="margin:14px 0 8px">${dm(kc(i.amount), 3.4)}</div>${lbRow(i.currency, ivWhen(i))}</div>
+      <div class="cd tight rows"><div class="row"><span class="grow rt one">Issued</span><span class="lb">${i.issued}</span></div><div class="row"><span class="grow rt one">Due</span><span class="lb">${i.due}</span></div>${i.paidOn ? `<div class="row"><span class="grow rt one">Paid</span><span class="lb">${i.paidOn}</span></div>` : ''}</div>
+      ${i.status === 'cancelled' ? '' : i.status === 'paid'
+        ? `<button class="key t" style="width:100%;margin-top:12px" data-a="invUnpaid" data-x="${id}">Mark as unpaid</button>`
+        : `<button class="key" style="width:100%;margin-top:12px" data-a="invPaid" data-x="${id}">Mark as paid today</button>`}`;
+    }
+  });
+};
+A.invPaid = (el, id) => { const st = B.store(), was = st.invoices.find(i => i.id === id); if (!was) return; st.patchInvoice(id, { status: 'paid', paidOn: isoOff(0) }); closeSheet('invoice'); toast(was.number + ' paid', { undo: () => B.store().patchInvoice(id, { status: was.status, paidOn: was.paidOn }) }); };
+A.invUnpaid = (el, id) => { const st = B.store(), was = st.invoices.find(i => i.id === id); if (!was) return; st.patchInvoice(id, { status: was.sentOn ? 'sent' : 'open', paidOn: undefined }); toast(was.number + ' unpaid', { undo: () => B.store().patchInvoice(id, { status: 'paid', paidOn: was.paidOn }) }); };
+
 /* ---------------- BILLS: no page of its own here; every door goes straight to the real Bills page (CLASSIC_V) ---------------- */
 A.openClassic = (el, x) => B.openClassic(x);
 
@@ -2897,7 +2965,7 @@ A.jvTab = (el, id) => tab(id);
 A.jvProj = (el, id) => { S.ui.planProj = id; S.ui.planSeg = 'todo'; tab('plan'); };
 A.jvOpen = (el, id) => { if (id === 'goals') { S.ui.hSeg = 'goals'; tab('habits'); } else open(id, id === 'people' ? { mode: 'personal' } : {}); };
 /* ---------------- APPS DRAWER (root tab) ---------------- */
-const DRAWER = [['calendar', 'calendar', 'Calendar'], ['notes', 'note', 'Notes'], ['ideas', 'ideas', 'Ideas'], ['people', 'people', 'People'], ['bills', 'bills', 'Bills'], ['mymind', 'mymind', 'MyMind'], ['jar', 'jar', 'Jar'], ['zone', 'zone', 'Zone'], ['focus', 'bolt', 'Focus'], ['jarvis', 'face', 'Jarvis'], ['skills', 'skills', 'Skills'], ['watchless', 'eyeoff', 'Watchless'], ['weather', 'sun', 'Weather'], ['settings', 'gear', 'Settings']];
+const DRAWER = [['calendar', 'calendar', 'Calendar'], ['notes', 'note', 'Notes'], ['ideas', 'ideas', 'Ideas'], ['people', 'people', 'People'], ['bills', 'bills', 'Bills'], ['mymind', 'mymind', 'MyMind'], ['invoices', 'invoices', 'Invoices'], ['jar', 'jar', 'Jar'], ['zone', 'zone', 'Zone'], ['focus', 'bolt', 'Focus'], ['jarvis', 'face', 'Jarvis'], ['skills', 'skills', 'Skills'], ['watchless', 'eyeoff', 'Watchless'], ['weather', 'sun', 'Weather'], ['settings', 'gear', 'Settings']];
 V.apps = {
   title: 'Apps', render() {
     const badge = { people: overdue().length, bills: billsOverdue().length, ideas: S.prompts.filter(p => !p.sent).length };

@@ -237,6 +237,8 @@ export const DockBook = make(<><path d="M19 4v16h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0
 /* Watchless: a transcript, not a video. Tabler's file-text over a play, because
    the point of the page is that the video became something you read. */
 export const DockTranscript = make(<><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2" /><path d="M9 9l1 0" /><path d="M9 13l6 0" /><path d="M9 17l6 0" /></>, 16, { k: 1, x: 0, y: 0 })
+/* Invoices: Tabler's file-invoice, a page with the total line at its foot. */
+export const DockInvoice = make(<><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2" /><path d="M9 7l1 0" /><path d="M9 13l6 0" /><path d="M13 17l2 0" /></>, 16, { k: 1, x: 0, y: 0 })
 /* Ideas: Tabler's bulb, the one mark nobody reads as anything but an idea. */
 export const DockBulb = make(<><path d="M3 12h1m8 -9v1m8 8h1m-15.4 -6.4l.7 .7m12.1 -.7l-.7 .7" /><path d="M9 16a5 5 0 1 1 6 0a3.5 3.5 0 0 0 -1 3a2 2 0 0 1 -4 0a3.5 3.5 0 0 0 -1 -3" /><path d="M9.7 17l4.6 0" /></>, 16, { k: 1, x: 0, y: 0 })
 /* People: him in the middle, three people around him. */

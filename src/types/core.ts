@@ -52,6 +52,8 @@ export type PageId =
    *  the Zone. */
   | 'bills'
   | 'mymind'
+  /** Invoices, Fakturoid rebuilt. Header only, next to Ideas. */
+  | 'invoices'
   /** The work calendar, read from the feed. Big Time only: see NAV. */
   | 'calendar'
   /** Measured history above a now line, and the same rate carried forward. */

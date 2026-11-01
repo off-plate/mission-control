@@ -450,3 +450,6 @@ export async function mymindImageUrls(paths: string[]): Promise<Record<string, s
 }
 
 export { SUPABASE_ENABLED }
+
+/** The signed-in client, for modules that own their own tables (invoicecloud.ts). Null with sync off. */
+export const dbClient = (): SupabaseClient | null => db()

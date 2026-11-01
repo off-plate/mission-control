@@ -88,7 +88,7 @@ function loadMC(mc) {
   S.routines = mc.routines.map(r => ({ ...r, steps: r.steps.map((st, i) => ({ id: r.id + '-s' + i, ...st, done: !!st.done })) }));
   S.goals = mc.goals; S.quitting = mc.quitting;
   S.notes = mc.notes.items; S.folders = mc.notes.folders;
-  S.people = mc.people; S.prospects = mc.prospects; S.bills = mc.bills; S.ideas = mc.ideas; S.prompts = mc.prompts;
+  S.people = mc.people; S.prospects = mc.prospects; S.invoices = mc.invoices || []; S.bills = mc.bills; S.ideas = mc.ideas; S.prompts = mc.prompts;
   S.focus = { sessions: mc.focusToday.sessions, minutes: mc.focusToday.minutes };
   S.focusWeek = mc.focusWeek; S.gym = mc.gym; S.momentum = mc.momentum;
   S.plan.returned = mc.returned; S.dailyDone = mc.dailyDone;
@@ -579,7 +579,7 @@ function setChrome() {
 
 /* open a view. from = a widget tile element for the morph; push = slide in from the right */
 /* Pages this look does not draw itself: they open the real page in the classic app. */
-const CLASSIC_V = { bills: 'bills', mymind: 'mymind', invoices: 'invoices', longevity: 'longevity', watchless: 'watchless', skills: 'skills' };
+const CLASSIC_V = { bills: 'bills', mymind: 'mymind', longevity: 'longevity', watchless: 'watchless', skills: 'skills' };
 /* ---- the stack follows the browser's history, so the iOS swipe-back and the on-screen Back are the same thing ----
    Every pushed view and every open sheet owns one history entry. Back (screen, edge swipe, pull-down) just calls history.back(); the popstate
    below does the real pop with the usual animation. Anything that unwinds on its own (a tab switch, a sheet closing after an action) removes
@@ -2674,6 +2674,44 @@ A.stageSet = (el, x) => { const [id, s] = x.split('|'), p = S.prospects.find(p =
 A.touchLog = (el, x) => { const [id, s] = x.split('|'); B.logTouch(id, s); toast('Logged: ' + s); };
 A.prospectAdd = () => sheet('pradd', { title: 'Add a prospect', focus: '#prn', body: () => `<input class="fld" id="prn" placeholder="Business" data-enter="prospectSave"><input class="fld" id="prd" placeholder="Domain" style="margin-top:8px">`, foot: () => `<button class="key t" data-a="sheetX">Cancel</button><button class="key" data-a="prospectSave">Add</button>` });
 A.prospectSave = () => { const v = $('#prn').value.trim(); if (!v) return; const d = ($('#prd').value || '').trim().replace(/^https?:\/\//, ''); const id = B.store().addProspect({ name: v, domain: d || undefined, source: 'found', stage: 'Ready to contact' }); closeSheet('pradd'); afterUpdate(() => A.prospectOpen(null, id)); };
+
+/* ---------------- INVOICES: status only. Created and edited on the desktop, never here (his call, 2026-11-01) ---------------- */
+const IV_MONEY = (n, c) => c === 'CZK' ? kc(n) + ' Kč' : c === 'EUR' ? '€' + kc(n) : '$' + kc(n);
+const ivSum = l => { const czk = l.filter(i => i.currency === 'CZK').reduce((a, i) => a + i.amount, 0), other = l.length - l.filter(i => i.currency === 'CZK').length; return kc(czk) + ' Kč' + (other ? ' + ' + other + ' other' : ''); };
+const ivWhen = i => i.status === 'paid' ? 'PAID ' + i.paidOn.toUpperCase() : i.status === 'cancelled' ? 'CANCELLED' : i.dueIn < 0 ? -i.dueIn + 'D LATE' : i.dueIn === 0 ? 'DUE TODAY' : 'IN ' + i.dueIn + 'D';
+V.invoices = {
+  title: 'Invoices', lazy: true,
+  render() {
+    const all = S.invoices, od = all.filter(i => i.status === 'overdue'), wait = all.filter(i => i.status === 'open' || i.status === 'sent'), yr = isoOff(0).slice(0, 4);
+    const paid = all.filter(i => i.status === 'paid' && i.paidIso.startsWith(yr)).sort((a, b) => b.paidIso.localeCompare(a.paidIso));
+    const m = S.ui.imode || (od.length ? 'overdue' : 'waiting');
+    const list = m === 'overdue' ? od : m === 'waiting' ? [...od, ...wait] : paid;
+    if (!all.length) return `<div class="cd"><div class="wt">No invoices yet. You create them on the desktop, and they show up here.</div></div>`;
+    return `<div class="g3" style="margin-bottom:10px">
+      <button class="cd ${od.length ? 'r' : ''}" style="padding:14px;text-align:left" data-a="imode" data-x="overdue">${dm(od.length, 4)}<div class="lb" style="margin-top:8px">Overdue</div></button>
+      <button class="cd" style="padding:14px;text-align:left" data-a="imode" data-x="waiting">${dm(od.length + wait.length, 4)}<div class="lb" style="margin-top:8px">Unpaid</div></button>
+      <button class="cd k" style="padding:14px;text-align:left" data-a="imode" data-x="paid">${dm(paid.length, 4)}<div class="lb" style="margin-top:8px">Paid ${yr}</div></button></div>
+    <div class="cd">${lbRow(m === 'paid' ? 'Paid in ' + yr : m === 'overdue' ? 'Overdue' : 'Waiting for payment', list.length + (list.length === 1 ? ' invoice' : ' invoices'))}<div style="margin-top:10px">${dm(kc(list.filter(i => i.currency === 'CZK').reduce((a, i) => a + i.amount, 0)), 3)}</div><div style="margin-top:8px">${lb(ivSum(list).replace(/^[\d,]+ /, ''))}</div></div>
+    <div class="seg" style="margin:12px 0"><button class="${m === 'overdue' ? 'on' : ''}" data-a="imode" data-x="overdue">Overdue</button><button class="${m === 'waiting' ? 'on' : ''}" data-a="imode" data-x="waiting">Unpaid</button><button class="${m === 'paid' ? 'on' : ''}" data-a="imode" data-x="paid">Paid</button></div>
+    <div class="cd tight rows">${list.map(i => `<button class="row" style="width:100%" data-a="invOpen" data-x="${i.id}"><div class="grow"><div class="rt one">${esc(i.client)}</div><div class="rs"><span>${esc(i.number)}</span><span>${IV_MONEY(i.amount, i.currency)}</span></div></div><span class="lb ${i.status === 'overdue' ? 'red' : i.status === 'paid' ? '' : 'fg'}">${ivWhen(i)}</span></button>`).join('') || `<div class="empty">${m === 'overdue' ? 'Nothing late.' : m === 'paid' ? 'Nothing paid yet this year.' : 'Everything is paid.'}</div>`}</div>`;
+  }
+};
+A.imode = (el, x) => { S.ui.imode = x; renderBody(top_(), true); };
+A.invOpen = (el, id) => {
+  sheet('invoice', {
+    live: true, title: () => (S.invoices.find(i => i.id === id) || {}).number || 'Invoice', body: () => {
+      const i = S.invoices.find(x => x.id === id); if (!i) return '<div class="empty">This invoice is gone.</div>';
+      const st = { open: 'Not sent yet', sent: 'Sent', overdue: 'Overdue', paid: 'Paid', cancelled: 'Cancelled' }[i.status];
+      return `<div class="cd ${i.status === 'overdue' ? 'r' : i.status === 'paid' ? 'k' : ''}">${lbRow(esc(i.client), st)}<div style="margin:14px 0 8px">${dm(kc(i.amount), 3.4)}</div>${lbRow(i.currency, ivWhen(i))}</div>
+      <div class="cd tight rows"><div class="row"><span class="grow rt one">Issued</span><span class="lb">${i.issued}</span></div><div class="row"><span class="grow rt one">Due</span><span class="lb">${i.due}</span></div>${i.paidOn ? `<div class="row"><span class="grow rt one">Paid</span><span class="lb">${i.paidOn}</span></div>` : ''}</div>
+      ${i.status === 'cancelled' ? '' : i.status === 'paid'
+        ? `<button class="key t" style="width:100%;margin-top:12px" data-a="invUnpaid" data-x="${id}">Mark as unpaid</button>`
+        : `<button class="key" style="width:100%;margin-top:12px" data-a="invPaid" data-x="${id}">Mark as paid today</button>`}`;
+    }
+  });
+};
+A.invPaid = (el, id) => { const st = B.store(), was = st.invoices.find(i => i.id === id); if (!was) return; st.patchInvoice(id, { status: 'paid', paidOn: isoOff(0) }); closeSheet('invoice'); toast(was.number + ' paid', { undo: () => B.store().patchInvoice(id, { status: was.status, paidOn: was.paidOn }) }); };
+A.invUnpaid = (el, id) => { const st = B.store(), was = st.invoices.find(i => i.id === id); if (!was) return; st.patchInvoice(id, { status: was.sentOn ? 'sent' : 'open', paidOn: undefined }); toast(was.number + ' unpaid', { undo: () => B.store().patchInvoice(id, { status: 'paid', paidOn: was.paidOn }) }); };
 
 /* ---------------- BILLS: no page of its own here; every door goes straight to the real Bills page (CLASSIC_V) ---------------- */
 A.openClassic = (el, x) => B.openClassic(x);

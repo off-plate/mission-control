@@ -51,7 +51,7 @@ const NothingShell = lazy(() => import('./shells/nothing'))
    Longevity, Watchless, Skills and the Jar page (its reel player), which stay the classic pages. */
 const SHELL_VIEW: Partial<Record<PageId, string>> = {
   plan: 'plan', projects: 'projects', habits: 'habits', routines: 'habits', goals: 'habits', quitting: 'habits',
-  notes: 'notes', calendar: 'calendar', ideas: 'ideas', prompts: 'ideas', people: 'people', focus: 'focus',
+  notes: 'notes', calendar: 'calendar', ideas: 'ideas', prompts: 'ideas', invoices: 'invoices', people: 'people', focus: 'focus',
   zone: 'zone', assistant: 'jarvis', health: 'health', gym: 'gym', board: 'why', apps: 'apps',
 }
 const PeoplePage = lazy(() => import('./people').then((m) => ({ default: m.PeoplePage })))
@@ -553,7 +553,7 @@ function PhoneTabBar({ page, setPage, nothing }: { page: PageId; setPage: (p: Pa
 
 /* Pages that are dark in both modes, so the header goes dark with them. */
 /* Pages the Nothing app opens full screen from Apps: they carry the standard back header, so no classic bottom bar, same as Notes or People. */
-const NOTHING_OPENED: PageId[] = ['bills', 'mymind', 'invoices', 'skills', 'longevity', 'watchless']
+const NOTHING_OPENED: PageId[] = ['bills', 'mymind', 'skills', 'longevity', 'watchless']
 const DARK_CHROME_PAGES: PageId[] = ['timeline', 'board', 'health', 'gym', 'longevity']
 
 export default function App() {

@@ -138,7 +138,6 @@ const CARDS: { id: Filter; label: string; icon: ReactNode; scope: string }[] = [
   { id: 'unpaid', label: 'Unpaid', icon: <Icon.Clock size={26} />, scope: 'incl. overdue' },
   { id: 'overdue', label: 'Overdue', icon: <Icon.Flag size={26} />, scope: 'all time' },
   { id: 'paid', label: 'Paid', icon: <Icon.CheckRing size={26} />, scope: 'last 12 months' },
-  { id: 'cancelled', label: 'Cancelled', icon: <Icon.Close size={26} />, scope: 'last 12 months' },
 ]
 
 function inFilter(i: Invoice, f: Filter, today: string): boolean {
@@ -177,8 +176,11 @@ function InvoiceList({ filter, setFilter, onOpen, onNew }: { filter: Filter; set
           return (
             <button key={c.id} type="button" className={`iv-scard is-${c.id}`} aria-pressed={!q.trim() && filter === c.id} onClick={() => { setFilter(c.id); setQ('') }}>
               <span className="iv-scard-ico" aria-hidden="true">{c.icon}</span>
-              <span className="iv-scard-name">{c.label}<small>{plural(rows.length, 'invoice', 'invoices')}</small></span>
-              <span className="iv-scard-sum">{sumText(rows)}<small>{c.scope}</small></span>
+              <span className="iv-scard-body">
+                <b className="iv-scard-name">{c.label}</b>
+                <span className="iv-scard-sum">{sumText(rows)}</span>
+                <small>{plural(rows.length, 'invoice', 'invoices')}, {c.scope}</small>
+              </span>
             </button>
           )
         })}
@@ -203,14 +205,19 @@ function InvoiceRows({ rows, onOpen, hideClient }: { rows: Invoice[]; onOpen: (i
   const today = isoDay()
   return (
     <ul className={`iv-rows${hideClient ? ' no-client' : ''}`}>
+      <li className="iv-row is-head" aria-hidden="true">
+        <span>Number</span><span>Status</span><span>Issued</span><span>Due</span>{!hideClient && <span>Client</span>}<span className="is-n">Amount</span><span />
+      </li>
       {rows.map((i) => {
         const s = shownStatus(i, today)
-        const late = s === 'overdue' ? -daysBetween(today, i.due) : 0
+        const d = daysBetween(today, i.due)
+        const due = s === 'paid' ? `Paid ${fmtShort(i.paidOn ?? i.due)}` : s === 'cancelled' ? '' : d < 0 ? `${plural(-d, 'day', 'days')} late` : d === 0 ? 'Today' : `In ${plural(d, 'day', 'days')}`
         return (
           <li key={i.id} className={`iv-row is-${s}`} onClick={() => onOpen(i.id)}>
             <button type="button" className="iv-num" onClick={(e) => { e.stopPropagation(); onOpen(i.id) }}>{i.number}</button>
-            <span className={`iv-st is-${s}`}>{STATUS_LABEL[s]}</span>
-            <span className="iv-row-date">{late ? plural(late, 'day', 'days') : fmtShort(i.issued)}</span>
+            <span><span className={`iv-st is-${s}`}>{STATUS_LABEL[s]}</span></span>
+            <span className="iv-row-date">{fmtShort(i.issued)}</span>
+            <span className={`iv-row-due is-${s}`}>{due}</span>
             {!hideClient && <span className="iv-row-client">{i.client.name}</span>}
             <span className="iv-row-amt">{money(invoiceTotal(i), i.currency)}</span>
             <span className="iv-row-menu" onClick={(e) => e.stopPropagation()}>
@@ -878,13 +885,16 @@ function ContactDetail({ id, onBack, onEdit, onOpen, onNew }: { id: string; onBa
       </section>
 
       {events.length > 0 && (
-        <section className="iv-sec iv-events">
-          <h3><Icon.DockCalendar size={20} />Events</h3>
-          <ul>
+        <section className="iv-sec is-flush iv-events">
+          <h2 className="iv-h2 iv-pad-x">Events</h2>
+          <ul className="iv-evrows">
+            <li className="iv-evrow is-head" aria-hidden="true"><span>Date</span><span>Event</span><span>Invoice</span><span className="is-n">Amount</span></li>
             {events.map((e, k) => (
-              <li key={k}>
-                <span className="iv-quiet">{fmtDate(e.day)}</span>
-                <span>{e.text} <button type="button" className="iv-a" onClick={() => onOpen(e.i.id)}>{e.i.number}</button><span className="iv-quiet"> for {money(invoiceTotal(e.i), e.i.currency)}</span></span>
+              <li key={k} className="iv-evrow" onClick={() => onOpen(e.i.id)}>
+                <span className="iv-row-date">{fmtDate(e.day)}</span>
+                <span><span className={`iv-st is-ev-${e.text.toLowerCase()}`}>{e.text}</span></span>
+                <button type="button" className="iv-num" onClick={(ev) => { ev.stopPropagation(); onOpen(e.i.id) }}>{e.i.number}</button>
+                <span className="iv-row-amt">{money(invoiceTotal(e.i), e.i.currency)}</span>
               </li>
             ))}
           </ul>

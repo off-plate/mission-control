@@ -12443,6 +12443,54 @@ textarea.iv-input { height: auto; padding: 10px 12px; resize: vertical; }
 .iv-yellow { background: var(--iv-acc); color: var(--iv-on-acc); }
 @media (hover: hover) and (pointer: fine) { .iv-yellow:hover:not(:disabled) { background: var(--a-accent-2, var(--iv-acc)); } }
 
+/* Sixth pass (his review): no cancelled card, headed aligned columns, events as a table. */
+.iv-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.iv-scard { border-bottom: 0; }
+.iv-scard:nth-child(3n) { border-right: 1px solid var(--fk-line); }
+.iv-scard:last-child { border-right: 0; }
+.iv-scard[aria-pressed="true"] { box-shadow: none; background: var(--iv-acc-wash); }
+.iv-cards { border-bottom: 1px solid var(--fk-line); }
+.iv-row, .iv-rows.no-client .iv-row { grid-template-columns: 130px 120px 110px 140px minmax(160px, 1fr) 170px 44px; gap: 16px; }
+.iv-rows.no-client .iv-row { grid-template-columns: 130px 120px 110px 140px minmax(0, 1fr) 44px; }
+.iv-rows.no-client .iv-row .iv-row-amt { justify-self: end; }
+.iv-row.is-head, .iv-evrow.is-head { min-height: 40px; cursor: default; background: var(--fk-sunk); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--fk-muted); border-top: 1px solid var(--fk-line); }
+.iv-row.is-head:hover, .iv-evrow.is-head:hover { background: var(--fk-sunk); }
+.iv-row .is-n, .iv-evrow .is-n { text-align: right; }
+.iv-st { justify-self: start; }
+.iv-row-due { color: var(--fk-muted); font-size: 0.95rem; }
+.iv-row-due.is-overdue { color: var(--iv-late); font-weight: 700; }
+.iv-row-due.is-paid { color: var(--iv-paid); font-weight: 600; }
+.iv-row.is-overdue .iv-row-date { color: var(--fk-muted); font-weight: 400; }
+.iv-events { background: #fff; }
+.iv-pad-x { padding: 0 32px; }
+.iv-evrows { list-style: none; margin: 0; padding: 0; }
+.iv-evrow { display: grid; grid-template-columns: 130px 120px 130px minmax(0, 1fr); align-items: center; gap: 16px; min-height: 52px; padding: 0 32px; border-top: 1px solid var(--fk-line); cursor: pointer; font-size: 1rem; transition: background-color 120ms ease; }
+@media (hover: hover) and (pointer: fine) { .iv-evrow:not(.is-head):hover { background: #FBFBFB; } }
+.iv-evrow .iv-row-amt { justify-self: end; }
+.iv-st.is-ev-issued { color: var(--fk-info); background: var(--info-wash); }
+.iv-st.is-ev-sent { color: var(--iv-wait); background: var(--iv-wait-wash); }
+.iv-st.is-ev-paid { color: var(--iv-paid); background: var(--iv-paid-wash); }
+.iv-st.is-ev-overdue { color: var(--iv-late); background: var(--iv-late-wash); }
+@media (max-width: 760px) {
+  .iv-cards { grid-template-columns: 1fr 1fr; }
+  .iv-row.is-head, .iv-evrow.is-head { display: none; }
+  .iv-row-due { grid-area: date; text-align: right; } .iv-row > span:nth-child(2), .iv-row-date { display: none; }
+  .iv-evrow { grid-template-columns: auto 1fr auto; padding: 10px 16px; } .iv-evrow .iv-num { display: none; }
+}
+
+/* Cards stacked: name, the sum, then count and scope. Events table beats the old timeline rules. */
+.iv-scard { grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 16px; padding: 22px 24px; }
+.iv-scard-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.iv-scard-body .iv-scard-name { display: block; font-size: 1rem; }
+.iv-scard-body .iv-scard-sum { display: block; align-items: initial; text-align: left; font-size: 1.35rem; line-height: 1.2; white-space: normal; }
+.iv-scard-body small { font-size: 0.85rem; color: var(--fk-muted); }
+.iv-events ul.iv-evrows { max-width: none; margin: 0; }
+.iv-events li.iv-evrow { display: grid; grid-template-columns: 130px 120px 130px minmax(0, 1fr); padding: 0 84px 0 32px; border-top: 1px solid var(--fk-line); font-size: 1rem; gap: 16px; }
+.iv-events li.iv-evrow.is-head { font-size: 0.75rem; }
+.iv-events li.iv-evrow:first-child { border-top: 1px solid var(--fk-line); }
+.iv-sec.is-grey { padding-bottom: 0; }
+.iv-events { padding-bottom: 0; }
+
 /* The A4 sheet: a document, not app chrome. */
 .iv-paper {
   position: relative; box-sizing: border-box; width: 794px; min-height: 1123px; margin: 0 auto; padding: 56px 60px;

@@ -18,10 +18,10 @@ import { Dropdown, Segmented, Select } from './ui'
 import * as Icon from './icons'
 import { qrMatrix, qrSvgPath } from './qr'
 import {
-  DEFAULT_PROFILE, STATUS_LABEL, addDays, czIban, daysBetween, ibanSpaced, invoiceTotal, isoDay, money, nextNumber,
+  DEFAULT_PROFILE, STATUS_LABEL, accountsOf, addDays, pickAccount, czIban, daysBetween, ibanSpaced, invoiceTotal, isoDay, money, nextNumber,
   shownStatus, spayd, totals, vsFromNumber, type ShownStatus,
 } from './invoicecalc'
-import type { Invoice, InvoiceCurrency, InvoiceLang, InvoiceLine, InvoiceParty, InvoiceProfile, PaymentMethod } from './types'
+import type { BankAccount, Invoice, InvoiceCurrency, InvoiceLang, InvoiceLine, InvoiceParty, InvoiceProfile, PaymentMethod } from './types'
 import type { InvoiceClientDraft, InvoiceDraft } from './store/invoices'
 
 type Tab = 'overview' | 'invoices' | 'contacts' | 'stats' | 'settings'
@@ -480,6 +480,7 @@ function InvoiceDetail({ id, onBack, onEdit, onCopy, onContact }: {
           <dl className="iv-kv">
             <dt>Variable symbol</dt><dd>{inv.vs}</dd>
             <dt>Payment</dt><dd>{METHODS.find((m) => m.id === inv.method)?.label}</dd>
+            {inv.method === 'bank' && (inv.supplier.account || inv.supplier.iban) && <><dt>Account</dt><dd>{inv.supplier.account || ibanSpaced(inv.supplier.iban ?? '')}</dd></>}
             {inv.orderNo && <><dt>Order</dt><dd>{inv.orderNo}</dd></>}
           </dl>
         </div>
@@ -573,7 +574,8 @@ function InvoiceForm({ id, copyOf, clientId, onDone }: { id?: string; copyOf?: s
     return {
       number, vs: vsFromNumber(number), issued: today, taxable: today, due: addDays(today, days),
       clientId: c?.id ?? source?.clientId, client: c ? partyOf(c) : source?.client ?? { name: '' },
-      supplier: supplierOf(profile),
+      supplier: supplierOf(profile, pickAccount(accountsOf(profile), source?.currency ?? 'CZK')),
+      accountId: source?.accountId ?? pickAccount(accountsOf(profile), source?.currency ?? 'CZK')?.id,
       method: source?.method ?? 'bank', currency: source?.currency ?? 'CZK', lang: source?.lang ?? 'cs',
       lines: source ? source.lines.map((l) => ({ ...l, id: lineId() })) : [{ id: lineId(), name: '', qty: 1, unit: '', price: 0, vat: 21 }],
       noteBefore: source?.noteBefore ?? '', noteAfter: source?.noteAfter ?? '', footer: profile.footer ?? '', orderNo: '',
@@ -581,7 +583,6 @@ function InvoiceForm({ id, copyOf, clientId, onDone }: { id?: string; copyOf?: s
     }
   })
   const [editNumber, setEditNumber] = useState(false)
-  const [more, setMore] = useState(false)
   const [newContact, setNewContact] = useState(false)
   const [preview, setPreview] = useState(false)
   const [tried, setTried] = useState(false)
@@ -590,6 +591,11 @@ function InvoiceForm({ id, copyOf, clientId, onDone }: { id?: string; copyOf?: s
   const dueDays = daysBetween(d.issued, d.due)
   const vatPayer = existing ? d.supplier.vatPayer : profile.vatPayer
   const tot = totals(d.lines, vatPayer)
+  const accounts = accountsOf(profile)
+  const account = accounts.find((a) => a.id === d.accountId)
+  /* A currency change brings the account for that currency along, as long as he hasn't picked one by hand. */
+  const [pickedByHand, setPickedByHand] = useState(!!existing)
+  const setCurrency = (cur: InvoiceCurrency) => setD((p) => ({ ...p, currency: cur, accountId: pickedByHand ? p.accountId : pickAccount(accounts, cur)?.id ?? p.accountId }))
   const clash = invoices.some((i) => i.number === d.number.trim() && i.id !== id)
   const err = {
     client: !d.client.name.trim() ? 'Pick who the invoice is for.' : '',
@@ -608,7 +614,7 @@ function InvoiceForm({ id, copyOf, clientId, onDone }: { id?: string; copyOf?: s
     lines: d.lines.filter((l) => l.name.trim()).map((l) => ({ ...l, name: l.name.trim(), qty: Number(l.qty) || 0, price: Number(l.price) || 0, vat: Number(l.vat) || 0 })),
     /* Re-saving takes his current details, except on an invoice already sent
        or paid: that one stays exactly as the customer received it. */
-    supplier: existing && existing.status !== 'open' ? existing.supplier : supplierOf(profile),
+    supplier: existing && existing.status !== 'open' && existing.accountId === d.accountId ? existing.supplier : supplierOf(profile, account),
     ...(existing ? { id: existing.id } : {}),
   })
   const save = () => { setTried(true); if (!bad) onDone(saveInvoice(draftFinal())) }
@@ -622,65 +628,64 @@ function InvoiceForm({ id, copyOf, clientId, onDone }: { id?: string; copyOf?: s
           <button className="iv-outline is-sm" type="button" onClick={() => onDone(existing?.id)}><Icon.ChevronLeft size={14} />Back</button>
         </header>
         <div className="iv-fgrid">
-          <FRow label="Customer" error={tried ? err.client : ''}>
-            <div className="iv-inline">
-              <Select className="iv-select iv-w-lg" ariaLabel="Customer" value={d.clientId ?? ''} onChange={pickClient}
+          <div className="iv-fcol">
+            <FRow label="Customer" error={tried ? err.client : ''}>
+              <Select className="iv-select" ariaLabel="Customer" value={d.clientId ?? ''} onChange={pickClient}
                 options={[{ value: '', label: invoiceClients.length ? 'Choose a customer' : 'No contacts yet' },
                   ...[...invoiceClients].sort((a, b) => a.name.localeCompare(b.name, 'cs')).map((c) => ({ value: c.id, label: c.name }))]} />
-              <button type="button" className="iv-a iv-plus" onClick={() => setNewContact(true)}><Icon.Plus size={18} />New customer</button>
-            </div>
-            {d.client.name && (
-              <span className="iv-hint">{[d.client.street, [d.client.zip, d.client.city].filter(Boolean).join(' '), d.client.ico && `IČO ${d.client.ico}`].filter(Boolean).join(', ')}</span>
-            )}
-          </FRow>
-
-          <FRow label="Invoice number" error={tried ? err.number : ''}>
-            {editNumber
-              ? <input className="iv-input iv-w-md" autoFocus value={d.number} onChange={(e) => { const v = e.target.value; setD((p) => ({ ...p, number: v, vs: p.vs === vsFromNumber(p.number) ? vsFromNumber(v) : p.vs })) }} />
-              : <div className="iv-inline"><b className="iv-static">{d.number}</b><button type="button" className="iv-a is-quiet" onClick={() => setEditNumber(true)}>Change</button></div>}
-          </FRow>
-
-          <FRow label="Issue date">
-            <input className="iv-input iv-w-date" type="date" value={d.issued}
-              onChange={(e) => { const v = e.target.value; if (v) setD((p) => ({ ...p, issued: v, taxable: p.taxable === p.issued ? v : p.taxable, due: addDays(v, daysBetween(p.issued, p.due)) })) }} />
-          </FRow>
-          {vatPayer && (
-            <FRow label="Taxable supply">
-              <input className="iv-input iv-w-date" type="date" value={d.taxable} onChange={(e) => e.target.value && set('taxable', e.target.value)} />
+              <div className="iv-inline is-tight">
+                {d.client.name && <span className="iv-hint">{[d.client.street, [d.client.zip, d.client.city].filter(Boolean).join(' '), d.client.ico && `IČO ${d.client.ico}`].filter(Boolean).join(', ')}</span>}
+                <button type="button" className="iv-a iv-plus" onClick={() => setNewContact(true)}><Icon.Plus size={16} />New customer</button>
+              </div>
             </FRow>
-          )}
+            <FRow label="Invoice number" error={tried ? err.number : ''}>
+              {editNumber
+                ? <input className="iv-input iv-w-md" autoFocus value={d.number} onChange={(e) => { const v = e.target.value; setD((p) => ({ ...p, number: v, vs: p.vs === vsFromNumber(p.number) ? vsFromNumber(v) : p.vs })) }} />
+                : <div className="iv-inline"><b className="iv-static">{d.number}</b><button type="button" className="iv-a is-quiet" onClick={() => setEditNumber(true)}>Change</button></div>}
+            </FRow>
+            <FRow label="Issue date">
+              <input className="iv-input iv-w-date" type="date" value={d.issued}
+                onChange={(e) => { const v = e.target.value; if (v) setD((p) => ({ ...p, issued: v, taxable: p.taxable === p.issued ? v : p.taxable, due: addDays(v, daysBetween(p.issued, p.due)) })) }} />
+            </FRow>
+            {vatPayer && (
+              <FRow label="Taxable supply">
+                <input className="iv-input iv-w-date" type="date" value={d.taxable} onChange={(e) => e.target.value && set('taxable', e.target.value)} />
+              </FRow>
+            )}
+            <FRow label="Due" error={tried ? err.due : ''}>
+              <div className="iv-inline">
+                <Select className="iv-select iv-w-md" ariaLabel="Due in" value={dueDays} onChange={(n) => set('due', addDays(d.issued, n))}
+                  options={dueOptions.map((n) => ({ value: n, label: n === 0 ? 'On issue' : plural(n, 'day', 'days') }))} />
+                <span className="iv-hint">lands on <b>{fmtDate(d.due)}</b></span>
+              </div>
+            </FRow>
+          </div>
 
-          <FRow label="Payment method">
-            <Segmented size="sm" label="Payment method" value={d.method} onPick={(v) => set('method', v)} options={METHODS} className="iv-paymethod" />
-          </FRow>
+          <div className="iv-fcol">
+            <FRow label="Payment method">
+              <Segmented size="sm" label="Payment method" value={d.method} onPick={(v) => set('method', v)} options={METHODS} className="iv-paymethod" />
+            </FRow>
+            <FRow label="Currency">
+              <Select className="iv-select iv-w-sm" ariaLabel="Currency" value={d.currency} onChange={setCurrency} options={CURRENCIES} />
+            </FRow>
+            {d.method === 'bank' && (
+              <FRow label="Bank account">
+                {accounts.length
+                  ? <Select className="iv-select" ariaLabel="Bank account" value={d.accountId ?? ''} onChange={(v) => { setPickedByHand(true); set('accountId', v) }}
+                      options={accounts.map((a) => ({ value: a.id, label: `${a.label}${a.account ? `, ${a.account}` : a.iban ? `, ${ibanSpaced(a.iban)}` : ''}` }))} />
+                  : <span className="iv-hint">No bank account yet. Add one under Settings.</span>}
+              </FRow>
+            )}
+            <FRow label="Language"><Select className="iv-select iv-w-md" ariaLabel="Language" value={d.lang} onChange={(v) => set('lang', v)} options={LANGS} /></FRow>
+            <FRow label="Variable symbol"><input className="iv-input iv-w-md" inputMode="numeric" value={d.vs} onChange={(e) => set('vs', e.target.value.replace(/\D/g, '').slice(0, 10))} /></FRow>
+            <FRow label="Order number"><input className="iv-input iv-w-md" value={d.orderNo ?? ''} onChange={(e) => set('orderNo', e.target.value)} /></FRow>
+          </div>
 
-          <FRow label="Due" error={tried ? err.due : ''}>
-            <div className="iv-inline">
-              <Select className="iv-select iv-w-md" ariaLabel="Due in" value={dueDays} onChange={(n) => set('due', addDays(d.issued, n))}
-                options={dueOptions.map((n) => ({ value: n, label: n === 0 ? 'On issue' : plural(n, 'day', 'days') }))} />
-              <span className="iv-hint">lands on {fmtDate(d.due)}</span>
-            </div>
-          </FRow>
-
-          <FRow label="Currency">
-            <Select className="iv-select iv-w-sm" ariaLabel="Currency" value={d.currency} onChange={(v) => set('currency', v)} options={CURRENCIES} />
-          </FRow>
-
-          <FRow label="">
-            <button type="button" className="iv-chipbtn iv-more-btn" aria-expanded={more} onClick={() => setMore((v) => !v)}>
-              <Icon.ChevronDown size={15} />{more ? 'Fewer options' : 'More options'}
-            </button>
-          </FRow>
-          {more && (
-            <>
-              <FRow label="Language"><Select className="iv-select iv-w-md" ariaLabel="Language" value={d.lang} onChange={(v) => set('lang', v)} options={LANGS} /></FRow>
-              <FRow label="Variable symbol"><input className="iv-input iv-w-md" inputMode="numeric" value={d.vs} onChange={(e) => set('vs', e.target.value.replace(/\D/g, '').slice(0, 10))} /></FRow>
-              <FRow label="Order number"><input className="iv-input iv-w-md" value={d.orderNo ?? ''} onChange={(e) => set('orderNo', e.target.value)} /></FRow>
-              <FRow label="Text above items"><textarea className="iv-input iv-w-lg" rows={2} value={d.noteBefore ?? ''} onChange={(e) => set('noteBefore', e.target.value)} /></FRow>
-              <FRow label="Text below items"><textarea className="iv-input iv-w-lg" rows={2} value={d.noteAfter ?? ''} onChange={(e) => set('noteAfter', e.target.value)} /></FRow>
-              <FRow label="Footer"><input className="iv-input iv-w-lg" value={d.footer ?? ''} onChange={(e) => set('footer', e.target.value)} /></FRow>
-            </>
-          )}
+          <div className="iv-fnotes">
+            <label className="iv-flabel">Text above items<textarea className="iv-input" rows={2} value={d.noteBefore ?? ''} onChange={(e) => set('noteBefore', e.target.value)} /></label>
+            <label className="iv-flabel">Text below items<textarea className="iv-input" rows={2} value={d.noteAfter ?? ''} onChange={(e) => set('noteAfter', e.target.value)} /></label>
+            <label className="iv-flabel">Footer<textarea className="iv-input" rows={2} value={d.footer ?? ''} onChange={(e) => set('footer', e.target.value)} /></label>
+          </div>
         </div>
 
         <div className={`iv-items${vatPayer ? ' has-vat' : ''}`}>
@@ -954,10 +959,16 @@ function PartyFields({ value, onChange }: { value: InvoiceParty; onChange: (p: P
 
 function SettingsForm() {
   const { invoiceSupplier, saveInvoiceProfile, invoices } = useStore()
-  const [p, setP] = useState<Omit<InvoiceProfile, 'id' | 'updatedAt'>>(() => ({ ...DEFAULT_PROFILE, ...(invoiceSupplier ?? {}) }))
+  const [p, setP] = useState<Omit<InvoiceProfile, 'id' | 'updatedAt'>>(() => {
+    const base = { ...DEFAULT_PROFILE, ...(invoiceSupplier ?? {}) }
+    return { ...base, accounts: accountsOf(base) }
+  })
   const [saved, setSaved] = useState(false)
   const set = (patch: Partial<InvoiceProfile>) => { setP((x) => ({ ...x, ...patch })); setSaved(false) }
-  const autoIban = czIban(p.account ?? '')
+  const accounts = p.accounts ?? []
+  const setAcc = (id: string, patch: Partial<BankAccount>) => set({ accounts: accounts.map((a) => (a.id === id ? { ...a, ...patch } : patch.isDefault ? { ...a, isDefault: false } : a)) })
+  const addAcc = () => set({ accounts: [...accounts, { id: `acc-${Date.now().toString(36)}`, label: accounts.length ? 'Another account' : 'Main account', currency: 'CZK', isDefault: !accounts.length }] })
+  const dropAcc = (id: string) => { const rest = accounts.filter((a) => a.id !== id); if (rest.length && !rest.some((a) => a.isDefault)) rest[0] = { ...rest[0], isDefault: true }; set({ accounts: rest }) }
   return (
     <div className="iv-settings">
       <section className="iv-card iv-spanel">
@@ -966,13 +977,29 @@ function SettingsForm() {
         <label className="iv-flabel">Website<input className="iv-input" value={p.web ?? ''} onChange={(e) => set({ web: e.target.value })} /></label>
       </section>
       <section className="iv-card iv-spanel">
-        <h2 className="iv-h2">Bank account</h2>
-        <label className="iv-flabel">Account number<input className="iv-input" placeholder="123456789/0800" value={p.account ?? ''} onChange={(e) => set({ account: e.target.value })} /></label>
-        <div className="iv-two">
-          <label className="iv-flabel">IBAN<input className="iv-input" placeholder={autoIban ? ibanSpaced(autoIban) : ''} value={p.iban ?? ''} onChange={(e) => set({ iban: e.target.value })} /></label>
-          <label className="iv-flabel">SWIFT<input className="iv-input" value={p.swift ?? ''} onChange={(e) => set({ swift: e.target.value })} /></label>
-        </div>
-        {autoIban && !p.iban && <p className="iv-hint">The IBAN for the QR payment code comes from the account number: {ibanSpaced(autoIban)}</p>}
+        <h2 className="iv-h2">Bank accounts</h2>
+        {accounts.length === 0 && <p className="iv-hint">No account yet. Invoices paid by bank transfer need one for the account number and the QR code.</p>}
+        {accounts.map((a) => {
+          const auto = czIban(a.account ?? '')
+          return (
+            <div key={a.id} className="iv-acc">
+              <div className="iv-acc-head">
+                <input className="iv-input iv-acc-name" aria-label="Account name" value={a.label} onChange={(e) => setAcc(a.id, { label: e.target.value })} />
+                <Select className="iv-select iv-w-sm" ariaLabel="Account currency" value={a.currency ?? 'CZK'} onChange={(v) => setAcc(a.id, { currency: v })} options={CURRENCIES} />
+                <button type="button" className={`iv-acc-default${a.isDefault ? ' is-on' : ''}`} aria-pressed={!!a.isDefault} onClick={() => setAcc(a.id, { isDefault: true })}>{a.isDefault ? 'Default' : 'Make default'}</button>
+                <button type="button" className="iv-x" aria-label={`Remove ${a.label}`} onClick={() => dropAcc(a.id)}><Icon.Close size={15} /></button>
+              </div>
+              <label className="iv-flabel">Account number<input className="iv-input" placeholder="123456789/0800" value={a.account ?? ''} onChange={(e) => setAcc(a.id, { account: e.target.value })} /></label>
+              <div className="iv-two">
+                <label className="iv-flabel">IBAN<input className="iv-input" placeholder={auto ? ibanSpaced(auto) : 'For foreign accounts'} value={a.iban ?? ''} onChange={(e) => setAcc(a.id, { iban: e.target.value })} /></label>
+                <label className="iv-flabel">SWIFT<input className="iv-input" value={a.swift ?? ''} onChange={(e) => setAcc(a.id, { swift: e.target.value })} /></label>
+              </div>
+              {auto && !a.iban && <p className="iv-hint">IBAN from the account number: <b>{ibanSpaced(auto)}</b></p>}
+            </div>
+          )
+        })}
+        <button type="button" className="iv-outline iv-additem" onClick={addAcc}><Icon.Plus size={15} />Add bank account</button>
+        <p className="iv-hint">An invoice takes the account in its currency by itself, else the default. You can change it on each invoice.</p>
       </section>
       <section className="iv-card iv-spanel">
         <h2 className="iv-h2">Invoice defaults</h2>
@@ -991,7 +1018,7 @@ function SettingsForm() {
       </section>
       <div className="iv-settings-foot">
         {saved && <span className="iv-saved" role="status">Saved. New invoices use these details.</span>}
-        <button className="iv-yellow iv-create" type="button" onClick={() => { saveInvoiceProfile(p); setSaved(true) }}>Save details</button>
+        <button className="iv-yellow iv-create" type="button" onClick={() => { saveInvoiceProfile({ ...p, account: undefined, iban: undefined, swift: undefined }); setSaved(true) }}>Save details</button>
       </div>
     </div>
   )
@@ -1157,9 +1184,9 @@ export function InvoicePaper({ inv }: { inv: Invoice }) {
   )
 }
 
-function supplierOf(p: Omit<InvoiceProfile, 'id' | 'updatedAt'>): Invoice['supplier'] {
+function supplierOf(p: Omit<InvoiceProfile, 'id' | 'updatedAt'>, a?: BankAccount): Invoice['supplier'] {
   return {
-    ...partyOf(p), account: p.account, iban: p.iban || czIban(p.account ?? '') || undefined, swift: p.swift,
+    ...partyOf(p), account: a?.account, iban: a?.iban || czIban(a?.account ?? '') || undefined, swift: a?.swift,
     vatPayer: p.vatPayer, regNote: p.regNote,
   }
 }

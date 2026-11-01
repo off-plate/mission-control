@@ -1,11 +1,23 @@
 /* The invoice arithmetic, kept pure so it can be checked without the page:
    numbering, totals, status, the Czech account to IBAN conversion, and the
    QR Platba (SPAYD) string. */
-import type { Invoice, InvoiceCurrency, InvoiceLine, InvoiceProfile } from './types'
+import type { BankAccount, Invoice, InvoiceCurrency, InvoiceLine, InvoiceProfile } from './types'
 
 export const DEFAULT_PROFILE: Omit<InvoiceProfile, 'id' | 'updatedAt'> = {
   name: '', country: 'Česká republika', vatPayer: false, dueDays: 14, numberFormat: 'YYYY-NNNN',
   regNote: 'Fyzická osoba zapsaná v živnostenském rejstříku.',
+}
+
+/** His accounts, with the single account of the first version carried over as the first one. */
+export function accountsOf(p: Pick<InvoiceProfile, 'accounts' | 'account' | 'iban' | 'swift'> | undefined): BankAccount[] {
+  if (p?.accounts?.length) return p.accounts
+  if (p?.account || p?.iban) return [{ id: 'acc-main', label: 'Main account', account: p.account, iban: p.iban, swift: p.swift, isDefault: true }]
+  return []
+}
+/** The account an invoice in this currency goes to by itself: one in that currency, else the default. */
+export function pickAccount(accounts: BankAccount[], currency: InvoiceCurrency): BankAccount | undefined {
+  return accounts.find((a) => a.currency === currency && a.isDefault) ?? accounts.find((a) => a.currency === currency)
+    ?? accounts.find((a) => a.isDefault) ?? accounts[0]
 }
 
 export const isoDay = (d = new Date()): string =>

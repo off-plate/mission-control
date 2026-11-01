@@ -33,6 +33,7 @@ import { usePromptsSlice, type PromptsSlice } from './store/prompts'
 import { usePeopleSlice, type PeopleSlice } from './store/people'
 import { useProspectsSlice, type ProspectsSlice } from './store/prospects'
 import { useInvoicesSlice, type InvoicesSlice } from './store/invoices'
+import { useInvoiceCloud } from './invoicecloud'
 import type { OutreachEvent, SheetRow } from './prospectcalc'
 import { useGymSlice, type GymSlice } from './store/gym'
 import { useConnectionsSlice } from './store/connections'
@@ -1097,6 +1098,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const { gymGoals, setGymGoals } = gymSlice
   const invoicesSlice = useInvoicesSlice(persisted, { armUndo, bury, digUp })
   const { invoices, setInvoices, invoiceClients, setInvoiceClients, invoiceProfile, setInvoiceProfile } = invoicesSlice
+  /* Every invoice row is mirrored into its own Supabase table (invoicecloud.ts). */
+  type Upd<T> = (f: (prev: T[]) => T[]) => void
+  useInvoiceCloud({
+    invoices, setInvoices: setInvoices as unknown as Upd<Invoice>, invoiceClients, setInvoiceClients: setInvoiceClients as unknown as Upd<InvoiceClient>,
+    invoiceProfile, setInvoiceProfile: setInvoiceProfile as unknown as Upd<InvoiceProfile>,
+    isBuried: (k) => graveyardRef.current.some((t) => t.k === k && !t.undone),
+  })
   const growthSlice = useGrowthSlice(persisted, { space, armUndo, bury, digUp, setPageState })
   const {
     habits, setHabits, goals, setGoals, routines, setRoutines,

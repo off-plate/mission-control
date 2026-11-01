@@ -226,7 +226,7 @@ export function toMC(inp: ShellInput) {
   const invoices = [...s.invoices].sort((a, b) => a.due.localeCompare(b.due)).map((i) => ({
     id: i.id, number: i.number, client: i.client.name || 'No client', amount: invoiceTotal(i), currency: i.currency,
     status: shownStatus(i, today), dueIn: daysBetween(today, i.due), due: shortDay(i.due), issued: shortDay(i.issued),
-    paidOn: i.paidOn ? shortDay(i.paidOn) : '', paidIso: i.paidOn ?? '', sentOn: i.sentOn ?? '',
+    paidOn: i.paidOn ? shortDay(i.paidOn) : '', paidIso: i.paidOn ?? '', sentOn: i.sentOn ?? '', issuedIso: i.issued,
   }))
 
   /* ---- money: Compass, only when it actually loaded ---- */

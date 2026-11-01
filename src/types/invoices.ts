@@ -33,13 +33,28 @@ export interface InvoiceLine {
   vat: number
 }
 
-/** His own details, the supplier on every invoice. One row, id 'me'. */
-export interface InvoiceProfile extends InvoiceParty {
-  id: 'me'
+/** One of his bank accounts. Each invoice picks one; the QR code pays into it. */
+export interface BankAccount {
+  id: string
+  /** His own name for it, "Fio CZK", "Wise EUR". */
+  label: string
   /** Czech account, "prefix-number/bank" or "number/bank". */
   account?: string
   iban?: string
   swift?: string
+  /** Picked by itself for invoices in this currency. */
+  currency?: InvoiceCurrency
+  isDefault?: boolean
+}
+
+/** His own details, the supplier on every invoice. One row, id 'me'. */
+export interface InvoiceProfile extends InvoiceParty {
+  id: 'me'
+  /** Superseded by `accounts`; read once to seed the first account. */
+  account?: string
+  iban?: string
+  swift?: string
+  accounts?: BankAccount[]
   vatPayer: boolean
   /** The register line, "Fyzická osoba zapsaná v živnostenském rejstříku." */
   regNote?: string
@@ -64,7 +79,9 @@ export interface Invoice {
   number: string
   clientId?: string
   client: InvoiceParty
-  supplier: Omit<InvoiceProfile, 'id' | 'updatedAt' | 'numberFormat' | 'dueDays' | 'footer'>
+  supplier: Omit<InvoiceProfile, 'id' | 'updatedAt' | 'numberFormat' | 'dueDays' | 'footer' | 'accounts'>
+  /** Which of his accounts it is paid into; the supplier copy holds that account's numbers. */
+  accountId?: string
   /** YYYY-MM-DD */
   issued: string
   /** Taxable supply date (DUZP). Printed only for a VAT payer. */

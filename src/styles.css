@@ -11994,16 +11994,22 @@ html { background: var(--bg); }
 .mm-danger { color: var(--alert); }
 .mm-danger.is-sure { background: var(--alert); color: #fff; }
 
-/* ---------------- INVOICES (2026-11-01, third pass) ----------------
+/* ---------------- INVOICES (2026-11-01, fourth pass) ----------------
    Fakturoid's own palette and approach, studied in his account, scoped to this
    page only (his call: "not using correct colors"): green for the brand, links
    and every action icon, red only for overdue, yellow only for creating, white
    cards on the app's paper, soft grey pills for sections and switches. The app
    header and every other page keep Mission Control's colours. */
 .iv-page {
-  --fk-green: #108A00; --fk-green-d: #0B6B00; --fk-green-wash: #EAF4E6; --fk-red: #D92F26; --fk-red-wash: #FCEBEA;
-  --fk-yellow: #FFD940; --fk-yellow-d: #F2C200; --fk-ink: #212121; --fk-muted: #6B6B6B; --fk-soft: #8C8C8C;
-  --fk-line: #E8E8E8; --fk-line-2: #CFCFCF; --fk-sunk: #F6F6F6; --fk-pill: #EEEEEE; --fk-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  /* Fakturoid's structure, Mission Control's colours (his call, 2026-11-01):
+     ink for links and actions, the space accent for the one create button,
+     green only for money that came in, coral only for late. */
+  --fk-green: var(--ink); --fk-green-d: var(--ink); --fk-green-wash: var(--surface-2);
+  --fk-red: var(--alert); --fk-red-wash: var(--alert-wash);
+  --fk-yellow: var(--accent-fill); --fk-yellow-d: var(--a-accent-2, var(--accent-fill)); --fk-on-yellow: var(--accent-ink);
+  --fk-money: var(--progress); --fk-money-soft: color-mix(in srgb, var(--progress) 30%, #fff); --fk-info: var(--info);
+  --fk-ink: var(--ink); --fk-muted: var(--muted); --fk-soft: var(--faint);
+  --fk-line: var(--hairline); --fk-line-2: var(--hairline-strong); --fk-sunk: var(--surface-2); --fk-pill: var(--surface-2); --fk-ease: cubic-bezier(0.23, 1, 0.32, 1);
   color: var(--fk-ink); padding: var(--s4) 0 var(--s8);
 }
 .iv-subnav { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
@@ -12291,6 +12297,90 @@ textarea.iv-input { height: auto; padding: 10px 12px; resize: vertical; }
   .iv-cgroup li { grid-template-columns: 1fr auto; padding-left: 32px; } .iv-cids, .iv-cgroup li > .iv-quiet { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .iv-stack, .iv-vatbar i, .iv-chipbtn svg { transition: none; } }
+
+/* Fourth pass: MC colour roles, heavier type, the two-column form, accounts. */
+.iv-yellow { color: var(--fk-on-yellow); box-shadow: none; font-weight: 700; }
+.iv-tab { color: var(--fk-muted); font-weight: 600; }
+.iv-tab[aria-current="page"] { color: var(--fk-ink); font-weight: 700; }
+.iv-a, .iv-num { text-decoration-color: var(--fk-line-2); }
+.iv-a:hover, .iv-num:hover { text-decoration-color: var(--fk-ink); }
+.iv-outline svg, .iv-chipbtn { color: var(--fk-ink); }
+.iv-scard-ico { color: var(--fk-muted); }
+.iv-scard.is-paid .iv-scard-ico { color: var(--fk-money); }
+.iv-scard.is-overdue .iv-scard-sum { color: var(--fk-red); }
+.iv-st { color: var(--fk-info); font-weight: 600; }
+.iv-st.is-paid { color: var(--fk-money); font-weight: 700; }
+.iv-st.is-overdue { font-weight: 700; }
+.iv-pill { background: var(--fk-info); }
+.iv-pill.is-paid { background: var(--fk-money); }
+.iv-bar-paid { background: var(--fk-money); }
+.iv-bar-unpaid { background: var(--fk-money-soft); }
+.iv-tip i.is-inv, .iv-tip i.is-paid { background: var(--fk-money); }
+.iv-tip i.is-unpaid { background: var(--fk-money-soft); }
+.iv-total b, .iv-grand { border-top-color: var(--fk-money); }
+.iv-vat td { border-bottom-color: var(--fk-money); }
+.iv-vatbar i { background: var(--fk-money); }
+.iv-iact { color: var(--fk-ink); font-weight: 600; }
+@media (hover: hover) and (pointer: fine) { .iv-iact:hover { background: var(--fk-sunk); } }
+.iv-saved { color: var(--fk-money); font-weight: 600; }
+.iv-stat tbody th { color: var(--fk-ink); font-weight: 600; }
+.iv-search.is-big { border-color: var(--fk-line-2); border-width: 1px; }
+.iv-search.is-big:focus-within, .iv-search:focus-within, .iv-input:focus { border-color: var(--fk-ink); box-shadow: 0 0 0 3px var(--fk-sunk); }
+
+/* Weight: the numbers and names carry the page. */
+.iv-h2 { font-weight: 800; }
+.iv-dtitle, .iv-form-head h2 { font-weight: 800; }
+.iv-scard-name { font-weight: 700; }
+.iv-scard-sum { font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; }
+.iv-scard small, .iv-caps { font-weight: 600; }
+.iv-num { font-weight: 700; }
+.iv-row-amt { font-weight: 700; }
+.iv-row-client { color: var(--fk-ink); font-weight: 500; }
+.iv-sumlines { font-weight: 600; }
+.iv-sumlines dd { font-weight: 800; }
+.iv-total b, .iv-grand b { font-weight: 800; }
+.iv-items-view td.is-sum { font-weight: 700; }
+.iv-dclient > :first-child { font-weight: 700; }
+.iv-kv dd, .iv-ids dd { font-weight: 600; }
+.iv-flab { font-weight: 600; }
+.iv-flabel { font-weight: 600; color: var(--fk-ink); }
+.iv-input, .iv-page .iv-select .dd-trigger { font-weight: 600; }
+.iv-static { font-weight: 800; }
+.iv-hint b { color: var(--fk-ink); font-weight: 700; }
+.iv-item.is-head, .iv-items-view th, .iv-stat thead th { font-weight: 700; }
+.iv-item-sum { font-weight: 700; }
+.iv-stat td { font-weight: 600; }
+.iv-stat tfoot th, .iv-stat tfoot td { font-weight: 800; }
+.iv-cgroup h3 { font-weight: 800; }
+.iv-cgroup li > .iv-a { font-weight: 700; }
+.iv-cstat b, .iv-pay-amt { font-weight: 800; }
+.iv-events li > span:last-child { font-weight: 500; }
+.iv-tip > b { font-weight: 800; }
+.iv-pill { font-weight: 700; }
+.iv-yearstep b { font-weight: 800; }
+
+/* The form: two columns that use the width, nothing folded away. */
+.iv-fgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 48px; row-gap: 16px; max-width: none; margin: 0; padding: 32px; }
+.iv-fcol { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.iv-frow { grid-template-columns: 150px minmax(0, 1fr); }
+.iv-fnotes { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding-top: 20px; border-top: 1px solid var(--fk-line); }
+.iv-fnotes textarea { min-height: 64px; }
+.iv-inline.is-tight { gap: 4px 16px; margin-top: 2px; }
+.iv-items { padding-top: 24px; border-top: 1px solid var(--fk-line); margin-top: 0; }
+
+/* Bank accounts */
+.iv-acc { display: flex; flex-direction: column; gap: 12px; padding: 16px; border: 1px solid var(--fk-line); border-radius: 12px; background: var(--fk-sunk); }
+.iv-acc-head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.iv-acc-name { flex: 1 1 100%; font-weight: 700; }
+.iv-acc-head .iv-x { margin-left: auto; }
+.iv-acc-default { all: unset; cursor: pointer; height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--fk-line-2); background: #fff; font-size: 0.85rem; font-weight: 600; color: var(--fk-muted); white-space: nowrap; }
+.iv-acc-default.is-on { border-color: var(--fk-money); color: var(--fk-money); cursor: default; }
+.iv-acc .iv-x { background: #fff; }
+
+@media (max-width: 1100px) {
+  .iv-fgrid { grid-template-columns: minmax(0, 1fr); }
+  .iv-fnotes { grid-template-columns: minmax(0, 1fr); }
+}
 
 /* The A4 sheet: a document, not app chrome. */
 .iv-paper {

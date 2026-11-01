@@ -2687,7 +2687,7 @@ V.invoices = {
     const m = S.ui.imode || (od.length ? 'overdue' : 'waiting');
     const list = m === 'overdue' ? od : m === 'waiting' ? [...od, ...wait] : paid;
     if (!all.length) return `<div class="cd"><div class="wt">No invoices yet. You create them on the desktop, and they show up here.</div></div>`;
-    return `<div class="g3" style="margin-bottom:10px">
+    return ivInsights() + `<div class="sl">Status</div><div class="g3" style="margin-bottom:10px">
       <button class="cd ${od.length ? 'r' : ''}" style="padding:14px;text-align:left" data-a="imode" data-x="overdue">${dm(od.length, 4)}<div class="lb" style="margin-top:8px">Overdue</div></button>
       <button class="cd" style="padding:14px;text-align:left" data-a="imode" data-x="waiting">${dm(od.length + wait.length, 4)}<div class="lb" style="margin-top:8px">Unpaid</div></button>
       <button class="cd k" style="padding:14px;text-align:left" data-a="imode" data-x="paid">${dm(paid.length, 4)}<div class="lb" style="margin-top:8px">Paid ${yr}</div></button></div>
@@ -2697,6 +2697,35 @@ V.invoices = {
   }
 };
 A.imode = (el, x) => { S.ui.imode = x; renderBody(top_(), true); };
+/* Insights with a period picker (his ask, 2026-11-01): what came in, what was billed, month by month. CZK only. */
+const IV_PERIODS = [['30', '30D', 1], ['90', '3M', 3], ['180', '6M', 6], ['365', '12M', 12]];
+function ivInsights() {
+  const per = S.ui.iper || '180', days = +per, from = isoOff(-days), all = S.invoices.filter(i => i.currency === 'CZK' && i.status !== 'cancelled');
+  const earned = all.filter(i => i.status === 'paid' && i.paidIso >= from), billed = all.filter(i => i.issuedIso >= from);
+  const sum = l => l.reduce((a, i) => a + i.amount, 0);
+  const prevFrom = isoOff(-2 * days), prev = sum(all.filter(i => i.status === 'paid' && i.paidIso >= prevFrom && i.paidIso < from));
+  const ch = prev ? Math.round((sum(earned) - prev) / prev * 100) : null;
+  /* Buckets: weeks for 30 days, months otherwise, oldest first. */
+  const n = days === 30 ? 5 : IV_PERIODS.find(p => p[0] === per)[2];
+  const buckets = [];
+  for (let k = n - 1; k >= 0; k--) {
+    let a, b, label;
+    if (days === 30) { a = isoOff(-(k + 1) * 7 + 1); b = isoOff(-k * 7); label = 'W' + (n - k); }
+    else { const d = new Date(isoOff(0) + 'T12:00:00'); d.setDate(1); d.setMonth(d.getMonth() - k); const e = new Date(d); e.setMonth(e.getMonth() + 1); e.setDate(0); a = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-01'; b = e.getFullYear() + '-' + pad(e.getMonth() + 1) + '-' + pad(e.getDate()); label = MONTHS[d.getMonth()]; }
+    buckets.push({ label, v: sum(all.filter(i => i.status === 'paid' && i.paidIso >= a && i.paidIso <= b)) });
+  }
+  const top = Math.max(1, ...buckets.map(x => x.v)), rows = 8, W = 300, cw = W / buckets.length;
+  let svg = '';
+  buckets.forEach((bk, k) => { const lit = Math.round(bk.v / top * rows); for (let r = 0; r < rows; r++) svg += `<circle cx="${cw * k + cw / 2}" cy="${8 + (rows - 1 - r) * 11}" r="3.6" class="dt${r < lit ? ' on' : ''}"/>`; svg += `<text x="${cw * k + cw / 2}" y="${8 + rows * 11 + 8}" text-anchor="middle" font-size="8" font-family="Space Mono" fill="var(--t2, #888)">${bk.label.toUpperCase().slice(0, 3)}</text>`; });
+  const byClient = {}; earned.forEach(i => { byClient[i.client] = (byClient[i.client] || 0) + i.amount; });
+  const best = Object.entries(byClient).sort((a, b) => b[1] - a[1])[0];
+  return `<div class="seg" style="margin-bottom:10px">${IV_PERIODS.map(([v, l]) => `<button class="${per === v ? 'on' : ''}" data-a="iper" data-x="${v}">${l}</button>`).join('')}</div>
+    <div class="cd k">${lbRow('Earned', ch == null ? null : (ch >= 0 ? '+' : '') + ch + '% vs before')}<div style="margin:12px 0 6px">${dm(kc(sum(earned)), 3.4)}</div>${lb('Kč paid to you, last ' + IV_PERIODS.find(p => p[0] === per)[1])}</div>
+    <div class="cd" style="padding:12px 8px 6px"><svg class="dts" viewBox="0 0 ${W} ${rows * 11 + 22}" width="100%" aria-label="Paid per period">${svg}</svg></div>
+    <div class="g2" style="margin-bottom:10px"><div class="cd">${dm(kc(sum(billed)), 2.4)}<div class="lb" style="margin-top:8px">Kč invoiced</div></div><div class="cd">${dm(billed.length, 2.4)}<div class="lb" style="margin-top:8px">Invoices issued</div></div></div>
+    ${best ? `<div class="cd tight rows"><div class="row"><span class="grow rt one">${esc(best[0])}</span><span class="lb fg">TOP ${kc(best[1])} KČ</span></div></div>` : ''}`;
+}
+A.iper = (el, x) => { S.ui.iper = x; renderBody(top_(), true); };
 A.invOpen = (el, id) => {
   sheet('invoice', {
     live: true, title: () => (S.invoices.find(i => i.id === id) || {}).number || 'Invoice', body: () => {

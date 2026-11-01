@@ -11,7 +11,8 @@
    Stored in the app state like Prospects: three synced lists, offline first,
    merged by row, deletions buried and undoable. An invoice carries a copy of
    both parties, so editing a contact later never rewrites one already sent. */
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useStore } from './store'
 import { Sheet } from './modals'
 import { Dropdown, Segmented, Select } from './ui'
@@ -528,23 +529,29 @@ function IconAction({ icon, label, onClick }: { icon: ReactNode; label: string; 
   return <button type="button" className="iv-iact" onClick={onClick}>{icon}<span>{label}</span></button>
 }
 
-/** The A4 sheet the customer gets, behind the PDF action as in Fakturoid. Print saves it as a PDF. */
-function PdfSheet({ inv, onClose }: { inv: Invoice; onClose: () => void }) {
+/** The A4 sheet the customer gets, behind the PDF action as in Fakturoid. Printing uses a copy of the
+ *  sheet in its own root straight under <body> (everything else is hidden by the print stylesheet), so
+ *  the page is A4 with real margins and a white background, whatever the app looks like around it. */
+export function PdfSheet({ inv, onClose }: { inv: Invoice; onClose: () => void }) {
+  const name = `${inv.lang === 'en' ? 'Invoice' : 'Faktura'} ${inv.number}`
   const print = () => {
+    /* The browser names the saved PDF after the page title. */
     const was = document.title
-    document.title = `${inv.lang === 'en' ? 'Invoice' : 'Faktura'} ${inv.number}`
-    document.body.classList.add('iv-printing')
-    const done = () => { document.title = was; document.body.classList.remove('iv-printing'); window.removeEventListener('afterprint', done) }
+    document.title = name
+    const done = () => { document.title = was; window.removeEventListener('afterprint', done) }
     window.addEventListener('afterprint', done)
     window.print()
   }
   return (
-    <Sheet title={`${inv.lang === 'en' ? 'Invoice' : 'Faktura'} ${inv.number}`} onClose={onClose}>
-      <div className="iv-pdf">
-        <div className="iv-pdf-bar"><button className="iv-yellow" type="button" onClick={print}>Print or save as PDF</button></div>
-        <div className="iv-pdf-paper"><InvoicePaper inv={inv} /></div>
-      </div>
-    </Sheet>
+    <>
+      <Sheet title={name} onClose={onClose} wide>
+        <div className="iv-pdf">
+          <div className="iv-pdf-bar"><button className="iv-yellow" type="button" onClick={print}>Print or save as PDF</button></div>
+          <FitPaper inv={inv} />
+        </div>
+      </Sheet>
+      {createPortal(<div className="iv-print-root"><InvoicePaper inv={inv} /></div>, document.body)}
+    </>
   )
 }
 
@@ -743,8 +750,8 @@ function InvoiceForm({ id, copyOf, clientId, onDone }: { id?: string; copyOf?: s
           onSaved={(cid, c) => { setNewContact(false); setD((p) => ({ ...p, clientId: cid, client: partyOf(c), due: c.dueDays != null ? addDays(p.issued, c.dueDays) : p.due })) }} />
       )}
       {preview && (
-        <Sheet title="Preview" onClose={() => setPreview(false)}>
-          <div className="iv-preview"><InvoicePaper inv={{ ...draftFinal(), id: 'preview', createdAt: 0, updatedAt: 0 } as Invoice} /></div>
+        <Sheet title="Preview" onClose={() => setPreview(false)} wide>
+          <FitPaper inv={{ ...draftFinal(), id: 'preview', createdAt: 0, updatedAt: 0 } as Invoice} />
         </Sheet>
       )}
     </div>
@@ -1062,45 +1069,54 @@ async function aresLookup(ico: string): Promise<AresHit> {
 
 /* ---------- the printed sheet ---------- */
 
+/* Laid out from his own Fakturoid PDF (PM375, 2026-11-01): the title and a heavy rule
+   top right, supplier and customer side by side, label left and value right, a single
+   PRICE column unless an item has a quantity, the QR payment square bottom left under
+   the total's rule, the register line at the foot. No IBAN or SWIFT unless the payer
+   needs them (his call, 2026-11-01). */
 const L = {
   cs: {
-    title: 'Faktura', supplier: 'Dodavatel', customer: 'Odběratel', ico: 'IČO', dic: 'DIČ', issued: 'Datum vystavení',
-    taxable: 'Datum zdan. plnění', due: 'Datum splatnosti', method: 'Způsob platby', account: 'Bankovní účet', iban: 'IBAN', swift: 'SWIFT',
-    vs: 'Variabilní symbol', order: 'Číslo objednávky', item: 'Položka', qty: 'Množství', price: 'Cena za jedn.', vatRate: 'DPH',
-    base: 'Bez DPH', vat: 'DPH', total: 'Celkem', toPay: 'Celkem k úhradě', noVat: 'Nejsem plátce DPH.', qr: 'QR Platba',
-    summaryBase: 'Základ', cancelled: 'STORNO', paid: 'Uhrazeno',
+    title: 'Faktura', supplier: 'Dodavatel', customer: 'Odběratel', ico: 'IČO', dic: 'DIČ', notVat: 'Neplátce DPH',
+    account: 'Bankovní účet', iban: 'IBAN', swift: 'SWIFT', vs: 'Variabilní symbol', method: 'Způsob platby', order: 'Číslo objednávky',
+    issued: 'Datum vystavení', taxable: 'Datum zdan. plnění', due: 'Datum splatnosti',
+    qty: 'Počet', unitPrice: 'Cena za MJ', vatRate: 'DPH', price: 'Cena', base: 'Základ', vat: 'DPH', qr: 'QR Platba', cancelled: 'STORNO',
     methods: { bank: 'Převodem', cash: 'Hotově', card: 'Kartou', cod: 'Dobírkou' } as Record<PaymentMethod, string>,
   },
   en: {
-    title: 'Invoice', supplier: 'Supplier', customer: 'Customer', ico: 'Reg. No.', dic: 'VAT No.', issued: 'Issue date',
-    taxable: 'Taxable supply date', due: 'Due date', method: 'Payment method', account: 'Bank account', iban: 'IBAN', swift: 'SWIFT',
-    vs: 'Variable symbol', order: 'Order number', item: 'Item', qty: 'Quantity', price: 'Unit price', vatRate: 'VAT',
-    base: 'Net', vat: 'VAT', total: 'Total', toPay: 'Total due', noVat: 'Not registered for VAT.', qr: 'QR payment',
-    summaryBase: 'Base', cancelled: 'CANCELLED', paid: 'Paid',
+    title: 'Invoice', supplier: 'Supplier', customer: 'Customer', ico: 'Reg. No.', dic: 'VAT No.', notVat: 'Not a VAT payer',
+    account: 'Bank account', iban: 'IBAN', swift: 'SWIFT', vs: 'Variable symbol', method: 'Payment method', order: 'Order number',
+    issued: 'Issue date', taxable: 'Taxable supply date', due: 'Due date',
+    qty: 'Qty', unitPrice: 'Unit price', vatRate: 'VAT', price: 'Price', base: 'Base', vat: 'VAT', qr: 'QR payment', cancelled: 'CANCELLED',
     methods: { bank: 'Bank transfer', cash: 'Cash', card: 'Card', cod: 'Cash on delivery' } as Record<PaymentMethod, string>,
   },
 }
 
-function PartyBlock({ head, p, t }: { head: string; p: InvoiceParty; t: typeof L.cs }) {
+/** 58601 -> "586 01", the Czech way. */
+const zipFmt = (z?: string) => { const d = (z ?? '').replace(/\s/g, ''); return /^\d{5}$/.test(d) ? `${d.slice(0, 3)} ${d.slice(3)}` : (z ?? '') }
+
+function PartyBlock({ head, p, t, extra }: { head: string; p: InvoiceParty; t: typeof L.cs; extra?: ReactNode }) {
   return (
     <div className="ivp-party">
+      <i className="ivp-dash" />
       <span className="ivp-k">{head}</span>
       <b className="ivp-name">{p.name || '...'}</b>
-      {p.street && <span>{p.street}</span>}
-      {(p.zip || p.city) && <span>{[p.zip, p.city].filter(Boolean).join(' ')}</span>}
-      {p.country && p.country !== 'Česká republika' && <span>{p.country}</span>}
+      <span className="ivp-addr">
+        {p.street && <span>{p.street}</span>}
+        {(p.zip || p.city) && <span>{[zipFmt(p.zip), p.city].filter(Boolean).join(' ')}</span>}
+        {p.country && p.country !== 'Česká republika' && <span>{p.country}</span>}
+      </span>
       {(p.ico || p.dic) && (
-        <span className="ivp-ids">
-          {p.ico && <span>{t.ico}: {p.ico}</span>}
-          {p.dic && <span>{t.dic}: {p.dic}</span>}
-        </span>
+        <dl className="ivp-rows">
+          {p.ico && <><dt>{t.ico}</dt><dd>{p.ico}</dd></>}
+          {p.dic && <><dt>{t.dic}</dt><dd>{p.dic}</dd></>}
+        </dl>
       )}
-      {p.email && <span className="ivp-soft">{p.email}</span>}
+      {extra}
     </div>
   )
 }
 
-/** The A4 sheet. Also what prints: the print stylesheet shows this alone. */
+/** The A4 sheet. Also what prints: the print stylesheet shows this alone (PdfSheet's print root). */
 export function InvoicePaper({ inv }: { inv: Invoice }) {
   const t = L[inv.lang] ?? L.cs
   const sup = inv.supplier
@@ -1110,55 +1126,54 @@ export function InvoicePaper({ inv }: { inv: Invoice }) {
   const qr = useMemo(() => { if (!code) return null; try { return qrSvgPath(qrMatrix(code)) } catch { return null } }, [code])
   const iban = sup.iban || czIban(sup.account ?? '')
   const cur = inv.currency
+  const bank = inv.method === 'bank'
+  /* Only when the payer needs them: a foreign currency, or an account with no Czech number. */
+  const showIban = bank && (cur !== 'CZK' || !sup.account)
+  /* One PRICE column, like Fakturoid, until an item has a quantity or a unit. */
+  const plain = inv.lines.every((l) => Number(l.qty) === 1 && !l.unit)
   return (
     <article className="iv-paper" aria-label={`${t.title} ${inv.number}`}>
       {inv.status === 'cancelled' && <span className="ivp-stamp">{t.cancelled}</span>}
-      <header className="ivp-head">
-        <h2>{t.title} <span>{inv.number}</span></h2>
-      </header>
-      <div className="ivp-parties">
-        <PartyBlock head={t.supplier} p={sup} t={t} />
+      <div className="ivp-grid">
+        <span aria-hidden="true" />
+        <h2 className="ivp-title">{t.title} <span>{inv.number}</span></h2>
+        <PartyBlock head={t.supplier} p={sup} t={t} extra={!vatPayer && <span className="ivp-vatnote">{t.notVat}</span>} />
         <PartyBlock head={t.customer} p={inv.client} t={t} />
-      </div>
-      <div className="ivp-meta">
-        <dl>
-          {inv.method === 'bank' && sup.account && <><dt>{t.account}</dt><dd className="ivp-strong">{sup.account}</dd></>}
-          {inv.method === 'bank' && iban && <><dt>{t.iban}</dt><dd>{ibanSpaced(iban)}</dd></>}
-          {inv.method === 'bank' && sup.swift && <><dt>{t.swift}</dt><dd>{sup.swift}</dd></>}
-          {inv.vs && <><dt>{t.vs}</dt><dd className="ivp-strong">{inv.vs}</dd></>}
+        <dl className="ivp-rows ivp-pay">
+          {bank && sup.account && <><dt>{t.account}</dt><dd>{sup.account}</dd></>}
+          {showIban && iban && <><dt>{t.iban}</dt><dd>{ibanSpaced(iban)}</dd></>}
+          {showIban && sup.swift && <><dt>{t.swift}</dt><dd>{sup.swift}</dd></>}
+          {inv.vs && <><dt>{t.vs}</dt><dd>{inv.vs}</dd></>}
           <dt>{t.method}</dt><dd>{t.methods[inv.method]}</dd>
           {inv.orderNo && <><dt>{t.order}</dt><dd>{inv.orderNo}</dd></>}
         </dl>
-        <dl>
+        <dl className="ivp-rows ivp-pay">
           <dt>{t.issued}</dt><dd>{fmtDate(inv.issued)}</dd>
           {vatPayer && <><dt>{t.taxable}</dt><dd>{fmtDate(inv.taxable)}</dd></>}
-          <dt>{t.due}</dt><dd className="ivp-strong">{fmtDate(inv.due)}</dd>
+          <dt>{t.due}</dt><dd>{fmtDate(inv.due)}</dd>
         </dl>
       </div>
       {inv.noteBefore && <p className="ivp-note">{inv.noteBefore}</p>}
       <table className="ivp-lines">
         <thead>
           <tr>
-            <th>{t.item}</th>
-            <th className="is-n">{t.qty}</th>
-            <th className="is-n">{t.price}</th>
+            <th />
+            {!plain && <th className="is-n">{t.qty}</th>}
+            {!plain && <th className="is-n">{t.unitPrice}</th>}
             {vatPayer && <th className="is-n">{t.vatRate}</th>}
-            {vatPayer && <th className="is-n">{t.base}</th>}
-            <th className="is-n">{vatPayer ? `${t.total} s DPH` : t.total}</th>
+            <th className="is-n">{t.price}</th>
           </tr>
         </thead>
         <tbody>
           {inv.lines.map((l) => {
             const base = (Number(l.qty) || 0) * (Number(l.price) || 0)
-            const withVat = vatPayer ? base * (1 + (Number(l.vat) || 0) / 100) : base
             return (
               <tr key={l.id}>
-                <td>{l.name}</td>
-                <td className="is-n">{String(l.qty).replace('.', ',')} {l.unit}</td>
-                <td className="is-n">{money(Number(l.price) || 0, cur)}</td>
+                <td className="is-desc">{l.name}</td>
+                {!plain && <td className="is-n">{String(l.qty).replace('.', ',')}{l.unit ? ` ${l.unit}` : ''}</td>}
+                {!plain && <td className="is-n">{money(Number(l.price) || 0, cur)}</td>}
                 {vatPayer && <td className="is-n">{Number(l.vat) || 0} %</td>}
-                {vatPayer && <td className="is-n">{money(base, cur)}</td>}
-                <td className="is-n">{money(withVat, cur)}</td>
+                <td className="is-n">{money(base, cur)}</td>
               </tr>
             )
           })}
@@ -1166,31 +1181,56 @@ export function InvoicePaper({ inv }: { inv: Invoice }) {
       </table>
       <div className="ivp-foot">
         <div className="ivp-qr">
-          {qr && inv.method === 'bank' && (
+          {qr && bank && (
             <>
-              <svg viewBox={`0 0 ${qr.size} ${qr.size}`} width="132" height="132" shapeRendering="crispEdges" role="img" aria-label={t.qr}>
-                <rect width={qr.size} height={qr.size} fill="#fff" /><path d={qr.d} fill="#000" />
-              </svg>
-              <span className="ivp-k">{t.qr}</span>
+              <div className="ivp-qrbox">
+                <svg viewBox={`0 0 ${qr.size} ${qr.size}`} width="120" height="120" shapeRendering="crispEdges" role="img" aria-label={t.qr}>
+                  <rect width={qr.size} height={qr.size} fill="#fff" /><path d={qr.d} fill="#000" />
+                </svg>
+              </div>
+              <span className="ivp-qrcap"><i />{t.qr}<i /></span>
             </>
           )}
         </div>
         <div className="ivp-sum">
           {vatPayer && tot.byRate.map((r) => (
-            <div className="ivp-sumrow" key={r.rate}><span>{t.summaryBase} {r.rate} %</span><span>{money(r.base, cur)}</span><span>{t.vat} {money(r.vat, cur)}</span></div>
+            <div className="ivp-sumrow" key={r.rate}><span>{t.base} {r.rate} %</span><span>{money(r.base, cur)}</span><span>{t.vat} {money(r.vat, cur)}</span></div>
           ))}
-          <div className="ivp-total"><span>{t.toPay}</span><b>{money(tot.total, cur)}</b></div>
-          {inv.status === 'paid' && <span className="ivp-paid">{t.paid} {fmtDate(inv.paidOn)}</span>}
+          <b className="ivp-total">{money(tot.total, cur)}</b>
         </div>
       </div>
       {inv.noteAfter && <p className="ivp-note">{inv.noteAfter}</p>}
       <footer className="ivp-legal">
-        {!vatPayer && <span>{t.noVat}</span>}
         {sup.regNote && <span>{sup.regNote}</span>}
         {inv.footer && <span>{inv.footer}</span>}
         {(sup.phone || sup.email || sup.web) && <span className="ivp-contact">{[sup.phone, sup.email, sup.web].filter(Boolean).map((x) => <span key={x}>{x}</span>)}</span>}
       </footer>
     </article>
+  )
+}
+
+/** Shrinks the A4 sheet to the width it is given, and tracks its height, so a preview is never cropped. */
+function FitPaper({ inv }: { inv: Invoice }) {
+  const slot = useRef<HTMLDivElement>(null)
+  const paper = useRef<HTMLDivElement>(null)
+  const [fit, setFit] = useState({ s: 1, h: 1123 })
+  useLayoutEffect(() => {
+    const a = slot.current, b = paper.current
+    if (!a || !b) return
+    const measure = () => setFit({ s: Math.min(1, a.clientWidth / 794), h: b.offsetHeight })
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(a); ro.observe(b)
+    return () => ro.disconnect()
+  }, [])
+  return (
+    <div className="iv-fit">
+      <div className="iv-fit-slot" ref={slot}>
+        <div className="iv-fit-box" style={{ width: 794 * fit.s, height: fit.h * fit.s }}>
+          <div ref={paper} className="iv-fit-inner" style={{ width: 794, transform: `scale(${fit.s})` }}><InvoicePaper inv={inv} /></div>
+        </div>
+      </div>
+    </div>
   )
 }
 

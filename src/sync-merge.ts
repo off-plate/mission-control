@@ -126,6 +126,9 @@ const ENTITY_KEYS: Record<string, (r: Row) => string> = {
   personContacts: (r) => `personContacts:${r.id}`,
   prospects: (r) => `prospects:${r.id}`,
   gymGoals: (r) => `gymGoals:${r.id}`,
+  invoices: (r) => `invoices:${r.id}`,
+  invoiceClients: (r) => `invoiceClients:${r.id}`,
+  invoiceProfile: (r) => `invoiceProfile:${r.id}`,
   noteFolders: (r) => `noteFolders:${r.id}`,
   coachSessions: (r) => `coachSessions:${r.id}`,
   assistantLog: (r) => `assistantLog:${r.id}`,
@@ -239,7 +242,7 @@ function dayOfWeekKeyFor(i: number, now = new Date()): string {
 /* A person or a link edited on two devices: the edit made last stands, not the
    one on whichever device happened to save last. */
 const byUpdatedAt = (a: Row, b: Row): Row => (Number(b.updatedAt ?? 0) > Number(a.updatedAt ?? 0) ? b : a)
-const RESOLVE: Record<string, (a: Row, b: Row, buried?: Set<string>) => Row> = { notes: resolveNote, habits: resolveHabit, people: byUpdatedAt, personBonds: byUpdatedAt, prospects: byUpdatedAt, gymGoals: byUpdatedAt }
+const RESOLVE: Record<string, (a: Row, b: Row, buried?: Set<string>) => Row> = { notes: resolveNote, habits: resolveHabit, people: byUpdatedAt, personBonds: byUpdatedAt, prospects: byUpdatedAt, gymGoals: byUpdatedAt, invoices: byUpdatedAt, invoiceClients: byUpdatedAt, invoiceProfile: byUpdatedAt }
 
 /** The key a row is buried under, so the store can bury or dig up the same
  *  thing this file will look for. */

@@ -11993,3 +11993,178 @@ html { background: var(--bg); }
 .mm-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .mm-danger { color: var(--alert); }
 .mm-danger.is-sure { background: var(--alert); color: #fff; }
+
+/* ---------------- INVOICES (2026-11-01) ----------------
+   Fakturoid rebuilt. Reuses the People/Business bar, table and fields; only
+   what they do not have lives here. The A4 sheet is a document, not app
+   chrome: white, black ink, hairlines. */
+.iv-page { max-width: 1280px; margin-left: auto; margin-right: auto; width: 100%; }
+/* iv-toolbar, never iv-bar: that name is the chart's bars. */
+.iv-toolbar { width: max-content; }
+.iv-toolbar .pp-add { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; }
+@media (max-width: 640px) { .iv-toolbar { width: auto; } }
+.iv-notice { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 12px 16px; border: 1px solid var(--hairline-strong); border-radius: 10px; background: var(--surface); }
+.iv-notice p { margin: 0; color: var(--muted); font-size: 0.875rem; }
+.iv-quiet { color: var(--muted); font-size: 0.8125rem; margin: 0; }
+.iv-late { color: var(--alert); font-weight: 700; font-size: 0.8125rem; }
+.iv-warn { margin: 0; padding: 10px 14px; border-radius: 8px; background: var(--warn-wash); color: var(--warn); font-size: 0.8125rem; font-weight: 600; }
+.iv-err { margin: 0; color: var(--alert); font-size: 0.8125rem; font-weight: 600; }
+.iv-problems { margin: 0; padding: 10px 14px 10px 30px; border-radius: 8px; background: var(--alert-wash); color: var(--alert); font-size: 0.8125rem; font-weight: 600; }
+.iv-actions-gap { flex: 1; }
+
+/* Overview */
+.iv-overview { display: flex; flex-direction: column; gap: var(--s4); }
+.iv-yearrow { display: flex; }
+.iv-year { width: 120px; }
+.iv-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s3); }
+.iv-tile { display: flex; flex-direction: column; gap: 4px; padding: 16px; border: 1px solid var(--hairline-strong); border-radius: 10px; background: var(--surface); min-width: 0; }
+.iv-tile-k { font-size: 0.75rem; font-weight: 700; color: var(--muted); }
+.iv-tile-v { font-family: var(--font-display); font-size: 1.375rem; font-weight: 800; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; color: var(--ink); overflow-wrap: anywhere; }
+.iv-tile-n { font-size: 0.75rem; color: var(--muted); }
+.iv-tile.is-pos .iv-tile-v { color: var(--progress); }
+.iv-tile.is-urgent { border-color: var(--alert); }
+.iv-tile.is-urgent .iv-tile-v, .iv-tile.is-urgent .iv-tile-n { color: var(--alert); }
+.iv-card { display: flex; flex-direction: column; gap: 12px; padding: 16px; border: 1px solid var(--hairline-strong); border-radius: 10px; background: var(--surface); min-width: 0; }
+.iv-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.iv-card-head h2 { margin: 0; font-family: var(--font-display); font-size: 0.9375rem; font-weight: 800; color: var(--ink); }
+.iv-card-head .mono { color: var(--muted); font-size: 0.8125rem; }
+.iv-legend { display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--muted); }
+.iv-legend i { width: 10px; height: 10px; border-radius: 2px; margin-left: 8px; }
+.iv-legend i.is-issued, .iv-bar.is-issued { background: var(--hairline-strong); }
+.iv-legend i.is-paid, .iv-bar.is-paid { background: var(--progress); }
+.iv-bars { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 6px; height: 180px; align-items: end; }
+.iv-bar-col { display: flex; flex-direction: column; align-items: stretch; gap: 6px; height: 100%; min-width: 0; }
+.iv-bar-pair { flex: 1; display: flex; align-items: flex-end; justify-content: center; gap: 3px; border-bottom: 1px solid var(--hairline-strong); }
+.iv-bar { width: min(14px, 40%); min-height: 0; border-radius: 3px 3px 0 0; transition: height 400ms cubic-bezier(0.23, 1, 0.32, 1); }
+.iv-bar-k { text-align: center; font-size: 0.6875rem; color: var(--muted); }
+.iv-two { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: var(--s3); }
+.iv-rows { list-style: none; margin: 0; padding: 0; }
+.iv-rows li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--hairline); }
+.iv-rows li:first-child { border-top: 0; }
+.iv-row-main { all: unset; flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px; cursor: pointer; font-size: 0.875rem; }
+.iv-row-main.is-static { cursor: default; }
+.iv-row-main b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; color: var(--ink); }
+.iv-row-main .mono { color: var(--muted); font-size: 0.8125rem; }
+.iv-row-main:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+@media (hover: hover) and (pointer: fine) { button.iv-row-main:hover b { text-decoration: underline; text-underline-offset: 3px; } }
+.iv-amt { font-weight: 700; font-size: 0.875rem; white-space: nowrap; color: var(--ink); }
+
+/* List and contacts */
+.iv-filters { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.iv-filters .pp-dd { width: auto; min-width: 170px; }
+.iv-filter-sum { margin-left: auto; font-weight: 700; font-size: 0.875rem; color: var(--ink); }
+.iv-grid { width: 100%; }
+.iv-grid tbody tr > * { --st: transparent; }
+.iv-c-num { position: sticky; left: 0; z-index: 1; min-width: 150px; font-weight: 700 !important; box-shadow: inset -1px 0 0 var(--hairline-strong); }
+.iv-grid thead .iv-c-num { z-index: 3; }
+.iv-c-num button { all: unset; display: block; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.iv-c-num button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) { .iv-grid tbody tr:hover > * { background: var(--pp-sunk); } }
+.iv-grid .chip { white-space: nowrap; }
+
+/* One invoice */
+.iv-view, .iv-editor { display: flex; flex-direction: column; gap: var(--s4); }
+.iv-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.iv-actions .btn { display: inline-flex; align-items: center; gap: 6px; }
+.iv-paybox { display: inline-flex; gap: 6px; align-items: center; }
+.iv-paybox .pp-date { width: 150px; }
+.iv-edit-title { margin: 0 0 0 6px; font-family: var(--font-display); font-size: 1.125rem; font-weight: 800; }
+.iv-paperwrap { overflow-x: auto; padding-bottom: var(--s4); }
+
+.iv-paper {
+  position: relative; box-sizing: border-box; width: 794px; min-height: 1123px; margin: 0 auto; padding: 56px 60px;
+  background: #fff; color: #111; border: 1px solid var(--hairline-strong); border-radius: 4px;
+  font-family: var(--font-body); font-size: 12.5px; line-height: 1.5; display: flex; flex-direction: column; gap: 26px;
+}
+.ivp-head h2 { margin: 0; font-family: var(--font-display); font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
+.ivp-head h2 span { font-weight: 500; color: #555; }
+.ivp-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; padding-top: 22px; border-top: 2px solid #111; }
+.ivp-party { display: flex; flex-direction: column; gap: 1px; }
+.ivp-k { font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #6b6b6b; margin-bottom: 6px; }
+.ivp-name { font-size: 15px; font-weight: 800; margin-bottom: 2px; }
+.ivp-ids { display: flex; gap: 16px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.ivp-soft { color: #555; }
+.ivp-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; padding: 16px 0; border-top: 1px solid #ddd; border-bottom: 1px solid #ddd; }
+.ivp-meta dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; }
+.ivp-meta dt { color: #6b6b6b; }
+.ivp-meta dd { margin: 0; font-variant-numeric: tabular-nums; }
+.ivp-strong { font-weight: 800; }
+.ivp-note { margin: 0; white-space: pre-wrap; }
+.ivp-lines { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.ivp-lines th { text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #6b6b6b; padding: 0 8px 8px; border-bottom: 1px solid #111; }
+.ivp-lines td { padding: 9px 8px; border-bottom: 1px solid #e4e4e4; vertical-align: top; }
+.ivp-lines th:first-child, .ivp-lines td:first-child { padding-left: 0; }
+.ivp-lines th:last-child, .ivp-lines td:last-child { padding-right: 0; }
+.ivp-lines .is-n { text-align: right; white-space: nowrap; }
+.ivp-foot { display: flex; justify-content: space-between; align-items: flex-start; gap: 30px; }
+.ivp-qr { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 132px; }
+.ivp-qr .ivp-k { margin: 0; }
+.ivp-sum { display: flex; flex-direction: column; align-items: stretch; gap: 6px; min-width: 300px; font-variant-numeric: tabular-nums; }
+.ivp-sumrow { display: grid; grid-template-columns: 1fr auto auto; gap: 16px; color: #555; }
+.ivp-total { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; padding: 12px 0 0; border-top: 2px solid #111; }
+.ivp-total span { font-weight: 700; }
+.ivp-total b { font-family: var(--font-display); font-size: 24px; font-weight: 800; letter-spacing: -0.01em; }
+.ivp-paid { align-self: flex-end; font-weight: 700; color: var(--progress); }
+.ivp-legal { margin-top: auto; padding-top: 14px; border-top: 1px solid #ddd; display: flex; flex-direction: column; gap: 2px; color: #6b6b6b; font-size: 11px; }
+.ivp-contact { display: flex; gap: 18px; flex-wrap: wrap; }
+.ivp-stamp { position: absolute; top: 46px; right: 60px; padding: 6px 14px; border: 3px solid var(--alert); color: var(--alert); font-weight: 800; font-size: 20px; letter-spacing: 0.12em; transform: none; border-radius: 4px; }
+
+/* Editor and settings */
+.iv-form { display: flex; flex-direction: column; gap: var(--s3); max-width: 980px; }
+.iv-settings { max-width: 720px; }
+.iv-field > span { font-size: 0.74rem; font-weight: 700; color: var(--pp-muted); }
+.iv-field textarea { resize: vertical; min-height: 56px; }
+.iv-grid3 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.iv-client-row .pp-dd { max-width: 420px; }
+.iv-client-card { display: flex; flex-direction: column; gap: 2px; font-size: 0.875rem; color: var(--muted); }
+.iv-client-card b { color: var(--ink); font-size: 0.9375rem; }
+.iv-lines { display: flex; flex-direction: column; gap: 6px; }
+.iv-line { display: grid; grid-template-columns: minmax(180px, 1fr) 80px 80px 120px 120px 28px; gap: 6px; align-items: center; }
+.iv-lines.has-vat .iv-line { grid-template-columns: minmax(180px, 1fr) 80px 80px 120px 96px 120px 28px; }
+.iv-line.is-head { font-size: 0.72rem; font-weight: 700; color: var(--pp-muted); }
+.iv-line .is-n { text-align: right; }
+.iv-line-sum { font-weight: 700; font-size: 0.875rem; white-space: nowrap; }
+.iv-line .pp-x:disabled { opacity: 0.3; cursor: default; }
+.iv-addline { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; }
+.iv-totals { align-self: flex-end; display: flex; flex-direction: column; gap: 4px; min-width: 260px; font-size: 0.875rem; }
+.iv-totals > div { display: flex; justify-content: space-between; gap: 20px; color: var(--muted); }
+.iv-totals .is-total { padding-top: 8px; border-top: 1px solid var(--hairline-strong); color: var(--ink); font-weight: 800; font-size: 1.0625rem; }
+.iv-party-fields { display: flex; flex-direction: column; gap: 10px; }
+.iv-ico-row { display: grid; grid-template-columns: minmax(0, 220px) auto; gap: 8px; align-items: end; }
+.iv-zip-row { display: grid; grid-template-columns: 120px 1fr; gap: 8px; }
+.iv-sheet { display: flex; flex-direction: column; gap: 12px; }
+.iv-sheet-actions { align-items: center; flex-wrap: wrap; }
+.iv-their h3 { margin: 6px 0 4px; font-size: 0.86rem; font-weight: 800; }
+.iv-save-row { display: flex; align-items: center; gap: 12px; }
+.iv-saved { font-size: 0.8125rem; font-weight: 700; color: var(--progress); }
+
+@media (max-width: 900px) {
+  .iv-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .iv-two { grid-template-columns: minmax(0, 1fr); }
+  .iv-grid3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .iv-tile-v { font-size: 1.125rem; }
+  .iv-row-main { flex-wrap: wrap; gap: 2px 8px; }
+  .iv-row-main b { flex-basis: 100%; }
+  .iv-bars { height: 140px; gap: 3px; }
+  .iv-filter-sum { margin-left: 0; width: 100%; }
+  .iv-line, .iv-lines.has-vat .iv-line { grid-template-columns: 1fr 1fr 1fr 28px; }
+  .iv-line > input:first-child { grid-column: 1 / -1; }
+  .iv-line.is-head { display: none; }
+  .iv-line { padding-bottom: 8px; border-bottom: 1px solid var(--hairline); }
+  .iv-line-sum { grid-column: 1 / -2; text-align: left; }
+  .iv-totals { align-self: stretch; }
+  .iv-ico-row { grid-template-columns: 1fr auto; }
+  .iv-paper { transform-origin: top left; }
+}
+@media (prefers-reduced-motion: reduce) { .iv-bar { transition: none; } }
+
+/* Printing an invoice shows the sheet alone, on A4, nothing else. */
+@media print {
+  @page { size: A4; margin: 0; }
+  body.iv-printing * { visibility: hidden !important; }
+  body.iv-printing .iv-paper, body.iv-printing .iv-paper * { visibility: visible !important; }
+  body.iv-printing .iv-paper { position: fixed; left: 0; top: 0; width: 210mm; min-height: 297mm; margin: 0; border: 0; border-radius: 0; padding: 16mm 16mm; }
+  body.iv-printing { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

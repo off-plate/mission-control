@@ -43,6 +43,7 @@ const HealthPage = lazy(() => import('./healthpage').then((m) => ({ default: m.H
 const GymPage = lazy(() => import('./gympage').then((m) => ({ default: m.GymPage })))
 const LongevityPage = lazy(() => import('./longevity').then((m) => ({ default: m.LongevityPage })))
 const WatchlessPage = lazy(() => import('./watchlesspage').then((m) => ({ default: m.WatchlessPage })))
+const InvoicesPage = lazy(() => import('./invoicespage').then((m) => ({ default: m.InvoicesPage })))
 const IdeasPage = lazy(() => import('./ideaboard').then((m) => ({ default: m.IdeasPage })))
 /* The Nothing look on a phone is its own app (the approved prototype), not a restyle. */
 const NothingShell = lazy(() => import('./shells/nothing'))
@@ -451,6 +452,7 @@ const MORE_PAGES: { id: PageId; label: string; icon: ReactNode }[] = [
   { id: 'calendar', label: 'Calendar', icon: <Icon.DockCalendar size={22} /> },
   { id: 'notes', label: 'Notes', icon: <Icon.DockNote size={22} /> },
   { id: 'ideas', label: 'Ideas', icon: <Icon.DockBulb size={22} /> },
+  { id: 'invoices', label: 'Invoices', icon: <Icon.DockInvoice size={22} /> },
   { id: 'people', label: 'People', icon: <Icon.DockPeople size={22} /> },
   { id: 'timeline', label: 'Jar', icon: <Icon.DockHistory size={22} /> },
   { id: 'bills', label: 'Bills', icon: <Icon.DockWallet size={22} /> },
@@ -551,7 +553,7 @@ function PhoneTabBar({ page, setPage, nothing }: { page: PageId; setPage: (p: Pa
 
 /* Pages that are dark in both modes, so the header goes dark with them. */
 /* Pages the Nothing app opens full screen from Apps: they carry the standard back header, so no classic bottom bar, same as Notes or People. */
-const NOTHING_OPENED: PageId[] = ['bills', 'mymind', 'skills', 'longevity', 'watchless']
+const NOTHING_OPENED: PageId[] = ['bills', 'mymind', 'invoices', 'skills', 'longevity', 'watchless']
 const DARK_CHROME_PAGES: PageId[] = ['timeline', 'board', 'health', 'gym', 'longevity']
 
 export default function App() {
@@ -853,6 +855,17 @@ export default function App() {
             <span className="btn-sq-label">Ideas</span>
             {promptsReady && <span className="btn-sq-dot" aria-hidden="true" />}
           </button>
+          {/* Invoices, right after Ideas on his instruction (2026-11-01). */}
+          <button
+            className={`btn btn-ghost btn-sq hide-phone${page === 'invoices' ? ' is-on' : ''}`}
+            onClick={() => setPage('invoices')}
+            aria-pressed={page === 'invoices'}
+            aria-label="Invoices"
+            title="Invoices"
+          >
+            <Icon.DockInvoice size={16} />
+            <span className="btn-sq-label">Invoices</span>
+          </button>
           {/* People, next to Ideas on his instruction (2026-09-17). */}
           <PeopleButton on={page === 'people'} open={() => setPage('people')} />
           <button
@@ -933,6 +946,7 @@ export default function App() {
         {page === 'longevity' && <LongevityPage />}
         {page === 'watchless' && <WatchlessPage />}
         {page === 'ideas' && <IdeasPage />}
+        {page === 'invoices' && <InvoicesPage />}
         {page === 'prompts' && <PromptsPage />}
         {page === 'people' && <PeoplePage />}
         {page === 'focus' && <FocusPage />}

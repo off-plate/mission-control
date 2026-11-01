@@ -12541,15 +12541,22 @@ textarea.iv-input { height: auto; padding: 10px 12px; resize: vertical; }
 .iv-fit-inner { transform-origin: top left; }
 .iv-fit-inner .iv-paper { margin: 0; }
 
-/* Printing: A4 with real margins, the sheet alone on white. @page has to sit at the top level of the
-   stylesheet: nested in @media print (as it was) it is ignored and the browser falls back to its own page. */
-@page { size: A4; margin: 10mm 9mm; }
+/* Printing: A4, the sheet alone on white, carrying its own margins. The page margin is 0 on purpose: Chrome
+   lets the print dialog's "Margins" (None, Minimum, Custom) override @page, and "None" is what it remembers,
+   which printed the text to the very edge of the paper. @page has to sit at the top level of the
+   stylesheet (nested in @media print it is ignored). */
+@page { size: A4; margin: 0; }
 .iv-print-root { display: none; }
 @media print {
   html, body { background: #fff !important; }
   body > *:not(.iv-print-root) { display: none !important; }
   .iv-print-root { display: block; }
   .iv-print-root, .iv-print-root * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .iv-print-root .iv-paper { width: auto; min-height: 276mm; padding: 0; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
-  .iv-print-root .ivp-stamp { top: 0; left: 0; }
+  .iv-print-table { width: 100%; border-collapse: collapse; border-spacing: 0; }
+  .iv-print-table > thead { display: table-header-group; }
+  .iv-print-table > tfoot { display: table-footer-group; }
+  .iv-print-table > thead > tr > td, .iv-print-table > tbody > tr > td, .iv-print-table > tfoot > tr > td { padding: 0; }
+  .iv-print-gap { height: 11mm; }
+  .iv-print-root .iv-paper { width: auto; min-height: 273mm; padding: 0 10mm; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+  .iv-print-root .ivp-stamp { top: 0; left: 10mm; }
 }

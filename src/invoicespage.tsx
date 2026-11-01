@@ -550,7 +550,19 @@ export function PdfSheet({ inv, onClose }: { inv: Invoice; onClose: () => void }
           <FitPaper inv={inv} />
         </div>
       </Sheet>
-      {createPortal(<div className="iv-print-root"><InvoicePaper inv={inv} /></div>, document.body)}
+      {createPortal(
+        /* The table is only there to repeat a top and bottom gap on every printed page: the page itself has
+           no margin (the print dialog's "Margins" setting can override @page, "None" is a common choice), so
+           the sheet carries its own. */
+        <div className="iv-print-root">
+          <table className="iv-print-table">
+            <thead><tr><td className="iv-print-gap" /></tr></thead>
+            <tbody><tr><td><InvoicePaper inv={inv} /></td></tr></tbody>
+            <tfoot><tr><td className="iv-print-gap" /></tr></tfoot>
+          </table>
+        </div>,
+        document.body,
+      )}
     </>
   )
 }

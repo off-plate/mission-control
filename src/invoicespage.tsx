@@ -11,10 +11,10 @@
    Stored in the app state like Prospects: three synced lists, offline first,
    merged by row, deletions buried and undoable. An invoice carries a copy of
    both parties, so editing a contact later never rewrites one already sent. */
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useStore } from './store'
 import { Sheet } from './modals'
-import { Band, Dropdown, Segmented, Select } from './ui'
+import { Dropdown, Segmented, Select } from './ui'
 import * as Icon from './icons'
 import { qrMatrix, qrSvgPath } from './qr'
 import {
@@ -24,7 +24,7 @@ import {
 import type { Invoice, InvoiceCurrency, InvoiceLang, InvoiceLine, InvoiceParty, InvoiceProfile, PaymentMethod } from './types'
 import type { InvoiceClientDraft, InvoiceDraft } from './store/invoices'
 
-type Tab = 'invoices' | 'overview' | 'contacts' | 'settings'
+type Tab = 'overview' | 'invoices' | 'contacts' | 'stats' | 'settings'
 type View =
   | { kind: 'list' }
   | { kind: 'invoice'; id: string }
@@ -33,8 +33,8 @@ type View =
 
 const TAB_KEY = 'mc-invoices-tab'
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'invoices', label: 'Invoices' }, { id: 'overview', label: 'Overview' },
-  { id: 'contacts', label: 'Contacts' }, { id: 'settings', label: 'Settings' },
+  { id: 'overview', label: 'Overview' }, { id: 'invoices', label: 'Invoices' }, { id: 'contacts', label: 'Contacts' },
+  { id: 'stats', label: 'Statistics' }, { id: 'settings', label: 'Settings' },
 ]
 const METHODS: { id: PaymentMethod; label: string }[] = [
   { id: 'bank', label: 'Bank' }, { id: 'card', label: 'Card' }, { id: 'cash', label: 'Cash' }, { id: 'cod', label: 'Cash on delivery' },
@@ -60,53 +60,48 @@ function sumText(rows: Invoice[]): string {
     .map(([c, n]) => money(n, c, 0)).join(' + ')
 }
 
-/** "Due in 5 days", "12 days late", "Paid 3. 11. 2026". */
-function whenText(i: Invoice, today: string): { t: string; late: boolean } {
-  const s = shownStatus(i, today)
-  if (s === 'paid') return { t: `Paid ${fmtDate(i.paidOn)}`, late: false }
-  if (s === 'cancelled') return { t: 'Cancelled', late: false }
-  const d = daysBetween(today, i.due)
-  if (d < 0) return { t: `${plural(-d, 'day', 'days')} late`, late: true }
-  return { t: d === 0 ? 'Due today' : `Due in ${plural(d, 'day', 'days')}`, late: false }
-}
-
 /* ---------- the page ---------- */
 
 export function InvoicesPage() {
   const { invoiceSupplier } = useStore()
   const [tab, setTabRaw] = useState<Tab>(() => {
-    try { const t = localStorage.getItem(TAB_KEY) as Tab | null; return t && TABS.some((x) => x.id === t) ? t : 'invoices' } catch { return 'invoices' }
+    try { const t = localStorage.getItem(TAB_KEY) as Tab | null; return t && TABS.some((x) => x.id === t) ? t : 'overview' } catch { return 'overview' }
   })
   const [view, setView] = useState<View>({ kind: 'list' })
+  const [filter, setFilter] = useState<Filter>('all')
   const [contactEdit, setContactEdit] = useState<{ id?: string } | null>(null)
   const setTab = (t: Tab) => { setTabRaw(t); setView({ kind: 'list' }); try { localStorage.setItem(TAB_KEY, t) } catch { /* private mode */ } }
   const openInvoice = (id: string) => { setTabRaw('invoices'); setView({ kind: 'invoice', id }) }
   const newInvoice = (clientId?: string) => { setTabRaw('invoices'); setView({ kind: 'edit', clientId }) }
   const openContact = (id: string) => { setTabRaw('contacts'); setView({ kind: 'contact', id }) }
+  const openList = (f: Filter) => { setFilter(f); setTab('invoices') }
   useEffect(() => { window.scrollTo({ top: 0 }) }, [tab, view])
-
-  const action = view.kind === 'edit' ? null : tab === 'contacts' && view.kind === 'list'
-    ? <button className="btn btn-primary iv-new" type="button" onClick={() => setContactEdit({})}><Icon.Plus size={15} />New contact</button>
-    : tab !== 'settings' ? <button className="btn btn-primary iv-new" type="button" onClick={() => newInvoice()}><Icon.Plus size={15} />New invoice</button> : null
 
   return (
     <div className="iv-page">
-      <Band title="Invoices" actions={action} />
-      <nav className="iv-tabs" aria-label="Invoices sections">
-        {TABS.map((t) => (
-          <button key={t.id} type="button" className="iv-tab" aria-current={tab === t.id ? 'page' : undefined} onClick={() => setTab(t.id)}>{t.label}</button>
-        ))}
-      </nav>
+      {/* Fakturoid's second row: sections as soft pills on the left, the one
+          action on the right. The app header above stays Mission Control's. */}
+      <div className="iv-subnav">
+        <nav className="iv-tabs" aria-label="Invoices sections">
+          {TABS.map((t) => (
+            <button key={t.id} type="button" className="iv-tab" aria-current={tab === t.id ? 'page' : undefined} onClick={() => setTab(t.id)}>{t.label}</button>
+          ))}
+        </nav>
+        {view.kind !== 'edit' && (tab === 'contacts' && view.kind === 'list'
+          ? <button className="iv-outline" type="button" onClick={() => setContactEdit({})}><Icon.Plus size={16} />New contact</button>
+          : <button className="iv-outline" type="button" onClick={() => newInvoice()}><Icon.Plus size={16} />New invoice</button>)}
+      </div>
 
       {!invoiceSupplier?.name && tab !== 'settings' && (
         <div className="iv-notice">
           <span>Your name, IČO, address and bank account go on every invoice.</span>
-          <button className="btn btn-quiet" type="button" onClick={() => setTab('settings')}>Fill in your details</button>
+          <button className="iv-outline" type="button" onClick={() => setTab('settings')}>Fill in your details</button>
         </div>
       )}
 
       <div className="iv-body">
-        {tab === 'invoices' && view.kind === 'list' && <InvoiceList onOpen={openInvoice} onNew={() => newInvoice()} />}
+        {tab === 'overview' && <Overview onOpen={openInvoice} onList={openList} onContact={openContact} />}
+        {tab === 'invoices' && view.kind === 'list' && <InvoiceList filter={filter} setFilter={setFilter} onOpen={openInvoice} onNew={() => newInvoice()} />}
         {tab === 'invoices' && view.kind === 'invoice' && (
           <InvoiceDetail id={view.id} onBack={() => setView({ kind: 'list' })} onEdit={(id) => setView({ kind: 'edit', id })}
             onCopy={(id) => setView({ kind: 'edit', copyOf: id })} onContact={openContact} />
@@ -118,12 +113,12 @@ export function InvoicesPage() {
             onDone={(id) => setView(id ? { kind: 'invoice', id } : { kind: 'list' })}
           />
         )}
-        {tab === 'overview' && <Overview onOpen={openInvoice} />}
         {tab === 'contacts' && view.kind === 'list' && <ContactList onOpen={openContact} onAdd={() => setContactEdit({})} />}
         {tab === 'contacts' && view.kind === 'contact' && (
           <ContactDetail id={view.id} onBack={() => setView({ kind: 'list' })} onEdit={() => setContactEdit({ id: view.id })}
             onOpen={openInvoice} onNew={newInvoice} />
         )}
+        {tab === 'stats' && <Statistics />}
         {tab === 'settings' && <SettingsForm />}
       </div>
 
@@ -139,47 +134,46 @@ export function InvoicesPage() {
 
 type Filter = 'all' | 'unpaid' | 'overdue' | 'paid' | 'cancelled'
 const CARDS: { id: Filter; label: string; icon: ReactNode; scope: string }[] = [
-  { id: 'all', label: 'All', icon: <Icon.DockInvoice size={22} />, scope: 'in 12 months' },
-  { id: 'unpaid', label: 'Unpaid', icon: <Icon.Clock size={22} />, scope: 'incl. overdue' },
-  { id: 'overdue', label: 'Overdue', icon: <Icon.Flag size={22} />, scope: 'all time' },
-  { id: 'paid', label: 'Paid', icon: <Icon.CheckRing size={22} />, scope: 'in 12 months' },
-  { id: 'cancelled', label: 'Cancelled', icon: <Icon.Close size={22} />, scope: 'in 12 months' },
+  { id: 'all', label: 'All', icon: <Icon.DockInvoice size={26} />, scope: 'last 12 months' },
+  { id: 'unpaid', label: 'Unpaid', icon: <Icon.Clock size={26} />, scope: 'incl. overdue' },
+  { id: 'overdue', label: 'Overdue', icon: <Icon.Flag size={26} />, scope: 'all time' },
+  { id: 'paid', label: 'Paid', icon: <Icon.CheckRing size={26} />, scope: 'last 12 months' },
+  { id: 'cancelled', label: 'Cancelled', icon: <Icon.Close size={26} />, scope: 'last 12 months' },
 ]
 
-function InvoiceList({ onOpen, onNew }: { onOpen: (id: string) => void; onNew: () => void }) {
+function inFilter(i: Invoice, f: Filter, today: string): boolean {
+  const s = shownStatus(i, today)
+  const yearAgo = addDays(today, -365)
+  if (f === 'unpaid') return s === 'open' || s === 'sent' || s === 'overdue'
+  if (f === 'overdue') return s === 'overdue'
+  if (f === 'paid') return s === 'paid' && (i.paidOn ?? i.issued) >= yearAgo
+  if (f === 'cancelled') return s === 'cancelled' && i.issued >= yearAgo
+  return i.issued >= yearAgo && s !== 'cancelled'
+}
+
+function InvoiceList({ filter, setFilter, onOpen, onNew }: { filter: Filter; setFilter: (f: Filter) => void; onOpen: (id: string) => void; onNew: () => void }) {
   const { invoices } = useStore()
   const today = isoDay()
-  const yearAgo = addDays(today, -365)
-  const [filter, setFilter] = useState<Filter>('all')
   const [q, setQ] = useState('')
   const [order, setOrder] = useState<'new' | 'old'>('new')
-
-  const inFilter = (i: Invoice, f: Filter): boolean => {
-    const s = shownStatus(i, today)
-    if (f === 'unpaid') return s === 'open' || s === 'sent' || s === 'overdue'
-    if (f === 'overdue') return s === 'overdue'
-    if (f === 'paid') return s === 'paid' && (i.paidOn ?? i.issued) >= yearAgo
-    if (f === 'cancelled') return s === 'cancelled' && i.issued >= yearAgo
-    return i.issued >= yearAgo && s !== 'cancelled'
-  }
   const shown = invoices
-    .filter((i) => (q.trim() ? true : inFilter(i, filter)))
+    .filter((i) => (q.trim() ? true : inFilter(i, filter, today)))
     .filter((i) => !q.trim() || fold(q.trim()).split(/\s+/).every((w) => fold([i.number, i.client.name, i.client.ico, ...i.lines.map((l) => l.name)].join(' ')).includes(w)))
     .sort((a, b) => (order === 'new' ? 1 : -1) * (b.issued.localeCompare(a.issued) || b.number.localeCompare(a.number)))
 
   if (!invoices.length) {
     return (
-      <div className="iv-empty">
+      <div className="iv-card iv-empty">
         <p>Every invoice you issue lives here, with what is paid, what is waiting and what is late.</p>
-        <button className="btn btn-primary" type="button" onClick={onNew}>Create the first invoice</button>
+        <button className="iv-yellow" type="button" onClick={onNew}>Create the first invoice</button>
       </div>
     )
   }
   return (
-    <>
+    <div className="iv-card">
       <div className="iv-cards" role="group" aria-label="Show invoices">
         {CARDS.map((c) => {
-          const rows = invoices.filter((i) => inFilter(i, c.id))
+          const rows = invoices.filter((i) => inFilter(i, c.id, today))
           return (
             <button key={c.id} type="button" className={`iv-scard is-${c.id}`} aria-pressed={!q.trim() && filter === c.id} onClick={() => { setFilter(c.id); setQ('') }}>
               <span className="iv-scard-ico" aria-hidden="true">{c.icon}</span>
@@ -189,23 +183,21 @@ function InvoiceList({ onOpen, onNew }: { onOpen: (id: string) => void; onNew: (
           )
         })}
       </div>
-
       <div className="iv-listbar">
         <label className="iv-search">
           <Icon.Search size={16} />
-          <input type="search" value={q} placeholder="Search by number, client or item" aria-label="Search invoices" onChange={(e) => setQ(e.target.value)} />
+          <input type="search" value={q} placeholder="Number, client or item" aria-label="Search invoices" onChange={(e) => setQ(e.target.value)} />
         </label>
-        <Segmented size="sm" label="Order" value={order} onPick={setOrder} options={[{ id: 'new', label: 'Newest' }, { id: 'old', label: 'Oldest' }]} />
+        <Segmented size="sm" label="Order" value={order} onPick={setOrder} options={[{ id: 'new', label: 'Newest' }, { id: 'old', label: 'Oldest' }]} className="iv-seg-soft" />
       </div>
-
       {shown.length === 0
-        ? <div className="iv-empty"><p>{q.trim() ? 'Nothing matches that search.' : 'No invoices here.'}</p></div>
+        ? <p className="iv-quiet iv-pad">{q.trim() ? 'Nothing matches that search.' : 'No invoices here.'}</p>
         : <InvoiceRows rows={shown} onOpen={onOpen} />}
-    </>
+    </div>
   )
 }
 
-/** One invoice per line, Fakturoid's list: number, status, date, client, due, amount, menu. */
+/** Fakturoid's row: number, status word, the date (or how late it is), client, amount, menu. */
 function InvoiceRows({ rows, onOpen, hideClient }: { rows: Invoice[]; onOpen: (id: string) => void; hideClient?: boolean }) {
   const { patchInvoice } = useStore()
   const today = isoDay()
@@ -213,18 +205,17 @@ function InvoiceRows({ rows, onOpen, hideClient }: { rows: Invoice[]; onOpen: (i
     <ul className={`iv-rows${hideClient ? ' no-client' : ''}`}>
       {rows.map((i) => {
         const s = shownStatus(i, today)
-        const w = whenText(i, today)
+        const late = s === 'overdue' ? -daysBetween(today, i.due) : 0
         return (
           <li key={i.id} className={`iv-row is-${s}`} onClick={() => onOpen(i.id)}>
-            <button type="button" className="iv-row-num" onClick={(e) => { e.stopPropagation(); onOpen(i.id) }}>{i.number}</button>
-            <span className={`iv-row-status is-${s}`}>{STATUS_LABEL[s]}</span>
-            <span className="iv-row-date">{fmtDate(i.issued)}</span>
+            <button type="button" className="iv-num" onClick={(e) => { e.stopPropagation(); onOpen(i.id) }}>{i.number}</button>
+            <span className={`iv-st is-${s}`}>{STATUS_LABEL[s]}</span>
+            <span className="iv-row-date">{late ? plural(late, 'day', 'days') : fmtShort(i.issued)}</span>
             {!hideClient && <span className="iv-row-client">{i.client.name}</span>}
-            <span className={`iv-row-when${w.late ? ' is-late' : ''}`}>{w.t}</span>
             <span className="iv-row-amt">{money(invoiceTotal(i), i.currency)}</span>
             <span className="iv-row-menu" onClick={(e) => e.stopPropagation()}>
               <Dropdown label={`Options for ${i.number}`}>
-                {s !== 'paid' && s !== 'cancelled' && <button role="menuitem" onClick={() => patchInvoice(i.id, { status: 'paid', paidOn: today })}>Mark as paid today</button>}
+                {s !== 'paid' && s !== 'cancelled' && <button role="menuitem" onClick={() => patchInvoice(i.id, { status: 'paid', paidOn: today })}>Record payment today</button>}
                 {i.status === 'open' && <button role="menuitem" onClick={() => patchInvoice(i.id, { status: 'sent', sentOn: today })}>Mark as sent</button>}
                 {s === 'paid' && <button role="menuitem" onClick={() => patchInvoice(i.id, { status: i.sentOn ? 'sent' : 'open', paidOn: undefined })}>Mark as unpaid</button>}
                 <button role="menuitem" onClick={() => onOpen(i.id)}>Open</button>
@@ -237,102 +228,58 @@ function InvoiceRows({ rows, onOpen, hideClient }: { rows: Invoice[]; onOpen: (i
   )
 }
 
-/* ---------- overview ---------- */
+/** "31. 10. 26", Fakturoid's short date in lists. */
+const fmtShort = (iso: string) => { const [y, m, d] = iso.split('-'); return `${Number(d)}. ${Number(m)}. ${y.slice(2)}` }
 
-function Overview({ onOpen }: { onOpen: (id: string) => void }) {
-  const { invoices } = useStore()
-  const today = isoDay()
-  const thisYear = today.slice(0, 4)
-  const years = [...new Set([thisYear, ...invoices.map((i) => i.issued.slice(0, 4))])].sort().reverse()
-  const [year, setYear] = useState(thisYear)
-  const [hover, setHover] = useState<number | null>(null)
-  const live = invoices.filter((i) => i.status !== 'cancelled')
-  const inYear = live.filter((i) => i.issued.startsWith(year))
-  const paidYear = inYear.filter((i) => i.status === 'paid')
-  const unpaidAll = live.filter((i) => i.status !== 'paid').sort((a, b) => a.due.localeCompare(b.due))
-  const late = unpaidAll.filter((i) => i.due < today)
-
-  /* Fakturoid's chart: per month, what was invoiced, split into paid and not yet. CZK only, a bar cannot add euros to crowns. */
-  const czk = inYear.filter((i) => i.currency === 'CZK')
-  const months = Array.from({ length: 12 }, (_, m) => {
-    const key = `${year}-${String(m + 1).padStart(2, '0')}`
-    const rows = czk.filter((i) => i.issued.startsWith(key))
+/** Bars per period: what was invoiced, how much of it is paid. CZK only. */
+type Period = 'months' | 'quarters' | 'years'
+function periodBuckets(invoices: Invoice[], year: string, period: Period): { key: string; name: string; paid: number; unpaid: number; count: number }[] {
+  const live = invoices.filter((i) => i.status !== 'cancelled' && i.currency === 'CZK')
+  const sum = (rows: Invoice[]) => {
     const paid = rows.filter((i) => i.status === 'paid').reduce((s, i) => s + invoiceTotal(i), 0)
-    const all = rows.reduce((s, i) => s + invoiceTotal(i), 0)
-    return { key, name: new Date(Number(year), m, 1).toLocaleDateString('en-GB', { month: 'long' }), paid, unpaid: all - paid, count: rows.length }
+    return { paid, unpaid: rows.reduce((s, i) => s + invoiceTotal(i), 0) - paid, count: rows.length }
+  }
+  if (period === 'years') {
+    const ys = [...new Set(live.map((i) => i.issued.slice(0, 4)))].sort().slice(-6)
+    return ys.map((y) => ({ key: y, name: y, ...sum(live.filter((i) => i.issued.startsWith(y))) }))
+  }
+  if (period === 'quarters') {
+    return [1, 2, 3, 4].map((q) => ({ key: `${year}-Q${q}`, name: `Q${q}`, ...sum(live.filter((i) => i.issued.startsWith(year) && Math.ceil(Number(i.issued.slice(5, 7)) / 3) === q)) }))
+  }
+  return Array.from({ length: 12 }, (_, m) => {
+    const key = `${year}-${String(m + 1).padStart(2, '0')}`
+    return { key, name: new Date(Number(year), m, 1).toLocaleDateString('en-GB', { month: 'long' }), ...sum(live.filter((i) => i.issued.startsWith(key))) }
   })
-  const top = Math.max(1, ...months.map((m) => m.paid + m.unpaid))
+}
+
+function BarChart({ data, height = 260 }: { data: ReturnType<typeof periodBuckets>; height?: number }) {
+  const [hover, setHover] = useState<number | null>(null)
+  const top = Math.max(1, ...data.map((m) => m.paid + m.unpaid))
   const step = niceStep(top)
   const ceil = Math.ceil(top / step) * step
-  const clients = [...inYear.reduce((m, i) => {
-    const k = i.clientId ?? i.client.name
-    const cur = m.get(k) ?? { name: i.client.name, rows: [] as Invoice[] }
-    cur.rows.push(i); m.set(k, cur); return m
-  }, new Map<string, { name: string; rows: Invoice[] }>()).values()]
-    .map((c) => ({ ...c, sum: c.rows.filter((i) => i.currency === 'CZK').reduce((s, i) => s + invoiceTotal(i), 0) }))
-    .sort((a, b) => b.sum - a.sum).slice(0, 5)
-
-  if (!invoices.length) return <div className="iv-empty"><p>Nothing invoiced yet. Once you issue invoices, this shows what came in each month and what is still waiting.</p></div>
-
+  const ticks = Array.from({ length: Math.round(ceil / step) + 1 }, (_, k) => ceil - k * step)
   return (
-    <div className="iv-overview">
-      <div className="iv-ov-head">
-        <div className="iv-kpis">
-          <div className="iv-kpi"><span>Invoiced in {year}</span><b>{sumText(inYear)}</b><small>{plural(inYear.length, 'invoice', 'invoices')}</small></div>
-          <div className="iv-kpi"><span>Paid</span><b className="is-pos">{sumText(paidYear)}</b><small>{plural(paidYear.length, 'invoice', 'invoices')}</small></div>
-          <div className="iv-kpi"><span>Waiting for payment</span><b>{sumText(unpaidAll)}</b><small>{plural(unpaidAll.length, 'invoice', 'invoices')}, all years</small></div>
-          <div className="iv-kpi"><span>Overdue</span><b className={late.length ? 'is-late' : ''}>{late.length ? sumText(late) : 'Nothing late'}</b><small>{plural(late.length, 'invoice', 'invoices')}</small></div>
-        </div>
-        {years.length > 1 && <Select className="iv-year" ariaLabel="Year" value={year} onChange={setYear} options={years.map((y) => ({ value: y, label: y }))} />}
-      </div>
-
-      <section className="iv-panel iv-chart-panel" aria-label={`Invoiced per month in ${year}, CZK`}>
-        <div className="iv-chart">
-          <div className="iv-axis" aria-hidden="true">
-            {Array.from({ length: Math.round(ceil / step) + 1 }, (_, k) => ceil - k * step).map((v) => <span key={v}>{money(v, 'CZK', 0)}</span>)}
-          </div>
-          <div className="iv-plot" onMouseLeave={() => setHover(null)}>
-            <div className="iv-grid-lines" aria-hidden="true">{Array.from({ length: Math.round(ceil / step) + 1 }, (_, k) => <i key={k} className="iv-grid-line" style={{ top: `${(k * step / ceil) * 100}%` }} />)}</div>
-            {months.map((m, k) => (
-              <div key={m.key} className={`iv-col${hover === k ? ' is-on' : ''}`} onMouseEnter={() => setHover(k)}>
-                <div className="iv-stack" style={{ height: `${((m.paid + m.unpaid) / ceil) * 100}%` }}>
-                  {m.unpaid > 0 && <span className="iv-seg is-unpaid" style={{ flexGrow: m.unpaid }} />}
-                  {m.paid > 0 && <span className="iv-seg is-paid" style={{ flexGrow: m.paid }} />}
-                </div>
-                <span className="iv-col-k">{m.name.slice(0, 3)}</span>
-                {hover === k && m.count > 0 && (
-                  <div className={`iv-tip${k > 8 ? ' is-left' : ''}`} role="status">
-                    <b>{m.name}</b>
-                    <div><span>Invoiced</span><span>{money(m.paid + m.unpaid, 'CZK', 0)}</span></div>
-                    <div><span><i className="is-paid" />Paid</span><span>{money(m.paid, 'CZK', 0)}</span></div>
-                    <div><span><i className="is-unpaid" />Unpaid</span><span>{money(m.unpaid, 'CZK', 0)}</span></div>
-                  </div>
-                )}
+    <div className="iv-chart" style={{ height }}>
+      <div className="iv-axis" aria-hidden="true">{ticks.map((v) => <span key={v}>{money(v, 'CZK')}</span>)}</div>
+      <div className="iv-plot" style={{ gridTemplateColumns: `repeat(${data.length}, minmax(0, 1fr))` }} onMouseLeave={() => setHover(null)}>
+        <div className="iv-gridlines" aria-hidden="true">{ticks.map((_, k) => <i key={k} style={{ top: `${(k / (ticks.length - 1)) * 100}%` }} />)}</div>
+        {data.map((m, k) => (
+          <div key={m.key} className={`iv-col${hover === k ? ' is-on' : ''}`} onMouseEnter={() => setHover(k)}>
+            <div className="iv-stack" style={{ height: `${((m.paid + m.unpaid) / ceil) * 100}%` }}>
+              {m.unpaid > 0 && <span className="iv-bar-unpaid" style={{ flexGrow: m.unpaid }} />}
+              {m.paid > 0 && <span className="iv-bar-paid" style={{ flexGrow: m.paid }} />}
+            </div>
+            <span className="iv-col-k">{data.length > 6 ? m.name.slice(0, 3) : m.name}</span>
+            {hover === k && m.count > 0 && (
+              <div className={`iv-tip${k > data.length * 0.6 ? ' is-left' : ''}`} role="status">
+                <b>{m.name}</b>
+                <div><span><i className="is-inv" />Invoiced</span><b>{money(m.paid + m.unpaid, 'CZK')}</b></div>
+                <div><span><i className="is-paid" />Paid</span><span>{money(m.paid, 'CZK')}</span></div>
+                <div><span><i className="is-unpaid" />Not paid yet</span><span>{money(m.unpaid, 'CZK')}</span></div>
               </div>
-            ))}
+            )}
           </div>
-        </div>
-      </section>
-
-      <div className="iv-ov-lists">
-        <section className="iv-panel">
-          <h2 className="iv-h2">Waiting for payment</h2>
-          {unpaidAll.length ? <InvoiceRows rows={unpaidAll.slice(0, 8)} onOpen={onOpen} /> : <p className="iv-quiet">Everything is paid.</p>}
-        </section>
-        <section className="iv-panel">
-          <h2 className="iv-h2">Top clients in {year}</h2>
-          {clients.length ? (
-            <ol className="iv-tops">
-              {clients.map((c) => (
-                <li key={c.name}>
-                  <span className="iv-top-name">{c.name}</span>
-                  <span className="iv-top-bar"><i style={{ transform: `scaleX(${c.sum / Math.max(1, clients[0].sum)})` }} /></span>
-                  <span className="iv-top-sum">{sumText(c.rows)}</span>
-                </li>
-              ))}
-            </ol>
-          ) : <p className="iv-quiet">No invoices in {year}.</p>}
-        </section>
+        ))}
       </div>
     </div>
   )
@@ -344,7 +291,135 @@ function niceStep(max: number): number {
   return [1, 2, 2.5, 5, 10].map((k) => k * mag).find((s) => s >= raw) ?? mag * 10
 }
 
-/* ---------- one invoice ---------- */
+/* ---------- overview: Fakturoid's Přehled ---------- */
+
+const QUIET_DAYS = 45
+
+function Overview({ onOpen, onList, onContact }: { onOpen: (id: string) => void; onList: (f: Filter) => void; onContact: (id: string) => void }) {
+  const { invoices, invoiceClients } = useStore()
+  const today = isoDay()
+  const [period, setPeriod] = useState<Period>('months')
+  const year = today.slice(0, 4)
+  const unpaid = invoices.filter((i) => inFilter(i, 'unpaid', today))
+  const late = invoices.filter((i) => inFilter(i, 'overdue', today))
+  const newest = [...invoices].sort((a, b) => b.issued.localeCompare(a.issued) || b.number.localeCompare(a.number)).slice(0, 6)
+  /* Fakturoid's "Dlouho nefakturovaní": clients he has billed before and not lately. */
+  const quiet = invoiceClients.map((c) => {
+    const last = invoices.filter((i) => i.clientId === c.id && i.status !== 'cancelled').map((i) => i.issued).sort().at(-1)
+    return { c, last, days: last ? daysBetween(last, today) : -1 }
+  }).filter((x) => x.days >= QUIET_DAYS).sort((a, b) => b.days - a.days).slice(0, 5)
+
+  if (!invoices.length) return <div className="iv-card iv-empty"><p>Nothing invoiced yet. Once you issue invoices, this shows what came in each month, what is unpaid and what is late.</p></div>
+
+  return (
+    <div className="iv-card">
+      <section className="iv-sec">
+        <div className="iv-sec-tools">
+          <Segmented size="sm" label="Period" value={period} onPick={setPeriod} className="iv-seg-soft"
+            options={[{ id: 'months', label: 'Months' }, { id: 'quarters', label: 'Quarters' }, { id: 'years', label: 'Years' }]} />
+        </div>
+        <BarChart data={periodBuckets(invoices, year, period)} />
+      </section>
+
+      <section className="iv-sec iv-split">
+        <div>
+          <h2 className="iv-h2 is-center">Invoices</h2>
+          <dl className="iv-sumlines">
+            <dt><button type="button" className="iv-a" onClick={() => onList('unpaid')}>Unpaid</button></dt><dd>{sumText(unpaid)}</dd>
+            <dt><button type="button" className="iv-a" onClick={() => onList('overdue')}>Overdue</button></dt><dd className={late.length ? 'is-red' : ''}>{sumText(late)}</dd>
+          </dl>
+        </div>
+        <div>
+          <h2 className="iv-h2 is-center">Not invoiced lately</h2>
+          {quiet.length ? (
+            <dl className="iv-sumlines">
+              {quiet.map((x) => (
+                <Fragment key={x.c.id}><dt><button type="button" className="iv-a" onClick={() => onContact(x.c.id)}>{x.c.name}</button></dt><dd className="iv-quiet">{x.days} days ago</dd></Fragment>
+              ))}
+            </dl>
+          ) : <p className="iv-quiet is-center">Everyone you bill was invoiced in the last {QUIET_DAYS} days.</p>}
+        </div>
+      </section>
+
+      <section className="iv-sec is-flush">
+        <h2 className="iv-h2 is-center">Newest invoices</h2>
+        <InvoiceRows rows={newest} onOpen={onOpen} />
+        <div className="is-center iv-pad"><button type="button" className="iv-a is-quiet" onClick={() => onList('all')}>All invoices</button></div>
+      </section>
+    </div>
+  )
+}
+
+/* ---------- statistics: Fakturoid's Statistiky, with the VAT limit ---------- */
+
+const VAT_LIMIT = 2_000_000
+const VAT_HARD = 2_536_000
+
+function Statistics() {
+  const { invoices, invoiceSupplier } = useStore()
+  const today = isoDay()
+  const years = [...new Set([today.slice(0, 4), ...invoices.map((i) => i.issued.slice(0, 4))])].sort()
+  const [year, setYear] = useState(today.slice(0, 4))
+  const [period, setPeriod] = useState<Period>('months')
+  const data = periodBuckets(invoices, year, period === 'years' ? 'months' : period)
+  const rows = period === 'years' ? periodBuckets(invoices, year, 'years') : data
+  const total = (r: { paid: number; unpaid: number }) => r.paid + r.unpaid
+  const yearSum = data.reduce((s, r) => s + total(r), 0)
+  const prevYear = periodBuckets(invoices, String(Number(year) - 1), 'months').reduce((s, r) => s + total(r), 0)
+  const yi = years.indexOf(year)
+  const vatShare = Math.min(1, yearSum / VAT_LIMIT)
+  return (
+    <div className="iv-card">
+      <section className="iv-sec">
+        <div className="iv-sec-tools is-split">
+          <div className="iv-yearstep">
+            <button type="button" aria-label="Previous year" disabled={yi <= 0} onClick={() => setYear(years[yi - 1])}><Icon.ChevronLeft size={16} /></button>
+            <b>{year}</b>
+            <button type="button" aria-label="Next year" disabled={yi >= years.length - 1} onClick={() => setYear(years[yi + 1])}><Icon.ChevronRight size={16} /></button>
+          </div>
+          <Segmented size="sm" label="Period" value={period} onPick={setPeriod} className="iv-seg-soft"
+            options={[{ id: 'months', label: 'Months' }, { id: 'quarters', label: 'Quarters' }, { id: 'years', label: 'Years' }]} />
+        </div>
+        <BarChart data={rows} />
+      </section>
+      <section className="iv-sec">
+        <table className="iv-stat">
+          <thead><tr><th /><th>Invoiced</th><th /><th>Paid</th><th>Not paid yet</th></tr></thead>
+          <tbody>
+            {rows.map((r, k) => {
+              const prev = k > 0 ? total(rows[k - 1]) : 0
+              const ch = prev ? ((total(r) - prev) / prev) * 100 : null
+              return (
+                <tr key={r.key}>
+                  <th scope="row">{r.name}</th>
+                  <td>{money(total(r), 'CZK')}</td>
+                  <td className={`iv-ch${ch != null && ch < 0 ? ' is-down' : ''}`}>{ch == null ? '' : `${ch > 0 ? '+' : ''}${ch.toFixed(1).replace('.', ',')} %`}</td>
+                  <td>{money(r.paid, 'CZK')}</td>
+                  <td>{money(r.unpaid, 'CZK')}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+          {period !== 'years' && (
+            <tfoot><tr><th scope="row">{year}</th><td>{money(yearSum, 'CZK')}</td>
+              <td className={`iv-ch${prevYear && yearSum < prevYear ? ' is-down' : ''}`}>{prevYear ? `${yearSum >= prevYear ? '+' : ''}${(((yearSum - prevYear) / prevYear) * 100).toFixed(1).replace('.', ',')} %` : ''}</td>
+              <td>{money(data.reduce((s, r) => s + r.paid, 0), 'CZK')}</td><td>{money(data.reduce((s, r) => s + r.unpaid, 0), 'CZK')}</td></tr></tfoot>
+          )}
+        </table>
+      </section>
+      {!invoiceSupplier?.vatPayer && (
+        <section className="iv-sec">
+          <h2 className="iv-h2">Turnover towards compulsory VAT registration</h2>
+          <p className="iv-vatline">Turnover in {year} is <mark>{money(yearSum, 'CZK')}</mark>, {Math.round(vatShare * 100)} % of {money(VAT_LIMIT, 'CZK', 0)}.</p>
+          <div className="iv-vatbar" aria-hidden="true"><i style={{ transform: `scaleX(${vatShare})` }} /></div>
+          <p className="iv-quiet">Over {money(VAT_LIMIT, 'CZK', 0)} in a calendar year makes you a VAT payer from the start of the next year. Over {money(VAT_HARD, 'CZK', 0)}, from the day after you cross it. CZK invoices only, by issue date.</p>
+        </section>
+      )}
+    </div>
+  )
+}
+
+/* ---------- one invoice: Fakturoid's page, the app's own view of it ---------- */
 
 function InvoiceDetail({ id, onBack, onEdit, onCopy, onContact }: {
   id: string; onBack: () => void; onEdit: (id: string) => void; onCopy: (id: string) => void; onContact: (id: string) => void
@@ -353,39 +428,29 @@ function InvoiceDetail({ id, onBack, onEdit, onCopy, onContact }: {
   const inv = invoices.find((i) => i.id === id)
   const today = isoDay()
   const [paying, setPaying] = useState(false)
-  if (!inv) return <div className="iv-empty"><p>This invoice was deleted.</p><button className="btn btn-quiet" type="button" onClick={onBack}>Back to invoices</button></div>
+  const [pdf, setPdf] = useState(false)
+  if (!inv) return <div className="iv-card iv-empty"><p>This invoice was deleted.</p><button className="iv-outline" type="button" onClick={onBack}>Back to invoices</button></div>
   const s = shownStatus(inv, today)
-  const w = whenText(inv, today)
+  const d = daysBetween(today, inv.due)
   const t = totals(inv.lines, inv.supplier.vatPayer)
   const contact = inv.clientId ? invoiceClients.find((c) => c.id === inv.clientId) : undefined
-
-  const print = () => {
-    const was = document.title
-    document.title = `${inv.lang === 'en' ? 'Invoice' : 'Faktura'} ${inv.number}`
-    document.body.classList.add('iv-printing')
-    const done = () => { document.title = was; document.body.classList.remove('iv-printing'); window.removeEventListener('afterprint', done) }
-    window.addEventListener('afterprint', done)
-    window.print()
-  }
+  const pill = s === 'paid' ? `Paid ${fmtDate(inv.paidOn)}` : s === 'cancelled' ? 'Cancelled' : s === 'overdue' ? `Overdue ${plural(-d, 'day', 'days')}` : s === 'sent' ? `Sent ${fmtDate(inv.sentOn)}` : `Issued ${fmtDate(inv.issued)}`
+  const due = s === 'paid' || s === 'cancelled' ? '' : s === 'overdue' ? `Was due ${fmtDate(inv.due)}` : d === 0 ? 'Due today' : `Due in ${plural(d, 'day', 'days')}`
 
   return (
-    <div className="iv-detail">
-      <button className="iv-back" type="button" onClick={onBack}><Icon.ChevronLeft size={15} />All invoices</button>
+    <div className="iv-card">
       <header className="iv-dhead">
-        <div className="iv-dtitle">
-          <h2>Invoice {inv.number}</h2>
-          <div className="iv-dstate">
-            <span className={`iv-row-status is-${s}`}>{STATUS_LABEL[s]}{s === 'sent' && inv.sentOn ? ` ${fmtDate(inv.sentOn)}` : ''}</span>
-            <span className={w.late ? 'is-late' : ''}>{w.t}</span>
-          </div>
+        <div>
+          <h2 className="iv-dtitle">Invoice {inv.number}</h2>
+          <div className="iv-dstate"><span className={`iv-pill is-${s}`}>{pill}</span>{due && <span>{due}</span>}</div>
         </div>
         <div className="iv-dactions" role="toolbar" aria-label="Invoice actions">
-          <IconAction icon={<Icon.DockInvoice size={22} />} label="Print or PDF" onClick={print} />
-          {s !== 'paid' && s !== 'cancelled' && <IconAction icon={<Icon.CheckRing size={22} />} label="Record payment" onClick={() => setPaying(true)} strong />}
-          <IconAction icon={<Icon.Edit size={22} />} label="Edit" onClick={() => onEdit(inv.id)} />
-          <IconAction icon={<Icon.Copy size={22} />} label="Duplicate" onClick={() => onCopy(inv.id)} />
+          <IconAction icon={<Icon.DockInvoice size={24} />} label="PDF" onClick={() => setPdf(true)} />
+          {s !== 'paid' && s !== 'cancelled' && <IconAction icon={<Icon.CheckRing size={24} />} label="Record payment" onClick={() => setPaying(true)} />}
+          <IconAction icon={<Icon.Edit size={24} />} label="Edit" onClick={() => onEdit(inv.id)} />
+          <IconAction icon={<Icon.Copy size={24} />} label="Duplicate" onClick={() => onCopy(inv.id)} />
           <Dropdown label="More actions" className="iv-more" trigger={({ onClick, open }) => (
-            <button type="button" className="iv-iact" aria-expanded={open} onClick={onClick}><Icon.More size={22} /><span>More</span></button>
+            <button type="button" className="iv-iact" aria-expanded={open} onClick={onClick}><Icon.More size={24} /><span>More</span></button>
           )}>
             {inv.status === 'open' && <button role="menuitem" onClick={() => patchInvoice(inv.id, { status: 'sent', sentOn: today })}>Mark as sent</button>}
             {inv.status === 'paid' && <button role="menuitem" onClick={() => patchInvoice(inv.id, { status: inv.sentOn ? 'sent' : 'open', paidOn: undefined })}>Mark as unpaid</button>}
@@ -397,34 +462,82 @@ function InvoiceDetail({ id, onBack, onEdit, onCopy, onContact }: {
         </div>
       </header>
 
-      <div className="iv-dfacts">
-        <div>
-          {contact ? <button type="button" className="iv-link iv-dclient" onClick={() => onContact(contact.id)}>{inv.client.name}</button> : <b className="iv-dclient">{inv.client.name}</b>}
-          {inv.client.street && <span>{inv.client.street}</span>}
-          {(inv.client.zip || inv.client.city) && <span>{[inv.client.zip, inv.client.city].filter(Boolean).join(' ')}</span>}
+      <div className="iv-dbody">
+        <div className="iv-dfacts">
+          <div className="iv-dclient">
+            {contact ? <button type="button" className="iv-a is-big" onClick={() => onContact(contact.id)}>{inv.client.name}</button> : <b>{inv.client.name}</b>}
+            {inv.client.street && <span>{inv.client.street}</span>}
+            {(inv.client.zip || inv.client.city) && <span>{[inv.client.zip, inv.client.city].filter(Boolean).join(' ')}</span>}
+            {(inv.client.ico || inv.client.dic) && (
+              <dl className="iv-ids">{inv.client.ico && <><dt>IČO</dt><dd>{inv.client.ico}</dd></>}{inv.client.dic && <><dt>DIČ</dt><dd>{inv.client.dic}</dd></>}</dl>
+            )}
+          </div>
+          <dl className="iv-kv">
+            <dt>Issued</dt><dd>{fmtDate(inv.issued)}</dd>
+            <dt>Due</dt><dd>{fmtDate(inv.due)}</dd>
+            {inv.supplier.vatPayer && <><dt>Taxable supply</dt><dd>{fmtDate(inv.taxable)}</dd></>}
+          </dl>
+          <dl className="iv-kv">
+            <dt>Variable symbol</dt><dd>{inv.vs}</dd>
+            <dt>Payment</dt><dd>{METHODS.find((m) => m.id === inv.method)?.label}</dd>
+            {inv.orderNo && <><dt>Order</dt><dd>{inv.orderNo}</dd></>}
+          </dl>
         </div>
-        <dl>
-          <dt>Issued</dt><dd>{fmtDate(inv.issued)}</dd>
-          <dt>Due</dt><dd>{fmtDate(inv.due)}</dd>
-          {inv.supplier.vatPayer && <><dt>Taxable supply</dt><dd>{fmtDate(inv.taxable)}</dd></>}
-          {inv.paidOn && <><dt>Paid</dt><dd>{fmtDate(inv.paidOn)}</dd></>}
-        </dl>
-        <dl>
-          <dt>Variable symbol</dt><dd>{inv.vs}</dd>
-          <dt>Payment</dt><dd>{METHODS.find((m) => m.id === inv.method)?.label}</dd>
-          <dt>Total</dt><dd className="iv-dtotal">{money(t.total, inv.currency)}</dd>
-        </dl>
+
+        {inv.noteBefore && <div className="iv-note"><span>Text above the items</span><p>{inv.noteBefore}</p></div>}
+        <table className="iv-items-view">
+          <thead><tr><th colSpan={3} /><th>Unit price</th>{inv.supplier.vatPayer && <th>VAT</th>}<th>Total</th></tr></thead>
+          <tbody>
+            {inv.lines.map((l) => {
+              const base = (Number(l.qty) || 0) * (Number(l.price) || 0)
+              return (
+                <tr key={l.id}>
+                  <td className="is-qty">{String(l.qty).replace('.', ',')}</td><td className="is-unit">{l.unit}</td><td>{l.name}</td>
+                  <td className="is-soft">{money(l.price, inv.currency)}</td>
+                  {inv.supplier.vatPayer && <td className="is-soft">{l.vat} %</td>}
+                  <td className="is-sum">{money(inv.supplier.vatPayer ? base * (1 + l.vat / 100) : base, inv.currency)}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        <div className="iv-total"><b>{money(t.total, inv.currency)}</b></div>
+        {inv.noteAfter && <div className="iv-note"><span>Text below the items</span><p>{inv.noteAfter}</p></div>}
       </div>
 
-      <div className="iv-paperwrap"><InvoicePaper inv={inv} /></div>
+      <footer className="iv-dfoot">
+        <div><Icon.DockInvoice size={20} /><b>Print outputs</b><button type="button" className="iv-a" onClick={() => setPdf(true)}>Invoice PDF</button></div>
+        <div className="iv-quiet">Created {new Date(inv.createdAt).toLocaleDateString('cs-CZ')}{inv.sentOn ? `, sent ${fmtDate(inv.sentOn)}` : ''}{inv.paidOn ? `, paid ${fmtDate(inv.paidOn)}` : ''}</div>
+      </footer>
 
       {paying && <PaymentSheet inv={inv} onClose={() => setPaying(false)} onPaid={(day) => { patchInvoice(inv.id, { status: 'paid', paidOn: day }); setPaying(false) }} />}
+      {pdf && <PdfSheet inv={inv} onClose={() => setPdf(false)} />}
     </div>
   )
 }
 
-function IconAction({ icon, label, onClick, strong }: { icon: ReactNode; label: string; onClick: () => void; strong?: boolean }) {
-  return <button type="button" className={`iv-iact${strong ? ' is-strong' : ''}`} onClick={onClick}>{icon}<span>{label}</span></button>
+function IconAction({ icon, label, onClick }: { icon: ReactNode; label: string; onClick: () => void }) {
+  return <button type="button" className="iv-iact" onClick={onClick}>{icon}<span>{label}</span></button>
+}
+
+/** The A4 sheet the customer gets, behind the PDF action as in Fakturoid. Print saves it as a PDF. */
+function PdfSheet({ inv, onClose }: { inv: Invoice; onClose: () => void }) {
+  const print = () => {
+    const was = document.title
+    document.title = `${inv.lang === 'en' ? 'Invoice' : 'Faktura'} ${inv.number}`
+    document.body.classList.add('iv-printing')
+    const done = () => { document.title = was; document.body.classList.remove('iv-printing'); window.removeEventListener('afterprint', done) }
+    window.addEventListener('afterprint', done)
+    window.print()
+  }
+  return (
+    <Sheet title={`${inv.lang === 'en' ? 'Invoice' : 'Faktura'} ${inv.number}`} onClose={onClose}>
+      <div className="iv-pdf">
+        <div className="iv-pdf-bar"><button className="iv-yellow" type="button" onClick={print}>Print or save as PDF</button></div>
+        <div className="iv-pdf-paper"><InvoicePaper inv={inv} /></div>
+      </div>
+    </Sheet>
+  )
 }
 
 function PaymentSheet({ inv, onClose, onPaid }: { inv: Invoice; onClose: () => void; onPaid: (day: string) => void }) {
@@ -435,8 +548,8 @@ function PaymentSheet({ inv, onClose, onPaid }: { inv: Invoice; onClose: () => v
         <div className="iv-pay-amt">{money(invoiceTotal(inv), inv.currency)}<span>from {inv.client.name}</span></div>
         <label className="iv-flabel">Paid on<input className="iv-input" type="date" value={day} onChange={(e) => setDay(e.target.value)} /></label>
         <div className="iv-sheet-foot">
-          <button className="btn btn-quiet" type="button" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" type="button" disabled={!day} onClick={() => onPaid(day)}>Mark as paid</button>
+          <button className="iv-outline" type="button" onClick={onClose}>Cancel</button>
+          <button className="iv-yellow" type="button" disabled={!day} onClick={() => onPaid(day)}>Record payment</button>
         </div>
       </div>
     </Sheet>
@@ -503,19 +616,18 @@ function InvoiceForm({ id, copyOf, clientId, onDone }: { id?: string; copyOf?: s
 
   return (
     <div className="iv-form">
-      <div className="iv-form-head">
-        <button className="iv-back" type="button" onClick={() => onDone(existing?.id)}><Icon.ChevronLeft size={15} />{existing ? `Invoice ${existing.number}` : 'All invoices'}</button>
-        <h2>{existing ? `Edit invoice ${existing.number}` : copyOf ? 'New invoice from a copy' : 'New invoice'}</h2>
-      </div>
-
-      <div className="iv-panel iv-form-panel">
+      <div className="iv-card iv-form-panel">
+        <header className="iv-form-head">
+          <h2>{existing ? `Edit invoice ${existing.number}` : copyOf ? 'New invoice from a copy' : 'New invoice'}</h2>
+          <button className="iv-outline is-sm" type="button" onClick={() => onDone(existing?.id)}><Icon.ChevronLeft size={14} />Back</button>
+        </header>
         <div className="iv-fgrid">
           <FRow label="Customer" error={tried ? err.client : ''}>
             <div className="iv-inline">
               <Select className="iv-select iv-w-lg" ariaLabel="Customer" value={d.clientId ?? ''} onChange={pickClient}
                 options={[{ value: '', label: invoiceClients.length ? 'Choose a customer' : 'No contacts yet' },
                   ...[...invoiceClients].sort((a, b) => a.name.localeCompare(b.name, 'cs')).map((c) => ({ value: c.id, label: c.name }))]} />
-              <button type="button" className="iv-link iv-plus" onClick={() => setNewContact(true)}><Icon.Plus size={15} />New customer</button>
+              <button type="button" className="iv-a iv-plus" onClick={() => setNewContact(true)}><Icon.Plus size={18} />New customer</button>
             </div>
             {d.client.name && (
               <span className="iv-hint">{[d.client.street, [d.client.zip, d.client.city].filter(Boolean).join(' '), d.client.ico && `IČO ${d.client.ico}`].filter(Boolean).join(', ')}</span>
@@ -525,7 +637,7 @@ function InvoiceForm({ id, copyOf, clientId, onDone }: { id?: string; copyOf?: s
           <FRow label="Invoice number" error={tried ? err.number : ''}>
             {editNumber
               ? <input className="iv-input iv-w-md" autoFocus value={d.number} onChange={(e) => { const v = e.target.value; setD((p) => ({ ...p, number: v, vs: p.vs === vsFromNumber(p.number) ? vsFromNumber(v) : p.vs })) }} />
-              : <div className="iv-inline"><b className="iv-static">{d.number}</b><button type="button" className="iv-link" onClick={() => setEditNumber(true)}>Change</button></div>}
+              : <div className="iv-inline"><b className="iv-static">{d.number}</b><button type="button" className="iv-a is-quiet" onClick={() => setEditNumber(true)}>Change</button></div>}
           </FRow>
 
           <FRow label="Issue date">
@@ -555,7 +667,7 @@ function InvoiceForm({ id, copyOf, clientId, onDone }: { id?: string; copyOf?: s
           </FRow>
 
           <FRow label="">
-            <button type="button" className="iv-link iv-plus iv-more-btn" aria-expanded={more} onClick={() => setMore((v) => !v)}>
+            <button type="button" className="iv-chipbtn iv-more-btn" aria-expanded={more} onClick={() => setMore((v) => !v)}>
               <Icon.ChevronDown size={15} />{more ? 'Fewer options' : 'More options'}
             </button>
           </FRow>
@@ -591,7 +703,7 @@ function InvoiceForm({ id, copyOf, clientId, onDone }: { id?: string; copyOf?: s
             )
           })}
           {tried && err.lines && <p className="iv-err">{err.lines}</p>}
-          <button className="btn btn-quiet iv-additem" type="button"
+          <button className="iv-outline iv-additem" type="button"
             onClick={() => setD((p) => ({ ...p, lines: [...p.lines, { id: lineId(), name: '', qty: 1, unit: p.lines.at(-1)?.unit ?? '', price: 0, vat: p.lines.at(-1)?.vat ?? 21 }] }))}>
             <Icon.Plus size={15} />Add item
           </button>
@@ -608,9 +720,9 @@ function InvoiceForm({ id, copyOf, clientId, onDone }: { id?: string; copyOf?: s
         </div>
 
         <div className="iv-form-foot">
-          <button type="button" className="iv-link" onClick={() => onDone(existing?.id)}>Discard</button>
-          <button type="button" className="iv-link" onClick={() => setPreview(true)}>Preview</button>
-          <button type="button" className="btn btn-primary iv-create" onClick={save}>{existing ? 'Save invoice' : 'Create invoice'}</button>
+          <button type="button" className="iv-a is-quiet" onClick={() => onDone(existing?.id)}>Discard</button>
+          <button type="button" className="iv-a is-quiet" onClick={() => setPreview(true)}>Preview</button>
+          <button type="button" className="iv-yellow iv-create" onClick={save}>{existing ? 'Save invoice' : 'Create invoice'}</button>
         </div>
       </div>
 
@@ -636,83 +748,143 @@ function FRow({ label, error, children }: { label: string; error?: string; child
   )
 }
 
-/* ---------- contacts ---------- */
+/* ---------- contacts: Fakturoid's A to Z list and contact page ---------- */
 
 function ContactList({ onOpen, onAdd }: { onOpen: (id: string) => void; onAdd: () => void }) {
   const { invoiceClients, invoices } = useStore()
+  const today = isoDay()
   const [q, setQ] = useState('')
+  const [mode, setMode] = useState<'all' | 'quiet'>('all')
+  const lastOf = (cid: string) => invoices.filter((i) => i.clientId === cid && i.status !== 'cancelled').map((i) => i.issued).sort().at(-1)
   const rows = invoiceClients
     .filter((c) => !q.trim() || fold([c.name, c.ico, c.dic, c.city, c.email].join(' ')).includes(fold(q.trim())))
+    .filter((c) => { if (mode === 'all') return true; const l = lastOf(c.id); return !!l && daysBetween(l, today) >= QUIET_DAYS })
     .sort((a, b) => a.name.localeCompare(b.name, 'cs'))
+  const groups = rows.reduce((m, c) => { const k = c.name.trim()[0]?.toUpperCase() ?? '#'; (m[k] ??= []).push(c); return m }, {} as Record<string, typeof rows>)
   if (!invoiceClients.length) {
     return (
-      <div className="iv-empty">
+      <div className="iv-card iv-empty">
         <p>Everyone you invoice. Type an IČO and the name and address come from ARES.</p>
-        <button className="btn btn-primary" type="button" onClick={onAdd}>Add the first contact</button>
+        <button className="iv-yellow" type="button" onClick={onAdd}>Add the first contact</button>
       </div>
     )
   }
   return (
-    <>
-      <label className="iv-search is-big">
-        <Icon.Search size={18} />
-        <input type="search" value={q} placeholder="Name, IČO or email" aria-label="Search contacts" onChange={(e) => setQ(e.target.value)} />
-      </label>
-      <ul className="iv-crows">
-        {rows.map((c) => {
-          const mine = invoices.filter((i) => i.clientId === c.id && i.status !== 'cancelled')
-          const unpaid = mine.filter((i) => i.status !== 'paid')
-          return (
-            <li key={c.id} className="iv-crow" onClick={() => onOpen(c.id)}>
-              <button type="button" className="iv-crow-name" onClick={(e) => { e.stopPropagation(); onOpen(c.id) }}>{c.name}</button>
-              <span className="iv-crow-ids">{c.ico && <span>IČO {c.ico}</span>}{c.dic && <span>DIČ {c.dic}</span>}</span>
-              <span className="iv-crow-mail">{c.email}</span>
-              <span className="iv-crow-city">{c.city}</span>
-              <span className="iv-crow-sum">{mine.length ? sumText(mine) : ''}<small>{mine.length ? plural(mine.length, 'invoice', 'invoices') : 'Not invoiced yet'}</small></span>
-              <span className={`iv-crow-unpaid${unpaid.length ? ' is-on' : ''}`}>{unpaid.length ? `${sumText(unpaid)} unpaid` : ''}</span>
-            </li>
-          )
-        })}
-      </ul>
-    </>
+    <div className="iv-card">
+      <div className="iv-cbar">
+        <label className="iv-search is-big">
+          <Icon.Search size={20} />
+          <input type="search" value={q} placeholder="Name, IČO or email" aria-label="Search contacts" onChange={(e) => setQ(e.target.value)} />
+        </label>
+        <Segmented size="sm" label="Show" value={mode} onPick={setMode} className="iv-seg-soft"
+          options={[{ id: 'all', label: 'All contacts' }, { id: 'quiet', label: 'Not invoiced lately' }]} />
+      </div>
+      {rows.length === 0 && <p className="iv-quiet iv-pad">{mode === 'quiet' ? `Everyone was invoiced in the last ${QUIET_DAYS} days.` : 'Nobody matches that search.'}</p>}
+      {Object.entries(groups).map(([letter, list]) => (
+        <section key={letter} className="iv-cgroup">
+          <h3>{letter}</h3>
+          <ul>
+            {list.map((c) => {
+              const l = lastOf(c.id)
+              const unpaid = invoices.filter((i) => i.clientId === c.id && inFilter(i, 'unpaid', today))
+              return (
+                <li key={c.id} onClick={() => onOpen(c.id)}>
+                  <button type="button" className="iv-a is-plain" onClick={(e) => { e.stopPropagation(); onOpen(c.id) }}>{c.name}</button>
+                  <span className="iv-cids">{c.ico && <span>IČO: <b>{c.ico}</b></span>}{c.dic && <span>DIČ: <b>{c.dic}</b></span>}</span>
+                  <span className="iv-quiet">{c.email}</span>
+                  <span className={unpaid.length ? 'iv-cunpaid' : 'iv-quiet'}>{unpaid.length ? `${sumText(unpaid)} unpaid` : l ? `Last invoice ${fmtDate(l)}` : 'Not invoiced yet'}</span>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      ))}
+    </div>
   )
 }
 
 function ContactDetail({ id, onBack, onEdit, onOpen, onNew }: { id: string; onBack: () => void; onEdit: () => void; onOpen: (id: string) => void; onNew: (cid: string) => void }) {
   const { invoiceClients, invoices, deleteInvoiceClient } = useStore()
+  const today = isoDay()
   const c = invoiceClients.find((x) => x.id === id)
-  if (!c) return <div className="iv-empty"><p>This contact was deleted.</p><button className="btn btn-quiet" type="button" onClick={onBack}>Back to contacts</button></div>
-  const theirs = invoices.filter((i) => i.clientId === c.id).sort((a, b) => b.issued.localeCompare(a.issued))
-  const live = theirs.filter((i) => i.status !== 'cancelled')
-  const unpaid = live.filter((i) => i.status !== 'paid')
-  const late = unpaid.filter((i) => i.due < isoDay())
+  const theirs = invoices.filter((i) => i.clientId === id)
+  const years = [...new Set([today.slice(0, 4), ...theirs.map((i) => i.issued.slice(0, 4))])].sort()
+  const [year, setYear] = useState(today.slice(0, 4))
+  const [more, setMore] = useState(false)
+  if (!c) return <div className="iv-card iv-empty"><p>This contact was deleted.</p><button className="iv-outline" type="button" onClick={onBack}>Back to contacts</button></div>
+  const inYear = theirs.filter((i) => i.issued.startsWith(year) && i.status !== 'cancelled')
+  const unpaid = theirs.filter((i) => inFilter(i, 'unpaid', today)).sort((a, b) => a.due.localeCompare(b.due))
+  const yi = years.indexOf(year)
+  /* Fakturoid's Události: what happened to this client's invoices, newest first. */
+  const events = theirs.flatMap((i) => [
+    { day: i.issued, text: 'Issued', i },
+    ...(i.sentOn ? [{ day: i.sentOn, text: 'Sent', i }] : []),
+    ...(i.paidOn ? [{ day: i.paidOn, text: 'Paid', i }] : []),
+    ...(i.status !== 'paid' && i.status !== 'cancelled' && i.due < today ? [{ day: addDays(i.due, 1), text: 'Overdue', i }] : []),
+  ]).sort((a, b) => b.day.localeCompare(a.day)).slice(0, 8)
   return (
-    <div className="iv-detail">
-      <button className="iv-back" type="button" onClick={onBack}><Icon.ChevronLeft size={15} />All contacts</button>
-      <header className="iv-dhead">
-        <div className="iv-dtitle">
-          <h2>{c.name}</h2>
-          <div className="iv-dstate">{[c.ico && `IČO ${c.ico}`, c.dic && `DIČ ${c.dic}`, [c.street, [c.zip, c.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).map((x) => <span key={String(x)}>{x}</span>)}</div>
+    <div className="iv-card">
+      <header className="iv-dhead is-white">
+        <div>
+          <h2 className="iv-dtitle">{c.name}</h2>
+          <div className="iv-dstate"><span className="iv-caps">Customer</span>{c.ico && <span>IČO {c.ico}</span>}</div>
         </div>
         <div className="iv-dactions" role="toolbar" aria-label="Contact actions">
-          <IconAction icon={<Icon.Plus size={22} />} label="New invoice" onClick={() => onNew(c.id)} strong />
-          <IconAction icon={<Icon.Edit size={22} />} label="Edit" onClick={onEdit} />
+          <IconAction icon={<Icon.Plus size={24} />} label="Invoice" onClick={() => onNew(c.id)} />
+          <IconAction icon={<Icon.Edit size={24} />} label="Edit" onClick={onEdit} />
           <Dropdown label="More actions" className="iv-more" trigger={({ onClick, open }) => (
-            <button type="button" className="iv-iact" aria-expanded={open} onClick={onClick}><Icon.More size={22} /><span>More</span></button>
+            <button type="button" className="iv-iact" aria-expanded={open} onClick={onClick}><Icon.More size={24} /><span>More</span></button>
           )}>
             <button role="menuitem" className="danger" onClick={() => { deleteInvoiceClient(c.id); onBack() }}>Delete contact</button>
           </Dropdown>
         </div>
       </header>
-      <div className="iv-kpis is-contact">
-        <div className="iv-kpi"><span>Invoiced</span><b>{sumText(live)}</b><small>{plural(live.length, 'invoice', 'invoices')}</small></div>
-        <div className="iv-kpi"><span>Waiting for payment</span><b>{sumText(unpaid)}</b><small>{plural(unpaid.length, 'invoice', 'invoices')}</small></div>
-        <div className="iv-kpi"><span>Overdue</span><b className={late.length ? 'is-late' : ''}>{late.length ? sumText(late) : 'Nothing late'}</b><small>{c.email || 'No email'}</small></div>
+      <div className="is-center iv-moreline">
+        <button type="button" className="iv-chipbtn" aria-expanded={more} onClick={() => setMore((v) => !v)}>Address and details <Icon.ChevronDown size={14} /></button>
       </div>
-      <section className="iv-panel">
-        <h2 className="iv-h2">Invoices</h2>
-        {theirs.length ? <InvoiceRows rows={theirs} onOpen={onOpen} hideClient /> : <p className="iv-quiet">No invoices for {c.name} yet.</p>}
+      {more && (
+        <dl className="iv-kv iv-pad">
+          {c.street && <><dt>Address</dt><dd>{[c.street, [c.zip, c.city].filter(Boolean).join(' '), c.country].filter(Boolean).join(', ')}</dd></>}
+          {c.dic && <><dt>DIČ</dt><dd>{c.dic}</dd></>}
+          {c.email && <><dt>Email</dt><dd>{c.email}</dd></>}
+          {c.phone && <><dt>Phone</dt><dd>{c.phone}</dd></>}
+          {c.dueDays != null && <><dt>Due in</dt><dd>{plural(c.dueDays, 'day', 'days')}</dd></>}
+        </dl>
+      )}
+
+      <section className="iv-sec iv-cchart">
+        <div>
+          <BarChart data={periodBuckets(theirs, year, 'months')} height={200} />
+          <div className="iv-yearstep is-center">
+            <button type="button" aria-label="Previous year" disabled={yi <= 0} onClick={() => setYear(years[yi - 1])}><Icon.ChevronLeft size={16} /></button>
+            <b>{year}</b>
+            <button type="button" aria-label="Next year" disabled={yi >= years.length - 1} onClick={() => setYear(years[yi + 1])}><Icon.ChevronRight size={16} /></button>
+          </div>
+        </div>
+        <div className="iv-cstat">
+          <span className="iv-caps">{plural(inYear.length, 'invoice', 'invoices')} in {year}</span>
+          <b>{sumText(inYear)}</b>
+        </div>
       </section>
+
+      <section className="iv-sec is-flush is-grey">
+        <div className="iv-rowhead"><span className="iv-caps">Unpaid invoices</span><span>{unpaid.length ? sumText(unpaid) : ''}</span></div>
+        {unpaid.length ? <InvoiceRows rows={unpaid} onOpen={onOpen} hideClient /> : <p className="iv-quiet iv-pad">Everything from {c.name} is paid.</p>}
+      </section>
+
+      {events.length > 0 && (
+        <section className="iv-sec iv-events">
+          <h3><Icon.DockCalendar size={20} />Events</h3>
+          <ul>
+            {events.map((e, k) => (
+              <li key={k}>
+                <span className="iv-quiet">{fmtDate(e.day)}</span>
+                <span>{e.text} <button type="button" className="iv-a" onClick={() => onOpen(e.i.id)}>{e.i.number}</button><span className="iv-quiet"> for {money(invoiceTotal(e.i), e.i.currency)}</span></span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   )
 }
@@ -733,8 +905,8 @@ function ContactSheet({ id, onClose, onSaved }: { id?: string; onClose: () => vo
             onChange={(e) => setC((x) => ({ ...x, dueDays: e.target.value === '' ? undefined : Math.max(0, Number(e.target.value)) }))} />
         </label>
         <div className="iv-sheet-foot">
-          <button className="btn btn-quiet" type="button" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" type="button" disabled={!c.name.trim()} onClick={save}>{existing ? 'Save contact' : 'Add contact'}</button>
+          <button className="iv-outline" type="button" onClick={onClose}>Cancel</button>
+          <button className="iv-yellow" type="button" disabled={!c.name.trim()} onClick={save}>{existing ? 'Save contact' : 'Add contact'}</button>
         </div>
       </div>
     </Sheet>
@@ -756,7 +928,7 @@ function PartyFields({ value, onChange }: { value: InvoiceParty; onChange: (p: P
       <label className="iv-flabel">IČO
         <span className="iv-inline">
           <input {...f('ico')} className="iv-input iv-w-md" inputMode="numeric" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void lookup() } }} />
-          <button className="btn btn-quiet" type="button" disabled={busy || !(value.ico ?? '').replace(/\D/g, '')} onClick={() => void lookup()}>{busy ? 'Looking up' : 'Fill from ARES'}</button>
+          <button className="iv-outline" type="button" disabled={busy || !(value.ico ?? '').replace(/\D/g, '')} onClick={() => void lookup()}>{busy ? 'Looking up' : 'Fill from ARES'}</button>
         </span>
         {err && <span className="iv-err">{err}</span>}
       </label>
@@ -788,12 +960,12 @@ function SettingsForm() {
   const autoIban = czIban(p.account ?? '')
   return (
     <div className="iv-settings">
-      <section className="iv-panel">
+      <section className="iv-card iv-spanel">
         <h2 className="iv-h2">Your details</h2>
         <PartyFields value={p} onChange={set} />
         <label className="iv-flabel">Website<input className="iv-input" value={p.web ?? ''} onChange={(e) => set({ web: e.target.value })} /></label>
       </section>
-      <section className="iv-panel">
+      <section className="iv-card iv-spanel">
         <h2 className="iv-h2">Bank account</h2>
         <label className="iv-flabel">Account number<input className="iv-input" placeholder="123456789/0800" value={p.account ?? ''} onChange={(e) => set({ account: e.target.value })} /></label>
         <div className="iv-two">
@@ -802,7 +974,7 @@ function SettingsForm() {
         </div>
         {autoIban && !p.iban && <p className="iv-hint">The IBAN for the QR payment code comes from the account number: {ibanSpaced(autoIban)}</p>}
       </section>
-      <section className="iv-panel">
+      <section className="iv-card iv-spanel">
         <h2 className="iv-h2">Invoice defaults</h2>
         <div className="iv-flabel">VAT
           <Segmented size="sm" label="VAT" value={p.vatPayer ? 'yes' : 'no'} onPick={(v) => set({ vatPayer: v === 'yes' })}
@@ -819,7 +991,7 @@ function SettingsForm() {
       </section>
       <div className="iv-settings-foot">
         {saved && <span className="iv-saved" role="status">Saved. New invoices use these details.</span>}
-        <button className="btn btn-primary iv-create" type="button" onClick={() => { saveInvoiceProfile(p); setSaved(true) }}>Save details</button>
+        <button className="iv-yellow iv-create" type="button" onClick={() => { saveInvoiceProfile(p); setSaved(true) }}>Save details</button>
       </div>
     </div>
   )

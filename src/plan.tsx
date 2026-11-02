@@ -14,6 +14,7 @@ import { fakeDecompose } from './mock'
 import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
 import { BreakdownSheet, Sheet } from './modals'
+import { WeekGoals } from './weekgoals'
 import { Linkify } from './widgets'
 import { PLAN_AHEAD_DAYS, WeekGrid, dayPlus, shortDay, weekRangeLabel } from './weekgrid'
 import { useCoarsePointer, usePhone, Band, WorkspaceTitle, Dropdown, SpaceMark, TagMark } from './ui'
@@ -1075,6 +1076,7 @@ export function PlanPage() {
         />,
         document.body,
       )}
+      <WeekGoals />
       <ProjectStrip
         projects={stripProjects} tasks={tasks} sel={sel} showSpaces={view === 'all'} touch={coarse} inScope={(t) => inView(t.space)}
         onAll={() => setPicked([])}

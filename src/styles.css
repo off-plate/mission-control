@@ -12560,3 +12560,39 @@ textarea.iv-input { height: auto; padding: 10px 12px; resize: vertical; }
   .iv-print-root .iv-paper { width: auto; min-height: 273mm; padding: 0 10mm; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
   .iv-print-root .ivp-stamp { top: 0; left: 10mm; }
 }
+
+/* THIS WEEK'S GOALS (Plan). A row is a name, a number, a bar and one line of
+   pace. Colour is meaning only: the bar is the accent, amber when behind pace,
+   green when done. No fill AND border on the same control. */
+.weekgoals { margin-bottom: var(--s4); }
+.weekgoals .col-head { align-items: center; }
+.wg-act {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--font-mono); font-size: 0.6875rem; color: var(--info);
+  border: 1px solid var(--hairline-strong); border-radius: 3px; padding: 3px 8px; min-height: 28px;
+}
+.wg-act:hover { color: var(--accent-text); border-color: var(--accent-text); }
+.wg-add { align-items: center; flex-wrap: nowrap; }
+.wg-target { width: 84px; flex: none; }
+.wg-row { padding: var(--s3) 0; border-top: 1px solid var(--hairline); }
+.wg-row:first-of-type { border-top: 0; padding-top: 0; }
+.wg-top { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s2); min-width: 0; }
+.wg-name { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.wg-row.is-done .wg-name { color: var(--muted); }
+.wg-count { font-size: var(--text-sm); color: var(--ink); padding: 2px 4px; border-radius: var(--r-sm); }
+.wg-count span { color: var(--muted); }
+.wg-count:not(:disabled):hover { background: var(--surface-2); }
+.wg-step {
+  font-size: var(--text-xs); min-width: 40px; min-height: 32px; padding: 0 8px;
+  color: var(--accent-text); border: 1px solid var(--hairline-strong); border-radius: var(--r-sm);
+}
+.wg-step:hover { border-color: var(--accent-text); }
+.wg-step:active { transform: scale(0.97); }
+.wg-pace { margin-top: var(--s2); font-size: var(--text-xs); color: var(--info); }
+.wg-pace.is-behind { color: var(--warn); }
+@media (max-width: 639px) {
+  .wg-top { flex-wrap: wrap; }
+  .wg-name { flex: 1 0 100%; }
+  .wg-step { min-height: 40px; min-width: 48px; }
+  .wg-act { min-height: 36px; }
+}

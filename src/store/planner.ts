@@ -86,6 +86,8 @@ export function usePlannerSlice(
     /* A hashtag can name a project in the other workspace, and a project only
        holds tasks of its own space (see setTaskSpace), so the task follows
        the project there rather than pointing at one it cannot see. */
+    setTaskGoal: (id: string, goalId: string | undefined, goalAmt?: number) =>
+      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, goalId, goalAmt: goalId ? Math.max(1, goalAmt ?? 1) : undefined } : t))),
     setTaskProject: (id: string, projectId: string | undefined) => {
       const sp = projectId ? projects.find((p) => p.id === projectId)?.space : undefined
       setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, projectId, space: sp ?? t.space } : t)))

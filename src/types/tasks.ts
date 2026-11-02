@@ -56,6 +56,11 @@ export interface Task {
    *  one as though he had planned it there. */
   horizon?: GoalTimeframe
   horizonKey?: string
+  /** A weekly goal this task feeds, and by how much. Finishing the task adds
+   *  goalAmt to that goal; reopening it takes the amount back. One fact in one
+   *  place: the goal never keeps its own copy of which tasks fed it. */
+  goalId?: string
+  goalAmt?: number
 }
 
 /** A room inside a Space: Off-Plate holds clients, Corner holds workstreams,

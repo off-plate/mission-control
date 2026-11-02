@@ -304,6 +304,8 @@ interface Store extends PersistedState {
    *  with undefined. The task's own space never changes; a project only
    *  ever holds tasks that already belonged to it. */
   setTaskProject: (id: string, projectId: string | undefined) => void
+  /** Tie a task to a weekly goal: finishing it adds goalAmt to the goal. */
+  setTaskGoal: (id: string, goalId: string | undefined, goalAmt?: number) => void
   /** Move a task into a different workspace outright, clearing its project
    *  (a project only ever holds tasks from its own space, same rule
    *  setTaskProject already keeps). */
@@ -1549,6 +1551,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     autoFrom(next, 0)
   }
 
+  /* A task tied to a weekly goal moves that goal when it is finished, and moves
+     it back when it is reopened. Only a goal still running: last week's result
+     is history and a late tick must not rewrite it. */
+  const creditGoal = (t: Task | undefined, sign: 1 | -1) => {
+    if (!t?.goalId) return
+    const g = goals.find((x) => x.id === t.goalId)
+    if (!g || g.closed || g.habitId) return
+    growthSlice.bumpGoal(g.id, sign * (t.goalAmt ?? 1))
+  }
+
   const value: Store = {
     version: 3,
     tasks, habits, goals, projects, storageFull, ledger, plan, review, routines, ideas,
@@ -1558,6 +1570,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setProjectTag: plannerSlice.setProjectTag,
     deleteProject: plannerSlice.deleteProject,
     setTaskProject: plannerSlice.setTaskProject,
+    setTaskGoal: plannerSlice.setTaskGoal,
     setTaskSpace: plannerSlice.setTaskSpace,
     focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog,
     view, setView, inView,
@@ -1604,11 +1617,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     noteToOpen, openNote: setNoteToOpen,
 
 
-    toggleTask: (...a: Parameters<typeof plannerSlice.toggleTask>) => { haptic(); return plannerSlice.toggleTask(...a) },
+    toggleTask: (...a: Parameters<typeof plannerSlice.toggleTask>) => {
+      haptic()
+      const t = tasks.find((x) => x.id === a[0])
+      creditGoal(t, t?.done ? -1 : 1)
+      return plannerSlice.toggleTask(...a)
+    },
     updateTask: plannerSlice.updateTask,
 
     logActual: (id, actualMin) => {
       const t = tasks.find((x) => x.id === id)
+      if (t && !t.done) creditGoal(t, 1)
       setTasks((prev) => prev.map((x) => (x.id === id
         ? { ...x, done: true, doneAt: x.doneAt ?? new Date().toISOString(), actualMin, subtasks: x.subtasks?.map((sub) => ({ ...sub, done: true })) }
         : x)))
@@ -1654,6 +1673,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           : t)),
       )
       if (parent && allDone && !parent.done) {
+        creditGoal(parent, 1)
         const est = subs.reduce((a, s) => a + s.estimateMin, 0)
         const act = subs.reduce((a, s) => a + (s.actualMin ?? s.estimateMin), 0)
         const lid = newId('l')

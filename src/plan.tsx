@@ -14,6 +14,7 @@ import { fakeDecompose } from './mock'
 import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
 import { BreakdownSheet, Sheet } from './modals'
+import { WeekGoals, useWeekGoals } from './weekgoals'
 import { Linkify } from './widgets'
 import { PLAN_AHEAD_DAYS, WeekGrid, dayPlus, shortDay, weekRangeLabel } from './weekgrid'
 import { useCoarsePointer, usePhone, Band, WorkspaceTitle, Dropdown, SpaceMark, TagMark } from './ui'
@@ -531,6 +532,57 @@ function PhoneProjectFilter({ projects, tasks, sel, inScope, onAll, onPick, onMa
   )
 }
 
+/* Desktop's project filter: one button where the strip of folders used to be.
+   Same choices as the phone's menu, but the button itself opens the menu. */
+function ProjectFilter({ projects, tasks, sel, inScope, onAll, onPick, onManage }: {
+  projects: Project[]; tasks: Task[]; sel: string[]; inScope: (t: Task) => boolean
+  onAll: () => void; onPick: (id: string, add: boolean) => void; onManage: () => void
+}) {
+  const open = (id: string) => tasks.filter((t) => t.projectId === id && !t.done).length
+  const label = sel.length === 0 ? 'All projects'
+    : sel.length === 1 ? (sel[0] === UNSORTED ? 'Unsorted' : projects.find((p) => p.id === sel[0])?.name ?? 'Project')
+    : `${sel.length} projects`
+  return (
+    <Dropdown
+      label="Filter Plan by project" className="hide-phone"
+      trigger={({ onClick, open: isOpen }) => (
+        <button className="btn btn-ghost pf-proj" onClick={onClick} aria-expanded={isOpen}>
+          {label} <Icon.ChevronDown size={14} />
+        </button>
+      )}
+    >
+      <button role="menuitem" aria-checked={sel.length === 0} onClick={onAll}>All projects <em className="mono plan-proj-n">{tasks.filter((t) => !t.done && inScope(t)).length}</em></button>
+      {projects.map((p) => (
+        <button key={p.id} role="menuitem" aria-checked={sel.includes(p.id)} onClick={(e) => onPick(p.id, e.shiftKey || e.metaKey || e.ctrlKey)}>
+          <FolderGlyph cls={`s-${p.space}`} /><span>{p.name}</span><em className="mono plan-proj-n">{open(p.id)}</em>
+        </button>
+      ))}
+      <button role="menuitem" aria-checked={sel.includes(UNSORTED)} onClick={(e) => onPick(UNSORTED, e.shiftKey || e.metaKey || e.ctrlKey)}>
+        <FolderGlyph cls="f-unsorted" /><span>Unsorted</span><em className="mono plan-proj-n">{tasks.filter((t) => !t.projectId && !t.done && inScope(t)).length}</em>
+      </button>
+      <span className="kebab-sep" />
+      <button role="menuitem" onClick={onManage}>Manage projects</button>
+    </Dropdown>
+  )
+}
+
+/** What a day of focus is measured against on the Today ring: an hour and a
+ *  half, the figure in the version he picked (2026-11-02). */
+const FOCUS_DAY_MIN = 90
+
+function Ring({ v, size, cls }: { v: number; size: number; cls: string }) {
+  const r = size / 2 - 5
+  const c = 2 * Math.PI * r
+  return (
+    <svg className={`pf-ringsvg ${cls}`} width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
+      <circle cx={size / 2} cy={size / 2} r={r} className="pf-ring-track" />
+      <circle cx={size / 2} cy={size / 2} r={r} className="pf-ring-fill"
+        strokeDasharray={c} strokeDashoffset={c * (1 - Math.max(0, Math.min(1, v)))}
+        transform={`rotate(-90 ${size / 2} ${size / 2})`} />
+    </svg>
+  )
+}
+
 /* The phone shows one list at a time (his ask, 2026-10-15). The tab bar's +
    fires mc:new-task, which lands on Plan's new-task box, and that box lives in
    the to-do list, so the next Plan render opens on it. Registered at import,
@@ -1035,33 +1087,257 @@ export function PlanPage() {
     document.querySelector('.day-switch')?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }
 
+  /* ---------------- TODAY FOCUS (2026-11-02) ----------------
+     He picked this shape from three working versions: one task in front of
+     him, the week's goals on the left with today's share of each, the to-do
+     pool on the right. What came out with it: the three header numbers, the
+     project strip, the black week bar (the Today page keeps the week), and the
+     four time-of-day boxes, which are now a label on the row he can click. */
+  const { goals, setTaskGoal } = useStore()
+  const { rows: goalRows } = useWeekGoals()
+  const goalOf = (t: Task) => (t.goalId ? goals.find((g) => g.id === t.goalId) : undefined)
+  const goalTag = (t: Task) => {
+    const g = goalOf(t)
+    return g ? <span className="goal-tag mono" title={`Finishing this adds ${t.goalAmt ?? 1} to ${g.name}`}>{g.name} +{t.goalAmt ?? 1}</span> : null
+  }
+  /* "Send first 10 cold emails" counts as 10. A title with no number counts as one. */
+  const amtFrom = (title: string) => { const m = title.match(/\d+/); return m ? Math.max(1, Math.min(1000, Number(m[0]))) : 1 }
+  const goalMenu = (t: Task) => (goalRows.length === 0 ? null : (
+    <>
+      <span className="kebab-sep" />
+      <span className="kebab-head">Counts toward</span>
+      {goalRows.map(({ goal: g }) => (
+        <button key={g.id} role="menuitem" aria-checked={t.goalId === g.id}
+          onClick={() => setTaskGoal(t.id, t.goalId === g.id ? undefined : g.id, amtFrom(t.title))}>
+          {t.goalId === g.id ? `Stop counting toward ${g.name}` : `${g.name} +${amtFrom(t.title)}`}
+        </button>
+      ))}
+    </>
+  ))
+  const SLOT_CYCLE: (TimeSlot | undefined)[] = [...SLOTS.map((s) => s.id), undefined]
+  const slotLabel = (s?: TimeSlot) => (s ? SLOTS.find((x) => x.id === s)!.label : 'Anytime')
+  const slotBtn = (t: Task) => (
+    <button className="slot-btn" title="Change the part of the day" aria-label={`${slotLabel(t.slot)}, change the part of the day`}
+      onClick={() => assignSlot(t.id, SLOT_CYCLE[(SLOT_CYCLE.indexOf(t.slot) + 1) % SLOT_CYCLE.length])}>
+      {slotLabel(t.slot)}
+    </button>
+  )
+  const slotRank = (t: Task) => (t.slot ? SLOTS.findIndex((x) => x.id === t.slot) : SLOTS.length)
+  const dayOpen = todayAll.filter((t) => !t.done).sort((a, b) => slotRank(a) - slotRank(b))
+  const nextUp = dayOpen[0]
+  const dayRest = dayOpen.slice(1)
+  const dayDone = todayAll.filter((t) => t.done)
+  const rDone = (r: Routine) => routineComplete(r, periodKeyFor(r.cadence))
+
+  /* The rings read TODAY, whichever day the middle column is showing. */
+  const todayList = spaceTasks.filter((t) => t.list === 'today' && (t.plannedOn ?? today) === today)
+  const todayDone = todayList.filter((t) => t.done).length
+  const focusToday = focusSessions.filter((f) => f.day === today && inView(f.space)).reduce((a, f) => a + f.minutes, 0)
+    + (pomo.phase === 'focus' ? Math.max(0, Math.floor((pomo.blockMin * 60 - pomo.secondsLeft) / 60)) : 0)
+  const shareRows = goalRows.filter((r) => !r.done || r.added > 0)
+  const goalWant = shareRows.reduce((a, r) => a + r.share, 0)
+  const goalGot = shareRows.reduce((a, r) => a + Math.min(r.share, r.added), 0)
+  const rings = [
+    { k: 'Tasks', cls: 'r-accent', v: todayList.length ? todayDone / todayList.length : 0, txt: `${todayDone} of ${todayList.length}` },
+    { k: 'Focus', cls: 'r-info', v: Math.min(1, focusToday / FOCUS_DAY_MIN), txt: `${fmtDuration(focusToday)} of ${fmtDuration(FOCUS_DAY_MIN)}` },
+    { k: 'Goals', cls: 'r-prog', v: goalWant ? goalGot / goalWant : 0, txt: goalWant ? `${goalGot} of ${goalWant} today` : 'No goals yet' },
+  ]
+  const ringRow = (size: number) => (
+    <div className="pf-rings">
+      {rings.map((r) => (
+        <div key={r.k} className="pf-ring">
+          <Ring v={r.v} size={size} cls={r.cls} />
+          <b>{r.k}</b>
+          <span className="mono">{r.txt}</span>
+        </div>
+      ))}
+    </div>
+  )
+  const [closing, setClosing] = useState(false)
+  const leftToday = todayList.filter((t) => !t.done)
+  const focusingOn = (t: Task) => pomo.phase === 'focus' && (pomo.focusLabel ?? '').trim().toLowerCase() === t.title.trim().toLowerCase()
+  const [pq, setPq] = useState('')
+  const poolShown = pq.trim() ? backlogSorted.filter((t) => t.title.toLowerCase().includes(pq.trim().toLowerCase())) : backlogSorted
+  const addFromSearch = () => {
+    const got = takeTag(pq, projects)
+    if (!got.title) return
+    const proj = got.project ?? (newProjectId ? projects.find((p) => p.id === newProjectId) : undefined)
+    addTask({ title: got.title, source: 'mc', estimateMin: 0, space: proj?.space ?? addSpace, list: 'backlog', category: 'quick', projectId: proj?.id })
+    if (got.project && sel.length && !sel.includes(got.project.id)) setPicked((prev) => [...prev, got.project!.id])
+    setPq('')
+  }
+
+  const dayMenu = (t: Task) => (
+    <Dropdown label={`Options for ${t.title}`}>
+      {phone && !t.done && isEstimated(t) && <button role="menuitem" onClick={() => startFocus(taskMinutes(t), t.title)}>Start focus</button>}
+      {!t.done && <button role="menuitem" onClick={() => setBreakdownFor(t)}>Break it down</button>}
+      {!t.done && <span className="kebab-sep" />}
+      {!t.done && (
+        <>
+          <button role="menuitem" onClick={() => setEditingTask(t)}>Edit</button>
+          <button role="menuitem" onClick={() => { moveTaskList(t.id, 'backlog'); assignSlot(t.id, undefined); setTaskAt(t.id, undefined) }}>Back to the list</button>
+        </>
+      )}
+      {!t.done && goalMenu(t)}
+      {!t.done && projectMenu(t)}
+      {!t.done && spaceMenu(t)}
+      <button role="menuitem" className="danger" onClick={() => deleteTask(t.id)}>Delete</button>
+    </Dropdown>
+  )
+  const subList = (t: Task) => (
+    <div className="subtask-list">
+      {t.subtasks!.map((s) => (
+        <div key={s.id} className="subtask-wrap">
+          <button
+            className={`subtask${s.done ? ' done' : ''}`}
+            onClick={() => { if (s.done) toggleSubtask(t.id, s.id); else setLogging(`sub|${t.id}|${s.id}`) }}
+          >
+            <span className="sub-tick" aria-hidden="true" />
+            <span className="grow">{s.title}</span>
+            {s.done && s.actualMin != null ? (
+              <span className="est-vs-actual mono">{fmtDuration(s.estimateMin)} → {fmtDuration(s.actualMin)} <b className={s.estimateMin - s.actualMin >= 0 ? 'val-pos' : 'val-urgent'}>{s.estimateMin - s.actualMin >= 0 ? '+' : ''}{s.estimateMin - s.actualMin}m</b></span>
+            ) : (
+              <span className="chip tone-info">{fmtDuration(s.estimateMin)}</span>
+            )}
+          </button>
+          {!s.done && (
+            <button
+              className="task-act task-focus sub-focus"
+              aria-label={`Focus on ${s.title} for ${s.estimateMin} minutes`}
+              title={`Focus ${s.estimateMin}m on this step`}
+              onClick={() => startFocus(s.estimateMin, s.title)}
+            >
+              <Icon.Play size={17} />
+            </button>
+          )}
+          {!s.done && <SubEdit taskId={t.id} sub={s} />}
+          {logging === `sub|${t.id}|${s.id}` && (
+            <ActualLog est={s.estimateMin} tracked={trackedFor(s.title)} onLog={(m) => { logSubtaskActual(t.id, s.id, m); setLogging(null) }} onSkip={() => { toggleSubtask(t.id, s.id); setLogging(null) }} />
+          )}
+        </div>
+      ))}
+    </div>
+  )
+  const dayRow = (t: Task) => {
+    const isExp = expanded.has(t.id)
+    const hasSubs = !!t.subtasks?.length
+    const doneSubs = t.subtasks?.filter((s) => s.done).length ?? 0
+    return (
+      <div className="today-item" key={t.id} data-task-id={t.id}>
+        <div
+          className={`today-task${t.done ? ' done' : ''}${flashId === t.id ? ' flash' : ''}`}
+          draggable={!t.done}
+          onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move' }}
+        >
+          <span className="drag-grip" aria-hidden="true"><Icon.Grip /></span>
+          <button
+            className="checkbox" role="checkbox" aria-checked={t.done}
+            aria-label={t.done ? `Reopen: ${t.title}` : `Complete: ${t.title}`}
+            onClick={() => { if (t.done) { toggleTask(t.id); return } setLogging(t.id) }}
+          >
+            <Icon.Check size={12} strokeWidth={4} />
+          </button>
+          <SpaceMark space={t.space} />
+          <span className={`grow wrap2${openTitles.has(t.id) ? ' is-open' : ''}`} onClick={(e) => toggleTitle(e, t.id)}><Linkify text={t.title} /> <TagMark project={markOf(t)} onPick={pickTag} /></span>
+          {goalTag(t)}
+          {!t.done && slotBtn(t)}
+          {t.done && t.actualMin != null ? (
+            <span className="est-vs-actual mono">{fmtDuration(taskMinutes(t))} → {fmtDuration(t.actualMin)}</span>
+          ) : (
+            <EstimateChip task={t} />
+          )}
+          {hasSubs && (
+            <button className="expand-btn" aria-expanded={isExp} aria-label={isExp ? 'Collapse subtasks' : 'Expand subtasks'} onClick={() => toggleExp(t.id)}>
+              {isExp ? '▾' : '▸'} {doneSubs}/{t.subtasks!.length}
+            </button>
+          )}
+          {!t.done && <TaskActions task={t} onFocus={() => startFocus(taskMinutes(t), t.title)} />}
+          {dayMenu(t)}
+        </div>
+        {logging === t.id && (
+          <ActualLog est={taskMinutes(t)} tracked={trackedFor(t.title)} onLog={(m) => { logActual(t.id, m); setLogging(null) }} onSkip={() => { toggleTask(t.id); setLogging(null) }} />
+        )}
+        {hasSubs && isExp && subList(t)}
+      </div>
+    )
+  }
+  const poolRow = (t: Task) => {
+    const isExp = expanded.has(t.id)
+    const hasSubs = !!t.subtasks?.length
+    const doneSubs = t.subtasks?.filter((s) => s.done).length ?? 0
+    return (
+      <div className="todo-item" key={t.id} data-todo-id={t.id}>
+        <div
+          className={`todo-row${flashIds.includes(t.id) ? ' flash' : ''}`}
+          draggable
+          onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move' }}
+        >
+          <span className="drag-grip" aria-hidden="true"><Icon.Grip /></span>
+          <SpaceMark space={t.space} />
+          <span className={`grow${openTitles.has(t.id) ? ' is-open' : ''}`} onClick={(e) => toggleTitle(e, t.id)}>
+            <Linkify text={t.title} /> <TagMark project={markOf(t)} onPick={pickTag} />
+            {goalOf(t) && <><br />{goalTag(t)}</>}
+          </span>
+          {t.createdAt && daysSince(t.createdAt) > 0 && (
+            <span className="carried-tag mono" title={`On the list since ${t.createdAt}`}>
+              {daysSince(t.createdAt) === 1 ? '1 day' : `${daysSince(t.createdAt)} days`}
+            </span>
+          )}
+          <EstimateChip task={t} />
+          {hasSubs && (
+            <button className="expand-btn" aria-expanded={isExp} aria-label={isExp ? 'Collapse subtasks' : 'Expand subtasks'} onClick={() => toggleExp(t.id)}>
+              {isExp ? '▾' : '▸'} {doneSubs}/{t.subtasks!.length}
+            </button>
+          )}
+          <button className="pf-send" aria-label={`Add ${t.title} to ${dayOffset === 0 ? 'today' : longDay(planDay)}`}
+            title={`Add to ${dayOffset <= 1 ? offsetWord(dayOffset).toLowerCase() : shortDay(planDay)}`}
+            onClick={() => moveTasksToToday([t.id], planDay)}>
+            <Icon.ChevronRight size={16} />
+          </button>
+          <Dropdown label={`Options for ${t.title}`}>
+            <button role="menuitem" onClick={() => setEditingTask(t)}>Edit</button>
+            <button role="menuitem" onClick={() => setBreakdownFor(t)}>Break it down</button>
+            {coarse && (
+              <>
+                <span className="kebab-head">Plan for a day</span>
+                {Array.from({ length: PLAN_AHEAD_DAYS + 1 }, (_, n) => n).map((n) => (
+                  <button key={n} role="menuitem" onClick={() => { moveTasksToToday([t.id], dayPlus(n)); setDayOffset(n) }}>
+                    Move to {n <= 1 ? offsetWord(n).toLowerCase() : shortDay(dayPlus(n))}
+                  </button>
+                ))}
+              </>
+            )}
+            {goalMenu(t)}
+            {projectMenu(t)}
+            {spaceMenu(t)}
+            <span className="kebab-sep" />
+            <button role="menuitem" className="danger" onClick={() => deleteTask(t.id)}>Delete</button>
+          </Dropdown>
+        </div>
+        {hasSubs && isExp && (
+          <div className="subtask-list">
+            {t.subtasks!.map((s) => <SubtaskRow key={s.id} taskId={t.id} sub={s} />)}
+          </div>
+        )}
+      </div>
+    )
+  }
+  const pickProject = (id: string, add: boolean) => setPicked(sel.includes(id)
+    ? (add ? sel.filter((x) => x !== id) : sel.length === 1 ? [] : [id])
+    : (add ? [...sel, id] : [id]))
+
   return (
-    <div className="page">
+    <div className="page plan-focus">
       <Band
         title={<WorkspaceTitle before="Plan" after={longDay(planDay)} />}
-        /* Which room this is, against the title itself, not off in the far
-           corner with the buttons: see Band's own note on `beside`. */
-        metrics={[
-          { v: fmtDuration(plannedMin), k: `planned ${dayOffset === 0 ? 'today' : offsetWord(dayOffset).toLowerCase()}`, tone: 'info' as const },
-          { v: pool.length ? `${donePct}%` : '—', k: pool.length ? 'of planned time done' : 'no tasks yet', tone: (pool.length && donePct > 0 ? 'pos' : 'info') as 'pos' | 'info' },
-          /* Moved up from the to-do list's own header (2026-09-30). No estimates,
-             no duration: "4 waiting · 0m" read like a bug. */
-          ...(backlogMins > 0 ? [{ v: fmtDuration(backlogMins), k: 'of waiting work', tone: 'info' as const }] : []),
-          ...(loggedAny ? [{ v: savedToday >= 0 ? fmtSigned(savedToday) : fmtDuration(-savedToday), k: savedToday >= 0 ? 'saved today' : 'over your estimates', tone: (savedToday >= 0 ? 'pos' : 'urgent') as 'pos' | 'urgent' }] : []),
-        ]}
-        /* The way back into the record, or the way back out of a project into
-           its own room's Plan. Never both: a project already has Yesterday
-           one tap further, through Projects then the Space's own Plan. */
         actions={(
           <span className="plan-actions">
             <button className="btn btn-ghost plan-search-btn hide-phone" onClick={() => setSpot(true)} aria-label="Search every task" title="Search every task (Cmd K)"><Icon.Search size={16} /></button>
+            <ProjectFilter projects={stripProjects} tasks={tasks} sel={sel} inScope={(t) => inView(t.space)}
+              onAll={() => setPicked([])} onPick={pickProject} onManage={() => setPage('projects')} />
             <PhoneProjectFilter
               projects={stripProjects} tasks={tasks} sel={sel} inScope={(t) => inView(t.space)}
-              onAll={() => setPicked([])}
-              onPick={(id, add) => setPicked(sel.includes(id)
-                ? (add ? sel.filter((x) => x !== id) : sel.length === 1 ? [] : [id])
-                : (add ? [...sel, id] : [id]))}
-              onManage={() => setPage('projects')}
+              onAll={() => setPicked([])} onPick={pickProject} onManage={() => setPage('projects')}
             />
             <button className="btn btn-ghost" onClick={openDaily}>Yesterday</button>
           </span>
@@ -1075,109 +1351,6 @@ export function PlanPage() {
         />,
         document.body,
       )}
-      <ProjectStrip
-        projects={stripProjects} tasks={tasks} sel={sel} showSpaces={view === 'all'} touch={coarse} inScope={(t) => inView(t.space)}
-        onAll={() => setPicked([])}
-        onPick={(id, add) => setPicked(sel.includes(id)
-          ? (add ? sel.filter((x) => x !== id) : sel.length === 1 ? [] : [id])
-          : (add ? [...sel, id] : [id]))}
-        onManage={() => setPage('projects')}
-      />
-      {/* THE WEEK. Moved above the to-do list and day panel on his instruction
-          (2026-08-31, from his own mockup): folded to one bar by default,
-          giving context for the day he's about to plan without taking over
-          the page in full. */}
-      <div className={`panel weekplan${weekOpen ? ' is-open' : ''}`}>
-        {/* The whole bar opens AND closes it -- one handler, both directions.
-            The nav row (This week / prev) stops its own clicks from reaching
-            this so paging a week doesn't also fold the thing shut. */}
-        {/* A div carrying role="button": it holds real <button> nav controls
-            inside it, and a button cannot nest inside a button -- the browser
-            would just close the outer one early and break the layout.
-            role+tabIndex give it the same keyboard reach a button would have. */}
-        <div
-          className="weekplan-bar"
-          role="button"
-          tabIndex={0}
-          aria-expanded={weekOpen}
-          onClick={() => setWeekOpen((v) => !v)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setWeekOpen((v) => !v) }
-          }}
-        >
-          <span className="weekplan-title">
-            <span className="microcap">The week</span>
-            <span className="weekplan-range mono">{weekRangeLabel(weekDays[0], weekDays[6])}</span>
-          </span>
-          {/* His sentence, verbatim in shape, tightened in wording: "9hours and
-              10 minutes" read as a typo more than a choice, and this app
-              already spells every other duration as fmtDuration does (Band's
-              own "9h 10m" sits three lines above this bar on the same page). */}
-          <span className="weekplan-sentence">
-            {todayTasks.length === 0 ? (
-              'Nothing planned for today yet.'
-            ) : (
-              <>
-                You have <strong>{todayTasks.length} {todayTasks.length === 1 ? 'task' : 'tasks'}</strong> planned
-                for today, taking <strong>{fmtDuration(plannedMin)}</strong> of your day.
-              </>
-            )}
-          </span>
-          <span className="weekplan-nav" onClick={(e) => e.stopPropagation()}>
-            {weekOpen && (
-              <button className="wk-navbtn" aria-label="Previous week" onClick={() => setWeekShift((n) => n - 1)}>
-                <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 L6 8 L10 13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              </button>
-            )}
-            {weekOpen && (
-              <button
-                className="wk-navbtn is-word"
-                disabled={weekShift === 0}
-                aria-current={weekShift === 0 ? 'true' : undefined}
-                onClick={() => setWeekShift(0)}
-              >
-                This week
-              </button>
-            )}
-            {/* Same slot, two jobs. Shut, it's a redundant affordance for what
-                the whole bar already does -- his words, "more of a show off
-                than functional". Open, it becomes the real next-week arrow,
-                which is why the icon swaps from a down chevron to a right one
-                the moment the fold opens. */}
-            <button
-              className="wk-navbtn weekplan-toggle"
-              aria-label={weekOpen ? 'Next week' : 'Show the week'}
-              onClick={() => (weekOpen ? setWeekShift((n) => n + 1) : setWeekOpen(true))}
-            >
-              {weekOpen ? (
-                <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3 L10 8 L6 13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              ) : (
-                <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6 L8 10 L13 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              )}
-            </button>
-          </span>
-        </div>
-        {/* A CSS grid-rows tween, not a max-height guess: it animates to
-            however tall the real content is, at any density, instead of
-            snapping open or stopping short. The grid itself stays mounted
-            through both states so the tween always has something to measure
-            and a click inside it can never bubble up to the bar and fold it
-            shut -- only the bar's own onClick can do that. */}
-        <div className="weekplan-collapse" aria-hidden={!weekOpen}>
-        <div className="weekplan-collapse-inner">
-        <WeekGrid
-          weekDays={weekDays} weekTasks={weekTasks} spaceTasks={spaceTasks} dayLog={dayLog}
-          today={today} daysOut={daysOut} reachableMax={PLAN_AHEAD_DAYS} onDayClick={jumpToDay}
-        />
-        </div>
-        </div>
-      </div>
-      {/* What came back overnight. Said once, on the day it happened, with the
-          count and a way to take it back in one move. The alternative was work
-          quietly vanishing from the day, which is worse than a wall of it. */}
-      {/* Counted live against the tasks themselves: the bar names unfinished
-          work, so finishing it (or deleting it) takes the bar away. A banner
-          about work already done is nagging, not information. */}
       {plan.returnedOn === localDateKey() && returnedLeft.length > 0 && !handoffDismissed && (
         <div className="handoff">
           <span className="grow">
@@ -1186,49 +1359,114 @@ export function PlanPage() {
               : `${returnedLeft.length} things you did not finish are back on the list.`}
           </span>
           <button className="btn btn-quiet" onClick={() => openDay(prevDay())}>See yesterday</button>
-          {/* This used to route to Plan from Plan, which is nothing happening.
-              It now finds them on the list and marks them for a moment. */}
           <button className="btn btn-quiet" onClick={showReturned}>Show me</button>
-          {/* Re-choosing them is the point of the rollover; re-dragging them one
-              by one is just its tax. One press puts all of them back on today,
-              unsorted, still his to place. */}
           <button className="btn btn-primary" onClick={() => { moveTasksToToday(returnedLeft); setDayOffset(0) }}>
             Replan {returnedLeft.length === 1 ? 'it' : `all ${returnedLeft.length}`} for today
           </button>
-          {/* His report (2026-09-18): "I should be able to dismiss this
-              notification." Dismissing isn't resolving -- the tasks stay
-              exactly where they are, back on the list -- it just stops
-              saying so again for a day already acknowledged. Keyed to the
-              date it was shown, so a genuinely new rollover on a later day
-              still says its piece once. */}
-          <button
-            className="handoff-close"
-            onClick={() => dismissHandoff(plan.returnedOn)}
-            aria-label="Dismiss"
-          >
+          <button className="handoff-close" onClick={() => dismissHandoff(plan.returnedOn)} aria-label="Dismiss">
             <Icon.Close size={14} />
           </button>
         </div>
       )}
 
-      {/* The hourly schedule lives on Calendar now; Plan is the list and the day. */}
       <div className="seg-phone" role="tablist" aria-label="Which list">
         <button role="tab" aria-selected={phoneList === 'day'} onClick={() => setPhoneList('day')}>{offsetWord(dayOffset)}</button>
         <button role="tab" aria-selected={phoneList === 'todo'} onClick={() => setPhoneList('todo')}>To-do list <em>{backlogOpen.length}</em></button>
       </div>
-      <div className={`grid-3 plan-cols plan-two phone-${phoneList}`}>
-        {/* 1. To-do list: everything you added, any day. Drag out to plan it,
-            drag back to take it off today. */}
-        <div
-          className={`panel todo-col${listDropOver ? ' drop-over' : ''}`}
+      <div className={`pf-grid phone-${phoneList}`}>
+        {/* LEFT: how today is going, and what the week is for. */}
+        <aside className="pf-rail">
+          <section className="panel pf-today" aria-label="Today">
+            <div className="pf-head"><span className="microcap">Today</span></div>
+            {ringRow(64)}
+            <button className="btn btn-quiet pf-close" onClick={() => setClosing(true)}>Close the day</button>
+          </section>
+          <WeekGoals />
+        </aside>
+
+        {/* MIDDLE: the day, with the next thing to do in front. */}
+        <main
+          className={`pf-main${dropKey === 'day' ? ' drop-over' : ''}`}
+          onDragOver={(e) => { e.preventDefault(); setDropKey('day') }}
+          onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropKey(null) }}
+          onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); const t = tasks.find((x) => x.id === id); if (id) dropTo((t?.slot ?? 'unsorted') as TimeSlot | 'unsorted', id); setDropKey(null) }}
+        >
+          <div className="pf-days" role="group" aria-label="Which day to plan">
+            {Array.from({ length: PLAN_AHEAD_DAYS + 1 }, (_, n) => n).map((n) => (
+              <button
+                key={n}
+                className={`pf-day${armingDay === n ? ' is-arming' : ''}`}
+                aria-pressed={dayOffset === n}
+                onClick={() => setDayOffset(n)}
+                onDragEnter={() => armDay(n)}
+                onDragOver={(e) => e.preventDefault()}
+                onDragLeave={() => { if (armingDay === n) clearArm() }}
+              >
+                {offsetWord(n)}{offsetDate(n) && <i>{offsetDate(n)}</i>}
+              </button>
+            ))}
+          </div>
+
+          {nextUp ? (
+            <section className={`panel pf-next${flashId === nextUp.id ? ' flash' : ''}`} data-task-id={nextUp.id} aria-label="Next up">
+              <div className="pf-next-top">
+                <span className="microcap">{dayOffset === 0 ? 'Next up' : `${offsetWord(dayOffset)}, first up`}</span>
+                {dayMenu(nextUp)}
+              </div>
+              <div className="pf-next-title"><Linkify text={nextUp.title} /> <TagMark project={markOf(nextUp)} onPick={pickTag} /></div>
+              <div className="pf-next-meta">
+                <EstimateChip task={nextUp} />
+                {goalTag(nextUp)}
+                {slotBtn(nextUp)}
+              </div>
+              <div className="pf-next-acts">
+                {dayOffset === 0 && (focusingOn(nextUp)
+                  ? <span className="pf-timer mono" aria-live="off">{String(Math.floor(pomo.secondsLeft / 60)).padStart(2, '0')}:{String(pomo.secondsLeft % 60).padStart(2, '0')}</span>
+                  : (
+                    <button className="btn btn-primary" disabled={!isEstimated(nextUp)} onClick={() => startFocus(taskMinutes(nextUp), nextUp.title)}>
+                      <Icon.Play size={14} /> {isEstimated(nextUp) ? `Start ${taskMinutes(nextUp)} min focus` : 'Estimating...'}
+                    </button>
+                  ))}
+                <button className="btn btn-quiet" onClick={() => setLogging(nextUp.id)}>Mark done</button>
+              </div>
+              {logging === nextUp.id && (
+                <ActualLog est={taskMinutes(nextUp)} tracked={trackedFor(nextUp.title)} onLog={(m) => { logActual(nextUp.id, m); setLogging(null) }} onSkip={() => { toggleTask(nextUp.id); setLogging(null) }} />
+              )}
+              {!!nextUp.subtasks?.length && subList(nextUp)}
+            </section>
+          ) : (
+            <section className="panel pf-next is-empty">
+              <div className="pf-next-title">{todayAll.length ? 'Everything planned is done' : `Nothing planned for ${dayOffset === 0 ? 'today' : longDay(planDay)}`}</div>
+              <p className="col-note">
+                {todayAll.length && dayOffset === 0 ? 'Close the day, or pull one more from the list.' : 'Pull something from the to-do list with its arrow, or drag it here.'}
+              </p>
+            </section>
+          )}
+
+          {(dayRest.length > 0 || dueRoutines.length > 0 || dayDone.length > 0) && (
+            <div className="pf-sum">
+              <b>{dayOpen.length} open</b>
+              <span className="mono">{fmtDuration(plannedMin)} of your day</span>
+            </div>
+          )}
+          <div className="pf-list">
+            {dayRest.map(dayRow)}
+            {dueRoutines.filter((r) => !rDone(r)).map((r) => <RoutineOnDay key={r.id} routine={r} day={planDay} />)}
+            {dayDone.map(dayRow)}
+            {dueRoutines.filter(rDone).map((r) => <RoutineOnDay key={r.id} routine={r} day={planDay} />)}
+          </div>
+        </main>
+
+        {/* RIGHT: the pool. Search it, add to it, send from it. */}
+        <aside
+          className={`panel todo-col pf-pool${listDropOver ? ' drop-over' : ''}`}
           onDragOver={(e) => { e.preventDefault(); setListDropOver(true) }}
           onDragLeave={() => setListDropOver(false)}
           onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); if (id) dropToList(id); setListDropOver(false) }}
         >
-          {/* One line that says what the list holds and what is left. The bar
-              and the bare "10 here" were three tellings of half a fact. */}
-          <div className="col-head">
-            <span className="microcap">To-do list</span>
+          <div className="pf-head">
+            <span className="microcap">To do</span>
+            <span className="pf-count mono">{backlogOpen.length} waiting</span>
             <Dropdown
               label="Sort the to-do list"
               className="col-sort"
@@ -1243,340 +1481,56 @@ export function PlanPage() {
               ))}
             </Dropdown>
           </div>
-          {/* Add a task; breaking it down is an action on the task itself. */}
-          <div className="formrow" style={{ marginBottom: 'var(--s2)' }}>
-            <TagField
-              id="plan-add" label="New task" placeholder="Add something to the list… #project to file it"
-              value={quick} onChange={setQuick} onSubmit={submitQuick}
-              projects={tagChoices} createSpace={addSpace}
-            />
-            <button className="btn btn-quiet" disabled={!takeTag(quick, projects).title} onClick={submitQuick}>Add</button>
+          <TagField
+            id="plan-add" label="Search or add a new task" placeholder="Search, or type and press Enter to add"
+            value={pq} onChange={setPq} onSubmit={addFromSearch}
+            projects={tagChoices} createSpace={addSpace}
+          />
+          <div className="pf-pool-list">
+            {poolShown.map(poolRow)}
+            {backlogOpen.length === 0 && <div className="empty">Nothing waiting. Type above to add the first task.</div>}
+            {backlogOpen.length > 0 && poolShown.length === 0 && <div className="empty">Nothing matches. Press Enter to add it.</div>}
           </div>
-          {backlogSorted.map((t) => {
-            const isExp = expanded.has(t.id)
-            const hasSubs = !!t.subtasks?.length
-            const doneSubs = t.subtasks?.filter((s) => s.done).length ?? 0
-            return (
-              <div className="todo-item" key={t.id} data-todo-id={t.id}>
-                <div
-                  className={`todo-row${flashIds.includes(t.id) ? ' flash' : ''}`}
-                  draggable
-                  onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move' }}
-                >
-                  <span className="drag-grip" aria-hidden="true"><Icon.Grip /></span>
-                  <SpaceMark space={t.space} />
-                  <span className={`cat-dot ${t.category}`} aria-hidden="true" />
-                  <span className={`grow${openTitles.has(t.id) ? ' is-open' : ''}`} onClick={(e) => toggleTitle(e, t.id)}><Linkify text={t.title} /> <TagMark project={markOf(t)} onPick={pickTag} /></span>
-                  {/* Age since it was written down, not replans: moving it on
-                      and off a day never changes the number. */}
-                  {t.createdAt && daysSince(t.createdAt) > 0 && (
-                    <span className="carried-tag mono" title={`On the list since ${t.createdAt}`}>
-                      {daysSince(t.createdAt) === 1 ? '1 day' : `${daysSince(t.createdAt)} days`}
-                    </span>
-                  )}
-                  <EstimateChip task={t} />
-                  {hasSubs && (
-                    <button className="expand-btn" aria-expanded={isExp} aria-label={isExp ? 'Collapse subtasks' : 'Expand subtasks'} onClick={() => toggleExp(t.id)}>
-                      {isExp ? '▾' : '▸'} {doneSubs}/{t.subtasks!.length}
-                    </button>
-                  )}
-                  <TaskActions task={t} />
-                  <Dropdown label={`Options for ${t.title}`}>
-                    <button role="menuitem" onClick={() => setEditingTask(t)}>Edit</button>
-                    <button role="menuitem" onClick={() => setBreakdownFor(t)}>Break it down</button>
-                    {/* ON A TOUCH SCREEN ONLY, restored 2026-09-09. These two
-                        groups were cut on 2026-09-04 because he does not reach
-                        for them with a mouse -- drag does both, and the menu
-                        was getting long. True on the desktop, and it stays cut
-                        there. It was not true on a phone: drag needs a cursor,
-                        so cutting them left a task that could be written down
-                        and then never put on a day at all, which is the exact
-                        complaint ("Plan doesn't work at all on mobile") the tap
-                        paths were built for in the first place. */}
-                    {coarse && (
-                      <>
-                        <span className="kebab-head">Plan for a day</span>
-                        {Array.from({ length: PLAN_AHEAD_DAYS + 1 }, (_, n) => n).map((n) => (
-                          <button key={n} role="menuitem" onClick={() => { moveTasksToToday([t.id], dayPlus(n)); setDayOffset(n) }}>
-                            Move to {n <= 1 ? offsetWord(n).toLowerCase() : shortDay(dayPlus(n))}
-                          </button>
-                        ))}
-                        <span className="kebab-head">Straight into today</span>
-                        {SLOTS.map((sl) => (
-                          <button key={sl.id} role="menuitem" onClick={() => dropTo(sl.id, t.id)}>{sl.label}</button>
-                        ))}
-                      </>
-                    )}
-                    {projectMenu(t)}
-                    {spaceMenu(t)}
-                    <span className="kebab-sep" />
-                    <button role="menuitem" className="danger" onClick={() => deleteTask(t.id)}>Delete</button>
-                  </Dropdown>
-                </div>
-                {hasSubs && isExp && (
-                  <div className="subtask-list">
-                    {t.subtasks!.map((s) => (
-                      <SubtaskRow key={s.id} taskId={t.id} sub={s} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-          {backlogOpen.length === 0 && <div className="empty">Nothing waiting. Add the first task above.</div>}
-        </div>
-
-        {/* 2. The day: drag tasks from Unsorted into a time of day */}
-        <div className="panel">
-          <div className="col-head">
-            {/* Which day this column lays out. Two days is the whole range: the
-                one he is in, and the one he is about to be in. */}
-            {/* Seven pills, not two. He asked (2026-08-28) to lay out a
-                week ahead rather than only the day right in front of him: each
-                one steps this same panel onto that day, the way Today and
-                Tomorrow always did. */}
-            <span className="day-switch" role="group" aria-label="Which day to plan">
-              {Array.from({ length: PLAN_AHEAD_DAYS + 1 }, (_, n) => n).map((n) => (
-                <button
-                  key={n}
-                  className={`microcap${armingDay === n ? ' is-arming' : ''}`}
-                  aria-pressed={dayOffset === n}
-                  onClick={() => setDayOffset(n)}
-                  onDragEnter={() => armDay(n)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDragLeave={() => { if (armingDay === n) clearArm() }}
-                >
-                  {offsetWord(n)}{offsetDate(n) && <i>{offsetDate(n)}</i>}
-                </button>
-              ))}
-            </span>
-            {(() => {
-              const shown = BUCKETS.filter((b) => b.id !== 'unsorted' || todayAll.some((t) => !t.slot && !t.done)).map((b) => b.id)
-              const allShut = shown.length > 0 && shown.every((id) => shutSlots.has(id))
-              return (
-                <button
-                  className="fold-all"
-                  onClick={() => keepShut(allShut ? new Set() : new Set(shown))}
-                >
-                  {allShut ? 'Expand all' : 'Collapse all'}
-                </button>
-              )
-            })()}
-          </div>
-          {BUCKETS.map((b) => {
-            // A finished task is not waiting to be scheduled, so it drops out of
-            // Unsorted and joins the done group at the bottom.
-            const inBucket = todayAll.filter((t) => (t.slot ?? 'unsorted') === b.id && !(b.id === 'unsorted' && t.done))
-            // Dayless routines get their own group above; they are not tasks
-            // waiting to be dragged into a time.
-            const mine = b.id === 'unsorted' ? [] : dueRoutines.filter((r) => routineSlot(r) === b.id)
-            if (b.id === 'unsorted' && inBucket.length === 0) return null
-            /* One ordered list: what is still to do first, his own work ahead of
-               the repeats, and everything finished sunk to the bottom. A ticked
-               task sitting between two open ones is the list telling him he has
-               work above AND below something already handled. */
-            const rDone = (r: Routine) => routineComplete(r, periodKeyFor(r.cadence))
-            const items = [
-              ...inBucket.filter((x) => !x.done).map((task) => ({ kind: 'task' as const, task })),
-              ...mine.filter((r) => !rDone(r)).map((routine) => ({ kind: 'repeat' as const, routine })),
-              ...inBucket.filter((x) => x.done).map((task) => ({ kind: 'task' as const, task })),
-              ...mine.filter(rDone).map((routine) => ({ kind: 'repeat' as const, routine })),
-            ]
-            const tot = inBucket.filter((t) => !t.done).reduce((a, t) => a + taskMinutes(t), 0)
-            /* Unsorted is not a part of the day and has no hours to run out of. */
-            const cap = b.id === 'unsorted' ? 0 : slotMinutes(b.id as TimeSlot)
-            const over = cap > 0 ? tot - cap : 0
-            const shut = shutSlots.has(b.id)
-            const left = inBucket.filter((x) => !x.done).length + mine.filter((r) => !rDone(r)).length
-            return (
-              <div
-                className={`bucket drop-zone${dropKey === b.id ? ' drop-over' : ''}${shut ? ' is-shut' : ''}`}
-                key={b.id}
-                /* A task cannot be dropped into a part of the day he cannot see,
-                   so hovering one open is the only honest thing to do. */
-                onDragOver={(e) => { e.preventDefault(); setDropKey(b.id); if (shut) setShut(b.id, false) }}
-                onDragLeave={() => setDropKey((k) => (k === b.id ? null : k))}
-                onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); if (id) dropTo(b.id, id); setDropKey(null) }}
-              >
-                <button
-                  className="bucket-head"
-                  aria-expanded={!shut}
-                  aria-label={`${b.label}, ${shut ? 'expand' : 'collapse'}`}
-                  onClick={() => setShut(b.id, !shut)}
-                >
-                  <span className="fold-caret" aria-hidden="true" />
-                  <span className="bucket-name">{b.label}</span>
-                  {BUCKET_HINT[b.id] && <span className="bucket-hours mono">{BUCKET_HINT[b.id]}</span>}
-                  {/* Shut, the rows are gone and the count is the only thing left
-                      saying whether there is anything in there. */}
-                  {shut && left > 0 && <span className="bucket-left mono">{left} left</span>}
-                  {/* What is planned against what the window actually holds, for
-                      THIS workspace only. Four hours of work in a two hour
-                      window is not ambition, it is a day that was over before it
-                      started, and the app knew both numbers all along. */}
-                  {tot > 0 && (over > 0
-                    ? (
-                      <span className="tot mono is-over" title={`${fmtDuration(tot)} planned, ${fmtDuration(cap)} in this part of the day`}>
-                        {fmtDuration(tot)} of {fmtDuration(cap)}
-                        <b>{fmtDuration(over)} over</b>
-                      </span>
-                    )
-                    : <span className="tot mono">{fmtDuration(tot)}</span>)}
-                </button>
-                {shut ? null : items.length === 0 ? (
-                  <p className="empty is-boxed">Drop a task here.</p>
-                ) : (
-                  items.map((it) => {
-                    if (it.kind === 'repeat') {
-                      const r = it.routine
-                      return <RoutineOnDay key={r.id} routine={r} day={planDay} />
-                    }
-                    const t = it.task
-                    const isExp = expanded.has(t.id)
-                    const hasSubs = !!t.subtasks?.length
-                    const doneSubs = t.subtasks?.filter((s) => s.done).length ?? 0
-                    return (
-                      <div className="today-item" key={t.id} data-task-id={t.id}>
-                        <div
-                          className={`today-task${t.done ? ' done' : ''}${flashId === t.id ? ' flash' : ''}`}
-                          draggable={!t.done}
-                          onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move' }}
-                        >
-                          <span className="drag-grip" aria-hidden="true"><Icon.Grip /></span>
-                          <button
-                            className="checkbox" role="checkbox" aria-checked={t.done}
-                            aria-label={t.done ? `Reopen: ${t.title}` : `Complete: ${t.title}`}
-                            onClick={() => {
-                              if (t.done) { toggleTask(t.id); return }  // reopen
-                              // Subtasked or flat, it asks how long it took; ticking the
-                              // parent ticks the steps inside it either way.
-                              setLogging(t.id)
-                            }}
-                          >
-                            <Icon.Check size={12} strokeWidth={4} />
-                          </button>
-                          <SpaceMark space={t.space} />
-                          <span className={`cat-dot ${t.category}`} aria-hidden="true" />
-                          <span className={`grow wrap2${openTitles.has(t.id) ? ' is-open' : ''}`} onClick={(e) => toggleTitle(e, t.id)}><Linkify text={t.title} /> <TagMark project={markOf(t)} onPick={pickTag} /></span>
-                          {t.done && t.actualMin != null ? (
-                            <span className="est-vs-actual mono">{fmtDuration(taskMinutes(t))} → {fmtDuration(t.actualMin)} <b className={taskMinutes(t) - t.actualMin >= 0 ? 'val-pos' : 'val-urgent'}>{taskMinutes(t) - t.actualMin >= 0 ? '+' : ''}{taskMinutes(t) - t.actualMin}m</b></span>
-                          ) : (
-                            <EstimateChip task={t} />
-                          )}
-                          {hasSubs && (
-                            <button className="expand-btn" aria-expanded={isExp} aria-label={isExp ? 'Collapse subtasks' : 'Expand subtasks'} onClick={() => toggleExp(t.id)}>
-                              {isExp ? '▾' : '▸'} {doneSubs}/{t.subtasks!.length}
-                            </button>
-                          )}
-                          {!t.done && <TaskActions task={t} onFocus={() => startFocus(taskMinutes(t), t.title)} />}
-                          <Dropdown label={`Options for ${t.title}`}>
-                            {phone && !t.done && isEstimated(t) && <button role="menuitem" onClick={() => startFocus(taskMinutes(t), t.title)}>Start focus</button>}
-                            {!t.done && <button role="menuitem" onClick={() => setBreakdownFor(t)}>Break it down</button>}
-                            {/* Both "Move to" (the radio-style time-slot list)
-                                and "At a time" came out of this menu entirely
-                                on his direct instruction (2026-09-13), after
-                                the "duplicate Move to" fix above turned out to
-                                be answering the wrong question -- once there
-                                was only one of them left, he didn't want that
-                                one either. Dragging a task onto a slot, and
-                                "Back to the list" below plus the backlog's own
-                                "Straight into today" menu, are what's left for
-                                getting a task in and out of a time of day from
-                                here. */}
-                            {!t.done && <span className="kebab-sep" />}
-                            {!t.done && (
-                              <>
-                                <button role="menuitem" onClick={() => setEditingTask(t)}>Edit</button>
-                                <button role="menuitem" onClick={() => { moveTaskList(t.id, 'backlog'); assignSlot(t.id, undefined); setTaskAt(t.id, undefined) }}>Back to the list</button>
-                              </>
-                            )}
-                            {!t.done && projectMenu(t)}
-                            {!t.done && spaceMenu(t)}
-                            <button role="menuitem" className="danger" onClick={() => deleteTask(t.id)}>Delete</button>
-                          </Dropdown>
-                        </div>
-                        {logging === t.id && (
-                          <ActualLog est={taskMinutes(t)} tracked={trackedFor(t.title)} onLog={(m) => { logActual(t.id, m); setLogging(null) }} onSkip={() => { toggleTask(t.id); setLogging(null) }} />
-                        )}
-                        {hasSubs && isExp && (
-                          <div className="subtask-list">
-                            {t.subtasks!.map((s) => (
-                              <div key={s.id} className="subtask-wrap">
-                                <button
-                                  className={`subtask${s.done ? ' done' : ''}`}
-                                  onClick={() => { if (s.done) toggleSubtask(t.id, s.id); else setLogging(`sub|${t.id}|${s.id}`) }}
-                                >
-                                  <span className="sub-tick" aria-hidden="true" />
-                                  <span className="grow">{s.title}</span>
-                                  {s.done && s.actualMin != null ? (
-                                    <span className="est-vs-actual mono">{fmtDuration(s.estimateMin)} → {fmtDuration(s.actualMin)} <b className={s.estimateMin - s.actualMin >= 0 ? 'val-pos' : 'val-urgent'}>{s.estimateMin - s.actualMin >= 0 ? '+' : ''}{s.estimateMin - s.actualMin}m</b></span>
-                                  ) : (
-                                    <span className="chip tone-info">{fmtDuration(s.estimateMin)}</span>
-                                  )}
-                                </button>
-                                {!s.done && (
-                                  <button
-                                    className="task-act task-focus sub-focus"
-                                    aria-label={`Focus on ${s.title} for ${s.estimateMin} minutes`}
-                                    title={`Focus ${s.estimateMin}m on this step`}
-                                    onClick={() => startFocus(s.estimateMin, s.title)}
-                                  >
-                                    <Icon.Play size={17} />
-                                  </button>
-                                )}
-                                {/* The same tools the list gives a step. A step
-                                    could only be corrected before he planned it,
-                                    so the day he actually works from was the one
-                                    place a wrong number was stuck. */}
-                                {!s.done && <SubEdit taskId={t.id} sub={s} />}
-                                {logging === `sub|${t.id}|${s.id}` && (
-                                  <ActualLog est={s.estimateMin} tracked={trackedFor(s.title)} onLog={(m) => { logSubtaskActual(t.id, s.id, m); setLogging(null) }} onSkip={() => { toggleSubtask(t.id, s.id); setLogging(null) }} />
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })
-                )}
-              </div>
-            )
-          })}
-          {/* No dayless group any more: a routine on the day has been started,
-              and the moment it started is a real time, so it always has a slot. */}
-          {/* Finished-but-unscheduled work, kept visible without asking to be planned. */}
-          {doneUnsorted.length > 0 && (
-            <div className="done-group">
-              <div className="bucket-head">
-                <span className="bucket-name">Done today</span>
-                <span className="tot mono">{doneUnsorted.length}</span>
-              </div>
-              {doneUnsorted.map((t) => (
-                <div className="today-task done" key={t.id} data-task-id={t.id}>
-                  <button className="checkbox" role="checkbox" aria-checked aria-label={`Reopen: ${t.title}`} onClick={() => toggleTask(t.id)}>
-                    <Icon.Check size={12} strokeWidth={4} />
-                  </button>
-                  <span className={`cat-dot ${t.category}`} aria-hidden="true" />
-                  <span className="grow">{t.title}</span>
-                  {t.actualMin != null
-                    ? <span className="est-vs-actual mono">{fmtDuration(taskMinutes(t))} → {fmtDuration(t.actualMin)}</span>
-                    : isEstimated(t)
-                      ? <span className="chip tone-info">{fmtDuration(taskMinutes(t))}</span>
-                      : <span className="chip tone-info is-none">no estimate</span>}
-                </div>
-              ))}
-            </div>
-          )}
-          {todayAll.length === 0 && (
-            <p className="col-note">
-              <span className="hide-touch">Drag anything from the list into a time of day. Drag it back to take it off today.</span>
-              <span className="only-touch">Use a task's ⋯ menu to put it into a time of day, or send it back to the list.</span>
-            </p>
-          )}
-        </div>
+        </aside>
       </div>
 
+      {closing && (
+        <Sheet title="Close the day" onClose={() => setClosing(false)}>
+          {ringRow(56)}
+          <span className="microcap pf-sheet-h">Done today</span>
+          {todayList.filter((t) => t.done).length === 0 && <p className="col-note">Nothing ticked yet today.</p>}
+          <ul className="pf-wins">
+            {todayList.filter((t) => t.done).sort((a, b) => (a.doneAt ?? '').localeCompare(b.doneAt ?? '')).map((t) => (
+              <li key={t.id}>
+                <span className="mono">{t.doneAt ? new Date(t.doneAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                <span className="grow">{t.title}</span>
+                {goalTag(t)}
+              </li>
+            ))}
+            {focusToday > 0 && <li><span className="mono">Focus</span><span className="grow">{fmtDuration(focusToday)} focused</span></li>}
+            {goalRows.filter((r) => r.added > 0).map((r) => (
+              <li key={r.goal.id}><span className="mono">Goal</span><span className="grow">{r.goal.name}</span><span className="goal-tag mono">+{r.added}</span></li>
+            ))}
+          </ul>
+          {leftToday.length > 0 && (
+            <>
+              <span className="microcap pf-sheet-h">Moves to tomorrow</span>
+              <ul className="pf-wins">
+                {leftToday.map((t) => <li key={t.id}><span className="grow">{t.title}</span><span className="mono">{fmtDuration(taskMinutes(t))}</span></li>)}
+              </ul>
+            </>
+          )}
+          <div className="sheet-actions">
+            <button className="btn btn-quiet" onClick={() => setClosing(false)}>Not yet</button>
+            <button className="btn btn-primary" onClick={() => {
+              if (leftToday.length) moveTasksToToday(leftToday.map((t) => t.id), dayPlus(1))
+              setClosing(false)
+            }}>
+              {leftToday.length ? `Move ${leftToday.length} to tomorrow and close` : 'Close the day'}
+            </button>
+          </div>
+        </Sheet>
+      )}
 
       {breakdownFor && <BreakdownSheet task={breakdownFor} onClose={() => setBreakdownFor(null)} />}
       {editingTask && <EditTaskSheet task={editingTask} onClose={() => setEditingTask(null)} />}
@@ -1592,7 +1546,6 @@ export function PlanPage() {
           onPlaced={(n) => setDayOffset(n)}
         />
       )}
-
     </div>
   )
 }

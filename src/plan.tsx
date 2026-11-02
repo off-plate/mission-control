@@ -7,7 +7,7 @@ import { daysSince } from './health'
    confirmed by grep before moving them, not assumed. ActualLog stays
    exported: assistantdock.tsx and assistantpage.tsx both import it. */
 import * as Icon from './icons'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { SPACE_LABELS } from './exceptions'
 import { fakeDecompose } from './mock'
@@ -1154,6 +1154,28 @@ export function PlanPage() {
     </div>
   )
   const [closing, setClosing] = useState(false)
+  /* THREE COLUMNS, EACH ITS OWN SCROLL (his ask, 2026-11-02): a long day must
+     not drag the goals and the pool off screen with it. Each column sticks
+     under the app's header and scrolls inside itself; this measures that
+     header so the columns start exactly below it at any width. */
+  const gridRef = useRef<HTMLDivElement>(null)
+  /* The columns fill exactly what is left of the window under the title (and
+     the overnight banner when it shows), so at rest nothing hides below the
+     fold and the page itself does not need to scroll. Measured after every
+     render because that banner comes and goes. */
+  useLayoutEffect(() => {
+    const g = gridRef.current
+    if (!g) return
+    const set = () => {
+      const top = g.getBoundingClientRect().top + window.scrollY
+      g.style.setProperty('--pf-h', `${Math.max(420, Math.floor(window.innerHeight - top - 16))}px`)
+      const head = document.querySelector('.topstick') as HTMLElement | null
+      g.style.setProperty('--pf-top', `${Math.ceil(head?.getBoundingClientRect().height ?? 0)}px`)
+    }
+    set()
+    window.addEventListener('resize', set)
+    return () => window.removeEventListener('resize', set)
+  })
   const leftToday = todayList.filter((t) => !t.done)
   const focusingOn = (t: Task) => pomo.phase === 'focus' && (pomo.focusLabel ?? '').trim().toLowerCase() === t.title.trim().toLowerCase()
   const [pq, setPq] = useState('')
@@ -1373,9 +1395,9 @@ export function PlanPage() {
         <button role="tab" aria-selected={phoneList === 'day'} onClick={() => setPhoneList('day')}>{offsetWord(dayOffset)}</button>
         <button role="tab" aria-selected={phoneList === 'todo'} onClick={() => setPhoneList('todo')}>To-do list <em>{backlogOpen.length}</em></button>
       </div>
-      <div className={`pf-grid phone-${phoneList}`}>
+      <div className={`pf-grid phone-${phoneList}`} ref={gridRef}>
         {/* LEFT: how today is going, and what the week is for. */}
-        <aside className="pf-rail">
+        <aside className="pf-rail pf-col" data-menu-fixed>
           <section className="panel pf-today" aria-label="Today">
             <div className="pf-head"><span className="microcap">Today</span></div>
             {ringRow(64)}
@@ -1386,7 +1408,8 @@ export function PlanPage() {
 
         {/* MIDDLE: the day, with the next thing to do in front. */}
         <main
-          className={`pf-main${dropKey === 'day' ? ' drop-over' : ''}`}
+          className={`pf-main pf-col${dropKey === 'day' ? ' drop-over' : ''}`}
+          data-menu-fixed
           onDragOver={(e) => { e.preventDefault(); setDropKey('day') }}
           onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropKey(null) }}
           onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); const t = tasks.find((x) => x.id === id); if (id) dropTo((t?.slot ?? 'unsorted') as TimeSlot | 'unsorted', id); setDropKey(null) }}
@@ -1449,17 +1472,70 @@ export function PlanPage() {
               <span className="mono">{fmtDuration(plannedMin)} of your day</span>
             </div>
           )}
+          {/* PHASES OF THE DAY, back on his word (2026-11-02, with fourteen
+              tasks on the day): one flat list of fourteen is not a plan. Each
+              phase is a header in the list, not a box: its hours, what is in it
+              against what it holds, a fold. Anytime collects what has no part
+              of the day yet and only shows when something is in it. An empty
+              phase is one quiet line that opens up while a task is dragged over
+              it, so it stays a place to drop without taking room. The Next up
+              task is counted in its phase but shown only once, in the card. */}
           <div className="pf-list">
-            {dayRest.map(dayRow)}
-            {dueRoutines.filter((r) => !rDone(r)).map((r) => <RoutineOnDay key={r.id} routine={r} day={planDay} />)}
-            {dayDone.map(dayRow)}
-            {dueRoutines.filter(rDone).map((r) => <RoutineOnDay key={r.id} routine={r} day={planDay} />)}
+            {BUCKETS.map((b) => {
+              const inPhase = (t: Task) => (t.slot ?? 'unsorted') === b.id
+              const open = dayRest.filter(inPhase)
+              const fin = dayDone.filter(inPhase)
+              const rts = b.id === 'unsorted' ? [] : dueRoutines.filter((r) => routineSlot(r) === b.id)
+              const rOpen = rts.filter((r) => !rDone(r))
+              const rFin = rts.filter(rDone)
+              const heroHere = !!nextUp && inPhase(nextUp)
+              const count = open.length + fin.length + rts.length + (heroHere ? 1 : 0)
+              if (b.id === 'unsorted' && count === 0) return null
+              const tot = todayAll.filter((t) => !t.done && inPhase(t)).reduce((a, t) => a + taskMinutes(t), 0)
+              const cap = b.id === 'unsorted' ? 0 : slotMinutes(b.id as TimeSlot)
+              const over = cap > 0 ? tot - cap : 0
+              const shut = shutSlots.has(b.id)
+              const left = open.length + rOpen.length
+              const rows = open.length + fin.length + rts.length
+              return (
+                <section
+                  key={b.id}
+                  className={`pf-phase${count === 0 ? ' is-empty' : ''}${b.id === 'unsorted' ? ' is-anytime' : ''}${dropKey === b.id ? ' drop-over' : ''}`}
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDropKey(b.id); if (shut) setShut(b.id, false) }}
+                  onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropKey((k) => (k === b.id ? null : k)) }}
+                  onDrop={(e) => { e.preventDefault(); e.stopPropagation(); const id = e.dataTransfer.getData('text/plain'); if (id) dropTo(b.id, id); setDropKey(null) }}
+                >
+                  <button className="pf-phase-head" aria-expanded={!shut} disabled={rows === 0}
+                    aria-label={`${b.id === 'unsorted' ? 'Anytime' : b.label}, ${shut ? 'expand' : 'collapse'}`}
+                    onClick={() => setShut(b.id, !shut)}>
+                    {rows > 0 && <span className="fold-caret" aria-hidden="true" />}
+                    <span className="pf-phase-name">{b.id === 'unsorted' ? 'Anytime' : b.label}</span>
+                    {BUCKET_HINT[b.id] && <span className="pf-phase-hours mono">{BUCKET_HINT[b.id]}</span>}
+                    <span className={`pf-phase-tot mono${over > 0 ? ' is-over' : ''}`}>
+                      {count === 0 ? 'Empty, drop a task here'
+                        : over > 0 ? `${fmtDuration(tot)} of ${fmtDuration(cap)}, ${fmtDuration(over)} over`
+                        : tot > 0 ? fmtDuration(tot) : ''}
+                      {shut && left > 0 ? `, ${left} left` : ''}
+                    </span>
+                  </button>
+                  {!shut && rows > 0 && (
+                    <div className="pf-phase-rows">
+                      {open.map(dayRow)}
+                      {rOpen.map((r) => <RoutineOnDay key={r.id} routine={r} day={planDay} />)}
+                      {fin.map(dayRow)}
+                      {rFin.map((r) => <RoutineOnDay key={r.id} routine={r} day={planDay} />)}
+                    </div>
+                  )}
+                </section>
+              )
+            })}
           </div>
         </main>
 
         {/* RIGHT: the pool. Search it, add to it, send from it. */}
         <aside
-          className={`panel todo-col pf-pool${listDropOver ? ' drop-over' : ''}`}
+          className={`panel todo-col pf-pool pf-col${listDropOver ? ' drop-over' : ''}`}
+          data-menu-fixed
           onDragOver={(e) => { e.preventDefault(); setListDropOver(true) }}
           onDragLeave={() => setListDropOver(false)}
           onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); if (id) dropToList(id); setListDropOver(false) }}

@@ -231,10 +231,15 @@ export function Dropdown({ label, children, className = '', trigger, sheet, menu
     const btn = ref.current!.getBoundingClientRect()
     const menu = ref.current!.querySelector('.kebab-menu') as HTMLElement | null
     const need = (menu?.offsetHeight ?? 0) + 12
-    const goUp = btn.bottom + need > window.innerHeight && btn.top > need
+    /* A long menu opens toward whichever side has more room and scrolls
+       inside itself, so no item ends up off screen. */
+    const below = window.innerHeight - btn.bottom - 12
+    const above = btn.top - 12
+    const goUp = need > below && above > below
+    const room = Math.max(160, goUp ? above : below)
     setFixedAt(goUp
-      ? { position: 'fixed', top: 'auto', bottom: window.innerHeight - btn.top + 2, right: window.innerWidth - btn.right, margin: 0 }
-      : { position: 'fixed', top: btn.bottom + 2, bottom: 'auto', right: window.innerWidth - btn.right, margin: 0 })
+      ? { position: 'fixed', top: 'auto', bottom: window.innerHeight - btn.top + 2, right: window.innerWidth - btn.right, margin: 0, maxHeight: room, overflowY: 'auto' }
+      : { position: 'fixed', top: btn.bottom + 2, bottom: 'auto', right: window.innerWidth - btn.right, margin: 0, maxHeight: room, overflowY: 'auto' })
     const away = () => setOpen(false)
     scroller.addEventListener('scroll', away, { passive: true })
     window.addEventListener('resize', away)

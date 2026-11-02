@@ -1240,7 +1240,7 @@ export function PlanPage() {
           <SpaceMark space={t.space} />
           <span className={`grow wrap2${openTitles.has(t.id) ? ' is-open' : ''}`} onClick={(e) => toggleTitle(e, t.id)}><Linkify text={t.title} /> <TagMark project={markOf(t)} onPick={pickTag} /></span>
           {goalTag(t)}
-          {!t.done && dayOffset === 0 && slotBtn(t)}
+          {!t.done && slotBtn(t)}
           {t.done && t.actualMin != null ? (
             <span className="est-vs-actual mono">{fmtDuration(taskMinutes(t))} → {fmtDuration(t.actualMin)}</span>
           ) : (
@@ -1417,7 +1417,7 @@ export function PlanPage() {
               <div className="pf-next-meta">
                 <EstimateChip task={nextUp} />
                 {goalTag(nextUp)}
-                {dayOffset === 0 && slotBtn(nextUp)}
+                {slotBtn(nextUp)}
               </div>
               <div className="pf-next-acts">
                 {dayOffset === 0 && (focusingOn(nextUp)
@@ -1482,7 +1482,7 @@ export function PlanPage() {
             </Dropdown>
           </div>
           <TagField
-            id="plan-add" label="Search or add a task" placeholder="Search, or type and press Enter to add"
+            id="plan-add" label="Search or add a new task" placeholder="Search, or type and press Enter to add"
             value={pq} onChange={setPq} onSubmit={addFromSearch}
             projects={tagChoices} createSpace={addSpace}
           />

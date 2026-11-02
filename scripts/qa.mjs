@@ -202,17 +202,30 @@ const pickSpace = async (label) => {
 
    Touch is the exception and keeps the tap paths (restored 2026-09-09, gated
    on (pointer: coarse) -- drag needs a cursor). The phone steps cover those. */
+/* Plan's Today focus layout (2026-11-02) has no time-of-day boxes: a task is
+   dropped onto the day, and its part of the day is the label on its row,
+   clicked round to the one wanted. Same end state as the old bucket drop. */
 const dragToSlot = async (title, slotLabel, p = page) => {
   const row = p.locator('.todo-row', { hasText: title }).first()
   const id = await row.evaluate((el) => el.closest('[data-todo-id]').dataset.todoId)
-  const bucket = p.locator('.bucket').filter({ has: p.locator('.bucket-head', { hasText: slotLabel }) }).first()
-  await bucket.evaluate((el, taskId) => {
+  await p.locator('.pf-main').evaluate((el, taskId) => {
     const dt = new DataTransfer()
     dt.setData('text/plain', taskId)
     el.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }))
     el.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }))
   }, id)
   await p.waitForTimeout(400)
+  const btn = p.locator(`[data-task-id="${id}"] .slot-btn`).first()
+  for (let i = 0; i < 6 && (await btn.innerText()).trim() !== slotLabel; i++) { await btn.click(); await p.waitForTimeout(150) }
+  if ((await btn.innerText()).trim() !== slotLabel) throw new Error(`could not set ${title} to ${slotLabel}`)
+  await p.waitForTimeout(450) // local saves are debounced 300ms
+}
+/* The first open task on the day is the Next up card, which finishes through
+   its Mark done button; every other one through its row's checkbox. */
+const tickOnDay = async (title, p = page) => {
+  const row = p.locator('.today-task', { hasText: title }).first()
+  if (await row.count()) await row.locator('.checkbox').click()
+  else await p.locator('.pf-next', { hasText: title }).getByRole('button', { name: 'Mark done' }).click()
 }
 
 const openRoutines = async () => {
@@ -232,9 +245,9 @@ const shoot = async (name) => {
 await step('plan: add, estimate visible, complete via chips', async () => {
   await fresh('plan')
   await page.getByRole('combobox', { name: 'New task' }).fill('Gate task')
-  await page.getByRole('button', { name: 'Add', exact: true }).click()
+  await page.getByRole('combobox', { name: 'New task' }).press('Enter')
   await dragToSlot('Gate task', 'Morning')
-  await page.locator('.today-task', { hasText: 'Gate task' }).first().locator('.checkbox').click()
+  await tickOnDay('Gate task')
   await page.locator('.actual-chip').first().click()
   await page.waitForTimeout(400)
   await shoot('flow-plan-task-completed')
@@ -244,7 +257,7 @@ await step('plan: add, estimate visible, complete via chips', async () => {
 await step('breakdown: his own steps, his own minutes', async () => {
   await fresh('plan')
   await page.getByRole('combobox', { name: 'New task' }).fill('Gate breakdown task')
-  await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(400)
+  await page.getByRole('combobox', { name: 'New task' }).press('Enter'); await page.waitForTimeout(400)
   await page.locator('.todo-row', { hasText: 'Gate breakdown' }).first().getByRole('button', { name: /Options/ }).click()
   await page.getByRole('menuitem', { name: /Break it down/i }).click(); await page.waitForTimeout(2200)
   // the line naming the service that wrote them is gone
@@ -1334,18 +1347,18 @@ await step('vision + day record render', async () => {
 await step('plan: tomorrow holds its own day', async () => {
   await fresh('plan')
   await page.getByRole('combobox', { name: 'New task' }).fill('Gate tomorrow task')
-  await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(300)
+  await page.getByRole('combobox', { name: 'New task' }).press('Enter'); await page.waitForTimeout(300)
   /* Step the panel onto tomorrow first, then drop: dropTo() plans onto the
      day the panel is showing, which is the whole point of the switcher. */
-  await page.locator('.day-switch .microcap', { hasText: 'Tomorrow' }).click(); await page.waitForTimeout(300)
+  await page.locator('.pf-days .pf-day', { hasText: 'Tomorrow' }).click(); await page.waitForTimeout(300)
   await dragToSlot('Gate tomorrow', 'Morning')
   const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
   const t = s.tasks.find((x) => x.title === 'Gate tomorrow task')
   const tomorrow = await page.evaluate(() => { const d = new Date(); d.setDate(d.getDate() + 1); const z = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}` })
   if (t.list !== 'today' || t.plannedOn !== tomorrow) throw new Error(`stored ${t.list}/${t.plannedOn}`)
   // and today's side of the switch must not show it
-  await page.locator('.day-switch .microcap', { hasText: 'Today' }).click(); await page.waitForTimeout(300)
-  if (await page.locator('.today-task', { hasText: 'Gate tomorrow' }).count()) throw new Error('leaked into today')
+  await page.locator('.pf-days .pf-day', { hasText: 'Today' }).click(); await page.waitForTimeout(300)
+  if (await page.locator('.pf-main [data-task-id]', { hasText: 'Gate tomorrow' }).count()) throw new Error('leaked into today')
 })
 /* HIS ASK, 2026-08-28: "instead of today, tomorrow... it can show... seven
    days ahead... I can plan it ahead for each day." The switcher used to be
@@ -1361,11 +1374,11 @@ await step('plan: tomorrow holds its own day', async () => {
 await step('plan: holding a drag over a day pill steps the panel onto it', async () => {
   await fresh('plan')
   await page.getByRole('combobox', { name: 'New task' }).fill('Gate hover-arm task')
-  await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(300)
+  await page.getByRole('combobox', { name: 'New task' }).press('Enter'); await page.waitForTimeout(300)
   const row = page.locator('.todo-row', { hasText: 'Gate hover-arm' })
   const taskId = await row.evaluate((el) => el.closest('[data-todo-id]').dataset.todoId)
 
-  const pill = (i) => page.locator('.day-switch .microcap').nth(i)
+  const pill = (i) => page.locator('.pf-days .pf-day').nth(i)
   // A drag that leaves before a second is up must not switch anything.
   await pill(5).evaluate((el, id) => {
     const dt = new DataTransfer(); dt.setData('text/plain', id)
@@ -1390,7 +1403,7 @@ await step('plan: holding a drag over a day pill steps the panel onto it', async
   if (await pill(5).evaluate((el) => el.classList.contains('is-arming'))) throw new Error('the arming mark is still showing after the switch')
 
   // The drag is still alive: drop it into the day now on screen.
-  const bucket = page.locator('.bucket', { hasText: 'Morning' })
+  const bucket = page.locator('.pf-main')
   await bucket.evaluate((el, id) => {
     const dt = new DataTransfer(); dt.setData('text/plain', id)
     el.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }))
@@ -1400,180 +1413,77 @@ await step('plan: holding a drag over a day pill steps the panel onto it', async
   const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
   const t = s.tasks.find((x) => x.id === taskId)
   const wanted = await page.evaluate(() => { const d = new Date(); d.setDate(d.getDate() + 5); const z = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}` })
-  if (t.plannedOn !== wanted || t.slot !== 'morning') throw new Error(`landed on ${t.plannedOn}/${t.slot}, wanted ${wanted}/morning`)
-  if (!(await page.locator('.today-task', { hasText: 'Gate hover-arm' }).count())) throw new Error('the task is not shown on the day it was armed onto')
+  if (t.plannedOn !== wanted) throw new Error(`landed on ${t.plannedOn}, wanted ${wanted}`)
+  if (!(await page.locator('.pf-main [data-task-id]', { hasText: 'Gate hover-arm' }).count())) throw new Error('the task is not shown on the day it was armed onto')
 })
 
 await step('plan: the day switcher reaches six days out, one real day each', async () => {
   await fresh('plan')
-  const pills = await page.locator('.day-switch .microcap').allInnerTexts()
+  const pills = await page.locator('.pf-days .pf-day').allInnerTexts()
   if (pills.length !== 7) throw new Error(`${pills.length} pills: ${pills.join(', ')}`)
   if (!/Today/i.test(pills[0]) || !/Tomorrow/i.test(pills[1])) throw new Error(`starts ${pills[0]}, ${pills[1]}`)
   // The sixth pill out is a real date six days from now, not a fixed word.
   const sixOut = await page.evaluate(() => { const d = new Date(); d.setDate(d.getDate() + 6); return d.getDate() })
   if (!pills[6].includes(String(sixOut))) throw new Error(`day 6 reads "${pills[6]}", not ${sixOut}`)
   // Stepping onto Wednesday plans onto Wednesday, not onto today.
-  const wedPill = page.locator('.day-switch .microcap').nth(5)
+  const wedPill = page.locator('.pf-days .pf-day').nth(5)
   await wedPill.click(); await page.waitForTimeout(300)
   if ((await wedPill.getAttribute('aria-pressed')) !== 'true') throw new Error('the fifth pill did not become the active day')
   await page.getByRole('combobox', { name: 'New task' }).fill('Gate five-out task')
-  await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(300)
+  await page.getByRole('combobox', { name: 'New task' }).press('Enter'); await page.waitForTimeout(300)
   /* The kebab's own seven-day "Plan for a day" list was asserted here until
      2026-09-04, when it was cut from the desktop menu on his word. It lives
      on for touch only now and is asserted in the phone step instead. */
   // Dropping straight into a slot lands it on the day currently on screen (Wed), not today.
   await dragToSlot('Gate five-out', 'Morning')
-  if (!(await page.locator('.today-task', { hasText: 'Gate five-out' }).count())) throw new Error('did not land on the day shown')
+  if (!(await page.locator('.pf-main [data-task-id]', { hasText: 'Gate five-out' }).count())) throw new Error('did not land on the day shown')
   const s = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
   const t = s.tasks.find((x) => x.title === 'Gate five-out task')
   const wed = await page.evaluate(() => { const d = new Date(); d.setDate(d.getDate() + 5); const z = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}` })
   if (t.plannedOn !== wed || t.slot !== 'morning') throw new Error(`stored ${t.plannedOn}/${t.slot}, wanted ${wed}/morning`)
   // Today's own view does not show a task planned five days out.
-  await page.locator('.day-switch .microcap').first().click(); await page.waitForTimeout(300)
-  if (await page.locator('.today-task', { hasText: 'Gate five-out' }).count()) throw new Error('leaked back into today')
+  await page.locator('.pf-days .pf-day').first().click(); await page.waitForTimeout(300)
+  if (await page.locator('.pf-main [data-task-id]', { hasText: 'Gate five-out' }).count()) throw new Error('leaked back into today')
 })
 
-/* HIS SECOND ASK THE SAME DAY: a widget below the day panel, Monday to Sunday,
-   morning/noon/afternoon/evening down each column, so the whole week is one
-   look rather than seven trips through the switcher above. */
-await step('plan: the week widget is a real Monday-to-Sunday, not the switcher again', async () => {
+/* TODAY FOCUS (2026-11-02), his pick from three working versions. The week
+   widget, the week bar and the time-of-day boxes left Plan with it (the Today
+   page keeps its own week), so their three steps went too. This one walks the
+   new page: the first open task is Next up, a task tied to a weekly goal moves
+   that goal when it is finished, and Close the day sends what is left to
+   tomorrow. */
+await step('plan: today focus, a goal fed by a task, and closing the day', async () => {
   await fresh('plan')
-  if (!(await page.locator('.weekplan').count())) throw new Error('no week widget on the page')
-  // Folded shut on load; open it before touching anything inside.
-  await page.locator('.weekplan-bar').click(); await page.waitForTimeout(400)
-  const names = await page.locator('.weekplan-dayname').allInnerTexts()
-  if (names.join(',').toUpperCase() !== 'MON,TUE,WED,THU,FRI,SAT,SUN') throw new Error(`columns read ${names.join(',')}`)
-  // It does not track the day switcher's offset: moving the switcher must not move it.
-  const before = await page.locator('.weekplan-range').innerText()
-  await page.locator('.day-switch .microcap').nth(4).click(); await page.waitForTimeout(300)
-  const after = await page.locator('.weekplan-range').innerText()
-  if (before !== after) throw new Error(`the week range moved with the switcher: ${before} -> ${after}`)
-  // A task planned onto a day, with a slot, shows up in that day's column, in that slot.
-  await page.locator('.day-switch .microcap').first().click(); await page.waitForTimeout(300)
-  await page.getByRole('combobox', { name: 'New task' }).fill('Gate week widget task')
-  await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(300)
-  await dragToSlot('Gate week widget', 'Afternoon')
-  const todayCol = page.locator('.weekplan-day.is-today')
-  if (!(await todayCol.count())) throw new Error("no column is marked today's")
-  const cell = todayCol.locator('.weekplan-slot', { hasText: 'Afternoon' })
-  if (!(await cell.getByText('Gate week widget task', { exact: false }).count())) throw new Error('the task is not in its slot in the week widget')
-  // Clicking a day within reach of the switcher steps the switcher onto it,
-  // rather than navigating away from the page.
-  const cols = page.locator('.weekplan-day')
-  const n = await cols.count()
-  let forwardIdx = -1
-  for (let i = 0; i < n; i++) { if (!(await cols.nth(i).evaluate((el) => el.className.includes('is-past')))) { forwardIdx = i; break } }
-  await cols.nth(Math.min(forwardIdx + 1, n - 1)).locator('.weekplan-daybtn').click(); await page.waitForTimeout(400)
-  if (page.url().includes('/day/')) throw new Error('a forward day navigated away instead of stepping the switcher')
-  const pressed = await page.locator('.day-switch .microcap[aria-pressed="true"]').count()
-  if (pressed !== 1) throw new Error('no single pill is active after the click')
-  // Clicking a day that has already happened opens its record instead. No
-  // re-navigation needed here -- `page.goto` to the SAME hash is a no-op in
-  // this hash-routed SPA (no unmount, no reload), so it never actually reset
-  // anything; it just left the fold open from earlier while looking like a
-  // fresh page, and the next click landed on whatever state was already
-  // there. The fold is still open and the week still current from above.
-  if (forwardIdx > 0) {
-    await page.locator('.weekplan-day').first().locator('.weekplan-daybtn').click(); await page.waitForTimeout(600)
-    if (!page.url().includes('/day/')) throw new Error('a past day did not open its record')
-    if (!(await page.locator('h1').count())) throw new Error('the record page did not render')
+  if (await page.locator('.weekplan').count()) throw new Error('the week bar is back on Plan')
+  await page.getByRole('button', { name: /Goal$/ }).click()
+  await page.getByLabel('Goal for this week').fill('Gate outreach'); await page.getByLabel('How many').fill('100')
+  await page.locator('.wg-add').getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(300)
+  for (const t of ['Gate send 10 emails', 'Gate second thing']) {
+    await page.getByRole('combobox', { name: 'New task' }).fill(t)
+    await page.getByRole('combobox', { name: 'New task' }).press('Enter'); await page.waitForTimeout(300)
   }
-})
-
-/* THE ALMANAC, on his pick from three artifacts, and the density rule from a
-   second one: a day with far more than a slot's share of tasks must not tower
-   over the quiet day beside it, and the rule has to be provable with a real
-   sixteen-task day rather than trusted on the strength of two or three. */
-await step('plan: a heavy day shows every task uncapped, and This week stays put across the row', async () => {
-  await fresh('plan')
-  /* TODAY, not "tomorrow": a day out can land past Sunday and off the grid
-     entirely depending which weekday this runs on, and today is always
-     inside its own week by definition. roll() only sweeps a plannedOn that is
-     BEFORE today, so today's own tasks are never touched by it either. */
-  await page.evaluate((K) => {
-    // A view left over from an earlier step in the suite must not hide a
-    // 'personal' task: fresh() clears the app's own state but not this.
-    localStorage.setItem('mc-view', 'all')
-    const s = JSON.parse(localStorage.getItem(K))
-    const today = new Date(); const z = (n) => String(n).padStart(2, '0')
-    const day = `${today.getFullYear()}-${z(today.getMonth() + 1)}-${z(today.getDate())}`
-    const tasks = Array.from({ length: 5 }, (_, i) => ({
-      id: `heavy-${i}`, title: `Heavy morning task ${i}`, source: 'mc', estimateMin: 10, done: false,
-      space: 'personal', list: 'today', category: 'quick', plannedOn: day, slot: 'morning', addedAt: Date.now(),
-    }))
-    s.tasks = [...(s.tasks ?? []), ...tasks]
-    localStorage.setItem(K, JSON.stringify(s))
-  }, KEY)
-  await page.reload(); await page.waitForTimeout(900)
-  // Folded shut on load; open it before touching anything inside.
-  await page.locator('.weekplan-bar').click(); await page.waitForTimeout(400)
-  const heavy = page.locator('.weekplan-day.is-today')
-  if (!(await heavy.count())) throw new Error("no card is marked today's")
-  // No cap, no toggle: every seeded task renders straight away.
-  const shown = await heavy.locator('.weekplan-item').count()
-  if (shown !== 5) throw new Error(`the card shows ${shown} of 5, they should all render uncapped`)
-  if (await heavy.locator('.weekplan-more').count()) throw new Error('an overflow tag is showing even though nothing caps anymore')
-  if (await page.locator('.weekplan-expand').count()) throw new Error('the show-every-task toggle is still in the DOM, it was supposed to be removed')
-  // A quiet day beside it is not stretched to match the heavy one's height.
-  const heights = await page.evaluate(() => [...document.querySelectorAll('.weekplan-day')].map((el) => Math.round(el.getBoundingClientRect().height)))
-  if (Math.max(...heights) - Math.min(...heights) < 20) throw new Error('every card reads the same height, the cards are being stretched')
-  // "This week" sits in the nav row at rest too now, just inert, so an arrow
-  // click never changes how many controls are in the row.
-  const thisWeekBtn = page.locator('.weekplan-nav button', { hasText: 'This week' })
-  if (!(await thisWeekBtn.count())) throw new Error('"This week" is missing on the current week, it should be inert not absent')
-  if (!(await thisWeekBtn.isDisabled())) throw new Error('"This week" should be disabled while already viewing the current week')
-  await page.locator('.weekplan-nav .wk-navbtn').first().click(); await page.waitForTimeout(300)
-  if (!(await thisWeekBtn.count())) throw new Error('"This week" disappeared after paging away, it should stay in place')
-  if (await thisWeekBtn.isDisabled()) throw new Error('"This week" should be clickable once off the current week')
-})
-
-/* Moved above the day panel and folded shut by default on his instruction
-   (2026-08-31, from his own mockup): the bar opens and closes on its own
-   click, the toggle icon on the right swaps job and shape with it, and a
-   click that lands inside the open grid must never fold it back up -- only
-   the bar itself does that. */
-await step('plan: the week bar folds shut by default, and only the bar itself opens or closes it', async () => {
-  await fresh('plan')
-  const panel = page.locator('.weekplan')
-  if ((await panel.getAttribute('class'))?.includes('is-open')) throw new Error('the week starts open; it should be folded shut on load')
-  const collapseHeight = await page.locator('.weekplan-collapse').evaluate((el) => el.getBoundingClientRect().height)
-  if (collapseHeight > 4) throw new Error(`the folded section still measures ${collapseHeight}px tall`)
-  if ((await page.locator('.weekplan-toggle').getAttribute('aria-label')) !== 'Show the week') throw new Error('the toggle should read as an expand affordance while shut')
-  // Clicking anywhere on the bar (not just the toggle icon) opens it.
-  await page.locator('.weekplan-title').click(); await page.waitForTimeout(400)
-  if (!((await panel.getAttribute('class'))?.includes('is-open'))) throw new Error('clicking the bar did not open the week')
-  if ((await page.locator('.weekplan-collapse').evaluate((el) => el.getBoundingClientRect().height)) < 100) throw new Error('open, but the grid never actually grew')
-  if ((await page.locator('.weekplan-toggle').getAttribute('aria-label')) !== 'Next week') throw new Error('open, the same icon slot should now read as the next-week control')
-  // A click inside the now-open grid must not fold it back up.
-  await page.locator('.weekplan-grid').click({ position: { x: 5, y: 5 } })
-  await page.waitForTimeout(300)
-  if (!((await panel.getAttribute('class'))?.includes('is-open'))) throw new Error('a click inside the grid closed the week; only the bar should be able to do that')
-  // The repurposed toggle pages the week forward instead of closing it.
-  const rangeBefore = await page.locator('.weekplan-range').innerText()
-  await page.locator('.weekplan-toggle').click(); await page.waitForTimeout(300)
-  if (!((await panel.getAttribute('class'))?.includes('is-open'))) throw new Error('clicking the open-state toggle closed the week instead of paging it')
-  if ((await page.locator('.weekplan-range').innerText()) === rangeBefore) throw new Error('the open-state toggle did not page the week forward')
-  // The bar itself closes it again.
-  await page.locator('.weekplan-title').click(); await page.waitForTimeout(400)
-  if ((await panel.getAttribute('class'))?.includes('is-open')) throw new Error('clicking the bar again did not close the week')
-  // The dynamic sentence: singular/plural and a real duration, not his mockup's "9hours" typo.
-  await page.evaluate((K) => {
-    localStorage.setItem('mc-view', 'all')
-    const s = JSON.parse(localStorage.getItem(K))
-    const today = new Date(); const z = (n) => String(n).padStart(2, '0')
-    const day = `${today.getFullYear()}-${z(today.getMonth() + 1)}-${z(today.getDate())}`
-    s.tasks = [...(s.tasks ?? []), { id: 'sentence-gate', title: 'Sentence gate task', source: 'mc', estimateMin: 45, done: false, space: 'personal', list: 'today', category: 'quick', plannedOn: day, addedAt: Date.now() }]
-    localStorage.setItem(K, JSON.stringify(s))
-  }, KEY)
-  await page.reload(); await page.waitForTimeout(900)
-  const sentence = await page.locator('.weekplan-sentence').innerText()
-  if (!/^You have 1 task planned for today, taking 45m of your day\.$/.test(sentence)) throw new Error(`the sentence reads "${sentence}"`)
+  await page.getByRole('button', { name: 'Options for Gate send 10 emails' }).click()
+  await page.getByRole('menuitem', { name: /Gate outreach \+10/ }).click(); await page.waitForTimeout(300)
+  await page.getByRole('button', { name: 'Add Gate send 10 emails to today' }).click(); await page.waitForTimeout(300)
+  await page.getByRole('button', { name: 'Add Gate second thing to today' }).click(); await page.waitForTimeout(300)
+  const next = (await page.locator('.pf-next-title').innerText()).trim()
+  if (!/Gate (send 10 emails|second thing)/.test(next)) throw new Error(`Next up reads "${next}"`)
+  await tickOnDay('Gate send 10 emails'); await page.waitForTimeout(300)
+  await page.locator('.actual-skip').first().click(); await page.waitForTimeout(500)
+  const count = (await page.locator('.wg-row', { hasText: 'Gate outreach' }).locator('.wg-count').innerText()).replace(/\s/g, '')
+  if (count !== '10/100') throw new Error(`the goal reads ${count} after the task that feeds it was finished`)
+  await page.getByRole('button', { name: 'Close the day' }).click(); await page.waitForTimeout(400)
+  await page.getByRole('button', { name: /Move 1 to tomorrow and close/ }).click(); await page.waitForTimeout(500)
+  const st = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
+  const left = st.tasks.find((x) => x.title === 'Gate second thing')
+  const tomorrow = await page.evaluate(() => { const d = new Date(); d.setDate(d.getDate() + 1); const z = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}` })
+  if (left.plannedOn !== tomorrow) throw new Error(`the unfinished task is on ${left.plannedOn}, not tomorrow`)
 })
 
 await step('goals: a promised task ticks from the plan', async () => {
   await fresh('plan')
   await page.getByRole('combobox', { name: 'New task' }).fill('Gate promise')
-  await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(300)
+  await page.getByRole('combobox', { name: 'New task' }).press('Enter'); await page.waitForTimeout(300)
   await page.goto(`${URL}#/goals`); await page.waitForTimeout(600)
   /* The Promised card among the goals (HabitKit page, 2026-10-25). */
   const card = page.locator('.hk-promised')
@@ -1582,7 +1492,7 @@ await step('goals: a promised task ticks from the plan', async () => {
   await card.locator('.hk-offer button', { hasText: 'Gate promise' }).click(); await page.waitForTimeout(300)
   await page.goto(`${URL}#/plan`); await page.waitForTimeout(500)
   await dragToSlot('Gate promise', 'Morning')
-  await page.locator('.today-task', { hasText: 'Gate promise' }).locator('.checkbox').click()
+  await tickOnDay('Gate promise')
   await page.locator('.actual-chip').first().click(); await page.waitForTimeout(400)
   await page.goto(`${URL}#/goals`); await page.waitForTimeout(600)
   await page.locator('.hk-promised .hk-seg button', { hasText: 'This month' }).click(); await page.waitForTimeout(200)
@@ -1837,7 +1747,7 @@ await step('sync: two tabs both keep what they added', async () => {
     await page.bringToFront()
     if (!/#\/plan/.test(page.url())) { await page.goto(`${URL}#/plan`); await page.waitForTimeout(600) }
     await page.getByRole('combobox', { name: 'New task' }).fill(title)
-    await page.getByRole('button', { name: 'Add', exact: true }).click()
+    await page.getByRole('combobox', { name: 'New task' }).press('Enter')
     await page.waitForTimeout(500)
   }
   await A.goto(URL); await A.waitForTimeout(300)
@@ -2016,9 +1926,9 @@ await step('a task finished without a time is finished on every page that counts
   const doIt = async (title, skip) => {
     await page.goto(`${URL}#/plan`); await page.waitForTimeout(700)
     await page.getByRole('combobox', { name: 'New task' }).fill(title)
-    await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(500)
+    await page.getByRole('combobox', { name: 'New task' }).press('Enter'); await page.waitForTimeout(500)
     await dragToSlot(title, 'Morning')
-    await page.locator('.today-task', { hasText: title }).first().locator('.checkbox').click()
+    await tickOnDay(title)
     await page.waitForTimeout(400)
     if (skip) await page.locator('.actual-skip').first().click()
     else await page.locator('.actual-chip').first().click()

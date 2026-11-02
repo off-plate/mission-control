@@ -12561,38 +12561,145 @@ textarea.iv-input { height: auto; padding: 10px 12px; resize: vertical; }
   .iv-print-root .ivp-stamp { top: 0; left: 10mm; }
 }
 
-/* THIS WEEK'S GOALS (Plan). A row is a name, a number, a bar and one line of
-   pace. Colour is meaning only: the bar is the accent, amber when behind pace,
-   green when done. No fill AND border on the same control. */
-.weekgoals { margin-bottom: var(--s4); }
-.weekgoals .col-head { align-items: center; }
+/* PLAN, TODAY FOCUS (2026-11-02). He picked this from three working versions:
+   rail (today's rings, the week's goals) | the day, next task first | the pool.
+   Colour stays semantic: accent only where he can act, slate for facts, green
+   for done and progress, amber never used for a goal (a goal is not at risk on
+   a Monday). */
+.pf-grid { display: grid; grid-template-columns: minmax(250px, 290px) minmax(0, 1fr) minmax(280px, 360px); gap: var(--s5); align-items: start; }
+@media (max-width: 1180px) { .pf-grid { grid-template-columns: minmax(240px, 270px) minmax(0, 1fr); } .pf-pool { grid-column: 1 / -1; } }
+@media (max-width: 860px) { .pf-grid { grid-template-columns: minmax(0, 1fr); } }
+.pf-rail { display: grid; gap: var(--s4); min-width: 0; }
+.pf-main { min-width: 0; border-radius: var(--r-md); transition: background-color 160ms ease-out; }
+.pf-main.drop-over { background: var(--accent-wash); outline: 1px dashed var(--accent); outline-offset: 6px; }
+.pf-head { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s3); }
+.pf-head .microcap { margin-bottom: 0; }
+.pf-head > :last-child:not(.microcap) { margin-left: auto; }
+.pf-count { font-size: 0.75rem; color: var(--info); margin-left: auto; }
+.pf-head .pf-count + * { margin-left: 0; }
+
+/* rings */
+.pf-rings { display: flex; justify-content: space-between; gap: var(--s2); }
+.pf-ring { display: grid; justify-items: center; gap: 2px; text-align: center; min-width: 0; }
+.pf-ring b { font-size: var(--text-xs); font-weight: 600; margin-top: 4px; }
+.pf-ring span { font-size: 0.6875rem; color: var(--info); }
+.pf-ringsvg circle { fill: none; stroke-width: 7; }
+.pf-ring-track { stroke: var(--surface-2); }
+.pf-ring-fill { stroke-linecap: round; transition: stroke-dashoffset 400ms cubic-bezier(0.23, 1, 0.32, 1); }
+.r-accent .pf-ring-fill { stroke: var(--accent); }
+.r-info .pf-ring-fill { stroke: var(--info); }
+.r-prog .pf-ring-fill { stroke: var(--progress); }
+.pf-close { width: 100%; justify-content: center; margin-top: var(--s4); }
+
+/* goals rail */
+.weekgoals { display: grid; gap: 0; }
 .wg-act {
-  display: inline-flex; align-items: center; gap: 4px;
+  display: inline-flex; align-items: center; gap: 4px; margin-left: auto;
   font-family: var(--font-mono); font-size: 0.6875rem; color: var(--info);
   border: 1px solid var(--hairline-strong); border-radius: 3px; padding: 3px 8px; min-height: 28px;
 }
 .wg-act:hover { color: var(--accent-text); border-color: var(--accent-text); }
-.wg-add { align-items: center; flex-wrap: nowrap; }
-.wg-target { width: 84px; flex: none; }
-.wg-row { padding: var(--s3) 0; border-top: 1px solid var(--hairline); }
+.wg-carry { margin: 0 0 var(--s3); justify-self: start; }
+.wg-add { display: grid; gap: var(--s2); margin-bottom: var(--s3); }
+.wg-add-row { display: flex; gap: var(--s2); }
+.wg-target { width: 90px; flex: none; }
+.wg-row { padding: var(--s3) 0; border-top: 1px solid var(--hairline); display: grid; gap: var(--s2); }
 .wg-row:first-of-type { border-top: 0; padding-top: 0; }
-.wg-top { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s2); min-width: 0; }
-.wg-name { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.wg-top { display: flex; align-items: baseline; gap: var(--s2); min-width: 0; }
+.wg-name { font-weight: 600; flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .wg-row.is-done .wg-name { color: var(--muted); }
-.wg-count { font-size: var(--text-sm); color: var(--ink); padding: 2px 4px; border-radius: var(--r-sm); }
-.wg-count span { color: var(--muted); }
+.wg-count { font-family: var(--font-display); font-weight: 700; font-size: 1.125rem; color: var(--ink); padding: 0 2px; border-radius: var(--r-sm); font-variant-numeric: tabular-nums; }
+.wg-count span { color: var(--muted); font-weight: 500; }
 .wg-count:not(:disabled):hover { background: var(--surface-2); }
+.wg-foot { display: flex; align-items: center; gap: var(--s2); }
+.wg-pace { flex: 1; font-size: var(--text-xs); color: var(--info); }
+.wg-pace.is-met { color: var(--progress); }
 .wg-step {
-  font-size: var(--text-xs); min-width: 40px; min-height: 32px; padding: 0 8px;
+  font-family: var(--font-mono); font-size: var(--text-xs); min-width: 38px; min-height: 30px; padding: 0 8px;
   color: var(--accent-text); border: 1px solid var(--hairline-strong); border-radius: var(--r-sm);
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), border-color 160ms ease-out;
 }
 .wg-step:hover { border-color: var(--accent-text); }
-.wg-step:active { transform: scale(0.97); }
-.wg-pace { margin-top: var(--s2); font-size: var(--text-xs); color: var(--info); }
-.wg-pace.is-behind { color: var(--warn); }
+.wg-step:active { transform: scale(0.95); }
+
+/* day switcher */
+.pf-days { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--s4); }
+.pf-day {
+  border: 1px solid var(--hairline-strong); border-radius: var(--r-md); padding: 6px 12px; min-height: 36px;
+  font-size: var(--text-sm); color: var(--ink); background: var(--surface);
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), background-color 160ms ease-out;
+}
+.pf-day:active { transform: scale(0.97); }
+.pf-day i { font-style: normal; color: var(--faint); margin-left: 4px; }
+.pf-day[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.pf-day[aria-pressed="true"] i { color: var(--hairline-strong); }
+.pf-day.is-arming { border-color: var(--accent); }
+
+/* next up */
+.pf-next { display: grid; gap: var(--s3); padding: var(--s5); margin-bottom: var(--s4); }
+.pf-next-top { display: flex; align-items: center; }
+.pf-next-top .microcap { margin-bottom: 0; }
+.pf-next-top > :last-child { margin-left: auto; }
+.pf-next-title { font-family: var(--font-display); font-weight: 700; font-size: 1.75rem; line-height: 1.15; letter-spacing: -0.01em; overflow-wrap: anywhere; text-wrap: balance; }
+.pf-next.is-empty .pf-next-title { font-size: 1.375rem; }
+.pf-next-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3); }
+.pf-next-acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
+.pf-next-acts .btn-primary { display: inline-flex; align-items: center; gap: 8px; }
+.pf-timer { font-family: var(--font-display); font-weight: 700; font-size: 1.75rem; margin-right: var(--s2); }
+
+/* the rest of the day */
+.pf-sum { display: flex; justify-content: space-between; align-items: baseline; padding: 0 2px var(--s2); }
+.pf-sum span { font-size: var(--text-xs); color: var(--info); }
+.pf-list .today-item:first-child .today-task { border-top: 1px solid var(--hairline); }
+.slot-btn { font-size: var(--text-xs); color: var(--faint); padding: 3px 6px; border-radius: var(--r-sm); white-space: nowrap; }
+.slot-btn:hover { color: var(--ink); background: var(--surface-2); }
+.goal-tag { font-size: 0.75rem; color: var(--info); white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: bottom; }
+.today-task.done .goal-tag { color: var(--faint); }
+
+/* the pool */
+.pf-pool .tagfield, .pf-pool .textinput { width: 100%; }
+.pf-pool-list { margin-top: var(--s2); }
+.pf-send {
+  width: 32px; height: 32px; flex: none; display: grid; place-items: center; color: var(--ink);
+  border: 1px solid var(--hairline-strong); border-radius: var(--r-md);
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), border-color 160ms ease-out, color 160ms ease-out;
+}
+.pf-send:hover { color: var(--accent-text); border-color: var(--accent-text); }
+.pf-send:active { transform: scale(0.94); }
+.pf-proj { display: inline-flex; align-items: center; gap: 6px; }
+
+/* close the day */
+.pf-sheet-h { display: block; margin: var(--s4) 0 var(--s2); }
+.pf-wins { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.pf-wins li { display: flex; gap: var(--s3); align-items: baseline; padding: 8px 0; border-top: 1px solid var(--hairline); font-size: var(--text-sm); }
+.pf-wins li:first-child { border-top: 0; }
+.pf-wins li .mono { font-size: var(--text-xs); color: var(--info); min-width: 42px; }
+
 @media (max-width: 639px) {
-  .wg-top { flex-wrap: wrap; }
-  .wg-name { flex: 1 0 100%; }
+  .pf-grid.phone-day > .pf-pool { display: none; }
+  .pf-grid.phone-todo > .pf-rail, .pf-grid.phone-todo > .pf-main { display: none; }
+  .pf-next { padding: var(--s4); }
+  .pf-next-title { font-size: 1.375rem; }
+  .pf-days { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .pf-day { flex: none; min-height: 40px; }
   .wg-step { min-height: 40px; min-width: 48px; }
-  .wg-act { min-height: 36px; }
+  .slot-btn { min-height: 36px; }
+}
+@media (prefers-reduced-motion: reduce) { .pf-ring-fill { transition: none; } }
+
+/* Plan, Today focus: rows read as text first. The estimate is a fact (slate,
+   no fill) that turns into the accent only when he points at it to change it;
+   the workspace is a small dot instead of a letter and a bar; the row's play
+   button waits for the pointer, the Next up card already carries the big one. */
+.plan-focus .today-task .chip.tone-info, .plan-focus .todo-row .chip.tone-info,
+.plan-focus .pf-next .chip.tone-info {
+  background: none; color: var(--info); font-weight: 500; padding: 2px 4px; border: 1px solid transparent; border-radius: var(--r-sm);
+}
+.plan-focus .est-edit:hover { color: var(--accent-text); border-color: var(--hairline-strong); }
+.plan-focus .spacemark { align-self: center; }
+.plan-focus .spacemark > b { display: none; }
+.plan-focus .spacemark > i { width: 7px; height: 7px; min-height: 0; border-radius: 50%; align-self: center; }
+@media (hover: hover) and (pointer: fine) {
+  .plan-focus .today-task .task-actions { opacity: 0; transition: opacity 120ms ease-out; }
+  .plan-focus .today-task:hover .task-actions, .plan-focus .today-task:focus-within .task-actions { opacity: 1; }
 }

@@ -192,6 +192,11 @@ export function Dropdown({ label, children, className = '', trigger, sheet, menu
 }) {
   const [open, setOpen] = useState(false)
   const [up, setUp] = useState(false)
+  /* Inside a column that scrolls on its own (Plan's three, 2026-11-02) an
+     absolute menu is cut off at the column's edge, so there it becomes a fixed
+     layer anchored to its button, and it closes when the column scrolls rather
+     than floating away from the row it belongs to. */
+  const [fixedAt, setFixedAt] = useState<React.CSSProperties | null>(null)
   const ref = useRef<HTMLSpanElement>(null)
   const sheetRef = useRef<HTMLDivElement>(null)
   const scrimRef = useRef<HTMLDivElement>(null)
@@ -220,6 +225,22 @@ export function Dropdown({ label, children, className = '', trigger, sheet, menu
     return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc) }
   }, [open, asSheet])
 
+  useLayoutEffect(() => {
+    const scroller = open && !asSheet ? ref.current?.closest('[data-menu-fixed]') : null
+    if (!scroller) { setFixedAt(null); return }
+    const btn = ref.current!.getBoundingClientRect()
+    const menu = ref.current!.querySelector('.kebab-menu') as HTMLElement | null
+    const need = (menu?.offsetHeight ?? 0) + 12
+    const goUp = btn.bottom + need > window.innerHeight && btn.top > need
+    setFixedAt(goUp
+      ? { position: 'fixed', top: 'auto', bottom: window.innerHeight - btn.top + 2, right: window.innerWidth - btn.right, margin: 0 }
+      : { position: 'fixed', top: btn.bottom + 2, bottom: 'auto', right: window.innerWidth - btn.right, margin: 0 })
+    const away = () => setOpen(false)
+    scroller.addEventListener('scroll', away, { passive: true })
+    window.addEventListener('resize', away)
+    return () => { scroller.removeEventListener('scroll', away); window.removeEventListener('resize', away) }
+  }, [open, asSheet])
+
   const shut = useCallback(() => slideOut(sheetRef.current, scrimRef.current, () => setOpen(false)), [])
   useSwipeDown(sheetRef, shut, open && asSheet)
 
@@ -233,7 +254,7 @@ export function Dropdown({ label, children, className = '', trigger, sheet, menu
         </button>
       )}
       {open && !asSheet && (
-        <div className={`kebab-menu${up ? ' opens-up' : ''}`} role="menu" onClick={() => setOpen(false)}>
+        <div className={`kebab-menu${up && !fixedAt ? ' opens-up' : ''}`} style={fixedAt ?? undefined} role="menu" onClick={() => setOpen(false)}>
           {children}
         </div>
       )}

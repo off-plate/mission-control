@@ -204,7 +204,7 @@ const pickSpace = async (label) => {
    on (pointer: coarse) -- drag needs a cursor). The phone steps cover those. */
 /* Plan's Today focus layout (2026-11-02) has no time-of-day boxes: a task is
    dropped onto the day, and its part of the day is the label on its row,
-   clicked round to the one wanted. Same end state as the old bucket drop. */
+   picked from its menu. Same end state as the old bucket drop. */
 const dragToSlot = async (title, slotLabel, p = page) => {
   const row = p.locator('.todo-row', { hasText: title }).first()
   const id = await row.evaluate((el) => el.closest('[data-todo-id]').dataset.todoId)
@@ -215,9 +215,10 @@ const dragToSlot = async (title, slotLabel, p = page) => {
     el.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }))
   }, id)
   await p.waitForTimeout(400)
-  const btn = p.locator(`[data-task-id="${id}"] .slot-btn`).first()
-  for (let i = 0; i < 6 && (await btn.innerText()).trim() !== slotLabel; i++) { await btn.click(); await p.waitForTimeout(150) }
-  if ((await btn.innerText()).trim() !== slotLabel) throw new Error(`could not set ${title} to ${slotLabel}`)
+  /* The part of the day is set from the row's menu (2026-11-02). */
+  await p.locator(`.pf-phase [data-task-id="${id}"]`).getByRole('button', { name: /^Options for / }).click()
+  await p.waitForTimeout(150)
+  await p.getByRole('menuitem', { name: slotLabel, exact: true }).click()
   await p.waitForTimeout(450) // local saves are debounced 300ms
 }
 /* The first open task on the day is the Next up card, which finishes through
@@ -1450,9 +1451,8 @@ await step('plan: the day switcher reaches six days out, one real day each', asy
    widget, the week bar and the time-of-day boxes left Plan with it (the Today
    page keeps its own week), so their three steps went too. This one walks the
    new page: the first open task is Next up, a task tied to a weekly goal moves
-   that goal when it is finished, and Close the day sends what is left to
-   tomorrow. */
-await step('plan: today focus, a goal fed by a task, and closing the day', async () => {
+   that goal when it is finished, and the rail counts the day. */
+await step('plan: today focus, a goal fed by a task, and the day in numbers', async () => {
   await fresh('plan')
   if (await page.locator('.weekplan').count()) throw new Error('the week bar is back on Plan')
   await page.getByRole('button', { name: /Goal$/ }).click()
@@ -1472,12 +1472,34 @@ await step('plan: today focus, a goal fed by a task, and closing the day', async
   await page.locator('.actual-skip').first().click(); await page.waitForTimeout(500)
   const count = (await page.locator('.wg-row', { hasText: 'Gate outreach' }).locator('.wg-count').innerText()).replace(/\s/g, '')
   if (count !== '10/100') throw new Error(`the goal reads ${count} after the task that feeds it was finished`)
-  await page.getByRole('button', { name: 'Close the day' }).click(); await page.waitForTimeout(400)
-  await page.getByRole('button', { name: /Move 1 to tomorrow and close/ }).click(); await page.waitForTimeout(500)
-  const st = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)), KEY)
-  const left = st.tasks.find((x) => x.title === 'Gate second thing')
-  const tomorrow = await page.evaluate(() => { const d = new Date(); d.setDate(d.getDate() + 1); const z = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}` })
-  if (left.plannedOn !== tomorrow) throw new Error(`the unfinished task is on ${left.plannedOn}, not tomorrow`)
+  /* No Close the day any more (his call, 2026-11-02): the rail shows the
+     day in numbers, and he picks what is next up himself. */
+  if (await page.getByRole('button', { name: 'Close the day' }).count()) throw new Error('Close the day is back')
+  const stats = (await page.locator('.pf-stat').allInnerTexts()).map((x) => x.replace(/\s+/g, ' '))
+  if (stats.length !== 3 || !/^2 planned$/.test(stats[0]) || !/^1 left$/.test(stats[2])) throw new Error(`the day reads ${JSON.stringify(stats)}`)
+  if (!(await page.locator('.pf-next-title').innerText()).includes('Gate second thing')) throw new Error('the only open task is not next up')
+})
+
+/* He picks Next up (2026-11-02), and a phase with only that task in it still
+   opens and closes like any other. */
+await step('plan: next up is his pick, and every phase folds', async () => {
+  await fresh('plan')
+  for (const t of ['Gate first', 'Gate pick me']) {
+    await page.getByRole('combobox', { name: 'New task' }).fill(t)
+    await page.getByRole('combobox', { name: 'New task' }).press('Enter'); await page.waitForTimeout(300)
+    await page.getByRole('button', { name: `Add ${t} to today` }).click(); await page.waitForTimeout(300)
+  }
+  const first = (await page.locator('.pf-next-title').innerText()).includes('Gate first')
+  const pick = first ? 'Gate pick me' : 'Gate first'
+  const row = page.locator('.pf-main .today-task', { hasText: pick })
+  await row.hover(); await row.locator('.pf-make-next').click(); await page.waitForTimeout(300)
+  if (!(await page.locator('.pf-next-title').innerText()).includes(pick)) throw new Error('Make it next up did not move the card')
+  if (await page.locator('.slot-btn').count()) throw new Error('rows carry a part-of-day label again')
+  const ph = page.locator('.pf-phase').filter({ has: page.locator('button.pf-phase-head') }).first()
+  await ph.locator('button.pf-phase-head').click(); await page.waitForTimeout(350)
+  if ((await ph.locator('button.pf-phase-head').getAttribute('aria-expanded')) !== 'false') throw new Error('the phase did not fold')
+  await ph.locator('button.pf-phase-head').click(); await page.waitForTimeout(350)
+  if ((await ph.locator('button.pf-phase-head').getAttribute('aria-expanded')) !== 'true') throw new Error('the phase did not open again')
 })
 
 await step('goals: a promised task ticks from the plan', async () => {

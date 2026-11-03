@@ -1158,7 +1158,7 @@ export function PlanPage() {
   const dayDoneMin = todayAll.filter((t) => t.done).reduce((a, t) => a + taskMinutes(t), 0)
   const dayStats = [
     { v: String(todayAll.length), k: 'planned', tone: '' },
-    { v: dayMin ? fmtDuration(dayMin) : '0h', k: dayCap && dayMin > dayCap ? `${fmtDuration(dayMin - dayCap)} over` : 'of work', tone: dayCap && dayMin > dayCap ? 'warn' : '' },
+    { v: `${Math.floor(dayMin / 60)}h ${String(dayMin % 60).padStart(2, '0')}m`, k: dayCap && dayMin > dayCap ? `${fmtDuration(dayMin - dayCap)} over` : 'of work', tone: dayCap && dayMin > dayCap ? 'warn' : '' },
     { v: String(dayOpen.length), k: dayOpen.length === 0 && todayAll.length ? 'all done' : 'left', tone: dayOpen.length === 0 && todayAll.length ? 'good' : '' },
   ]
   /* The day as one strip: finished time green first, then what is left in

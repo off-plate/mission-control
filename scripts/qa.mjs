@@ -226,7 +226,7 @@ const dragToSlot = async (title, slotLabel, p = page) => {
 const tickOnDay = async (title, p = page) => {
   const row = p.locator('.today-task', { hasText: title }).first()
   if (await row.count()) await row.locator('.checkbox').click()
-  else await p.locator('.pf-next', { hasText: title }).getByRole('button', { name: 'Mark done' }).click()
+  else await p.locator('.pf-next', { hasText: title }).getByRole('button', { name: 'Done' }).click()
 }
 
 const openRoutines = async () => {
@@ -1466,7 +1466,7 @@ await step('plan: today focus, a goal fed by a task, and the day in numbers', as
   await page.getByRole('menuitem', { name: /Gate outreach \+10/ }).click(); await page.waitForTimeout(300)
   await page.getByRole('button', { name: 'Add Gate send 10 emails to today' }).click(); await page.waitForTimeout(300)
   await page.getByRole('button', { name: 'Add Gate second thing to today' }).click(); await page.waitForTimeout(300)
-  const next = (await page.locator('.pf-next-title').innerText()).trim()
+  const next = (await page.locator('.pf-next-t b').innerText()).trim()
   if (!/Gate (send 10 emails|second thing)/.test(next)) throw new Error(`Next up reads "${next}"`)
   await tickOnDay('Gate send 10 emails'); await page.waitForTimeout(300)
   await page.locator('.actual-skip').first().click(); await page.waitForTimeout(500)
@@ -1475,9 +1475,9 @@ await step('plan: today focus, a goal fed by a task, and the day in numbers', as
   /* No Close the day any more (his call, 2026-11-02): the rail shows the
      day in numbers, and he picks what is next up himself. */
   if (await page.getByRole('button', { name: 'Close the day' }).count()) throw new Error('Close the day is back')
-  const stats = (await page.locator('.pf-stat').allInnerTexts()).map((x) => x.replace(/\s+/g, ' '))
+  const stats = (await page.locator('.pf-tile').allInnerTexts()).map((x) => x.replace(/\s+/g, ' '))
   if (stats.length !== 3 || !/^2 planned$/.test(stats[0]) || !/^1 left$/.test(stats[2])) throw new Error(`the day reads ${JSON.stringify(stats)}`)
-  if (!(await page.locator('.pf-next-title').innerText()).includes('Gate second thing')) throw new Error('the only open task is not next up')
+  if (!(await page.locator('.pf-next-t b').innerText()).includes('Gate second thing')) throw new Error('the only open task is not next up')
 })
 
 /* He picks Next up (2026-11-02), and a phase with only that task in it still
@@ -1489,11 +1489,12 @@ await step('plan: next up is his pick, and every phase folds', async () => {
     await page.getByRole('combobox', { name: 'New task' }).press('Enter'); await page.waitForTimeout(300)
     await page.getByRole('button', { name: `Add ${t} to today` }).click(); await page.waitForTimeout(300)
   }
-  const first = (await page.locator('.pf-next-title').innerText()).includes('Gate first')
+  const first = (await page.locator('.pf-next-t b').innerText()).includes('Gate first')
   const pick = first ? 'Gate pick me' : 'Gate first'
-  const row = page.locator('.pf-main .today-task', { hasText: pick })
-  await row.hover(); await row.locator('.pf-make-next').click(); await page.waitForTimeout(300)
-  if (!(await page.locator('.pf-next-title').innerText()).includes(pick)) throw new Error('Make it next up did not move the card')
+  /* Next up is picked from the row's menu (2026-11-03): no button hides until hover. */
+  await page.locator('.pf-main .today-task', { hasText: pick }).getByRole('button', { name: /^Options for / }).click()
+  await page.getByRole('menuitem', { name: 'Make it next up' }).click(); await page.waitForTimeout(300)
+  if (!(await page.locator('.pf-next-t b').innerText()).includes(pick)) throw new Error('Make it next up did not move the card')
   if (await page.locator('.slot-btn').count()) throw new Error('rows carry a part-of-day label again')
   const ph = page.locator('.pf-phase').filter({ has: page.locator('button.pf-phase-head') }).first()
   await ph.locator('button.pf-phase-head').click(); await page.waitForTimeout(350)

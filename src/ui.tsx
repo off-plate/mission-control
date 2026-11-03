@@ -21,7 +21,8 @@ import { useStore } from './store'
 import { isoWeekKey, localDateKey } from './util'
 import type { Project, SpaceId, Task, ViewId } from './types'
 import * as Icon from './icons'
-import { tagOf, toneOf } from './tags'
+import { tagOf } from './tags'
+import { hueOf } from './hues'
 
 
 /* A field that grows with what you type, up to a ceiling, then scrolls. Dragging
@@ -357,10 +358,10 @@ export function TagMark({ project, onPick }: { project?: Project; onPick?: (p: P
   const { projects } = useStore()
   if (!project) return null
   const tag = `#${tagOf(project)}`
-  const cls = `tagmark tt${toneOf(project, projects)}`
+  const st = { color: hueOf(project, projects).h }
   return onPick
-    ? <button type="button" className={cls} title={`Show only ${project.name}`} onClick={(e) => { e.stopPropagation(); onPick(project) }}>{tag}</button>
-    : <span className={cls} title={project.name}>{tag}</span>
+    ? <button type="button" className="tagmark" style={st} title={`Show only ${project.name}`} onClick={(e) => { e.stopPropagation(); onPick(project) }}>{tag}</button>
+    : <span className="tagmark" style={st} title={project.name}>{tag}</span>
 }
 
 /** The mark for a task row: its workspace, plus its project when it has one.

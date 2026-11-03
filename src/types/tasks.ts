@@ -74,6 +74,9 @@ export interface Project {
   /** The hashtag it answers to, without the `#`. Unset means it follows the
    *  name (tags.ts slugTag), so most projects never store one. */
   tag?: string
+  /** The colour he picked for it (an id from src/hues.ts). Unset means the
+   *  default for its place in the list. */
+  hue?: string
 }
 
 export interface PlanState {

@@ -55,6 +55,8 @@ export function usePlannerSlice(
     /** A hand-picked hashtag. Empty puts it back to following the name. */
     setProjectTag: (id: string, tag: string) =>
       setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, tag: tag ? freeTag(tag, prev, id, true) : undefined } : p))),
+    setProjectHue: (id: string, hue: string) =>
+      setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, hue } : p))),
     renameProject: (id: string, name: string) => {
       const trimmed = name.trim()
       if (!trimmed) return

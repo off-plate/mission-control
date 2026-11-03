@@ -12761,3 +12761,138 @@ button.pf-phase-head:focus-visible { outline: 2px solid var(--accent); outline-o
 .pf-rowacts { margin-left: auto; display: inline-flex; align-items: center; gap: var(--s1); }
 .pf-rowline .pf-send { width: 30px; height: 30px; min-height: 0; }
 .pf-pool .todo-row > .spacemark { align-self: start; margin-top: 9px; }
+
+/* A filter is hiding tasks: amber is the warning colour, and the way out is one button. */
+.pf-filtered { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; margin: 0 0 var(--s3); padding: var(--s2) var(--s3); border-radius: var(--r-md); background: var(--warn-wash); font-size: var(--text-sm); }
+.pf-filtered > span { flex: 1 1 220px; min-width: 0; }
+.pf-filtered .btn { flex: none; }
+
+/* Day rows: fixed right-hand columns (2026-11-03). */
+.pf-c-sub, .pf-c-est, .pf-c-acts { flex: none; display: inline-flex; align-items: center; justify-content: flex-end; }
+.pf-c-sub { width: 52px; }
+.pf-c-est { width: 60px; white-space: nowrap; }
+.pf-c-acts { width: 66px; gap: 4px; }
+.pf-is-next { margin-left: var(--s2); }
+
+/* ===== Plan, "Colour rows" (his pick, 2026-11-03) =====
+   Three surfaces: white cards on the paper rail, one white day sheet, cards
+   straight on the paper pool. Colour comes from his project colours (row
+   tint, tag, bar segments) and the room accent (Next, Focus, send). Only
+   menus float, so nothing else casts a shadow. No control hides until hover. */
+.plan-focus .pf-h2 { margin: 0; font-family: var(--font-display); font-size: 1.0625rem; font-weight: 800; letter-spacing: -0.01em; color: var(--ink); display: flex; align-items: baseline; gap: 8px; }
+.plan-focus .pf-h2 em { font-style: normal; color: var(--muted); font-weight: 700; }
+.plan-focus .pf-head { margin-bottom: 12px; }
+.plan-focus .pf-rail { gap: 14px; }
+.plan-focus .pf-card, .plan-focus .weekgoals { background: var(--surface); border-radius: 14px; padding: 18px; border: 0; box-shadow: none; }
+.plan-focus .pf-main { background: var(--surface); border-radius: 14px; padding: 16px; }
+@media (min-width: 1181px) { .plan-focus .pf-grid > .pf-main { margin: 0; padding: 18px; } }
+.plan-focus .pf-pool { background: transparent; box-shadow: none; border: 0; padding: 0; border-radius: 0; }
+@media (min-width: 1181px) { .plan-focus .pf-grid > .pf-pool { padding: 2px; } }
+
+/* the day in a strip and three tiles */
+.plan-focus .pf-today .pf-h2 { margin-bottom: 12px; }
+.pf-segs { display: flex; gap: 2px; height: 10px; border-radius: 3px; overflow: hidden; background: var(--surface-2); margin-bottom: 12px; }
+.pf-segs i { display: block; height: 100%; min-width: 2px; background: var(--faint); opacity: .45; }
+.pf-segs i.is-done { background: var(--progress); opacity: 1; }
+.pf-tiles { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr); gap: 8px; }
+.pf-tile { background: var(--surface-2); border-radius: 8px; padding: 10px 12px; display: grid; gap: 2px; min-width: 0; }
+.pf-tile b { font-family: var(--font-display); font-size: 1.25rem; font-weight: 800; letter-spacing: -0.02em; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--ink); }
+.pf-tile span { font-size: 0.75rem; color: var(--muted); }
+.pf-tile.is-warn { background: var(--warn-wash); }
+.pf-tile.is-warn b, .pf-tile.is-warn span { color: var(--warn); }
+.pf-tile.is-good { background: var(--progress-wash); }
+.pf-tile.is-good b, .pf-tile.is-good span { color: var(--progress); }
+
+/* goals as cards */
+.plan-focus .wg-row { background: var(--surface-2); border-radius: 8px; padding: 12px; border: 0; }
+.plan-focus .wg-row:first-of-type { padding-top: 12px; }
+.plan-focus .wg-row + .wg-row { margin-top: 8px; }
+.plan-focus .wg-row.is-done { background: var(--progress-wash); }
+.plan-focus .wg-row.is-done .wg-name { color: var(--progress); }
+.plan-focus .wg-name { font-weight: 700; }
+.plan-focus .wg-row .bar { background: var(--surface); border: 0; height: 8px; border-radius: 3px; }
+.plan-focus .wg-row .bar i { background: var(--progress); border-radius: 3px; }
+.plan-focus .wg-pace { color: var(--accent-text); font-weight: 600; }
+.plan-focus .wg-pace.is-met { color: var(--progress); }
+.plan-focus .wg-act { background: var(--surface-2); border: 0; border-radius: 6px; color: var(--ink); font-family: var(--font-body); font-weight: 700; font-size: 0.8125rem; padding: 6px 10px; }
+.plan-focus .wg-act:hover { background: var(--a-accent); color: var(--a-on-accent); }
+.plan-focus .wg-step { background: var(--surface); border: 0; border-radius: 6px; color: var(--accent-text); font-weight: 800; }
+.plan-focus .wg-step:hover { background: var(--a-accent); color: var(--a-on-accent); }
+
+/* Next up: one dark strip */
+.plan-focus .pf-next { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 12px 12px 12px 16px; margin: 0 0 18px; border-radius: 10px; background: #12100C; color: #FFFFFF; border: 0; box-shadow: none; }
+.pf-next-k { font-weight: 800; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; background: var(--a-accent); color: var(--a-on-accent); }
+.pf-next-t { min-width: 0; display: grid; gap: 2px; }
+.pf-next-t b { font-size: 1rem; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.pf-next-t b a { color: inherit; }
+.pf-next-t span { font-size: 0.8125rem; color: rgba(255, 255, 255, 0.72); }
+.pf-next-a { display: flex; gap: 6px; align-items: center; }
+.plan-focus .pf-next-done { background: rgba(255, 255, 255, 0.14); color: #FFFFFF; border: 0; }
+.plan-focus .pf-next-done:hover { background: rgba(255, 255, 255, 0.24); }
+.plan-focus .pf-next .kebab { color: rgba(255, 255, 255, 0.8); }
+.plan-focus .pf-next .kebab:hover { color: #FFFFFF; background: rgba(255, 255, 255, 0.14); }
+.plan-focus .pf-next .pf-timer { color: #FFFFFF; font-weight: 700; }
+.pf-next-log { grid-column: 1 / -1; background: var(--surface); color: var(--ink); border-radius: 8px; padding: 8px; }
+.plan-focus .pf-next.is-empty { grid-template-columns: minmax(0, 1fr); background: var(--surface-2); color: var(--ink); }
+.plan-focus .pf-next.is-empty .pf-next-t span { color: var(--muted); }
+.plan-focus .pf-next.drop-over { outline: 2px dashed var(--a-accent); outline-offset: 2px; }
+@media (max-width: 700px) { .plan-focus .pf-next { grid-template-columns: auto minmax(0, 1fr); } .pf-next-a { grid-column: 1 / -1; } }
+
+/* phases: a heading, a bar sized to the hours, one value */
+.plan-focus .pf-phase { border-top: 0; }
+.plan-focus .pf-phase-head { display: grid; grid-template-columns: 16px auto minmax(40px, 1fr) auto; gap: 12px; align-items: center; padding: 14px 6px 8px; }
+.plan-focus .pf-phase.is-empty .pf-phase-head { grid-template-columns: auto minmax(40px, 1fr) auto; padding: 10px 6px 10px 34px; }
+.plan-focus .pf-phase-name { font-family: var(--font-display); font-size: 1.125rem; font-weight: 800; white-space: nowrap; }
+.plan-focus .pf-phase-name em { font-style: normal; font-family: var(--font-body); font-weight: 600; font-size: 0.75rem; color: var(--faint); margin-left: 8px; }
+.plan-focus .pf-phase.is-empty .pf-phase-name { font-size: 1rem; color: var(--muted); }
+.pf-phase-bar { display: flex; gap: 2px; height: 12px; border-radius: 3px; overflow: hidden; background: var(--surface-2); }
+.pf-phase-bar i { display: block; height: 100%; min-width: 3px; background: var(--faint); }
+.plan-focus .pf-phase-tot { font-weight: 700; font-size: 0.8125rem; color: var(--muted); margin-left: 0; white-space: nowrap; text-align: right; }
+.plan-focus .pf-phase-tot.is-over { color: var(--warn); }
+.plan-focus .pf-phase-tot.is-free { color: var(--progress); }
+
+/* rows: filled with the project's tint */
+.plan-focus .pf-phase-rows { display: grid; gap: 6px; padding-bottom: 8px; }
+.plan-focus .pf-phase-rows .today-task { background: var(--bg); border-radius: 8px; border: 0; padding: 10px; margin: 0; align-items: center; }
+.plan-focus .pf-phase-rows .today-task.has-hue { background: var(--t); }
+.plan-focus .pf-phase-rows .today-task::before { display: none; }
+.plan-focus .pf-phase-rows .today-task:hover { filter: brightness(0.985); }
+.plan-focus .pf-phase-rows .drag-grip, .plan-focus .pf-phase-rows .spacemark { display: none; }
+.pf-rt { display: grid; gap: 2px; min-width: 0; }
+.plan-focus .pf-rt .wrap2 { font-weight: 600; }
+.pf-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; font-size: 0.8125rem; }
+.pf-meta .tagmark, .pf-rowline .tagmark { font-weight: 700; font-size: 0.8125rem; display: inline-flex; align-items: center; gap: 6px; }
+.pf-meta .tagmark::before, .pf-rowline .tagmark::before { content: ""; width: 9px; height: 9px; border-radius: 2px; background: currentColor; }
+.pf-steps { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; font-size: 0.8125rem; color: var(--muted); }
+.pf-steps:hover { color: var(--accent-text); }
+.pf-steps svg { transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1); }
+.pf-steps[aria-expanded="true"] svg { transform: rotate(180deg); }
+.plan-focus .pf-is-next { margin-left: 8px; font-weight: 800; }
+.plan-focus .pf-c-est .chip.tone-info, .plan-focus .pf-c-est .est-edit { font-weight: 700; font-size: 0.9375rem; color: var(--ink); }
+.plan-focus .pf-c-acts { width: 40px; }
+.plan-focus .today-task .task-actions { opacity: 1 !important; }
+.plan-focus .pf-c-acts .task-focus { width: 32px; height: 32px; border-radius: 6px; background: var(--surface); color: var(--accent-text); display: grid; place-items: center; }
+.plan-focus .pf-c-acts .task-focus:hover { background: var(--a-accent); color: var(--a-on-accent); }
+
+/* the pool: cards straight on the paper */
+.plan-focus .pf-pool-list { display: grid; gap: 6px; }
+.plan-focus .pf-pool .todo-item { border: 0; }
+.plan-focus .pf-pool .todo-row { grid-template-columns: minmax(0, 1fr); background: var(--surface); border-radius: 8px; padding: 12px; border: 0; }
+.plan-focus .pf-pool .todo-row.has-hue { background: var(--t); }
+.plan-focus .pf-pool .todo-row::before { display: none; }
+.plan-focus .pf-pool .drag-grip, .plan-focus .pf-pool .spacemark { display: none; }
+.plan-focus .pf-pool .todo-row > .grow { font-weight: 600; }
+.plan-focus .pf-rowline { padding-left: 0; gap: 12px; }
+.pf-age { font-size: 0.8125rem; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.pf-age.is-stale { color: var(--warn); font-weight: 700; }
+.plan-focus .pf-send { background: var(--a-accent); color: var(--a-on-accent); border: 0; border-radius: 6px; }
+.plan-focus .pf-send:hover { background: var(--a-accent-2); color: var(--a-on-accent); }
+
+/* the colour picker */
+.pf-hues { display: grid; gap: 6px; padding: 8px 10px; }
+.pf-hues + .pf-hues { border-top: 1px solid var(--hairline); }
+.pf-hues-n { font-weight: 700; font-size: 0.8125rem; }
+.pf-hues-row { display: grid; grid-template-columns: repeat(8, 24px); gap: 6px; }
+.pf-hues-row button { width: 24px; height: 24px; border-radius: 5px; border: 0; padding: 0; transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1); }
+.pf-hues-row button:hover { transform: scale(1.08); }
+.pf-hues-row button[aria-checked="true"] { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px currentColor; }

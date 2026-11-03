@@ -1476,7 +1476,8 @@ await step('plan: today focus, a goal fed by a task, and the day in numbers', as
      day in numbers, and he picks what is next up himself. */
   if (await page.getByRole('button', { name: 'Close the day' }).count()) throw new Error('Close the day is back')
   const stats = (await page.locator('.pf-tile').allInnerTexts()).map((x) => x.replace(/\s+/g, ' '))
-  if (stats.length !== 3 || !/^2 planned$/.test(stats[0]) || !/^1 left$/.test(stats[2])) throw new Error(`the day reads ${JSON.stringify(stats)}`)
+  /* Three time boxes: planned, worked, saved (2026-11-03). One of the two finished. */
+  if (stats.length !== 3 || !/ planned$/.test(stats[0]) || !/^0h 15m worked$/.test(stats[1]) || !/ saved$/.test(stats[2])) throw new Error(`the day reads ${JSON.stringify(stats)}`)
   if (!(await page.locator('.pf-next-t b').innerText()).includes('Gate second thing')) throw new Error('the only open task is not next up')
 })
 

@@ -24,35 +24,12 @@ import {
 import { goalPace, goalPeriodKey, goalPeriodRange, localDateKey } from './util'
 
 /* ---------- colour and icon ---------- */
-const PALETTE = ['#A3E635', '#A78BFA', '#38BDF8', '#F472B6', '#FB923C', '#2DD4BF', '#22D3EE', '#FACC15', '#4ADE80', '#818CF8', '#F87171', '#E879F9', '#60A5FA', '#34D399', '#F59E0B', '#FB7185', '#C084FC', '#5EEAD4', '#FDBA74', '#94A3B8']
-const ICONS: Record<string, (p: { size?: number }) => ReactNode> = {
-  sun: Icon.Sun, cup: Icon.Cup, focus: Icon.Focus, bolt: Icon.Bolt, clock: Icon.Clock, hourglass: Icon.Hourglass,
-  wave: Icon.Waveform, heart: Icon.DockHeartbeat, book: Icon.DockBook, wallet: Icon.DockWallet, flag: Icon.Flag,
-  calendar: Icon.DockCalendar, checklist: Icon.Checklist, home: Icon.Home, bulb: Icon.DockBulb, eye: Icon.Eye, note: Icon.Note,
-}
-const ICON_KEYS = Object.keys(ICONS)
-function hashOf(s: string) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h) }
-function guessIcon(name: string, fallback: string): string {
-  const n = name.toLowerCase()
-  if (/water|drink|cup|coffee|tea/.test(n)) return 'cup'
-  if (/wake|morning|sun|breakfast/.test(n)) return 'sun'
-  if (/meditat|breath|calm/.test(n)) return 'wave'
-  if (/focus|deep|work/.test(n)) return 'focus'
-  if (/bed|sleep|night|evening/.test(n)) return 'hourglass'
-  if (/gym|run|stretch|walk|push|sport|train|creatine/.test(n)) return 'heart'
-  if (/read|book|journal|pronunc|typing/.test(n)) return 'book'
-  if (/earn|money|save|invoice|czk|pay|spend|income/.test(n)) return 'wallet'
-  if (/review|plan|week|month/.test(n)) return 'calendar'
-  if (/brain|scroll|reset|rot/.test(n)) return 'bolt'
-  return fallback
-}
-const colorFor = (id: string, set?: string) => set ?? PALETTE[hashOf(id) % PALETTE.length]
+import { ICONS, ICON_KEYS, PALETTE, guessIcon, colorFor, fmt, HkRing, tileSize } from './hkparts'
 
 /* ---------- dates and numbers ---------- */
 const DAY = 86400000
 const keyAgo = (n: number) => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() - n); return localDateKey(d) }
 const short = (k: string) => new Date(`${k}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-const fmt = (n: number) => (Math.round(n * 10) / 10).toLocaleString('cs-CZ').replace(/[  ]/g, ' ')
 function parseAmount(s: string, unit?: string): number | null {
   const t = s.trim().toLowerCase().replace(/\s/g, '').replace(',', '.')
   if (unit === 'ml') { const l = t.match(/^(\d+(?:\.\d+)?)l$/); if (l) return parseFloat(l[1]) * 1000 }
@@ -248,9 +225,6 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
     const status = goalPace(total, g.target, tf, new Date(), !!fed && !isTimeFed(fed))
     return { total, pace, left, reach, weekNeed, ahead: status !== 'behind', status, end: range.to }
   }
-  /* Goal tiles are the same size as a habit's day dots: a 26-wide grid, at
-     most two rows, so 1 goal is one small dot and 100 000 CZK is fifty. */
-  const tileSize = (target: number) => { const raw = target / 52; const steps = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000]; return steps.find((x) => x >= raw) ?? 100000 }
 
   /* ---------- actions ---------- */
   const say = (text: string, undo?: () => void) => setToast({ text, undo })
@@ -273,18 +247,7 @@ export function HabitKitRoom({ start = 'all' }: { start?: string }) {
   }
 
   /* ---------- pieces ---------- */
-  const Ring = ({ f, c, size = 46, w = 4, children }: { f: number; c: string; size?: number; w?: number; children?: ReactNode }) => {
-    const r = size / 2 - w, C = 2 * Math.PI * r
-    return (
-      <span className="hk-ringwrap" style={{ width: size, height: size }}>
-        <svg className="hk-ring" viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
-          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={`color-mix(in oklab, ${c} 18%, var(--hk-dot))`} strokeWidth={w} />
-          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={c} strokeWidth={w} strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - Math.min(1, Math.max(0, f)))} />
-        </svg>
-        {children}
-      </span>
-    )
-  }
+  const Ring = HkRing
   const Ico = ({ it, small }: { it: Item; small?: boolean }) => { const C = ICONS[it.icon] ?? Icon.Checklist; return <span className={`hk-ico${small ? ' is-small' : ''}`}><C size={small ? 16 : 21} /></span> }
 
   const Tiles = ({ it, weeks }: { it: Item; weeks: number }) => {

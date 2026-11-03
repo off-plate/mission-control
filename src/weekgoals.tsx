@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import * as Icon from './icons'
 import { useStore } from './store'
 import { Dropdown } from './ui'
+import { ICONS, colorFor, fmt, guessIcon, HkRing, tileSize } from './hkparts'
 import { goalCurrent, type Goal } from './types'
 import { goalPeriodKey, goalPeriodRange, localDateKey, shiftPeriodKey } from './util'
 
@@ -84,36 +85,59 @@ function GoalRow({ row, today }: { row: GoalDay; today: string }) {
     if (Number.isFinite(n) && n >= 0) updateGoal(goal.id, { current: Math.min(goal.target, n), touchedAt: today })
     setTyping(false)
   }
+  /* THE HABITS & GOALS CARD (his ask, 2026-11-03): the goal looks here the
+     way it looks on its own page, icon, colour, ring and tiles, with this
+     page's one addition, today's share, as its line. */
+  const c = colorFor(goal.id, goal.color)
+  const Ico = ICONS[goal.icon ?? guessIcon(goal.name, 'flag')] ?? Icon.Flag
+  const size = tileSize(goal.target)
+  const tiles = Math.ceil(goal.target / size), filled = Math.floor(cur / size)
+  const want = Math.floor(Math.min(goal.target, cur + left) / size)
+  const f = cur / Math.max(1, goal.target)
   return (
-    <div className={`wg-row${done ? ' is-done' : ''}`}>
-      <div className="wg-top">
-        <span className="wg-name">{goal.name}</span>
+    <article className={`hk-card wg-card${done ? ' is-done' : ''}`} style={{ ['--c' as string]: c }}>
+      <div className="hk-top">
+        <span className="hk-ico"><Ico size={21} /></span>
+        <div className="hk-name">
+          <span className="hk-title">{goal.name}</span>
+          <span className="hk-sub">
+            {done ? <b>Done for the week</b> : left === 0 ? <b>Today's share done</b> : <><b>{left}{unit} more</b> today</>}
+          </span>
+        </div>
+        {auto ? (
+          <HkRing f={f} c={c}><span className="hk-ringnum">{pct}%</span></HkRing>
+        ) : (
+          <button className="hk-act is-ring" disabled={done} aria-label={`Add 1 to ${goal.name}`} onClick={() => bumpGoal(goal.id, 1)}>
+            <HkRing f={f} c={c}><Icon.Plus size={18} /></HkRing>
+          </button>
+        )}
+      </div>
+      <div className="hk-amt">
         {typing ? (
           <input className="est-input mono" type="number" min={0} max={goal.target} autoFocus value={val}
             aria-label={`Progress on ${goal.name}`}
             onChange={(e) => setVal(e.target.value)} onBlur={commit}
             onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setTyping(false) }} />
         ) : (
-          <button className="wg-count mono" disabled={auto}
+          <button className="wg-count" disabled={auto}
             title={auto ? 'Counts itself from a habit' : 'Click to set the number yourself'}
             onClick={() => { setVal(String(cur)); setTyping(true) }}>
-            {cur}<span>/{goal.target}</span>
+            <b>{fmt(cur)}</b><span>/ {fmt(goal.target)}{unit}</span>
           </button>
         )}
-      </div>
-      <div className={`bar${done ? ' prog' : ''}`}><i style={{ width: `${pct}%` }} /></div>
-      <div className="wg-foot">
-        <span className={`wg-pace${done || left === 0 ? ' is-met' : ''}`}>
-          {done ? 'Done for the week' : left === 0 ? "Today's share done" : `${left}${unit} more today`}
+        <span className="wg-tools">
+          {!auto && !done && stepsFor(goal.target).filter((x) => x > 1).map((x) => (
+            <button key={x} className="wg-step" aria-label={`Add ${x} to ${goal.name}`} onClick={() => bumpGoal(goal.id, x)}>+{x}</button>
+          ))}
+          <Dropdown label={`Options for ${goal.name}`}>
+            <button role="menuitem" className="danger" onClick={() => deleteGoal(goal.id)}>Delete</button>
+          </Dropdown>
         </span>
-        {!auto && !done && stepsFor(goal.target).map((s) => (
-          <button key={s} className="wg-step mono" aria-label={`Add ${s} to ${goal.name}`} onClick={() => bumpGoal(goal.id, s)}>+{s}</button>
-        ))}
-        <Dropdown label={`Options for ${goal.name}`}>
-          <button role="menuitem" className="danger" onClick={() => deleteGoal(goal.id)}>Delete</button>
-        </Dropdown>
       </div>
-    </div>
+      <div className="hk-tiles is-goal" style={{ gridTemplateColumns: 'repeat(26, 1fr)' }} aria-label={`${fmt(cur)} of ${fmt(goal.target)}`}>
+        {Array.from({ length: tiles }, (_, i) => <i key={i} className={i < filled ? 'f' : i < want ? 'pace' : ''} />)}
+      </div>
+    </article>
   )
 }
 
@@ -137,7 +161,7 @@ export function WeekGoals() {
   }
 
   return (
-    <section className="weekgoals" aria-label="This week's goals">
+    <section className="weekgoals hk" aria-label="This week's goals">
       <div className="pf-head">
         <h2 className="pf-h2">This week</h2>
         <button className="wg-act" aria-expanded={adding} onClick={() => setAdding((v) => !v)}>

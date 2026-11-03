@@ -1470,7 +1470,7 @@ await step('plan: today focus, a goal fed by a task, and the day in numbers', as
   if (!/Gate (send 10 emails|second thing)/.test(next)) throw new Error(`Next up reads "${next}"`)
   await tickOnDay('Gate send 10 emails'); await page.waitForTimeout(300)
   await page.locator('.actual-skip').first().click(); await page.waitForTimeout(500)
-  const count = (await page.locator('.wg-row', { hasText: 'Gate outreach' }).locator('.wg-count').innerText()).replace(/\s/g, '')
+  const count = (await page.locator('.wg-card', { hasText: 'Gate outreach' }).locator('.wg-count').innerText()).replace(/\s/g, '')
   if (count !== '10/100') throw new Error(`the goal reads ${count} after the task that feeds it was finished`)
   /* No Close the day any more (his call, 2026-11-02): the rail shows the
      day in numbers, and he picks what is next up himself. */

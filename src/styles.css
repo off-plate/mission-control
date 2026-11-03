@@ -12579,10 +12579,13 @@ textarea.iv-input { height: auto; padding: 10px 12px; resize: vertical; }
 .pf-head .pf-count + * { margin-left: 0; }
 
 /* the day in three numbers */
-.pf-stats { display: grid; grid-template-columns: auto auto auto; justify-content: space-between; gap: var(--s3); }
+.pf-stats { display: grid; grid-template-columns: auto auto auto; justify-content: space-between; gap: var(--s4); }
 .pf-stat { display: grid; gap: 2px; min-width: 0; }
-.pf-stat b { white-space: nowrap; font-size: 1.375rem; font-weight: 600; line-height: 1.1; color: var(--ink); }
-.pf-stat span { font-size: 0.75rem; color: var(--info); }
+.pf-stat b { font-family: var(--font-display); font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 1.375rem; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1; }
+.pf-stat span { font-size: 0.75rem; color: var(--muted); }
+.pf-stat b.val-warn { color: var(--warn-text, var(--warn)); }
+.pf-daybar { height: 6px; margin-top: var(--s4); border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.pf-daybar i { display: block; height: 100%; border-radius: 3px; background: var(--progress); transition: width 400ms cubic-bezier(0.23, 1, 0.32, 1); }
 
 /* goals rail */
 .weekgoals { display: grid; gap: 0; }
@@ -12719,7 +12722,9 @@ button.pf-phase-head:focus-visible { outline: 2px solid var(--accent); outline-o
 /* The accordion: rows stay mounted and the body folds by its own height. */
 .pf-phase-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 220ms cubic-bezier(0.23, 1, 0.32, 1); }
 .pf-phase.is-shut .pf-phase-body { grid-template-rows: 0fr; }
-.pf-phase-rows { min-height: 0; overflow: hidden; }
+/* The fold hides overflow, so the side room for each row's hover wash and
+   focus ring is padding inside it (cancelled outside by the negative margin). */
+.pf-phase-rows { min-height: 0; overflow: hidden; margin: 0 -12px; padding: 0 12px; }
 .pf-phase-rows .today-item:last-child .today-task { border-bottom: none; }
 .pf-is-next { flex: none; font-size: 0.6875rem; color: var(--accent-text); }
 .pf-next-slot { font-size: 0.75rem; color: var(--info); }
@@ -12746,3 +12751,13 @@ button.pf-phase-head:focus-visible { outline: 2px solid var(--accent); outline-o
      their border and shadow, given back with a matching negative margin. */
   .pf-grid > .pf-main, .pf-grid > .pf-rail { padding: 14px; margin: -14px; }
 }
+
+/* To-do rows (2026-11-03): the title is the important thing, so it gets the
+   whole row; the age, estimate, send arrow and menu sit on a line under it.
+   A grid, because the phone rules above force these rows to one flex line. */
+.pf-pool .todo-row { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: start; column-gap: var(--s2); row-gap: var(--s1); flex-wrap: initial; }
+.pf-pool .todo-row > .grow { min-width: 0; flex: none !important; }
+.pf-rowline { grid-column: 1 / -1; display: flex; align-items: center; gap: var(--s2); padding-left: 26px; min-width: 0; }
+.pf-rowacts { margin-left: auto; display: inline-flex; align-items: center; gap: var(--s1); }
+.pf-rowline .pf-send { width: 30px; height: 30px; min-height: 0; }
+.pf-pool .todo-row > .spacemark { align-self: start; margin-top: 9px; }

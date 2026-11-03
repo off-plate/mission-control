@@ -1119,11 +1119,14 @@ export function PlanPage() {
      (2026-11-02): what is planned, how long it takes, what is left. They read
      the day being shown. */
   const dayMin = todayAll.reduce((a, t) => a + taskMinutes(t), 0)
+  const dayCap = SLOTS.reduce((a, sl) => a + slotMinutes(sl.id), 0)
+  const dayDoneMin = todayAll.filter((t) => t.done).reduce((a, t) => a + taskMinutes(t), 0)
   const dayStats = [
-    { v: String(todayAll.length), k: 'planned' },
-    { v: dayMin ? fmtDuration(dayMin) : '0h', k: 'of work' },
-    { v: String(dayOpen.length), k: dayOpen.length === 0 && todayAll.length ? 'all done' : 'left' },
+    { v: String(todayAll.length), k: 'planned', tone: 'info' },
+    { v: dayMin ? fmtDuration(dayMin) : '0h', k: dayCap && dayMin > dayCap ? `of work, ${fmtDuration(dayMin - dayCap)} over` : 'of work', tone: dayCap && dayMin > dayCap ? 'warn' : 'info' },
+    { v: String(dayOpen.length), k: dayOpen.length === 0 && todayAll.length ? 'all done' : 'left', tone: 'pos' },
   ]
+  const dayPct = dayMin ? Math.round((dayDoneMin / dayMin) * 100) : 0
   /* THREE COLUMNS, EACH ITS OWN SCROLL (his ask, 2026-11-02): a long day must
      not drag the goals and the pool off screen with it. Each column sticks
      under the app's header and scrolls inside itself; this measures that
@@ -1298,6 +1301,7 @@ export function PlanPage() {
             <Linkify text={t.title} /> <TagMark project={markOf(t)} onPick={pickTag} />
             {goalOf(t) && <><br />{goalTag(t)}</>}
           </span>
+          <div className="pf-rowline">
           {t.createdAt && daysSince(t.createdAt) > 0 && (
             <span className="carried-tag mono" title={`On the list since ${t.createdAt}`}>
               {daysSince(t.createdAt) === 1 ? '1 day' : `${daysSince(t.createdAt)} days`}
@@ -1309,6 +1313,7 @@ export function PlanPage() {
               {isExp ? '▾' : '▸'} {doneSubs}/{t.subtasks!.length}
             </button>
           )}
+          <span className="pf-rowacts">
           <button className="pf-send" aria-label={`Add ${t.title} to ${dayOffset === 0 ? 'today' : longDay(planDay)}`}
             title={`Add to ${dayOffset <= 1 ? offsetWord(dayOffset).toLowerCase() : shortDay(planDay)}`}
             onClick={() => moveTasksToToday([t.id], planDay)}>
@@ -1333,6 +1338,8 @@ export function PlanPage() {
             <span className="kebab-sep" />
             <button role="menuitem" className="danger" onClick={() => deleteTask(t.id)}>Delete</button>
           </Dropdown>
+          </span>
+          </div>
         </div>
         {hasSubs && isExp && (
           <div className="subtask-list">
@@ -1400,9 +1407,10 @@ export function PlanPage() {
             <div className="pf-head"><span className="microcap">{offsetWord(dayOffset)}</span></div>
             <div className="pf-stats">
               {dayStats.map((x) => (
-                <div key={x.k} className="pf-stat"><b className="mono">{x.v}</b><span>{x.k}</span></div>
+                <div key={x.k} className="pf-stat"><b className={`val-${x.tone}`}>{x.v}</b><span>{x.k}</span></div>
               ))}
             </div>
+            <div className="pf-daybar" role="img" aria-label={`${dayPct}% of the planned time is done`}><i style={{ width: `${dayPct}%` }} /></div>
           </section>
           <WeekGoals />
         </aside>

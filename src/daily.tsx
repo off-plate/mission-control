@@ -62,11 +62,18 @@ function dueOn(h: HabitDef, day: string): boolean {
  *  visibly moved at all. */
 function Tally({ n, at = 0, fmt }: { n: number; at?: number; fmt?: (v: number) => string }) {
   const [shown, setShown] = useState(n)
-  const ran = useRef(false)
+  const first = useRef(true)
   useEffect(() => {
-    if (ran.current || n <= 0) return
-    ran.current = true
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    /* Only the first real number counts up. Any later change (the synced
+       tasks landing while it was still counting, which is exactly when this
+       screen opens) just shows the new number: the old version cancelled the
+       count on that change and never restarted it, so the tile sat on 0. */
+    if (n <= 0 || !first.current || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      if (n > 0) first.current = false
+      setShown(n)
+      return
+    }
+    first.current = false
     setShown(0)
     let raf = 0
     const start = window.setTimeout(() => {

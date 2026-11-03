@@ -12783,7 +12783,7 @@ button.pf-phase-head:focus-visible { outline: 2px solid var(--accent); outline-o
 .plan-focus .pf-h2 em { font-style: normal; color: var(--muted); font-weight: 700; }
 .plan-focus .pf-head { margin-bottom: 12px; }
 .plan-focus .pf-rail { gap: 14px; }
-.plan-focus .pf-card, .plan-focus .weekgoals { background: var(--surface); border-radius: 14px; padding: 18px; border: 0; box-shadow: none; }
+.plan-focus .pf-card { background: var(--surface); border-radius: 14px; padding: 18px; border: 0; box-shadow: none; }
 .plan-focus .pf-main { background: var(--surface); border-radius: 14px; padding: 16px; }
 @media (min-width: 1181px) { .plan-focus .pf-grid > .pf-main { margin: 0; padding: 18px; } }
 .plan-focus .pf-pool { background: transparent; box-shadow: none; border: 0; padding: 0; border-radius: 0; }
@@ -12912,3 +12912,17 @@ button.pf-phase-head:focus-visible { outline: 2px solid var(--accent); outline-o
 .shell.is-hud .pf-phase-bar i, .shell.is-hud .pf-segs i:not(.is-done) { filter: brightness(1.6); }
 .shell.is-hud .plan-focus .pf-next { background: var(--surface-2); }
 .shell.is-hud .pf-tile b { font-family: var(--font-body); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0; }
+
+/* Plan's "This week" goals are the Habits & Goals cards (his ask, 2026-11-03),
+   straight on the paper like on their own page, with that page's tokens. */
+.weekgoals.hk { padding: 0; background: transparent; display: grid; gap: 8px; }
+.weekgoals.hk .pf-head { margin-bottom: 4px; }
+.wg-card .hk-amt { align-items: center; }
+.wg-count { display: inline-flex; align-items: baseline; gap: 6px; background: none; border: 0; padding: 0; border-radius: 6px; }
+.wg-count span { color: var(--hk-muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.wg-count:not(:disabled):hover b { color: color-mix(in oklab, var(--c) var(--hk-cpct), #12100C); }
+.wg-tools { margin-left: auto; display: inline-flex; gap: 4px; align-items: center; }
+.weekgoals .wg-card .wg-step { height: 30px; padding: 0 10px; border-radius: 9px; border: 0; background: var(--hk-card-2); color: var(--hk-ink); font-weight: 700; font-size: 13px; }
+.weekgoals .wg-card .wg-step:hover { background: var(--c); color: #0C0D10; }
+.wg-card .kebab { color: var(--hk-muted); }
+.wg-card .hk-act.is-ring:disabled { cursor: default; opacity: 1; }

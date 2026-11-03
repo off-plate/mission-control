@@ -12794,7 +12794,10 @@ button.pf-phase-head:focus-visible { outline: 2px solid var(--accent); outline-o
 .pf-segs { display: flex; gap: 2px; height: 10px; border-radius: 3px; overflow: hidden; background: var(--surface-2); margin-bottom: 12px; }
 .pf-segs i { display: block; height: 100%; min-width: 2px; background: var(--faint); opacity: .45; }
 .pf-segs i.is-done { background: var(--progress); opacity: 1; }
-.pf-tiles { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr); gap: 8px; }
+/* The time is the widest value, so it gets the full row; planned and left
+   share the row under it, equal, so every edge lines up (2026-11-03). */
+.pf-tiles { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.pf-tile:nth-child(2) { grid-column: 1 / -1; order: -1; }
 .pf-tile { background: var(--surface-2); border-radius: 8px; padding: 10px 12px; display: grid; gap: 2px; min-width: 0; }
 .pf-tile b { font-family: var(--font-display); font-size: 1.25rem; font-weight: 800; letter-spacing: -0.02em; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--ink); }
 .pf-tile span { font-size: 0.75rem; color: var(--muted); }

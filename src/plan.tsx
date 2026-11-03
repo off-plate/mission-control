@@ -1156,10 +1156,19 @@ export function PlanPage() {
   const dayMin = todayAll.reduce((a, t) => a + taskMinutes(t), 0)
   const dayCap = SLOTS.reduce((a, sl) => a + slotMinutes(sl.id), 0)
   const dayDoneMin = todayAll.filter((t) => t.done).reduce((a, t) => a + taskMinutes(t), 0)
+  /* THREE TIME BOXES, side by side (his words, 2026-11-03: "how much time I
+     have planned, how much time I worked and how much time I saved"). Worked
+     is the logged time of what is finished (focus blocks count, finished
+     steps of an open task count); saved is the old header's own number,
+     estimate minus actual. */
+  const hm = (m: number) => `${Math.floor(m / 60)}h ${String(Math.round(m) % 60).padStart(2, '0')}m`
+  const workedMin = todayAll.reduce((a, t) => (t.done
+    ? a + (actualOf(t) ?? taskMinutes(t))
+    : a + (t.subtasks?.filter((x) => x.done).reduce((n, x) => n + (x.actualMin ?? x.estimateMin), 0) ?? 0)), 0)
   const dayStats = [
-    { v: String(todayAll.length), k: 'planned', tone: '' },
-    { v: `${Math.floor(dayMin / 60)}h ${String(dayMin % 60).padStart(2, '0')}m`, k: dayCap && dayMin > dayCap ? `${fmtDuration(dayMin - dayCap)} over` : 'of work', tone: dayCap && dayMin > dayCap ? 'warn' : '' },
-    { v: String(dayOpen.length), k: dayOpen.length === 0 && todayAll.length ? 'all done' : 'left', tone: dayOpen.length === 0 && todayAll.length ? 'good' : '' },
+    { v: hm(dayMin), k: 'planned', tone: dayCap && dayMin > dayCap ? 'warn' : '' },
+    { v: hm(workedMin), k: 'worked', tone: workedMin > 0 ? 'good' : '' },
+    { v: loggedAny ? `${savedToday >= 0 ? '+' : '-'}${hm(Math.abs(savedToday))}` : hm(0), k: 'saved', tone: !loggedAny ? '' : savedToday >= 0 ? 'good' : 'bad' },
   ]
   /* The day as one strip: finished time green first, then what is left in
      each task's project colour. */

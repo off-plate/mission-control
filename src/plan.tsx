@@ -21,6 +21,7 @@ import { useCoarsePointer, usePhone, Band, WorkspaceTitle, Dropdown, SpaceMark, 
 import { TaskSheet } from './tasksheet'
 import { TagField } from './tagfield'
 import { matchProjects, tagOf, takeTag } from './tags'
+import { HUES, hueOf } from './hues'
 import { SLOTS, SPACES, UNSORTED, habitLocked, routineComplete, routineProgress, slotMinutes, TYPING_TARGET_WPM, type Project, type Routine, type SubTask, type Task, type TimeSlot } from './types'
 import { periodKeyFor, fmtDuration, fmtSigned, dayOfWeekKey, isEstimated, localDateKey, slotForMoment, taskMinutes } from './util'
 
@@ -566,6 +567,36 @@ function ProjectFilter({ projects, tasks, sel, inScope, onAll, onPick, onManage 
   )
 }
 
+/* His colours (2026-11-03): every project picks its own from eight, and the
+   tag, the row tint and the bar segments all follow. */
+function ProjectColours({ projects }: { projects: Project[] }) {
+  const { setProjectHue, projects: all } = useStore()
+  if (!projects.length) return null
+  return (
+    <Dropdown
+      label="Project colours" className="hide-phone"
+      trigger={({ onClick, open: isOpen }) => (
+        <button className="btn btn-ghost pf-proj" onClick={onClick} aria-expanded={isOpen}>Colours <Icon.ChevronDown size={14} /></button>
+      )}
+    >
+      {projects.map((p) => {
+        const cur = hueOf(p, all)
+        return (
+          <div key={p.id} className="pf-hues" role="group" aria-label={`Colour for ${p.name}`}>
+            <span className="pf-hues-n" style={{ color: cur.h }}>#{tagOf(p)}</span>
+            <span className="pf-hues-row">
+              {HUES.map((h) => (
+                <button key={h.id} role="menuitemradio" aria-checked={cur.id === h.id} aria-label={`${h.name} for ${p.name}`} title={h.name}
+                  style={{ background: h.h, color: h.h }} onClick={() => setProjectHue(p.id, h.id)} />
+              ))}
+            </span>
+          </div>
+        )
+      })}
+    </Dropdown>
+  )
+}
+
 /* The phone shows one list at a time (his ask, 2026-10-15). The tab bar's +
    fires mc:new-task, which lands on Plan's new-task box, and that box lives in
    the to-do list, so the next Plan render opens on it. Registered at import,
@@ -630,6 +661,10 @@ export function PlanPage() {
     setOpenTitles((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
   }
   const markOf = (t: Task) => (t.projectId ? projects.find((p) => p.id === t.projectId) : undefined)
+  /* A task wears its project's colour (his pick, 2026-11-03): the ink for its
+     tag and bar segment, the tint for its row. */
+  const hueFor = (t: Task) => { const p = markOf(t); return p ? hueOf(p, projects) : undefined }
+  const hueStyle = (t: Task) => { const h = hueFor(t); return h ? ({ '--h': h.h, '--t': h.t } as React.CSSProperties) : undefined }
   const pickTag = (p: Project) => setPicked((prev) => (prev.length === 1 && prev[0] === p.id ? [] : [p.id]))
   /* Offered in the add box: this workspace's projects first, then the rest,
      because a hashtag can file a task anywhere. */
@@ -1122,11 +1157,15 @@ export function PlanPage() {
   const dayCap = SLOTS.reduce((a, sl) => a + slotMinutes(sl.id), 0)
   const dayDoneMin = todayAll.filter((t) => t.done).reduce((a, t) => a + taskMinutes(t), 0)
   const dayStats = [
-    { v: String(todayAll.length), k: 'planned', tone: 'info' },
-    { v: dayMin ? fmtDuration(dayMin) : '0h', k: dayCap && dayMin > dayCap ? `of work, ${fmtDuration(dayMin - dayCap)} over` : 'of work', tone: dayCap && dayMin > dayCap ? 'warn' : 'info' },
-    { v: String(dayOpen.length), k: dayOpen.length === 0 && todayAll.length ? 'all done' : 'left', tone: 'pos' },
+    { v: String(todayAll.length), k: 'planned', tone: '' },
+    { v: dayMin ? fmtDuration(dayMin) : '0h', k: dayCap && dayMin > dayCap ? `${fmtDuration(dayMin - dayCap)} over` : 'of work', tone: dayCap && dayMin > dayCap ? 'warn' : '' },
+    { v: String(dayOpen.length), k: dayOpen.length === 0 && todayAll.length ? 'all done' : 'left', tone: dayOpen.length === 0 && todayAll.length ? 'good' : '' },
   ]
-  const dayPct = dayMin ? Math.round((dayDoneMin / dayMin) * 100) : 0
+  /* The day as one strip: finished time green first, then what is left in
+     each task's project colour. */
+  const daySegs = [...todayAll].sort((a, b) => Number(b.done) - Number(a.done)).map((t) => ({
+    id: t.id, w: dayMin ? (taskMinutes(t) / dayMin) * 100 : 0, done: t.done, c: hueFor(t)?.h,
+  }))
   /* THREE COLUMNS, EACH ITS OWN SCROLL (his ask, 2026-11-02): a long day must
      not drag the goals and the pool off screen with it. Each column sticks
      under the app's header and scrolls inside itself; this measures that
@@ -1243,7 +1282,8 @@ export function PlanPage() {
     return (
       <div className="today-item" key={t.id} data-task-id={t.id}>
         <div
-          className={`today-task${t.done ? ' done' : ''}${flashId === t.id ? ' flash' : ''}`}
+          className={`today-task${t.done ? ' done' : ''}${flashId === t.id ? ' flash' : ''}${hueFor(t) ? ' has-hue' : ''}`}
+          style={hueStyle(t)}
           draggable={!t.done}
           onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move' }}
         >
@@ -1256,25 +1296,32 @@ export function PlanPage() {
             <Icon.Check size={12} strokeWidth={4} />
           </button>
           <SpaceMark space={t.space} />
-          <span className={`grow wrap2${openTitles.has(t.id) ? ' is-open' : ''}`} onClick={(e) => toggleTitle(e, t.id)}><Linkify text={t.title} /> <TagMark project={markOf(t)} onPick={pickTag} /></span>
-          {goalTag(t)}
-          {t === nextUp && <span className="pf-is-next mono">Next up</span>}
-          {t.done && t.actualMin != null ? (
-            <span className="est-vs-actual mono">{fmtDuration(taskMinutes(t))} → {fmtDuration(t.actualMin)}</span>
-          ) : (
-            <EstimateChip task={t} />
-          )}
-          {hasSubs && (
-            <button className="expand-btn" aria-expanded={isExp} aria-label={isExp ? 'Collapse subtasks' : 'Expand subtasks'} onClick={() => toggleExp(t.id)}>
-              {isExp ? '▾' : '▸'} {doneSubs}/{t.subtasks!.length}
-            </button>
-          )}
-          {!t.done && t !== nextUp && (
-            <button className="task-act pf-make-next" aria-label={`Make ${t.title} next up`} title="Make it next up" onClick={() => pickNext(t.id)}>
-              <Icon.SkipNext size={16} />
-            </button>
-          )}
-          {!t.done && <TaskActions task={t} onFocus={() => startFocus(taskMinutes(t), t.title)} />}
+          <span className="grow pf-rt">
+            <span className={`wrap2${openTitles.has(t.id) ? ' is-open' : ''}`} onClick={(e) => toggleTitle(e, t.id)}>
+              <Linkify text={t.title} />{t === nextUp && <span className="pf-is-next">Next up</span>}
+            </span>
+            {(markOf(t) || goalOf(t) || hasSubs) && (
+              <span className="pf-meta">
+                <TagMark project={markOf(t)} onPick={pickTag} />
+                {goalTag(t)}
+                {hasSubs && (
+                  <button className="pf-steps" aria-expanded={isExp} aria-label={isExp ? 'Hide steps' : 'Show steps'} onClick={() => toggleExp(t.id)}>
+                    {doneSubs} of {t.subtasks!.length} steps <Icon.ChevronDown size={12} />
+                  </button>
+                )}
+              </span>
+            )}
+          </span>
+          <span className="pf-c-est">
+            {t.done && t.actualMin != null ? (
+              <span className="est-vs-actual mono">{fmtDuration(taskMinutes(t))} → {fmtDuration(t.actualMin)}</span>
+            ) : (
+              <EstimateChip task={t} />
+            )}
+          </span>
+          <span className="pf-c-acts">
+            {!t.done && <TaskActions task={t} onFocus={() => startFocus(taskMinutes(t), t.title)} />}
+          </span>
           {dayMenu(t)}
         </div>
         {logging === t.id && (
@@ -1291,23 +1338,26 @@ export function PlanPage() {
     return (
       <div className="todo-item" key={t.id} data-todo-id={t.id}>
         <div
-          className={`todo-row${flashIds.includes(t.id) ? ' flash' : ''}`}
+          className={`todo-row${flashIds.includes(t.id) ? ' flash' : ''}${hueFor(t) ? ' has-hue' : ''}`}
+          style={hueStyle(t)}
           draggable
           onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move' }}
         >
           <span className="drag-grip" aria-hidden="true"><Icon.Grip /></span>
           <SpaceMark space={t.space} />
           <span className={`grow${openTitles.has(t.id) ? ' is-open' : ''}`} onClick={(e) => toggleTitle(e, t.id)}>
-            <Linkify text={t.title} /> <TagMark project={markOf(t)} onPick={pickTag} />
-            {goalOf(t) && <><br />{goalTag(t)}</>}
+            <Linkify text={t.title} />
           </span>
           <div className="pf-rowline">
+          <TagMark project={markOf(t)} onPick={pickTag} />
+          {goalTag(t)}
+          <EstimateChip task={t} />
           {t.createdAt && daysSince(t.createdAt) > 0 && (
-            <span className="carried-tag mono" title={`On the list since ${t.createdAt}`}>
+            /* Amber once it has waited a month: the list's own warning. */
+            <span className={`pf-age${daysSince(t.createdAt) > 30 ? ' is-stale' : ''}`} title={`On the list since ${t.createdAt}`}>
               {daysSince(t.createdAt) === 1 ? '1 day' : `${daysSince(t.createdAt)} days`}
             </span>
           )}
-          <EstimateChip task={t} />
           {hasSubs && (
             <button className="expand-btn" aria-expanded={isExp} aria-label={isExp ? 'Collapse subtasks' : 'Expand subtasks'} onClick={() => toggleExp(t.id)}>
               {isExp ? '▾' : '▸'} {doneSubs}/{t.subtasks!.length}
@@ -1362,6 +1412,7 @@ export function PlanPage() {
             <button className="btn btn-ghost plan-search-btn hide-phone" onClick={() => setSpot(true)} aria-label="Search every task" title="Search every task (Cmd K)"><Icon.Search size={16} /></button>
             <ProjectFilter projects={stripProjects} tasks={tasks} sel={sel} inScope={(t) => inView(t.space)}
               onAll={() => setPicked([])} onPick={pickProject} onManage={() => setPage('projects')} />
+            <ProjectColours projects={stripProjects} />
             <PhoneProjectFilter
               projects={stripProjects} tasks={tasks} sel={sel} inScope={(t) => inView(t.space)}
               onAll={() => setPicked([])} onPick={pickProject} onManage={() => setPage('projects')}
@@ -1396,6 +1447,22 @@ export function PlanPage() {
         </div>
       )}
 
+      {/* A project filter hides tasks from BOTH lists and is remembered between
+          visits, so it has to say so out loud. On a phone the folder button only
+          carries a dot, and a leftover "Unsorted" filter once read as the whole
+          to-do list being gone (his report, 2026-11-03). One strip, one button. */}
+      {sel.length > 0 && (() => {
+        const live = (t: Task) => inView(t.space) && !t.done && (t.list === 'backlog' || t.list === 'today')
+        const hidden = tasks.filter((t) => live(t) && !spaceTasks.includes(t)).length
+        const names = sel.map((id) => (id === UNSORTED ? 'Unsorted' : projects.find((p) => p.id === id)?.name ?? 'a project'))
+        return (
+          <div className="pf-filtered" role="status">
+            <span>Showing only <b>{names.join(', ')}</b>. {hidden} {hidden === 1 ? 'task is' : 'tasks are'} hidden.</span>
+            <button className="btn btn-quiet" onClick={() => setPicked([])}>Show everything</button>
+          </div>
+        )
+      })()}
+
       <div className="seg-phone" role="tablist" aria-label="Which list">
         <button role="tab" aria-selected={phoneList === 'day'} onClick={() => setPhoneList('day')}>{offsetWord(dayOffset)}</button>
         <button role="tab" aria-selected={phoneList === 'todo'} onClick={() => setPhoneList('todo')}>To-do list <em>{backlogOpen.length}</em></button>
@@ -1403,14 +1470,18 @@ export function PlanPage() {
       <div className={`pf-grid phone-${phoneList}`} ref={gridRef}>
         {/* LEFT: how today is going, and what the week is for. */}
         <aside className="pf-rail pf-col" data-menu-fixed>
-          <section className="panel pf-today" aria-label="Today">
-            <div className="pf-head"><span className="microcap">{offsetWord(dayOffset)}</span></div>
-            <div className="pf-stats">
+          <section className="pf-card pf-today" aria-label={offsetWord(dayOffset)}>
+            <h2 className="pf-h2">{offsetWord(dayOffset)}</h2>
+            {dayMin > 0 && (
+              <div className="pf-segs" role="img" aria-label={`${fmtDuration(dayDoneMin)} of ${fmtDuration(dayMin)} done`}>
+                {daySegs.map((x) => <i key={x.id} className={x.done ? 'is-done' : undefined} style={{ width: `${x.w}%`, ...(x.c && !x.done ? { background: x.c } : {}) }} />)}
+              </div>
+            )}
+            <div className="pf-tiles">
               {dayStats.map((x) => (
-                <div key={x.k} className="pf-stat"><b className={`val-${x.tone}`}>{x.v}</b><span>{x.k}</span></div>
+                <div key={x.k} className={`pf-tile${x.tone ? ` is-${x.tone}` : ''}`}><b>{x.v}</b><span>{x.k}</span></div>
               ))}
             </div>
-            <div className="pf-daybar" role="img" aria-label={`${dayPct}% of the planned time is done`}><i style={{ width: `${dayPct}%` }} /></div>
           </section>
           <WeekGoals />
         </aside>
@@ -1440,7 +1511,7 @@ export function PlanPage() {
           </div>
 
           {nextUp ? (
-            <section className={`panel pf-next${flashId === nextUp.id ? ' flash' : ''}${dropKey === 'next' ? ' drop-over' : ''}`} data-task-id={nextUp.id} aria-label="Next up"
+            <section className={`pf-next${flashId === nextUp.id ? ' flash' : ''}${dropKey === 'next' ? ' drop-over' : ''}`} data-task-id={nextUp.id} aria-label="Next up"
               onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDropKey('next') }}
               onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropKey(null) }}
               onDrop={(e) => {
@@ -1450,46 +1521,42 @@ export function PlanPage() {
                 if (!onDay(t)) dropTo((nextUp.slot ?? 'unsorted') as TimeSlot | 'unsorted', id)
                 pickNext(id)
               }}>
-              <div className="pf-next-top">
-                <span className="microcap">{dayOffset === 0 ? 'Next up' : `${offsetWord(dayOffset)}, first up`}</span>
-                {dayMenu(nextUp)}
+              {/* NEXT UP IS ONE SLIM DARK STRIP (his pick, 2026-11-03): the big
+                  card took half the column and hid the rest of the day. */}
+              <span className="pf-next-k">{dayOffset === 0 ? 'Next' : 'First'}</span>
+              <div className="pf-next-t">
+                <b><Linkify text={nextUp.title} /></b>
+                <span>
+                  {[fmtDuration(taskMinutes(nextUp)), markOf(nextUp) ? `#${tagOf(markOf(nextUp)!)}` : null, nextUp.slot ? SLOTS.find((x) => x.id === nextUp.slot)!.label : 'Anytime',
+                    nextUp.subtasks?.length ? `${nextUp.subtasks.filter((x) => x.done).length} of ${nextUp.subtasks.length} steps` : null].filter(Boolean).join(', ')}
+                </span>
               </div>
-              <div className="pf-next-title"><Linkify text={nextUp.title} /> <TagMark project={markOf(nextUp)} onPick={pickTag} /></div>
-              <div className="pf-next-meta">
-                <EstimateChip task={nextUp} />
-                {goalTag(nextUp)}
-                <span className="pf-next-slot mono">{nextUp.slot ? SLOTS.find((x) => x.id === nextUp.slot)!.label : 'Anytime'}</span>
-              </div>
-              <div className="pf-next-acts">
+              <div className="pf-next-a">
                 {dayOffset === 0 && (focusingOn(nextUp)
                   ? <span className="pf-timer mono" aria-live="off">{String(Math.floor(pomo.secondsLeft / 60)).padStart(2, '0')}:{String(pomo.secondsLeft % 60).padStart(2, '0')}</span>
                   : (
                     <button className="btn btn-primary" disabled={!isEstimated(nextUp)} onClick={() => startFocus(taskMinutes(nextUp), nextUp.title)}>
-                      <Icon.Play size={14} /> {isEstimated(nextUp) ? `Start ${taskMinutes(nextUp)} min focus` : 'Estimating...'}
+                      <Icon.Play size={14} /> {isEstimated(nextUp) ? `Focus ${fmtDuration(taskMinutes(nextUp))}` : 'Estimating...'}
                     </button>
                   ))}
-                <button className="btn btn-quiet" onClick={() => setLogging(nextUp.id)}>Mark done</button>
+                <button className="btn pf-next-done" onClick={() => setLogging(nextUp.id)}><Icon.Check size={14} /> Done</button>
+                {dayMenu(nextUp)}
               </div>
               {logging === nextUp.id && (
-                <ActualLog est={taskMinutes(nextUp)} tracked={trackedFor(nextUp.title)} onLog={(m) => { logActual(nextUp.id, m); setLogging(null) }} onSkip={() => { toggleTask(nextUp.id); setLogging(null) }} />
+                <div className="pf-next-log">
+                  <ActualLog est={taskMinutes(nextUp)} tracked={trackedFor(nextUp.title)} onLog={(m) => { logActual(nextUp.id, m); setLogging(null) }} onSkip={() => { toggleTask(nextUp.id); setLogging(null) }} />
+                </div>
               )}
-              {!!nextUp.subtasks?.length && subList(nextUp)}
             </section>
           ) : (
-            <section className="panel pf-next is-empty">
-              <div className="pf-next-title">{todayAll.length ? 'Everything planned is done' : `Nothing planned for ${dayOffset === 0 ? 'today' : longDay(planDay)}`}</div>
-              <p className="col-note">
-                {todayAll.length ? 'Pull one more from the to-do list, or call it a day.' : 'Pull something from the to-do list with its arrow, or drag it here.'}
-              </p>
+            <section className="pf-next is-empty">
+              <div className="pf-next-t">
+                <b>{todayAll.length ? 'Everything planned is done' : `Nothing planned for ${dayOffset === 0 ? 'today' : longDay(planDay)}`}</b>
+                <span>{todayAll.length ? 'Pull one more from the to-do list, or call it a day.' : 'Pull something from the to-do list with its arrow, or drag it here.'}</span>
+              </div>
             </section>
           )}
 
-          {(dayRest.length > 0 || dueRoutines.length > 0 || dayDone.length > 0) && (
-            <div className="pf-sum">
-              <b>{dayOpen.length} open</b>
-              <span className="mono">{fmtDuration(plannedMin)} of your day</span>
-            </div>
-          )}
           {/* PHASES OF THE DAY, back on his word (2026-11-02, with fourteen
               tasks on the day): one flat list of fourteen is not a plan. Each
               phase is a header in the list, not a box: its hours, what is in it
@@ -1514,13 +1581,21 @@ export function PlanPage() {
               const shut = shutSlots.has(b.id)
               const left = open.length + rOpen.length + (nextUp && inPhase(nextUp) ? 1 : 0)
               const name = b.id === 'unsorted' ? 'Anytime' : b.label
+              /* What the part of the day holds, drawn instead of counted: a bar
+                 sized to its hours, one segment per task in its project colour. */
+              const scale = Math.max(cap, tot) || 1
+              const segs = todayAll.filter((t) => !t.done && inPhase(t))
               const head = (
                 <>
-                  <span className="pf-phase-name">{name}</span>
-                  {BUCKET_HINT[b.id] && <span className="pf-phase-hours mono">{BUCKET_HINT[b.id]}</span>}
-                  <span className={`pf-phase-tot mono${over > 0 ? ' is-over' : ''}`}>
+                  <span className="pf-phase-name">{name}{BUCKET_HINT[b.id] && <em>{BUCKET_HINT[b.id]}</em>}</span>
+                  {count > 0 && (cap > 0 || tot > 0) ? (
+                    <span className="pf-phase-bar" aria-hidden="true">
+                      {segs.map((t) => <i key={t.id} style={{ width: `${(taskMinutes(t) / scale) * 100}%`, ...(hueFor(t) ? { background: hueFor(t)!.h } : {}) }} />)}
+                    </span>
+                  ) : <span />}
+                  <span className={`pf-phase-tot${over > 0 ? ' is-over' : cap > 0 && count > 0 ? ' is-free' : ''}`}>
                     {count === 0 ? 'Drop a task here'
-                      : `${left} left${tot > 0 ? `, ${over > 0 ? `${fmtDuration(tot)} of ${fmtDuration(cap)}` : fmtDuration(tot)}` : ''}`}
+                      : `${shut && left ? `${left} left, ` : ''}${over > 0 ? `${fmtDuration(over)} over` : cap > 0 ? (tot < cap ? `${fmtDuration(cap - tot)} free` : 'full') : fmtDuration(tot)}`}
                   </span>
                 </>
               )
@@ -1563,8 +1638,7 @@ export function PlanPage() {
           onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); if (id) dropToList(id); setListDropOver(false) }}
         >
           <div className="pf-head">
-            <span className="microcap">To do</span>
-            <span className="pf-count mono">{backlogOpen.length} waiting</span>
+            <h2 className="pf-h2">To do <em>{backlogOpen.length}</em></h2>
             <Dropdown
               label="Sort the to-do list"
               className="col-sort"

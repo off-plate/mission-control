@@ -139,7 +139,7 @@ export function WeekGoals() {
   return (
     <section className="weekgoals" aria-label="This week's goals">
       <div className="pf-head">
-        <span className="microcap">This week</span>
+        <h2 className="pf-h2">This week</h2>
         <button className="wg-act" aria-expanded={adding} onClick={() => setAdding((v) => !v)}>
           <Icon.Plus size={12} /> Goal
         </button>

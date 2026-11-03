@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom'
 import * as Icon from './icons'
 import { useStore } from './store'
 import { slideOut, useSwipeDown } from './sheetdrag'
-import { toneOf, tagOf } from './tags'
+import { tagOf } from './tags'
+import { hueOf } from './hues'
 import { daysSince } from './health'
 import { SPACE_LABELS } from './exceptions'
 import { SLOTS, SPACES, type Task, type TimeSlot } from './types'
@@ -60,7 +61,7 @@ export function TaskSheet({ task, onClose, onDone, onEdit, onBreakdown, onFocus,
 
         <h3 className="ts-title">{t.title}</h3>
         <div className="ts-meta">
-          {project && <span className={`ts-chip tt${toneOf(project, projects)}`}>#{tagOf(project)}</span>}
+          {project && <span className="ts-chip" style={{ color: hueOf(project, projects).h }}>#{tagOf(project)}</span>}
           {isEstimated(t) && <span className="ts-chip"><Icon.Clock size={13} />{fmtDuration(taskMinutes(t))}</span>}
           {onDay && <span className="ts-chip">{onDay === today ? 'Today' : new Date(`${onDay}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'long' })}{t.slot ? `, ${SLOTS.find((s) => s.id === t.slot)?.label}` : ''}</span>}
           {!onDay && age > 0 && <span className="ts-chip">On the list {age === 1 ? '1 day' : `${age} days`}</span>}
@@ -108,7 +109,7 @@ export function TaskSheet({ task, onClose, onDone, onEdit, onBreakdown, onFocus,
               <button aria-pressed={!t.projectId} onClick={() => setTaskProject(t.id, undefined)}>None</button>
               {inSpace.map((p) => (
                 <button key={p.id} aria-pressed={t.projectId === p.id} onClick={() => setTaskProject(t.id, p.id)}>
-                  <i className={`ts-dot tt${toneOf(p, projects)}`} aria-hidden="true" />{p.name}
+                  <i className="ts-dot" style={{ color: hueOf(p, projects).h }} aria-hidden="true" />{p.name}
                 </button>
               ))}
             </div>

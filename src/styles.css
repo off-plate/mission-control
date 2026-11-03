@@ -12854,7 +12854,7 @@ button.pf-phase-head:focus-visible { outline: 2px solid var(--accent); outline-o
 /* rows: filled with the project's tint */
 .plan-focus .pf-phase-rows { display: grid; gap: 6px; padding-bottom: 8px; }
 .plan-focus .pf-phase-rows .today-task { background: var(--bg); border-radius: 8px; border: 0; padding: 10px; margin: 0; align-items: center; }
-.plan-focus .pf-phase-rows .today-task.has-hue { background: var(--t); }
+.plan-focus .pf-phase-rows .today-task.has-hue { background: color-mix(in srgb, var(--h) 14%, var(--surface)); }
 .plan-focus .pf-phase-rows .today-task::before { display: none; }
 .plan-focus .pf-phase-rows .today-task:hover { filter: brightness(0.985); }
 .plan-focus .pf-phase-rows .drag-grip, .plan-focus .pf-phase-rows .spacemark { display: none; }
@@ -12878,7 +12878,7 @@ button.pf-phase-head:focus-visible { outline: 2px solid var(--accent); outline-o
 .plan-focus .pf-pool-list { display: grid; gap: 6px; }
 .plan-focus .pf-pool .todo-item { border: 0; }
 .plan-focus .pf-pool .todo-row { grid-template-columns: minmax(0, 1fr); background: var(--surface); border-radius: 8px; padding: 12px; border: 0; }
-.plan-focus .pf-pool .todo-row.has-hue { background: var(--t); }
+.plan-focus .pf-pool .todo-row.has-hue { background: color-mix(in srgb, var(--h) 14%, var(--surface)); }
 .plan-focus .pf-pool .todo-row::before { display: none; }
 .plan-focus .pf-pool .drag-grip, .plan-focus .pf-pool .spacemark { display: none; }
 .plan-focus .pf-pool .todo-row > .grow { font-weight: 600; }
@@ -12896,3 +12896,13 @@ button.pf-phase-head:focus-visible { outline: 2px solid var(--accent); outline-o
 .pf-hues-row button { width: 24px; height: 24px; border-radius: 5px; border: 0; padding: 0; transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1); }
 .pf-hues-row button:hover { transform: scale(1.08); }
 .pf-hues-row button[aria-checked="true"] { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px currentColor; }
+
+/* Plan colours in the dark Jarvis look (his report, 2026-11-03): the row tint
+   is mixed from the surface above, so it darkens with the theme; the project
+   inks are dark by design, so they brighten here or they sink into the black. */
+.shell.is-hud .plan-focus .pf-phase-rows .today-task.has-hue,
+.shell.is-hud .plan-focus .pf-pool .todo-row.has-hue { background: color-mix(in srgb, var(--h) 26%, var(--surface)); }
+.shell.is-hud .tagmark, .shell.is-hud .ts-chip, .shell.is-hud .ts-dot, .shell.is-hud .pf-hues-n { filter: brightness(1.9) saturate(1.15); }
+.shell.is-hud .pf-phase-bar i, .shell.is-hud .pf-segs i:not(.is-done) { filter: brightness(1.6); }
+.shell.is-hud .plan-focus .pf-next { background: var(--surface-2); }
+.shell.is-hud .pf-tile b { font-family: var(--font-body); font-size: 1.25rem; font-weight: 700; letter-spacing: 0; }

@@ -12792,7 +12792,7 @@ button.pf-phase-head:focus-visible { outline: 2px solid var(--accent); outline-o
 /* the day in a strip and three tiles */
 .plan-focus .pf-today .pf-h2 { margin-bottom: 12px; }
 .pf-segs { display: flex; gap: 2px; height: 10px; border-radius: 3px; overflow: hidden; background: var(--surface-2); margin-bottom: 12px; }
-.pf-segs i { display: block; height: 100%; min-width: 2px; background: var(--faint); opacity: .45; }
+.pf-segs i { display: block; height: 100%; min-width: 2px; background: var(--faint); }
 .pf-segs i.is-done { background: var(--progress); opacity: 1; }
 /* Three time boxes in one row, equal width (his ask, 2026-11-03). */
 .pf-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
@@ -12926,3 +12926,14 @@ button.pf-phase-head:focus-visible { outline: 2px solid var(--accent); outline-o
 .weekgoals .wg-card .wg-step:hover { background: var(--c); color: #0C0D10; }
 .wg-card .kebab { color: var(--hk-muted); }
 .wg-card .hk-act.is-ring:disabled { cursor: default; opacity: 1; }
+
+/* Each time box keeps its colour at zero too (his rule: Mission Control is
+   never grey): planned in info blue (the room accent can be red, which reads as a warning), worked and saved in progress
+   green, saved in coral once it runs over, planned in amber when it does. */
+.pf-tile.is-info { background: #DDEAF4; }
+.pf-tile.is-info b, .pf-tile.is-info span { color: #1F6E9E; }
+.shell.is-hud .pf-tile.is-info { background: color-mix(in srgb, #38BDF8 20%, var(--surface)); }
+.shell.is-hud .pf-tile.is-info b, .shell.is-hud .pf-tile.is-info span { color: #7DD3FC; }
+.shell.is-hud .pf-tile.is-good { background: color-mix(in srgb, var(--progress) 18%, var(--surface)); }
+.shell.is-hud .pf-tile.is-bad { background: color-mix(in srgb, var(--alert) 18%, var(--surface)); }
+.shell.is-hud .pf-tile.is-warn { background: color-mix(in srgb, var(--warn) 18%, var(--surface)); }

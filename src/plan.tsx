@@ -1166,9 +1166,9 @@ export function PlanPage() {
     ? a + (actualOf(t) ?? taskMinutes(t))
     : a + (t.subtasks?.filter((x) => x.done).reduce((n, x) => n + (x.actualMin ?? x.estimateMin), 0) ?? 0)), 0)
   const dayStats = [
-    { v: hm(dayMin), k: 'planned', tone: dayCap && dayMin > dayCap ? 'warn' : '' },
-    { v: hm(workedMin), k: 'worked', tone: workedMin > 0 ? 'good' : '' },
-    { v: loggedAny ? `${savedToday >= 0 ? '+' : '-'}${hm(Math.abs(savedToday))}` : hm(0), k: 'saved', tone: !loggedAny ? '' : savedToday >= 0 ? 'good' : 'bad' },
+    { v: hm(dayMin), k: 'planned', tone: dayCap && dayMin > dayCap ? 'warn' : 'info' },
+    { v: hm(workedMin), k: 'worked', tone: 'good' },
+    { v: loggedAny ? `${savedToday >= 0 ? '+' : '-'}${hm(Math.abs(savedToday))}` : hm(0), k: 'saved', tone: savedToday >= 0 ? 'good' : 'bad' },
   ]
   /* The day as one strip: finished time green first, then what is left in
      each task's project colour. */

@@ -91,30 +91,26 @@ function GoalRow({ row, today }: { row: GoalDay; today: string }) {
   const c = colorFor(goal.id, goal.color)
   const Ico = ICONS[goal.icon ?? guessIcon(goal.name, 'flag')] ?? Icon.Flag
   const size = tileSize(goal.target)
-  const tiles = Math.ceil(goal.target / size), filled = Math.floor(cur / size)
-  const want = Math.floor(Math.min(goal.target, cur + left) / size)
   const f = cur / Math.max(1, goal.target)
+  /* TWO ROWS, NO MORE (his ask, 2026-11-05): the same card, folded. Row one is
+     the icon, the name with today's share, the count and the ring; row two is
+     the week as one line of dots with the step buttons. The dots stretch to
+     twenty at most, so a big target never wraps into a block. */
+  const lineSize = Math.max(size, Math.ceil(goal.target / 20))
+  const dots = Math.ceil(goal.target / lineSize), dotsOn = Math.floor(cur / lineSize)
+  const dotsPace = Math.floor(Math.min(goal.target, cur + left) / lineSize)
   return (
-    <article className={`hk-card wg-card${done ? ' is-done' : ''}`} style={{ ['--c' as string]: c }}>
-      <div className="hk-top">
-        <span className="hk-ico"><Ico size={21} /></span>
+    <article className={`hk-card wg-card is-compact${done ? ' is-done' : ''}`} style={{ ['--c' as string]: c }}>
+      <div className="wg-r1">
+        <span className="hk-ico is-small"><Ico size={17} /></span>
         <div className="hk-name">
           <span className="hk-title">{goal.name}</span>
           <span className="hk-sub">
             {done ? <b>Done for the week</b> : left === 0 ? <b>Today's share done</b> : <><b>{left}{unit} more</b> today</>}
           </span>
         </div>
-        {auto ? (
-          <HkRing f={f} c={c}><span className="hk-ringnum">{pct}%</span></HkRing>
-        ) : (
-          <button className="hk-act is-ring" disabled={done} aria-label={`Add 1 to ${goal.name}`} onClick={() => bumpGoal(goal.id, 1)}>
-            <HkRing f={f} c={c}><Icon.Plus size={18} /></HkRing>
-          </button>
-        )}
-      </div>
-      <div className="hk-amt">
         {typing ? (
-          <input className="est-input mono" type="number" min={0} max={goal.target} autoFocus value={val}
+          <input className="est-input mono wg-num" type="number" min={0} max={goal.target} autoFocus value={val}
             aria-label={`Progress on ${goal.name}`}
             onChange={(e) => setVal(e.target.value)} onBlur={commit}
             onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setTyping(false) }} />
@@ -125,6 +121,18 @@ function GoalRow({ row, today }: { row: GoalDay; today: string }) {
             <b>{fmt(cur)}</b><span>/ {fmt(goal.target)}{unit}</span>
           </button>
         )}
+        {auto ? (
+          <HkRing f={f} c={c} size={36} w={3.5}><span className="hk-ringnum">{pct}%</span></HkRing>
+        ) : (
+          <button className="hk-act is-ring" disabled={done} aria-label={`Add 1 to ${goal.name}`} onClick={() => bumpGoal(goal.id, 1)}>
+            <HkRing f={f} c={c} size={36} w={3.5}><Icon.Plus size={15} /></HkRing>
+          </button>
+        )}
+      </div>
+      <div className="wg-r2">
+        <div className="hk-tiles is-goal" style={{ gridTemplateColumns: `repeat(${dots}, minmax(0, 10px))` }} aria-label={`${fmt(cur)} of ${fmt(goal.target)}`}>
+          {Array.from({ length: dots }, (_, i) => <i key={i} className={i < dotsOn ? 'f' : i < dotsPace ? 'pace' : ''} />)}
+        </div>
         <span className="wg-tools">
           {!auto && !done && stepsFor(goal.target).filter((x) => x > 1).map((x) => (
             <button key={x} className="wg-step" aria-label={`Add ${x} to ${goal.name}`} onClick={() => bumpGoal(goal.id, x)}>+{x}</button>
@@ -133,9 +141,6 @@ function GoalRow({ row, today }: { row: GoalDay; today: string }) {
             <button role="menuitem" className="danger" onClick={() => deleteGoal(goal.id)}>Delete</button>
           </Dropdown>
         </span>
-      </div>
-      <div className="hk-tiles is-goal" style={{ gridTemplateColumns: 'repeat(26, 1fr)' }} aria-label={`${fmt(cur)} of ${fmt(goal.target)}`}>
-        {Array.from({ length: tiles }, (_, i) => <i key={i} className={i < filled ? 'f' : i < want ? 'pace' : ''} />)}
       </div>
     </article>
   )

@@ -12991,3 +12991,17 @@ button.pf-phase-head:focus-visible { outline: 2px solid var(--accent); outline-o
 .pl-log { grid-column: 3; padding-bottom: 6px; }
 .shell.is-hud .pl-card { background: color-mix(in srgb, var(--h, var(--info)) 26%, var(--surface)); }
 .shell.is-hud .pl-bar { filter: brightness(1.5); }
+
+/* This week's goals, two rows (2026-11-05): name, count and ring; then one
+   line of dots with the step buttons. */
+.wg-card.is-compact { padding: 10px 10px 10px 12px; gap: 8px; }
+.wg-r1 { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; }
+.wg-r1 .wg-count b { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.wg-r1 .wg-num { width: 64px; }
+.wg-r2 { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.wg-r2 .hk-tiles { gap: 3px; }
+.wg-r2 .hk-tiles i { width: 100%; }
+.weekgoals .wg-card.is-compact .wg-step { height: 26px; padding: 0 8px; border-radius: 8px; font-size: 12px; }
+/* Plan's toolbar icons (2026-11-05): folder for projects, rewind for yesterday. */
+.pf-icobtn { width: 42px; height: 42px; padding: 0; display: inline-grid; place-items: center; position: relative; }
+.pf-icobtn.is-on::after { content: ""; position: absolute; top: 7px; right: 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--a-accent); }

@@ -4,6 +4,7 @@
    either way), reads the real data the bridge hands it (src/shells/bridge.ts)
    and every write is an existing store or pomodoro function, reached through B.
    Timers, frames and window listeners are tracked so unmount leaves nothing. */
+import { layoutDay, placeAt, toHM, nextFree } from '../../line';
 export function mountNothing(HOST, B, INIT) {
 const ROOT = HOST.shadowRoot;
 let dead = false;
@@ -302,6 +303,7 @@ const ICONS = {
   mic: ['...###...', '..#####..', '..#####..', '..#####..', '..#####..', '#..###..#', '.#.....#.', '..#####..', '....#....'],
   home: ['....#....', '...###...', '..#####..', '.#######.', '#########', '.#.....#.', '.#.###.#.', '.#.###.#.', '.#.###.#.'],
   plan: ['.........', '##.######', '.........', '.........', '##.######', '.........', '.........', '##.####..', '.........'],
+  line: ['#..#####.', '#........', '#..######', '#........', '#..####..', '#........', '#..######', '#........', '#..###...'],
   habits: ['..#####..', '.#.....#.', '#..#....#', '#...#...#', '#....####', '#.......#', '#.......#', '.#.....#.', '..#####..'],
   back: ['.........', '...#.....', '..#......', '.#.......', '#########', '.#.......', '..#......', '...#.....', '.........'],
   fwd: ['.........', '.....#...', '......#..', '.......#.', '#########', '.......#.', '......#..', '.....#...', '.........'],
@@ -731,7 +733,7 @@ R.dock = () => {
   d.classList.toggle('hide', !show || !!$('#home.editing') && e.id === 'home');
   const act = e.id;
   const b = (id, icon, label) => `<button class="${act === id ? 'on' : ''}" data-a="tab" data-x="${id}" aria-label="${label}" aria-current="${act === id}">${ico(icon)}<span>${label}</span></button>`;
-  d.innerHTML = b('home', 'home', 'Home') + b('plan', 'plan', 'Plan') + `<button class="qa" data-a="quickAdd" data-long="jarvis" aria-label="Quick add">${ico('plus')}</button>` + b('habits', 'habits', 'Habits') + b('apps', 'apps', 'Apps');
+  d.innerHTML = b('home', 'home', 'Home') + b('plan', planView() === 'line' ? 'line' : 'plan', 'Plan') + `<button class="qa" data-a="quickAdd" data-long="jarvis" aria-label="Quick add">${ico('plus')}</button>` + b('habits', 'habits', 'Habits') + b('apps', 'apps', 'Apps');
 };
 A.tab = (el, id) => tab(id);
 A.back = () => back();
@@ -1266,6 +1268,7 @@ A.editDone = () => { EDIT = false; $('#home').classList.remove('editing'); R.doc
 addRec({
   long(st) {
     if (st.target.closest('.dock .qa')) return { end() { open('jarvis'); } };
+    if (st.target.closest('.dock [data-x="plan"]')) { pvMenu(true); return { end() { } }; }
     if (top_().id !== 'home' || CC.open || $('.sheet.on')) return null;
     if (!st.target.closest('#home') || st.target.closest('.editbar,.htop')) return null;
     const tile = st.target.closest('.w');
@@ -1712,13 +1715,14 @@ A.runRoutine = (el, id) => { const t = el.closest('.w'); open('runner', { id }, 
 const QA_TYPES = [['task', 'Task', 'list'], ['habit', 'Habit log', 'habits'], ['note', 'Note', 'note'], ['focus', 'Focus', 'zone'], ['contact', 'Contact', 'person'], ['expense', 'Expense', 'money']];
 A.quickAdd = () => {
   S.ui.qa = S.ui.qa || { type: 'task', day: 0, slot: null, habit: (S.habits.find(h => h.kind === 'measured' && !h.auto) || {}).id, person: (S.people[0] || {}).id, channel: 'call' };
+  S.ui.qa.at = null;
   sheet('qa', {
     title: 'Add', live: true, focus: '#qat', body: () => {
       const q = S.ui.qa, ph = { task: 'What needs doing?', habit: 'How many?', note: 'Write it down', focus: 'What are you focusing on?', contact: 'How did it go? (optional)', expense: 'What was it, and how much?' }[q.type];
       const extra = q.type === 'habit' ? `<div class="chips" style="margin-top:10px">${S.habits.filter(h => h.kind === 'measured' && !h.auto).map(h => `<button class="chip ${q.habit === h.id ? 'on' : ''}" data-a="qaHabit" data-x="${h.id}">${esc(h.name)}</button>`).join('')}</div>`
         : q.type === 'contact' ? `<div class="chips" style="margin-top:10px">${S.people.slice(0, 8).map(p => `<button class="chip ${q.person === p.id ? 'on' : ''}" data-a="qaPerson" data-x="${p.id}">${esc(p.name)}</button>`).join('')}</div><div class="chips" style="margin-top:6px">${['inperson', 'call', 'message', 'video', 'email'].map(c => `<button class="chip ${q.channel === c ? 'on' : ''}" data-a="qaChan" data-x="${c}">${c === 'inperson' ? 'In person' : c}</button>`).join('')}</div>`
           : q.type === 'focus' ? `<div class="chips" style="margin-top:10px">${[15, 25, 45, 60].map(m => `<button class="chip ${(q.min || 25) === m ? 'on' : ''}" data-a="qaMin" data-x="${m}">${m} min</button>`).join('')}</div>`
-            : q.type === 'task' ? `<div class="lb" style="margin-top:14px">When</div><div class="chips" style="margin-top:6px">${[0, 1, 2, 3, 4, 5, 6].map(d => `<button class="chip ${q.day === d ? 'on' : ''}" data-a="qaDay" data-x="${d}">${dayShort(d)}</button>`).join('')}<button class="chip ${q.day === null ? 'on' : ''}" data-a="qaDay" data-x="none">NO DATE</button></div>${q.day === null ? '' : `<div class="lb" style="margin-top:12px">Part of the day</div><div class="chips" style="margin-top:6px">${[[null, 'ANY TIME'], ['morning', 'MORNING'], ['noon', 'NOON'], ['afternoon', 'AFTERNOON'], ['evening', 'EVENING']].map(([v, l]) => `<button class="chip ${q.slot === v ? 'on' : ''}" data-a="qaSlot" data-x="${v || 'any'}">${l}</button>`).join('')}</div>`}` : '';
+            : q.type === 'task' ? `<div class="lb" style="margin-top:14px">When</div><div class="chips" style="margin-top:6px">${[0, 1, 2, 3, 4, 5, 6].map(d => `<button class="chip ${q.day === d ? 'on' : ''}" data-a="qaDay" data-x="${d}">${dayShort(d)}</button>`).join('')}<button class="chip ${q.day === null ? 'on' : ''}" data-a="qaDay" data-x="none">NO DATE</button></div>${q.day === null ? '' : q.at ? `<div class="lb" style="margin-top:12px">Time</div><div class="chips" style="margin-top:6px"><button class="chip on" data-a="qaSlot" data-x="any">AT ${q.at} ${ico('close')}</button></div>` : `<div class="lb" style="margin-top:12px">Part of the day</div><div class="chips" style="margin-top:6px">${[[null, 'ANY TIME'], ['morning', 'MORNING'], ['noon', 'NOON'], ['afternoon', 'AFTERNOON'], ['evening', 'EVENING']].map(([v, l]) => `<button class="chip ${q.slot === v ? 'on' : ''}" data-a="qaSlot" data-x="${v || 'any'}">${l}</button>`).join('')}</div>`}` : '';
       return `<div class="chips" role="tablist">${QA_TYPES.map(([id, l, ic]) => `<button class="chip ${q.type === id ? 'on' : ''}" data-a="qaType" data-x="${id}">${ico(ic)}${l}</button>`).join('')}</div>
       <div class="hstack" style="margin-top:12px"><input class="fld" id="qat" placeholder="${ph}" value="${esc(q.text || '')}" data-enter="qaGo" ${q.type === 'habit' ? 'inputmode="numeric"' : ''}><button class="kb ${q.listening ? 'red' : ''}" data-a="qaMic" aria-label="Dictate">${q.listening ? `<span class="wave"><i></i><i></i><i></i><i></i></span>` : ico('mic')}</button></div>${extra}
       ${['task', 'habit', 'note'].includes(q.type) ? `<button class="ctx" style="margin:12px 0 0" data-a="ctxSpace"><span class="sd"></span>Adding to<b>${esc(spLabel(wsp()))}${q.type === 'task' ? ', ' + esc(projFor(wsp()) ? projFor(wsp()).name : 'Unsorted') : ''}</b>${ico('down')}</button>` : ''}`;
@@ -1731,7 +1735,7 @@ A.qaPerson = (el, p) => { S.ui.qa.text = $('#qat').value; S.ui.qa.person = p; re
 A.qaChan = (el, c) => { S.ui.qa.text = $('#qat').value; S.ui.qa.channel = c; repaintSheets(); };
 A.qaMin = (el, m) => { S.ui.qa.text = $('#qat').value; S.ui.qa.min = +m; repaintSheets(); };
 A.qaDay = (el, d) => { S.ui.qa.text = $('#qat').value; S.ui.qa.day = d === 'none' ? null : +d; repaintSheets(); };
-A.qaSlot = (el, v) => { S.ui.qa.text = $('#qat').value; S.ui.qa.slot = v === 'any' ? null : v; repaintSheets(); };
+A.qaSlot = (el, v) => { S.ui.qa.text = $('#qat').value; S.ui.qa.slot = v === 'any' ? null : v; S.ui.qa.at = null; repaintSheets(); };
 A.qaMic = () => toast('Dictation is not wired into this look yet. The keyboard mic works.');
 A.qaGo = () => {
   const q = S.ui.qa, v = ($('#qat').value || '').trim();
@@ -1740,7 +1744,10 @@ A.qaGo = () => {
     if (!v) return;
     const dated = q.day !== null && q.day !== undefined;
     const id = B.store().addTask({ title: v, source: 'mc', estimateMin: 0, space: sp, projectId: pj ? pj.id : undefined, list: dated ? 'today' : 'backlog', ...(dated ? { plannedOn: isoOff(q.day), ...(q.slot ? { slot: q.slot } : {}) } : {}), category: 'quick' });
-    toast(dated ? 'On ' + dayShort(q.day).toLowerCase() + (q.slot ? ', ' + q.slot : '') : 'Added to the to-do list', { act: 'seeTask', x: id, actLabel: 'See it' });
+    /* From a free stretch on the Line: the task gets that clock time. */
+    if (dated && q.at) B.store().setTaskAt(id, q.at);
+    toast(dated ? 'On ' + dayShort(q.day).toLowerCase() + (q.at ? ' at ' + q.at : q.slot ? ', ' + q.slot : '') : 'Added to the to-do list', { act: 'seeTask', x: id, actLabel: 'See it' });
+    q.at = null;
   }
   if (q.type === 'habit') { if (!q.habit) return; const h = habit(q.habit); const n = h.measure === 'amount' ? (+v || (h.presets || [1])[0]) : 1; A.logAmount(null, q.habit + ':' + n); }
   if (q.type === 'note') { if (!v) return; const nid = B.addNote(sp, v); toast('Note saved', { act: 'seeNote', x: nid, actLabel: 'Open' }); }
@@ -1882,7 +1889,8 @@ V.plan = {
       const open_ = S.tasks.filter(t => t.list === 'today' && t.day === day && !t.done && inSp(t, sp) && inP(t)).sort((x, y) => x.order - y.order);
       const uns = open_.filter(t => !t.slot);
       const routinesOnDay = day === 0 ? S.routines.filter(r => inSp(r, sp) && r.daypart && routineDone(r) > 0 && routineDone(r) < r.steps.length) : [];
-      body = dayStrip('planDay', sp) + `<div data-dayswipe="planDay" ${dayAnim()}>` +
+      if (planView() === 'line') body = dayStrip('planDay', sp) + `<div data-dayswipe="planDay" ${dayAnim()}>` + lineHtml(sp, day, inP) + '</div>' + lineTray(sp, day);
+      else body = dayStrip('planDay', sp) + `<div data-dayswipe="planDay" ${dayAnim()}>` +
         (uns.length ? bucket({ id: 'uns', label: 'Unsorted', hours: 'no time yet', capMin: 0 }, uns, sp, day) : '') +
         MC.slots.map(sl => bucket(sl, open_.filter(t => t.slot === sl.id), sp, day, routinesOnDay.filter(r => r.daypart === sl.id))).join('') +
         (() => { const dn = S.tasks.filter(t => t.done && t.day === day && t.list === 'today' && inSp(t, sp) && inP(t)); return dn.length ? `<div class="sl">Done ${day === 0 ? 'today' : ''}<b>${dn.length}</b></div><div class="cd tight rows">${dn.map(t => taskRow(t)).join('')}</div>` : ''; })() +
@@ -1916,6 +1924,144 @@ function bucket(sl, tasks, sp, day, rts = []) {
   ${shut ? `<div class="lb" style="margin:0 4px 10px">${tasks.length} left</div>` : `<div class="cd tight rows">${tasks.map(t => taskRow(t, { reorder: 'slot-' + sl.id, play: true })).join('')}${rts.map(r => `<button class="row" style="width:100%" data-a="openRunner" data-x="${r.id}">${dring({ n: 12, on: routineDone(r) / r.steps.length * 12, size: 28, r: 1.5, pad: 2, cls: '' })}<span class="grow rt one">${esc(r.title)}</span><span class="lb">Routine ${routineDone(r)}/${r.steps.length}</span></button>`).join('')}${!tasks.length && !rts.length ? '<div class="empty" style="padding:14px">Nothing here yet.</div>' : ''}</div>`}</div>`;
 }
 A.bkToggle = (el, id) => { S.ui['shut' + id] = !S.ui['shut' + id]; refresh(); };
+
+/* ---------------- THE LINE (2026-11-05) ----------------
+   Plan's second view, the day hour by hour, his pick over a separate page or a
+   widget. The arithmetic is shared with the desktop (src/line.ts). Hold Plan in
+   the dock to choose List or Line; the dock wears the one Plan opens in, and it
+   is remembered on this phone. A task is one dot per quarter hour on the rail;
+   the one running now is a black tile with its passed quarters in red. Hold a
+   task to lift it and drag it; to-dos wait in a tray above the dock: tap one
+   and every free stretch it fits shows a red Put here, or hold it and drag. */
+function planView() {
+  if (!S.ui.planView) { try { S.ui.planView = localStorage.getItem('mc:plan-view') === 'line' ? 'line' : 'list'; } catch (e) { S.ui.planView = 'list'; } }
+  return S.ui.planView;
+}
+function pvMenu(on) {
+  let m = $('#pvm', APP);
+  if (!on) { if (m) { m.classList.remove('on'); setTimeout(() => m && m.remove(), 260); } return; }
+  if (m) m.remove();
+  const cur = planView();
+  m = document.createElement('div'); m.id = 'pvm';
+  m.innerHTML = `<div class="pvm-scrim" data-a="pvClose"></div><div class="pvm-box" role="menu" aria-label="Plan opens in">${lb('Plan opens in')}${[['list', 'List', 'plan'], ['line', 'Line', 'line']].map(([v, l, i]) => `<button class="pvm-o ${cur === v ? 'on' : ''}" role="menuitemradio" aria-checked="${cur === v}" data-a="pvPick" data-x="${v}"><span class="pvm-pv">${ico(i)}</span><span class="pvm-n">${l}</span><span class="pvm-ok">${ico('check')}</span></button>`).join('')}</div>`;
+  APP.appendChild(m); requestAnimationFrame(() => m.classList.add('on'));
+}
+A.pvClose = () => pvMenu(false);
+A.pvPick = (el, v) => {
+  S.ui.planView = v; try { localStorage.setItem('mc:plan-view', v); } catch (e) { }
+  pvMenu(false); S.ui.planSeg = 'day'; S.ui.lnArm = null;
+  if (top_().id === 'plan' && STACK.length === 1) refresh(); else tab('plan');
+  R.dock(); toast(v === 'line' ? 'Plan opens in Line' : 'Plan opens in List');
+};
+function lineItems(sp, day, inP) {
+  const list = S.tasks.filter(t => t.list === 'today' && t.day === day && inSp(t, sp) && inP(t)).map(t => ({ id: t.id, at: t.at || null, slot: t.slot, done: t.done, min: t.est || 0, t }));
+  return layoutDay(list, day === 0 ? Math.floor(minsOfDay(NOW())) : null);
+}
+const lnDur = m => m < 60 ? m + 'M' : (m % 60 ? Math.floor(m / 60) + 'H ' + (m % 60) + 'M' : m / 60 + 'H');
+function lineHtml(sp, day, inP) {
+  const items = lineItems(sp, day, inP), now = day === 0 ? Math.floor(minsOfDay(NOW())) : -1;
+  if (!items.length) return `<div class="empty">Nothing planned for ${dayShort(day).toLowerCase()}. Tap a to-do below, then tap a time.</div>`;
+  const arm = S.ui.lnArm && task(S.ui.lnArm), armLen = arm ? (arm.est || 30) : 0;
+  let h = '', reach = 0;
+  const gapRow = (s, e) => {
+    /* Free time already gone today is drawn, never offered: a slot in the past is not a plan. */
+    const len = e - s, live = now >= s && now < e, gone = now >= e, from = live ? Math.ceil(now / 5) * 5 : s, fits = arm && !gone && armLen <= e - from;
+    return `<div class="ln-row ln-gap ${gone ? 'gone' : ''}" data-lnslot="gap" data-s="${gone ? '' : from}" data-e="${e}">${live ? `<span class="ln-nowt">${toHM(now)}</span>` : '<span></span>'}<span class="ln-dots">${'<i></i>'.repeat(Math.min(5, Math.max(2, Math.round(len / 30))))}</span>
+      <div class="ln-gapc"><span class="lb ${live ? 'red' : ''}">${live ? 'Now, ' : ''}Free ${lnDur(gone ? len : e - from)}</span>${gone ? '' : fits ? `<button class="key sm red ln-put" data-a="lnPut" data-x="${from}">Put here ${toHM(from)}</button>` : `<button class="key sm t" data-a="lnAdd" data-x="${from}:${e - from}">${ico('plus')} Add</button>`}</div></div>`;
+  };
+  const lead = day === 0 ? Math.max(360, Math.ceil(now / 15) * 15) : 360;
+  if (items[0].s - lead >= 15) h += gapRow(lead, items[0].s);
+  items.forEach((it, i) => {
+    const t = it.t.t, e = it.s + it.d, live = now >= it.s && now < e && !t.done, past = now >= e;
+    const n = Math.max(2, Math.min(16, Math.round(it.d / 15))), passed = live ? Math.floor((now - it.s) / it.d * n) : 0;
+    const dots = Array.from({ length: n }, (_, k) => `<i class="${past || t.done ? 'on' : live && k < passed ? 'rd' : live && k === passed ? 'on' : ''}"></i>`).join('');
+    h += `<div class="ln-row ln-task ${live ? 'now' : ''} ${t.done ? 'done' : ''} ${it.pinned ? '' : 'flex'}" data-lnslot="task" data-s="${it.s}" data-e="${e}" data-id="${it.id}">
+      <span class="ln-tc">${toHM(it.s)}</span><span class="ln-dots">${dots}</span>
+      <div class="ln-tile" data-lndrag="task" data-id="${it.id}"><div class="grow" data-a="taskMenu" data-x="${t.id}"><div class="rt ${t.done ? 'done' : ''}">${esc(t.title)}</div>
+        <div class="rs">${live ? `<span class="red">Now, ${lnDur(e - now)} left</span>` : `<span>${toHM(it.s)} to ${toHM(e)}, ${it.guess ? 'no estimate' : lnDur(it.d)}</span>`}${!it.pinned && !t.done ? '<span>Flexible</span>' : ''}${t.projectId ? `<span>${esc(projName(t.projectId))}</span>` : ''}</div></div>
+        ${ck(t.done, `data-a="taskCk" data-x="${t.id}" aria-label="Complete ${esc(t.title)}"`)}</div></div>`;
+    reach = Math.max(reach, e);
+    const nx = items[i + 1];
+    if (!nx) { if (1440 - reach >= 15) h += gapRow(reach, 1440); return; }
+    if (nx.s - reach >= 15) h += gapRow(reach, nx.s);
+    else h += `<div class="ln-row ln-join" data-lnslot="join" data-s="${reach}" data-e="${nx.s}"></div>`;
+  });
+  return `<div class="ln" data-lnday="${day}">${h}</div>`;
+}
+function lineTray(sp, day) {
+  const pool = backlog(sp).sort((x, y) => x.ageDays - y.ageDays || x.order - y.order);
+  if (!pool.length) return '';
+  const arm = S.ui.lnArm && task(S.ui.lnArm);
+  return `<div class="ln-tray">${arm ? `<div class="ln-trh">${lb('Tap a red slot, or hold and drag', 'red')}<button class="kb sm" data-a="lnArm" data-x="" aria-label="Cancel">${ico('close')}</button></div>` : `<div class="ln-trh">${lb('To-do ' + pool.length, 'fg')}${lb('Tap, then tap a time')}</div>`}
+    <div class="ln-trr">${pool.map(t => `<button class="ln-chip ${S.ui.lnArm === t.id ? 'on' : ''}" data-a="lnArm" data-x="${t.id}" data-lndrag="pool" data-id="${t.id}"><span class="rt one">${esc(t.title)}</span><span class="lb">${t.est ? lnDur(t.est) : 'No est'}</span></button>`).join('')}</div></div>`;
+}
+/* Write a placement: on the day first if it came from elsewhere, then every time placeAt asks for. */
+function lnPlace(id, start) {
+  const day = S.ui.planDay || 0, sp = viewSpace(), t = task(id); if (!t) return;
+  const pf = S.ui.planProj, inP = x => !pf || (pf === '__u' ? !x.projectId : x.projectId === pf);
+  const items = lineItems(sp, day, inP), it = items.find(x => x.id === id);
+  const writes = placeAt(items, id, start, it ? it.d : (t.est || 30));
+  if (t.list !== 'today' || t.day !== day) B.store().moveTaskList(id, 'today', isoOff(day));
+  writes.forEach(w => B.store().setTaskAt(w.id, w.at));
+  S.ui.lnArm = null;
+  const nm = t.title.length > 30 ? t.title.slice(0, 29).trimEnd() + '…' : t.title;
+  toast(`${nm} at ${writes[0].at}${writes.length > 1 ? ', the rest moved later' : ''}`);
+}
+A.lnArm = (el, id) => {
+  S.ui.lnArm = !id || S.ui.lnArm === id ? null : id; refresh();
+  const t = S.ui.lnArm && task(S.ui.lnArm); if (!t) return;
+  setTimeout(() => {
+    const k = $('.ln-put', top_().el);
+    if (!k) { toast('No free stretch that long. Hold it and drag it onto a task'); return; }
+    k.scrollIntoView({ block: 'center', behavior: RM ? 'auto' : 'smooth' });
+  }, 60);
+};
+A.lnPut = (el, s) => { if (S.ui.lnArm) lnPlace(S.ui.lnArm, +s); };
+A.lnAdd = (el, x) => {
+  const [s] = x.split(':').map(Number), day = S.ui.planDay || 0;
+  A.quickAdd();
+  Object.assign(S.ui.qa, { type: 'task', day, slot: null, at: toHM(s) }); repaintSheets();
+};
+/* hold a task (or a to-do in the tray) and drag it onto the Line */
+addRec({
+  long(st) {
+    const src = st.target.closest && st.target.closest('[data-lndrag]'); if (!src || top_().id !== 'plan') return null;
+    const sc = top_().el.querySelector('.vsc'), id = src.dataset.id, ar = APP.getBoundingClientRect();
+    const r = src.getBoundingClientRect();
+    const g = src.cloneNode(true); g.classList.add('ln-ghost'); g.style.width = r.width + 'px';
+    const badge = document.createElement('span'); badge.className = 'ln-badge'; g.appendChild(badge);
+    APP.appendChild(g); src.classList.add('lifted'); top_().el.classList.add('ln-dragging');
+    const ox = st.x0 - (r.left - ar.left), oy = st.y0 - (r.top - ar.top);
+    let cx = st.x0, cy = st.y0, target = null, raf = 0, alive = true;
+    const day = S.ui.planDay || 0, t = task(id), len = (lineItems(viewSpace(), day, () => true).find(x => x.id === id) || {}).d || (t && t.est) || 30;
+    const clear = () => $$('.ln-row.tgt', top_().el).forEach(x => x.classList.remove('tgt', 'tb', 'ta', 'ti'));
+    const find = () => {
+      clear(); target = null;
+      const hit = ROOT.elementFromPoint(ar.left + cx, ar.top + cy), row = hit && hit.closest('[data-lnslot]');
+      if (!row || row.dataset.s === '') { badge.textContent = 'Drop on the day'; return; }
+      const b = row.getBoundingClientRect(), p = (ar.top + cy - b.top) / Math.max(1, b.height), s = +row.dataset.s, e = +row.dataset.e;
+      if (row.dataset.lnslot === 'gap') { let v = s + Math.round(p * (e - s) / 15) * 15; v = Math.max(s, Math.min(v, Math.max(s, e - len))); target = v; row.classList.add('tgt', 'ti'); row.style.setProperty('--ty', ((v - s) / Math.max(1, e - s) * 100) + '%'); }
+      else if (row.dataset.lnslot === 'join') { target = s; row.classList.add('tgt', 'ti'); row.style.setProperty('--ty', '50%'); }
+      else if (row.dataset.id === id) { badge.textContent = 'Stays at ' + toHM(s); return; }
+      else if (p < .5) { target = s; row.classList.add('tgt', 'tb'); } else { target = e; row.classList.add('tgt', 'ta'); }
+      badge.textContent = toHM(target);
+    };
+    const paint = () => { g.style.transform = `translate(${cx - ox}px,${cy - oy}px) scale(1.03)`; };
+    const loop = () => {
+      if (!alive) return;
+      if (sc) { const b = sc.getBoundingClientRect(), y = ar.top + cy; if (y < b.top + 70) sc.scrollTop -= 9; else if (y > b.bottom - 150) sc.scrollTop += 9; }
+      find(); raf = requestAnimationFrame(loop);
+    };
+    paint(); loop();
+    return {
+      move(dx, dy, x, y) { cx = x; cy = y; paint(); },
+      end(dx, dy, vx, vy, cancel) {
+        alive = false; cancelAnimationFrame(raf); clear(); g.remove(); src.classList.remove('lifted'); top_().el.classList.remove('ln-dragging');
+        if (!cancel && target != null) lnPlace(id, target);
+      }
+    };
+  }
+});
 A.planSeg = (el, x) => { S.ui.planSeg = x; refresh(); };
 A.todoSort = (el, x) => { S.ui.todoSort = x; S.ui.todoManual = false; refresh(); };
 A.weekToggle = () => { S.ui.weekOpen = !S.ui.weekOpen; refresh(); };

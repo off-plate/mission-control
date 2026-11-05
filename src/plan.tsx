@@ -19,11 +19,12 @@ import { Linkify } from './widgets'
 import { PLAN_AHEAD_DAYS, WeekGrid, dayPlus, shortDay, weekRangeLabel } from './weekgrid'
 import { useCoarsePointer, usePhone, Band, WorkspaceTitle, Dropdown, SpaceMark, TagMark } from './ui'
 import { TaskSheet } from './tasksheet'
+import { PlanLine } from './planline'
 import { TagField } from './tagfield'
 import { matchProjects, tagOf, takeTag } from './tags'
 import { HUES, hueOf } from './hues'
 import { SLOTS, SPACES, UNSORTED, habitLocked, routineComplete, routineProgress, slotMinutes, TYPING_TARGET_WPM, type Project, type Routine, type SubTask, type Task, type TimeSlot } from './types'
-import { periodKeyFor, fmtDuration, fmtSigned, dayOfWeekKey, isEstimated, localDateKey, slotForMoment, taskMinutes } from './util'
+import { periodKeyFor, fmtDuration, fmtSigned, dayOfWeekKey, isEstimated, localDateKey, slotForMoment, slotForTime, taskMinutes } from './util'
 
 const prevDay = (): string => dayPlus(-1)
 
@@ -782,6 +783,17 @@ export function PlanPage() {
   }, [])
   const coarse = useCoarsePointer()
   const phone = usePhone()
+  /* LIST OR LINE (2026-11-05). The Line is the day hour by hour; List is the
+     four parts of the day. Plan opens in whichever he used last, every time,
+     on this device: a view he set, not data, so it stays out of the sync. */
+  const [planView, setPlanView] = useState<'list' | 'line'>(() => {
+    try { return localStorage.getItem('mc:plan-view') === 'line' ? 'line' : 'list' } catch { return 'list' }
+  })
+  const pickView = (v: 'list' | 'line') => {
+    setPlanView(v)
+    try { localStorage.setItem('mc:plan-view', v) } catch { /* private mode */ }
+  }
+  const showLine = planView === 'line' && !phone
   const planDay = dayPlus(dayOffset)
   const onDay = (t: Task) => t.list === 'today' && (t.plannedOn ?? localDateKey()) === planDay
   const todayAll = spaceTasks.filter(onDay)                      // the day incl. finished (they stay, struck)
@@ -1241,6 +1253,7 @@ export function PlanPage() {
       {!t.done && (
         <>
           <button role="menuitem" onClick={() => setEditingTask(t)}>Edit</button>
+          {t.at && <button role="menuitem" onClick={() => setTaskAt(t.id, undefined)}>Remove the set time</button>}
           <button role="menuitem" onClick={() => { moveTaskList(t.id, 'backlog'); assignSlot(t.id, undefined); setTaskAt(t.id, undefined) }}>Back to the list</button>
         </>
       )}
@@ -1418,6 +1431,10 @@ export function PlanPage() {
         title={<WorkspaceTitle before="Plan" after={longDay(planDay)} />}
         actions={(
           <span className="plan-actions">
+            <span className="pl-vsw hide-phone" role="group" aria-label="Plan view">
+              <button aria-pressed={planView === 'list'} onClick={() => pickView('list')}><Icon.List size={15} /> List</button>
+              <button aria-pressed={planView === 'line'} onClick={() => pickView('line')}><Icon.Clock size={15} /> Line</button>
+            </span>
             <button className="btn btn-ghost plan-search-btn hide-phone" onClick={() => setSpot(true)} aria-label="Search every task" title="Search every task (Cmd K)"><Icon.Search size={16} /></button>
             <ProjectFilter projects={stripProjects} tasks={tasks} sel={sel} inScope={(t) => inView(t.space)}
               onAll={() => setPicked([])} onPick={pickProject} onManage={() => setPage('projects')} />
@@ -1574,6 +1591,33 @@ export function PlanPage() {
               phase is one quiet line that opens up while a task is dragged over
               it, so it stays a place to drop without taking room. Every phase
               with something in it folds, the Next up task included, marked. */}
+          {showLine ? (
+            <PlanLine
+              day={todayAll}
+              all={tasks}
+              isToday={dayOffset === 0}
+              hueStyle={hueStyle}
+              tag={(t) => <TagMark project={markOf(t)} onPick={pickTag} />}
+              menu={dayMenu}
+              check={(t) => { if (t.done) { toggleTask(t.id); return } setLogging(t.id) }}
+              log={(t) => (logging === t.id ? (
+                <div className="pl-log"><ActualLog est={taskMinutes(t)} tracked={trackedFor(t.title)} onLog={(m) => { logActual(t.id, m); setLogging(null) }} onSkip={() => { toggleTask(t.id); setLogging(null) }} /></div>
+              ) : null)}
+              focus={(t) => () => startFocus(taskMinutes(t), t.title)}
+              flashId={flashId}
+              onPlace={(id, writes) => {
+                const t = tasks.find((x) => x.id === id)
+                if (!t) return
+                if (!onDay(t)) moveTaskList(id, 'today', planDay)
+                writes.forEach((w) => setTaskAt(w.id, w.at))
+              }}
+              onAdd={(title, at) => {
+                const got = takeTag(title, projects)
+                const proj = got.project ?? (newProjectId ? projects.find((p) => p.id === newProjectId) : undefined)
+                addTask({ title: got.title || title, source: 'mc', estimateMin: 0, space: proj?.space ?? addSpace, list: 'today', plannedOn: planDay, at, slot: slotForTime(at), category: 'quick', projectId: proj?.id })
+              }}
+            />
+          ) : (
           <div className="pf-list">
             {BUCKETS.map((b) => {
               const inPhase = (t: Task) => (t.slot ?? 'unsorted') === b.id
@@ -1636,6 +1680,7 @@ export function PlanPage() {
               )
             })}
           </div>
+          )}
         </main>
 
         {/* RIGHT: the pool. Search it, add to it, send from it. */}

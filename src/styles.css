@@ -12995,9 +12995,15 @@ button.pf-phase-head:focus-visible { outline: 2px solid var(--accent); outline-o
 /* This week's goals, two rows (2026-11-05): name, count and ring; then one
    line of dots with the step buttons. */
 .wg-card.is-compact { padding: 10px 10px 10px 12px; gap: 8px; }
-.wg-r1 { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; }
-.wg-r1 .wg-count b { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.wg-r1 .wg-num { width: 64px; }
+.wg-r1 { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: start; }
+.wg-r1 > .hk-ico, .wg-r1 > .hk-ringwrap, .wg-r1 > .hk-act { margin-top: 1px; }
+.wg-name { display: grid; gap: 2px; min-width: 0; }
+.wg-title { font-weight: 700; font-size: 15px; line-height: 1.25; overflow-wrap: anywhere; text-wrap: pretty; }
+.wg-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: 12.5px; color: var(--hk-muted); }
+.wg-line .wg-count b { font-size: 13px; font-weight: 700; color: var(--hk-ink); font-variant-numeric: tabular-nums; }
+.wg-line .wg-count span { font-size: 12.5px; }
+.wg-share b { color: var(--hk-ink); font-weight: 600; }
+.wg-r1 .wg-num { width: 64px; height: 26px; }
 .wg-r2 { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; }
 .wg-r2 .hk-tiles { gap: 3px; }
 .wg-r2 .hk-tiles i { width: 100%; }

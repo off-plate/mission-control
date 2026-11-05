@@ -544,12 +544,19 @@ function ProjectFilter({ projects, tasks, sel, inScope, onAll, onPick, onManage 
   const label = sel.length === 0 ? 'All projects'
     : sel.length === 1 ? (sel[0] === UNSORTED ? 'Unsorted' : projects.find((p) => p.id === sel[0])?.name ?? 'Project')
     : `${sel.length} projects`
+  /* A FOLDER, NOT A LABEL (his ask, 2026-11-05): the toolbar keeps one icon for
+     projects, and the colours live in this menu's Edit colours instead of a
+     second button. A dot on the folder says a filter is on. */
+  const { setProjectHue, projects: all } = useStore()
+  const [editing, setEditing] = useState(false)
+  const keep = (e: React.MouseEvent) => e.stopPropagation()
   return (
     <Dropdown
       label="Filter Plan by project" className="hide-phone"
       trigger={({ onClick, open: isOpen }) => (
-        <button className="btn btn-ghost pf-proj" onClick={onClick} aria-expanded={isOpen}>
-          {label} <Icon.ChevronDown size={14} />
+        <button className={`btn btn-ghost pf-icobtn${sel.length ? ' is-on' : ''}`} onClick={() => { setEditing(false); onClick() }} aria-expanded={isOpen}
+          aria-label={`Projects: ${label}`} title={`Projects: ${label}`}>
+          <Icon.Folder size={17} />
         </button>
       )}
     >
@@ -563,27 +570,15 @@ function ProjectFilter({ projects, tasks, sel, inScope, onAll, onPick, onManage 
         <FolderGlyph cls="f-unsorted" /><span>Unsorted</span><em className="mono plan-proj-n">{tasks.filter((t) => !t.projectId && !t.done && inScope(t)).length}</em>
       </button>
       <span className="kebab-sep" />
-      <button role="menuitem" onClick={onManage}>Manage projects</button>
-    </Dropdown>
-  )
-}
-
-/* His colours (2026-11-03): every project picks its own from eight, and the
-   tag, the row tint and the bar segments all follow. */
-function ProjectColours({ projects }: { projects: Project[] }) {
-  const { setProjectHue, projects: all } = useStore()
-  if (!projects.length) return null
-  return (
-    <Dropdown
-      label="Project colours" className="hide-phone"
-      trigger={({ onClick, open: isOpen }) => (
-        <button className="btn btn-ghost pf-proj" onClick={onClick} aria-expanded={isOpen}>Colours <Icon.ChevronDown size={14} /></button>
+      {projects.length > 0 && (
+        <button role="menuitem" aria-expanded={editing} onClick={(e) => { keep(e); setEditing((v) => !v) }}>
+          {editing ? 'Done editing colours' : 'Edit colours'}
+        </button>
       )}
-    >
-      {projects.map((p) => {
+      {editing && projects.map((p) => {
         const cur = hueOf(p, all)
         return (
-          <div key={p.id} className="pf-hues" role="group" aria-label={`Colour for ${p.name}`}>
+          <div key={`hue-${p.id}`} className="pf-hues" role="group" aria-label={`Colour for ${p.name}`} onClick={keep}>
             <span className="pf-hues-n" style={{ color: cur.h }}>#{tagOf(p)}</span>
             <span className="pf-hues-row">
               {HUES.map((h) => (
@@ -594,6 +589,7 @@ function ProjectColours({ projects }: { projects: Project[] }) {
           </div>
         )
       })}
+      <button role="menuitem" onClick={onManage}>Manage projects</button>
     </Dropdown>
   )
 }
@@ -1435,15 +1431,13 @@ export function PlanPage() {
               <button aria-pressed={planView === 'list'} onClick={() => pickView('list')}><Icon.List size={15} /> List</button>
               <button aria-pressed={planView === 'line'} onClick={() => pickView('line')}><Icon.Clock size={15} /> Line</button>
             </span>
-            <button className="btn btn-ghost plan-search-btn hide-phone" onClick={() => setSpot(true)} aria-label="Search every task" title="Search every task (Cmd K)"><Icon.Search size={16} /></button>
             <ProjectFilter projects={stripProjects} tasks={tasks} sel={sel} inScope={(t) => inView(t.space)}
               onAll={() => setPicked([])} onPick={pickProject} onManage={() => setPage('projects')} />
-            <ProjectColours projects={stripProjects} />
             <PhoneProjectFilter
               projects={stripProjects} tasks={tasks} sel={sel} inScope={(t) => inView(t.space)}
               onAll={() => setPicked([])} onPick={pickProject} onManage={() => setPage('projects')}
             />
-            <button className="btn btn-ghost" onClick={openDaily}>Yesterday</button>
+            <button className="btn btn-ghost pf-icobtn" onClick={openDaily} aria-label="Yesterday" title="Yesterday"><Icon.Rewind size={17} /></button>
           </span>
         )}
       />

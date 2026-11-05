@@ -80,6 +80,8 @@ function GoalRow({ row, today }: { row: GoalDay; today: string }) {
   const left = Math.max(0, share - added)
   const pct = Math.min(100, Math.round((cur / Math.max(1, goal.target)) * 100))
   const unit = goal.unit ? ` ${goal.unit}` : ''
+  /* "1 hour", not "1 hours". */
+  const one = (n: number) => (n === 1 && unit.endsWith('s') ? unit.slice(0, -1) : unit)
   const commit = () => {
     const n = Math.round(Number(val))
     if (Number.isFinite(n) && n >= 0) updateGoal(goal.id, { current: Math.min(goal.target, n), touchedAt: today })
@@ -101,26 +103,31 @@ function GoalRow({ row, today }: { row: GoalDay; today: string }) {
   const dotsPace = Math.floor(Math.min(goal.target, cur + left) / lineSize)
   return (
     <article className={`hk-card wg-card is-compact${done ? ' is-done' : ''}`} style={{ ['--c' as string]: c }}>
+      {/* The title is never cut (his report, 2026-11-05: "I cannot see the title").
+          Row one is icon, the whole name and the ring; the count and today's share
+          sit under the name, the dots and steps are row two. */}
       <div className="wg-r1">
         <span className="hk-ico is-small"><Ico size={17} /></span>
-        <div className="hk-name">
-          <span className="hk-title">{goal.name}</span>
-          <span className="hk-sub">
-            {done ? <b>Done for the week</b> : left === 0 ? <b>Today's share done</b> : <><b>{left}{unit} more</b> today</>}
+        <div className="wg-name">
+          <span className="wg-title">{goal.name}</span>
+          <span className="wg-line">
+            {typing ? (
+              <input className="est-input mono wg-num" type="number" min={0} max={goal.target} autoFocus value={val}
+                aria-label={`Progress on ${goal.name}`}
+                onChange={(e) => setVal(e.target.value)} onBlur={commit}
+                onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setTyping(false) }} />
+            ) : (
+              <button className="wg-count" disabled={auto}
+                title={auto ? 'Counts itself from a habit' : 'Click to set the number yourself'}
+                onClick={() => { setVal(String(cur)); setTyping(true) }}>
+                <b>{fmt(cur)}</b><span>/ {fmt(goal.target)}{unit}</span>
+              </button>
+            )}
+            <span className="wg-share">
+              {done ? <b>done for the week</b> : left === 0 ? <b>today's share done</b> : <><b>{left}{one(left)} more</b> today</>}
+            </span>
           </span>
         </div>
-        {typing ? (
-          <input className="est-input mono wg-num" type="number" min={0} max={goal.target} autoFocus value={val}
-            aria-label={`Progress on ${goal.name}`}
-            onChange={(e) => setVal(e.target.value)} onBlur={commit}
-            onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setTyping(false) }} />
-        ) : (
-          <button className="wg-count" disabled={auto}
-            title={auto ? 'Counts itself from a habit' : 'Click to set the number yourself'}
-            onClick={() => { setVal(String(cur)); setTyping(true) }}>
-            <b>{fmt(cur)}</b><span>/ {fmt(goal.target)}{unit}</span>
-          </button>
-        )}
         {auto ? (
           <HkRing f={f} c={c} size={36} w={3.5}><span className="hk-ringnum">{pct}%</span></HkRing>
         ) : (

@@ -23,7 +23,6 @@ import { Segmented, Select } from './ui'
 import { localDateKey } from './util'
 import { ALL_NAMES, daysUntil, nameDayFor } from './namedays'
 import { nextPersonSlot } from './peoplelayout'
-import { BusinessView } from './prospects'
 import type { ContactChannel, Person, PersonBond, PersonContact, PersonTier } from './types'
 
 type Tier = { id: PersonTier; label: string; r: number; size: number; cadence: number; bond: number }
@@ -147,23 +146,13 @@ function readView(): View | null {
   } catch { return null }
 }
 
-/* Personal is the circle; Business is the prospects list and board. Which one
-   he left it on is per device. */
-const MODE_KEY = 'mc-people-mode'
+/* People is the circle only since 2026-11-07, his ask: clients and prospects moved to Business mode
+   (Clients and Outreach), so the Personal/Business switch here is gone. */
 export function PeoplePage() {
-  const [mode, setMode] = useState<'personal' | 'business'>(() => { try { return localStorage.getItem(MODE_KEY) === 'business' ? 'business' : 'personal' } catch { return 'personal' } })
-  useEffect(() => { try { localStorage.setItem(MODE_KEY, mode) } catch { /* private mode */ } }, [mode])
-  /* The header's People menu picks a view while this page is already open. */
-  useEffect(() => {
-    const on = (e: Event) => { const m = (e as CustomEvent<string>).detail; if (m === 'personal' || m === 'business') setMode(m) }
-    window.addEventListener('mc:people-mode', on)
-    return () => window.removeEventListener('mc:people-mode', on)
-  }, [])
-  const modeSwitch = <Segmented size="sm" label="Which people" value={mode} onPick={setMode} options={[{ id: 'personal', label: 'Personal' }, { id: 'business', label: 'Business' }]} />
-  return mode === 'business' ? <BusinessView modeSwitch={modeSwitch} /> : <CirclePage modeSwitch={modeSwitch} />
+  return <CirclePage />
 }
 
-function CirclePage({ modeSwitch }: { modeSwitch: JSX.Element }) {
+function CirclePage({ modeSwitch }: { modeSwitch?: JSX.Element }) {
   const {
     people, personBonds, personContacts,
     addPerson, updatePerson, deletePerson, addPersonBond, setBondLabel, removePersonBond, logContact, removeContact,

@@ -13126,3 +13126,91 @@ button.pf-phase-head:focus-visible { outline: 2px solid var(--accent); outline-o
   .mode-switch button { padding: 6px 9px; }
 }
 @media (prefers-reduced-motion: reduce) { .mode-knob, .mode-switch button, .biz-switch button { transition: none; } .biz-modal { animation: none; } }
+
+/* ---- BUSINESS MODE COLOUR (2026-11-07) ------------------------------------
+   His complaint: "everything looks so plain ... no visible way to recognize
+   what is important". Built from Jarvis .claude/design/color-rules.md:
+   PRIMARY = the logo's navy: solid fills for selected and primary actions.
+   SECONDARY = the logo's lime: live signals, counts, hovers, text on navy.
+   Neutrals tinted toward navy, one temperature. Status hues FILLED, never a
+   pale tint on the canvas (p-100 on the canvas measures 1.16:1 and vanishes),
+   so pale washes only ever sit on white cards. Measured: navy on lime 9.7:1,
+   white on amber 5.1, coral 5.5, green 5.4, muted on canvas 6.5. */
+[data-mode="business"] {
+  --a-paper: #F1F3F7; --a-card: #FFFFFF; --a-sunk: #E3E8F1; --a-line: #D3DAE6; --a-line-2: #B8C2D4;
+  --a-ink: #1F2A44; --a-muted: #4B5770; --a-soft: #5F6A82;
+  --bz-navy: #1F2A44; --bz-navy-2: #2E3D63; --bz-deep: #121A2E; --bz-p50: #EEF2F9; --bz-p100: #DCE3F0;
+  --bz-lime: #A6E84C; --bz-lime-2: #95D93B; --bz-l50: #F1FADF;
+  --bz-amber: #A85A08; --bz-amber-50: #FCEFD9; --bz-amber-ink: #8A4A05;
+  --bz-coral: #BF3A21; --bz-coral-50: #FBE3DD; --bz-coral-ink: #A33219;
+  --bz-green: #1F7A43; --bz-green-50: #DDF1E3; --bz-green-ink: #1A6638;
+  --warn: var(--bz-amber); --alert: var(--bz-coral); --progress: var(--bz-green);
+}
+/* Navigation: selected = solid navy with lime text, hover = solid lime. */
+[data-mode="business"] .nav-tab[aria-current="page"] { background: var(--bz-navy); color: var(--bz-lime); }
+[data-mode="business"] .nav-tab:not([aria-current="page"]):hover { background: var(--bz-lime); color: var(--bz-navy); }
+[data-mode="business"] .mode-switch button[aria-pressed="true"] { color: var(--bz-lime); }
+[data-mode="business"] .tabbar.is-biz .tabbar-tab[aria-current="page"] { background: var(--bz-navy); color: var(--bz-lime); border-radius: 8px; }
+[data-mode="business"] .tabbar.is-biz .tabbar-tab[aria-current="page"] svg { color: var(--bz-lime); }
+/* Buttons: primary navy, hover lime. Secondary is an outline that fills on hover. */
+[data-mode="business"] .btn-primary { background: var(--bz-navy); color: #fff; }
+[data-mode="business"] .btn-primary:hover:not(:disabled) { background: var(--bz-lime); color: var(--bz-navy); }
+[data-mode="business"] .biz .btn-ghost, [data-mode="business"] .biz .btn-quiet { background: transparent; color: var(--bz-navy); border: 1.5px solid var(--bz-navy); }
+[data-mode="business"] .biz .btn-ghost:hover, [data-mode="business"] .biz .btn-quiet:hover { background: var(--bz-navy); color: #fff; border-color: var(--bz-navy); }
+[data-mode="business"] .biz-paste-btn { background: var(--bz-lime); color: var(--bz-navy); }
+[data-mode="business"] .biz-paste-btn:hover { background: var(--bz-navy); color: var(--bz-lime); }
+/* The figures at the top of a page are filled tiles, coloured by what they mean. */
+[data-mode="business"] .band-metric { background: var(--bz-navy); color: #fff; padding: 10px 16px; border-radius: 10px; min-width: 112px; text-align: left; }
+[data-mode="business"] .band-metric .k { color: rgb(255 255 255 / 0.78); }
+[data-mode="business"] .band-metric:has(.val-info) { background: var(--bz-amber); }
+[data-mode="business"] .band-metric:has(.val-urgent) { background: var(--bz-coral); }
+[data-mode="business"] .band-metric:has(.val-pos) { background: var(--bz-green); }
+[data-mode="business"] .band-metric .v { color: #fff; }
+/* Sections and rows. Counts are lime badges; whose turn it is reads at a glance. */
+[data-mode="business"] .biz-count { background: var(--bz-lime); color: var(--bz-navy); font-weight: 700; font-size: 12.5px; padding: 3px 7px; border-radius: 5px; }
+[data-mode="business"] .biz-row { background: #fff; }
+[data-mode="business"] .biz-row.is-mine, [data-mode="business"] .biz-card.is-mine { background: var(--bz-amber-50); }
+[data-mode="business"] .biz-clink { color: var(--bz-navy); }
+[data-mode="business"] .biz-clink:hover { color: var(--bz-navy); background: var(--bz-lime); text-decoration: none; border-radius: 3px; }
+[data-mode="business"] .biz-quiet { color: var(--a-muted); }
+[data-mode="business"] .biz-quiet.is-old { color: #fff; background: var(--bz-coral); padding: 3px 7px; border-radius: 5px; font-size: 12.5px; }
+[data-mode="business"] .biz-chip.is-good { color: var(--bz-navy); background: var(--bz-lime); }
+[data-mode="business"] .biz-chip.is-warn { color: #fff; background: var(--bz-amber); }
+[data-mode="business"] .biz-chip.is-alert { color: #fff; background: var(--bz-coral); }
+[data-mode="business"] .biz-chip.is-info { color: var(--bz-navy); background: var(--bz-p100); }
+[data-mode="business"] .biz-switch { background: var(--bz-p100); }
+[data-mode="business"] .biz-switch button[aria-pressed="true"] { background: var(--bz-navy); color: var(--bz-lime); }
+[data-mode="business"] .biz-switch.is-dark button[aria-pressed="true"] { background: var(--bz-lime); color: var(--bz-navy); }
+/* The board: white columns, each headed by its stage colour. Active is the live one, so it is lime. */
+[data-mode="business"] .biz-colm { background: #fff; padding: 0 0 12px; gap: 8px; overflow: hidden; }
+[data-mode="business"] .biz-colm > :not(.biz-colh) { margin-inline: 12px; }
+[data-mode="business"] .biz-colm.is-over { background: var(--bz-l50); }
+[data-mode="business"] .biz-colh { margin: 0 0 4px; padding: 12px 14px; background: var(--bz-p100); color: var(--bz-navy); }
+[data-mode="business"] .biz-colh span { color: inherit; font-weight: 700; }
+[data-mode="business"] .biz-colm:nth-child(2) .biz-colh { background: var(--bz-navy-2); color: #fff; }
+[data-mode="business"] .biz-colm:nth-child(3) .biz-colh { background: var(--bz-navy); color: #fff; }
+[data-mode="business"] .biz-colm:nth-child(4) .biz-colh { background: var(--bz-lime); color: var(--bz-navy); }
+[data-mode="business"] .biz-colm:nth-child(5) .biz-colh { background: var(--bz-green); color: #fff; }
+[data-mode="business"] .biz-card { background: var(--bz-p50); }
+[data-mode="business"] .biz-card:hover { background: var(--bz-navy); color: #fff; }
+[data-mode="business"] .biz-card:hover .biz-sub, [data-mode="business"] .biz-card:hover .biz-quiet { color: rgb(255 255 255 / 0.8); }
+/* One client: stage picker and history. */
+[data-mode="business"] .biz-stages button { background: var(--bz-p100); color: var(--bz-navy); }
+[data-mode="business"] .biz-stages button:hover { background: var(--bz-lime); }
+[data-mode="business"] .biz-stages button[aria-pressed="true"] { background: var(--bz-navy); color: var(--bz-lime); }
+[data-mode="business"] .biz-tl li { border-top-color: var(--a-line); }
+[data-mode="business"] .biz-crumb { color: var(--bz-navy); }
+/* Meetings: today is the navy column. */
+[data-mode="business"] .biz-day { background: #fff; }
+[data-mode="business"] .biz-day.is-today { box-shadow: none; background: var(--bz-navy); color: #fff; }
+[data-mode="business"] .biz-day.is-today .biz-colh { background: none; color: var(--bz-lime); padding: 0; }
+[data-mode="business"] .biz-day .biz-colh { background: none; padding: 0; }
+[data-mode="business"] .biz-mtg { background: var(--bz-p50); }
+[data-mode="business"] .biz-day.is-today .biz-mtg { background: var(--bz-navy-2); color: #fff; }
+[data-mode="business"] .biz-day.is-today .biz-mtg .biz-sub { color: rgb(255 255 255 / 0.8); }
+[data-mode="business"] .biz-pick button[aria-pressed="true"] { background: var(--bz-navy); color: var(--bz-lime); }
+[data-mode="business"] .biz-pick button:hover { background: var(--bz-lime); color: var(--bz-navy); }
+@media (max-width: 760px) { [data-mode="business"] .band-metric { min-width: 0; padding: 8px 12px; } }
+/* Six tabs and the transcript button leave no room for the sync words: the dot alone (its title still says it). */
+[data-mode="business"] .syncpip .syncpip-text { display: none; }
+@media (max-width: 760px) { .biz-row .biz-main { flex-basis: 100%; } }

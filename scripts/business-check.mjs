@@ -69,11 +69,12 @@ async function run(label, viewport) {
   const menu = phone
     ? (await page.locator('.tabbar.is-biz .tabbar-tab span').allInnerTexts()).join('|')
     : (await page.locator('nav.nav').first().locator('button, a').allInnerTexts()).map((s) => s.trim()).filter(Boolean).join('|')
-  check(phone ? menu.toLowerCase() === 'today|clients|meetings|outreach|money|life' : /Today.*Clients.*Meetings.*Outreach.*Plan.*Money/i.test(menu), `${label}: the menu is the business menu (${menu})`)
+  check(phone ? menu.toLowerCase() === 'today|clients|meetings|outreach|invoices|life' : /Today.*Clients.*Meetings.*Outreach.*Plan.*Invoices/i.test(menu), `${label}: the menu is the business menu (${menu})`)
   check(await page.locator('.biz').count() === 1, `${label}: Business Today opens`)
   const mine = await page.locator('.biz-sec[aria-label="Waiting on you"] .biz-clink').allInnerTexts()
   check(mine.length === 3 && mine.some((m) => m.startsWith('Fake Studio')) && mine.includes('Fake Replied') && !mine.includes('Fake Cafe Alpha'), `${label}: waiting on you holds the clients with no step or a step on me, not the one on the client (${mine.join(' / ')})`)
   check(!/overdue|due /i.test(await page.locator('.biz').innerText()), `${label}: no due dates anywhere`)
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/mode-${label}-today.png` })
 
   // Clients board
   await page.evaluate(() => { location.hash = '/clients' }); await page.waitForTimeout(600)

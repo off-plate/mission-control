@@ -2749,10 +2749,9 @@ V.people = {
   title: 'People', lazy: true,
   action: () => `<button class="kb ink" data-a="personAdd" aria-label="Add">${ico('plus')}</button>`,
   render(a, e) {
-    if (a.mode && !e.modeSet) { S.ui.pmode = a.mode; e.modeSet = 1; }
-    const m = S.ui.pmode || 'personal';
-    const seg = `<div class="seg" style="margin-bottom:12px"><button class="${m === 'personal' ? 'on' : ''}" data-a="pmode" data-x="personal">Personal</button><button class="${m === 'business' ? 'on' : ''}" data-a="pmode" data-x="business">Business</button></div>`;
-    return seg + (m === 'personal' ? peoplePersonal() : peopleBusiness());
+    /* People is personal only since 2026-11-07: clients and prospects live in Business mode. */
+    S.ui.pmode = 'personal';
+    return peoplePersonal();
   }
 };
 A.pmode = (el, x) => { S.ui.pmode = x; renderBody(top_(), true); };

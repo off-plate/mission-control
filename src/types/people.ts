@@ -146,6 +146,10 @@ export interface Prospect {
    *  `at` is when it was set, so the room can say how long it has been quiet.
    *  No date to hit: this app is against due dates (2026-08-20). */
   next?: { text: string; on: 'me' | 'client'; at: number }
+  /** Business mode: a finished client (Acquired, work delivered). Sits in Done, not Active. */
+  closed?: number
+  /** Business mode: calendar event uids whose meeting prep is ready. */
+  prep?: string[]
   people: ProspectPerson[]
   touches: ProspectTouch[]
   createdAt: number

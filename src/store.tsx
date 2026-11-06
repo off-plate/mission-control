@@ -954,7 +954,7 @@ function routeFromHash(): { page: PageId; day: string | null } {
   if (m) return { page: 'day', day: m[1] }
   // The give-up screen lives on the Jar page; the Jar reads the same hash.
   if (h === 'give-up') return { page: 'timeline', day: null }
-  const pages: PageId[] = ['today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting', 'settings', 'notes', 'bills', 'mymind', 'invoices', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant', 'timeline', 'skills', 'health', 'gym', 'longevity', 'watchless', 'ideas', 'prompts', 'people', 'business']
+  const pages: PageId[] = ['today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting', 'settings', 'notes', 'bills', 'mymind', 'invoices', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant', 'timeline', 'skills', 'health', 'gym', 'longevity', 'watchless', 'ideas', 'prompts', 'people', 'business', 'clients', 'meetings', 'outreach']
   return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
 }
 
@@ -1155,7 +1155,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [noteToOpen, setNoteToOpen] = useState<string | null>(null)
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-space', view)
+    /* Business mode owns the accent while it is on (App.tsx). */
+    if (document.documentElement.getAttribute('data-mode') !== 'business') document.documentElement.setAttribute('data-space', view)
     try {
       localStorage.setItem('mc-view', view)
       localStorage.setItem('mc-space', writeSpace)

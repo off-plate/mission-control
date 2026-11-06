@@ -26,6 +26,10 @@ export type PageId =
   | 'today'
   /** The Business room: Off-Plate clients and their next steps. A room like the Zone, not a space. */
   | 'business'
+  /** Business mode pages. */
+  | 'clients'
+  | 'meetings'
+  | 'outreach'
   | 'plan'
   /** A directory of Projects, scoped by the active Space. Opening one sets
    *  openProjectId and lands on Plan, filtered; it is not its own data. */

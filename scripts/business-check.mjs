@@ -1,4 +1,4 @@
-/* Drives the real Business room against a snapshot of docs/, ?noremote only, with
+/* Drives the real Business mode against a snapshot of docs/, ?noremote only, with
    seeded fake clients. Asserts the invariants (order, saved state, the accent
    while open and restored after, no sideways scroll, no console errors) and
    writes screenshots when SHOTS is set. Never touches a live profile. */
@@ -50,54 +50,80 @@ async function run(label, viewport) {
       { ...base, id: 'b2', name: 'Fake Studio With A Really Long Name That Must Wrap And Never Be Cut Off', stage: 'Acquired', touches: [{ id: 't2', step: 'work', day: d2 }] },
       { ...base, id: 'b3', name: 'Fake Clinic', stage: 'Meeting planned', touches: [{ id: 't3', step: 'work', day: d2 }], next: { text: 'Prepare the meeting', on: 'me', at: t - 2 * 864e5 } },
       { ...base, id: 'b4', name: 'Fake Replied', stage: 'Responded waiting', touches: [{ id: 't4', step: 'work', day: d2 }], replied: { day: d2, subject: 'Re: Your site' } },
-      { ...base, id: 'b5', name: 'Fake Cold Lead', stage: 'Contacted', touches: [] },
+      { ...base, id: 'b5', name: 'Fake Cold Lead', stage: 'Contacted', touches: [{ id: 't5', step: 'work', day: d2 }] },
+      { ...base, id: 'b6', name: 'Fake Audited', stage: 'Audited', touches: [] },
+      { ...base, id: 'b7', name: 'Fake Lost', stage: 'Lost', touches: [] },
     ]
     localStorage.setItem(K, JSON.stringify(s))
   }, [KEY, day(2), day(9), now])
   await page.reload(); await page.waitForTimeout(900)
+  const phone = viewport.width < 640
+  const space = () => page.evaluate(() => document.documentElement.getAttribute('data-space'))
 
-  // Phone: the Nothing shell hands classic pages over by address; desktop uses the header switch.
-  if (viewport.width < 640) { await page.evaluate(() => { location.hash = '/business' }) }
-  else await page.getByRole('button', { name: 'Business', exact: true }).click()
-  await page.waitForTimeout(700)
-  check(await page.locator('.biz').count() === 1, `${label}: the Business room opens`)
-  check((await page.evaluate(() => document.documentElement.getAttribute('data-space'))) === 'business', `${label}: its accent is on while open`)
-  const names = await page.locator('.biz-row .biz-name').allInnerTexts()
-  check(names.length === 4, `${label}: four live clients shown, the cold lead is not (${names.length})`)
-  const active = await page.locator('.biz-sec', { hasText: 'Active clients' }).locator('.biz-row .biz-name').allInnerTexts()
-  check(active[0]?.startsWith('Fake Studio'), `${label}: waiting on me first, no next step counts as mine (${active[0]})`)
+  /* Desktop: the header switch. Phone: the Nothing app's drawer opens the Business page, which turns the mode on. */
+  if (phone) {
+    await page.evaluate(() => { location.hash = '/business' })
+  } else await page.locator('.mode-switch').first().getByRole('button', { name: 'Business' }).click()
+  await page.waitForTimeout(800)
+  check((await space()) === 'business', `${label}: the switch puts the business accent on`)
+  const menu = phone
+    ? (await page.locator('.tabbar.is-biz .tabbar-tab span').allInnerTexts()).join('|')
+    : (await page.locator('nav.nav').first().locator('button, a').allInnerTexts()).map((s) => s.trim()).filter(Boolean).join('|')
+  check(phone ? menu.toLowerCase() === 'today|clients|meetings|outreach|money|life' : /Today.*Clients.*Meetings.*Outreach.*Plan.*Money/i.test(menu), `${label}: the menu is the business menu (${menu})`)
+  check(await page.locator('.biz').count() === 1, `${label}: Business Today opens`)
+  const mine = await page.locator('.biz-sec[aria-label="Waiting on you"] .biz-clink').allInnerTexts()
+  check(mine.length === 3 && mine.some((m) => m.startsWith('Fake Studio')) && mine.includes('Fake Replied') && !mine.includes('Fake Cafe Alpha'), `${label}: waiting on you holds the clients with no step or a step on me, not the one on the client (${mine.join(' / ')})`)
+  check(!/overdue|due /i.test(await page.locator('.biz').innerText()), `${label}: no due dates anywhere`)
+
+  // Clients board
+  await page.evaluate(() => { location.hash = '/clients' }); await page.waitForTimeout(600)
+  const cols = await page.locator('.biz-colh').allInnerTexts()
+  check(cols.map((c) => c.replace(/\s+/g, ' ')).join('|').toLowerCase() === 'outreach 1|contacted 1|in conversation 2|active 2|done 0', `${label}: five columns over the Sheet statuses, Lost left out (${cols.map((c) => c.replace(/\s+/g, ' ')).join('|')})`)
   const cut = await page.evaluate(() => [...document.querySelectorAll('.biz-name')].filter((e) => e.scrollWidth > e.clientWidth + 1).length)
   check(cut === 0, `${label}: no client name is cut off`)
-  check((await page.locator('.biz-quiet.is-old').count()) >= 1, `${label}: a client quiet 7+ days is flagged`)
-  check(!/overdue|due /i.test(await page.locator('.biz').innerText()), `${label}: no due dates or overdue anywhere`)
-
-  // Edit a next step, flip who it waits on, both must save.
-  await page.locator('.biz-row', { hasText: 'Fake Studio' }).locator('.biz-step').click()
-  await page.locator('.biz-input').fill('Book the kickoff')
-  await page.locator('.biz-input').press('Enter'); await page.waitForTimeout(500)
-  await page.locator('.biz-row', { hasText: 'Fake Studio' }).getByRole('button', { name: 'Client' }).click(); await page.waitForTimeout(600)
-  const saved = await page.evaluate((K) => { const p = JSON.parse(localStorage.getItem(K)).prospects.find((x) => x.id === 'b2'); return p.next && `${p.next.text}|${p.next.on}` }, KEY)
-  check(saved === 'Book the kickoff|client', `${label}: next step and who it waits on are saved (${saved})`)
-
-  // Paste a transcript.
-  await page.locator('#biz-client').click()
-  await page.locator('.dd-option', { hasText: 'Fake Clinic' }).click()
-  await page.getByRole('textbox', { name: 'Transcript' }).fill('Speaker 1: hello\nSpeaker 2: hi')
-  await page.getByRole('button', { name: 'Save transcript' }).click(); await page.waitForTimeout(600)
-  const note = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).notes.find((n) => n.title.startsWith('Transcript:')), KEY)
-  check(!!note && /Fake Clinic/.test(note.title), `${label}: the transcript is saved as a note tagged to the client`)
-  check((await page.locator('.biz-tr-row').count()) === 1, `${label}: it shows as waiting to be processed`)
-
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
-  check(overflow <= 1, `${label}: no sideways scroll (${overflow}px)`)
-  if (SHOTS) await page.screenshot({ path: `${SHOTS}/business-${label}.png`, fullPage: true })
-
-  // Leave: the space accent comes back.
-  if (viewport.width >= 640) {
-    await page.getByRole('button', { name: 'Leave Business' }).click(); await page.waitForTimeout(500)
-    check(!/business/.test(await page.evaluate(() => document.documentElement.getAttribute('data-space') ?? '')), `${label}: leaving gives the accent back`)
-    check(!(await page.locator('.biz').count()), `${label}: the switch goes back to the page he came from`)
+  if (!phone) {
+    await page.locator('.biz-card', { hasText: 'Fake Cold Lead' }).dragTo(page.locator('.biz-colm', { hasText: 'In conversation' }))
+    await page.waitForTimeout(500)
+    const st = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).prospects.find((x) => x.id === 'b5').stage, KEY)
+    check(st === 'Responded waiting', `${label}: dragging a card moves its stage (${st})`)
   }
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/mode-${label}-clients.png` })
+  await page.locator('.biz-card', { hasText: 'Fake Clinic' }).click(); await page.waitForTimeout(500)
+  check((await page.locator('.biz-title').innerText()).toLowerCase() === 'fake clinic', `${label}: a card opens the client`)
+  await page.locator('.biz-nextin').fill('Send the offer'); await page.locator('.biz-nextin').press('Enter'); await page.waitForTimeout(400)
+  await page.locator('.biz-nextcard').getByRole('button', { name: 'Client' }).click(); await page.waitForTimeout(500)
+  await page.locator('.biz-stages').getByRole('button', { name: 'Done' }).click(); await page.waitForTimeout(500)
+  const c3 = await page.evaluate((K) => { const p = JSON.parse(localStorage.getItem(K)).prospects.find((x) => x.id === 'b3'); return `${p.next?.text}|${p.next?.on}|${p.stage}|${!!p.closed}` }, KEY)
+  check(c3 === 'Send the offer|client|Acquired|true', `${label}: next step, who it waits on and Done all save (${c3})`)
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/mode-${label}-client.png`, fullPage: !phone })
+
+  // Transcript from the client page
+  await page.locator('.biz-links').getByRole('button', { name: 'Paste a transcript' }).click(); await page.waitForTimeout(300)
+  check((await page.locator('.biz-pick button[aria-pressed="true"]').innerText()).toLowerCase() === 'fake clinic', `${label}: the transcript sheet opens on this client`)
+  await page.getByRole('textbox', { name: 'Transcript' }).fill('Speaker 1: hello')
+  await page.getByRole('button', { name: 'Save transcript' }).click(); await page.waitForTimeout(500)
+  const note = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).notes.find((n) => n.title.startsWith('Transcript:'))?.title, KEY)
+  check(/Fake Clinic/.test(note ?? ''), `${label}: the transcript is saved as a note (${note})`)
+
+  for (const [hash, want] of [['meetings', 'Meetings'], ['outreach', 'Outreach']]) {
+    await page.evaluate((h) => { location.hash = '/' + h }, hash); await page.waitForTimeout(700)
+    const h1 = (await page.locator('h1').first().innerText()).trim()
+    check(h1.toLowerCase().includes(want.toLowerCase()), `${label}: ${want} opens (${h1})`)
+    const ov = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
+    check(ov <= 1, `${label}: ${want} has no sideways scroll (${ov}px)`)
+  }
+  if (!phone) {
+    await page.getByRole('button', { name: 'Plan', exact: true }).first().click().catch(() => {}); await page.waitForTimeout(600)
+    check((await space()) === 'business' && /plan/.test(await page.evaluate(() => location.hash)), `${label}: Plan opens and keeps business mode`)
+  }
+
+  if (phone) await page.getByRole('button', { name: 'Switch to Life' }).click()
+  else await page.locator('.mode-switch').first().getByRole('button', { name: 'Life' }).click()
+  await page.waitForTimeout(700)
+  check((await space()) !== 'business', `${label}: Life gives the space accent back (${await space()})`)
+  check(!(await page.locator('.biz').count()), `${label}: Life leaves the business pages`)
+  const stored = await page.evaluate(() => localStorage.getItem('mc:mode'))
+  check(stored === 'life', `${label}: the mode is remembered on this device (${stored})`)
   check(errors.length === 0, `${label}: no console errors ${errors.slice(0, 2).join(' | ')}`)
   await ctx.close()
 }

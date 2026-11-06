@@ -38,6 +38,10 @@ const BoardPage = lazy(() => import('./board').then((m) => ({ default: m.BoardPa
 const CalendarPage = lazy(() => import('./calendarpage').then((m) => ({ default: m.CalendarPage })))
 const AssistantPage = lazy(() => import('./assistantpage').then((m) => ({ default: m.AssistantPage })))
 const BusinessPage = lazy(() => import('./business').then((m) => ({ default: m.BusinessPage })))
+const ClientsPage = lazy(() => import('./business').then((m) => ({ default: m.ClientsPage })))
+const MeetingsPage = lazy(() => import('./business').then((m) => ({ default: m.MeetingsPage })))
+const PasteTranscript = lazy(() => import('./business').then((m) => ({ default: m.PasteTranscript })))
+const OutreachPage = lazy(() => import('./prospects').then((m) => ({ default: () => <m.BusinessView title="Outreach" /> })))
 const FocusPage = lazy(() => import('./focus').then((m) => ({ default: m.FocusPage })))
 const SkillsPage = lazy(() => import('./skillspage').then((m) => ({ default: m.SkillsPage })))
 const HealthPage = lazy(() => import('./healthpage').then((m) => ({ default: m.HealthPage })))
@@ -61,7 +65,7 @@ import { CLASSIC_LOOK, SKINS, useSkin } from './skins'
 import { openInShell } from './shells/nav'
 import { ago, describe, useSyncStatus } from './sync'
 import { isReadOnly } from './store'
-import { SPACES, UNSORTED, type PageId, type SpaceId, type ViewId } from './types'
+import { PROJECT_OFFPLATE, SPACES, UNSORTED, type PageId, type SpaceId, type ViewId } from './types'
 
 /* Is this thing up to date, and where did the last change come from.
 
@@ -220,6 +224,32 @@ const NAV: { id: PageId; label: string }[] = [
 
    It stays LAST in the row deliberately. Every other tab keeps the position it
    has had, so nothing he already reaches for by muscle memory moves. */
+/* Business mode's menu (2026-11-07, his ask: "everything in the menu will be directed to the
+   business"). Plan is the Off-Plate project's Plan, Money is the Invoices page. */
+const BIZ_NAV: { id: PageId; label: string }[] = [
+  { id: 'business', label: 'Today' }, { id: 'clients', label: 'Clients' }, { id: 'meetings', label: 'Meetings' },
+  { id: 'outreach', label: 'Outreach' }, { id: 'plan', label: 'Plan' }, { id: 'invoices', label: 'Money' },
+]
+const BIZ_PAGES: PageId[] = ['business', 'clients', 'meetings', 'outreach']
+const BIZ_TABS: { id: PageId; label: string; icon: ReactNode }[] = [
+  { id: 'business', label: 'Today', icon: <Icon.TabToday size={23} /> },
+  { id: 'clients', label: 'Clients', icon: <Icon.DockPeople size={22} /> },
+  { id: 'meetings', label: 'Meetings', icon: <Icon.DockCalendar size={22} /> },
+  { id: 'outreach', label: 'Outreach', icon: <Icon.DockChartBar size={22} /> },
+  { id: 'invoices', label: 'Money', icon: <Icon.DockInvoice size={22} /> },
+]
+
+/** Life or Business. Per device, like HUD: how he wants this screen right now. */
+function ModeSwitch({ biz, flip }: { biz: boolean; flip: (b: boolean) => void }) {
+  return (
+    <span className={`mode-switch${biz ? ' is-biz' : ''}`} role="group" aria-label="Mode">
+      <i className="mode-knob" aria-hidden="true" />
+      <button aria-pressed={!biz} onClick={() => flip(false)}>Life</button>
+      <button aria-pressed={biz} onClick={() => flip(true)}>Business</button>
+    </span>
+  )
+}
+
 function navFor(_view: ViewId): { id: PageId; label: string }[] {
   return [...NAV, { id: 'calendar' as PageId, label: 'Calendar' }]
 }
@@ -467,7 +497,19 @@ const MORE_PAGES: { id: PageId; label: string; icon: ReactNode }[] = [
   { id: 'settings', label: 'Settings', icon: <Icon.Settings size={22} /> },
 ]
 
-function PhoneTabBar({ page, setPage, nothing }: { page: PageId; setPage: (p: PageId) => void; nothing?: boolean }) {
+function PhoneTabBar({ page, setPage, nothing, biz, onLife }: { page: PageId; setPage: (p: PageId) => void; nothing?: boolean; biz?: boolean; onLife?: () => void }) {
+  if (biz) return (
+    <nav className="tabbar is-biz" aria-label="Pages">
+      {BIZ_TABS.map((t) => (
+        <button key={t.id} className="tabbar-tab" aria-current={page === t.id ? 'page' : undefined} onClick={() => setPage(t.id)}>{t.icon}<span>{t.label}</span></button>
+      ))}
+      {/* The way back on a phone: the Nothing app has no header switch. */}
+      <button className="tabbar-tab tabbar-life" aria-label="Switch to Life" onClick={onLife}><Icon.TabHabits size={23} /><span>Life</span></button>
+    </nav>
+  )
+  return <LifeTabBar page={page} setPage={setPage} nothing={nothing} />
+}
+function LifeTabBar({ page, setPage, nothing }: { page: PageId; setPage: (p: PageId) => void; nothing?: boolean }) {
   const [open, setOpen] = useState(false)
   const sheet = useRef<HTMLDivElement>(null)
   const drag = useRef<{ y: number; t: number; dy: number } | null>(null)
@@ -555,11 +597,11 @@ function PhoneTabBar({ page, setPage, nothing }: { page: PageId; setPage: (p: Pa
 
 /* Pages that are dark in both modes, so the header goes dark with them. */
 /* Pages the Nothing app opens full screen from Apps: they carry the standard back header, so no classic bottom bar, same as Notes or People. */
-const NOTHING_OPENED: PageId[] = ['business', 'bills', 'mymind', 'skills', 'longevity', 'watchless']
+const NOTHING_OPENED: PageId[] = ['bills', 'mymind', 'skills', 'longevity', 'watchless']
 const DARK_CHROME_PAGES: PageId[] = ['timeline', 'board', 'health', 'gym', 'longevity']
 
 export default function App() {
-  const { space, view, setView, page, setPage, tasks, routines, goals, habits, markHabitDaysOn, prompts, storageFull } = useStore()
+  const { space, view, setView, page, setPage, enterProject, tasks, routines, goals, habits, markHabitDaysOn, prompts, storageFull } = useStore()
   const waitingPrompts = prompts.filter((p) => !p.sentAt).length
   useEffect(() => { try { localStorage.setItem('mc-prompts-waiting', String(waitingPrompts)) } catch { /* private mode */ } }, [waitingPrompts])
   const promptsReady = usePromptWindow(waitingPrompts).state === 'open' && waitingPrompts > 0
@@ -597,7 +639,6 @@ export default function App() {
     return () => window.removeEventListener('mc:new-task', onNewTask)
   }, [])
 
-  const tabs = navFor(view)
 
   /* The once-a-day Hevy sync is GONE, on his instruction, 2026-08-26: "the
      23:00 sync doesn't work, so I would kill that automatic sync and put there
@@ -629,6 +670,18 @@ export default function App() {
   /* The assistant's page IS Jarvis (his ask, 2026-10-04): it wears the HUD
      theme whether or not the mode is on, the way the Zone is its own room.
      The switch itself, and every other page, are untouched. */
+  /* Business mode (2026-11-07). Per device, like HUD. Landing on a Business page (the phone
+     drawer, a bookmark) turns it on, so the menu always matches the page. */
+  const [biz, setBiz] = useState<boolean>(() => { try { return localStorage.getItem('mc:mode') === 'business' } catch { return false } })
+  useEffect(() => { try { localStorage.setItem('mc:mode', biz ? 'business' : 'life') } catch { /* private mode */ } }, [biz])
+  useEffect(() => { if (BIZ_PAGES.includes(page) && !biz) setBiz(true) }, [page]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const el = document.documentElement
+    if (biz) el.setAttribute('data-mode', 'business'); else el.removeAttribute('data-mode')
+    el.setAttribute('data-space', biz ? 'business' : view)
+  }, [biz, view])
+  const flipMode = (b: boolean) => { if (b === biz) return; setBiz(b); setPage(b ? 'business' : 'today') }
+  const tabs = biz ? BIZ_NAV : navFor(view)
   const hudLook = hud || page === 'assistant'
   /* The look (Settings > Look). HUD, the Jarvis room and the Zone keep their
      own, so a skin only applies where none of them does. */
@@ -639,8 +692,8 @@ export default function App() {
   /* On a phone, Nothing is the shell, standing in for Today. Any page the shell
      hands back to (Settings, Bills) is the classic one, and Today in its tab
      bar is the way back. */
-  const shellView = phone ? SHELL_VIEW[page] : undefined
-  const shellOn = phone && (page === 'today' || !!shellView)
+  const shellView = phone && !biz ? SHELL_VIEW[page] : undefined
+  const shellOn = phone && !biz && (page === 'today' || !!shellView)
   useEffect(() => { if (phone) setPage('today') }, [phone]) // eslint-disable-line react-hooks/exhaustive-deps
   /* A page the Nothing app has its own version of opens that version, wherever it was asked
      from (the classic More sheet, a link, the assistant), so a phone never shows the desktop one. */
@@ -662,8 +715,6 @@ export default function App() {
   useEffect(() => { if (page !== 'zone') backFromZone.current = page }, [page])
   const backFromAssistant = useRef<PageId>('today')
   useEffect(() => { if (page !== 'assistant') backFromAssistant.current = page }, [page])
-  const backFromBusiness = useRef<PageId>('today')
-  useEffect(() => { if (page !== 'business') backFromBusiness.current = page }, [page])
   useEffect(() => { if (JAR_PAGES[page]) void warmJar() }, [page])
 
   /* His catch (2026-09-04): the drawer hangs at a flat `left: var(--gutter)`
@@ -693,7 +744,9 @@ export default function App() {
          switcher instead: its left edge is the switcher's right edge plus a
          gap, and it centres on the switcher's own midline. */
       const t = topstick.getBoundingClientRect()
-      const r = spaces.getBoundingClientRect()
+      /* Since 2026-11-07 the Life/Business switch sits right of the brand, so the row starts after it. */
+      const anchor = (topstick.querySelector('.topbar-left .mode-switch') as HTMLElement | null) ?? spaces
+      const r = anchor.getBoundingClientRect()
       topstick.style.setProperty('--nav-inline-left', `${r.right - t.left + 16}px`)
       topstick.style.setProperty('--nav-mid', `${r.top - t.top + r.height / 2}px`)
     }
@@ -705,7 +758,7 @@ export default function App() {
     const brand = topstickRef.current?.querySelector('.brand')
     if (brand) ro.observe(brand)
     return () => { window.removeEventListener('resize', measure); ro.disconnect() }
-  }, [page, hud])
+  }, [page, hud, biz])
 
   /* On a phone the Nothing app stays mounted, hidden, while a classic page (Bills, Settings...) is open, so
      coming back (the back swipe, the Today tab) shows it exactly where it was, not reset to Home. */
@@ -773,7 +826,8 @@ export default function App() {
               Jarvis is one click away, and in Jarvis the logo means the way back. */}
           <span className="brand-swap" aria-hidden="true">{hud ? <Logo /> : <Helmet lit={false} />}</span>
         </button>
-        <WorkspacePick className="phone-only" />
+        <ModeSwitch biz={biz} flip={flipMode} />
+        {!biz && <WorkspacePick className="phone-only" />}
         </div>
         <div className="topbar-right">
           {/* Status before actions, and not in the Zone: that room is one thing
@@ -795,7 +849,7 @@ export default function App() {
               2026-10-04). A toggle like the Zone: pressing it again goes back
               to the page he came from. */}
           <button
-            className={`btn btn-ghost btn-sq${page === 'assistant' ? ' is-on' : ''}`}
+            className={`btn btn-ghost btn-sq biz-keep${page === 'assistant' ? ' is-on' : ''}`}
             onClick={() => setPage(page === 'assistant' ? backFromAssistant.current : 'assistant')}
             aria-pressed={page === 'assistant'}
             title={page === 'assistant' ? 'Leave JARVIS' : 'JARVIS, the assistant'}
@@ -804,18 +858,11 @@ export default function App() {
             <Icon.Waveform size={16} />
             <span className="btn-sq-label">Jarvis</span>
           </button>
-          {/* The Business room (2026-11-07): the switch to the Off-Plate side. A toggle like
-              JARVIS and the Zone: pressing it again goes back to the page he came from. */}
-          <button
-            className={`btn btn-ghost btn-sq${page === 'business' ? ' is-on' : ''}`}
-            onClick={() => setPage(page === 'business' ? backFromBusiness.current : 'business')}
-            aria-pressed={page === 'business'}
-            title={page === 'business' ? 'Leave Business' : 'Business'}
-            aria-label={page === 'business' ? 'Leave Business' : 'Business'}
-          >
-            <Icon.DockChartBar size={16} />
-            <span className="btn-sq-label">Business</span>
-          </button>
+          {biz && (
+            <button className="btn btn-primary biz-paste-btn" onClick={() => window.dispatchEvent(new CustomEvent('mc:paste-transcript'))}>
+              <Icon.Plus size={16} /><span>Transcript</span>
+            </button>
+          )}
           <button
             className={`btn btn-ghost btn-sq${page === 'zone' ? ' is-on' : ''}`}
             onClick={() => setPage(page === 'zone' ? backFromZone.current : 'zone')}
@@ -847,7 +894,7 @@ export default function App() {
               (2026-09-15), next to the Zone and Jarvis. The dock keeps its own
               Note and Ideas for quick capture; these open the full pages. */}
           <button
-            className={`btn btn-ghost btn-sq hide-phone${page === 'notes' ? ' is-on' : ''}`}
+            className={`btn btn-ghost btn-sq biz-keep hide-phone${page === 'notes' ? ' is-on' : ''}`}
             onClick={() => setPage('notes')}
             aria-pressed={page === 'notes'}
             aria-label="Notes"
@@ -926,7 +973,7 @@ export default function App() {
           moment, which starts the hide timer, and nothing was cancelling it
           again once the pointer landed on the row itself: it closed a second
           later out from under a cursor that never actually left it. */}
-      {page !== 'zone' && <PageNav tabs={tabs} page={navPage} setPage={setPage} onMouseEnter={nav.show} />}
+      {page !== 'zone' && <PageNav tabs={tabs} page={navPage} setPage={(p) => (biz && p === 'plan' ? enterProject(PROJECT_OFFPLATE) : setPage(p))} onMouseEnter={nav.show} />}
       </div>
 
       {isReadOnly() && (
@@ -971,6 +1018,9 @@ export default function App() {
         {page === 'calendar' && <CalendarPage />}
         {page === 'assistant' && <AssistantPage />}
         {page === 'business' && <BusinessPage />}
+        {page === 'clients' && <ClientsPage />}
+        {page === 'meetings' && <MeetingsPage />}
+        {page === 'outreach' && <OutreachPage />}
         {page === 'notes' && <NotesPage />}
         {page === 'bills' && <BillsPage />}
         {page === 'mymind' && <MyMindPage />}
@@ -980,8 +1030,9 @@ export default function App() {
         </Suspense>
         </PageBoundary>
       </main>
+      {biz && <Suspense fallback={null}><PasteTranscript /></Suspense>}
 
-      {page !== 'zone' && !(phone && skin.startsWith('nothing') && NOTHING_OPENED.includes(page)) && <PhoneTabBar page={page} setPage={setPage} nothing={skin.startsWith('nothing')} />}
+      {page !== 'zone' && !(phone && skin.startsWith('nothing') && NOTHING_OPENED.includes(page)) && <PhoneTabBar page={page} setPage={setPage} nothing={skin.startsWith('nothing')} biz={biz} onLife={() => flipMode(false)} />}
     </div>
     )}
     </>

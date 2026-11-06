@@ -160,7 +160,7 @@ function ageLabel(p: Prospect, today: string): { t: string; stale: boolean } {
   return { t, stale: isOpen(p) && a.days >= AVOID_DAYS }
 }
 
-export function BusinessView({ modeSwitch }: { modeSwitch: JSX.Element }) {
+export function BusinessView({ modeSwitch, title = 'People' }: { modeSwitch?: JSX.Element; title?: string }) {
   const { prospects, addProspect, updateProspect } = useStore()
   const today = localDateKey()
   const [layout, setLayout] = useState<Layout>(() => { try { return localStorage.getItem(LAYOUT_KEY) === 'board' ? 'board' : 'list' } catch { return 'list' } })
@@ -185,7 +185,7 @@ export function BusinessView({ modeSwitch }: { modeSwitch: JSX.Element }) {
   return (
     <div className="pp-page pr-page">
       <div className="pr-bar" role="toolbar" aria-label="People">
-        <h1 className="pp-h1">People</h1>
+        <h1 className="pp-h1">{title}</h1>
         {modeSwitch}
         <Segmented size="sm" label="Layout" value={layout} onPick={setLayout} options={[{ id: 'list', label: 'Table' }, { id: 'board', label: 'Board' }]} />
         {prospects.length > 0 && (() => {

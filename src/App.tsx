@@ -37,6 +37,7 @@ const warmJar = () => Promise.all([import('./board'), import('./healthpage'), im
 const BoardPage = lazy(() => import('./board').then((m) => ({ default: m.BoardPage })))
 const CalendarPage = lazy(() => import('./calendarpage').then((m) => ({ default: m.CalendarPage })))
 const AssistantPage = lazy(() => import('./assistantpage').then((m) => ({ default: m.AssistantPage })))
+const BusinessPage = lazy(() => import('./business').then((m) => ({ default: m.BusinessPage })))
 const FocusPage = lazy(() => import('./focus').then((m) => ({ default: m.FocusPage })))
 const SkillsPage = lazy(() => import('./skillspage').then((m) => ({ default: m.SkillsPage })))
 const HealthPage = lazy(() => import('./healthpage').then((m) => ({ default: m.HealthPage })))
@@ -453,6 +454,7 @@ const MORE_PAGES: { id: PageId; label: string; icon: ReactNode }[] = [
   { id: 'notes', label: 'Notes', icon: <Icon.DockNote size={22} /> },
   { id: 'ideas', label: 'Ideas', icon: <Icon.DockBulb size={22} /> },
   { id: 'invoices', label: 'Invoices', icon: <Icon.DockInvoice size={22} /> },
+  { id: 'business', label: 'Business', icon: <Icon.DockChartBar size={22} /> },
   { id: 'people', label: 'People', icon: <Icon.DockPeople size={22} /> },
   { id: 'timeline', label: 'Jar', icon: <Icon.DockHistory size={22} /> },
   { id: 'bills', label: 'Bills', icon: <Icon.DockWallet size={22} /> },
@@ -553,7 +555,7 @@ function PhoneTabBar({ page, setPage, nothing }: { page: PageId; setPage: (p: Pa
 
 /* Pages that are dark in both modes, so the header goes dark with them. */
 /* Pages the Nothing app opens full screen from Apps: they carry the standard back header, so no classic bottom bar, same as Notes or People. */
-const NOTHING_OPENED: PageId[] = ['bills', 'mymind', 'skills', 'longevity', 'watchless']
+const NOTHING_OPENED: PageId[] = ['business', 'bills', 'mymind', 'skills', 'longevity', 'watchless']
 const DARK_CHROME_PAGES: PageId[] = ['timeline', 'board', 'health', 'gym', 'longevity']
 
 export default function App() {
@@ -660,6 +662,8 @@ export default function App() {
   useEffect(() => { if (page !== 'zone') backFromZone.current = page }, [page])
   const backFromAssistant = useRef<PageId>('today')
   useEffect(() => { if (page !== 'assistant') backFromAssistant.current = page }, [page])
+  const backFromBusiness = useRef<PageId>('today')
+  useEffect(() => { if (page !== 'business') backFromBusiness.current = page }, [page])
   useEffect(() => { if (JAR_PAGES[page]) void warmJar() }, [page])
 
   /* His catch (2026-09-04): the drawer hangs at a flat `left: var(--gutter)`
@@ -799,6 +803,18 @@ export default function App() {
           >
             <Icon.Waveform size={16} />
             <span className="btn-sq-label">Jarvis</span>
+          </button>
+          {/* The Business room (2026-11-07): the switch to the Off-Plate side. A toggle like
+              JARVIS and the Zone: pressing it again goes back to the page he came from. */}
+          <button
+            className={`btn btn-ghost btn-sq${page === 'business' ? ' is-on' : ''}`}
+            onClick={() => setPage(page === 'business' ? backFromBusiness.current : 'business')}
+            aria-pressed={page === 'business'}
+            title={page === 'business' ? 'Leave Business' : 'Business'}
+            aria-label={page === 'business' ? 'Leave Business' : 'Business'}
+          >
+            <Icon.DockChartBar size={16} />
+            <span className="btn-sq-label">Business</span>
           </button>
           <button
             className={`btn btn-ghost btn-sq${page === 'zone' ? ' is-on' : ''}`}
@@ -954,6 +970,7 @@ export default function App() {
         {page === 'apps' && <AppsPage />}
         {page === 'calendar' && <CalendarPage />}
         {page === 'assistant' && <AssistantPage />}
+        {page === 'business' && <BusinessPage />}
         {page === 'notes' && <NotesPage />}
         {page === 'bills' && <BillsPage />}
         {page === 'mymind' && <MyMindPage />}

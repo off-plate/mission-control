@@ -142,6 +142,10 @@ export interface Prospect {
   sheet?: ProspectSheetRow
   /** A reply the Gmail sync found, waiting for his yes before the stage moves. */
   replied?: { day: string; subject?: string; body?: string }
+  /** The Business room: the one next step with this client and who it waits on.
+   *  `at` is when it was set, so the room can say how long it has been quiet.
+   *  No date to hit: this app is against due dates (2026-08-20). */
+  next?: { text: string; on: 'me' | 'client'; at: number }
   people: ProspectPerson[]
   touches: ProspectTouch[]
   createdAt: number

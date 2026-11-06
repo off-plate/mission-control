@@ -24,7 +24,8 @@
    closed list, so a pasted instruction inside a dictation cannot do anything.
 
    Usage:
-     node tools/claude-brain.mjs --login     sign in once
+     node tools/claude-brain.mjs --login     sign in once (asks for email and code)
+     node tools/claude-brain.mjs --login <email> [code]   same, scripted in two steps
      node tools/claude-brain.mjs --status    who it is, is it running, last beat
      node tools/claude-brain.mjs --once      answer what is queued, then exit
      node tools/claude-brain.mjs             run until stopped */
@@ -208,14 +209,21 @@ async function saveSession(session) {
   await fsp.rename(tmp, SESSION_FILE)
 }
 
-async function login() {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+/** Two ways in. Interactive (`--login`) asks for both. Scripted
+ *  (`--login <email>` sends the code, `--login <email> <code>` finishes) lets
+ *  the code be relayed without a terminal. Same emailed 8-digit code the app uses. */
+async function login(emailArg, codeArg) {
   const c = client()
-  const email = (await rl.question('Mission Control email: ')).trim()
-  const { error: sendErr } = await c.auth.signInWithOtp({ email, options: { shouldCreateUser: false } })
-  if (sendErr) { rl.close(); throw new Error(`could not send the code: ${sendErr.message}`) }
-  const token = (await rl.question('8-digit code from the email: ')).trim()
-  rl.close()
+  let rl = null
+  const ask = async (q) => { rl ??= readline.createInterface({ input: process.stdin, output: process.stdout }); return (await rl.question(q)).trim() }
+  const email = emailArg || (await ask('Mission Control email: '))
+  if (!codeArg) {
+    const { error: sendErr } = await c.auth.signInWithOtp({ email, options: { shouldCreateUser: false } })
+    if (sendErr) { rl?.close(); throw new Error(`could not send the code: ${sendErr.message}`) }
+    if (emailArg) { say(`code sent to ${email}. Finish with: node tools/claude-brain.mjs --login ${email} <code>`); return }
+  }
+  const token = codeArg || (await ask('8-digit code from the email: '))
+  rl?.close()
   const { data, error } = await c.auth.verifyOtp({ email, token, type: 'email' })
   if (error || !data.session) throw new Error(`code rejected: ${error?.message ?? 'no session'}`)
   await saveSession(data.session)
@@ -299,7 +307,7 @@ async function status() {
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const arg = process.argv[2]
   try {
-    if (arg === '--login') await login()
+    if (arg === '--login') await login(process.argv[3], process.argv[4])
     else if (arg === '--status') await status()
     else process.exitCode = await serve({ once: arg === '--once' })
   } catch (e) {

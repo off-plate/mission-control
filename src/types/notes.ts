@@ -100,3 +100,28 @@ export interface PromptItem {
   updatedAt: number
   sentAt?: number
 }
+
+/** A Reminders list (his ask, 2026-11-07: Reminders, inspired by Apple's app).
+ *  `color` is a name from REMINDER_COLORS in remindersPage.tsx, not a hex. */
+export interface ReminderList {
+  id: string
+  name: string
+  color: string
+  createdAt: number
+  updatedAt: number
+}
+
+/** One reminder. `remindAt` is local wall time, 'YYYY-MM-DDTHH:MM', the moment
+ *  it should remind him. Not a due date: nothing turns red when it passes. */
+export interface Reminder {
+  id: string
+  title: string
+  notes: string
+  listId: string
+  remindAt?: string
+  repeat?: 'daily' | 'weekly' | 'monthly'
+  flagged: boolean
+  doneAt?: number
+  createdAt: number
+  updatedAt: number
+}

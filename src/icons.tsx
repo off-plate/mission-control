@@ -241,6 +241,8 @@ export const DockTranscript = make(<><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d
 export const DockInvoice = make(<><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2" /><path d="M9 7l1 0" /><path d="M9 13l6 0" /><path d="M13 17l2 0" /></>, 16, { k: 1, x: 0, y: 0 })
 /* Ideas: Tabler's bulb, the one mark nobody reads as anything but an idea. */
 export const DockBulb = make(<><path d="M3 12h1m8 -9v1m8 8h1m-15.4 -6.4l.7 .7m12.1 -.7l-.7 .7" /><path d="M9 16a5 5 0 1 1 6 0a3.5 3.5 0 0 0 -1 3a2 2 0 0 1 -4 0a3.5 3.5 0 0 0 -1 -3" /><path d="M9.7 17l4.6 0" /></>, 16, { k: 1, x: 0, y: 0 })
+/* Reminders (2026-11-07): Tabler's list-check, same set and weight as the Dock icons around it. */
+export const DockChecklist = make(<><path d="M3.5 5.5l1.5 1.5l2.5 -2.5" /><path d="M3.5 11.5l1.5 1.5l2.5 -2.5" /><path d="M3.5 17.5l1.5 1.5l2.5 -2.5" /><path d="M11 6l9 0" /><path d="M11 12l9 0" /><path d="M11 18l9 0" /></>, 16, { k: 1, x: 0, y: 0 })
 /* People: him in the middle, three people around him. */
 export const DockPeople = make(<><circle cx="12" cy="12" r="2.6" /><circle cx="5" cy="5.5" r="2" /><circle cx="19" cy="5.5" r="2" /><circle cx="12" cy="20.5" r="2" /><path d="M6.5 7l3.6 3.3" /><path d="M17.5 7l-3.6 3.3" /><path d="M12 14.6v3.9" /></>, 16, { k: 1, x: 0, y: 0 })
 /* Prompts: a terminal window with its prompt chevron. Tabler's terminal-2. */

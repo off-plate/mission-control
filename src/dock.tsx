@@ -9,6 +9,19 @@ import { WatchlessChip, WatchlessPanel } from './watchlessdock'
 import { bumpDockRank, rankDockItems } from './dockrank'
 import { APPS } from './apps'
 import * as Icon from './icons'
+import { lastFace } from './ideasswitch'
+import { usePromptWindow } from './promptwindow'
+import type { PageId } from './types'
+
+/* The pages that left the header (2026-11-07), bottom of this list = closest to the button. */
+const DOCK_PAGES: { id: PageId; label: string; icon: React.ReactNode }[] = [
+  { id: 'mymind', label: 'MyMind', icon: <Icon.DockBookmark size={20} /> },
+  { id: 'people', label: 'People', icon: <Icon.DockPeople size={20} /> },
+  { id: 'bills', label: 'Bills', icon: <Icon.DockWallet size={20} /> },
+  { id: 'ideas', label: 'Ideas', icon: <Icon.DockBulb size={20} /> },
+  { id: 'notes', label: 'Notes', icon: <Icon.DockNote size={20} /> },
+  { id: 'reminders', label: 'Reminders', icon: <Icon.DockChecklist size={20} /> },
+]
 
 /* Hover opens the dial now, on his instruction (2026-09-02) -- the same
    show/hide-with-a-grace-period pattern the header's nav row already uses
@@ -239,10 +252,10 @@ function isRankable(id: PanelFace): id is RankableFace {
 // The number of pills the stack shows before folding the rest behind More --
 // his own number, from "three by three grade" and "only three latest...
 // frequently used items."
-const TOP_N = 3
 
 export function Dock() {
-  const { page, setPage, setFocusAppId } = useStore()
+  const { page, setPage, setFocusAppId, prompts } = useStore()
+  const promptsReady = usePromptWindow(prompts.filter((p) => !p.sentAt).length).state === 'open' && prompts.some((p) => !p.sentAt)
   const mo = useMundiOpus()
   const { mode, closing, entered, go, closeMenu, hover } = useDockMenu()
   // Fixed, not looped over panels: hooks can't vary in count between
@@ -262,7 +275,6 @@ export function Dock() {
   // Only meaningful mid-menu, on his own "fourth icon, which I would be
   // able to quickly click" -- reset the moment the menu itself closes so a
   // stale expanded grid never reappears the next time he opens the dock.
-  const [moreOpen, setMoreOpen] = useState(false)
   /* Signed out, nothing is backed up. This mark used to sit on the header's
      settings gear; Settings lives in More now (2026-09-15), so the mark moved
      with it, and onto the FAB so it is still visible with the dock closed. */
@@ -272,7 +284,6 @@ export function Dock() {
     void currentAccount().then((a) => setNeedsSignIn(!a))
     return onAccountChange((a) => setNeedsSignIn(!a))
   }, [])
-  useEffect(() => { if (mode !== 'menu') setMoreOpen(false) }, [mode])
 
   /* Reopened in the Zone on his direct instruction (2026-09-12), reversing
      the note above this one: the room used to hold its own permanent Note
@@ -330,12 +341,6 @@ export function Dock() {
   const mediaItem = panels.find((t) => t.id === 'media')
   const rankable = panels.filter((t): t is typeof panels[number] & { id: RankableFace } => isRankable(t.id))
   const ranked = rankDockItems(rankable)
-  const topItems = ranked.slice(0, TOP_N)
-  const restItems = ranked.slice(TOP_N)
-  /* Apps and Settings always live in More (his instruction, 2026-09-15), so
-     More always exists. */
-  const moreCount = restItems.length + APPS.filter((a) => a.id !== 'watchless').length + 1
-  const hasMore = true
 
   if (mode === 'closed' || mode === 'menu') {
     // One <button> for the FAB/X across both states, always the wrapper's
@@ -414,7 +419,7 @@ export function Dock() {
                same reasoning as always -- since it never entered the
                ranking pool at all (see RANKABLE_FACES above it never earns a
                score to lose). */}
-            {!moreOpen && mediaItem && (() => {
+            {mediaItem && (() => {
               const hold = holdFor[mediaItem.id]
               return (
                 <button
@@ -430,78 +435,23 @@ export function Dock() {
                 </button>
               )
             })()}
-            {/* The fourth, dark pill -- his own "fourth icon, which I would
-               be able to quickly click" -- sits above the top three ranked
-               items, same place a fourth or fifth ranked pill used to sit.
-               Its grid opens fixed to the same corner the whole dock already
-               anchors to (see .dock-more-grid, styles.css) rather than
-               hanging off this pill's own shifting position in the stack,
-               so it lands in the same spot "any other quick popup" would --
-               his own words for the size and placement he wanted. */}
-            {hasMore && (
-              <div className="dock-item dock-more-wrap">
-                <button
-                  className="dock-more-btn"
-                  onClick={() => setMoreOpen((v) => !v)}
-                  aria-expanded={moreOpen}
-                  aria-label={moreOpen ? 'Hide more tools' : `Show ${moreCount} more tools${needsSignIn ? ', sync is off' : ''}`}
-                >
-                  <span className="dock-item-label dock-more-label">More<span className="dock-more-badge">{moreCount}</span><i className={`dock-alert-dot${needsSignIn ? ' is-on' : ''}`} aria-hidden="true" /></span>
-                  <span className="dock-item-avatar-ring">
-                    <span className="dock-item-avatar dock-item-avatar--more"><Icon.AppsGrid size={20} /></span>
-                  </span>
-                </button>
-                {moreOpen && (
-                  <div className="dock-more-grid" role="menu" aria-label="More tools">
-                    {restItems.map((t) => (
-                      <button
-                        key={t.id}
-                        className="dock-more-cell"
-                        role="menuitem"
-                        onClick={() => { goPanel(t.id); setMoreOpen(false) }}
-                      >
-                        <span className="dock-more-cell-icon">{t.switchIcon}</span>
-                        <span>{t.label}</span>
-                      </button>
-                    ))}
-                    {/* His apps sit in this grid as themselves, not behind a second
-                       "Apps" page one more tap away -- Challengers and Nexus are the
-                       point, not the shelf they used to live on. Opening one still
-                       goes through the Apps page's own iframe/back-out machinery
-                       (focusAppId is the one-shot signal it already reads), just
-                       arrived at directly. */}
-                    {/* Watchless already has its own panel above (a real chip,
-                       transcripts inline) -- listing it again from APPS would
-                       be the same tool twice in one grid. */}
-                    {APPS.filter((a) => a.id !== 'watchless').map((a) => (
-                      a.external ? (
-                        <a key={a.id} className="dock-more-cell" role="menuitem" href={a.url} target="_blank" rel="noreferrer" onClick={() => setMoreOpen(false)}>
-                          <span className="dock-more-cell-icon">{a.icon}</span>
-                          <span>{a.name}</span>
-                        </a>
-                      ) : (
-                        <button
-                          key={a.id} className="dock-more-cell" role="menuitem"
-                          onClick={() => { setMoreOpen(false); setFocusAppId(a.id); setPage('apps'); go('closed') }}
-                        >
-                          <span className="dock-more-cell-icon">{a.icon}</span>
-                          <span>{a.name}</span>
-                        </button>
-                      )
-                    ))}
-                    <button className="dock-more-cell" role="menuitem" aria-label={needsSignIn ? 'Settings, sync is off' : 'Settings'} onClick={() => { setMoreOpen(false); setPage('settings'); go('closed') }}>
-                      <span className="dock-more-cell-icon"><Icon.Settings size={17} /><i className={`dock-alert-dot${needsSignIn ? ' is-on' : ''}`} aria-hidden="true" /></span>
-                      <span>Settings</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-            {/* Reversed so the item he actually reaches for most lands
-               closest to the FAB -- the same "closest to the corner is the
-               one he reaches for most" convention every other row here
-               already follows (see the comment above the panels array). */}
-            {!moreOpen && [...topItems].reverse().map((t) => {
+            {/* Everything sits in the open stack now, nothing behind a "More" (his ask, 2026-11-07:
+               the header was "getting out of hand", so its pages moved here, all visible). Top row:
+               Settings and his embedded apps as small circles. Then the quick panels, then the pages,
+               with the one he reaches for most closest to the button. */}
+            <div className="dock-item dock-mini" role="group" aria-label="Settings and apps">
+              <button className="dock-mini-btn" aria-label={needsSignIn ? 'Settings, sync is off' : 'Settings'} title="Settings" onClick={() => { setPage('settings'); go('closed') }}>
+                <Icon.Settings size={18} /><i className={`dock-alert-dot${needsSignIn ? ' is-on' : ''}`} aria-hidden="true" />
+              </button>
+              {APPS.filter((a) => a.id !== 'watchless').map((a) => (
+                a.external ? (
+                  <a key={a.id} className="dock-mini-btn" href={a.url} target="_blank" rel="noreferrer" aria-label={a.name} title={a.name} onClick={() => go('closed')}>{a.icon}</a>
+                ) : (
+                  <button key={a.id} className="dock-mini-btn" aria-label={a.name} title={a.name} onClick={() => { setFocusAppId(a.id); setPage('apps'); go('closed') }}>{a.icon}</button>
+                )
+              ))}
+            </div>
+            {[...ranked].reverse().map((t) => {
               const hold = holdFor[t.id]
               return (
                 <button
@@ -511,18 +461,25 @@ export function Dock() {
                   {...hold?.handlers}
                 >
                   <span className="dock-item-label">{t.label}</span>
-                  {/* The ring lives on this wrapper, not on .dock-item-avatar
-                     itself -- the avatar's own overflow:hidden (there to
-                     mask album art into the circle) was silently clipping
-                     it away, invisible in a real browser despite every
-                     computed style reading correctly. See the note on
-                     .dock-item-avatar-ring in styles.css. */}
                   <span className="dock-item-avatar-ring">
                     <span className={`dock-item-avatar dock-item-avatar--${t.id}`}>{t.chip}</span>
                   </span>
                 </button>
               )
             })}
+            {DOCK_PAGES.map((d) => (
+              <button
+                key={d.id}
+                className={`dock-item dock-item--page${page === d.id || (d.id === 'ideas' && page === 'prompts') ? ' is-current' : ''}`}
+                aria-current={page === d.id ? 'page' : undefined}
+                onClick={() => { setPage(d.id === 'ideas' ? (promptsReady ? 'prompts' : lastFace()) : d.id); go('closed') }}
+              >
+                <span className="dock-item-label">{d.label}{d.id === 'ideas' && promptsReady && <i className="dock-alert-dot is-on" aria-hidden="true" />}</span>
+                <span className="dock-item-avatar-ring">
+                  <span className="dock-item-avatar">{d.icon}</span>
+                </span>
+              </button>
+            ))}
             {focusRow}
           </div>
         )}

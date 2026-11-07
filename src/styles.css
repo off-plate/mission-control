@@ -13248,3 +13248,41 @@ button.pf-phase-head:focus-visible { outline: 2px solid var(--accent); outline-o
 /* Six tabs and the transcript button leave no room for the sync words: the dot alone (its title still says it). */
 [data-mode="business"] .syncpip .syncpip-text { display: none; }
 @media (max-width: 760px) { .biz-row .biz-main { flex-basis: 100%; } }
+
+/* ---- floating button, everything visible (2026-11-07) ----
+   The header's pages joined the stack, so the stack is taller: the top row is
+   Settings and his embedded apps as small circles, the page items use a slightly
+   smaller circle, and on a short window everything tightens so the stack never
+   reaches the header. Staggered from the button upward, closest item first. */
+.dock-mini { gap: 8px; }
+.dock-mini-btn {
+  position: relative; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--surface); border: 1px solid var(--hairline-strong); color: var(--ink);
+  box-shadow: var(--shadow-pop); cursor: pointer; padding: 0; text-decoration: none;
+  transition: border-color .15s ease, color .15s ease;
+}
+.dock-mini-btn:hover { border-color: var(--accent-text); color: var(--accent-text); }
+.dock-mini-btn svg { width: 18px; height: 18px; }
+.dock-mini-btn .dock-alert-dot { position: absolute; top: 2px; right: 2px; }
+.dock-item--page .dock-item-avatar { width: calc(var(--dock-circle) - 6px); height: calc(var(--dock-circle) - 6px); }
+.dock-item--page.is-current .dock-item-label { color: var(--accent-text); border-color: var(--accent-text); }
+.dock-item--page.is-current .dock-item-avatar { background: var(--accent-fill, var(--accent)); color: var(--accent-ink); border-color: transparent; }
+.dock-item-label .dock-alert-dot { position: static; }
+.dock-menu .dock-item:nth-last-child(1) { animation-delay: 0ms; }
+.dock-menu .dock-item:nth-last-child(2) { animation-delay: 14ms; }
+.dock-menu .dock-item:nth-last-child(3) { animation-delay: 28ms; }
+.dock-menu .dock-item:nth-last-child(4) { animation-delay: 42ms; }
+.dock-menu .dock-item:nth-last-child(5) { animation-delay: 56ms; }
+.dock-menu .dock-item:nth-last-child(6) { animation-delay: 70ms; }
+.dock-menu .dock-item:nth-last-child(7) { animation-delay: 84ms; }
+.dock-menu .dock-item:nth-last-child(8) { animation-delay: 98ms; }
+.dock-menu .dock-item:nth-last-child(9) { animation-delay: 112ms; }
+.dock-menu .dock-item:nth-last-child(10) { animation-delay: 126ms; }
+.dock-menu .dock-item:nth-last-child(11) { animation-delay: 140ms; }
+.dock-menu .dock-item:nth-last-child(12) { animation-delay: 154ms; }
+@media (max-height: 880px) {
+  .dock-menu { gap: 6px; }
+  .dock-menu .dock-item-label { padding: 6px 13px; }
+  .dock-item--page .dock-item-avatar { width: calc(var(--dock-circle) - 12px); height: calc(var(--dock-circle) - 12px); }
+  .dock-mini-btn { width: 34px; height: 34px; }
+}

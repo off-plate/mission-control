@@ -8,8 +8,8 @@
    - the app skips Claude at once when the Mac's heartbeat is stale
    - the app gives up on an unclaimed request and deletes it
    - the row is deleted after the answer is read, whatever the answer was
-   - the assistant sends only long dictations to Claude, and falls back to the
-     other brains when Claude is off, asleep or unreadable */
+   - the assistant sends EVERY request to Claude by default, and falls back to
+     the other brains when Claude is off, asleep or unreadable */
 import { build } from 'esbuild'
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
@@ -232,13 +232,15 @@ const msgs = [{ role: 'system', content: 'SYS' }, { role: 'system', content: 'BR
   assert.equal(db.tables.mc_brain.filter((r) => r.kind === 'ask').length, 0)
 }
 
-/* 14. Only long dictations are worth a Claude round, and only when switched on. */
+/* 14. Claude is the default brain: on unless he switched it off, any length. */
 const long = Array.from({ length: 70 }, (_, i) => `word${i}`).join(' ')
+delete store['mc-claude-brain']
+assert.equal(B.claudeWanted('tick groceries'), true, 'no saved choice means ON: Claude is the default')
 store['mc-claude-brain'] = '0'
 assert.equal(B.claudeWanted(long), false, 'off means off')
 store['mc-claude-brain'] = '1'
 assert.equal(B.claudeWanted(long), true)
-assert.equal(B.claudeWanted('tick groceries'), false, 'short commands stay on the instant brain')
+assert.equal(B.claudeWanted('tick groceries'), true, 'no word limit')
 store['mc-claude-model'] = 'rm -rf'
 assert.equal(B.getClaudeModel(), 'claude-haiku-5-5', 'an unknown stored model falls back to Haiku')
 
@@ -259,7 +261,7 @@ globalThis.fetch = async () => {
 store['mc-claude-model'] = 'claude-haiku-5-5'
 B.__setBrainClient({ client: db, uid: UID })
 
-/* 15. A long dictation, Mac awake: Claude answers, the backup brain is never called. */
+/* 15. A request, Mac awake: Claude answers, the backup brain is never called. */
 {
   wipe(); await D.beat(db, UID); ran.length = 0; fetched = 0
   const daemon = (async () => { await sleep(80); await D.sweep(db, UID, ok('{"say":"On it.","do":[{"kind":"add","title":"Call the dentist"}]}')) })()
@@ -292,13 +294,25 @@ B.__setBrainClient({ client: db, uid: UID })
   assert.equal(fetched, 1)
 }
 
-/* 18. A short command never touches the mailbox. */
+/* 18. A short command goes to Claude too when the Mac is awake. */
 {
-  wipe(); await D.beat(db, UID); fetched = 0
+  wipe(); await D.beat(db, UID); fetched = 0; ran.length = 0
+  const daemon = (async () => { await sleep(80); await D.sweep(db, UID, ok('{"say":"Ticked.","do":[{"kind":"done","match":"Groceries"}]}')) })()
+  const r = await A.ask('tick groceries', brief, [], hands)
+  await daemon
+  assert.equal(r.reply.say, 'Ticked.')
+  assert.equal(ran[0].kind, 'done')
+  assert.equal(fetched, 0)
+}
+
+/* 19. And a short command with the Mac asleep is answered at once by the backup. */
+{
+  wipe(); fetched = 0
+  const t0 = Date.now()
   const r = await A.ask('tick groceries', brief, [], hands)
   assert.equal(r.reply.say, 'From the backup brain.')
   assert.equal(fetched, 1)
-  assert.equal(db.tables.mc_brain.filter((r) => r.kind === 'ask').length, 0)
+  assert.ok(Date.now() - t0 < 500, 'no waiting on a sleeping Mac')
 }
 
 console.log('Claude brain mailbox: all checks passed.')

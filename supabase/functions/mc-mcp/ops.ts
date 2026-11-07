@@ -20,6 +20,20 @@
 export type Row = Record<string, any>
 export type Blob = Record<string, any>
 
+/* A cascade is the one honest reason an operation removes more than one row: deleting a person
+   removes their logged contacts, deleting a project can remove its tasks. commit.ts's safety stop
+   normally allows ONE removed row per collection; an operation that KNOWS it is cascading declares
+   exactly how many extra rows it will remove, per collection, and the stop allows that many and no
+   more. The declaration lives on a symbol, so it never reaches the saved JSON. A bug that removes
+   more than the operation declared is still stopped. */
+const ALLOW = Symbol.for('mc.allowShrink')
+export function allowShrink(b: Blob, collection: string, extra: number): void {
+  if (extra <= 0) return
+  const cur: Record<string, number> = (b as any)[ALLOW] ?? {}
+  ;(b as any)[ALLOW] = { ...cur, [collection]: (cur[collection] ?? 0) + extra }
+}
+export const shrinkAllowance = (b: Blob): Record<string, number> => (b as any)[ALLOW] ?? {}
+
 /** A refusal the person should read: ambiguous match, unknown project, a habit
  *  this connector cannot tick safely. Never a crash. */
 export class McError extends Error {}

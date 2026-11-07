@@ -310,6 +310,20 @@ const noWait = { sleep: async () => {} }
   assert.equal(empty.calls.updates, 0)
 }
 
+/* 13b. A cascade may remove exactly as many extra rows as it declares, and no more. */
+{
+  const db = fakeDb(fixture())
+  const rows = (n) => Array.from({ length: n }, (_, i) => ({ id: `c${i}` }))
+  const withRows = { ...fixture(), contacts: rows(6) }
+  const db2 = fakeDb(withRows)
+  await assert.rejects(() => M.commit(db2, 'u1', (b) => { b.contacts = b.contacts.slice(3); return { text: 'x' } }, noWait), (e) => /Safety stop: "contacts" would have shrunk from 6 to 3/.test(e.message), 'removing 3 with no declaration is stopped')
+  await M.commit(db2, 'u1', (b) => { M.allowShrink(b, 'contacts', 2); b.contacts = b.contacts.slice(3); return { text: 'x' } }, noWait)
+  assert.equal(db2.row.data.contacts.length, 3, 'removing 3 with 2 extra declared (1 is always allowed) goes through')
+  await assert.rejects(() => M.commit(db2, 'u1', (b) => { M.allowShrink(b, 'contacts', 1); b.contacts = []; return { text: 'x' } }, noWait), (e) => /Safety stop/.test(e.message), 'a bug removing more than it declared is still stopped')
+  assert.equal(db2.row.data.contacts.length, 3)
+  assert.equal(JSON.stringify(db2.row.data).includes('allow'), false, 'the declaration never reaches the saved data')
+}
+
 /* 14. THE APP'S REAL MERGE keeps what the connector did. */
 {
   const app = fixture() // what an app that has not seen the connector's write still holds

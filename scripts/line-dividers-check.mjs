@@ -60,9 +60,10 @@ for (const engine of [chromium, webkit]) {
       const kids = [...document.querySelector('.pl').children]
       const iEv = kids.findIndex((k) => k.classList.contains('pl-slot') && /Evening/.test(k.textContent))
       const iAf = kids.findIndex((k) => k.classList.contains('pl-task') && /Afternoon task/.test(k.textContent))
-      return kids.slice(iAf + 1, iEv).map((k) => k.dataset.s + '-' + k.dataset.e)
+      /* Free time already gone today is drawn without a range (it is not offered), so only count real ones. */
+      return kids.slice(iAf + 1, iEv).filter((k) => k.dataset.s).map((k) => k.dataset.s + '-' + k.dataset.e)
     })
-    assert.ok(gapsBetween.length >= 1 && gapsBetween.every((g) => Number(g.split('-')[1]) <= 18 * 60), `gap crosses 18:00: ${gapsBetween}`)
+    assert.ok(gapsBetween.every((g) => Number(g.split('-')[1]) <= 18 * 60), `gap crosses 18:00: ${gapsBetween}`)
   })
   await page.screenshot({ path: `${SHOTS}/${engine.name()}.png` })
   await step(`${engine.name()}: no console errors`, async () => assert.deepEqual(errors, []))

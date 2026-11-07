@@ -1231,6 +1231,11 @@ function useFinder() {
   }
 }
 
+/** Where a card sorts when several come at once: the day, then the days after it,
+ *  then the list, then everything else in the order it arrived. */
+const DAY_FIRST: Partial<Record<CardKind, number>> = { today: 0, planned: 1, backlog: 2 }
+export const dayRank = (k: CardKind): number => DAY_FIRST[k] ?? 3
+
 export interface Turn { who: 'you' | 'it'; text: string; reply?: Reply; done?: Done[]; touched?: string[]; /** The LOVE YOU 3000 reply: the core plays its own show. */ egg?: boolean }
 
 /** Where a turn's changes landed: the cards that hold them, in the order they
@@ -1268,7 +1273,11 @@ export function useAssistantThread() {
   /* What the right half is showing. It survives a reply that names no cards,
      because a canvas that empties itself every time he asks a plain question is
      a canvas he cannot work from. */
-  const [canvas, setCanvas] = useState<CardKind[]>(['today'])
+  const [canvas, setCanvasRaw] = useState<CardKind[]>(['today'])
+  /* The day leads. A turn that made a project and seven tasks touched both, and
+     the project list used to open first with the day below the fold, though the
+     day was what he asked about (his report, 2026-11-07). The rest keep their order. */
+  const setCanvas = (ks: CardKind[]) => setCanvasRaw([...ks].sort((a, b) => dayRank(a) - dayRank(b)))
   /** Rows the last change touched, marked on the canvas. */
   const [touched, setTouched] = useState<string[]>([])
   /* The answer as it is being written. The model emits its sentence first, so

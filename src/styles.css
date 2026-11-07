@@ -4661,7 +4661,7 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 
 /* ---- chips ---- */
 .as-chip {
-  border: 1px solid var(--hairline-strong); border-radius: 999px;
+  border: 1px solid var(--hairline-strong); border-radius: var(--r-sm);
   padding: var(--s2) var(--s4); background: none; cursor: pointer;
   font-size: var(--text-sm); color: var(--muted); white-space: nowrap;
   transition: border-color var(--t-fast), color var(--t-fast);
@@ -4751,7 +4751,13 @@ body:has(.shell.in-zone) .pomo-ambient.await { --glow: color-mix(in oklab, var(-
 }
 .as-did-undoall { font-size: var(--text-xs); padding: 2px var(--s3); }
 
-.as-next { display: flex; gap: var(--s2); flex-wrap: wrap; margin-top: var(--s3); }
+.as-next { display: flex; gap: var(--s2); flex-wrap: nowrap; overflow-x: auto; margin-top: var(--s3); scrollbar-width: none; }
+.as-next::-webkit-scrollbar { display: none; }
+/* One row, however many there are: they scroll sideways instead of stacking
+   three high. Square corners, as everywhere in this app (no pills). */
+.as-next .as-chip { flex: none; padding: 5px var(--s3); font-size: var(--text-xs); }
+/* The edge fades while there is more to reach to the right. */
+.as-next[data-more="true"] { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); }
 
 /* Thinking, and visibly so. A still page that has stopped answering looks the
    same as a page that is answering, and that is the moment he reloads. */
@@ -10483,11 +10489,22 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
    and the ceiling, so a tall or large display actually gets a bigger core;
    the thread below it still scrolls, so this never forces the ask box off
    screen. */
-.jv-stage { position: relative; flex: none; height: clamp(220px, 50dvh, 820px); cursor: grab; touch-action: none; }
+.jv-stage { position: relative; flex: none; width: 100%; height: clamp(220px, 50dvh, 820px); cursor: grab; touch-action: none; }
+/* The head holds the core and the name. Empty room: the core fills the column
+   and the name sits on its top edge. Talking: see .is-talking below. */
+.jv-head { position: relative; flex: none; }
 .jv-stage.is-drag { cursor: grabbing; }
 /* Once there is a conversation the core steps back and the thread gets the room
    (his report, 2026-10-16: "I barely can see the chat"). */
-.jv-stage.is-talking { height: clamp(160px, 26dvh, 340px); }
+/* Once he has said something the core becomes a small mark at the head of the
+   column, beside the name, and the thread gets the height. It happens once per
+   conversation, so it earns a real transition (the drawer curve, 360ms). The
+   core re-fits itself to its box as the box shrinks (a ResizeObserver). */
+.jv-stage.is-talking { width: 64px; height: 64px; }
+.jv-stage { transition: width 360ms var(--ease-drawer), height 360ms var(--ease-drawer); }
+.jv-head.is-talking { display: flex; align-items: center; gap: var(--s4); padding-top: var(--s2); }
+.jv-head.is-talking .jv-presence { position: static; transform: none; }
+@media (prefers-reduced-motion: reduce) { .jv-stage { transition: none; } }
 .jv-presence {
   position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 1;
   display: flex; align-items: baseline; gap: 12px; white-space: nowrap; pointer-events: none;
@@ -10508,18 +10525,35 @@ body:has(.topstick.is-navopen) .hg-float.is-on .hg-switch { pointer-events: none
 /* The skills, as small amber chips under the core rather than the old
    doorway's big buttons: here they are suggestions, not the whole page. */
 .jv-skills { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
-.as-page.jv .jv-skills .as-brief {
+.as-page.jv .jv-skills .as-brief, .as-page.jv .as-focus-btn {
   width: auto;
   height: 36px; padding: 0 12px; gap: 8px; border-radius: 3px; background: none; box-shadow: none;
   border: 1px solid color-mix(in srgb, var(--jv-amber) 45%, transparent); color: var(--jv-amber-text);
   font: 400 13px var(--font-body); transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), border-color 160ms ease;
 }
-.as-page.jv .jv-skills .as-brief:active { transform: scale(0.97); }
-@media (hover: hover) and (pointer: fine) { .as-page.jv .jv-skills .as-brief:hover { border-color: var(--jv-amber); background: none; color: var(--jv-amber-text); transform: none; } }
+.as-page.jv .jv-skills .as-brief:active, .as-page.jv .as-focus-btn:active { transform: scale(0.97); }
+@media (hover: hover) and (pointer: fine) { .as-page.jv .as-focus-btn:hover { border-color: var(--jv-amber); } .as-page.jv .jv-skills .as-brief:hover { border-color: var(--jv-amber); background: none; color: var(--jv-amber-text); transform: none; } }
 /* A compact ask box: one line, controls beside it, so the conversation gets
    the height. */
 .jv-ask { border-radius: 2px; padding: 10px 12px; gap: 6px; background: color-mix(in srgb, var(--surface) 85%, transparent); }
 .jv-ask .as-input { min-height: 0; padding-block: 10px 4px; }
+.as-focus-start { display: flex; gap: var(--s2); margin-bottom: var(--s4); }
+.as-focus-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+/* WHAT CHANGED lives on the right, above the day it changed. A summary line,
+   opened on demand; a change that did not apply stays open. */
+.as-act { flex: none; padding: var(--s2) var(--s5) var(--s3); border-bottom: 1px solid var(--hairline); }
+.as-act-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
+.as-act-toggle {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0;
+  border: 0; background: none; cursor: pointer; font-size: var(--text-sm); color: var(--ink); text-align: left;
+}
+.as-act-toggle svg { color: var(--muted); transition: transform 200ms var(--ease-out); }
+.as-act-toggle svg.is-open { transform: rotate(180deg); }
+.as-act-list { max-height: 260px; overflow-y: auto; margin-top: var(--s2); overscroll-behavior: contain; }
+/* In the thread, the same changes are one quiet line that points at the panel. */
+.as-act-ref { display: block; margin-top: var(--s2); padding: 2px 0; border: 0; background: none; cursor: pointer; font-size: var(--text-xs); color: var(--muted); text-align: left; }
+.as-act-ref.is-here { color: var(--ink); }
+@media (hover: hover) and (pointer: fine) { .as-act-ref:hover { color: var(--accent-text); } }
 .jv-grid .as-canvas { border-radius: 2px; background: color-mix(in srgb, var(--surface) 82%, transparent); }
 
 /* The same no-number sizing the old split page used: the shell is the

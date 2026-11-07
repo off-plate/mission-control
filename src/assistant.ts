@@ -465,7 +465,7 @@ KNOW THE DIFFERENCE
 - note adds, noteEdit replaces, noteDelete removes. Never add when he asked to change one. "Clear my head" makes tasks, not notes.
 - People circles from his words: core = family, partner, closest few. close = real close friends. friends. business = any professional tie. wider = knows and likes, rarely sees. distant = barely in touch. rel is his own words ("brother", "my accountant"). birthday MM-DD, a year is birthYear.
 - Meetings have other people in them; blocks are hours he gave himself. Plan into blocks, not around them.
-- focus starts a real timer immediately: a short "say", no debate.
+- focus starts a real timer immediately: a short "say", no debate. When he asks about focus, show focus.
 - sync is only the Hevy workout sync. "Jarvis mode" / "Iron Man mode" is the jarvis action, the app's dark HUD look.
 
 THE BUTTONS HE PRESSES

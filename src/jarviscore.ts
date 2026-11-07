@@ -657,6 +657,9 @@ export class JarvisCore {
   }
   private showFlys(items: Callout[]): void {
     this.hideFlys()
+    /* Beside the name, as the small mark it becomes once he is talking, there is
+       no room for callout labels: the shape plays without them. */
+    if (this.stage.getBoundingClientRect().width < 240) return
     const anchors = ANCHORS[this.shape] ?? []
     const NS = 'http://www.w3.org/2000/svg'
     this.flys = items.slice(0, anchors.length).map((c, i) => {
@@ -701,13 +704,15 @@ export class JarvisCore {
     this.renderer.setSize(w, h, false)
     this.camera.aspect = w / h
     /* A little below the stage's middle: the JARVIS title sits on its top edge. */
-    const sx = st.left - box.left + st.width / 2, sy = st.top - box.top + st.height / 2 + 12
+    const sx = st.left - box.left + st.width / 2, sy = st.top - box.top + st.height / 2 + (st.width < 240 ? 0 : 12)
     this.camera.setViewOffset(w, h, w / 2 - sx, h / 2 - sy, w, h)
     this.camera.updateProjectionMatrix()
     /* The rings fill about 90% of the stage's smaller side: at distance 9 and
        a 38 degree field the view is 6.2 units tall across the canvas. */
+    /* The floor is only a guard against zero: the small mark beside the name is 64px,
+       and a floor near 170px made it spill across the neighbouring column. */
     const side = Math.min(st.width, st.height)
-    this.group.scale.setScalar(Math.max(0.2, ((0.82 * side) / h) * 6.2 / (2 * 2.4)))
+    this.group.scale.setScalar(Math.max(0.02, ((0.82 * side) / h) * 6.2 / (2 * 2.4)))
   }
 
   /* ---------- look around ---------- */

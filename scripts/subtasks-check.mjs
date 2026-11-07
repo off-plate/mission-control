@@ -1,4 +1,4 @@
-/* Sub tasks on the Plan page, in the line view and the list view, on the real page and real saved state.
+/* Sub tasks on the Plan page's line view, on the real page and real saved state.
    Run after `npm run build`: node scripts/subtasks-check.mjs   Shots: /tmp/mc-sub-shots/ */
 import { chromium, webkit } from 'playwright'
 import { createServer } from 'http'
@@ -34,7 +34,7 @@ for (const engine of [chromium, webkit]) {
     const t = (id, title, at, min, extra = {}) => ({ id, title, source: 'mc', estimateMin: min, estimated: true, done: false, space: 'personal', list: 'today', plannedOn: day, at, category: 'deep', createdAt: day, addedAt: Date.now(), ...extra })
     s.tasks = [t('sb-1', 'Write the proposal', '20:00', 60), t('sb-2', 'Already has steps', '21:30', 45, { subtasks: [{ id: 'x1', title: 'Outline', estimateMin: 15, done: true }, { id: 'x2', title: 'Draft', estimateMin: 30, done: false }] })]
     s.dailySkipped = day
-    localStorage.setItem(K, JSON.stringify(s)); localStorage.setItem('mc:plan-view', 'line')
+    localStorage.setItem(K, JSON.stringify(s))
   }, { K: KEY, day })
   await page.reload(); await page.waitForTimeout(1500)
   await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => /^\s*Plan\s*$/i.test(x.textContent)); b && b.click() })
@@ -83,17 +83,13 @@ for (const engine of [chromium, webkit]) {
     await page.locator('.pl').waitFor(); await page.waitForTimeout(1200)
     assert.match(await card('Write the proposal').locator('.pf-steps').textContent(), /1 of 1 steps/)
   })
-  await step(`${tag} list view: same, open the list and add a step to a task`, async () => {
-    await page.evaluate(() => localStorage.setItem('mc:plan-view', 'list'))
-    await page.reload(); await page.waitForTimeout(1500)
-    await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => /^\s*Plan\s*$/i.test(x.textContent)); b && b.click() })
-    await page.waitForTimeout(1500)
-    const row = page.locator('.today-item', { hasText: 'Already has steps' })
-    await row.locator('.pf-steps').click()
-    await row.locator('.step-add-title').fill('Review'); await page.keyboard.press('Enter'); await page.waitForTimeout(500)
+  await step(`${tag} line: a task that already has steps takes another, the total follows`, async () => {
+    const c = card('Already has steps')
+    await c.locator('.pf-steps').click()
+    await c.locator('.step-add-title').fill('Review'); await page.keyboard.press('Enter'); await page.waitForTimeout(500)
     const t = (await blob()).find((x) => x.id === 'sb-2')
     assert.equal(t.subtasks.length, 3); assert.equal(t.estimateMin, 60)
-    await page.screenshot({ path: `${SHOTS}/${tag}-list-open.png` })
+    await page.screenshot({ path: `${SHOTS}/${tag}-line-second.png` })
   })
   await step(`${tag}: no console errors`, async () => assert.deepEqual(errors, []))
   await b.close()

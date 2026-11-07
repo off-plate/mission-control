@@ -1285,7 +1285,6 @@ A.editDone = () => { EDIT = false; $('#home').classList.remove('editing'); R.doc
 addRec({
   long(st) {
     if (st.target.closest('.dock .qa')) return { end() { open('jarvis'); } };
-    if (st.target.closest('.dock [data-x="plan"]')) { pvMenu(true); return { end() { } }; }
     if (top_().id !== 'home' || CC.open || $('.sheet.on')) return null;
     if (!st.target.closest('#home') || st.target.closest('.editbar,.htop')) return null;
     const tile = st.target.closest('.w');
@@ -1903,15 +1902,7 @@ V.plan = {
       <button class="kb ${pf ? 'ink' : ''}" data-a="planFilter" aria-label="Project filter">${ico('folder')}</button><button class="kb" data-a="openDaily" aria-label="Yesterday">${ico('sunrise')}</button></div>`;
     let body = '';
     if (seg === 'day') {
-      const open_ = S.tasks.filter(t => t.list === 'today' && t.day === day && !t.done && inSp(t, sp) && inP(t)).sort((x, y) => x.order - y.order);
-      const uns = open_.filter(t => !t.slot);
-      const routinesOnDay = day === 0 ? S.routines.filter(r => inSp(r, sp) && r.daypart && routineDone(r) > 0 && routineDone(r) < r.steps.length) : [];
-      if (planView() === 'line') body = dayStrip('planDay', sp) + `<div data-dayswipe="planDay" ${dayAnim()}>` + lineHtml(sp, day, inP) + '</div>' + lineTray(sp, day);
-      else body = dayStrip('planDay', sp) + `<div data-dayswipe="planDay" ${dayAnim()}>` +
-        (uns.length ? bucket({ id: 'uns', label: 'Unsorted', hours: 'no time yet', capMin: 0 }, uns, sp, day) : '') +
-        MC.slots.map(sl => bucket(sl, open_.filter(t => t.slot === sl.id), sp, day, routinesOnDay.filter(r => r.daypart === sl.id))).join('') +
-        (() => { const dn = S.tasks.filter(t => t.done && t.day === day && t.list === 'today' && inSp(t, sp) && inP(t)); return dn.length ? `<div class="sl">Done ${day === 0 ? 'today' : ''}<b>${dn.length}</b></div><div class="cd tight rows">${dn.map(t => taskRow(t)).join('')}</div>` : ''; })() +
-        (!open_.length ? `<div class="empty">Nothing planned for ${dayShort(day).toLowerCase()}. Use a task's Plan menu to put it into a time of day.</div>` : '') + '</div>';
+      body = dayStrip('planDay', sp) + `<div data-dayswipe="planDay" ${dayAnim()}>` + lineHtml(sp, day, inP) + '</div>' + lineTray(sp, day);
     } else {
       const sort = S.ui.todoSort || 'Newest';
       let rows = backlog(sp).filter(inP);
@@ -1928,48 +1919,21 @@ V.plan = {
   },
   after(el, a, fresh) {
     S.ui.dayDir = 0;
-    if (S.ui.flash) { const r = $(`.sw[data-id="${S.ui.flash}"]`, el); if (r) { S.ui.flash = null; setTimeout(() => { r.scrollIntoView({ block: 'center', behavior: RM ? 'auto' : 'smooth' }); r.classList.remove('flash'); void r.offsetWidth; r.classList.add('flash'); }, 60); } }
+    if (S.ui.flash) { const r = $(`.ln-task[data-id="${S.ui.flash}"], .sw[data-id="${S.ui.flash}"]`, el); if (r) { S.ui.flash = null; setTimeout(() => { r.scrollIntoView({ block: 'center', behavior: RM ? 'auto' : 'smooth' }); r.classList.remove('flash'); void r.offsetWidth; r.classList.add('flash'); }, 60); } }
     if (S.ui.focusNew) { S.ui.focusNew = 0; setTimeout(() => { const f = $('#newtask', el); f && f.focus(); }, 300); }
   }
 };
-function bucket(sl, tasks, sp, day, rts = []) {
-  const m = tasks.reduce((a, t) => a + t.est, 0), over = sl.capMin && m > sl.capMin;
-  const shut = S.ui['shut' + sl.id];
-  const nowSl = day === 0 && phaseOf().toLowerCase() === sl.id;
-  return `<div class="bk"><button class="bkh ${nowSl ? 'now' : ''}" data-a="bkToggle" data-x="${sl.id}"><span class="lb fg">${shut ? '▸' : '▾'} ${sl.label}</span><span class="lb">${sl.hours}</span><span class="grow"></span><span class="lb ${over ? 'red' : 'fg'}">${sl.capMin ? (over ? `${fmtMin(m)} OF ${fmtMin(sl.capMin)}, ${fmtMin(m - sl.capMin)} OVER` : `${fmtMin(m)} OF ${fmtMin(sl.capMin)}`) : tasks.length + ' tasks'}</span></button>
-  ${sl.capMin ? `<div style="margin:0 2px 8px">${drow(sl.capMin / 15, Math.min(sl.capMin / 15, Math.ceil(m / 15)), { gap: 7.4, r: 2.2, over: over ? Math.ceil((m - sl.capMin) / 15) : 0, k: 'bk' + sl.id + day + sp })}</div>` : ''}
-  ${shut ? `<div class="lb" style="margin:0 4px 10px">${tasks.length} left</div>` : `<div class="cd tight rows">${tasks.map(t => taskRow(t, { reorder: 'slot-' + sl.id, play: true })).join('')}${rts.map(r => `<button class="row" style="width:100%" data-a="openRunner" data-x="${r.id}">${dring({ n: 12, on: routineDone(r) / r.steps.length * 12, size: 28, r: 1.5, pad: 2, cls: '' })}<span class="grow rt one">${esc(r.title)}</span><span class="lb">Routine ${routineDone(r)}/${r.steps.length}</span></button>`).join('')}${!tasks.length && !rts.length ? '<div class="empty" style="padding:14px">Nothing here yet.</div>' : ''}</div>`}</div>`;
-}
 A.bkToggle = (el, id) => { S.ui['shut' + id] = !S.ui['shut' + id]; refresh(); };
 
 /* ---------------- THE LINE (2026-11-05) ----------------
    Plan's second view, the day hour by hour, his pick over a separate page or a
    widget. The arithmetic is shared with the desktop (src/line.ts). Hold Plan in
-   the dock to choose List or Line; the dock wears the one Plan opens in, and it
-   is remembered on this phone. A task is one dot per quarter hour on the rail;
+   the dock. A task is one dot per quarter hour on the rail;
    the one running now is a black tile with its passed quarters in red. Hold a
    task to lift it and drag it; to-dos wait in a tray above the dock: tap one
    and every free stretch it fits shows a red Put here, or hold it and drag. */
-function planView() {
-  if (!S.ui.planView) { try { S.ui.planView = localStorage.getItem('mc:plan-view') === 'line' ? 'line' : 'list'; } catch (e) { S.ui.planView = 'list'; } }
-  return S.ui.planView;
-}
-function pvMenu(on) {
-  let m = $('#pvm', APP);
-  if (!on) { if (m) { m.classList.remove('on'); setTimeout(() => m && m.remove(), 260); } return; }
-  if (m) m.remove();
-  const cur = planView();
-  m = document.createElement('div'); m.id = 'pvm';
-  m.innerHTML = `<div class="pvm-scrim" data-a="pvClose"></div><div class="pvm-box" role="menu" aria-label="Plan opens in">${lb('Plan opens in')}${[['list', 'List', 'plan'], ['line', 'Line', 'line']].map(([v, l, i]) => `<button class="pvm-o ${cur === v ? 'on' : ''}" role="menuitemradio" aria-checked="${cur === v}" data-a="pvPick" data-x="${v}"><span class="pvm-pv">${ico(i)}</span><span class="pvm-n">${l}</span><span class="pvm-ok">${ico('check')}</span></button>`).join('')}</div>`;
-  APP.appendChild(m); requestAnimationFrame(() => m.classList.add('on'));
-}
-A.pvClose = () => pvMenu(false);
-A.pvPick = (el, v) => {
-  S.ui.planView = v; try { localStorage.setItem('mc:plan-view', v); } catch (e) { }
-  pvMenu(false); S.ui.planSeg = 'day'; S.ui.lnArm = null;
-  if (top_().id === 'plan' && STACK.length === 1) refresh(); else tab('plan');
-  R.dock(); toast(v === 'line' ? 'Plan opens in Line' : 'Plan opens in List');
-};
+/* The Line is the only Plan view (2026-11-07), so there is nothing to choose and nothing to remember. */
+function planView() { return 'line'; }
 function lineItems(sp, day, inP) {
   const list = S.tasks.filter(t => t.list === 'today' && t.day === day && inSp(t, sp) && inP(t)).map(t => ({ id: t.id, at: t.at || null, slot: t.slot, done: t.done, min: t.est || 0, t }));
   return layoutDay(list, day === 0 ? Math.floor(minsOfDay(NOW())) : null);

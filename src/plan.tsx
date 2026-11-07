@@ -803,17 +803,8 @@ export function PlanPage() {
   }, [])
   const coarse = useCoarsePointer()
   const phone = usePhone()
-  /* LIST OR LINE (2026-11-05). The Line is the day hour by hour; List is the
-     four parts of the day. Plan opens in whichever he used last, every time,
-     on this device: a view he set, not data, so it stays out of the sync. */
-  const [planView, setPlanView] = useState<'list' | 'line'>(() => {
-    try { return localStorage.getItem('mc:plan-view') === 'line' ? 'line' : 'list' } catch { return 'list' }
-  })
-  const pickView = (v: 'list' | 'line') => {
-    setPlanView(v)
-    try { localStorage.setItem('mc:plan-view', v) } catch { /* private mode */ }
-  }
-  const showLine = planView === 'line' && !phone
+  /* The Line is the only Plan view (his call, 2026-11-07: "fully remove the list view, we are keeping the line only").
+     It draws on a phone too now. The to-do list beside it stays. */
   const planDay = dayPlus(dayOffset)
   const onDay = (t: Task) => t.list === 'today' && (t.plannedOn ?? localDateKey()) === planDay
   const todayAll = spaceTasks.filter(onDay)                      // the day incl. finished (they stay, struck)
@@ -1331,62 +1322,6 @@ export function PlanPage() {
     )
   }
   const openSteps = (id: string) => setExpanded((p) => new Set(p).add(id))
-  const dayRow = (t: Task) => {
-    const isExp = expanded.has(t.id)
-    const hasSubs = !!t.subtasks?.length
-    const doneSubs = t.subtasks?.filter((s) => s.done).length ?? 0
-    return (
-      <div className="today-item" key={t.id} data-task-id={t.id}>
-        <div
-          className={`today-task${t.done ? ' done' : ''}${flashId === t.id ? ' flash' : ''}${hueFor(t) ? ' has-hue' : ''}`}
-          style={hueStyle(t)}
-          draggable={!t.done}
-          onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move' }}
-        >
-          <span className="drag-grip" aria-hidden="true"><Icon.Grip /></span>
-          <button
-            className="checkbox" role="checkbox" aria-checked={t.done}
-            aria-label={t.done ? `Reopen: ${t.title}` : `Complete: ${t.title}`}
-            onClick={() => { if (t.done) { toggleTask(t.id); return } setLogging(t.id) }}
-          >
-            <Icon.Check size={12} strokeWidth={4} />
-          </button>
-          <SpaceMark space={t.space} />
-          <span className="grow pf-rt">
-            <span className={`wrap2${openTitles.has(t.id) ? ' is-open' : ''}`} onClick={(e) => toggleTitle(e, t.id)}>
-              <Linkify text={t.title} />{t === nextUp && <span className="pf-is-next">Next up</span>}
-            </span>
-            {(markOf(t) || goalOf(t) || hasSubs) && (
-              <span className="pf-meta">
-                <TagMark project={markOf(t)} onPick={pickTag} />
-                {goalTag(t)}
-                {hasSubs && (
-                  <button className="pf-steps" aria-expanded={isExp} aria-label={isExp ? 'Hide steps' : 'Show steps'} onClick={() => toggleExp(t.id)}>
-                    {doneSubs} of {t.subtasks!.length} steps <Icon.ChevronDown size={12} />
-                  </button>
-                )}
-              </span>
-            )}
-          </span>
-          <span className="pf-c-est">
-            {t.done && t.actualMin != null ? (
-              <span className="est-vs-actual mono">{fmtDuration(taskMinutes(t))} → {fmtDuration(t.actualMin)}</span>
-            ) : (
-              <EstimateChip task={t} />
-            )}
-          </span>
-          <span className="pf-c-acts">
-            {!t.done && <TaskActions task={t} onFocus={() => startFocus(taskMinutes(t), t.title)} />}
-          </span>
-          {dayMenu(t)}
-        </div>
-        {logging === t.id && (
-          <ActualLog est={taskMinutes(t)} tracked={trackedFor(t.title)} onLog={(m) => { logActual(t.id, m); setLogging(null) }} onSkip={() => { toggleTask(t.id); setLogging(null) }} />
-        )}
-        {isExp && subList(t)}
-      </div>
-    )
-  }
   const poolRow = (t: Task) => {
     const isExp = expanded.has(t.id)
     const hasSubs = !!t.subtasks?.length
@@ -1467,10 +1402,6 @@ export function PlanPage() {
         title={<WorkspaceTitle before="Plan" after={longDay(planDay)} />}
         actions={(
           <span className="plan-actions">
-            <span className="pl-vsw hide-phone" role="group" aria-label="Plan view">
-              <button aria-pressed={planView === 'list'} onClick={() => pickView('list')}><Icon.List size={15} /> List</button>
-              <button aria-pressed={planView === 'line'} onClick={() => pickView('line')}><Icon.Clock size={15} /> Line</button>
-            </span>
             <ProjectFilter projects={stripProjects} tasks={tasks} sel={sel} inScope={(t) => inView(t.space)}
               onAll={() => setPicked([])} onPick={pickProject} onManage={() => setPage('projects')} />
             <PhoneProjectFilter
@@ -1625,98 +1556,33 @@ export function PlanPage() {
               phase is one quiet line that opens up while a task is dragged over
               it, so it stays a place to drop without taking room. Every phase
               with something in it folds, the Next up task included, marked. */}
-          {showLine ? (
-            <PlanLine
-              day={todayAll}
-              all={tasks}
-              isToday={dayOffset === 0}
-              hueStyle={hueStyle}
-              tag={(t) => <TagMark project={markOf(t)} onPick={pickTag} />}
-              menu={dayMenu}
-              check={(t) => { if (t.done) { toggleTask(t.id); return } setLogging(t.id) }}
-              log={(t) => (logging === t.id ? (
-                <div className="pl-log"><ActualLog est={taskMinutes(t)} tracked={trackedFor(t.title)} onLog={(m) => { logActual(t.id, m); setLogging(null) }} onSkip={() => { toggleTask(t.id); setLogging(null) }} /></div>
-              ) : null)}
-              focus={(t) => () => startFocus(taskMinutes(t), t.title)}
-              steps={(t) => (expanded.has(t.id) ? subList(t) : null)}
-              stepsToggle={stepsToggle}
-              flashId={flashId}
-              onPlace={(id, writes) => {
-                const t = tasks.find((x) => x.id === id)
-                if (!t) return
-                if (!onDay(t)) moveTaskList(id, 'today', planDay)
-                writes.forEach((w) => setTaskAt(w.id, w.at))
-              }}
-              onAdd={(title, at) => {
-                const got = takeTag(title, projects)
-                const proj = got.project ?? (newProjectId ? projects.find((p) => p.id === newProjectId) : undefined)
-                addTask({ title: got.title || title, source: 'mc', estimateMin: 0, space: proj?.space ?? addSpace, list: 'today', plannedOn: planDay, at, slot: slotForTime(at), category: 'quick', projectId: proj?.id })
-              }}
-            />
-          ) : (
-          <div className="pf-list">
-            {BUCKETS.map((b) => {
-              const inPhase = (t: Task) => (t.slot ?? 'unsorted') === b.id
-              const open = dayRest.filter(inPhase)
-              const fin = dayDone.filter(inPhase)
-              const rts = b.id === 'unsorted' ? [] : dueRoutines.filter((r) => routineSlot(r) === b.id)
-              const rOpen = rts.filter((r) => !rDone(r))
-              const rFin = rts.filter(rDone)
-              const count = open.length + fin.length + rts.length + (nextUp && inPhase(nextUp) ? 1 : 0)
-              if (b.id === 'unsorted' && count === 0) return null
-              const tot = todayAll.filter((t) => !t.done && inPhase(t)).reduce((a, t) => a + taskMinutes(t), 0)
-              const cap = b.id === 'unsorted' ? 0 : slotMinutes(b.id as TimeSlot)
-              const over = cap > 0 ? tot - cap : 0
-              const shut = shutSlots.has(b.id)
-              const left = open.length + rOpen.length + (nextUp && inPhase(nextUp) ? 1 : 0)
-              const name = b.id === 'unsorted' ? 'Anytime' : b.label
-              /* What the part of the day holds, drawn instead of counted: a bar
-                 sized to its hours, one segment per task in its project colour. */
-              const scale = Math.max(cap, tot) || 1
-              const segs = todayAll.filter((t) => !t.done && inPhase(t))
-              const head = (
-                <>
-                  <span className="pf-phase-name">{name}{BUCKET_HINT[b.id] && <em>{BUCKET_HINT[b.id]}</em>}</span>
-                  {count > 0 && (cap > 0 || tot > 0) ? (
-                    <span className="pf-phase-bar" aria-hidden="true">
-                      {segs.map((t) => <i key={t.id} style={{ width: `${(taskMinutes(t) / scale) * 100}%`, ...(hueFor(t) ? { background: hueFor(t)!.h } : {}) }} />)}
-                    </span>
-                  ) : <span />}
-                  <span className={`pf-phase-tot${over > 0 ? ' is-over' : cap > 0 && count > 0 ? ' is-free' : ''}`}>
-                    {count === 0 ? 'Drop a task here'
-                      : `${shut && left ? `${left} left, ` : ''}${over > 0 ? `${fmtDuration(over)} over` : cap > 0 ? (tot < cap ? `${fmtDuration(cap - tot)} free` : 'full') : fmtDuration(tot)}`}
-                  </span>
-                </>
-              )
-              return (
-                <section
-                  key={b.id}
-                  className={`pf-phase${count === 0 ? ' is-empty' : ''}${shut ? ' is-shut' : ''}${dropKey === b.id ? ' drop-over' : ''}`}
-                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDropKey(b.id); if (shut) setShut(b.id, false) }}
-                  onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropKey((k) => (k === b.id ? null : k)) }}
-                  onDrop={(e) => { e.preventDefault(); e.stopPropagation(); const id = e.dataTransfer.getData('text/plain'); if (id) dropTo(b.id, id); setDropKey(null) }}
-                >
-                  {count === 0 ? <div className="pf-phase-head">{head}</div> : (
-                    <button className="pf-phase-head" aria-expanded={!shut} aria-controls={`pf-ph-${b.id}`} onClick={() => setShut(b.id, !shut)}>
-                      <Icon.ChevronDown size={14} className="pf-phase-chev" />
-                      {head}
-                    </button>
-                  )}
-                  {count > 0 && (
-                    <div className="pf-phase-body" id={`pf-ph-${b.id}`} {...({ inert: shut ? '' : undefined } as object)}>
-                      <div className="pf-phase-rows">
-                        {dayOpen.filter(inPhase).map(dayRow)}
-                        {rOpen.map((r) => <RoutineOnDay key={r.id} routine={r} day={planDay} />)}
-                        {fin.map(dayRow)}
-                        {rFin.map((r) => <RoutineOnDay key={r.id} routine={r} day={planDay} />)}
-                      </div>
-                    </div>
-                  )}
-                </section>
-              )
-            })}
-          </div>
-          )}
+          <PlanLine
+            day={todayAll}
+            all={tasks}
+            isToday={dayOffset === 0}
+            hueStyle={hueStyle}
+            tag={(t) => <TagMark project={markOf(t)} onPick={pickTag} />}
+            menu={dayMenu}
+            check={(t) => { if (t.done) { toggleTask(t.id); return } setLogging(t.id) }}
+            log={(t) => (logging === t.id ? (
+              <div className="pl-log"><ActualLog est={taskMinutes(t)} tracked={trackedFor(t.title)} onLog={(m) => { logActual(t.id, m); setLogging(null) }} onSkip={() => { toggleTask(t.id); setLogging(null) }} /></div>
+            ) : null)}
+            focus={(t) => () => startFocus(taskMinutes(t), t.title)}
+            steps={(t) => (expanded.has(t.id) ? subList(t) : null)}
+            stepsToggle={stepsToggle}
+            flashId={flashId}
+            onPlace={(id, writes) => {
+              const t = tasks.find((x) => x.id === id)
+              if (!t) return
+              if (!onDay(t)) moveTaskList(id, 'today', planDay)
+              writes.forEach((w) => setTaskAt(w.id, w.at))
+            }}
+            onAdd={(title, at) => {
+              const got = takeTag(title, projects)
+              const proj = got.project ?? (newProjectId ? projects.find((p) => p.id === newProjectId) : undefined)
+              addTask({ title: got.title || title, source: 'mc', estimateMin: 0, space: proj?.space ?? addSpace, list: 'today', plannedOn: planDay, at, slot: slotForTime(at), category: 'quick', projectId: proj?.id })
+            }}
+          />
         </main>
 
         {/* RIGHT: the pool. Search it, add to it, send from it. */}

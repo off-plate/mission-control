@@ -35,11 +35,16 @@ for (const engine of [chromium, webkit]) {
     const t = (id, title, at, min) => ({ id, title, source: 'mc', estimateMin: min, estimated: true, done: false, space: 'personal', list: 'today', plannedOn: day, at, category: 'deep', createdAt: day, addedAt: Date.now() })
     s.tasks = [t('ln-1', 'Morning task', '08:00', 30), t('ln-2', 'Noon task', '13:30', 60), t('ln-3', 'Afternoon task', '15:00', 30), t('ln-4', 'Evening task', '19:00', 20)]
     s.dailySkipped = day
-    localStorage.setItem(K, JSON.stringify(s)); localStorage.setItem('mc:plan-view', 'line')
+    localStorage.setItem(K, JSON.stringify(s))
   }, { K: KEY, day })
   await page.reload(); await page.waitForTimeout(1500)
   await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => /^\s*Plan\s*$/i.test(x.textContent)); b && b.click() })
   await page.locator('.pl').waitFor(); await page.waitForTimeout(1500)
+  await step(`${engine.name()}: the Line is the only Plan view, no List switch anywhere`, async () => {
+    assert.equal(await page.locator('.pl-vsw').count(), 0, 'view switch still there')
+    assert.equal(await page.locator('.pf-list').count(), 0, 'list view still drawn')
+    assert.equal(await page.getByRole('button', { name: /^List$/ }).count(), 0, 'a List button is still on the page')
+  })
   await step(`${engine.name()}: one divider per part of the day, in order`, async () => {
     const labels = await page.locator('.pl-slot b').allTextContents()
     assert.deepEqual(labels, ['Morning', 'Noon', 'Afternoon', 'Evening'], `got ${labels}`)

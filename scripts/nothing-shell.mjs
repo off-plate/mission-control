@@ -869,7 +869,9 @@ await step('open a widget, then close it', async () => {
 
 await step('Plan: swipe to complete, How long, the real task is done', async () => {
   await tap('#dock [data-x="plan"]'); await wait(300)
-  await drag('.sw[data-id="ns-1"] .sw-fg', 170)
+  /* Plan is the Line only (2026-11-07): a task is finished with the tick on its tile, no swipe. */
+  await page.locator('.ln-task[data-id="ns-1"]').evaluate((e) => e.scrollIntoView({ block: 'center' })); await wait(300)
+  await tap('.ln-task[data-id="ns-1"] [data-a="taskCk"]'); await wait(500)
   await page.screenshot({ path: `${SHOTS}/light-howlong.png` })
   await tap('.sheet.on [data-a="logActual"]')
   await wait(1500)
@@ -879,9 +881,9 @@ await step('Plan: swipe to complete, How long, the real task is done', async () 
 
 await step('Plan: delete, then undo, restores the real task', async () => {
   await page.locator('#toast [data-a="toastX"]').click().catch(() => {}); await wait(300)
-  await page.locator('.sw[data-id="ns-2"]').evaluate((e) => e.scrollIntoView({ block: 'center' })); await wait(300)
-  await drag('.sw[data-id="ns-2"] .sw-fg', -170)
-  await tap('.sw[data-id="ns-2"] [data-a="taskDel"]'); await wait(1300)
+  await page.locator('.ln-task[data-id="ns-2"]').evaluate((e) => e.scrollIntoView({ block: 'center' })); await wait(300)
+  await tap('.ln-task[data-id="ns-2"] [data-a="taskMenu"]')
+  await tap('.sheet.on [data-a="taskDelM"]'); await wait(1300)
   if ((await blob()).tasks.some((x) => x.id === 'ns-2')) throw new Error('not deleted in the store')
   await tap('#toast [data-a="undo"]'); await wait(1300)
   if (!(await blob()).tasks.some((x) => x.id === 'ns-2')) throw new Error('undo did not restore it')
@@ -889,7 +891,8 @@ await step('Plan: delete, then undo, restores the real task', async () => {
 
 await step('Plan: tap a task, its detail sheet opens', async () => {
   await page.locator('#toast [data-a="toastX"]').click().catch(() => {})
-  await tap('.sw[data-id="ns-2"] [data-a="taskMenu"]')
+  await page.locator('.ln-task[data-id="ns-2"]').evaluate((e) => e.scrollIntoView({ block: 'center' })); await wait(300)
+  await tap('.ln-task[data-id="ns-2"] [data-a="taskMenu"]')
   if (!(await page.locator('.sheet.on [data-a="taskDelM"]').count())) throw new Error('no task sheet')
   await page.screenshot({ path: `${SHOTS}/light-taskmenu.png` })
   /* every tap shows at once, and the current project and all three spaces stay in their rows */
@@ -934,7 +937,7 @@ await step('add button: a task goes into the real store', async () => {
   if (!(await page.locator('section.view.on[data-view="plan"]').count())) throw new Error('See it did not open Plan')
   const pill = await page.locator('section.view.on .dpill').evaluateAll((ps) => ps.findIndex((p) => p.classList.contains('on')))
   if (pill !== 1) throw new Error(`day pill ${pill} selected, want tomorrow`)
-  const row = page.locator(`section.view.on .sw[data-id="${t2.id}"]`)
+  const row = page.locator(`section.view.on .ln-task[data-id="${t2.id}"]`)
   if (!(await row.count())) throw new Error('the task row is not on screen (slot shut or wrong filter)')
   const vis = await row.evaluate((r) => { const b = r.getBoundingClientRect(); return b.top >= 0 && b.bottom <= innerHeight })
   if (!vis || !(await row.evaluate((r) => r.classList.contains('flash')))) throw new Error(`row visible ${vis}, flashed ${await row.evaluate((r) => r.classList.contains('flash'))}`)

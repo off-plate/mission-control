@@ -7,7 +7,7 @@ import assert from 'assert/strict'
 import { loadKit } from './mcp-test-kit.mjs'
 import { readFileSync } from 'fs'
 
-const MODULES = ['tools-core.ts', 'tools-goals.ts', 'tools-people.ts', 'tools-money.ts', 'tools-planning.ts', 'tools-library.ts', 'tools-focus.ts', 'tools-growth.ts']
+const MODULES = ['tools-core.ts', 'tools-goals.ts', 'tools-people.ts', 'tools-money.ts', 'tools-planning.ts', 'tools-library.ts', 'tools-focus.ts', 'tools-growth.ts', 'tools-tasks.ts']
 const present = MODULES.filter((m) => { try { readFileSync(new URL(`../supabase/functions/mc-mcp/${m}`, import.meta.url)); return true } catch { return false } })
 const K = await loadKit({ modules: present })
 const { M, fixture, stateDb, fakeDb, fakeServer } = K

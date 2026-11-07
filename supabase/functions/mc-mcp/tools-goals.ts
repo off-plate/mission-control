@@ -1,13 +1,9 @@
 /* Goals, and the task <-> goal bridge. Every tool is a port of what the app (or its in-app assistant)
    does; the file and function are named in ops-goals.ts.
 
-   NOT supported (the descriptions say so, so Claude does not promise it):
-   - changing a goal's timeframe (the app leaves its period behind), editing or adding milestones
-     after creation, a deadline, colour or icon, tying a goal to a habit
-   - setting a number on a goal that counts itself from a habit, or on one measured in its milestones
-   - the app also CLOSES a goal when its period has ended; that happens when the app is opened and
-     is not done from here
-   - deleting a project together with more than one task (the writer's safety stop) */
+   NOT supported (the descriptions say so, so Claude does not promise it): a goal's colour or icon (no page of the
+   app sets them), a number set by hand on a goal that counts itself from a habit or is measured in its
+   milestones (derived), changing a finished goal's period, habit or milestones (history). */
 import * as g from './ops-goals.ts'
 import type { Reg } from './reg.ts'
 
@@ -16,7 +12,7 @@ export function register(r: Reg): void {
   const { space, ref } = s
   const tf = z.enum(['weekly', 'monthly', 'quarter', 'half'])
   const cat = z.enum(['money', 'health', 'life', 'work', 'offplate', 'habits'])
-  const goalRef = { id: ref.id, title: z.string().optional().describe('Part of the goal name, if no id. Must match exactly one open goal.') }
+  const goalRef = { id: ref.id, title: z.string().optional().describe('Part of the goal name, if no id. Must match exactly one goal (a running goal is preferred over a finished one of the same name).') }
   const projRef = { id: ref.id, name: z.string().optional().describe('Part of the project name, if no id. Must match exactly one project.') }
   const projOf = (i: any) => ({ id: i.id, title: i.name })
 
@@ -31,17 +27,24 @@ export function register(r: Reg): void {
   /* ---------------- goals ---------------- */
   r.tool('add_goal', {
     title: 'Add a goal',
-    description: 'Create a goal for the CURRENT period of its timeframe (default monthly): either a target number with a unit (target 40000, unit "CZK") or a checklist of milestones (then the target is their count and the unit "milestones"). Category defaults to life, space to personal. A goal is a specific outcome, not an activity. Refuses a duplicate open goal of the same name and period unless allow_duplicate is true. Not supported here: deadline, colour, icon, tying it to a habit.',
-    inputSchema: z.object({ name: z.string().max(200), target: z.number().min(1).max(1e7).optional(), unit: z.string().max(40).optional(), timeframe: tf.optional(), category: cat.optional(), why: z.string().max(300).optional().describe('Why it matters'), space: space.optional(), milestones: z.array(z.string().max(200)).max(30).optional(), allow_duplicate: z.boolean().optional() }),
+    description: 'Create a goal for the CURRENT period of its timeframe (default monthly), or for another period with period_key (like 2026-W46, 2026-12, 2026-Q4, 2026-H2) to plan ahead. Either a target number with a unit (target 40000, unit "CZK"), a checklist of milestones (then the target is their count and the unit "milestones"), or counted from one of his habits (habit: name or id; it counts itself from the habit\'s check-offs or focus time, so give a target and no unit or milestones; the name defaults to the habit\'s). Optional: why, deadline (free text such as "End of July"), category (default life), space (default personal, or the habit\'s). Refuses a duplicate open goal of the same name and period unless allow_duplicate is true. Not settable anywhere in the app, so not here: colour, icon.',
+    inputSchema: z.object({ name: z.string().max(200).optional(), target: z.number().min(1).max(1e7).optional(), unit: z.string().max(40).optional(), timeframe: tf.optional(), category: cat.optional(), why: z.string().max(300).optional().describe('Why it matters'), deadline: z.string().max(100).optional(), space: space.optional(), milestones: z.array(z.string().max(200)).max(30).optional(), habit: z.string().optional().describe('A habit (id or part of its name) the goal counts itself from'), period_key: z.string().optional(), allow_duplicate: z.boolean().optional() }),
     annotations: ann.W,
-  }, ({ allow_duplicate, ...i }) => write((b) => g.addGoal(b, { ...i, allowDuplicate: allow_duplicate })))
+  }, ({ allow_duplicate, period_key, ...i }) => write((b) => g.addGoal(b, { ...i, periodKey: period_key, allowDuplicate: allow_duplicate })))
 
   r.tool('edit_goal', {
     title: 'Change a goal',
-    description: 'Change the name, target, unit or why of an open goal. Only the fields you pass change. A finished (closed) goal is history and is refused. The timeframe cannot be changed (the goal is bound to its period): make a new goal instead. A goal measured in its milestones keeps its target equal to their count.',
-    inputSchema: z.object({ ...goalRef, name: z.string().max(200).optional(), target: z.number().min(1).max(1e7).optional(), unit: z.string().max(40).optional(), why: z.string().max(300).optional() }),
+    description: 'Change anything the Goals page\'s edit sheet changes. Only the fields you pass change: name, target, unit, why and deadline (empty string clears), category, timeframe, milestones, habit. timeframe moves the goal to the period RUNNING NOW for the new timeframe (as saving the sheet does; the logged entries and the number are kept, the period key changes); move_to_current_period: true does the same without changing the timeframe. milestones is the FULL list of labels the goal should have (a label that stays keeps its tick; the target becomes their count). habit (name or id) makes it count itself from that habit; habit: null goes back to logging by hand and keeps the number it showed. A finished goal can still have its name, target, unit, why, deadline and category corrected, but not its period, habit or milestones (use repeat_goal to run it again). A goal measured in its milestones keeps target = their count.',
+    inputSchema: z.object({ ...goalRef, name: z.string().max(200).optional(), target: z.number().min(1).max(1e7).optional(), unit: z.string().max(40).optional(), why: z.string().max(300).nullable().optional(), deadline: z.string().max(100).nullable().optional(), category: cat.optional(), timeframe: tf.optional(), milestones: z.array(z.string().max(200)).max(30).optional(), habit: z.string().nullable().optional(), move_to_current_period: z.boolean().optional() }),
     annotations: ann.WI,
-  }, ({ id, title, ...p }) => write((b) => g.editGoal(b, { id, title }, p)))
+  }, ({ id, title, move_to_current_period, ...p }) => write((b) => g.editGoal(b, { id, title }, { ...p, moveToCurrentPeriod: move_to_current_period })))
+
+  r.tool('close_ended_goals', {
+    title: 'Close goals whose period has ended',
+    description: 'What the app does by itself every time it is opened: every running goal whose period is over is closed and keeps the number it finished on (counted from its habit over its own period when it has one); a finished goal that counts itself from a habit is renewed for the period running now. Nothing is deleted. list_goals shows which goals are "ended" but not yet closed. Safe to repeat.',
+    inputSchema: z.object({}),
+    annotations: ann.WI,
+  }, () => write((b) => g.closeEndedGoals(b)))
 
   r.tool('set_goal_progress', {
     title: 'Move a goal\'s number',
@@ -88,7 +91,7 @@ export function register(r: Reg): void {
   /* ---------------- task <-> goal ---------------- */
   r.tool('set_task_goal', {
     title: 'Make a task count toward a goal',
-    description: 'Tie a task to one of THIS WEEK\'s weekly goals: finishing the task adds amount (default 1, at least 1) to the goal, reopening takes it back. Omit goal to remove the link. The link lives on the task only. Refused for non-weekly, past, finished, habit-fed or milestone goals. NOTE: the credit is applied when the task is finished; check that complete_task in this connector credits goals before relying on it, otherwise the goal must be moved by hand.',
+    description: 'Tie a task to a goal: finishing the task adds amount (default 1, at least 1) to the goal, reopening takes it back. Omit goal to remove the link. The link lives on the task only. Works for any running goal, weekly or not (the app\'s plan menu only offers this week\'s, but its credit rule feeds any running goal). Refused for finished, habit-fed or milestone-measured goals (the app never credits those). The credit is applied by complete_task / complete_tasks and taken back by reopen_task / reopen_tasks.',
     inputSchema: z.object({ ...ref, goal_id: z.string().optional(), goal: z.string().optional().describe('Part of the goal name, if no goal_id'), amount: z.number().min(1).max(1000).optional() }),
     annotations: ann.WI,
   }, ({ id, title, goal_id, goal, amount }) => write((b) => g.setTaskGoal(b, { id, title }, goal_id || goal ? { id: goal_id, title: goal } : null, amount)))
@@ -103,7 +106,7 @@ export function register(r: Reg): void {
   /* ---------------- projects ---------------- */
   r.tool('delete_project', {
     title: 'Delete a project',
-    description: 'Delete a project. mode "move" (default and safe): its tasks stay as ordinary tasks of the space. mode "delete": the tasks go too, but only when the project holds at most ONE task (more is refused; delete them one by one first). Confirm with the user first unless they asked.',
+    description: 'Delete a project. mode "move" (default): its tasks stay as ordinary tasks of the space. mode "delete": all its tasks are deleted with it, however many (the answer says how many; they cannot be brought back from here). Confirm with the user first unless they asked.',
     inputSchema: z.object({ ...projRef, mode: z.enum(['move', 'delete']).optional() }),
     annotations: ann.D,
   }, (i) => write((b) => g.deleteProject(b, projOf(i), i.mode ?? 'move')))

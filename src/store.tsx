@@ -1,6 +1,7 @@
 import { haptic } from './haptic'
 import { flushSync } from 'react-dom'
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { focusCmdFromItem, FOCUS_EVENT } from './inbox-focus'
 import { SUPABASE_ENABLED, deleteRemoteState, claimInbox, onAccountChange, loadRemoteState, readOutreachEvents, readProspectSheet, stampOutreachEvents, stampProspectSheet } from './supabase'
 import { outbox } from './sync'
 import { estimateTask } from './ai'
@@ -1074,6 +1075,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         } else if (it.op === 'done' && it.task_id) {
           const t = io.tasks.find((x) => x.id === it.task_id)
           if (t && !t.done) io.done(t.id, Math.max(1, Math.round(it.actual_min ?? t.estimateMin ?? 0)))
+        } else if (it.op === 'focus' || it.op === 'focusStop') {
+          /* From the Claude connector. The timer lives in the Pomodoro provider, so the
+             decoded command goes to it as an event (src/inbox-focus.ts decides; stale or
+             malformed rows come back null and are dropped). */
+          const cmd = focusCmdFromItem(it, io.tasks, Date.now())
+          if (cmd) window.dispatchEvent(new CustomEvent(FOCUS_EVENT, { detail: cmd }))
         }
       }
     } catch { /* next pull */ } finally { inboxBusy.current = false }

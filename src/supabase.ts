@@ -327,7 +327,7 @@ export async function stampOutreachEvents(ids: string[]): Promise<void> {
  *  list, "done" finishes one with the time it took. The shortcut function only
  *  queues them in mc_inbox; the app applies them through its own actions, so a
  *  shortcut can never collide with a save. */
-export interface InboxItem { id: string; op: 'add' | 'done'; title: string | null; space: 'personal' | 'work' | null; task_id: string | null; actual_min: number | null }
+export interface InboxItem { id: string; op: 'add' | 'done' | 'focus' | 'focusStop'; title: string | null; space: 'personal' | 'work' | null; task_id: string | null; actual_min: number | null; created_at?: string }
 
 /** Claim what is waiting and hand it back, in ONE update: only rows still
  *  unclaimed are stamped, and the database gives each row to exactly one caller.

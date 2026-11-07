@@ -35,7 +35,7 @@ export const isTime = (s: unknown): s is string => typeof s === 'string' && /^([
 export const weekdayIndex = (day: string): number => (new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7
 
 export type Slot = 'morning' | 'noon' | 'afternoon' | 'evening'
-const SLOTS: Slot[] = ['morning', 'noon', 'afternoon', 'evening']
+export const SLOTS: Slot[] = ['morning', 'noon', 'afternoon', 'evening']
 /** src/util.ts slotForTime. */
 export function slotForTime(hhmm: string): Slot {
   const [h, m] = hhmm.split(':').map(Number)
@@ -61,16 +61,16 @@ export const HIST = 60
 export const fold = (s: string): string => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
 /** src/tags.ts slugTag. */
 export const slugTag = (name: string): string => fold(name).replace(/[^a-z0-9]+/g, '').slice(0, 40) || 'project'
-const tagOf = (p: Row): string => p.tag || slugTag(String(p.name ?? ''))
+export const tagOf = (p: Row): string => p.tag || slugTag(String(p.name ?? ''))
 /** src/store/notes.ts noteTitle. */
 export function noteTitle(body: string): string {
   const first = body.split('\n').map((l) => l.trim()).find((l) => l.length > 0) ?? ''
   return first.replace(/^#{1,3}\s+/, '').replace(/^[-*]\s+(\[[ xX]\]\s*)?/, '').slice(0, 120)
 }
 
-const arr = (b: Blob, k: string): Row[] => (Array.isArray(b[k]) ? b[k] : [])
+export const arr = (b: Blob, k: string): Row[] => (Array.isArray(b[k]) ? b[k] : [])
 /** For writes: the collection, created only when something is being added to it. */
-const ensure = (b: Blob, k: string): Row[] => (Array.isArray(b[k]) ? b[k] : (b[k] = []))
+export const ensure = (b: Blob, k: string): Row[] => (Array.isArray(b[k]) ? b[k] : (b[k] = []))
 
 /** A deleted row is buried so the merge cannot bring it back (store/graveyard.ts). */
 export function bury(b: Blob, ...keys: string[]): void {
@@ -88,7 +88,7 @@ export interface Ref { id?: string; title?: string }
 
 /** One row, by id or by words. A wrong guess changes his real data, so it NEVER
  *  guesses: no match and several matches are both refusals that name the rows. */
-function pick(rows: Row[], ref: Ref, label: string, nameOf: (r: Row) => string): Row {
+export function pick(rows: Row[], ref: Ref, label: string, nameOf: (r: Row) => string): Row {
   if (ref.id) {
     const hit = rows.find((r) => r.id === ref.id)
     if (!hit) throw new McError(`No ${label} has the id "${ref.id}". List them first to get a real id.`)
@@ -103,8 +103,8 @@ function pick(rows: Row[], ref: Ref, label: string, nameOf: (r: Row) => string):
   const names = hits.slice(0, 8).map((r) => `${r.id}: ${nameOf(r)}`).join(' | ')
   throw new McError(`"${ref.title}" matches ${hits.length} ${label}s (${names}${hits.length > 8 ? ' ...' : ''}). Pass the id of the one you mean.`)
 }
-const findTask = (b: Blob, ref: Ref) => pick(arr(b, 'tasks'), ref, 'task', (t) => String(t.title ?? ''))
-const findProject = (b: Blob, name: string): Row => {
+export const findTask = (b: Blob, ref: Ref) => pick(arr(b, 'tasks'), ref, 'task', (t) => String(t.title ?? ''))
+export const findProject = (b: Blob, name: string): Row => {
   const q = fold(name).replace(/^#/, '')
   const rows = arr(b, 'projects')
   const hit = rows.find((p) => fold(String(p.name)) === q || tagOf(p) === q.replace(/[^a-z0-9_-]/g, ''))
@@ -275,11 +275,11 @@ export function addProject(b: Blob, name: string, space: 'personal' | 'work'): {
   if (!trimmed) throw new McError('A project needs a name.')
   const projects = ensure(b, 'projects')
   if (projects.some((p) => fold(String(p.name)) === fold(trimmed))) throw new McError(`A project called "${trimmed}" already exists.`)
-  // Two projects named alike would answer to one tag; the second gets "-2" (src/store/planner.ts freeTag).
+  // Two projects named alike would answer to one tag; the second gets "2", then "3" (src/tags.ts freeTag: "home" then "home2").
   const taken = new Set(projects.map(tagOf))
   const base = slugTag(trimmed)
   let tag = base
-  for (let n = 2; taken.has(tag); n++) tag = `${base}-${n}`
+  for (let n = 2; taken.has(tag); n++) tag = `${base}${n}`
   const row: Row = { id: newId('proj'), name: trimmed, space, createdAt: dateKey() }
   if (tag !== base) row.tag = tag
   projects.push(row)
@@ -298,7 +298,7 @@ export function renameProject(b: Blob, nameOrId: string, to: string): { id: stri
 /* Ports of src/store/notes.ts. The dev stamp is "claude": a merge uses it to tell
    a different device's edit from this one's own. */
 
-const DEV = 'claude'
+export const DEV = 'claude'
 
 export function addNote(b: Blob, i: { body: string; space?: 'personal' | 'work'; folderId?: string }): { id: string; text: string } {
   const body = i.body ?? ''
@@ -353,53 +353,6 @@ export function setNoteDone(b: Blob, ref: Ref, done: boolean): { id: string; tex
   if (done) { n.done = Date.now(); n.pinned = false } else delete n.done
   n.dev = DEV; n.updatedAt = Date.now()
   return { id: n.id, text: done ? `Marked note "${n.title}" done.` : `Reopened note "${n.title}".` }
-}
-
-/* ============================== HABITS ======================================= */
-/* The app's habit model is large (measured, amounts, quits, gated, linked to a
-   routine). v1 ticks only a PLAIN habit and refuses the rest with the reason. */
-
-const habitById = (b: Blob, ref: Ref) => pick(arr(b, 'habits').filter((h) => !h.archivedAt), ref, 'habit', (h) => String(h.name ?? ''))
-
-/** Why this habit cannot be ticked safely from here, or null when it can. */
-export function habitRefusal(h: Row): string | null {
-  if (h.kind === 'break') return 'it is a quit (breaking) habit, which counts days kept and slips, not ticks. Use the app or tell me to log a slip once that is supported.'
-  if (h.folderId || h.srcStepId) return 'it belongs to a routine, and ticking it must also update the routine. Do it in the app.'
-  if (h.gatedBy) return 'it is gated by a number (a test result), not a tick.'
-  if (h.measure || h.auto || h.source) return 'it is measured or fills itself (minutes, times or amounts), so a tick would not match how it counts.'
-  if (Array.isArray(h.alts) && h.alts.length) return 'it has alternatives to pick from, which this connector cannot choose yet.'
-  if (h.paused) return 'it is paused.'
-  return null
-}
-
-export function tickHabit(b: Blob, ref: Ref, opts: { day?: string; done?: boolean }): { id: string; text: string } {
-  const h = habitById(b, ref)
-  const why = habitRefusal(h)
-  if (why) throw new McError(`"${h.name}" cannot be ticked from here: ${why}`)
-  const day = opts.day ?? dateKey()
-  if (!isDate(day)) throw new McError(`day must be YYYY-MM-DD, got "${day}".`)
-  if (day > dateKey()) throw new McError('A habit cannot be ticked for a day that has not happened yet.')
-  const on = opts.done !== false
-  const log = ensure(b, 'habitLog')
-  const has = log.some((t) => t.habitId === h.id && t.day === day)
-  // The week strip (days[]) is a cache of THIS week's log: only touch it for a day in this week.
-  const today = dateKey()
-  const mondayOf = (d: string) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() - weekdayIndex(d)); return x.toISOString().slice(0, 10) }
-  const inThisWeek = mondayOf(day) === mondayOf(today)
-  const i = weekdayIndex(day)
-  if (on) {
-    if (has) return { id: h.id, text: `"${h.name}" was already kept on ${day}.` }
-    log.push({ habitId: h.id, day, at: new Date().toISOString() })
-    if (inThisWeek && Array.isArray(h.days) && h.days.length === 7) h.days[i] = true
-    // A tick after an earlier untick must not stay buried.
-    if (Array.isArray(b.graveyard)) b.graveyard = b.graveyard.filter((t: Row) => t.k !== `habitLog:${h.id}|${day}|`)
-    return { id: h.id, text: `Kept "${h.name}" on ${day}.` }
-  }
-  if (!has) return { id: h.id, text: `"${h.name}" was not kept on ${day}.` }
-  b.habitLog = log.filter((t) => !(t.habitId === h.id && t.day === day && !t.src))
-  if (inThisWeek && Array.isArray(h.days) && h.days.length === 7) h.days[i] = false
-  bury(b, `habitLog:${h.id}|${day}|`) // an untick is a fact; without the tombstone a stale device hands the tick back
-  return { id: h.id, text: `Unticked "${h.name}" on ${day}.` }
 }
 
 /* ============================== READS ======================================== */
@@ -473,15 +426,6 @@ export function listProjects(b: Blob): Row[] {
   }))
 }
 
-export function listHabits(b: Blob): Row[] {
-  const today = dateKey(); const i = weekdayIndex(today)
-  const log = arr(b, 'habitLog')
-  return arr(b, 'habits').filter((h) => !h.archivedAt).map((h) => ({
-    id: h.id, name: h.name, space: h.space, kind: h.kind ?? 'build', paused: !!h.paused,
-    frequency: h.frequency ?? 'daily', keptToday: log.some((t) => t.habitId === h.id && t.day === today) || (Array.isArray(h.days) && !!h.days[i]),
-    tickable: habitRefusal(h) === null, ...(habitRefusal(h) ? { whyNot: habitRefusal(h) } : {}),
-  }))
-}
 
 export function listNotes(b: Blob, i: { query?: string; limit?: number }): { count: number; notes: Row[] } {
   const q = i.query ? fold(i.query) : ''

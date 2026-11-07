@@ -106,7 +106,7 @@ create policy mc_prospect_sheet_stamp
 create table if not exists mc_inbox (
   id          text primary key,
   owner       uuid not null references auth.users (id) on delete cascade,
-  op          text not null check (op in ('add', 'done')),
+  op          text not null check (op in ('add', 'done', 'focus', 'focusStop')),
   title       text,
   space       text check (space in ('personal', 'work')),
   task_id     text,
@@ -119,3 +119,6 @@ drop policy if exists mc_inbox_read on mc_inbox;
 create policy mc_inbox_read on mc_inbox for select to authenticated using (owner = auth.uid());
 drop policy if exists mc_inbox_stamp on mc_inbox;
 create policy mc_inbox_stamp on mc_inbox for update to authenticated using (owner = auth.uid()) with check (owner = auth.uid());
+-- Focus commands from the Claude connector: see supabase/mc-inbox-focus.sql (insert, focus ops only).
+drop policy if exists mc_inbox_focus_insert on mc_inbox;
+create policy mc_inbox_focus_insert on mc_inbox for insert to authenticated with check (owner = auth.uid() and op in ('focus', 'focusStop'));

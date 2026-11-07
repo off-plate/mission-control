@@ -15,20 +15,24 @@ Every tool runs as HIM: the client is scoped to his token, so row-level security
 rows. The library's service-role client is never used.
 
 ## Files
-- `ops.ts`    every operation as a pure function on the state blob (a port of src/store/*.ts)
-- `commit.ts` compare-and-swap writer + safety stop (never writes over a save it did not see)
-- `index.ts`  the MCP server and the tool list
-- test: `node tools/mcp-ops-test.mjs` (includes the app's real merge engine)
+- `ops.ts`, `commit.ts`, `reg.ts`  shared: pure operations on the state blob, the compare-and-swap writer + safety stop, the registration layer
+- `ops-<area>.ts` + `tools-<area>.ts`  one pair per area; `index.ts` registers them all (MODULES)
+- tests: `tools/mcp-*-test.mjs` (each area, `mcp-all-test.mjs` registers everything together), kit in `tools/mcp-test-kit.mjs`
 
-## Tools (v1)
-Read: get_overview, get_day, list_tasks, list_projects, list_habits, list_notes, get_note, browse.
-Write: add_task, update_task, complete_task, reopen_task, set_task_steps, delete_task, add_project,
-rename_project, add_note, append_to_note, replace_note, set_note_done, delete_note, tick_habit.
+## Areas (101 tools)
+- core: overview, day, tasks (add, change, finish, reopen, steps, delete), projects, notes (add, append, rewrite, tick, delete), browse
+- growth: habits (every kind), routines, quit habits and slips, amounts/counts
+- goals: goals, progress, milestones, repeat, tasks feeding goals, delete project, project tag/colour
+- people: people and the Business prospects pipeline, contact log
+- money: this cycle's bills, debts, transactions; mark paid, skip, expense, income (compass_* tables)
+- planning: plan_day (many placements, all or nothing), day_capacity, log_task_time, log_focus, focus_stats, get_calendar
+- library: note extras and folders, ideas board, prompts, gym goals
+- focus: start_focus / stop_focus (queued in mc_inbox; an OPEN Mission Control applies them, within ~15 s, and a command older than 10 minutes is dropped)
 
-## Not here yet (the tool says so instead of guessing)
-Focus timer (client-side state), the time a task took, quit / measured / gated / routine-linked
-habits, routines, goals progress, people and prospects writes, bills (compass_* tables), gym,
-prompts, the ideas board.
+## Not here (each tool says so instead of guessing)
+Editing or deleting recurring bills, debts and income; partial bill payments; deleting prospects; changing a goal's
+timeframe; a few multi-row deletes the safety stop refuses (a person with several logged contacts, a project with many
+tasks: use move or the app); AI task breakdown (Claude writes the steps itself with set_task_steps).
 
 ## Deploy
     export SUPABASE_ACCESS_TOKEN=$(cat ~/.config/mission-control/supabase-token)

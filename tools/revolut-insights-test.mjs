@@ -92,7 +92,7 @@ assert.equal(mo[10].month, '2025-12'); assert.equal(mo[10].spending, 300); asser
 /* ---- the whole thing: lines are sentences, never NaN or undefined ---------------------- */
 const all = T.analyse([...rows, ...recRows, ...sub('Bet House', 4, 2000, 7, '2026-10-12').map((r) => ({ ...r, category: 'betting' }))], AS_OF, 30)
 assert.ok(all.lines.length >= 4)
-for (const l of all.lines) { assert.ok(!/NaN|undefined|Infinity|—/.test(l), l); assert.ok(l.endsWith('.'), l) }
+for (const l of all.lines) { assert.ok(!/NaN|undefined|Infinity|\u2014/.test(l), l); assert.ok(l.endsWith('.'), l) }
 assert.ok(all.lines.some((l) => l.startsWith('Betting:') || l.startsWith('Betting is the biggest')), 'betting is mentioned')
 assert.ok(all.lines.every((l) => /^[A-Z0-9]/.test(l)), 'every sentence starts with a capital')
 assert.ok(!all.lines.some((l) => /\d{4}-\d{2}-\d{2}/.test(l)), 'no ISO dates in sentences')

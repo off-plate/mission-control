@@ -315,4 +315,18 @@ B.__setBrainClient({ client: db, uid: UID })
   assert.ok(Date.now() - t0 < 500, 'no waiting on a sleeping Mac')
 }
 
+/* 20. Claude down and no other brain on this device: the failure says WHY, not "no key". */
+{
+  const keep = store['mc-groq-key']; delete store['mc-groq-key']
+  wipe(); fetched = 0
+  const r = await A.ask(long, brief, [], hands)
+  assert.equal(r.ok, false)
+  assert.deepEqual([r.reason, r.detail], ['claude-down', 'mac-off'], 'a sleeping Mac is named, not "No Groq key yet"')
+  B.__setBrainClient(null)
+  const r2 = await A.ask(long, brief, [], hands)
+  assert.deepEqual([r2.reason, r2.detail], ['claude-down', 'off'], 'signed out here is named too')
+  assert.equal(fetched, 0)
+  store['mc-groq-key'] = keep
+}
+
 console.log('Claude brain mailbox: all checks passed.')

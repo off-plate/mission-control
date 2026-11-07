@@ -658,7 +658,11 @@ function firstObject(text: string): string | null {
  *  the page-only extras (undo, the actual-time prompt). */
 export interface Ran { ok: boolean; text: string }
 
-type Failure = { ok: false; reason: 'no-key' | 'rejected' | 'offline' | 'unreadable' | 'model-gone' | 'rate-limit' | 'too-big'; detail?: string }
+/* 'claude-down': Claude was tried first and could not answer, and nothing else on
+   this device could either. `detail` says why: off (not signed in here), mac-off,
+   timeout, failed. It replaces "No Groq key yet", which sent him to fix a key he
+   was never meant to need. */
+type Failure = { ok: false; reason: 'no-key' | 'rejected' | 'offline' | 'unreadable' | 'model-gone' | 'rate-limit' | 'too-big' | 'claude-down'; detail?: string }
 export type Outcome = { ok: true; reply: Reply } | Failure
 
 type Msg = { role: 'system' | 'user' | 'assistant'; content: string }
@@ -731,12 +735,14 @@ async function once(messages: Msg[], key: string, onSay?: (partial: string) => v
      failure, Mac asleep included, falls straight through to the brains below
      as if this block were not here. A reply that does not parse also falls
      through: Gemini answers it rather than him seeing "unreadable". */
+  let claudeWhy = ''
   if (viaClaude) {
     const c = await askClaude(messages)
     if (c.ok) {
       const o = finish(c.text)
       if (o.ok) return o
-    }
+      claudeWhy = 'failed'
+    } else claudeWhy = c.reason
     onSay?.('')
   }
   const gemini = hasTtsKey()
@@ -745,7 +751,7 @@ async function once(messages: Msg[], key: string, onSay?: (partial: string) => v
     if (g?.ok) return g
     onSay?.('')
   }
-  if (!key) return { ok: false, reason: gemini ? 'rate-limit' : 'no-key' }
+  if (!key) return claudeWhy && !gemini ? { ok: false, reason: 'claude-down', detail: claudeWhy } : { ok: false, reason: gemini ? 'rate-limit' : 'no-key' }
   let res: Response
   try {
     res = await request({

@@ -1357,7 +1357,9 @@ export function useAssistantThread() {
          was rejected", which sends him to fix the wrong field. */
       const provider = PROVIDERS[getAiProvider()]
       setErr(
-        out.reason === 'no-key' ? `No ${provider.label} key yet.`
+        out.reason === 'claude-down' ? (out.detail === 'off' ? 'JARVIS cannot reach Claude from this device.'
+          : out.detail === 'mac-off' ? 'Your Mac is not answering.' : 'Claude did not answer.')
+        : out.reason === 'no-key' ? `No ${provider.label} key yet.`
           : out.reason === 'rejected' ? `That ${provider.label} key was rejected.`
             : out.reason === 'offline' ? 'Could not reach the model.'
               : out.reason === 'rate-limit' ? 'Too many questions in the last minute.'
@@ -1365,7 +1367,10 @@ export function useAssistantThread() {
                 : out.detail ?? 'The answer came back unreadable.',
       )
       setErrHint(
-        out.reason === 'no-key' ? 'Add one in Settings. It stays on this device.'
+        out.reason === 'claude-down' ? (out.detail === 'off' ? 'Sign in under Settings, Your account. Claude needs your login here, not a key.'
+          : out.detail === 'mac-off' ? 'Wake the Mac and check the Claude helper is running. This device has no Gemini or Groq key to answer instead.'
+          : 'Ask again. If it keeps happening, check the Claude helper on your Mac.')
+        : out.reason === 'no-key' ? 'Add one in Settings. It stays on this device.'
           : out.reason === 'rejected' ? `Check it in Settings, or generate a new one at ${provider.getKeyUrl}.`
             : out.reason === 'model-gone' ? 'The model this app used was retired. This build already moved to its replacement, so reload the page.'
               : out.reason === 'offline' ? 'Check the connection and ask again.'

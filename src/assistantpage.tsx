@@ -603,7 +603,9 @@ function Activity({ done, onUndo, onUndoAll, onLog }: {
   onUndoAll: () => void
   onLog: (k: number, taskId: string, minutes: number) => void
 }) {
-  const [open, setOpen] = useState(false)
+  /* A few changes are just shown; a batch folds to its summary line. Folding one
+     change behind a click hid the very thing he had just asked for. */
+  const [open, setOpen] = useState(done.length <= 3)
   const failed = done.filter((d) => !d.ok).length
   const live = done.filter((d) => d.undo && !d.undone).length
   const rows = done.map((d, k) => ({ d, k })).filter(({ d }) => open || !d.ok || d.needsActual)

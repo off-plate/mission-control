@@ -355,53 +355,6 @@ export function setNoteDone(b: Blob, ref: Ref, done: boolean): { id: string; tex
   return { id: n.id, text: done ? `Marked note "${n.title}" done.` : `Reopened note "${n.title}".` }
 }
 
-/* ============================== HABITS ======================================= */
-/* The app's habit model is large (measured, amounts, quits, gated, linked to a
-   routine). v1 ticks only a PLAIN habit and refuses the rest with the reason. */
-
-const habitById = (b: Blob, ref: Ref) => pick(arr(b, 'habits').filter((h) => !h.archivedAt), ref, 'habit', (h) => String(h.name ?? ''))
-
-/** Why this habit cannot be ticked safely from here, or null when it can. */
-export function habitRefusal(h: Row): string | null {
-  if (h.kind === 'break') return 'it is a quit (breaking) habit, which counts days kept and slips, not ticks. Use the app or tell me to log a slip once that is supported.'
-  if (h.folderId || h.srcStepId) return 'it belongs to a routine, and ticking it must also update the routine. Do it in the app.'
-  if (h.gatedBy) return 'it is gated by a number (a test result), not a tick.'
-  if (h.measure || h.auto || h.source) return 'it is measured or fills itself (minutes, times or amounts), so a tick would not match how it counts.'
-  if (Array.isArray(h.alts) && h.alts.length) return 'it has alternatives to pick from, which this connector cannot choose yet.'
-  if (h.paused) return 'it is paused.'
-  return null
-}
-
-export function tickHabit(b: Blob, ref: Ref, opts: { day?: string; done?: boolean }): { id: string; text: string } {
-  const h = habitById(b, ref)
-  const why = habitRefusal(h)
-  if (why) throw new McError(`"${h.name}" cannot be ticked from here: ${why}`)
-  const day = opts.day ?? dateKey()
-  if (!isDate(day)) throw new McError(`day must be YYYY-MM-DD, got "${day}".`)
-  if (day > dateKey()) throw new McError('A habit cannot be ticked for a day that has not happened yet.')
-  const on = opts.done !== false
-  const log = ensure(b, 'habitLog')
-  const has = log.some((t) => t.habitId === h.id && t.day === day)
-  // The week strip (days[]) is a cache of THIS week's log: only touch it for a day in this week.
-  const today = dateKey()
-  const mondayOf = (d: string) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() - weekdayIndex(d)); return x.toISOString().slice(0, 10) }
-  const inThisWeek = mondayOf(day) === mondayOf(today)
-  const i = weekdayIndex(day)
-  if (on) {
-    if (has) return { id: h.id, text: `"${h.name}" was already kept on ${day}.` }
-    log.push({ habitId: h.id, day, at: new Date().toISOString() })
-    if (inThisWeek && Array.isArray(h.days) && h.days.length === 7) h.days[i] = true
-    // A tick after an earlier untick must not stay buried.
-    if (Array.isArray(b.graveyard)) b.graveyard = b.graveyard.filter((t: Row) => t.k !== `habitLog:${h.id}|${day}|`)
-    return { id: h.id, text: `Kept "${h.name}" on ${day}.` }
-  }
-  if (!has) return { id: h.id, text: `"${h.name}" was not kept on ${day}.` }
-  b.habitLog = log.filter((t) => !(t.habitId === h.id && t.day === day && !t.src))
-  if (inThisWeek && Array.isArray(h.days) && h.days.length === 7) h.days[i] = false
-  bury(b, `habitLog:${h.id}|${day}|`) // an untick is a fact; without the tombstone a stale device hands the tick back
-  return { id: h.id, text: `Unticked "${h.name}" on ${day}.` }
-}
-
 /* ============================== READS ======================================== */
 
 const projName = (b: Blob, id?: string): string | undefined => (id ? arr(b, 'projects').find((p) => p.id === id)?.name : undefined)
@@ -473,15 +426,6 @@ export function listProjects(b: Blob): Row[] {
   }))
 }
 
-export function listHabits(b: Blob): Row[] {
-  const today = dateKey(); const i = weekdayIndex(today)
-  const log = arr(b, 'habitLog')
-  return arr(b, 'habits').filter((h) => !h.archivedAt).map((h) => ({
-    id: h.id, name: h.name, space: h.space, kind: h.kind ?? 'build', paused: !!h.paused,
-    frequency: h.frequency ?? 'daily', keptToday: log.some((t) => t.habitId === h.id && t.day === today) || (Array.isArray(h.days) && !!h.days[i]),
-    tickable: habitRefusal(h) === null, ...(habitRefusal(h) ? { whyNot: habitRefusal(h) } : {}),
-  }))
-}
 
 export function listNotes(b: Blob, i: { query?: string; limit?: number }): { count: number; notes: Row[] } {
   const q = i.query ? fold(i.query) : ''

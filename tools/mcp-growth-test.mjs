@@ -923,7 +923,8 @@ console.log('growth: merge ok')
 
   // the only names shared with core are the two this module takes over
   const core = fakeServer(K, M.tools_core?.register ?? (() => {}), stateDb(growth())).names()
-  if (core.length) assert.deepEqual(names.filter((n) => core.includes(n)).sort(), ['list_habits', 'tick_habit'], 'integration: remove these two from core')
+  // integrated: core's v1 habit tools are gone, so this module shares no name with core
+  assert.deepEqual(names.filter((n) => core.includes(n)), [], 'no tool name shared with core')
 
   const state = () => db.tables.mc_state[0].data
   // reads

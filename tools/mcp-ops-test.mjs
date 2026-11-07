@@ -204,29 +204,7 @@ assert.equal(M.rowKey('notes', { id: 'q' }), M.appRowKey('notes', { id: 'q' }))
   assert.equal(b.notes.some((x) => x.id === 'note-1'), false); assert.ok(b.graveyard.some((t) => t.k === 'notes:note-1'))
 }
 
-/* 8. habits */
-{
-  const b = fixture()
-  const today = M.dateKey(); const i = M.weekdayIndex(today)
-  M.tickHabit(b, { title: 'stretch' }, {})
-  assert.deepEqual(b.habitLog.map((t) => [t.habitId, t.day]), [['h-stretch', today]])
-  assert.equal(b.habits[0].days[i], true)
-  assert.match(M.tickHabit(b, { title: 'stretch' }, {}).text, /already kept/)
-  assert.equal(b.habitLog.length, 1, 'no double tick')
-  M.tickHabit(b, { title: 'stretch' }, { done: false })
-  assert.deepEqual([b.habitLog.length, b.habits[0].days[i]], [0, false])
-  assert.ok(b.graveyard.some((t) => t.k === `habitLog:h-stretch|${today}|`), 'an untick is buried so a stale device cannot hand it back')
-  M.tickHabit(b, { title: 'stretch' }, {})
-  assert.equal(b.graveyard.some((t) => t.k === `habitLog:h-stretch|${today}|`), false, 'a tick after an untick digs the tombstone up')
-
-  refuses(() => M.tickHabit(b, { id: 'h-quit' }, {}), /quit/)
-  refuses(() => M.tickHabit(b, { id: 'h-routine' }, {}), /routine/)
-  refuses(() => M.tickHabit(b, { id: 'h-gated' }, {}), /gated/)
-  refuses(() => M.tickHabit(b, { id: 'h-measured' }, {}), /measured/)
-  refuses(() => M.tickHabit(b, { id: 'h-stretch' }, { day: '2099-01-01' }), /has not happened/)
-  const hs = M.listHabits(b)
-  assert.deepEqual(hs.map((h) => [h.name, h.tickable]), [['Stretch', true], ['No energy drinks', false], ['Brush', false], ['Typing', false], ['Read', false]])
-}
+/* 8. habits: moved to tools/mcp-growth-test.mjs (the full habit set replaced the v1 tick). */
 
 /* 9. reads */
 {
@@ -339,14 +317,12 @@ const noWait = { sleep: async () => {} }
   await M.commit(db, 'u1', (b) => M.addTask(b, { title: 'Brand new from Claude' }), noWait)
   await M.commit(db, 'u1', (b) => M.deleteTask(b, { id: 't-c' }), noWait)
   await M.commit(db, 'u1', (b) => M.appendNote(b, { id: 'note-1' }, 'bread'), noWait)
-  await M.commit(db, 'u1', (b) => M.tickHabit(b, { title: 'stretch' }, {}), noWait)
   // The older app copy saves after the connector, the way a phone left open does: it merges against the head.
   const merged = JSON.parse(M.mergeStates(JSON.stringify({ ...app, savedAt: 500 }), JSON.stringify(db.row.data)))
   assert.ok(merged.tasks.some((t) => t.title === 'Brand new from Claude'), 'the new task survives a stale save')
   assert.equal(merged.tasks.some((t) => t.id === 't-c'), false, 'the deleted task stays deleted: this is what the tombstone is for')
   const note = merged.notes.find((n) => n.id === 'note-1')
   assert.equal(note.body, 'Groceries\nmilk\nbread'); assert.equal(note.conflict, undefined, 'an appended note is ordinary propagation, not a conflict banner')
-  assert.ok(merged.habitLog.some((t) => t.habitId === 'h-stretch'), 'the tick survives')
   // And the other direction: the app's newer save merges into ours without dropping the connector's rows.
   const phone = { ...clone(db.row.data), savedAt: Date.now() + 5000, tasks: [{ id: 't-phone', title: 'Phone', done: false, list: 'backlog', space: 'personal', estimateMin: 0 }, ...db.row.data.tasks] }
   const m2 = JSON.parse(M.mergeStates(JSON.stringify(phone), JSON.stringify(db.row.data)))

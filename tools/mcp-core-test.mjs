@@ -14,13 +14,13 @@ const srv = fakeServer(K, M.tools_core.register, db)
 /* The surface: every tool has a title, a description, an input schema and annotations. */
 const names = srv.names()
 assert.equal(names.length, new Set(names).size)
-assert.equal(names.length, 22, `22 tools, got ${names.length}: ${names}`)
+assert.equal(names.length, 20, `20 tools, got ${names.length}: ${names}`)
 for (const n of names) {
   const c = srv.tools[n].cfg
   assert.ok(c.title && c.description && c.inputSchema && c.annotations, `${n} is fully described`)
 }
 const reads = names.filter((n) => srv.tools[n].cfg.annotations.readOnlyHint)
-assert.deepEqual(reads.sort(), ['browse', 'get_day', 'get_note', 'get_overview', 'list_habits', 'list_notes', 'list_projects', 'list_tasks'])
+assert.deepEqual(reads.sort(), ['browse', 'get_day', 'get_note', 'get_overview', 'list_notes', 'list_projects', 'list_tasks'])
 assert.deepEqual(names.filter((n) => srv.tools[n].cfg.annotations.destructiveHint).sort(), ['delete_note', 'delete_task', 'replace_note'])
 
 /* A read, a change, a refusal. */

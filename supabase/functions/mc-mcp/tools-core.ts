@@ -15,7 +15,6 @@ export function register(r: Reg): void {
     inputSchema: z.object({ where: z.enum(['open', 'today', 'planned', 'backlog', 'done', 'all']).optional(), date: z.string().optional(), space: space.optional(), project: z.string().optional(), query: z.string().optional(), limit: z.number().int().min(1).max(200).optional() }), annotations: ann.RO,
   }, (i) => read((b) => ops.listTasks(b, i)))
   r.tool('list_projects', { title: 'List projects', description: 'Projects with their hashtag, space and open task count.', inputSchema: z.object({}), annotations: ann.RO }, () => read(ops.listProjects))
-  r.tool('list_habits', { title: 'List habits', description: 'Habits, whether each is kept today, and whether this connector can tick it.', inputSchema: z.object({}), annotations: ann.RO }, () => read(ops.listHabits))
   r.tool('list_notes', { title: 'List notes', description: 'Notes, newest edited first, optionally filtered by words in the title or body.', inputSchema: z.object({ query: z.string().optional(), limit: z.number().int().min(1).max(100).optional() }), annotations: ann.RO }, (i) => read((b) => ops.listNotes(b, i)))
   r.tool('get_note', { title: 'Read a note', description: 'The full text of one note, found by its id or by part of its title. Use list_notes first to find it.', inputSchema: z.object(ref), annotations: ann.RO }, (i) => read((b) => ops.getNote(b, i)))
   r.tool('browse', {
@@ -58,10 +57,4 @@ export function register(r: Reg): void {
   r.tool('replace_note', { title: 'Rewrite a note', description: 'Replace the whole text of a note. Read it with get_note first, and keep what should stay.', inputSchema: z.object({ ...ref, body: z.string() }), annotations: ann.D }, ({ id, title, body }) => write((b) => ops.replaceNote(b, { id, title }, body)))
   r.tool('set_note_done', { title: 'Tick a note', description: 'Mark a note done (or reopen it).', inputSchema: z.object({ ...ref, done: z.boolean() }), annotations: ann.WI }, ({ id, title, done }) => write((b) => ops.setNoteDone(b, { id, title }, done)))
   r.tool('delete_note', { title: 'Delete a note', description: 'Delete a note for good. Confirm first unless asked.', inputSchema: z.object(ref), annotations: ann.D }, (i) => write((b) => ops.deleteNote(b, i)))
-
-  /* ---------------- habits (plain ones; the full set lives in tools-growth) ---------------- */
-  r.tool('tick_habit', {
-    title: 'Keep a habit', description: 'Tick a plain habit for a day (default today), or untick it with done: false. Refuses quit, measured, gated or routine-linked habits and says why; list_habits shows which are tickable.',
-    inputSchema: z.object({ ...ref, day: z.string().optional().describe('YYYY-MM-DD, not in the future'), done: z.boolean().optional() }), annotations: ann.WI,
-  }, ({ id, title, day, done }) => write((b) => ops.tickHabit(b, { id, title }, { day, done })))
 }

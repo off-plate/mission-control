@@ -17,7 +17,7 @@ const noWait = { sleep: async () => {} }
   for (const n of lib.names()) { const c = lib.tools[n].cfg; assert.ok(c.title && c.description && c.inputSchema && c.annotations, n); assert.match(n, /^[a-z]+(_[a-z0-9]+)+$/) }
   assert.deepEqual(lib.names().filter((n) => lib.tools[n].cfg.annotations.readOnlyHint).sort(), ['list_gym_goals', 'list_ideas', 'list_note_folders', 'list_prompts'])
   assert.deepEqual(lib.names().filter((n) => lib.tools[n].cfg.annotations.destructiveHint).sort(), ['delete_gym_goal', 'delete_idea', 'delete_note_folder', 'delete_prompt', 'edit_prompt'])
-  assert.ok(srv.names().length >= 41)
+  assert.ok(srv.names().length >= 39) // core (20, after the habit tools moved to tools-growth) + library (19)
 }
 
 /* ---------- notes: edit_note ---------- */

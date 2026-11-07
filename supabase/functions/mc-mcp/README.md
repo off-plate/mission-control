@@ -27,7 +27,7 @@ rows. The library's service-role client is never used.
 - money: this cycle's bills, debts, transactions; mark paid, skip, expense, income (compass_* tables)
 - planning: plan_day (many placements, all or nothing), day_capacity, log_task_time, log_focus, focus_stats, get_calendar
 - library: note extras and folders, ideas board, prompts, gym goals
-- focus: start_focus / stop_focus (queued in mc_inbox; an OPEN Mission Control applies them, within ~15 s, and a command older than 10 minutes is dropped)
+- focus: start_focus, stop_focus, pause_focus, resume_focus, extend_focus, start_break, get_focus_timer. Written into the synced `activeFocus` field (the same one src/pomodoro.tsx mirrors), so the timer shows on every device on its next sync, with no open app needed; stopping early logs the minutes worked
 
 ## Not here (each tool says so instead of guessing)
 Editing or deleting recurring bills, debts and income; partial bill payments; deleting prospects; changing a goal's

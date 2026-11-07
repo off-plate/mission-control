@@ -24,6 +24,7 @@ import { activeModel, getAiKey, request, stripReasoning } from './ai'
 import { getTtsKey, hasTtsKey } from './speech'
 import { STAGES, normStage } from './prospectcalc'
 import type { ProspectSource, ProspectStage, ContactChannel, GoalCategory, GoalTimeframe, GymMetric, HabitFrequency, PageId, PersonTier, PromptKind, RoutineCadence } from './types'
+import { askClaude, claudeWanted } from './claudebrain'
 
 /** What a card shows. The app owns every one of these; the model only names one. */
 export type CardKind =
@@ -725,7 +726,19 @@ async function askGemini(messages: Msg[], onSay?: (partial: string) => void, ret
 /** One call: Gemini first when its key is saved, then the active provider,
  *  which itself falls back to Gemini on a 429 or 413 when Gemini was not
  *  already tried this call. */
-async function once(messages: Msg[], key: string, onSay?: (partial: string) => void): Promise<Outcome> {
+async function once(messages: Msg[], key: string, onSay?: (partial: string) => void, viaClaude = false): Promise<Outcome> {
+  /* A long dictation goes to Claude on his Mac first (claudebrain.ts). Any
+     failure, Mac asleep included, falls straight through to the brains below
+     as if this block were not here. A reply that does not parse also falls
+     through: Gemini answers it rather than him seeing "unreadable". */
+  if (viaClaude) {
+    const c = await askClaude(messages)
+    if (c.ok) {
+      const o = finish(c.text)
+      if (o.ok) return o
+    }
+    onSay?.('')
+  }
   const gemini = hasTtsKey()
   if (gemini) {
     const g = await askGemini(messages, onSay)
@@ -856,7 +869,8 @@ export async function ask(
   onSay?: (partial: string) => void,
 ): Promise<Outcome> {
   const key = getAiKey()
-  if (!key && !hasTtsKey()) return { ok: false, reason: 'no-key' }
+  const viaClaude = claudeWanted(question)
+  if (!key && !hasTtsKey() && !viaClaude) return { ok: false, reason: 'no-key' }
   const messages: Msg[] = [
     { role: 'system', content: SYSTEM },
     { role: 'system', content: `Today's briefing, read from his own log:\n${briefText(brief)}` },
@@ -872,7 +886,7 @@ export async function ask(
   let say = ''
   let show: Card[] = []
   for (let round = 0; round < MAX_ROUNDS; round++) {
-    let out = await once(messages, key, onSay)
+    let out = await once(messages, key, onSay, viaClaude)
     /* A RATE LIMIT WAITS RATHER THAN FAILS, on his instruction: he would
        rather watch the thinking mark for twenty seconds than press Ask again.
        Per round, so a limit hit halfway through a job resumes it instead of
@@ -880,7 +894,7 @@ export async function ask(
     for (let tries = 0; !out.ok && out.reason === 'rate-limit' && tries < 2; tries++) {
       onSay?.('')
       await new Promise((r) => setTimeout(r, (out.ok ? 0 : Math.max(1, Number(out.detail) || 20)) * 1000))
-      out = await once(messages, key, onSay)
+      out = await once(messages, key, onSay, viaClaude)
     }
     if (!out.ok) {
       /* Work already done stays reported: a later round failing must never

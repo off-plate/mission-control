@@ -881,6 +881,17 @@ export default function App() {
             {promptsReady && <span className="btn-sq-dot" aria-hidden="true" />}
           </button>
           {/* Invoices left the Life header for Business only (his ask, 2026-11-07): Business mode's own menu carries it. */}
+          {/* Reminders, top right with Notes and Ideas (his ask, 2026-11-07). Also in the floating button. */}
+          <button
+            className={`btn btn-ghost btn-sq hide-phone${page === 'reminders' ? ' is-on' : ''}`}
+            onClick={() => setPage('reminders')}
+            aria-pressed={page === 'reminders'}
+            aria-label="Reminders"
+            title="Reminders"
+          >
+            <Icon.DockChecklist size={16} />
+            <span className="btn-sq-label">Reminders</span>
+          </button>
           {/* People, next to Ideas on his instruction (2026-09-17). */}
           <PeopleButton on={page === 'people'} open={() => setPage('people')} />
           {/* Bills and MyMind moved to the floating button (his ask, 2026-11-07). The rest stays here. */}

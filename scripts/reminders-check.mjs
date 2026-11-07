@@ -37,7 +37,7 @@ for (const [engine, size] of [[chromium, { width: 1440, height: 900 }], [chromiu
   await step(`${tag}: header keeps Jarvis, Zone, Jar, Notes, Ideas, People; Bills and MyMind left`, async () => {
     const labels = await page.locator('.topbar-right .btn-sq:visible').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))
     for (const gone of ['Bills', 'MyMind', 'Invoices']) assert.ok(!labels.includes(gone), `${gone} still in header: ${labels}`)
-    for (const kept of [/Jarvis/i, /Zone/, /^Jar$/, /^Notes$/, /^Ideas$/, /^People$/]) assert.ok(labels.some((l) => kept.test(l)), `${kept} missing: ${labels}`)
+    for (const kept of [/Jarvis/i, /Zone/, /^Jar$/, /^Notes$/, /^Ideas$/, /^Reminders$/, /^People$/]) assert.ok(labels.some((l) => kept.test(l)), `${kept} missing: ${labels}`)
   })
   await step(`${tag}: floating button holds MyMind, Bills, Reminders, no More, stack clear of the header`, async () => {
     await page.locator('.dock-fab').hover(); await page.waitForTimeout(500)

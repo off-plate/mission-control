@@ -35,7 +35,7 @@ export const isTime = (s: unknown): s is string => typeof s === 'string' && /^([
 export const weekdayIndex = (day: string): number => (new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7
 
 export type Slot = 'morning' | 'noon' | 'afternoon' | 'evening'
-const SLOTS: Slot[] = ['morning', 'noon', 'afternoon', 'evening']
+export const SLOTS: Slot[] = ['morning', 'noon', 'afternoon', 'evening']
 /** src/util.ts slotForTime. */
 export function slotForTime(hhmm: string): Slot {
   const [h, m] = hhmm.split(':').map(Number)
@@ -61,16 +61,16 @@ export const HIST = 60
 export const fold = (s: string): string => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
 /** src/tags.ts slugTag. */
 export const slugTag = (name: string): string => fold(name).replace(/[^a-z0-9]+/g, '').slice(0, 40) || 'project'
-const tagOf = (p: Row): string => p.tag || slugTag(String(p.name ?? ''))
+export const tagOf = (p: Row): string => p.tag || slugTag(String(p.name ?? ''))
 /** src/store/notes.ts noteTitle. */
 export function noteTitle(body: string): string {
   const first = body.split('\n').map((l) => l.trim()).find((l) => l.length > 0) ?? ''
   return first.replace(/^#{1,3}\s+/, '').replace(/^[-*]\s+(\[[ xX]\]\s*)?/, '').slice(0, 120)
 }
 
-const arr = (b: Blob, k: string): Row[] => (Array.isArray(b[k]) ? b[k] : [])
+export const arr = (b: Blob, k: string): Row[] => (Array.isArray(b[k]) ? b[k] : [])
 /** For writes: the collection, created only when something is being added to it. */
-const ensure = (b: Blob, k: string): Row[] => (Array.isArray(b[k]) ? b[k] : (b[k] = []))
+export const ensure = (b: Blob, k: string): Row[] => (Array.isArray(b[k]) ? b[k] : (b[k] = []))
 
 /** A deleted row is buried so the merge cannot bring it back (store/graveyard.ts). */
 export function bury(b: Blob, ...keys: string[]): void {
@@ -88,7 +88,7 @@ export interface Ref { id?: string; title?: string }
 
 /** One row, by id or by words. A wrong guess changes his real data, so it NEVER
  *  guesses: no match and several matches are both refusals that name the rows. */
-function pick(rows: Row[], ref: Ref, label: string, nameOf: (r: Row) => string): Row {
+export function pick(rows: Row[], ref: Ref, label: string, nameOf: (r: Row) => string): Row {
   if (ref.id) {
     const hit = rows.find((r) => r.id === ref.id)
     if (!hit) throw new McError(`No ${label} has the id "${ref.id}". List them first to get a real id.`)
@@ -103,8 +103,8 @@ function pick(rows: Row[], ref: Ref, label: string, nameOf: (r: Row) => string):
   const names = hits.slice(0, 8).map((r) => `${r.id}: ${nameOf(r)}`).join(' | ')
   throw new McError(`"${ref.title}" matches ${hits.length} ${label}s (${names}${hits.length > 8 ? ' ...' : ''}). Pass the id of the one you mean.`)
 }
-const findTask = (b: Blob, ref: Ref) => pick(arr(b, 'tasks'), ref, 'task', (t) => String(t.title ?? ''))
-const findProject = (b: Blob, name: string): Row => {
+export const findTask = (b: Blob, ref: Ref) => pick(arr(b, 'tasks'), ref, 'task', (t) => String(t.title ?? ''))
+export const findProject = (b: Blob, name: string): Row => {
   const q = fold(name).replace(/^#/, '')
   const rows = arr(b, 'projects')
   const hit = rows.find((p) => fold(String(p.name)) === q || tagOf(p) === q.replace(/[^a-z0-9_-]/g, ''))
@@ -298,7 +298,7 @@ export function renameProject(b: Blob, nameOrId: string, to: string): { id: stri
 /* Ports of src/store/notes.ts. The dev stamp is "claude": a merge uses it to tell
    a different device's edit from this one's own. */
 
-const DEV = 'claude'
+export const DEV = 'claude'
 
 export function addNote(b: Blob, i: { body: string; space?: 'personal' | 'work'; folderId?: string }): { id: string; text: string } {
   const body = i.body ?? ''

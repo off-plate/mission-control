@@ -29,8 +29,9 @@ import { register as planning } from './tools-planning.ts'
 import { register as library } from './tools-library.ts'
 import { register as focus } from './tools-focus.ts'
 import { register as growth } from './tools-growth.ts'
+import { register as tasks } from './tools-tasks.ts'
 
-const MODULES = [core, goals, people, money, planning, library, focus, growth]
+const MODULES = [core, goals, people, money, planning, library, focus, growth, tasks]
 
 const INSTRUCTIONS = `This is Michael's Mission Control: his personal life dashboard (tasks, habits, routines, goals, notes, people, bills).
 - Start with get_overview or get_day. Dates are YYYY-MM-DD in Prague time; times are HH:MM, 24 hour.

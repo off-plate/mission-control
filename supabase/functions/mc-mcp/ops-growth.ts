@@ -14,12 +14,16 @@
      the live blob, so a routine tick that touches the habit log twice cannot overwrite itself.
    - dates are Prague's (ops.dateKey), not the browser's.
 
-   What is REFUSED instead of half-done: quit habits ticked as if they were builds, habits kept by
-   focus minutes, gated habits (the typing test), alternatives without a choice, goals attached to a
-   routine being deleted, and any call that would remove more than one row of a collection at once
-   (commit.ts' safety stop; the refusal says what to do instead). */
+   What is still REFUSED, and why (each is a rule the app itself has, or a value that is not stored):
+   - quit habits ticked as if they were builds (log_slip is the act), habits kept by the clock/focus minutes (derived, nothing
+     to tick), a gated step or habit before its real number is in (the app disables it), a step or habit with alternatives
+     ticked without saying WHICH answer (genuinely his to say; the refusal lists them), a start date before 2000 (a typo guard),
+     amount unit / target after creation (the app has no editor for them), changing an amount habit's kind.
+   Everything else the Habits & Goals pages do with data is done, including the multi-row ones: operations that remove several
+   rows (un-finishing a routine, taking back several counts) go through `cascade`, which declares exactly the rows removed and
+   refuses to remove one outside the routine or habit involved. */
 
-import { McError, arr, bury, dateKey, ensure, fold, isDate, newId, pick, weekdayIndex, type Blob, type Ref, type Row } from './ops.ts'
+import { McError, allowShrink, arr, bury, dateKey, ensure, fold, isDate, newId, pick, weekdayIndex, type Blob, type Ref, type Row } from './ops.ts'
 
 /* ============================ dates and periods ============================= */
 
@@ -86,7 +90,7 @@ export function digUp(b: Blob, ...keys: string[]): void {
 }
 
 /** growth.ts `tracked`: replace a log with `next`, bury what left it and dig up what entered it. */
-function setLog(b: Blob, field: string, next: Row[]): void {
+function setLog(b: Blob, field: string, next: Row[], opts: { digOnlyBuried?: boolean } = {}): void {
   const prev = arr(b, field)
   if (!Array.isArray(b[field]) && !next.length) return
   const was = new Set(prev.map((r) => logKey(field, r)))
@@ -95,26 +99,61 @@ function setLog(b: Blob, field: string, next: Row[]): void {
   const added = [...now].filter((k) => !was.has(k))
   b[field] = next
   if (gone.length) bury(b, ...gone)
-  if (added.length) digUp(b, ...added)
+  /* A long backfill (years of "since" days) would dig up hundreds of keys, and the graveyard keeps only its newest 900: that would push
+     real tombstones out and let a stale device bring deleted rows back. A day written by a backfill only needs a dig-up when this
+     blob already holds a tombstone for it. (The app digs up all of them; for the usual few rows the result is identical.) */
+  const buriedNow = opts.digOnlyBuried ? new Set((Array.isArray(b.graveyard) ? b.graveyard : []).filter((t: Row) => !t.undone).map((t: Row) => t.k)) : null
+  const dig = buriedNow ? added.filter((k) => buriedNow.has(k)) : added
+  if (dig.length) digUp(b, ...dig)
 }
 
-/** commit.ts allows a call to remove at most one row per collection. Check it here so the refusal can
- *  say what to do, instead of a bare "safety stop". Throws before anything is written. */
-function lengths(b: Blob): Record<string, number> {
-  const o: Record<string, number> = {}
-  for (const [k, v] of Object.entries(b)) if (Array.isArray(v)) o[k] = v.length
-  return o
-}
-function guarded<T>(b: Blob, what: string, fn: () => T): T {
-  const before = lengths(b)
+/* Some operations remove several rows at once, and that is what the app does too: unticking the last
+   step of a finished routine takes back the step's habit row, the step tick, the routine's finish and the
+   routine's own streak tick. commit.ts' safety stop allows ONE removed row per list; an operation that knows
+   it cascades declares how many extra rows it removed, and the stop allows exactly that many.
+   `cascade` is the one place that declares it, and it does not trust itself: it names the rows the
+   operation is ALLOWED to touch (`scope`, built from the routine or habit involved, before anything runs),
+   and refuses if the operation removed a row outside that scope, or from a list that is not in it. The
+   declared allowance is the net shrink of each list, so a bug that removes more than the operation should
+   still fails at the safety stop. */
+type Scope = Record<string, (r: Row) => boolean>
+function cascade<T>(b: Blob, what: string, scope: Scope, fn: () => T): T {
+  const before: Record<string, Row[]> = {}
+  for (const [k, v] of Object.entries(b)) if (Array.isArray(v)) before[k] = [...v]
   const out = fn()
-  for (const [k, n] of Object.entries(before)) {
-    const now = arr(b, k).length
-    if (now < n - 1) {
-      throw new McError(`${what} would remove ${n - now} rows from "${k}" at once. This connector removes at most one record per list in a single change, so nothing was changed. Undo it in smaller steps (one habit or one routine step at a time), or do it in the app.`)
+  for (const [k, rows] of Object.entries(before)) {
+    const now = arr(b, k)
+    if (now.length >= rows.length) continue
+    const keep = new Set(now.map((r) => logKey(k, r)))
+    const lost = rows.filter((r) => !keep.has(logKey(k, r)))
+    const inScope = scope[k]
+    if (!inScope || lost.some((r) => !inScope(r))) {
+      throw new McError(`${what} would have removed rows from "${k}" that it should not touch. Nothing was changed.`)
     }
+    allowShrink(b, k, Math.max(0, rows.length - now.length - 1))
   }
   return out
+}
+/** The rows that belong to one routine's bookkeeping: its finish records, its step ticks, and the day rows of its streak and step habits. */
+function routineScope(b: Blob, r: Row): Scope {
+  const ids = new Set<string>([r.habitId, ...(r.steps ?? []).map((st: Row) => st.habitId ?? `h-${r.id}-${st.id}`)].filter(Boolean))
+  return { habitLog: (t) => ids.has(t.habitId), routineLog: (x) => x.routineId === r.id, stepTicks: (x) => x.routineId === r.id }
+}
+/** What ticking or unticking one habit may remove: its own rows, and, when it is a step of a routine, that routine's bookkeeping. */
+function habitScope(b: Blob, h: Row): Scope {
+  const rid = routineOfHabit(b, h)
+  const rt = rid ? arr(b, 'routines').find((x) => x.id === rid) : undefined
+  if (!rt) return { habitLog: (t) => t.habitId === h.id }
+  const s = routineScope(b, rt)
+  return { ...s, habitLog: (t) => t.habitId === h.id || s.habitLog(t) }
+}
+
+/** src/hkparts.tsx PALETTE and ICONS keys: the only colours and icons the Habits page offers. */
+export const PALETTE = ['#A3E635', '#A78BFA', '#38BDF8', '#F472B6', '#FB923C', '#2DD4BF', '#22D3EE', '#FACC15', '#4ADE80', '#818CF8', '#F87171', '#E879F9', '#60A5FA', '#34D399', '#F59E0B', '#FB7185', '#C084FC', '#5EEAD4', '#FDBA74', '#94A3B8']
+export const ICON_KEYS = ['sun', 'cup', 'focus', 'bolt', 'clock', 'hourglass', 'wave', 'heart', 'book', 'wallet', 'flag', 'calendar', 'checklist', 'home', 'bulb', 'eye', 'note']
+function checkLook(color?: string, icon?: string): void {
+  if (color !== undefined && !PALETTE.includes(color.toUpperCase())) throw new McError(`colour must be one of the Habits page's swatches: ${PALETTE.join(' ')}.`)
+  if (icon !== undefined && !ICON_KEYS.includes(icon)) throw new McError(`icon must be one of: ${ICON_KEYS.join(', ')}.`)
 }
 
 /* ============================ the rules (src/types/habits.ts) ================= */
@@ -353,6 +392,20 @@ const keptOn = (b: Blob, id: string, day: string) => arr(b, 'habitLog').some((t)
 
 export interface TickOpts { day?: string; done?: boolean; alt?: string }
 
+export interface TickItem extends TickOpts { id?: string; title?: string }
+/** Several ticks in one change. All or nothing: the first refusal stops the whole call and nothing is written (commit.ts
+ *  only writes what the function returns). Each item is exactly one tick_habit. */
+export function tickHabits(b: Blob, items: TickItem[]): { text: string } {
+  if (!items.length) throw new McError('Say which habits: pass at least one item.')
+  if (items.length > 40) throw new McError('At most 40 habits in one call.')
+  const out: string[] = []
+  items.forEach((it, k) => {
+    try { out.push(tickHabit(b, { id: it.id, title: it.title }, { day: it.day, done: it.done, alt: it.alt }).text) }
+    catch (e) { if (e instanceof McError) throw new McError(`Item ${k + 1} (${it.id ?? it.title ?? '?'}): ${e.message} Nothing was changed.`); throw e }
+  })
+  return { text: `${items.length} done together:\n${out.map((t) => `- ${t}`).join('\n')}` }
+}
+
 /** assistant `habit` -> markHabitDay / markHabitOn; with `alt`: pickHabitAlt. */
 export function tickHabit(b: Blob, ref: Ref, opts: TickOpts = {}): { id: string; text: string } {
   const h = findHabit(b, ref)
@@ -366,7 +419,7 @@ export function tickHabit(b: Blob, ref: Ref, opts: TickOpts = {}): { id: string;
   if (track === 'amount') throw new McError(`"${name}" is an amount habit (${h.unit ?? 'units'}). Add what he did with log_habit_amount, take the last entry back with remove_habit_amount.`)
   if (track === 'auto') throw new McError(`"${name}" is kept by the clock (it fills itself from focus minutes), so there is nothing to tick. list_habits shows today's progress.`)
   if (track === 'count') throw new McError(`"${name}" is a counted habit (${countTarget(h)} per ${h.per ?? 'day'}). Log one with habit_count (value 1), take one back with value -1.`)
-  if (h.paused) throw new McError(`"${name}" is paused. Resume it with pause_habit first.`)
+  // A paused habit can still be ticked: the app only stops treating it as due (the Habits page leaves its dots live).
   const owner = drivenBy(b, h)
 
   if (opts.alt !== undefined) {
@@ -376,7 +429,12 @@ export function tickHabit(b: Blob, ref: Ref, opts: TickOpts = {}): { id: string;
     return pickHabitAlt(b, h, alt, opts.done)
   }
   if (owner) {
-    if (day >= today) throw new McError(`"${name}" is the streak of the routine "${owner.title}", set by its steps. Tick the steps (routine_step) or finish the routine (routine_done). A past day can still be corrected here.`)
+    // Today the routine owns its streak habit (habits.tsx leaves today's dot to the routine). The app's own way to
+    // set it by hand is the routine card's button (plan.tsx setRoutineDone), so that is what this does.
+    if (day >= today) {
+      const r = routineDone(b, { id: owner.id }, on)
+      return { id: h.id, text: `"${name}" is the streak of the routine "${owner.title}", so this was done through the routine. ${r.text}` }
+    }
     return assertRoutineOn(b, h, owner, day, opts.done)
   }
   if (day === today && habitGate(h) && habitLocked(h, arr(b, 'stepLog'), day)) {
@@ -384,12 +442,15 @@ export function tickHabit(b: Blob, ref: Ref, opts: TickOpts = {}): { id: string;
     throw new McError(`"${name}" is locked until today's number reaches ${g.target} ${g.unit}. Log his real result with habit_count; it keeps the day itself when it passes.`)
   }
   if (day === today && h.alts?.length) {
-    throw new McError(`"${name}" is answered by picking one of its alternatives, not by a tick. Call again with alt set to one of: ${h.alts.map((a: Row) => `${a.id} (${a.title})`).join(', ')}. A past day can be ticked directly.`)
+    // Taking an answer back is the app's own gesture: pick the chosen answer again.
+    const picked = h.alts.find((a: Row) => arr(b, 'habitLog').some((t) => t.habitId === h.id && t.day === day && t.src === `alt:${a.id}`))
+    if (opts.done === false && picked) return pickHabitAlt(b, h, picked, false)
+    if (on) throw new McError(`"${name}" is answered by picking one of its alternatives, and which one is his to say. Call again with alt set to one of: ${h.alts.map((a: Row) => `${a.id} (${a.title})`).join(', ')}. A past day can be ticked directly.`)
   }
   const has = keptOn(b, h.id, day)
   if (on && has) return { id: h.id, text: `"${name}" was already kept on ${day}.` }
   if (!on && !has) return { id: h.id, text: `"${name}" was not kept on ${day}.` }
-  guarded(b, `Unticking "${name}" on ${day}`, () => markDayOn(b, h.id, day, on))
+  cascade(b, `Unticking "${name}" on ${day}`, habitScope(b, h), () => markDayOn(b, h.id, day, on))
   const rid = routineOfHabit(b, h)
   const r = rid ? arr(b, 'routines').find((x) => x.id === rid) : undefined
   return { id: h.id, text: `${on ? 'Kept' : 'Unticked'} "${name}" on ${day}.${r && day === today ? ` It is a step of "${r.title}", so that routine now reads ${routineProgress(rolled(r)).done} of ${routineProgress(rolled(r)).total}.` : ''}` }
@@ -406,7 +467,7 @@ function pickHabitAlt(b: Blob, h: Row, alt: Row, done?: boolean): { id: string; 
   const mine = new Set(h.alts.map((a: Row) => `alt:${a.id}`))
   const rest = log.filter((t) => !(t.habitId === h.id && t.day === day && !!t.src && mine.has(t.src)))
   const next = isOn ? rest : [...rest, { habitId: h.id, day, src, at: nowIso() }]
-  guarded(b, `Taking back "${alt.title}"`, () => {
+  cascade(b, `Taking back "${alt.title}"`, habitScope(b, h), () => {
     setLog(b, 'habitLog', next)
     const i = weekdayIndex(day)
     const held = next.some((t) => t.habitId === h.id && t.day === day)
@@ -421,7 +482,7 @@ function assertRoutineOn(b: Blob, h: Row, r: Row, day: string, done?: boolean): 
   const has = keptOn(b, h.id, day)
   if (done === true && has) return { id: h.id, text: `"${h.name}" was already kept on ${day}.` }
   if (done === false && !has) return { id: h.id, text: `"${h.name}" was not kept on ${day}.` }
-  guarded(b, `Correcting "${h.name}" on ${day}`, () => {
+  cascade(b, `Correcting "${h.name}" on ${day}`, { ...routineScope(b, r), habitLog: (t) => t.habitId === h.id }, () => {
     markDayOn(b, h.id, day, !has)
     const pk = r.cadence === 'weekly' ? isoWeekKeyOf(day) : r.cadence === 'monthly' ? day.slice(0, 7) : day
     setLog(b, 'routineLog', has
@@ -439,22 +500,21 @@ export function habitCount(b: Blob, ref: Ref, value: number): { id: string; text
   if (!Number.isFinite(value)) throw new McError('value must be a number.')
   if (habitStepKey(h)) return logHabitNumber(b, h, value)
   if (trackOf(h) !== 'count') throw new McError(`"${h.name}" is not counted: it is ${isQuit(h) ? 'a quit habit (log_slip)' : h.measure === 'amount' ? 'an amount habit (log_habit_amount)' : isAuto(h) ? 'fed by focus time' : 'ticked (tick_habit)'}.`)
-  if (h.paused) throw new McError(`"${h.name}" is paused. Resume it first.`)
   const n = Math.round(value)
-  if (n === 0) throw new McError('value must be a whole number other than 0 (1 = did it once, -1 = take one back).')
+  if (n === 0) throw new McError('value must be a whole number other than 0 (1 = did it once, -1 = take the last one back, -2 = the last two ...).')
   if (n > 50) throw new McError('More than 50 in one go is almost certainly a typo. Log it in smaller pieces if it is real.')
-  if (n < -1) throw new McError('Take back one at a time (value -1): this connector removes at most one record per change.')
   const day = dateKey()
   const idx = weekdayIndex(day)
   if (n < 0) {
+    // The app takes back the newest row per tap (logCount -1); taking back k is k taps.
     const mine = arr(b, 'habitLog').filter((t) => t.habitId === h.id && t.day === day)
-    const last = mine[mine.length - 1]
-    if (!last) return { id: h.id, text: `"${h.name}" has nothing logged today to take back.` }
-    const log = arr(b, 'habitLog'); const at = log.lastIndexOf(last)
-    const next = [...log.slice(0, at), ...log.slice(at + 1)]
-    setLog(b, 'habitLog', next)
+    if (!mine.length) return { id: h.id, text: `"${h.name}" has nothing logged today to take back.` }
+    if (-n > mine.length) throw new McError(`"${h.name}" has only ${mine.length} logged today, so ${-n} cannot be taken back.`)
+    const drop = new Set(mine.slice(mine.length + n))
+    const next = arr(b, 'habitLog').filter((t) => !drop.has(t))
+    cascade(b, `Taking back ${-n}`, { habitLog: (t) => t.habitId === h.id && t.day === day }, () => setLog(b, 'habitLog', next))
     h.days = (h.days ?? []).map((d: boolean, i: number) => (i === idx ? next.some((t) => t.habitId === h.id && t.day === day) : d))
-    return { id: h.id, text: `Took one off "${h.name}" (${counted(b, h)}).` }
+    return { id: h.id, text: `Took ${-n === 1 ? 'one' : -n} off "${h.name}" (${counted(b, h)}).` }
   }
   let next = arr(b, 'habitLog')
   for (let k = 0; k < n; k++) next = [...next, { habitId: h.id, day, src: `count#${tag()}`, at: nowIso() }]
@@ -472,7 +532,6 @@ function counted(b: Blob, h: Row): string {
 function logHabitNumber(b: Blob, h: Row, value: number): { id: string; text: string } {
   const key = habitStepKey(h)!
   if (!(value > 0)) throw new McError('A recorded number has to be above 0.')
-  if (h.paused) throw new McError(`"${h.name}" is paused. Resume it first.`)
   const day = dateKey()
   // setStepLog is the raw setter in the app: a number is appended, never tracked or buried.
   ensure(b, 'stepLog').push({ routineId: key.routineId, stepId: key.stepId, day, at: nowIso(), value })
@@ -482,7 +541,7 @@ function logHabitNumber(b: Blob, h: Row, value: number): { id: string; text: str
   const gate = habitGate(h)
   let kept = false
   if (!gate || value >= gate.target) {
-    guarded(b, `Keeping "${h.name}"`, () => markDayOn(b, h.id, day, true))
+    cascade(b, `Keeping "${h.name}"`, habitScope(b, h), () => markDayOn(b, h.id, day, true))
     kept = true
   }
   return { id: h.id, text: `Logged ${value}${gate ? ` ${gate.unit}` : ''} on "${h.name}".${gate ? (kept ? ' That passes the gate, so today is kept.' : ` That is under the ${gate.target} ${gate.unit} needed, so today is not kept.`) : ' Today is kept.'}` }
@@ -495,7 +554,6 @@ export function logAmount(b: Blob, ref: Ref, amount: number): { id: string; text
   const h = findHabit(b, ref)
   if (h.measure !== 'amount') throw new McError(`"${h.name}" does not count an amount${isCounted(h) ? ' (it counts times: habit_count)' : ' (tick_habit)'}.`)
   if (!(amount > 0) || !Number.isFinite(amount)) throw new McError('The amount has to be above 0.')
-  if (h.paused) throw new McError(`"${h.name}" is paused. Resume it first.`)
   const day = dateKey()
   const before = amountOn(arr(b, 'habitLog'), h.id, day)
   setLog(b, 'habitLog', [...arr(b, 'habitLog'), { habitId: h.id, day, src: `amt#${tag()}`, at: nowIso(), v: amount }])
@@ -556,17 +614,19 @@ export function undoSlip(b: Blob, ref: Ref, dayIn?: string): { id: string; text:
 export interface AddHabitInput {
   name: string; space?: 'personal' | 'work'; daypart?: string; frequency?: string; perWeek?: number
   breaking?: boolean; quitSince?: string; startedOn?: string; dailyCost?: number
-  track?: 'check' | 'count' | 'amount'; countTarget?: number; countPer?: 'day' | 'week' | 'month'
-  unit?: string; targetAmount?: number; presets?: number[]
+  track?: 'check' | 'count' | 'amount' | 'minutes'; countTarget?: number; countPer?: 'day' | 'week' | 'month'
+  unit?: string; targetAmount?: number; presets?: number[]; minutesTarget?: number; color?: string; icon?: string
 }
 const FREQS = ['daily', 'weekdays', 'times-per-week', 'weekly', 'monthly']
 const DAYPARTS = ['morning', 'noon', 'afternoon', 'evening']
-const BACKFILL_MAX_DAYS = 366
+/* The app puts NO lower limit on a start date (the date input has only max = today), and backfillKept writes a row
+   for every day from it. The one guard here is against a typo such as year 0200 writing tens of thousands of rows. */
+const EARLIEST_DAY = '2000-01-01'
 
 function checkStart(day: string, label: string): void {
   if (!isDate(day)) throw new McError(`${label} must be YYYY-MM-DD, got "${day}".`)
   if (day > dateKey()) throw new McError(`${label} cannot be in the future.`)
-  if (day < addDays(dateKey(), -BACKFILL_MAX_DAYS)) throw new McError(`${label} is more than ${BACKFILL_MAX_DAYS} days back. This connector will not write that many past days at once; use the latest date you are sure about, or do it in the app.`)
+  if (day < EARLIEST_DAY) throw new McError(`${label} ${day} is before ${EARLIEST_DAY}, which is almost certainly a typo.`)
 }
 
 /** growth.ts backfillKept: "I have been keeping this since June" is written as days, up to yesterday. */
@@ -578,7 +638,7 @@ function backfillKept(b: Blob, habitId: string, from?: string, until?: string): 
   const rows: Row[] = []
   for (let d = from; d < stop; d = addDays(d, 1)) if (!have.has(d)) rows.push({ habitId, day: d, src: 'since' })
   const filled = new Set(rows.map((r) => r.day))
-  if (rows.length) setLog(b, 'habitLog', [...arr(b, 'habitLog'), ...rows])
+  if (rows.length) setLog(b, 'habitLog', [...arr(b, 'habitLog'), ...rows], { digOnlyBuried: true })
   const h = arr(b, 'habits').find((x) => x.id === habitId)
   if (h) {
     h.filledSince = from
@@ -597,11 +657,18 @@ export function addHabit(b: Blob, i: AddHabitInput): { id: string; text: string 
   const id = newId('h')
   let row: Row
   if (i.breaking) {
-    for (const [k, v] of Object.entries({ frequency: i.frequency, per_week: i.perWeek, started_on: i.startedOn, track: i.track, daypart: i.daypart })) {
-      if (v !== undefined) throw new McError(`A quit habit takes only a name, the day he stopped (quit_since) and a daily cost. "${k}" does not apply.`)
+    for (const [k, v] of Object.entries({ started_on: i.startedOn, track: i.track, daypart: i.daypart })) {
+      if (v !== undefined) throw new McError(`A quit habit has no "${k}": the Quit form takes a name, the day he stopped (quit_since), how often to check in (frequency) and a daily cost.`)
     }
     if (i.quitSince !== undefined) checkStart(i.quitSince, 'quit_since')
-    row = clean({ id, space, name, frequency: 'daily', kind: 'break', dailyCost: i.dailyCost, quitSince: i.quitSince ?? today, days: [false, false, false, false, false, false, false], paused: false })
+    if (i.frequency !== undefined && !FREQS.includes(i.frequency)) throw new McError(`frequency must be one of ${FREQS.join(', ')}.`)
+    const qf = i.frequency ?? 'daily'
+    if (i.perWeek !== undefined) {
+      if (qf !== 'times-per-week') throw new McError('per_week only applies to frequency "times-per-week".')
+      if (!Number.isInteger(i.perWeek) || i.perWeek < 1 || i.perWeek > 7) throw new McError('per_week must be a whole number from 1 to 7.')
+    }
+    checkLook(i.color, i.icon)
+    row = clean({ id, space, name, frequency: qf, targetPerWeek: qf === 'times-per-week' ? (i.perWeek ?? 3) : undefined, kind: 'break', color: i.color?.toUpperCase(), icon: i.icon, dailyCost: i.dailyCost, quitSince: i.quitSince ?? today, days: [false, false, false, false, false, false, false], paused: false })
   } else {
     if (i.quitSince !== undefined || i.dailyCost !== undefined) throw new McError('quit_since and daily_cost are for a quit habit (breaking: true).')
     const track = i.track ?? 'check'
@@ -613,14 +680,21 @@ export function addHabit(b: Blob, i: AddHabitInput): { id: string; text: string 
     }
     if (i.daypart !== undefined && !DAYPARTS.includes(i.daypart)) throw new McError(`daypart must be one of ${DAYPARTS.join(', ')}.`)
     if (i.startedOn !== undefined) checkStart(i.startedOn, 'started_on')
-    const x: Row = { id, space, name, daypart: i.daypart, frequency, targetPerWeek: frequency === 'times-per-week' ? i.perWeek : undefined }
+    checkLook(i.color, i.icon)
+    const x: Row = { id, space, name, daypart: i.daypart, frequency, targetPerWeek: frequency === 'times-per-week' ? i.perWeek : undefined, color: i.color?.toUpperCase(), icon: i.icon }
+    if (i.minutesTarget !== undefined && track !== 'minutes') throw new McError('minutes_target only applies to track "minutes".')
     if (track === 'check') {
-      for (const [k, v] of Object.entries({ count_target: i.countTarget, count_per: i.countPer, unit: i.unit, target_amount: i.targetAmount, presets: i.presets })) if (v !== undefined) throw new McError(`"${k}" does not apply to a plain tick habit. Set track to "count" or "amount".`)
+      for (const [k, v] of Object.entries({ count_target: i.countTarget, count_per: i.countPer, unit: i.unit, target_amount: i.targetAmount, presets: i.presets })) if (v !== undefined) throw new McError(`"${k}" does not apply to a plain tick habit. Set track to "count", "amount" or "minutes".`)
       x.kind = 'build'
     } else if (track === 'count') {
       for (const [k, v] of Object.entries({ unit: i.unit, target_amount: i.targetAmount, presets: i.presets })) if (v !== undefined) throw new McError(`"${k}" does not apply to a counted habit.`)
       x.kind = 'measured'; x.measure = 'times'; x.per = i.countPer ?? 'day'
       x.targetCount = Math.max(1, Math.round(i.countTarget ?? 1))
+    } else if (track === 'minutes') {
+      // habits.tsx HabitSheet: "Minutes of focus time" is measured / minutes / source focus, a target of 5 to 600 a day.
+      for (const [k, v] of Object.entries({ count_target: i.countTarget, count_per: i.countPer, unit: i.unit, target_amount: i.targetAmount, presets: i.presets })) if (v !== undefined) throw new McError(`"${k}" does not apply to a habit kept by focus minutes.`)
+      x.kind = 'measured'; x.measure = 'minutes'; x.source = 'focus'
+      x.dailyTargetMin = minutesIn(i.minutesTarget ?? 60)
     } else {
       if (i.countTarget !== undefined || i.countPer !== undefined) throw new McError('count_target and count_per do not apply to an amount habit.')
       if (!i.unit?.trim()) throw new McError('An amount habit needs a unit (ml, pages, minutes ...): say what one log is measured in.')
@@ -642,23 +716,57 @@ export function addHabit(b: Blob, i: AddHabitInput): { id: string; text: string 
     : `Added a habit: "${name}" (${row.kind === 'measured' ? `${countTarget(row)} per ${row.per}` : row.measure === 'amount' ? `${row.targetAmount} ${row.unit} a day` : row.frequency}).${filled ? ` ${filled} earlier days since ${i.startedOn} were marked kept.` : ''}` }
 }
 
-export interface EditHabitInput { newName?: string; frequency?: string; perWeek?: number; daypart?: string | null; quitSince?: string; startedOn?: string; countTarget?: number; countPer?: 'day' | 'week' | 'month'; dailyCost?: number }
+/** habits.tsx HabitSheet: the minutes input is min 5, max 600. */
+const minutesIn = (n: number): number => {
+  if (!Number.isFinite(n) || n < 5 || n > 600) throw new McError('minutes_target is 5 to 600 minutes a day (the Habits page\'s own range).')
+  return Math.round(n)
+}
 
-/** assistant `editHabit` -> updateHabit (name, frequency, targetPerWeek, quitSince, startedOn, per, targetCount) and setLook (daypart, dailyCost). */
+export interface EditHabitInput {
+  newName?: string; frequency?: string; perWeek?: number; daypart?: string | null; quitSince?: string; startedOn?: string
+  countTarget?: number; countPer?: 'day' | 'week' | 'month'; dailyCost?: number | null
+  color?: string; icon?: string; presets?: number[]; minutesTarget?: number
+  /** habits.tsx HabitSheet "Which kind is this?": keep (a tick), quit, count (times), minutes (focus time). */
+  kind?: 'keep' | 'quit' | 'count' | 'minutes'
+}
+
+/** assistant `editHabit` -> updateHabit (name, frequency, targetPerWeek, quitSince, startedOn, per, targetCount, kind, measure,
+ *  dailyTargetMin, source: the Habit sheet) and setLook (daypart, dailyCost, presets, color, icon: the Habits page detail sheet). */
 export function editHabit(b: Blob, ref: Ref, p: EditHabitInput): { id: string; text: string } {
   const h = findHabit(b, ref)
   const owner = drivenBy(b, h)
   const did: string[] = []
   const patch: Row = {}
+  const clear: string[] = []
+  // habits.tsx: a habit a routine drives keeps its name, frequency and kind in step with the routine; only the part of the day (and the look) is his to move.
+  const lockedTo = (what: string) => { if (owner) throw new McError(`"${h.name}" is the streak of the routine "${owner.title}", so its ${what} follows the routine (edit_routine). Only the part of the day, colour and icon can change here.`) }
+  if (p.kind !== undefined) {
+    lockedTo('kind')
+    if (h.measure === 'amount') throw new McError(`"${h.name}" is an amount habit. The Habits page's habit sheet has no amount kind to switch to or from, so its kind cannot be changed. Make a new habit instead.`)
+    const was = isQuit(h) ? 'quit' : isCounted(h) ? 'count' : h.kind === 'measured' || h.auto?.from === 'focus' ? 'minutes' : 'keep'
+    if (p.kind !== was) {
+      if (isAuto(h) && h.auto?.from === 'focus') throw new McError(`"${h.name}" is kept by a focus rule the Habit sheet cannot rewrite, so its kind stays.`)
+      // The sheet writes every kind-specific field each time; the ones that do not apply are cleared.
+      Object.assign(patch, { kind: p.kind === 'quit' ? 'break' : p.kind === 'keep' ? 'build' : 'measured', measure: undefined, per: undefined, targetCount: undefined, dailyTargetMin: undefined, source: undefined, quitSince: undefined })
+      clear.push('measure', 'per', 'targetCount', 'dailyTargetMin', 'source', 'quitSince')
+      if (p.kind === 'quit') { patch.quitSince = p.quitSince ?? h.quitSince ?? dateKey(); patch.startedOn = undefined; clear.push('startedOn', 'daypart'); delete h.daypart; checkStart(patch.quitSince, 'quit_since') }
+      else patch.startedOn = p.startedOn ?? h.startedOn ?? dateKey()
+      if (p.kind === 'count') { patch.measure = 'times'; patch.per = p.countPer ?? h.per ?? 'day'; patch.targetCount = Math.max(1, Math.round(p.countTarget ?? h.targetCount ?? 1)) }
+      if (p.kind === 'minutes') { patch.measure = 'minutes'; patch.source = 'focus'; patch.dailyTargetMin = minutesIn(p.minutesTarget ?? h.dailyTargetMin ?? 60) }
+      did.push(`now ${p.kind === 'keep' ? 'a plain tick habit' : p.kind === 'quit' ? 'a quit' : p.kind === 'count' ? 'a counted habit' : 'kept by focus minutes'}`)
+    }
+  }
+  const nowQuit = patch.kind ? patch.kind === 'break' : isQuit(h)
+  const nowCounted = patch.kind ? (patch.kind === 'measured' && patch.measure === 'times') : isCounted(h)
   if (p.newName !== undefined) {
     const n = p.newName.trim()
     if (!n) throw new McError('A habit name cannot be empty.')
-    if (owner) throw new McError(`"${h.name}" is the streak of the routine "${owner.title}", so its name follows the routine. Rename the routine (edit_routine).`)
+    lockedTo('name')
     if (live(b).some((x) => x.id !== h.id && fold(habitName(x)) === fold(n))) throw new McError(`Another habit is already called "${n}".`)
     patch.name = n; did.push(`name "${n}"`)
   }
   if (p.frequency !== undefined || p.perWeek !== undefined) {
-    if (owner) throw new McError(`The "${owner.title}" routine keeps this habit, so its frequency follows the routine.`)
+    lockedTo('frequency')
     if (p.frequency !== undefined && !FREQS.includes(p.frequency)) throw new McError(`frequency must be one of ${FREQS.join(', ')}.`)
     const f = p.frequency ?? h.frequency
     if (p.perWeek !== undefined) {
@@ -669,23 +777,41 @@ export function editHabit(b: Blob, ref: Ref, p: EditHabitInput): { id: string; t
     if (p.frequency !== undefined) { patch.frequency = p.frequency; did.push(p.frequency) }
   }
   if (p.countTarget !== undefined || p.countPer !== undefined) {
-    if (!isCounted(h)) throw new McError(`"${h.name}" is not a counted habit, so it has no count target.`)
-    if (p.countTarget !== undefined) { patch.targetCount = Math.max(1, Math.round(p.countTarget)); did.push(`${patch.targetCount} per period`) }
+    if (!nowCounted) throw new McError(`"${h.name}" is not a counted habit, so it has no count target.`)
+    if (p.countTarget !== undefined) {
+      if (!Number.isInteger(p.countTarget) || p.countTarget < 1 || p.countTarget > 99) throw new McError('count_target is a whole number from 1 to 99 (the Habits page\'s own range).')
+      patch.targetCount = p.countTarget; did.push(`${patch.targetCount} per period`)
+    }
     if (p.countPer !== undefined) { patch.per = p.countPer; did.push(`per ${p.countPer}`) }
   }
-  if (p.quitSince !== undefined) {
-    if (!isQuit(h)) throw new McError(`"${h.name}" is not a quit habit.`)
+  if (p.minutesTarget !== undefined && !(patch.kind && patch.source === 'focus')) {
+    if (h.measure === 'amount' || isQuit(h) || !(h.kind === 'measured' && h.measure !== 'times') && h.auto?.from !== 'focus') throw new McError(`"${h.name}" is not kept by focus minutes, so it has no minutes target.`)
+    patch.dailyTargetMin = minutesIn(p.minutesTarget); did.push(`${patch.dailyTargetMin} min a day`)
+  }
+  if (p.quitSince !== undefined && !(patch.kind && patch.quitSince !== undefined)) {
+    if (!nowQuit) throw new McError(`"${h.name}" is not a quit habit.`)
     checkStart(p.quitSince, 'quit_since'); patch.quitSince = p.quitSince; did.push(`stopped on ${p.quitSince}`)
   }
   if (p.dailyCost !== undefined) {
-    if (!isQuit(h)) throw new McError('daily_cost is for a quit habit.')
-    if (!(p.dailyCost >= 0)) throw new McError('daily_cost must be 0 or more.')
-    patch.dailyCost = p.dailyCost; did.push(`${p.dailyCost} a day`)
+    if (!nowQuit) throw new McError('daily_cost is for a quit habit.')
+    if (p.dailyCost === null) { clear.push('dailyCost'); patch.dailyCost = undefined; did.push('no daily cost') } else {
+      if (!(p.dailyCost >= 0)) throw new McError('daily_cost must be 0 or more.')
+      patch.dailyCost = p.dailyCost; did.push(`${p.dailyCost} a day`)
+    }
+  }
+  if (p.presets !== undefined) {
+    if (h.measure !== 'amount') throw new McError(`"${h.name}" is not an amount habit, so it has no quick amounts.`)
+    if (p.presets.some((x) => !(x > 0))) throw new McError('Quick amounts have to be above 0.')
+    patch.presets = p.presets; did.push(`quick amounts ${p.presets.join(', ') || 'none'}`)
   }
   if (p.startedOn !== undefined) {
-    if (isQuit(h)) throw new McError('A quit habit runs from quit_since, not started_on.')
+    if (nowQuit) throw new McError('A quit habit runs from quit_since, not started_on.')
+    lockedTo('start date')
     checkStart(p.startedOn, 'started_on'); patch.startedOn = p.startedOn; did.push(`started ${p.startedOn}`)
   }
+  checkLook(p.color, p.icon)
+  if (p.color !== undefined) { patch.color = p.color.toUpperCase(); did.push(`colour ${patch.color}`) }
+  if (p.icon !== undefined) { patch.icon = p.icon; did.push(`icon ${p.icon}`) }
   if (p.daypart !== undefined) {
     if (p.daypart !== null && !DAYPARTS.includes(p.daypart)) throw new McError(`daypart must be one of ${DAYPARTS.join(', ')}, or null for any time.`)
     did.push(p.daypart ?? 'any time of day')
@@ -693,9 +819,10 @@ export function editHabit(b: Blob, ref: Ref, p: EditHabitInput): { id: string; t
   if (!did.length) throw new McError('Nothing to change: pass at least one field.')
   const had = h.filledSince
   Object.assign(h, patch)
+  for (const k of clear) if (patch[k] === undefined) delete h[k]
   if (p.daypart !== undefined) { if (p.daypart === null) delete h.daypart; else h.daypart = p.daypart; h.partSet = true } // setLook
   // Moving the start EARLIER claims only the days it reached back over; later never deletes a logged day.
-  if (p.startedOn && p.startedOn !== had) backfillKept(b, h.id, p.startedOn, had)
+  if (p.startedOn && p.startedOn !== had && !nowQuit) backfillKept(b, h.id, p.startedOn, had)
   return { id: h.id, text: `Updated "${h.name}": ${did.join(', ')}.` }
 }
 
@@ -712,7 +839,8 @@ export function pauseHabit(b: Blob, ref: Ref, paused?: boolean): { id: string; t
 export function archiveHabit(b: Blob, ref: Ref): { id: string; text: string } {
   const h = findHabit(b, ref)
   const own = liveRoutines(b).find((r) => r.habitId === h.id)
-  if (own) throw new McError(`"${h.name}" is the streak of the routine "${own.title}" and goes with it. Delete the routine instead (delete_routine).`)
+  // habits.tsx: "Deleted with the routine" is the only delete a routine's own streak habit has, so that is what this does.
+  if (own) { const r = deleteRoutine(b, { id: own.id }); return { id: h.id, text: `"${h.name}" is the streak habit of the routine "${own.title}" and goes with it. ${r.text}` } }
   h.archivedAt = dateKey()
   const seeds = ensure(b, 'removedSeeds') as unknown as string[]
   if (!seeds.includes(h.id)) seeds.push(h.id)
@@ -724,8 +852,9 @@ export function archiveHabit(b: Blob, ref: Ref): { id: string; text: string } {
 const freqForCadence = (c: string) => (c === 'weekly' ? 'weekly' : c === 'monthly' ? 'monthly' : c === 'prework' ? 'weekdays' : 'daily')
 const CADENCES = ['daily', 'prework', 'weekly', 'monthly']
 
-/** growth.ts addRoutine (+ addRoutineStep for each given step, as the assistant does). */
-export function addRoutine(b: Blob, i: { title: string; cadence?: string; blurb?: string; daypart?: string; space?: 'personal' | 'work'; steps?: string[] }): { id: string; text: string } {
+/** growth.ts addRoutineWithSteps (the Habits page's New > Routine sheet) when steps are given: the routine arrives with its steps already as
+ *  habits in its folder. With no steps: growth.ts addRoutine (the assistant's and the Plan page's empty routine). */
+export function addRoutine(b: Blob, i: { title: string; cadence?: string; blurb?: string; daypart?: string; space?: 'personal' | 'work'; steps?: string[]; color?: string; icon?: string; repeatable?: boolean }): { id: string; text: string } {
   const title = (i.title ?? '').trim()
   if (!title) throw new McError('A routine needs a title.')
   const cadence = i.cadence ?? 'daily'
@@ -734,21 +863,30 @@ export function addRoutine(b: Blob, i: { title: string; cadence?: string; blurb?
   if (liveRoutines(b).some((r) => fold(String(r.title)) === fold(title))) throw new McError(`There is already a routine called "${title}".`)
   const steps = (i.steps ?? []).map((s) => String(s).trim()).filter(Boolean)
   if (steps.length > 40) throw new McError('A routine takes at most 40 steps here.')
+  if (i.repeatable && cadence !== 'daily') throw new McError('repeatable ("whenever I need it") is a daily routine: the app offers it only as the daily kind.')
+  checkLook(i.color, i.icon)
   const space = i.space ?? 'personal'
   const hid = newId('h'), rid = newId('r')
-  ensure(b, 'habits').push(clean({
-    id: hid, space, name: title, daypart: i.daypart, kind: 'build', frequency: freqForCadence(cadence),
-    days: [false, false, false, false, false, false, false], paused: false, history: [],
-  }))
-  ensure(b, 'routines').push(clean({
-    id: rid, space, title, cadence, blurb: i.blurb, steps: [], doneStepIds: [], habitId: hid, periodKey: periodKeyFor(cadence), stepData: {},
-  }))
-  for (const s of steps) addStep(b, rid, s)
-  return { id: rid, text: `Made a new routine "${title}" (${cadence}${steps.length ? `, ${steps.length} steps` : ''}).` }
+  const frequency = freqForCadence(cadence)
+  const blank = () => [false, false, false, false, false, false, false]
+  const look = { color: i.color?.toUpperCase(), icon: i.icon }
+  if (steps.length) {
+    const stamp = Date.now().toString(36)
+    const rs = steps.map((t, k) => ({ id: `st${stamp}${k}`, title: t, kind: 'do' }))
+    ensure(b, 'habits').push(
+      clean({ id: hid, space, name: title, daypart: i.daypart, kind: 'build', frequency, days: blank(), paused: false, history: [], startedOn: dateKey() }),
+      ...rs.map((st, k) => clean({ id: `h-${rid}-${st.id}`, space, name: st.title, kind: 'build', frequency, daypart: i.daypart, partSet: true, days: blank(), paused: false, history: [], folderId: rid, folderOrder: k, startedOn: dateKey() })),
+    )
+    ensure(b, 'routines').push(clean({ id: rid, space, title, cadence, steps: rs, doneStepIds: [], habitId: hid, periodKey: periodKeyFor(cadence), stepData: {}, ...look, repeatable: i.repeatable, blurb: i.blurb }))
+  } else {
+    ensure(b, 'habits').push(clean({ id: hid, space, name: title, daypart: i.daypart, kind: 'build', frequency, days: blank(), paused: false, history: [] }))
+    ensure(b, 'routines').push(clean({ id: rid, space, title, cadence, blurb: i.blurb, steps: [], doneStepIds: [], habitId: hid, periodKey: periodKeyFor(cadence), stepData: {}, ...look, repeatable: i.repeatable }))
+  }
+  return { id: rid, text: `Made a new routine "${title}" (${cadence}${i.repeatable ? ', whenever he needs it' : ''}${steps.length ? `, ${steps.length} steps, each one a habit in its folder` : ''}).` }
 }
 
 /** growth.ts updateRoutine */
-export function editRoutine(b: Blob, ref: Ref, p: { title?: string; cadence?: string; blurb?: string }): { id: string; text: string } {
+export function editRoutine(b: Blob, ref: Ref, p: { title?: string; cadence?: string; blurb?: string; color?: string; icon?: string }): { id: string; text: string } {
   const r = findRoutine(b, ref)
   const did: string[] = []
   const patch: Row = {}
@@ -762,6 +900,9 @@ export function editRoutine(b: Blob, ref: Ref, p: { title?: string; cadence?: st
     patch.cadence = p.cadence; did.push(p.cadence)
   }
   if (p.blurb !== undefined) { patch.blurb = p.blurb; did.push('blurb') }
+  checkLook(p.color, p.icon) // growth.ts setLook('routine'): colour and icon
+  if (p.color !== undefined) { patch.color = p.color.toUpperCase(); did.push(`colour ${patch.color}`) }
+  if (p.icon !== undefined) { patch.icon = p.icon; did.push(`icon ${p.icon}`) }
   if (!did.length) throw new McError('Nothing to change: pass at least one field.')
   Object.assign(r, patch)
   // The mirrored habit carries the routine's name, so keep them in step.
@@ -769,25 +910,42 @@ export function editRoutine(b: Blob, ref: Ref, p: { title?: string; cadence?: st
   return { id: r.id, text: `Updated routine "${r.title}": ${did.join(', ')}.` }
 }
 
+const TIMEFRAME_WEEKS: Record<string, number> = { weekly: 1, monthly: 4, quarter: 13, half: 26 }
+/** src/types/goals.ts goalCurrent(g, habits) with no log and no range, which is how growth.ts deleteRoutine calls it. */
+function goalCurrentPlain(g: Row, habits: Row[]): number {
+  if (g.closed) return g.closed.final
+  if (!g.habitId) return g.current
+  const h = habits.find((x) => x.id === g.habitId)
+  if (!h) return g.current
+  const thisWeek = (h.days ?? []).filter(Boolean).length
+  const weeks = TIMEFRAME_WEEKS[g.timeframe ?? 'quarter']
+  const past = (h.history ?? []).slice(-(weeks - 1)).reduce((a: number, n: number) => a + n, 0)
+  return Math.min(g.target, thisWeek + (weeks > 1 ? past : 0))
+}
+
 /** growth.ts deleteRoutine: archived with its own habit, never erased. */
 export function deleteRoutine(b: Blob, ref: Ref): { id: string; text: string } {
   const r = findRoutine(b, ref)
-  const goal = r.habitId ? arr(b, 'goals').find((g) => g.habitId === r.habitId && !g.closed) : undefined
-  if (goal) throw new McError(`The goal "${goal.name}" counts off this routine's habit. The app re-works that goal when a routine goes; this connector cannot, so unlink the goal first (or delete the routine in the app).`)
   const today = dateKey()
+  // A goal counting off that habit keeps the progress it earned and goes back to being logged by hand (growth.ts deleteRoutine).
+  const detached: string[] = []
+  if (r.habitId) {
+    const habits = arr(b, 'habits')
+    for (const g of arr(b, 'goals')) {
+      if (g.habitId !== r.habitId) continue
+      g.current = goalCurrentPlain(g, habits)
+      delete g.habitId
+      if (g.unit === 'checkoffs') g.unit = 'done'
+      detached.push(g.name)
+    }
+  }
   r.archivedAt = today
   if (r.habitId) for (const h of arr(b, 'habits')) if (h.id === r.habitId) h.archivedAt = today
   const seeds = ensure(b, 'removedSeeds') as unknown as string[]
   if (r.habitId && !seeds.includes(r.habitId)) seeds.push(r.habitId)
   if (!seeds.includes(r.id)) seeds.push(r.id)
   const kids = arr(b, 'habits').filter((h) => h.folderId === r.id && !h.archivedAt).length
-  return { id: r.id, text: `Deleted routine "${r.title}" (kept in its history).${kids ? ` Its ${kids} step habits are still there as habits; archive them with archive_habit if he wants them gone.` : ''}` }
-}
-
-function addStep(b: Blob, routineId: string, title: string): string {
-  const stepId = newId('st')
-  applyRoutine(b, routineId, (r) => ({ ...r, steps: [...(r.steps ?? []), { id: stepId, kind: 'do', title }] }))
-  return stepId
+  return { id: r.id, text: `Deleted routine "${r.title}" (kept in its history).${detached.length ? ` ${detached.length === 1 ? 'The goal' : 'The goals'} ${detached.map((n) => `"${n}"`).join(', ')} counted off its habit, so ${detached.length === 1 ? 'it keeps' : 'they keep'} the progress earned and ${detached.length === 1 ? 'is' : 'are'} logged by hand from now on.` : ''}${kids ? ` Its ${kids} step habits are still there as habits; archive them with archive_habit if he wants them gone.` : ''}` }
 }
 
 /** growth.ts addRoutineStep. Adding a required step to a finished routine reopens it, as in the app. */
@@ -798,7 +956,18 @@ export function addRoutineStep(b: Blob, ref: Ref, title: string): { id: string; 
   if ((r.steps ?? []).length >= 40) throw new McError('A routine takes at most 40 steps here.')
   if ((r.steps ?? []).some((s: Row) => fold(String(s.title)) === fold(t))) throw new McError(`"${r.title}" already has a step "${t}".`)
   const wasDone = routineComplete(rolled(r), periodKeyFor(r.cadence))
-  guarded(b, 'Adding a step', () => addStep(b, r.id, t))
+  const order = arr(b, 'habits').filter((x) => x.folderId === r.id).reduce((m, x) => Math.max(m, x.folderOrder ?? 0), -1) + 1
+  let stepId = ''
+  cascade(b, 'Adding a step', routineScope(b, r), () => {
+    // The step is also made as a habit in the routine's folder, exactly as addRoutineWithSteps makes them, so it shows on the Habits page at once.
+    stepId = newId('st')
+    const home = arr(b, 'habits').find((x) => x.id === r.habitId)
+    ensure(b, 'habits').push(clean({
+      id: `h-${r.id}-${stepId}`, space: r.space, name: t, kind: 'build', frequency: freqForCadence(r.cadence), daypart: home?.daypart, partSet: true,
+      days: [false, false, false, false, false, false, false], paused: false, history: [], folderId: r.id, folderOrder: order, startedOn: dateKey(),
+    }))
+    applyRoutine(b, r.id, (x) => ({ ...x, steps: [...(x.steps ?? []), { id: stepId, kind: 'do', title: t }] }))
+  })
   return { id: r.id, text: `Added a step to "${r.title}": ${t}.${wasDone ? ' The routine had been finished for this period; the new step reopens it.' : ''}` }
 }
 
@@ -809,7 +978,7 @@ const findStep = (r: Row, ref: { stepId?: string; step?: string }): Row =>
 export function removeRoutineStep(b: Blob, ref: Ref, stepRef: { stepId?: string; step?: string }): { id: string; text: string } {
   const r = findRoutine(b, ref)
   const st = findStep(r, stepRef)
-  guarded(b, 'Removing a step', () => applyRoutine(b, r.id, (x) => ({ ...x, steps: x.steps.filter((s: Row) => s.id !== st.id), doneStepIds: (x.doneStepIds ?? []).filter((id: string) => id !== st.id) })))
+  cascade(b, 'Removing a step', routineScope(b, r), () => applyRoutine(b, r.id, (x) => ({ ...x, steps: x.steps.filter((s: Row) => s.id !== st.id), doneStepIds: (x.doneStepIds ?? []).filter((id: string) => id !== st.id) })))
   const hid = st.habitId ?? `h-${r.id}-${st.id}`
   const kept = arr(b, 'habits').some((h) => h.id === hid && !h.archivedAt)
   return { id: r.id, text: `Removed from "${r.title}": ${st.title}.${kept ? ` Its habit "${arr(b, 'habits').find((h) => h.id === hid)!.name}" is still there; archive_habit removes it.` : ''}` }
@@ -830,7 +999,7 @@ export function routineStep(b: Blob, ref: Ref, stepRef: { stepId?: string; step?
     if (opts.done === true && off) return { id: r.id, text: `"${st.title}" was already ticked with "${alt.title}".` }
     if (opts.done === false && !off) return { id: r.id, text: `"${st.title}" was not ticked with "${alt.title}".` }
     if (!off && stepLocked(r, st.id)) throw new McError(`"${st.title}" is locked until its own test is passed.`)
-    guarded(b, `"${st.title}"`, () => applyRoutine(b, r.id, (x) => {
+    cascade(b, `"${st.title}"`, routineScope(b, r), () => applyRoutine(b, r.id, (x) => {
       const stepChoice = { ...(x.stepChoice ?? {}) }
       if (off) delete stepChoice[st.id]; else stepChoice[st.id] = alt.id
       const doneStepIds = off ? x.doneStepIds.filter((id: string) => id !== st.id) : x.doneStepIds.includes(st.id) ? x.doneStepIds : [...x.doneStepIds, st.id]
@@ -841,13 +1010,15 @@ export function routineStep(b: Blob, ref: Ref, stepRef: { stepId?: string; step?
   }
   const want = opts.done ?? !has
   if (want === has) return { id: r.id, text: `"${st.title}" was already ${has ? 'ticked' : 'open'} in "${r.title}".` }
+  // Taking an answer back is the app's own gesture on a step with alternatives: pick the chosen answer again (plan.tsx toggleRoutineAlt).
+  if (!want && st.alts?.length && r.stepChoice?.[st.id]) return routineStep(b, ref, stepRef, { done: false, alt: r.stepChoice[st.id] })
   if (want) {
     if (stepLocked(r, st.id)) throw new McError(`"${st.title}" is locked until its own test is passed (75 WPM).`)
     if (habit && habitGate(habit)) throw new McError(`"${st.title}" is gated by a number (${habitGate(habit)!.target} ${habitGate(habit)!.unit}). Log his real result with habit_count on the habit "${habit.name}".`)
-    if (st.alts?.length) throw new McError(`"${st.title}" is answered by picking one alternative. Call again with alt set to one of: ${st.alts.map((a: Row) => `${a.id} (${a.title})`).join(', ')}.`)
+    if (st.alts?.length) throw new McError(`"${st.title}" is answered by picking one alternative, and which one is his to say. Call again with alt set to one of: ${st.alts.map((a: Row) => `${a.id} (${a.title})`).join(', ')}.`)
   }
   const doneStepIds = has ? r.doneStepIds.filter((x: string) => x !== st.id) : [...r.doneStepIds, st.id]
-  guarded(b, `Unticking "${st.title}"`, () => {
+  cascade(b, `${has ? 'Unticking' : 'Ticking'} "${st.title}"`, routineScope(b, r), () => {
     applyRoutine(b, r.id, (x) => stamped({ ...x, doneStepIds }))
     markSteps(b, r.id, [st.id], !has)
   })
@@ -861,8 +1032,9 @@ function progressText(b: Blob, id: string): string {
 
 /** growth.ts setRoutineDone: finishing finishes what is REQUIRED (never an optional step he did not tick,
  *  never a step that has to be earned elsewhere: the typing test, or a habit gated by a number). */
-export function routineDone(b: Blob, ref: Ref, done: boolean): { id: string; text: string } {
+export function routineDone(b: Blob, ref: Ref, done: boolean, day?: string): { id: string; text: string } {
   const r0 = findRoutine(b, ref)
+  if (day !== undefined && day !== dateKey()) return routineDonePast(b, r0, day, done)
   const r = rollRoutine(r0)
   if (!(r.steps ?? []).length) throw new McError(`"${r.title}" has no steps yet, so there is nothing to finish. Add steps first (add_routine_step).`)
   const locked = (x: Row, st: Row): boolean => {
@@ -870,7 +1042,7 @@ export function routineDone(b: Blob, ref: Ref, done: boolean): { id: string; tex
     const hb = arr(b, 'habits').find((h) => h.id === (st.habitId ?? `h-${x.id}-${st.id}`))
     return !!hb && habitLocked(hb, arr(b, 'stepLog'), dateKey())
   }
-  guarded(b, done ? `Finishing "${r.title}"` : `Reopening "${r.title}"`, () => applyRoutine(b, r.id, (x) => {
+  cascade(b, done ? `Finishing "${r.title}"` : `Reopening "${r.title}"`, routineScope(b, r), () => applyRoutine(b, r.id, (x) => {
     markSteps(b, r.id, requiredSteps(x).filter((st) => !locked(x, st)).map((st) => st.id), done)
     return stamped({
       ...x,
@@ -889,12 +1061,28 @@ export function routineDone(b: Blob, ref: Ref, done: boolean): { id: string; tex
     : `Reopened "${r.title}": every step is open again.` }
 }
 
+/** src/daily.tsx "Forgot to tick?" > "I finished <routine>": every required, unpaused step habit of the folder is marked on that
+ *  day, then the routine's own habit and finish record are asserted (assertRoutineOn, force). The review runs these in ONE click
+ *  handler over a stale copy of the log, so in the app all but the last step habit write can be lost; here every write sees the last. */
+function routineDonePast(b: Blob, r: Row, day: string, done: boolean): { id: string; text: string } {
+  if (!isDate(day)) throw new McError(`day must be YYYY-MM-DD, got "${day}".`)
+  if (day > dateKey()) throw new McError('A routine cannot be finished for a day that has not happened yet.')
+  if (!done) throw new McError(`The app has no "reopen a past day" for a whole routine. To take the routine's own record for ${day} back, untick its streak habit for that day with tick_habit (done: false, day).`)
+  const steps = arr(b, 'habits').filter((x) => x.folderId === r.id && !x.optional && !x.paused && !x.archivedAt)
+  const own = r.habitId ? arr(b, 'habits').find((x) => x.id === r.habitId) : undefined
+  cascade(b, `Finishing "${r.title}" on ${day}`, routineScope(b, r), () => {
+    for (const h of steps) markDayOn(b, h.id, day, true)
+    if (own) assertRoutineOn(b, own, r, day, true)
+  })
+  return { id: r.id, text: `Marked "${r.title}" as finished on ${day}: ${steps.length} step habit${steps.length === 1 ? '' : 's'}${own ? ' and the routine\'s own streak day' : ''}.` }
+}
+
 /** growth.ts planRoutine. slot absent = clear the plan (the app's own meaning). */
 export function planRoutine(b: Blob, ref: Ref, o: { slot?: string; date?: string; clear?: boolean }): { id: string; text: string } {
   const r = findRoutine(b, ref)
   if (o.clear) {
     if (o.slot !== undefined || o.date !== undefined) throw new McError('clear takes neither slot nor date.')
-    guarded(b, 'Clearing the plan', () => applyRoutine(b, r.id, (x) => ({ ...x, planned: undefined })))
+    cascade(b, 'Clearing the plan', routineScope(b, r), () => applyRoutine(b, r.id, (x) => ({ ...x, planned: undefined })))
     return { id: r.id, text: `"${r.title}" is no longer planned on a day.` }
   }
   if (!o.slot) throw new McError('Say where on the day: slot is morning, noon, afternoon or evening. (clear: true removes a plan.)')
@@ -902,8 +1090,19 @@ export function planRoutine(b: Blob, ref: Ref, o: { slot?: string; date?: string
   const day = o.date ?? dateKey()
   if (!isDate(day)) throw new McError(`date must be YYYY-MM-DD, got "${day}".`)
   if (day < dateKey()) throw new McError('A routine cannot be planned on a day that has passed.')
-  guarded(b, 'Planning', () => applyRoutine(b, r.id, (x) => ({ ...x, planned: { day, slot: o.slot } })))
+  cascade(b, 'Planning', routineScope(b, r), () => applyRoutine(b, r.id, (x) => ({ ...x, planned: { day, slot: o.slot } })))
   return { id: r.id, text: `Planned "${r.title}" for ${day === dateKey() ? 'today' : day}, ${o.slot}.` }
+}
+
+/* ============================ the daily review ================================ */
+
+/** growth.ts closeDaily(walked): the review was walked (dailyDone) or waved off (dailySkipped) today. These two top-level keys
+ *  are all the app stores about it; what he fixes inside the review is written by tick_habit, log_slip and routine_done with a day.
+ *  (ReviewState.reflections has no writer anywhere in the app today, so there is nothing to port.) */
+export function closeDaily(b: Blob, walked: boolean): { text: string } {
+  const today = dateKey()
+  if (walked) b.dailyDone = today; else b.dailySkipped = today
+  return { text: walked ? `Marked today's daily review as walked (${today}).` : `Marked today's daily review as skipped (${today}).` }
 }
 
 /* ============================ reads =========================================== */
@@ -915,10 +1114,10 @@ function howToKeep(b: Blob, h: Row): { track: string; how: string } {
   if (t === 'auto') return { track: 'auto', how: 'none: it fills itself from focus minutes' }
   if (t === 'count') return { track: 'count', how: 'habit_count (1 = did it once, -1 = take one back)' }
   const own = drivenBy(b, h)
-  if (own) return { track: 'routine', how: `none by hand today: set by the steps of "${own.title}" (routine_step / routine_done)` }
+  if (own) return { track: 'routine', how: `set by the steps of "${own.title}" (routine_step), or all at once with routine_done; tick_habit does routine_done for it` }
   if (habitGate(h)) return { track: 'gated', how: `habit_count with his real result (needs ${habitGate(h)!.target} ${habitGate(h)!.unit})` }
   if (h.alts?.length) return { track: 'alts', how: 'tick_habit with alt set to one of the alternatives' }
-  if (h.paused) return { track: 'check', how: 'paused: resume it first (pause_habit)' }
+  if (h.paused) return { track: 'check', how: 'tick_habit (paused: it can still be ticked; pause_habit resumes it)' }
   return { track: 'check', how: 'tick_habit' }
 }
 
@@ -931,6 +1130,9 @@ export function listHabits(b: Blob, i: { query?: string; space?: 'personal' | 'w
     const { track, how } = howToKeep(b, h)
     const base: Row = { id: h.id, name: h.name, space: h.space, track, paused: !!h.paused, how }
     if (h.daypart) base.daypart = h.daypart
+    if (h.color) base.color = h.color
+    if (h.icon) base.icon = h.icon
+    if (h.startedOn) base.startedOn = h.startedOn
     const rid = h.folderId ?? arr(b, 'routines').find((r) => !r.archivedAt && (r.steps ?? []).some((s: Row) => s.habitId === h.id))?.id
     const rt = rid ? arr(b, 'routines').find((r) => r.id === rid) : undefined
     if (rt) base.routine = rt.title
@@ -945,9 +1147,9 @@ export function listHabits(b: Blob, i: { query?: string; space?: 'personal' | 'w
     }
     if (track === 'amount') {
       const total = amountOn(log, h.id, today)
-      return { ...common, keptToday: total >= (h.targetAmount ?? 1), amount: { today: total, target: h.targetAmount ?? 1, unit: h.unit } }
+      return { ...common, keptToday: total >= (h.targetAmount ?? 1), amount: { today: total, target: h.targetAmount ?? 1, unit: h.unit, ...(h.presets?.length ? { presets: h.presets } : {}) } }
     }
-    if (track === 'auto') return { ...common, keptToday: kept, fills: `${h.auto?.minutes ?? h.dailyTargetMin ?? 60} min of focus a day` }
+    if (track === 'auto') return { ...common, keptToday: kept, fills: `${h.auto?.minutes ?? h.dailyTargetMin ?? 60} min of focus a day`, ...(h.dailyTargetMin ? { minutesTarget: h.dailyTargetMin } : {}) }
     return {
       ...common, streak: currentStreak(log, h.id, today), bestStreak: bestStreak(log, h.id),
       week: week.map((d) => keptOn(b, h.id, d)),
@@ -966,7 +1168,7 @@ export function listRoutines(b: Blob, i: { query?: string } = {}): { count: numb
     const key = periodKeyFor(r.cadence)
     const habits = arr(b, 'habits')
     return clean({
-      id: r.id, title: r.title, space: r.space, cadence: r.cadence, blurb: r.blurb,
+      id: r.id, title: r.title, space: r.space, cadence: r.cadence, blurb: r.blurb, color: r.color, icon: r.icon,
       complete: routineComplete(r, key), progress: routineProgress(r), startedAt: r.startedAt,
       planned: r.planned && r.planned.day >= today ? r.planned : undefined,
       repeatable: r.repeatable || undefined, runsThisPeriod: r.run || undefined,

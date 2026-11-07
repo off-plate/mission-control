@@ -21,7 +21,7 @@
    The db is any object shaped like a supabase-js client, so the tests can hand
    it a fake. */
 
-import { McError, type Blob } from './ops.ts'
+import { McError, shrinkAllowance, type Blob } from './ops.ts'
 
 export interface Db { from(table: string): any }
 const TABLE = 'mc_state'
@@ -46,11 +46,12 @@ export async function readState(db: Db, uid: string): Promise<Blob> {
  *  from a collection, and never drops a collection. A bug in an operation that
  *  would wipe a list stops here, before anything is written. */
 export function guard(before: Blob, after: Blob): void {
+  const allow = shrinkAllowance(after) // a cascading operation declares exactly how many extra rows it removes
   for (const [k, v] of Object.entries(before)) {
     if (!Array.isArray(v)) continue
     const now = after[k]
     if (!Array.isArray(now)) throw new McError(`Safety stop: "${k}" would have been removed. Nothing was written.`)
-    if (now.length < v.length - 1) throw new McError(`Safety stop: "${k}" would have shrunk from ${v.length} to ${now.length}. Nothing was written.`)
+    if (now.length < v.length - 1 - (allow[k] ?? 0)) throw new McError(`Safety stop: "${k}" would have shrunk from ${v.length} to ${now.length}. Nothing was written.`)
   }
 }
 

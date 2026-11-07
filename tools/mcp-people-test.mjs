@@ -154,11 +154,8 @@ for (const st of ['Prospect', 'Ready to contact', 'Contacted', 'Responded waitin
     assert.ok(!m.people.some((p) => p.id === 'person-ada')); assert.equal(m.personContacts.length, 0); assert.equal(m.personBonds.length, 0)
     assert.equal(m.people.length, 3)
   }
-  // more than the safety stop allows: refused in words, nothing changed, nothing buried
-  const c = world(); O.logContact(c, { title: 'Ada N' }, { date: dayAgo(10) })
-  const snap = JSON.stringify(c)
-  refuses(() => O.deletePerson(c, { title: 'Ada N' }), /2 logged contacts.*in the app/)
-  assert.equal(JSON.stringify(c), snap)
+  // LIFTED in v3: a person with several contacts and links used to be refused; the cascade now declares its allowance
+  // (the old assertion "/2 logged contacts.*in the app/" is deliberately replaced by the cascade checks in the v3 section below)
   // a person with nothing attached
   const e = world(); O.deletePerson(e, { title: 'Quiet' }); assert.deepEqual(keys(e), ['people:person-off'])
   refuses(() => O.deletePerson(world(), { title: 'Nov' }), /matches 2/)
@@ -174,7 +171,7 @@ for (const st of ['Prospect', 'Ready to contact', 'Contacted', 'Responded waitin
   assert.deepEqual(l.people.map((p) => p.id), ['person-adam', 'person-ada', 'person-milan', 'person-off'], 'overdue first, untracked last')
   const adam = l.people[0]; assert.equal(adam.overdue, true); assert.equal(adam.daysOverdue, 16); assert.deepEqual(adam.lastContact, { day: dayAgo(30), channel: 'message', daysAgo: 30 })
   const ada = l.people[1]; assert.equal(ada.overdue, false); assert.equal(ada.lastContact.daysAgo, 3)
-  assert.deepEqual(ada.knows, [{ with: 'Adam Novák', isToThem: 'brother' }]); assert.deepEqual(adam.knows, [{ with: 'Ada Nováková', isToThem: 'sister' }])
+  assert.deepEqual(ada.knows, [{ with: 'Adam Novák', withId: 'person-adam', isToThem: 'brother' }]); assert.deepEqual(adam.knows, [{ with: 'Ada Nováková', withId: 'person-ada', isToThem: 'sister' }]) // v3 added withId
   const off = l.people[3]; assert.equal(off.tracked, false); assert.equal(off.overdue, false)
   assert.equal(l.overdueNow, 1)
   assert.deepEqual(O.listPeople(b, { tier: 'core' }).people.map((p) => p.id), ['person-ada'])
@@ -258,10 +255,10 @@ for (const st of ['Prospect', 'Ready to contact', 'Contacted', 'Responded waitin
   const db = stateDb(world())
   const srv = fakeServer(K, M.tools_people.register, db)
   const names = srv.names()
-  assert.deepEqual(names.sort(), ['add_person', 'add_prospect', 'delete_person', 'edit_person', 'edit_prospect', 'get_prospect', 'list_people', 'list_prospects', 'log_contact', 'log_touch', 'remove_contact'])
+  assert.deepEqual(names.sort(), ['add_person', 'add_prospect', 'delete_person', 'delete_prospect', 'edit_contact', 'edit_link', 'edit_person', 'edit_prospect', 'edit_prospect_contact', 'get_prospect', 'link_people', 'list_people', 'list_prospects', 'log_contact', 'log_touch', 'mark_meeting_prep_ready', 'remove_contact', 'remove_prospect_contact', 'remove_touch', 'resolve_prospect_reply', 'unlink_people'])
   for (const n of names) { const c = srv.tools[n].cfg; assert.ok(c.title && c.description && c.inputSchema && c.annotations, n); assert.match(n, /^[a-z]+(_[a-z]+)+$/) }
   assert.deepEqual(names.filter((n) => srv.tools[n].cfg.annotations.readOnlyHint).sort(), ['get_prospect', 'list_people', 'list_prospects'])
-  assert.deepEqual(names.filter((n) => srv.tools[n].cfg.annotations.destructiveHint).sort(), ['delete_person', 'remove_contact'])
+  assert.deepEqual(names.filter((n) => srv.tools[n].cfg.annotations.destructiveHint).sort(), ['delete_person', 'delete_prospect', 'edit_contact', 'remove_contact', 'remove_prospect_contact', 'remove_touch', 'unlink_people'])
   const data = () => db.tables.mc_state[0].data
 
   // the example that failed in real use
@@ -286,7 +283,8 @@ for (const st of ['Prospect', 'Ready to contact', 'Contacted', 'Responded waitin
   const snap = JSON.stringify(data())
   data().personContacts.push({ id: 'contact-9', personId: 'person-ada', day: dayAgo(9), channel: 'call', createdAt: 1 })
   const snap2 = JSON.stringify(data())
-  const del = await srv.call('delete_person', { person: 'Ada Nováková' }); assert.equal(del.isError, true); assert.match(del.text, /in the app/); assert.equal(JSON.stringify(data()), snap2)
+  const del = await srv.call('delete_person', { person: 'Ada Nováková' }); assert.equal(del.isError, false, del.text) // v3: cascades through the safety stop
+  assert.ok(!data().personContacts.some((c) => c.personId === 'person-ada')); assert.ok(keys(data()).includes('personContacts:contact-9'))
   assert.equal((await srv.call('delete_person', { person: 'Quiet' })).isError, false); assert.ok(keys(data()).includes('people:person-off'))
 
   // bad input is refused by the real schema before any handler runs
@@ -328,6 +326,258 @@ for (const st of ['Prospect', 'Ready to contact', 'Contacted', 'Responded waitin
   const gone = db2.tables.mc_state[0].data
   const staleEdit = world(); staleEdit.savedAt = 9e15; staleEdit.people.find((p) => p.id === 'person-off').updatedAt = Date.now() + 1000 // even a "newer" stale row is buried
   for (const m of [merge(staleEdit, gone), merge(gone, staleEdit)]) assert.ok(!m.people.some((p) => p.id === 'person-off'), 'a buried person stays buried')
+}
+
+/* =====================================================================================
+   v3: everything the People page, the Business pipeline and the Business room can do
+   ===================================================================================== */
+const regAll = () => { const db = stateDb(world()); const srv = fakeServer(K, M.tools_people.register, db); return { db, srv, data: () => db.tables.mc_state[0].data } }
+
+/* ---- delete_person: a person with MANY contacts and links (was refused), cascade declared exactly ---- */
+{
+  const w = world()
+  w.people.push(person('person-eve', 'Eva Dvořáková', { x: 355, y: 0 }))
+  w.personBonds.push({ id: 'bond-2', a: 'person-eve', b: 'person-ada', aToB: 'friend', createdAt: 1, updatedAt: 1 }, { id: 'bond-3', a: 'person-milan', b: 'person-eve', bToA: 'client', createdAt: 1, updatedAt: 1 })
+  for (let n = 0; n < 4; n++) w.personContacts.push({ id: `contact-e${n}`, personId: 'person-eve', day: dayAgo(n + 1), channel: 'call', createdAt: n })
+  const stale = clone(w)
+  const db = stateDb(w)
+  const r = await M.commit(db, 'u1', (b) => O.deletePerson(b, { title: 'Eva Dvorakova' })) // forgiving name
+  const out = db.tables.mc_state[0].data
+  assert.match(r.text, /Removed Eva Dvořáková \(and 4 contacts, 2 links\)/)
+  assert.ok(!out.people.some((p) => p.id === 'person-eve'))
+  assert.deepEqual(out.personBonds.map((x) => x.id), ['bond-1']) // Ada/Adam's untouched
+  assert.deepEqual(out.personContacts.map((c) => c.id), ['contact-1'])
+  const want = ['people:person-eve', 'personBonds:bond-2', 'personBonds:bond-3', 'personContacts:contact-e0', 'personContacts:contact-e1', 'personContacts:contact-e2', 'personContacts:contact-e3']
+  for (const k of want) assert.ok(keys(out).includes(k), k)
+  assert.equal(keys(out).length, want.length) // nothing else buried
+  for (const m of [merge(stale, out), merge(out, stale)]) {
+    assert.ok(!m.people.some((p) => p.id === 'person-eve')); assert.equal(m.personContacts.length, 1); assert.deepEqual(m.personBonds.map((x) => x.id), ['bond-1'])
+  }
+  // the allowance never reaches the saved row
+  assert.ok(!JSON.stringify(out).includes('allowShrink'))
+  // a BUG that removes one more contact than the cascade declared is still stopped
+  await assert.rejects(() => M.commit(stateDb(clone(stale)), 'u1', (b) => { O.deletePerson(b, { id: 'person-eve' }); b.personContacts = b.personContacts.filter((c) => c.id !== 'contact-1'); return { text: 'x' } }), /Safety stop: "personContacts"/)
+  // and a different person's rows are not collateral: removing two people at once is stopped by the people collection
+  await assert.rejects(() => M.commit(stateDb(clone(stale)), 'u1', (b) => { O.deletePerson(b, { id: 'person-eve' }); O.deletePerson(b, { id: 'person-milan' }); return { text: 'x' } }), /Safety stop: "people"/)
+}
+
+/* ---- MUTATION CHECK on the riskiest rule (the declared cascade): drop the declaration, the real writer must stop it ---- */
+{
+  const fs = await import('fs'); const path = await import('path')
+  const dir = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'supabase', 'functions', 'mc-mcp')
+  const src = fs.readFileSync(path.join(dir, 'ops-people.ts'), 'utf8')
+  const mutated = src.replace("allowShrink(b, 'personContacts', contacts.length - 1)", '/* mutation: declaration removed */')
+  assert.notEqual(mutated, src, 'the mutation must actually change the source')
+  const tmp = path.join(dir, 'ops-people-mut.ts')
+  fs.writeFileSync(tmp, mutated)
+  try {
+    const K2 = await loadKit({ modules: ['ops-people-mut.ts'] })
+    const w = world(); for (let n = 0; n < 3; n++) w.personContacts.push({ id: `contact-m${n}`, personId: 'person-ada', day: dayAgo(n + 5), channel: 'call', createdAt: n })
+    await assert.rejects(() => K2.M.commit(K2.stateDb(w), 'u1', (b) => K2.M.ops_people_mut.deletePerson(b, { title: 'Ada N' })), /Safety stop: "personContacts"/, 'without the allowance the cascade must be stopped')
+    // and the real module passes the very same scenario
+    const db = stateDb(w); await M.commit(db, 'u1', (b) => O.deletePerson(b, { title: 'Ada N' }))
+    assert.equal(db.tables.mc_state[0].data.personContacts.length, 0)
+  } finally { fs.unlinkSync(tmp) }
+}
+
+/* ---- links between people (people.ts addPersonBond / setBondLabel / removePersonBond) ---- */
+{
+  const { db, srv, data } = regAll()
+  // new link, one direction: bond.a = person, bToA = what the other is to person; no aToB key
+  let r = await srv.call('link_people', { person: 'Milan', other: 'Quinn', other_is_to_person: 'client' })
+  assert.equal(r.isError, false, r.text)
+  let bond = data().personBonds.at(-1)
+  assert.deepEqual({ ...bond, id: undefined, createdAt: undefined, updatedAt: undefined }, { id: undefined, a: 'person-milan', b: 'person-off', bToA: 'client', createdAt: undefined, updatedAt: undefined })
+  assert.match(bond.id, /^bond-[0-9a-z]+$/); assert.ok(bond.createdAt > 1000 && bond.updatedAt === bond.createdAt)
+  // the same pair from the other side sets the OTHER field on the same row (withLabel), no second row
+  const n0 = data().personBonds.length
+  r = await srv.call('link_people', { person: 'Quiet Quinn', other: 'Milan Shadek', other_is_to_person: 'accountant' }) // forgiving names
+  assert.equal(r.isError, false, r.text); assert.equal(data().personBonds.length, n0)
+  bond = data().personBonds.at(-1); assert.equal(bond.aToB, 'accountant'); assert.equal(bond.bToA, 'client')
+  // both directions at once on a fresh pair
+  r = await srv.call('link_people', { person: 'Ada N', other_id: 'person-milan', other_is_to_person: 'accountant', person_is_to_other: 'client' })
+  assert.equal(r.isError, false, r.text); bond = data().personBonds.at(-1)
+  assert.deepEqual([bond.a, bond.b, bond.bToA, bond.aToB], ['person-ada', 'person-milan', 'accountant', 'client'])
+  // list_people shows both ways
+  const lp = (await srv.call('list_people', { query: 'Milan' })).json.people[0]
+  assert.deepEqual(lp.knows.map((k) => [k.with, k.isToThem]).sort(), [['Ada Nováková', 'client'], ['Quiet Quinn', 'client']].sort())
+  // an empty word on an existing link changes nothing (the app's rule); self-link and unknown people are refused
+  const snap = JSON.stringify(data().personBonds)
+  r = await srv.call('link_people', { person: 'Ada N', other: 'Milan' }); assert.equal(r.isError, false); assert.equal(JSON.stringify(data().personBonds), snap)
+  assert.equal((await srv.call('link_people', { person: 'Milan', other_id: 'person-milan' })).isError, true)
+  assert.equal((await srv.call('link_people', { person: 'Milan', other: 'zzz nobody' })).isError, true)
+  assert.equal((await srv.call('link_people', { person: 'Nov', other: 'Milan' })).isError, true) // ambiguous Ada/Adam
+  // edit_link: either side, clear with ""
+  r = await srv.call('edit_link', { person: 'Ada Nováková', other: 'Adam', other_is_to_person: 'twin', person_is_to_other: '' })
+  assert.equal(r.isError, false, r.text); bond = data().personBonds.find((x) => x.id === 'bond-1')
+  assert.equal(bond.bToA, 'twin'); assert.equal(bond.aToB, ''); assert.ok(bond.updatedAt > 1000)
+  assert.equal((await srv.call('edit_link', { person: 'Ada N', other: 'Quiet', other_is_to_person: 'x' })).isError, true) // not linked
+  assert.equal((await srv.call('edit_link', { person: 'Ada N', other: 'Adam' })).isError, true) // nothing to change
+  // unlink: removed and buried, either order of names
+  r = await srv.call('unlink_people', { person: 'Adam', other: 'Ada Nováková' }); assert.equal(r.isError, false, r.text)
+  assert.ok(!data().personBonds.some((x) => x.id === 'bond-1')); assert.ok(keys(data()).includes('personBonds:bond-1'))
+  assert.equal((await srv.call('unlink_people', { person: 'Adam', other: 'Ada Nováková' })).isError, true)
+  // real merge: a stale phone keeps the new link and does not bring the removed one back
+  const stale = world(); stale.savedAt = 500
+  for (const m of [merge(stale, data()), merge(data(), stale)]) {
+    assert.ok(!m.personBonds.some((x) => x.id === 'bond-1')); assert.ok(m.personBonds.some((x) => x.a === 'person-ada' && x.b === 'person-milan' && x.aToB === 'client'))
+  }
+}
+
+/* ---- edit_contact (remove + re-log, as the card does it) ---- */
+{
+  const { srv, data } = regAll()
+  const r = await srv.call('edit_contact', { person: 'Ada Novakova', date: dayAgo(3), new_date: dayAgo(5), new_channel: 'video' })
+  assert.equal(r.isError, false, r.text)
+  const c = data().personContacts.filter((x) => x.personId === 'person-ada'); assert.equal(c.length, 1)
+  assert.deepEqual({ ...c[0], id: undefined, createdAt: undefined }, { id: undefined, personId: 'person-ada', day: dayAgo(5), channel: 'video', createdAt: undefined })
+  assert.notEqual(c[0].id, 'contact-1'); assert.ok(keys(data()).includes('personContacts:contact-1'))
+  assert.equal((await srv.call('list_people', { query: 'Ada Novakova' })).json.people[0].lastContact.daysAgo, 5)
+  assert.equal((await srv.call('edit_contact', { contact_id: c[0].id, new_date: '2999-01-01' })).isError, true)
+  assert.equal((await srv.call('edit_contact', { contact_id: c[0].id })).isError, true)
+  assert.equal((await srv.call('edit_contact', { contact_id: c[0].id, new_channel: 'video' })).isError, true) // identical
+  await srv.call('log_contact', { person: 'Ada N', channel: 'call', date: dayAgo(5) })
+  const dup = await srv.call('edit_contact', { contact_id: c[0].id, new_channel: 'call' }); assert.equal(dup.isError, true); assert.match(dup.text, /already has a call contact/)
+  assert.equal((await srv.call('edit_contact', { contact_id: c[0].id, new_channel: 'call', allow_duplicate: true })).isError, false)
+  // log_contact twice is now allowed on request
+  assert.equal((await srv.call('log_contact', { person: 'Ada N', channel: 'call', date: dayAgo(5) })).isError, true)
+  assert.equal((await srv.call('log_contact', { person: 'Ada N', channel: 'call', date: dayAgo(5), allow_duplicate: true })).isError, false)
+  // merge: the old contact stays gone on a stale phone
+  const stale = world()
+  for (const m of [merge(stale, data()), merge(data(), stale)]) assert.ok(!m.personContacts.some((x) => x.id === 'contact-1'))
+}
+
+/* ---- edit_person: position, birthday clears the year, everything the card edits ---- */
+{
+  const { srv, data } = regAll()
+  const milan = () => data().people.find((p) => p.id === 'person-milan')
+  // dragged far outside the business ring: clamped into the band (410.5..489.5), then rounded
+  let r = await srv.call('edit_person', { person: 'Milan', x: 700, y: 0 }); assert.equal(r.isError, false, r.text)
+  assert.deepEqual([milan().x, milan().y], [490, 0])
+  r = await srv.call('edit_person', { person: 'Milan', x: 440, y: 20 }); assert.deepEqual([milan().x, milan().y], [440, 20]) // already inside: untouched
+  assert.equal((await srv.call('edit_person', { person: 'Milan', x: 5 })).isError, true) // needs both
+  // tier and position in one call: the position is clamped into the NEW ring
+  await srv.call('edit_person', { person: 'Milan', tier: 'core', x: 10, y: 0 })
+  assert.equal(milan().tier, 'core'); assert.equal(Math.hypot(milan().x, milan().y) >= 40 + 30 + 12, true)
+  // birth year follows the date out
+  await srv.call('edit_person', { person: 'Milan', birth_year: 1980 }); assert.equal(milan().birthYear, 1980)
+  await srv.call('edit_person', { person: 'Milan', birthday: null }); assert.equal(milan().birthday, undefined); assert.equal(milan().birthYear, undefined)
+  await srv.call('edit_person', { person: 'Milan', name_day_as: 'Veronika', job: 'tax', cadence_days: 11, reminders_off: true })
+  assert.deepEqual([milan().nameDayAs, milan().job, milan().cadenceDays, milan().remindersOff], ['Veronika', 'tax', 11, true])
+  await srv.call('edit_person', { person: 'Milan', reminders_off: false, name_day_as: null, job: null }); assert.equal(milan().remindersOff, false); assert.equal(milan().job, undefined); assert.equal(milan().nameDayAs, undefined)
+}
+
+/* ---- prospects: stage/source/notes/links/next at creation, every field in the pipeline edits ---- */
+{
+  const { srv, data } = regAll()
+  const row = (n) => data().prospects.find((p) => p.name === n)
+  let r = await srv.call('add_prospect', { name: 'Zubař Novák', source: 'friend', stage: 'contacted', domain: 'https://www.zubar.cz/x', value: 70, why: 'old site', notes: 'met at the gym', links: { drive: 'https://drive/x', proposal: '' }, next_step: 'Send the audit', waiting_on: 'me', contact: 'Dr. Novák', decides: true })
+  assert.equal(r.isError, false, r.text)
+  const Z = () => row('Zubař Novák')
+  assert.equal(Z().stage, 'Contacted'); assert.equal(Z().source, 'friend'); assert.equal(Z().domain, 'zubar.cz'); assert.equal(Z().notes, 'met at the gym'); assert.deepEqual(Z().links, { drive: 'https://drive/x' })
+  assert.deepEqual({ ...Z().next, at: 0 }, { text: 'Send the audit', on: 'me', at: 0 }); assert.ok(Z().next.at > 1000)
+  assert.equal(Z().people.length, 1); assert.equal(Z().people[0].decides, true); assert.deepEqual(Z().touches, [])
+  assert.equal((await srv.call('add_prospect', { name: 'Q1', source: 'found', stage: 'Won big' })).isError, true)
+  assert.equal((await srv.call('add_prospect', { name: 'Q2', source: 'found' })).isError, false); assert.equal(row('Q2').stage, 'Ready to contact')
+
+  // edit: notes, links merge + clear, next step keeps the other half, closed, clearing fields
+  r = await srv.call('edit_prospect', { prospect: 'zubar', notes: 'second note', links: { outreach: 'https://doc/y', drive: null } }); assert.equal(r.isError, false, r.text)
+  assert.equal(Z().notes, 'second note'); assert.deepEqual(Z().links, { outreach: 'https://doc/y' })
+  await srv.call('edit_prospect', { prospect: 'zubar', links: { outreach: null } }); assert.equal(Z().links, undefined)
+  await srv.call('edit_prospect', { prospect: 'zubar', waiting_on: 'client' }); assert.deepEqual([Z().next.text, Z().next.on], ['Send the audit', 'client'])
+  await srv.call('edit_prospect', { prospect: 'zubar', next_step: 'Chase them' }); assert.deepEqual([Z().next.text, Z().next.on], ['Chase them', 'client'])
+  await srv.call('edit_prospect', { prospect: 'zubar', stage: 'Acquired', closed: true }); assert.equal(Z().stage, 'Acquired'); assert.ok(Z().closed > 1000)
+  assert.equal((await srv.call('get_prospect', { prospect: 'zubar' })).json.closed, new Date(Z().closed).toISOString().slice(0, 10))
+  await srv.call('edit_prospect', { prospect: 'zubar', closed: false }); assert.equal('closed' in Z(), false)
+  await srv.call('edit_prospect', { prospect: 'zubar', value: null, why: null, notes: null, domain: null }); for (const k of ['value', 'why', 'notes', 'domain']) assert.equal(k in Z(), false, k)
+  await srv.call('edit_prospect', { prospect: 'zubar', source: 'met', stage: 'Lost', lost_reason: 'no budget' }); assert.deepEqual([Z().source, Z().stage, Z().lostReason], ['met', 'Lost', 'no budget'])
+  await srv.call('edit_prospect', { prospect: 'zubar', lost_reason: null }); assert.equal('lostReason' in Z(), false)
+  // the stage vocabulary is the app's own
+  for (const st of ['reach', 'Build: building', 'In conversation']) { await srv.call('edit_prospect', { prospect: 'zubar', stage: st }); assert.equal(Z().stage, A.normStage(st)) }
+  assert.match((await srv.call('edit_prospect', { prospect: 'zubar', stage: 'Won big' })).text, /is not a stage/)
+  // Sheet columns stay read-only
+  assert.equal((await srv.call('edit_prospect', { prospect: 'zubar', sheet: { niche: 'x' } }).catch((e) => ({ isError: true, text: String(e) }))).isError !== false || Z().sheet === undefined, true)
+  assert.equal(Z().sheet, undefined)
+}
+
+/* ---- contacts at a business: rename, clear, unset decides, remove ---- */
+{
+  const { srv, data } = regAll()
+  const p = () => data().prospects.find((x) => x.id === 'prospect-1')
+  let r = await srv.call('edit_prospect_contact', { prospect: 'Pekarna', contact: 'jan', new_name: 'Jan Svoboda ml.', role: 'Owner', phone: '+420 111', email: null, decides: false })
+  assert.equal(r.isError, false, r.text)
+  assert.deepEqual(p().people, [{ id: 'pp-1', name: 'Jan Svoboda ml.', role: 'Owner', phone: '+420 111' }]) // email gone, decides gone (decides: checked || undefined)
+  await srv.call('edit_prospect', { prospect: 'Pekarna', contact: 'Eva Černá', role: 'Manager' }); assert.equal(p().people.length, 2)
+  assert.equal((await srv.call('edit_prospect_contact', { prospect: 'Pekarna', contact: 'Svoboda', role: 'x' })).isError, false)
+  assert.equal((await srv.call('edit_prospect_contact', { prospect: 'Pekarna', contact: 'nobody', role: 'x' })).isError, true)
+  assert.equal((await srv.call('edit_prospect_contact', { prospect: 'Pekarna', contact: 'Eva' })).isError, true) // nothing to change
+  // a touch sent to Jan keeps working after Jan goes
+  await srv.call('log_touch', { prospect: 'Pekarna', step: 'work', to: 'Jan' })
+  r = await srv.call('remove_prospect_contact', { prospect: 'Pekarna', contact: 'pp-1' }); assert.equal(r.isError, false, r.text)
+  assert.deepEqual(p().people.map((x) => x.name), ['Eva Černá'])
+  assert.equal((await srv.call('get_prospect', { prospect: 'Pekarna' })).json.touches[0].to, undefined)
+}
+
+/* ---- remove_touch / resolve reply / prep / delete_prospect ---- */
+{
+  const w = world()
+  w.prospects[1].touches.push({ id: 'touch-b', step: 'reminder', day: dayAgo(2), subject: 'Re: Hello' })
+  w.prospects[1].replied = { day: dayAgo(1), subject: 'Re: Hello', body: 'yes?' }
+  w.prospects[0].replied = { day: dayAgo(1), subject: 'Hi' }
+  const stale = clone(w)
+  const db = stateDb(w); const srv = fakeServer(K, M.tools_people.register, db); const data = () => db.tables.mc_state[0].data
+  const kav = () => data().prospects.find((x) => x.id === 'prospect-2')
+  // remove a touch by step+day, by id; the stage is not moved back
+  let r = await srv.call('remove_touch', { prospect: 'Kavarna', step: 'reminder', date: dayAgo(2) }); assert.equal(r.isError, false, r.text)
+  assert.deepEqual(kav().touches.map((t) => t.id), ['touch-a']); assert.equal(kav().stage, 'Contacted'); assert.ok(kav().updatedAt > 1000)
+  assert.equal((await srv.call('remove_touch', { prospect: 'Kavarna', touch_id: 'touch-zzz' })).isError, true)
+  assert.equal((await srv.call('remove_touch', { prospect: 'Kavarna' })).isError, true)
+  assert.equal((await srv.call('remove_touch', { prospect: 'Kavarna', step: 'call', date: dayAgo(2) })).isError, true)
+  r = await srv.call('remove_touch', { prospect: 'Kavarna', touch_id: 'touch-a' }); assert.deepEqual(kav().touches, [])
+  for (const m of [merge(stale, data()), merge(data(), stale)]) assert.deepEqual(m.prospects.find((x) => x.id === 'prospect-2').touches, [])
+  // replies: accept = stage Responded waiting + cleared; dismiss = cleared only
+  r = await srv.call('resolve_prospect_reply', { prospect: 'Kavarna', action: 'accept' }); assert.equal(r.isError, false, r.text)
+  assert.equal(kav().stage, 'Responded waiting'); assert.equal('replied' in kav(), false)
+  r = await srv.call('resolve_prospect_reply', { prospect: 'Pekarna', action: 'dismiss' }); assert.equal(data().prospects[0].stage, 'Ready to contact'); assert.equal('replied' in data().prospects[0], false)
+  assert.equal((await srv.call('resolve_prospect_reply', { prospect: 'Pekarna', action: 'accept' })).isError, true) // none waiting
+  // prep
+  r = await srv.call('mark_meeting_prep_ready', { prospect: 'Closed', event_uid: 'evt-1@google.com' }); assert.equal(r.isError, false, r.text)
+  const closed = () => data().prospects.find((x) => x.id === 'prospect-4'); assert.deepEqual(closed().prep, ['evt-1@google.com'])
+  await srv.call('mark_meeting_prep_ready', { prospect: 'Closed', event_uid: 'evt-1@google.com' }); await srv.call('mark_meeting_prep_ready', { prospect: 'Closed', event_uid: 'evt-2' })
+  assert.deepEqual(closed().prep, ['evt-1@google.com', 'evt-2'])
+  assert.deepEqual((await srv.call('get_prospect', { prospect: 'Closed' })).json.prepReadyFor, ['evt-1@google.com', 'evt-2'])
+  // delete_prospect: gone, buried, a stale phone does not bring it back; a stale phone's own EDIT of it loses to the burial
+  r = await srv.call('delete_prospect', { prospect: 'Old Lane' }); assert.equal(r.isError, false, r.text)
+  assert.ok(!data().prospects.some((x) => x.id === 'prospect-3')); assert.deepEqual(keys(data()), ['prospects:prospect-3'])
+  stale.prospects.find((x) => x.id === 'prospect-3').updatedAt = Date.now() + 5000
+  for (const m of [merge(stale, data()), merge(data(), stale)]) assert.ok(!m.prospects.some((x) => x.id === 'prospect-3'))
+  assert.equal((await srv.call('delete_prospect', { prospect: 'Old Lane' })).isError, true)
+  // the Sheet note: a Sheet-born card is warned about
+  data().prospects.find((x) => x.id === 'prospect-4').sheet = { country: 'CZ', row: 1 }
+  assert.match((await srv.call('delete_prospect', { prospect: 'Closed Deal' })).text, /Prospects Sheet/)
+  // deleting two at once would trip the writer's stop (no cascade is declared for prospects)
+  await assert.rejects(() => M.commit(stateDb(world()), 'u1', (b) => { O.deleteProspect(b, { id: 'prospect-1' }); O.deleteProspect(b, { id: 'prospect-2' }); return { text: 'x' } }), /Safety stop: "prospects"/)
+}
+
+/* ---- the Sheet sync (src/prospectcalc.ts applySheet) against what the connector writes ---- */
+{
+  const w = world(); const db = stateDb(w)
+  await M.commit(db, 'u1', (b) => { O.editProspect(b, { id: 'prospect-1' }, { stage: 'Meeting planned', notes: 'mine', value: 50, links: { drive: 'https://d' } }); return { text: 'ok' } })
+  const mine = db.tables.mc_state[0].data.prospects
+  const out = A.applySheet(mine, [{ name: 'Pekárna Svoboda', domain: 'pekarna.cz', status: 'Audited', country: 'CZ', row: 1 }], Date.now())
+  const p = out.prospects.find((x) => x.id === 'prospect-1')
+  assert.equal(p.stage, 'Audited') // the Sheet overwrites the stage, as the tool descriptions warn
+  assert.deepEqual([p.notes, p.value, p.links], ['mine', 50, { drive: 'https://d' }]) // and leaves notes, value, links alone
+}
+
+/* ---- registered through zod: schemas reject nonsense ---- */
+if (K.zodReal) {
+  const { srv } = regAll()
+  await assert.rejects(() => srv.call('link_people', { person: 'a', other: 'b', other_is_to_person: 'x'.repeat(81) }), /too_big|Too big|80/i)
+  await assert.rejects(() => srv.call('resolve_prospect_reply', { prospect: 'a', action: 'maybe' }), /Invalid|enum/i)
+  await assert.rejects(() => srv.call('edit_prospect', { prospect: 'a', waiting_on: 'nobody' }), /Invalid|enum/i)
+  await assert.rejects(() => srv.call('remove_touch', { prospect: 'a', step: 'fax' }), /Invalid|enum/i)
+  await assert.rejects(() => srv.call('edit_contact', { contact_id: 'x', new_date: 'yesterday' }), /Invalid|regex|string/i)
 }
 
 console.log(`MCP people + prospects: all checks passed (${K.zodReal ? 'schemas validated with zod' : 'schemas NOT validated'}).`)

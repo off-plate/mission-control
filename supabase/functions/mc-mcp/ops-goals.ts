@@ -14,10 +14,10 @@
    Rules from the merge engine (src/sync-merge.ts): a deleted goal / project / task is also
    BURIED ("goals:<id>", "projects:<id>", "tasks:<id>"). None of these touch a LOG collection.
 
-   What is deliberately NOT here (the tool refuses instead): see tools-goals.ts. */
+   What is deliberately NOT here (the tool refuses instead): see the header of tools-goals.ts. */
 
 import {
-  McError, arr, bury, dateKey, ensure, findTask, fold, isDate, newId, pick, rowKey, slugTag, tagOf,
+  McError, allowShrink, arr, bury, dateKey, ensure, findTask, fold, isDate, newId, pick, rowKey, slugTag, tagOf,
   type Blob, type Ref, type Row,
 } from './ops.ts'
 
@@ -200,34 +200,57 @@ export function pickGoal(b: Blob, ref: Ref, opts: { closed?: 'never' | 'fallback
 }
 
 export interface AddGoalInput {
-  name: string
+  name?: string
   target?: number
   unit?: string
   timeframe?: GoalTf
   category?: (typeof GOAL_CATEGORIES)[number]
   why?: string
+  deadline?: string
   space?: 'personal' | 'work'
   milestones?: string[]
+  /** a habit (id or words) the goal counts itself from (goals.tsx GoalSheet "Track one of my habits") */
+  habit?: string
+  /** plan forward: the period the goal is FOR, default the one running now (goals.tsx: the column he is browsing) */
+  periodKey?: string
   allowDuplicate?: boolean
 }
 
-/** assistantcore addGoal + growth.ts addGoal. */
+/** goals.tsx GoalSheet: only habits of the goal's own space that are neither paused nor archived. */
+function linkableHabit(b: Blob, space: string, want: string): Row {
+  const list = arr(b, 'habits').filter((h) => h.space === space && !h.paused && !h.archivedAt)
+  return list.find((h) => h.id === want) ?? pick(list, { title: want }, `${space} habit`, (h) => String(h.name ?? ''))
+}
+
+/** assistantcore addGoal + growth.ts addGoal + goals.tsx GoalSheet (deadline, habit, period). */
 export function addGoal(b: Blob, i: AddGoalInput, today: string = dateKey()): { id: string; text: string } {
-  const name = text(i.name, 'A goal name', 200)
   const tf = i.timeframe ?? 'monthly' // assistantcore: a.timeframe ?? 'monthly'
   if (!GOAL_TFS.includes(tf)) throw new McError(`timeframe must be one of ${GOAL_TFS.join(', ')}.`)
   const category = i.category ?? 'life' // assistantcore: a.category ?? 'life'
   if (!GOAL_CATEGORIES.includes(category)) throw new McError(`category must be one of ${GOAL_CATEGORIES.join(', ')}.`)
+  let space = i.space ?? 'personal'
+  if (space !== 'personal' && space !== 'work') throw new McError('space must be personal or work.')
+  let habit: Row | undefined
+  if (i.habit) {
+    if (i.milestones?.length) throw new McError('A goal that counts itself from a habit has no milestones (the Goals sheet hides them). Pass habit or milestones, not both.')
+    if (!i.space) { // the habit decides the space when he did not say
+      const any = arr(b, 'habits').filter((h) => !h.paused && !h.archivedAt)
+      const one = any.find((h) => h.id === i.habit) ?? pick(any, { title: i.habit }, 'habit', (h) => String(h.name ?? ''))
+      space = one.space
+    }
+    habit = linkableHabit(b, space, i.habit)
+  }
+  const name = habit && !(i.name ?? '').trim() ? String(habit.name) : text(i.name, 'A goal name', 200) // the sheet's name follows the habit until he writes his own
   const labels = (i.milestones ?? []).map((m) => String(m ?? '').trim()).filter(Boolean)
   if (labels.length > 30) throw new McError('A goal can have at most 30 milestones.')
   if (labels.some((l) => l.length > 200)) throw new McError('A milestone label is over 200 characters.')
   const unit = i.unit === undefined ? undefined : text(i.unit, 'unit', 40)
   const why = i.why === undefined ? undefined : text(i.why, 'why', 300)
+  const deadline = i.deadline === undefined ? undefined : text(i.deadline, 'deadline', 100)
   const target = i.target === undefined ? undefined : need(i.target, 'target', 1, 1e7)
   if (!labels.length && !target) throw new McError(`A goal needs a target number or milestones: ${name}`)
-  const space = i.space ?? 'personal'
-  if (space !== 'personal' && space !== 'work') throw new McError('space must be personal or work.')
-  const periodKey = goalPeriodKey(tf, today)
+  if (i.periodKey !== undefined && !validPeriodKey(tf, i.periodKey)) throw new McError(`period_key "${i.periodKey}" is not a ${tf} key (like ${goalPeriodKey(tf, today)}).`)
+  const periodKey = i.periodKey ?? goalPeriodKey(tf, today)
   const goals = ensure(b, 'goals')
   const dupe = goals.find((g) => !g.closed && g.space === space && tfOf(g) === tf && g.periodKey === periodKey && fold(String(g.name)) === fold(name))
   if (dupe && !i.allowDuplicate) {
@@ -236,38 +259,122 @@ export function addGoal(b: Blob, i: AddGoalInput, today: string = dateKey()): { 
   const stamp = Date.now().toString(36)
   const row: Row = {
     id: newId('g'), space, name, current: 0, note: '',
-    target: labels.length || target!, unit: labels.length ? 'milestones' : (unit ?? 'steps'),
+    target: labels.length || target!, unit: habit ? (isTimeFed(habit) ? 'hours' : 'checkoffs') : labels.length ? 'milestones' : (unit ?? 'steps'),
     timeframe: tf, category,
     periodKey, createdAt: today, touchedAt: today,
     milestones: labels.map((label, k) => ({ id: `ms-${stamp}-${k}`, label, done: false })),
   }
+  if (habit) row.habitId = habit.id
   if (why !== undefined) row.why = why
+  if (deadline !== undefined) row.deadline = deadline
   goals.push(row)
-  return { id: row.id, text: `Made a new ${tf} goal: ${name} (${labels.length ? `${labels.length} milestones` : `${row.target} ${row.unit}`}, ${space}, ${periodKey}).` }
+  return { id: row.id, text: `Made a new ${tf} goal: ${name} (${habit ? `${row.target} ${row.unit}, counted from habit "${habit.name}"` : labels.length ? `${labels.length} milestones` : `${row.target} ${row.unit}`}, ${space}, ${periodKey}).` }
 }
 
-export interface EditGoalInput { name?: string; target?: number; unit?: string; timeframe?: GoalTf; why?: string }
+export interface EditGoalInput {
+  name?: string; target?: number; unit?: string; timeframe?: GoalTf; category?: (typeof GOAL_CATEGORIES)[number]
+  /** '' or null clears it (the sheet saves an empty box as undefined) */
+  why?: string | null; deadline?: string | null
+  /** the FULL list of milestone labels the goal should have (replaces the list) */
+  milestones?: string[]
+  /** a habit (id or words) to count from, or null to go back to logging by hand */
+  habit?: string | null
+  /** put the goal on the period running now, as saving the Goals sheet does */
+  moveToCurrentPeriod?: boolean
+}
 
-/** assistantcore editGoal + growth.ts updateGoal. */
+/** assistantcore editGoal + growth.ts updateGoal, with everything goals.tsx GoalSheet saves.
+ *  The sheet saves `periodKey: shiftPeriodKey(timeframe, 0)` on every save, i.e. the period running
+ *  now for the (new) timeframe. So: a changed timeframe, or moveToCurrentPeriod, moves the goal there.
+ *  `current` and the logged `entries` are never touched by a move (updateGoal does not touch them).
+ *  A finished goal is edited the way the store's updateGoal would (the sheet itself is only offered on
+ *  running goals): its words, target, unit, category and deadline; never its period, habit or milestones. */
 export function editGoal(b: Blob, ref: Ref, p: EditGoalInput, today: string = dateKey()): { id: string; text: string } {
-  const g = pickGoal(b, ref)
+  const g = pickGoal(b, ref, { closed: 'fallback' })
+  const finished = !!g.closed
   const did: string[] = []
   const patch: Row = {}
+  const drop: string[] = []
+  const noFinished = (what: string) => { if (finished) throw new McError(`"${g.name}" is finished (closed ${g.closed.on}). Its ${what} is history and is not changed. Use repeat_goal to run it again for this period.`) }
   if (p.name !== undefined) { patch.name = text(p.name, 'name', 200); did.push('name') }
+  if (p.category !== undefined) {
+    if (!GOAL_CATEGORIES.includes(p.category)) throw new McError(`category must be one of ${GOAL_CATEGORIES.join(', ')}.`)
+    patch.category = p.category; did.push('category')
+  }
+  if (p.why !== undefined) {
+    if (p.why === null || !p.why.trim()) { drop.push('why'); did.push('why cleared') } else { patch.why = text(p.why, 'why', 300); did.push('why') }
+  }
+  if (p.deadline !== undefined) {
+    if (p.deadline === null || !p.deadline.trim()) { drop.push('deadline'); did.push('deadline cleared') } else { patch.deadline = text(p.deadline, 'deadline', 100); did.push('deadline') }
+  }
+
+  /* habit link */
+  if (p.habit !== undefined) {
+    noFinished('habit link')
+    if (p.habit === null) {
+      if (!g.habitId) throw new McError(`"${g.name}" is not tied to a habit.`)
+      // "Clearing the link keeps whatever the habit had counted, so the number does not jump" (growth.ts
+      // updateGoal's comment; its code line is a no-op), so the number the app was showing is stored.
+      patch.current = goalNow(b, g, today); drop.push('habitId'); did.push('no longer counted from a habit')
+    } else {
+      const h = linkableHabit(b, g.space, p.habit)
+      patch.habitId = h.id; patch.unit = isTimeFed(h) ? 'hours' : 'checkoffs'; did.push(`counted from habit "${h.name}"`)
+    }
+  }
+  const habitFed = p.habit === null ? false : !!(patch.habitId ?? g.habitId)
+  if (p.unit !== undefined) {
+    if (habitFed) throw new McError(`"${g.name}" counts itself from a habit, so its unit follows the habit.`)
+    patch.unit = text(p.unit, 'unit', 40); did.push('unit')
+  }
+
+  /* milestones */
+  let ms: Row[] | undefined
+  if (p.milestones !== undefined) {
+    noFinished('milestones')
+    const labels = p.milestones.map((m) => String(m ?? '').trim()).filter(Boolean)
+    if (labels.length > 30) throw new McError('A goal can have at most 30 milestones.')
+    if (labels.some((l) => l.length > 200)) throw new McError('A milestone label is over 200 characters.')
+    const old: Row[] = Array.isArray(g.milestones) ? [...g.milestones] : []
+    const stamp = Date.now().toString(36)
+    ms = labels.map((label, k) => { // a label he keeps stays the same milestone (same id, same tick)
+      const at = old.findIndex((m) => String(m.label).trim() === label)
+      if (at >= 0) return old.splice(at, 1)[0]
+      return { id: `ms-${stamp}-${k}`, label, done: false }
+    })
+    patch.milestones = ms; did.push(`${ms.length} milestones`)
+  }
+  const msAfter: Row[] = ms ?? (Array.isArray(g.milestones) ? g.milestones : [])
+  if (habitFed && msAfter.length) throw new McError(`"${g.name}" would count itself from a habit and also hold milestones. Pass milestones: [] to clear them first (the Goals sheet hides milestones for a habit goal).`)
+
+  /* target */
   if (p.target !== undefined) {
     const t = need(p.target, 'target', 1, 1e7)
-    if (milestoneMeasured(g) && t !== g.target) throw new McError(`"${g.name}" is measured in its ${g.milestones.length} milestones, so its target is their count. Change the milestones in the app, not the target.`)
+    if (ms === undefined && milestoneMeasured(g) && t !== g.target) throw new McError(`"${g.name}" is measured in its ${g.milestones.length} milestones, so its target is their count. Pass milestones to change the list; the target follows.`)
+    if (ms !== undefined && ms.length && t !== ms.length) throw new McError(`With milestones the target is their count (${ms.length}). Leave target out.`)
     patch.target = t; did.push(`target ${t}`)
   }
-  if (p.unit !== undefined) { patch.unit = text(p.unit, 'unit', 40); did.push('unit') }
-  if (p.timeframe !== undefined && p.timeframe !== tfOf(g)) {
-    // The app's updateGoal leaves periodKey as it was, which would point a weekly goal at a month.
-    throw new McError(`Changing "${g.name}" from ${tfOf(g)} to ${p.timeframe} is refused: the goal is bound to its period (${keyOf(g, today)}) and the app does not move it. Make a new ${p.timeframe} goal with add_goal and delete this one if he wants that.`)
+  if (ms !== undefined && ms.length && !habitFed) {
+    patch.target = ms.length; patch.unit = 'milestones' // GoalSheet: the target follows the list
+    // growth.ts toggleGoalMilestone keeps the number equal to the ticked count for such a goal; the sheet
+    // leaves a stale count when a ticked step is removed, so the derived number is made right here.
+    patch.current = ms.filter((m) => m.done).length
   }
-  if (p.why !== undefined) { patch.why = text(p.why, 'why', 300); did.push('why') }
-  if (!did.length) throw new McError('Nothing to change: pass at least one of name, target, unit, why.')
+
+  /* period */
+  const tfNow = tfOf(g)
+  const wantTf = p.timeframe ?? tfNow
+  if (p.timeframe !== undefined && !GOAL_TFS.includes(p.timeframe)) throw new McError(`timeframe must be one of ${GOAL_TFS.join(', ')}.`)
+  if (wantTf !== tfNow || p.moveToCurrentPeriod) {
+    noFinished('period')
+    const key = goalPeriodKey(wantTf, today)
+    if (wantTf !== tfNow) { patch.timeframe = wantTf; did.push(`timeframe ${tfNow} to ${wantTf}`) }
+    if (key !== g.periodKey) { patch.periodKey = key; did.push(`period ${g.periodKey ?? '(none)'} to ${key}`) }
+  }
+
+  if (!did.length) throw new McError('Nothing to change: pass at least one of name, target, unit, why, deadline, category, timeframe, milestones, habit, move_to_current_period.')
   Object.assign(g, patch, { touchedAt: today })
-  return { id: g.id, text: `Updated goal: ${g.name}${did.length ? ` (${did.join(', ')})` : ''}.` }
+  for (const k of drop) delete g[k]
+  return { id: g.id, text: `Updated goal: ${g.name} (${did.join(', ')}). Now ${g.current} of ${g.target} ${g.unit}, ${g.timeframe ?? 'quarter'} ${g.periodKey ?? ''}.` }
 }
 
 /** assistantcore 'goal' action. by -> growth.ts bumpGoal (clamped to 0..target); set -> updateGoal
@@ -367,7 +474,10 @@ export function creditGoal(b: Blob, t: Row | undefined, sign: 1 | -1, today: str
 }
 
 /** planner.ts setTaskGoal. goal omitted/null takes the link off. The link is the ONLY record:
- *  the goal never stores which tasks fed it. */
+ *  the goal never stores which tasks fed it.
+ *  The store function takes any goal id; plan.tsx only OFFERS this week's goals. Both are lifted to
+ *  "any running goal" here, because store.tsx creditGoal credits any goal that is not closed and not
+ *  habit-fed, whatever its timeframe. */
 export function setTaskGoal(b: Blob, ref: Ref, goal: Ref | null, amount?: number, today: string = dateKey()): { id: string; text: string } {
   const t = findTask(b, ref)
   if (!goal) {
@@ -375,16 +485,14 @@ export function setTaskGoal(b: Blob, ref: Ref, goal: Ref | null, amount?: number
     delete t.goalId; delete t.goalAmt
     return { id: t.id, text: `"${t.title}" no longer counts toward a goal.` }
   }
-  const g = pickGoal(b, goal)
-  // The app offers only this week's weekly goals (weekgoals.tsx) and creditGoal skips habit-fed ones.
-  if (tfOf(g) !== 'weekly') throw new McError(`"${g.name}" is a ${tfOf(g)} goal. A task can only feed a weekly goal.`)
-  if (g.periodKey !== goalPeriodKey('weekly', today)) throw new McError(`"${g.name}" is for ${g.periodKey}, not this week (${goalPeriodKey('weekly', today)}). Only this week's goals can be fed.`)
-  if (g.habitId) throw new McError(`"${g.name}" counts itself from a habit, so a task cannot feed it.`)
-  if (milestoneMeasured(g)) throw new McError(`"${g.name}" is measured in its milestones, so a task cannot feed it.`)
+  const g = pickGoal(b, goal) // a finished goal: creditGoal never feeds it, so the link would do nothing
+  if (g.habitId) throw new McError(`"${g.name}" counts itself from a habit, so a task cannot feed it (creditGoal skips it).`)
+  if (milestoneMeasured(g)) throw new McError(`"${g.name}" is measured in its milestones, so a task cannot feed it. Tick its milestones instead.`)
   if (amount !== undefined && (typeof amount !== 'number' || !Number.isFinite(amount) || amount > 1000)) throw new McError('amount must be a number from 1 to 1000.')
   t.goalId = g.id
   t.goalAmt = Math.max(1, amount ?? 1) // planner.ts: Math.max(1, goalAmt ?? 1)
-  return { id: t.id, text: `Finishing "${t.title}" now adds ${t.goalAmt} to ${g.name}${t.done ? ' (it is already done, so nothing is added retroactively)' : ''}.` }
+  const when = g.periodKey && g.periodKey !== goalPeriodKey(tfOf(g), today) ? ` (note: that goal is for ${g.periodKey}, not the period running now)` : ''
+  return { id: t.id, text: `Finishing "${t.title}" now adds ${t.goalAmt} to ${g.name}${when}${t.done ? '; it is already done, so nothing is added retroactively' : ''}.` }
 }
 
 /** planner.ts commitTask. horizon null takes it off its period. */
@@ -421,23 +529,22 @@ export const HUE_IDS = ['sky', 'teal', 'terra', 'ochre', 'rose', 'slate', 'olive
 const pickProject = (b: Blob, ref: Ref): Row => pick(arr(b, 'projects'), { id: ref.id, title: ref.title }, 'project', (p) => String(p.name ?? ''))
 
 /** planner.ts deleteProject. 'move': its tasks lose the project and stay. 'delete': they go too,
- *  each buried. The writer's safety stop allows ONE removed row per collection, so a project with
- *  more than one task cannot be deleted with its tasks in one go. */
+ *  each buried. The writer's safety stop allows ONE removed row per collection, so the extra tasks
+ *  (all but one) are declared with allowShrink: exactly that many, no more. */
 export function deleteProject(b: Blob, ref: Ref, mode: 'move' | 'delete'): { id: string; text: string } {
   if (mode !== 'move' && mode !== 'delete') throw new McError("mode must be 'move' (keep its tasks) or 'delete' (delete them too).")
   const p = pickProject(b, ref)
   const theirs = arr(b, 'tasks').filter((t) => t.projectId === p.id)
-  if (mode === 'delete' && theirs.length > 1) {
-    throw new McError(`"${p.name}" holds ${theirs.length} tasks. Deleting them together is more than one row in one step, which this connector refuses. Either use mode "move" (the tasks stay, without the project), or delete the tasks one by one with delete_task and then the project. Nothing was changed.`)
-  }
   const keys = [rowKey('projects', p), ...(mode === 'delete' ? theirs.map((t) => rowKey('tasks', t)) : [])]
   b.projects = arr(b, 'projects').filter((x) => x.id !== p.id)
-  if (mode === 'delete') b.tasks = arr(b, 'tasks').filter((t) => t.projectId !== p.id)
-  else for (const t of theirs) delete t.projectId
+  if (mode === 'delete') {
+    b.tasks = arr(b, 'tasks').filter((t) => t.projectId !== p.id)
+    allowShrink(b, 'tasks', theirs.length - 1) // the stop already allows one
+  } else for (const t of theirs) delete t.projectId
   bury(b, ...keys)
   return {
     id: p.id,
-    text: mode === 'delete' && theirs.length ? `Deleted "${p.name}" and its task.` : `Deleted project "${p.name}"${theirs.length ? `; its ${theirs.length} task(s) stay, without a project` : ''}.`,
+    text: mode === 'delete' && theirs.length ? `Deleted "${p.name}" and its ${theirs.length} task${theirs.length === 1 ? '' : 's'}.` : `Deleted project "${p.name}"${theirs.length ? `; its ${theirs.length} task(s) stay, without a project` : ''}.`,
   }
 }
 
@@ -461,6 +568,47 @@ export function setProjectHue(b: Blob, ref: Ref, hue: string): { id: string; tex
   if (!(HUE_IDS as readonly string[]).includes(hue)) throw new McError(`colour must be one of ${HUE_IDS.join(', ')}.`)
   p.hue = hue
   return { id: p.id, text: `"${p.name}" is now ${hue}.` }
+}
+
+/* ============================== ROLLOVER ========================================= */
+
+/** store.tsx load ("A goal whose period has ended stops counting and keeps the number it finished
+ *  on"): the app does this every time it opens; here it is an explicit call. For each goal:
+ *  - a goal with no periodKey gets the current one of its timeframe (the app stamps it);
+ *  - a running goal whose period is past is closed: closed = { on: period end, final: goalCurrent over
+ *    its own period };
+ *  - a closed goal that counts itself from a habit renews: a copy for the period running now, id
+ *    `${id}-r${key without punctuation}`, number 0, no milestones, unless one already exists. */
+export function closeEndedGoals(b: Blob, today: string = dateKey()): { text: string } {
+  const goals = arr(b, 'goals')
+  if (!goals.length) return { text: 'There are no goals.' }
+  const habits = arr(b, 'habits'), log = arr(b, 'habitLog'), slips = arr(b, 'slips'), sessions = arr(b, 'focusSessions')
+  const closedNow: string[] = []
+  const renewals: Row[] = []
+  let stamped = 0
+  for (const g of goals) {
+    const tf = tfOf(g)
+    const key = g.periodKey ?? goalPeriodKey(tf, today)
+    if (g.periodKey === undefined) { g.periodKey = key; stamped++ }
+    if (g.closed || !validPeriodKey(tf, key) || !periodIsPast(tf, key, today)) continue
+    const range = goalPeriodRange(tf, key)
+    const final = goalCurrent(g, habits, log, range, slips, sessions, today)
+    if (g.habitId) {
+      const now = goalPeriodKey(tf, today)
+      const next: Row = { ...g, id: `${g.id}-r${now.replace(/[^0-9A-Za-z]/g, '')}`, current: 0, milestones: [], periodKey: now }
+      delete next.closed
+      renewals.push(next)
+    }
+    g.closed = { on: range.to, final }
+    closedNow.push(`${g.name} (${tf} ${key}) finished on ${final} of ${g.target} ${g.unit}`)
+  }
+  const renewed: string[] = []
+  for (const r of renewals) {
+    const dupe = goals.some((g) => !g.closed && g.habitId === r.habitId && g.name === r.name && tfOf(g) === tfOf(r) && g.periodKey === r.periodKey)
+    if (!dupe) { goals.push(r); renewed.push(`${r.name} (${r.periodKey})`) }
+  }
+  if (!closedNow.length && !stamped) return { text: 'No goal has ended: nothing was changed.' }
+  return { text: `${closedNow.length ? `Closed ${closedNow.length} ended goal${closedNow.length === 1 ? '' : 's'}: ${closedNow.join('; ')}.` : 'No goal had ended.'}${renewed.length ? ` Renewed ${renewed.length} habit-fed goal${renewed.length === 1 ? '' : 's'} for the period running now: ${renewed.join(', ')}.` : ''}${stamped ? ` Stamped ${stamped} goal${stamped === 1 ? '' : 's'} with its current period.` : ''}` }
 }
 
 /* ============================== READ ============================================= */

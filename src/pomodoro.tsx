@@ -6,7 +6,6 @@ import { onTitles, titlesVersion, trackTitle } from './tunes'
 import { deviceId } from './sync-merge'
 import * as Icon from './icons'
 import { Dock } from './dock'
-import { FOCUS_EVENT, runFocusCmd, type FocusCmd } from './inbox-focus'
 
 /* A global Pomodoro that lives above the whole app: a bottom-right badge you
    see on every tab, a corner ambient glow that shows the state at a glance,
@@ -308,16 +307,6 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeFocus])
-
-  /* Start/stop sent from Claude through the inbox (store.tsx decodes it). Read through a
-     ref so the listener is attached once and always sees the current timer. */
-  const remote = useRef({ phase, startFocus, stop })
-  remote.current = { phase, startFocus, stop }
-  useEffect(() => {
-    const on = (e: Event) => runFocusCmd((e as CustomEvent<FocusCmd>).detail, remote.current)
-    window.addEventListener(FOCUS_EVENT, on)
-    return () => window.removeEventListener(FOCUS_EVENT, on)
-  }, [])
 
   const value: Pomo = { phase, running, secondsLeft, focusMin, blockMin, breakMin, cyclesDone, focusLabel, startFocus, toggle, skip, stop, startBreak, extend, dismiss, setFocusMin, setBreakMin }
   return (

@@ -52,7 +52,7 @@ function world() {
 {
   const srv = fakeServer(K, M.tools_goals.register, stateDb(world()))
   const names = srv.names()
-  check('count', () => assert.equal(names.length, 14, names.join()))
+  check('count', () => assert.equal(names.length, 15, names.join()))
   for (const nm of names) { const c = srv.tools[nm].cfg; assert.ok(c.title && c.description && c.inputSchema && c.annotations, nm); assert.match(nm, /^[a-z]+(_[a-z]+)*$/) }
   check('reads', () => assert.deepEqual(names.filter((x) => srv.tools[x].cfg.annotations.readOnlyHint), ['list_goals']))
   check('destructive', () => assert.deepEqual(names.filter((x) => srv.tools[x].cfg.annotations.destructiveHint).sort(), ['delete_goal', 'delete_project', 'remove_goal_entry']))
@@ -182,13 +182,18 @@ function world() {
   check('edit_goal', () => { assert.equal(e.isError, false, e.text); const g = goal('g-save'); assert.deepEqual([g.name, g.target, g.unit, g.why, g.touchedAt, g.current], ['Save 40k', 50000, 'Kč', 'Debt', TODAY, 5000]) })
   const eNone = await srv.call('edit_goal', { id: 'g-save' })
   check('edit nothing', () => { assert.equal(eNone.isError, true); assert.match(eNone.text, /Nothing to change/) })
-  refuses(() => G.editGoal(data(), { id: 'g-save' }, { timeframe: 'weekly' }), /bound to its period/)
+  // LIFTED in round 3: the Goals sheet moves a goal to another timeframe (its new tests are in the sections below)
+  assert.doesNotThrow(() => G.editGoal(world(), { id: 'g-save' }, { timeframe: 'weekly' }))
   refuses(() => G.editGoal(data(), { id: 'g-ship' }, { target: 5 }), /measured in its 3 milestones/)
   assert.doesNotThrow(() => G.editGoal(world(), { id: 'g-ship' }, { target: 3, name: 'Ship it' }))
-  const eClosed = await srv.call('edit_goal', { id: 'g-old', name: 'x' })
-  check('edit closed', () => { assert.equal(eClosed.isError, true); assert.match(eClosed.text, /finished goal/) })
-  const eClosedWords = await srv.call('edit_goal', { title: 'read a book', name: 'x' })
-  check('edit closed by words', () => { assert.equal(eClosedWords.isError, true); assert.match(eClosedWords.text, /only goal matching .* is finished/) })
+  // LIFTED in round 3: a finished goal can be corrected (name/target/unit/why/deadline/category); period, habit, milestones stay history
+  const eClosed = await srv.call('edit_goal', { id: 'g-old', name: 'Read a novel', why: 'Calm' })
+  check('edit closed', () => { assert.equal(eClosed.isError, false, eClosed.text); const g = goal('g-old'); assert.deepEqual([g.name, g.why, g.closed, g.periodKey], ['Read a novel', 'Calm', { on: '2026-09-30', final: 1 }, '2026-09']) })
+  const eClosedWords = await srv.call('edit_goal', { title: 'read a novel', unit: 'novels' })
+  check('edit closed by words', () => { assert.equal(eClosedWords.isError, false, eClosedWords.text); assert.equal(goal('g-old').unit, 'novels') })
+  for (const [a, re] of [[{ timeframe: 'weekly' }, /is finished .* period is history/], [{ milestones: ['a'] }, /milestones is history/], [{ habit: 'gym' }, /habit link is history/], [{ move_to_current_period: true }, /period is history/]]) {
+    const x = await srv.call('edit_goal', { id: 'g-old', ...a }); check(`edit closed refusal ${Object.keys(a)}`, () => { assert.equal(x.isError, true); assert.match(x.text, re) })
+  }
   const eNo = await srv.call('edit_goal', { title: 'zzzz', name: 'x' })
   check('edit none', () => { assert.equal(eNo.isError, true); assert.match(eNo.text, /No goal matches/) })
   const eAmb = await srv.call('edit_goal', { title: 'e', name: 'x' }) // "Save 40k"? no: 'e' is in several names
@@ -317,12 +322,14 @@ function world() {
   if (K.zodReal) await assert.rejects(() => srv.call('set_task_goal', { id: 't-c', goal_id: 'g-emails', amount: 0.5 }), /too_small|Too small/i)
   // refusals
   for (const [args, re] of [
-    [{ id: 't-b', goal_id: 'g-save' }, /monthly goal/], [{ id: 't-b', goal_id: 'g-gym' }, /counts itself from a habit/],
+    [{ id: 't-b', goal_id: 'g-ship' }, /measured in its milestones/], [{ id: 't-b', goal_id: 'g-gym' }, /counts itself from a habit/],
     [{ id: 't-b', goal_id: 'g-old' }, /finished goal/], [{ id: 't-b', goal_id: 'nope' }, /No goal has the id/],
     [{ id: 'nope', goal_id: 'g-emails' }, /No task has the id/],
   ]) { r = await srv.call('set_task_goal', args); check(`set_task_goal refusal ${re}`, () => { assert.equal(r.isError, true); assert.match(r.text, re) }) }
+  // LIFTED in round 3: a non-weekly goal, or one of another period, can be fed (the store takes any goal; creditGoal feeds any running one)
   const stale = world(); stale.goals.find((g) => g.id === 'g-emails').periodKey = '2026-W01'
-  refuses(() => G.setTaskGoal(stale, { id: 't-b' }, { id: 'g-emails' }), /not this week/)
+  assert.match(G.setTaskGoal(stale, { id: 't-b' }, { id: 'g-emails' }).text, /for 2026-W01, not the period running now/)
+  assert.match(G.setTaskGoal(world(), { id: 't-b' }, { id: 'g-save' }, 3).text, /adds 3 to Save money/)
   // creditGoal == store.tsx creditGoal + growth.ts bumpGoal
   const b = clone(data())
   const t = b.tasks.find((x) => x.id === 't-a'); const g = b.goals.find((x) => x.id === 'g-emails')
@@ -377,10 +384,14 @@ function world() {
     assert.equal(d.projects.some((p) => p.id === 'p-car'), false); assert.equal(d.tasks.some((t) => t.id === 't-c1'), false)
     assert.deepEqual(d.graveyard.map((x) => x.k).sort(), ['projects:p-car', 'tasks:t-c1'])
   })
-  // delete with TWO tasks: refused, nothing written
-  const before = JSON.stringify(data())
-  r = await srv.call('delete_project', { name: 'car', mode: 'delete' })
-  check('delete_project delete (two tasks) refused', () => { assert.equal(r.isError, true); assert.match(r.text, /holds 2 tasks/); assert.equal(JSON.stringify(data()), before) })
+  // LIFTED in round 3: delete with TWO tasks cascades (allowShrink declares the extra row)
+  const two = stateDb(world()); const s2b = fakeServer(K, M.tools_goals.register, two)
+  r = await s2b.call('delete_project', { name: 'car', mode: 'delete' })
+  check('delete_project delete (two tasks)', () => {
+    assert.equal(r.isError, false, r.text); const d = two.tables.mc_state[0].data
+    assert.deepEqual(d.tasks.map((t) => t.id).sort(), ['t-a', 't-b', 't-c', 't-h1']); assert.match(r.text, /its 2 tasks/)
+    assert.deepEqual(d.graveyard.map((x) => x.k).sort(), ['projects:p-car', 'tasks:t-c1', 'tasks:t-c2'])
+  })
   // move with two tasks works and the safety stop is not hit
   r = await srv.call('delete_project', { name: 'car' }); check('delete_project move (two tasks)', () => { assert.equal(r.isError, false); assert.ok(data().tasks.filter((t) => t.id === 't-c1' || t.id === 't-c2').every((t) => !('projectId' in t))) })
   r = await srv.call('delete_project', { name: 'zzz' }); check('delete_project none', () => assert.match(r.text, /No project matches/))
@@ -455,6 +466,225 @@ function world() {
   const calls = db.calls.updates
   await srv.call('set_goal_progress', { id: 'g-gym', by: 1 })
   check('refusal writes nothing', () => assert.equal(db.calls.updates, calls))
+}
+
+/* ============================== round 3: edit_goal in full (the Goals sheet) ============================== */
+{
+  const D = '2026-11-07', local = new Date(2026, 10, 7, 12)
+  // timeframe change == GoalSheet save: periodKey = shiftPeriodKey(newTf, 0) = the period running now; number and entries untouched
+  for (const from of ['weekly', 'monthly', 'quarter', 'half']) for (const to of ['weekly', 'monthly', 'quarter', 'half']) {
+    if (from === to) continue
+    const b = world(); const g = b.goals.find((x) => x.id === 'g-save'); g.timeframe = from; g.periodKey = G.goalPeriodKey(from, '2026-03-01')
+    const old = clone(g)
+    G.editGoal(b, { id: 'g-save' }, { timeframe: to }, D)
+    assert.deepEqual(g, { ...old, timeframe: to, periodKey: M.appPeriodKey(to, local), touchedAt: D }, `${from} -> ${to}`)
+  }
+  check('timeframe change == the sheet, all 12 pairs', () => {})
+  { // same timeframe, move_to_current_period moves a stale key; at the current period it changes nothing and says so
+    const b = world(); b.goals.find((x) => x.id === 'g-emails').periodKey = '2026-W01'
+    const r = G.editGoal(b, { id: 'g-emails' }, { moveToCurrentPeriod: true }, D)
+    check('move_to_current_period', () => { assert.equal(b.goals.find((x) => x.id === 'g-emails').periodKey, M.appPeriodKey('weekly', local)); assert.match(r.text, /period 2026-W01 to /) })
+    refuses(() => G.editGoal(b, { id: 'g-emails' }, { moveToCurrentPeriod: true }, D), /Nothing to change/)
+  }
+  { // why / deadline set and cleared; category
+    const b = world()
+    G.editGoal(b, { id: 'g-save' }, { why: 'Debt', deadline: 'End of July', category: 'health' }, D)
+    const g = b.goals.find((x) => x.id === 'g-save')
+    check('why/deadline/category', () => assert.deepEqual([g.why, g.deadline, g.category], ['Debt', 'End of July', 'health']))
+    G.editGoal(b, { id: 'g-save' }, { why: '', deadline: null }, D)
+    check('cleared', () => { assert.equal('why' in g, false); assert.equal('deadline' in g, false) })
+    refuses(() => G.editGoal(b, { id: 'g-save' }, { category: 'fun' }, D), /category must be one of/)
+  }
+  { // milestones: the full list; kept labels keep id + tick; target follows (GoalSheet), the count is right
+    const b = world(); const g = b.goals.find((x) => x.id === 'g-ship')
+    G.editGoal(b, { id: 'g-ship' }, { milestones: ['Draft report', 'Client review', 'Send invoice', 'Archive'] }, D)
+    check('milestones add', () => { assert.deepEqual(g.milestones.slice(0, 3), [{ id: 'ms-1', label: 'Draft report', done: true }, { id: 'ms-2', label: 'Client review', done: false }, { id: 'ms-3', label: 'Send invoice', done: false }]); assert.match(g.milestones[3].id, /^ms-/); assert.deepEqual([g.target, g.unit, g.current], [4, 'milestones', 1]) })
+    G.editGoal(b, { id: 'g-ship' }, { milestones: ['Client review', 'Archive'] }, D) // removes the ticked one
+    check('milestones remove a ticked one: the number follows', () => { assert.deepEqual(g.milestones.map((m) => m.label), ['Client review', 'Archive']); assert.deepEqual([g.target, g.current], [2, 0]) })
+    refuses(() => G.editGoal(b, { id: 'g-ship' }, { milestones: ['a', 'b'], target: 9 }, D), /Leave target out/)
+    refuses(() => G.editGoal(world(), { id: 'g-ship' }, { target: 7 }, D), /Pass milestones to change the list/)
+    G.editGoal(b, { id: 'g-ship' }, { milestones: [] }, D)
+    check('milestones cleared', () => assert.deepEqual([g.milestones, g.target], [[], 2]))
+    refuses(() => G.editGoal(b, { id: 'g-ship' }, { milestones: Array(31).fill('x') }, D), /at most 30/)
+    // a plain goal gets milestones: target becomes their count, the unit "milestones"
+    const c = world(); G.editGoal(c, { id: 'g-save' }, { milestones: ['a', 'b'] }, D)
+    check('plain goal gets milestones', () => { const s = c.goals.find((x) => x.id === 'g-save'); assert.deepEqual([s.target, s.unit, s.current], [2, 'milestones', 0]) })
+  }
+  { // habit link and unlink
+    const b = world()
+    refuses(() => G.editGoal(b, { id: 'g-save' }, { habit: 'deep work' }, D), /No personal habit matches/) // the Sheet offers only the goal's own space
+    G.editGoal(b, { id: 'g-save' }, { habit: 'gym', unit: undefined }, D)
+    const g = b.goals.find((x) => x.id === 'g-save')
+    check('link habit', () => assert.deepEqual([g.habitId, g.unit], ['h-gym', 'checkoffs']))
+    refuses(() => G.editGoal(b, { id: 'g-save' }, { unit: 'x' }, D), /unit follows the habit/)
+    refuses(() => G.editGoal(world(), { id: 'g-ship' }, { habit: 'deep' }, D), /milestones/) // a milestone goal cannot also be habit-fed
+    const w = world(); G.editGoal(w, { id: 'g-ship' }, { habit: 'deep work', milestones: [] }, D)
+    check('time-fed habit => hours', () => assert.deepEqual([w.goals.find((x) => x.id === 'g-ship').habitId, w.goals.find((x) => x.id === 'g-ship').unit], ['h-focus', 'hours']))
+    // unlink keeps the number the app was showing
+    const u = world(); const gg = u.goals.find((x) => x.id === 'g-gym'); const range = G.goalPeriodRange('weekly', gg.periodKey)
+    u.habitLog = [{ habitId: 'h-gym', day: range.from }, { habitId: 'h-gym', day: range.to }]
+    const shown = G.goalNow(u, gg)
+    G.editGoal(u, { id: 'g-gym' }, { habit: null }, D)
+    check('unlink keeps the shown number', () => { assert.equal(shown, 2); assert.equal('habitId' in gg, false); assert.equal(gg.current, 2) })
+    refuses(() => G.editGoal(u, { id: 'g-gym' }, { habit: null }, D), /not tied to a habit/)
+    refuses(() => G.editGoal(world(), { id: 'g-save' }, { habit: 'nope' }, D), /No personal habit matches/)
+    const paused = world(); paused.habits[0].paused = true
+    refuses(() => G.editGoal(paused, { id: 'g-save' }, { habit: 'gym' }, D), /No personal habit matches/)
+  }
+  // through the tool, with zod
+  const db = stateDb(world()); const srv = fakeServer(K, M.tools_goals.register, db); const data = () => db.tables.mc_state[0].data
+  let r = await srv.call('edit_goal', { id: 'g-save', timeframe: 'weekly' })
+  check('edit_goal tool: timeframe', () => { assert.equal(r.isError, false, r.text); const g = data().goals.find((x) => x.id === 'g-save'); assert.deepEqual([g.timeframe, g.periodKey, g.current, g.entries.length], ['weekly', G.goalPeriodKey('weekly'), 5000, 1]) })
+  r = await srv.call('edit_goal', { id: 'g-save', why: null, deadline: 'Friday' })
+  check('edit_goal tool: nullable why', () => assert.equal(data().goals.find((x) => x.id === 'g-save').deadline, 'Friday'))
+  if (K.zodReal) await assert.rejects(() => srv.call('edit_goal', { id: 'g-save', timeframe: 'yearly' }), /Invalid|enum/i)
+  // merge: a stale app copy does not undo the timeframe move or the milestone edit
+  const app = world(); const d2 = stateDb(clone(app)); const s2 = fakeServer(K, M.tools_goals.register, d2)
+  await s2.call('edit_goal', { id: 'g-save', timeframe: 'weekly', category: 'health' }); await s2.call('edit_goal', { id: 'g-ship', milestones: ['Draft report', 'Ship'] })
+  const merged = JSON.parse(M.mergeStates(JSON.stringify({ ...app, savedAt: 500 }), JSON.stringify(d2.tables.mc_state[0].data)))
+  check('merge: edits survive a stale copy', () => { const g = merged.goals.find((x) => x.id === 'g-save'); assert.deepEqual([g.timeframe, g.category], ['weekly', 'health']); assert.deepEqual(merged.goals.find((x) => x.id === 'g-ship').milestones.map((m) => m.label), ['Draft report', 'Ship']) })
+}
+
+/* ============================== round 3: add_goal with deadline, habit, period ============================== */
+{
+  const db = stateDb(world()); const srv = fakeServer(K, M.tools_goals.register, db); const data = () => db.tables.mc_state[0].data
+  let r = await srv.call('add_goal', { name: 'Ship v2', target: 4, timeframe: 'weekly', period_key: '2026-W50', deadline: 'Fri', why: 'Launch' })
+  check('add_goal planned forward + deadline', () => { assert.equal(r.isError, false, r.text); const g = data().goals.at(-1); assert.deepEqual([g.periodKey, g.deadline, g.why, g.timeframe], ['2026-W50', 'Fri', 'Launch', 'weekly']) })
+  r = await srv.call('add_goal', { name: 'Ship v2', target: 4, timeframe: 'weekly', period_key: '2026-W50' }); check('same name, same planned period = duplicate', () => assert.match(r.text, /already an open weekly goal .* 2026-W50/))
+  r = await srv.call('add_goal', { name: 'x', target: 1, timeframe: 'weekly', period_key: '2026-11' }); check('bad period_key', () => assert.match(r.text, /not a weekly key/))
+  r = await srv.call('add_goal', { habit: 'gym', target: 12, timeframe: 'monthly' })
+  check('add_goal from habit: name, space, unit, link', () => { assert.equal(r.isError, false, r.text); const g = data().goals.at(-1); assert.deepEqual([g.name, g.space, g.habitId, g.unit, g.target, g.current, g.milestones], ['Gym', 'personal', 'h-gym', 'checkoffs', 12, 0, []]) })
+  r = await srv.call('add_goal', { habit: 'deep work', name: 'Focus 10h', target: 10, timeframe: 'weekly' })
+  check('time-fed habit goal in the habit\'s space', () => { const g = data().goals.at(-1); assert.deepEqual([g.space, g.unit, g.name], ['work', 'hours', 'Focus 10h']) })
+  r = await srv.call('add_goal', { habit: 'deep work', space: 'personal', target: 1 }); check('habit of another space refused', () => assert.match(r.text, /No personal habit matches/))
+  r = await srv.call('add_goal', { habit: 'gym', milestones: ['a'], target: 1 }); check('habit + milestones refused', () => assert.match(r.text, /habit or milestones, not both/))
+  r = await srv.call('add_goal', { habit: 'gym', timeframe: 'quarter' }); check('habit goal still needs a target', () => assert.match(r.text, /needs a target/))
+  r = await srv.call('add_goal', { target: 3 }); check('no name and no habit', () => assert.equal(r.isError, true))
+  const hb = world(); hb.habits[0].archivedAt = '2026-10-01'
+  refuses(() => G.addGoal(hb, { habit: 'gym', target: 3 }), /No personal habit matches|No habit matches/)
+}
+
+/* ============================== round 3: close_ended_goals == store.tsx rollover ============================== */
+{
+  const D = '2026-11-07'
+  const mk = () => {
+    const b = world()
+    b.goals = [
+      { id: 'g-m', space: 'personal', name: 'Save', current: 7, target: 10, unit: 'CZK', note: '', timeframe: 'monthly', category: 'money', periodKey: '2026-09', milestones: [] },
+      { id: 'g-run', space: 'personal', name: 'Still running', current: 1, target: 3, unit: 'x', note: '', timeframe: 'monthly', category: 'life', periodKey: G.goalPeriodKey('monthly', D), milestones: [] },
+      { id: 'g-h', space: 'personal', name: 'Gym', current: 0, target: 3, unit: 'checkoffs', note: '', timeframe: 'weekly', habitId: 'h-gym', category: 'habits', periodKey: '2026-W40', milestones: [{ id: 'x', label: 'x', done: true }] },
+      { id: 'g-f', space: 'work', name: 'Focus', current: 0, target: 5, unit: 'hours', note: '', timeframe: 'weekly', habitId: 'h-focus', category: 'habits', periodKey: '2026-W41', milestones: [] },
+      { id: 'g-q', space: 'personal', name: 'No sugar', current: 0, target: 30, unit: 'checkoffs', note: '', timeframe: 'quarter', habitId: 'h-quit', category: 'habits', periodKey: '2026-Q3', milestones: [] },
+      { id: 'g-done', space: 'personal', name: 'Old', current: 2, target: 2, unit: 'x', note: '', timeframe: 'monthly', periodKey: '2026-08', closed: { on: '2026-08-31', final: 2 } },
+      { id: 'g-nokey', space: 'personal', name: 'Nokey', current: 0, target: 1, unit: 'x', note: '', timeframe: 'monthly' },
+    ]
+    b.habitLog = [{ habitId: 'h-gym', day: '2026-09-29' }, { habitId: 'h-gym', day: '2026-10-01' }, { habitId: 'h-gym', day: '2026-10-02' }, { habitId: 'h-gym', day: '2026-10-04' }]
+    b.focusSessions = [{ day: '2026-10-06', minutes: 90, space: 'work' }, { day: '2026-10-07', minutes: 45, space: 'work' }, { day: '2026-10-08', minutes: 600, space: 'personal' }]
+    return b
+  }
+  const b = mk(); const before = clone(b)
+  const res = G.closeEndedGoals(b, D)
+  const g = (id) => b.goals.find((x) => x.id === id)
+  // each final == the app's own goalCurrent over the goal's own period (src/types/goals.ts), the same call store.tsx makes
+  const appFinal = (id) => { const o = before.goals.find((x) => x.id === id); return M.appGoalCurrent(o, before.habits, before.habitLog, M.appPeriodRange(o.timeframe, o.periodKey), before.slips, before.focusSessions) }
+  check('closes the ended ones with the app\'s numbers', () => {
+    assert.deepEqual(g('g-m').closed, { on: '2026-09-30', final: 7 })
+    assert.deepEqual(g('g-h').closed, { on: M.appPeriodRange('weekly', '2026-W40').to, final: appFinal('g-h') }); assert.equal(g('g-h').closed.final, 3) // 4 ticks over the week 28 Sep to 4 Oct, capped... counted days: 29 Sep, 1, 2, 4 Oct = 4, min(target 3)
+    assert.deepEqual(g('g-f').closed, { on: M.appPeriodRange('weekly', '2026-W41').to, final: appFinal('g-f') }); assert.equal(g('g-f').closed.final, 2.3)
+    assert.deepEqual(g('g-q').closed, { on: '2026-09-30', final: appFinal('g-q') })
+  })
+  check('left alone: running, already closed; a missing key is stamped', () => {
+    assert.equal('closed' in g('g-run'), false); assert.deepEqual(g('g-done'), before.goals.find((x) => x.id === 'g-done'))
+    assert.equal(g('g-nokey').periodKey, G.goalPeriodKey('monthly', D)); assert.equal('closed' in g('g-nokey'), false)
+  })
+  check('habit-fed goals renew for the period running now (store.tsx renewals)', () => {
+    const rg = g('g-h-r2026W45'); assert.ok(rg); assert.deepEqual({ ...rg }, { ...before.goals.find((x) => x.id === 'g-h'), id: 'g-h-r2026W45', current: 0, milestones: [], periodKey: G.goalPeriodKey('weekly', D) }); assert.equal('closed' in rg, false)
+    assert.ok(g('g-f-r2026W45')); assert.ok(g('g-q-r2026Q4'))
+    assert.equal(b.goals.some((x) => x.id === 'g-m-r2026-09'), false); assert.equal(b.goals.filter((x) => /-r20\d\d/.test(x.id)).length, 3) // hand-logged goals stay one-off
+    assert.match(res.text, /Closed 4 ended goals/); assert.match(res.text, /Renewed 3/); assert.match(res.text, /Stamped 1/)
+  })
+  const snap = clone(b); const again = G.closeEndedGoals(b, D)
+  check('idempotent', () => { assert.deepEqual(b, snap); assert.match(again.text, /nothing was changed/) })
+  // a renewal already running for the period is not doubled
+  const c = mk(); c.goals.push({ ...before.goals.find((x) => x.id === 'g-h'), id: 'mine', periodKey: G.goalPeriodKey('weekly', D), milestones: [] })
+  G.closeEndedGoals(c, D); check('no double renewal', () => assert.equal(c.goals.some((x) => x.id === 'g-h-r2026W45'), false))
+  assert.match(G.closeEndedGoals({ goals: [] }, D).text, /no goals/)
+  // through the tool + the real merge: the stale app copy (goals still open) does not reopen them
+  const app = mk(); const db = stateDb(clone(app)); const srv = fakeServer(K, M.tools_goals.register, db)
+  const out = await srv.call('close_ended_goals', {})
+  const d = db.tables.mc_state[0].data
+  check('close_ended_goals tool', () => { assert.equal(out.isError, false, out.text); assert.equal(d.goals.find((x) => x.id === 'g-m').closed.final, 7); assert.ok(d.goals.some((x) => /^g-h-r20/.test(x.id))) })
+  const merged = JSON.parse(M.mergeStates(JSON.stringify({ ...app, savedAt: 500 }), JSON.stringify(d)))
+  check('merge: closed goals stay closed against a stale open copy', () => { assert.deepEqual(merged.goals.find((x) => x.id === 'g-m').closed, { on: '2026-09-30', final: 7 }); assert.ok(merged.goals.some((x) => /^g-h-r20/.test(x.id))) })
+  // list_goals still says "ended" before and "closed" after
+  const lb = G.listGoals(mk(), { where: 'open' }, D).goals.find((x) => x.id === 'g-m'); const la = G.listGoals(d, { where: 'closed' }, D).goals.find((x) => x.id === 'g-m')
+  check('list_goals follows', () => { assert.match(lb.period.status, /ended/); assert.equal(la.period.status, 'closed') })
+}
+
+/* ============================== round 3: set_task_goal for any running goal; credit ============================== */
+{
+  const db = stateDb(world()); const srv = fakeServer(K, M.tools_goals.register, db); const data = () => db.tables.mc_state[0].data
+  let r = await srv.call('set_task_goal', { id: 't-a', goal: 'save money', amount: 500 })
+  check('monthly goal can be fed', () => { assert.equal(r.isError, false, r.text); assert.deepEqual([data().tasks.find((t) => t.id === 't-a').goalId, data().tasks.find((t) => t.id === 't-a').goalAmt], ['g-save', 500]) })
+  const w = clone(data()); const t = w.tasks.find((x) => x.id === 't-a'); M.completeTask(w, { id: 't-a' }); G.creditGoal(w, t, 1)
+  check('and is credited on finishing (creditGoal feeds any running goal)', () => assert.equal(w.goals.find((x) => x.id === 'g-save').current, 5500))
+  r = await srv.call('set_task_goal', { id: 't-a', goal_id: 'g-old' }); check('finished goal still refused (never credited)', () => assert.match(r.text, /finished goal/))
+}
+
+/* ============================== round 3: delete_project with MANY tasks ============================== */
+{
+  const N = 30
+  const app = world(); for (let i = 0; i < N; i++) app.tasks.push({ id: `t-bulk${i}`, title: `Bulk ${i}`, source: 'mc', estimateMin: 0, done: i % 2 === 0, space: 'personal', list: 'backlog', category: 'quick', projectId: 'p-home', createdAt: '2026-11-01', addedAt: 100 + i })
+  const db = stateDb(clone(app)); const srv = fakeServer(K, M.tools_goals.register, db); const data = () => db.tables.mc_state[0].data
+  const keep = app.tasks.filter((t) => t.projectId !== 'p-home').map((t) => t.id)
+  const r = await srv.call('delete_project', { name: 'home', mode: 'delete' })
+  check(`delete_project delete (${N + 1} tasks)`, () => {
+    assert.equal(r.isError, false, r.text); assert.match(r.text, new RegExp(`its ${N + 1} tasks`))
+    assert.deepEqual(data().tasks.map((t) => t.id), keep, 'only the others remain, in order'); assert.equal(data().projects.some((p) => p.id === 'p-home'), false)
+    const keys = data().graveyard.map((x) => x.k); assert.equal(keys.length, N + 2); assert.ok(keys.includes('projects:p-home') && keys.includes('tasks:t-h1') && keys.includes(`tasks:t-bulk${N - 1}`))
+    for (const k of keys) assert.match(k, /^(projects|tasks):/)
+  })
+  const merged = JSON.parse(M.mergeStates(JSON.stringify({ ...app, savedAt: 500 }), JSON.stringify(data())))
+  check('merge: nothing of it comes back from a stale copy', () => { assert.equal(merged.projects.some((p) => p.id === 'p-home'), false); assert.equal(merged.tasks.some((t) => t.projectId === 'p-home' || /^t-bulk|^t-h1$/.test(t.id)), false); assert.equal(merged.tasks.length, keep.length) })
+  // the allowance is EXACT: one extra removed row, or one too few declared, is still stopped by the writer
+  const bad = world(); for (let i = 0; i < 5; i++) bad.tasks.push({ id: `t-x${i}`, title: `X ${i}`, projectId: 'p-home', done: false })
+  const sdb = () => stateDb(clone(bad))
+  await M.commit(sdb(), 'u1', (b) => G.deleteProject(b, { id: 'p-home' }, 'delete'), { sleep: async () => {} }) // exact: passes
+  await assert.rejects(() => M.commit(sdb(), 'u1', (b) => { G.deleteProject(b, { id: 'p-home' }, 'delete'); b.tasks = b.tasks.filter((t) => t.id !== 't-a'); return { text: 'x' } }, { sleep: async () => {} }), /Safety stop: "tasks"/)
+  // move mode needs no allowance and removes no task
+  const mv = world(); G.deleteProject(mv, { id: 'p-car' }, 'move'); check('move keeps every task', () => assert.equal(mv.tasks.length, world().tasks.length))
+  // a project with no tasks in delete mode
+  const none = world(); const rr = G.deleteProject(none, { id: 'p-sonar' }, 'delete'); check('delete mode, no tasks', () => assert.match(rr.text, /^Deleted project "Sonar"/))
+}
+
+/* ============================== MUTATION: the cascade allowance is the rule that keeps this safe ============================== */
+{
+  const { build } = await import('esbuild')
+  const src = (await import('fs')).readFileSync(new URL('../supabase/functions/mc-mcp/ops-goals.ts', import.meta.url), 'utf8')
+  const FN = new URL('../supabase/functions/mc-mcp/', import.meta.url).pathname
+  const bundle = async (mut) => {
+    const out = await build({
+      stdin: { contents: `export * from '${FN}ops.ts'; export * from '${FN}commit.ts'; export * as G from '${FN}ops-goals.ts'`, resolveDir: FN, loader: 'ts' },
+      bundle: true, write: false, format: 'esm', platform: 'node', logLevel: 'error',
+      plugins: [{ name: 'mut', setup(bd) { bd.onLoad({ filter: /ops-goals\.ts$/ }, () => ({ contents: mut ? src.replace(mut[0], mut[1]) : src, loader: 'ts' })) } }],
+    })
+    return import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`)
+  }
+  const world5 = () => { const b = world(); for (let i = 0; i < 5; i++) b.tasks.push({ id: `t-m${i}`, title: `M ${i}`, projectId: 'p-home', done: false }); return b }
+  const real = await bundle(null)
+  await real.commit(stateDb(world5()), 'u1', (b) => real.G.deleteProject(b, { id: 'p-home' }, 'delete'), { sleep: async () => {} })
+  const mutants = [['allowShrink(b, \'tasks\', theirs.length - 1)', 'allowShrink(b, \'tasks\', theirs.length - 2)'], ['allowShrink(b, \'tasks\', theirs.length - 1)', '/* no allowance */']]
+  for (const [from, to] of mutants) {
+    assert.ok(src.includes(from), 'mutation target exists')
+    const bad = await bundle([from, to])
+    await assert.rejects(() => bad.commit(stateDb(world5()), 'u1', (b) => bad.G.deleteProject(b, { id: 'p-home' }, 'delete'), { sleep: async () => {} }), /Safety stop/, `mutant "${to}" must be caught`)
+  }
+  check('mutation: an allowance one short, or none, makes the cascade fail; the real one passes', () => {})
+  // mutation on the rollover: if a past goal were not closed, the test's "closes the ended ones" would fail
+  const m2 = await bundle(['if (g.closed || !validPeriodKey(tf, key) || !periodIsPast(tf, key, today)) continue', 'continue'])
+  const m1 = world(); m1.goals[0].periodKey = '2026-09'; real.G.closeEndedGoals(m1, '2026-11-07')
+  const bb = world(); bb.goals[0].periodKey = '2026-09'; m2.G.closeEndedGoals(bb, '2026-11-07')
+  check('mutation: the real rollover closes the ended goal, a mutant that closes nothing leaves it open (so the checks above would fail)', () => { assert.deepEqual(m1.goals[0].closed, { on: '2026-09-30', final: 5000 }); assert.equal(!!bb.goals[0].closed, false) })
 }
 
 console.log(`MCP goals: ${n} named checks and all inline assertions passed (${K.zodReal ? 'schemas validated with zod' : 'schemas NOT validated'}).`)

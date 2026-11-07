@@ -1,90 +1,139 @@
-/* start_focus / stop_focus through the real registration path, and the app-side consumer
-   (src/inbox-focus.ts) that turns the queued row into a real timer.
-   `ZOD_PATH=... node tools/mcp-focus-test.mjs` */
+/* The focus timer, written the way the app writes it (the synced `activeFocus` field).
+   `ZOD_PATH=... node tools/mcp-focus-test.mjs`
+   What it holds the connector to:
+   - a start writes EXACTLY the shape src/pomodoro.tsx mirrors out, with a foreign `dev`, so every
+     device adopts it
+   - a start never replaces a focus block that is running, paused or finished-but-unlogged
+   - a stop banks the whole minutes worked (a remote stop is adopted WITHOUT banking by the app,
+     so the connector must), and the app's own mirror shape never collides with it
+   - pause and resume keep the remaining time exact; extend banks then restarts; a break
+     cannot start over a focus block
+   - the app's real merge keeps the connector's timer against a stale copy */
 import assert from 'assert/strict'
-import { loadKit, fixture } from './mcp-test-kit.mjs'
+import { loadKit } from './mcp-test-kit.mjs'
 
-const K = await loadKit({ modules: ['tools-focus.ts'], extra: ["export * as appFocus from './src/inbox-focus.ts'"] })
-const { M } = K
-const { appFocus } = M
+const K = await loadKit({ modules: ['tools-focus.ts', 'ops-focus.ts'] })
+const { M, fixture, stateDb, fakeServer, refuses, clone } = K
+const F = M.ops_focus
+const T0 = Date.parse('2026-11-09T09:00:00.000Z') // a Monday morning
+const MIN = 60_000
 
-/* ---------- server side ---------- */
-const db = K.fakeDb({ mc_inbox: [], mc_state: [{ id: 'u1', owner: 'u1', data: fixture(), updated_at: 'x' }] })
-const srv = K.fakeServer(K, M.tools_focus.register, db)
-assert.deepEqual(srv.names().sort(), ['start_focus', 'stop_focus'])
-
-const a = await srv.call('start_focus', { title: 'dentist', minutes: 25 })
-assert.equal(a.isError, false)
-assert.equal(db.tables.mc_inbox.length, 1)
-const { id, created_at, ...row } = db.tables.mc_inbox[0]
-assert.match(id, /^[0-9a-f-]{36}$/)
-assert.deepEqual(row, { owner: 'u1', op: 'focus', task_id: 't-b', title: 'Call the dentist', actual_min: 25 })
-/* honest: queued, never started */
-assert.match(a.text, /^Queued a focus on "Call the dentist" for 25 minutes\./)
-assert.match(a.text, /cannot see whether it started/)
-assert.match(a.text, /dropped/)
-assert.doesNotMatch(a.text, /\b(Started|is running|has started)\b/)
-
-/* the task's estimate is the default length; no task, no minutes: the app's own setting */
-await srv.call('start_focus', { id: 't-b' })
-assert.equal(db.tables.mc_inbox[1].actual_min, 10)
-const plain = await srv.call('start_focus', { label: 'Deep work' })
-assert.deepEqual([db.tables.mc_inbox[2].task_id, db.tables.mc_inbox[2].title, db.tables.mc_inbox[2].actual_min], [null, 'Deep work', null])
-assert.match(plain.text, /length set in the app/)
-
-/* refusals queue nothing */
-const n = db.tables.mc_inbox.length
-const none = await srv.call('start_focus', { title: 'zzzz nothing' })
-assert.equal(none.isError, true)
-const amb = await srv.call('start_focus', { title: 'call the' })
-assert.equal(amb.isError, true); assert.match(amb.text, /matches 2/)
-db.tables.mc_state[0].data.tasks[0].done = true
-const done = await srv.call('start_focus', { id: 't-a' })
-assert.equal(done.isError, true); assert.match(done.text, /already done/)
-assert.equal(db.tables.mc_inbox.length, n, 'a refusal inserts nothing')
-if (K.zodReal) {
-  await assert.rejects(() => srv.call('start_focus', { minutes: 0 }), /too_small|>=1|Too small/i)
-  await assert.rejects(() => srv.call('start_focus', { minutes: 9999 }), /too_big|<=480|Too big/i)
-  await assert.rejects(() => srv.call('start_focus', { minutes: 2.5 }), /int|Invalid/i)
+/* start on a task: the row is exactly what pomodoro.tsx would write */
+{
+  const b = fixture()
+  b.tasks.find((t) => t.id === 't-b').estimateMin = 10
+  const r = F.startFocus(b, { title: 'call the dentist' }, T0)
+  assert.match(r.text, /Focus started on "Call the dentist": 10 minutes/)
+  assert.deepEqual(b.activeFocus, {
+    phase: 'focus', endsAt: T0 + 10 * MIN, pausedLeft: null, startedAt: T0, blockMin: 10, focusLabel: 'Call the dentist', taskId: 't-b', space: 'personal', dev: 'claude-mcp', updatedAt: T0,
+  })
+  assert.equal(b.activeFocus.dev !== 'd-test', true, 'a foreign device id, so every device adopts it')
+}
+/* explicit minutes, no task: needs a space; label is free text */
+{
+  const b = fixture()
+  refuses(() => F.startFocus(b, { minutes: 25 }, T0), /Which space/)
+  refuses(() => F.startFocus(b, { space: 'work' }, T0), /How many minutes/)
+  F.startFocus(b, { minutes: 25, space: 'work', label: '  Deep work ' }, T0)
+  assert.deepEqual([b.activeFocus.blockMin, b.activeFocus.focusLabel, b.activeFocus.space, b.activeFocus.taskId], [25, 'Deep work', 'work', undefined])
+  refuses(() => F.startFocus(fixture(), { title: 'call the insurance' }, T0), /has no estimate/, 'no invented default length')
+  refuses(() => F.startFocus(fixture(), { title: 'nope', minutes: 5 }, T0), /No task matches/)
+  const d = fixture(); d.tasks[0].done = true
+  refuses(() => F.startFocus(d, { id: 't-a', minutes: 5 }, T0), /already done/)
+  for (const bad of [0, 481, 1.5, -3]) refuses(() => F.startFocus(fixture(), { minutes: bad, space: 'work' }, T0), /whole number from 1 to 480/)
+}
+/* never replace a block that holds time */
+{
+  const b = fixture()
+  F.startFocus(b, { minutes: 25, space: 'work', label: 'A' }, T0)
+  refuses(() => F.startFocus(b, { minutes: 5, space: 'work' }, T0 + 5 * MIN), /already running with 20 min 00 s left/)
+  F.pauseFocus(b, T0 + 5 * MIN)
+  refuses(() => F.startFocus(b, { minutes: 5, space: 'work' }, T0 + 6 * MIN), /already paused with 20 min 00 s left/)
+  refuses(() => F.startFocus(b, { minutes: 5, space: 'work' }, T0 + 90 * MIN), /already paused/)
+  const e = fixture(); F.startFocus(e, { minutes: 25, space: 'work', label: 'A' }, T0)
+  refuses(() => F.startFocus(e, { minutes: 5, space: 'work' }, T0 + 40 * MIN), /run out its time but has not been logged/, 'a finished-but-unlogged block is not overwritten')
+  refuses(() => F.startBreak(e, 5, T0 + 5 * MIN), /stop_focus first/)
+}
+/* stop banks whole minutes worked, exactly the app's bankPartial */
+{
+  const b = fixture(); F.startFocus(b, { minutes: 25, space: 'work', label: 'Write deck' }, T0)
+  const r = F.stopFocus(b, T0 + 10 * MIN + 40_000)
+  assert.match(r.text, /Stopped the focus timer\. 10 minutes were logged as focus on "Write deck"/)
+  assert.equal(b.activeFocus, null)
+  assert.equal(b.focusSessions.length, 1)
+  assert.deepEqual([b.focusSessions[0].minutes, b.focusSessions[0].label, b.focusSessions[0].space, b.focusSessions[0].day], [10, 'Write deck', 'work', '2026-11-09'])
+  assert.equal(b.ledger.length, 1); assert.equal(b.ledger[0].actualMin, 10)
+  // under a minute: nothing logged
+  const c = fixture(); F.startFocus(c, { minutes: 25, space: 'work' }, T0)
+  assert.match(F.stopFocus(c, T0 + 50_000).text, /Under a minute/); assert.equal(c.focusSessions.length, 0)
+  // an expired block logs the FULL block (the app logs blockMin at zero)
+  const d = fixture(); F.startFocus(d, { minutes: 25, space: 'work', label: 'X' }, T0)
+  F.stopFocus(d, T0 + 3 * 60 * MIN); assert.equal(d.focusSessions[0].minutes, 25, 'never more than the block')
+  // nothing running
+  assert.match(F.stopFocus(fixture()).text, /No focus or break timer is running/)
+  // a break stops without logging
+  const e = fixture(); F.startBreak(e, 5, T0); F.stopFocus(e, T0 + 2 * MIN); assert.equal(e.activeFocus, null); assert.equal(e.focusSessions.length, 0)
+}
+/* pause and resume keep the time exact */
+{
+  const b = fixture(); F.startFocus(b, { minutes: 25, space: 'work' }, T0)
+  F.pauseFocus(b, T0 + 7 * MIN)
+  assert.deepEqual([b.activeFocus.endsAt, b.activeFocus.pausedLeft, b.activeFocus.phase], [null, 18 * 60, 'focus'])
+  assert.match(F.pauseFocus(b, T0 + 8 * MIN).text, /already paused/)
+  F.resumeFocus(b, T0 + 30 * MIN)
+  assert.deepEqual([b.activeFocus.endsAt, b.activeFocus.pausedLeft], [T0 + 48 * MIN, null], 'resumes from the 18 minutes it had left')
+  assert.match(F.resumeFocus(b, T0 + 31 * MIN).text, /already running/)
+  refuses(() => F.pauseFocus(fixture()), /No timer is running/)
+}
+/* extend banks the worked time, then a fresh block under the same name */
+{
+  const b = fixture(); F.startFocus(b, { minutes: 25, space: 'work', label: 'Deck' }, T0)
+  const r = F.extendFocus(b, 15, T0 + 25 * MIN)
+  assert.match(r.text, /new 15 minute block on "Deck" is running; the 25 minutes already worked were logged/)
+  assert.equal(b.focusSessions[0].minutes, 25)
+  assert.deepEqual([b.activeFocus.blockMin, b.activeFocus.endsAt, b.activeFocus.startedAt], [15, T0 + 40 * MIN, T0 + 25 * MIN])
+  refuses(() => F.extendFocus(fixture(), 5), /No focus block is running/)
+}
+/* a break, and the status read */
+{
+  const b = fixture(); F.startBreak(b, 5, T0)
+  assert.deepEqual([b.activeFocus.phase, b.activeFocus.blockMin, b.activeFocus.focusLabel], ['break', 5, null])
+  F.startFocus(b, { minutes: 10, space: 'work' }, T0 + MIN) // a running break is simply replaced
+  assert.equal(b.activeFocus.phase, 'focus')
+  const st = F.focusStatus(b, T0 + 4 * MIN)
+  assert.deepEqual([st.running, st.phase, st.paused, st.secondsLeft, st.startedBy], [true, 'focus', false, 7 * 60, 'Claude'])
+  assert.equal(F.focusStatus(fixture()).running, false)
+  const done = fixture(); F.startFocus(done, { minutes: 5, space: 'work' }, T0)
+  assert.match(F.focusStatus(done, T0 + 99 * MIN).warning, /not been logged/)
+}
+/* through registration + real zod + real commit, and the app's real merge */
+{
+  const db = stateDb(fixture())
+  const srv = fakeServer(K, M.tools_focus.register, db)
+  assert.deepEqual(srv.names().sort(), ['extend_focus', 'get_focus_timer', 'pause_focus', 'resume_focus', 'start_break', 'start_focus', 'stop_focus'])
+  if (K.zodReal) {
+    await assert.rejects(() => srv.call('start_focus', { minutes: 0, space: 'work' }), /too_small|>=1|Too small/i)
+    await assert.rejects(() => srv.call('start_focus', { minutes: 481, space: 'work' }), /too_big|<=480|Too big/i)
+    await assert.rejects(() => srv.call('extend_focus', {}), /minutes|Invalid|expected/i)
+  }
+  const bad = await srv.call('start_focus', { minutes: 20 }); assert.equal(bad.isError, true); assert.match(bad.text, /Which space/)
+  const ok = await srv.call('start_focus', { minutes: 20, space: 'work', label: 'Deck' })
+  assert.equal(ok.isError, false, ok.text)
+  const saved = db.tables.mc_state[0].data
+  assert.equal(saved.activeFocus.dev, 'claude-mcp'); assert.equal(saved.activeFocus.blockMin, 20)
+  const dupe = await srv.call('start_focus', { minutes: 5, space: 'work' }); assert.equal(dupe.isError, true); assert.match(dupe.text, /already running/)
+  const stat = await srv.call('get_focus_timer'); assert.equal(stat.json.running, true)
+  // a stale copy (no timer, older save) merging against the connector's write keeps the timer
+  const stale = { ...fixture(), savedAt: 500, activeFocus: null }
+  const merged = JSON.parse(M.mergeStates(JSON.stringify(stale), JSON.stringify(saved)))
+  assert.equal(merged.activeFocus?.dev, 'claude-mcp', 'the timer survives a stale save')
+  // and a stop is not undone by a stale copy that still shows the timer
+  await srv.call('stop_focus')
+  const after = db.tables.mc_state[0].data
+  assert.equal(after.activeFocus, null)
+  const staleRunning = { ...clone(saved), savedAt: 500 }
+  const m2 = JSON.parse(M.mergeStates(JSON.stringify(staleRunning), JSON.stringify(after)))
+  assert.equal(m2.activeFocus, null, 'a stop is not resurrected by an older copy')
 }
 
-const st = await srv.call('stop_focus')
-assert.equal(st.isError, false)
-const { id: _i, created_at: _c, ...srow } = db.tables.mc_inbox.at(-1)
-assert.deepEqual(srow, { owner: 'u1', op: 'focusStop', task_id: null, title: null, actual_min: null })
-assert.match(st.text, /^Queued a stop\./); assert.match(st.text, /cannot see whether it started/)
-assert.doesNotMatch(st.text, /\bStopped\b/)
-
-/* a database refusal (e.g. the migration is not applied) is reported, nothing claimed */
-const bad = K.fakeDb({ mc_inbox: [] }); bad.from = ((f) => (t) => { const q = f(t); if (t === 'mc_inbox') q.insert = () => Promise.resolve({ error: { message: 'new row violates row-level security policy' } }); return q })(bad.from)
-const refused = await K.fakeServer(K, M.tools_focus.register, bad).call('stop_focus')
-assert.equal(refused.isError, true); assert.match(refused.text, /Nothing was started|security policy/)
-
-/* ---------- app side ---------- */
-const NOW = Date.parse('2026-11-07T10:00:00Z')
-const ago = (ms) => new Date(NOW - ms).toISOString()
-const tasks = [{ id: 't-b', title: 'Call the dentist', estimateMin: 10, done: false }, { id: 't-d', title: 'Done thing', estimateMin: 5, done: true }]
-const cmd = (it) => appFocus.focusCmdFromItem({ created_at: ago(5000), ...it }, tasks, NOW)
-
-assert.deepEqual(cmd({ op: 'focus', task_id: 't-b', title: 'x', actual_min: 25 }), { do: 'start', minutes: 25, label: 'Call the dentist' })
-assert.deepEqual(cmd({ op: 'focus', task_id: 't-b', actual_min: null }), { do: 'start', minutes: 10, label: 'Call the dentist' })
-assert.deepEqual(cmd({ op: 'focus', title: 'Deep work' }), { do: 'start', minutes: undefined, label: 'Deep work' })
-assert.deepEqual(cmd({ op: 'focusStop' }), { do: 'stop' })
-/* ignored: not focus, malformed, stale, from the future, finished task */
-for (const bad of [{ op: 'add', title: 'x' }, { op: 'done', task_id: 't-b' }, { op: 'focus', actual_min: 0 }, { op: 'focus', actual_min: 99999 }, { op: 'focus', actual_min: NaN }, { op: 'focus', task_id: 't-d' }, { op: 'focus', created_at: ago(11 * 60000) }, { op: 'focusStop', created_at: ago(11 * 60000) }, { op: 'focus', created_at: 'nope' }, { op: 'focus', created_at: ago(-5 * 60000) }]) {
-  assert.equal(appFocus.focusCmdFromItem({ created_at: ago(5000), ...bad }, tasks, NOW), null, JSON.stringify(bad))
-}
-assert.equal(appFocus.focusCmdFromItem({ op: 'focus', title: 'no stamp' }, tasks, NOW), null, 'no created_at: cannot prove it is fresh')
-
-/* the consumer drives the real timer controls */
-const ctl = (phase) => { const calls = []; return { phase, calls, startFocus: (m, l) => calls.push(['start', m, l]), stop: () => calls.push(['stop']) } }
-let c = ctl('idle'); assert.equal(appFocus.runFocusCmd({ do: 'start', minutes: 25, label: 'X' }, c), 'started'); assert.deepEqual(c.calls, [['start', 25, 'X']])
-c = ctl('break'); assert.equal(appFocus.runFocusCmd({ do: 'start', minutes: 5 }, c), 'started')
-c = ctl('await'); assert.equal(appFocus.runFocusCmd({ do: 'start' }, c), 'started')
-c = ctl('focus'); assert.equal(appFocus.runFocusCmd({ do: 'start', minutes: 25 }, c), 'skipped'); assert.deepEqual(c.calls, [], 'a running block is never replaced')
-c = ctl('focus'); assert.equal(appFocus.runFocusCmd({ do: 'stop' }, c), 'stopped'); assert.deepEqual(c.calls, [['stop']])
-c = ctl('break'); assert.equal(appFocus.runFocusCmd({ do: 'stop' }, c), 'stopped')
-c = ctl('idle'); assert.equal(appFocus.runFocusCmd({ do: 'stop' }, c), 'skipped'); assert.deepEqual(c.calls, [])
-c = ctl('await'); assert.equal(appFocus.runFocusCmd({ do: 'stop' }, c), 'skipped')
-
-console.log(`MCP focus: all checks passed (${K.zodReal ? 'schemas validated with zod' : 'schemas NOT validated'}).`)
+console.log(`MCP focus timer: all checks passed (${K.zodReal ? 'schemas validated with zod' : 'schemas NOT validated'}).`)

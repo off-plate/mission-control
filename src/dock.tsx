@@ -19,6 +19,7 @@ const DOCK_PAGES: { id: PageId; label: string; icon: React.ReactNode }[] = [
   { id: 'mymind', label: 'MyMind', icon: <Icon.DockBookmark size={20} /> },
   { id: 'bills', label: 'Bills', icon: <Icon.DockWallet size={20} /> },
   { id: 'reminders', label: 'Reminders', icon: <Icon.DockChecklist size={20} /> },
+  { id: 'revolut', label: 'Revolut', icon: <Icon.DockHistory size={20} /> },
 ]
 
 /* Hover opens the dial now, on his instruction (2026-09-02) -- the same

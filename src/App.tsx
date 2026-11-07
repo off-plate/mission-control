@@ -49,6 +49,7 @@ const HealthPage = lazy(() => import('./healthpage').then((m) => ({ default: m.H
 const GymPage = lazy(() => import('./gympage').then((m) => ({ default: m.GymPage })))
 const LongevityPage = lazy(() => import('./longevity').then((m) => ({ default: m.LongevityPage })))
 const WatchlessPage = lazy(() => import('./watchlesspage').then((m) => ({ default: m.WatchlessPage })))
+const RevolutPage = lazy(() => import('./revolutpage').then((m) => ({ default: m.RevolutPage })))
 const InvoicesPage = lazy(() => import('./invoicespage').then((m) => ({ default: m.InvoicesPage })))
 const RemindersPage = lazy(() => import('./remindersPage').then((m) => ({ default: m.RemindersPage })))
 const IdeasPage = lazy(() => import('./ideaboard').then((m) => ({ default: m.IdeasPage })))
@@ -445,6 +446,7 @@ const MORE_PAGES: { id: PageId; label: string; icon: ReactNode }[] = [
   { id: 'notes', label: 'Notes', icon: <Icon.DockNote size={22} /> },
   { id: 'ideas', label: 'Ideas', icon: <Icon.DockBulb size={22} /> },
   { id: 'reminders', label: 'Reminders', icon: <Icon.DockChecklist size={22} /> },
+  { id: 'revolut', label: 'Revolut', icon: <Icon.DockHistory size={22} /> },
   { id: 'business', label: 'Business', icon: <Icon.DockChartBar size={22} /> },
   { id: 'people', label: 'People', icon: <Icon.DockPeople size={22} /> },
   { id: 'timeline', label: 'Jar', icon: <Icon.DockHistory size={22} /> },
@@ -558,7 +560,7 @@ function LifeTabBar({ page, setPage, nothing }: { page: PageId; setPage: (p: Pag
 
 /* Pages that are dark in both modes, so the header goes dark with them. */
 /* Pages the Nothing app opens full screen from Apps: they carry the standard back header, so no classic bottom bar, same as Notes or People. */
-const NOTHING_OPENED: PageId[] = ['bills', 'mymind', 'reminders', 'skills', 'longevity', 'watchless']
+const NOTHING_OPENED: PageId[] = ['bills', 'mymind', 'reminders', 'revolut', 'skills', 'longevity', 'watchless']
 const DARK_CHROME_PAGES: PageId[] = ['timeline', 'board', 'health', 'gym', 'longevity']
 
 export default function App() {
@@ -953,6 +955,7 @@ export default function App() {
         {page === 'watchless' && <WatchlessPage />}
         {page === 'ideas' && <IdeasPage />}
         {page === 'reminders' && <RemindersPage />}
+        {page === 'revolut' && <RevolutPage />}
         {page === 'invoices' && <InvoicesPage />}
         {page === 'prompts' && <PromptsPage />}
         {page === 'people' && <PeoplePage />}
